@@ -1,0 +1,7 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 32 32" role="img" aria-label="Lootsplit">
+  <rect width="32" height="32" rx="6" fill="#10182c"/>
+  <ellipse cx="12.5" cy="23.4" rx="8" ry="3.5" fill="#1a2744" stroke="#e0c17a" stroke-width="1.7"/>
+  <ellipse cx="12.5" cy="22.8" rx="3.2" ry="1.2" fill="#0c1220"/>
+  <path d="M26 5.2C20.6 11.2 17.2 16.4 14.4 21.6" fill="none" stroke="#f6f1e6" stroke-width="2.2" stroke-linecap="round"/>
+  <path d="M26 5.1c-3.6 2.4-6.4 3.8-9.4 6.4 3.6-1.4 7-2.8 10-4.6-.4-.7-.5-1.3-.6-1.8z" fill="#f6f1e6"/>
+</svg>

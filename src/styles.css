@@ -1,0 +1,222 @@
+@import "tailwindcss";
+
+@theme {
+  --font-display: "Cormorant Garamond", "Source Serif 4", Palatino, "Palatino Linotype", serif;
+  --font-sans: "Source Sans 3", "Avenir Next", "Segoe UI", sans-serif;
+
+  --color-bg: #10182c;
+  --color-elevated: #18243c;
+  --color-subtle: #1c2c4c;
+  --color-border: #3a4d72;
+  --color-lead: #e0c17a;
+  --color-fg: #f6f1e6;
+  --color-muted: #cbbfae;
+  --color-faint: #8e8798;
+  --color-accent: #e0a04a;
+
+  --color-paper: #f7f1e4;
+  --color-paper-sunk: #ebe2d0;
+  --color-paper-line: #dcc9a0;
+  --color-ink: #1a1422;
+  --color-paper-muted: #5e564c;
+
+  --color-danger: #9a3044;
+
+  --radius-sm: 8px;
+  --radius-md: 12px;
+  --radius-lg: 16px;
+  --radius-xl: 24px;
+}
+
+:root {
+  --motion-quick: 150ms;
+  --motion-fast: 250ms;
+  --ease-smooth-out: cubic-bezier(0.22, 1, 0.36, 1);
+  color-scheme: dark;
+}
+
+@layer base {
+  html {
+    -webkit-font-smoothing: antialiased;
+    -moz-osx-font-smoothing: grayscale;
+  }
+
+  body {
+    margin: 0;
+    min-height: 100vh;
+    background:
+      radial-gradient(ellipse 70% 36% at 50% -8%, color-mix(in srgb, var(--color-accent) 26%, transparent), transparent 52%),
+      radial-gradient(ellipse 42% 36% at 0% 100%, color-mix(in srgb, var(--color-subtle) 85%, transparent), transparent 58%),
+      radial-gradient(ellipse 36% 32% at 100% 78%, color-mix(in srgb, var(--color-danger) 32%, transparent), transparent 52%),
+      var(--color-bg);
+    background-attachment: fixed;
+    color: var(--color-fg);
+    font-family: var(--font-sans);
+    line-height: 1.5;
+  }
+
+  h1,
+  h2,
+  h3 {
+    text-wrap: balance;
+    font-family: var(--font-display);
+    font-weight: 600;
+  }
+
+  p {
+    text-wrap: pretty;
+  }
+
+  button:not(:disabled),
+  [role="button"]:not(:disabled) {
+    cursor: pointer;
+  }
+
+  button:disabled {
+    cursor: not-allowed;
+  }
+
+  input[type="range"] {
+    height: 2.75rem;
+    accent-color: var(--color-accent);
+    cursor: pointer;
+  }
+
+  :focus-visible {
+    outline: 2px solid currentColor;
+    outline-offset: 2px;
+  }
+
+  ::selection {
+    background: color-mix(in srgb, var(--color-accent) 42%, var(--color-bg));
+    color: var(--color-fg);
+  }
+}
+
+[data-surface="paper"] {
+  color-scheme: light;
+  background:
+    linear-gradient(180deg, rgba(255, 252, 245, 0.55), transparent 28%),
+    var(--color-paper);
+  color: var(--color-ink);
+  box-shadow: inset 0 0 0 1px #e6d3a4;
+}
+
+[data-surface="paper"] ::selection {
+  background: #d9d2c4;
+  color: var(--color-ink);
+}
+
+@utility motion-colors {
+  transition-property: background-color, color, border-color, opacity;
+  transition-duration: var(--motion-quick);
+  transition-timing-function: var(--ease-smooth-out);
+}
+
+@utility motion-press {
+  transition-property: transform, background-color, color, opacity;
+  transition-duration: var(--motion-quick);
+  transition-timing-function: var(--ease-smooth-out);
+}
+
+.modal-overlay {
+  background: color-mix(in srgb, var(--color-bg) 72%, transparent);
+  animation: fade-in var(--motion-fast) var(--ease-smooth-out);
+}
+
+.modal-pop {
+  position: fixed;
+  z-index: 50;
+  left: 50%;
+  top: 50%;
+  translate: -50% -50%;
+  width: min(36rem, calc(100% - 2rem));
+  max-height: min(42rem, calc(100dvh - 2rem));
+  overflow: auto;
+  animation: modal-in var(--motion-fast) var(--ease-smooth-out);
+}
+
+@keyframes fade-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes modal-in {
+  from {
+    opacity: 0;
+    translate: -50% -48%;
+    scale: 0.96;
+  }
+  to {
+    opacity: 1;
+    translate: -50% -50%;
+    scale: 1;
+  }
+}
+
+@media (prefers-reduced-motion: reduce) {
+  .motion-colors,
+  .motion-press,
+  .modal-overlay,
+  .modal-pop,
+  .quire-dawn,
+  .quire-dawn-name {
+    animation: none;
+    transition: none;
+  }
+
+  .quire-dawn {
+    display: none;
+  }
+
+  button:active {
+    transform: none;
+  }
+}
+
+.quire-dawn {
+  position: fixed;
+  inset: 0;
+  z-index: 60;
+  display: grid;
+  place-items: center;
+  align-content: center;
+  pointer-events: none;
+  background: var(--color-bg);
+  animation: dawn-out 1.4s var(--ease-smooth-out) forwards;
+}
+
+.quire-dawn-name {
+  margin: 0;
+  font-family: var(--font-display);
+  font-size: 3.4rem;
+  font-weight: 600;
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--color-fg);
+  opacity: 0;
+  animation: pane-in 0.35s var(--ease-smooth-out) forwards;
+}
+
+@keyframes pane-in {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes dawn-out {
+  0%,
+  55% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
