@@ -79,7 +79,7 @@ export type CatalogItem = {
   rarity: ItemRarity;
   baseCopper: number;
   notes: string;
-  origin: "stock" | "hand" | "pdf";
+  origin: "stock" | "hand" | "pdf" | "open5e";
   service: boolean;
 };
 

@@ -1,9 +1,11 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Dices } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { Open5eBrowser } from "@/components/open5e-browser";
+import { NameGenerator } from "@/components/name-generator";
 import { BookHarvest } from "@/components/book-harvest";
 import { RemoveButton } from "@/components/quire-ui";
-import { Shell, KeptByDm } from "@/components/shell";
+import { Shell } from "@/components/shell";
 import { Button, Segmented, Select, TextInput } from "@/components/ui";
 import { useEconomy } from "@/lib/quire/economy-context";
 import { CATEGORIES, LEXEME_KINDS, RARITIES, labelOf } from "@/lib/quire/labels";
@@ -17,33 +19,44 @@ export const Route = createFileRoute("/catalog")({
   component: CatalogPage,
 });
 
-type Pane = "goods" | "names" | "book";
+type Pane = "goods" | "names" | "book" | "open5e";
 
 function CatalogPage() {
   const seat = useSeat();
-  const [pane, setPane] = useState<Pane>("goods");
-  if (seat.role === "player") return <KeptByDm />;
+  const [pane, setPane] = useState<Pane>(seat.role === "player" ? "open5e" : "goods");
+  const dm = seat.role === "dm";
+  const activePane = !dm && (pane === "goods" || pane === "book") ? "open5e" : pane;
   return (
     <Shell>
       <h1 className="font-display text-4xl tracking-tight">Catalog</h1>
       <p className="mt-2 max-w-prose text-sm text-muted">
-        Items a shop can stock, and names a generated shop can use.
+        Your item collection, open rules, and names for your world.
       </p>
       <div className="mt-4">
         <Segmented
           label="Catalog section"
-          value={pane}
+          value={activePane}
           onChange={setPane}
           options={[
-            { value: "goods", label: "Items" },
+            ...(dm ? [{ value: "goods" as Pane, label: "Items" }] : []),
+            { value: "open5e", label: "Open5e" },
             { value: "names", label: "Names" },
-            { value: "book", label: "Book" },
+            ...(dm ? [{ value: "book" as Pane, label: "Book" }] : []),
           ]}
         />
       </div>
-      {pane === "goods" ? <GoodsPane /> : null}
-      {pane === "names" ? <NamesPane /> : null}
-      {pane === "book" ? <BookHarvest /> : null}
+      {activePane === "goods" && dm ? <GoodsPane /> : null}
+      {activePane === "names" ? (
+        dm ? (
+          <NamesPane />
+        ) : (
+          <div className="mt-6">
+            <NameGenerator />
+          </div>
+        )
+      ) : null}
+      {activePane === "open5e" ? <Open5eBrowser /> : null}
+      {activePane === "book" && dm ? <BookHarvest /> : null}
     </Shell>
   );
 }
@@ -110,10 +123,24 @@ function GoodsPane() {
     <div className="mt-6">
       {!ready ? <p className="text-muted">Opening the catalog…</p> : null}
       <form className="flex flex-col gap-2" onSubmit={add}>
-        <TextInput value={name} onChange={(event) => setName(event.target.value)} placeholder="New item" aria-label="New item" />
+        <TextInput
+          value={name}
+          onChange={(event) => setName(event.target.value)}
+          placeholder="New item"
+          aria-label="New item"
+        />
         <div className="grid grid-cols-2 gap-2">
-          <TextInput value={price} onChange={(event) => setPrice(event.target.value)} placeholder="List price, 2 gp" aria-label="List price" />
-          <Select aria-label="Category" value={kind} onChange={(event) => setKind(event.target.value as ItemCategory)}>
+          <TextInput
+            value={price}
+            onChange={(event) => setPrice(event.target.value)}
+            placeholder="List price, 2 gp"
+            aria-label="List price"
+          />
+          <Select
+            aria-label="Category"
+            value={kind}
+            onChange={(event) => setKind(event.target.value as ItemCategory)}
+          >
             {CATEGORIES.map((option) => (
               <option key={option.value} value={option.value}>
                 {option.label}
@@ -121,7 +148,11 @@ function GoodsPane() {
             ))}
           </Select>
         </div>
-        <Select aria-label="Rarity" value={rarity} onChange={(event) => setRarity(event.target.value as ItemRarity)}>
+        <Select
+          aria-label="Rarity"
+          value={rarity}
+          onChange={(event) => setRarity(event.target.value as ItemRarity)}
+        >
           {RARITIES.map((option) => (
             <option key={option.value} value={option.value}>
               {option.label}
@@ -134,9 +165,15 @@ function GoodsPane() {
       </form>
       <div className="mt-8 rounded-lg border border-border p-4">
         <h2 className="font-display text-2xl tracking-tight">Generate items</h2>
-        <p className="mt-2 text-sm text-muted">Generated items with list prices. No PDF required.</p>
+        <p className="mt-2 text-sm text-muted">
+          Generated items with list prices. No PDF required.
+        </p>
         <div className="mt-3 flex flex-col gap-3">
-          <Select aria-label="Generated category" value={inventCategory} onChange={(event) => setInventCategory(event.target.value as ItemCategory)}>
+          <Select
+            aria-label="Generated category"
+            value={inventCategory}
+            onChange={(event) => setInventCategory(event.target.value as ItemCategory)}
+          >
             {CATEGORIES.map((option) => (
               <option key={option.value} value={option.value}>
                 {option.label}
@@ -150,7 +187,9 @@ function GoodsPane() {
                   type="checkbox"
                   className="size-5 accent-accent"
                   checked={flags[option.value]}
-                  onChange={() => setFlags((current) => ({ ...current, [option.value]: !current[option.value] }))}
+                  onChange={() =>
+                    setFlags((current) => ({ ...current, [option.value]: !current[option.value] }))
+                  }
                 />
                 {option.label}
               </label>
@@ -161,7 +200,9 @@ function GoodsPane() {
             <input
               inputMode="numeric"
               value={count}
-              onChange={(event) => setCount(Math.min(12, Math.max(1, Math.floor(Number(event.target.value) || 1))))}
+              onChange={(event) =>
+                setCount(Math.min(12, Math.max(1, Math.floor(Number(event.target.value) || 1))))
+              }
               className="mt-1 min-h-11 w-full rounded-sm border border-border bg-subtle px-3 text-base text-fg"
             />
           </label>
@@ -169,8 +210,17 @@ function GoodsPane() {
         </div>
       </div>
       <div className="mt-8 grid gap-2 lg:grid-cols-[minmax(0,1fr)_16rem]">
-        <TextInput value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Find an item" aria-label="Find an item" />
-        <Select aria-label="Filter category" value={category} onChange={(event) => setCategory(event.target.value as ItemCategory | "all")}>
+        <TextInput
+          value={query}
+          onChange={(event) => setQuery(event.target.value)}
+          placeholder="Find an item"
+          aria-label="Find an item"
+        />
+        <Select
+          aria-label="Filter category"
+          value={category}
+          onChange={(event) => setCategory(event.target.value as ItemCategory | "all")}
+        >
           <option value="all">All categories</option>
           {CATEGORIES.map((option) => (
             <option key={option.value} value={option.value}>
@@ -189,10 +239,22 @@ function GoodsPane() {
                 <span className="text-sm text-muted">
                   {labelOf(CATEGORIES, item.category)} · {item.rarity}
                   {dollars(item.baseCopper) ? ` · ${dollars(item.baseCopper)}` : ""}
-                  {item.origin === "pdf" ? " · from a book" : ""}
+                  {item.origin === "pdf"
+                    ? " · from a book"
+                    : item.origin === "open5e"
+                      ? " · Open5e"
+                      : ""}
                 </span>
               </span>
             </div>
+            {item.origin === "open5e" ? (
+              <details className="mt-2 text-sm">
+                <summary className="cursor-pointer min-h-8 text-muted">
+                  Description & source
+                </summary>
+                <p className="whitespace-pre-wrap break-words">{item.notes}</p>
+              </details>
+            ) : null}
             <div className="mt-2 flex items-center gap-2">
               <TextInput
                 aria-label={`List price of ${item.name}`}
@@ -200,7 +262,8 @@ function GoodsPane() {
                 key={`${item.id}-${item.baseCopper}`}
                 onBlur={(event) => {
                   const copper = parsePrice(event.target.value);
-                  if (copper !== null && copper !== item.baseCopper) void saveGood({ ...item, baseCopper: copper });
+                  if (copper !== null && copper !== item.baseCopper)
+                    void saveGood({ ...item, baseCopper: copper });
                 }}
               />
               <RemoveButton
@@ -231,7 +294,9 @@ function NamesPane() {
   function save(event: FormEvent) {
     event.preventDefault();
     if (!name.trim()) return;
-    void addNames([{ name: name.trim(), kind: addKind, bookId: "", notes: "" }]).then(() => setName(""));
+    void addNames([{ name: name.trim(), kind: addKind, bookId: "", notes: "" }]).then(() =>
+      setName(""),
+    );
   }
 
   function roll() {
@@ -242,14 +307,31 @@ function NamesPane() {
 
   return (
     <div className="mt-6">
+      <NameGenerator />
+      <h2 className="mb-3 font-display text-2xl">Saved names</h2>
       <form className="flex flex-col gap-2" onSubmit={save}>
         <div className="flex gap-2">
-          <TextInput value={name} onChange={(event) => setName(event.target.value)} placeholder="Name" aria-label="Name" />
-          <Button type="button" variant="secondary" className="shrink-0 px-3" aria-label="Randomize name" onClick={roll}>
+          <TextInput
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+            placeholder="Name"
+            aria-label="Name"
+          />
+          <Button
+            type="button"
+            variant="secondary"
+            className="shrink-0 px-3"
+            aria-label="Randomize name"
+            onClick={roll}
+          >
             <Dices className="size-4" />
           </Button>
         </div>
-        <Select aria-label="Name kind" value={addKind} onChange={(event) => setAddKind(event.target.value as LexemeKind)}>
+        <Select
+          aria-label="Name kind"
+          value={addKind}
+          onChange={(event) => setAddKind(event.target.value as LexemeKind)}
+        >
           {LEXEME_KINDS.map((option) => (
             <option key={option.value} value={option.value}>
               {option.label}
@@ -261,7 +343,11 @@ function NamesPane() {
         </Button>
       </form>
       <div className="mt-6">
-        <Select aria-label="Filter names" value={kind} onChange={(event) => setKind(event.target.value as LexemeKind | "all")}>
+        <Select
+          aria-label="Filter names"
+          value={kind}
+          onChange={(event) => setKind(event.target.value as LexemeKind | "all")}
+        >
           <option value="all">All kinds</option>
           {LEXEME_KINDS.map((option) => (
             <option key={option.value} value={option.value}>
@@ -270,7 +356,11 @@ function NamesPane() {
           ))}
         </Select>
       </div>
-      {shown.length === 0 ? <p className="mt-4 text-muted">No names yet. Use the dice button, or import them from a PDF.</p> : null}
+      {shown.length === 0 ? (
+        <p className="mt-4 text-muted">
+          No names yet. Use the dice button, or import them from a PDF.
+        </p>
+      ) : null}
       <ul className="mt-3 divide-y divide-border border-y border-border">
         {shown.map((row) => (
           <li key={row.id} className="flex items-baseline justify-between gap-3 py-3">

@@ -560,7 +560,7 @@ export async function buyFromShop(input: { stockId: string; purseId: string; qua
     const holdings = await request<Holding[]>(tx.objectStore("holdings").index("purseId").getAll(purse.id));
     const existing = holdings.find((holding) => holding.name.toLowerCase() === stock.name.toLowerCase() && holding.kind === "item");
     tx.objectStore("purses").put({ ...purse, coins });
-    tx.objectStore("holdings").put(existing ? { ...existing, quantity: existing.quantity + quantity, unitCopper: stock.copper } : { id: crypto.randomUUID(), purseId: purse.id, name: stock.name, kind: "item", quantity, unitCopper: stock.copper, notes: "" });
+    tx.objectStore("holdings").put(existing ? { ...existing, quantity: existing.quantity + quantity, unitCopper: stock.copper } : { id: crypto.randomUUID(), purseId: purse.id, name: stock.name, kind: "item", quantity, unitCopper: stock.copper, notes: stock.notes });
     if (stock.quantity !== null) tx.objectStore("stock").put({ ...stock, quantity: stock.quantity - quantity });
     const percent = score === null ? 0 : charismaOffPercent(score);
     const summary = `Bought ${quantity} ${stock.name} from ${shop.name}` + (percent ? `, Charisma ${score}, ${percent}% off` : "");

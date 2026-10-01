@@ -75,7 +75,7 @@ export function composeShelf(catalog: CatalogItem[], input: ComposeInput, rng: (
         }),
         quantity: quantityFor(item, input.wealth, depth, rng),
         rarity: item.rarity,
-        notes: item.service ? "Service" : "",
+        notes: item.origin === "open5e" ? item.notes : item.service ? "Service" : "",
       });
     }
   }

@@ -212,6 +212,7 @@ export function Shell({
               label="Market"
               onPick={() => setMore(false)}
             />
+            {!dm ? <MoreLink to="/catalog" label="Reference & names" onPick={() => setMore(false)} /> : null}
             {dm ? (
               <MoreLink to="/catalog" label="Catalog" onPick={() => setMore(false)} />
             ) : (

@@ -125,7 +125,7 @@ export function applyCommand(input: CloudTable, seat: CloudSeat, raw: Command): 
       kind: "item",
       quantity: cmd.quantity,
       unitCopper: s.copper,
-      notes: "",
+      notes: s.notes,
     });
     log(cmd.purseId, `Bought ${cmd.quantity} ${s.name} from ${shop.name}`, -cost, shop.id);
   } else if (cmd.kind === "listing") {
