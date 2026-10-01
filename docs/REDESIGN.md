@@ -34,7 +34,7 @@ TypeScript passed. Full npm test: template-script suite 188 passed, 4 failed, 4 
 ## Release gate
 Old/new save round trips; financial and permission regression tests; session/internal transfer accounting; closed-shop enforcement; review idempotency; disposable campaign deletion; production build; isolated client trade/chat/sync/turn/recovery; mobile and desktop screenshots. Document actual results and limitations rather than claiming unchecked gates.
 
-## Implementation review — release candidate, not deployed
+## Implementation review — web 1.3.0 deployed
 - Shared midnight/gold components, optimized illustrative assets (149 KB total), role-specific Home/character views and existing five-destination navigation.
 - Room/Chat/Notifications tabs, invitation share/copy fallback and explicit membership wording.
 - Optional portraits, imagery and inventory classifications; existing catalog classifications remain usable as filters.
@@ -52,7 +52,7 @@ Old/new save round trips; financial and permission regression tests; session/int
 - TypeScript passed. Production Cloudflare build passed. Wrangler dry run bundled successfully with DB and ASSETS bindings.
 - Existing room tests exercise independent seats, concurrent buying, private chat, turn restrictions, duplicate/retry handling and persisted room reads. These are automated service tests, not a claim of two-browser visual verification.
 
-### Remaining release gates
+### Browser validation and release status
 Cloudflare connector access resolved the preview blocker: `wrangler preview` needed a separate D1 binding. A dedicated `lootsplit-preview` database now isolates test rooms from production. Branch preview build 55dddf45-b341-456c-af8d-95a676b90f91 succeeded.
 
 Two browser clients on the branch alias and unique deployment origin joined disposable room EDQMY. Verified player-only Home/purse/inventory, a purchase (2 sp debit, stock 6→5, item synchronized to host), party chat/unread state, turn handoff, disabled buying while waiting, a sale during the player's turn, pending-action persistence across reload, successful submission and return to DM turn. Player-to-DM role switching was blocked while joined. Player settings exposed backups/diagnostics without economy controls or private Books. App console inspection showed no app errors (browser extension metadata errors excluded).
@@ -61,7 +61,7 @@ Browser review found and fixed a Sell button that was not disabled out of turn; 
 
 Responsive browser checks used a temporary 390×844 iframe fixture (375 CSS pixels of content with desktop scrollbars), not Android device emulation. DM and player Home, multiplayer joining, room controls and five-tab navigation rendered. Fixed the missing Market mobile tab and activity-grid overflow; final measured content width equals scroll width (375px). Named session started with zero totals, synchronized to player; player submitted a 10cp payment request, DM approved, both clients displayed the one-time 1sp debit and correct session net. Leave/release/rejoin worked. Private messages reached the selected DM conversation without appearing in party chat; unread cleared when read. Test fixtures are removed from release output.
 
-Final suite: 192 script tests, 99 app tests and 55 auth/app-data tests passed (346 total, four script tests skipped), TypeScript passed; Cloudflare preview production build passed. PDF parsing, Open5e, names, backup compatibility and campaign deletion are covered by automated regression tests; their complete end-to-end UI flows were not all repeated in this browser pass. Native Android behavior and real offline-network interruption remain unverified here. Production promotion and Android build are the next steps.
+Final suite: 192 script tests, 99 app tests and 55 auth/app-data tests passed (346 total, four script tests skipped), TypeScript passed; Cloudflare preview production build passed. PDF parsing, Open5e, names, backup compatibility and campaign deletion are covered by automated regression tests; their complete end-to-end UI flows were not all repeated in this browser pass. Native Android behavior and real offline-network interruption remain unverified here. Production commit d7dd0309751432ce4442541712e26863f54a7c29 deployed successfully in Cloudflare build 69443bae-396c-47d4-8348-e5558d325cff. The live Home page rendered successfully. A final player check confirmed both Buy and Sell disabled while waiting for the DM. Android preparation is isolated on android/update-1.3.0; the first Actions attempt stopped at a removed SDK tools package, corrected by specifying the required platform/build packages.
 
 ### Deployment and rollback
-Checkpoint branch `checkpoint/pre-redesign-1.2.3` points to e6776f55ad557fe5e5fdd6927bdfc8d0df0aa003. Release candidate is on `feature/illustrated-ledger`. Promote only after remaining gates. Deploy server and matching assets together through the existing Cloudflare build; preserve D1. Roll back code through a revert/redeployment without deleting or restoring D1. Keep new client backups; older binaries do not understand the new journal fields.
+Checkpoint branch `checkpoint/pre-redesign-1.2.3` points to e6776f55ad557fe5e5fdd6927bdfc8d0df0aa003. Web release d7dd030 is on `main` and `feature/illustrated-ledger`. Deploy server and matching assets together through the existing Cloudflare build; preserve D1. Roll back code through a revert/redeployment without deleting or restoring D1. Keep new client backups; older binaries do not understand the new journal fields.
