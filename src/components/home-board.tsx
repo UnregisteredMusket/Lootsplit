@@ -150,8 +150,14 @@ export function HomeBoard() {
                 <p className="text-sm text-muted">Characters</p>
               </Link>
               <Link
-                to={seat.role === "dm" ? "/market" : "/party"}
-                search={seat.role === "dm" ? { book: "" } : { action: "" }}
+                to={seat.role === "dm" ? "/" : "/party"}
+                search={seat.role === "dm" ? { view: "home" } : { action: "" }}
+                hash={seat.role === "dm" ? "review-inbox" : undefined}
+                onClick={() => {
+                  if (seat.role !== "dm") return;
+                  const el = document.getElementById("review-inbox");
+                  if (el instanceof HTMLDetailsElement) el.open = true;
+                }}
                 className="stat-card hidden sm:block"
               >
                 <ScrollText className="size-5 text-lead" />

@@ -517,6 +517,7 @@ function AddGood({ shopId }: { shopId: string }) {
 function SellBox({ shopId }: { shopId: string }) {
   const { holdings, sell, shops } = useEconomy();
   const closed = shops.find((s) => s.id === shopId)?.closed;
+  const turnLocked = turnIsLocked();
   const seat = useSeat();
   const mine =
     seat.role === "player"
@@ -538,7 +539,7 @@ function SellBox({ shopId }: { shopId: string }) {
       className="mt-6 flex flex-col gap-2"
       onSubmit={(event) => {
         event.preventDefault();
-        if (!holding) return;
+        if (!holding || closed || turnLocked) return;
         void sell(holding.id, shopId, Math.max(1, Math.floor(Number(qty) || 1)));
       }}
     >
@@ -561,7 +562,7 @@ function SellBox({ shopId }: { shopId: string }) {
           aria-label="Quantity to sell"
           className="w-24"
         />
-        <Button type="submit" variant="secondary" disabled={closed}>
+        <Button type="submit" variant="secondary" disabled={closed || turnLocked}>
           Sell
         </Button>
       </div>
