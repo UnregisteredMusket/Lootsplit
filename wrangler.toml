@@ -10,10 +10,9 @@ directory = "./dist/client"
 binding = "ASSETS"
 run_worker_first = true
 
-# Binding name DB is required. database_id is intentionally omitted:
-# create the D1 database, then add `database_id = "<id from Cloudflare>"` here.
-# Do not guess an id.
+# Binding name DB is required. database_id is the lootsplit D1 database.
 [[d1_databases]]
 binding = "DB"
 database_name = "lootsplit"
+database_id = "0a200e96-ae2e-47b5-9869-c1f4d316148f"
 migrations_dir = "cloudflare/migrations"

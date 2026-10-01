@@ -9,8 +9,7 @@ test("wrangler binds shared rooms to D1 as DB and does not invent a database id"
   assert.match(config, /binding = "DB"/);
   assert.match(config, /binding = "ASSETS"/);
   assert.match(config, /migrations_dir = "cloudflare\/migrations"/);
-  assert.match(config, /database_id = "<id from Cloudflare>"/);
-  assert.doesNotMatch(config, /database_id = "[0-9a-f-]+"/i);
+  assert.match(config, /database_id = "0a200e96-ae2e-47b5-9869-c1f4d316148f"/);
   assert.match(worker, /globalThis\.__env__ = env/);
   assert.match(worker, /dist\/server\/index\.mjs/);
   assert.match(migration, /CREATE TABLE IF NOT EXISTS campaign_rooms/);
