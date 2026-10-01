@@ -235,7 +235,7 @@ export function Shell({
         className="fixed inset-x-0 bottom-0 z-20 border-t border-lead/40 bg-bg/92 pb-[env(safe-area-inset-bottom)] backdrop-blur-sm lg:hidden"
         aria-label="Sections"
       >
-        <div className="mx-auto grid max-w-3xl grid-cols-4">{navLinks("tab")}</div>
+        <div className="mx-auto grid max-w-3xl grid-cols-5">{navLinks("tab")}</div>
       </nav>
       <Toaster theme={prefs.appearance === "light" ? "light" : "dark"} position="top-center" />
       <BillReceipt />
@@ -375,6 +375,14 @@ export function Shell({
           active={onHome}
           icon={<Home className="size-5" />}
           label="Home"
+        />
+        <NavLink
+          layout={layout}
+          to="/market"
+          search={{ book: "" }}
+          active={pathname.startsWith("/market") || pathname.startsWith("/shop/")}
+          icon={<Store className="size-5" />}
+          label="Market"
         />
         <NavLink
           layout={layout}
