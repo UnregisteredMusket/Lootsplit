@@ -1,16 +1,6 @@
 name: Android test APK
 
 on:
-  push:
-    branches: [main]
-    paths:
-      - 'src/**'
-      - 'android/**'
-      - 'package*.json'
-      - 'vite.mobile.config.ts'
-      - 'capacitor.config.ts'
-      - 'scripts/prepare-mobile.mjs'
-      - '.github/workflows/android-test-apk.yml'
   workflow_dispatch:
 
 jobs:
