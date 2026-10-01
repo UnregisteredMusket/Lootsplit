@@ -15,6 +15,7 @@ export type RawLine = {
   y: number;
   width: number;
   page: number;
+  tableRow?: boolean;
 };
 
 export type PageText = {
@@ -29,72 +30,108 @@ function median(values: number[]): number {
 }
 
 function clean(text: string): string {
-  return text.replace(/\u00a0/g, " ").replace(/[ \t]+/g, " ").trim();
+  return text
+    .normalize("NFKC")
+    .replace(/\u00ad/g, "")
+    .replace(/\u00a0/g, " ")
+    .replace(/[ \t]+/g, " ")
+    .trim();
 }
 
 export function itemsToLines(items: TextAtom[], page: number): RawLine[] {
-  const usable = items.filter((item) => clean(item.str).length > 0);
+  const usable = items.filter(
+    (item) =>
+      clean(item.str).length > 0 &&
+      [item.x, item.y, item.width, item.height].every(Number.isFinite),
+  );
   usable.sort((a, b) => b.y - a.y || a.x - b.x);
-  const groups: TextAtom[][] = [];
+  // Establish baselines before horizontal grouping: font jitter must not scramble word order.
+  const bands: TextAtom[][] = [];
   for (const item of usable) {
-    let placed = false;
-    for (let index = groups.length - 1; index >= 0 && index > groups.length - 5; index -= 1) {
-      const current = groups[index];
-      const last = current?.[current.length - 1];
-      if (!current || !last) continue;
-      const y = current.reduce((sum, part) => sum + part.y, 0) / current.length;
-      const height = current.reduce((sum, part) => sum + part.height, 0) / current.length;
-      const gap = item.x - (last.x + last.width);
-      const sameBand = Math.abs(item.y - y) <= Math.max(2, height * 0.4);
-      if (sameBand && gap >= -1 && gap < 12) {
-        current.push(item);
-        placed = true;
-        break;
-      }
-    }
-    if (!placed) groups.push([item]);
+    const band = bands
+      .slice(-4)
+      .find(
+        (parts) =>
+          Math.abs(item.y - median(parts.map((p) => p.y))) <=
+          Math.max(1.5, Math.min(item.height, median(parts.map((p) => p.height))) * 0.3),
+      );
+    if (band) {
+      if (
+        !band.some(
+          (p) => p.str === item.str && Math.abs(p.x - item.x) < 0.6 && Math.abs(p.y - item.y) < 0.6,
+        )
+      )
+        band.push(item);
+    } else bands.push([item]);
   }
-
-  return groups
-    .map((group) => {
-      group.sort((a, b) => a.x - b.x);
+  const lines: RawLine[] = [];
+  for (const band of bands) {
+    band.sort((a, b) => a.x - b.x);
+    const groups: TextAtom[][] = [];
+    for (const atom of band) {
+      const group = groups.at(-1),
+        prev = group?.at(-1);
+      if (
+        prev &&
+        atom.x - (prev.x + prev.width) <= Math.max(12, Math.min(prev.height, atom.height) * 1.3)
+      )
+        group!.push(atom);
+      else groups.push([atom]);
+    }
+    const row: RawLine[] = [];
+    for (const group of groups) {
       let text = "";
-      for (let i = 0; i < group.length; i += 1) {
-        const item = group[i];
-        if (!item) continue;
-        if (i > 0) {
-          const prev = group[i - 1];
-          if (prev) {
-            const gap = item.x - (prev.x + prev.width);
-            const charWidth = prev.width / Math.max(1, prev.str.length);
-            if (gap > charWidth * 0.3) text += " ";
-          }
-        }
-        text += item.str;
+      for (let i = 0; i < group.length; i++) {
+        const atom = group[i]!,
+          prev = group[i - 1];
+        if (
+          prev &&
+          atom.x - (prev.x + prev.width) >
+            Math.max(0.6, (prev.width / Math.max(1, prev.str.length)) * 0.28) &&
+          !/\s$/.test(text) &&
+          !/^\s/.test(atom.str)
+        )
+          text += " ";
+        text += atom.str;
       }
-      const first = group[0];
-      if (!first) return null;
-      const end = Math.max(...group.map((item) => item.x + item.width));
-      const heights = group.map((item) => item.height);
-      return {
+      const first = group[0]!;
+      const line: RawLine = {
         text: clean(text),
-        size: median(heights) || heights[0] || 10,
+        size: median(group.map((p) => p.height)) || 10,
         x: first.x,
-        y: first.y,
-        width: end - first.x,
+        y: median(group.map((p) => p.y)),
+        width: Math.max(...group.map((p) => p.x + p.width)) - first.x,
         page,
       };
-    })
-    .filter((line): line is RawLine => line !== null && line.text.length > 0);
+      const previous = row.at(-1);
+      // Keep right-aligned price cells with their labels rather than reading a column of prices alone.
+      const priceCell =
+        /^\d[\d,.]*\s*(?:[csegp]\s*p|(?:gold|silver|copper|electrum|platinum)\s+pieces?)\b/i.test(
+          line.text,
+        );
+      if (
+        previous &&
+        priceCell &&
+        previous.text.length <= 72 &&
+        !/[.!?]$/.test(previous.text) &&
+        /[a-z]/i.test(previous.text) &&
+        line.x - previous.x - previous.width < 240
+      ) {
+        previous.text += ` — ${line.text}`;
+        previous.width = line.x + line.width - previous.x;
+        previous.tableRow = true;
+      } else row.push(line);
+    }
+    lines.push(...row);
+  }
+  return lines;
 }
 
 function absorbDropCaps(lines: RawLine[]): RawLine[] {
   const caps = lines.filter(
     (line) => line.text.length === 1 && /[A-Za-z]/.test(line.text) && line.size >= 20,
   );
-  const rest = lines
-    .filter((line) => !caps.includes(line))
-    .map((line) => ({ ...line }));
+  const rest = lines.filter((line) => !caps.includes(line)).map((line) => ({ ...line }));
   for (const cap of caps) {
     const host = rest
       .filter(
@@ -141,7 +178,9 @@ function clusterOrigins(xs: number[]): number[] {
 }
 
 export function orderPage(lines: RawLine[], pageWidth: number): RawLine[] {
-  const prepared = absorbDropCaps(lines).filter((line) => !isPageNumber(line.text));
+  const prepared = absorbDropCaps(lines).filter(
+    (line) => !(isPageNumber(line.text) && line.y === Math.min(...lines.map((l) => l.y))),
+  );
   if (prepared.length === 0) return [];
   const heights = prepared.map((line) => line.size);
   const body = median(heights) || 10;
@@ -163,12 +202,9 @@ export function orderPage(lines: RawLine[], pageWidth: number): RawLine[] {
     const nearRight = Math.abs(line.x - rightOrigin) < 56;
     const mid = line.x + line.width / 2;
     const centered =
-      !nearLeft &&
-      !nearRight &&
-      line.width > 80 &&
-      mid > leftOrigin + 70 &&
-      mid < rightOrigin + 30;
-    const fullBleed = end - line.x > pageWidth * 0.62 || (line.x < leftOrigin + 24 && end > rightOrigin + 16);
+      !nearLeft && !nearRight && line.width > 80 && mid > leftOrigin + 70 && mid < rightOrigin + 30;
+    const fullBleed =
+      end - line.x > pageWidth * 0.62 || (line.x < leftOrigin + 24 && end > rightOrigin + 16);
     if (centered || fullBleed) spanning.push(line);
     else if (line.x < (leftOrigin + rightOrigin) / 2) left.push(line);
     else right.push(line);
@@ -201,7 +237,9 @@ function isMarginal(line: RawLine, lines: RawLine[]): boolean {
   const span = Math.max(1, max - min);
   if (line.y > max - span * 0.09 || line.y < min + span * 0.09) return true;
   const sorted = lines.slice().sort((a, b) => b.y - a.y);
-  return sorted[0] === line || sorted[1] === line || sorted.at(-1) === line || sorted.at(-2) === line;
+  return (
+    sorted[0] === line || sorted[1] === line || sorted.at(-1) === line || sorted.at(-2) === line
+  );
 }
 
 function stripChrome(pages: PageText[], body: number): RawLine[] {
@@ -226,7 +264,6 @@ function stripChrome(pages: PageText[], body: number): RawLine[] {
     }
   }
   return ordered.filter((line) => {
-    if (isPageNumber(line.text)) return false;
     if (!marginalIds.has(line)) return true;
     return (marginalCounts.get(line.text.toLowerCase()) ?? 0) < 3;
   });
@@ -270,16 +307,27 @@ function blocksFromLines(lines: RawLine[], body: number): Block[] {
   let previous: RawLine | null = null;
 
   const flush = () => {
-    const text = clean(paragraph).replace(/^[A-Z](?=[A-Z][a-z]{2})/, "");
+    const text = clean(paragraph);
     if (text) blocks.push({ text, page: paragraphPage, heading: false });
     paragraph = "";
   };
 
   for (const line of lines) {
+    const listed =
+      line.tableRow ||
+      /\d[\d,.]*\s*(?:cp|sp|ep|gp|pp)\b/i.test(line.text) ||
+      /^[•*]\s|^\d+[.)]\s/.test(line.text);
+    if (listed) {
+      flush();
+      blocks.push({ text: clean(line.text), page: line.page, heading: false });
+      previous = null;
+      continue;
+    }
     if (looksLikeHeading(line.text, line.size, body)) {
       flush();
       const last = blocks[blocks.length - 1];
-      if (last?.heading && last.page === line.page) last.text = repairHeading(clean(`${last.text} ${line.text}`));
+      if (last?.heading && last.page === line.page)
+        last.text = repairHeading(clean(`${last.text} ${line.text}`));
       else blocks.push({ text: repairHeading(clean(line.text)), page: line.page, heading: true });
       previous = line;
       continue;
@@ -291,11 +339,17 @@ function blocksFromLines(lines: RawLine[], body: number): Block[] {
       continue;
     }
     const gap = previous.y - line.y;
-    const sameBaseline = line.page === previous.page && Math.abs(line.y - previous.y) <= 2 && line.x >= previous.x;
+    const sameBaseline =
+      line.page === previous.page && Math.abs(line.y - previous.y) <= 2 && line.x >= previous.x;
     const columnJump = line.y > previous.y + 4 || line.page !== previous.page;
     const indented = !sameBaseline && line.x > previous.x + 6 && line.size <= previous.size * 1.2;
     const loose = gap > Math.max(previous.size, line.size) * 1.7;
-    const hyphen = /[A-Za-z]-$/.test(paragraph) && /^[a-z]/.test(line.text) && !columnJump && gap > 0 && gap < 28;
+    const hyphen =
+      /[A-Za-z]-$/.test(paragraph) &&
+      /^[a-z]/.test(line.text) &&
+      !columnJump &&
+      gap > 0 &&
+      gap < 28;
     if (hyphen) {
       paragraph = paragraph.slice(0, -1) + line.text;
     } else if (sameBaseline) {
@@ -330,7 +384,7 @@ function sectionsFromBlocks(blocks: Block[]): DraftArticle[] {
   const flush = () => {
     const text = paras.join("\n\n").trim();
     if (!title && !text) return;
-    if (text.length < 24) {
+    if (!text) {
       if (title) kicker = kicker ? `${kicker}: ${title}` : title;
       title = "";
       paras = [];
@@ -378,7 +432,7 @@ function splitLong(drafts: DraftArticle[]): DraftArticle[] {
     let index = 0;
     const push = () => {
       const text = buf.join("\n\n").trim();
-      if (text.length < 40) return;
+      if (!text) return;
       index += 1;
       out.push({
         title: index === 1 ? draft.title : `${draft.title} · ${index}`,
@@ -415,7 +469,7 @@ function pageArticles(pages: PageText[], body: number): DraftArticle[] {
       .map((block) => block.text)
       .join("\n\n")
       .trim();
-    if (text.length < 80) continue;
+    if (!text) continue;
     const pageNo = lines[0]?.page ?? 0;
     drafts.push({
       title: heading?.text || carry || clipTitle(text),
@@ -443,8 +497,11 @@ function disambiguate(drafts: DraftArticle[]): DraftArticle[] {
 export function buildArticles(pages: PageText[]): DraftArticle[] {
   const withText = pages.filter((page) => page.lines.some((line) => clean(line.text).length > 0));
   if (withText.length === 0) return [];
-  const sizes = withText.flatMap((page) => page.lines.filter((line) => line.text.length > 30).map((line) => line.size));
-  const body = median(sizes) || median(withText.flatMap((page) => page.lines.map((line) => line.size))) || 10;
+  const sizes = withText.flatMap((page) =>
+    page.lines.filter((line) => line.text.length > 30).map((line) => line.size),
+  );
+  const body =
+    median(sizes) || median(withText.flatMap((page) => page.lines.map((line) => line.size))) || 10;
   const lines = stripChrome(withText, body);
   const sectional = disambiguate(sectionsFromBlocks(blocksFromLines(lines, body)));
   const thin = sectional.filter((article) => article.text.length < 80).length;
@@ -455,7 +512,10 @@ export function buildArticles(pages: PageText[]): DraftArticle[] {
   return paged.length > 0 ? paged : sectional;
 }
 
-export function snippetAround(text: string, query: string): { before: string; match: string; after: string } | null {
+export function snippetAround(
+  text: string,
+  query: string,
+): { before: string; match: string; after: string } | null {
   const flat = text.replace(/\s+/g, " ").trim();
   const needle = query.trim();
   if (!needle) return null;

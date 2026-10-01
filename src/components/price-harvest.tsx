@@ -3,11 +3,11 @@ import { toast } from "sonner";
 import { articlesForBook } from "@/lib/quire/db";
 import { useEconomy } from "@/lib/quire/economy-context";
 import { useLibrary } from "@/lib/quire/library";
-import { goodsFromText } from "@/lib/quire/extract";
-import { formatCopper } from "@/lib/quire/money";
+import { goodsFromText, type GoodHit } from "@/lib/quire/extract";
+import { formatCopper, parsePrice } from "@/lib/quire/money";
 import { Button, TextInput } from "@/components/ui";
 
-type Hit = { id: string; name: string; copper: number; on: boolean };
+type Hit = GoodHit & { id: string; on: boolean; priceText: string };
 
 export function PriceHarvest({ bookId }: { bookId: string }) {
   const { books } = useLibrary();
@@ -21,6 +21,8 @@ export function PriceHarvest({ bookId }: { bookId: string }) {
 
   useEffect(() => {
     setChosenBook(bookId);
+    setHits([]);
+    setScanned(false);
   }, [bookId]);
 
   async function scan(id: string) {
@@ -29,12 +31,14 @@ export function PriceHarvest({ bookId }: { bookId: string }) {
     try {
       const articles = await articlesForBook(id);
       const found: Hit[] = goodsFromText(articles).map((hit) => ({
+        ...hit,
         id: `${hit.name.toLowerCase()}|${hit.copper}`,
         name: hit.name,
         copper: hit.copper,
-        on: true,
+        on: !hit.conflict,
+        priceText: formatCopper(hit.copper),
       }));
-      setHits(found.slice(0, 80));
+      setHits(found);
       setScanned(true);
       if (found.length === 0) toast("No printed prices in that book. Add items by hand instead.");
     } catch (error) {
@@ -46,18 +50,29 @@ export function PriceHarvest({ bookId }: { bookId: string }) {
 
   async function file() {
     const chosen = hits.filter((hit) => hit.on);
+    if (chosen.some((hit) => !hit.name.trim() || parsePrice(hit.priceText) === null)) {
+      toast.error("Check selected item names and prices.");
+      return;
+    }
     if (chosen.length === 0) {
       toast("Select at least one price.");
       return;
     }
     setBusy(true);
     try {
-      const target = shopId === "new" ? await createShop({ name: newName.trim() || "Imported shop" }) : shopId;
+      const target =
+        shopId === "new" ? await createShop({ name: newName.trim() || "Imported shop" }) : shopId;
       const added = await stockFromPrices(
         target,
-        chosen.map((hit) => ({ name: hit.name, copper: hit.copper, notes: "Read from a PDF. Check it." })),
+        chosen.map((hit) => ({
+          name: hit.name.trim(),
+          copper: parsePrice(hit.priceText)!,
+          notes: `Read from ${books.find((b) => b.id === chosenBook)?.title ?? "a PDF"}. ${hit.source}\n${hit.quote}`,
+        })),
       );
-      toast.success(added === 0 ? "Those items are already in that shop." : `Added ${added} items.`);
+      toast.success(
+        added === 0 ? "Those items are already in that shop." : `Added ${added} items.`,
+      );
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "Could not add those items.");
     } finally {
@@ -77,7 +92,12 @@ export function PriceHarvest({ bookId }: { bookId: string }) {
         <div className="mt-4 flex flex-col gap-3">
           <select
             value={chosenBook}
-            onChange={(event) => setChosenBook(event.target.value)}
+            disabled={busy}
+            onChange={(event) => {
+              setChosenBook(event.target.value);
+              setHits([]);
+              setScanned(false);
+            }}
             className="min-h-11 rounded-sm border border-border bg-subtle px-3 text-base text-fg"
           >
             <option value="">Choose a book</option>
@@ -87,7 +107,11 @@ export function PriceHarvest({ bookId }: { bookId: string }) {
               </option>
             ))}
           </select>
-          <Button variant="secondary" disabled={!chosenBook || busy} onClick={() => void scan(chosenBook)}>
+          <Button
+            variant="secondary"
+            disabled={!chosenBook || busy}
+            onClick={() => void scan(chosenBook)}
+          >
             {busy ? "Reading…" : "Find prices"}
           </Button>
         </div>
@@ -100,12 +124,44 @@ export function PriceHarvest({ bookId }: { bookId: string }) {
                 <input
                   type="checkbox"
                   checked={hit.on}
-                  onChange={() => setHits((current) => current.map((row) => (row.id === hit.id ? { ...row, on: !row.on } : row)))}
+                  onChange={() =>
+                    setHits((current) =>
+                      current.map((row) => (row.id === hit.id ? { ...row, on: !row.on } : row)),
+                    )
+                  }
                   className="size-5"
                 />
                 <span className="min-w-0 flex-1">
-                  <span className="block truncate">{hit.name}</span>
-                  <span className="text-sm text-muted">{formatCopper(hit.copper)}</span>
+                  <TextInput
+                    aria-label={`Name of ${hit.name}`}
+                    value={hit.name}
+                    onChange={(e) =>
+                      setHits((rows) =>
+                        rows.map((row) =>
+                          row.id === hit.id ? { ...row, name: e.target.value } : row,
+                        ),
+                      )
+                    }
+                  />
+                  <TextInput
+                    className="mt-2"
+                    aria-label={`Price of ${hit.name}`}
+                    value={hit.priceText}
+                    onChange={(e) =>
+                      setHits((rows) =>
+                        rows.map((row) =>
+                          row.id === hit.id ? { ...row, priceText: e.target.value } : row,
+                        ),
+                      )
+                    }
+                  />
+                  <span className="mt-2 block text-xs text-muted">{hit.source}</span>
+                  <span className="block text-sm text-muted">{hit.quote}</span>
+                  {hit.conflict ? (
+                    <span className="block text-sm text-accent">
+                      Conflicting prices. Choose the correct entry.
+                    </span>
+                  ) : null}
                 </span>
               </li>
             ))}
@@ -124,7 +180,11 @@ export function PriceHarvest({ bookId }: { bookId: string }) {
               ))}
             </select>
             {shopId === "new" ? (
-              <TextInput value={newName} onChange={(event) => setNewName(event.target.value)} aria-label="New shop name" />
+              <TextInput
+                value={newName}
+                onChange={(event) => setNewName(event.target.value)}
+                aria-label="New shop name"
+              />
             ) : null}
             <Button disabled={busy} onClick={() => void file()}>
               Add selected items to shop

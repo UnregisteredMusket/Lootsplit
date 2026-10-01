@@ -87,6 +87,7 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
           },
           result.articles,
         );
+        if(result.skippedPages.length)toast.warning(`${result.title}: ${result.skippedPages.length} pages had no selectable text (blank or scanned). They need OCR to extract text.`);
         added += 1;
         setBooks(await listBooks());
       } catch (error) {

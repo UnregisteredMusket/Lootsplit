@@ -46,7 +46,13 @@ test("joins words split with a hyphen and groups text items into lines", () => {
       { str: "North", x: 40, y: 500, width: 36, height: 10 },
       { str: "road", x: 80, y: 500, width: 30, height: 10 },
       { str: "The northern road continues half-", x: 40, y: 486, width: 180, height: 10 },
-      { str: "way through the hills until the lanterns thin and the gate is only a rumor told by traders.", x: 40, y: 472, width: 420, height: 10 },
+      {
+        str: "way through the hills until the lanterns thin and the gate is only a rumor told by traders.",
+        x: 40,
+        y: 472,
+        width: 420,
+        height: 10,
+      },
     ],
     2,
   );
@@ -73,4 +79,41 @@ test("drops a repeated running header", () => {
   const articles = buildArticles(pages);
   assert.ok(articles.every((article) => !article.text.includes("Private Ledger")));
   assert.equal(articles.length >= 1, true);
+});
+
+test("baseline jitter, ligatures and duplicate glyphs preserve word order", () => {
+  const atoms = [
+    { str: "fine", x: 50, y: 500.8, width: 20, height: 10 },
+    { str: "A", x: 40, y: 500, width: 6, height: 10 },
+    { str: "ﬁne", x: 50, y: 500.8, width: 20, height: 10 },
+    { str: "cloak", x: 74, y: 500, width: 25, height: 10 },
+  ];
+  // Exact duplicated paint operations should not appear twice.
+  atoms.splice(2, 1, { ...atoms[0]! });
+  assert.equal(itemsToLines(atoms, 1)[0]!.text, "A fine cloak");
+  assert.equal(
+    itemsToLines([{ str: "ﬁne\u00a0cloak", x: 0, y: 10, width: 50, height: 10 }], 1)[0]!.text,
+    "fine cloak",
+  );
+});
+
+test("aligned table prices stay attached and short entries are retained", () => {
+  const atoms = [
+    { str: "Longsword", x: 40, y: 500, width: 55, height: 10 },
+    { str: "15 gp", x: 240, y: 500, width: 28, height: 10 },
+    { str: "Rope (50 ft.)", x: 40, y: 486, width: 62, height: 10 },
+    { str: "1 gp", x: 240, y: 486, width: 24, height: 10 },
+  ];
+  const lines = itemsToLines(atoms, 1);
+  assert.equal(lines.length, 2);
+  assert.equal(lines[0]!.text, "Longsword — 15 gp");
+  const articles = buildArticles([{ width: 600, lines }]);
+  assert.equal(articles.length, 1);
+  assert.match(articles[0]!.text, /15 gp\n\nRope/);
+  assert.equal(
+    buildArticles([
+      { width: 600, lines: [line({ text: "Rope 1 gp", x: 40, y: 500, width: 70 })] },
+    ])[0]!.text,
+    "Rope 1 gp",
+  );
 });

@@ -7,7 +7,13 @@ export function emptyCoins(): Coins {
 }
 
 export function toCopper(coins: Coins): number {
-  return coins.cp * COPPER.cp + coins.sp * COPPER.sp + coins.ep * COPPER.ep + coins.gp * COPPER.gp + coins.pp * COPPER.pp;
+  return (
+    coins.cp * COPPER.cp +
+    coins.sp * COPPER.sp +
+    coins.ep * COPPER.ep +
+    coins.gp * COPPER.gp +
+    coins.pp * COPPER.pp
+  );
 }
 
 export function fromCopper(total: number): Coins {
@@ -38,7 +44,9 @@ export function formatDollars(copper: number, gpDollars: number): string {
   const value = (Math.abs(copper) / 100) * (Number.isFinite(gpDollars) ? gpDollars : 250);
   const body =
     value >= 20
-      ? `$${Math.round(value).toString().replace(/\B(?=(\d{3})+(?!\d))/g, ",")}`
+      ? `$${Math.round(value)
+          .toString()
+          .replace(/\B(?=(\d{3})+(?!\d))/g, ",")}`
       : `$${value.toFixed(2).replace(/\.00$/, "")}`;
   return negative ? `−${body}` : body;
 }
@@ -99,7 +107,9 @@ export function explainPurse(coins: Coins): string {
   if (ep) terms.push(`${ep} ep`);
   if (sp) terms.push(`${sp} sp`);
   if (cp) terms.push(`${cp} cp`);
-  const rate = ep ? "10 cp = 1 sp, 10 sp = 1 gp, 10 gp = 1 pp, 1 ep = 5 sp" : "10 cp = 1 sp, 10 sp = 1 gp, 10 gp = 1 pp";
+  const rate = ep
+    ? "10 cp = 1 sp, 10 sp = 1 gp, 10 gp = 1 pp, 1 ep = 5 sp"
+    : "10 cp = 1 sp, 10 sp = 1 gp, 10 gp = 1 pp";
   return `${terms.join(" + ")} = ${formatCoins(carryToStandard({ cp, sp, ep, gp, pp }))}, at ${rate}.`;
 }
 
@@ -148,25 +158,57 @@ export type PriceHit = {
 
 export function pricesInText(text: string): PriceHit[] {
   const hits: PriceHit[] = [];
+  const normalized = text
+    .normalize("NFKC")
+    .replace(/\u00ad/g, "")
+    .replace(
+      /\b(copper|silver|electrum|gold|platinum)\s+pieces?\b/gi,
+      (_, unit: string) =>
+        ({ copper: "cp", silver: "sp", electrum: "ep", gold: "gp", platinum: "pp" })[
+          unit.toLowerCase() as "gold"
+        ]!,
+    )
+    .replace(/\b([csegp])\s+p\b/gi, "$1p");
   const pattern = /(?<![\d.dD])(\d{1,6}(?:,\d{3})*(?:\.\d+)?)\s*(pp|gp|ep|sp|cp)\b/gi;
-  for (const line of text.split(/\n+/)) {
+  const originalLines = text.split(/\n+/);
+  for (const [lineNumber, line] of normalized.split(/\n+/).entries()) {
     const matches = [...line.matchAll(pattern)];
     for (let i = 0; i < matches.length; i += 1) {
-      const match = matches[i];
-      if (!match) continue;
-      const amount = Number((match[1] ?? "").replace(/,/g, ""));
-      const unit = (match[2] ?? "").toLowerCase() as keyof typeof COPPER;
-      if (!COPPER[unit] || Number.isNaN(amount)) continue;
-      const copper = Math.round(amount * COPPER[unit]);
+      const match = matches[i]!;
+      let copper = Math.round(
+        Number(match[1]!.replace(/,/g, "")) *
+          COPPER[match[2]!.toLowerCase() as keyof typeof COPPER],
+      );
+      const start = i === 0 ? 0 : matches[i - 1]!.index! + matches[i - 1]![0].length;
+      const index = match.index!;
+      // Adjacent denominations are one price (1 gp 5 sp), not a second unnamed item.
+      let end = index + match[0].length;
+      while (matches[i + 1] && /^[ ,+]*$/.test(line.slice(end, matches[i + 1]!.index))) {
+        const next = matches[++i]!;
+        copper += Math.round(
+          Number(next[1]!.replace(/,/g, "")) *
+            COPPER[next[2]!.toLowerCase() as keyof typeof COPPER],
+        );
+        end = next.index! + next[0].length;
+      }
       if (copper <= 0 || copper > 100_000_000) continue;
-      const start = i === 0 ? 0 : (matches[i - 1]?.index ?? 0) + (matches[i - 1]?.[0].length ?? 0);
-      const index = match.index ?? 0;
-      let name = line.slice(start, index).split(/[.;:]/).pop() ?? "";
+      let name =
+        line
+          .slice(start, index)
+          .replace(/\.{2,}|…+/g, " ")
+          .split(/[;:]/)
+          .pop() ?? "";
+      // Sentence boundaries, but keep decimal quantities and abbreviations such as “50 ft.”.
+      name = name.split(/(?<=[a-z])\.\s+(?=[A-Z])/).pop() ?? name;
       name = name.replace(/\b(costs?|priced at|worth|price(?: of)?|for|at|is|are)\s*$/i, "");
-      name = name.replace(/^[\s\-–—*•\d.)]+/, "").replace(/[\s\-–—*•,]+$/g, "").replace(/\s+/g, " ").trim();
-      if (name.length < 3 || name.length > 72) continue;
-      if (/^(the|a|an|and|or|of|to|in)$/i.test(name)) continue;
-      hits.push({ name, copper, quote: line.trim().slice(0, 180) });
+      name = name
+        .replace(/^[\s\-–—*•\d.)]+/, "")
+        .replace(/[\s\-–—*•,.]+$/g, "")
+        .replace(/\s+/g, " ")
+        .trim();
+      if (name.length < 3 || name.length > 72 || /^(the|a|an|and|or|of|to|in)$/i.test(name))
+        continue;
+      hits.push({ name, copper, quote: (originalLines[lineNumber] ?? line).trim().slice(0, 240) });
     }
   }
   return hits;
@@ -176,7 +218,14 @@ const SPEND_ORDER = ["cp", "sp", "ep", "gp", "pp"] as const;
 const BREAK_ORDER = ["sp", "ep", "gp", "pp"] as const;
 
 export function spendCoins(coins: Coins, cost: number): Coins | null {
-  if (!Number.isSafeInteger(cost) || cost < 0 || Object.values(coins).some((value) => !Number.isSafeInteger(value) || value < 0) || !Number.isSafeInteger(toCopper(coins)) || toCopper(coins) < cost) return null;
+  if (
+    !Number.isSafeInteger(cost) ||
+    cost < 0 ||
+    Object.values(coins).some((value) => !Number.isSafeInteger(value) || value < 0) ||
+    !Number.isSafeInteger(toCopper(coins)) ||
+    toCopper(coins) < cost
+  )
+    return null;
   if (cost === 0) return { ...coins };
   const next = { ...coins };
   let remaining = cost;

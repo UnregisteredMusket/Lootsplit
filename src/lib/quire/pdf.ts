@@ -1,6 +1,12 @@
 import { getDocument, GlobalWorkerOptions } from "pdfjs-dist";
 import workerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
-import { buildArticles, itemsToLines, type PageText, type TextAtom } from "./articles.ts";
+import {
+  buildArticles,
+  itemsToLines,
+  orderPage,
+  type PageText,
+  type TextAtom,
+} from "./articles.ts";
 import type { DraftArticle } from "./types.ts";
 
 type PdfTextItem = {
@@ -22,13 +28,15 @@ export type PdfRead = {
   title: string;
   pageCount: number;
   articles: DraftArticle[];
+  skippedPages: number[];
 };
 
 function atomFromItem(item: PdfTextItem): TextAtom | null {
   const text = item.str ?? "";
   if (!text.trim()) return null;
   const transform = item.transform ?? [];
-  const height = item.height || Math.hypot(Number(transform[2]) || 0, Number(transform[3]) || 0) || 10;
+  const height =
+    item.height || Math.hypot(Number(transform[2]) || 0, Number(transform[3]) || 0) || 10;
   return {
     str: text,
     x: Number(transform[4]) || 0,
@@ -54,11 +62,12 @@ export async function readPdf(
   });
 
   try {
-    const meta = await doc.getMetadata();
+    const meta = await doc.getMetadata().catch(() => ({ info: {} }));
     const info = meta.info as { Title?: unknown };
     const metaTitle = typeof info.Title === "string" ? info.Title.trim() : "";
     const title = metaTitle || file.name.replace(/\.pdf$/i, "").trim() || "Untitled PDF";
     const pages: PageText[] = [];
+    const skippedPages: number[] = [];
     for (let number = 1; number <= doc.numPages; number += 1) {
       const page = await doc.getPage(number);
       const viewport = page.getViewport({ scale: 1 });
@@ -68,6 +77,7 @@ export async function readPdf(
         const atom = atomFromItem(item);
         return atom ? [atom] : [];
       });
+      if (!atoms.length) skippedPages.push(number);
       pages.push({ width: viewport.width, lines: itemsToLines(atoms, number) });
       onProgress(number, doc.numPages);
       await page.cleanup();
@@ -76,14 +86,16 @@ export async function readPdf(
     if (articles.length === 0) {
       throw new Error("No selectable text was found. Scanned pages cannot be catalogued.");
     }
-    return { title, pageCount: doc.numPages, articles };
+    return { title, pageCount: doc.numPages, articles, skippedPages };
   } finally {
     await doc.cleanup();
     await task.destroy();
   }
 }
 
-export async function readPdfPlain(file: File): Promise<{ fields: Record<string, string>; text: string }> {
+export async function readPdfPlain(
+  file: File,
+): Promise<{ fields: Record<string, string>; text: string }> {
   ensureWorker();
   const data = new Uint8Array(await file.arrayBuffer());
   const task = getDocument({ data, verbosity: 0 });
@@ -108,15 +120,18 @@ export async function readPdfPlain(file: File): Promise<{ fields: Record<string,
     for (let number = 1; number <= last; number += 1) {
       const page = await doc.getPage(number);
       const content = await page.getTextContent();
-      const line = content.items
-        .map((item) => ("str" in item ? item.str : ""))
-        .join(" ")
-        .replace(/\s+/g, " ")
-        .trim();
-      if (line) pages.push(line);
+      const atoms = content.items.flatMap((item) => {
+        if (!("str" in item)) return [];
+        const atom = atomFromItem(item);
+        return atom ? [atom] : [];
+      });
+      const lines = orderPage(itemsToLines(atoms, number), page.getViewport({ scale: 1 }).width);
+      if (lines.length) pages.push(lines.map((line) => line.text).join("\n"));
       await page.cleanup();
     }
-    return { fields, text: pages.join("\n") };
+    if (!pages.length && !Object.keys(fields).length)
+      throw new Error("No selectable text or form fields were found. This PDF may need OCR first.");
+    return { fields, text: pages.join("\n\n") };
   } finally {
     await doc.cleanup();
     await task.destroy();
@@ -129,7 +144,8 @@ function fieldText(entries: unknown): string {
     if (typeof entry !== "object" || entry === null) continue;
     const record = entry as { value?: unknown; fieldValue?: unknown };
     const value = record.value ?? record.fieldValue;
-    if (typeof value === "string" && value.trim() && !/^(off|false)$/i.test(value.trim())) return value.trim();
+    if (typeof value === "string" && value.trim() && !/^(off|false)$/i.test(value.trim()))
+      return value.trim();
     if (typeof value === "number" && Number.isFinite(value)) return String(value);
   }
   return "";
