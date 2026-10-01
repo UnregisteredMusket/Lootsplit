@@ -34,6 +34,12 @@ function LiveChat() {
   const [sending, setSending] = useState<string[]>([]);
   const sendingRef = useRef(new Set<string>());
   const history = useRef<HTMLDivElement>(null);
+  const [inView, setInView] = useState(false);
+  useEffect(() => {
+    const observer = new IntersectionObserver(([entry]) => setInView(entry?.isIntersecting ?? false), { threshold: 0.2 });
+    if (history.current) observer.observe(history.current);
+    return () => observer.disconnect();
+  }, []);
   const nearBottom = useRef(true);
   const store = `lootsplit.chat.outbox.${room.code}.${room.seatId}`;
   useEffect(() => {
@@ -75,14 +81,14 @@ function LiveChat() {
 
   useEffect(() => {
     const mark = () => {
-      if (nearBottom.current) markRead(active.id, visible);
+      if (nearBottom.current && inView) markRead(active.id, visible);
     };
     if (nearBottom.current && history.current)
       history.current.scrollTop = history.current.scrollHeight;
     mark();
     document.addEventListener("visibilitychange", mark);
     return () => document.removeEventListener("visibilitychange", mark);
-  }, [active.id, notes, outbox, markRead]);
+  }, [active.id, notes, outbox, markRead, inView]);
   // Drop confirmed outbox entries, including an acknowledgement found after a failed response.
   useEffect(() => {
     if (!outbox.some((m) => notes.some((n) => n.id === m.command.id))) return;
@@ -189,7 +195,7 @@ function LiveChat() {
           const el = history.current;
           if (!el) return;
           nearBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 60;
-          if (nearBottom.current) markRead(active.id, visible);
+          if (nearBottom.current && inView) markRead(active.id, visible);
         }}
       >
         {!visible.length && !pending.length ? (
