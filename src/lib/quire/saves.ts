@@ -23,7 +23,9 @@ function request<T>(req: IDBRequest<T>): Promise<T> {
 
 function database(): Promise<IDBDatabase> {
   if (typeof indexedDB === "undefined") {
-    return Promise.reject(new Error("Saves stay on this device, and this browser cannot store them."));
+    return Promise.reject(
+      new Error("Saves stay on this device, and this browser cannot store them."),
+    );
   }
   return new Promise((resolve, reject) => {
     const open = indexedDB.open(DB_NAME, DB_VERSION);
@@ -54,17 +56,28 @@ export function saveDownloadName(name: string, savedAt: number): string {
 }
 
 export function nameFromImport(filename: string): string {
-  const base = filename.replace(/\.json$/i, "").replace(/^lootsplit-/i, "").replace(/-/g, " ").trim();
+  const base = filename
+    .replace(/\.json$/i, "")
+    .replace(/^lootsplit-/i, "")
+    .replace(/-/g, " ")
+    .trim();
   return cleanSaveName(base);
 }
 
-export async function listSaves(campaignId: string): Promise<LocalSave[]> {
+export async function listSaves(campaignId?: string): Promise<LocalSave[]> {
   const db = await database();
-  const rows = await request(db.transaction("saves").objectStore("saves").index("campaignId").getAll(campaignId));
+  const store = db.transaction("saves").objectStore("saves");
+  const rows = await request<LocalSave[]>(
+    campaignId ? store.index("campaignId").getAll(campaignId) : store.getAll(),
+  );
   return rows.sort((a, b) => b.savedAt - a.savedAt);
 }
 
-export async function rememberSave(input: { name: string; campaignId: string; file: SavePayload }): Promise<LocalSave> {
+export async function rememberSave(input: {
+  name: string;
+  campaignId: string;
+  file: SavePayload;
+}): Promise<LocalSave> {
   const save: LocalSave = {
     id: crypto.randomUUID(),
     name: cleanSaveName(input.name),
@@ -105,8 +118,13 @@ export async function removeSave(id: string): Promise<void> {
   });
 }
 
-export async function replaceSaves(saves:LocalSave[]):Promise<void>{
- const db=await database();const tx=db.transaction('saves','readwrite');
- for(const save of saves)tx.objectStore('saves').put(save);
- await new Promise<void>((resolve,reject)=>{tx.oncomplete=()=>resolve();tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error);});
+export async function replaceSaves(saves: LocalSave[]): Promise<void> {
+  const db = await database();
+  const tx = db.transaction("saves", "readwrite");
+  for (const save of saves) tx.objectStore("saves").put(save);
+  await new Promise<void>((resolve, reject) => {
+    tx.oncomplete = () => resolve();
+    tx.onerror = () => reject(tx.error);
+    tx.onabort = () => reject(tx.error);
+  });
 }

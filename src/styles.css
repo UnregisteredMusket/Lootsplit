@@ -330,3 +330,4 @@ input,select,textarea { max-width: 100%; }
 @media(max-width:420px){.shop-tile .ledger-art{width:3.5rem;height:4rem}.shop-actions{padding-inline:.65rem;gap:.35rem}.inventory-row{gap:.5rem}.inventory-row .ledger-art{width:2.8rem;height:2.8rem}}
 @media(prefers-reduced-motion:reduce){.loot-shell *{animation:none!important;transition:none!important;scroll-behavior:auto!important;}}
 .review-inbox{margin-top:1.5rem;padding:1rem;border:1px solid var(--color-border);border-radius:.9rem;background:var(--color-elevated);scroll-margin-top:6rem;}.review-inbox>summary{cursor:pointer;min-height:2.75rem;display:list-item;font-family:var(--font-display);font-size:1.5rem;}.review-inbox>p{margin-top:.5rem;}
+.multiplayer-heading {padding:1.1rem;border-bottom:1px solid var(--color-border);background:linear-gradient(90deg,var(--color-bg),color-mix(in srgb,var(--color-bg) 82%,transparent)),url('/art/landscape.webp') center/cover;}

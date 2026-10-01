@@ -4,7 +4,13 @@ import { getCloudTable, subscribeCloudTable } from "@/lib/quire/cloud-client";
 import { toast } from "sonner";
 import { useEconomy } from "@/lib/quire/economy-context";
 import { SHOP_KINDS, WEALTHS } from "@/lib/quire/labels";
-import { charismaOffPercent, formatCopper, parsePrice, priceAfterCharisma, toCopper } from "@/lib/quire/money";
+import {
+  charismaOffPercent,
+  formatCopper,
+  parsePrice,
+  priceAfterCharisma,
+  toCopper,
+} from "@/lib/quire/money";
 import { charismaScore } from "@/lib/quire/sheet";
 import { useDollarText, usePrefs } from "@/lib/quire/prefs";
 import { useSeat } from "@/lib/quire/seat";
@@ -27,13 +33,19 @@ function ShopPage() {
   const seat = useSeat();
   const shop = economy.shops.find((item) => item.id === shopId);
   const lines = economy.stock.filter((line) => line.shopId === shopId);
-  const spendable = seat.role === "player" ? economy.purses.filter((purse) => seat.purseIds.includes(purse.id)) : economy.purses;
+  const spendable =
+    seat.role === "player"
+      ? economy.purses.filter((purse) => seat.purseIds.includes(purse.id))
+      : economy.purses;
   const [mode, setMode] = useState<"counter" | "edit">("counter");
-  const [purseId, setPurseId] = useState(spendable.find((purse) => purse.kind === "party")?.id ?? spendable[0]?.id ?? "");
+  const [purseId, setPurseId] = useState(
+    spendable.find((purse) => purse.kind === "party")?.id ?? spendable[0]?.id ?? "",
+  );
   const [confirming, setConfirming] = useState(false);
 
   useEffect(() => {
-    if (!spendable.some((purse) => purse.id === purseId) && spendable[0]) setPurseId(spendable[0].id);
+    if (!spendable.some((purse) => purse.id === purseId) && spendable[0])
+      setPurseId(spendable[0].id);
   }, [spendable, purseId]);
 
   if (!economy.ready) {
@@ -47,7 +59,11 @@ function ShopPage() {
     return (
       <Shell>
         <h1 className="font-display text-4xl tracking-tight">Missing shop</h1>
-        <Link to="/market" search={{ book: "" }} className="mt-4 inline-flex min-h-11 items-center text-sm">
+        <Link
+          to="/market"
+          search={{ book: "" }}
+          className="mt-4 inline-flex min-h-11 items-center text-sm"
+        >
           Back to the market
         </Link>
       </Shell>
@@ -58,7 +74,9 @@ function ShopPage() {
     return (
       <Shell>
         <h1 className="font-display text-4xl tracking-tight">Shop not included</h1>
-        <p className="mt-2 text-sm text-muted">This shop was not included in the link you opened.</p>
+        <p className="mt-2 text-sm text-muted">
+          This shop was not included in the link you opened.
+        </p>
       </Shell>
     );
   }
@@ -70,6 +88,19 @@ function ShopPage() {
       <Link to="/market" search={{ book: "" }} className="text-sm text-muted">
         Market
       </Link>
+      <div className="mt-3 flex items-center justify-between gap-3">
+        <p className={shop.closed ? "text-muted" : "text-positive"}>
+          {shop.closed ? "Closed · browsing only" : "Open for trading"}
+        </p>
+        {seat.role === "dm" ? (
+          <Button
+            variant="secondary"
+            onClick={() => void economy.updateShop({ ...shop, closed: !shop.closed })}
+          >
+            {shop.closed ? "Open shop" : "Close shop"}
+          </Button>
+        ) : null}
+      </div>
       {viewing === "edit" ? (
         <div className="mt-3 flex flex-col gap-3">
           <TextInput
@@ -87,14 +118,18 @@ function ShopPage() {
             placeholder="Shopkeeper"
             defaultValue={shop.keeper}
             key={`keeper-${shop.keeper}`}
-            onBlur={(event) => void economy.updateShop({ ...shop, keeper: event.target.value.trim() })}
+            onBlur={(event) =>
+              void economy.updateShop({ ...shop, keeper: event.target.value.trim() })
+            }
           />
           <TextInput
             aria-label="Shop location"
             placeholder="Shop location"
             defaultValue={shop.place}
             key={`place-${shop.place}`}
-            onBlur={(event) => void economy.updateShop({ ...shop, place: event.target.value.trim() })}
+            onBlur={(event) =>
+              void economy.updateShop({ ...shop, place: event.target.value.trim() })
+            }
           />
           <ShelfTuning shop={shop} />
         </div>
@@ -102,8 +137,8 @@ function ShopPage() {
         <div className="mt-2">
           <h1 className="font-display text-4xl tracking-tight">{shop.name}</h1>
           <p className="mt-1 text-sm text-muted">
-            {[shop.keeper, shop.place].filter(Boolean).join(" · ") || "No owner or location"} · sells at {Math.round(shop.sellRate * 100)}%, buys at{" "}
-            {Math.round(shop.buyRate * 100)}%
+            {[shop.keeper, shop.place].filter(Boolean).join(" · ") || "No owner or location"} ·
+            sells at {Math.round(shop.sellRate * 100)}%, buys at {Math.round(shop.buyRate * 100)}%
           </p>
         </div>
       )}
@@ -121,16 +156,27 @@ function ShopPage() {
             />
           </div>
         ) : (
-          <p className="text-sm text-muted sm:flex-1">You can buy and sell. Only the dungeon master can change prices.</p>
+          <p className="text-sm text-muted sm:flex-1">
+            You can buy and sell. Only the dungeon master can change prices.
+          </p>
         )}
         <Button
           variant="secondary"
           onClick={() => {
-            void downloadShopPdf({ shop, lines, showDollars: prefs.showDollars, gpDollars: economy.realm.gpDollars })
+            void downloadShopPdf({
+              shop,
+              lines,
+              showDollars: prefs.showDollars,
+              gpDollars: economy.realm.gpDollars,
+            })
               .then((saved) => {
                 if (saved) toast.success("Shop sheet downloaded.");
               })
-              .catch((error: unknown) => toast.error(error instanceof Error ? error.message : "Could not share the shop sheet."));
+              .catch((error: unknown) =>
+                toast.error(
+                  error instanceof Error ? error.message : "Could not share the shop sheet.",
+                ),
+              );
           }}
         >
           Share as PDF
@@ -143,27 +189,48 @@ function ShopPage() {
           onChange={(event) => setPurseId(event.target.value)}
           className="mt-1 min-h-11 w-full rounded-sm border border-border bg-subtle px-3 text-base text-fg"
         >
-          {[...spendable].sort((a, b) => Number(b.kind === "party") - Number(a.kind === "party") || a.name.localeCompare(b.name)).map((purse) => (
-            <option key={purse.id} value={purse.id}>
-              {purse.kind === "party" ? `Party · ${purse.name}` : purse.name} · {formatCopper(toCopper(purse.coins))}
-            </option>
-          ))}
+          {[...spendable]
+            .sort(
+              (a, b) =>
+                Number(b.kind === "party") - Number(a.kind === "party") ||
+                a.name.localeCompare(b.name),
+            )
+            .map((purse) => (
+              <option key={purse.id} value={purse.id}>
+                {purse.kind === "party" ? `Party · ${purse.name}` : purse.name} ·{" "}
+                {formatCopper(toCopper(purse.coins))}
+              </option>
+            ))}
         </select>
         {spendable.some((purse) => purse.kind === "party") ? (
-          <span className="mt-1 block">The party option spends the shared account. A character spends their own.</span>
+          <span className="mt-1 block">
+            The party option spends the shared account. A character spends their own.
+          </span>
         ) : null}
         <CharismaNote purseId={purseId} />
       </label>
       <TurnLock />
       <ul className="mt-4 divide-y divide-border border-y border-border">
         {lines.map((line) => (
-          <StockRow key={line.id} line={line} mode={viewing} purseId={purseId} sellRate={shop.sellRate} charisma={charismaScore(economy.sheets.find((sheet) => sheet.purseId === purseId))} locked={viewing === "counter" && turnIsLocked()} />
+          <StockRow
+            key={line.id}
+            line={line}
+            mode={viewing}
+            purseId={purseId}
+            sellRate={shop.sellRate}
+            charisma={charismaScore(economy.sheets.find((sheet) => sheet.purseId === purseId))}
+            locked={!!shop.closed || (viewing === "counter" && turnIsLocked())}
+          />
         ))}
       </ul>
       {lines.length === 0 ? <p className="mt-4 text-muted">This shop has no items.</p> : null}
       {viewing === "edit" ? <AddGood shopId={shop.id} /> : <SellBox shopId={shop.id} />}
       {viewing === "edit" ? (
-        <button type="button" onClick={() => setConfirming(true)} className="mt-8 inline-flex min-h-11 items-center text-sm text-muted">
+        <button
+          type="button"
+          onClick={() => setConfirming(true)}
+          className="mt-8 inline-flex min-h-11 items-center text-sm text-muted"
+        >
           Remove shop
         </button>
       ) : null}
@@ -174,7 +241,9 @@ function ShopPage() {
         body="The shop and its stock are deleted. Purchases already in the ledger stay."
         confirmLabel="Remove"
         onConfirm={() => {
-          void economy.deleteShop(shop.id).then(() => navigate({ to: "/market", search: { book: "" } }));
+          void economy
+            .deleteShop(shop.id)
+            .then(() => navigate({ to: "/market", search: { book: "" } }));
         }}
       />
     </Shell>
@@ -199,7 +268,9 @@ function ShelfTuning({ shop }: { shop: Shop }) {
       <Select
         aria-label="Type of shop"
         value={shop.category}
-        onChange={(event) => void updateShop({ ...shop, category: event.target.value as Shop["category"] })}
+        onChange={(event) =>
+          void updateShop({ ...shop, category: event.target.value as Shop["category"] })
+        }
       >
         {SHOP_KINDS.map((option) => (
           <option key={option.value} value={option.value}>
@@ -212,7 +283,15 @@ function ShelfTuning({ shop }: { shop: Shop }) {
           <Button
             key={option.value}
             variant={shop.wealth === option.value ? "primary" : "secondary"}
-            onClick={() => void applyShop({ ...shop, wealth: option.value as Wealth, priceScale: scale, sellRate: sell, buyRate: buy })}
+            onClick={() =>
+              void applyShop({
+                ...shop,
+                wealth: option.value as Wealth,
+                priceScale: scale,
+                sellRate: sell,
+                buyRate: buy,
+              })
+            }
           >
             {option.label}
           </Button>
@@ -225,7 +304,9 @@ function ShelfTuning({ shop }: { shop: Shop }) {
         step={0.05}
         value={scale}
         onChange={setScale}
-        onCommit={(value) => void applyShop({ ...shop, priceScale: value, sellRate: sell, buyRate: buy })}
+        onCommit={(value) =>
+          void applyShop({ ...shop, priceScale: value, sellRate: sell, buyRate: buy })
+        }
         display={`${Math.round(scale * 100)}%`}
       />
       <Slider
@@ -249,7 +330,9 @@ function ShelfTuning({ shop }: { shop: Shop }) {
         display={`${Math.round(buy * 100)}%`}
       />
       <p className="text-sm text-muted">
-        {realmNote(realm, { dollars: prefs.showDollars })} {scarcityNote(realm.scarcity)} Updating prices uses the modifiers above. Dollars are a comparison for one gold piece, not a second price.
+        {realmNote(realm, { dollars: prefs.showDollars })} {scarcityNote(realm.scarcity)} Updating
+        prices uses the modifiers above. Dollars are a comparison for one gold piece, not a second
+        price.
       </p>
     </div>
   );
@@ -269,12 +352,23 @@ function TurnLock() {
 function CharismaNote({ purseId }: { purseId: string }) {
   const { sheets, purses } = useEconomy();
   const purse = purses.find((item) => item.id === purseId);
-  if (!purse || purse.kind !== "character") return <span className="mt-1 block">The party fund pays the listed price.</span>;
+  if (!purse || purse.kind !== "character")
+    return <span className="mt-1 block">The party fund pays the listed price.</span>;
   const score = charismaScore(sheets.find((sheet) => sheet.purseId === purseId));
-  if (score === null) return <span className="mt-1 block">Import this character's 2014 sheet to take the Charisma discount.</span>;
+  if (score === null)
+    return (
+      <span className="mt-1 block">
+        Import this character's 2014 sheet to take the Charisma discount.
+      </span>
+    );
   const percent = charismaOffPercent(score);
-  if (percent <= 0) return <span className="mt-1 block">Charisma {score} pays the listed price.</span>;
-  return <span className="mt-1 block">Charisma {score} takes {percent}% off every purchase.</span>;
+  if (percent <= 0)
+    return <span className="mt-1 block">Charisma {score} pays the listed price.</span>;
+  return (
+    <span className="mt-1 block">
+      Charisma {score} takes {percent}% off every purchase.
+    </span>
+  );
 }
 
 function StockRow({
@@ -393,10 +487,25 @@ function AddGood({ shopId }: { shopId: string }) {
         setQty("");
       }}
     >
-      <TextInput value={name} onChange={(event) => setName(event.target.value)} placeholder="Good" aria-label="New item" />
+      <TextInput
+        value={name}
+        onChange={(event) => setName(event.target.value)}
+        placeholder="Good"
+        aria-label="New item"
+      />
       <div className="grid grid-cols-2 gap-2">
-        <TextInput value={price} onChange={(event) => setPrice(event.target.value)} placeholder="2 gp" aria-label="New price" />
-        <TextInput value={qty} onChange={(event) => setQty(event.target.value)} placeholder="Qty" aria-label="New quantity" />
+        <TextInput
+          value={price}
+          onChange={(event) => setPrice(event.target.value)}
+          placeholder="2 gp"
+          aria-label="New price"
+        />
+        <TextInput
+          value={qty}
+          onChange={(event) => setQty(event.target.value)}
+          placeholder="Qty"
+          aria-label="New quantity"
+        />
       </div>
       <Button type="submit" variant="secondary">
         Add item
@@ -406,9 +515,13 @@ function AddGood({ shopId }: { shopId: string }) {
 }
 
 function SellBox({ shopId }: { shopId: string }) {
-  const { holdings, sell } = useEconomy();
+  const { holdings, sell, shops } = useEconomy();
+  const closed = shops.find((s) => s.id === shopId)?.closed;
   const seat = useSeat();
-  const mine = seat.role === "player" ? holdings.filter((holding) => seat.purseIds.includes(holding.purseId)) : holdings;
+  const mine =
+    seat.role === "player"
+      ? holdings.filter((holding) => seat.purseIds.includes(holding.purseId))
+      : holdings;
   const [holdingId, setHoldingId] = useState(mine[0]?.id ?? "");
   const [qty, setQty] = useState("1");
   const holding = mine.find((item) => item.id === holdingId);
@@ -417,7 +530,8 @@ function SellBox({ shopId }: { shopId: string }) {
     if (!mine.some((item) => item.id === holdingId) && mine[0]) setHoldingId(mine[0].id);
   }, [holdingId, mine]);
 
-  if (mine.length === 0) return <p className="mt-6 text-sm text-muted">This account has nothing this shop will buy.</p>;
+  if (mine.length === 0)
+    return <p className="mt-6 text-sm text-muted">This account has nothing this shop will buy.</p>;
 
   return (
     <form
@@ -441,8 +555,13 @@ function SellBox({ shopId }: { shopId: string }) {
         ))}
       </select>
       <div className="flex gap-2">
-        <TextInput value={qty} onChange={(event) => setQty(event.target.value)} aria-label="Quantity to sell" className="w-24" />
-        <Button type="submit" variant="secondary">
+        <TextInput
+          value={qty}
+          onChange={(event) => setQty(event.target.value)}
+          aria-label="Quantity to sell"
+          className="w-24"
+        />
+        <Button type="submit" variant="secondary" disabled={closed}>
           Sell
         </Button>
       </div>

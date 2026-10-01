@@ -374,8 +374,8 @@ export function CloudTable() {
             </div>
           ) : null}
           <section className="mt-6" aria-label="Room players">
-            <h2 className="mb-3 text-2xl text-lead">Players ({cloud.seats.length})</h2>
-            <ul className="player-roster">
+            <h2 className="mb-3 text-2xl text-lead">Joined participants ({cloud.seats.length})</h2>
+            <p className="mb-3 text-sm text-muted">Joined participants may be offline. Your connection status appears above.</p><ul className="player-roster">
               {cloud.seats.map((item) => (
                 <li key={item.id}>
                   <span className="member-avatar">

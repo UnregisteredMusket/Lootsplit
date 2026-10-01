@@ -12,6 +12,7 @@ type CampaignState = { campaigns: Campaign[]; activeId: string };
 
 const listeners = new Set<() => void>();
 let booted = false;
+let deleting = false;
 let state: CampaignState = { campaigns: [FIRST_CAMPAIGN], activeId: FIRST_CAMPAIGN.id };
 const SERVER_CAMPAIGNS: CampaignState = state;
 
@@ -86,21 +87,28 @@ export async function deleteCampaign(id: string) {
   };
   // Durable intent permits recovery if the browser closes between IDB deletion and registry commit.
   localStorage.setItem("quire.deletion.v1", JSON.stringify({ target, next }));
+  deleting = true;
   try {
     await deleteQuireDatabase(target.db);
   } catch (error) {
     localStorage.removeItem("quire.deletion.v1");
+    deleting = false;
     throw error;
   }
   state = next;
   persist();
   localStorage.removeItem("quire.deletion.v1");
+  deleting = false;
   closeQuireDb();
   reloadSeat();
   publish();
 }
 
 function playersCannotChangeCampaigns() {
+  if (deleting)
+    throw new Error(
+      "A campaign deletion is still finishing. Close other Lootsplit tabs if it is waiting.",
+    );
   if (getCloudWatch().joined) throw new Error("Return to Local Mode before changing campaigns.");
   if (getSeat().role === "player")
     throw new Error("A player link cannot create, change, or delete campaigns.");

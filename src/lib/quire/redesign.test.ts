@@ -240,3 +240,41 @@ test("journal changes travel through existing optimistic patches with conflict p
   assert.deepEqual(next.journal, changed.journal);
   assert.throws(() => applyCommand(changed, dm, { ...patch, id: "again" }), /changed elsewhere/);
 });
+
+test("session boundaries remain exact for transactions in the same millisecond", () => {
+  let t = fixture();
+  const now = Date.now;
+  Date.now = () => 1000;
+  try {
+    t = applyCommand(t, player, {
+      id: "before",
+      kind: "buy",
+      stockId: "x",
+      purseId: "a",
+      quantity: 1,
+    });
+    t = applyCommand(t, dm, { id: "s", kind: "session", name: "Boundary", end: false });
+    t = applyCommand(t, player, {
+      id: "during",
+      kind: "buy",
+      stockId: "x",
+      purseId: "a",
+      quantity: 1,
+    });
+    t = applyCommand(t, dm, { id: "end", kind: "session", name: "Boundary", end: true });
+    t = applyCommand(t, player, {
+      id: "after",
+      kind: "buy",
+      stockId: "x",
+      purseId: "a",
+      quantity: 1,
+    });
+    assert.deepEqual(sessionSummary(t.ledger, t.journal!.sessions[0]!), {
+      net: -10,
+      received: 0,
+      spent: 10,
+    });
+  } finally {
+    Date.now = now;
+  }
+});

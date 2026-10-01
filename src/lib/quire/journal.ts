@@ -6,7 +6,14 @@ const id = z.string().min(1).max(150),
 export const journalSchema = z.object({
   sessions: z
     .array(
-      z.object({ id, name: z.string().min(1).max(100), startedAt: at, endedAt: at.optional() }),
+      z.object({
+        id,
+        name: z.string().min(1).max(100),
+        startedAt: at,
+        endedAt: at.optional(),
+        startLedgerIds: z.array(id).optional(),
+        endLedgerIds: z.array(id).optional(),
+      }),
     )
     .default([]),
   requests: z
@@ -49,10 +56,12 @@ export function sessionSummary(
   session: Journal["sessions"][number],
   purseIds?: string[],
 ) {
+  const startIds = session.startLedgerIds ? new Set(session.startLedgerIds) : null;
+  const endIds = session.endLedgerIds ? new Set(session.endLedgerIds) : null;
   const rows = ledger.filter(
     (x) =>
-      x.at >= session.startedAt &&
-      (!session.endedAt || x.at < session.endedAt) &&
+      (startIds ? !startIds.has(x.id) : x.at >= session.startedAt) &&
+      (endIds ? endIds.has(x.id) : !session.endedAt || x.at < session.endedAt) &&
       (!purseIds || purseIds.includes(x.purseId)),
   );
   // An account movement is not campaign income. Legacy transfers are identified by their recorded summaries.

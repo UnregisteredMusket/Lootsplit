@@ -54,7 +54,7 @@ export function SaveFolder() {
   useEffect(() => {
     if (!campaign) return;
     let cancelled = false;
-    listSaves(campaign.id)
+    listSaves(seat.role === "dm" ? undefined : campaign.id)
       .then((rows) => {
         if (!cancelled) setSaves(rows);
       })
@@ -72,12 +72,15 @@ export function SaveFolder() {
     return () => {
       cancelled = true;
     };
-  }, [campaign]);
+  }, [campaign, seat.role]);
 
   if (!campaign) return null;
 
   async function refresh() {
-    const [rows, nextLock] = await Promise.all([listSaves(campaign.id), loadSeatLock()]);
+    const [rows, nextLock] = await Promise.all([
+      listSaves(seat.role === "dm" ? undefined : campaign.id),
+      loadSeatLock(),
+    ]);
     setSaves(rows);
     setLock(nextLock);
   }
@@ -167,7 +170,9 @@ export function SaveFolder() {
     void (async () => {
       if (next.kind === "load" || next.kind === "export") {
         const saveId = next.save.id;
-        const current = (await listSaves(campaign.id)).find((row) => row.id === saveId);
+        const current = (await listSaves(seat.role === "dm" ? undefined : campaign.id)).find(
+          (row) => row.id === saveId,
+        );
         if (!current) throw new Error("This backup was removed. Refresh the backup list.");
         next = { ...next, save: current };
       }
@@ -209,8 +214,8 @@ export function SaveFolder() {
         }}
       />
       <p className="text-sm text-muted">
-        Save stores a named backup on this device. Export downloads it. Import adds a backup file
-        to this list. Load replaces the current campaign with the selected backup. Download backup
+        Save stores a named backup on this device. Export downloads it. Import adds a backup file to
+        this list. Load replaces the current campaign with the selected backup. Download backup
         saves the current campaign as a file on your device. Browser copies can be lost if you clear
         site data; keep a downloaded copy too.
         {lock?.protectSaves
@@ -304,6 +309,11 @@ export function SaveFolder() {
             <div className="flex items-baseline justify-between gap-3">
               <p className="min-w-0 truncate">
                 {save.name}
+                {save.campaignId !== campaign.id ? (
+                  <span className="ml-2 text-sm text-muted">
+                    {campaigns.find((c) => c.id === save.campaignId)?.name || "Deleted campaign"}
+                  </span>
+                ) : null}
                 {isLockedFile(save.file) ? (
                   <span className="ml-2 text-sm text-muted">Locked</span>
                 ) : null}

@@ -313,3 +313,46 @@ test("acknowledgments let a client recover a committed purchase after losing the
   assert.ok(state.acknowledged.includes(command.id));
   assert.equal(state.table.holdings.length, 1);
 });
+
+test("new request metadata remains private and approved payments synchronize once across seats", async () => {
+  const { dm, a, b } = await setup();
+  await submitCommands({
+    code: dm.code,
+    token: a.token,
+    batchId: "request",
+    commands: [
+      {
+        id: "request",
+        kind: "payment-request",
+        purseId: "A",
+        copper: 100,
+        note: "Private test bill",
+      },
+    ],
+  });
+  const host = await roomState(dm),
+    other = await roomState({ ...dm, token: b.token });
+  assert.equal(host.table.journal?.requests.length, 1);
+  assert.equal(other.table.journal?.requests.length, 0);
+  await assert.rejects(
+    submitCommands({
+      code: dm.code,
+      token: a.token,
+      batchId: "bad",
+      commands: [{ id: "bad", kind: "payment-decision", requestId: "request", status: "approved" }],
+    }),
+    /Only the DM/,
+  );
+  const command = {
+    id: "approve",
+    kind: "payment-decision" as const,
+    requestId: "request",
+    status: "approved" as const,
+  };
+  await submitCommands({ ...dm, batchId: "approve", commands: [command] });
+  await submitCommands({ ...dm, batchId: "approve", commands: [command] });
+  const reconnect = await roomState({ ...dm, token: a.token });
+  assert.equal(reconnect.table.purses.find((p) => p.id === "A")?.coins.gp, 9);
+  assert.equal(reconnect.table.journal?.requests[0]?.status, "approved");
+  await closeRoom(dm);
+});

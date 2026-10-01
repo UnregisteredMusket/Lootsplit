@@ -94,12 +94,19 @@ export function PortraitPicker({ purse }: { purse: Purse }) {
   );
 }
 export function InventoryList({ holdings }: { holdings: Holding[] }) {
+  const { catalog } = useEconomy();
+  const classify = (x: Holding) =>
+    x.category ||
+    (x.kind === "property"
+      ? "property"
+      : catalog.find((c) => c.name.toLowerCase() === x.name.toLowerCase())?.category) ||
+    x.kind;
   const [query, setQuery] = useState("");
   const [category, setCategory] = useState("All");
-  const categories = ["All", ...new Set(holdings.map((x) => x.category || x.kind))];
+  const categories = ["All", ...new Set(holdings.map(classify))];
   const shown = holdings.filter(
     (x) =>
-      (category === "All" || (x.category || x.kind) === category) &&
+      (category === "All" || classify(x) === category) &&
       `${x.name} ${x.notes}`.toLowerCase().includes(query.toLowerCase()),
   );
   return (
@@ -131,7 +138,7 @@ export function InventoryList({ holdings }: { holdings: Holding[] }) {
             <span className="min-w-0 flex-1">
               <strong>{x.name}</strong>
               <small>
-                {x.category || x.kind} · ×{x.quantity}
+                {classify(x)} · ×{x.quantity}
               </small>
               {x.notes ? <small className="line-clamp-2">{x.notes}</small> : null}
             </span>

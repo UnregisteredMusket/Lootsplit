@@ -158,8 +158,17 @@ export function applyCommand(input: CloudTable, seat: CloudSeat, raw: Command): 
   } else if (cmd.kind === "session") {
     dm();
     const active = journal.sessions.find((x) => !x.endedAt);
-    if (active) active.endedAt = at;
-    if (!cmd.end) journal.sessions.push({ id: cmd.id, name: cmd.name, startedAt: at });
+    if (active) {
+      active.endedAt = at;
+      active.endLedgerIds = t.ledger.map((x) => x.id);
+    }
+    if (!cmd.end)
+      journal.sessions.push({
+        id: cmd.id,
+        name: cmd.name,
+        startedAt: at,
+        startLedgerIds: t.ledger.map((x) => x.id),
+      });
     event(
       cmd.end ? `Ended session: ${active?.name ?? cmd.name}` : `Started session: ${cmd.name}`,
       "session",
