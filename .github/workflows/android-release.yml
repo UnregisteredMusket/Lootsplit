@@ -2,6 +2,10 @@ name: Android signed release APK
 
 on:
   workflow_dispatch:
+  push:
+    branches: ["android/update-1.3.0"]
+    paths:
+      - ".github/workflows/android-release.yml"
 
 permissions:
   contents: read
@@ -45,7 +49,14 @@ jobs:
           printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$ANDROID_KEYSTORE_PATH"
           cd android
           ./gradlew assembleRelease
-          "$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --print-certs app/build/outputs/apk/release/app-release.apk
+          certificate_report=$("$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --print-certs app/build/outputs/apk/release/app-release.apk)
+          printf '%s\n' "$certificate_report"
+          actual_fingerprint=$(printf '%s\n' "$certificate_report" | sed -n 's/^Signer #1 certificate SHA-256 digest: //p' | tr '[:upper:]' '[:lower:]')
+          expected_fingerprint=baca95a880d14d0d8c422c397decd4c9bf0e7f710a3fd6a5be1e47abd3f730a0
+          if [ "$actual_fingerprint" != "$expected_fingerprint" ]; then
+            echo "::error::APK certificate does not match Lootsplit's permanent signing key"
+            exit 1
+          fi
       - name: Upload signed APK only
         uses: actions/upload-artifact@v4
         with:
