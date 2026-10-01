@@ -6,7 +6,12 @@ type Result = { meta: { changes: number } };
 type Statement = { bind: (...values: unknown[]) => Statement; first: <T>() => Promise<T | null>; run: () => Promise<Result> };
 type Database = { prepare: (sql: string) => Statement };
 function database(): Database | undefined {
-  return (globalThis as typeof globalThis & { __env__?: { DB?: Database } }).__env__?.DB;
+  const env = (globalThis as typeof globalThis & { __env__?: { DB?: Database; ASSETS?: unknown } }).__env__;
+  if (env?.DB) return env.DB;
+  if (env && "ASSETS" in env) {
+    throw new Error("Shared tables need a D1 database bound as DB. This deployment does not store rooms in Worker memory or local files.");
+  }
+  return undefined;
 }
 const FILE = path.join(process.cwd(), "data", "cloud-rooms.json");
 async function localRooms(): Promise<CloudRoom[]> {

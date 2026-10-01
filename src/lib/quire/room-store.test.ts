@@ -17,6 +17,15 @@ test("durable shared rooms reject stale writes and survive independent reads",as
  await assert.rejects(deleteRoom(room.code,1),/table changed/);
  await deleteRoom(room.code,2);assert.equal(await readRoom(room.code),null);
 });
+test("a cloudflare worker without D1 does not fall back to a local file", async () => {
+  const previous = (globalThis as { __env__?: unknown }).__env__;
+  (globalThis as { __env__?: unknown }).__env__ = { ASSETS: {} };
+  try {
+    await assert.rejects(readRoom("NONE"), /D1 database bound as DB/);
+  } finally {
+    (globalThis as { __env__?: unknown }).__env__ = previous;
+  }
+});
 test("player responses exclude other private messages, loans, and NPC join choices",async()=>{
  const table={...emptyCloudTable(),purses:[{id:"pc",name:"PC",kind:"character" as const,coins:emptyCoins()},{id:"npc",name:"NPC",kind:"character" as const,control:"npc" as const,coins:emptyCoins()}],notes:[{id:"public",at:1,from:"dm" as const,to:"party" as const,purseId:"",text:"Party note"},{id:"private",at:1,from:"dm" as const,to:"dm" as const,purseId:"npc",text:"Secret"}]};
  const opened=await openRoom({name:"DM",table});

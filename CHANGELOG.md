@@ -1,5 +1,12 @@
 # Lootsplit changelog
 
+## Cloudflare Workers deployment
+
+- Added `cloudflare/worker.mjs`, Wrangler config, and a D1 migration for `campaign_rooms`.
+- Shared rooms on Cloudflare use the `DB` binding and the existing revision check. A Worker without that binding does not write room data to local files or memory.
+- Device backups are unchanged. `npm run dev` still uses the local file store when D1 is absent.
+- `database_id` is left unset on purpose. See CLOUDFLARE.md.
+
 ## 1.1.1 — October 1, 2026
 
 - Replaced the Google Drive section with one Device backups section, reusing existing named snapshots and file import/export. Removed the obsolete app-specific Drive upload endpoints and helpers.

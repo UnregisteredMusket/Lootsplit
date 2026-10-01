@@ -22,7 +22,9 @@
     "test": "node --test scripts/*.test.mjs && npm run test:app && node --experimental-strip-types --test src/lib/app-data/app-data.test.ts src/lib/app-data/readiness-schedule.test.ts src/lib/auth/gate-identity.test.ts src/lib/auth/sign-in-gate.test.ts",
     "lint": "eslint .",
     "format": "prettier --write .",
-    "test:app": "node --experimental-strip-types --test src/lib/quire/*.test.ts"
+    "test:app": "node --experimental-strip-types --test src/lib/quire/*.test.ts",
+    "build:cloudflare": "VITE_AUTH_ENABLED=false node scripts/with-app-env.mjs vite build",
+    "deploy:cloudflare": "wrangler d1 migrations apply DB --remote && wrangler deploy"
   },
   "dependencies": {
     "@electric-sql/pglite": "^0.5.4",
@@ -100,6 +102,7 @@
     "globals": "^15.15.0",
     "playwright": "^1.62.0",
     "prettier": "^3.4.0",
-    "typescript-eslint": "^8.56.1"
+    "typescript-eslint": "^8.56.1",
+    "wrangler": "^4.145.0"
   }
 }
