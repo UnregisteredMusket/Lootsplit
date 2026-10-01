@@ -1,3 +1,4 @@
+import { SyncStatus } from "./sync-status";
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import { Coins, Ellipsis, Home, Hourglass, Library, Radio, Scale, ScrollText, Search, Settings, Share2, Smartphone, Store } from "lucide-react";
 import { useEffect, useRef, useState, useSyncExternalStore, type FormEvent, type ReactNode } from "react";
@@ -60,16 +61,16 @@ export function Shell({ children, width = "wide" }: { children: ReactNode; width
   }
 
   return (
-    <div className="min-h-dvh bg-bg text-fg">
+    <div className="loot-shell min-h-dvh bg-bg text-fg">
       <div className="lg:grid lg:grid-cols-[15rem_minmax(0,1fr)]">
         <aside className="sticky top-0 z-20 hidden h-dvh flex-col border-r border-lead/40 bg-bg/95 px-3 py-5 lg:flex">
           <Link to="/" search={{ view: "home" }} className="inline-flex items-center gap-2 px-2 font-display text-3xl leading-none tracking-tight">
             <QuillMark />
             Lootsplit
           </Link>
-          <nav className="mt-8 flex flex-1 flex-col gap-1" aria-label="Sections">
+          <nav className="mt-8 flex flex-1 flex-col gap-2" aria-label="Sections">
             {navLinks("rail")}
-          </nav>
+          </nav><div className="rounded-xl border border-lead/20 p-4 text-sm text-muted"><p className="text-xs tracking-widest text-lead uppercase">Campaign ledger</p><p className="mt-2">Manage party funds, inventory, and shops.</p></div>
         </aside>
         <div className="min-w-0">
           <header className="sticky top-0 z-20 border-b border-lead/50 bg-bg/90 backdrop-blur-sm">
@@ -111,15 +112,15 @@ export function Shell({ children, width = "wide" }: { children: ReactNode; width
               </div>
             ) : null}
           </header>
-          <main className={cn("mx-auto w-full px-4 pt-6 pb-28 lg:px-8 lg:pt-8 lg:pb-12", width === "prose" ? "max-w-3xl" : "max-w-6xl")}>{children}</main>
+          <main className={cn("mx-auto w-full px-4 pt-6 pb-28 lg:px-8 lg:pt-8 lg:pb-12", width === "prose" ? "max-w-3xl" : "max-w-6xl")}><SyncStatus />{children}</main>
         </div>
       </div>
       {more ? (
         <div className="fixed inset-x-0 bottom-[calc(3.5rem+env(safe-area-inset-bottom))] z-30 border-t border-lead/30 bg-elevated lg:hidden">
           <div className="mx-auto flex max-w-3xl flex-col px-2 py-2">
-            {dm ? <MoreLink to="/books" search={{ q: "" }} label="Library" onPick={() => setMore(false)} /> : null}
+            {dm ? <MoreLink to="/books" search={{ q: "" }} label="Books" onPick={() => setMore(false)} /> : null}
             <MoreLink to="/share" label="Share" onPick={() => setMore(false)} />
-            {dm ? <MoreLink to="/settings" label="Settings" onPick={() => setMore(false)} /> : null}
+            <MoreLink to="/settings" label={dm ? "Settings" : "Device backups"} onPick={() => setMore(false)} />
           </div>
         </div>
       ) : null}
@@ -136,7 +137,7 @@ export function Shell({ children, width = "wide" }: { children: ReactNode; width
         open={leaving}
         onOpenChange={setLeaving}
         title="Switch to player?"
-        body="This phone will act as a player. You will need the campaign password to become the dungeon master again."
+        body="This browser will act as a player. You will need the campaign password to become the dungeon master again."
         confirmLabel="Switch to player"
         onConfirm={() => {
           if (roleChangeBlocked()) return;
@@ -155,7 +156,7 @@ export function Shell({ children, width = "wide" }: { children: ReactNode; width
     if (reason) return;
     const lock = await loadSeatLock().catch(() => null);
     if (seat.role === "player" && !lock) {
-      setBlocked("The dungeon master has not set a password. This phone cannot become the dungeon master until then.");
+      setBlocked("The dungeon master has not set a password. This browser cannot become the dungeon master until then.");
       return;
     }
     if (!lock) {
@@ -168,8 +169,8 @@ export function Shell({ children, width = "wide" }: { children: ReactNode; width
 
   function roleChangeBlocked(): string | null {
     const watch = getCloudWatch();
-    if (!watch.joined || !watch.live) return null;
-    const reason = "Live Mode does not allow a role change. Choose Turn based Mode or Local Mode first.";
+    if (!watch.joined) return null;
+    const reason = "Disconnect from the shared campaign before changing roles. Choose Turn-based Mode or Local Mode first.";
     setBlocked(reason);
     setLeaving(false);
     setSwitching(false);
@@ -180,12 +181,13 @@ export function Shell({ children, width = "wide" }: { children: ReactNode; width
     if (layout === "rail") {
       return (
         <>
-          <NavLink layout={layout} to="/" search={{ view: "home" }} active={onHome} icon={dm ? <Scale className="size-4" /> : <Home className="size-4" />} label={dm ? "Board" : "Home"} />
+          <NavLink layout={layout} to="/" search={{ view: "home" }} active={onHome} icon={dm ? <Scale className="size-4" /> : <Home className="size-4" />} label="Home" />
           <NavLink layout={layout} to="/market" search={{ book: "" }} active={pathname.startsWith("/market") || pathname.startsWith("/shop/")} icon={<Store className="size-4" />} label="Market" />
           <NavLink layout={layout} to="/party" active={pathname === "/party"} icon={<Coins className="size-4" />} label="Party" />
-          {dm ? <NavLink layout={layout} to="/books" search={{ q: "" }} active={inBooks || pathname === "/catalog"} icon={<Library className="size-4" />} label="Books" /> : <NavLink layout={layout} to="/" search={{ view: "sheet" }} active={onSheet} icon={<ScrollText className="size-4" />} label="Sheet" />}
+          {dm ? <NavLink layout={layout} to="/catalog" active={pathname === "/catalog"} icon={<Library className="size-4" />} label="Catalog" /> : <NavLink layout={layout} to="/" search={{ view: "sheet" }} active={onSheet} icon={<ScrollText className="size-4" />} label="Sheet" />}
+          {dm ? <NavLink layout={layout} to="/books" search={{ q: "" }} active={inBooks} icon={<Library className="size-4" />} label="Books" /> : null}
           <NavLink layout={layout} to="/share" active={pathname === "/share"} icon={<Share2 className="size-4" />} label="Share" />
-          {dm ? <NavLink layout={layout} to="/settings" active={pathname === "/settings"} icon={<Settings className="size-4" />} label="Settings" /> : null}
+          <NavLink layout={layout} to="/settings" active={pathname === "/settings"} icon={<Settings className="size-4" />} label={dm ? "Settings" : "Device backups"} />
         </>
       );
     }
@@ -193,11 +195,11 @@ export function Shell({ children, width = "wide" }: { children: ReactNode; width
       <>
         {dm ? (
           <>
-            <NavLink layout={layout} to="/" search={{ view: "home" }} active={onHome} icon={<Scale className="size-4" />} label="Board" />
+            <NavLink layout={layout} to="/" search={{ view: "home" }} active={onHome} icon={<Scale className="size-4" />} label="Home" />
             <NavLink layout={layout} to="/market" search={{ book: "" }} active={pathname.startsWith("/market") || pathname.startsWith("/shop/")} icon={<Store className="size-4" />} label="Market" />
             <NavLink layout={layout} to="/party" active={pathname === "/party"} icon={<Coins className="size-4" />} label="Party" />
-            <NavLink layout={layout} to="/books" search={{ q: "" }} active={inBooks || pathname === "/catalog"} icon={<Library className="size-4" />} label="Books" />
-            <NavLink layout={layout} to="/settings" active={pathname === "/settings"} icon={<Settings className="size-4" />} label="Settings" />
+            <NavLink layout={layout} to="/catalog" active={pathname === "/catalog"} icon={<Library className="size-4" />} label="Catalog" />
+            <button type="button" aria-expanded={more} onClick={() => setMore((open) => !open)} className={cn("inline-flex min-h-14 flex-col items-center justify-center gap-1 text-sm", more ? "text-lead" : "text-faint")}><Ellipsis className="size-4" />More</button>
           </>
         ) : (
           <>
@@ -239,7 +241,7 @@ export function KeptByDm() {
     <Shell>
       <h1 className="font-display text-4xl tracking-tight">Dungeon master only</h1>
       <p className="mt-2 max-w-prose text-sm text-muted">
-        Players can buy and sell for their assigned characters. Only the dungeon master can change prices, the index, PDFs, and price settings.
+        Players can buy and sell for their assigned characters. Only the dungeon master can change prices, the catalog, PDFs, and price settings.
       </p>
     </Shell>
   );
@@ -250,7 +252,7 @@ const LOCAL_WATCH: CloudWatch = { joined: false, mine: true, live: false, who: "
 function ModeMark() {
   const watch = useSyncExternalStore(subscribeCloudWatch, getCloudWatch, () => LOCAL_WATCH);
   const mode = !watch.joined ? "local" : watch.live ? "live" : "turns";
-  const label = mode === "live" ? "Live Mode" : mode === "turns" ? "Turn based Mode" : "Local Mode";
+  const label = mode === "live" ? "Live Mode" : mode === "turns" ? "Turn-based Mode" : "Local Mode";
   const Icon = mode === "live" ? Radio : mode === "turns" ? Hourglass : Smartphone;
   return (
     <Link
@@ -258,11 +260,11 @@ function ModeMark() {
       title={label}
       aria-label={label}
       className={cn(
-        "inline-flex size-11 items-center justify-center",
+        "inline-flex min-h-11 items-center justify-center gap-2 px-2",
         mode === "live" ? "text-accent" : mode === "turns" ? "text-lead" : "text-faint",
       )}
     >
-      <Icon className="size-4" aria-hidden="true" />
+      <Icon className="size-4" aria-hidden="true" /><span className="hidden text-xs sm:inline">{label}</span>
     </Link>
   );
 }
@@ -284,7 +286,7 @@ function SeatMark({
       type="button"
       disabled={!known}
       onClick={onPress}
-      className={cn("inline-flex min-h-11 items-center gap-1.5 text-[0.68rem] font-medium tracking-wide text-faint uppercase", className)}
+      className={cn("inline-flex min-h-11 items-center gap-1.5 text-xs font-medium tracking-wide text-faint uppercase", className)}
       aria-label={known ? (player ? "Player. Change role." : "Dungeon master. Change role.") : "Role"}
     >
       <span className={cn("size-1.5 rounded-full", known ? (player ? "bg-accent" : "bg-lead") : "bg-faint")} aria-hidden="true" />
@@ -328,7 +330,7 @@ function NavLink({
       className={cn(
         "font-medium",
         layout === "tab"
-          ? "inline-flex min-h-14 flex-col items-center justify-center gap-1 px-0.5 text-center text-xs leading-tight"
+          ? "loot-nav-tab inline-flex min-h-16 flex-col items-center justify-center gap-1 px-0.5 text-center text-sm leading-tight"
           : "inline-flex min-h-11 items-center gap-3 rounded-sm px-3 text-sm",
         active ? "text-lead" : "text-faint",
         layout === "rail" && active && "bg-subtle",

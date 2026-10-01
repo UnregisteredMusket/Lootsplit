@@ -92,6 +92,7 @@ let browser = null;
 try {
   browser = await chromium.launch({
     headless: true,
+    executablePath: process.env.CHROMIUM_EXECUTABLE_PATH || undefined,
     args: ["--no-sandbox", "--disable-dev-shm-usage"],
   });
 
@@ -109,7 +110,7 @@ try {
     // networkidle never settles and would burn the whole timeout.
     const resp = await page.goto(url, { waitUntil: "domcontentloaded", timeout: timeoutMs });
     const status = resp?.status() ?? 0;
-    await page.waitForTimeout(1000);
+    await page.waitForTimeout(1800);
 
     const title = await page.title();
     const hasCanvas = (await page.locator("canvas").count()) > 0;

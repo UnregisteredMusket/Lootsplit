@@ -83,15 +83,15 @@ function ShopPage() {
             className="font-display text-2xl"
           />
           <TextInput
-            aria-label="Keeper"
-            placeholder="Keeper"
+            aria-label="Shopkeeper"
+            placeholder="Shopkeeper"
             defaultValue={shop.keeper}
             key={`keeper-${shop.keeper}`}
             onBlur={(event) => void economy.updateShop({ ...shop, keeper: event.target.value.trim() })}
           />
           <TextInput
-            aria-label="Place"
-            placeholder="Place"
+            aria-label="Shop location"
+            placeholder="Shop location"
             defaultValue={shop.place}
             key={`place-${shop.place}`}
             onBlur={(event) => void economy.updateShop({ ...shop, place: event.target.value.trim() })}
@@ -147,7 +147,7 @@ function ShopPage() {
           ))}
         </select>
         {spendable.some((purse) => purse.kind === "party") ? (
-          <span className="mt-1 block">The party option spends the shared purse. A character spends their own.</span>
+          <span className="mt-1 block">The party option spends the shared account. A character spends their own.</span>
         ) : null}
         <CharismaNote purseId={purseId} />
       </label>
@@ -216,7 +216,7 @@ function ShelfTuning({ shop }: { shop: Shop }) {
         ))}
       </div>
       <Slider
-        label="Sticker scale"
+        label="Base price multiplier"
         min={0.5}
         max={2.5}
         step={0.05}
@@ -266,7 +266,7 @@ function TurnLock() {
 function CharismaNote({ purseId }: { purseId: string }) {
   const { sheets, purses } = useEconomy();
   const purse = purses.find((item) => item.id === purseId);
-  if (!purse || purse.kind !== "character") return <span className="mt-1 block">The party purse pays the listed price.</span>;
+  if (!purse || purse.kind !== "character") return <span className="mt-1 block">The party fund pays the listed price.</span>;
   const score = charismaScore(sheets.find((sheet) => sheet.purseId === purseId));
   if (score === null) return <span className="mt-1 block">Import this character's 2014 sheet to take the Charisma discount.</span>;
   const percent = charismaOffPercent(score);
@@ -361,9 +361,9 @@ function StockRow({
       </div>
       <RemoveButton
         className="self-start"
-        label="Remove good"
+        label="Remove item"
         title={`Remove ${line.name}?`}
-        body="This removes the item from this shop. It stays in the index."
+        body="This removes the item from this shop. It stays in the catalog."
         onRemove={() => void deleteStock(line.id)}
       />
     </li>
@@ -390,13 +390,13 @@ function AddGood({ shopId }: { shopId: string }) {
         setQty("");
       }}
     >
-      <TextInput value={name} onChange={(event) => setName(event.target.value)} placeholder="Good" aria-label="New good" />
+      <TextInput value={name} onChange={(event) => setName(event.target.value)} placeholder="Good" aria-label="New item" />
       <div className="grid grid-cols-2 gap-2">
         <TextInput value={price} onChange={(event) => setPrice(event.target.value)} placeholder="2 gp" aria-label="New price" />
         <TextInput value={qty} onChange={(event) => setQty(event.target.value)} placeholder="Qty" aria-label="New quantity" />
       </div>
       <Button type="submit" variant="secondary">
-        Add good
+        Add item
       </Button>
     </form>
   );
@@ -414,7 +414,7 @@ function SellBox({ shopId }: { shopId: string }) {
     if (!mine.some((item) => item.id === holdingId) && mine[0]) setHoldingId(mine[0].id);
   }, [holdingId, mine]);
 
-  if (mine.length === 0) return <p className="mt-6 text-sm text-muted">This purse has nothing this shop will buy.</p>;
+  if (mine.length === 0) return <p className="mt-6 text-sm text-muted">This account has nothing this shop will buy.</p>;
 
   return (
     <form

@@ -7,20 +7,24 @@ export function PasswordGate({
   body,
   onOpenChange,
   onSubmit,
+  showBackupPassword = false,
 }: {
   open: boolean;
   title: string;
   body: string;
   onOpenChange: (open: boolean) => void;
-  onSubmit: (password: string) => Promise<void>;
+  onSubmit: (password: string, backupPassword?: string) => Promise<void>;
+  showBackupPassword?: boolean;
 }) {
   const [password, setPassword] = useState("");
+  const [backupPassword,setBackupPassword]=useState("");
   const [error, setError] = useState("");
   const [busy, setBusy] = useState(false);
 
   useEffect(() => {
     if (!open) return;
     setPassword("");
+    setBackupPassword("");
     setError("");
     setBusy(false);
   }, [open]);
@@ -31,7 +35,7 @@ export function PasswordGate({
     setBusy(true);
     setError("");
     try {
-      await onSubmit(password);
+      await onSubmit(password,backupPassword||undefined);
       onOpenChange(false);
     } catch (caught) {
       setError(caught instanceof Error ? caught.message : "That password does not match this save.");
@@ -47,6 +51,7 @@ export function PasswordGate({
         <Field label="Password">
           <TextInput type="password" autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} />
         </Field>
+        {showBackupPassword ? <Field label="Backup file password (if different)"><TextInput type="password" autoComplete="off" value={backupPassword} onChange={e=>setBackupPassword(e.target.value)} /></Field> : null}
         {error ? <p className="text-sm text-danger">{error}</p> : null}
         <Button type="submit" disabled={busy || password.length === 0}>
           Continue

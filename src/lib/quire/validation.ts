@@ -1,0 +1,18 @@
+import { z } from "zod";
+const id = z.string().min(1);
+const amount = z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER);
+export const coinsSchema = z.object({cp:amount,sp:amount,ep:amount,gp:amount,pp:amount});
+const purse = z.object({id,name:z.string(),kind:z.enum(["party","character"]),coins:coinsSchema,control:z.enum(["player","npc"]).optional()});
+const holding = z.object({id,purseId:id,name:z.string(),kind:z.enum(["item","property"]),quantity:amount,unitCopper:amount,notes:z.string()});
+const shop = z.object({id,name:z.string(),keeper:z.string(),place:z.string(),notes:z.string(),sellRate:z.number().finite().nonnegative(),buyRate:z.number().finite().nonnegative()});
+const stock = z.object({id,shopId:id,name:z.string(),copper:amount,quantity:amount.nullable(),notes:z.string()});
+const ledger = z.object({id,purseId:id,shopId:z.string().nullable(),summary:z.string(),copper:z.number().int().min(-Number.MAX_SAFE_INTEGER).max(Number.MAX_SAFE_INTEGER),at:z.number().finite()});
+export function validateEconomyRows(value: {purses:unknown;holdings:unknown;shops:unknown;stock:unknown;ledger:unknown}): void {
+  const schemas = {purses:purse,holdings:holding,shops:shop,stock,ledger};
+  for (const key of Object.keys(schemas) as (keyof typeof schemas)[]) {
+    const rows = value[key];
+    if (!z.array(schemas[key]).safeParse(rows).success) throw new Error(`The ${key} contain invalid or missing data. The current campaign was not changed.`);
+    const ids = (rows as {id:string}[]).map((row)=>row.id);
+    if (new Set(ids).size !== ids.length) throw new Error(`The ${key} contain duplicate IDs. The current campaign was not changed.`);
+  }
+}

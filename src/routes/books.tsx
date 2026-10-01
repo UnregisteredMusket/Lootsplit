@@ -34,10 +34,10 @@ function LibraryHome() {
         <ImportButton disabled={Boolean(job)} onFiles={importFiles} />
       </div>
       <p className="mt-3 max-w-prose text-sm text-muted">
-        Import a PDF you already own. It stays on this phone. Players cannot read the book. Mark one entry as a handout if they should. The item index is the list shops stock from.
+        Import a PDF you already own. It stays in this browser on this device. Players cannot read the book. Mark one entry as a handout if they should. The item catalog is the list shops stock from.
       </p>
       <Link to="/catalog" className="mt-3 inline-flex min-h-11 items-center text-sm">
-        Open the item index
+        Open the item catalog
       </Link>
       {!ready ? <p className="mt-6 text-muted">Loading…</p> : null}
       {ready && books.length === 0 ? <p className="mt-6 text-muted">No PDFs yet.</p> : null}

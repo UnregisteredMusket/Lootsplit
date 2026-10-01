@@ -1,10 +1,11 @@
 import { quireDb } from "./db.ts";
 
-export type SeatLock = { salt: string; hash: string; protectSaves: boolean };
+export type SeatLock = { salt: string; hash: string; protectSaves: boolean; iterations?: number };
 
 export type LockedFile = {
   kind: "lootsplit-locked";
   version: 1;
+  iterations?: number;
   salt: string;
   iv: string;
   data: string;
@@ -17,7 +18,8 @@ export function readSeatLock(value: unknown): SeatLock | null {
   const lock = value as Partial<SeatLock>;
   if (typeof lock.salt !== "string" || typeof lock.hash !== "string") return null;
   if (!/^[0-9a-f]{32}$/.test(lock.salt) || !/^[0-9a-f]{64}$/.test(lock.hash)) return null;
-  return { salt: lock.salt, hash: lock.hash, protectSaves: lock.protectSaves === true };
+  if (lock.iterations !== undefined && (!Number.isInteger(lock.iterations) || lock.iterations < 100000 || lock.iterations > 1000000)) return null;
+  return { salt: lock.salt, hash: lock.hash, protectSaves: lock.protectSaves === true, iterations: lock.iterations };
 }
 
 export function isLockedFile(value: unknown): value is LockedFile {
@@ -28,24 +30,24 @@ export function isLockedFile(value: unknown): value is LockedFile {
 
 export async function sealPassword(password: string, protectSaves = false): Promise<SeatLock> {
   const salt = hex(crypto.getRandomValues(new Uint8Array(16)));
-  return { salt, hash: await digest(password, salt), protectSaves };
+  return { salt, hash: await stretchedHash(password, salt, 210000), protectSaves, iterations: 210000 };
 }
 
 export async function passwordMatches(password: string, lock: SeatLock): Promise<boolean> {
-  const hash = await digest(password, lock.salt);
+  const hash = lock.iterations ? await stretchedHash(password, lock.salt, lock.iterations) : await digest(password, lock.salt);
   return hash === lock.hash;
 }
 
 export async function lockFile(file: unknown, password: string, salt: string): Promise<LockedFile> {
-  const key = await aesKey(password, salt);
+  const key = await aesKey(password, salt, 210000);
   const iv = crypto.getRandomValues(new Uint8Array(12));
   const cipher = await crypto.subtle.encrypt({ name: "AES-GCM", iv }, key, new TextEncoder().encode(JSON.stringify(file)));
-  return { kind: "lootsplit-locked", version: 1, salt, iv: bytesToBase64(iv), data: bytesToBase64(new Uint8Array(cipher)) };
+  return { kind: "lootsplit-locked", version: 1, iterations: 210000, salt, iv: bytesToBase64(iv), data: bytesToBase64(new Uint8Array(cipher)) };
 }
 
 export async function unlockFile(locked: LockedFile, password: string): Promise<unknown> {
   try {
-    const key = await aesKey(password, locked.salt);
+    const key = await aesKey(password, locked.salt, locked.iterations);
     const plain = await crypto.subtle.decrypt(
       { name: "AES-GCM", iv: copyBytes(base64ToBytes(locked.iv)) },
       key,
@@ -66,7 +68,7 @@ export async function loadSeatLock(): Promise<SeatLock | null> {
 export async function saveSeatLock(lock: SeatLock): Promise<void> {
   const db = await quireDb();
   const tx = db.transaction("meta", "readwrite");
-  tx.objectStore("meta").put({ id: KEY, salt: lock.salt, hash: lock.hash, protectSaves: lock.protectSaves === true });
+  tx.objectStore("meta").put({ id: KEY, salt: lock.salt, hash: lock.hash, protectSaves: lock.protectSaves === true, iterations: lock.iterations });
   await done(tx);
 }
 
@@ -77,7 +79,14 @@ export async function clearSeatLock(): Promise<void> {
   await done(tx);
 }
 
-async function aesKey(password: string, salt: string): Promise<CryptoKey> {
+async function stretchedHash(password:string,salt:string,iterations:number):Promise<string>{
+ if(!Number.isInteger(iterations)||iterations<100000||iterations>1000000)throw new Error("Unsupported password protection settings.");
+ const material=await crypto.subtle.importKey("raw",new TextEncoder().encode(password),"PBKDF2",false,["deriveBits"]);
+ const bits=await crypto.subtle.deriveBits({name:"PBKDF2",salt:new TextEncoder().encode(salt),iterations,hash:"SHA-256"},material,256);
+ return hex(new Uint8Array(bits));
+}
+async function aesKey(password: string, salt: string, iterations?:number): Promise<CryptoKey> {
+ if(iterations){const value=await stretchedHash(password,salt,iterations);return crypto.subtle.importKey("raw",new Uint8Array(value.match(/../g)!.map(x=>parseInt(x,16))),"AES-GCM",false,["encrypt","decrypt"]);}
   const raw = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(`${salt}\n${password}`));
   return crypto.subtle.importKey("raw", raw, "AES-GCM", false, ["encrypt", "decrypt"]);
 }

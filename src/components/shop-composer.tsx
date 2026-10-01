@@ -88,7 +88,7 @@ export function ShopComposer() {
 
   async function open() {
     if (lines.length === 0) {
-      toast("Nothing matched. Turn a rarity on, or add goods to the index.");
+      toast("Nothing matched. Turn a rarity on, or add items to the catalog.");
       return;
     }
     setBusy(true);
@@ -124,7 +124,7 @@ export function ShopComposer() {
         </Button>
       </div>
       <p className="mt-2 text-sm text-muted">
-        Built from the index. Shuffle picks a new name, owner, location, and stock.
+        Built from the catalog. Shuffle picks a new name, owner, location, and stock.
       </p>
       <div className="mt-4 flex flex-col gap-4">
         <NamedField label="Shop" value={name} onChange={setName} onRoll={() => roll("shop")} rollLabel="Random shop name" />
@@ -156,8 +156,8 @@ export function ShopComposer() {
             ))}
           </div>
         </fieldset>
-        <Slider label="Sticker scale" min={0.5} max={2.5} step={0.05} value={priceScale} onChange={setPriceScale} display={`${Math.round(priceScale * 100)}%`} />
-        <Slider label="How full" min={0.4} max={1.6} step={0.1} value={depth} onChange={setDepth} display={depth < 0.7 ? "Thin" : depth > 1.2 ? "Packed" : "Usual"} />
+        <Slider label="Base price multiplier" min={0.5} max={2.5} step={0.05} value={priceScale} onChange={setPriceScale} display={`${Math.round(priceScale * 100)}%`} />
+        <Slider label="Stock level" min={0.4} max={1.6} step={0.1} value={depth} onChange={setDepth} display={depth < 0.7 ? "Low" : depth > 1.2 ? "High" : "Standard"} />
         <Slider label="Sells at" min={0.5} max={2} step={0.05} value={sellRate} onChange={setSellRate} display={`${Math.round(sellRate * 100)}%`} />
         <Slider
           label="Buys at"
@@ -171,7 +171,7 @@ export function ShopComposer() {
           }}
           display={`${Math.round(buyRate * 100)}%`}
         />
-        <NamedField label="Keeper" value={keeper} onChange={setKeeper} onRoll={() => roll("person")} rollLabel="Random keeper" placeholder="NPC" />
+        <NamedField label="Shopkeeper" value={keeper} onChange={setKeeper} onRoll={() => roll("person")} rollLabel="Random keeper" placeholder="NPC" />
         {people.length > 0 ? (
           <Select aria-label="Saved people" value="" onChange={(event) => event.target.value && setKeeper(event.target.value)}>
             <option value="">Assign a saved person</option>
@@ -182,7 +182,7 @@ export function ShopComposer() {
             ))}
           </Select>
         ) : null}
-        <NamedField label="Place" value={place} onChange={setPlace} onRoll={() => roll("place")} rollLabel="Random place" placeholder="Where it stands" />
+        <NamedField label="Shop location" value={place} onChange={setPlace} onRoll={() => roll("place")} rollLabel="Random place" placeholder="Shop location" />
         {places.length > 0 ? (
           <Select aria-label="Saved places" value="" onChange={(event) => event.target.value && setPlace(event.target.value)}>
             <option value="">Use a saved place</option>
@@ -195,7 +195,7 @@ export function ShopComposer() {
         ) : null}
       </div>
       <h3 ref={shelfRef} className="mt-6 font-display text-xl tracking-tight">Stock · {lines.length}</h3>
-      {lines.length === 0 ? <p className="mt-2 text-sm text-muted">No items match. Check the index, or turn a rarity on.</p> : null}
+      {lines.length === 0 ? <p className="mt-2 text-sm text-muted">No items match. Check the catalog, or turn a rarity on.</p> : null}
       <ul className="mt-2 divide-y divide-border border-y border-border">
         {lines.map((line) => (
           <li key={`${line.name}-${line.rarity}`} className="flex items-baseline justify-between gap-3 py-2">

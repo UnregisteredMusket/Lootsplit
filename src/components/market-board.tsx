@@ -11,10 +11,10 @@ export function MarketBoard() {
   const seat = useSeat();
   return (
     <>
-      <Fold title="Holdings and property" hint="Goods and places for sale, apart from the shops." defaultOpen>
+      <Fold title="Holdings and property" hint="Items and places for sale, apart from the shops.">
         <Listings />
       </Fold>
-      <Fold title="Loans" hint="A player asks. The dungeon master approves or denies." defaultOpen>
+      <Fold title="Loans" hint="A player asks. The dungeon master approves or denies.">
         {seat.role === "dm" ? <LoanQueue /> : <LoanAskForm />}
       </Fold>
     </>
@@ -32,8 +32,8 @@ function Listings() {
     <div>
       <p className="text-sm text-muted">
         {seat.role === "dm"
-          ? "Post a holding or a property. A player pays from their purse and it becomes theirs."
-          : "Buy a holding or a property with the purse on this link. The dungeon master sees the purchase on your bill."}
+          ? "Post a holding or a property. A player pays from their account and it becomes theirs."
+          : "Buy a holding or a property with the account on this link. The dungeon master sees the purchase on your activity report."}
       </p>
       {shown.length === 0 ? <p className="mt-3 text-sm text-muted">Nothing is listed.</p> : null}
       <ul className="mt-3 flex flex-col gap-3">
@@ -78,7 +78,7 @@ function BuyListing({
   useEffect(() => {
     if (!purses.some((purse) => purse.id === purseId)) setPurseId(purses[0]?.id ?? "");
   }, [purses, purseId]);
-  if (purses.length === 0) return <p className="mt-2 text-sm text-muted">This link has no purse that can pay.</p>;
+  if (purses.length === 0) return <p className="mt-2 text-sm text-muted">This link has no account that can pay.</p>;
   return (
     <form
       className="mt-2 flex flex-col gap-2 sm:flex-row"
@@ -163,7 +163,7 @@ function LoanAskForm() {
 
   return (
     <div>
-      <p className="text-sm text-muted">Ask the dungeon master for coin. Nothing is paid until they approve the bill.</p>
+      <p className="text-sm text-muted">Request a loan from the DM. Funds are added only after the loan is approved.</p>
       {asked.length > 0 ? (
         <ul className="mt-3 flex flex-col gap-2">
           {asked.map((loan) => (
@@ -174,7 +174,7 @@ function LoanAskForm() {
           ))}
         </ul>
       ) : null}
-      {mine.length === 0 ? <p className="mt-3 text-sm text-muted">This link has no purse to borrow for.</p> : (
+      {mine.length === 0 ? <p className="mt-3 text-sm text-muted">This link has no account to borrow for.</p> : (
         <form
           className="mt-3 flex flex-col gap-2"
           onSubmit={(event) => {
@@ -210,7 +210,7 @@ function LoanQueue() {
   const answered = loans.filter((loan) => loan.status !== "pending").slice(-6).reverse();
   return (
     <div>
-      <p className="text-sm text-muted">A request arrives with the player's bill. Approving pays that purse. Denying pays nothing.</p>
+      <p className="text-sm text-muted">Requests arrive through player activity reports or shared campaign updates. Approval adds funds to the character’s account; denial adds nothing.</p>
       {waiting.length === 0 ? <p className="mt-3 text-sm text-muted">No loans waiting.</p> : null}
       <ul className="mt-3 flex flex-col gap-3">
         {waiting.map((loan) => (

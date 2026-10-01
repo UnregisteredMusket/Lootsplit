@@ -1,6 +1,5 @@
 import type { ChatNote } from "./chat.ts";
 import type { LoanAsk } from "./market.ts";
-import type { CharacterSheet } from "./sheet.ts";
 import type { BillFile } from "./table.ts";
 
 export type ReceiptLine = { summary: string; copper: number };

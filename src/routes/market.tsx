@@ -1,4 +1,5 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
+import { Store, MapPin, Search, ChevronRight } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useEconomy } from "@/lib/quire/economy-context";
 import { CATEGORIES } from "@/lib/quire/labels";
@@ -71,13 +72,13 @@ function MarketPage() {
           </Button>
         ) : null}
       </div>
-      <label className="mt-4 block">
+      <label className="relative mt-5 block"><Search className="absolute left-4 top-3.5 size-5 text-faint" aria-hidden="true" />
         <span className="sr-only">Search the market</span>
         <input
           value={query}
           onChange={(event) => setQuery(event.target.value)}
           placeholder="Search items or shops"
-          className="min-h-11 w-full rounded-xl border border-lead/30 bg-elevated px-3 text-base text-fg outline-none placeholder:text-faint"
+          className="min-h-11 w-full rounded-xl border border-lead/30 bg-elevated pl-12 pr-3 text-base text-fg outline-none placeholder:text-faint"
         />
       </label>
       {seat.role === "dm" ? (
@@ -109,20 +110,20 @@ function MarketPage() {
           />
         </div>
       ) : null}
-      <ul className="mt-3 flex flex-col gap-2">
+      <ul className="market-grid mt-5 grid gap-3 md:grid-cols-2">
         {filtered.map((shop) => {
           const lines = stock.filter((line) => line.shopId === shop.id);
           const tier = shop.sellRate > 1.15 ? "High prices" : shop.sellRate < 0.9 ? "Low prices" : "Fair prices";
           return (
             <li key={shop.id}>
-              <Link to="/shop/$shopId" params={{ shopId: shop.id }} className="flex items-center justify-between gap-3 rounded-2xl border border-lead/25 bg-elevated px-4 py-3">
-                <span className="min-w-0">
+              <Link to="/shop/$shopId" params={{ shopId: shop.id }} className="market-shop flex h-full items-center gap-4 rounded-2xl border border-lead/25 bg-elevated p-5"><span className="icon-tile"><Store className="size-6" /></span>
+                <span className="min-w-0 flex-1">
                   <span className="block truncate font-display text-2xl leading-tight">{shop.name}</span>
                   <span className="text-sm text-muted">
                     {labelKind(shop.category)} · {lines.length} items · {tier}
-                  </span>
+                  </span>{shop.place ? <span className="mt-2 flex items-center gap-1 text-sm text-faint"><MapPin className="size-3" />{shop.place}</span> : null}
                 </span>
-                <span className="shrink-0 text-sm text-lead">{Math.round(shop.sellRate * 100)}%</span>
+                <ChevronRight className="size-4 shrink-0 text-lead" />
               </Link>
             </li>
           );

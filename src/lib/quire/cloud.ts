@@ -1,3 +1,6 @@
+import { validateEconomyRows } from "./validation.ts";
+import { clampRealm } from "./scale.ts";
+import type { RealmSettings } from "./types.ts";
 import type { ChatNote } from "./chat.ts";
 import { mergeNoteLists, readNotes } from "./chat.ts";
 import { readGifts } from "./gift.ts";
@@ -6,9 +9,10 @@ import { fromCopper } from "./money.ts";
 import { mergeSheets, readSheets, type CharacterSheet } from "./sheet.ts";
 import { lesserQuantity, type BillFile } from "./table.ts";
 import { readHandouts, type Handout } from "./handouts.ts";
-import type { Coins, Holding, LedgerLine, Purse, Shop, StockLine } from "./types.ts";
+import { characterControl, type Coins, type Holding, type LedgerLine, type Purse, type Shop, type StockLine } from "./types.ts";
 
 export type CloudTable = {
+  realm?: RealmSettings;
   purses: Purse[];
   holdings: Holding[];
   shops: Shop[];
@@ -39,6 +43,9 @@ export type CloudRoom = {
   seats: CloudSeat[];
   table: CloudTable;
   seen: CloudSeen;
+  commands?: string[];
+  batches?: string[];
+  drafts?: Record<string, import("./commands.ts").Command[]>;
 };
 
 export function emptyCloudTable(): CloudTable {
@@ -51,7 +58,9 @@ export function readCloudTable(value: unknown): CloudTable | null {
   if (!Array.isArray(table.purses) || !Array.isArray(table.holdings) || !Array.isArray(table.shops) || !Array.isArray(table.stock) || !Array.isArray(table.ledger)) {
     return null;
   }
+  try { validateEconomyRows(table as CloudTable); } catch { return null; }
   return {
+    realm: table.realm ? clampRealm(table.realm) : undefined,
     purses: table.purses,
     holdings: table.holdings,
     shops: table.shops,
@@ -114,6 +123,7 @@ export function applyBillToTable(table: CloudTable, bill: BillFile, seen: CloudS
   }
   return {
     table: {
+      realm: table.realm,
       purses,
       holdings,
       shops: table.shops,
@@ -130,7 +140,7 @@ export function applyBillToTable(table: CloudTable, bill: BillFile, seen: CloudS
 }
 
 export function claimSeat(room: CloudRoom, purseId: string, name: string): { room: CloudRoom; seat: CloudSeat } {
-  const purse = room.table.purses.find((item) => item.id === purseId && item.kind === "character");
+  const purse = room.table.purses.find((item) => item.id === purseId && item.kind === "character" && characterControl(item) === "player");
   if (!purse) throw new Error("That character is not at this table.");
   const taken = room.seats.find((seat) => seat.purseIds.includes(purseId));
   if (taken) throw new Error(`${purse.name} is already seated.`);
@@ -163,6 +173,8 @@ export function endPlayerTurn(room: CloudRoom, token: string, bill: BillFile, ba
     purses: bill.purses.filter((purse) => seat.purseIds.includes(purse.id)),
     holdings: bill.holdings.filter((holding) => seat.purseIds.includes(holding.purseId)),
     ledger: bill.ledger.filter((line) => seat.purseIds.includes(line.purseId)),
+    loans: readLoans(bill.loans).filter((loan) => seat.purseIds.includes(loan.purseId)).map((loan) => ({ ...loan, status: "pending" })),
+    notes: readNotes(bill.notes).filter((note) => note.from === "player" && seat.purseIds.includes(note.purseId)),
   };
   const applied = applyBillToTable(room.table, limited, room.seen);
   const next = { ...room, table: applied.table, seen: applied.seen };
@@ -184,7 +196,7 @@ function requireTurn(room: CloudRoom, token: string): CloudSeat {
 
 function seated(room: CloudRoom, token: string): CloudSeat {
   const seat = room.seats.find((item) => item.token === token);
-  if (!seat) throw new Error("This phone is not seated at that table.");
+  if (!seat) throw new Error("This browser is not seated at that table.");
   return seat;
 }
 

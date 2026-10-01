@@ -1,4 +1,3 @@
-import { readPdfPlain } from "./pdf.ts";
 import { mergeSheetBodies, sheetFromData, sheetFromFields, sheetFromText, type SheetDraft } from "./sheet.ts";
 
 export async function readCharacterSheet(file: File): Promise<SheetDraft> {
@@ -17,6 +16,7 @@ export async function readCharacterSheet(file: File): Promise<SheetDraft> {
   if (!name.endsWith(".pdf") && file.type !== "application/pdf") {
     throw new Error("Use a PDF character sheet or a JSON export.");
   }
+  const { readPdfPlain } = await import("./pdf.ts");
   const plain = await readPdfPlain(file);
   const sheet = mergeSheetBodies(sheetFromFields(plain.fields), sheetFromText(plain.text));
   if (!sheet) throw new Error("That PDF does not look like a 2014 character sheet. A scan without selectable text cannot be read.");

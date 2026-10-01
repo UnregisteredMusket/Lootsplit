@@ -32,8 +32,8 @@ export function SeatSwitch({
   async function flip(event: FormEvent) {
     event.preventDefault();
     const watch = getCloudWatch();
-    if (watch.joined && watch.live) {
-      setError("Live Mode does not allow a role change.");
+    if (watch.joined) {
+      setError("Disconnect from the shared campaign before changing roles.");
       return;
     }
     if (!lock) return;
@@ -59,7 +59,7 @@ export function SeatSwitch({
       ) : null}
       {lock ? (
         <form className="flex flex-col gap-3" onSubmit={(event) => void flip(event)}>
-          <p className="text-sm text-muted">Enter the password from this save. The bill you send will say this phone became the dungeon master.</p>
+          <p className="text-sm text-muted">Enter the password from this save. The activity report you send will say this browser on this device became the dungeon master.</p>
           <Field label="Password">
             <TextInput type="password" autoComplete="current-password" value={password} onChange={(event) => setPassword(event.target.value)} />
           </Field>

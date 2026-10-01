@@ -25,17 +25,17 @@ function CatalogPage() {
   if (seat.role === "player") return <KeptByDm />;
   return (
     <Shell>
-      <h1 className="font-display text-4xl tracking-tight">Index</h1>
+      <h1 className="font-display text-4xl tracking-tight">Catalog</h1>
       <p className="mt-2 max-w-prose text-sm text-muted">
-        Items a shop can stock, and names a generated shop can use. Nothing is uploaded.
+        Items a shop can stock, and names a generated shop can use.
       </p>
       <div className="mt-4">
         <Segmented
-          label="Index section"
+          label="Catalog section"
           value={pane}
           onChange={setPane}
           options={[
-            { value: "goods", label: "Goods" },
+            { value: "goods", label: "Items" },
             { value: "names", label: "Names" },
             { value: "book", label: "Book" },
           ]}
@@ -108,9 +108,9 @@ function GoodsPane() {
 
   return (
     <div className="mt-6">
-      {!ready ? <p className="text-muted">Opening the index…</p> : null}
+      {!ready ? <p className="text-muted">Opening the catalog…</p> : null}
       <form className="flex flex-col gap-2" onSubmit={add}>
-        <TextInput value={name} onChange={(event) => setName(event.target.value)} placeholder="New good" aria-label="New good" />
+        <TextInput value={name} onChange={(event) => setName(event.target.value)} placeholder="New item" aria-label="New item" />
         <div className="grid grid-cols-2 gap-2">
           <TextInput value={price} onChange={(event) => setPrice(event.target.value)} placeholder="List price, 2 gp" aria-label="List price" />
           <Select aria-label="Category" value={kind} onChange={(event) => setKind(event.target.value as ItemCategory)}>
@@ -129,14 +129,14 @@ function GoodsPane() {
           ))}
         </Select>
         <Button type="submit" variant="secondary">
-          Add to the index
+          Add to the catalog
         </Button>
       </form>
       <div className="mt-8 rounded-lg border border-border p-4">
-        <h2 className="font-display text-2xl tracking-tight">Invent goods</h2>
+        <h2 className="font-display text-2xl tracking-tight">Generate items</h2>
         <p className="mt-2 text-sm text-muted">Generated items with list prices. No PDF required.</p>
         <div className="mt-3 flex flex-col gap-3">
-          <Select aria-label="Invented category" value={inventCategory} onChange={(event) => setInventCategory(event.target.value as ItemCategory)}>
+          <Select aria-label="Generated category" value={inventCategory} onChange={(event) => setInventCategory(event.target.value as ItemCategory)}>
             {CATEGORIES.map((option) => (
               <option key={option.value} value={option.value}>
                 {option.label}
@@ -165,11 +165,11 @@ function GoodsPane() {
               className="mt-1 min-h-11 w-full rounded-sm border border-border bg-subtle px-3 text-base text-fg"
             />
           </label>
-          <Button onClick={() => void invent(inventCategory, flags, count)}>Invent</Button>
+          <Button onClick={() => void invent(inventCategory, flags, count)}>Generate</Button>
         </div>
       </div>
       <div className="mt-8 grid gap-2 lg:grid-cols-[minmax(0,1fr)_16rem]">
-        <TextInput value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Find a good" aria-label="Find a good" />
+        <TextInput value={query} onChange={(event) => setQuery(event.target.value)} placeholder="Find an item" aria-label="Find an item" />
         <Select aria-label="Filter category" value={category} onChange={(event) => setCategory(event.target.value as ItemCategory | "all")}>
           <option value="all">All categories</option>
           {CATEGORIES.map((option) => (
@@ -207,7 +207,7 @@ function GoodsPane() {
                 className="shrink-0"
                 label="Remove"
                 title={`Remove ${item.name}?`}
-                body="This removes it from the index. Shops that already stock it keep it until you edit them."
+                body="This removes it from the catalog. Shops that already stock it keep it until you edit them."
                 onRemove={() => void deleteGood(item.id)}
               />
             </div>
@@ -215,7 +215,7 @@ function GoodsPane() {
         ))}
       </ul>
       <button type="button" className="mt-4 text-sm text-muted" onClick={() => void restoreGoods()}>
-        Restore starter goods
+        Restore starter items
       </button>
     </div>
   );

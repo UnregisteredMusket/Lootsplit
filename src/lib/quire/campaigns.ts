@@ -1,3 +1,4 @@
+import { getCloudWatch } from "./cloud-turn.ts";
 import { closeQuireDb, deleteQuireDatabase } from "./db.ts";
 import { getSeat, reloadSeat } from "./table.ts";
 
@@ -5,7 +6,7 @@ export type Campaign = { id: string; name: string; db: string };
 
 const REGISTRY = "quire.campaigns.v1";
 const ACTIVE = "quire.campaign.v1";
-export const FIRST_CAMPAIGN: Campaign = { id: "main", name: "The company", db: "quire" };
+export const FIRST_CAMPAIGN: Campaign = { id: "main", name: "Party overview", db: "quire" };
 
 type CampaignState = { campaigns: Campaign[]; activeId: string };
 
@@ -89,6 +90,7 @@ export async function deleteCampaign(id: string) {
 }
 
 function playersCannotChangeCampaigns() {
+  if (getCloudWatch().joined) throw new Error("Return to Local Mode before changing campaigns.");
   if (getSeat().role === "player") throw new Error("A player link cannot create, change, or delete campaigns.");
 }
 

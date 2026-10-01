@@ -11,3 +11,8 @@ dist
 *.log
 .env
 .env.*
+
+# Runtime sessions from the uploaded archive are not application source.
+data/cloud-rooms.json
+.sites-runtime
+.wrangler

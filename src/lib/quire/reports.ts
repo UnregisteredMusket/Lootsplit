@@ -35,7 +35,7 @@ export function recordReport(input: { message: string; stack?: string; source: B
     message: input.message.slice(0, 500),
     stack: (input.stack ?? "").slice(0, 4000),
     source: input.source,
-    href: typeof location === "undefined" ? "" : location.href,
+    href: typeof location === "undefined" ? "" : location.origin + location.pathname,
     mode: modeLabel(),
     role: roleLabel(),
   };
@@ -66,7 +66,7 @@ export function watchCrashes() {
 function modeLabel(): string {
   const watch = getCloudWatch();
   if (!watch.joined) return "Local Mode";
-  return watch.live ? "Live Mode" : "Turn based Mode";
+  return watch.live ? "Live Mode" : "Turn-based Mode";
 }
 
 function roleLabel(): string {

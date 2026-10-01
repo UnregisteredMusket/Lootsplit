@@ -1,3 +1,4 @@
+import type {ReportBase} from "./local-report.ts";
 import type { Coins, Holding, LedgerLine, Purse, RealmSettings, Shop, StockLine } from "./types.ts";
 import { readGifts, readRoster, type PlayerGift, type RosterPerson } from "./gift.ts";
 import { readListings, readLoans, readSales, type Listing, type ListingSale, type LoanAsk } from "./market.ts";
@@ -25,6 +26,8 @@ export type TableFile = {
 };
 
 export type BillFile = {
+  reportId?: string;
+  base?: ReportBase;
   kind: "quire-bill";
   version: 1;
   exportedAt: number;
@@ -158,6 +161,7 @@ export function buildTable(input: {
 
 export function buildBill(
   input: {
+    shareBase?: ReportBase;
     purses: Purse[];
     holdings: Holding[];
     stock: StockLine[];
@@ -174,6 +178,8 @@ export function buildBill(
   const shopIds = new Set(sitting.shopIds);
   return {
     kind: "quire-bill",
+    reportId: crypto.randomUUID(),
+    base: input.shareBase,
     version: 1,
     exportedAt: Date.now(),
     openedAt: sitting.openedAt,
@@ -195,11 +201,11 @@ export function buildBill(
 }
 
 export function readShare(value: unknown): TableFile | BillFile {
-  if (typeof value !== "object" || value === null) throw new Error("That file is not a player file or a bill.");
+  if (typeof value !== "object" || value === null) throw new Error("That file is not a player file or an activity report.");
   const file = value as { kind?: string; version?: number };
   if (file.kind === "quire-table" && file.version === 1) return readTable(value);
   if (file.kind === "quire-bill" && file.version === 1) return readBill(value);
-  throw new Error("That file is not a player file or a bill.");
+  throw new Error("That file is not a player file or an activity report.");
 }
 
 export function lesserQuantity(here: number | null, there: number | null): number | null {
@@ -238,12 +244,14 @@ function readTable(value: unknown): TableFile {
 function readBill(value: unknown): BillFile {
   const file = value as Partial<BillFile>;
   if (!Array.isArray(file.purses) || !Array.isArray(file.holdings) || !Array.isArray(file.stock) || !Array.isArray(file.ledger)) {
-    throw new Error("That bill is incomplete.");
+    throw new Error("That activity report is incomplete.");
   }
-  if (!Array.isArray(file.purseIds) || !Array.isArray(file.shopIds)) throw new Error("That bill is incomplete.");
-  if (!file.purses.every(isPurse)) throw new Error("That bill is incomplete.");
+  if (!Array.isArray(file.purseIds) || !Array.isArray(file.shopIds)) throw new Error("That activity report is incomplete.");
+  if (!file.purses.every(isPurse)) throw new Error("That activity report is incomplete.");
   return {
     kind: "quire-bill",
+    reportId: typeof file.reportId === "string" ? file.reportId : undefined,
+    base: file.base,
     version: 1,
     exportedAt: Number(file.exportedAt) || Date.now(),
     openedAt: Number(file.openedAt) || 0,

@@ -18,7 +18,7 @@ export function Campaigns() {
       <section className="mt-6 rounded-lg border border-border p-4">
         <h2 className="font-display text-2xl tracking-tight">Campaign</h2>
         <p className="mt-2 text-sm text-muted">
-          This phone opened a player link. You cannot create, rename, open, or delete campaigns. The dungeon master keeps those.
+          This browser opened a player link. You cannot create, rename, open, or delete campaigns. Only the DM can manage campaigns.
         </p>
       </section>
     );
@@ -29,7 +29,7 @@ export function Campaigns() {
   return (
     <section className="mt-6 rounded-lg border border-border p-4">
       <h2 className="font-display text-2xl tracking-tight">Campaigns</h2>
-      <p className="mt-2 text-sm text-muted">Each campaign has its own shops, money, index, names, and PDFs. The app uses the one that is open.</p>
+      <p className="mt-2 text-sm text-muted">Each campaign has its own shops, money, catalog, names, and PDFs. The app uses the one that is open.</p>
       <label className="mt-4 block text-sm text-muted">
         Open campaign
         <TextInput
@@ -83,7 +83,7 @@ export function Campaigns() {
         open={removing !== null}
         onOpenChange={(open) => { if (!open) setRemoving(null); }}
         title="Remove this campaign?"
-        body="Its shops, money, index, and PDFs are deleted from this device. The campaign that is open is not deleted."
+        body="Its shops, money, catalog, and PDFs are deleted from this device. The campaign that is open is not deleted."
         confirmLabel="Remove"
         onConfirm={() => {
           const id = removing;

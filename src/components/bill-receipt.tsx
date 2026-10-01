@@ -20,7 +20,7 @@ export function BillReceipt() {
         ) : null}
         {receipt.switchedToDm ? (
           <p className="rounded-sm border border-danger px-3 py-2 text-sm">
-            This player switched to dungeon master before sending the bill. The purchases may have been changed after that switch.
+            This player switched to dungeon master before sending the activity report. The purchases may have been changed after that switch.
           </p>
         ) : null}
         <section>

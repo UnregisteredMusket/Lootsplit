@@ -60,7 +60,7 @@ export function Fold({
 }) {
   const [open, setOpen] = useState(defaultOpen);
   return (
-    <section className="mt-4 rounded-lg border border-border">
+    <section className="loot-fold mt-4 rounded-lg border border-border">
       <div className="flex items-stretch">
         <button
           type="button"

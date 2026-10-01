@@ -1,3 +1,4 @@
+import {getCloudTable} from "@/lib/quire/cloud-client";
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useState, type FormEvent } from "react";
 import { useEconomy } from "@/lib/quire/economy-context";
@@ -8,16 +9,22 @@ import { useSeat } from "@/lib/quire/seat";
 import { characterControl, type Purse } from "@/lib/quire/types";
 import { Shell } from "@/components/shell";
 import { CharacterSheetPanel } from "@/components/character-sheet";
-import { Button, Segmented, Select, TextInput } from "@/components/ui";
+import { Button, Modal, Segmented, TextInput } from "@/components/ui";
 import { RemoveButton } from "@/components/quire-ui";
 
 export const Route = createFileRoute("/party")({
+  validateSearch: (search: Record<string, unknown>): { action?: string } => ({ action: search.action === "add" || search.action === "give" || search.action === "pay" ? search.action : "" }),
   component: PartyPage,
 });
 
 function PartyPage() {
   const economy = useEconomy();
+  const { action: initialAction } = Route.useSearch();
+  const [action, setAction] = useState(initialAction ?? "");
+  useEffect(() => setAction(initialAction ?? ""), [initialAction]);
   const seat = useSeat();
+  const cloud=getCloudTable();
+  const readOnly=cloud.joined && (seat.role === "player" || !cloud.mine);
   const visible = seat.role === "player" ? economy.purses.filter((purse) => seat.purseIds.includes(purse.id)) : economy.purses;
   const coin = visible.reduce((sum, purse) => sum + toCopper(purse.coins), 0);
   const goods = economy.holdings
@@ -26,11 +33,11 @@ function PartyPage() {
 
   return (
     <Shell>
-      <h1 className="font-display text-4xl tracking-tight">Party</h1>
+      <div className="flex items-center justify-between gap-3"><div><p className="eyebrow">Party overview</p><h1 className="font-display text-4xl tracking-tight">Party</h1></div><Button disabled={!economy.ready || visible.length === 0 || readOnly} onClick={() => setAction("add")}>+ Add loot</Button></div>
       {!economy.ready ? <p className="mt-6 text-muted">Loading…</p> : null}
       {economy.ready ? (
         <>
-          <section className="mt-4 rounded-2xl border border-lead/25 bg-elevated p-4">
+          <section className="wealth-card mt-5 rounded-2xl border border-lead/25 bg-elevated p-5">
             <p className="text-xs tracking-[0.16em] text-faint uppercase">Combined wealth</p>
             <p className="mt-1 font-display text-4xl tracking-tight text-lead">{formatCopper(coin + goods)}</p>
             <div className="mt-3 grid grid-cols-3 gap-2 text-sm">
@@ -45,7 +52,7 @@ function PartyPage() {
               const worth = toCopper(purse.coins) + economy.holdings.filter((holding) => holding.purseId === purse.id).reduce((sum, holding) => sum + holding.unitCopper * holding.quantity, 0);
               return (
                 <li key={purse.id}>
-                  <a href={`#purse-${purse.id}`} className="flex min-h-11 items-center justify-between gap-3 text-sm">
+                  <a onClick={() => { const detail = document.getElementById(`purse-${purse.id}`); if (detail instanceof HTMLDetailsElement) detail.open = true; }} href={`#purse-${purse.id}`} className="flex min-h-11 items-center justify-between gap-3 text-sm">
                     <span>{purse.name}</span>
                     <span className="tabular-nums text-lead">{formatCopper(worth)}</span>
                   </a>
@@ -73,7 +80,7 @@ function PartyPage() {
                 Add character
               </Button>
               <Button variant="secondary" onClick={() => void economy.createPurse("party")}>
-                Add party purse
+                Add party fund
               </Button>
             </div>
           ) : (
@@ -81,10 +88,10 @@ function PartyPage() {
           )}
           <div className="mt-6 grid gap-4 lg:grid-cols-2">
             {visible.map((purse) => (
-              <PurseCard key={purse.id} purse={purse} />
+              <details key={purse.id} id={`purse-${purse.id}`} className="member-detail rounded-xl border border-lead/20 bg-elevated"><summary className="flex min-h-14 cursor-pointer items-center justify-between p-4"><span>{purse.name}</span><span className="text-sm text-lead">Manage funds +</span></summary><PurseCard purse={purse} /></details>
             ))}
           </div>
-          <h2 className="mt-10 font-display text-2xl tracking-tight">Shared holdings</h2>
+          <h2 className="mt-8 font-display text-2xl tracking-tight">Holdings & property</h2>
           <ul className="mt-3 divide-y divide-border border-y border-border">
             {economy.holdings
               .filter((holding) => visible.some((purse) => purse.id === holding.purseId))
@@ -109,7 +116,7 @@ function PartyPage() {
                         className="mt-1"
                         label="Remove"
                         title={`Remove ${holding.name}?`}
-                        body="This item is deleted. Money already in a purse is not changed."
+                        body="This item is deleted. Money already in an account is not changed."
                         onRemove={() => void economy.deleteHolding(holding.id)}
                       />
                     ) : null}
@@ -117,9 +124,8 @@ function PartyPage() {
                 );
               })}
           </ul>
-          <AddHolding purses={visible} />
-          <GiveToPlayer purses={visible} />
-          <Payment purses={visible} />
+          <div className="mt-5 flex gap-3"><Button onClick={() => setAction("add")} disabled={visible.length === 0 || readOnly}>Add loot</Button><Button variant="secondary" onClick={() => setAction("give")} disabled={visible.length === 0}>Give</Button><Button variant="secondary" onClick={() => setAction("pay")} disabled={visible.length === 0 || readOnly}>Payment</Button></div>
+          <Modal open={action !== ""} onOpenChange={(open) => { if (!open) setAction(""); }} title={action === "add" ? "Add loot" : action === "give" ? "Give to a player" : "Record a payment"}>{readOnly && action !== "give" ? <p>Only the DM can directly edit funds and inventory in shared modes. Use Buy, Sell, Give, or Request loan.</p> : action === "add" ? <AddHolding purses={visible} /> : action === "give" ? <GiveToPlayer purses={visible} /> : <Payment purses={visible} />}</Modal>
         </>
       ) : null}
     </Shell>
@@ -129,6 +135,8 @@ function PartyPage() {
 function PurseCard({ purse }: { purse: Purse }) {
   const { updatePurse, setPurseCoins, deletePurse } = useEconomy();
   const seat = useSeat();
+  const cloud=getCloudTable();
+  const readOnly=cloud.joined && (seat.role === "player" || !cloud.mine);
   const dollars = useDollarText();
   const [coins, setCoins] = useState(purse.coins);
   const purseDollars = dollars(toCopper(purse.coins));
@@ -141,12 +149,12 @@ function PurseCard({ purse }: { purse: Purse }) {
 
   useEffect(() => {
     setCoins(purse.coins);
-  }, [purse.coins.cp, purse.coins.sp, purse.coins.ep, purse.coins.gp, purse.coins.pp]);
+  }, [purse.coins]);
 
   return (
-    <section id={`purse-${purse.id}`} className="rounded-xl border border-lead/25 bg-elevated p-4">
+    <section className="rounded-xl border border-lead/25 bg-elevated p-4"><fieldset disabled={readOnly}>
       <TextInput
-        aria-label="Purse name"
+        aria-label="Funds name"
         defaultValue={purse.name}
         key={purse.name}
         onBlur={(event) => {
@@ -156,7 +164,7 @@ function PurseCard({ purse }: { purse: Purse }) {
         className="font-display text-2xl"
       />
       <p className="mt-1 text-sm text-muted">
-        {purse.kind === "party" ? "Party purse" : characterControl(purse) === "npc" ? "NPC" : "Player"} · {formatCoins(purse.coins)}
+        {purse.kind === "party" ? "Party account" : characterControl(purse) === "npc" ? "NPC" : "Player"} · {formatCoins(purse.coins)}
         {purseDollars ? ` · ${purseDollars}` : ""}
       </p>
       {purse.kind === "character" && seat.role === "dm" ? (
@@ -220,28 +228,29 @@ function PurseCard({ purse }: { purse: Purse }) {
         </Button>
         {changed(intoSilver) ? (
           <Button variant="secondary" onClick={() => { setCoins(intoSilver); void setPurseCoins(purse.id, intoSilver); }}>
-            Into silver
+            Convert to silver
           </Button>
         ) : null}
         {changed(intoGold) ? (
           <Button variant="secondary" onClick={() => { setCoins(intoGold); void setPurseCoins(purse.id, intoGold); }}>
-            Into gold
+            Convert to gold
           </Button>
         ) : null}
         {changed(intoPlatinum) ? (
           <Button variant="secondary" onClick={() => { setCoins(intoPlatinum); void setPurseCoins(purse.id, intoPlatinum); }}>
-            Into platinum
+            Convert to platinum
           </Button>
         ) : null}
         {seat.role === "dm" ? (
           <RemoveButton
-            label="Remove purse"
+            label="Remove account"
             title={`Remove ${purse.name}?`}
-            body="Items on this purse are not deleted."
+            body="This account and its holdings are deleted. Transaction history is retained."
             onRemove={() => void deletePurse(purse.id)}
           />
         ) : null}
       </div>
+      </fieldset>{readOnly ? <p className="mt-2 text-sm text-muted">Direct fund edits are managed by the DM in shared modes.</p> : null}
       {purse.kind === "character" ? <CharacterSheetPanel purseId={purse.id} /> : null}
     </section>
   );
@@ -298,6 +307,7 @@ function AddHolding({ purses }: { purses: Purse[] }) {
         <TextInput value={qty} onChange={(event) => setQty(event.target.value)} aria-label="Holding quantity" />
       </div>
       <select
+        aria-label="Holding owner"
         value={purseId}
         onChange={(event) => setPurseId(event.target.value)}
         className="min-h-11 rounded-sm border border-border bg-subtle px-3 text-base text-fg"
@@ -363,7 +373,7 @@ function GiveToPlayer({ purses }: { purses: Purse[] }) {
     <section className="mt-10">
       <h2 className="font-display text-2xl tracking-tight">Give to a player</h2>
       <p className="mt-1 text-sm text-muted">
-        Coins, items, or property move to another player. The party chat shows it, and the dungeon master's bill lists it.
+        Coins, items, or property move to another player. The party chat shows it, and the dungeon master's activity report lists it.
       </p>
       {recipients.length === 0 ? (
         <p className="mt-3 text-sm text-muted">
@@ -432,7 +442,7 @@ function Payment({ purses }: { purses: Purse[] }) {
           value={purseId}
           onChange={(event) => setPurseId(event.target.value)}
           className="min-h-11 rounded-sm border border-border bg-subtle px-3 text-base text-fg"
-          aria-label="Purse for the payment"
+          aria-label="Funds for the payment"
         >
           {purses.map((purse) => (
             <option key={purse.id} value={purse.id}>
@@ -444,10 +454,10 @@ function Payment({ purses }: { purses: Purse[] }) {
         <TextInput value={note} onChange={(event) => setNote(event.target.value)} placeholder="What it was for" aria-label="Payment note" />
         <div className="flex flex-wrap gap-2">
           <Button variant="secondary" onClick={() => send(-1)}>
-            Pay out
+            Pay funds
           </Button>
           <Button variant="secondary" onClick={() => send(1)}>
-            Take in
+            Receive funds
           </Button>
         </div>
       </div>

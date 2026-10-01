@@ -1,11 +1,11 @@
 import { useEffect, useState } from "react";
 import { noticesOn, setNotices } from "@/lib/quire/notify";
-import { sendBugReport } from "@/lib/quire/drive-client";
+import { downloadBugReport } from "@/lib/quire/diagnostics";
 import { Switch, Button } from "@/components/ui";
 
 export function Notices() {
   const [on, setOn] = useState(false);
-  const [hint, setHint] = useState("A notice when the mode changes, a message arrives, or it is your turn. Mail after the app is closed needs a mail account, and none is connected.");
+  const [hint, setHint] = useState("Receive notifications for messages, mode changes, and turns while Lootsplit is running. Browser permission is required.");
 
   useEffect(() => setOn(noticesOn()), []);
 
@@ -13,13 +13,13 @@ export function Notices() {
     <div>
       <Switch
         checked={on}
-        label="Notices"
+        label="Notifications"
         hint={hint}
         onChange={(checked) => {
           void setNotices(checked).then((allowed) => {
             setOn(allowed);
-            if (checked && !allowed) setHint("This browser did not allow notices.");
-            else setHint(allowed ? "Notices are on for this phone." : "Notices are off.");
+            if (checked && !allowed) setHint("This browser did not allow notifications.");
+            else setHint(allowed ? "Notifications are on for this browser on this device." : "Notifications are off.");
           });
         }}
       />
@@ -27,13 +27,13 @@ export function Notices() {
         <Button
           variant="secondary"
           onClick={() => {
-            void sendBugReport().then(
-              () => setHint("Bug report copied to Google Drive."),
+            void downloadBugReport().then(
+              () => setHint("Diagnostic report downloaded."),
               (error: unknown) => setHint(error instanceof Error ? error.message : "The bug report could not be sent."),
             );
           }}
         >
-          Send bug report
+          Download diagnostic report
         </Button>
       </div>
     </div>

@@ -1,3 +1,4 @@
+import {getCloudTable} from "@/lib/quire/cloud-client";
 import { useEconomy } from "@/lib/quire/economy-context";
 import { formatCoins, toCopper } from "@/lib/quire/money";
 import { useSeat } from "@/lib/quire/seat";
@@ -17,13 +18,13 @@ export function CharacterSheetPanel({ purseId, face = true }: { purseId: string;
   const { sheets, importSheet, updateSheet } = useEconomy();
   const seat = useSeat();
   const sheet = sheets.find((item) => item.purseId === purseId);
-  const canImport = seat.role === "dm" || seat.purseIds.includes(purseId);
+  const canImport = seat.role === "dm" || (!getCloudTable().joined && seat.purseIds.includes(purseId));
 
   return (
     <div className="mt-4">
       {canImport ? (
         <label className="inline-flex min-h-11 cursor-pointer items-center text-sm underline">
-          Bring in a 2014 sheet
+          Import a D&D 5e (2014) character sheet
           <input
             type="file"
             accept="application/pdf,application/json,.pdf,.json"

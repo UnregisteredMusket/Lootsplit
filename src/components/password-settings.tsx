@@ -13,7 +13,8 @@ import {
   unlockFile,
   type SeatLock,
 } from "@/lib/quire/lock";
-import { listSaves, replaceSave } from "@/lib/quire/saves";
+import { readQuireFile } from "@/lib/quire/economy";
+import { listSaves, replaceSaves } from "@/lib/quire/saves";
 
 export function PasswordSettings() {
   const [lock, setLock] = useState<SeatLock | null | undefined>(undefined);
@@ -46,8 +47,8 @@ export function PasswordSettings() {
 
   async function create(event: FormEvent) {
     event.preventDefault();
-    if (password.trim().length < 4) {
-      setError("Use at least 4 characters.");
+    if (password.trim().length < 8) {
+      setError("Use at least 8 characters.");
       return;
     }
     if (password !== again) {
@@ -71,8 +72,8 @@ export function PasswordSettings() {
   async function change(event: FormEvent) {
     event.preventDefault();
     if (!lock) return;
-    if (password.trim().length < 4) {
-      setError("Use at least 4 characters.");
+    if (password.trim().length < 8) {
+      setError("Use at least 8 characters.");
       return;
     }
     if (password !== again) {
@@ -88,12 +89,20 @@ export function PasswordSettings() {
       const sealed = await sealPassword(password, lock.protectSaves);
       const campaignId = getCampaigns().activeId;
       const saves = await listSaves(campaignId);
+      const replacements = [];
       for (const save of saves) {
         if (!isLockedFile(save.file)) continue;
-        const plain = await unlockFile(save.file, current);
-        await replaceSave({ ...save, file: await lockFile(plain, password, sealed.salt) });
+        const plain = readQuireFile(await unlockFile(save.file, current));
+        plain.seatLock = sealed;
+        replacements.push({ ...save, file: await lockFile(plain, password, sealed.salt) });
       }
-      await saveSeatLock(sealed);
+      await replaceSaves(replacements);
+      try {
+        await saveSeatLock(sealed);
+      } catch (error) {
+        await replaceSaves(saves);
+        throw error;
+      }
       setLock(sealed);
       resetFields();
       toast.success("Password changed. Locked saves use the new one.");
@@ -132,18 +141,32 @@ export function PasswordSettings() {
   }
 
   return (
-    <Fold title="Password" hint="One password for the dungeon master switch and, if you turn it on, for saves.">
+    <Fold
+      title="Password"
+      hint="One password for the dungeon master switch and, if you turn it on, for saves."
+    >
       {lock === undefined ? <p className="text-sm text-muted">Loading…</p> : null}
       {lock === null ? (
         <form className="flex flex-col gap-3" onSubmit={(event) => void create(event)}>
           <p className="text-sm text-muted">
-            This campaign has no password. Set one here. It is kept with the save. A player must enter it to become the dungeon master.
+            This campaign has no password. Set one here. It is kept with the save. A player must
+            enter it to become the dungeon master.
           </p>
           <Field label="Password">
-            <TextInput type="password" autoComplete="new-password" value={password} onChange={(event) => setPassword(event.target.value)} />
+            <TextInput
+              type="password"
+              autoComplete="new-password"
+              value={password}
+              onChange={(event) => setPassword(event.target.value)}
+            />
           </Field>
           <Field label="Confirm password">
-            <TextInput type="password" autoComplete="new-password" value={again} onChange={(event) => setAgain(event.target.value)} />
+            <TextInput
+              type="password"
+              autoComplete="new-password"
+              value={again}
+              onChange={(event) => setAgain(event.target.value)}
+            />
           </Field>
           {error ? <p className="text-sm text-danger">{error}</p> : null}
           <Button type="submit" disabled={busy}>
@@ -153,29 +176,58 @@ export function PasswordSettings() {
       ) : null}
       {lock ? (
         <div className="flex flex-col gap-4">
-          <p className="text-sm text-muted">A password is saved with this campaign. Switching to dungeon master asks for it. Switching to player asks you to confirm. Live Mode blocks both.</p>
+          <p className="text-sm text-muted">
+            A password is saved with this campaign. Switching to dungeon master asks for it.
+            Switching to player asks you to confirm. Shared modes block both.
+          </p>
           <Switch
             checked={lock.protectSaves}
-            onChange={(on) => void protect(on).catch((caught) => toast.error(caught instanceof Error ? caught.message : "That setting could not be saved."))}
+            onChange={(on) =>
+              void protect(on).catch((caught) =>
+                toast.error(
+                  caught instanceof Error ? caught.message : "That setting could not be saved.",
+                ),
+              )
+            }
             label="Protect saves"
             hint="Save, load, import, and export ask for this same password. The file itself is locked."
           />
           <form className="flex flex-col gap-3" onSubmit={(event) => void change(event)}>
             <Field label="Current password">
-              <TextInput type="password" autoComplete="current-password" value={current} onChange={(event) => setCurrent(event.target.value)} />
+              <TextInput
+                type="password"
+                autoComplete="current-password"
+                value={current}
+                onChange={(event) => setCurrent(event.target.value)}
+              />
             </Field>
             <Field label="New password">
-              <TextInput type="password" autoComplete="new-password" value={password} onChange={(event) => setPassword(event.target.value)} />
+              <TextInput
+                type="password"
+                autoComplete="new-password"
+                value={password}
+                onChange={(event) => setPassword(event.target.value)}
+              />
             </Field>
             <Field label="Confirm new password">
-              <TextInput type="password" autoComplete="new-password" value={again} onChange={(event) => setAgain(event.target.value)} />
+              <TextInput
+                type="password"
+                autoComplete="new-password"
+                value={again}
+                onChange={(event) => setAgain(event.target.value)}
+              />
             </Field>
             {error ? <p className="text-sm text-danger">{error}</p> : null}
             <div className="flex flex-wrap gap-2">
               <Button type="submit" disabled={busy}>
                 Change password
               </Button>
-              <Button type="button" variant="secondary" disabled={busy} onClick={() => void remove()}>
+              <Button
+                type="button"
+                variant="secondary"
+                disabled={busy}
+                onClick={() => void remove()}
+              >
                 Remove password
               </Button>
             </div>

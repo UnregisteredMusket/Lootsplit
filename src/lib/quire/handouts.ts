@@ -5,7 +5,7 @@ export type Handout = { id: string; title: string; text: string };
 function request<T>(req: IDBRequest<T>): Promise<T> {
   return new Promise((resolve, reject) => {
     req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error ?? new Error("That handout could not be kept."));
+    req.onerror = () => reject(req.error ?? new Error("Could not save the handout."));
   });
 }
 
@@ -33,7 +33,7 @@ export async function saveHandouts(handouts: Handout[]): Promise<void> {
   tx.objectStore("meta").put({ id: "handouts", handouts: readHandouts(handouts) });
   await new Promise<void>((resolve, reject) => {
     tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error ?? new Error("That handout could not be kept."));
+    tx.onerror = () => reject(tx.error ?? new Error("Could not save the handout."));
   });
 }
 

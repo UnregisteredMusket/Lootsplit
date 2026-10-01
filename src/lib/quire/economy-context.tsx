@@ -1,3 +1,4 @@
+import { loadSeatLock, passwordMatches } from "./lock.ts";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import {
@@ -55,12 +56,12 @@ import {
   type QuireFile,
 } from "./economy.ts";
 import { subscribeCampaigns } from "./campaigns.ts";
-import { getCloudWatch, pushCloudChange, subscribeCloudWatch } from "./cloud-turn.ts";
-import { resumeTable } from "./cloud-client.ts";
+import { getCloudWatch, subscribeCloudWatch } from "./cloud-turn.ts";
+import { captureDeviceBackup, resumeTable, queueCommand, runSharedMutation, hasPendingChanges } from "./cloud-client.ts";
 import { loadNotes } from "./chat.ts";
 import { primeNotices } from "./notify.ts";
-import { forgetGifts, loadGifts } from "./gift.ts";
-import { forgetSales, loadListings, loadLoans, loadSales } from "./market.ts";
+import { loadGifts } from "./gift.ts";
+import { loadListings, loadLoans, loadSales } from "./market.ts";
 import { loadSheets } from "./sheet.ts";
 import type { CharacterSheet } from "./sheet.ts";
 import type { Listing, LoanAsk, LoanStatus } from "./market.ts";
@@ -132,7 +133,7 @@ type EconomyApi = {
   addNames: (rows: Array<Omit<Lexeme, "id">>) => Promise<number>;
   deleteName: (id: string) => Promise<void>;
   download: () => Promise<void>;
-  restoreFile: (file: File) => Promise<void>;
+  restoreFile: (file: File, password?: string) => Promise<void>;
   resetAll: () => Promise<void>;
   openCounter: (file: File) => Promise<void>;
   takeBill: (file: File) => Promise<number>;
@@ -196,8 +197,8 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
         try {
           const opened = await applySeatLink();
           if (cancelled) return;
-          if (opened === "player") toast.success("This phone is a player.");
-          if (opened === "dm") toast.success("This phone is the dungeon master.");
+          if (opened === "player") toast.success("Player mode enabled.");
+          if (opened === "dm" || opened === "bill") toast.success("Player activity imported.");
         } catch (error) {
           if (!cancelled) fault(error, "That link could not be opened.");
         }
@@ -233,10 +234,9 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
         return;
       }
       try {
-        await work();
+        if (gate.joined) await runSharedMutation(work); else await work();
         await reload();
-        if (ok) toast.success(ok);
-        pushCloudChange();
+        if (ok) toast.success(gate.joined && hasPendingChanges() ? "Action saved as pending. Check sync status." : ok);
       } catch (error) {
         fault(error, "That change could not be saved.");
       }
@@ -246,7 +246,7 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
 
   const api = useMemo<EconomyApi>(() => {
     const dmOnly = () => {
-      if (getSeat().role === "player") throw new Error("The dungeon master keeps that.");
+      if (getSeat().role === "player") throw new Error("Only the DM can change this setting.");
     };
     const ownPurse = (purseId: string) => {
       const sitting = getSeat();
@@ -256,6 +256,8 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
       const sitting = getSeat();
       if (sitting.role === "player" && !sitting.shopIds.includes(shopId)) throw new Error("That shop was not included in your link.");
     };
+    const shared = async (command: import("./commands.ts").CommandInput) => { try { await queueCommand(command); await reload(); } catch(error) { fault(error, "Action failed. Check sync status."); } };
+    const mutation = async <T,>(work: () => Promise<T>): Promise<T> => { if (!getCloudWatch().joined) return work(); let result!: T; await runSharedMutation(async () => { result = await work(); }); return result; };
     return {
       ready,
       purses,
@@ -273,12 +275,12 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
       createShop: async (partial) => {
         dmOnly();
         const shop = { ...blankShop(), ...partial, id: crypto.randomUUID() };
-        await saveShop(shop);
+        await mutation(() => saveShop(shop));
         await reload();
         return shop.id;
       },
       updateShop: (shop) => run(async () => { dmOnly(); await saveShop(shop); }),
-      applyShop: (shop) => run(async () => { dmOnly(); await repriceShop(shop); }, "Shelf repriced."),
+      applyShop: (shop) => run(async () => { dmOnly(); await repriceShop(shop); }, "Shop prices updated."),
       deleteShop: (id) => run(async () => { dmOnly(); await removeShop(id); }, "Shop removed."),
       updateStock: (line) => run(async () => { dmOnly(); await saveStock(line); }),
       addStock: (shopId, name, copper, quantity) =>
@@ -294,23 +296,23 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
             baseCopper: copper,
             rarity: "common",
           });
-        }, "Good added."),
+        }, "Item added."),
       deleteStock: (id) => run(async () => { dmOnly(); await removeStock(id); }),
       stockFromPrices: async (shopId, rows) => {
         dmOnly();
-        const added = await addPricedStock(shopId, rows);
+        const added = await mutation(() => addPricedStock(shopId, rows));
         await reload();
         return added;
       },
       openShelf: async (input) => {
         dmOnly();
-        const id = await openComposedShop(input);
+        const id = await mutation(() => openComposedShop(input));
         await reload();
         return id;
       },
-      createPurse: (kind) => run(async () => { dmOnly(); await savePurse(blankPurse(kind)); }, "Purse added."),
+      createPurse: (kind) => run(async () => { dmOnly(); await savePurse(blankPurse(kind)); }, "Account created."),
       updatePurse: (purse) => run(async () => { ownPurse(purse.id); await savePurse(purse); }),
-      deletePurse: (id) => run(async () => { dmOnly(); await removePurse(id); }, "Purse removed."),
+      deletePurse: (id) => run(async () => { dmOnly(); await removePurse(id); }, "Account removed."),
       updateHolding: (holding) => run(async () => { ownPurse(holding.purseId); await saveHolding(holding); }),
       addHolding: (purseId, name, kind, quantity, unitCopper) =>
         run(async () => {
@@ -322,14 +324,14 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
           dmOnly();
           await removeHolding(id);
         }),
-      buy: (stockId, purseId, quantity) =>
+      buy: (stockId, purseId, quantity) => getCloudWatch().joined ? shared({kind:"buy",stockId,purseId,quantity}) :
         run(async () => {
           ownPurse(purseId);
           const line = stock.find((item) => item.id === stockId);
           if (line) ownShop(line.shopId);
           await buyFromShop({ stockId, purseId, quantity });
         }, "Purchase recorded."),
-      sell: (holdingId, shopId, quantity) =>
+      sell: (holdingId, shopId, quantity) => getCloudWatch().joined ? shared({kind:"sell",holdingId,shopId,quantity}) :
         run(async () => {
           ownShop(shopId);
           const holding = holdings.find((item) => item.id === holdingId);
@@ -338,19 +340,19 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
         }, "Sale recorded."),
       setPurseCoins: (purseId, coins) => run(async () => { ownPurse(purseId); await setCoins(purseId, coins); }, "Coin updated."),
       post: (purseId, copper, summary) => run(async () => { ownPurse(purseId); await postCopper(purseId, copper, summary); }, "Ledger updated."),
-      give: (input) => run(async () => { ownPurse(input.fromId); await giveToPlayer(input); }, "Given. The party chat has it."),
+      give: (input) => getCloudWatch().joined ? shared({kind:"give",...input}) : run(async () => { ownPurse(input.fromId); await giveToPlayer(input); }, "Transfer recorded and added to party messages."),
       addListing: (input) => run(async () => { dmOnly(); await addListing(input); }, "Listing posted."),
       removeListing: (id) => run(async () => { dmOnly(); await removeListing(id); }, "Listing removed."),
-      buyListing: (listingId, purseId, quantity) => run(async () => { ownPurse(purseId); await buyListing({ listingId, purseId, quantity }); }, "Purchase recorded."),
-      askLoan: (purseId, copper, note) => run(async () => { ownPurse(purseId); await askLoan({ purseId, copper, note }); }, "Loan requested."),
-      decideLoan: (id, status) => run(async () => { dmOnly(); await answerLoan(id, status); }, status === "approved" ? "Loan approved." : "Loan denied."),
+      buyListing: (listingId, purseId, quantity) => getCloudWatch().joined ? shared({kind:"listing",listingId,purseId,quantity}) : run(async () => { ownPurse(purseId); await buyListing({ listingId, purseId, quantity }); }, "Purchase recorded."),
+      askLoan: (purseId, copper, note) => getCloudWatch().joined ? shared({kind:"loan",purseId,copper,note}) : run(async () => { ownPurse(purseId); await askLoan({ purseId, copper, note }); }, "Loan requested."),
+      decideLoan: (id, status) => getCloudWatch().joined ? (status === "pending" ? Promise.resolve() : shared({kind:"decision",loanId:id,status})) : run(async () => { dmOnly(); await answerLoan(id, status); }, status === "approved" ? "Loan approved." : "Loan denied."),
       importSheet: async (purseId, file) => {
         ownPurse(purseId);
-        const gaps = await importCharacterSheet(purseId, file);
+        const gaps = await mutation(() => importCharacterSheet(purseId, file));
         await reload();
         toast.success(gaps.length > 0 ? `Imported. Still blank: ${gaps.join(", ")}.` : "Character sheet imported.");
       },
-      updateSheet: (sheet) => run(async () => { ownPurse(sheet.purseId); await updateCharacterSheet(sheet); }),
+      updateSheet: (sheet) => getCloudWatch().joined ? shared({kind:"sheet",sheet}) : run(async () => { ownPurse(sheet.purseId); await updateCharacterSheet(sheet); }),
       voidLine: (id) => run(async () => { dmOnly(); await voidLedgerLine(id); }, "That line was voided."),
       setRealm: (settings, options) =>
         run(async () => {
@@ -358,7 +360,7 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
           await saveRealm(settings);
           if (!options?.reprice) return;
           const count = await repriceAllShops();
-          toast.success(count === 0 ? "Realm kept. No shops are open." : `Repriced ${count === 1 ? "1 shop" : `${count} shops`}.`);
+          toast.success(count === 0 ? "Economy settings saved. No shops to update." : `Repriced ${count === 1 ? "1 shop" : `${count} shops`}.`);
         }),
       addGoods: async (rows) => {
         dmOnly();
@@ -373,10 +375,10 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
         const added = await inventGoods({ category, flags, count, rng: Math.random });
         await reload();
         if (added === 0) toast("Nothing new to add.");
-        else toast.success(`Added ${added} to the index.`);
+        else toast.success(`Added ${added} to the catalog.`);
         return added;
       },
-      restoreGoods: () => run(async () => { dmOnly(); await restoreStarterGoods(); }, "Starter goods restored."),
+      restoreGoods: () => run(async () => { dmOnly(); await restoreStarterGoods(); }, "Starter items restored."),
       addNames: async (rows) => {
         dmOnly();
         const added = await addLexemeRows(rows);
@@ -385,7 +387,9 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
       },
       deleteName: (id) => run(async () => { dmOnly(); await removeLexeme(id); }),
       download: async () => {
-        const file: QuireFile = await snapshot();
+        const lock = await loadSeatLock();
+        if (lock?.protectSaves) throw new Error("Use Settings → Device backups to export with password protection.");
+        const file: QuireFile = await captureDeviceBackup();
         const blob = new Blob([JSON.stringify(file)], { type: "application/json" });
         const url = URL.createObjectURL(blob);
         const link = document.createElement("a");
@@ -394,7 +398,10 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
         link.click();
         URL.revokeObjectURL(url);
       },
-      restoreFile: async (file) => {
+      restoreFile: async (file, password) => {
+        const lock = await loadSeatLock();
+        if (lock?.protectSaves && (!password || !(await passwordMatches(password,lock)))) throw new Error("Use Settings → Device backups to restore with the campaign password.");
+        if (getCloudWatch().joined) throw new Error("Return to Local Mode before importing or replacing campaign data.");
         dmOnly();
         const parsed = readQuireFile(JSON.parse(await file.text()) as unknown);
         await restore(parsed);
@@ -402,14 +409,16 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
         toast.success("Copy restored on this device.");
       },
       resetAll: async () => {
+        if (getCloudWatch().joined) throw new Error("Return to Local Mode before importing or replacing campaign data.");
         dmOnly();
         await resetToDefault();
         setSeat(DM_SEAT);
         await reload();
       },
       openCounter: async (file) => {
+        if (getCloudWatch().joined) throw new Error("Return to Local Mode before importing or replacing campaign data.");
         const parsed = readShare(JSON.parse(await file.text()) as unknown);
-        if (parsed.kind !== "quire-table") throw new Error("That file is a bill. Open it on the dungeon master's phone.");
+        if (parsed.kind !== "quire-table") throw new Error("That file is an activity report. Open it on the dungeon master's device.");
         await applyTable(parsed);
         setSeat({
           role: "player",
@@ -418,29 +427,30 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
           openedAt: parsed.exportedAt,
         });
         await reload();
-        toast.success("This phone is a player.");
+        toast.success("Player mode enabled.");
       },
       takeBill: async (file) => {
+        if (getCloudWatch().joined) throw new Error("Return to Local Mode before importing or replacing campaign data.");
         dmOnly();
         const parsed = readShare(JSON.parse(await file.text()) as unknown);
-        if (parsed.kind !== "quire-bill") throw new Error("That file is a player file, not a bill.");
+        if (parsed.kind !== "quire-bill") throw new Error("That file is a player file, not an activity report.");
         const added = await applyBill(parsed);
         presentReceipt(parsed);
         await reload();
-        if (added === 0) toast("Bill taken. Nothing new was purchased.");
+        if (added === 0) toast("Activity report taken. Nothing new was purchased.");
         return added;
       },
       sendBill: async () => {
         const sitting = getSeat();
-        if (sitting.role !== "player") throw new Error("A bill is sent from the player's phone.");
+        if (sitting.role !== "player") throw new Error("An activity report is sent from the player's device.");
         const file = await snapshot();
         const gifts = await loadGifts();
         const loansOnPhone = await loadLoans();
         const sales = await loadSales();
         const bill = buildBill({ ...file, notes: await loadNotes(), gifts, loans: loansOnPhone, sales, sheets: await loadSheets() }, sitting);
         downloadJson(`lootsplit-bill-${new Date().toISOString().slice(0, 10)}.json`, bill);
-        await forgetGifts(bill.gifts?.map((gift) => gift.id) ?? []);
-        await forgetSales(bill.sales?.map((sale) => sale.id) ?? []);
+
+
       },
     };
   },

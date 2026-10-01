@@ -142,8 +142,8 @@ async function putMeta(value: { id: string } & Record<string, unknown>): Promise
   tx.objectStore("meta").put(value);
   await new Promise<void>((resolve, reject) => {
     tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error ?? new Error("That gift could not be kept."));
-    tx.onabort = () => reject(tx.error ?? new Error("That gift could not be kept."));
+    tx.onerror = () => reject(tx.error ?? new Error("Could not save the transfer."));
+    tx.onabort = () => reject(tx.error ?? new Error("Could not save the transfer."));
   });
 }
 

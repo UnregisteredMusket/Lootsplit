@@ -1,3 +1,5 @@
+import { getCloudWatch } from "@/lib/quire/cloud-turn";
+import { runSharedMutation } from "@/lib/quire/cloud-client";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { ChevronLeft, Star } from "lucide-react";
 import { useEffect, useState } from "react";
@@ -88,8 +90,8 @@ function ReadPage() {
             <button
               type="button"
               onClick={() => {
-                void toggleHandout(article.id).then(setHandout).catch((error: unknown) => {
-                  toast.error(error instanceof Error ? error.message : "That handout could not be kept.");
+                void (getCloudWatch().joined ? runSharedMutation(async () => { setHandout(await toggleHandout(article.id)); }) : toggleHandout(article.id).then(setHandout)).catch((error: unknown) => {
+                  toast.error(error instanceof Error ? error.message : "Could not save the handout.");
                 });
               }}
               aria-pressed={handout}

@@ -36,7 +36,7 @@ export function PriceHarvest({ bookId }: { bookId: string }) {
       }));
       setHits(found.slice(0, 80));
       setScanned(true);
-      if (found.length === 0) toast("No printed prices in that book. Add goods by hand instead.");
+      if (found.length === 0) toast("No printed prices in that book. Add items by hand instead.");
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "That book could not be read.");
     } finally {
@@ -59,7 +59,7 @@ export function PriceHarvest({ bookId }: { bookId: string }) {
       );
       toast.success(added === 0 ? "Those items are already in that shop." : `Added ${added} items.`);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not file those prices.");
+      toast.error(error instanceof Error ? error.message : "Could not add those items.");
     } finally {
       setBusy(false);
     }
@@ -127,7 +127,7 @@ export function PriceHarvest({ bookId }: { bookId: string }) {
               <TextInput value={newName} onChange={(event) => setNewName(event.target.value)} aria-label="New shop name" />
             ) : null}
             <Button disabled={busy} onClick={() => void file()}>
-              File selected goods
+              Add selected items to shop
             </Button>
           </div>
         </div>

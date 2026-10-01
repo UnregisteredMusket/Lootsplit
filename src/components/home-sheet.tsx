@@ -1,5 +1,6 @@
+import {getCloudTable,subscribeCloudTable} from "@/lib/quire/cloud-client";
 import { Link } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { CharacterSheetPanel, SheetBody } from "@/components/character-sheet";
 import { Guide } from "@/components/guide";
 import { TurnLine } from "@/components/turn-line";
@@ -12,6 +13,7 @@ import { useSeat } from "@/lib/quire/seat";
 export function HomeSheet() {
   const { ready, purses, holdings, sheets } = useEconomy();
   const seat = useSeat();
+  const cloud=useSyncExternalStore(subscribeCloudTable,getCloudTable,getCloudTable);
   const mine = purses.filter((purse) => purse.kind === "character" && seat.purseIds.includes(purse.id));
   const [picked, setPicked] = useState(mine[0]?.id ?? "");
   const purse = mine.find((item) => item.id === picked) ?? mine[0];
@@ -21,14 +23,14 @@ export function HomeSheet() {
 
   useEffect(() => {
     void loadHandouts().then(setHandouts).catch(() => setHandouts([]));
-  }, [ready]);
+  }, [ready,cloud.revision]);
 
   if (!ready) return <p className="mt-6 text-muted">Loading…</p>;
   if (!purse) {
     return (
       <>
         <h1 className="font-display text-4xl tracking-tight">Sheet</h1>
-        <p className="mt-2 text-sm text-muted">No character is assigned to this phone.</p>
+        <p className="mt-2 text-sm text-muted">No character is assigned to this browser on this device.</p>
       </>
     );
   }
@@ -53,11 +55,11 @@ export function HomeSheet() {
           </select>
         </label>
       ) : null}
-      <p className="text-xs tracking-[0.2em] text-faint uppercase">Purse</p>
+      <p className="text-xs tracking-[0.2em] text-faint uppercase">Funds</p>
       <h1 className="mt-1 font-display text-4xl tracking-tight">{sheet?.name || purse.name}</h1>
       {subtitle ? <p className="text-sm text-muted">{subtitle}</p> : null}
       <TurnLine />
-      <section className="mt-4 rounded-2xl border border-lead/25 bg-elevated p-4">
+      <section className="mt-4 rounded-2xl border border-lead/25 wealth-card bg-elevated p-5">
         <p className="font-display text-3xl tabular-nums tracking-tight text-lead">{formatCoins(purse.coins)}</p>
         <p className="mt-1 text-sm text-muted">≈ {formatCopper(coin)}</p>
         <div className="mt-3 grid grid-cols-3 gap-2 text-sm">
@@ -67,10 +69,10 @@ export function HomeSheet() {
         </div>
       </section>
       <div className="mt-3 grid grid-cols-4 gap-2 text-center text-sm">
-        <Link to="/party" className="inline-flex min-h-11 items-center justify-center rounded-xl border border-lead/40">Pay</Link>
-        <Link to="/party" className="inline-flex min-h-11 items-center justify-center rounded-xl border border-lead/40">Give</Link>
+        {!cloud.joined ? <Link to="/party" search={{ action: "pay" }} className="inline-flex min-h-11 items-center justify-center rounded-xl border border-lead/40">Pay</Link> : null}
+        <Link to="/party" search={{ action: "give" }} className="inline-flex min-h-11 items-center justify-center rounded-xl border border-lead/40">Give</Link>
         <Link to="/market" search={{ book: "" }} className="inline-flex min-h-11 items-center justify-center rounded-xl border border-lead/40">Sell</Link>
-        <Link to="/party" className="inline-flex min-h-11 items-center justify-center rounded-xl border border-lead/40">Add</Link>
+        {!cloud.joined ? <Link to="/party" search={{ action: "add" }} className="inline-flex min-h-11 items-center justify-center rounded-xl border border-lead/40">Add</Link> : null}
       </div>
       <section className="mt-5">
         <h2 className="text-sm font-medium text-muted">Inventory · {carried.length}</h2>

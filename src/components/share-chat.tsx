@@ -3,10 +3,10 @@ import { toast } from "sonner";
 import { Button, TextArea } from "@/components/ui";
 import { getCampaigns, serverCampaigns, subscribeCampaigns } from "@/lib/quire/campaigns";
 import { getChatSnapshot, postNotes, refreshChat, serverChat, subscribeChat, loadNotes, type ChatNote } from "@/lib/quire/chat";
-import { getCloudWatch } from "@/lib/quire/cloud-turn";
+import { getCloudTable, subscribeCloudTable, queueCommand } from "@/lib/quire/cloud-client";
 import { snapshot } from "@/lib/quire/economy";
-import { forgetGifts, loadGifts } from "@/lib/quire/gift";
-import { forgetSales, loadLoans, loadSales } from "@/lib/quire/market";
+import { loadGifts } from "@/lib/quire/gift";
+import { loadLoans, loadSales } from "@/lib/quire/market";
 import { loadSheets } from "@/lib/quire/sheet";
 import { buildBill, copyText, encodeLinkPayload, seatHref } from "@/lib/quire/table";
 import { useEconomy } from "@/lib/quire/economy-context";
@@ -15,6 +15,7 @@ import { characterControl } from "@/lib/quire/types";
 
 export function ShareChat() {
   const seat = useSeat();
+  const cloud = useSyncExternalStore(subscribeCloudTable, getCloudTable, getCloudTable);
   const { purses } = useEconomy();
   const { activeId } = useSyncExternalStore(subscribeCampaigns, getCampaigns, serverCampaigns);
   const notes = useSyncExternalStore(subscribeChat, getChatSnapshot, serverChat);
@@ -49,19 +50,15 @@ export function ShareChat() {
     }
     setBusy(true);
     try {
-      await postNotes(targets.map((purseId) => ({ from: player ? "player" : "dm", to: toParty ? "party" : "dm", purseId, text: body })));
+      if (cloud.joined) { for (const purseId of targets) await queueCommand({kind:"message",to:toParty?"party":"dm",purseId,text:body}); }
+      else await postNotes(targets.map((purseId) => ({ from: player ? "player" : "dm", to: toParty ? "party" : "dm", purseId, text: body })));
       setText("");
-      toast.success(
-        toParty
-          ? player
-            ? "Kept for the party. It goes out with your next bill, then on the other players' links."
-            : "Kept for the party. It is copied onto every player's next link."
-          : player
-            ? "Kept for the dungeon master. It goes out with your next bill."
-            : "Message kept. It is copied into each selected player's next link.",
-      );
+      toast.success(cloud.joined
+        ? "Message shared."
+        : player ? "Message saved. Share your activity report link or file with the DM."
+        : "Message saved. Share updated player links or files with the recipients.");
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "That message could not be kept.");
+      toast.error(error instanceof Error ? error.message : "Could not save the message.");
     } finally {
       setBusy(false);
     }
@@ -70,9 +67,13 @@ export function ShareChat() {
   return (
     <div>
       <p className="text-sm text-muted">
-        {player
-          ? "Write to the dungeon master, or to the party. Both leave with your next bill. Party notes are then copied onto the other players' links. Nothing is sent until then."
-          : "A party note is copied onto every player link. A private note goes only to the players you check. Their replies arrive when you open the bill."}
+        {cloud.joined
+          ? cloud.live
+            ? "Write to the DM or party. Messages sync through the shared campaign."
+            : "Write to the DM or party. Messages are shared immediately, independently of transaction turns."
+          : player
+            ? "Save a message for the DM or party, then share your activity report link or file with the DM. Party messages reach other players through their updated links or files."
+            : "Save a message for the party or selected players, then share updated player links or files. Replies arrive when you import player activity."}
       </p>
       <Thread title="Party" notes={partyNotes} names={names} empty="No one has written to the party." />
       {player ? (
@@ -135,11 +136,11 @@ export function ShareChat() {
         <TextArea className="mt-1" maxLength={500} value={text} placeholder="Write a message" onChange={(event) => setText(event.target.value)} />
       </label>
       <Button className="mt-2" disabled={busy || text.trim().length === 0} onClick={() => void send()}>
-        {sendLabel(player, player ? playerTo === "party" : audience === "party", selected.length)}
+        {cloud.joined ? "Save message" : sendLabel(player, player ? playerTo === "party" : audience === "party", selected.length)}
       </Button>
-      {player && !getCloudWatch().joined ? (
+      {player && !cloud.joined ? (
         <div className="mt-3">
-          <p className="text-sm text-muted">Not sent yet. A message or a gift stays on this phone until you send the bill.</p>
+          <p className="text-sm text-muted">Not sent yet. A message or a gift stays in this browser on this device until you send the activity report.</p>
           <Button
             className="mt-2"
             variant="secondary"
@@ -150,15 +151,15 @@ export function ShareChat() {
                 const bill = buildBill({ ...file, notes: await loadNotes(), gifts, loans: await loadLoans(), sales: await loadSales(), sheets: await loadSheets() }, seat);
                 const payload = await encodeLinkPayload(bill);
                 const url = seatHref("dm", payload, window.location.origin);
-                if (url.length > 48000) throw new Error("This bill is too long for a link. Download it from Share.");
+                if (url.length > 48000) throw new Error("This activity report is too long for a link. Download it from Share.");
                 await copyText(url);
-                await forgetGifts(bill.gifts?.map((gift) => gift.id) ?? []);
-                await forgetSales(bill.sales?.map((sale) => sale.id) ?? []);
-                toast.success("Bill link copied. The dungeon master opens it.");
-              })().catch((error: unknown) => toast.error(error instanceof Error ? error.message : "Could not copy the bill link."));
+
+
+                toast.success("Activity report link copied. The dungeon master opens it.");
+              })().catch((error: unknown) => toast.error(error instanceof Error ? error.message : "Could not copy the activity report link."));
             }}
           >
-            Send now
+            Copy report link
           </Button>
         </div>
       ) : null}
@@ -167,9 +168,9 @@ export function ShareChat() {
 }
 
 function sendLabel(player: boolean, party: boolean, count: number) {
-  if (party) return "Keep for the party";
-  if (player) return "Keep for the dungeon master";
-  return count > 1 ? "Attach to selected players" : "Keep message";
+  if (party) return "Save message for the party";
+  if (player) return "Save message for the DM";
+  return count > 1 ? "Save message for selected players" : "Save message";
 }
 
 function Choice({ label, checked, onChange }: { label: string; checked: boolean; onChange: () => void }) {

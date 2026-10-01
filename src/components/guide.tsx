@@ -6,77 +6,71 @@ const OFFER = "quire.guide.offer.v3";
 
 const sections: Array<{ title: string; body: string; points?: Array<{ label: string; body: string }> }> = [
   {
-    title: "Two homes",
-    body: "The dungeon master's first screen is the Board: the mode, notices, recent messages, the party, and a few settings. A player's first screen is their Sheet: the 2014 character sheet, the coin purse, and the inventory. The first tab is named for whichever one this phone is.",
+    "title": "Set up a campaign",
+    "body": "Open Settings to create or select a campaign. Each campaign has separate characters, funds, inventory, shops, catalog entries, and imported PDFs. Campaign data is stored in this browser on this device. Export a backup before clearing browser data or moving to another device."
   },
   {
-    title: "Three modes",
-    body: "The dungeon master changes the mode from the Board or from Share. The icon at the upper right shows which one is on.",
-    points: [
+    "title": "Add characters and funds",
+    "body": "On Party, add characters and a shared party fund. Mark characters as Player or NPC; only player characters can be assigned to players. Set coin balances, record payments, and add items or property. Use Give to transfer coins or holdings to another player."
+  },
+  {
+    "title": "Use the dashboard and character sheet",
+    "body": "Home shows balances, inventory value, and recent transactions. Players can open Sheet to view their assigned character and inventory. On mobile, More contains Books, Share, and Settings. Import a supported D&D 5e (2014) character sheet from a filled PDF or JSON file. Image-only scans are not supported."
+  },
+  {
+    "title": "Create and manage shops",
+    "body": "Catalog contains the items shops can stock and names used by the shop generator. Add items manually, generate items, or extract priced items from an imported PDF. In Market, create a shop and choose its category, wealth, stock level, and price settings. Shuffle generates a new name, shopkeeper, location, and stock."
+  },
+  {
+    "title": "Buy, sell, and request loans",
+    "body": "Open a shop, choose the account to use, and buy or sell items. Blank stock quantities mean unlimited supply. A character’s imported Charisma score reduces purchase prices by 1% per point above 10, up to 20%; the party fund does not receive this discount. Players can request loans, which add funds only after DM approval."
+  },
+  {
+    "title": "Choose a sharing mode",
+    "body": "The DM selects a mode from Home, Share, or Settings. Players also need access to the published site; a campaign code does not grant site access.",
+    "points": [
       {
-        label: "Local Mode",
-        body: "The campaign stays on this phone. Players use a link or a file. Nothing is shared until a bill comes back.",
+        "label": "Local Mode",
+        "body": "Each browser has a separate copy. In Share, the DM selects shops and copies a character’s player link or downloads their player file. Party-fund access is optional. Players return an activity report link or file, which the DM reviews and imports. Conflicting funds, inventory, or stock changes are rejected. After an accepted report, send a fresh player copy before the next round of activity. Reports from older app versions need manual reconciliation. Copying a link does not send it; share it with the recipient yourself."
       },
       {
-        label: "Turn based Mode",
-        body: "One shared table. Read the players the code. Only the person whose turn it is can buy, sell, or change money. Ending a turn passes the table on.",
+        "label": "Turn-based Mode",
+        "body": "The DM opens a shared campaign and shares its code. Players enter the code in Share and select an available character. Only the current participant can make transactions. Actions are saved as a draft on this device and, while connected, on the server. Submit changes and end turn commits the draft and passes control. Messages are shared immediately."
       },
       {
-        label: "Live Mode",
-        body: "The same shared table, but anyone seated can act. The dungeon master is the only one who can turn Live Mode on, and nobody can change roles while it is on.",
-      },
-    ],
+        "label": "Live Mode",
+        "body": "Participants can make changes without waiting for a turn. Updates sync through the shared campaign. Only the DM can change modes. Server checks prevent overspending and overselling. Failed actions stay pending for review or retry."
+      }
+    ]
   },
   {
-    title: "Market",
-    body: "Each shop has an owner, a location, and stock. At the counter, pick who is paying and buy. The shop charges its sell rate and pays its buy rate. A blank quantity means the shop does not run out. A character's Charisma lowers the price by one percent for each point above 10. The dungeon master can list property and other holdings, and can approve or refuse a loan a player requests.",
+    "title": "Exchange messages and player activity",
+    "body": "Use Share to write to the DM, the party, or selected players. In Local Mode, saved messages travel with the next player link or activity report. In both shared modes, messages are sent independently of transaction turns. In Live Mode, transactions sync automatically. Activity reports include purchases, sales, transfers, loan requests, and messages. They also record a switch from player to DM."
   },
   {
-    title: "Index and shops",
-    body: "The index is the list of items and names. Add an item, generate a batch, or copy priced lines from a PDF. A shop can only stock items that are in the index. Create a shop picks a type, a level of wealth, and which rarities to keep. Shuffle picks a new name, owner, location, and stock.",
+    "title": "Manage roles and passwords",
+    "body": "Use the role control at the top of the app to switch roles. Set a campaign password in Settings before switching to player. Returning to DM requires that password. Shared modes prevent role changes. Return to Local Mode or disconnect first. The DM manages campaign settings, shop prices, catalog entries, and imported books."
   },
   {
-    title: "Party",
-    body: "A character purse belongs to one person. The party purse is shared money. Mark each character as Player or NPC. Only player characters can be put on a link. Import a 2014 character sheet from a filled PDF or a JSON export onto that character. Holdings are items and property. Players can give coins, items, or property to someone else at the table. Those gifts show in the party messages and in the dungeon master's bill.",
+    "title": "Adjust the economy",
+    "body": "Settings includes season, shortage, war, plague, roads, scarcity, and inflation controls. These affect generated prices. Enable automatic repricing to update existing shops when modifiers change, or use Reprice open shops now. The estimated dollar equivalent is a display comparison and does not change coin balances."
   },
   {
-    title: "Share",
-    body: "Players do not need Grok. They open the link in a browser. The link carries the characters you checked, and the shops you included.",
-    points: [
-      {
-        label: "Messages",
-        body: "A player can write to the dungeon master or to the party. The dungeon master can write to the party or to the players they check. In Local Mode the note travels with the next bill. In Turn based Mode and Live Mode it arrives with the table.",
-      },
-      {
-        label: "Bill",
-        body: "When a player's link or file is opened, a report lists every purchase, sale, gift, loan, and message from that phone. The report also says if that phone switched to dungeon master.",
-      },
-      {
-        label: "Notices",
-        body: "Turn notices on from Share or from Settings. This phone can then say when the mode changes, a message arrives, or it is your turn. That works only while Lootsplit is still open.",
-      },
-    ],
+    "title": "Import books and share handouts",
+    "body": "Import a PDF with selectable text in Books. The PDF remains in this browser and is not included in player links. Select an entry as a handout to share its text. Extracted items and prices should be reviewed before adding them to the catalog or a shop."
   },
   {
-    title: "Role",
-    body: "The name at the upper right is the role. Press it to change. Set a password in Settings first. Switching from dungeon master to player asks you to confirm. Switching back asks for that password. Live Mode blocks both. A bill records it if a player becomes the dungeon master.",
+    "title": "Save and restore backups",
+    "body": "In Settings, Device backups stores named snapshots in this browser. Save creates a snapshot; Export downloads it; Import adds a backup file to the list; Load replaces the current campaign with that snapshot. Home provides direct download and restore for unprotected campaigns. Protected backups use Device backups and require a password. Keep an exported copy outside the browser. Enable Protect saves to encrypt backup files with the campaign password. Download backup saves the current campaign to a device file. Shared-mode backups refresh from the server and require your pending actions to be resolved first. Players can back up only the data visible to them; the DM keeps the complete campaign copy. Pending-action recovery is available separately in the sync panel. Disconnect or return to Local Mode before loading a backup; loading does not reconnect or overwrite a shared room. You can download diagnostic reports and share them manually."
   },
   {
-    title: "Prices",
-    body: "Settings changes the season, shortages, war, and the dollar reading of a gold piece. That reading does not convert the coins. Scarcity raises rare and magic prices. Turn on repricing if shops that are already open should update. Otherwise only later shops use the new prices.",
+    "title": "Recover shared sessions",
+    "body": "Sync status shows pending actions and connection errors. Review or export pending actions before discarding them. Recovery files can be imported into the same campaign code. Sessions are remembered in this browser. If a character is stuck on another device, the DM can release it after pending actions are resolved. The DM can also grant party-fund access or choose the next participant. Mode changes and room closure require all submitted drafts to be resolved; offline actions remain saved on their original device."
   },
   {
-    title: "Books",
-    body: "Import a PDF you already own. It stays on the dungeon master's phone. Players cannot open or read it. You can stock a shop from its prices, or copy names and items into the index.",
-  },
-  {
-    title: "Saves",
-    body: "The save folder in Settings keeps named copies on this phone. You can export one, or import a Lootsplit file. Load replaces this campaign. The same password can lock those files. From the published app, Google Drive can hold a backup, a save, and a bug report in a Lootsplit folder. This copy of the app is version " + APP_VERSION + ".",
-  },
-  {
-    title: "Campaigns",
-    body: "The dungeon master can keep more than one campaign. Each has its own shops, money, index, names, and books. A player link cannot create, rename, open, or delete one.",
-  },
+    "title": "Enable notifications",
+    "body": "Enable Notifications in Share or Settings and allow browser permission. Notifications cover messages, mode changes, and turns while Lootsplit is running; they are not email alerts or guaranteed notifications after the app closes."
+  }
 ];
 
 export function Guide() {
@@ -106,7 +100,7 @@ export function Guide() {
   return (
     <>
       <button type="button" className="mt-3 inline-flex min-h-11 items-center text-sm text-muted" onClick={() => setOpen(true)}>
-        How Lootsplit works
+        Help
       </button>
       <Modal open={ask} onOpenChange={(next) => {
         if (next || choosing.current) {
@@ -117,18 +111,18 @@ export function Guide() {
       }} title="View the instructions?">
         <div className="flex flex-col gap-4">
           <p className="text-sm text-muted">
-            The instructions are optional. No skips them. Yes shows them now. How Lootsplit works opens them later either way.
+            View the setup guide now, or open Help anytime.
           </p>
           <div className="flex flex-wrap gap-2">
-            <Button variant="secondary" onClick={() => answer(false)}>No</Button>
-            <Button onClick={() => answer(true)}>Yes</Button>
+            <Button variant="secondary" onClick={() => answer(false)}>Not now</Button>
+            <Button onClick={() => answer(true)}>View guide</Button>
           </div>
         </div>
       </Modal>
       <Modal open={open} onOpenChange={setOpen} title="How Lootsplit works">
         <div className="flex flex-col gap-4">
           <p className="text-sm text-muted">
-            Lootsplit {APP_VERSION} keeps a campaign's money, shops, and table. Local Mode stays on this phone. Turn based Mode and Live Mode share one table.
+            Lootsplit {APP_VERSION} helps you manage campaign funds, inventory, shops, and player updates.
           </p>
           {sections.map((section) => (
             <section key={section.title}>

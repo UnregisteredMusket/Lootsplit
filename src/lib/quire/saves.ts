@@ -17,7 +17,7 @@ export type LocalSave = {
 function request<T>(req: IDBRequest<T>): Promise<T> {
   return new Promise((resolve, reject) => {
     req.onsuccess = () => resolve(req.result);
-    req.onerror = () => reject(req.error ?? new Error("The save folder could not be opened."));
+    req.onerror = () => reject(req.error ?? new Error("Could not open saved backups."));
   });
 }
 
@@ -35,7 +35,7 @@ function database(): Promise<IDBDatabase> {
       }
     };
     open.onsuccess = () => resolve(open.result);
-    open.onerror = () => reject(open.error ?? new Error("The save folder could not be opened."));
+    open.onerror = () => reject(open.error ?? new Error("Could not open saved backups."));
   });
 }
 
@@ -77,8 +77,8 @@ export async function rememberSave(input: { name: string; campaignId: string; fi
   tx.objectStore("saves").put(save);
   await new Promise<void>((resolve, reject) => {
     tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error ?? new Error("That save could not be kept."));
-    tx.onabort = () => reject(tx.error ?? new Error("That save could not be kept."));
+    tx.onerror = () => reject(tx.error ?? new Error("Could not save the backup."));
+    tx.onabort = () => reject(tx.error ?? new Error("Could not save the backup."));
   });
   return save;
 }
@@ -89,8 +89,8 @@ export async function replaceSave(save: LocalSave): Promise<void> {
   tx.objectStore("saves").put(save);
   await new Promise<void>((resolve, reject) => {
     tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error ?? new Error("That save could not be kept."));
-    tx.onabort = () => reject(tx.error ?? new Error("That save could not be kept."));
+    tx.onerror = () => reject(tx.error ?? new Error("Could not save the backup."));
+    tx.onabort = () => reject(tx.error ?? new Error("Could not save the backup."));
   });
 }
 
@@ -103,4 +103,10 @@ export async function removeSave(id: string): Promise<void> {
     tx.onerror = () => reject(tx.error ?? new Error("That save could not be removed."));
     tx.onabort = () => reject(tx.error ?? new Error("That save could not be removed."));
   });
+}
+
+export async function replaceSaves(saves:LocalSave[]):Promise<void>{
+ const db=await database();const tx=db.transaction('saves','readwrite');
+ for(const save of saves)tx.objectStore('saves').put(save);
+ await new Promise<void>((resolve,reject)=>{tx.oncomplete=()=>resolve();tx.onerror=()=>reject(tx.error);tx.onabort=()=>reject(tx.error);});
 }

@@ -31,7 +31,15 @@ export const pullCloudTable = createServerFn({ method: "POST" })
   });
 
 export const finishCloudTurn = createServerFn({ method: "POST" })
-  .validator((input: { code: string; token: string; baseRevision?: number; table?: CloudTable; bill?: BillFile }) => input)
+  .validator(
+    (input: {
+      code: string;
+      token: string;
+      baseRevision?: number;
+      table?: CloudTable;
+      bill?: BillFile;
+    }) => input,
+  )
   .handler(async ({ data }) => {
     const { publishTurn } = await import("./cloud.server.ts");
     return publishTurn(data);
@@ -56,4 +64,34 @@ export const skipCloudTurn = createServerFn({ method: "POST" })
   .handler(async ({ data }) => {
     const { passTurn } = await import("./cloud.server.ts");
     return passTurn(data);
+  });
+
+export const submitCloudCommands = createServerFn({ method: "POST" })
+  .validator(
+    (input: {
+      code: string;
+      token: string;
+      batchId: string;
+      commands: unknown[];
+      endTurn?: boolean;
+      stage?: boolean;
+    }) => input,
+  )
+  .handler(async ({ data }) => {
+    const { submitCommands } = await import("./cloud.server.ts");
+    return submitCommands(data);
+  });
+export const manageCloudRoom = createServerFn({ method: "POST" })
+  .validator(
+    (input: {
+      code: string;
+      token: string;
+      action: "release" | "permission" | "start" | "discard";
+      seatId: string;
+      allowParty?: boolean;
+    }) => input,
+  )
+  .handler(async ({ data }) => {
+    const { manageRoom } = await import("./cloud.server.ts");
+    return manageRoom(data);
   });

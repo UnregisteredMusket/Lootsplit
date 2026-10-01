@@ -1,10 +1,10 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
-import { Shell, KeptByDm } from "@/components/shell";
+import { Shell } from "@/components/shell";
 import { Campaigns } from "@/components/campaigns";
 import { SaveFolder } from "@/components/save-folder";
-import { DriveHost } from "@/components/drive-host";
+import { Diagnostics } from "@/components/diagnostics";
 import { Notices } from "@/components/notices";
 import { PasswordSettings } from "@/components/password-settings";
 import { CloudTable } from "@/components/cloud-table";
@@ -23,7 +23,7 @@ export const Route = createFileRoute("/settings")({
   component: SettingsPage,
 });
 
-const READ_LABELS = ["Small", "Usual", "Large", "Broadsheet"] as const;
+const READ_LABELS = ["Small", "Standard", "Large", "Broadsheet"] as const;
 const DOLLAR_PRESETS = [100, 250, 500, 1000] as const;
 
 function bandOf(value: number): 0 | 1 | 2 {
@@ -74,7 +74,14 @@ function SettingsPage() {
     return scalePrice(100, { wealth: "modest", rarity, priceScale: 1, category, realm: draft });
   }
 
-  if (seat.role === "player") return <KeptByDm />;
+  if (seat.role === "player") return (
+    <Shell width="prose">
+      <h1 className="font-display text-4xl tracking-tight">Device backups</h1>
+      <p className="mt-2 text-sm text-muted">Keep a copy of the campaign data available on this device. Full campaign restoration is a DM action in Local Mode.</p>
+      {ready ? <SaveFolder /> : <p>Loading…</p>}
+      <Fold title="Diagnostic reports" hint="Download an error report to share manually."><Diagnostics /></Fold>
+    </Shell>
+  );
 
   const dirty = JSON.stringify(draft) !== JSON.stringify(realm);
 
@@ -84,21 +91,21 @@ function SettingsPage() {
         <h1 className="font-display text-4xl tracking-tight">Control panel</h1>
         <p className="text-sm text-faint">Version {APP_VERSION}</p>
       </div>
-      <p className="mt-2 text-sm text-muted">How the table plays, then the tools that keep this campaign.</p>
+      <p className="mt-2 text-sm text-muted">Manage sharing, backups, economy settings, and appearance.</p>
       {!ready ? <p className="mt-6 text-muted">Loading…</p> : null}
       {ready ? (
         <>
-          <Fold title="Mode" hint="Local, turn based, or live." defaultOpen>
+          <Fold title="Mode" hint="Local, turn-based, or live." defaultOpen>
             <CloudTable />
           </Fold>
           <PasswordSettings />
-          <Fold title="Google Drive" hint="Backups, saves, and bug reports.">
-            <DriveHost />
+          <SaveFolder />
+          <Fold title="Diagnostic reports" hint="Download an error report to share manually.">
+            <Diagnostics />
           </Fold>
-          <Fold title="Notices" hint="Mode changes, messages, and your turn.">
+          <Fold title="Notifications" hint="Mode changes, messages, and your turn.">
             <Notices />
           </Fold>
-          <SaveFolder />
           <Fold title="Price modifiers" hint="Season, shortages, war, and the value of a gold piece." defaultOpen>
             <p className="mt-2 text-sm text-muted">
               {realmNote(draft, { dollars: prefs.showDollars })}
@@ -182,7 +189,7 @@ function SettingsPage() {
             <RealmBand
               label="Scarcity"
               low="Flat"
-              mid="Usual"
+              mid="Standard"
               high="Severe"
               value={draft.scarcity}
               onPick={(value) => commitKey("scarcity", value)}
@@ -272,7 +279,7 @@ function SettingsPage() {
             </fieldset>
             <div className="mt-3 flex flex-col gap-1">
               <Slider
-                label="Sticker scale"
+                label="Base price multiplier"
                 min={0.5}
                 max={2.5}
                 step={0.05}
@@ -281,7 +288,7 @@ function SettingsPage() {
                 display={`${Math.round(prefs.defaultScale * 100)}%`}
               />
               <Slider
-                label="How full"
+                label="Stock level"
                 min={0.4}
                 max={1.6}
                 step={0.1}
@@ -372,20 +379,20 @@ function SettingsPage() {
               </label>
             </div>
             <Button className="mt-3" variant="secondary" onClick={() => setPrefs({ appearance: "dark", accent: DEFAULT_ACCENT, ground: DEFAULT_GROUND })}>
-              Restore glass colors
+              Reset theme colors
             </Button>
           </Fold>
 
           <Fold title="Display" hint="Dollars, type size, and how many recent entries to show.">
             <Switch
-              label="Show a modern dollar reading"
+              label="Show a modern estimated dollar equivalent"
               hint="Prices stay in copper, silver, and gold. Dollars are only a comparison for one gold piece."
               checked={prefs.showDollars}
               onChange={(showDollars) => setPrefs({ showDollars })}
             />
             <Switch
               label="Ask before removing a line"
-              hint="Applies to purses, items, index entries, names, and single shop lines. Deleting a whole shop always asks."
+              hint="Applies to accounts, items, catalog entries, names, and single shop lines. Deleting a whole shop always asks."
               checked={prefs.confirmRemoves}
               onChange={(confirmRemoves) => setPrefs({ confirmRemoves })}
             />
@@ -403,10 +410,10 @@ function SettingsPage() {
                 step={1}
                 value={prefs.readScale}
                 onChange={(readScale) => setPrefs({ readScale })}
-                display={READ_LABELS[Math.round(prefs.readScale)] ?? "Usual"}
+                display={READ_LABELS[Math.round(prefs.readScale)] ?? "Standard"}
               />
               <Slider
-                label="Recent entries on the desk"
+                label="Recent transactions shown on Home"
                 min={4}
                 max={24}
                 step={1}
@@ -415,7 +422,7 @@ function SettingsPage() {
                 display={String(Math.round(prefs.ledgerRows))}
               />
               <Slider
-                label="Goods invented at a time"
+                label="Items generated per batch"
                 min={1}
                 max={12}
                 step={1}
@@ -442,7 +449,7 @@ function SettingsPage() {
               </Button>
             </div>
             <p className="mt-4 max-w-prose text-sm text-muted">
-              Returns this campaign to the starter data: the sample shop, the sample purses, the starter item list, and the default price modifiers. Other campaigns are not changed. Display settings return to their defaults.
+              Returns this campaign to the starter data: the sample shop, the sample accounts, the starter item list, and the default price modifiers. Other campaigns are not changed. Display settings return to their defaults.
             </p>
             <Button variant="danger" className="mt-4" onClick={() => setWiping(true)}>
               Reset everything
@@ -467,7 +474,7 @@ function SettingsPage() {
         open={wiping}
         onOpenChange={setWiping}
         title="Reset everything?"
-        body="This campaign's shops, purses, ledger, index, names, and imported PDFs are deleted. Other campaigns are not changed. Display settings and this campaign's price modifiers return to their defaults."
+        body="This campaign's shops, accounts, ledger, catalog, names, and imported PDFs are deleted. Other campaigns are not changed. Display settings and this campaign's price modifiers return to their defaults."
         confirmLabel="Reset everything"
         onConfirm={() => {
           void resetAll()

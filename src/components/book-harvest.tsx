@@ -49,7 +49,7 @@ export function BookHarvest() {
   async function fileGoods() {
     const chosen = goods.filter((row) => row.on);
     if (chosen.length === 0) {
-      toast("Select at least one good.");
+      toast("Select at least one item.");
       return;
     }
     const added = await addGoods(
@@ -64,7 +64,7 @@ export function BookHarvest() {
         service: false,
       })),
     );
-    toast.success(added === 0 ? "Those items are already in the index." : `Added ${added} items.`);
+    toast.success(added === 0 ? "Those items are already in the catalog." : `Added ${added} items.`);
   }
 
   if (books.length === 0) {
@@ -123,7 +123,7 @@ export function BookHarvest() {
               Save selected names
             </Button>
           ) : null}
-          <HarvestBlock title="Goods with a price" empty="No printed prices in that book.">
+          <HarvestBlock title="Items with detected prices" empty="No printed prices in that book.">
             {goods.map((row, index) => (
               <li key={row.name} className="flex items-center gap-3 py-2">
                 <input
@@ -142,7 +142,7 @@ export function BookHarvest() {
               </li>
             ))}
           </HarvestBlock>
-          {goods.length > 0 ? <Button onClick={() => void fileGoods()}>File selected goods</Button> : null}
+          {goods.length > 0 ? <Button onClick={() => void fileGoods()}>Add selected items to catalog</Button> : null}
         </>
       ) : null}
     </div>

@@ -2,12 +2,12 @@ import type { ReactNode } from "react";
 import { cn } from "@/lib/cn";
 
 export function Card({ children, className }: { children: ReactNode; className?: string }) {
-  return <section className={cn("rounded-2xl border border-lead/25 bg-elevated p-4", className)}>{children}</section>;
+  return <section className={cn("loot-card rounded-2xl border border-lead/25 bg-elevated p-5", className)}>{children}</section>;
 }
 
 export function EmptyState({ title, body, action }: { title: string; body: string; action?: ReactNode }) {
   return (
-    <div className="rounded-2xl border border-dashed border-lead/30 px-4 py-6 text-center">
+    <div className="loot-empty rounded-2xl border border-lead/20 px-4 py-6 text-center">
       <p className="font-display text-2xl tracking-tight">{title}</p>
       <p className="mx-auto mt-1 max-w-xs text-sm text-muted">{body}</p>
       {action ? <div className="mt-3">{action}</div> : null}

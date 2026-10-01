@@ -124,7 +124,7 @@ export function priceAfterCharisma(copper: number, score: number | null): number
 
 export function parsePrice(input: string): number | null {
   const text = input.trim().toLowerCase();
-  if (!text) return null;
+  if (!text || /[-−]/.test(text)) return null;
   const pattern = /(\d+(?:,\d{3})*(?:\.\d+)?)\s*(pp|gp|ep|sp|cp)\b/g;
   let total = 0;
   let found = false;
@@ -135,7 +135,7 @@ export function parsePrice(input: string): number | null {
     if (!unit || Number.isNaN(amount)) continue;
     total += Math.round(amount * COPPER[unit]);
   }
-  if (found) return total;
+  if (found) return Number.isSafeInteger(total) ? total : null;
   if (/^\d+(?:\.\d+)?$/.test(text)) return Math.round(Number(text) * COPPER.gp);
   return null;
 }
@@ -176,7 +176,7 @@ const SPEND_ORDER = ["cp", "sp", "ep", "gp", "pp"] as const;
 const BREAK_ORDER = ["sp", "ep", "gp", "pp"] as const;
 
 export function spendCoins(coins: Coins, cost: number): Coins | null {
-  if (cost < 0 || toCopper(coins) < cost) return null;
+  if (!Number.isSafeInteger(cost) || cost < 0 || Object.values(coins).some((value) => !Number.isSafeInteger(value) || value < 0) || !Number.isSafeInteger(toCopper(coins)) || toCopper(coins) < cost) return null;
   if (cost === 0) return { ...coins };
   const next = { ...coins };
   let remaining = cost;

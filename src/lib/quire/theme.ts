@@ -17,8 +17,8 @@ export const LOOKS: Look[] = [
   { id: "ledger", label: "Ledger", appearance: "light", accent: "#8a5a12", ground: "#f3ead7" },
 ];
 
-export const DEFAULT_ACCENT = "#e0a04a";
-export const DEFAULT_GROUND = "#10182c";
+export const DEFAULT_ACCENT = "#c8a96b";
+export const DEFAULT_GROUND = "#0c1424";
 
 export function themeVars(appearance: Appearance, accent: string, ground: string): Record<string, string> {
   const dark = appearance === "dark";

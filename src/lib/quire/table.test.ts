@@ -9,7 +9,7 @@ import type { LedgerLine, Purse, StockLine } from "./types.ts";
 const purse = (id: string): Purse => ({ id, name: id, kind: "character", coins: { cp: 0, sp: 0, ep: 0, gp: 10, pp: 0 } });
 
 test("a counter file is not a full backup", () => {
-  assert.throws(() => readShare({ kind: "quire", version: 2 }), /player file or a bill/);
+  assert.throws(() => readShare({ kind: "quire", version: 2 }), /player file or an activity report/);
   const table = readShare({
     kind: "quire-table",
     version: 1,

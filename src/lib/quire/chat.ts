@@ -99,8 +99,8 @@ async function writeNotes(next: ChatNote[]): Promise<void> {
   tx.objectStore("meta").put({ id: KEY, notes: next });
   await new Promise<void>((resolve, reject) => {
     tx.oncomplete = () => resolve();
-    tx.onerror = () => reject(tx.error ?? new Error("That message could not be kept."));
-    tx.onabort = () => reject(tx.error ?? new Error("That message could not be kept."));
+    tx.onerror = () => reject(tx.error ?? new Error("Could not save the message."));
+    tx.onabort = () => reject(tx.error ?? new Error("Could not save the message."));
   });
   notes = next;
   publish();

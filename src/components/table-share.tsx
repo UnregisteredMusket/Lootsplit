@@ -1,17 +1,18 @@
+import {getCloudTable} from "@/lib/quire/cloud-client";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { useEconomy } from "@/lib/quire/economy-context";
 import { characterControl } from "@/lib/quire/types";
 import { useSeat } from "@/lib/quire/seat";
 import { loadNotes } from "@/lib/quire/chat";
-import { forgetGifts, loadGifts } from "@/lib/quire/gift";
-import { forgetSales, loadListings, loadLoans, loadSales } from "@/lib/quire/market";
+import { loadGifts } from "@/lib/quire/gift";
+import { loadListings, loadLoans, loadSales } from "@/lib/quire/market";
 import { loadHandouts } from "@/lib/quire/handouts";
 import { loadSheets } from "@/lib/quire/sheet";
 import { buildBill, buildTable, copyText, downloadJson, encodeLinkPayload, seatHref } from "@/lib/quire/table";
 import { snapshot } from "@/lib/quire/economy";
 import { loadSeatLock } from "@/lib/quire/lock";
-import { Button, Switch } from "@/components/ui";
+import { Button, Switch, Confirm } from "@/components/ui";
 
 export function TableShare() {
   const { shops, stock, purses, holdings, realm } = useEconomy();
@@ -93,7 +94,7 @@ export function TableShare() {
   return (
     <div>
       <p className="max-w-prose text-sm text-muted">
-        Each player gets their own link. Turn party fund on or off, then copy that player's link. The phone that opens it can buy only for that character, plus the shared purse if you left the switch on.
+        Each player gets their own link. Turn party fund on or off, then copy that player's link. The device that opens it can buy only for that character, plus the shared account if you left the switch on.
       </p>
       <fieldset className="mt-4">
         <legend className="mb-2 text-sm font-medium">Shops they can buy from</legend>
@@ -145,22 +146,24 @@ export function TableShare() {
 export function TableDesk() {
   const seat = useSeat();
   const { openCounter, takeBill, sendBill } = useEconomy();
+  const [incoming,setIncoming]=useState<File|null>(null);
 
   async function read(file: File | undefined, kind: "counter" | "bill") {
     if (!file) return;
     try {
       if (kind === "counter") await openCounter(file);
-      else await takeBill(file);
+      else setIncoming(file);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "That file could not be read.");
     }
   }
 
+  if(getCloudTable().joined)return <p className="text-sm text-muted">Shared modes synchronize player activity directly. Return to Local Mode before importing or exporting player reports.</p>;
   if (seat.role === "player") {
     return (
       <div>
         <p className="text-sm text-muted">
-          Buy and sell with a character, or with the party purse. Give coins or holdings to another player from the Party page. Copy the group bill when you are done. It lists every purchase and gift on this phone.
+          Buy and sell with a character, or with the party fund. Give coins or holdings to another player from the Party page. Copy the activity report link when you are done, then share it with the DM. It lists every purchase and gift in this browser on this device.
         </p>
         <div className="mt-4 flex flex-wrap gap-2">
           <Button
@@ -173,27 +176,27 @@ export function TableDesk() {
                 const payload = await encodeLinkPayload(bill);
                 const url = seatHref("dm", payload, window.location.origin);
                 if (url.length > 48000) {
-                  toast.error("This bill is too long for a link. Send the file.");
+                  toast.error("This activity report is too long for a link. Send the file.");
                   return;
                 }
                 await copyText(url);
-                await forgetGifts(bill.gifts?.map((gift) => gift.id) ?? []);
-                await forgetSales(bill.sales?.map((sale) => sale.id) ?? []);
-                toast.success("Group bill copied. The phone that opens it becomes the dungeon master and shows who bought what.");
-              })().catch((error: unknown) => toast.error(error instanceof Error ? error.message : "Could not copy the bill link."));
+
+
+                toast.success("Activity report copied. Share this report with the DM to import the player activity.");
+              })().catch((error: unknown) => toast.error(error instanceof Error ? error.message : "Could not copy the activity report link."));
             }}
           >
-            Copy group bill
+            Copy activity report link
           </Button>
           <Button
             variant="secondary"
             onClick={() => {
               void sendBill()
-                .then(() => toast.success("Group bill saved. Send that file if the link is inconvenient."))
-                .catch((error: unknown) => toast.error(error instanceof Error ? error.message : "Could not write the bill."));
+                .then(() => toast.success("Activity report saved. Send that file if the link is inconvenient."))
+                .catch((error: unknown) => toast.error(error instanceof Error ? error.message : "Could not write the activity report."));
             }}
           >
-            Download group bill
+            Download activity report
           </Button>
         </div>
       </div>
@@ -202,8 +205,9 @@ export function TableDesk() {
 
   return (
     <div>
+      <Confirm open={incoming!==null} onOpenChange={open=>{if(!open)setIncoming(null);}} title="Import player activity?" body={incoming ? `${incoming.name}: account, inventory, and stock changes will be checked against the original player copy. Conflicting reports are rejected without applying changes. Export a backup first if you need a recovery copy.` : ""} confirmLabel="Check and import" onConfirm={()=>{const file=incoming;setIncoming(null);if(file)void takeBill(file).catch(e=>toast.error(e instanceof Error?e.message:"Import failed."));}} />
       <p className="text-sm text-muted">
-        Open a player file on this phone, or take a bill a player sent. A bill lists what was bought and who paid. If both sides still have an item, the lower quantity is kept.
+        Open a player file in this browser on this device, or import an activity report from a player. An activity report lists what was bought and who paid. Conflicting funds, inventory, or stock changes are rejected. After accepting a report, send the player a fresh copy before they continue.
       </p>
       <div className="mt-4 flex flex-wrap gap-2">
         <label className="inline-flex min-h-11 cursor-pointer items-center rounded-sm border border-border px-4 text-sm">
@@ -219,7 +223,7 @@ export function TableDesk() {
           />
         </label>
         <label className="inline-flex min-h-11 cursor-pointer items-center rounded-sm border border-border px-4 text-sm">
-          Take a bill
+          Import player activity
           <input
             type="file"
             accept="application/json,.json"

@@ -17,7 +17,7 @@ export const Route = createRootRoute({
       { title: APP_NAME },
       {
         name: "description",
-        content: "Track campaign money, shops, and prices. Create shops from an item index, and read names and prices from PDFs you import.",
+        content: "Track campaign money, shops, and prices. Create shops from an item catalog, and read names and prices from PDFs you import.",
       },
       { name: "theme-color", content: "#10182c" },
     ],
@@ -26,12 +26,6 @@ export const Route = createRootRoute({
       { rel: "stylesheet", href: appCss },
       { rel: "manifest", href: "/__grok/manifest.webmanifest" },
       { rel: "apple-touch-icon", href: "/__grok/icon-180.png" },
-      { rel: "preconnect", href: "https://fonts.googleapis.com" },
-      { rel: "preconnect", href: "https://fonts.gstatic.com", crossOrigin: "anonymous" },
-      {
-        rel: "stylesheet",
-        href: "https://fonts.googleapis.com/css2?family=Cormorant+Garamond:wght@600;700&family=Source+Sans+3:wght@400;500;600&family=Source+Serif+4:ital,opsz,wght@0,8..60,400;0,8..60,600&display=swap",
-      },
     ],
   }),
   component: () => (
