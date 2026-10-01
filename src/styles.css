@@ -309,7 +309,7 @@ input,select,textarea { max-width: 100%; }
 .wealth-card { position:relative; isolation:isolate; border:1px solid color-mix(in srgb,var(--color-lead) 65%,var(--color-border)); box-shadow:inset 0 0 0 3px var(--color-bg),inset 0 0 0 4px color-mix(in srgb,var(--color-lead) 20%,transparent); }
 .wealth-card::before { content:"";position:absolute;inset:0;z-index:-1;border-radius:inherit;background:linear-gradient(90deg,var(--color-bg) 32%,transparent),url('/art/treasury.webp') right center/auto 100% no-repeat;opacity:.22;pointer-events:none; }
 .stat-card,.quick-action,.shop-tile,.character-link { border-color:color-mix(in srgb,var(--color-lead) 45%,var(--color-border)); }
-.quick-action.primary { background:linear-gradient(115deg,color-mix(in srgb,var(--color-lead) 85%,white),var(--color-lead)); }
+.quick-action.primary { background:var(--color-lead); }
 .ledger-art { width:3.5rem;height:3.5rem;object-fit:cover;flex-shrink:0;border:1px solid color-mix(in srgb,var(--color-lead) 45%,transparent);border-radius:.7rem; }
 .ledger-art.round {border-radius:50%;width:2.7rem;height:2.7rem;}
 .shop-tile {border:1px solid color-mix(in srgb,var(--color-lead) 45%,var(--color-border));border-radius:.9rem;overflow:hidden;background:var(--color-elevated);}

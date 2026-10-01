@@ -9,7 +9,7 @@ type Tone = "dark" | "paper";
 
 const styles: Record<Tone, Record<Variant, string>> = {
   dark: {
-    primary: "bg-lead text-bg hover:bg-accent",
+    primary: "bg-lead text-bg hover:brightness-95",
     secondary: "border border-border bg-subtle text-fg hover:bg-elevated",
     ghost: "text-fg hover:bg-subtle",
     danger: "border border-danger text-fg hover:bg-danger",

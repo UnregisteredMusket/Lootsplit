@@ -15,3 +15,13 @@ test("a light page uses dark ink", () => {
   assert.equal(vars["--color-fg"], "#1c1422");
   assert.ok(luminance(vars["--color-bg"] ?? "#000") > luminance(vars["--color-fg"] ?? "#fff"));
 });
+
+test("gold accent text remains readable on a light page without losing the chosen accent", () => {
+  const vars = themeVars("light", "#c8a96b", "#f6f1e6");
+  assert.equal(vars["--color-accent"], "#c8a96b");
+  const a = luminance(vars["--color-lead"]!);
+  for (const key of ["--color-bg", "--color-elevated"]) {
+    const b = luminance(vars[key]!);
+    assert.ok((Math.max(a,b)+0.05)/(Math.min(a,b)+0.05) >= 4.5);
+  }
+});

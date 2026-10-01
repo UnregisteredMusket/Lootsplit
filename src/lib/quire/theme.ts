@@ -29,12 +29,22 @@ export function themeVars(appearance: Appearance, accent: string, ground: string
   const muted = mix(fg, ground, 0.34);
   const faint = mix(fg, ground, 0.55);
   const paper = dark ? "#f7f1e4" : "#fffaf3";
+  // Keep the chosen accent while adapting text and primary controls to the page.
+  const target = luminance(ground) > 0.3 ? "#000000" : "#ffffff";
+  const contrast = (a: string, b: string) => {
+    const x = luminance(a), y = luminance(b);
+    return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05);
+  };
+  let lead = accent;
+  for (let step = 1; step <= 20 && Math.min(contrast(lead, ground), contrast(lead, elevated)) < 4.5; step++) {
+    lead = mix(accent, target, step / 20);
+  }
   return {
     "--color-bg": ground,
     "--color-elevated": elevated,
     "--color-subtle": subtle,
     "--color-border": border,
-    "--color-lead": accent,
+    "--color-lead": lead,
     "--color-fg": fg,
     "--color-muted": muted,
     "--color-faint": faint,
