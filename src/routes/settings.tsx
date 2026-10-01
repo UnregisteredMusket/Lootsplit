@@ -1,13 +1,11 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { Link, createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Shell } from "@/components/shell";
 import { Campaigns } from "@/components/campaigns";
 import { SaveFolder } from "@/components/save-folder";
 import { Diagnostics } from "@/components/diagnostics";
-import { Notices } from "@/components/notices";
 import { PasswordSettings } from "@/components/password-settings";
-import { CloudTable } from "@/components/cloud-table";
 import { Button, ChoiceGrid, Confirm, Fold, Slider, Switch, ToggleButton } from "@/components/ui";
 import { useEconomy } from "@/lib/quire/economy-context";
 import { useLibrary } from "@/lib/quire/library";
@@ -88,24 +86,20 @@ function SettingsPage() {
   return (
     <Shell width="prose">
       <div className="flex items-end justify-between gap-3">
-        <h1 className="font-display text-4xl tracking-tight">Control panel</h1>
+        <h1 className="font-display text-4xl tracking-tight">Settings</h1>
         <p className="text-sm text-faint">Version {APP_VERSION}</p>
       </div>
-      <p className="mt-2 text-sm text-muted">Manage sharing, backups, economy settings, and appearance.</p>
+      <p className="mt-2 text-sm text-muted">Manage backups, economy settings, and appearance.</p>
       {!ready ? <p className="mt-6 text-muted">Loading…</p> : null}
       {ready ? (
         <>
-          <Fold title="Mode" hint="Local, turn-based, or live." defaultOpen>
-            <CloudTable />
-          </Fold>
+          <Link to="/share" className="quick-action mt-5">Multiplayer — rooms, players & notifications →</Link>
           <PasswordSettings />
           <SaveFolder />
           <Fold title="Diagnostic reports" hint="Download an error report to share manually.">
             <Diagnostics />
           </Fold>
-          <Fold title="Notifications" hint="Mode changes, messages, and your turn.">
-            <Notices />
-          </Fold>
+
           <Fold title="Price modifiers" hint="Season, shortages, war, and the value of a gold piece." defaultOpen>
             <p className="mt-2 text-sm text-muted">
               {realmNote(draft, { dollars: prefs.showDollars })}

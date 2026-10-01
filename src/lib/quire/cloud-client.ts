@@ -1,3 +1,4 @@
+import { rememberSave } from "./saves.ts";
 import { loadSeatLock } from "./lock.ts";
 import { notify } from "./notify.ts";
 import {
@@ -229,8 +230,11 @@ export async function joinTable(code: string, purseId: string, name: string) {
     if (hasPendingChanges())
       throw new Error("Resolve pending changes before joining another campaign.");
     if (!(await loadSeatLock())?.protectSaves) {
-      const saved = await downloadJson(`lootsplit-before-join-${Date.now()}.json`, await snapshot());
-      if (!saved) throw new Error("Share the backup file before joining this campaign.");
+      await rememberSave({
+        name: `Before joining room ${code.trim().toUpperCase()}`,
+        campaignId: localStorage.getItem("quire.campaign.v1") || "main",
+        file: await snapshot(),
+      });
     }
     const joined = await joinCloudTable({
       data: { code: code.trim().toUpperCase(), purseId, name },

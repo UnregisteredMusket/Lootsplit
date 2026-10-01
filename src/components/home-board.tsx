@@ -3,9 +3,7 @@ import { Link } from "@tanstack/react-router";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { toast } from "sonner";
 import { Campaigns } from "@/components/campaigns";
-import { CloudTable } from "@/components/cloud-table";
 import { Guide } from "@/components/guide";
-import { Notices } from "@/components/notices";
 import { Card, EmptyState, MoneyLine } from "@/components/terminal";
 import { TurnLine } from "@/components/turn-line";
 import { Button, Confirm, Fold, Switch } from "@/components/ui";
@@ -96,18 +94,16 @@ export function HomeBoard() {
           </div>
         </>
       ) : null}
-      <Fold title="Table" hint="Mode, notifications, and this campaign.">
-        <CloudTable />
-        <div className="mt-3">
-          <Notices />
-        </div>
+      <Fold title="Campaign tools" hint="Multiplayer, display options, and this campaign.">
+        <Link to="/share" className="quick-action primary">Open Multiplayer — host or join a room</Link>
+
         <TurnLine />
         <div className="mt-3">
           <Switch checked={prefs.showDollars} onChange={(on) => setPrefs({ showDollars: on })} label="Show dollars" hint="A estimated dollar equivalent beside the coins." />
         </div>
         <div className="mt-3 flex flex-wrap gap-2 text-sm">
           <Link to="/settings" className="inline-flex min-h-11 items-center rounded-xl border border-lead/40 px-3">Settings</Link>
-          <Link to="/share" className="inline-flex min-h-11 items-center rounded-xl border border-lead/40 px-3">Share</Link>
+          <Link to="/share" className="inline-flex min-h-11 items-center rounded-xl border border-lead/40 px-3">Multiplayer</Link>
           {seat.role === "dm" ? (
             <Button variant="secondary" onClick={() => void download().catch((e: unknown) => toast.error(e instanceof Error ? e.message : "Could not export backup."))}>Download copy</Button>
           ) : null}

@@ -125,10 +125,10 @@ export function SaveFolder() {
       setName("");
       toast.success(
         next.download && shared
-          ? "Backup downloaded and saved in this browser."
+          ? "Backup downloaded and saved on this device."
           : next.download
-            ? "Backup saved in this browser. The file was not shared."
-            : "Backup saved in this browser.",
+            ? "Backup saved on this device. The file was not shared."
+            : "Backup saved on this device.",
       );
       return;
     }
@@ -193,7 +193,7 @@ export function SaveFolder() {
   }
 
   return (
-    <Fold title="Device backups" hint="Save in this browser or download a backup file." defaultOpen>
+    <Fold title="Device backups" hint="Save on this device or download a backup file." defaultOpen>
       <Confirm
         open={restoreChoice !== null}
         onOpenChange={(open) => {
@@ -209,7 +209,7 @@ export function SaveFolder() {
         }}
       />
       <p className="text-sm text-muted">
-        Save stores a named backup in this browser. Export downloads it. Import adds a backup file
+        Save stores a named backup on this device. Export downloads it. Import adds a backup file
         to this list. Load replaces the current campaign with the selected backup. Download backup
         saves the current campaign as a file on your device. Browser copies can be lost if you clear
         site data; keep a downloaded copy too.

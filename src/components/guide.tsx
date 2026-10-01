@@ -15,7 +15,7 @@ const sections: Array<{ title: string; body: string; points?: Array<{ label: str
   },
   {
     "title": "Use the dashboard and character sheet",
-    "body": "Home shows balances, inventory value, and recent transactions. Players can open Sheet to view their assigned character and inventory. On mobile, More contains Books, Share, and Settings. Import a supported D&D 5e (2014) character sheet from a filled PDF or JSON file. Image-only scans are not supported."
+    "body": "Home shows balances, inventory value, and recent transactions. Players can open Sheet to view their assigned character and inventory. On mobile, Multiplayer contains rooms, codes, players, and messages. More contains Market, Catalog or Character sheet, Books, and Settings. Import a supported D&D 5e (2014) character sheet from a filled PDF or JSON file. Image-only scans are not supported."
   },
   {
     "title": "Create and manage shops",
@@ -27,11 +27,11 @@ const sections: Array<{ title: string; body: string; points?: Array<{ label: str
   },
   {
     "title": "Choose a sharing mode",
-    "body": "The DM selects a mode from Home, Share, or Settings. Players also need access to the published site; a campaign code does not grant site access.",
+    "body": "Open Multiplayer to start or join a room. The host chooses Live or Turn-based. Players also need access to the published site; a campaign code does not grant site access.",
     "points": [
       {
         "label": "Local Mode",
-        "body": "Each browser has a separate copy. In Share, the DM selects shops and copies a character’s player link or downloads their player file. Party-fund access is optional. Players return an activity report link or file, which the DM reviews and imports. Conflicting funds, inventory, or stock changes are rejected. After an accepted report, send a fresh player copy before the next round of activity. Reports from older app versions need manual reconciliation. Copying a link does not send it; share it with the recipient yourself."
+        "body": "Each browser has a separate copy. In Multiplayer → Manual sharing & files, the DM selects shops and copies a character’s player link or downloads their player file. Party-fund access is optional. Players return an activity report link or file, which the DM reviews and imports. Conflicting funds, inventory, or stock changes are rejected. After an accepted report, send a fresh player copy before the next round of activity. Reports from older app versions need manual reconciliation. Copying a link does not send it; share it with the recipient yourself."
       },
       {
         "label": "Turn-based Mode",

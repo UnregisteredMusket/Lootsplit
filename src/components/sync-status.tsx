@@ -12,7 +12,7 @@ import {
 } from "@/lib/quire/cloud-client";
 import { Button, Confirm } from "./ui";
 import { toast } from "sonner";
-export function SyncStatus() {
+export function SyncStatus({ compact = false }: { compact?: boolean }) {
   const state = useSyncExternalStore(subscribeCloudTable, getCloudTable, getCloudTable);
   const [discard, setDiscard] = useState(false);
   const [disconnect, setDisconnect] = useState(false);
@@ -36,52 +36,58 @@ export function SyncStatus() {
                 : "Synced"}
         </span>
         <Link to="/share" className="underline">
-          Sharing controls
+          Multiplayer
         </Link>
       </div>
-      <details className="mt-2">
-        <summary className="cursor-pointer">Pending actions and recovery</summary>
-        {pendingActions().length ? (
-          <ol className="mt-2 list-inside list-decimal">
-            {pendingActions().map((action) => (
-              <li key={action.id}>{action.kind === "patch" ? "DM campaign edit" : action.kind}</li>
-            ))}
-          </ol>
-        ) : (
-          <p>No pending actions.</p>
-        )}
-        <label className="inline-flex min-h-11 cursor-pointer items-center underline">
-          Import recovery file
-          <input
-            className="sr-only"
-            type="file"
-            accept="application/json,.json"
-            onChange={(event) => {
-              const file = event.target.files?.[0];
-              event.target.value = "";
-              if (file) act(() => importPending(file));
-            }}
-          />
-        </label>
-      </details>
-      {state.error ? <p className="mt-2 text-danger">{state.error}</p> : null}
-      {state.pending || state.error ? (
-        <div className="mt-2 flex flex-wrap gap-2">
-          <Button variant="secondary" onClick={() => act(retryPending)}>
-            Retry
-          </Button>
-          <Button variant="ghost" onClick={() => act(exportPending)}>
-            Export pending actions
-          </Button>
-          <Button variant="ghost" onClick={() => setDiscard(true)}>
-            Discard pending actions
-          </Button>
-          {state.error ? (
-            <Button variant="ghost" onClick={() => setDisconnect(true)}>
-              Disconnect with recovery copy
-            </Button>
+      {!compact ? (
+        <>
+          <details className="mt-2">
+            <summary className="cursor-pointer">Pending actions and recovery</summary>
+            {pendingActions().length ? (
+              <ol className="mt-2 list-inside list-decimal">
+                {pendingActions().map((action) => (
+                  <li key={action.id}>
+                    {action.kind === "patch" ? "DM campaign edit" : action.kind}
+                  </li>
+                ))}
+              </ol>
+            ) : (
+              <p>No pending actions.</p>
+            )}
+            <label className="inline-flex min-h-11 cursor-pointer items-center underline">
+              Import recovery file
+              <input
+                className="sr-only"
+                type="file"
+                accept="application/json,.json"
+                onChange={(event) => {
+                  const file = event.target.files?.[0];
+                  event.target.value = "";
+                  if (file) act(() => importPending(file));
+                }}
+              />
+            </label>
+          </details>
+          {state.error ? <p className="mt-2 text-danger">{state.error}</p> : null}
+          {state.pending || state.error ? (
+            <div className="mt-2 flex flex-wrap gap-2">
+              <Button variant="secondary" onClick={() => act(retryPending)}>
+                Retry
+              </Button>
+              <Button variant="ghost" onClick={() => act(exportPending)}>
+                Export pending actions
+              </Button>
+              <Button variant="ghost" onClick={() => setDiscard(true)}>
+                Discard pending actions
+              </Button>
+              {state.error ? (
+                <Button variant="ghost" onClick={() => setDisconnect(true)}>
+                  Disconnect with recovery copy
+                </Button>
+              ) : null}
+            </div>
           ) : null}
-        </div>
+        </>
       ) : null}
       <Confirm
         open={discard}
