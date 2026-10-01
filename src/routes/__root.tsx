@@ -5,6 +5,7 @@ import { PreviewHostBridge } from "@/components/preview-host-bridge";
 import { LibraryProvider } from "@/lib/quire/library";
 import { EconomyProvider } from "@/lib/quire/economy-context";
 import { PrefsProvider } from "@/lib/quire/prefs";
+import { installMobileApi } from "@/lib/mobile/boot";
 import appCss from "../styles.css?url";
 
 const APP_NAME = "Lootsplit";
@@ -13,7 +14,7 @@ export const Route = createRootRoute({
   head: () => ({
     meta: [
       { charSet: "utf-8" },
-      { name: "viewport", content: "width=device-width, initial-scale=1" },
+      { name: "viewport", content: "width=device-width, initial-scale=1, viewport-fit=cover" },
       { title: APP_NAME },
       {
         name: "description",
@@ -28,7 +29,9 @@ export const Route = createRootRoute({
       { rel: "apple-touch-icon", href: "/__grok/icon-180.png" },
     ],
   }),
-  component: () => (
+  component: () => {
+    installMobileApi();
+    return (
     <html lang="en" suppressHydrationWarning>
       <head>
         <HeadContent />
@@ -48,5 +51,6 @@ export const Route = createRootRoute({
         <Scripts />
       </body>
     </html>
-  ),
+    );
+  },
 });

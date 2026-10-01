@@ -70,7 +70,7 @@ export function SyncStatus() {
           <Button variant="secondary" onClick={() => act(retryPending)}>
             Retry
           </Button>
-          <Button variant="ghost" onClick={() => exportPending()}>
+          <Button variant="ghost" onClick={() => act(exportPending)}>
             Export pending actions
           </Button>
           <Button variant="ghost" onClick={() => setDiscard(true)}>
@@ -102,7 +102,7 @@ export function SyncStatus() {
         confirmLabel="Export and disconnect"
         onConfirm={() => {
           setDisconnect(false);
-          disconnectClosedRoom();
+          act(disconnectClosedRoom);
         }}
       />
     </aside>

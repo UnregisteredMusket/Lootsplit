@@ -87,8 +87,8 @@ export function TableShare() {
       toast("Choose at least one shop.");
       return;
     }
-    downloadJson(`lootsplit-${name.replace(/\s+/g, "-").toLowerCase()}.json`, file);
-    toast.success(`${name}'s file saved.`);
+    const saved = await downloadJson(`lootsplit-${name.replace(/\s+/g, "-").toLowerCase()}.json`, file);
+    if (saved) toast.success(`${name}'s file saved.`);
   }
 
   return (

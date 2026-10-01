@@ -1,0 +1,7 @@
+<?xml version='1.0' encoding='utf-8'?>
+<resources>
+    <string name="app_name">Lootsplit</string>
+    <string name="title_activity_main">Lootsplit</string>
+    <string name="package_name">com.unregisteredmusket.lootsplit</string>
+    <string name="custom_url_scheme">com.unregisteredmusket.lootsplit</string>
+</resources>

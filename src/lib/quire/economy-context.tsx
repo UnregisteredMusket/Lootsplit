@@ -390,13 +390,8 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
         const lock = await loadSeatLock();
         if (lock?.protectSaves) throw new Error("Use Settings → Device backups to export with password protection.");
         const file: QuireFile = await captureDeviceBackup();
-        const blob = new Blob([JSON.stringify(file)], { type: "application/json" });
-        const url = URL.createObjectURL(blob);
-        const link = document.createElement("a");
-        link.href = url;
-        link.download = `lootsplit-${new Date().toISOString().slice(0, 10)}.json`;
-        link.click();
-        URL.revokeObjectURL(url);
+        const saved = await downloadJson(`lootsplit-${new Date().toISOString().slice(0, 10)}.json`, file);
+        if (!saved) throw new Error("Share was dismissed. The backup file was not saved.");
       },
       restoreFile: async (file, password) => {
         const lock = await loadSeatLock();
@@ -448,7 +443,8 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
         const loansOnPhone = await loadLoans();
         const sales = await loadSales();
         const bill = buildBill({ ...file, notes: await loadNotes(), gifts, loans: loansOnPhone, sales, sheets: await loadSheets() }, sitting);
-        downloadJson(`lootsplit-bill-${new Date().toISOString().slice(0, 10)}.json`, bill);
+        const saved = await downloadJson(`lootsplit-bill-${new Date().toISOString().slice(0, 10)}.json`, bill);
+        if (!saved) throw new Error("Share was dismissed. The activity report was not saved.");
 
 
       },

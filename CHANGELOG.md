@@ -1,5 +1,12 @@
 # Lootsplit changelog
 
+## Android package
+
+- Added a client-only Capacitor build. The APK serves the interface from the phone and sends shared-room calls to the existing Cloudflare Worker.
+- The Worker allows those calls only from the app WebView origins. Browser visits stay same-origin.
+- Device backups and PDF downloads use the Android share sheet. The back button and screen insets are handled in the packaged app.
+- See ANDROID.md. This is a test-APK workflow, not a Play Store release.
+
 ## Cloudflare Workers deployment
 
 - Added `cloudflare/worker.mjs`, Wrangler config, and a D1 migration for `campaign_rooms`.

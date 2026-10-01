@@ -378,12 +378,18 @@ function base64UrlToBytes(value: string): Uint8Array {
   return bytes;
 }
 
-export function downloadJson(filename: string, value: unknown) {
-  const blob = new Blob([JSON.stringify(value)], { type: "application/json" });
+export async function downloadJson(filename: string, value: unknown): Promise<boolean> {
+  const text = JSON.stringify(value);
+  if (import.meta.env.VITE_MOBILE === "true") {
+    const { saveTextFile } = await import("@/lib/mobile/files");
+    return saveTextFile(filename, text);
+  }
+  const blob = new Blob([text], { type: "application/json" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
   link.download = filename;
   link.click();
   URL.revokeObjectURL(url);
+  return true;
 }

@@ -20,7 +20,8 @@ export function Diagnostics() {
         variant="secondary"
         onClick={() =>
           void downloadBugReport(note)
-            .then(() => {
+            .then((saved) => {
+              if (!saved) return;
               setNote("");
               toast.success("Diagnostic report downloaded.");
             })

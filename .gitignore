@@ -16,3 +16,9 @@ dist
 data/cloud-rooms.json
 .sites-runtime
 .wrangler
+
+# Release signing stays off the repository. See ANDROID.md.
+*.jks
+*.keystore
+*.apk
+*.aab

@@ -33,15 +33,21 @@ export function renderShopPdf(input: ShopPdfInput): string {
   return assemble(pages);
 }
 
-export function downloadShopPdf(input: ShopPdfInput): void {
+export async function downloadShopPdf(input: ShopPdfInput): Promise<boolean> {
   const pdf = renderShopPdf(input);
+  const filename = shopPdfFilename(input.shop.name);
+  if (import.meta.env.VITE_MOBILE === "true") {
+    const { saveBinaryFile } = await import("@/lib/mobile/files");
+    return saveBinaryFile(filename, pdf);
+  }
   const blob = new Blob([pdf], { type: "application/pdf" });
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
   link.href = url;
-  link.download = shopPdfFilename(input.shop.name);
+  link.download = filename;
   link.click();
   URL.revokeObjectURL(url);
+  return true;
 }
 
 function layout(input: ShopPdfInput): string[] {

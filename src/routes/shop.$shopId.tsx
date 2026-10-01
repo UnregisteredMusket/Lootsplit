@@ -126,8 +126,11 @@ function ShopPage() {
         <Button
           variant="secondary"
           onClick={() => {
-            downloadShopPdf({ shop, lines, showDollars: prefs.showDollars, gpDollars: economy.realm.gpDollars });
-            toast.success("Shop sheet downloaded.");
+            void downloadShopPdf({ shop, lines, showDollars: prefs.showDollars, gpDollars: economy.realm.gpDollars })
+              .then((saved) => {
+                if (saved) toast.success("Shop sheet downloaded.");
+              })
+              .catch((error: unknown) => toast.error(error instanceof Error ? error.message : "Could not share the shop sheet."));
           }}
         >
           Share as PDF

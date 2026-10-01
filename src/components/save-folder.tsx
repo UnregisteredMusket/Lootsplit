@@ -119,12 +119,16 @@ export function SaveFolder() {
         await captureDeviceBackup(),
         password,
       );
-      if (next.download) downloadJson(saveDownloadName(saved.name, saved.savedAt), saved.file);
+      const shared = next.download
+        ? await downloadJson(saveDownloadName(saved.name, saved.savedAt), saved.file)
+        : false;
       setName("");
       toast.success(
-        next.download
+        next.download && shared
           ? "Backup downloaded and saved in this browser."
-          : "Backup saved in this browser.",
+          : next.download
+            ? "Backup saved in this browser. The file was not shared."
+            : "Backup saved in this browser.",
       );
       return;
     }
@@ -151,7 +155,7 @@ export function SaveFolder() {
     }
     const download =
       gate?.protectSaves && password ? await lockFile(plain, password, gate.salt) : plain;
-    downloadJson(saveDownloadName(next.save.name, next.save.savedAt), download);
+    await downloadJson(saveDownloadName(next.save.name, next.save.savedAt), download);
   }
 
   function start(next: Ask, confirmed = false) {

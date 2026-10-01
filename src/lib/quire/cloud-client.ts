@@ -228,8 +228,10 @@ export async function joinTable(code: string, purseId: string, name: string) {
   return serial(async () => {
     if (hasPendingChanges())
       throw new Error("Resolve pending changes before joining another campaign.");
-    if (!(await loadSeatLock())?.protectSaves)
-      downloadJson(`lootsplit-before-join-${Date.now()}.json`, await snapshot());
+    if (!(await loadSeatLock())?.protectSaves) {
+      const saved = await downloadJson(`lootsplit-before-join-${Date.now()}.json`, await snapshot());
+      if (!saved) throw new Error("Share the backup file before joining this campaign.");
+    }
     const joined = await joinCloudTable({
       data: { code: code.trim().toUpperCase(), purseId, name },
     });
@@ -280,7 +282,7 @@ export function retryPending() {
 }
 export function exportPending() {
   const s = requireSession();
-  downloadJson(`lootsplit-pending-${s.code}.json`, {
+  return downloadJson(`lootsplit-pending-${s.code}.json`, {
     code: s.code,
     commands: s.pending,
     exportedAt: Date.now(),
@@ -427,8 +429,9 @@ export function leaveTable() {
     error: "",
   });
 }
-export function disconnectClosedRoom() {
-  exportPending();
+export async function disconnectClosedRoom() {
+  const saved = await exportPending();
+  if (!saved) throw new Error("Share the recovery file before disconnecting. Pending actions are still on this device.");
   const s = requireSession();
   s.pending = [];
   remember(s);

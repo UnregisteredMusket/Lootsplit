@@ -1,10 +1,10 @@
 import { listReports, recordReport } from "./reports.ts";
 import { APP_VERSION } from "./version.ts";
 
-export async function downloadBugReport(note?: string): Promise<void> {
+export async function downloadBugReport(note?: string): Promise<boolean> {
   if (note?.trim()) recordReport({ message: note.trim(), source: "note" });
   const { downloadJson } = await import("./table.ts");
-  downloadJson(`lootsplit-diagnostics-${Date.now()}.json`, {
+  return downloadJson(`lootsplit-diagnostics-${Date.now()}.json`, {
     version: APP_VERSION,
     exportedAt: Date.now(),
     reports: listReports()

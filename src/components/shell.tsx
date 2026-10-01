@@ -13,6 +13,7 @@ import { SeatSwitch } from "@/components/seat-switch";
 import { Confirm, Modal } from "@/components/ui";
 import { cn } from "@/lib/cn";
 import { loadSeatLock } from "@/lib/quire/lock";
+import { getOnline, subscribeOnline } from "@/lib/mobile/online";
 import { watchCrashes } from "@/lib/quire/reports";
 
 type Dest = "/" | "/market" | "/catalog" | "/party" | "/books" | "/share" | "/settings";
@@ -34,6 +35,30 @@ export function Shell({ children, width = "wide" }: { children: ReactNode; width
   const dirty = useRef(false);
 
   useEffect(() => watchCrashes(), []);
+  useEffect(() => {
+    if (import.meta.env.VITE_MOBILE !== "true") return;
+    let remove = () => {};
+    let live = true;
+    void import("@capacitor/app").then(({ App }) => {
+      void App.addListener("backButton", ({ canGoBack }) => {
+        if (canGoBack) window.history.back();
+        else void App.exitApp();
+      }).then((handle) => {
+        if (!live) {
+          void handle.remove();
+          return;
+        }
+        remove = () => void handle.remove();
+      });
+    });
+    void import("@capacitor/status-bar")
+      .then(({ StatusBar }) => StatusBar.setOverlaysWebView({ overlay: true }))
+      .catch(() => undefined);
+    return () => {
+      live = false;
+      remove();
+    };
+  }, []);
 
   useEffect(() => {
     setDraft(query);
@@ -73,7 +98,7 @@ export function Shell({ children, width = "wide" }: { children: ReactNode; width
           </nav><div className="rounded-xl border border-lead/20 p-4 text-sm text-muted"><p className="text-xs tracking-widest text-lead uppercase">Campaign ledger</p><p className="mt-2">Manage party funds, inventory, and shops.</p></div>
         </aside>
         <div className="min-w-0">
-          <header className="sticky top-0 z-20 border-b border-lead/50 bg-bg/90 backdrop-blur-sm">
+          <header className="sticky top-0 z-20 border-b border-lead/50 bg-bg/90 pt-[env(safe-area-inset-top)] backdrop-blur-sm">
             <div className="mx-auto flex w-full max-w-6xl items-center gap-3 px-4 py-3 lg:px-8">
               <Link to="/" search={{ view: "home" }} className="inline-flex items-center gap-2 font-display text-3xl leading-none tracking-tight lg:hidden">
                 <QuillMark />
@@ -112,6 +137,7 @@ export function Shell({ children, width = "wide" }: { children: ReactNode; width
               </div>
             ) : null}
           </header>
+          <OfflineNote />
           <main className={cn("mx-auto w-full px-4 pt-6 pb-28 lg:px-8 lg:pt-8 lg:pb-12", width === "prose" ? "max-w-3xl" : "max-w-6xl")}><SyncStatus />{children}</main>
         </div>
       </div>
@@ -214,6 +240,16 @@ export function Shell({ children, width = "wide" }: { children: ReactNode; width
           </>
         )}
       </>
+    );
+  }
+
+  function OfflineNote() {
+    const online = useSyncExternalStore(subscribeOnline, getOnline, () => true);
+    if (online) return null;
+    return (
+      <p className="border-b border-lead/30 bg-elevated px-4 py-2 text-sm text-muted" role="status">
+        Offline. This device keeps its local campaign. A shared change is not saved until the server accepts it.
+      </p>
     );
   }
 
