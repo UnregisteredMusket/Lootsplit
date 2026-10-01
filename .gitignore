@@ -1,6 +1,7 @@
 node_modules
 .vercel
-.grok
+.grok/*
+!.grok/app-env.json
 .tanstack
 screenshots
 artifacts

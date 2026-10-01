@@ -1,3 +1,4 @@
+import { loadJournal, readJournal, type Journal } from "./journal.ts";
 import {getCloudWatch} from "./cloud-turn.ts";
 import { verifyReportBase, type ReportBase } from "./local-report.ts";
 import { coinsSchema, validateEconomyRows } from "./validation.ts";
@@ -114,6 +115,7 @@ async function seedEconomy(): Promise<void> {
   const db = await quireDb();
   const seeded = await request(db.transaction("meta").objectStore("meta").get("seeded"));
   if (seeded) return;
+  if(typeof window!=="undefined"){try{const registry=JSON.parse(localStorage.getItem("quire.campaigns.v1")||"[]") as {id:string;blank?:boolean}[];if(registry.find(c=>c.id===localStorage.getItem("quire.campaign.v1"))?.blank){await request(db.transaction("meta","readwrite").objectStore("meta").put({id:"seeded"}));return;}}catch{/* Original campaigns retain their existing initialization. */}}
   const party = crypto.randomUUID();
   const ivo = crypto.randomUUID();
   const shop = crypto.randomUUID();
@@ -248,7 +250,7 @@ export async function loadRealm(): Promise<RealmSettings> {
 export async function saveRealm(settings: RealmSettings): Promise<void> {
   const db = await quireDb();
   const next = clampRealm(settings);
-  await request(db.transaction("meta", "readwrite").objectStore("meta").put({ id: "settings", ...next }));
+  await atomic(["meta"],async tx=>{const before=await request<RealmSettings|undefined>(tx.objectStore("meta").get("settings"));tx.objectStore("meta").put({id:"settings",...next});if(JSON.stringify(clampRealm(before))!==JSON.stringify(next))await audit(tx,`Economy rules: ${JSON.stringify(clampRealm(before))} → ${JSON.stringify(next)}`.slice(0,500),"prices");});
 }
 
 export async function saveCatalog(item: CatalogItem): Promise<void> {
@@ -376,8 +378,9 @@ export async function repriceShop(shop: Shop): Promise<void> {
   const realm = await loadRealm();
   const catalog = await listCatalog();
   const lines = await request<StockLine[]>(db.transaction("stock").objectStore("stock").index("shopId").getAll(normalized.id));
-  const tx = db.transaction(["shops", "stock"], "readwrite");
+  const tx = db.transaction(["shops", "stock", "meta"], "readwrite");
   const done = finish(tx);
+  const history: string[]=[];
   tx.objectStore("shops").put(normalized);
   for (const line of lines) {
     const current = normalizeStock(line);
@@ -394,8 +397,10 @@ export async function repriceShop(shop: Shop): Promise<void> {
       category,
       realm,
     });
+    if(current.copper!==copper)history.push(`${current.name}: ${current.copper} cp → ${copper} cp`);
     tx.objectStore("stock").put({ ...current, baseCopper: base, rarity, copper });
   }
+  if(history.length)await audit(tx,`${normalized.name}: ${history.join("; ")}`.slice(0,500),"prices");
   await done;
 }
 
@@ -413,12 +418,12 @@ export async function savePurse(purse: Purse): Promise<void> {
 
 export async function saveShop(shop: Shop): Promise<void> {
   const db = await quireDb();
-  await request(db.transaction("shops", "readwrite").objectStore("shops").put(normalizeShop(shop)));
+  await atomic(["shops","meta"],async tx=>{const before=await request<Shop|undefined>(tx.objectStore("shops").get(shop.id));tx.objectStore("shops").put(normalizeShop(shop));await audit(tx,`${before?"Updated":"Created"} shop: ${shop.name}${shop.closed?" (closed)":" (open)"}`,"management");});
 }
 
 export async function saveStock(line: StockLine): Promise<void> {
   const db = await quireDb();
-  await request(db.transaction("stock", "readwrite").objectStore("stock").put(line));
+  await atomic(["stock","meta"],async tx=>{const before=await request<StockLine|undefined>(tx.objectStore("stock").get(line.id));tx.objectStore("stock").put(line);if(before&&before.copper!==line.copper)await audit(tx,`${line.name}: ${before.copper} cp → ${line.copper} cp`,"prices");});
 }
 
 export async function saveHolding(holding: Holding): Promise<void> {
@@ -552,6 +557,7 @@ export async function buyFromShop(input: { stockId: string; purseId: string; qua
     const shop = await request<Shop | undefined>(tx.objectStore("shops").get(stock.shopId));
     const purse = await request<Purse | undefined>(tx.objectStore("purses").get(input.purseId));
     if (!shop || !purse) throw new Error("Choose an account and a shop.");
+    if(shop.closed)throw new Error("This shop is closed.");
     if (stock.quantity !== null && stock.quantity < quantity) throw new Error("The shop does not have that many.");
     const unit = priceAfterCharisma(Math.round(stock.copper * shop.sellRate), score);
     const cost = unit * quantity;
@@ -575,6 +581,7 @@ export async function sellToShop(input: { holdingId: string; shopId: string; qua
     const holding = await request<Holding | undefined>(tx.objectStore("holdings").get(input.holdingId));
     const shop = await request<Shop | undefined>(tx.objectStore("shops").get(input.shopId));
     if (!holding || !shop) throw new Error("That sale cannot be made.");
+    if(shop.closed)throw new Error("This shop is closed.");
     if (holding.quantity < quantity) throw new Error("You do not have that many.");
     const purse = await request<Purse | undefined>(tx.objectStore("purses").get(holding.purseId));
     if (!purse) throw new Error("This account no longer exists.");
@@ -673,8 +680,9 @@ export async function giveToPlayer(input: { fromId: string; toId: string; copper
       });
     }
   }
+  if (sitting.role!=="player"&&to)tx.objectStore("ledger").put(logLine(to.id,null,"Transfer received",copper));
   if (pending) tx.objectStore("meta").put({ id: "gifts", gifts: pending });
-  tx.objectStore("ledger").put(logLine(from.id, null, `Gave ${toName} ${giftParts(gift)}`, copper > 0 ? -copper : 0));
+  tx.objectStore("ledger").put(logLine(from.id, null, sitting.role!=="player"&&to ? "Transfer sent" : `Gave ${toName} ${giftParts(gift)}`, copper > 0 ? -copper : 0));
   });
   await postNotes([{ from: "player", to: "party", purseId: from.id, text: giftSummary(gift) }]);
 }
@@ -864,6 +872,7 @@ export async function postCopper(purseId: string, copper: number, summary: strin
 }
 
 export type QuireFile = {
+  journal?: Journal;
   gifts?: import("./gift.ts").PlayerGift[];
   sales?: import("./market.ts").ListingSale[];
   shareBase?: ReportBase;
@@ -934,6 +943,7 @@ export async function snapshot(): Promise<QuireFile> {
   file.sales = await loadSales();
   file.notes = await loadNotes();
   file.handouts = await loadHandouts();
+  file.journal = await loadJournal();
   return file;
 }
 
@@ -1040,6 +1050,7 @@ export function readQuireFile(value: unknown): QuireFile {
     if (!Array.isArray(file[key])) throw new Error("That file is missing part of the ledger.");
   }
   validateEconomyRows(file as QuireFile);
+  readJournal(file.journal);
   return file as QuireFile;
 }
 
@@ -1076,6 +1087,7 @@ export async function restore(file: QuireFile): Promise<void> {
   if (Array.isArray(file.sheets)) tx.objectStore("meta").put({ id: "sheets", sheets: readSheets(file.sheets) });
   tx.objectStore("meta").put({ id: "chat", notes: readNotes(file.notes) });
   tx.objectStore("meta").put({ id: "handouts", handouts: readHandouts(file.handouts) });
+  tx.objectStore("meta").put({ id: "journal", value: readJournal(file.journal) });
   const lock = readSeatLock(file.seatLock);
   if (lock) tx.objectStore("meta").put({ id: "seatLock", ...lock });
   else tx.objectStore("meta").delete("seatLock");
@@ -1135,6 +1147,7 @@ export async function economySnapshot(): Promise<CloudTable> {
   table.sheets = await loadSheets();
   table.notes = await loadNotes();
   table.handouts = await loadHandouts();
+  table.journal = await loadJournal();
   return table;
 }
 
@@ -1155,7 +1168,10 @@ export async function applyCloudTable(table: CloudTable): Promise<void> {
   tx.objectStore("meta").put({ id: "loans", loans: next.loans });
   tx.objectStore("meta").put({ id: "sheets", sheets: next.sheets });
   tx.objectStore("meta").put({ id: "handouts", handouts: next.handouts ?? [] });
+  tx.objectStore("meta").put({ id: "journal", value: readJournal(next.journal) });
   await done;
   await replaceNotes(next.notes);
   await refreshChat();
 }
+
+async function audit(tx:IDBTransaction,summary:string,kind:"prices"|"management") {const store=tx.objectStore("meta");const row=await request<{value:unknown}|undefined>(store.get("journal"));const journal=readJournal(row?.value);journal.events.push({id:crypto.randomUUID(),at:Date.now(),summary,kind});store.put({id:"journal",value:journal});}

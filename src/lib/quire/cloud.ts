@@ -1,3 +1,4 @@
+import { readJournal, type Journal } from "./journal.ts";
 import { validateEconomyRows } from "./validation.ts";
 import { clampRealm } from "./scale.ts";
 import type { RealmSettings } from "./types.ts";
@@ -12,6 +13,7 @@ import { readHandouts, type Handout } from "./handouts.ts";
 import { characterControl, type Coins, type Holding, type LedgerLine, type Purse, type Shop, type StockLine } from "./types.ts";
 
 export type CloudTable = {
+  journal?: Journal;
   realm?: RealmSettings;
   purses: Purse[];
   holdings: Holding[];
@@ -58,8 +60,9 @@ export function readCloudTable(value: unknown): CloudTable | null {
   if (!Array.isArray(table.purses) || !Array.isArray(table.holdings) || !Array.isArray(table.shops) || !Array.isArray(table.stock) || !Array.isArray(table.ledger)) {
     return null;
   }
-  try { validateEconomyRows(table as CloudTable); } catch { return null; }
+  try { validateEconomyRows(table as CloudTable); readJournal(table.journal); } catch { return null; }
   return {
+    journal: readJournal(table.journal),
     realm: table.realm ? clampRealm(table.realm) : undefined,
     purses: table.purses,
     holdings: table.holdings,
@@ -134,6 +137,7 @@ export function applyBillToTable(table: CloudTable, bill: BillFile, seen: CloudS
       sheets: mergeSheets(table.sheets, readSheets(bill.sheets).filter((sheet) => purseIds.has(sheet.purseId))),
       notes: mergeNoteLists(table.notes, bill.notes ?? []),
       handouts: table.handouts,
+      journal: table.journal,
     },
     seen: { gifts: [...giftSeen], sales: [...saleSeen] },
   };

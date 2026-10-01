@@ -15,7 +15,7 @@ export function activeDatabaseName(): string {
   return "quire";
 }
 
-function request<T>(req: IDBRequest<T>): Promise<T> {
+export function request<T>(req: IDBRequest<T>): Promise<T> {
   return new Promise((resolve, reject) => {
     req.onsuccess = () => resolve(req.result);
     req.onerror = () => reject(req.error ?? new Error("Library storage failed."));
@@ -94,7 +94,8 @@ export function deleteQuireDatabase(name: string): Promise<void> {
     const request = indexedDB.deleteDatabase(name);
     request.onsuccess = () => resolve();
     request.onerror = () => reject(request.error ?? new Error("That campaign could not be removed."));
-    request.onblocked = () => reject(new Error("Close other Lootsplit tabs, then try again."));
+    // A delete request cannot be cancelled. Keep it pending until other connections close.
+    request.onblocked = () => {};
   });
 }
 

@@ -16,8 +16,11 @@ import { useSeat } from "@/lib/quire/seat";
 export const Route = createFileRoute("/share")({ component: SharePage });
 function SharePage() {
   const [openChat, setOpenChat] = useState(false);
+  const [tab, setTab] = useState("room");
   useEffect(() => {
-    setOpenChat(new URLSearchParams(window.location.search).get("chat") === "1");
+    const chat = new URLSearchParams(window.location.search).get("chat") === "1";
+    setOpenChat(chat);
+    if (chat) setTab("chat");
   }, []);
   const room = useSyncExternalStore(subscribeCloudTable, getCloudTable, getCloudTable);
   const seat = useSeat();
@@ -28,18 +31,41 @@ function SharePage() {
         <p className="eyebrow">Your party, together</p>
         <h1>Multiplayer</h1>
       </div>
-      <CloudTable />
-      <Fold
-        key={String(openChat)}
-        defaultOpen={openChat}
-        title={count ? `Messages · ${count} unread` : "Messages"}
-        hint="Party chat and private conversations."
-      >
-        <ShareChat />
-      </Fold>
-      <Fold title="Notifications" hint="Turn reminders, messages, and room changes.">
-        <Notices />
-      </Fold>
+      <div className="mode-switch mb-5" role="tablist" aria-label="Multiplayer sections">
+        {[
+          ["room", "Room"],
+          ["chat", count ? `Chat · ${count}` : "Chat"],
+          ["notifications", "Notifications"],
+        ].map(([key, label]) => (
+          <button
+            key={key}
+            role="tab"
+            aria-selected={tab === key}
+            aria-pressed={tab === key}
+            onClick={() => setTab(key!)}
+          >
+            {label}
+          </button>
+        ))}
+      </div>
+      <div hidden={tab !== "room"}>
+        <CloudTable />
+      </div>
+      <div hidden={tab !== "chat"}>
+        <Fold
+          key={String(openChat)}
+          defaultOpen={true}
+          title={count ? `Messages · ${count} unread` : "Messages"}
+          hint="Party chat and private conversations."
+        >
+          <ShareChat />
+        </Fold>
+      </div>
+      <div hidden={tab !== "notifications"}>
+        <Fold defaultOpen title="Notifications" hint="Turn reminders, messages, and room changes.">
+          <Notices />
+        </Fold>
+      </div>
       <Fold title="Connection & recovery" hint="Pending changes, retry, and recovery files.">
         <SyncStatus />
         <p className="text-sm text-muted">

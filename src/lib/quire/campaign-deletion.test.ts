@@ -1,0 +1,27 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import 'fake-indexeddb/auto';
+import {createCampaign,deleteCampaign,getCampaigns} from './campaigns.ts';
+import {ensureEconomy,listPurses,savePurse} from './economy.ts';
+import {fromCopper} from './money.ts';
+const values=new Map<string,string>();
+const storage={getItem:(key:string)=>values.get(key)??null,setItem:(key:string,value:string)=>{values.set(key,value);},removeItem:(key:string)=>{values.delete(key);}};
+Object.assign(globalThis,{localStorage:storage,window:{localStorage:storage,location:{search:'',hash:''}}});
+test('disposable current and last campaigns delete while other campaigns and backups remain',async()=>{
+ const first=getCampaigns().activeId;
+ await ensureEconomy();
+ createCampaign('Disposable deletion test');
+ const second=getCampaigns().activeId;
+ await ensureEconomy();
+ assert.deepEqual(await listPurses(),[]);
+ await savePurse({id:'test',name:'Disposable account',kind:'character',coins:fromCopper(1)});
+ await deleteCampaign(second);
+ assert.equal(getCampaigns().activeId,first);
+ assert.equal(getCampaigns().campaigns.length,1);
+ await deleteCampaign(first);
+ assert.equal(getCampaigns().campaigns.length,1);
+ assert.notEqual(getCampaigns().activeId,first);
+ await ensureEconomy();
+ assert.deepEqual(await listPurses(),[]);
+ assert.equal(storage.getItem('quire.deletion.v1'),null);
+});

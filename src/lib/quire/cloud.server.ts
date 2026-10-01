@@ -194,6 +194,7 @@ function view(room: CloudRoom, seat: CloudSeat): RoomView {
             notes: room.table.notes.filter(
               (note) => canReadNote(note, seat),
             ),
+            journal: room.table.journal ? {...room.table.journal, requests:room.table.journal.requests.filter(r=>seat.purseIds.includes(r.purseId)),events:room.table.journal.events.filter(e=>!e.purseId||seat.purseIds.includes(e.purseId))}:undefined,
             loans: room.table.loans.filter((loan) => seat.purseIds.includes(loan.purseId)),
             sheets: room.table.sheets.filter((sheet) => seat.purseIds.includes(sheet.purseId)),
           },

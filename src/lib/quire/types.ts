@@ -7,6 +7,7 @@ export type Coins = {
 };
 
 export type Purse = {
+  portrait?: string;
   id: string;
   name: string;
   kind: "party" | "character";
@@ -21,6 +22,8 @@ export function characterControl(purse: Purse): "player" | "npc" | null {
 }
 
 export type Holding = {
+  image?: string;
+  category?: string;
   id: string;
   purseId: string;
   name: string;
@@ -49,6 +52,8 @@ export type ItemCategory =
 export type ShopCategory = ItemCategory | "mixed";
 
 export type Shop = {
+  closed?: boolean;
+  image?: string;
   id: string;
   name: string;
   keeper: string;

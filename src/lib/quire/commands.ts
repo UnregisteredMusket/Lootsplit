@@ -1,3 +1,4 @@
+import { readJournal } from "./journal.ts";
 import { z } from "zod";
 import type { CloudTable, CloudSeat } from "./cloud.ts";
 import { fromCopper, toCopper, spendCoins, priceAfterCharisma } from "./money.ts";
@@ -8,6 +9,35 @@ const id = z.string().min(1).max(150),
   qty = amount.min(1).max(100000);
 const base = { id };
 export const commandSchema = z.discriminatedUnion("kind", [
+  z.object({
+    ...base,
+    kind: z.literal("session"),
+    name: z.string().trim().min(1).max(100),
+    end: z.boolean(),
+  }),
+  z.object({
+    ...base,
+    kind: z.literal("payment-request"),
+    purseId: id,
+    copper: amount.min(1),
+    note: z.string().trim().min(1).max(1000),
+  }),
+  z.object({
+    ...base,
+    kind: z.literal("payment-decision"),
+    requestId: id,
+    status: z.enum(["approved", "denied"]),
+  }),
+  z.object({ ...base, kind: z.literal("restock"), shopId: id, quantity: qty }),
+  z.object({
+    ...base,
+    kind: z.literal("portrait"),
+    purseId: id,
+    portrait: z
+      .string()
+      .max(100000)
+      .regex(/^(data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+|\/art\/[a-z0-9-]+\.webp)$/),
+  }),
   z.object({ ...base, kind: z.literal("buy"), stockId: id, purseId: id, quantity: qty }),
   z.object({ ...base, kind: z.literal("sell"), holdingId: id, shopId: id, quantity: qty }),
   z.object({ ...base, kind: z.literal("listing"), listingId: id, purseId: id, quantity: qty }),
@@ -59,6 +89,7 @@ export const commandSchema = z.discriminatedUnion("kind", [
             "sheets",
             "handouts",
             "realm",
+            "journal",
           ]),
           id: z.string(),
           before: z.unknown(),
@@ -78,6 +109,21 @@ export function applyCommand(input: CloudTable, seat: CloudSeat, raw: Command): 
   const cmd = commandSchema.parse(raw);
   const t = structuredClone(input);
   const at = Date.now();
+  const journal = (t.journal = readJournal(t.journal));
+  const event = (
+    summary: string,
+    kind: "management" | "prices" | "request" | "session" = "management",
+    purseId?: string,
+  ) => {
+    if (cmd.kind === "patch" && cmd.changes.some((c) => c.store === "journal")) return;
+    journal.events.push({
+      id: cmd.id + "-event-" + journal.events.length,
+      at,
+      summary,
+      kind,
+      ...(purseId ? { purseId } : {}),
+    });
+  };
   const own = (purseId: string) => {
     if (seat.role !== "dm" && !seat.purseIds.includes(purseId))
       throw new Error("You do not have permission to spend from this account.");
@@ -107,11 +153,54 @@ export function applyCommand(input: CloudTable, seat: CloudSeat, raw: Command): 
     t.purses.find((p) => p.id === purseId)?.kind === "party"
       ? null
       : charismaScore(t.sheets.find((s) => s.purseId === purseId));
-  if (cmd.kind === "buy") {
+  if (cmd.kind === "portrait") {
+    own(cmd.purseId).portrait = cmd.portrait;
+  } else if (cmd.kind === "session") {
+    dm();
+    const active = journal.sessions.find((x) => !x.endedAt);
+    if (active) active.endedAt = at;
+    if (!cmd.end) journal.sessions.push({ id: cmd.id, name: cmd.name, startedAt: at });
+    event(
+      cmd.end ? `Ended session: ${active?.name ?? cmd.name}` : `Started session: ${cmd.name}`,
+      "session",
+    );
+  } else if (cmd.kind === "payment-request") {
+    const p = own(cmd.purseId);
+    journal.requests.push({
+      id: cmd.id,
+      at,
+      purseId: p.id,
+      copper: cmd.copper,
+      note: cmd.note,
+      status: "pending",
+    });
+    event(`${p.name} submitted a payment request`, "request", p.id);
+  } else if (cmd.kind === "payment-decision") {
+    dm();
+    const r = journal.requests.find((x) => x.id === cmd.requestId);
+    if (!r || r.status !== "pending")
+      throw new Error("This request is missing or already decided.");
+    if (cmd.status === "approved") {
+      coins(r.purseId, -r.copper);
+      log(r.purseId, `Payment approved: ${r.note}`, -r.copper);
+    }
+    r.status = cmd.status;
+    event(`Payment request ${cmd.status}`, "request", r.purseId);
+  } else if (cmd.kind === "restock") {
+    dm();
+    const shop = t.shops.find((x) => x.id === cmd.shopId);
+    if (!shop) throw new Error("Shop no longer exists.");
+    for (const line of t.stock.filter((x) => x.shopId === shop.id && x.quantity !== null)) {
+      if (line.quantity! + cmd.quantity > 100000) throw new Error("Stock quantity is too large.");
+      line.quantity! += cmd.quantity;
+    }
+    event(`Restocked ${shop.name}: +${cmd.quantity} per finite stock line`);
+  } else if (cmd.kind === "buy") {
     own(cmd.purseId);
     const s = t.stock.find((x) => x.id === cmd.stockId),
       shop = t.shops.find((x) => x.id === s?.shopId);
     if (!s || !shop) throw new Error("Item or shop no longer exists.");
+    if (shop.closed) throw new Error("This shop is closed.");
     if (s.quantity !== null && s.quantity < cmd.quantity)
       throw new Error("Not enough stock. Refresh and choose a smaller quantity.");
     const cost =
@@ -151,6 +240,7 @@ export function applyCommand(input: CloudTable, seat: CloudSeat, raw: Command): 
     const h = t.holdings.find((x) => x.id === cmd.holdingId),
       s = t.shops.find((x) => x.id === cmd.shopId);
     if (!h || !s) throw new Error("Item or shop no longer exists.");
+    if (s.closed) throw new Error("This shop is closed.");
     own(h.purseId);
     if (h.quantity < cmd.quantity) throw new Error("Not enough items to sell.");
     const paid = Math.round(h.unitCopper * s.buyRate) * cmd.quantity;
@@ -210,9 +300,15 @@ export function applyCommand(input: CloudTable, seat: CloudSeat, raw: Command): 
       if (sender.kind !== "character") throw new Error("Send as your character.");
     }
     if (cmd.to === "player") {
-      if (seat.role !== "player" || cmd.recipientId === cmd.purseId || !t.purses.some((p) => p.id === cmd.recipientId && p.kind === "character" && p.control !== "npc")) throw new Error("Choose another player character.");
-    }
-    else if (cmd.to === "dm" && !t.purses.some((p) => p.id === cmd.purseId))
+      if (
+        seat.role !== "player" ||
+        cmd.recipientId === cmd.purseId ||
+        !t.purses.some(
+          (p) => p.id === cmd.recipientId && p.kind === "character" && p.control !== "npc",
+        )
+      )
+        throw new Error("Choose another player character.");
+    } else if (cmd.to === "dm" && !t.purses.some((p) => p.id === cmd.purseId))
       throw new Error("Choose a recipient.");
     t.notes.push({
       id: cmd.id,
@@ -236,12 +332,41 @@ export function applyCommand(input: CloudTable, seat: CloudSeat, raw: Command): 
   } else if (cmd.kind === "patch") {
     dm();
     for (const change of cmd.changes) {
+      if (change.store === "journal") {
+        if (!same(t.journal ?? readJournal(null), change.before ?? readJournal(null)))
+          throw new Error("Activity changed elsewhere. Refresh and retry.");
+        t.journal = readJournal(change.after);
+        continue;
+      }
       if (change.store === "realm") {
         if (!same(t.realm ?? null, change.before))
           throw new Error("Economy settings changed elsewhere. Review your pending changes.");
         t.realm = change.after as CloudTable["realm"];
+        event(
+          `Economy rules changed: ${JSON.stringify(change.before)} → ${JSON.stringify(change.after)}`.slice(
+            0,
+            500,
+          ),
+          "prices",
+        );
         continue;
       }
+      if (change.store === "shops")
+        event(
+          change.after === null
+            ? "Shop removed"
+            : `Shop updated: ${(change.after as { name: string }).name}`,
+        );
+      if (
+        change.store === "stock" &&
+        change.before &&
+        change.after &&
+        (change.before as { copper: number }).copper !== (change.after as { copper: number }).copper
+      )
+        event(
+          `${(change.after as { name: string }).name}: ${(change.before as { copper: number }).copper} cp → ${(change.after as { copper: number }).copper} cp`,
+          "prices",
+        );
       const rows = (t[change.store] ?? []) as any[];
       const rowId = (x: any) => (change.store === "sheets" ? x.purseId : x.id);
       const current = rows.find((x) => rowId(x) === change.id) ?? null;
@@ -286,6 +411,13 @@ export function tablePatch(before: CloudTable, after: CloudTable): CommandInput 
       id: "realm",
       before: before.realm ?? null,
       after: after.realm ?? null,
+    });
+  if (!same(before.journal ?? readJournal(null), after.journal ?? readJournal(null)))
+    changes.push({
+      store: "journal",
+      id: "journal",
+      before: before.journal ?? readJournal(null),
+      after: after.journal ?? readJournal(null),
     });
   return { kind: "patch", changes };
 }

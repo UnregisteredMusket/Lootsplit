@@ -1,3 +1,7 @@
+import { rememberSave, listSaves } from "./saves.ts";
+import { loadJournal, type Journal } from "./journal.ts";
+import { applyCommand, type CommandInput } from "./commands.ts";
+import { economySnapshot, applyCloudTable } from "./economy.ts";
 import { loadSeatLock, passwordMatches } from "./lock.ts";
 import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { toast } from "sonner";
@@ -72,6 +76,8 @@ import { DEFAULT_REALM } from "./scale.ts";
 import type { CatalogItem, Coins, Holding, ItemCategory, LedgerLine, Lexeme, Purse, RealmSettings, Shop, ShopCategory, StockLine, Wealth } from "./types.ts";
 
 type EconomyApi = {
+  journal: Journal;
+  command: (input: CommandInput) => Promise<void>;
   ready: boolean;
   purses: Purse[];
   holdings: Holding[];
@@ -147,6 +153,7 @@ function fault(error: unknown, fallback: string) {
 }
 
 export function EconomyProvider({ children }: { children: ReactNode }) {
+  const [journal,setJournal]=useState<Journal>({sessions:[],requests:[],events:[]});
   const [ready, setReady] = useState(false);
   const [purses, setPurses] = useState<Purse[]>([]);
   const [holdings, setHoldings] = useState<Holding[]>([]);
@@ -162,6 +169,16 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
 
   const reload = useCallback(async () => {
     await ensureEconomy();
+    // A once-per-campaign safety copy. Never bypass an existing password-protected-save policy.
+    if(!getCloudWatch().joined && getSeat().role==="dm" && !(await loadSeatLock())?.protectSaves){
+      const campaignId=localStorage.getItem("quire.campaign.v1")||"main";
+      const marker=`lootsplit.before-illustrated.${campaignId}`;
+      if(!localStorage.getItem(marker)){
+        const name="Before illustrated UI update";
+        if(!(await listSaves(campaignId)).some(s=>s.name===name))await rememberSave({name,campaignId,file:await snapshot()});
+        localStorage.setItem(marker,"1");
+      }
+    }
     const [nextPurses, nextHoldings, nextShops, nextStock, nextLedger, nextCatalog, nextLexicon, nextRealm, nextListings, nextLoans, nextSheets] = await Promise.all([
       listPurses(),
       listHoldings(),
@@ -186,6 +203,7 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
     setListings(nextListings);
     setLoans(nextLoans);
     setSheets(nextSheets);
+    setJournal(await loadJournal());
     setReady(true);
   }, []);
 
@@ -259,6 +277,8 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
     const shared = async (command: import("./commands.ts").CommandInput) => { try { await queueCommand(command); await reload(); } catch(error) { fault(error, "Action failed. Check sync status."); } };
     const mutation = async <T,>(work: () => Promise<T>): Promise<T> => { if (!getCloudWatch().joined) return work(); let result!: T; await runSharedMutation(async () => { result = await work(); }); return result; };
     return {
+      journal,
+      command: async (input) => {if(getCloudWatch().joined){await queueCommand(input);await reload();return;}const sitting=getSeat();const next=applyCommand(await economySnapshot(),{id:"local",token:"",name:"Local",role:sitting.role,purseIds:sitting.purseIds},{...input,id:crypto.randomUUID()});await applyCloudTable(next);await reload();},
       ready,
       purses,
       holdings,
@@ -450,7 +470,7 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
       },
     };
   },
-    [ready, purses, holdings, shops, stock, ledger, catalog, lexicon, realm, listings, loans, sheets, reload, run],
+    [journal, ready, purses, holdings, shops, stock, ledger, catalog, lexicon, realm, listings, loans, sheets, reload, run],
   );
 
   return <EconomyContext.Provider value={api}>{children}</EconomyContext.Provider>;

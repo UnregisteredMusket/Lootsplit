@@ -318,7 +318,7 @@ export function CloudTable() {
               </Button>
               <Button variant="secondary" disabled={busy} onClick={() => run(invitePlayers)}>
                 <Users size={17} />
-                Invite players
+                Share join link
               </Button>
             </div>
           </section>

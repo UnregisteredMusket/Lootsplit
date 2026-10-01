@@ -2,9 +2,10 @@ import { z } from "zod";
 const id = z.string().min(1);
 const amount = z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER);
 export const coinsSchema = z.object({cp:amount,sp:amount,ep:amount,gp:amount,pp:amount});
-const purse = z.object({id,name:z.string(),kind:z.enum(["party","character"]),coins:coinsSchema,control:z.enum(["player","npc"]).optional()});
-const holding = z.object({id,purseId:id,name:z.string(),kind:z.enum(["item","property"]),quantity:amount,unitCopper:amount,notes:z.string()});
-const shop = z.object({id,name:z.string(),keeper:z.string(),place:z.string(),notes:z.string(),sellRate:z.number().finite().nonnegative(),buyRate:z.number().finite().nonnegative()});
+export const artworkSchema=z.string().max(100000).regex(/^(data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+|\/art\/[a-z0-9-]+\.webp)$/);
+const purse = z.object({id,name:z.string(),kind:z.enum(["party","character"]),portrait:artworkSchema.optional(),coins:coinsSchema,control:z.enum(["player","npc"]).optional()});
+const holding = z.object({id,purseId:id,name:z.string(),kind:z.enum(["item","property"]),image:artworkSchema.optional(),category:z.string().max(80).optional(),quantity:amount,unitCopper:amount,notes:z.string()});
+const shop = z.object({id,closed:z.boolean().optional(),image:artworkSchema.optional(),name:z.string(),keeper:z.string(),place:z.string(),notes:z.string(),sellRate:z.number().finite().nonnegative(),buyRate:z.number().finite().nonnegative()});
 const stock = z.object({id,shopId:id,name:z.string(),copper:amount,quantity:amount.nullable(),notes:z.string()});
 const ledger = z.object({id,purseId:id,shopId:z.string().nullable(),summary:z.string(),copper:z.number().int().min(-Number.MAX_SAFE_INTEGER).max(Number.MAX_SAFE_INTEGER),at:z.number().finite()});
 export function validateEconomyRows(value: {purses:unknown;holdings:unknown;shops:unknown;stock:unknown;ledger:unknown}): void {
