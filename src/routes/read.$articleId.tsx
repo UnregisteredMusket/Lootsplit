@@ -1,7 +1,9 @@
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { ChevronLeft, Star } from "lucide-react";
 import { useEffect, useState } from "react";
+import { toast } from "sonner";
 import { articleNeighbors, getArticle, getBook } from "@/lib/quire/db";
+import { loadHandouts, toggleHandout } from "@/lib/quire/handouts";
 import { useLibrary } from "@/lib/quire/library";
 import type { Article } from "@/lib/quire/types";
 import { Shell } from "@/components/shell";
@@ -19,10 +21,8 @@ function ReadPage() {
   const { prefs } = usePrefs();
   const [article, setArticle] = useState<Article | null | undefined>(undefined);
   const [bookTitle, setBookTitle] = useState("");
-  const [neighbors, setNeighbors] = useState<{ prev: Article | null; next: Article | null }>({
-    prev: null,
-    next: null,
-  });
+  const [handout, setHandout] = useState(false);
+  const [neighbors, setNeighbors] = useState<{ prev: Article | null; next: Article | null }>({ prev: null, next: null });
 
   useEffect(() => {
     let cancelled = false;
@@ -35,6 +35,8 @@ function ReadPage() {
         if (cancelled) return;
         setBookTitle(book?.title ?? "PDF");
         setNeighbors(around);
+        const shared = await loadHandouts();
+        if (!cancelled) setHandout(shared.some((item) => item.id === next.id));
       })
       .catch(() => {
         if (!cancelled) setArticle(null);
@@ -82,6 +84,18 @@ function ReadPage() {
             >
               <Star className={article.favorite ? "size-4 fill-accent text-accent" : "size-4"} />
               {article.favorite ? "Saved" : "Save"}
+            </button>
+            <button
+              type="button"
+              onClick={() => {
+                void toggleHandout(article.id).then(setHandout).catch((error: unknown) => {
+                  toast.error(error instanceof Error ? error.message : "That handout could not be kept.");
+                });
+              }}
+              aria-pressed={handout}
+              className="inline-flex min-h-11 items-center rounded-sm border border-border px-3 text-sm"
+            >
+              {handout ? "Handout" : "Share with players"}
             </button>
           </div>
           <div className={cn("mt-4 rounded-xl p-4", prefs.nightReading ? "bg-elevated text-fg" : "bg-paper text-ink")}>

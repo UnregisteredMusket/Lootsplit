@@ -45,13 +45,33 @@ export function formatDollars(copper: number, gpDollars: number): string {
 
 export function formatCoins(coins: Coins): string {
   const parts: string[] = [];
+  if (coins.pp) parts.push(`${coins.pp} pp`);
   if (coins.gp) parts.push(`${coins.gp} gp`);
+  if (coins.ep) parts.push(`${coins.ep} ep`);
   if (coins.sp) parts.push(`${coins.sp} sp`);
   if (coins.cp) parts.push(`${coins.cp} cp`);
-  if (coins.ep) parts.push(`${coins.ep} ep`);
-  if (coins.pp) parts.push(`${coins.pp} pp`);
   if (parts.length === 0) parts.push("0 cp");
   return parts.join(", ");
+}
+
+/** Carry copper up, and stop at the coin the player asked for. Electrum stays until gold. */
+export function carryUpTo(coins: Coins, stop: "sp" | "gp" | "pp"): Coins {
+  let pp = whole(coins.pp);
+  let gp = whole(coins.gp);
+  let ep = whole(coins.ep);
+  let sp = whole(coins.sp);
+  let cp = whole(coins.cp);
+  sp += Math.floor(cp / 10);
+  cp %= 10;
+  if (stop === "sp") return { pp, gp, ep, sp, cp };
+  sp += ep * 5;
+  ep = 0;
+  gp += Math.floor(sp / 10);
+  sp %= 10;
+  if (stop === "gp") return { pp, gp, ep, sp, cp };
+  pp += Math.floor(gp / 10);
+  gp %= 10;
+  return { pp, gp, ep, sp, cp };
 }
 
 /** Book rates: 10 cp = 1 sp, 10 sp = 1 gp, 10 gp = 1 pp, and 1 ep = 5 sp. */
@@ -85,6 +105,21 @@ export function explainPurse(coins: Coins): string {
 
 function whole(value: number): number {
   return Math.max(0, Math.floor(Number(value) || 0));
+}
+
+/** Flat percent off: one point for each Charisma point above 10, and none below. */
+export function charismaOffPercent(score: number): number {
+  const points = Math.floor(Number(score));
+  if (!Number.isFinite(points)) return 0;
+  return Math.max(0, Math.min(20, points - 10));
+}
+
+export function priceAfterCharisma(copper: number, score: number | null): number {
+  const asking = Math.max(0, Math.round(copper));
+  if (score === null) return asking;
+  const percent = charismaOffPercent(score);
+  if (percent <= 0) return asking;
+  return Math.max(0, Math.round((asking * (100 - percent)) / 100));
 }
 
 export function parsePrice(input: string): number | null {

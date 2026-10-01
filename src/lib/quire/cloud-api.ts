@@ -1,0 +1,59 @@
+import { createServerFn } from "@tanstack/react-start";
+import type { CloudTable } from "./cloud.ts";
+import type { BillFile } from "./table.ts";
+
+export const openCloudTable = createServerFn({ method: "POST" })
+  .validator((input: { name: string; table: CloudTable }) => input)
+  .handler(async ({ data }) => {
+    const { openRoom } = await import("./cloud.server.ts");
+    return openRoom(data);
+  });
+
+export const previewCloudTable = createServerFn({ method: "POST" })
+  .validator((input: { code: string }) => input)
+  .handler(async ({ data }) => {
+    const { previewRoom } = await import("./cloud.server.ts");
+    return previewRoom(data.code);
+  });
+
+export const joinCloudTable = createServerFn({ method: "POST" })
+  .validator((input: { code: string; purseId: string; name: string }) => input)
+  .handler(async ({ data }) => {
+    const { joinRoom } = await import("./cloud.server.ts");
+    return joinRoom(data);
+  });
+
+export const pullCloudTable = createServerFn({ method: "POST" })
+  .validator((input: { code: string; token: string }) => input)
+  .handler(async ({ data }) => {
+    const { roomState } = await import("./cloud.server.ts");
+    return roomState(data);
+  });
+
+export const finishCloudTurn = createServerFn({ method: "POST" })
+  .validator((input: { code: string; token: string; baseRevision?: number; table?: CloudTable; bill?: BillFile }) => input)
+  .handler(async ({ data }) => {
+    const { publishTurn } = await import("./cloud.server.ts");
+    return publishTurn(data);
+  });
+
+export const setCloudPace = createServerFn({ method: "POST" })
+  .validator((input: { code: string; token: string; live: boolean }) => input)
+  .handler(async ({ data }) => {
+    const { choosePace } = await import("./cloud.server.ts");
+    return choosePace(data);
+  });
+
+export const closeCloudTable = createServerFn({ method: "POST" })
+  .validator((input: { code: string; token: string }) => input)
+  .handler(async ({ data }) => {
+    const { closeRoom } = await import("./cloud.server.ts");
+    await closeRoom(data);
+  });
+
+export const skipCloudTurn = createServerFn({ method: "POST" })
+  .validator((input: { code: string; token: string }) => input)
+  .handler(async ({ data }) => {
+    const { passTurn } = await import("./cloud.server.ts");
+    return passTurn(data);
+  });

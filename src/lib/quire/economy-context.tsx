@@ -38,7 +38,16 @@ import {
   saveShop,
   saveStock,
   sellToShop,
+  addListing,
+  removeListing,
+  buyListing,
+  askLoan,
+  decideLoan as answerLoan,
+  importCharacterSheet,
+  updateCharacterSheet,
+  voidLedgerLine,
   setCoins,
+  giveToPlayer,
   snapshot,
   applyBill,
   applyTable,
@@ -46,6 +55,15 @@ import {
   type QuireFile,
 } from "./economy.ts";
 import { subscribeCampaigns } from "./campaigns.ts";
+import { getCloudWatch, pushCloudChange, subscribeCloudWatch } from "./cloud-turn.ts";
+import { resumeTable } from "./cloud-client.ts";
+import { loadNotes } from "./chat.ts";
+import { primeNotices } from "./notify.ts";
+import { forgetGifts, loadGifts } from "./gift.ts";
+import { forgetSales, loadListings, loadLoans, loadSales } from "./market.ts";
+import { loadSheets } from "./sheet.ts";
+import type { CharacterSheet } from "./sheet.ts";
+import type { Listing, LoanAsk, LoanStatus } from "./market.ts";
 import { presentReceipt } from "./receipt.ts";
 import { DM_SEAT, buildBill, downloadJson, getSeat, readShare, setSeat } from "./table.ts";
 import type { RarityFlags, ShelfDraft } from "./compose.ts";
@@ -93,6 +111,18 @@ type EconomyApi = {
   sell: (holdingId: string, shopId: string, quantity: number) => Promise<void>;
   setPurseCoins: (purseId: string, coins: Coins) => Promise<void>;
   post: (purseId: string, copper: number, summary: string) => Promise<void>;
+  give: (input: { fromId: string; toId: string; copper: number; holdingId: string | null; quantity: number }) => Promise<void>;
+  listings: Listing[];
+  loans: LoanAsk[];
+  addListing: (input: { name: string; kind: Listing["kind"]; copper: number; quantity: number | null; notes: string }) => Promise<void>;
+  removeListing: (id: string) => Promise<void>;
+  buyListing: (listingId: string, purseId: string, quantity: number) => Promise<void>;
+  askLoan: (purseId: string, copper: number, note: string) => Promise<void>;
+  decideLoan: (id: string, status: LoanStatus) => Promise<void>;
+  sheets: CharacterSheet[];
+  importSheet: (purseId: string, file: File) => Promise<void>;
+  updateSheet: (sheet: CharacterSheet) => Promise<void>;
+  voidLine: (id: string) => Promise<void>;
   setRealm: (settings: RealmSettings, options?: { reprice?: boolean }) => Promise<void>;
   addGoods: (rows: CatalogItem[]) => Promise<number>;
   saveGood: (item: CatalogItem) => Promise<void>;
@@ -125,10 +155,13 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
   const [catalog, setCatalog] = useState<CatalogItem[]>([]);
   const [lexicon, setLexicon] = useState<Lexeme[]>([]);
   const [realm, setRealmState] = useState<RealmSettings>(DEFAULT_REALM);
+  const [listings, setListings] = useState<Listing[]>([]);
+  const [loans, setLoans] = useState<LoanAsk[]>([]);
+  const [sheets, setSheets] = useState<CharacterSheet[]>([]);
 
   const reload = useCallback(async () => {
     await ensureEconomy();
-    const [nextPurses, nextHoldings, nextShops, nextStock, nextLedger, nextCatalog, nextLexicon, nextRealm] = await Promise.all([
+    const [nextPurses, nextHoldings, nextShops, nextStock, nextLedger, nextCatalog, nextLexicon, nextRealm, nextListings, nextLoans, nextSheets] = await Promise.all([
       listPurses(),
       listHoldings(),
       listShops(),
@@ -137,6 +170,9 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
       listCatalog(),
       listLexicon(),
       loadRealm(),
+      loadListings(),
+      loadLoans(),
+      loadSheets(),
     ]);
     setPurses(nextPurses.sort((a, b) => a.name.localeCompare(b.name)));
     setHoldings(nextHoldings.sort((a, b) => a.name.localeCompare(b.name)));
@@ -146,6 +182,9 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
     setCatalog(nextCatalog);
     setLexicon(nextLexicon);
     setRealmState(nextRealm);
+    setListings(nextListings);
+    setLoans(nextLoans);
+    setSheets(nextSheets);
     setReady(true);
   }, []);
 
@@ -154,11 +193,15 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
     void (async () => {
       try {
         await ensureEconomy();
-        const opened = await applySeatLink();
-        if (cancelled) return;
-        if (opened === "player") toast.success("This phone is a player.");
-        if (opened === "dm") toast.success("This phone is the dungeon master.");
-        await reload();
+        try {
+          const opened = await applySeatLink();
+          if (cancelled) return;
+          if (opened === "player") toast.success("This phone is a player.");
+          if (opened === "dm") toast.success("This phone is the dungeon master.");
+        } catch (error) {
+          if (!cancelled) fault(error, "That link could not be opened.");
+        }
+        if (!cancelled) await reload();
       } catch (error) {
         if (!cancelled) fault(error, "The ledger on this device could not be opened.");
       }
@@ -168,6 +211,15 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
     };
   }, [reload]);
 
+  useEffect(() => {
+    void loadNotes()
+      .then((notes) => primeNotices(notes.map((note) => note.id)))
+      .catch(() => primeNotices([]))
+      .finally(() => resumeTable());
+  }, []);
+
+  useEffect(() => subscribeCloudWatch(() => { void reload(); }), [reload]);
+
   useEffect(() => subscribeCampaigns(() => {
     setReady(false);
     void reload();
@@ -175,10 +227,16 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
 
   const run = useCallback(
     async (work: () => Promise<unknown>, ok?: string) => {
+      const gate = getCloudWatch();
+      if (gate.joined && !gate.mine) {
+        toast.error(`It is ${gate.who}'s turn.`);
+        return;
+      }
       try {
         await work();
         await reload();
         if (ok) toast.success(ok);
+        pushCloudChange();
       } catch (error) {
         fault(error, "That change could not be saved.");
       }
@@ -208,6 +266,9 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
       catalog,
       lexicon,
       realm,
+      listings,
+      loans,
+      sheets,
       reload,
       createShop: async (partial) => {
         dmOnly();
@@ -277,6 +338,20 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
         }, "Sale recorded."),
       setPurseCoins: (purseId, coins) => run(async () => { ownPurse(purseId); await setCoins(purseId, coins); }, "Coin updated."),
       post: (purseId, copper, summary) => run(async () => { ownPurse(purseId); await postCopper(purseId, copper, summary); }, "Ledger updated."),
+      give: (input) => run(async () => { ownPurse(input.fromId); await giveToPlayer(input); }, "Given. The party chat has it."),
+      addListing: (input) => run(async () => { dmOnly(); await addListing(input); }, "Listing posted."),
+      removeListing: (id) => run(async () => { dmOnly(); await removeListing(id); }, "Listing removed."),
+      buyListing: (listingId, purseId, quantity) => run(async () => { ownPurse(purseId); await buyListing({ listingId, purseId, quantity }); }, "Purchase recorded."),
+      askLoan: (purseId, copper, note) => run(async () => { ownPurse(purseId); await askLoan({ purseId, copper, note }); }, "Loan requested."),
+      decideLoan: (id, status) => run(async () => { dmOnly(); await answerLoan(id, status); }, status === "approved" ? "Loan approved." : "Loan denied."),
+      importSheet: async (purseId, file) => {
+        ownPurse(purseId);
+        const gaps = await importCharacterSheet(purseId, file);
+        await reload();
+        toast.success(gaps.length > 0 ? `Imported. Still blank: ${gaps.join(", ")}.` : "Character sheet imported.");
+      },
+      updateSheet: (sheet) => run(async () => { ownPurse(sheet.purseId); await updateCharacterSheet(sheet); }),
+      voidLine: (id) => run(async () => { dmOnly(); await voidLedgerLine(id); }, "That line was voided."),
       setRealm: (settings, options) =>
         run(async () => {
           dmOnly();
@@ -358,11 +433,18 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
       sendBill: async () => {
         const sitting = getSeat();
         if (sitting.role !== "player") throw new Error("A bill is sent from the player's phone.");
-        downloadJson(`lootsplit-bill-${new Date().toISOString().slice(0, 10)}.json`, buildBill(await snapshot(), sitting));
+        const file = await snapshot();
+        const gifts = await loadGifts();
+        const loansOnPhone = await loadLoans();
+        const sales = await loadSales();
+        const bill = buildBill({ ...file, notes: await loadNotes(), gifts, loans: loansOnPhone, sales, sheets: await loadSheets() }, sitting);
+        downloadJson(`lootsplit-bill-${new Date().toISOString().slice(0, 10)}.json`, bill);
+        await forgetGifts(bill.gifts?.map((gift) => gift.id) ?? []);
+        await forgetSales(bill.sales?.map((sale) => sale.id) ?? []);
       },
     };
   },
-    [ready, purses, holdings, shops, stock, ledger, catalog, lexicon, realm, reload, run],
+    [ready, purses, holdings, shops, stock, ledger, catalog, lexicon, realm, listings, loans, sheets, reload, run],
   );
 
   return <EconomyContext.Provider value={api}>{children}</EconomyContext.Provider>;

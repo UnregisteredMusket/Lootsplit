@@ -1,62 +1,81 @@
 import { useEffect, useRef, useState } from "react";
 import { Button, Modal } from "@/components/ui";
+import { APP_VERSION } from "@/lib/quire/version";
 
-const OFFER = "quire.guide.offer.v2";
+const OFFER = "quire.guide.offer.v3";
 
 const sections: Array<{ title: string; body: string; points?: Array<{ label: string; body: string }> }> = [
   {
-    title: "Desk",
-    body: "The home page shows the money on hand, the value of items and property, the current price modifiers, and recent purchases, sales, and payments. Download copy saves this campaign to a file. Restore copy replaces it.",
+    title: "Two homes",
+    body: "The dungeon master's first screen is the Board: the mode, notices, recent messages, the party, and a few settings. A player's first screen is their Sheet: the 2014 character sheet, the coin purse, and the inventory. The first tab is named for whichever one this phone is.",
   },
   {
-    title: "Market",
-    body: "Each shop has an owner, a location, and a list of items. At the counter, pick who is paying and buy. The shop charges its sell rate. It pays its buy rate when someone sells an item back. Edit changes the name, the rates, and the stock. A blank quantity means the shop does not run out.",
-  },
-  {
-    title: "Create a shop",
-    body: "Create a shop builds one from the index. Choose the type, how wealthy it is, and whether it stocks common, uncommon, rare, or magic items. A poor shop stocks basics and charges less. A wealthy shop charges more and keeps rarer items. Shuffle picks a new name, owner, location, and stock.",
-  },
-  {
-    title: "Index",
-    body: "The index is the list of items and names. Add an item yourself, generate a batch, or copy priced lines and names from a PDF you imported. A shop can only stock items that are in the index. Nothing is uploaded.",
-  },
-  {
-    title: "Party",
-    body: "The party purse is the group's shared money. A character purse belongs to one person. Mark each character as Player or NPC. Only player characters get a link on the Share tab. Set the coins, or use Make change so 10 copper becomes 1 silver, 10 silver becomes 1 gold, and 10 gold becomes 1 platinum. Electrum is half a gold piece. Holdings are items and property. A payment adds a ledger line without using a shop.",
-  },
-  {
-    title: "Player and dungeon master",
-    body: "The link sets the role. The label at the top shows which one this phone is. There is no live connection. The last link this phone opened is the role it keeps.",
+    title: "Three modes",
+    body: "The dungeon master changes the mode from the Board or from Share. The icon at the upper right shows which one is on.",
     points: [
       {
-        label: "Player link",
-        body: "Copy it from the Share tab for one character. Turn party fund on if that player may spend the shared purse, then copy the link. The phone that opens it becomes a player for that character only. They cannot change prices, the index, anyone else's money, or which campaign is open.",
+        label: "Local Mode",
+        body: "The campaign stays on this phone. Players use a link or a file. Nothing is shared until a bill comes back.",
       },
       {
-        label: "Dungeon master",
-        body: "Opening the app normally makes the phone the dungeon master. Leave player mode does the same for a phone that opened a player link. It does not send your campaign.",
+        label: "Turn based Mode",
+        body: "One shared table. Read the players the code. Only the person whose turn it is can buy, sell, or change money. Ending a turn passes the table on.",
       },
       {
-        label: "Bill link",
-        body: "The player copies this when they are done. It includes every purchase on that phone. The phone that opens it becomes the dungeon master, and a popup lists what was bought and who paid. If both sides still have an item, the lower quantity is kept.",
+        label: "Live Mode",
+        body: "The same shared table, but anyone seated can act. The dungeon master is the only one who can turn Live Mode on, and nobody can change roles while it is on.",
       },
     ],
   },
   {
-    title: "Prices",
-    body: "Settings changes prices. Season, shortage, war, plague, and road conditions affect the categories they apply to. Scarcity raises rare and magic prices. Inflation raises every price. One gold piece is shown as a dollar amount, $250 unless you change it. That does not convert the coins. Turn on repricing if open shops should update. Otherwise only shops you create later use the new prices.",
+    title: "Market",
+    body: "Each shop has an owner, a location, and stock. At the counter, pick who is paying and buy. The shop charges its sell rate and pays its buy rate. A blank quantity means the shop does not run out. A character's Charisma lowers the price by one percent for each point above 10. The dungeon master can list property and other holdings, and can approve or refuse a loan a player requests.",
   },
   {
-    title: "PDFs",
-    body: "Import a PDF you already own. It stays on this device and is split into entries you can search and save. You can copy names into the index, or copy printed prices onto a shop. Only lines that look like items are offered. You choose what to keep.",
+    title: "Index and shops",
+    body: "The index is the list of items and names. Add an item, generate a batch, or copy priced lines from a PDF. A shop can only stock items that are in the index. Create a shop picks a type, a level of wealth, and which rarities to keep. Shuffle picks a new name, owner, location, and stock.",
+  },
+  {
+    title: "Party",
+    body: "A character purse belongs to one person. The party purse is shared money. Mark each character as Player or NPC. Only player characters can be put on a link. Import a 2014 character sheet from a filled PDF or a JSON export onto that character. Holdings are items and property. Players can give coins, items, or property to someone else at the table. Those gifts show in the party messages and in the dungeon master's bill.",
+  },
+  {
+    title: "Share",
+    body: "Players do not need Grok. They open the link in a browser. The link carries the characters you checked, and the shops you included.",
+    points: [
+      {
+        label: "Messages",
+        body: "A player can write to the dungeon master or to the party. The dungeon master can write to the party or to the players they check. In Local Mode the note travels with the next bill. In Turn based Mode and Live Mode it arrives with the table.",
+      },
+      {
+        label: "Bill",
+        body: "When a player's link or file is opened, a report lists every purchase, sale, gift, loan, and message from that phone. The report also says if that phone switched to dungeon master.",
+      },
+      {
+        label: "Notices",
+        body: "Turn notices on from Share or from Settings. This phone can then say when the mode changes, a message arrives, or it is your turn. That works only while Lootsplit is still open.",
+      },
+    ],
+  },
+  {
+    title: "Role",
+    body: "The name at the upper right is the role. Press it to change. Set a password in Settings first. Switching from dungeon master to player asks you to confirm. Switching back asks for that password. Live Mode blocks both. A bill records it if a player becomes the dungeon master.",
+  },
+  {
+    title: "Prices",
+    body: "Settings changes the season, shortages, war, and the dollar reading of a gold piece. That reading does not convert the coins. Scarcity raises rare and magic prices. Turn on repricing if shops that are already open should update. Otherwise only later shops use the new prices.",
+  },
+  {
+    title: "Books",
+    body: "Import a PDF you already own. It stays on the dungeon master's phone. Players cannot open or read it. You can stock a shop from its prices, or copy names and items into the index.",
+  },
+  {
+    title: "Saves",
+    body: "The save folder in Settings keeps named copies on this phone. You can export one, or import a Lootsplit file. Load replaces this campaign. The same password can lock those files. From the published app, Google Drive can hold a backup, a save, and a bug report in a Lootsplit folder. This copy of the app is version " + APP_VERSION + ".",
   },
   {
     title: "Campaigns",
-    body: "The dungeon master can keep more than one campaign. Each has its own shops, money, index, names, and PDFs. Open switches which one the app is using. A new campaign starts with the starter data. Removing one deletes only that campaign. A player link cannot create, rename, open, or delete campaigns.",
-  },
-  {
-    title: "On this device",
-    body: "Colors, light and dark mode, and reading options are in Settings. Reset prices returns the modifiers to their defaults. Reset everything returns this campaign to the starter data. Other campaigns are not changed. Nothing is uploaded.",
+    body: "The dungeon master can keep more than one campaign. Each has its own shops, money, index, names, and books. A player link cannot create, rename, open, or delete one.",
   },
 ];
 
@@ -98,7 +117,7 @@ export function Guide() {
       }} title="View the instructions?">
         <div className="flex flex-col gap-4">
           <p className="text-sm text-muted">
-            By default the desk opens and you can use the app. The instructions are optional. No skips them. Yes shows them now. How Lootsplit works on the desk opens them later either way.
+            The instructions are optional. No skips them. Yes shows them now. How Lootsplit works opens them later either way.
           </p>
           <div className="flex flex-wrap gap-2">
             <Button variant="secondary" onClick={() => answer(false)}>No</Button>
@@ -109,7 +128,7 @@ export function Guide() {
       <Modal open={open} onOpenChange={setOpen} title="How Lootsplit works">
         <div className="flex flex-col gap-4">
           <p className="text-sm text-muted">
-            Lootsplit tracks money, shops, and prices for a campaign. It runs on this device. Nothing is uploaded.
+            Lootsplit {APP_VERSION} keeps a campaign's money, shops, and table. Local Mode stays on this phone. Turn based Mode and Live Mode share one table.
           </p>
           {sections.map((section) => (
             <section key={section.title}>

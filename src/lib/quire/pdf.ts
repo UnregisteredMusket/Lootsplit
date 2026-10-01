@@ -82,3 +82,55 @@ export async function readPdf(
     await task.destroy();
   }
 }
+
+export async function readPdfPlain(file: File): Promise<{ fields: Record<string, string>; text: string }> {
+  ensureWorker();
+  const data = new Uint8Array(await file.arrayBuffer());
+  const task = getDocument({ data, verbosity: 0 });
+  const doc = await new Promise<Awaited<typeof task.promise>>((resolve, reject) => {
+    task.onPassword = () => {
+      reject(new Error("This PDF is locked with a password."));
+      void task.destroy();
+    };
+    task.promise.then(resolve, reject);
+  });
+  try {
+    const fields: Record<string, string> = {};
+    const raw = await doc.getFieldObjects();
+    if (raw) {
+      for (const [name, entries] of raw) {
+        const value = fieldText(entries);
+        if (value) fields[name] = value;
+      }
+    }
+    const pages: string[] = [];
+    const last = Math.min(doc.numPages, 6);
+    for (let number = 1; number <= last; number += 1) {
+      const page = await doc.getPage(number);
+      const content = await page.getTextContent();
+      const line = content.items
+        .map((item) => ("str" in item ? item.str : ""))
+        .join(" ")
+        .replace(/\s+/g, " ")
+        .trim();
+      if (line) pages.push(line);
+      await page.cleanup();
+    }
+    return { fields, text: pages.join("\n") };
+  } finally {
+    await doc.cleanup();
+    await task.destroy();
+  }
+}
+
+function fieldText(entries: unknown): string {
+  if (!Array.isArray(entries)) return "";
+  for (const entry of entries) {
+    if (typeof entry !== "object" || entry === null) continue;
+    const record = entry as { value?: unknown; fieldValue?: unknown };
+    const value = record.value ?? record.fieldValue;
+    if (typeof value === "string" && value.trim() && !/^(off|false)$/i.test(value.trim())) return value.trim();
+    if (typeof value === "number" && Number.isFinite(value)) return String(value);
+  }
+  return "";
+}

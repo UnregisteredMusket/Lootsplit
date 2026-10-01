@@ -3,9 +3,15 @@ import { toast } from "sonner";
 import { useEconomy } from "@/lib/quire/economy-context";
 import { characterControl } from "@/lib/quire/types";
 import { useSeat } from "@/lib/quire/seat";
-import { buildBill, buildTable, copyText, DM_SEAT, downloadJson, encodeLinkPayload, seatHref, setSeat } from "@/lib/quire/table";
+import { loadNotes } from "@/lib/quire/chat";
+import { forgetGifts, loadGifts } from "@/lib/quire/gift";
+import { forgetSales, loadListings, loadLoans, loadSales } from "@/lib/quire/market";
+import { loadHandouts } from "@/lib/quire/handouts";
+import { loadSheets } from "@/lib/quire/sheet";
+import { buildBill, buildTable, copyText, downloadJson, encodeLinkPayload, seatHref } from "@/lib/quire/table";
 import { snapshot } from "@/lib/quire/economy";
-import { Button, Confirm, Switch } from "@/components/ui";
+import { loadSeatLock } from "@/lib/quire/lock";
+import { Button, Switch } from "@/components/ui";
 
 export function TableShare() {
   const { shops, stock, purses, holdings, realm } = useEconomy();
@@ -35,15 +41,31 @@ export function TableShare() {
     return partyOn[characterId] ? [...parties, character] : [character];
   }
 
-  function tableFor(characterId: string) {
+  async function tableFor(characterId: string) {
     const chosenShops = pickedShops();
     const chosenPurses = pursesFor(characterId);
     if (chosenShops.length === 0 || chosenPurses.length === 0) return null;
-    return buildTable({ realm, shops: chosenShops, stock, purses: chosenPurses, holdings });
+    const roster = [...characters, ...parties]
+      .filter((purse) => !chosenPurses.some((chosen) => chosen.id === purse.id))
+      .map((purse) => ({ id: purse.id, name: purse.name, kind: purse.kind }));
+    return buildTable({
+      realm,
+      shops: chosenShops,
+      stock,
+      purses: chosenPurses,
+      holdings,
+      seatLock: await loadSeatLock(),
+      notes: await loadNotes(),
+      roster,
+      listings: await loadListings(),
+      loans: await loadLoans(),
+      sheets: await loadSheets(),
+      handouts: await loadHandouts(),
+    });
   }
 
   async function copyPlayerLink(characterId: string, name: string) {
-    const file = tableFor(characterId);
+    const file = await tableFor(characterId);
     if (!file) {
       toast("Choose at least one shop.");
       return;
@@ -58,8 +80,8 @@ export function TableShare() {
     toast.success(`${name}'s link copied.`);
   }
 
-  function downloadPlayerFile(characterId: string, name: string) {
-    const file = tableFor(characterId);
+  async function downloadPlayerFile(characterId: string, name: string) {
+    const file = await tableFor(characterId);
     if (!file) {
       toast("Choose at least one shop.");
       return;
@@ -109,7 +131,7 @@ export function TableShare() {
               <Button variant="secondary" onClick={() => void copyPlayerLink(character.id, character.name).catch(() => toast.error("Could not copy the link."))}>
                 Copy link
               </Button>
-              <Button variant="secondary" onClick={() => downloadPlayerFile(character.id, character.name)}>
+              <Button variant="secondary" onClick={() => void downloadPlayerFile(character.id, character.name).catch(() => toast.error("That file could not be saved."))}>
                 Download file
               </Button>
             </div>
@@ -123,7 +145,6 @@ export function TableShare() {
 export function TableDesk() {
   const seat = useSeat();
   const { openCounter, takeBill, sendBill } = useEconomy();
-  const [leaving, setLeaving] = useState(false);
 
   async function read(file: File | undefined, kind: "counter" | "bill") {
     if (!file) return;
@@ -139,20 +160,25 @@ export function TableDesk() {
     return (
       <div>
         <p className="text-sm text-muted">
-          Buy and sell with a character, or with the party purse. Copy the group bill when you are done. It lists every purchase on this phone and who paid.
+          Buy and sell with a character, or with the party purse. Give coins or holdings to another player from the Party page. Copy the group bill when you are done. It lists every purchase and gift on this phone.
         </p>
         <div className="mt-4 flex flex-wrap gap-2">
           <Button
             variant="secondary"
             onClick={() => {
               void (async () => {
-                const payload = await encodeLinkPayload(buildBill(await snapshot(), seat));
+                const file = await snapshot();
+                const gifts = await loadGifts();
+                const bill = buildBill({ ...file, notes: await loadNotes(), gifts, loans: await loadLoans(), sales: await loadSales(), sheets: await loadSheets() }, seat);
+                const payload = await encodeLinkPayload(bill);
                 const url = seatHref("dm", payload, window.location.origin);
                 if (url.length > 48000) {
                   toast.error("This bill is too long for a link. Send the file.");
                   return;
                 }
                 await copyText(url);
+                await forgetGifts(bill.gifts?.map((gift) => gift.id) ?? []);
+                await forgetSales(bill.sales?.map((sale) => sale.id) ?? []);
                 toast.success("Group bill copied. The phone that opens it becomes the dungeon master and shows who bought what.");
               })().catch((error: unknown) => toast.error(error instanceof Error ? error.message : "Could not copy the bill link."));
             }}
@@ -169,18 +195,7 @@ export function TableDesk() {
           >
             Download group bill
           </Button>
-          <Button variant="secondary" onClick={() => setLeaving(true)}>
-            Leave player mode
-          </Button>
         </div>
-        <Confirm
-          open={leaving}
-          onOpenChange={setLeaving}
-          title="Leave player mode?"
-          body="This phone becomes a dungeon master again for the data already on it. The dungeon master's original campaign is not changed."
-          confirmLabel="Leave"
-          onConfirm={() => setSeat(DM_SEAT)}
-        />
       </div>
     );
   }

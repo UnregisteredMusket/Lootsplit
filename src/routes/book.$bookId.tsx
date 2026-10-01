@@ -110,7 +110,7 @@ function BookPage() {
             body="The entries made from it are deleted from this device. The original file on your computer is not deleted."
             confirmLabel="Remove"
             onConfirm={() => {
-              void remove(book.id).then(() => navigate({ to: "/", search: { q: "" } }));
+              void remove(book.id).then(() => navigate({ to: "/books", search: { q: "" } }));
             }}
           />
         </section>

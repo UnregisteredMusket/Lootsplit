@@ -12,6 +12,11 @@ type CampaignState = { campaigns: Campaign[]; activeId: string };
 const listeners = new Set<() => void>();
 let booted = false;
 let state: CampaignState = { campaigns: [FIRST_CAMPAIGN], activeId: FIRST_CAMPAIGN.id };
+const SERVER_CAMPAIGNS: CampaignState = state;
+
+export function serverCampaigns(): CampaignState {
+  return SERVER_CAMPAIGNS;
+}
 
 export function resolveDatabaseName(activeId: string | null, list: Campaign[]): string {
   return list.find((campaign) => campaign.id === activeId)?.db || list[0]?.db || FIRST_CAMPAIGN.db;

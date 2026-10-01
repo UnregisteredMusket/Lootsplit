@@ -1,9 +1,11 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
+import { getCloudTable, subscribeCloudTable } from "@/lib/quire/cloud-client";
 import { toast } from "sonner";
 import { useEconomy } from "@/lib/quire/economy-context";
 import { SHOP_KINDS, WEALTHS } from "@/lib/quire/labels";
-import { formatCopper, parsePrice, toCopper } from "@/lib/quire/money";
+import { charismaOffPercent, formatCopper, parsePrice, priceAfterCharisma, toCopper } from "@/lib/quire/money";
+import { charismaScore } from "@/lib/quire/sheet";
 import { useDollarText, usePrefs } from "@/lib/quire/prefs";
 import { useSeat } from "@/lib/quire/seat";
 import { realmNote, scarcityNote } from "@/lib/quire/scale";
@@ -147,10 +149,12 @@ function ShopPage() {
         {spendable.some((purse) => purse.kind === "party") ? (
           <span className="mt-1 block">The party option spends the shared purse. A character spends their own.</span>
         ) : null}
+        <CharismaNote purseId={purseId} />
       </label>
+      <TurnLock />
       <ul className="mt-4 divide-y divide-border border-y border-border">
         {lines.map((line) => (
-          <StockRow key={line.id} line={line} mode={viewing} purseId={purseId} sellRate={shop.sellRate} />
+          <StockRow key={line.id} line={line} mode={viewing} purseId={purseId} sellRate={shop.sellRate} charisma={charismaScore(economy.sheets.find((sheet) => sheet.purseId === purseId))} locked={viewing === "counter" && turnIsLocked()} />
         ))}
       </ul>
       {lines.length === 0 ? <p className="mt-4 text-muted">This shop has no items.</p> : null}
@@ -248,23 +252,52 @@ function ShelfTuning({ shop }: { shop: Shop }) {
   );
 }
 
+function turnIsLocked() {
+  const table = getCloudTable();
+  return table.joined && !table.live && !table.mine;
+}
+
+function TurnLock() {
+  const table = useSyncExternalStore(subscribeCloudTable, getCloudTable, getCloudTable);
+  if (!table.joined || table.live || table.mine) return null;
+  return <p className="mt-3 text-sm text-muted">It is {table.who}'s turn. Buying waits.</p>;
+}
+
+function CharismaNote({ purseId }: { purseId: string }) {
+  const { sheets, purses } = useEconomy();
+  const purse = purses.find((item) => item.id === purseId);
+  if (!purse || purse.kind !== "character") return <span className="mt-1 block">The party purse pays the listed price.</span>;
+  const score = charismaScore(sheets.find((sheet) => sheet.purseId === purseId));
+  if (score === null) return <span className="mt-1 block">Import this character's 2014 sheet to take the Charisma discount.</span>;
+  const percent = charismaOffPercent(score);
+  if (percent <= 0) return <span className="mt-1 block">Charisma {score} pays the listed price.</span>;
+  return <span className="mt-1 block">Charisma {score} takes {percent}% off every purchase.</span>;
+}
+
 function StockRow({
   line,
   mode,
   purseId,
   sellRate,
+  charisma,
+  locked = false,
 }: {
   line: StockLine;
   mode: "counter" | "edit";
   purseId: string;
   sellRate: number;
+  charisma: number | null;
+  locked?: boolean;
 }) {
   const { buy, updateStock, deleteStock } = useEconomy();
   const dollars = useDollarText();
   const [qty, setQty] = useState("1");
   const asked = Math.max(1, Math.floor(Number(qty) || 1));
-  const unit = Math.round(line.copper * sellRate);
+  const asking = Math.round(line.copper * sellRate);
+  const percent = charisma === null ? 0 : charismaOffPercent(charisma);
+  const unit = priceAfterCharisma(asking, charisma);
   const price = unit * asked;
+  const reduced = unit !== asking;
 
   if (mode === "counter") {
     return (
@@ -273,6 +306,7 @@ function StockRow({
           <span className="block">{line.name}</span>
           <span className="text-sm text-muted">
             {formatCopper(unit)}
+            {reduced ? ` · ${percent}% off · was ${formatCopper(asking)}` : ""}
             {dollars(unit) ? ` · ${dollars(unit)}` : ""}
             {line.quantity === null ? "" : ` · ${line.quantity} left`}
           </span>
@@ -285,7 +319,7 @@ function StockRow({
           className="h-11 w-16 rounded-sm border border-border bg-subtle px-2 text-center text-base text-fg"
         />
         <Button
-          disabled={!purseId || (line.quantity !== null && line.quantity < 1)}
+          disabled={locked || !purseId || (line.quantity !== null && line.quantity < 1)}
           onClick={() => void buy(line.id, purseId, asked)}
         >
           Buy {formatCopper(price)}

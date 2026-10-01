@@ -3,12 +3,18 @@ import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
 import { Shell, KeptByDm } from "@/components/shell";
 import { Campaigns } from "@/components/campaigns";
+import { SaveFolder } from "@/components/save-folder";
+import { DriveHost } from "@/components/drive-host";
+import { Notices } from "@/components/notices";
+import { PasswordSettings } from "@/components/password-settings";
+import { CloudTable } from "@/components/cloud-table";
 import { Button, ChoiceGrid, Confirm, Fold, Slider, Switch, ToggleButton } from "@/components/ui";
 import { useEconomy } from "@/lib/quire/economy-context";
 import { useLibrary } from "@/lib/quire/library";
 import { CATEGORIES, RARITIES, WEALTHS } from "@/lib/quire/labels";
 import { usePrefs, type AppPrefs } from "@/lib/quire/prefs";
 import { useSeat } from "@/lib/quire/seat";
+import { APP_VERSION } from "@/lib/quire/version";
 import { basketNote, DEFAULT_REALM, realmNote, scalePrice, SEASON_NAMES } from "@/lib/quire/scale";
 import { DEFAULT_ACCENT, DEFAULT_GROUND, LOOKS, luminance } from "@/lib/quire/theme";
 import type { ItemCategory, ItemRarity, RealmSettings, Wealth } from "@/lib/quire/types";
@@ -74,13 +80,25 @@ function SettingsPage() {
 
   return (
     <Shell width="prose">
-      <h1 className="font-display text-4xl tracking-tight">Settings</h1>
-      <p className="mt-2 max-w-prose text-sm text-muted">
-        Price modifiers, the defaults for the next shop, how entries are displayed, and the colors. A slider sets a number. A button picks a named option.
-      </p>
+      <div className="flex items-end justify-between gap-3">
+        <h1 className="font-display text-4xl tracking-tight">Control panel</h1>
+        <p className="text-sm text-faint">Version {APP_VERSION}</p>
+      </div>
+      <p className="mt-2 text-sm text-muted">How the table plays, then the tools that keep this campaign.</p>
       {!ready ? <p className="mt-6 text-muted">Loading…</p> : null}
       {ready ? (
         <>
+          <Fold title="Mode" hint="Local, turn based, or live." defaultOpen>
+            <CloudTable />
+          </Fold>
+          <PasswordSettings />
+          <Fold title="Google Drive" hint="Backups, saves, and bug reports.">
+            <DriveHost />
+          </Fold>
+          <Fold title="Notices" hint="Mode changes, messages, and your turn.">
+            <Notices />
+          </Fold>
+          <SaveFolder />
           <Fold title="Price modifiers" hint="Season, shortages, war, and the value of a gold piece." defaultOpen>
             <p className="mt-2 text-sm text-muted">
               {realmNote(draft, { dollars: prefs.showDollars })}

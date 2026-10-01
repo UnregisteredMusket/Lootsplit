@@ -1,11 +1,13 @@
 import { createFileRoute } from "@tanstack/react-router";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type FormEvent } from "react";
 import { useEconomy } from "@/lib/quire/economy-context";
-import { carryToStandard, explainPurse, formatCoins, formatCopper, parsePrice, toCopper } from "@/lib/quire/money";
+import { loadRoster, type RosterPerson } from "@/lib/quire/gift";
+import { carryUpTo, explainPurse, formatCoins, formatCopper, parsePrice, toCopper } from "@/lib/quire/money";
 import { useDollarText } from "@/lib/quire/prefs";
 import { useSeat } from "@/lib/quire/seat";
 import { characterControl, type Purse } from "@/lib/quire/types";
 import { Shell } from "@/components/shell";
+import { CharacterSheetPanel } from "@/components/character-sheet";
 import { Button, Segmented, Select, TextInput } from "@/components/ui";
 import { RemoveButton } from "@/components/quire-ui";
 
@@ -16,14 +18,11 @@ export const Route = createFileRoute("/party")({
 function PartyPage() {
   const economy = useEconomy();
   const seat = useSeat();
-  const dollars = useDollarText();
   const visible = seat.role === "player" ? economy.purses.filter((purse) => seat.purseIds.includes(purse.id)) : economy.purses;
   const coin = visible.reduce((sum, purse) => sum + toCopper(purse.coins), 0);
   const goods = economy.holdings
     .filter((holding) => visible.some((purse) => purse.id === holding.purseId))
     .reduce((sum, holding) => sum + holding.unitCopper * holding.quantity, 0);
-  const coinDollars = dollars(coin);
-  const goodsDollars = dollars(goods);
 
   return (
     <Shell>
@@ -31,11 +30,42 @@ function PartyPage() {
       {!economy.ready ? <p className="mt-6 text-muted">Loading…</p> : null}
       {economy.ready ? (
         <>
-          <p className="mt-3 text-muted">
-            {formatCopper(coin)}
-            {coinDollars ? ` (${coinDollars})` : ""} in coin · {formatCopper(goods)}
-            {goodsDollars ? ` (${goodsDollars})` : ""} in goods and property
-          </p>
+          <section className="mt-4 rounded-2xl border border-lead/25 bg-elevated p-4">
+            <p className="text-xs tracking-[0.16em] text-faint uppercase">Combined wealth</p>
+            <p className="mt-1 font-display text-4xl tracking-tight text-lead">{formatCopper(coin + goods)}</p>
+            <div className="mt-3 grid grid-cols-3 gap-2 text-sm">
+              <span><span className="block text-xs text-faint">Coin</span>{formatCopper(coin)}</span>
+              <span><span className="block text-xs text-faint">Items</span>{formatCopper(itemValue(economy.holdings, visible, "item"))}</span>
+              <span><span className="block text-xs text-faint">Property</span>{formatCopper(itemValue(economy.holdings, visible, "property"))}</span>
+            </div>
+          </section>
+          <h2 className="mt-5 text-sm font-medium text-muted">Members · {visible.length}</h2>
+          <ul className="mt-1 divide-y divide-border border-y border-border">
+            {visible.map((purse) => {
+              const worth = toCopper(purse.coins) + economy.holdings.filter((holding) => holding.purseId === purse.id).reduce((sum, holding) => sum + holding.unitCopper * holding.quantity, 0);
+              return (
+                <li key={purse.id}>
+                  <a href={`#purse-${purse.id}`} className="flex min-h-11 items-center justify-between gap-3 text-sm">
+                    <span>{purse.name}</span>
+                    <span className="tabular-nums text-lead">{formatCopper(worth)}</span>
+                  </a>
+                </li>
+              );
+            })}
+          </ul>
+          {seat.role === "dm" && economy.loans.some((loan) => loan.status === "pending") ? (
+            <section className="mt-4">
+              <h2 className="text-sm font-medium text-muted">Pending</h2>
+              <ul>
+                {economy.loans.filter((loan) => loan.status === "pending").map((loan) => (
+                  <li key={loan.id} className="flex items-baseline justify-between gap-3 border-b border-border/70 py-2 text-sm">
+                    <span>{loan.purseName} · loan</span>
+                    <span className="tabular-nums text-lead">{formatCopper(loan.copper)}</span>
+                  </li>
+                ))}
+              </ul>
+            </section>
+          ) : null}
           <p className="mt-1 text-sm text-muted">10 copper = 1 silver. 10 silver = 1 gold. 10 gold = 1 platinum. Electrum is half a gold.</p>
           {seat.role === "dm" ? (
             <div className="mt-4 flex flex-wrap gap-2">
@@ -47,14 +77,14 @@ function PartyPage() {
               </Button>
             </div>
           ) : (
-            <p className="mt-3 text-sm text-muted">You can only use the characters assigned to you.</p>
+            <p className="mt-3 text-sm text-muted">You can spend only the characters on your link. You can give coins or holdings to the other players named on that link.</p>
           )}
           <div className="mt-6 grid gap-4 lg:grid-cols-2">
             {visible.map((purse) => (
               <PurseCard key={purse.id} purse={purse} />
             ))}
           </div>
-          <h2 className="mt-10 font-display text-2xl tracking-tight">Holdings</h2>
+          <h2 className="mt-10 font-display text-2xl tracking-tight">Shared holdings</h2>
           <ul className="mt-3 divide-y divide-border border-y border-border">
             {economy.holdings
               .filter((holding) => visible.some((purse) => purse.id === holding.purseId))
@@ -88,6 +118,7 @@ function PartyPage() {
               })}
           </ul>
           <AddHolding purses={visible} />
+          <GiveToPlayer purses={visible} />
           <Payment purses={visible} />
         </>
       ) : null}
@@ -102,16 +133,18 @@ function PurseCard({ purse }: { purse: Purse }) {
   const [coins, setCoins] = useState(purse.coins);
   const purseDollars = dollars(toCopper(purse.coins));
   const worth = toCopper(coins);
-  const carried = carryToStandard(coins);
   const worthNote = explainPurse(coins);
-  const loose = carried.gp !== coins.gp || carried.sp !== coins.sp || carried.cp !== coins.cp || coins.pp > 0 || coins.ep > 0;
+  const intoSilver = carryUpTo(coins, "sp");
+  const intoGold = carryUpTo(coins, "gp");
+  const intoPlatinum = carryUpTo(coins, "pp");
+  const changed = (next: typeof coins) => next.cp !== coins.cp || next.sp !== coins.sp || next.ep !== coins.ep || next.gp !== coins.gp || next.pp !== coins.pp;
 
   useEffect(() => {
     setCoins(purse.coins);
   }, [purse.coins.cp, purse.coins.sp, purse.coins.ep, purse.coins.gp, purse.coins.pp]);
 
   return (
-    <section className="rounded-xl border border-border p-4">
+    <section id={`purse-${purse.id}`} className="rounded-xl border border-lead/25 bg-elevated p-4">
       <TextInput
         aria-label="Purse name"
         defaultValue={purse.name}
@@ -185,15 +218,19 @@ function PurseCard({ purse }: { purse: Purse }) {
         <Button variant="secondary" onClick={() => void setPurseCoins(purse.id, coins)}>
           Set coins
         </Button>
-        {loose ? (
-          <Button
-            variant="secondary"
-            onClick={() => {
-              setCoins(carried);
-              void setPurseCoins(purse.id, carried);
-            }}
-          >
-            Make change
+        {changed(intoSilver) ? (
+          <Button variant="secondary" onClick={() => { setCoins(intoSilver); void setPurseCoins(purse.id, intoSilver); }}>
+            Into silver
+          </Button>
+        ) : null}
+        {changed(intoGold) ? (
+          <Button variant="secondary" onClick={() => { setCoins(intoGold); void setPurseCoins(purse.id, intoGold); }}>
+            Into gold
+          </Button>
+        ) : null}
+        {changed(intoPlatinum) ? (
+          <Button variant="secondary" onClick={() => { setCoins(intoPlatinum); void setPurseCoins(purse.id, intoPlatinum); }}>
+            Into platinum
           </Button>
         ) : null}
         {seat.role === "dm" ? (
@@ -205,8 +242,14 @@ function PurseCard({ purse }: { purse: Purse }) {
           />
         ) : null}
       </div>
+      {purse.kind === "character" ? <CharacterSheetPanel purseId={purse.id} /> : null}
     </section>
   );
+}
+
+function itemValue(holdings: { purseId: string; kind: string; unitCopper: number; quantity: number }[], purses: { id: string }[], kind: "item" | "property") {
+  const ids = new Set(purses.map((purse) => purse.id));
+  return holdings.filter((holding) => ids.has(holding.purseId) && holding.kind === kind).reduce((sum, holding) => sum + holding.unitCopper * holding.quantity, 0);
 }
 
 function DollarLine({ copper }: { copper: number }) {
@@ -269,6 +312,97 @@ function AddHolding({ purses }: { purses: Purse[] }) {
         Add holding
       </Button>
     </form>
+  );
+}
+
+function GiveToPlayer({ purses }: { purses: Purse[] }) {
+  const { give, holdings, purses: everyone } = useEconomy();
+  const seat = useSeat();
+  const [roster, setRoster] = useState<RosterPerson[]>([]);
+  const [fromId, setFromId] = useState(purses[0]?.id ?? "");
+  const [toId, setToId] = useState("");
+  const [amount, setAmount] = useState("");
+  const [holdingId, setHoldingId] = useState("");
+  const [qty, setQty] = useState("1");
+
+  useEffect(() => {
+    if (seat.role !== "player") return;
+    void loadRoster().then(setRoster);
+  }, [seat.role, purses]);
+
+  const recipients =
+    seat.role === "dm"
+      ? everyone.filter((purse) => purse.id !== fromId).map((purse) => ({ id: purse.id, name: purse.name }))
+      : roster;
+  const mine = holdings.filter((holding) => holding.purseId === fromId);
+
+  useEffect(() => {
+    if (!purses.some((purse) => purse.id === fromId)) setFromId(purses[0]?.id ?? "");
+  }, [purses, fromId]);
+
+  useEffect(() => {
+    if (recipients.some((person) => person.id === toId)) return;
+    setToId(recipients[0]?.id ?? "");
+  }, [recipients, toId]);
+
+  useEffect(() => {
+    if (holdingId && !mine.some((holding) => holding.id === holdingId)) setHoldingId("");
+  }, [mine, holdingId]);
+
+  function submit(event: FormEvent) {
+    event.preventDefault();
+    const copper = amount.trim() ? parsePrice(amount) : 0;
+    if (copper === null || copper < 0 || !fromId || !toId) return;
+    void give({ fromId, toId, copper, holdingId: holdingId || null, quantity: Math.max(1, Math.floor(Number(qty) || 1)) });
+    setAmount("");
+    setHoldingId("");
+    setQty("1");
+  }
+
+  return (
+    <section className="mt-10">
+      <h2 className="font-display text-2xl tracking-tight">Give to a player</h2>
+      <p className="mt-1 text-sm text-muted">
+        Coins, items, or property move to another player. The party chat shows it, and the dungeon master's bill lists it.
+      </p>
+      {recipients.length === 0 ? (
+        <p className="mt-3 text-sm text-muted">
+          {seat.role === "player"
+            ? "No other players are on this link. They are included the next time the dungeon master copies it."
+            : "Add another character before giving something across the party."}
+        </p>
+      ) : (
+        <form className="mt-3 flex flex-col gap-2" onSubmit={submit}>
+          <select value={fromId} onChange={(event) => setFromId(event.target.value)} className="min-h-11 rounded-sm border border-border bg-subtle px-3 text-base text-fg" aria-label="Give from">
+            {purses.map((purse) => (
+              <option key={purse.id} value={purse.id}>
+                From {purse.name}
+              </option>
+            ))}
+          </select>
+          <select value={toId} onChange={(event) => setToId(event.target.value)} className="min-h-11 rounded-sm border border-border bg-subtle px-3 text-base text-fg" aria-label="Give to">
+            {recipients.map((person) => (
+              <option key={person.id} value={person.id}>
+                To {person.name}
+              </option>
+            ))}
+          </select>
+          <TextInput value={amount} onChange={(event) => setAmount(event.target.value)} placeholder="Coins, 5 gp. Blank sends only a holding." aria-label="Coins to give" />
+          <select value={holdingId} onChange={(event) => setHoldingId(event.target.value)} className="min-h-11 rounded-sm border border-border bg-subtle px-3 text-base text-fg" aria-label="Holding to give">
+            <option value="">No holding</option>
+            {mine.map((holding) => (
+              <option key={holding.id} value={holding.id}>
+                {holding.name} · × {holding.quantity}
+              </option>
+            ))}
+          </select>
+          {holdingId ? <TextInput value={qty} onChange={(event) => setQty(event.target.value)} aria-label="Quantity to give" /> : null}
+          <Button type="submit" variant="secondary">
+            Give
+          </Button>
+        </form>
+      )}
+    </section>
   );
 }
 

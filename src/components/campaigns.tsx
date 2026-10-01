@@ -1,15 +1,12 @@
 import { useState, useSyncExternalStore } from "react";
 import { toast } from "sonner";
-import { createCampaign, deleteCampaign, getCampaigns, renameCampaign, subscribeCampaigns, switchCampaign } from "@/lib/quire/campaigns";
+import { createCampaign, deleteCampaign, getCampaigns, renameCampaign, serverCampaigns, subscribeCampaigns, switchCampaign } from "@/lib/quire/campaigns";
 import { useSeat } from "@/lib/quire/seat";
 import { Button, Confirm, TextInput } from "@/components/ui";
 
 export function Campaigns() {
   const seat = useSeat();
-  const { campaigns, activeId } = useSyncExternalStore(subscribeCampaigns, getCampaigns, () => ({
-    campaigns: [{ id: "main", name: "The company", db: "quire" }],
-    activeId: "main",
-  }));
+  const { campaigns, activeId } = useSyncExternalStore(subscribeCampaigns, getCampaigns, serverCampaigns);
   const active = campaigns.find((campaign) => campaign.id === activeId) ?? campaigns[0];
   const [draft, setDraft] = useState<string | null>(null);
   const [nextName, setNextName] = useState("");

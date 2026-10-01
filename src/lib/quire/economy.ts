@@ -1,11 +1,33 @@
 import { CATALOG_REVISION, PREVIOUS_LIST, starterCatalog } from "./catalog-seed.ts";
 import { quireDb, activeDatabaseName } from "./db.ts";
 import { guessRarity } from "./extract.ts";
-import { emptyCoins, fromCopper, spendCoins, toCopper } from "./money.ts";
+import { charismaOffPercent, emptyCoins, formatCopper, fromCopper, priceAfterCharisma, spendCoins, toCopper } from "./money.ts";
 import { inventItemName } from "./names.ts";
 import { clampRealm, clampScale, inventedListPrice, scalePrice } from "./scale.ts";
+import { loadNotes, postNotes, refreshChat, rememberIncoming, replaceNotes } from "./chat.ts";
+import { readCloudTable, type CloudTable } from "./cloud.ts";
+import { loadHandouts } from "./handouts.ts";
+import { APP_VERSION } from "./version.ts";
+import { giftParts, giftSummary, loadGiftSeen, loadGifts, loadRoster, readRoster, type PlayerGift } from "./gift.ts";
+import {
+  loadListings,
+  loadLoans,
+  loadSales,
+  loadSaleSeen,
+  mergeLoanLists,
+  readListings,
+  readLoans,
+  saveListings,
+  saveLoans,
+  type Listing,
+  type LoanAsk,
+  type LoanStatus,
+} from "./market.ts";
+import { charismaScore, loadSheets, mergeSheets, readSheets, saveSheet, type CharacterSheet } from "./sheet.ts";
+import { readCharacterSheet } from "./sheet-file.ts";
 import { presentReceipt } from "./receipt.ts";
 import { lesserQuantity, decodeLinkPayload, setSeat, DM_SEAT, getSeat, type BillFile, type TableFile } from "./table.ts";
+import { readSeatLock, type SeatLock } from "./lock.ts";
 import type {
   Article,
   Book,
@@ -502,6 +524,18 @@ function logLine(purseId: string, shopId: string | null, summary: string, copper
   return { id: crypto.randomUUID(), at: Date.now(), purseId, shopId, summary, copper };
 }
 
+async function charismaOf(purseId: string): Promise<number | null> {
+  const sheets = await loadSheets();
+  return charismaScore(sheets.find((sheet) => sheet.purseId === purseId));
+}
+
+async function purchaseSummary(purseId: string, summary: string): Promise<string> {
+  const score = await charismaOf(purseId);
+  const percent = score === null ? 0 : charismaOffPercent(score);
+  if (!percent) return summary;
+  return `${summary}, Charisma ${score}, ${percent}% off`;
+}
+
 export async function buyFromShop(input: { stockId: string; purseId: string; quantity: number }): Promise<void> {
   const quantity = Math.floor(input.quantity);
   if (quantity < 1) throw new Error("Choose at least one.");
@@ -512,7 +546,7 @@ export async function buyFromShop(input: { stockId: string; purseId: string; qua
   const purse = await request<Purse | undefined>(db.transaction("purses").objectStore("purses").get(input.purseId));
   if (!shop || !purse) throw new Error("Choose a purse and a shop.");
   if (stock.quantity !== null && stock.quantity < quantity) throw new Error("The shop does not have that many.");
-  const unit = Math.max(0, Math.round(stock.copper * shop.sellRate));
+  const unit = priceAfterCharisma(Math.round(stock.copper * shop.sellRate), await charismaOf(purse.id));
   const cost = unit * quantity;
   const coins = spendCoins(purse.coins, cost);
   if (!coins) throw new Error("Not enough coin in that purse.");
@@ -536,7 +570,7 @@ export async function buyFromShop(input: { stockId: string; purseId: string; qua
     tx.objectStore("holdings").put(holding);
   }
   if (stock.quantity !== null) tx.objectStore("stock").put({ ...stock, quantity: stock.quantity - quantity });
-  tx.objectStore("ledger").put(logLine(purse.id, shop.id, `Bought ${quantity} ${stock.name} from ${shop.name}`, -cost));
+  tx.objectStore("ledger").put(logLine(purse.id, shop.id, await purchaseSummary(purse.id, `Bought ${quantity} ${stock.name} from ${shop.name}`), -cost));
   await done;
 }
 
@@ -582,7 +616,301 @@ function tidy(coins: Coins): Coins {
   };
 }
 
-export async function setCoins(purseId: string, coins: Coins): Promise<void> {
+export async function giveToPlayer(input: { fromId: string; toId: string; copper: number; holdingId: string | null; quantity: number }): Promise<void> {
+  const copper = Math.max(0, Math.round(input.copper));
+  if (input.fromId === input.toId) throw new Error("Choose another player.");
+  const db = await quireDb();
+  const purses = await request<Purse[]>(db.transaction("purses").objectStore("purses").getAll());
+  const from = purses.find((purse) => purse.id === input.fromId);
+  if (!from) throw new Error("That purse is gone.");
+  const sitting = getSeat();
+  const roster = sitting.role === "player" ? await loadRoster() : [];
+  const to = purses.find((purse) => purse.id === input.toId);
+  const known = sitting.role === "player" ? roster.some((person) => person.id === input.toId) : Boolean(to);
+  if (!known) throw new Error("That player is not on this link.");
+  const toName = to?.name ?? roster.find((person) => person.id === input.toId)?.name ?? "Another player";
+  const holdingRow = input.holdingId
+    ? await request<Holding | undefined>(db.transaction("holdings").objectStore("holdings").get(input.holdingId))
+    : undefined;
+  let moved: PlayerGift["holding"] = null;
+  if (input.holdingId) {
+    const quantity = Math.floor(input.quantity);
+    if (!holdingRow || holdingRow.purseId !== from.id) throw new Error("That holding is not yours.");
+    if (quantity < 1 || holdingRow.quantity < quantity) throw new Error("You do not have that many.");
+    moved = { name: holdingRow.name, kind: holdingRow.kind, quantity, unitCopper: holdingRow.unitCopper };
+  }
+  if (copper === 0 && !moved) throw new Error("Give coins, an item, or a holding.");
+  const nextCoins = copper > 0 ? spendCoins(from.coins, copper) : from.coins;
+  if (!nextCoins) throw new Error("That purse cannot cover it.");
+  const gift: PlayerGift = {
+    id: crypto.randomUUID(),
+    at: Date.now(),
+    fromId: from.id,
+    toId: input.toId,
+    fromName: from.name,
+    toName,
+    copper,
+    holding: moved,
+  };
+  const pending = sitting.role === "player" ? [...(await loadGifts()), gift] : null;
+  const tx = db.transaction(["purses", "holdings", "ledger", "meta"], "readwrite");
+  const done = finish(tx);
+  tx.objectStore("purses").put({ ...from, coins: nextCoins });
+  if (holdingRow && moved) {
+    if (holdingRow.quantity === moved.quantity) tx.objectStore("holdings").delete(holdingRow.id);
+    else tx.objectStore("holdings").put({ ...holdingRow, quantity: holdingRow.quantity - moved.quantity });
+  }
+  if (sitting.role !== "player" && to) {
+    tx.objectStore("purses").put({ ...to, coins: copper > 0 ? gain(to.coins, copper) : to.coins });
+    if (moved) {
+      tx.objectStore("holdings").put({
+        id: crypto.randomUUID(),
+        purseId: to.id,
+        name: moved.name,
+        kind: moved.kind,
+        quantity: moved.quantity,
+        unitCopper: moved.unitCopper,
+        notes: "",
+      });
+    }
+  }
+  if (pending) tx.objectStore("meta").put({ id: "gifts", gifts: pending });
+  tx.objectStore("ledger").put(logLine(from.id, null, `Gave ${toName} ${giftParts(gift)}`, copper > 0 ? -copper : 0));
+  await done;
+  await postNotes([{ from: "player", to: "party", purseId: from.id, text: giftSummary(gift) }]);
+}
+
+async function settleGifts(gifts: PlayerGift[] | undefined): Promise<void> {
+  const incoming = (gifts ?? []).filter((gift) => gift.copper > 0 || gift.holding);
+  if (incoming.length === 0) return;
+  const seen = new Set(await loadGiftSeen());
+  const fresh = incoming.filter((gift) => !seen.has(gift.id));
+  if (fresh.length === 0) return;
+  const db = await quireDb();
+  const purses = await request<Purse[]>(db.transaction("purses").objectStore("purses").getAll());
+  const tx = db.transaction(["purses", "holdings", "meta"], "readwrite");
+  const done = finish(tx);
+  const byId = new Map(purses.map((purse) => [purse.id, { ...purse }]));
+  for (const gift of fresh) {
+    const purse = byId.get(gift.toId);
+    if (!purse) continue;
+    const next = { ...purse, coins: gift.copper > 0 ? gain(purse.coins, gift.copper) : purse.coins };
+    byId.set(purse.id, next);
+    tx.objectStore("purses").put(next);
+    if (gift.holding) {
+      tx.objectStore("holdings").put({
+        id: crypto.randomUUID(),
+        purseId: purse.id,
+        name: gift.holding.name,
+        kind: gift.holding.kind,
+        quantity: gift.holding.quantity,
+        unitCopper: gift.holding.unitCopper,
+        notes: "",
+      });
+    }
+    seen.add(gift.id);
+  }
+  tx.objectStore("meta").put({ id: "giftSeen", ids: [...seen] });
+  await done;
+}
+
+export async function addListing(input: { name: string; kind: Listing["kind"]; copper: number; quantity: number | null; notes: string }): Promise<void> {
+  const name = input.name.trim();
+  const copper = Math.round(input.copper);
+  if (!name) throw new Error("Name the listing.");
+  if (!Number.isFinite(copper) || copper < 0) throw new Error("Enter a price.");
+  if (getSeat().role === "player") throw new Error("The dungeon master keeps the market.");
+  const listings = await loadListings();
+  listings.push({
+    id: crypto.randomUUID(),
+    name,
+    kind: input.kind,
+    copper,
+    quantity: input.quantity === null ? null : Math.max(0, Math.floor(input.quantity)),
+    notes: input.notes.trim(),
+  });
+  await saveListings(listings);
+}
+
+export async function removeListing(id: string): Promise<void> {
+  if (getSeat().role === "player") throw new Error("The dungeon master keeps the market.");
+  await saveListings((await loadListings()).filter((listing) => listing.id !== id));
+}
+
+export async function buyListing(input: { listingId: string; purseId: string; quantity: number }): Promise<void> {
+  const quantity = Math.floor(input.quantity);
+  if (quantity < 1) throw new Error("Choose at least one.");
+  const listings = await loadListings();
+  const listing = listings.find((item) => item.id === input.listingId);
+  if (!listing) throw new Error("That listing is gone.");
+  if (listing.quantity !== null && listing.quantity < quantity) throw new Error("There are not that many.");
+  const db = await quireDb();
+  const purse = await request<Purse | undefined>(db.transaction("purses").objectStore("purses").get(input.purseId));
+  if (!purse) throw new Error("That purse is gone.");
+  const score = await charismaOf(purse.id);
+  const unit = priceAfterCharisma(listing.copper, score);
+  const cost = unit * quantity;
+  const coins = cost > 0 ? spendCoins(purse.coins, cost) : purse.coins;
+  if (!coins) throw new Error("Not enough coin in that purse.");
+  const nextListings = listings.map((item) =>
+    item.id !== listing.id || item.quantity === null ? item : { ...item, quantity: item.quantity - quantity },
+  );
+  const sale = { id: crypto.randomUUID(), at: Date.now(), listingId: listing.id, quantity, purseId: purse.id };
+  const sales = getSeat().role === "player" ? [...(await loadSales()), sale] : null;
+  const tx = db.transaction(["purses", "holdings", "ledger", "meta"], "readwrite");
+  const done = finish(tx);
+  tx.objectStore("purses").put({ ...purse, coins });
+  tx.objectStore("holdings").put({
+    id: crypto.randomUUID(),
+    purseId: purse.id,
+    name: listing.name,
+    kind: listing.kind,
+    quantity,
+    unitCopper: listing.copper,
+    notes: listing.notes,
+  });
+  tx.objectStore("meta").put({ id: "listings", listings: nextListings });
+  if (sales) tx.objectStore("meta").put({ id: "sales", sales });
+  tx.objectStore("ledger").put(logLine(purse.id, null, await purchaseSummary(purse.id, `Bought ${quantity} ${listing.name} from the market`), cost > 0 ? -cost : 0));
+  await done;
+}
+
+export async function askLoan(input: { purseId: string; copper: number; note: string }): Promise<void> {
+  const copper = Math.round(input.copper);
+  const note = input.note.trim();
+  if (!Number.isFinite(copper) || copper <= 0) throw new Error("Enter how much to borrow.");
+  if (!note) throw new Error("Write what the loan is for.");
+  const db = await quireDb();
+  const purse = await request<Purse | undefined>(db.transaction("purses").objectStore("purses").get(input.purseId));
+  if (!purse) throw new Error("That purse is gone.");
+  const loans = await loadLoans();
+  loans.push({ id: crypto.randomUUID(), at: Date.now(), purseId: purse.id, purseName: purse.name, copper, note, status: "pending" });
+  await saveLoans(loans);
+  await postNotes([{ from: "player", to: "dm", purseId: purse.id, text: `${purse.name} asked for a loan of ${formatCopper(copper)}. ${note}` }]);
+}
+
+export async function decideLoan(id: string, status: LoanStatus): Promise<void> {
+  if (status === "pending") return;
+  if (getSeat().role === "player") throw new Error("The dungeon master answers loans.");
+  const loans = await loadLoans();
+  const loan = loans.find((item) => item.id === id);
+  if (!loan || loan.status !== "pending") return;
+  if (status === "approved") {
+    const db = await quireDb();
+    const purse = await request<Purse | undefined>(db.transaction("purses").objectStore("purses").get(loan.purseId));
+    if (!purse) throw new Error("That purse is gone.");
+    const tx = db.transaction(["purses", "ledger"], "readwrite");
+    const done = finish(tx);
+    tx.objectStore("purses").put({ ...purse, coins: gain(purse.coins, loan.copper) });
+    tx.objectStore("ledger").put(logLine(purse.id, null, `Approved a loan of ${formatCopper(loan.copper)}`, loan.copper));
+    await done;
+  }
+  await saveLoans(loans.map((item) => (item.id === id ? { ...item, status } : item)));
+  await postNotes([
+    {
+      from: "dm",
+      to: "dm",
+      purseId: loan.purseId,
+      text: status === "approved" ? `Loan of ${formatCopper(loan.copper)} approved.` : `Loan of ${formatCopper(loan.copper)} denied.`,
+    },
+  ]);
+}
+
+async function settleSales(sales: BillFile["sales"]): Promise<void> {
+  const incoming = sales ?? [];
+  if (incoming.length === 0) return;
+  const seen = new Set(await loadSaleSeen());
+  const fresh = incoming.filter((sale) => !seen.has(sale.id));
+  if (fresh.length === 0) return;
+  const listings = await loadListings();
+  const txSeen = [...seen];
+  for (const sale of fresh) {
+    const listing = listings.find((item) => item.id === sale.listingId);
+    if (listing && listing.quantity !== null) listing.quantity = Math.max(0, listing.quantity - sale.quantity);
+    txSeen.push(sale.id);
+  }
+  await saveListings(listings);
+  const db = await quireDb();
+  const tx = db.transaction("meta", "readwrite");
+  tx.objectStore("meta").put({ id: "saleSeen", ids: txSeen });
+  await finish(tx);
+}
+
+export async function importCharacterSheet(purseId: string, file: File): Promise<string[]> {
+  const body = await readCharacterSheet(file);
+  const sheet: CharacterSheet = { ...body, purseId, importedAt: Date.now() };
+  await saveSheet(sheet);
+  const db = await quireDb();
+  const purse = await request<Purse | undefined>(db.transaction("purses").objectStore("purses").get(purseId));
+  if (!purse || purse.kind !== "character") return sheetGaps(sheet);
+  if ((purse.name === "New character" || !purse.name.trim()) && sheet.name) await savePurse({ ...purse, name: sheet.name });
+  const fresh = await request<Purse | undefined>(db.transaction("purses").objectStore("purses").get(purseId));
+  if (!fresh || toCopper(fresh.coins) > 0 || toCopper(sheet.coins) === 0) return sheetGaps(sheet);
+  await setCoins(fresh.id, sheet.coins, "Brought from the character sheet");
+  return sheetGaps(sheet);
+}
+
+export function sheetGaps(sheet: CharacterSheet): string[] {
+  const gaps: string[] = [];
+  if (!sheet.name.trim()) gaps.push("Name");
+  if (!sheet.classLevel.trim()) gaps.push("Class");
+  if (!sheet.race.trim()) gaps.push("Race");
+  if (!sheet.armorClass.trim()) gaps.push("Armor class");
+  if (!sheet.hitPoints.trim()) gaps.push("Hit points");
+  const abilities: Array<[keyof CharacterSheet["abilities"], string]> = [
+    ["str", "Strength"],
+    ["dex", "Dexterity"],
+    ["con", "Constitution"],
+    ["int", "Intelligence"],
+    ["wis", "Wisdom"],
+    ["cha", "Charisma"],
+  ];
+  for (const [key, label] of abilities) {
+    if (!sheet.abilities[key].score.trim()) gaps.push(label);
+  }
+  return gaps;
+}
+
+export async function updateCharacterSheet(sheet: CharacterSheet): Promise<void> {
+  await saveSheet(sheet);
+}
+
+export async function voidLedgerLine(id: string): Promise<void> {
+  const db = await quireDb();
+  const lines = await request<LedgerLine[]>(db.transaction("ledger").objectStore("ledger").getAll());
+  const line = lines.find((item) => item.id === id);
+  if (!line) throw new Error("That line is not on this phone.");
+  if (line.summary.startsWith("Voided")) throw new Error("That line is already a void.");
+  if (lines.some((item) => item.summary.includes(`(void:${line.id})`))) throw new Error("That line was already voided.");
+  const purse = await request<Purse | undefined>(db.transaction("purses").objectStore("purses").get(line.purseId));
+  if (!purse) throw new Error("That purse is gone.");
+  const coins = line.copper < 0 ? gain(purse.coins, -line.copper) : spendCoins(purse.coins, line.copper);
+  if (!coins) throw new Error("That purse cannot cover reversing this line.");
+  const bought = /^Bought (\d+) (.+?) from /.exec(line.summary);
+  const holdings = await request<Holding[]>(db.transaction("holdings").objectStore("holdings").index("purseId").getAll(purse.id));
+  const stock = line.shopId
+    ? await request<StockLine[]>(db.transaction("stock").objectStore("stock").index("shopId").getAll(line.shopId))
+    : [];
+  const tx = db.transaction(["purses", "holdings", "stock", "ledger"], "readwrite");
+  const done = finish(tx);
+  tx.objectStore("purses").put({ ...purse, coins });
+  if (bought) {
+    const quantity = Number(bought[1]);
+    const name = bought[2].toLowerCase();
+    const holding = holdings.find((item) => item.name.toLowerCase() === name && item.kind === "item");
+    if (holding) {
+      const left = holding.quantity - quantity;
+      if (left > 0) tx.objectStore("holdings").put({ ...holding, quantity: left });
+      else tx.objectStore("holdings").delete(holding.id);
+    }
+    const shelf = stock.find((item) => item.name.toLowerCase() === name);
+    if (shelf && shelf.quantity !== null) tx.objectStore("stock").put({ ...shelf, quantity: shelf.quantity + quantity });
+  }
+  tx.objectStore("ledger").put(logLine(purse.id, line.shopId, `Voided ${line.summary} (void:${line.id})`, -line.copper));
+  await done;
+}
+
+export async function setCoins(purseId: string, coins: Coins, summary?: string): Promise<void> {
   const db = await quireDb();
   const purse = await request<Purse | undefined>(db.transaction("purses").objectStore("purses").get(purseId));
   if (!purse) throw new Error("That purse is gone.");
@@ -591,7 +919,7 @@ export async function setCoins(purseId: string, coins: Coins): Promise<void> {
   const tx = db.transaction(["purses", "ledger"], "readwrite");
   const done = finish(tx);
   tx.objectStore("purses").put({ ...purse, coins: next });
-  if (delta !== 0) tx.objectStore("ledger").put(logLine(purse.id, null, `Adjusted coin in ${purse.name}`, delta));
+  if (delta !== 0) tx.objectStore("ledger").put(logLine(purse.id, null, summary?.trim() || `Adjusted coin in ${purse.name}`, delta));
   await done;
 }
 
@@ -627,6 +955,11 @@ export type QuireFile = {
   catalog?: CatalogItem[];
   lexicon?: Lexeme[];
   settings?: RealmSettings;
+  seatLock?: SeatLock;
+  listings?: Listing[];
+  loans?: LoanAsk[];
+  sheets?: CharacterSheet[];
+  appVersion?: string;
 };
 
 export async function snapshot(): Promise<QuireFile> {
@@ -645,6 +978,8 @@ export async function snapshot(): Promise<QuireFile> {
   const catalog = request<CatalogItem[]>(tx.objectStore("catalog").getAll());
   const lexicon = request<Lexeme[]>(tx.objectStore("lexicon").getAll());
   const settingsRow = request<Partial<RealmSettings> | undefined>(tx.objectStore("meta").get("settings"));
+  const lockRow = request<unknown>(tx.objectStore("meta").get("seatLock"));
+  const seatLock = readSeatLock(await lockRow);
   const file: QuireFile = {
     kind: "quire",
     version: 2,
@@ -659,8 +994,13 @@ export async function snapshot(): Promise<QuireFile> {
     catalog: await catalog,
     lexicon: await lexicon,
     settings: clampRealm(await settingsRow),
+    seatLock: seatLock ?? undefined,
+    appVersion: APP_VERSION,
   };
   await finish(tx);
+  file.listings = await loadListings();
+  file.loans = await loadLoans();
+  file.sheets = await loadSheets();
   return file;
 }
 
@@ -670,6 +1010,8 @@ export async function applyTable(file: TableFile): Promise<void> {
   const purseIds = new Set(file.purses.map((purse) => purse.id));
   const existingStock = await request<StockLine[]>(db.transaction("stock").objectStore("stock").getAll());
   const existingHoldings = await request<Holding[]>(db.transaction("holdings").objectStore("holdings").getAll());
+  const loans = mergeLoanLists(await loadLoans(), readLoans(file.loans), false);
+  const sheets = mergeSheets(await loadSheets(), readSheets(file.sheets));
   const tx = db.transaction(["shops", "stock", "purses", "holdings", "meta"], "readwrite");
   const done = finish(tx);
   for (const shop of file.shops) tx.objectStore("shops").put(normalizeShop(shop));
@@ -683,7 +1025,15 @@ export async function applyTable(file: TableFile): Promise<void> {
   }
   for (const holding of file.holdings) tx.objectStore("holdings").put(holding);
   tx.objectStore("meta").put({ id: "settings", ...clampRealm(file.realm) });
+  const lock = readSeatLock(file.seatLock);
+  if (lock) tx.objectStore("meta").put({ id: "seatLock", ...lock });
+  tx.objectStore("meta").put({ id: "roster", people: readRoster(file.roster) });
+  if (Array.isArray(file.listings)) tx.objectStore("meta").put({ id: "listings", listings: readListings(file.listings) });
+  tx.objectStore("meta").put({ id: "loans", loans });
+  tx.objectStore("meta").put({ id: "sheets", sheets });
+  tx.objectStore("meta").put({ id: "handouts", handouts: file.handouts ?? [] });
   await done;
+  await rememberIncoming(file.notes ?? []);
 }
 
 export async function applyBill(file: BillFile): Promise<number> {
@@ -694,7 +1044,9 @@ export async function applyBill(file: BillFile): Promise<number> {
   const existingLedger = await request<LedgerLine[]>(db.transaction("ledger").objectStore("ledger").getAll());
   const haveLedger = new Set(existingLedger.map((line) => line.id));
   const stockById = new Map(existingStock.map((line) => [line.id, line]));
-  const tx = db.transaction(["purses", "holdings", "stock", "ledger"], "readwrite");
+  const loans = mergeLoanLists(await loadLoans(), readLoans(file.loans), true);
+  const sheets = mergeSheets(await loadSheets(), readSheets(file.sheets).filter((sheet) => purseIds.has(sheet.purseId)));
+  const tx = db.transaction(["purses", "holdings", "stock", "ledger", "meta"], "readwrite");
   const done = finish(tx);
   for (const purse of file.purses) {
     if (!purseIds.has(purse.id)) continue;
@@ -718,7 +1070,12 @@ export async function applyBill(file: BillFile): Promise<number> {
     tx.objectStore("ledger").put(entry);
     added += 1;
   }
+  tx.objectStore("meta").put({ id: "loans", loans });
+  tx.objectStore("meta").put({ id: "sheets", sheets });
   await done;
+  await rememberIncoming(file.notes ?? []);
+  await settleGifts(file.gifts);
+  await settleSales(file.sales);
   return added;
 }
 
@@ -748,11 +1105,9 @@ export async function applySeatLink(): Promise<"player" | "dm" | "bill" | null> 
     presentReceipt(bill);
     setSeat(DM_SEAT);
     result = "bill";
-  } else if (role === "player") {
-    const current = getSeat();
-    setSeat({ role: "player", purseIds: current.purseIds, shopIds: current.shopIds, openedAt: current.openedAt });
   } else {
     setSeat(DM_SEAT);
+    result = "dm";
   }
   const url = new URL(window.location.href);
   url.searchParams.delete("as");
@@ -794,6 +1149,12 @@ export async function restore(file: QuireFile): Promise<void> {
     for (const lexeme of file.lexicon) tx.objectStore("lexicon").put(lexeme);
   }
   if (file.settings) tx.objectStore("meta").put({ id: "settings", ...clampRealm(file.settings) });
+  if (Array.isArray(file.listings)) tx.objectStore("meta").put({ id: "listings", listings: readListings(file.listings) });
+  if (Array.isArray(file.loans)) tx.objectStore("meta").put({ id: "loans", loans: readLoans(file.loans) });
+  if (Array.isArray(file.sheets)) tx.objectStore("meta").put({ id: "sheets", sheets: readSheets(file.sheets) });
+  const lock = readSeatLock(file.seatLock);
+  if (lock) tx.objectStore("meta").put({ id: "seatLock", ...lock });
+  else tx.objectStore("meta").delete("seatLock");
   tx.objectStore("meta").put({ id: "seeded" });
   tx.objectStore("meta").put({ id: "catalogSeeded" });
   await done;
@@ -822,4 +1183,53 @@ export function blankShop(): Shop {
     category: "general",
     priceScale: 1,
   };
+}
+
+export async function economySnapshot(): Promise<CloudTable> {
+  const db = await quireDb();
+  const tx = db.transaction(["purses", "holdings", "shops", "stock", "ledger"], "readonly");
+  const purses = request<Purse[]>(tx.objectStore("purses").getAll());
+  const holdings = request<Holding[]>(tx.objectStore("holdings").getAll());
+  const shops = request<Shop[]>(tx.objectStore("shops").getAll());
+  const stock = request<StockLine[]>(tx.objectStore("stock").getAll());
+  const ledger = request<LedgerLine[]>(tx.objectStore("ledger").getAll());
+  const table: CloudTable = {
+    purses: await purses,
+    holdings: await holdings,
+    shops: (await shops).map((shop) => normalizeShop(shop)),
+    stock: (await stock).map((line) => normalizeStock(line)),
+    ledger: await ledger,
+    listings: [],
+    loans: [],
+    sheets: [],
+    notes: [],
+  };
+  await finish(tx);
+  table.listings = await loadListings();
+  table.loans = await loadLoans();
+  table.sheets = await loadSheets();
+  table.notes = await loadNotes();
+  table.handouts = await loadHandouts();
+  return table;
+}
+
+export async function applyCloudTable(table: CloudTable): Promise<void> {
+  const next = readCloudTable(table);
+  if (!next) throw new Error("That table could not be read.");
+  const db = await quireDb();
+  const tx = db.transaction(["purses", "holdings", "shops", "stock", "ledger", "meta"], "readwrite");
+  const done = finish(tx);
+  for (const store of ["purses", "holdings", "shops", "stock", "ledger"] as const) tx.objectStore(store).clear();
+  for (const purse of next.purses) tx.objectStore("purses").put(purse);
+  for (const holding of next.holdings) tx.objectStore("holdings").put(holding);
+  for (const shop of next.shops) tx.objectStore("shops").put(normalizeShop(shop));
+  for (const line of next.stock) tx.objectStore("stock").put(normalizeStock(line));
+  for (const entry of next.ledger) tx.objectStore("ledger").put(entry);
+  tx.objectStore("meta").put({ id: "listings", listings: next.listings });
+  tx.objectStore("meta").put({ id: "loans", loans: next.loans });
+  tx.objectStore("meta").put({ id: "sheets", sheets: next.sheets });
+  tx.objectStore("meta").put({ id: "handouts", handouts: next.handouts ?? [] });
+  await done;
+  await replaceNotes(next.notes);
+  await refreshChat();
 }

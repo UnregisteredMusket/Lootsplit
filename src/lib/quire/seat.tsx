@@ -1,16 +1,12 @@
-import { useSyncExternalStore } from "react";
+import { useEffect, useState, useSyncExternalStore } from "react";
 import { DM_SEAT, getSeat, subscribeSeat, type Seat } from "./table.ts";
 
-function clientKnown(): boolean {
-  return true;
-}
-
-function serverKnown(): boolean {
-  return false;
-}
-
 export function useSeatKnown(): boolean {
-  return useSyncExternalStore(subscribeSeat, clientKnown, serverKnown);
+  const [known, setKnown] = useState(false);
+  useEffect(() => {
+    setKnown(true);
+  }, []);
+  return known;
 }
 
 function serverSeat(): Seat {
@@ -20,7 +16,6 @@ function serverSeat(): Seat {
 export function useSeat(): Seat {
   const known = useSeatKnown();
   const seat = useSyncExternalStore(subscribeSeat, getSeat, serverSeat);
-  if (!known) return { ...seat, role: "player" };
+  if (!known) return DM_SEAT;
   return seat;
 }
-

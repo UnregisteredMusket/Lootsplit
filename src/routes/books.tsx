@@ -30,12 +30,15 @@ function LibraryHome() {
   return (
     <section>
       <div className="flex flex-wrap items-end justify-between gap-3">
-        <h1 className="font-display text-4xl tracking-tight">Books</h1>
+        <h1 className="font-display text-4xl tracking-tight">Library</h1>
         <ImportButton disabled={Boolean(job)} onFiles={importFiles} />
       </div>
       <p className="mt-3 max-w-prose text-sm text-muted">
-        Import a PDF you already own. It stays on this device. You can stock a shop from its prices, or copy names and items into the index.
+        Import a PDF you already own. It stays on this phone. Players cannot read the book. Mark one entry as a handout if they should. The item index is the list shops stock from.
       </p>
+      <Link to="/catalog" className="mt-3 inline-flex min-h-11 items-center text-sm">
+        Open the item index
+      </Link>
       {!ready ? <p className="mt-6 text-muted">Loading…</p> : null}
       {ready && books.length === 0 ? <p className="mt-6 text-muted">No PDFs yet.</p> : null}
       {books.length > 0 ? (

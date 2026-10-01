@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { carryToStandard, explainPurse, formatCopper, formatDollars, parsePrice, pricesInText, spendCoins, toCopper } from "./money.ts";
+import { carryToStandard, charismaOffPercent, explainPurse, formatCopper, formatDollars, parsePrice, priceAfterCharisma, pricesInText, spendCoins, toCopper } from "./money.ts";
 
 test("parses mixed coin prices and spends smaller coins first", () => {
   assert.equal(parsePrice("1 gp 5 sp"), 150);
@@ -10,6 +10,15 @@ test("parses mixed coin prices and spends smaller coins first", () => {
   assert.equal(toCopper(left!), 800);
   assert.equal(left?.pp, 0);
   assert.equal(left?.gp, 8);
+});
+
+test("Charisma above 10 takes a flat percent off the price", () => {
+  assert.equal(charismaOffPercent(10), 0);
+  assert.equal(charismaOffPercent(8), 0);
+  assert.equal(charismaOffPercent(16), 6);
+  assert.equal(priceAfterCharisma(10000, 16), 9400);
+  assert.equal(priceAfterCharisma(10000, null), 10000);
+  assert.equal(priceAfterCharisma(10000, 8), 10000);
 });
 
 test("counts a purse in gold, silver, and copper", () => {

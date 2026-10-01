@@ -1,7 +1,9 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { receiptFromBill } from "./receipt.ts";
-import { buildBill, encodeLinkPayload, decodeLinkPayload, lesserQuantity, readShare, seatHref, type Seat } from "./table.ts";
+import { giftSummary } from "./gift.ts";
+import { mergeLoanLists } from "./market.ts";
+import { buildBill, buildTable, encodeLinkPayload, decodeLinkPayload, lesserQuantity, readShare, seatHref, type Seat } from "./table.ts";
 import type { LedgerLine, Purse, StockLine } from "./types.ts";
 
 const purse = (id: string): Purse => ({ id, name: id, kind: "character", coins: { cp: 0, sp: 0, ep: 0, gp: 10, pp: 0 } });
@@ -58,7 +60,41 @@ test("a bill carries purchases made after the counter opened", () => {
     { id: "n", shopId: "other", name: "Nail", copper: 1, quantity: 9, notes: "", baseCopper: 1, rarity: "common" },
   ];
   const bill = buildBill({ purses: [purse("sera"), purse("ivo")], holdings: [], stock, ledger }, sitting);
+  assert.equal(bill.switchedToDm, false);
   assert.deepEqual(bill.ledger.map((line) => line.id), ["new"]);
+  const flagged = buildBill({ purses: [purse("sera")], holdings: [], stock, ledger }, { ...sitting, elevated: true });
+  assert.equal(flagged.switchedToDm, true);
+  assert.equal(receiptFromBill(flagged).switchedToDm, true);
+  const noted = buildBill(
+    { purses: [purse("sera")], holdings: [], stock, ledger, notes: [{ id: "n1", at: 1, from: "player", to: "dm", purseId: "sera", text: "We bought the loaf." }] },
+    sitting,
+  );
+  assert.equal(noted.notes?.[0]?.text, "We bought the loaf.");
+  assert.equal(readShare(noted).kind === "quire-bill" && readShare(noted).notes?.[0]?.text, "We bought the loaf.");
+  const shared = buildBill(
+    {
+      purses: [purse("sera")],
+      holdings: [],
+      stock,
+      ledger,
+      notes: [
+        { id: "n1", at: 1, from: "player", to: "dm", purseId: "sera", text: "We bought the loaf." },
+        { id: "party", at: 2, from: "player", to: "party", purseId: "ivo", text: "Watch the gate." },
+        { id: "secret", at: 3, from: "player", to: "dm", purseId: "ivo", text: "Secret." },
+      ],
+    },
+    sitting,
+  );
+  assert.deepEqual(shared.notes?.map((note) => note.text), ["We bought the loaf.", "Watch the gate."]);
+  const link = buildTable({
+    realm: { inflation: 1, scarcity: 1, gpDollars: 250, season: 1, shortage: 0, war: 0, plague: 0, roads: 1 },
+    shops: [{ id: "s", name: "Hearth", keeper: "", place: "", notes: "", sellRate: 100, buyRate: 50, wealth: "modest", category: "general", priceScale: 1 }],
+    stock: [],
+    purses: [purse("sera")],
+    holdings: [],
+    notes: shared.notes,
+  });
+  assert.deepEqual(link.notes?.map((note) => note.id), ["n1", "party"]);
   assert.deepEqual(bill.purses.map((row) => row.id), ["sera"]);
   assert.deepEqual(bill.stock, [{ id: "l", quantity: 3 }]);
   const company = { ...purse("company"), kind: "party" as const, name: "The company" };
@@ -77,4 +113,35 @@ test("a bill carries purchases made after the counter opened", () => {
   const receipt = receiptFromBill(grouped);
   assert.deepEqual(receipt.bought.map((buyer) => buyer.name), ["sera", "Party · The company"]);
   assert.equal(receipt.bought[1]?.lines[0]?.summary, "Bought 1 rope from Hearth");
+  assert.deepEqual(receipt.entries.map((entry) => entry.summary), ["Bought 1 loaf from Hearth", "Bought 1 rope from Hearth"]);
+  const gift = {
+    id: "g",
+    at: 220,
+    fromId: "sera",
+    toId: "ivo",
+    fromName: "Sera",
+    toName: "Ivo",
+    copper: 200,
+    holding: { name: "rope", kind: "item" as const, quantity: 1, unitCopper: 10 },
+  };
+  assert.equal(giftSummary(gift), "Sera gave Ivo 2 gp and 1 rope.");
+  const withGift = buildBill({ purses: [purse("sera")], holdings: [], stock, ledger, gifts: [gift, { ...gift, id: "old", at: 50 }, { ...gift, id: "other", fromId: "ivo" }] }, sitting);
+  assert.deepEqual(withGift.gifts?.map((row) => row.id), ["g"]);
+  const carried = readShare(withGift);
+  assert.equal(carried.kind, "quire-bill");
+  if (carried.kind === "quire-bill") assert.equal(carried.gifts?.[0]?.toName, "Ivo");
+  const loan = { id: "loan", at: 180, purseId: "sera", purseName: "Sera", copper: 500, note: "The inn", status: "pending" as const };
+  const billed = buildBill({ purses: [purse("sera")], holdings: [], stock, ledger, loans: [loan, { ...loan, id: "old", at: 40 }, { ...loan, id: "other", purseId: "ivo" }] }, sitting);
+  assert.deepEqual(billed.loans?.map((row) => row.id), ["loan"]);
+  const decided = mergeLoanLists([{ ...loan, status: "approved" }], [loan], true);
+  assert.equal(decided[0]?.status, "approved");
+  const posted = buildTable({
+    realm: { inflation: 1, scarcity: 1, gpDollars: 250, season: 1, shortage: 0, war: 0, plague: 0, roads: 1 },
+    shops: [{ id: "s", name: "Hearth", keeper: "", place: "", notes: "", sellRate: 100, buyRate: 50, wealth: "modest", category: "general", priceScale: 1 }],
+    stock: [],
+    purses: [purse("sera")],
+    holdings: [],
+    listings: [{ id: "mill", name: "Old mill", kind: "property", copper: 8000, quantity: 1, notes: "" }],
+  });
+  assert.equal(posted.listings?.[0]?.name, "Old mill");
 });

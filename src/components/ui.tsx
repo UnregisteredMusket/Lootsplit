@@ -9,7 +9,7 @@ type Tone = "dark" | "paper";
 
 const styles: Record<Tone, Record<Variant, string>> = {
   dark: {
-    primary: "bg-fg text-bg hover:bg-muted",
+    primary: "bg-lead text-bg hover:bg-accent",
     secondary: "border border-border bg-subtle text-fg hover:bg-elevated",
     ghost: "text-fg hover:bg-subtle",
     danger: "border border-danger text-fg hover:bg-danger",
@@ -69,7 +69,7 @@ export function Fold({
           className="flex min-h-14 min-w-0 flex-1 items-center justify-between gap-3 px-4 text-left"
         >
           <span className="min-w-0">
-            <span className="block font-display text-2xl tracking-tight">{title}</span>
+            <span className="block text-sm font-medium">{title}</span>
             {hint && !open ? <span className="mt-0.5 block truncate text-sm text-muted">{hint}</span> : null}
           </span>
           <ChevronDown className={cn("size-4 shrink-0 text-faint", open && "rotate-180")} />

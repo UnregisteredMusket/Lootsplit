@@ -1,4 +1,10 @@
 import type { Coins, Holding, LedgerLine, Purse, RealmSettings, Shop, StockLine } from "./types.ts";
+import { readGifts, readRoster, type PlayerGift, type RosterPerson } from "./gift.ts";
+import { readListings, readLoans, readSales, type Listing, type ListingSale, type LoanAsk } from "./market.ts";
+import { readSheets, type CharacterSheet } from "./sheet.ts";
+import { readNotes, type ChatNote } from "./chat.ts";
+import { readHandouts, type Handout } from "./handouts.ts";
+import { readSeatLock, type SeatLock } from "./lock.ts";
 
 export type TableFile = {
   kind: "quire-table";
@@ -9,6 +15,13 @@ export type TableFile = {
   stock: StockLine[];
   purses: Purse[];
   holdings: Holding[];
+  seatLock?: SeatLock;
+  notes?: ChatNote[];
+  roster?: RosterPerson[];
+  listings?: Listing[];
+  loans?: LoanAsk[];
+  sheets?: CharacterSheet[];
+  handouts?: Handout[];
 };
 
 export type BillFile = {
@@ -22,6 +35,12 @@ export type BillFile = {
   holdings: Holding[];
   stock: Array<{ id: string; quantity: number | null }>;
   ledger: LedgerLine[];
+  switchedToDm?: boolean;
+  notes?: ChatNote[];
+  gifts?: PlayerGift[];
+  loans?: LoanAsk[];
+  sales?: ListingSale[];
+  sheets?: CharacterSheet[];
 };
 
 export type Seat = {
@@ -29,9 +48,11 @@ export type Seat = {
   purseIds: string[];
   shopIds: string[];
   openedAt: number;
+  /** True after a player uses the save password to become the dungeon master. */
+  elevated?: boolean;
 };
 
-export const DM_SEAT: Seat = { role: "dm", purseIds: [], shopIds: [], openedAt: 0 };
+export const DM_SEAT: Seat = { role: "dm", purseIds: [], shopIds: [], openedAt: 0, elevated: false };
 
 const KEY = "quire.seat.v1";
 const listeners = new Set<() => void>();
@@ -56,6 +77,10 @@ export function getSeat(): Seat {
     try {
       const raw = window.localStorage.getItem(seatKey());
       if (raw) seat = normalizeSeat(JSON.parse(raw) as Partial<Seat>);
+      if (seat.role === "player" && seat.purseIds.length === 0) {
+        seat = DM_SEAT;
+        window.localStorage.setItem(seatKey(), JSON.stringify(seat));
+      }
     } catch {
       seat = DM_SEAT;
     }
@@ -87,6 +112,7 @@ export function normalizeSeat(input: Partial<Seat> | null | undefined): Seat {
     purseIds: strings(input?.purseIds),
     shopIds: strings(input?.shopIds),
     openedAt: Number.isFinite(input?.openedAt) ? Number(input?.openedAt) : 0,
+    elevated: input?.elevated === true,
   };
 }
 
@@ -96,9 +122,21 @@ export function buildTable(input: {
   stock: StockLine[];
   purses: Purse[];
   holdings: Holding[];
+  seatLock?: SeatLock | null;
+  notes?: ChatNote[];
+  roster?: RosterPerson[];
+  listings?: Listing[];
+  loans?: LoanAsk[];
+  sheets?: CharacterSheet[];
+  handouts?: Handout[];
 }): TableFile {
   const shopIds = new Set(input.shops.map((shop) => shop.id));
   const purseIds = new Set(input.purses.map((purse) => purse.id));
+  const notes = notesFor(input.notes, purseIds);
+  const roster = readRoster(input.roster);
+  const listings = readListings(input.listings);
+  const loans = readLoans(input.loans).filter((loan) => purseIds.has(loan.purseId));
+  const sheets = sheetsFor(input.sheets, purseIds);
   return {
     kind: "quire-table",
     version: 1,
@@ -108,11 +146,28 @@ export function buildTable(input: {
     stock: input.stock.filter((line) => shopIds.has(line.shopId)),
     purses: input.purses,
     holdings: input.holdings.filter((holding) => purseIds.has(holding.purseId)),
+    seatLock: readSeatLock(input.seatLock) ?? undefined,
+    notes,
+    roster: roster.length ? roster : undefined,
+    listings,
+    loans: loans.length ? loans : undefined,
+    sheets,
+    handouts: readHandouts(input.handouts),
   };
 }
 
 export function buildBill(
-  input: { purses: Purse[]; holdings: Holding[]; stock: StockLine[]; ledger: LedgerLine[] },
+  input: {
+    purses: Purse[];
+    holdings: Holding[];
+    stock: StockLine[];
+    ledger: LedgerLine[];
+    notes?: ChatNote[];
+    gifts?: PlayerGift[];
+    loans?: LoanAsk[];
+    sales?: ListingSale[];
+    sheets?: CharacterSheet[];
+  },
   sitting: Seat,
 ): BillFile {
   const purseIds = new Set(sitting.purseIds);
@@ -130,6 +185,12 @@ export function buildBill(
       .filter((line) => shopIds.has(line.shopId))
       .map((line) => ({ id: line.id, quantity: line.quantity })),
     ledger: input.ledger.filter((line) => line.at >= sitting.openedAt && purseIds.has(line.purseId)),
+    switchedToDm: sitting.elevated === true,
+    notes: notesFor(input.notes, purseIds),
+    gifts: giftsFor(input.gifts, purseIds, sitting.openedAt),
+    loans: loansOnBill(input.loans, purseIds, sitting.openedAt),
+    sales: salesOnBill(input.sales, purseIds, sitting.openedAt),
+    sheets: sheetsFor(input.sheets, purseIds),
   };
 }
 
@@ -156,7 +217,22 @@ function readTable(value: unknown): TableFile {
   if (!file.shops.every(isShop) || !file.purses.every(isPurse) || !file.stock.every(isStock)) {
     throw new Error("That player file is incomplete.");
   }
-  return file as TableFile;
+  const lock = readSeatLock(file.seatLock);
+  const notes = readNotes(file.notes);
+  const roster = readRoster(file.roster);
+  const listings = Array.isArray(file.listings) ? readListings(file.listings) : undefined;
+  const loans = readLoans(file.loans);
+  const sheets = readSheets(file.sheets);
+  return {
+    ...(file as TableFile),
+    seatLock: lock ?? undefined,
+    notes: notes.length ? notes : undefined,
+    roster: roster.length ? roster : undefined,
+    listings,
+    loans: loans.length ? loans : undefined,
+    sheets: sheets.length ? sheets : undefined,
+    handouts: readHandouts(file.handouts),
+  };
 }
 
 function readBill(value: unknown): BillFile {
@@ -177,7 +253,38 @@ function readBill(value: unknown): BillFile {
     holdings: file.holdings,
     stock: file.stock.filter(isQuantity),
     ledger: file.ledger.filter(isLedger),
+    switchedToDm: file.switchedToDm === true,
+    notes: notesFor(file.notes, new Set(strings(file.purseIds))),
+    gifts: giftsFor(file.gifts, new Set(strings(file.purseIds)), Number(file.openedAt) || 0),
+    loans: loansOnBill(file.loans, new Set(strings(file.purseIds)), Number(file.openedAt) || 0),
+    sales: salesOnBill(file.sales, new Set(strings(file.purseIds)), Number(file.openedAt) || 0),
+    sheets: sheetsFor(file.sheets, new Set(strings(file.purseIds))),
   };
+}
+
+function sheetsFor(value: CharacterSheet[] | undefined, purseIds: Set<string>): CharacterSheet[] | undefined {
+  const sheets = readSheets(value).filter((sheet) => purseIds.has(sheet.purseId));
+  return sheets.length ? sheets : undefined;
+}
+
+function loansOnBill(value: LoanAsk[] | undefined, purseIds: Set<string>, openedAt: number): LoanAsk[] | undefined {
+  const loans = readLoans(value).filter((loan) => loan.status === "pending" && purseIds.has(loan.purseId) && loan.at >= openedAt);
+  return loans.length ? loans : undefined;
+}
+
+function salesOnBill(value: ListingSale[] | undefined, purseIds: Set<string>, openedAt: number): ListingSale[] | undefined {
+  const sales = readSales(value).filter((sale) => purseIds.has(sale.purseId) && sale.at >= openedAt);
+  return sales.length ? sales : undefined;
+}
+
+function giftsFor(value: PlayerGift[] | undefined, purseIds: Set<string>, openedAt: number): PlayerGift[] | undefined {
+  const gifts = readGifts(value).filter((gift) => purseIds.has(gift.fromId) && gift.at >= openedAt);
+  return gifts.length ? gifts : undefined;
+}
+
+function notesFor(value: ChatNote[] | undefined, purseIds: Set<string>): ChatNote[] | undefined {
+  const notes = readNotes(value).filter((note) => note.to === "party" || purseIds.has(note.purseId));
+  return notes.length ? notes : undefined;
 }
 
 function strings(value: unknown): string[] {
