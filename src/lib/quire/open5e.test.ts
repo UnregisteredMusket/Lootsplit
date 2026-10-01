@@ -102,7 +102,7 @@ test('imported source notes survive generated shop stock', async () => {
 });
 
 test('shared conditions select only the requested SRD description',()=>{
- const q={...query,kind:'conditions' as const};
+ const q={...query,query:'Blinded',kind:'conditions' as const};
  const payload={count:1,results:[{key:'blinded',name:'Blinded',document:{key:'core'},descriptions:[{document:'a5e-ag',desc:'Third-party rules'},{document:'srd-2014',desc:'2014 condition'},{document:'srd-2024',desc:'2024 condition'}]}]};
  assert.equal(normalizeOpenPage(payload,q).entries[0]!.description,'2014 condition');
  assert.equal(normalizeOpenPage(payload,{...q,edition:'srd-2024'}).entries[0]!.description,'2024 condition');

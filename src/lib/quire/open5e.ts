@@ -61,6 +61,7 @@ export function normalizeOpenPage(payload: unknown, q: OpenQuery): OpenPage {
   const entries = data.results.flatMap((value): OpenEntry[] => {
     const r = { ...record(value) };
     let doc = record(r.document);
+    if (q.kind === "conditions" && !text(r.name).toLowerCase().includes(q.query.toLowerCase())) return [];
     // Conditions are shared concepts; only their per-source descriptions belong to an edition.
     if (q.kind === "conditions" && doc.key === "core") {
       const description = Array.isArray(r.descriptions) ? r.descriptions.map(record).find(d => d.document === q.edition) : undefined;
