@@ -216,8 +216,8 @@ export function HomeBoard() {
               {seat.role === "dm" ? "Economy rules" : "Your party"}
             </Link>
           </div>
-          <div className="mt-7 grid gap-6 lg:grid-cols-[1.5fr_1fr]">
-            <section>
+          <div className="mt-7 grid grid-cols-1 gap-6 lg:grid-cols-[1.5fr_1fr]">
+            <section className="min-w-0">
               <div className="section-heading">
                 <h2>Recent activity</h2>
                 <span className="text-sm text-faint">Latest transactions</span>
@@ -261,7 +261,7 @@ export function HomeBoard() {
                 </ul>
               )}
             </section>
-            <section>
+            <section className="min-w-0">
               <div className="section-heading">
                 <h2>{seat.role === "dm" ? "Party funds" : "Your funds"}</h2>
                 <Link to="/party" className="text-sm text-lead">
