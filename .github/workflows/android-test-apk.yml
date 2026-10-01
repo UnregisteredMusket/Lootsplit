@@ -2,6 +2,12 @@ name: Android test APK
 
 on:
   workflow_dispatch:
+  push:
+    branches:
+      - 'android/**'
+
+permissions:
+  contents: read
 
 jobs:
   test-apk:

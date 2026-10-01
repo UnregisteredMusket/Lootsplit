@@ -8,7 +8,7 @@ After this change is deployed, the Worker accepts server-function calls from `ht
 
 ## Test APK
 
-The GitHub Action **Android test APK** builds `app-debug.apk`. That file is signed with the build machine's debug key. It is not a Play Store release. A later test APK may not install over an older one if the debug key changed; uninstall the previous test copy first.
+The GitHub Action **Android test APK** builds `app-debug.apk`. Run it manually or push a prepared update to an `android/**` branch after verifying the web release. Version 1.3.0 uses Android version code 3. The APK is signed with the build machine's debug key, not a Play Store release key. A later test APK may not install over an older one if the debug key changed. Export and verify a backup of local campaigns before uninstalling an old test copy; uninstalling removes its local data.
 
 From a phone:
 
