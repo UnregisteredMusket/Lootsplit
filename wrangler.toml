@@ -16,3 +16,8 @@ binding = "DB"
 database_name = "lootsplit"
 database_id = "0a200e96-ae2e-47b5-9869-c1f4d316148f"
 migrations_dir = "cloudflare/migrations"
+
+# Branch previews use disposable test rooms, never production campaign data.
+[[previews.d1_databases]]
+binding = "DB"
+database_id = "78919bd1-caab-4655-8765-064797b250ad"
