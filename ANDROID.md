@@ -34,4 +34,8 @@ Store the file and both passwords somewhere private. For GitHub, add these repos
 - `ANDROID_KEY_ALIAS` — `lootsplit`
 - `ANDROID_KEY_PASSWORD`
 
-Do not commit `*.jks`, `*.keystore`, or those passwords. This repository's workflow does not sign a release APK.
+Do not commit `*.jks`, `*.keystore`, or those passwords. The manual **Android signed release APK** workflow signs using these four repository secrets. It verifies the APK signature and uploads only the APK, never the keystore. Missing secrets stop the build. The decoded keystore is temporary and removed on exit. Debug builds remain separate and are not release updates.
+
+Signing setup is not complete until the permanent keystore is generated, backed up securely outside GitHub, and installed in repository secrets. No permanent key has been generated or installed yet. Never generate a fresh key automatically during a build.
+
+The first release-signed APK cannot normally replace the old debug-signed installation. Export and verify all local campaigns before a one-time uninstall/reinstall; thereafter retain this signing key and increase versionCode for every distributed update.
