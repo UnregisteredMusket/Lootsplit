@@ -42,9 +42,9 @@ export function openUrl(input: OpenQuery) {
   const q = openQuery(input);
   const url = new URL(`https://api.open5e.com/v2/${q.kind}/`);
   url.search = new URLSearchParams({
-    document__key__in: q.edition,
+    document__key__in: q.kind === "conditions" ? "core" : q.edition,
     name__icontains: q.query,
-    limit: "12",
+    limit: q.kind === "conditions" ? "100" : "12",
     page: String(q.page),
     ordering: "name",
   }).toString();
@@ -59,8 +59,15 @@ export function normalizeOpenPage(payload: unknown, q: OpenQuery): OpenPage {
   if (!Array.isArray(data.results) || typeof data.count !== "number")
     throw new Error("Open5e returned an unexpected response. Try again later.");
   const entries = data.results.flatMap((value): OpenEntry[] => {
-    const r = record(value),
-      doc = record(r.document);
+    const r = { ...record(value) };
+    let doc = record(r.document);
+    // Conditions are shared concepts; only their per-source descriptions belong to an edition.
+    if (q.kind === "conditions" && doc.key === "core") {
+      const description = Array.isArray(r.descriptions) ? r.descriptions.map(record).find(d => d.document === q.edition) : undefined;
+      if (!description) return [];
+      r.desc = text(description.desc);
+      doc = {key:q.edition,name:`System Reference Document ${q.edition === "srd-2014" ? "5.1" : "5.2"}`};
+    }
     if (doc.key !== q.edition || !text(r.key) || !text(r.name)) return [];
     const version = q.edition === "srd-2014" ? "5.1" : "5.2";
     const attribution = `This work includes material from the System Reference Document ${version} (“SRD ${version}”) by Wizards of the Coast LLC, available at https://www.dndbeyond.com/srd. The SRD ${version} is licensed under the Creative Commons Attribution 4.0 International License, available at https://creativecommons.org/licenses/by/4.0/legalcode. Retrieved through Open5e; formatting adapted. Prices and categories may be customized in Lootsplit.`;
@@ -149,7 +156,7 @@ export function normalizeOpenPage(payload: unknown, q: OpenQuery): OpenPage {
       },
     ];
   });
-  return { entries, count: data.count, more: typeof data.next === "string" };
+  return { entries, count: q.kind === "conditions" ? entries.length : data.count, more: q.kind !== "conditions" && typeof data.next === "string" };
 }
 export function openCatalogItem(
   entry: OpenEntry,
