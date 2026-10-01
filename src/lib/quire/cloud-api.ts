@@ -95,3 +95,10 @@ export const manageCloudRoom = createServerFn({ method: "POST" })
     const { manageRoom } = await import("./cloud.server.ts");
     return manageRoom(data);
   });
+
+export const getRoomPushSettings = createServerFn({ method: "POST" })
+  .validator((input: { code: string; token: string; endpoint?: string }) => input)
+  .handler(async ({ data }) => { const { pushSettings } = await import("./push.server.ts"); return pushSettings(data); });
+export const updateRoomPushSubscription = createServerFn({ method: "POST" })
+  .validator((input: { code: string; token: string; endpoint: string; enabled: boolean }) => input)
+  .handler(async ({ data }) => { const { setPushSubscription } = await import("./push.server.ts"); return setPushSubscription(data); });

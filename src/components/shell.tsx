@@ -1,3 +1,4 @@
+import { useChatUnread } from "@/lib/quire/use-chat-unread";
 import { SyncStatus } from "./sync-status";
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import {
@@ -48,6 +49,7 @@ export function Shell({
 }) {
   const { job } = useLibrary();
   const seat = useSeat();
+  const { count: unreadCount } = useChatUnread();
   const seatKnown = useSeatKnown();
   const { prefs } = usePrefs();
   const navigate = useNavigate();
@@ -351,6 +353,7 @@ export function Shell({
             active={pathname === "/share"}
             icon={<Users className="size-4" />}
             label="Multiplayer"
+            badge={unreadCount}
           />
           <NavLink
             layout={layout}
@@ -385,6 +388,7 @@ export function Shell({
           active={pathname === "/share"}
           icon={<Users className="size-5" />}
           label="Multiplayer"
+          badge={unreadCount}
         />
         <button
           type="button"
@@ -540,12 +544,14 @@ function NavLink({
   icon,
   label,
   layout,
+  badge = 0,
 }: {
   to: Dest;
   search?: { book: string } | { q: string } | { view: "home" | "sheet" };
   active: boolean;
   icon: ReactNode;
   label: string;
+  badge?: number;
   layout: "tab" | "rail";
 }) {
   return (
@@ -562,7 +568,14 @@ function NavLink({
         layout === "rail" && active && "bg-subtle",
       )}
     >
-      {icon}
+      <span className="relative">
+        {icon}
+        {badge > 0 ? (
+          <span className="chat-nav-badge" aria-label={`${badge} unread messages`}>
+            {badge > 99 ? "99+" : badge}
+          </span>
+        ) : null}
+      </span>
       {label}
     </Link>
   );

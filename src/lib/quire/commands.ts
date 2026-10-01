@@ -36,7 +36,8 @@ export const commandSchema = z.discriminatedUnion("kind", [
   z.object({
     ...base,
     kind: z.literal("message"),
-    to: z.enum(["party", "dm"]),
+    to: z.enum(["party", "dm", "player"]),
+    recipientId: id.optional(),
     purseId: z.string().max(150),
     text: z.string().trim().min(1).max(500),
   }),
@@ -204,7 +205,13 @@ export function applyCommand(input: CloudTable, seat: CloudSeat, raw: Command): 
       log(l.purseId, "Loan approved", l.copper);
     }
   } else if (cmd.kind === "message") {
-    if (seat.role === "player") own(cmd.purseId);
+    if (seat.role === "player") {
+      const sender = own(cmd.purseId);
+      if (sender.kind !== "character") throw new Error("Send as your character.");
+    }
+    if (cmd.to === "player") {
+      if (seat.role !== "player" || cmd.recipientId === cmd.purseId || !t.purses.some((p) => p.id === cmd.recipientId && p.kind === "character" && p.control !== "npc")) throw new Error("Choose another player character.");
+    }
     else if (cmd.to === "dm" && !t.purses.some((p) => p.id === cmd.purseId))
       throw new Error("Choose a recipient.");
     t.notes.push({
@@ -212,6 +219,7 @@ export function applyCommand(input: CloudTable, seat: CloudSeat, raw: Command): 
       at,
       from: seat.role,
       to: cmd.to,
+      ...(cmd.to === "player" ? { recipientId: cmd.recipientId } : {}),
       purseId: cmd.purseId,
       text: cmd.text,
     });

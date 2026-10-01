@@ -1,3 +1,4 @@
+import { canReadNote } from "./chat-visibility.ts";
 import type {ReportBase} from "./local-report.ts";
 import type { Coins, Holding, LedgerLine, Purse, RealmSettings, Shop, StockLine } from "./types.ts";
 import { readGifts, readRoster, type PlayerGift, type RosterPerson } from "./gift.ts";
@@ -291,7 +292,7 @@ function giftsFor(value: PlayerGift[] | undefined, purseIds: Set<string>, opened
 }
 
 function notesFor(value: ChatNote[] | undefined, purseIds: Set<string>): ChatNote[] | undefined {
-  const notes = readNotes(value).filter((note) => note.to === "party" || purseIds.has(note.purseId));
+  const notes = readNotes(value).filter((note) => canReadNote(note, { role: "player", purseIds: [...purseIds] }));
   return notes.length ? notes : undefined;
 }
 

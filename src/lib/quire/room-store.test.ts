@@ -4,11 +4,14 @@ import { DatabaseSync } from "node:sqlite";
 import { readFileSync } from "node:fs";
 import { createRoom, readRoom, updateRoom, deleteRoom } from "./room-store.server.ts";
 import { emptyCloudTable } from "./cloud.ts";
-import { openRoom, joinRoom, roomState, previewRoom } from "./cloud.server.ts";
+import { openRoom, joinRoom, roomState, previewRoom, submitCommands } from "./cloud.server.ts";
 import { emptyCoins } from "./money.ts";
+import { pushSettings, setPushSubscription, validPushEndpoint, pushAuthorization } from "./push.server.ts";
+import { jwtVerify, importJWK } from "jose";
 const sql = new DatabaseSync(":memory:");
 sql.exec(readFileSync(new URL("../../../drizzle/0000_mysterious_lord_tyger.sql", import.meta.url),"utf8"));
-(globalThis as any).__env__ = { DB: { prepare(query:string) { let values: any[]=[]; return {bind(...args:any[]){values=args;return this;},async first(){return sql.prepare(query).get(...values)??null;},async run(){const r=sql.prepare(query).run(...values);return {meta:{changes:Number(r.changes)}};}}; } } };
+sql.exec(readFileSync(new URL("../../../cloudflare/migrations/0002_web_push.sql", import.meta.url),"utf8"));
+(globalThis as any).__env__ = { DB: { prepare(query:string) { let values: any[]=[]; return {bind(...args:any[]){values=args;return this;},async all(){return {results:sql.prepare(query).all(...values)};},async first(){return sql.prepare(query).get(...values)??null;},async run(){const r=sql.prepare(query).run(...values);return {meta:{changes:Number(r.changes)}};}}; } } };
 test("durable shared rooms reject stale writes and survive independent reads",async()=>{
  const room={code:"CAS01",revision:1,turn:0,live:false,seats:[],table:emptyCloudTable(),seen:{gifts:[],sales:[]}};
  await createRoom(room); assert.equal((await readRoom("CAS01"))?.revision,1);
@@ -34,4 +37,54 @@ test("player responses exclude other private messages, loans, and NPC join choic
  const view=await roomState({code:opened.code,token:joined.token});
  assert.deepEqual(view.table.notes.map(n=>n.id),["public"]);
  await assert.rejects(roomState({code:opened.code,token:"invalid"}),/not seated/);
+});
+
+test("private chat is isolated, idempotent, and independent of turns", async () => {
+  const opened=await openRoom({name:"DM",table:{...emptyCloudTable(),purses:["a","b","c"].map(id=>({id,name:id,kind:"character",coins:emptyCoins()}))}});
+  const a=await joinRoom({code:opened.code,purseId:"a",name:"A"});
+  const b=await joinRoom({code:opened.code,purseId:"b",name:"B"});
+  const c=await joinRoom({code:opened.code,purseId:"c",name:"C"});
+  const message={kind:"message",id:"private-chat",to:"player",purseId:"a",recipientId:"b",text:"Only A and B"};
+  const result=await submitCommands({code:opened.code,token:a.token,batchId:"first",commands:[message]});
+  assert.equal(result.turn,0);
+  assert.equal(result.table.notes.length,1);
+  await submitCommands({code:opened.code,token:a.token,batchId:"retry",commands:[message]});
+  assert.equal((await roomState({code:opened.code,token:b.token})).table.notes.length,1);
+  assert.equal((await roomState({code:opened.code,token:c.token})).table.notes.length,0);
+  assert.equal((await roomState({code:opened.code,token:opened.token})).table.notes.length,0);
+  await assert.rejects(submitCommands({code:opened.code,token:c.token,batchId:"forge",commands:[{...message,id:"forged"}]}),/permission/);
+  await assert.rejects(submitCommands({code:opened.code,token:a.token,batchId:"bad-target",commands:[{...message,id:"bad",recipientId:"missing"}]}),/another player/);
+});
+
+test("push subscriptions require membership and preserve stable signing keys", async () => {
+  const opened=await openRoom({name:"DM",table:{...emptyCloudTable(),purses:[{id:"push-player",name:"Player",kind:"character",coins:emptyCoins()}]}});
+  const player=await joinRoom({code:opened.code,purseId:"push-player",name:"Player"});
+  const endpoint="https://fcm.googleapis.com/fcm/send/test-subscription";
+  const config=await pushSettings(opened);
+  assert.equal(config.publicKey,(await pushSettings(opened)).publicKey);
+  assert.equal("privateKey" in config,false);
+  await assert.rejects(setPushSubscription({...opened,token:"invalid",endpoint,enabled:true}),/Join a room/);
+  await assert.rejects(setPushSubscription({...opened,endpoint:"https://localhost/private",enabled:true}),/not supported/);
+  await setPushSubscription({...player,code:opened.code,endpoint,enabled:true});
+  assert.equal((await pushSettings({...player,code:opened.code,endpoint})).subscribed,true);
+  assert.equal((await pushSettings({...opened,endpoint})).subscribed,false);
+  const row=sql.prepare("SELECT body FROM push_config WHERE id='vapid'").get() as {body:string};
+  const keys=JSON.parse(row.body);
+  const header=await pushAuthorization(endpoint,keys);
+  const jwt=header.slice("vapid t=".length).split(", k=")[0]!;
+  const jwk={...keys.privateKey};delete jwk.d;jwk.key_ops=["verify"];
+  const verified=await jwtVerify(jwt,await importJWK(jwk,"ES256"),{audience:"https://fcm.googleapis.com"});
+  assert.equal(verified.payload.sub,"https://lootsplit.oliverstorie2017.workers.dev");
+  const originalFetch=globalThis.fetch;let sends=0;
+  globalThis.fetch=async (url,init)=>{sends++;assert.equal(url,endpoint);assert.equal(init?.body,undefined);assert.equal(init?.redirect,"error");return new Response(null,{status:201});};
+  try {
+    const cmd={kind:"message",id:"push-note",to:"party",purseId:"",text:"Do not expose this text"};
+    await submitCommands({...opened,batchId:"push-send",commands:[cmd]});
+    await submitCommands({...opened,batchId:"push-retry",commands:[cmd]});
+    assert.equal(sends,1);
+  } finally {globalThis.fetch=originalFetch;}
+  await setPushSubscription({...player,code:opened.code,endpoint,enabled:false});
+  assert.equal((await pushSettings({...player,code:opened.code,endpoint})).subscribed,false);
+  assert.equal(validPushEndpoint("https://fcm.googleapis.com.evil.example/test"),false);
+  assert.equal(validPushEndpoint("https://user@fcm.googleapis.com/test"),false);
 });

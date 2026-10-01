@@ -484,3 +484,16 @@ export async function importPending(file: File) {
     else await stage();
   });
 }
+
+/** A stable message id makes manual retries safe after an ambiguous network failure. */
+export function sendRoomMessage(command: Extract<Command, { kind: "message" }>) {
+  return serial(async () => {
+    const s = requireSession();
+    const remote = await submitCloudCommands({ data: { code: s.code, token: s.token, batchId: command.id, commands: [command] } });
+    await accept(remote);
+  });
+}
+export function roomCredentials() {
+  const s = requireSession();
+  return { code: s.code, token: s.token };
+}

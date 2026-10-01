@@ -290,3 +290,16 @@ input,select,textarea { max-width: 100%; }
 .loot-nav-tab[aria-current="page"] { background: color-mix(in srgb, var(--color-lead) 7%, transparent); }
 .loot-nav-tab[aria-current="page"]::after { content: ""; position: absolute; bottom: .25rem; width: 1.5rem; height: 2px; border-radius: 2px; background: var(--color-lead); }
 @media (max-width: 420px) { .ledger-card { padding: 1.1rem; } .loot-nav-tab { font-size: .8rem; } }
+
+.live-chat { overflow: hidden; border: 1px solid color-mix(in srgb,var(--color-lead) 25%,transparent); border-radius: .8rem; }
+.chat-select { display: flex; flex-wrap: wrap; align-items: center; gap: .6rem; padding: .85rem; background: var(--color-bg); }
+.chat-select select { flex: 1; min-width: 0; min-height: 2.8rem; border: 1px solid var(--color-border); border-radius: .5rem; padding: .4rem .7rem; background: var(--color-elevated); color: var(--color-fg); }
+.chat-title { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: .5rem; padding: .8rem 1rem; border-block: 1px solid color-mix(in srgb,var(--color-lead) 20%,transparent); }
+.chat-history { height: clamp(16rem, 45dvh, 30rem); overflow-y: auto; overscroll-behavior: contain; padding: 1rem; background: color-mix(in srgb,var(--color-bg) 80%,var(--color-elevated)); }
+.chat-empty { min-height: 14rem; display: flex; flex-direction: column; align-items: center; justify-content: center; gap: .7rem; text-align: center; color: var(--color-muted); }
+.chat-empty p { font-family: var(--font-display); font-size: 1.7rem; color: var(--color-fg); }.chat-empty span { font-size: .9rem; }
+.chat-messages { display: flex; flex-direction: column; gap: 1rem; }.chat-message { display: flex; justify-content: flex-start; }.chat-message.own { justify-content: flex-end; }
+.chat-bubble { max-width: 88%; min-width: 7rem; border: 1px solid var(--color-border); border-radius: .8rem .8rem .8rem .15rem; padding: .75rem .9rem; background: var(--color-elevated); overflow-wrap: anywhere; }
+.own .chat-bubble { border-color: color-mix(in srgb,var(--color-lead) 45%,transparent); border-radius: .8rem .8rem .15rem .8rem; background: color-mix(in srgb,var(--color-lead) 13%,var(--color-bg)); }
+.chat-author { margin-bottom: .3rem; font-size: .75rem; font-weight: 600; color: var(--color-lead); }.chat-time { margin-top: .4rem; font-size: .72rem; color: var(--color-muted); }.chat-composer { padding: .85rem; border-top: 1px solid var(--color-border); background: var(--color-bg); }
+.chat-nav-badge { position: absolute; top: -.65rem; left: .65rem; min-width: 1rem; height: 1rem; padding: 0 .2rem; display: grid; place-items: center; border-radius: 1rem; background: var(--color-lead); color: var(--color-bg); font-size: .6rem; font-weight: 700; line-height: 1; }

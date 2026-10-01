@@ -7,7 +7,8 @@ export type ChatNote = {
   at: number;
   from: "dm" | "player";
   /** "dm" is a private note with one character. "party" is the shared party chat. */
-  to: "dm" | "party";
+  to: "dm" | "party" | "player";
+  recipientId?: string;
   purseId: string;
   text: string;
 };
@@ -123,11 +124,13 @@ function normalizeNote(value: unknown): ChatNote | null {
   const text = typeof note.text === "string" ? note.text.trim().slice(0, 500) : "";
   const purseId = typeof note.purseId === "string" ? note.purseId : "";
   const id = typeof note.id === "string" ? note.id : "";
-  const to = note.to === "party" ? "party" : "dm";
+  const to = note.to === "party" ? "party" : note.to === "player" ? "player" : "dm";
+  const recipientId = typeof note.recipientId === "string" ? note.recipientId : undefined;
+  if (to === "player" && (!recipientId || !purseId || note.from !== "player")) return null;
   if (!text || !id || (note.from !== "dm" && note.from !== "player")) return null;
   if (to === "dm" && !purseId) return null;
   if (to === "party" && note.from === "player" && !purseId) return null;
-  return { id, purseId, text, from: note.from, to, at: Number.isFinite(note.at) ? Number(note.at) : 0 };
+  return { id, purseId, text, from: note.from, to, ...(to === "player" ? { recipientId } : {}), at: Number.isFinite(note.at) ? Number(note.at) : 0 };
 }
 
 function request<T>(req: IDBRequest<T>): Promise<T> {

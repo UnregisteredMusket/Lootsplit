@@ -8,6 +8,7 @@ import {
   type CloudSeat,
   type CloudTable,
 } from "./cloud.ts";
+import { canReadNote } from "./chat-visibility.ts";
 import { characterControl } from "./types.ts";
 import type { BillFile } from "./table.ts";
 
@@ -187,11 +188,11 @@ function view(room: CloudRoom, seat: CloudSeat): RoomView {
     draft: JSON.stringify(room.drafts?.[seat.id] ?? []),
     table:
       seat.role === "dm"
-        ? room.table
+        ? { ...room.table, notes: room.table.notes.filter((note) => canReadNote(note, seat)) }
         : {
             ...room.table,
             notes: room.table.notes.filter(
-              (note) => note.to === "party" || seat.purseIds.includes(note.purseId),
+              (note) => canReadNote(note, seat),
             ),
             loans: room.table.loans.filter((loan) => seat.purseIds.includes(loan.purseId)),
             sheets: room.table.sheets.filter((sheet) => seat.purseIds.includes(sheet.purseId)),
@@ -267,6 +268,13 @@ export async function submitCommands(input: {
     };
     try {
       await updateRoom(next, room.revision);
+      if (!input.stage) {
+        const fresh = next.table.notes.filter((note) => !room.table.notes.some((old) => old.id === note.id));
+        if (fresh.length) {
+          try { const { pushMessages } = await import("./push.server.ts"); await pushMessages(next, seat.id, fresh); }
+          catch { console.warn("Background notification failed; campaign changes remain saved."); }
+        }
+      }
       return view(next, seat);
     } catch (error) {
       if (attempt === 4 || !(error instanceof Error) || !error.message.includes("table changed"))

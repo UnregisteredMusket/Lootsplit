@@ -1,7 +1,12 @@
+import { useSyncExternalStore } from "react";
+import { getCloudTable, subscribeCloudTable } from "@/lib/quire/cloud-client";
+import { useEffect, useState } from "react";
 import { Link, createFileRoute } from "@tanstack/react-router";
 import { CloudTable } from "@/components/cloud-table";
 import { Notices } from "@/components/notices";
 import { Shell } from "@/components/shell";
+import { ManualChat } from "@/components/manual-chat";
+import { useChatUnread } from "@/lib/quire/use-chat-unread";
 import { ShareChat } from "@/components/share-chat";
 import { TableDesk, TableShare } from "@/components/table-share";
 import { SyncStatus } from "@/components/sync-status";
@@ -10,7 +15,13 @@ import { useSeat } from "@/lib/quire/seat";
 
 export const Route = createFileRoute("/share")({ component: SharePage });
 function SharePage() {
+  const [openChat, setOpenChat] = useState(false);
+  useEffect(() => {
+    setOpenChat(new URLSearchParams(window.location.search).get("chat") === "1");
+  }, []);
+  const room = useSyncExternalStore(subscribeCloudTable, getCloudTable, getCloudTable);
   const seat = useSeat();
+  const { count } = useChatUnread();
   return (
     <Shell width="prose">
       <div className="multiplayer-heading">
@@ -18,7 +29,12 @@ function SharePage() {
         <h1>Multiplayer</h1>
       </div>
       <CloudTable />
-      <Fold title="Messages" hint="Talk with your dungeon master and party.">
+      <Fold
+        key={String(openChat)}
+        defaultOpen={openChat}
+        title={count ? `Messages · ${count} unread` : "Messages"}
+        hint="Party chat and private conversations."
+      >
         <ShareChat />
       </Fold>
       <Fold title="Notifications" hint="Turn reminders, messages, and room changes.">
@@ -43,6 +59,11 @@ function SharePage() {
           Mode.
         </p>
         {seat.role === "dm" ? <TableShare /> : null}
+        {!room.joined ? (
+          <Fold title="Offline messages">
+            <ManualChat />
+          </Fold>
+        ) : null}
         <TableDesk />
       </Fold>
     </Shell>

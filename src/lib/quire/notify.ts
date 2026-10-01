@@ -2,12 +2,13 @@ import { toast } from "sonner";
 
 const KEY = "quire.notices.v1";
 
-export type NoticeNote = { id: string; from: "dm" | "player"; to: "dm" | "party"; purseId: string; text: string };
+export type NoticeNote = { id: string; from: "dm" | "player"; to: "dm" | "party" | "player"; recipientId?: string; purseId: string; text: string };
 
 const seen = new Set<string>();
 let primed = false;
 
 export function noteIsForSeat(note: NoticeNote, seat: { role: "dm" | "player"; purseIds: string[] }): boolean {
+  if (note.to === "player") return seat.role === "player" && !!note.recipientId && seat.purseIds.includes(note.recipientId) && !seat.purseIds.includes(note.purseId);
   if (seat.role === "dm") return note.from === "player";
   if (note.from === "dm") return note.to === "party" || seat.purseIds.includes(note.purseId);
   return note.to === "party" && !seat.purseIds.includes(note.purseId);
@@ -44,7 +45,7 @@ export function alertNotes(notes: NoticeNote[]) {
     seen.add(note.id);
     if (!note.text.trim() || !noteIsForSeat(note, seat)) continue;
     const title = note.to === "party" ? "Party" : note.from === "dm" ? "Dungeon master" : "New message";
-    notify(title, note.text.trim().slice(0, 140), `note-${note.id}`);
+    notify(title, note.to === "party" ? note.text.trim().slice(0, 140) : "You have a new private message.", `note-${note.id}`);
   }
 }
 

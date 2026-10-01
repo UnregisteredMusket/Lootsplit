@@ -1,219 +1,291 @@
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { MessageCircle, Send, RotateCcw, Lock } from "lucide-react";
 import { toast } from "sonner";
-import { Button, TextArea } from "@/components/ui";
-import { getCampaigns, serverCampaigns, subscribeCampaigns } from "@/lib/quire/campaigns";
-import { getChatSnapshot, postNotes, refreshChat, serverChat, subscribeChat, loadNotes, type ChatNote } from "@/lib/quire/chat";
-import { getCloudTable, subscribeCloudTable, queueCommand } from "@/lib/quire/cloud-client";
-import { snapshot } from "@/lib/quire/economy";
-import { loadGifts } from "@/lib/quire/gift";
-import { loadLoans, loadSales } from "@/lib/quire/market";
-import { loadSheets } from "@/lib/quire/sheet";
-import { buildBill, copyText, encodeLinkPayload, seatHref } from "@/lib/quire/table";
+import { Button, TextArea } from "./ui";
+import { getCloudTable, sendRoomMessage, subscribeCloudTable } from "@/lib/quire/cloud-client";
+import { getChatSnapshot, serverChat, subscribeChat } from "@/lib/quire/chat";
+import { canReadNote, conversationFor, isOwnNote } from "@/lib/quire/chat-visibility";
+import { useChatUnread } from "@/lib/quire/use-chat-unread";
 import { useEconomy } from "@/lib/quire/economy-context";
 import { useSeat } from "@/lib/quire/seat";
-import { characterControl } from "@/lib/quire/types";
+import type { Command } from "@/lib/quire/commands";
 
+type Message = Extract<Command, { kind: "message" }>;
+type Outgoing = { command: Message; thread: string; at: number; error?: string };
 export function ShareChat() {
+  const room = useSyncExternalStore(subscribeCloudTable, getCloudTable, getCloudTable);
+  if (!room.joined)
+    return (
+      <p className="text-sm text-muted">
+        Start or join a room to chat live. Offline message files are under Manual sharing & files.
+      </p>
+    );
+  return <LiveChat key={`${room.code}.${room.seatId}`} />;
+}
+function LiveChat() {
+  const room = useSyncExternalStore(subscribeCloudTable, getCloudTable, getCloudTable);
   const seat = useSeat();
-  const cloud = useSyncExternalStore(subscribeCloudTable, getCloudTable, getCloudTable);
   const { purses } = useEconomy();
-  const { activeId } = useSyncExternalStore(subscribeCampaigns, getCampaigns, serverCampaigns);
   const notes = useSyncExternalStore(subscribeChat, getChatSnapshot, serverChat);
+  const { unread, markRead } = useChatUnread();
+  const [thread, setThread] = useState("party");
+  const [drafts, setDrafts] = useState<Record<string, string>>({});
+  const [outbox, setOutbox] = useState<Outgoing[]>([]);
+  const [sending, setSending] = useState<string[]>([]);
+  const sendingRef = useRef(new Set<string>());
+  const history = useRef<HTMLDivElement>(null);
+  const nearBottom = useRef(true);
+  const store = `lootsplit.chat.outbox.${room.code}.${room.seatId}`;
   useEffect(() => {
-    void refreshChat();
-  }, [activeId]);
-  const [text, setText] = useState("");
-  const [picked, setPicked] = useState<Record<string, boolean>>({});
-  const [audience, setAudience] = useState<"party" | "players">("players");
-  const [playerTo, setPlayerTo] = useState<"dm" | "party">("dm");
-  const [busy, setBusy] = useState(false);
-  const player = seat.role === "player";
-  const characters = purses.filter((purse) => purse.kind === "character" && characterControl(purse) !== "npc");
-  const mine = player ? characters.filter((purse) => seat.purseIds.includes(purse.id)) : characters;
-  const names = new Map(purses.map((purse) => [purse.id, purse.name]));
-  const partyNotes = notes.filter((note) => note.to === "party");
-  const privateNotes = notes.filter((note) => note.to !== "party" && (player ? seat.purseIds.includes(note.purseId) : mine.some((purse) => purse.id === note.purseId)));
-  const selected = mine.filter((purse) => picked[purse.id] !== false);
-
-  async function send() {
-    const body = text.trim();
-    if (!body) return;
-    const toParty = player ? playerTo === "party" : audience === "party";
-    const targets = toParty ? [player ? (mine[0]?.id ?? "") : ""] : player ? mine.map((purse) => purse.id).slice(0, 1) : selected.map((purse) => purse.id);
-    if (player && mine.length === 0) {
-      toast("This link has no character to write for.");
-      return;
-    }
-    if (!toParty && targets.length === 0) {
-      toast(player ? "This link has no character to write for." : "Choose at least one player.");
-      return;
-    }
-    setBusy(true);
     try {
-      if (cloud.joined) { for (const purseId of targets) await queueCommand({kind:"message",to:toParty?"party":"dm",purseId,text:body}); }
-      else await postNotes(targets.map((purseId) => ({ from: player ? "player" : "dm", to: toParty ? "party" : "dm", purseId, text: body })));
-      setText("");
-      toast.success(cloud.joined
-        ? "Message shared."
-        : player ? "Message saved. Share your activity report link or file with the DM."
-        : "Message saved. Share updated player links or files with the recipients.");
+      const saved = JSON.parse(localStorage.getItem(store) || "[]");
+      if (Array.isArray(saved))
+        setOutbox(
+          saved
+            .filter(
+              (m) =>
+                m?.command?.kind === "message" &&
+                typeof m.command.id === "string" &&
+                typeof m.command.text === "string",
+            )
+            .map((m) => ({ ...m, error: "Not confirmed. Retry to check delivery." })),
+        );
+    } catch {
+      toast.error("Could not read unsent messages.");
+    }
+  }, [store]);
+  const characters = purses.filter((p) => p.kind === "character" && p.control !== "npc");
+  const options = [
+    { id: "party", name: "Party chat" },
+    ...(seat.role === "player" ? [{ id: "dm", name: "Dungeon master" }] : []),
+    ...characters
+      .filter((p) => seat.role === "dm" || !seat.purseIds.includes(p.id))
+      .map((p) => ({ id: p.id, name: p.name })),
+  ];
+  const active = options.find((o) => o.id === thread) ?? options[0]!;
+  const visible = notes.filter(
+    (n) => canReadNote(n, seat) && conversationFor(n, seat) === active.id,
+  );
+  const pending = outbox.filter(
+    (m) => m.thread === active.id && !notes.some((n) => n.id === m.command.id),
+  );
+  const text = drafts[active.id] ?? "";
+  const sender = characters.find((p) => seat.purseIds.includes(p.id));
+  const isSending = sending.length > 0;
+
+  useEffect(() => {
+    const mark = () => {
+      if (nearBottom.current) markRead(active.id, visible);
+    };
+    if (nearBottom.current && history.current)
+      history.current.scrollTop = history.current.scrollHeight;
+    mark();
+    document.addEventListener("visibilitychange", mark);
+    return () => document.removeEventListener("visibilitychange", mark);
+  }, [active.id, notes, outbox, markRead]);
+  // Drop confirmed outbox entries, including an acknowledgement found after a failed response.
+  useEffect(() => {
+    if (!outbox.some((m) => notes.some((n) => n.id === m.command.id))) return;
+    const next = outbox.filter((m) => !notes.some((n) => n.id === m.command.id));
+    setOutbox(next);
+    try {
+      localStorage.setItem(store, JSON.stringify(next));
+    } catch {
+      /* duplicate retries remain idempotent */
+    }
+  }, [notes, outbox, store]);
+
+  function persist(next: Outgoing[]) {
+    localStorage.setItem(store, JSON.stringify(next));
+    setOutbox(next);
+  }
+  async function deliver(item: Outgoing) {
+    if (sendingRef.current.has(item.command.id)) return;
+    sendingRef.current.add(item.command.id);
+    setSending([...sendingRef.current]);
+    try {
+      await sendRoomMessage(item.command);
     } catch (error) {
-      toast.error(error instanceof Error ? error.message : "Could not save the message.");
+      const message =
+        error instanceof Error ? error.message : "Connection failed. Retry when online.";
+      setOutbox((old) => {
+        const next = old.map((m) =>
+          m.command.id === item.command.id ? { ...m, error: message } : m,
+        );
+        try {
+          localStorage.setItem(store, JSON.stringify(next));
+        } catch {
+          /* keep in this tab */
+        }
+        return next;
+      });
     } finally {
-      setBusy(false);
+      sendingRef.current.delete(item.command.id);
+      setSending([...sendingRef.current]);
     }
   }
-
+  function send() {
+    if (!text.trim() || isSending) return;
+    if (seat.role === "player" && !sender) {
+      toast.error("Your character is no longer assigned. Ask the host for help.");
+      return;
+    }
+    const to =
+      active.id === "party" ? "party" : active.id === "dm" || seat.role === "dm" ? "dm" : "player";
+    const command: Message = {
+      kind: "message",
+      id: crypto.randomUUID(),
+      to,
+      purseId: seat.role === "dm" ? (to === "party" ? "" : active.id) : sender!.id,
+      ...(to === "player" ? { recipientId: active.id } : {}),
+      text: text.trim(),
+    };
+    const item: Outgoing = { command, thread: active.id, at: Date.now() };
+    try {
+      persist([...outbox, item]);
+    } catch {
+      toast.error("Could not save the message on this device. Your draft is still here.");
+      return;
+    }
+    setDrafts((old) => ({ ...old, [active.id]: "" }));
+    nearBottom.current = true;
+    void deliver(item);
+  }
   return (
-    <div>
-      <p className="text-sm text-muted">
-        {cloud.joined
-          ? cloud.live
-            ? "Write to the DM or party. Messages sync through the shared campaign."
-            : "Write to the DM or party. Messages are shared immediately, independently of transaction turns."
-          : player
-            ? "Save a message for the DM or party, then share your activity report link or file with the DM. Party messages reach other players through their updated links or files."
-            : "Save a message for the party or selected players, then share updated player links or files. Replies arrive when you import player activity."}
-      </p>
-      <Thread title="Party" notes={partyNotes} names={names} empty="No one has written to the party." />
-      {player ? (
-        <Thread title="Dungeon master" notes={privateNotes} names={names} empty="No private messages." />
-      ) : (
-        <section className="mt-4">
-          <h2 className="text-sm font-medium">Dungeon master</h2>
-          {privateNotes.length === 0 ? <p className="mt-1 text-sm text-muted">No private messages.</p> : null}
-          <ul className="mt-2 flex flex-col gap-3">
-            {mine.map((purse) => {
-              const thread = privateNotes.filter((note) => note.purseId === purse.id);
-              if (thread.length === 0) return null;
-              return (
-                <li key={purse.id}>
-                  {mine.length > 1 ? <p className="text-sm font-medium">{purse.name}</p> : null}
-                  <NoteList notes={thread} names={names} />
-                </li>
-              );
-            })}
-          </ul>
-        </section>
-      )}
-      <fieldset className="mt-4">
-        <legend className="mb-2 text-sm font-medium">Send to</legend>
-        {player ? (
-          <>
-            <Radio name="player-to" label="Dungeon master" checked={playerTo === "dm"} onChange={() => setPlayerTo("dm")} />
-            <Radio name="player-to" label="Party" checked={playerTo === "party"} onChange={() => setPlayerTo("party")} />
-          </>
-        ) : (
-          <>
-            <Radio name="dm-to" label="Party" checked={audience === "party"} onChange={() => setAudience("party")} />
-            <Radio name="dm-to" label="Selected players" checked={audience === "players"} onChange={() => setAudience("players")} />
-            {audience === "players" && mine.length > 1 ? (
-              <div className="mt-1 pl-1">
-                <Choice
-                  label="All players"
-                  checked={selected.length === mine.length}
-                  onChange={() => {
-                    const on = selected.length !== mine.length;
-                    setPicked(Object.fromEntries(mine.map((purse) => [purse.id, on])));
-                  }}
-                />
-                {mine.map((purse) => (
-                  <Choice
-                    key={purse.id}
-                    label={purse.name}
-                    checked={picked[purse.id] !== false}
-                    onChange={() => setPicked((current) => ({ ...current, [purse.id]: current[purse.id] === false }))}
-                  />
-                ))}
-              </div>
-            ) : null}
-            {audience === "players" && mine.length === 1 ? <p className="text-sm text-muted">{mine[0]?.name}</p> : null}
-          </>
-        )}
-      </fieldset>
-      <label className="mt-4 block text-sm text-muted">
-        Message
-        <TextArea className="mt-1" maxLength={500} value={text} placeholder="Write a message" onChange={(event) => setText(event.target.value)} />
+    <section className="live-chat" aria-label="Live party chat">
+      <label className="chat-select">
+        <span className="text-sm font-medium">Conversation</span>
+        <select
+          value={active.id}
+          onChange={(e) => {
+            nearBottom.current = true;
+            setThread(e.target.value);
+          }}
+        >
+          {options.map((o) => {
+            const n = unread.filter((m) => conversationFor(m, seat) === o.id).length;
+            return (
+              <option key={o.id} value={o.id}>
+                {o.name}
+                {n ? ` (${n} unread)` : ""}
+              </option>
+            );
+          })}
+        </select>
       </label>
-      <Button className="mt-2" disabled={busy || text.trim().length === 0} onClick={() => void send()}>
-        {cloud.joined ? "Save message" : sendLabel(player, player ? playerTo === "party" : audience === "party", selected.length)}
-      </Button>
-      {player && !cloud.joined ? (
-        <div className="mt-3">
-          <p className="text-sm text-muted">Not sent yet. A message or a gift stays in this browser on this device until you send the activity report.</p>
-          <Button
-            className="mt-2"
-            variant="secondary"
-            onClick={() => {
-              void (async () => {
-                const file = await snapshot();
-                const gifts = await loadGifts();
-                const bill = buildBill({ ...file, notes: await loadNotes(), gifts, loans: await loadLoans(), sales: await loadSales(), sheets: await loadSheets() }, seat);
-                const payload = await encodeLinkPayload(bill);
-                const url = seatHref("dm", payload, window.location.origin);
-                if (url.length > 48000) throw new Error("This activity report is too long for a link. Download it from Share.");
-                await copyText(url);
-
-
-                toast.success("Activity report link copied. The dungeon master opens it.");
-              })().catch((error: unknown) => toast.error(error instanceof Error ? error.message : "Could not copy the activity report link."));
-            }}
-          >
-            Copy report link
+      <div className="chat-title">
+        <span className="inline-flex items-center gap-2">
+          {active.id === "party" ? <MessageCircle size={17} /> : <Lock size={15} />}
+          <strong>{active.name}</strong>
+        </span>
+        <span className="text-xs text-muted">
+          {active.id === "party" ? "Everyone in this room" : "Private conversation"}
+        </span>
+      </div>
+      <div
+        className="chat-history"
+        ref={history}
+        onScroll={() => {
+          const el = history.current;
+          if (!el) return;
+          nearBottom.current = el.scrollHeight - el.scrollTop - el.clientHeight < 60;
+          if (nearBottom.current) markRead(active.id, visible);
+        }}
+      >
+        {!visible.length && !pending.length ? (
+          <div className="chat-empty">
+            <MessageCircle size={30} />
+            <p>No messages yet</p>
+            <span>Say hello to {active.id === "party" ? "your party" : active.name}.</span>
+          </div>
+        ) : null}
+        <ol className="chat-messages">
+          {visible.map((note) => {
+            const own = isOwnNote(note, seat);
+            return (
+              <li key={note.id} className={own ? "chat-message own" : "chat-message"}>
+                <div className="chat-bubble">
+                  <p className="chat-author">
+                    {own
+                      ? "You"
+                      : note.from === "dm"
+                        ? "Dungeon master"
+                        : (purses.find((p) => p.id === note.purseId)?.name ?? "Player")}
+                  </p>
+                  <p className="whitespace-pre-wrap break-words">{note.text}</p>
+                  <p className="chat-time">
+                    <time
+                      dateTime={new Date(note.at).toISOString()}
+                      title={new Date(note.at).toLocaleString()}
+                    >
+                      {new Date(note.at).toLocaleTimeString([], {
+                        hour: "numeric",
+                        minute: "2-digit",
+                      })}
+                    </time>
+                    {own ? " · Sent" : ""}
+                  </p>
+                </div>
+              </li>
+            );
+          })}
+          {pending.map((item) => (
+            <li key={item.command.id} className="chat-message own">
+              <div className="chat-bubble">
+                <p className="chat-author">You</p>
+                <p className="whitespace-pre-wrap break-words">{item.command.text}</p>
+                <p className="chat-time" role="status">
+                  {sending.includes(item.command.id) ? "Sending…" : "Failed — not confirmed"}
+                </p>
+                {!sending.includes(item.command.id) ? (
+                  <>
+                    <p className="mt-1 text-xs text-muted">
+                      {item.error || "Retry when you are connected."}
+                    </p>
+                    <Button variant="secondary" className="mt-2" onClick={() => void deliver(item)}>
+                      <RotateCcw size={14} />
+                      Retry
+                    </Button>
+                  </>
+                ) : null}
+              </div>
+            </li>
+          ))}
+        </ol>
+      </div>
+      <form
+        className="chat-composer"
+        onSubmit={(e) => {
+          e.preventDefault();
+          send();
+        }}
+      >
+        <label className="sr-only" htmlFor="chat-message">
+          Message to {active.name}
+        </label>
+        <TextArea
+          id="chat-message"
+          rows={2}
+          className="min-h-20 resize-none"
+          maxLength={500}
+          value={text}
+          placeholder={`Message ${active.name}…`}
+          onChange={(e) => setDrafts((old) => ({ ...old, [active.id]: e.target.value }))}
+          onKeyDown={(e) => {
+            if ((e.ctrlKey || e.metaKey) && e.key === "Enter") {
+              e.preventDefault();
+              send();
+            }
+          }}
+        />
+        <div className="mt-2 flex items-center justify-between gap-3">
+          <span className="text-xs text-muted">{text.length}/500 · Send during any turn</span>
+          <Button type="submit" disabled={!text.trim() || isSending}>
+            <Send size={16} />
+            {isSending ? "Sending…" : "Send"}
           </Button>
         </div>
-      ) : null}
-    </div>
-  );
-}
-
-function sendLabel(player: boolean, party: boolean, count: number) {
-  if (party) return "Save message for the party";
-  if (player) return "Save message for the DM";
-  return count > 1 ? "Save message for selected players" : "Save message";
-}
-
-function Choice({ label, checked, onChange }: { label: string; checked: boolean; onChange: () => void }) {
-  return (
-    <label className="flex min-h-11 items-center gap-3 text-sm">
-      <input type="checkbox" className="size-5 accent-accent" checked={checked} onChange={onChange} />
-      {label}
-    </label>
-  );
-}
-
-function Radio({ name, label, checked, onChange }: { name: string; label: string; checked: boolean; onChange: () => void }) {
-  return (
-    <label className="flex min-h-11 items-center gap-3 text-sm">
-      <input type="radio" name={name} className="size-5 accent-accent" checked={checked} onChange={onChange} />
-      {label}
-    </label>
-  );
-}
-
-function Thread({ title, notes, names, empty }: { title: string; notes: ChatNote[]; names: Map<string, string>; empty: string }) {
-  return (
-    <section className="mt-4">
-      <h2 className="text-sm font-medium">{title}</h2>
-      {notes.length === 0 ? <p className="mt-1 text-sm text-muted">{empty}</p> : <NoteList notes={notes} names={names} />}
+      </form>
     </section>
   );
-}
-
-function NoteList({ notes, names }: { notes: ChatNote[]; names: Map<string, string> }) {
-  return (
-    <ul className="mt-2 flex flex-col gap-2">
-      {notes.map((note) => (
-        <li key={note.id} className="rounded-sm border border-border px-3 py-2">
-          <p className="text-xs font-medium tracking-wide text-faint uppercase">{speaker(note, names)}</p>
-          <p className="mt-1 text-sm">{note.text}</p>
-        </li>
-      ))}
-    </ul>
-  );
-}
-
-function speaker(note: ChatNote, names: Map<string, string>) {
-  if (note.from === "dm") return "Dungeon master";
-  return names.get(note.purseId) ?? "Player";
 }
