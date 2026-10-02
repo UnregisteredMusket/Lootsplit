@@ -4,7 +4,11 @@ import { mkdir } from "node:fs/promises";
 const origin = process.env.ACCOUNT_AUDIT_ORIGIN || "http://127.0.0.1:8080";
 if (!/^http:\/\/(127\.0\.0\.1|localhost):/.test(origin))
   throw new Error("Account audit only runs against disposable local servers.");
-const browser = await chromium.launch({ headless: true, args: ["--no-sandbox"] });
+const browser = await chromium.launch({
+  headless: true,
+  executablePath: process.env.CHROMIUM_EXECUTABLE_PATH || undefined,
+  args: ["--no-sandbox"],
+});
 await mkdir("test-results", { recursive: true });
 const errors = [];
 async function visit(page, path) {
@@ -12,7 +16,9 @@ async function visit(page, path) {
   await page.waitForTimeout(1600);
 }
 try {
-  const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+  const context = await browser.newContext({
+    viewport: { width: 1280, height: 900 },
+  });
   context.setDefaultTimeout(20000);
   const page = await context.newPage();
   page.on("pageerror", (e) => errors.push(e.message));
@@ -63,9 +69,14 @@ try {
   await page.getByRole("status").filter({ hasText: "was added" }).waitFor();
   await page.getByRole("button", { name: "Save current campaign", exact: true }).click();
   await page.getByRole("button", { name: "Restore as new", exact: true }).waitFor();
-  await page.screenshot({ path: "test-results/account-library-mobile.png", fullPage: true });
+  await page.screenshot({
+    path: "test-results/account-library-mobile.png",
+    fullPage: true,
+  });
   // A second browser/device sees the same private library, with an independent local campaign.
-  const second = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+  const second = await browser.newContext({
+    viewport: { width: 1280, height: 900 },
+  });
   second.setDefaultTimeout(20000);
   const other = await second.newPage();
   other.on("pageerror", (e) => errors.push(e.message));
@@ -75,12 +86,15 @@ try {
   await other.getByRole("button", { name: "Sign in", exact: true }).last().click();
   await other.getByRole("heading", { name: "Browser test hero", exact: true }).waitFor();
   await other.getByRole("button", { name: "Restore as new", exact: true }).waitFor();
-  await other.screenshot({ path: "test-results/account-library-desktop.png", fullPage: true });
+  await other.screenshot({
+    path: "test-results/account-library-desktop.png",
+    fullPage: true,
+  });
   console.log("Account audit: restore into new campaign");
   other.on("dialog", (d) => d.accept());
   await other.getByRole("button", { name: "Restore as new", exact: true }).click();
   await other.waitForURL((url) => url.origin === origin && url.pathname === "/");
-  await other.getByText("Campaign treasury", { exact: true }).waitFor();
+  await other.getByText("Campaign control", { exact: true }).waitFor();
   assert.ok(
     await other.evaluate(() => JSON.parse(localStorage.getItem("quire.campaigns.v1")).length >= 2),
   );
@@ -98,7 +112,7 @@ try {
   await page.reload();
   await page.getByRole("button", { name: "Resume", exact: true }).click();
   await page.waitForURL((url) => url.origin === origin && url.pathname === "/");
-  await page.getByText("Campaign treasury", { exact: true }).waitFor();
+  await page.getByText("Campaign control", { exact: true }).waitFor();
   assert.ok(
     await page.evaluate(() => localStorage.getItem("quire.campaign.v1").startsWith("account-")),
   );

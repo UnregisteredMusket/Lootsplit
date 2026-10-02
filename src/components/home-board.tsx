@@ -323,7 +323,9 @@ export function HomeBoard() {
       <Link to="/share" className="connection-link">
         Multiplayer · Room, chat & connection status →
       </Link>
-      <CampaignJournal />
+      <div id="journal">
+        <CampaignJournal />
+      </div>
       <Fold title="Campaign tools" hint="Multiplayer, display options, and this campaign.">
         <Link to="/share" className="quick-action primary">
           Open Multiplayer — host or join a room

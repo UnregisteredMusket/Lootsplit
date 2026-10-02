@@ -4,7 +4,12 @@ import { normalizeOpenPage, openCatalogItem, openUrl, type OpenQuery } from "./o
 import { fantasyBatch, NAME_STYLES } from "./fantasy-names.ts";
 import { rngFrom } from "./names.ts";
 import type { LexemeKind } from "./types.ts";
-const query: OpenQuery = { kind: "items", edition: "srd-2014", query: "Longsword", page: 1 };
+const query: OpenQuery = {
+  kind: "items",
+  edition: "srd-2014",
+  query: "Longsword",
+  page: 1,
+};
 const sword = {
   key: "srd_longsword",
   name: "Longsword",
@@ -22,7 +27,11 @@ test("Open5e fixes endpoint and applies the actual source filter", () => {
 });
 test("Open5e rejects mixed sources and converts gold prices without losing attribution", () => {
   const data = normalizeOpenPage(
-    { count: 2, next: null, results: [sword, { ...sword, document: { key: "srd-2024" } }] },
+    {
+      count: 2,
+      next: null,
+      results: [sword, { ...sword, document: { key: "srd-2024" } }],
+    },
     query,
   );
   assert.equal(data.entries.length, 1);
@@ -72,6 +81,35 @@ test("spell reference retains components, range and concentration", () => {
   assert.ok(e.facts.includes("Components: V, S, M (Sulfur)"));
   assert.throws(() => openCatalogItem(e, 10, "general"));
 });
+test("creature references retain combat facts and actions but cannot become shop goods", () => {
+  const q: OpenQuery = { ...query, kind: "creatures" };
+  const data = normalizeOpenPage(
+    {
+      count: 1,
+      results: [
+        {
+          key: "goblin",
+          name: "Goblin",
+          document: sword.document,
+          type: { name: "Humanoid" },
+          armor_class: 15,
+          hit_points: 7,
+          challenge_rating: 0.25,
+          experience_points: 50,
+          actions: [{ name: "Scimitar", desc: "Melee attack." }],
+        },
+      ],
+    },
+    q,
+  );
+  const entry = data.entries[0]!;
+  assert.ok(entry.facts.includes("Armor class: 15"));
+  assert.ok(entry.facts.includes("Hit points: 7"));
+  assert.match(entry.description, /Scimitar: Melee attack/);
+  assert.match(entry.attribution, /Creative Commons/);
+  assert.equal(new URL(openUrl(q)).pathname, "/v2/creatures/");
+  assert.throws(() => openCatalogItem(entry, 0, "general"));
+});
 test("offline name generation is deterministic, varied and bounded across all kinds", () => {
   for (const style of NAME_STYLES)
     for (const kind of [
@@ -92,19 +130,47 @@ test("offline name generation is deterministic, varied and bounded across all ki
   assert.equal(fantasyBatch("shop", "frontier", 6, () => 0).length, 1);
 });
 
-test('imported source notes survive generated shop stock', async () => {
-  const {composeShelf}=await import('./compose.ts');
-  const {DEFAULT_REALM}=await import('./scale.ts');
-  const entry=normalizeOpenPage({count:1,results:[sword]},query).entries[0]!;
-  const item=openCatalogItem(entry,1500,'smith');
-  const shelf=composeShelf([item],{category:'smith',wealth:'modest',flags:{common:true,uncommon:false,rare:false,magic:false},priceScale:1,depth:1,realm:DEFAULT_REALM},rngFrom(1));
-  assert.equal(shelf[0]!.notes,item.notes);
+test("imported source notes survive generated shop stock", async () => {
+  const { composeShelf } = await import("./compose.ts");
+  const { DEFAULT_REALM } = await import("./scale.ts");
+  const entry = normalizeOpenPage({ count: 1, results: [sword] }, query).entries[0]!;
+  const item = openCatalogItem(entry, 1500, "smith");
+  const shelf = composeShelf(
+    [item],
+    {
+      category: "smith",
+      wealth: "modest",
+      flags: { common: true, uncommon: false, rare: false, magic: false },
+      priceScale: 1,
+      depth: 1,
+      realm: DEFAULT_REALM,
+    },
+    rngFrom(1),
+  );
+  assert.equal(shelf[0]!.notes, item.notes);
 });
 
-test('shared conditions select only the requested SRD description',()=>{
- const q={...query,query:'Blinded',kind:'conditions' as const};
- const payload={count:1,results:[{key:'blinded',name:'Blinded',document:{key:'core'},descriptions:[{document:'a5e-ag',desc:'Third-party rules'},{document:'srd-2014',desc:'2014 condition'},{document:'srd-2024',desc:'2024 condition'}]}]};
- assert.equal(normalizeOpenPage(payload,q).entries[0]!.description,'2014 condition');
- assert.equal(normalizeOpenPage(payload,{...q,edition:'srd-2024'}).entries[0]!.description,'2024 condition');
- assert.equal(new URL(openUrl(q)).searchParams.get('document__key__in'),'core');
+test("shared conditions select only the requested SRD description", () => {
+  const q = { ...query, query: "Blinded", kind: "conditions" as const };
+  const payload = {
+    count: 1,
+    results: [
+      {
+        key: "blinded",
+        name: "Blinded",
+        document: { key: "core" },
+        descriptions: [
+          { document: "a5e-ag", desc: "Third-party rules" },
+          { document: "srd-2014", desc: "2014 condition" },
+          { document: "srd-2024", desc: "2024 condition" },
+        ],
+      },
+    ],
+  };
+  assert.equal(normalizeOpenPage(payload, q).entries[0]!.description, "2014 condition");
+  assert.equal(
+    normalizeOpenPage(payload, { ...q, edition: "srd-2024" }).entries[0]!.description,
+    "2024 condition",
+  );
+  assert.equal(new URL(openUrl(q)).searchParams.get("document__key__in"), "core");
 });

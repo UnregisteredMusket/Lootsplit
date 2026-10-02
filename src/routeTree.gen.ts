@@ -19,6 +19,7 @@ import { Route as DownloadsRouteImport } from './routes/downloads'
 import { Route as EncountersRouteImport } from './routes/encounters'
 import { Route as FavoritesRouteImport } from './routes/favorites'
 import { Route as HelpRouteImport } from './routes/help'
+import { Route as LibraryRouteImport } from './routes/library'
 import { Route as MarketRouteImport } from './routes/market'
 import { Route as PartyRouteImport } from './routes/party'
 import { Route as ResourcesRouteImport } from './routes/resources'
@@ -79,6 +80,11 @@ const FavoritesRoute = FavoritesRouteImport.update({
 const HelpRoute = HelpRouteImport.update({
   id: '/help',
   path: '/help',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const LibraryRoute = LibraryRouteImport.update({
+  id: '/library',
+  path: '/library',
   getParentRoute: () => rootRouteImport,
 } as any)
 const MarketRoute = MarketRouteImport.update({
@@ -148,6 +154,7 @@ export interface FileRoutesByFullPath {
   '/encounters': typeof EncountersRoute
   '/favorites': typeof FavoritesRoute
   '/help': typeof HelpRoute
+  '/library': typeof LibraryRoute
   '/market': typeof MarketRoute
   '/party': typeof PartyRoute
   '/resources': typeof ResourcesRoute
@@ -171,6 +178,7 @@ export interface FileRoutesByTo {
   '/encounters': typeof EncountersRoute
   '/favorites': typeof FavoritesRoute
   '/help': typeof HelpRoute
+  '/library': typeof LibraryRoute
   '/market': typeof MarketRoute
   '/party': typeof PartyRoute
   '/resources': typeof ResourcesRoute
@@ -195,6 +203,7 @@ export interface FileRoutesById {
   '/encounters': typeof EncountersRoute
   '/favorites': typeof FavoritesRoute
   '/help': typeof HelpRoute
+  '/library': typeof LibraryRoute
   '/market': typeof MarketRoute
   '/party': typeof PartyRoute
   '/resources': typeof ResourcesRoute
@@ -220,6 +229,7 @@ export interface FileRouteTypes {
     | '/encounters'
     | '/favorites'
     | '/help'
+    | '/library'
     | '/market'
     | '/party'
     | '/resources'
@@ -243,6 +253,7 @@ export interface FileRouteTypes {
     | '/encounters'
     | '/favorites'
     | '/help'
+    | '/library'
     | '/market'
     | '/party'
     | '/resources'
@@ -266,6 +277,7 @@ export interface FileRouteTypes {
     | '/encounters'
     | '/favorites'
     | '/help'
+    | '/library'
     | '/market'
     | '/party'
     | '/resources'
@@ -290,6 +302,7 @@ export interface RootRouteChildren {
   EncountersRoute: typeof EncountersRoute
   FavoritesRoute: typeof FavoritesRoute
   HelpRoute: typeof HelpRoute
+  LibraryRoute: typeof LibraryRoute
   MarketRoute: typeof MarketRoute
   PartyRoute: typeof PartyRoute
   ResourcesRoute: typeof ResourcesRoute
@@ -373,6 +386,13 @@ declare module '@tanstack/react-router' {
       path: '/help'
       fullPath: '/help'
       preLoaderRoute: typeof HelpRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/library': {
+      id: '/library'
+      path: '/library'
+      fullPath: '/library'
+      preLoaderRoute: typeof LibraryRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/market': {
@@ -466,6 +486,7 @@ const rootRouteChildren: RootRouteChildren = {
   EncountersRoute: EncountersRoute,
   FavoritesRoute: FavoritesRoute,
   HelpRoute: HelpRoute,
+  LibraryRoute: LibraryRoute,
   MarketRoute: MarketRoute,
   PartyRoute: PartyRoute,
   ResourcesRoute: ResourcesRoute,

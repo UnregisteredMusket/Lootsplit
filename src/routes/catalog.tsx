@@ -24,6 +24,10 @@ type Pane = "goods" | "names" | "book" | "open5e";
 function CatalogPage() {
   const seat = useSeat();
   const [pane, setPane] = useState<Pane>(seat.role === "player" ? "open5e" : "goods");
+  useEffect(() => {
+    const p = new URLSearchParams(location.search).get("pane");
+    if (["goods", "names", "book", "open5e"].includes(p || "")) setPane(p as Pane);
+  }, []);
   const dm = seat.role === "dm";
   const activePane = !dm && (pane === "goods" || pane === "book") ? "open5e" : pane;
   return (
@@ -74,7 +78,12 @@ function GoodsPane() {
   const [kind, setKind] = useState<ItemCategory>("general");
   const [inventCategory, setInventCategory] = useState<ItemCategory>("general");
   const [count, setCount] = useState(4);
-  const [flags, setFlags] = useState({ common: true, uncommon: false, rare: false, magic: false });
+  const [flags, setFlags] = useState({
+    common: true,
+    uncommon: false,
+    rare: false,
+    magic: false,
+  });
 
   useEffect(() => {
     if (!prefsReady || seeded.current) return;
@@ -188,7 +197,10 @@ function GoodsPane() {
                   className="size-5 accent-accent"
                   checked={flags[option.value]}
                   onChange={() =>
-                    setFlags((current) => ({ ...current, [option.value]: !current[option.value] }))
+                    setFlags((current) => ({
+                      ...current,
+                      [option.value]: !current[option.value],
+                    }))
                   }
                 />
                 {option.label}

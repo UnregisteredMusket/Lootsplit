@@ -40,7 +40,13 @@ try {
     dm = await actor("DM", "192.0.2.231");
   const room = {
     seats: [
-      { id: "player", token: "player-token", role: "player", name: "Player", purseIds: ["hero"] },
+      {
+        id: "player",
+        token: "player-token",
+        role: "player",
+        name: "Player",
+        purseIds: ["hero"],
+      },
       { id: "dm", token: "dm-token", role: "dm", name: "DM", purseIds: [] },
     ],
     table: {
@@ -69,9 +75,11 @@ try {
       .run();
   const page = player.page;
   await page.goto(origin + "/characters");
+  await page.locator(".character-library-controls > summary").click();
   await page.getByRole("button", { name: "Create character", exact: true }).click();
   await page.getByRole("heading", { name: "New adventurer", exact: true }).waitFor();
   await page.locator(".quire-dawn").waitFor({ state: "hidden" });
+  await page.getByRole("button", { name: "Edit sheet", exact: true }).click();
   await page.getByRole("button", { name: "Character details", exact: true }).click();
   await page.getByLabel("Character name", { exact: true }).fill("Mira Ashfall");
   await page.getByLabel("Species", { exact: true }).fill("Elf");
@@ -113,6 +121,7 @@ try {
   await page.getByLabel("Temporary HP", { exact: true }).fill("3");
   await page.getByLabel("Damage / healing amount", { exact: true }).fill("5");
   await page.getByRole("button", { name: "Apply damage", exact: true }).click();
+  await page.getByRole("button", { name: "Edit sheet", exact: true }).click();
   assert.equal(await page.getByLabel("Current HP", { exact: true }).inputValue(), "8");
   assert.equal(await page.getByLabel("Temporary HP", { exact: true }).inputValue(), "0");
   await page.getByRole("button", { name: "Add attack", exact: true }).click();
@@ -150,6 +159,7 @@ try {
   await dm.page.getByText(/MANUAL RESULT/).waitFor();
   await dm.page.getByRole("button", { name: "Mira Ashfall · View sheet", exact: true }).click();
   await dm.page.getByText("DM read-only view", { exact: true }).waitFor();
+  await dm.page.getByRole("button", { name: "Edit sheet", exact: true }).click();
   assert.equal(await dm.page.getByLabel("Current HP", { exact: true }).isEnabled(), false);
   await page.setViewportSize({ width: 390, height: 844 });
   await page.getByRole("button", { name: "Combat", exact: true }).click();
@@ -157,16 +167,27 @@ try {
     await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1),
     false,
   );
+  await page.getByRole("button", { name: "Play sheet", exact: true }).click();
+  await page.locator(".play-action-row").filter({ hasText: "Longbow" }).waitFor();
+  await page.getByRole("button", { name: "Spells", exact: true }).click();
+  await page.locator(".play-action-row").filter({ hasText: "Spark" }).waitFor();
+  await page.getByRole("button", { name: "Actions", exact: true }).click();
   await page.locator(".character-title").scrollIntoViewIfNeeded();
   await page.screenshot({ path: output + "/mobile.png" });
   await page.reload();
   await page.getByRole("heading", { name: "Mira Ashfall", exact: true }).waitFor();
+  await page.getByRole("button", { name: "Edit sheet", exact: true }).click();
   assert.equal(await page.getByLabel("Current HP", { exact: true }).inputValue(), "8");
   await page.evaluate(async () => {
     const t = await import("/src/lib/quire/table.ts");
     const e = await import("/src/lib/quire/economy.ts");
     const purse = (await e.listPurses()).find((p) => p.kind === "character");
-    t.setSeat({ role: "player", purseIds: [purse.id], shopIds: [], openedAt: Date.now() });
+    t.setSeat({
+      role: "player",
+      purseIds: [purse.id],
+      shopIds: [],
+      openedAt: Date.now(),
+    });
   });
   await page.goto(origin + "/");
   await page.getByRole("button", { name: "Not now", exact: true }).click();

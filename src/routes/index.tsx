@@ -1,4 +1,5 @@
 import { createFileRoute } from "@tanstack/react-router";
+import { DmDesk } from "@/components/control-panel/desk";
 import { HomeBoard } from "@/components/home-board";
 import { HomeSheet } from "@/components/home-sheet";
 import { Shell } from "@/components/shell";
@@ -26,9 +27,5 @@ function Home() {
       </Shell>
     );
   }
-  return (
-    <Shell>
-      <HomeBoard />
-    </Shell>
-  );
+  return <Shell>{view === "overview" ? <HomeBoard /> : <DmDesk />}</Shell>;
 }

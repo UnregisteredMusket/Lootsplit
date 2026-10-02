@@ -1,3 +1,6 @@
+import { useDraftGuard } from "@/lib/quire/use-draft-guard";
+import { HpBar } from "@/components/control-panel/readouts";
+import { getCloudTable } from "@/lib/quire/cloud-client";
 import { useEffect, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { z } from "zod";
@@ -20,7 +23,13 @@ type Combatant = z.infer<typeof combatantSchema>;
 type Filters = z.infer<typeof generatorSchema>;
 type Purse = { id: string; name: string; kind: string };
 type Campaign = { code: string; name: string; purses: Purse[] };
-type Summary = { id: string; code: string; name: string; status: string; updated_at: number };
+type Summary = {
+  id: string;
+  code: string;
+  name: string;
+  status: string;
+  updated_at: number;
+};
 type Detail = {
   id: string;
   code: string;
@@ -54,9 +63,10 @@ const defaults: Filters = {
 };
 const n = (value: string) => Number(value) || 0;
 export function EncounterWorkspace() {
-  const [library, setLibrary] = useState<{ campaigns: Campaign[]; encounters: Summary[] } | null>(
-      null,
-    ),
+  const [library, setLibrary] = useState<{
+      campaigns: Campaign[];
+      encounters: Summary[];
+    } | null>(null),
     [code, setCode] = useState(""),
     [selected, setSelected] = useState(""),
     [refresh, setRefresh] = useState(0),
@@ -73,7 +83,24 @@ export function EncounterWorkspace() {
     )
       .then((data) => {
         setLibrary(data);
-        setCode((v) => v || data.campaigns[0]?.code || "");
+        const current = getCloudTable().code;
+        setCode(
+          (v) =>
+            v ||
+            data.campaigns.find((x) => x.code === current)?.code ||
+            data.campaigns[0]?.code ||
+            "",
+        );
+        const params = new URLSearchParams(location.search);
+        if (params.has("resume") || params.has("review")) {
+          const eligible = data.encounters.filter(
+            (x) => (!current || x.code === current) && x.status !== "awarded",
+          );
+          const match =
+            eligible.find((x) => x.status === (params.has("review") ? "review" : "active")) ||
+            eligible[0];
+          if (match) setSelected((v) => v || match.id);
+        }
         setError("");
       })
       .catch((e) => {
@@ -184,7 +211,10 @@ export function EncounterWorkspace() {
                     await create({
                       ...body,
                       loot: body.loot.filter((item) => !item.sourceTableId),
-                      tables: body.tables.map((t) => ({ ...t, selected: null })),
+                      tables: body.tables.map((t) => ({
+                        ...t,
+                        selected: null,
+                      })),
                     });
                   } catch (err) {
                     setError(message(err));
@@ -195,32 +225,35 @@ export function EncounterWorkspace() {
           </div>
           <div className="encounter-layout">
             <aside className="encounter-library">
-              <h2>Saved encounters</h2>
-              <p className="text-sm text-muted">
-                Private drafts, active battles and award receipts.
-              </p>
-              {library.encounters
-                .filter((r) => r.code === code)
-                .map((r) => (
-                  <button
-                    key={r.id}
-                    className="encounter-library-row"
-                    aria-pressed={selected === r.id}
-                    onClick={() => {
-                      if (canLeave()) {
-                        dirty.current = false;
-                        setSelected(r.id);
-                      }
-                    }}
-                  >
-                    <strong>{r.name}</strong>
-                    <span>
-                      {r.status === "review" ? "Loot review" : r.status} ·{" "}
-                      {new Date(r.updated_at).toLocaleDateString()}
-                    </span>
-                  </button>
-                ))}
-              {!library.encounters.some((r) => r.code === code) && <p>No encounters yet.</p>}
+              <details open={!selected}>
+                <summary>Saved encounters</summary>
+                <h2 className="sr-only">Saved encounters</h2>
+                <p className="text-sm text-muted">
+                  Private drafts, active battles and award receipts.
+                </p>
+                {library.encounters
+                  .filter((r) => r.code === code)
+                  .map((r) => (
+                    <button
+                      key={r.id}
+                      className="encounter-library-row"
+                      aria-pressed={selected === r.id}
+                      onClick={() => {
+                        if (canLeave()) {
+                          dirty.current = false;
+                          setSelected(r.id);
+                        }
+                      }}
+                    >
+                      <strong>{r.name}</strong>
+                      <span>
+                        {r.status === "review" ? "Loot review" : r.status} ·{" "}
+                        {new Date(r.updated_at).toLocaleDateString()}
+                      </span>
+                    </button>
+                  ))}
+                {!library.encounters.some((r) => r.code === code) && <p>No encounters yet.</p>}
+              </details>
             </aside>
             {selected ? (
               <EncounterEditor
@@ -262,7 +295,13 @@ function EncounterEditor({
 }) {
   const [detail, setDetail] = useState<Detail | null>(null),
     [draft, setDraft] = useState<Encounter | null>(null),
-    [tab, setTab] = useState("battle"),
+    [tab, setTab] = useState(
+      typeof window !== "undefined" && new URLSearchParams(location.search).has("review")
+        ? "loot"
+        : "battle",
+    ),
+    [expanded, setExpanded] = useState(""),
+    [hpAmount, setHpAmount] = useState(1),
     [dirty, setDirty] = useState(false),
     [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
@@ -280,7 +319,10 @@ function EncounterEditor({
     [manual, setManual] = useState(true),
     [total, setTotal] = useState(""),
     [lootSearch, setLootSearch] = useState("");
-  const pendingRoll = useRef<{ path: string; body: Record<string, unknown> } | null>(null);
+  const pendingRoll = useRef<{
+    path: string;
+    body: Record<string, unknown>;
+  } | null>(null);
   const { catalog } = useEconomy();
   useEffect(() => {
     const c = new AbortController();
@@ -315,16 +357,7 @@ function EncounterEditor({
       });
     return () => c.abort();
   }, [id, reload]);
-  useEffect(() => {
-    const fn = (e: BeforeUnloadEvent) => {
-      if (dirty) {
-        e.preventDefault();
-        e.returnValue = "";
-      }
-    };
-    window.addEventListener("beforeunload", fn);
-    return () => window.removeEventListener("beforeunload", fn);
-  }, [dirty]);
+  useDraftGuard(dirty, "encounter");
   function change(next: Encounter) {
     setDraft(next);
     setDirty(true);
@@ -337,7 +370,11 @@ function EncounterEditor({
     setError("");
     setNotice("");
     try {
-      await accountRequest(`encounters/${path}`, { id, revision: detail.revision, ...extra });
+      await accountRequest(`encounters/${path}`, {
+        id,
+        revision: detail.revision,
+        ...extra,
+      });
       const saved = await accountRequest<Detail>("encounters/detail", { id });
       setDetail(saved);
       setDraft(saved.body);
@@ -375,15 +412,18 @@ function EncounterEditor({
         });
         if (draft.combatants.length + r.combatants.length > 100)
           throw new Error("An encounter can contain up to 100 combatants.");
-        change({ ...draft, combatants: [...draft.combatants, ...r.combatants] });
+        change({
+          ...draft,
+          combatants: [...draft.combatants, ...r.combatants],
+        });
         setNotice(
           `Added ${r.combatants.length} enemies. Review the estimated difficulty and adjust as needed.`,
         );
       } else {
-        const r = await accountRequest<{ creatures: typeof index; more: boolean }>(
-          "encounters/index",
-          { code: detail.code, filters: f, page },
-        );
+        const r = await accountRequest<{
+          creatures: typeof index;
+          more: boolean;
+        }>("encounters/index", { code: detail.code, filters: f, page });
         setIndex(r.creatures);
         setIndexMore(r.more);
         setIndexPage(page);
@@ -593,7 +633,10 @@ function EncounterEditor({
               </button>
               <button
                 onClick={() =>
-                  change({ ...draft, combatants: [...draft.combatants, blankCombatant()] })
+                  change({
+                    ...draft,
+                    combatants: [...draft.combatants, blankCombatant()],
+                  })
                 }
               >
                 Add combatant
@@ -605,145 +648,196 @@ function EncounterEditor({
             {[...draft.combatants]
               .sort((a, b) => (b.initiative ?? -1001) - (a.initiative ?? -1001))
               .map((c) => (
-                <article
+                <details
                   key={c.id}
+                  open={draft.activeId === c.id || expanded === c.id || !draft.activeId}
                   className={`encounter-combatant ${draft.activeId === c.id ? "is-active" : ""}`}
                 >
-                  <div className="encounter-heading">
-                    <h4>
-                      {c.name} {c.hp === 0 ? "· 0 HP" : ""}
-                    </h4>
-                    <button
-                      aria-pressed={draft.activeId === c.id}
-                      onClick={() => change({ ...draft, activeId: c.id })}
-                    >
-                      {draft.activeId === c.id ? "Current turn" : "Set active"}
-                    </button>
-                  </div>
-                  <div className="encounter-vitals">
-                    <label>
-                      Name
-                      <input
-                        value={c.name}
-                        onChange={(e) => updateCombatant(c.id, { name: e.target.value })}
-                      />
-                    </label>
-                    <label>
-                      Side
-                      <select
-                        value={c.side}
-                        onChange={(e) =>
-                          updateCombatant(c.id, { side: e.target.value as Combatant["side"] })
-                        }
-                      >
-                        <option value="enemy">Enemy</option>
-                        <option value="ally">Ally / player</option>
-                      </select>
-                    </label>
-                    <label>
-                      Initiative
-                      <input
-                        type="number"
-                        value={c.initiative ?? ""}
-                        placeholder="Not rolled"
-                        onChange={(e) =>
+                  <summary className="combat-summary" onClick={() => setExpanded(c.id)}>
+                    <span className="initiative-number">{c.initiative ?? "—"}</span>
+                    <span className="combat-portrait">
+                      <Swords size={23} />
+                    </span>
+                    <span className="combat-identity">
+                      <strong>{c.name}</strong>
+                      <HpBar hp={c.hp} max={c.maxHp} />
+                    </span>
+                    <span className="combat-hp">
+                      {c.hp} / {c.maxHp}
+                      <small>{c.hp === 0 ? "Defeated" : c.conditions || `AC ${c.ac}`}</small>
+                    </span>
+                  </summary>
+                  <div className="combat-expanded">
+                    <div className="combat-quick-adjust">
+                      <label>
+                        HP adjustment
+                        <input
+                          type="number"
+                          min="1"
+                          max="1000000"
+                          value={hpAmount}
+                          onChange={(e) => setHpAmount(Math.max(1, n(e.target.value)))}
+                        />
+                      </label>
+                      <button
+                        onClick={() =>
                           updateCombatant(c.id, {
-                            initiative: e.target.value === "" ? null : n(e.target.value),
+                            hp: Math.max(0, c.hp - hpAmount),
                           })
                         }
-                      />
-                    </label>
-                    <label>
-                      HP
-                      <input
-                        type="number"
-                        min="0"
-                        max={c.maxHp}
-                        value={c.hp}
-                        onChange={(e) => updateCombatant(c.id, { hp: n(e.target.value) })}
-                      />
-                    </label>
-                    <label>
-                      Max HP
-                      <input
-                        type="number"
-                        min="1"
-                        value={c.maxHp}
-                        onChange={(e) => updateCombatant(c.id, { maxHp: n(e.target.value) })}
-                      />
-                    </label>
-                    <label>
-                      AC
-                      <input
-                        type="number"
-                        value={c.ac}
-                        onChange={(e) => updateCombatant(c.id, { ac: n(e.target.value) })}
-                      />
-                    </label>
-                  </div>
-                  <label>
-                    Conditions
-                    <input
-                      placeholder="Prone, frightened, concentration…"
-                      value={c.conditions}
-                      onChange={(e) => updateCombatant(c.id, { conditions: e.target.value })}
-                    />
-                  </label>
-                  <details>
-                    <summary>Stats, notes & source</summary>
-                    <div className="encounter-grid">
+                      >
+                        Damage
+                      </button>
+                      <button
+                        onClick={() =>
+                          updateCombatant(c.id, {
+                            hp: Math.min(c.maxHp, c.hp + hpAmount),
+                          })
+                        }
+                      >
+                        Heal
+                      </button>
+                    </div>
+                    <div className="encounter-heading">
+                      <h4>
+                        {c.name} {c.hp === 0 ? "· 0 HP" : ""}
+                      </h4>
+                      <button
+                        aria-pressed={draft.activeId === c.id}
+                        onClick={() => change({ ...draft, activeId: c.id })}
+                      >
+                        {draft.activeId === c.id ? "Current turn" : "Set active"}
+                      </button>
+                    </div>
+                    <div className="encounter-vitals">
                       <label>
-                        CR
+                        Name
+                        <input
+                          value={c.name}
+                          onChange={(e) => updateCombatant(c.id, { name: e.target.value })}
+                        />
+                      </label>
+                      <label>
+                        Side
+                        <select
+                          value={c.side}
+                          onChange={(e) =>
+                            updateCombatant(c.id, {
+                              side: e.target.value as Combatant["side"],
+                            })
+                          }
+                        >
+                          <option value="enemy">Enemy</option>
+                          <option value="ally">Ally / player</option>
+                        </select>
+                      </label>
+                      <label>
+                        Initiative
+                        <input
+                          type="number"
+                          value={c.initiative ?? ""}
+                          placeholder="Not rolled"
+                          onChange={(e) =>
+                            updateCombatant(c.id, {
+                              initiative: e.target.value === "" ? null : n(e.target.value),
+                            })
+                          }
+                        />
+                      </label>
+                      <label>
+                        HP
                         <input
                           type="number"
                           min="0"
-                          max="30"
-                          step="0.125"
-                          value={c.cr}
-                          onChange={(e) => updateCombatant(c.id, { cr: n(e.target.value) })}
+                          max={c.maxHp}
+                          value={c.hp}
+                          onChange={(e) => updateCombatant(c.id, { hp: n(e.target.value) })}
                         />
                       </label>
                       <label>
-                        XP
+                        Max HP
                         <input
                           type="number"
-                          value={c.xp}
-                          onChange={(e) => updateCombatant(c.id, { xp: n(e.target.value) })}
+                          min="1"
+                          value={c.maxHp}
+                          onChange={(e) => updateCombatant(c.id, { maxHp: n(e.target.value) })}
                         />
                       </label>
                       <label>
-                        Initiative modifier
+                        AC
                         <input
                           type="number"
-                          value={c.initiativeBonus}
-                          onChange={(e) =>
-                            updateCombatant(c.id, { initiativeBonus: n(e.target.value) })
-                          }
+                          value={c.ac}
+                          onChange={(e) => updateCombatant(c.id, { ac: n(e.target.value) })}
                         />
                       </label>
                     </div>
                     <label>
-                      Actions & notes
-                      <textarea
-                        rows={5}
-                        value={c.notes}
-                        onChange={(e) => updateCombatant(c.id, { notes: e.target.value })}
+                      Conditions
+                      <input
+                        placeholder="Prone, frightened, concentration…"
+                        value={c.conditions}
+                        onChange={(e) => updateCombatant(c.id, { conditions: e.target.value })}
                       />
                     </label>
-                    <p className="text-sm text-muted">{c.source}</p>
-                    <button
-                      onClick={() =>
-                        change({
-                          ...draft,
-                          combatants: draft.combatants.filter((r) => r.id !== c.id),
-                          activeId: draft.activeId === c.id ? "" : draft.activeId,
-                        })
-                      }
-                    >
-                      Remove combatant
-                    </button>
-                  </details>
-                </article>
+                    <details>
+                      <summary>Stats, notes & source</summary>
+                      <div className="encounter-grid">
+                        <label>
+                          CR
+                          <input
+                            type="number"
+                            min="0"
+                            max="30"
+                            step="0.125"
+                            value={c.cr}
+                            onChange={(e) => updateCombatant(c.id, { cr: n(e.target.value) })}
+                          />
+                        </label>
+                        <label>
+                          XP
+                          <input
+                            type="number"
+                            value={c.xp}
+                            onChange={(e) => updateCombatant(c.id, { xp: n(e.target.value) })}
+                          />
+                        </label>
+                        <label>
+                          Initiative modifier
+                          <input
+                            type="number"
+                            value={c.initiativeBonus}
+                            onChange={(e) =>
+                              updateCombatant(c.id, {
+                                initiativeBonus: n(e.target.value),
+                              })
+                            }
+                          />
+                        </label>
+                      </div>
+                      <label>
+                        Actions & notes
+                        <textarea
+                          rows={5}
+                          value={c.notes}
+                          onChange={(e) => updateCombatant(c.id, { notes: e.target.value })}
+                        />
+                      </label>
+                      <p className="text-sm text-muted">{c.source}</p>
+                      <button
+                        onClick={() =>
+                          change({
+                            ...draft,
+                            combatants: draft.combatants.filter((r) => r.id !== c.id),
+                            activeId: draft.activeId === c.id ? "" : draft.activeId,
+                          })
+                        }
+                      >
+                        Remove combatant
+                      </button>
+                    </details>
+                  </div>
+                </details>
               ))}
           </div>
         )}
@@ -791,7 +885,10 @@ function EncounterEditor({
                 <select
                   value={draft.difficulty}
                   onChange={(e) =>
-                    change({ ...draft, difficulty: e.target.value as Encounter["difficulty"] })
+                    change({
+                      ...draft,
+                      difficulty: e.target.value as Encounter["difficulty"],
+                    })
                   }
                 >
                   {["easy", "medium", "hard", "deadly"].map((v) => (
@@ -820,7 +917,10 @@ function EncounterEditor({
                 <select
                   value={filters.mode}
                   onChange={(e) =>
-                    setFilters({ ...filters, mode: e.target.value as Filters["mode"] })
+                    setFilters({
+                      ...filters,
+                      mode: e.target.value as Filters["mode"],
+                    })
                   }
                 >
                   <option value="difficulty">Party difficulty</option>
@@ -885,7 +985,10 @@ function EncounterEditor({
               <button
                 disabled={review}
                 onClick={() => {
-                  change({ ...draft, combatants: [...draft.combatants, blankCombatant()] });
+                  change({
+                    ...draft,
+                    combatants: [...draft.combatants, blankCombatant()],
+                  });
                   setTab("battle");
                 }}
               >
@@ -953,7 +1056,10 @@ function EncounterEditor({
                     min="0"
                     value={draft.coins[k]}
                     onChange={(e) =>
-                      change({ ...draft, coins: { ...draft.coins, [k]: n(e.target.value) } })
+                      change({
+                        ...draft,
+                        coins: { ...draft.coins, [k]: n(e.target.value) },
+                      })
                     }
                   />
                 </label>
@@ -975,7 +1081,10 @@ function EncounterEditor({
                     change({
                       ...draft,
                       coinPurseId: recipient,
-                      loot: draft.loot.map((l) => ({ ...l, purseId: recipient })),
+                      loot: draft.loot.map((l) => ({
+                        ...l,
+                        purseId: recipient,
+                      })),
                     });
                   else setError("Create a party fund in this campaign first.");
                 }}
@@ -1098,7 +1207,10 @@ function EncounterEditor({
                 </details>
                 <button
                   onClick={() =>
-                    change({ ...draft, loot: draft.loot.filter((r) => r.id !== l.id) })
+                    change({
+                      ...draft,
+                      loot: draft.loot.filter((r) => r.id !== l.id),
+                    })
                   }
                 >
                   Remove item
@@ -1154,7 +1266,13 @@ function EncounterEditor({
                                   selected: null,
                                   entries: t.entries.map((r, i) =>
                                     i === ei
-                                      ? { ...r, loot: { ...r.loot, name: e.target.value } }
+                                      ? {
+                                          ...r,
+                                          loot: {
+                                            ...r.loot,
+                                            name: e.target.value,
+                                          },
+                                        }
                                       : r,
                                   ),
                                 })
@@ -1188,7 +1306,13 @@ function EncounterEditor({
                                   selected: null,
                                   entries: t.entries.map((r, i) =>
                                     i === ei
-                                      ? { ...r, loot: { ...r.loot, quantity: n(e.target.value) } }
+                                      ? {
+                                          ...r,
+                                          loot: {
+                                            ...r.loot,
+                                            quantity: n(e.target.value),
+                                          },
+                                        }
                                       : r,
                                   ),
                                 })
@@ -1259,7 +1383,9 @@ function EncounterEditor({
                         <select
                           value={t.selected ?? ""}
                           onChange={(e) =>
-                            update({ selected: e.target.value === "" ? null : n(e.target.value) })
+                            update({
+                              selected: e.target.value === "" ? null : n(e.target.value),
+                            })
                           }
                         >
                           <option value="">Not resolved</option>
@@ -1279,7 +1405,10 @@ function EncounterEditor({
                         </button>
                         <button
                           onClick={() =>
-                            change({ ...draft, tables: draft.tables.filter((r) => r.id !== t.id) })
+                            change({
+                              ...draft,
+                              tables: draft.tables.filter((r) => r.id !== t.id),
+                            })
                           }
                         >
                           Remove table
@@ -1386,10 +1515,10 @@ function EncounterEditor({
               onClick={async () => {
                 setBusy(true);
                 try {
-                  const r = await accountRequest<{ rolls: Roll[]; more: boolean }>(
-                    "encounters/log",
-                    { id, before: rolls.at(-1)?.seq },
-                  );
+                  const r = await accountRequest<{
+                    rolls: Roll[];
+                    more: boolean;
+                  }>("encounters/log", { id, before: rolls.at(-1)?.seq });
                   setRolls([...rolls, ...r.rolls]);
                   setMoreRolls(r.more);
                 } catch (e) {

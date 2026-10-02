@@ -1,6 +1,7 @@
 import { chromium } from "playwright";
 import assert from "node:assert/strict";
 import { mkdir } from "node:fs/promises";
+import { generateEncounter } from "../src/lib/encounters/model.mjs";
 import { localAccountDb } from "./account-dev-db.mjs";
 const origin = process.env.ENCOUNTER_ORIGIN || "http://127.0.0.1:8080";
 const output = process.env.ENCOUNTER_SCREENSHOTS || "test-results/encounters";
@@ -46,7 +47,13 @@ try {
     live: true,
     seats: [
       { id: "dmseat", token: "dm-token", role: "dm", name: "DM", purseIds: [] },
-      { id: "playerseat", token: "player-token", role: "player", name: "Hero", purseIds: ["hero"] },
+      {
+        id: "playerseat",
+        token: "player-token",
+        role: "player",
+        name: "Hero",
+        purseIds: ["hero"],
+      },
     ],
     table: {
       purses: [
@@ -88,6 +95,38 @@ try {
       .bind(a.id, code, s, t, "The northern road")
       .run();
   const p = dm.page;
+  // A deterministic index keeps browser interaction tests independent of Open5e uptime.
+  // Server authorization, normalization and generation are exercised in encounters.test.mjs.
+  if (process.env.ENCOUNTER_LIVE_INDEX !== "1") {
+    const goblin = {
+      id: "audit-goblin",
+      name: "Goblin",
+      side: "enemy",
+      hp: 7,
+      maxHp: 7,
+      ac: 15,
+      initiative: null,
+      initiativeBonus: 2,
+      conditions: "",
+      cr: 0.25,
+      xp: 50,
+      sourceKey: "audit-goblin",
+      source: "Browser test fixture",
+      notes: "",
+      type: "Humanoid",
+      environments: "Forest",
+    };
+    await p.route("**/api/account/encounters/index", async (route) => {
+      assert.equal(route.request().postDataJSON().filters.enemy, "goblin");
+      await route.fulfill({ json: { creatures: [goblin], more: false } });
+    });
+    await p.route("**/api/account/encounters/generate", async (route) => {
+      const input = route.request().postDataJSON().filters;
+      await route.fulfill({
+        json: { combatants: generateEncounter([goblin], input) },
+      });
+    });
+  }
   await p.goto(origin + "/encounters");
   await p.getByRole("button", { name: "New encounter", exact: true }).click();
   await p.getByRole("button", { name: "Add combatant", exact: true }).waitFor();
@@ -141,7 +180,10 @@ try {
   await p.getByRole("button", { name: "Save encounter", exact: true }).click();
   await p.getByText("Encounter saved.", { exact: true }).waitFor();
   assert.ok(await p.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
-  await p.screenshot({ path: output + "/mobile-loot-review.png", fullPage: true });
+  await p.screenshot({
+    path: output + "/mobile-loot-review.png",
+    fullPage: true,
+  });
   const d = await db
     .prepare("SELECT id,revision FROM dm_encounters WHERE user_id=?")
     .bind(dm.id)

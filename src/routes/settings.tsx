@@ -76,7 +76,7 @@ function SettingsPage() {
     <Shell width="prose">
       <h1 className="font-display text-4xl tracking-tight">Device backups</h1>
       <p className="mt-2 text-sm text-muted">Keep a copy of the campaign data available on this device. Full campaign restoration is a DM action in Local Mode.</p>
-      {ready ? <SaveFolder /> : <p>Loading…</p>}
+      {ready ? <div id="backups"><SaveFolder /></div> : <p>Loading…</p>}
       <Fold title="Diagnostic reports" hint="Download an error report to share manually."><Diagnostics /></Fold>
     </Shell>
   );
@@ -95,11 +95,12 @@ function SettingsPage() {
         <>
           <Link to="/share" className="quick-action mt-5">Multiplayer — rooms, players & notifications →</Link>
           <PasswordSettings />
-          <SaveFolder />
+          <div id="backups"><SaveFolder /></div>
           <Fold title="Diagnostic reports" hint="Download an error report to share manually.">
             <Diagnostics />
           </Fold>
 
+          <div id="economy" />
           <Fold title="Price modifiers" hint="Season, shortages, war, and the value of a gold piece." defaultOpen>
             <p className="mt-2 text-sm text-muted">
               {realmNote(draft, { dollars: prefs.showDollars })}
@@ -311,6 +312,7 @@ function SettingsPage() {
             </div>
           </Fold>
 
+          <div id="appearance" />
           <Fold title="Colors" hint="Light or dark, a ready-made look, or your own colors.">
             <p className="mt-2 text-sm text-muted">Light or dark, a ready-made look, or your own accent and page color.</p>
             <div className="mt-4">

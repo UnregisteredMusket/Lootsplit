@@ -12,6 +12,7 @@ import { ShareChat } from "@/components/share-chat";
 import { TableDesk, TableShare } from "@/components/table-share";
 import { SyncStatus } from "@/components/sync-status";
 import { Fold } from "@/components/ui";
+import { RollLog } from "@/components/characters/workspace";
 import { useSeat } from "@/lib/quire/seat";
 
 export const Route = createFileRoute("/share")({ component: SharePage });
@@ -22,6 +23,8 @@ function SharePage() {
     const chat = new URLSearchParams(window.location.search).get("chat") === "1";
     setOpenChat(chat);
     if (chat) setTab("chat");
+    else if (new URLSearchParams(window.location.search).get("tab") === "notifications")
+      setTab("notifications");
   }, []);
   const room = useSyncExternalStore(subscribeCloudTable, getCloudTable, getServerCloudTable);
   const seat = useSeat();
@@ -30,13 +33,15 @@ function SharePage() {
     <Shell width="prose">
       <div className="multiplayer-heading">
         <p className="eyebrow">Your party, together</p>
-        <h1>Multiplayer</h1>
+        <h1>Campaign</h1>
+        <p className="text-sm text-muted">Multiplayer · your party, messages and rolls</p>
       </div>
       <div className="mode-switch mb-5" role="tablist" aria-label="Multiplayer sections">
         {[
           ["room", "Room"],
           ["chat", count ? `Chat · ${count}` : "Chat"],
-          ["notifications", "Notifications"],
+          ["rolls", "Rolls"],
+          ["notifications", "Alerts"],
         ].map(([key, label]) => (
           <button
             key={key}
@@ -62,6 +67,18 @@ function SharePage() {
           <ShareChat />
         </Fold>
       </div>
+      {tab === "rolls" && (
+        <div className="character-play campaign-rolls">
+          {room.joined ? (
+            <RollLog code={room.code} />
+          ) : (
+            <p className="sheet-card">
+              Join an online campaign to see shared rolls.{" "}
+              <a href="/characters#dice">Your private dice and roll history →</a>
+            </p>
+          )}
+        </div>
+      )}
       <div hidden={tab !== "notifications"}>
         <Fold defaultOpen title="Notifications" hint="Turn reminders, messages, and room changes.">
           <Notices />

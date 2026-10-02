@@ -7,17 +7,25 @@ import { sessionSummary } from "@/lib/quire/journal";
 import { formatCopper } from "@/lib/quire/money";
 import { Button, Fold } from "./ui";
 function RecordedChange({ change }: { change: NonNullable<Journal["events"][number]["change"]> }) {
-  const keys = [...new Set([...Object.keys(change.before || {}), ...Object.keys(change.after || {})])]
-    .filter(key => change.before?.[key] !== change.after?.[key]);
-  return <details className="mt-2 text-sm">
-    <summary className="cursor-pointer">Recorded changes</summary>
-    <dl className="mt-2 grid gap-2">
-      {keys.map(key => <div key={key} className="break-words">
-        <dt className="font-medium">{key.replace(/([a-z])([A-Z])/g, "$1 $2")}</dt>
-        <dd>{String(change.before?.[key] ?? "Not recorded")} → {String(change.after?.[key] ?? "Not recorded")}</dd>
-      </div>)}
-    </dl>
-  </details>;
+  const keys = [
+    ...new Set([...Object.keys(change.before || {}), ...Object.keys(change.after || {})]),
+  ].filter((key) => change.before?.[key] !== change.after?.[key]);
+  return (
+    <details className="mt-2 text-sm">
+      <summary className="cursor-pointer">Recorded changes</summary>
+      <dl className="mt-2 grid gap-2">
+        {keys.map((key) => (
+          <div key={key} className="break-words">
+            <dt className="font-medium">{key.replace(/([a-z])([A-Z])/g, "$1 $2")}</dt>
+            <dd>
+              {String(change.before?.[key] ?? "Not recorded")} →{" "}
+              {String(change.after?.[key] ?? "Not recorded")}
+            </dd>
+          </div>
+        ))}
+      </dl>
+    </details>
+  );
 }
 export function CampaignJournal() {
   const { journal, ledger, purses, command, loans, decideLoan } = useEconomy();
@@ -51,7 +59,7 @@ export function CampaignJournal() {
     ...journal.events.filter((x) => dm || !x.purseId || seat.purseIds.includes(x.purseId)),
   ].sort((a, b) => b.at - a.at);
   return (
-    <div className="campaign-journal">
+    <div className="campaign-journal" id="review">
       <Fold
         title={active ? `Session · ${active.name}` : "Play sessions"}
         hint="Named sessions, with recorded coin movement."
@@ -161,7 +169,11 @@ export function CampaignJournal() {
                   disabled={busy}
                   onClick={() =>
                     void run(() =>
-                      command({ kind: "payment-decision", requestId: x.id, status: "approved" }),
+                      command({
+                        kind: "payment-decision",
+                        requestId: x.id,
+                        status: "approved",
+                      }),
                     )
                   }
                 >
@@ -172,7 +184,11 @@ export function CampaignJournal() {
                   variant="secondary"
                   onClick={() =>
                     void run(() =>
-                      command({ kind: "payment-decision", requestId: x.id, status: "denied" }),
+                      command({
+                        kind: "payment-decision",
+                        requestId: x.id,
+                        status: "denied",
+                      }),
                     )
                   }
                 >
