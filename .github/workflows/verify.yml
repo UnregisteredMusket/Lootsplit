@@ -32,6 +32,7 @@ jobs:
           done
           node scripts/release-browser-audit.mjs
           node scripts/account-browser-audit.mjs
+          AUDIT_ORIGIN=http://127.0.0.1:8080 node scripts/owner-browser-audit.mjs
           node scripts/website-browser-audit.mjs
       - name: Built Worker account checks
         timeout-minutes: 4
@@ -43,6 +44,7 @@ jobs:
             sleep 2
           done
           ACCOUNT_AUDIT_ORIGIN=http://127.0.0.1:8082 node scripts/account-browser-audit.mjs
+          AUDIT_ORIGIN=http://127.0.0.1:8082 node scripts/website-browser-audit.mjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:

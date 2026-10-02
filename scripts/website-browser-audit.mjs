@@ -26,6 +26,8 @@ try {
       ["downloads", "One party. Your platform."],
       ["updates", "Changelog"],
       ["help", "A little help, adventurer."],
+      ["resources", "Resources & credits"],
+      ["donate", "Support Lootsplit"],
     ]) {
       const response = await page.goto(`${origin}/${path}`, { waitUntil: "networkidle" });
       assert.equal(response.status(), 200);
@@ -52,7 +54,7 @@ try {
   }
   assert.deepEqual(failures, []);
   console.log(
-    JSON.stringify({ ok: true, widths: [1280, 390], pages: 4, externalFailures }, null, 2),
+    JSON.stringify({ ok: true, widths: [1280, 390], pages: 6, externalFailures }, null, 2),
   );
 } finally {
   await browser.close();

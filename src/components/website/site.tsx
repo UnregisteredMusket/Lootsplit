@@ -1,3 +1,4 @@
+import { SiteAnnouncement } from "./announcement";
 import { Link, useRouterState } from "@tanstack/react-router";
 import {
   ArrowDownToLine,
@@ -28,6 +29,12 @@ export function Website({ children }: { children: ReactNode }) {
         </Link>
         <nav aria-label="Website">
           <Link to="/account">My account</Link>
+          <Link to="/resources" aria-current={path === "/resources" ? "page" : undefined}>
+            Resources
+          </Link>
+          <Link to="/donate" aria-current={path === "/donate" ? "page" : undefined}>
+            Donate
+          </Link>
           <Link to="/downloads" aria-current={path === "/downloads" ? "page" : undefined}>
             Downloads
           </Link>
@@ -54,6 +61,8 @@ export function Website({ children }: { children: ReactNode }) {
           <Link to="/downloads">Downloads</Link>
           <Link to="/updates">Changelog</Link>
           <Link to="/help">Help & backups</Link>
+          <Link to="/resources">Resources</Link>
+          <Link to="/donate">Donate</Link>
           <a href={release.historyUrl}>GitHub releases ↗</a>
         </div>
         <p>
@@ -69,6 +78,7 @@ export function Website({ children }: { children: ReactNode }) {
 export function WelcomePage() {
   return (
     <Website>
+      <SiteAnnouncement />
       <section className="ls-hero">
         <img className="ls-hero-art" src="/art/landscape.webp" alt="" />
         <div className="ls-hero-shade" />
@@ -211,7 +221,11 @@ export function DownloadsPage() {
             </a>
             <p className="ls-small-copy">
               Having trouble? <a href={release.apkUrl}>Download from GitHub</a> or open this page in
-              Chrome. <a href="https://drive.google.com/file/d/1MT4by-7mNe7-7PANKbTwcbBOcd2CSKrr/view">Alternate download on Google Drive</a>.
+              Chrome.{" "}
+              <a href="https://drive.google.com/file/d/1MT4by-7mNe7-7PANKbTwcbBOcd2CSKrr/view">
+                Alternate download on Google Drive
+              </a>
+              .
             </p>
             <Link className="ls-text-link" to="/help" hash="android">
               Installation & update guide <ArrowRight size={16} />

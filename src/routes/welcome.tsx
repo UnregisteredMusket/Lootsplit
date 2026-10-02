@@ -12,6 +12,8 @@ export function SiteHeader() {
         <Link to="/downloads">Downloads</Link>
         <Link to="/updates">Changelog</Link>
         <Link to="/help">Help</Link>
+        <Link to="/resources">Resources</Link>
+        <Link to="/donate">Donate</Link>
         <Link to="/account">My account</Link>
         <Link to="/" search={{ view: "home" }} className="portal-button small">
           Open app <ArrowRight size={16} />

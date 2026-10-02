@@ -26,7 +26,7 @@ export async function accountRequest<T>(path: string, body?: unknown): Promise<T
   return result as T;
 }
 export type AccountLibrary = {
-  user: { id: string; name: string; email: string };
+  user: { id: string; name: string; email: string; role: "owner" | "member" };
   members: { code: string; seat_id: string; name: string; archived: number; updated_at: number }[];
   backups: { id: string; name: string; created_at: number }[];
   characters: CharacterProfile[];

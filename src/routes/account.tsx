@@ -1,3 +1,4 @@
+import { OwnerControls } from "@/components/account/owner-controls";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState, useSyncExternalStore, type FormEvent } from "react";
 import {
@@ -172,6 +173,7 @@ function Account() {
             {notice}
           </p>
         )}
+        {library?.user.role === "owner" && <OwnerControls />}
         {key && (
           <section className="portal-key" aria-label="Recovery key">
             <ShieldCheck />

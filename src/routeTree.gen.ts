@@ -13,11 +13,13 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AccountRouteImport } from './routes/account'
 import { Route as BooksRouteImport } from './routes/books'
 import { Route as CatalogRouteImport } from './routes/catalog'
+import { Route as DonateRouteImport } from './routes/donate'
 import { Route as DownloadsRouteImport } from './routes/downloads'
 import { Route as FavoritesRouteImport } from './routes/favorites'
 import { Route as HelpRouteImport } from './routes/help'
 import { Route as MarketRouteImport } from './routes/market'
 import { Route as PartyRouteImport } from './routes/party'
+import { Route as ResourcesRouteImport } from './routes/resources'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as ShareRouteImport } from './routes/share'
 import { Route as UpdatesRouteImport } from './routes/updates'
@@ -47,6 +49,11 @@ const CatalogRoute = CatalogRouteImport.update({
   path: '/catalog',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DonateRoute = DonateRouteImport.update({
+  id: '/donate',
+  path: '/donate',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DownloadsRoute = DownloadsRouteImport.update({
   id: '/downloads',
   path: '/downloads',
@@ -70,6 +77,11 @@ const MarketRoute = MarketRouteImport.update({
 const PartyRoute = PartyRouteImport.update({
   id: '/party',
   path: '/party',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const ResourcesRoute = ResourcesRouteImport.update({
+  id: '/resources',
+  path: '/resources',
   getParentRoute: () => rootRouteImport,
 } as any)
 const SettingsRoute = SettingsRouteImport.update({
@@ -118,11 +130,13 @@ export interface FileRoutesByFullPath {
   '/account': typeof AccountRoute
   '/books': typeof BooksRoute
   '/catalog': typeof CatalogRoute
+  '/donate': typeof DonateRoute
   '/downloads': typeof DownloadsRoute
   '/favorites': typeof FavoritesRoute
   '/help': typeof HelpRoute
   '/market': typeof MarketRoute
   '/party': typeof PartyRoute
+  '/resources': typeof ResourcesRoute
   '/settings': typeof SettingsRoute
   '/share': typeof ShareRoute
   '/updates': typeof UpdatesRoute
@@ -137,11 +151,13 @@ export interface FileRoutesByTo {
   '/account': typeof AccountRoute
   '/books': typeof BooksRoute
   '/catalog': typeof CatalogRoute
+  '/donate': typeof DonateRoute
   '/downloads': typeof DownloadsRoute
   '/favorites': typeof FavoritesRoute
   '/help': typeof HelpRoute
   '/market': typeof MarketRoute
   '/party': typeof PartyRoute
+  '/resources': typeof ResourcesRoute
   '/settings': typeof SettingsRoute
   '/share': typeof ShareRoute
   '/updates': typeof UpdatesRoute
@@ -157,11 +173,13 @@ export interface FileRoutesById {
   '/account': typeof AccountRoute
   '/books': typeof BooksRoute
   '/catalog': typeof CatalogRoute
+  '/donate': typeof DonateRoute
   '/downloads': typeof DownloadsRoute
   '/favorites': typeof FavoritesRoute
   '/help': typeof HelpRoute
   '/market': typeof MarketRoute
   '/party': typeof PartyRoute
+  '/resources': typeof ResourcesRoute
   '/settings': typeof SettingsRoute
   '/share': typeof ShareRoute
   '/updates': typeof UpdatesRoute
@@ -178,11 +196,13 @@ export interface FileRouteTypes {
     | '/account'
     | '/books'
     | '/catalog'
+    | '/donate'
     | '/downloads'
     | '/favorites'
     | '/help'
     | '/market'
     | '/party'
+    | '/resources'
     | '/settings'
     | '/share'
     | '/updates'
@@ -197,11 +217,13 @@ export interface FileRouteTypes {
     | '/account'
     | '/books'
     | '/catalog'
+    | '/donate'
     | '/downloads'
     | '/favorites'
     | '/help'
     | '/market'
     | '/party'
+    | '/resources'
     | '/settings'
     | '/share'
     | '/updates'
@@ -216,11 +238,13 @@ export interface FileRouteTypes {
     | '/account'
     | '/books'
     | '/catalog'
+    | '/donate'
     | '/downloads'
     | '/favorites'
     | '/help'
     | '/market'
     | '/party'
+    | '/resources'
     | '/settings'
     | '/share'
     | '/updates'
@@ -236,11 +260,13 @@ export interface RootRouteChildren {
   AccountRoute: typeof AccountRoute
   BooksRoute: typeof BooksRoute
   CatalogRoute: typeof CatalogRoute
+  DonateRoute: typeof DonateRoute
   DownloadsRoute: typeof DownloadsRoute
   FavoritesRoute: typeof FavoritesRoute
   HelpRoute: typeof HelpRoute
   MarketRoute: typeof MarketRoute
   PartyRoute: typeof PartyRoute
+  ResourcesRoute: typeof ResourcesRoute
   SettingsRoute: typeof SettingsRoute
   ShareRoute: typeof ShareRoute
   UpdatesRoute: typeof UpdatesRoute
@@ -281,6 +307,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CatalogRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/donate': {
+      id: '/donate'
+      path: '/donate'
+      fullPath: '/donate'
+      preLoaderRoute: typeof DonateRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/downloads': {
       id: '/downloads'
       path: '/downloads'
@@ -314,6 +347,13 @@ declare module '@tanstack/react-router' {
       path: '/party'
       fullPath: '/party'
       preLoaderRoute: typeof PartyRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/resources': {
+      id: '/resources'
+      path: '/resources'
+      fullPath: '/resources'
+      preLoaderRoute: typeof ResourcesRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/settings': {
@@ -380,11 +420,13 @@ const rootRouteChildren: RootRouteChildren = {
   AccountRoute: AccountRoute,
   BooksRoute: BooksRoute,
   CatalogRoute: CatalogRoute,
+  DonateRoute: DonateRoute,
   DownloadsRoute: DownloadsRoute,
   FavoritesRoute: FavoritesRoute,
   HelpRoute: HelpRoute,
   MarketRoute: MarketRoute,
   PartyRoute: PartyRoute,
+  ResourcesRoute: ResourcesRoute,
   SettingsRoute: SettingsRoute,
   ShareRoute: ShareRoute,
   UpdatesRoute: UpdatesRoute,
