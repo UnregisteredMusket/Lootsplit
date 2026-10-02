@@ -1,4 +1,4 @@
-import { createRootRoute, HeadContent, Outlet, Scripts } from "@tanstack/react-router";
+import { createRootRoute, HeadContent, Outlet, Scripts, useRouterState } from "@tanstack/react-router";
 import { AuthProvider } from "@/lib/auth/provider";
 import { OpeningDawn } from "@/components/opening-dawn";
 import { PreviewHostBridge } from "@/components/preview-host-bridge";
@@ -30,6 +30,8 @@ export const Route = createRootRoute({
     ],
   }),
   component: () => {
+    const pathname = useRouterState({ select: state => state.location.pathname });
+    const publicPage = ["/welcome", "/downloads", "/updates", "/help"].includes(pathname.replace(/\/$/, ""));
     installMobileApi();
     return (
     <html lang="en" suppressHydrationWarning>
@@ -38,6 +40,7 @@ export const Route = createRootRoute({
       </head>
       <body>
         <PreviewHostBridge />
+        {publicPage ? <Outlet /> : <>
         <OpeningDawn />
         <AuthProvider>
           <LibraryProvider>
@@ -48,6 +51,7 @@ export const Route = createRootRoute({
             </PrefsProvider>
           </LibraryProvider>
         </AuthProvider>
+        </>}
         <Scripts />
       </body>
     </html>

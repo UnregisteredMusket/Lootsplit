@@ -182,3 +182,17 @@ function readCampaign(value: unknown): Campaign | null {
     ...(row.blank ? { blank: true } : {}),
   };
 }
+
+/** Account resume selects a separate device database; it never promotes the old player copy. */
+export function selectAccountCampaign(id: string, name: string, seat: import('./table.ts').Seat) {
+  boot();
+  if (deleting) throw new Error('Wait for the campaign deletion to finish.');
+  if (!/^account-[a-zA-Z0-9_-]+$/.test(id)) throw new Error('Invalid account campaign.');
+  const existing = state.campaigns.find(c => c.id === id);
+  localStorage.setItem(`quire.seat.v1.${id}`, JSON.stringify(seat));
+  state = { campaigns: existing ? state.campaigns : [...state.campaigns, { id, name: cleanName(name), db: `quire-${id}`, blank: true }], activeId: id };
+  persist();
+  closeQuireDb();
+  reloadSeat();
+  // The caller reloads once credentials have been written. No intermediate DM render.
+}
