@@ -1,3 +1,11 @@
+import {
+  siteRole,
+  publicAnnouncement,
+  ownerOverview,
+  saveAnnouncement,
+  publicDonations,
+  saveDonations,
+} from "./site-owner.mjs";
 import { betterAuth } from "better-auth";
 import { bearer } from "better-auth/plugins";
 import { hashPassword } from "better-auth/crypto";
@@ -171,9 +179,20 @@ export async function handleAccounts(request, env) {
       if (!result[2].meta.changes) fail("This recovery key has already been used.", 409);
       return cors(json({ key: nextKey }));
     }
+    if (path === "/api/account/site-announcement" && request.method === "GET") {
+      return cors(json(await publicAnnouncement(db)));
+    }
+    if (path === "/api/account/site-donations" && request.method === "GET")
+      return cors(json(await publicDonations(db)));
     const session = await auth.api.getSession({ headers: request.headers });
     if (!session) fail("Sign in to open your account library.", 401);
     const userId = session.user.id;
+    if (path === "/api/account/owner/donations" && request.method === "POST")
+      return cors(json(await saveDonations(db, userId, body)));
+    if (path === "/api/account/owner" && request.method === "GET")
+      return cors(json(await ownerOverview(db, userId)));
+    if (path === "/api/account/owner/announcement" && request.method === "POST")
+      return cors(json(await saveAnnouncement(db, userId, body)));
     if (path === "/api/account/library" && request.method === "GET") {
       const [members, backups, characters, recovery] = await Promise.all([
         db
@@ -198,7 +217,12 @@ export async function handleAccounts(request, env) {
       ]);
       return cors(
         json({
-          user: { id: userId, name: session.user.name, email: session.user.email },
+          user: {
+            id: userId,
+            name: session.user.name,
+            email: session.user.email,
+            role: await siteRole(db, userId),
+          },
           members: members.results,
           backups: backups.results,
           characters: characters.results.map((r) => ({ id: r.id, ...JSON.parse(r.body) })),

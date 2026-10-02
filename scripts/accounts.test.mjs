@@ -200,3 +200,87 @@ test("signed native sessions work without third-party cookies; unsigned tokens f
     DB.close();
   }
 });
+
+test("site owner grants are server-only, revocable, audited and conflict-safe", async () => {
+  const { DB, call, signup } = setup();
+  try {
+    const a = await signup("owner@example.com"),
+      b = await signup("member@example.com");
+    const id = a.data.user.id;
+    assert.equal((await call("owner")).response.status, 401);
+    assert.equal((await call("owner", undefined, a.cookie)).response.status, 403);
+    assert.equal((await call("library", undefined, a.cookie)).data.user.role, "member");
+    await DB.prepare("INSERT INTO site_roles VALUES (?,'owner',?)").bind(id, Date.now()).run();
+    assert.equal((await call("library", undefined, a.cookie)).data.user.role, "owner");
+    const overview = await call("owner", undefined, a.cookie);
+    assert.equal(overview.response.status, 200);
+    assert.equal(overview.data.stats.accounts, 2);
+    assert.equal(JSON.stringify(overview.data).includes("member@example.com"), false);
+    const announcement = {
+      title: "News",
+      message: "Hello <b>party</b>",
+      published: true,
+      revision: 0,
+    };
+    assert.equal((await call("site-announcement")).data.announcement, null);
+    assert.equal((await call("owner/announcement", announcement, b.cookie)).response.status, 403);
+    assert.equal(
+      (await call("owner/announcement", announcement, a.cookie, "https://evil.example")).response
+        .status,
+      403,
+    );
+    assert.equal((await call("owner/announcement", announcement, a.cookie)).response.status, 200);
+    assert.equal((await call("owner/announcement", announcement, a.cookie)).response.status, 409);
+    assert.deepEqual((await call("site-announcement")).data.announcement, {
+      title: announcement.title,
+      message: announcement.message,
+    });
+    assert.equal((await DB.prepare("SELECT COUNT(*) AS n FROM site_audit").first()).n, 1);
+    assert.equal(
+      (
+        await call(
+          "owner/announcement",
+          { ...announcement, published: false, revision: 1 },
+          a.cookie,
+        )
+      ).response.status,
+      200,
+    );
+    assert.equal((await call("site-announcement")).data.announcement, null);
+    assert.equal((await call("site-donations")).data.donationUrl, null);
+    for (const donationUrl of [
+      "javascript:alert(1)",
+      "http://example.com",
+      "https://user:password@example.com",
+      "not a url",
+    ]) {
+      assert.equal(
+        (await call("owner/donations", { donationUrl, revision: 0 }, a.cookie)).response.status,
+        400,
+      );
+    }
+    const donation = { donationUrl: "https://example.com/support", revision: 0 };
+    assert.equal((await call("owner/donations", donation)).response.status, 401);
+    assert.equal(
+      (await call("owner/donations", { ...donation, userId: id }, b.cookie)).response.status,
+      403,
+    );
+    assert.equal((await call("owner/donations", donation, a.cookie)).response.status, 200);
+    assert.equal((await call("owner/donations", donation, a.cookie)).response.status, 409);
+    assert.equal((await call("site-donations")).data.donationUrl, donation.donationUrl);
+    assert.equal(
+      (await call("owner/donations", { donationUrl: "", revision: 1 }, a.cookie)).response.status,
+      200,
+    );
+    assert.equal((await call("site-donations")).data.donationUrl, null);
+    assert.equal((await DB.prepare("SELECT COUNT(*) AS n FROM site_audit").first()).n, 4);
+    await DB.prepare("DELETE FROM site_roles WHERE user_id=?").bind(id).run();
+    assert.equal((await call("owner", undefined, a.cookie)).response.status, 403);
+    assert.equal(
+      (await call("owner/donations", { ...donation, revision: 2 }, a.cookie)).response.status,
+      403,
+    );
+  } finally {
+    DB.close();
+  }
+});

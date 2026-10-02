@@ -339,3 +339,11 @@ input,select,textarea { max-width: 100%; }
 @media(max-width:800px){.portal-header{flex-wrap:wrap}.portal-header nav{width:100%;justify-content:space-between;gap:10px;border-top:1px solid #ffffff16;padding-top:12px}}
 
 .portal-form select{width:100%;min-width:0;background:#101827;border:1px solid #ffffff30;color:var(--portal-ink);border-radius:5px;padding:11px 12px;font-size:16px;min-height:46px}.portal h1{overflow-wrap:anywhere}.portal-title-row>div{min-width:0}
+
+.owner-controls {margin-block:28px;overflow-wrap:anywhere;}
+.owner-controls>p {margin-bottom:18px;}
+.owner-stats {display:grid;grid-template-columns:repeat(auto-fit,minmax(130px,1fr));gap:14px;margin:24px 0;}
+.owner-stats>div {padding:14px;background:#142233;border:1px solid #69735e;border-radius:8px;}
+.owner-stats dt {font-size:14px;color:#c5cbd1;}.owner-stats dd {font-size:28px;color:#e4c58b;}
+.owner-form {display:grid;gap:16px;}.owner-form label {display:grid;gap:8px;}
+.owner-form input,.owner-form textarea {width:100%;min-height:44px;border:1px solid #566377;border-radius:6px;padding:12px;background:#102030;color:#f3ecdf;font:inherit;}
