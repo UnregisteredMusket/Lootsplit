@@ -1,10 +1,4 @@
-import {
-  createRootRoute,
-  HeadContent,
-  Outlet,
-  Scripts,
-  useRouterState,
-} from "@tanstack/react-router";
+import { createRootRoute, HeadContent, Outlet, Scripts, useRouterState } from "@tanstack/react-router";
 import { AuthProvider } from "@/lib/auth/provider";
 import { OpeningDawn } from "@/components/opening-dawn";
 import { PreviewHostBridge } from "@/components/preview-host-bridge";
@@ -24,8 +18,7 @@ export const Route = createRootRoute({
       { title: APP_NAME },
       {
         name: "description",
-        content:
-          "Track campaign money, shops, and prices. Create shops from an item catalog, and read names and prices from PDFs you import.",
+        content: "Track campaign money, shops, and prices. Create shops from an item catalog, and read names and prices from PDFs you import.",
       },
       { name: "theme-color", content: "#10182c" },
     ],
@@ -37,37 +30,29 @@ export const Route = createRootRoute({
     ],
   }),
   component: () => {
-    const pathname = useRouterState({ select: (state) => state.location.pathname });
-    const publicPage = ["/welcome", "/downloads", "/updates", "/help"].includes(
-      pathname.replace(/\/$/, ""),
-    );
+    const pathname = useRouterState({ select: state => state.location.pathname });
+    const publicPage = ["/welcome", "/downloads", "/updates", "/help"].includes(pathname.replace(/\/$/, ""));
     installMobileApi();
     return (
-      <html lang="en" suppressHydrationWarning>
-        <head>
-          <HeadContent />
-        </head>
-        <body>
-          <PreviewHostBridge />
-          {publicPage ? (
-            <Outlet />
-          ) : (
-            <>
-              <OpeningDawn />
-              <AuthProvider>
-                <LibraryProvider>
-                  <PrefsProvider>
-                    <EconomyProvider>
-                      <Outlet />
-                    </EconomyProvider>
-                  </PrefsProvider>
-                </LibraryProvider>
-              </AuthProvider>
-            </>
-          )}
-          <Scripts />
-        </body>
-      </html>
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        <HeadContent />
+      </head>
+      <body>
+        <PreviewHostBridge />
+        {!publicPage && <OpeningDawn />}
+        <AuthProvider>
+          <LibraryProvider>
+            <PrefsProvider>
+              <EconomyProvider>
+                <Outlet />
+              </EconomyProvider>
+            </PrefsProvider>
+          </LibraryProvider>
+        </AuthProvider>
+        <Scripts />
+      </body>
+    </html>
     );
   },
 });

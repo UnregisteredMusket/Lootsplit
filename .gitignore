@@ -23,3 +23,6 @@ data/cloud-rooms.json
 *.keystore
 *.apk
 *.aab
+
+# Local-only account development state and credentials.
+data/account-dev*

@@ -503,3 +503,22 @@ export function roomCredentials() {
   const s = requireSession();
   return { code: s.code, token: s.token };
 }
+
+export async function resumeAccountMembership(member: import('../account/client').AccountMembership) {
+  return serial(async () => {
+    if (hasPendingChanges()) throw new Error('Submit or resolve your pending actions before switching campaigns.');
+    const remote = await pullCloudTable({ data: { code: member.code, token: member.token } });
+    const role = remote.seats.find(s => s.id === remote.seatId)?.role;
+    if (!role || (role === 'player' && !remote.purseIds.length) || remote.seatId !== member.seatId) throw new Error('This membership has changed. Refresh your account library.');
+    const { selectAccountCampaign } = await import('./campaigns');
+    const id = `account-${member.userId}-${member.code}`;
+    const targetKey = `quire.cloud.v2.${id}`;
+    const existing = JSON.parse(localStorage.getItem(targetKey) || 'null') as Session | null;
+    if (existing?.pending?.length) throw new Error('This device has an unfinished turn for that campaign. Reopen its existing device campaign and resolve it before resuming.');
+    if (timer) clearInterval(timer);
+    timer = undefined;
+    selectAccountCampaign(id, member.name, { role, purseIds: remote.purseIds, shopIds: remote.shopIds, openedAt: Date.now() });
+    remember({ code: member.code, token: member.token, seatId: remote.seatId, role, purseIds: remote.purseIds, revision: 0, pending: [], batchId: crypto.randomUUID() });
+    window.location.assign('/');
+  });
+}

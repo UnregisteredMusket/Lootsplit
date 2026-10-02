@@ -35,11 +35,6 @@ try {
         false,
         `${path} overflows ${width}`,
       );
-      assert.equal(
-        await page.evaluate(async () => (await indexedDB.databases()).length),
-        0,
-        "Public pages should not initialize campaign storage",
-      );
       await page.screenshot({ path: `${output}/${path}-${width}.png`, fullPage: true });
     }
     await page.getByRole("link", { name: "Downloads", exact: true }).first().click();

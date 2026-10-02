@@ -1,0 +1,127 @@
+import { chromium } from "playwright";
+import assert from "node:assert/strict";
+import { mkdir } from "node:fs/promises";
+const origin = process.env.ACCOUNT_AUDIT_ORIGIN || "http://127.0.0.1:8080";
+if (!/^http:\/\/(127\.0\.0\.1|localhost):/.test(origin))
+  throw new Error("Account audit only runs against disposable local servers.");
+const browser = await chromium.launch({ headless: true, args: ["--no-sandbox"] });
+await mkdir("test-results", { recursive: true });
+const errors = [];
+async function visit(page, path) {
+  await page.goto(origin + path);
+  await page.waitForTimeout(1600);
+}
+try {
+  const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+  context.setDefaultTimeout(20000);
+  const page = await context.newPage();
+  page.on("pageerror", (e) => errors.push(e.message));
+  // Warm Vite before checking for module errors.
+  await visit(page, "/welcome");
+  await page.waitForTimeout(2500);
+  errors.length = 0;
+  for (const width of [1280, 390]) {
+    await page.setViewportSize({ width, height: 900 });
+    for (const path of ["/welcome", "/downloads", "/help", "/updates", "/account"]) {
+      await visit(page, path);
+      assert.ok((await page.locator("body").innerText()).length > 200);
+      assert.ok(
+        await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1),
+        `Overflow ${path} ${width}`,
+      );
+      await page.screenshot({
+        path: `test-results/website-${path.slice(1)}-${width}.png`,
+        fullPage: true,
+      });
+    }
+  }
+  // Exercise client-side route transitions as well as direct navigation. Providers
+  // must stay mounted while the router renders the previous page during a lazy load.
+  await page.getByRole("link", { name: "Downloads", exact: true }).first().click();
+  await page.getByRole("heading", { name: "One party. Your platform.", exact: true }).waitFor();
+  await page.getByRole("link", { name: "My account", exact: true }).first().click();
+  await page.getByRole("heading", { name: "Good to see you again", exact: true }).waitFor();
+  console.log("Account audit: sign up");
+  const email = `browser-${Date.now()}@example.com`,
+    password = "browser testing password 2026";
+  await page.getByRole("button", { name: "Create account", exact: true }).click();
+  await page.getByLabel("Display name").fill("Test adventurer");
+  await page.getByLabel("Email", { exact: true }).fill(email);
+  await page.getByLabel("Password", { exact: true }).fill(password);
+  await page.getByRole("button", { name: "Create account", exact: true }).last().click();
+  await page.getByRole("heading", { name: "Test adventurer’s library" }).waitFor();
+  await page.getByRole("heading", { name: "Keep this recovery key somewhere safe" }).waitFor();
+  const key = await page.locator(".portal-key code").innerText();
+  assert.equal(key.length, 64);
+  await page.getByRole("button", { name: "I have saved it" }).click();
+  console.log("Account audit: character and backup");
+  await page.getByLabel("Character name", { exact: true }).fill("Browser test hero");
+  await page.getByLabel("Notes", { exact: true }).fill("A reusable hero.");
+  await page.getByRole("button", { name: "Save profile", exact: true }).click();
+  await page.getByRole("heading", { name: "Browser test hero", exact: true }).waitFor();
+  await page.getByRole("button", { name: "Add to campaign", exact: true }).click();
+  await page.getByRole("status").filter({ hasText: "was added" }).waitFor();
+  await page.getByRole("button", { name: "Save current campaign", exact: true }).click();
+  await page.getByRole("button", { name: "Restore as new", exact: true }).waitFor();
+  await page.screenshot({ path: "test-results/account-library-mobile.png", fullPage: true });
+  // A second browser/device sees the same private library, with an independent local campaign.
+  const second = await browser.newContext({ viewport: { width: 1280, height: 900 } });
+  second.setDefaultTimeout(20000);
+  const other = await second.newPage();
+  other.on("pageerror", (e) => errors.push(e.message));
+  await visit(other, "/account");
+  await other.getByLabel("Email", { exact: true }).fill(email);
+  await other.getByLabel("Password", { exact: true }).fill(password);
+  await other.getByRole("button", { name: "Sign in", exact: true }).last().click();
+  await other.getByRole("heading", { name: "Browser test hero", exact: true }).waitFor();
+  await other.getByRole("button", { name: "Restore as new", exact: true }).waitFor();
+  await other.screenshot({ path: "test-results/account-library-desktop.png", fullPage: true });
+  console.log("Account audit: restore into new campaign");
+  other.on("dialog", (d) => d.accept());
+  await other.getByRole("button", { name: "Restore as new", exact: true }).click();
+  await other.waitForURL((url) => url.origin === origin && url.pathname === "/");
+  await other.getByText("Campaign treasury", { exact: true }).waitFor();
+  assert.ok(
+    await other.evaluate(() => JSON.parse(localStorage.getItem("quire.campaigns.v1")).length >= 2),
+  );
+  await visit(other, "/account");
+  console.log("Account audit: shared membership resumes on another device");
+  await visit(other, "/share");
+  const skip = other.getByRole("button", { name: "Not now", exact: true });
+  if (await skip.isVisible()) await skip.click();
+  await other.getByRole("button", { name: "Start a room", exact: true }).click();
+  await other.getByRole("button", { name: "Create room", exact: true }).click();
+  await other.getByRole("button", { name: "Share join link", exact: true }).waitFor();
+  await visit(other, "/account");
+  await other.getByRole("button", { name: "Save current membership", exact: true }).click();
+  await other.getByRole("button", { name: "Resume", exact: true }).waitFor();
+  await page.reload();
+  await page.getByRole("button", { name: "Resume", exact: true }).click();
+  await page.waitForURL((url) => url.origin === origin && url.pathname === "/");
+  await page.getByText("Campaign treasury", { exact: true }).waitFor();
+  assert.ok(
+    await page.evaluate(() => localStorage.getItem("quire.campaign.v1").startsWith("account-")),
+  );
+  assert.ok(
+    await page.evaluate(() =>
+      JSON.parse(localStorage.getItem("quire.campaigns.v1")).some((c) => c.id === "main"),
+    ),
+  );
+  await visit(page, "/account");
+  console.log("Account audit: recover and revoke other sessions");
+  await page.getByRole("button", { name: "Sign out", exact: true }).click();
+  await page.getByRole("button", { name: "Forgot your password? Use a recovery key" }).click();
+  await page.getByLabel("Email", { exact: true }).fill(email);
+  await page.getByLabel("Recovery key", { exact: true }).fill(key);
+  await page.getByLabel("New password", { exact: true }).fill("new browser testing password 2026");
+  await page.getByRole("button", { name: "Reset password", exact: true }).click();
+  await page.getByRole("status").filter({ hasText: "Password changed" }).waitFor();
+  await other.reload();
+  await other.getByRole("button", { name: "Sign in", exact: true }).last().waitFor();
+  assert.deepEqual(errors, []);
+  console.log(
+    "Account audit passed: layouts, signup, profiles, cross-device library, restore, recovery, session revocation.",
+  );
+} finally {
+  await browser.close();
+}

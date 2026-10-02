@@ -27,6 +27,7 @@ export function Website({ children }: { children: ReactNode }) {
           Lootsplit<span>THE PARTY LEDGER</span>
         </Link>
         <nav aria-label="Website">
+          <Link to="/account">My account</Link>
           <Link to="/downloads" aria-current={path === "/downloads" ? "page" : undefined}>
             Downloads
           </Link>
@@ -58,7 +59,7 @@ export function Website({ children }: { children: ReactNode }) {
         <p>
           A companion for your tabletop adventures.
           <br />
-          No account required.
+          Accounts are optional.
         </p>
       </footer>
     </div>
@@ -159,6 +160,19 @@ export function WelcomePage() {
       </section>
       <section className="ls-wrap ls-callout">
         <div>
+          <p className="ls-eyebrow">YOUR CAMPAIGNS, CLOSE AT HAND</p>
+          <h2>A place for your adventures.</h2>
+          <p>
+            Sign in to save memberships, reusable character profiles, and private cloud backups when
+            you choose. Guest play stays available.
+          </p>
+        </div>
+        <Link className="ls-button ls-secondary" to="/account">
+          My campaign library <ArrowRight size={18} />
+        </Link>
+      </section>
+      <section className="ls-wrap ls-callout">
+        <div>
           <p className="ls-eyebrow">AT THE TABLE. ON THE GO.</p>
           <h2>Your ledger, within reach.</h2>
           <p>Open in your PC’s browser or take the Android app to your next session.</p>
@@ -186,8 +200,8 @@ export function DownloadsPage() {
             <span className="ls-tag">SIGNED RELEASE</span>
             <h2>Android</h2>
             <p>
-              The app on your phone, with native file saving and sharing. Shared rooms connect when
-              you’re online.
+              The app on your phone, with native file saving and sharing. The new account library is
+              available on the website first. Shared rooms connect when you’re online.
             </p>
             <div className="ls-version">
               Version {release.version} <span>Android 7.0+ · APK</span>
@@ -197,7 +211,7 @@ export function DownloadsPage() {
             </a>
             <p className="ls-small-copy">
               Having trouble? <a href={release.apkUrl}>Download from GitHub</a> or open this page in
-              Chrome.
+              Chrome. <a href="https://drive.google.com/file/d/1MT4by-7mNe7-7PANKbTwcbBOcd2CSKrr/view">Alternate download on Google Drive</a>.
             </p>
             <Link className="ls-text-link" to="/help" hash="android">
               Installation & update guide <ArrowRight size={16} />
@@ -382,8 +396,10 @@ export function HelpPage() {
             accepts it.
           </p>
           <p>
-            Accounts and an account-based campaign library are not available yet. Your current
-            guest, local, manual-sharing, and multiplayer options remain available.
+            Optional accounts now provide saved campaign memberships, private cloud backups, and
+            reusable character profiles on the website. Use My account to explicitly save a
+            membership or backup. Private PDFs stay device-local. Your current guest, local,
+            manual-sharing, and multiplayer options remain available.
           </p>
         </section>
         <section className="ls-help-block">

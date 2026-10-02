@@ -1,12 +1,12 @@
 # Website and download center
 
-Public pages: `/welcome`, `/downloads`, `/updates`, `/help`. Existing campaign routes, including `/`, keep their URLs. Public pages bypass campaign providers so browsing the website does not initialize a campaign. The app links back through Website & downloads on the desktop rail and mobile More menu.
+Public pages: `/welcome`, `/downloads`, `/updates`, `/help`. Existing campaign routes, including `/`, keep their URLs. Campaign providers remain mounted across public-page navigation to preserve account/campaign context while lazy routes load. The app links back through Website & downloads on the desktop rail and mobile More menu.
 
 The Android button calls `/download/android`. Its server-only handler fetches the fixed published GitHub APK, verifies SHA-256 before returning any APK bytes, and sets attachment/MIME headers. Failures return a non-cacheable 503 and recovery instructions; Downloads also links directly to GitHub. No URL from the visitor is fetched. Public downloads neither require a campaign nor access campaign state. This endpoint uses outbound GitHub access on the deployed Worker.
 
 `src/lib/website/release.json` is the reviewed release manifest. When publishing a newer permanent-signed APK, verify the asset first, update version/date/filename/URLs/checksum together, update release notes and version-code copy, and deploy the site. Do not point at an unreleased Android version merely because the web app version changed. The existing Android release/signing workflow is unchanged.
 
-PC access currently uses the browser app. Native Windows/macOS installers, account registration, a publishing dashboard, content packs, analytics, and a forum are outside this change. No domain purchase or DNS migration is performed. Keep the current browser origin for existing saves; a future custom domain needs an explicit backup/migration flow.
+PC access currently uses the browser app. Native Windows/macOS installers, a publishing dashboard, content packs, analytics, and a forum are outside this change. The separately released account library is preserved, with navigation and backup guidance integrated into these pages. No domain purchase or DNS migration is performed. Keep the current browser origin for existing saves; a future custom domain needs an explicit backup/migration flow.
 
 Verification: typecheck, web/mobile builds, existing full suite plus download failure/integrity/header tests. Browser verification checks all public pages at desktop/mobile widths and navigation back to the original application. Never test against real campaign rooms.
 

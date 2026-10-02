@@ -28,3 +28,7 @@ database_id = "78919bd1-caab-4655-8765-064797b250ad"
 name = "ROOM_ENTRY_LIMIT"
 namespace_id = "2026100201"
 simple = { limit = 60, period = 60 }
+
+[vars]
+ACCOUNT_ORIGIN = "https://lootsplit.oliverstorie2017.workers.dev"
+# ACCOUNT_SECRET is a Worker secret, never committed. Guest play does not depend on it.
