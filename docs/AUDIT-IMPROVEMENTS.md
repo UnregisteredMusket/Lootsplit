@@ -10,6 +10,8 @@ Implements necessary/high-value audit findings without optional account registra
 - Explain invitation versus existing room; deliberate switch saves a device backup, rejects pending actions, and confirms host room termination. Protected saves retain existing password flow.
 - Android Save file uses ACTION_CREATE_DOCUMENT with no broad storage permission; Share is retained. Cancellation/failure does not report a successful write.
 - Clarify local versus external backups and browser-only background notifications.
+- Stable server snapshots prevent hydration errors when reopening a restored room.
+- DM history offers expandable before/after details; player responses omit those new DM audit details.
 - Optional transactionType and structured journal changes preserve old saves. Historic values are not invented.
 - New rooms use eight cryptographically generated code characters; existing short codes still work.
 - Guest open/lookup/join rate limits use a Cloudflare edge binding, 60 attempts per action/network/minute. Established play does not share this budget. This is an edge-local abuse mitigation, not a global guarantee. Shared networks can reach the guest limit and receive a retry message. No automatic room expiration or data truncation.
@@ -19,4 +21,4 @@ Implements necessary/high-value audit findings without optional account registra
 Deploy matching Worker and assets together, retaining D1. Old Android clients remain supported by the additive schemas. Do not downgrade or replace campaign data during rollback. Preserve checkpoint commits and the permanent key. GitHub releases and APK version codes are immutable/increasing; a correction ships as a new version.
 
 ## Validation
-Local suite: 350 passed, four skipped; typecheck, Cloudflare and mobile builds passed. CI browser and Android compilation results are recorded in the release delivery; do not interpret this sentence as native hardware testing.
+Local suite: 351 passed, four skipped; typecheck, Cloudflare and mobile builds passed. CI browser and Android compilation results are recorded in the release delivery; do not interpret this sentence as native hardware testing.

@@ -21,6 +21,8 @@ async function open(width = 390) {
   await page.getByText("Campaign treasury", { exact: true }).waitFor();
   await page.waitForTimeout(2000); // Initial Vite dependency optimization can reload once.
   await page.getByText("Campaign treasury", { exact: true }).waitFor();
+  if (await skip.isVisible()) await skip.click();
+  await page.getByRole("dialog").waitFor({ state: "hidden" });
   return page;
 }
 try {

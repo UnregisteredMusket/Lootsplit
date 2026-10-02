@@ -105,3 +105,12 @@ test("lost acknowledgement can retry after an independent room read without doub
   assert.equal(recovered.table.ledger.length, 1);
   assert.equal(recovered.table.ledger[0]?.transactionType, "purchase");
 });
+
+
+test("structured DM audit details stay server-side for player responses", async () => {
+  const table = { ...emptyCloudTable(), purses: [{ id: "pc", name: "PC", kind: "character" as const, coins: emptyCoins() }], journal: { sessions: [], requests: [], events: [{ id: "price", at: 1, kind: "prices" as const, summary: "Price changed", change: { entity: "stock" as const, before: { copper: 10 }, after: { copper: 20 } } }] } };
+  const dm = await openRoom({ name: "DM", table });
+  const pc = await joinRoom({ code: dm.code, purseId: "pc", name: "PC" });
+  assert.equal((await roomState({ code: dm.code, token: pc.token })).table.journal?.events[0]?.change, undefined);
+  assert.equal((await roomState(dm)).table.journal?.events[0]?.change?.after?.copper, 20);
+});
