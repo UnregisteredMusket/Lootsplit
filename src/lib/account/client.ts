@@ -13,6 +13,10 @@ export async function accountRequest<T>(path: string, body?: unknown): Promise<T
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
   });
   const result = await response.json();
+  if (path === "activity" && response.status === 401)
+    localStorage.removeItem("lootsplit.account.active");
+  if (response.ok && path === "library") localStorage.setItem("lootsplit.account.active", "yes");
+  if (path === "auth/sign-out" && response.ok) localStorage.removeItem("lootsplit.account.active");
   if (!response.ok)
     throw new Error(
       result.error?.message ||
@@ -26,8 +30,18 @@ export async function accountRequest<T>(path: string, body?: unknown): Promise<T
   return result as T;
 }
 export type AccountLibrary = {
-  user: { id: string; name: string; email: string; role: "owner" | "member" };
-  members: { code: string; seat_id: string; name: string; archived: number; updated_at: number }[];
+  user: { id: string; name: string; email: string; role: SiteRole };
+  profile: MemberProfile;
+  notices: { action: string; reason: string; created_at: number }[];
+  members: {
+    role: "dm" | "player" | null;
+    room_revision: number | null;
+    code: string;
+    seat_id: string;
+    name: string;
+    archived: number;
+    updated_at: number;
+  }[];
   backups: { id: string; name: string; created_at: number }[];
   characters: CharacterProfile[];
   hasRecoveryKey: boolean;
@@ -41,4 +55,18 @@ export type AccountMembership = {
   role: "dm" | "player";
   purseIds: string[];
   name: string;
+};
+
+export type SiteRole = "owner" | "admin" | "moderator" | "member";
+export type MemberProfile = {
+  id: string;
+  name: string;
+  member_since: string | number;
+  last_online: number | null;
+  introduction: string;
+  portrait: string;
+  contact_email: string;
+  share_contact: number;
+  email_opt_in: number;
+  revision: number;
 };

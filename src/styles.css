@@ -347,3 +347,14 @@ input,select,textarea { max-width: 100%; }
 .owner-stats dt {font-size:14px;color:#c5cbd1;}.owner-stats dd {font-size:28px;color:#e4c58b;}
 .owner-form {display:grid;gap:16px;}.owner-form label {display:grid;gap:8px;}
 .owner-form input,.owner-form textarea {width:100%;min-height:44px;border:1px solid #566377;border-radius:6px;padding:12px;background:#102030;color:#f3ecdf;font:inherit;}
+
+.member-avatar { width: 88px; height: 88px; object-fit: cover; border-radius: 50%; }
+.member-row {display:flex;justify-content:space-between;align-items:center;gap:16px;border-bottom:1px solid #425166;padding:20px 0;overflow-wrap:anywhere;}
+.member-row p {margin:5px 0;}
+.member-introduction {white-space:pre-wrap;overflow-wrap:anywhere;}
+.staff-detail {margin-top:24px;padding-top:24px;border-top:1px solid #425166;}
+.owner-form select {width:100%;padding:12px;background:#101e2e;color:#eee;border:1px solid #425166;border-radius:6px;}
+.owner-form fieldset {border:0;padding:0;display:grid;gap:16px;min-width:0;}
+.owner-form .portal-check {display:flex;align-items:center;gap:10px;}
+.owner-form .portal-check input {width:auto;}
+@media(max-width:600px){.member-row{align-items:stretch;flex-direction:column;}}

@@ -51,3 +51,11 @@ Not implemented or promised by this inventory: OCR, Google Drive backup integrat
 - Donate is public and optional. An owner can set or clear an external HTTPS donation URL; no payment credentials are stored by Lootsplit.
 - My account exposes Owner controls only for a server-assigned owner role: aggregate site counts, homepage announcement publish/hide, and donation destination.
 - Every privileged request rechecks the role. Updates are audited and revision-checked. Site ownership does not bypass campaign or private library permissions.
+
+## Member accounts and moderation
+- Owner-only grants/revocations for admin and moderator roles, protected owner and self accounts, fresh sign-in required for role changes.
+- Searchable, paginated staff member directory with effective account status, member-since and approximate last-online dates, profile review and moderation history.
+- Warnings, temporary/permanent bans, access revocation/restoration, session revocation, and profile-content moderation. Moderators can warn/clear profiles and suspend ordinary members for up to 30 days; admins manage ordinary members; the owner manages other staff.
+- Restrictions terminate account sessions and block associated room-seat credentials. They do not erase local data or remove anonymous guest support.
+- Member profiles include display name, raster profile image, introduction, optional messaging email and explicit moderator visibility choice. Email-update preferences default off and record consent; sending is not configured.
+- Account page includes existing local campaign controls plus shared-membership rename and linked-DM deletion. Shared deletion checks current revision, refuses pending turns, retains a private snapshot of DM-visible saved data, and cleans up memberships and push subscriptions.

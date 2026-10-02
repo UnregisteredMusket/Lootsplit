@@ -1,3 +1,6 @@
+import { ProfileControls } from "@/components/account/profile-controls";
+import { StaffControls } from "@/components/account/staff-controls";
+import { Campaigns } from "@/components/campaigns";
 import { OwnerControls } from "@/components/account/owner-controls";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { useEffect, useState, useSyncExternalStore, type FormEvent } from "react";
@@ -174,6 +177,27 @@ function Account() {
           </p>
         )}
         {library?.user.role === "owner" && <OwnerControls />}
+        {library && (
+          <>
+            {library.notices.map((n, i) => (
+              <p key={i} className="portal-message" role="status">
+                Staff warning ({new Date(n.created_at).toLocaleDateString()}): {n.reason}
+              </p>
+            ))}
+            <ProfileControls profile={library.profile} onSaved={reload} />
+            {library.user.role !== "member" && (
+              <StaffControls userId={library.user.id} role={library.user.role} />
+            )}
+            <section className="portal-card">
+              <h2>Campaigns on this device</h2>
+              <p>
+                These campaigns are stored on this device, separately from your shared memberships
+                and cloud backups.
+              </p>
+              <Campaigns />
+            </section>
+          </>
+        )}
         {key && (
           <section className="portal-key" aria-label="Recovery key">
             <ShieldCheck />
@@ -367,6 +391,51 @@ function Account() {
                         Last used {new Date(m.updated_at).toLocaleDateString()}
                       </p>
                       <div className="portal-actions">
+                        <button
+                          className="portal-button secondary"
+                          disabled={busy}
+                          onClick={action(async () => {
+                            const name = window.prompt("Campaign name in your library", m.name);
+                            if (!name) return;
+                            await accountRequest("campaign", {
+                              action: "rename",
+                              code: m.code,
+                              name,
+                            });
+                            await reload();
+                          })}
+                        >
+                          Rename
+                        </button>
+                        {m.role === "dm" && (
+                          <button
+                            className="portal-button secondary"
+                            disabled={busy}
+                            onClick={action(async () => {
+                              if (cloud.joined && cloud.code === m.code && hasPendingChanges())
+                                throw new Error(
+                                  "Submit or export pending changes before deleting this campaign.",
+                                );
+                              const confirm = window.prompt(
+                                `Delete shared campaign ${m.name} for everyone? A private cloud backup of its saved state will be kept. Device copies remain. Type ${m.code} to confirm.`,
+                              );
+                              if (confirm !== m.code) return;
+                              await accountRequest("campaign", {
+                                action: "delete",
+                                code: m.code,
+                                confirm,
+                                revision: m.room_revision,
+                              });
+                              if (cloud.joined && cloud.code === m.code) leaveTable();
+                              await reload();
+                              setNotice(
+                                "Shared campaign deleted. Its saved state is in Cloud backups.",
+                              );
+                            })}
+                          >
+                            Delete shared campaign
+                          </button>
+                        )}
                         <button
                           className="portal-button"
                           disabled={busy}
