@@ -12,6 +12,8 @@ async function visit(page, url) {
 }
 async function open(width = 390) {
   const context = await browser.newContext({ viewport: { width, height: 844 } });
+  context.setDefaultTimeout(20000);
+  context.setDefaultNavigationTimeout(30000);
   const page = await context.newPage();
   page.on("pageerror", (e) => errors.push(e.message));
   await visit(page, origin);
@@ -29,9 +31,12 @@ try {
   // Warm Vite's lazy dependency optimizer before collecting application errors.
   // The first development navigation may be invalidated by dependency discovery.
   const warmup = await browser.newPage();
+  warmup.setDefaultTimeout(20000);
+  warmup.setDefaultNavigationTimeout(30000);
   await visit(warmup, origin);
   await warmup.waitForTimeout(4000);
   await warmup.close();
+  console.log("Audit: open DM");
   const dm = await open();
   // Disposable local test server only. Provision known balances without changing app defaults.
   await dm.evaluate(async () => {
@@ -48,6 +53,7 @@ try {
     async () => (await import("/src/lib/quire/cloud-client.ts")).getCloudTable().code,
   );
   assert.match(code, /^[A-Z2-9]{8}$/);
+  console.log("Audit: room created; open player");
   const player = await open();
   await visit(player, origin + "/share?join=" + code);
   await player.getByPlaceholder("Enter your code").waitFor();
@@ -56,12 +62,14 @@ try {
   await player.getByPlaceholder("What should the party call you?").fill("Audit player");
   await player.getByRole("button", { name: "Join room", exact: true }).click();
   await player.getByRole("button", { name: "Share join link", exact: true }).waitFor();
+  console.log("Audit: player joined; test conflicting invitation");
   await visit(player, origin + "/share?join=TEST1234");
   await player
     .getByText(`Invitation to TEST1234. You are currently connected to ${code}.`, { exact: true })
     .waitFor();
   await player.getByRole("button", { name: "Stay in this room", exact: true }).click();
   assert.equal(new URL(player.url()).searchParams.has("join"), false);
+  console.log("Audit: interrupt purchase and restore queue");
   // Interrupt only API transport so the app and saved queue can reload normally.
   await player.route("**/_serverFn/**", (route) => route.request().postData()?.includes("commands") ? route.abort("failed") : route.continue());
   await player.evaluate(async () => {
@@ -93,6 +101,7 @@ try {
     async () => (await import("/src/lib/quire/cloud-client.ts")).getCloudTable().pending,
   );
   assert.equal(count, 0);
+  console.log("Audit: recovery passed; inspect responsive routes");
   // Player and DM responsive entry points remain rendered.
   for (const page of [dm, player]) {
     for (const route of ["/", "/party", "/market", "/share", "/settings"]) {

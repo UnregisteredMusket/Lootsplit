@@ -6,6 +6,7 @@ on:
     branches: ["main"]
     paths:
       - "src/lib/quire/version.ts"
+      - ".github/workflows/android-release.yml"
 
 permissions:
   contents: write

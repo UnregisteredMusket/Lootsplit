@@ -23,6 +23,7 @@ jobs:
       - run: npm run build:mobile
       - run: npx playwright install --with-deps chromium
       - name: Browser recovery and UI checks
+        timeout-minutes: 4
         run: |
           npm run dev > /tmp/lootsplit-dev.log 2>&1 &
           for attempt in $(seq 1 60); do
