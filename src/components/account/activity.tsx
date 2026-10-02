@@ -5,8 +5,13 @@ export function MemberActivity() {
   useEffect(() => {
     let stopped = false;
     let busy = false;
+    const checkedKey = "lootsplit.activity.checked.v1";
     const record = async () => {
       if (stopped || busy || document.visibilityState !== "visible") return;
+      // Survive full-page navigation: frequent page visits must not multiply auth probes.
+      const checked = Number(sessionStorage.getItem(checkedKey) || 0);
+      if (Date.now() - checked < 240000) return;
+      sessionStorage.setItem(checkedKey, String(Date.now()));
       busy = true;
       try {
         const session = await accountRequest<{ user?: unknown } | null>("auth/get-session");
