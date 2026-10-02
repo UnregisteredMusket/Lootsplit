@@ -205,7 +205,7 @@ async function freshCode(): Promise<string> {
   const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   for (let attempt = 0; attempt < 20; attempt += 1) {
     let code = "";
-    for (let i = 0; i < 5; i += 1) code += alphabet[Math.floor(Math.random() * alphabet.length)];
+    for (const byte of crypto.getRandomValues(new Uint8Array(8))) code += alphabet[byte % alphabet.length];
     if (!(await readRoom(code))) return code;
   }
   throw new Error("Could not open a table. Try again.");

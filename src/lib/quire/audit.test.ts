@@ -24,6 +24,8 @@ test("shop and market purchases commit coins, inventory, stock, and ledger", asy
   await ensureEconomy();
   const purse = (await listPurses()).find((item) => item.kind === "character")!;
   const stock = (await listStock()).find((item) => item.quantity !== null && item.copper === 2)!;
+  purse.coins = { ...emptyCoins(), gp: 10 };
+  await savePurse(purse);
   const before = toCopper(purse.coins);
   await buyFromShop({ stockId:stock.id, purseId:purse.id, quantity:2 });
   assert.equal(toCopper((await listPurses()).find((item) => item.id === purse.id)!.coins), before - 4);

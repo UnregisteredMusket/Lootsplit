@@ -6,6 +6,7 @@ import { getRoomPushSettings, updateRoomPushSubscription } from "@/lib/quire/clo
 
 export function PushNotices() {
   const room = useSyncExternalStore(subscribeCloudTable, getCloudTable, getCloudTable);
+  const native = import.meta.env.VITE_MOBILE === "true";
   const [enabled, setEnabled] = useState(false);
   const [busy, setBusy] = useState(false);
   const [hint, setHint] = useState(
@@ -14,7 +15,8 @@ export function PushNotices() {
   useEffect(() => {
     let cancelled = false;
     setEnabled(false);
-    if (!room.joined || !("serviceWorker" in navigator) || !("PushManager" in window)) return;
+    if (native || !room.joined || !("serviceWorker" in navigator) || !("PushManager" in window))
+      return;
     void (async () => {
       const reg = await navigator.serviceWorker.getRegistration("/notify-sw.js");
       const sub = await reg?.pushManager.getSubscription();
@@ -89,12 +91,16 @@ export function PushNotices() {
     <div className="mb-5 border-b border-border pb-5">
       <h3 className="text-xl">Background message alerts</h3>
       <p className="mt-2 text-sm text-muted" role="status">
-        {room.joined ? hint : "Join a room to enable background message alerts."}
+        {native
+          ? "Background push is available on the website in a supported browser. This Android app does not yet receive native push while closed. Live chat remains available while connected."
+          : room.joined
+            ? hint
+            : "Join a room to enable background message alerts."}
       </p>
       <Button
         className="mt-3"
         variant="secondary"
-        disabled={!room.joined || busy}
+        disabled={native || !room.joined || busy}
         onClick={() => void toggle()}
       >
         <Bell size={16} />

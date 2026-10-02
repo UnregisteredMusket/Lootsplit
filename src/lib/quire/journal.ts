@@ -36,6 +36,18 @@ export const journalSchema = z.object({
         summary: z.string().max(500),
         kind: z.enum(["management", "prices", "request", "session"]),
         purseId: id.optional(),
+        change: z
+          .object({
+            entity: z.enum(["stock", "realm", "shop", "holding", "account"]),
+            entityId: id.optional(),
+            before: z
+              .record(z.string(), z.union([z.string(), z.number().finite(), z.boolean(), z.null()]))
+              .nullable(),
+            after: z
+              .record(z.string(), z.union([z.string(), z.number().finite(), z.boolean(), z.null()]))
+              .nullable(),
+          })
+          .optional(),
       }),
     )
     .default([]),
@@ -65,7 +77,11 @@ export function sessionSummary(
       (!purseIds || purseIds.includes(x.purseId)),
   );
   // An account movement is not campaign income. Legacy transfers are identified by their recorded summaries.
-  const external = rows.filter((x) => !/^(Transfer (sent|received)$|Gave )/.test(x.summary));
+  const external = rows.filter((x) =>
+    x.transactionType
+      ? x.transactionType !== "transfer"
+      : !/^(Transfer (sent|received)$|Gave )/.test(x.summary),
+  );
   return {
     net: rows.reduce((n, x) => n + x.copper, 0),
     received: external.reduce((n, x) => n + Math.max(0, x.copper), 0),

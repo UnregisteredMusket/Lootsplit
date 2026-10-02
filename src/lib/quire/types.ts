@@ -110,6 +110,7 @@ export type RealmSettings = {
 };
 
 export type LedgerLine = {
+  transactionType?: "transfer" | "purchase" | "sale" | "loan" | "payment" | "adjustment" | "void";
   id: string;
   at: number;
   purseId: string;

@@ -88,3 +88,20 @@ test("push subscriptions require membership and preserve stable signing keys", a
   assert.equal(validPushEndpoint("https://fcm.googleapis.com.evil.example/test"),false);
   assert.equal(validPushEndpoint("https://user@fcm.googleapis.com/test"),false);
 });
+
+test("lost acknowledgement can retry after an independent room read without double spending", async () => {
+  const table = { ...emptyCloudTable(), purses: [{ id: "recover", name: "Recover", kind: "character" as const, coins: { ...emptyCoins(), gp: 5 } }], shops: [{ id: "recovery-shop", name: "Shop", keeper: "", place: "", notes: "", sellRate: 1, buyRate: .5, wealth: "modest" as const, category: "general" as const, priceScale: 1 }], stock: [{ id: "recovery-item", shopId: "recovery-shop", name: "Item", copper: 10, quantity: 3, notes: "", baseCopper: 10, rarity: "common" as const }] };
+  const opened = await openRoom({ name: "Recovery test", table });
+  const { choosePace } = await import("./cloud.server.ts");
+  await choosePace({ ...opened, live: true });
+  const player = await joinRoom({ code: opened.code, purseId: "recover", name: "Player" });
+  const savedRequest = JSON.stringify({ code: opened.code, token: player.token, batchId: "persisted-batch", commands: [{ id: "persisted-buy", kind: "buy", purseId: "recover", stockId: "recovery-item", quantity: 1 }] });
+  await submitCommands(JSON.parse(savedRequest)); // Simulate committed request whose response was lost.
+  const beforeRetry = await roomState({ code: opened.code, token: player.token });
+  assert.equal(beforeRetry.table.stock[0]?.quantity, 2);
+  await submitCommands(JSON.parse(savedRequest)); // Recovered persisted queue.
+  const recovered = await roomState(opened);
+  assert.equal(recovered.table.stock[0]?.quantity, 2);
+  assert.equal(recovered.table.ledger.length, 1);
+  assert.equal(recovered.table.ledger[0]?.transactionType, "purchase");
+});

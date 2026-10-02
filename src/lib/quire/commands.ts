@@ -114,6 +114,7 @@ export function applyCommand(input: CloudTable, seat: CloudSeat, raw: Command): 
     summary: string,
     kind: "management" | "prices" | "request" | "session" = "management",
     purseId?: string,
+    change?: NonNullable<CloudTable["journal"]>["events"][number]["change"],
   ) => {
     if (cmd.kind === "patch" && cmd.changes.some((c) => c.store === "journal")) return;
     journal.events.push({
@@ -122,6 +123,7 @@ export function applyCommand(input: CloudTable, seat: CloudSeat, raw: Command): 
       summary,
       kind,
       ...(purseId ? { purseId } : {}),
+      ...(change ? { change } : {}),
     });
   };
   const own = (purseId: string) => {
@@ -148,7 +150,25 @@ export function applyCommand(input: CloudTable, seat: CloudSeat, raw: Command): 
     copper: number,
     shopId: string | null = null,
     suffix = "",
-  ) => t.ledger.push({ id: cmd.id + suffix, at, purseId, shopId, summary, copper });
+  ) =>
+    t.ledger.push({
+      id: cmd.id + suffix,
+      at,
+      purseId,
+      shopId,
+      summary,
+      copper,
+      transactionType:
+        cmd.kind === "give"
+          ? "transfer"
+          : cmd.kind === "buy" || cmd.kind === "listing"
+            ? "purchase"
+            : cmd.kind === "sell"
+              ? "sale"
+              : cmd.kind === "decision"
+                ? "loan"
+                : "payment",
+    });
   const score = (purseId: string) =>
     t.purses.find((p) => p.id === purseId)?.kind === "party"
       ? null
@@ -357,6 +377,12 @@ export function applyCommand(input: CloudTable, seat: CloudSeat, raw: Command): 
             500,
           ),
           "prices",
+          undefined,
+          {
+            entity: "realm",
+            before: change.before as Record<string, number> | null,
+            after: change.after as Record<string, number> | null,
+          },
         );
         continue;
       }
@@ -375,6 +401,13 @@ export function applyCommand(input: CloudTable, seat: CloudSeat, raw: Command): 
         event(
           `${(change.after as { name: string }).name}: ${(change.before as { copper: number }).copper} cp → ${(change.after as { copper: number }).copper} cp`,
           "prices",
+          undefined,
+          {
+            entity: "stock",
+            entityId: change.id,
+            before: { copper: (change.before as { copper: number }).copper },
+            after: { copper: (change.after as { copper: number }).copper },
+          },
         );
       const rows = (t[change.store] ?? []) as any[];
       const rowId = (x: any) => (change.store === "sheets" ? x.purseId : x.id);

@@ -5,6 +5,8 @@ import type { BillFile } from "./table.ts";
 export const openCloudTable = createServerFn({ method: "POST" })
   .validator((input: { name: string; table: CloudTable }) => input)
   .handler(async ({ data }) => {
+    const { limitRoomEntry } = await import("./room-limits.server.ts");
+    await limitRoomEntry("open");
     const { openRoom } = await import("./cloud.server.ts");
     return openRoom(data);
   });
@@ -12,6 +14,8 @@ export const openCloudTable = createServerFn({ method: "POST" })
 export const previewCloudTable = createServerFn({ method: "POST" })
   .validator((input: { code: string }) => input)
   .handler(async ({ data }) => {
+    const { limitRoomEntry } = await import("./room-limits.server.ts");
+    await limitRoomEntry("lookup");
     const { previewRoom } = await import("./cloud.server.ts");
     return previewRoom(data.code);
   });
@@ -19,6 +23,8 @@ export const previewCloudTable = createServerFn({ method: "POST" })
 export const joinCloudTable = createServerFn({ method: "POST" })
   .validator((input: { code: string; purseId: string; name: string }) => input)
   .handler(async ({ data }) => {
+    const { limitRoomEntry } = await import("./room-limits.server.ts");
+    await limitRoomEntry("join");
     const { joinRoom } = await import("./cloud.server.ts");
     return joinRoom(data);
   });

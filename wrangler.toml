@@ -21,3 +21,10 @@ migrations_dir = "cloudflare/migrations"
 [[previews.d1_databases]]
 binding = "DB"
 database_id = "78919bd1-caab-4655-8765-064797b250ad"
+
+# Guest entry only; established players' sync/commands are not throttled by this budget.
+# Conservative per-network allowance supports groups sharing Wi-Fi. Edge-local, not a global quota.
+[[ratelimits]]
+name = "ROOM_ENTRY_LIMIT"
+namespace_id = "2026100201"
+simple = { limit = 60, period = 60 }

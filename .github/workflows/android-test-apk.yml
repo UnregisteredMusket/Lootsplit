@@ -5,6 +5,7 @@ on:
   push:
     branches:
       - 'android/**'
+      - 'improvement/**'
 
 permissions:
   contents: read

@@ -39,3 +39,11 @@ Do not commit `*.jks`, `*.keystore`, or those passwords. The manual **Android si
 The permanent keystore was generated on 2026-10-01, downloaded by the owner for backup, and configured through the four repository secrets. Its alias is `lootsplit`. The workflow requires certificate SHA-256 `BA:CA:95:A8:80:D1:4D:0D:8C:42:2C:39:7D:EC:D4:C9:BF:0E:7F:71:0A:3F:D6:A5:BE:1E:47:AB:D3:F7:30:A0` and refuses to upload an APK signed by another key. Keep the keystore and passwords backed up securely. Never generate a fresh key automatically during a build.
 
 The first release-signed APK cannot normally replace the old debug-signed installation. Export and verify all local campaigns before a one-time uninstall/reinstall; thereafter retain this signing key and increase versionCode for every distributed update.
+
+## Releases from main (1.3.1 onward)
+
+`main` is the shared web/Android source. Increase `APP_VERSION`, Android `versionName`, and Android `versionCode` together, update `docs/RELEASE-NOTES.md`, and merge verified changes. A version-file change on main starts the signed-release workflow; it can also be run manually on main. Tests, type checking, both builds, monotonic version checks, and the permanent certificate check must pass. A versioned GitHub Release holds `Lootsplit-VERSION.apk` and `SHA256SUMS.txt`; do not overwrite an existing release. Actions artifacts remain available as secondary downloads.
+
+Android exports now ask whether to Save file or Share. Save file uses Android's document picker and reports success only after writing/closing the stream. Choose Downloads or another location outside app-private storage. Sharing only hands the file to another application: confirm that application's save/send completed. Cancelling preserves the campaign and named device backup. Neither private device backups nor shared room membership replace an external backup.
+
+The bundled Android client must be updated by installing the newer signed APK. Changes deployed to the website do not rewrite its bundled interface. The backend remains the existing Cloudflare Worker.

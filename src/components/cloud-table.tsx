@@ -2,6 +2,7 @@ import { useEffect, useState, useSyncExternalStore } from "react";
 import { Copy, Crown, DoorOpen, Radio, Users, ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
 import {
+  captureDeviceBackup,
   chooseTableMode,
   endTableTurn,
   getCloudTable,
@@ -19,6 +20,9 @@ import { API_ORIGIN } from "@/lib/mobile/origin";
 import { getOnline, subscribeOnline } from "@/lib/mobile/online";
 import { Button, TextInput, Confirm, Field, Fold } from "@/components/ui";
 
+import { rememberSave } from "@/lib/quire/saves";
+import { loadSeatLock } from "@/lib/quire/lock";
+
 const EMPTY = getCloudTable();
 type Mode = "local" | "turns" | "live";
 
@@ -32,6 +36,8 @@ export function CloudTable() {
   const [purseId, setPurseId] = useState("");
   const [busy, setBusy] = useState(false);
   const [joining, setJoining] = useState(false);
+  const [invitation, setInvitation] = useState("");
+  const [switchInvite, setSwitchInvite] = useState(false);
   const [hosting, setHosting] = useState(false);
   const [hostMode, setHostMode] = useState<"live" | "turns">("live");
   const [lookedUp, setLookedUp] = useState(false);
@@ -44,6 +50,13 @@ export function CloudTable() {
   useEffect(() => {
     resumeTable();
     const invite = new URLSearchParams(window.location.search).get("join");
+    if (invite)
+      setInvitation(
+        invite
+          .toUpperCase()
+          .replace(/[^A-Z0-9]/g, "")
+          .slice(0, 12),
+      );
     if (invite && !getCloudTable().joined) {
       setCode(
         invite
@@ -54,6 +67,32 @@ export function CloudTable() {
       setJoining(true);
     }
   }, []);
+
+  function dismissInvitation() {
+    setInvitation("");
+    const url = new URL(window.location.href);
+    url.searchParams.delete("join");
+    window.history.replaceState(window.history.state, "", url);
+  }
+
+  async function prepareInvitation() {
+    if ((await loadSeatLock())?.protectSaves)
+      throw new Error(
+        "Save a password-protected backup in Device backups, then leave or end this room before opening the invitation again.",
+      );
+    const file = await captureDeviceBackup();
+    await rememberSave({
+      name: `Before switching from ${cloud.code}`,
+      campaignId: localStorage.getItem("quire.campaign.v1") || "main",
+      file,
+    });
+    if (host) await chooseTableMode("local");
+    else leaveTable();
+    setCode(invitation);
+    setJoining(true);
+    setCharacters([]);
+    setLookedUp(false);
+  }
 
   function run(work: () => Promise<unknown>, ok?: string) {
     if (busy) return;
@@ -105,6 +144,48 @@ export function CloudTable() {
 
   return (
     <div className="multiplayer-hub" aria-busy={busy}>
+      {invitation && cloud.joined ? (
+        <div className="mb-4 rounded-xl border border-border p-4" role="status">
+          <p>
+            {invitation === cloud.code
+              ? `You are already connected to room ${cloud.code}.`
+              : `Invitation to ${invitation}. You are currently connected to ${cloud.code}.`}
+          </p>
+          <div className="mt-3 flex flex-wrap gap-2">
+            <Button variant="secondary" onClick={dismissInvitation}>
+              Stay in this room
+            </Button>
+            {invitation !== cloud.code ? (
+              <Button
+                disabled={unavailable || cloud.pending > 0}
+                onClick={() => setSwitchInvite(true)}
+              >
+                Switch rooms…
+              </Button>
+            ) : null}
+          </div>
+          {cloud.pending > 0 ? (
+            <p className="mt-2 text-sm text-muted">
+              Submit or resolve pending actions before switching.
+            </p>
+          ) : null}
+        </div>
+      ) : null}
+      <Confirm
+        open={switchInvite}
+        onOpenChange={setSwitchInvite}
+        title="Switch to the invited room?"
+        body={
+          host
+            ? "A device backup will be saved first. This ends your hosted room for everyone and invalidates its code. Then you can choose a character in the invited room."
+            : "A device backup will be saved first. You will leave this room; its host may need to release your character if you return. Then you can choose a character in the invited room."
+        }
+        confirmLabel={host ? "Back up, end room and continue" : "Back up and continue"}
+        onConfirm={() => {
+          setSwitchInvite(false);
+          run(prepareInvitation);
+        }}
+      />
       <p className="room-status" role="status">
         <span
           className={online && cloud.joined && !cloud.error ? "status-dot connected" : "status-dot"}
@@ -375,7 +456,10 @@ export function CloudTable() {
           ) : null}
           <section className="mt-6" aria-label="Room players">
             <h2 className="mb-3 text-2xl text-lead">Joined participants ({cloud.seats.length})</h2>
-            <p className="mb-3 text-sm text-muted">Joined participants may be offline. Your connection status appears above.</p><ul className="player-roster">
+            <p className="mb-3 text-sm text-muted">
+              Joined participants may be offline. Your connection status appears above.
+            </p>
+            <ul className="player-roster">
               {cloud.seats.map((item) => (
                 <li key={item.id}>
                   <span className="member-avatar">

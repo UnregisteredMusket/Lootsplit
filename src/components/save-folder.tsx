@@ -128,7 +128,7 @@ export function SaveFolder() {
       setName("");
       toast.success(
         next.download && shared
-          ? "Backup downloaded and saved on this device."
+          ? "Backup export completed. Verify the file in your chosen destination."
           : next.download
             ? "Backup saved on this device. The file was not shared."
             : "Backup saved on this device.",
@@ -158,7 +158,12 @@ export function SaveFolder() {
     }
     const download =
       gate?.protectSaves && password ? await lockFile(plain, password, gate.salt) : plain;
-    await downloadJson(saveDownloadName(next.save.name, next.save.savedAt), download);
+    const saved = await downloadJson(saveDownloadName(next.save.name, next.save.savedAt), download);
+    if (saved)
+      toast.success(
+        "Backup export completed. Keep and verify the file outside the app for recovery.",
+      );
+    else toast.info("Export cancelled. Your device backup is still available.");
   }
 
   function start(next: Ask, confirmed = false) {
@@ -216,8 +221,10 @@ export function SaveFolder() {
       <p className="text-sm text-muted">
         Save stores a named backup on this device. Export downloads it. Import adds a backup file to
         this list. Load replaces the current campaign with the selected backup. Download backup
-        saves the current campaign as a file on your device. Browser copies can be lost if you clear
-        site data; keep a downloaded copy too.
+        saves the current campaign as a file on your device. Device copies can be lost if you clear
+        site data, clear app storage, or uninstall. Keep an exported file outside the app, and
+        verify it by importing it before relying on it. Import adds a copy without replacing the
+        current campaign.
         {lock?.protectSaves
           ? " These actions ask for the campaign password, and the file is locked."
           : ""}

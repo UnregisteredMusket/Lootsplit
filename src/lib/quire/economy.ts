@@ -180,15 +180,13 @@ async function seedEconomy(): Promise<void> {
       kind: "party",
       coins: { cp: 30, sp: 18, ep: 0, gp: 45, pp: 0 },
     },
-    ...["Drugis Falkson", "Sigurdr Falkson", "Hemi", "Hrogvir", "Kaito"].map(
-      (name): Purse => ({
-        id: crypto.randomUUID(),
-        name,
-        kind: "character",
-        control: "player",
-        coins: emptyCoins(),
-      }),
-    ),
+    ...["Drugis Falkson", "Sigurdr Falkson", "Hemi", "Hrogvir", "Kaito"].map((name): Purse => ({
+      id: crypto.randomUUID(),
+      name,
+      kind: "character",
+      control: "player",
+      coins: emptyCoins(),
+    })),
   ];
   const holdings: Holding[] = [
     {
@@ -351,6 +349,8 @@ export async function saveRealm(settings: RealmSettings): Promise<void> {
           500,
         ),
         "prices",
+        undefined,
+        { entity: "realm", before: { ...clampRealm(before) }, after: { ...next } },
       );
   });
 }
@@ -492,7 +492,8 @@ export async function repriceShop(shop: Shop): Promise<void> {
   );
   const tx = db.transaction(["shops", "stock", "meta"], "readwrite");
   const done = finish(tx);
-  const history: string[] = [];
+  const history: { summary: string; change: NonNullable<Journal["events"][number]["change"]> }[] =
+    [];
   tx.objectStore("shops").put(normalized);
   for (const line of lines) {
     const current = normalizeStock(line);
@@ -510,10 +511,25 @@ export async function repriceShop(shop: Shop): Promise<void> {
       realm,
     });
     if (current.copper !== copper)
-      history.push(`${current.name}: ${current.copper} cp → ${copper} cp`);
+      history.push({
+        summary: `${current.name}: ${current.copper} cp → ${copper} cp`,
+        change: {
+          entity: "stock",
+          entityId: current.id,
+          before: { copper: current.copper },
+          after: { copper },
+        },
+      });
     tx.objectStore("stock").put({ ...current, baseCopper: base, rarity, copper });
   }
-  for(const change of history)await audit(tx,`${normalized.name}: ${change}`.slice(0,500),"prices");
+  for (const change of history)
+    await audit(
+      tx,
+      `${normalized.name}: ${change.summary}`.slice(0, 500),
+      "prices",
+      undefined,
+      change.change,
+    );
   await done;
 }
 
@@ -535,6 +551,12 @@ export async function savePurse(purse: Purse): Promise<void> {
       `${old ? "Updated" : "Created"} account: ${purse.name}`,
       "management",
       purse.id,
+      {
+        entity: "account",
+        entityId: purse.id,
+        before: old ? { name: old.name, kind: old.kind } : null,
+        after: { name: purse.name, kind: purse.kind },
+      },
     );
   });
 }
@@ -548,6 +570,25 @@ export async function saveShop(shop: Shop): Promise<void> {
       tx,
       `${before ? "Updated" : "Created"} shop: ${shop.name}${shop.closed ? " (closed)" : " (open)"}`,
       "management",
+      undefined,
+      {
+        entity: "shop",
+        entityId: shop.id,
+        before: before
+          ? {
+              name: before.name,
+              closed: !!before.closed,
+              buyRate: before.buyRate,
+              sellRate: before.sellRate,
+            }
+          : null,
+        after: {
+          name: shop.name,
+          closed: !!shop.closed,
+          buyRate: shop.buyRate,
+          sellRate: shop.sellRate,
+        },
+      },
     );
   });
 }
@@ -558,7 +599,18 @@ export async function saveStock(line: StockLine): Promise<void> {
     const before = await request<StockLine | undefined>(tx.objectStore("stock").get(line.id));
     tx.objectStore("stock").put(line);
     if (before && before.copper !== line.copper)
-      await audit(tx, `${line.name}: ${before.copper} cp → ${line.copper} cp`, "prices");
+      await audit(
+        tx,
+        `${line.name}: ${before.copper} cp → ${line.copper} cp`,
+        "prices",
+        undefined,
+        {
+          entity: "stock",
+          entityId: line.id,
+          before: { copper: before.copper },
+          after: { copper: line.copper },
+        },
+      );
   });
 }
 
@@ -697,8 +749,17 @@ function logLine(
   shopId: string | null,
   summary: string,
   copper: number,
+  transactionType: LedgerLine["transactionType"] = "adjustment",
 ): LedgerLine {
-  return { id: crypto.randomUUID(), at: Date.now(), purseId, shopId, summary, copper };
+  return {
+    id: crypto.randomUUID(),
+    at: Date.now(),
+    purseId,
+    shopId,
+    summary,
+    copper,
+    transactionType,
+  };
 }
 
 async function charismaOf(purseId: string): Promise<number | null> {
@@ -774,7 +835,7 @@ export async function buyFromShop(input: {
     const summary =
       `Bought ${quantity} ${stock.name} from ${shop.name}` +
       (percent ? `, Charisma ${score}, ${percent}% off` : "");
-    tx.objectStore("ledger").put(logLine(purse.id, shop.id, summary, -cost));
+    tx.objectStore("ledger").put(logLine(purse.id, shop.id, summary, -cost, "purchase"));
   });
 }
 
@@ -802,7 +863,7 @@ export async function sellToShop(input: {
     if (holding.quantity === quantity) tx.objectStore("holdings").delete(holding.id);
     else tx.objectStore("holdings").put({ ...holding, quantity: holding.quantity - quantity });
     tx.objectStore("ledger").put(
-      logLine(purse.id, shop.id, `Sold ${quantity} ${holding.name} to ${shop.name}`, paid),
+      logLine(purse.id, shop.id, `Sold ${quantity} ${holding.name} to ${shop.name}`, paid, "sale"),
     );
   });
 }
@@ -927,7 +988,7 @@ export async function giveToPlayer(input: {
       }
     }
     if (sitting.role !== "player" && to)
-      tx.objectStore("ledger").put(logLine(to.id, null, "Transfer received", copper));
+      tx.objectStore("ledger").put(logLine(to.id, null, "Transfer received", copper, "transfer"));
     if (pending) tx.objectStore("meta").put({ id: "gifts", gifts: pending });
     tx.objectStore("ledger").put(
       logLine(
@@ -935,6 +996,7 @@ export async function giveToPlayer(input: {
         null,
         sitting.role !== "player" && to ? "Transfer sent" : `Gave ${toName} ${giftParts(gift)}`,
         copper > 0 ? -copper : 0,
+        "transfer",
       ),
     );
   });
@@ -1030,7 +1092,7 @@ export async function buyListing(input: {
     const summary =
       `Bought ${quantity} ${listing.name} from the market` +
       (percent ? `, Charisma ${score}, ${percent}% off` : "");
-    tx.objectStore("ledger").put(logLine(purse.id, null, summary, -cost));
+    tx.objectStore("ledger").put(logLine(purse.id, null, summary, -cost, "purchase"));
   });
 }
 
@@ -1081,7 +1143,13 @@ export async function decideLoan(id: string, status: LoanStatus): Promise<void> 
       if (!purse) throw new Error("This account no longer exists.");
       tx.objectStore("purses").put({ ...purse, coins: gain(purse.coins, loan.copper) });
       tx.objectStore("ledger").put(
-        logLine(purse.id, null, `Approved a loan of ${formatCopper(loan.copper)}`, loan.copper),
+        logLine(
+          purse.id,
+          null,
+          `Approved a loan of ${formatCopper(loan.copper)}`,
+          loan.copper,
+          "loan",
+        ),
       );
     }
     tx.objectStore("meta").put({
@@ -1206,7 +1274,13 @@ export async function voidLedgerLine(id: string): Promise<void> {
       tx.objectStore("stock").put({ ...shelf, quantity: shelf.quantity + quantity });
   }
   tx.objectStore("ledger").put(
-    logLine(purse.id, line.shopId, `Voided ${line.summary} (void:${line.id})`, -line.copper),
+    logLine(
+      purse.id,
+      line.shopId,
+      `Voided ${line.summary} (void:${line.id})`,
+      -line.copper,
+      line.transactionType === "transfer" ? "transfer" : "void",
+    ),
   );
   await done;
 }
@@ -1244,7 +1318,7 @@ export async function postCopper(purseId: string, copper: number, summary: strin
       ...purse,
       coins: copper < 0 ? spendCoins(purse.coins, -copper)! : gain(purse.coins, copper),
     });
-    tx.objectStore("ledger").put(logLine(purse.id, null, summary.trim(), copper));
+    tx.objectStore("ledger").put(logLine(purse.id, null, summary.trim(), copper, "payment"));
   });
 }
 
@@ -1689,6 +1763,7 @@ async function audit(
   summary: string,
   kind: "prices" | "management",
   purseId?: string,
+  change?: Journal["events"][number]["change"],
 ) {
   const store = tx.objectStore("meta");
   const row = await request<{ value: unknown } | undefined>(store.get("journal"));
@@ -1699,6 +1774,7 @@ async function audit(
     summary,
     kind,
     ...(purseId ? { purseId } : {}),
+    ...(change ? { change } : {}),
   });
   store.put({ id: "journal", value: journal });
 }
