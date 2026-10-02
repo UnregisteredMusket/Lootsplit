@@ -1,5 +1,6 @@
 name: Verify preserved functionality
 on:
+  workflow_call:
   pull_request:
   push:
     branches: [main, 'improvement/**']
@@ -8,6 +9,7 @@ permissions:
 jobs:
   verify:
     runs-on: ubuntu-latest
+    timeout-minutes: 15
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4

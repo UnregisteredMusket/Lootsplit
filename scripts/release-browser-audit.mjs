@@ -5,11 +5,16 @@ const origin = process.env.AUDIT_ORIGIN || "http://127.0.0.1:8080";
 const browser = await chromium.launch({ headless: true, args: ["--no-sandbox"] });
 await mkdir("test-results", { recursive: true });
 const errors = [];
+async function visit(page, url) {
+  await page.goto(url);
+  // Server-rendered controls appear before hydration; wait for the client to attach handlers.
+  await page.waitForTimeout(1800);
+}
 async function open(width = 390) {
   const context = await browser.newContext({ viewport: { width, height: 844 } });
   const page = await context.newPage();
   page.on("pageerror", (e) => errors.push(e.message));
-  await page.goto(origin);
+  await visit(page, origin);
   await page.getByRole("link", { name: "Party", exact: true }).first().waitFor();
   const skip = page.getByRole("button", { name: "Not now", exact: true });
   if (await skip.isVisible()) await skip.click();
@@ -27,7 +32,7 @@ try {
     const p = (await e.listPurses()).find((p) => p.kind === "character");
     await e.savePurse({ ...p, coins: { cp: 0, sp: 0, ep: 0, gp: 10, pp: 0 } });
   });
-  await dm.goto(origin + "/share");
+  await visit(dm, origin + "/share");
   await dm.getByRole("button", { name: "Start a room", exact: true }).click();
   await dm.getByRole("button", { name: "Create room", exact: true }).click();
   await dm.getByRole("button", { name: "Share join link", exact: true }).waitFor();
@@ -36,14 +41,14 @@ try {
   );
   assert.match(code, /^[A-Z2-9]{8}$/);
   const player = await open();
-  await player.goto(origin + "/share?join=" + code);
+  await visit(player, origin + "/share?join=" + code);
   await player.getByPlaceholder("Enter your code").waitFor();
   assert.equal(await player.getByPlaceholder("Enter your code").inputValue(), code);
   await player.getByRole("button", { name: "Find characters", exact: true }).click();
   await player.getByPlaceholder("What should the party call you?").fill("Audit player");
   await player.getByRole("button", { name: "Join room", exact: true }).click();
   await player.getByRole("button", { name: "Share join link", exact: true }).waitFor();
-  await player.goto(origin + "/share?join=TEST1234");
+  await visit(player, origin + "/share?join=TEST1234");
   await player
     .getByText(`Invitation to TEST1234. You are currently connected to ${code}.`, { exact: true })
     .waitFor();
@@ -83,7 +88,7 @@ try {
   // Player and DM responsive entry points remain rendered.
   for (const page of [dm, player]) {
     for (const route of ["/", "/party", "/market", "/share", "/settings"]) {
-      await page.goto(origin + route);
+      await visit(page, origin + route);
       await page.locator("main").waitFor();
       await page.waitForTimeout(300);
       assert.ok((await page.locator("main").innerText()).trim());
@@ -93,12 +98,12 @@ try {
         route,
       );
     }
-    await page.goto(origin + "/");
+    await visit(page, origin + "/");
     await page.waitForTimeout(500);
     await page.screenshot({ path: `test-results/${page === dm ? "dm" : "player"}-mobile.png` });
   }
   const desktop = await open(1280);
-  await desktop.goto(origin + "/");
+  await visit(desktop, origin + "/");
   await desktop.waitForTimeout(500);
   await desktop.screenshot({ path: "test-results/dm-desktop.png" });
   assert.deepEqual(errors, []);

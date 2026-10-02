@@ -15,8 +15,12 @@ concurrency:
   cancel-in-progress: false
 
 jobs:
+  verify:
+    uses: ./.github/workflows/verify.yml
   release-apk:
+    needs: verify
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - name: Require main release source
         run: test "$GITHUB_REF" = refs/heads/main
