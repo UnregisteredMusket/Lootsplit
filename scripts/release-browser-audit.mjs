@@ -13,6 +13,9 @@ async function open(width = 390) {
   await page.getByRole("link", { name: "Party", exact: true }).first().waitFor();
   const skip = page.getByRole("button", { name: "Not now", exact: true });
   if (await skip.isVisible()) await skip.click();
+  await page.getByText("Campaign treasury", { exact: true }).waitFor();
+  await page.waitForTimeout(2000); // Initial Vite dependency optimization can reload once.
+  await page.getByText("Campaign treasury", { exact: true }).waitFor();
   return page;
 }
 try {

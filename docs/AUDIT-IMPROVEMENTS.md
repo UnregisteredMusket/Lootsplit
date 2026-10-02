@@ -19,4 +19,4 @@ Implements necessary/high-value audit findings without optional account registra
 Deploy matching Worker and assets together, retaining D1. Old Android clients remain supported by the additive schemas. Do not downgrade or replace campaign data during rollback. Preserve checkpoint commits and the permanent key. GitHub releases and APK version codes are immutable/increasing; a correction ships as a new version.
 
 ## Validation
-Local suite: 349 passed, four skipped; typecheck, Cloudflare and mobile builds passed. CI browser and Android compilation results are recorded in the release delivery; do not interpret this sentence as native hardware testing.
+Local suite: 350 passed, four skipped; typecheck, Cloudflare and mobile builds passed. CI browser and Android compilation results are recorded in the release delivery; do not interpret this sentence as native hardware testing.

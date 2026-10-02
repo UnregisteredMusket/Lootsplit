@@ -88,3 +88,13 @@ export function sessionSummary(
     spent: external.reduce((n, x) => n + Math.max(0, -x.copper), 0),
   };
 }
+
+/** Older clients omit optional change metadata. Preserve it during their journal patches. */
+export function preserveJournalMetadata(value: unknown, current: Journal): Journal {
+  const next = readJournal(value);
+  const changes = new Map(current.events.map(event => [event.id, event.change]));
+  return { ...next, events: next.events.map(event => {
+    const change = event.change ?? changes.get(event.id);
+    return change ? { ...event, change } : event;
+  }) };
+}

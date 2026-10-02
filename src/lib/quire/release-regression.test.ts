@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { sessionSummary, readJournal } from "./journal.ts";
+import { sessionSummary, readJournal, preserveJournalMetadata } from "./journal.ts";
 import { validateEconomyRows } from "./validation.ts";
 import { emptyCloudTable } from "./cloud.ts";
 
@@ -47,4 +47,10 @@ test("structured history round-trips without inventing values for old events", (
       ],
     }),
   );
+});
+
+test("old clients cannot erase structured history simply by omitting new metadata", () => {
+  const current = readJournal({ events: [{ id: "e", at: 1, kind: "prices", summary: "Price", change: { entity: "stock", before: { copper: 1 }, after: { copper: 2 } } }] });
+  const old = { ...current, events: current.events.map(({ change, ...event }) => event) };
+  assert.deepEqual(preserveJournalMetadata(old, current), current);
 });

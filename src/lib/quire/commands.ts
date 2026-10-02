@@ -1,4 +1,4 @@
-import { readJournal } from "./journal.ts";
+import { readJournal, preserveJournalMetadata } from "./journal.ts";
 import { z } from "zod";
 import type { CloudTable, CloudSeat } from "./cloud.ts";
 import { fromCopper, toCopper, spendCoins, priceAfterCharisma } from "./money.ts";
@@ -362,9 +362,10 @@ export function applyCommand(input: CloudTable, seat: CloudSeat, raw: Command): 
     dm();
     for (const change of cmd.changes) {
       if (change.store === "journal") {
-        if (!same(t.journal ?? readJournal(null), change.before ?? readJournal(null)))
+        const currentJournal = readJournal(t.journal);
+        if (!same(currentJournal, preserveJournalMetadata(change.before, currentJournal)))
           throw new Error("Activity changed elsewhere. Refresh and retry.");
-        t.journal = readJournal(change.after);
+        t.journal = preserveJournalMetadata(change.after, currentJournal);
         continue;
       }
       if (change.store === "realm") {
