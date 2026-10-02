@@ -32,3 +32,7 @@ simple = { limit = 60, period = 60 }
 [vars]
 ACCOUNT_ORIGIN = "https://lootsplit.oliverstorie2017.workers.dev"
 # ACCOUNT_SECRET is a Worker secret, never committed. Guest play does not depend on it.
+
+# Read-only release identity for the administrator server monitor.
+[version_metadata]
+binding = "CF_VERSION_METADATA"

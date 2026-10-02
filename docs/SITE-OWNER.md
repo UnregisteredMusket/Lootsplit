@@ -21,3 +21,28 @@ Shared deletion requires the linked DM, exact code confirmation, current room re
 ## Notifications
 
 The shipped Android APK has no Capacitor native push plugin or Firebase configuration, and its background push toggle explicitly remains disabled. Website Web Push exists separately. Native Android push requires Firebase Cloud Messaging integration, device token registration and secure server delivery, permission requests on Android 13+, a signed APK update, and actual-device testing. Email announcements require a verified sending domain/service, verified subscribers, unsubscribe handling and delivery/bounce controls before enabling sends. Registration email is not automatic mailing-list consent.
+
+## Server monitoring
+
+Owners and administrators can open **My account → Server monitoring**. Members and
+moderators cannot access either the panel or `GET /api/account/monitor`; every refresh
+checks the signed-in account's current access and role. Responses are `no-store`.
+
+The read-only snapshot checks D1 aggregate queries and a fixed bundled SVG through the
+ASSETS binding, with a five-second timeout per check. It shows server-side check duration,
+account check-ins over 5 minutes / 24 hours, stored campaign/library totals, distinct web
+push endpoints, moderation action count, notification configuration, and Worker version
+metadata. It returns no emails, user IDs, session tokens, room contents, push keys or
+subscription URLs. Activity includes the viewing administrator and is approximate.
+
+Auto-refresh runs every 30 seconds only while the panel is open and the page is visible.
+It can be paused, supports manual refresh, labels snapshots stale after 60 seconds, and
+clears results on request failure or loss of access. Database check failure suppresses
+usage totals; asset failure does not hide otherwise available database totals. The
+client stops a stalled request after 12 seconds. Closing the panel cancels its request.
+
+This is on-demand diagnostics, not an external uptime monitor or persistent request/error
+history. If authentication/D1 is down entirely, the panel cannot authenticate and displays
+unavailable. It does not measure CPU, RAM, billing, delivery success, guest presence or
+end-to-end multiplayer health. No campaign writes or external monitoring service are added.
+Email sending and Android native push remain unconfigured; existing browser push is retained.

@@ -1,3 +1,4 @@
+import { ServerMonitor } from "@/components/account/server-monitor";
 import { ProfileControls } from "@/components/account/profile-controls";
 import { StaffControls } from "@/components/account/staff-controls";
 import { Campaigns } from "@/components/campaigns";
@@ -176,6 +177,7 @@ function Account() {
             {notice}
           </p>
         )}
+        {(library?.user.role === "owner" || library?.user.role === "admin") && <ServerMonitor />}
         {library?.user.role === "owner" && <OwnerControls />}
         {library && (
           <>

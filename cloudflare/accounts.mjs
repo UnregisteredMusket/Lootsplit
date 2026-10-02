@@ -1,3 +1,4 @@
+import { serverMonitor } from "./monitoring.mjs";
 import {
   assertActive,
   touchMember,
@@ -209,6 +210,8 @@ export async function handleAccounts(request, env) {
     const userId = session.user.id;
     await assertActive(db, userId);
     await touchMember(db, userId);
+    if (path === "/api/account/monitor" && request.method === "GET")
+      return cors(json(await serverMonitor(env, userId)));
     if (path === "/api/account/profile" && request.method === "POST")
       return cors(json(await saveProfile(db, userId, body)));
     if (path === "/api/account/activity" && request.method === "GET")

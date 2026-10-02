@@ -59,3 +59,12 @@ Not implemented or promised by this inventory: OCR, Google Drive backup integrat
 - Restrictions terminate account sessions and block associated room-seat credentials. They do not erase local data or remove anonymous guest support.
 - Member profiles include display name, raster profile image, introduction, optional messaging email and explicit moderator visibility choice. Email-update preferences default off and record consent; sending is not configured.
 - Account page includes existing local campaign controls plus shared-membership rename and linked-DM deletion. Shared deletion checks current revision, refuses pending turns, retains a private snapshot of DM-visible saved data, and cleans up memberships and push subscriptions.
+
+### Administrator server monitoring
+- Owner/admin-only, server-authorized live monitoring panel in My account; members/moderators denied.
+- Read-only database and website-asset health checks, check timing, running Worker version metadata.
+- Aggregate account activity (5 min / 24 hr), stored shared campaigns, memberships, cloud backups,
+  character profiles, web push devices, and 24-hour moderation action count without private content.
+- Notification readiness distinguishes existing web push from unavailable email/native Android push.
+- Optional 30-second visible-page polling, manual refresh, cancellation, partial-failure display,
+  stale snapshot labels, no-store responses, and explicit on-demand monitoring limitations.

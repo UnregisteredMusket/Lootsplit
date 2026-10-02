@@ -1,7 +1,11 @@
 import { API_ORIGIN } from "../mobile/origin";
 const native = () => import.meta.env.VITE_MOBILE === "true";
 const TOKEN = "lootsplit.account.token.v1";
-export async function accountRequest<T>(path: string, body?: unknown): Promise<T> {
+export async function accountRequest<T>(
+  path: string,
+  body?: unknown,
+  signal?: AbortSignal,
+): Promise<T> {
   const headers = new Headers();
   if (body !== undefined) headers.set("content-type", "application/json");
   const token = native() ? localStorage.getItem(TOKEN) : null;
@@ -9,6 +13,7 @@ export async function accountRequest<T>(path: string, body?: unknown): Promise<T
   const response = await fetch(`${native() ? API_ORIGIN : ""}/api/account/${path}`, {
     method: body === undefined ? "GET" : "POST",
     headers,
+    signal,
     credentials: native() ? "omit" : "same-origin",
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
   });
