@@ -38,7 +38,7 @@ try {
   // Exercise client-side route transitions as well as direct navigation. Providers
   // must stay mounted while the router renders the previous page during a lazy load.
   await page.getByRole("link", { name: "Downloads", exact: true }).first().click();
-  await page.getByRole("heading", { name: "One party. Every screen.", exact: true }).waitFor();
+  await page.getByRole("heading", { name: "One party. Your platform.", exact: true }).waitFor();
   await page.getByRole("link", { name: "My account", exact: true }).first().click();
   await page.getByRole("heading", { name: "Good to see you again", exact: true }).waitFor();
   console.log("Account audit: sign up");

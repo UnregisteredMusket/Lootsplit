@@ -32,6 +32,7 @@ jobs:
           done
           node scripts/release-browser-audit.mjs
           node scripts/account-browser-audit.mjs
+          node scripts/website-browser-audit.mjs
       - name: Built Worker account checks
         timeout-minutes: 4
         run: |

@@ -36,7 +36,7 @@ No feature below may be removed, disabled, hidden or reduced without explicit us
 | Light/dark/custom appearance, reading scale, display settings and reduced motion | Settings |
 | Android bundled client, native share/file save, network/back behavior and permanent signing | Android |
 
-Not implemented or promised by this inventory: OCR, user registration, Google Drive, native Android push, online presence, or editors for every kind of image.
+Not implemented or promised by this inventory: OCR, Google Drive backup integration, native Android push, online presence, or editors for every kind of image.
 
 ## Website and optional account library
 - Public welcome, Android download, desktop installation guidance, changelog and help pages alongside the existing app URL.
