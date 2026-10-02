@@ -520,3 +520,93 @@ test("campaign deletion requires linked DM, confirmation and current revision; s
     DB.close();
   }
 });
+
+test("server monitoring is owner/admin only, no-store and exposes aggregates without secrets", async () => {
+  const { DB, env, call, signup } = setup();
+  try {
+    const member = await signup("monitor@example.com");
+    const id = member.data.user.id;
+    assert.equal((await call("monitor")).response.status, 401);
+    assert.equal((await call("monitor", undefined, member.cookie)).response.status, 403);
+    await DB.prepare("INSERT INTO site_roles VALUES (?,'moderator',?)").bind(id, Date.now()).run();
+    assert.equal((await call("monitor", undefined, member.cookie)).response.status, 403);
+    await DB.prepare("UPDATE site_roles SET role='admin' WHERE user_id=?").bind(id).run();
+    env.ASSETS = {
+      fetch: async (request) => {
+        assert.equal(new URL(request.url).pathname, "/favicon.svg");
+        assert.equal(request.method, "HEAD");
+        assert.equal(request.headers.get("cookie"), null);
+        return new Response(null, { headers: { "content-type": "image/svg+xml" } });
+      },
+    };
+    env.CF_VERSION_METADATA = { id: "release-123", timestamp: "2026-10-02T00:00:00Z" };
+    await DB.prepare("INSERT INTO push_config VALUES ('vapid',?)")
+      .bind('{"privateKey":"DO-NOT-EXPOSE"}')
+      .run();
+    const result = await call("monitor", undefined, member.cookie);
+    assert.equal(result.response.status, 200);
+    assert.equal(result.response.headers.get("cache-control"), "no-store");
+    assert.equal(result.data.status, "healthy");
+    assert.equal(result.data.stats.accounts, 1);
+    assert.equal(result.data.stats.active5m, 1);
+    assert.equal(result.data.stats.pushConfigured, 1);
+    assert.equal(result.data.stats.sharedCampaigns, 0);
+    assert.equal(result.data.version.id, "release-123");
+    assert.doesNotMatch(
+      JSON.stringify(result.data),
+      /DO-NOT-EXPOSE|monitor@example.com|privateKey|token/,
+    );
+    await DB.prepare("UPDATE site_roles SET role='owner' WHERE user_id=?").bind(id).run();
+    assert.equal((await call("monitor", undefined, member.cookie)).response.status, 200);
+    assert.equal(
+      (await call("monitor", undefined, member.cookie, "https://evil.example")).response.status,
+      403,
+    );
+    assert.equal((await call("monitor", {}, member.cookie)).response.status, 404);
+    env.ASSETS.fetch = async () =>
+      new Response("not an asset", { headers: { "content-type": "text/html" } });
+    const failedAsset = await call("monitor", undefined, member.cookie);
+    assert.equal(failedAsset.data.status, "degraded");
+    assert.equal(failedAsset.data.checks[1].status, "unavailable");
+    assert.equal(failedAsset.data.stats.accounts, 1);
+    await DB.prepare("UPDATE site_roles SET role='moderator' WHERE user_id=?").bind(id).run();
+    assert.equal((await call("monitor", undefined, member.cookie)).response.status, 403);
+    await DB.prepare("UPDATE site_roles SET role='admin' WHERE user_id=?").bind(id).run();
+    await DB.prepare("UPDATE member_access SET status='revoked' WHERE user_id=?").bind(id).run();
+    assert.equal((await call("monitor", undefined, member.cookie)).response.status, 403);
+  } finally {
+    DB.close();
+  }
+});
+
+test("server monitoring reports partial failure without leaking database exceptions", async () => {
+  const { serverMonitor } = await import("../cloudflare/monitoring.mjs");
+  const DB = {
+    prepare(sql) {
+      return {
+        bind() {
+          return this;
+        },
+        async first() {
+          if (sql.includes("site_roles")) return { role: "admin" };
+          throw new Error("sensitive SQL and credentials");
+        },
+      };
+    },
+  };
+  const result = await serverMonitor(
+    {
+      DB,
+      ACCOUNT_ORIGIN: origin,
+      ASSETS: {
+        fetch: async () => new Response(null, { headers: { "content-type": "image/svg+xml" } }),
+      },
+    },
+    "admin",
+  );
+  assert.equal(result.status, "degraded");
+  assert.equal(result.stats, null);
+  assert.equal(result.checks[0].status, "unavailable");
+  assert.equal(result.checks[1].status, "healthy");
+  assert.doesNotMatch(JSON.stringify(result), /sensitive|credentials/);
+});

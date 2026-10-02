@@ -34,6 +34,7 @@ jobs:
           node scripts/account-browser-audit.mjs
           AUDIT_ORIGIN=http://127.0.0.1:8080 node scripts/owner-browser-audit.mjs
           node scripts/member-browser-audit.mjs
+          node scripts/monitor-browser-audit.mjs
           node scripts/website-browser-audit.mjs
       - name: Built Worker account checks
         timeout-minutes: 4
