@@ -12,12 +12,17 @@ import { Route as rootRouteImport } from './routes/__root'
 import { Route as IndexRouteImport } from './routes/index'
 import { Route as BooksRouteImport } from './routes/books'
 import { Route as CatalogRouteImport } from './routes/catalog'
+import { Route as DownloadsRouteImport } from './routes/downloads'
 import { Route as FavoritesRouteImport } from './routes/favorites'
+import { Route as HelpRouteImport } from './routes/help'
 import { Route as MarketRouteImport } from './routes/market'
 import { Route as PartyRouteImport } from './routes/party'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as ShareRouteImport } from './routes/share'
+import { Route as UpdatesRouteImport } from './routes/updates'
+import { Route as WelcomeRouteImport } from './routes/welcome'
 import { Route as BookBookIdRouteImport } from './routes/book.$bookId'
+import { Route as DownloadAndroidRouteImport } from './routes/download.android'
 import { Route as ReadArticleIdRouteImport } from './routes/read.$articleId'
 import { Route as ShopShopIdRouteImport } from './routes/shop.$shopId'
 
@@ -36,9 +41,19 @@ const CatalogRoute = CatalogRouteImport.update({
   path: '/catalog',
   getParentRoute: () => rootRouteImport,
 } as any)
+const DownloadsRoute = DownloadsRouteImport.update({
+  id: '/downloads',
+  path: '/downloads',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const FavoritesRoute = FavoritesRouteImport.update({
   id: '/favorites',
   path: '/favorites',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const HelpRoute = HelpRouteImport.update({
+  id: '/help',
+  path: '/help',
   getParentRoute: () => rootRouteImport,
 } as any)
 const MarketRoute = MarketRouteImport.update({
@@ -61,9 +76,24 @@ const ShareRoute = ShareRouteImport.update({
   path: '/share',
   getParentRoute: () => rootRouteImport,
 } as any)
+const UpdatesRoute = UpdatesRouteImport.update({
+  id: '/updates',
+  path: '/updates',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const WelcomeRoute = WelcomeRouteImport.update({
+  id: '/welcome',
+  path: '/welcome',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const BookBookIdRoute = BookBookIdRouteImport.update({
   id: '/book/$bookId',
   path: '/book/$bookId',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const DownloadAndroidRoute = DownloadAndroidRouteImport.update({
+  id: '/download/android',
+  path: '/download/android',
   getParentRoute: () => rootRouteImport,
 } as any)
 const ReadArticleIdRoute = ReadArticleIdRouteImport.update({
@@ -81,12 +111,17 @@ export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
   '/books': typeof BooksRoute
   '/catalog': typeof CatalogRoute
+  '/downloads': typeof DownloadsRoute
   '/favorites': typeof FavoritesRoute
+  '/help': typeof HelpRoute
   '/market': typeof MarketRoute
   '/party': typeof PartyRoute
   '/settings': typeof SettingsRoute
   '/share': typeof ShareRoute
+  '/updates': typeof UpdatesRoute
+  '/welcome': typeof WelcomeRoute
   '/book/$bookId': typeof BookBookIdRoute
+  '/download/android': typeof DownloadAndroidRoute
   '/read/$articleId': typeof ReadArticleIdRoute
   '/shop/$shopId': typeof ShopShopIdRoute
 }
@@ -94,12 +129,17 @@ export interface FileRoutesByTo {
   '/': typeof IndexRoute
   '/books': typeof BooksRoute
   '/catalog': typeof CatalogRoute
+  '/downloads': typeof DownloadsRoute
   '/favorites': typeof FavoritesRoute
+  '/help': typeof HelpRoute
   '/market': typeof MarketRoute
   '/party': typeof PartyRoute
   '/settings': typeof SettingsRoute
   '/share': typeof ShareRoute
+  '/updates': typeof UpdatesRoute
+  '/welcome': typeof WelcomeRoute
   '/book/$bookId': typeof BookBookIdRoute
+  '/download/android': typeof DownloadAndroidRoute
   '/read/$articleId': typeof ReadArticleIdRoute
   '/shop/$shopId': typeof ShopShopIdRoute
 }
@@ -108,12 +148,17 @@ export interface FileRoutesById {
   '/': typeof IndexRoute
   '/books': typeof BooksRoute
   '/catalog': typeof CatalogRoute
+  '/downloads': typeof DownloadsRoute
   '/favorites': typeof FavoritesRoute
+  '/help': typeof HelpRoute
   '/market': typeof MarketRoute
   '/party': typeof PartyRoute
   '/settings': typeof SettingsRoute
   '/share': typeof ShareRoute
+  '/updates': typeof UpdatesRoute
+  '/welcome': typeof WelcomeRoute
   '/book/$bookId': typeof BookBookIdRoute
+  '/download/android': typeof DownloadAndroidRoute
   '/read/$articleId': typeof ReadArticleIdRoute
   '/shop/$shopId': typeof ShopShopIdRoute
 }
@@ -123,12 +168,17 @@ export interface FileRouteTypes {
     | '/'
     | '/books'
     | '/catalog'
+    | '/downloads'
     | '/favorites'
+    | '/help'
     | '/market'
     | '/party'
     | '/settings'
     | '/share'
+    | '/updates'
+    | '/welcome'
     | '/book/$bookId'
+    | '/download/android'
     | '/read/$articleId'
     | '/shop/$shopId'
   fileRoutesByTo: FileRoutesByTo
@@ -136,12 +186,17 @@ export interface FileRouteTypes {
     | '/'
     | '/books'
     | '/catalog'
+    | '/downloads'
     | '/favorites'
+    | '/help'
     | '/market'
     | '/party'
     | '/settings'
     | '/share'
+    | '/updates'
+    | '/welcome'
     | '/book/$bookId'
+    | '/download/android'
     | '/read/$articleId'
     | '/shop/$shopId'
   id:
@@ -149,12 +204,17 @@ export interface FileRouteTypes {
     | '/'
     | '/books'
     | '/catalog'
+    | '/downloads'
     | '/favorites'
+    | '/help'
     | '/market'
     | '/party'
     | '/settings'
     | '/share'
+    | '/updates'
+    | '/welcome'
     | '/book/$bookId'
+    | '/download/android'
     | '/read/$articleId'
     | '/shop/$shopId'
   fileRoutesById: FileRoutesById
@@ -163,12 +223,17 @@ export interface RootRouteChildren {
   IndexRoute: typeof IndexRoute
   BooksRoute: typeof BooksRoute
   CatalogRoute: typeof CatalogRoute
+  DownloadsRoute: typeof DownloadsRoute
   FavoritesRoute: typeof FavoritesRoute
+  HelpRoute: typeof HelpRoute
   MarketRoute: typeof MarketRoute
   PartyRoute: typeof PartyRoute
   SettingsRoute: typeof SettingsRoute
   ShareRoute: typeof ShareRoute
+  UpdatesRoute: typeof UpdatesRoute
+  WelcomeRoute: typeof WelcomeRoute
   BookBookIdRoute: typeof BookBookIdRoute
+  DownloadAndroidRoute: typeof DownloadAndroidRoute
   ReadArticleIdRoute: typeof ReadArticleIdRoute
   ShopShopIdRoute: typeof ShopShopIdRoute
 }
@@ -196,11 +261,25 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof CatalogRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/downloads': {
+      id: '/downloads'
+      path: '/downloads'
+      fullPath: '/downloads'
+      preLoaderRoute: typeof DownloadsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/favorites': {
       id: '/favorites'
       path: '/favorites'
       fullPath: '/favorites'
       preLoaderRoute: typeof FavoritesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/help': {
+      id: '/help'
+      path: '/help'
+      fullPath: '/help'
+      preLoaderRoute: typeof HelpRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/market': {
@@ -231,11 +310,32 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ShareRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/updates': {
+      id: '/updates'
+      path: '/updates'
+      fullPath: '/updates'
+      preLoaderRoute: typeof UpdatesRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/welcome': {
+      id: '/welcome'
+      path: '/welcome'
+      fullPath: '/welcome'
+      preLoaderRoute: typeof WelcomeRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/book/$bookId': {
       id: '/book/$bookId'
       path: '/book/$bookId'
       fullPath: '/book/$bookId'
       preLoaderRoute: typeof BookBookIdRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/download/android': {
+      id: '/download/android'
+      path: '/download/android'
+      fullPath: '/download/android'
+      preLoaderRoute: typeof DownloadAndroidRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/read/$articleId': {
@@ -259,12 +359,17 @@ const rootRouteChildren: RootRouteChildren = {
   IndexRoute: IndexRoute,
   BooksRoute: BooksRoute,
   CatalogRoute: CatalogRoute,
+  DownloadsRoute: DownloadsRoute,
   FavoritesRoute: FavoritesRoute,
+  HelpRoute: HelpRoute,
   MarketRoute: MarketRoute,
   PartyRoute: PartyRoute,
   SettingsRoute: SettingsRoute,
   ShareRoute: ShareRoute,
+  UpdatesRoute: UpdatesRoute,
+  WelcomeRoute: WelcomeRoute,
   BookBookIdRoute: BookBookIdRoute,
+  DownloadAndroidRoute: DownloadAndroidRoute,
   ReadArticleIdRoute: ReadArticleIdRoute,
   ShopShopIdRoute: ShopShopIdRoute,
 }
@@ -273,10 +378,11 @@ export const routeTree = rootRouteImport
   ._addFileTypes<FileRouteTypes>()
 
 import type { getRouter } from './router.tsx'
-import type { createStart } from '@tanstack/react-start'
+import type { startInstance } from './start.ts'
 declare module '@tanstack/react-start' {
   interface Register {
     ssr: true
     router: Awaited<ReturnType<typeof getRouter>>
+    config: Awaited<ReturnType<typeof startInstance.getOptions>>
   }
 }

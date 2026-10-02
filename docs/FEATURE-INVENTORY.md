@@ -37,3 +37,9 @@ No feature below may be removed, disabled, hidden or reduced without explicit us
 | Android bundled client, native share/file save, network/back behavior and permanent signing | Android |
 
 Not implemented or promised by this inventory: OCR, user registration, Google Drive, native Android push, online presence, or editors for every kind of image.
+
+## Public website additions
+- Welcome page, browser launch, Android download center, changelog, and installation/backup help.
+- Same-origin checksum-verified signed APK download with direct GitHub fallback and published checksum.
+- Desktop and mobile app links to the website; public pages do not initialize campaign storage.
+- Honest browser/PC availability; native PC installers are not yet distributed.

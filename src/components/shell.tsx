@@ -133,6 +133,7 @@ export function Shell({
           <div className="rounded-xl border border-lead/20 p-4 text-sm text-muted">
             <p className="text-xs tracking-widest text-lead uppercase">Campaign ledger</p>
             <p className="mt-2">Manage party funds, inventory, and shops.</p>
+            <a href={import.meta.env.VITE_MOBILE === "true" ? "https://lootsplit.oliverstorie2017.workers.dev/welcome" : "/welcome"} className="mt-3 inline-flex min-h-11 items-center text-lead">Website & downloads ↗</a>
           </div>
         </aside>
         <div className="min-w-0">
@@ -228,6 +229,7 @@ export function Shell({
               label={dm ? "Settings" : "Device backups"}
               onPick={() => setMore(false)}
             />
+            <a href={import.meta.env.VITE_MOBILE === "true" ? "https://lootsplit.oliverstorie2017.workers.dev/welcome" : "/welcome"} className="flex min-h-11 items-center px-2 text-sm">Website & downloads ↗</a>
           </div>
         </div>
       ) : null}
