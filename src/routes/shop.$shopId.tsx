@@ -1,3 +1,4 @@
+import { getServerCloudTable } from "@/lib/quire/cloud-client";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { getCloudTable, subscribeCloudTable } from "@/lib/quire/cloud-client";
@@ -344,7 +345,7 @@ function turnIsLocked() {
 }
 
 function TurnLock() {
-  const table = useSyncExternalStore(subscribeCloudTable, getCloudTable, getCloudTable);
+  const table = useSyncExternalStore(subscribeCloudTable, getCloudTable, getServerCloudTable);
   if (!table.joined || table.live || table.mine) return null;
   return <p className="mt-3 text-sm text-muted">It is {table.who}'s turn. Buying waits.</p>;
 }

@@ -1,3 +1,4 @@
+import { getServerCloudTable } from "@/lib/quire/cloud-client";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { Copy, Crown, DoorOpen, Radio, Users, ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
@@ -23,12 +24,11 @@ import { Button, TextInput, Confirm, Field, Fold } from "@/components/ui";
 import { rememberSave } from "@/lib/quire/saves";
 import { loadSeatLock } from "@/lib/quire/lock";
 
-const EMPTY = getCloudTable();
 type Mode = "local" | "turns" | "live";
 
 export function CloudTable() {
   const seat = useSeat();
-  const cloud = useSyncExternalStore(subscribeCloudTable, getCloudTable, () => EMPTY);
+  const cloud = useSyncExternalStore(subscribeCloudTable, getCloudTable, getServerCloudTable);
   const online = useSyncExternalStore(subscribeOnline, getOnline, () => true);
   const [code, setCode] = useState("");
   const [name, setName] = useState("");

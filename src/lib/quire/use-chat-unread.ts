@@ -1,3 +1,4 @@
+import { getServerCloudTable } from "./cloud-client";
 import { useCallback, useEffect, useState, useSyncExternalStore } from "react";
 import { getCloudTable, subscribeCloudTable } from "./cloud-client";
 import { getChatSnapshot, serverChat, subscribeChat } from "./chat";
@@ -5,7 +6,7 @@ import { useSeat } from "./seat";
 import { unreadMessages, readThrough, type ReadState } from "./chat-read";
 const EVENT = "lootsplit-chat-read";
 export function useChatUnread() {
-  const room = useSyncExternalStore(subscribeCloudTable, getCloudTable, getCloudTable);
+  const room = useSyncExternalStore(subscribeCloudTable, getCloudTable, getServerCloudTable);
   const notes = useSyncExternalStore(subscribeChat, getChatSnapshot, serverChat);
   const seat = useSeat();
   const key = `lootsplit.chat.read.${room.code}.${room.seatId}`;

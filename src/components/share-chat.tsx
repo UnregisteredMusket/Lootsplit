@@ -1,3 +1,4 @@
+import { getServerCloudTable } from "@/lib/quire/cloud-client";
 import { useEffect, useRef, useState, useSyncExternalStore } from "react";
 import { MessageCircle, Send, RotateCcw, Lock } from "lucide-react";
 import { toast } from "sonner";
@@ -13,7 +14,7 @@ import type { Command } from "@/lib/quire/commands";
 type Message = Extract<Command, { kind: "message" }>;
 type Outgoing = { command: Message; thread: string; at: number; error?: string };
 export function ShareChat() {
-  const room = useSyncExternalStore(subscribeCloudTable, getCloudTable, getCloudTable);
+  const room = useSyncExternalStore(subscribeCloudTable, getCloudTable, getServerCloudTable);
   if (!room.joined)
     return (
       <p className="text-sm text-muted">
@@ -23,7 +24,7 @@ export function ShareChat() {
   return <LiveChat key={`${room.code}.${room.seatId}`} />;
 }
 function LiveChat() {
-  const room = useSyncExternalStore(subscribeCloudTable, getCloudTable, getCloudTable);
+  const room = useSyncExternalStore(subscribeCloudTable, getCloudTable, getServerCloudTable);
   const seat = useSeat();
   const { purses } = useEconomy();
   const notes = useSyncExternalStore(subscribeChat, getChatSnapshot, serverChat);

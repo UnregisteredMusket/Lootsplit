@@ -24,6 +24,12 @@ async function open(width = 390) {
   return page;
 }
 try {
+  // Warm Vite's lazy dependency optimizer before collecting application errors.
+  // The first development navigation may be invalidated by dependency discovery.
+  const warmup = await browser.newPage();
+  await visit(warmup, origin);
+  await warmup.waitForTimeout(4000);
+  await warmup.close();
   const dm = await open();
   // Disposable local test server only. Provision known balances without changing app defaults.
   await dm.evaluate(async () => {

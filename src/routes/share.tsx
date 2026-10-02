@@ -1,3 +1,4 @@
+import { getServerCloudTable } from "@/lib/quire/cloud-client";
 import { useSyncExternalStore } from "react";
 import { getCloudTable, subscribeCloudTable } from "@/lib/quire/cloud-client";
 import { useEffect, useState } from "react";
@@ -22,7 +23,7 @@ function SharePage() {
     setOpenChat(chat);
     if (chat) setTab("chat");
   }, []);
-  const room = useSyncExternalStore(subscribeCloudTable, getCloudTable, getCloudTable);
+  const room = useSyncExternalStore(subscribeCloudTable, getCloudTable, getServerCloudTable);
   const seat = useSeat();
   const { count } = useChatUnread();
   return (

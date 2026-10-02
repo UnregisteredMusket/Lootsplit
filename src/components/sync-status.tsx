@@ -1,3 +1,4 @@
+import { getServerCloudTable } from "@/lib/quire/cloud-client";
 import { useState, useSyncExternalStore } from "react";
 import { Link } from "@tanstack/react-router";
 import {
@@ -13,7 +14,7 @@ import {
 import { Button, Confirm } from "./ui";
 import { toast } from "sonner";
 export function SyncStatus({ compact = false }: { compact?: boolean }) {
-  const state = useSyncExternalStore(subscribeCloudTable, getCloudTable, getCloudTable);
+  const state = useSyncExternalStore(subscribeCloudTable, getCloudTable, getServerCloudTable);
   const [discard, setDiscard] = useState(false);
   const [disconnect, setDisconnect] = useState(false);
   if (!state.joined && state.status === "local") return null;

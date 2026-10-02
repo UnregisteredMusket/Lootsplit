@@ -1,3 +1,4 @@
+import { getServerCloudTable } from "@/lib/quire/cloud-client";
 import { InventoryList, PortraitPicker } from "./ledger-art";
 import { getCloudTable, subscribeCloudTable } from "@/lib/quire/cloud-client";
 import { Link } from "@tanstack/react-router";
@@ -14,7 +15,7 @@ import { useSeat } from "@/lib/quire/seat";
 export function HomeSheet() {
   const { ready, purses, holdings, sheets } = useEconomy();
   const seat = useSeat();
-  const cloud = useSyncExternalStore(subscribeCloudTable, getCloudTable, getCloudTable);
+  const cloud = useSyncExternalStore(subscribeCloudTable, getCloudTable, getServerCloudTable);
   const mine = purses.filter(
     (purse) => purse.kind === "character" && seat.purseIds.includes(purse.id),
   );

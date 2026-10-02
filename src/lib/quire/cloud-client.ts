@@ -31,7 +31,7 @@ type Session = {
 };
 export type SyncState = "local" | "synced" | "pending" | "saving" | "attention";
 const listeners = new Set<() => void>();
-let view = {
+const initialView = {
   joined: false,
   mine: true,
   live: false,
@@ -46,6 +46,12 @@ let view = {
   error: "",
   lastSync: 0,
 };
+let view = initialView;
+// Hydration always starts from the same local snapshot, even if room restoration
+// ran before a lazy component loaded. React reads the live snapshot after mount.
+export function getServerCloudTable() {
+  return initialView;
+}
 let timer: ReturnType<typeof setInterval> | undefined;
 let chain: Promise<unknown> = Promise.resolve();
 let sessionKey = "";

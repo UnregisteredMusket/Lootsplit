@@ -1,3 +1,4 @@
+import { getServerCloudTable } from "@/lib/quire/cloud-client";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { toast } from "sonner";
 import { useSeat } from "@/lib/quire/seat";
@@ -35,7 +36,7 @@ type Ask =
 export function SaveFolder() {
   const { restoreFile } = useEconomy();
   const seat = useSeat();
-  const shared = useSyncExternalStore(subscribeCloudTable, getCloudTable, getCloudTable);
+  const shared = useSyncExternalStore(subscribeCloudTable, getCloudTable, getServerCloudTable);
   const { reload } = useLibrary();
   const { campaigns, activeId } = useSyncExternalStore(
     subscribeCampaigns,

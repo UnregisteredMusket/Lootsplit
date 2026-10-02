@@ -1,3 +1,4 @@
+import { getServerCloudTable } from "@/lib/quire/cloud-client";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { toast } from "sonner";
 import { Button, TextArea } from "@/components/ui";
@@ -23,7 +24,7 @@ import { characterControl } from "@/lib/quire/types";
 
 export function ManualChat() {
   const seat = useSeat();
-  const cloud = useSyncExternalStore(subscribeCloudTable, getCloudTable, getCloudTable);
+  const cloud = useSyncExternalStore(subscribeCloudTable, getCloudTable, getServerCloudTable);
   const { purses } = useEconomy();
   const { activeId } = useSyncExternalStore(subscribeCampaigns, getCampaigns, serverCampaigns);
   const notes = useSyncExternalStore(subscribeChat, getChatSnapshot, serverChat);

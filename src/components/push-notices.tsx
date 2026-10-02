@@ -1,3 +1,4 @@
+import { getServerCloudTable } from "@/lib/quire/cloud-client";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { Bell } from "lucide-react";
 import { Button } from "./ui";
@@ -5,7 +6,7 @@ import { getCloudTable, subscribeCloudTable, roomCredentials } from "@/lib/quire
 import { getRoomPushSettings, updateRoomPushSubscription } from "@/lib/quire/cloud-api";
 
 export function PushNotices() {
-  const room = useSyncExternalStore(subscribeCloudTable, getCloudTable, getCloudTable);
+  const room = useSyncExternalStore(subscribeCloudTable, getCloudTable, getServerCloudTable);
   const native = import.meta.env.VITE_MOBILE === "true";
   const [enabled, setEnabled] = useState(false);
   const [busy, setBusy] = useState(false);
