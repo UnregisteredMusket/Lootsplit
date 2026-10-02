@@ -84,32 +84,34 @@ function SharePage() {
           <Notices />
         </Fold>
       </div>
-      <Fold title="Connection & recovery" hint="Pending changes, retry, and recovery files.">
-        <SyncStatus />
-        <p className="text-sm text-muted">
-          Shared changes are saved when the server accepts them. Offline changes stay pending until
-          you reconnect.
-        </p>
-      </Fold>
-      <Link to="/settings" className="quick-action mt-4">
-        Device backups — view, export & restore →
-      </Link>
-      <Fold
-        title="Manual sharing & files"
-        hint="An alternative for playing without an online room."
-      >
-        <p className="mb-4 text-sm text-muted">
-          Online rooms sync automatically. Use these tools for exchanging campaign files in Local
-          Mode.
-        </p>
-        {seat.role === "dm" ? <TableShare /> : null}
-        {!room.joined ? (
-          <Fold title="Offline messages">
-            <ManualChat />
-          </Fold>
-        ) : null}
-        <TableDesk />
-      </Fold>
+      <div className="campaign-support">
+        <Fold title="Connection & recovery" hint="Pending changes, retry, and recovery files.">
+          <SyncStatus />
+          <p className="text-sm text-muted">
+            Shared changes are saved when the server accepts them. Offline changes stay pending
+            until you reconnect.
+          </p>
+        </Fold>
+        <Link to="/settings" className="quick-action mt-4">
+          Device backups — view, export & restore →
+        </Link>
+        <Fold
+          title="Manual sharing & files"
+          hint="An alternative for playing without an online room."
+        >
+          <p className="mb-4 text-sm text-muted">
+            Online rooms sync automatically. Use these tools for exchanging campaign files in Local
+            Mode.
+          </p>
+          {seat.role === "dm" ? <TableShare /> : null}
+          {!room.joined ? (
+            <Fold title="Offline messages">
+              <ManualChat />
+            </Fold>
+          ) : null}
+          <TableDesk />
+        </Fold>
+      </div>
     </Shell>
   );
 }

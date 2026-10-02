@@ -39,6 +39,7 @@ jobs:
           node scripts/character-browser-audit.mjs
           node scripts/encounter-browser-audit.mjs
           node scripts/control-panel-browser-audit.mjs
+          node scripts/desktop-browser-audit.mjs
           node scripts/website-browser-audit.mjs
       - name: Built Worker account checks
         timeout-minutes: 4
@@ -57,4 +58,3 @@ jobs:
         with:
           name: browser-audit
           path: test-results/
-

@@ -9,6 +9,7 @@ import { accountRequest } from "@/lib/account/client";
 import { LedgerArt } from "@/components/ledger-art";
 import { Guide } from "@/components/guide";
 import { Shortcuts } from "./shortcuts";
+import { DesktopDeskPanels } from "./desktop-panels";
 import { useSheetReadouts, HpBar } from "./readouts";
 export function DmDesk() {
   const { ready, purses, sheets, journal, loans } = useEconomy(),
@@ -142,6 +143,7 @@ export function DmDesk() {
         </section>
       </div>
       <Shortcuts campaignId={campaigns.activeId} />
+      <DesktopDeskPanels />
       <a href="/?view=overview" className="desk-overview">
         Full campaign overview, activity & tools <ChevronRight size={18} />
       </a>

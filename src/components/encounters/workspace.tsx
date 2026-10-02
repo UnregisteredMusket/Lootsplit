@@ -1,4 +1,5 @@
 import { useDraftGuard } from "@/lib/quire/use-draft-guard";
+import { useDesktop } from "@/lib/quire/use-desktop";
 import { HpBar } from "@/components/control-panel/readouts";
 import { getCloudTable } from "@/lib/quire/cloud-client";
 import { useEffect, useRef, useState } from "react";
@@ -63,6 +64,7 @@ const defaults: Filters = {
 };
 const n = (value: string) => Number(value) || 0;
 export function EncounterWorkspace() {
+  const desktop = useDesktop();
   const [library, setLibrary] = useState<{
       campaigns: Campaign[];
       encounters: Summary[];
@@ -225,7 +227,7 @@ export function EncounterWorkspace() {
           </div>
           <div className="encounter-layout">
             <aside className="encounter-library">
-              <details open={!selected}>
+              <details open={!selected || desktop}>
                 <summary>Saved encounters</summary>
                 <h2 className="sr-only">Saved encounters</h2>
                 <p className="text-sm text-muted">
