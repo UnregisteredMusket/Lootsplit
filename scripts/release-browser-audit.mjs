@@ -2,7 +2,7 @@ import { chromium } from "playwright";
 import assert from "node:assert/strict";
 import { mkdir } from "node:fs/promises";
 const origin = process.env.AUDIT_ORIGIN || "http://127.0.0.1:8080";
-const browser = await chromium.launch({ headless: true, args: ["--no-sandbox"] });
+const browser = await chromium.launch({ headless: true, executablePath: process.env.CHROMIUM_EXECUTABLE_PATH || undefined, args: ["--no-sandbox"] });
 await mkdir("test-results", { recursive: true });
 const errors = [];
 async function visit(page, url) {
@@ -17,9 +17,11 @@ async function open(width = 390) {
   const page = await context.newPage();
   page.on("pageerror", (e) => errors.push(e.message));
   await visit(page, origin);
-  await page.getByRole("link", { name: "Party", exact: true }).first().waitFor();
   const skip = page.getByRole("button", { name: "Not now", exact: true });
-  if (await skip.isVisible()) await skip.click();
+  // Fresh contexts show the guide dialog, which makes navigation inert until dismissed.
+  await skip.waitFor();
+  await skip.click();
+  await page.getByRole("link", { name: "Party", exact: true }).first().waitFor();
   await page.getByText("Campaign treasury", { exact: true }).waitFor();
   await page.waitForTimeout(2000); // Initial Vite dependency optimization can reload once.
   await page.getByText("Campaign treasury", { exact: true }).waitFor();
