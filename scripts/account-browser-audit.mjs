@@ -73,12 +73,35 @@ try {
   console.log("Account audit: restore into new campaign");
   other.on("dialog", (d) => d.accept());
   await other.getByRole("button", { name: "Restore as new", exact: true }).click();
-  await other.waitForURL(origin + "/");
+  await other.waitForURL((url) => url.origin === origin && url.pathname === "/");
   await other.getByText("Campaign treasury", { exact: true }).waitFor();
   assert.ok(
     await other.evaluate(() => JSON.parse(localStorage.getItem("quire.campaigns.v1")).length >= 2),
   );
   await visit(other, "/account");
+  console.log("Account audit: shared membership resumes on another device");
+  await visit(other, "/share");
+  const skip = other.getByRole("button", { name: "Not now", exact: true });
+  if (await skip.isVisible()) await skip.click();
+  await other.getByRole("button", { name: "Start a room", exact: true }).click();
+  await other.getByRole("button", { name: "Create room", exact: true }).click();
+  await other.getByRole("button", { name: "Share join link", exact: true }).waitFor();
+  await visit(other, "/account");
+  await other.getByRole("button", { name: "Save current membership", exact: true }).click();
+  await other.getByRole("button", { name: "Resume", exact: true }).waitFor();
+  await page.reload();
+  await page.getByRole("button", { name: "Resume", exact: true }).click();
+  await page.waitForURL((url) => url.origin === origin && url.pathname === "/");
+  await page.getByText("Campaign treasury", { exact: true }).waitFor();
+  assert.ok(
+    await page.evaluate(() => localStorage.getItem("quire.campaign.v1").startsWith("account-")),
+  );
+  assert.ok(
+    await page.evaluate(() =>
+      JSON.parse(localStorage.getItem("quire.campaigns.v1")).some((c) => c.id === "main"),
+    ),
+  );
+  await visit(page, "/account");
   console.log("Account audit: recover and revoke other sessions");
   await page.getByRole("button", { name: "Sign out", exact: true }).click();
   await page.getByRole("button", { name: "Forgot your password? Use a recovery key" }).click();

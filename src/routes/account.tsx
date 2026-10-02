@@ -114,6 +114,7 @@ function Account() {
       if (mode === "signup") {
         const result = await accountRequest<{ key: string }>("recovery-key", {});
         setKey(result.key);
+        await reload();
       }
     });
   }
@@ -554,6 +555,35 @@ function Account() {
                 }}
               >
                 <h3>{editId ? "Edit character profile" : "Save a character profile"}</h3>
+                {!editId && (
+                  <label>
+                    Start from a current character (optional)
+                    <select
+                      defaultValue=""
+                      onChange={(e) => {
+                        const p = economy.purses.find((p) => p.id === e.target.value);
+                        if (p) {
+                          setProfileName(p.name);
+                          setPortrait(p.portrait || "");
+                          setDescription("");
+                        }
+                      }}
+                    >
+                      <option value="">Choose a character or enter one below</option>
+                      {economy.purses
+                        .filter(
+                          (p) =>
+                            p.kind === "character" &&
+                            (seat.role === "dm" || seat.purseIds.includes(p.id)),
+                        )
+                        .map((p) => (
+                          <option key={p.id} value={p.id}>
+                            {p.name}
+                          </option>
+                        ))}
+                    </select>
+                  </label>
+                )}
                 <label>
                   Character name
                   <input

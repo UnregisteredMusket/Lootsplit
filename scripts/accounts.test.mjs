@@ -165,3 +165,38 @@ test("recovery rotates the key, revokes sessions and rejects replay", async () =
     DB.close();
   }
 });
+
+test("signed native sessions work without third-party cookies; unsigned tokens fail", async () => {
+  const { DB, env } = setup();
+  try {
+    const request = (path, body, token) =>
+      handleAccounts(
+        new Request(origin + "/api/account/" + path, {
+          method: body ? "POST" : "GET",
+          headers: {
+            origin: "https://localhost",
+            "content-type": "application/json",
+            "cf-connecting-ip": "192.0.2.77",
+            ...(token ? { authorization: `Bearer ${token}` } : {}),
+          },
+          ...(body ? { body: JSON.stringify(body) } : {}),
+        }),
+        env,
+      );
+    const response = await request("auth/sign-up/email", {
+      email: "native@example.com",
+      name: "Native",
+      password: "native password testing 2026",
+    });
+    assert.equal(response.status, 200);
+    assert.equal(response.headers.get("access-control-allow-origin"), "https://localhost");
+    const token = response.headers.get("set-auth-token");
+    assert.ok(token);
+    assert.equal((await request("library", undefined, token)).status, 200);
+    assert.equal((await request("library", undefined, "forged-token")).status, 401);
+    await request("auth/sign-out", {}, token);
+    assert.equal((await request("library", undefined, token)).status, 401);
+  } finally {
+    DB.close();
+  }
+});
