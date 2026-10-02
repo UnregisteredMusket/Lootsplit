@@ -284,3 +284,239 @@ test("site owner grants are server-only, revocable, audited and conflict-safe", 
     DB.close();
   }
 });
+
+test("member moderation enforces role hierarchy, bans, revocation, and audit revisions", async () => {
+  const { DB, call, signup } = setup();
+  try {
+    const owner = await signup("siteowner@example.com"),
+      admin = await signup("admin@example.com"),
+      mod = await signup("mod@example.com"),
+      member = await signup("ordinary@example.com");
+    for (const [u, role] of [
+      [owner, "owner"],
+      [admin, "admin"],
+      [mod, "moderator"],
+    ])
+      await DB.prepare("INSERT INTO site_roles VALUES (?,?,?)")
+        .bind(u.data.user.id, role, Date.now())
+        .run();
+    const id = member.data.user.id;
+    assert.equal((await call("staff/members", undefined, member.cookie)).response.status, 403);
+    const directory = await call("staff/members", undefined, owner.cookie);
+    assert.equal(directory.data.total, 4);
+    assert.ok(directory.data.members.every((m) => "member_since" in m && "last_online" in m));
+    const act = (action, revision, extra = {}) => ({
+      id,
+      action,
+      revision,
+      reason: "Test moderation reason",
+      ...extra,
+    });
+    assert.equal(
+      (await call("staff/action", act("role", 0, { role: "admin" }), admin.cookie)).response.status,
+      403,
+    );
+    assert.equal(
+      (await call("staff/action", act("ban", 0, { until: null }), mod.cookie)).response.status,
+      403,
+    );
+    assert.equal(
+      (
+        await call(
+          "staff/action",
+          { ...act("ban", 0, { until: null }), id: owner.data.user.id },
+          admin.cookie,
+        )
+      ).response.status,
+      403,
+    );
+    assert.equal((await call("staff/action", act("warn", 0), mod.cookie)).response.status, 200);
+    assert.equal((await call("staff/action", act("warn", 0), mod.cookie)).response.status, 409);
+    assert.equal(
+      (await call("library", undefined, member.cookie)).data.notices[0].reason,
+      "Test moderation reason",
+    );
+    assert.equal(
+      (await call("staff/action", act("ban", 1, { until: Date.now() + 86400000 }), mod.cookie))
+        .response.status,
+      200,
+    );
+    assert.equal((await call("library", undefined, member.cookie)).response.status, 401);
+    const login = () =>
+      call("auth/sign-in/email", {
+        email: "ordinary@example.com",
+        password: "a long unique test password",
+      });
+    assert.equal((await login()).response.status, 403);
+    await DB.prepare("UPDATE member_access SET ban_until=? WHERE user_id=?")
+      .bind(Date.now() - 1, id)
+      .run();
+    assert.equal((await login()).response.status, 200);
+    assert.equal(
+      (await call("staff/action", act("ban", 2, { until: null }), admin.cookie)).response.status,
+      200,
+    );
+    assert.equal((await login()).response.status, 403);
+    assert.equal(
+      (await call("staff/action", act("restore", 3), admin.cookie)).response.status,
+      200,
+    );
+    const signed = await login();
+    assert.equal(signed.response.status, 200);
+    assert.equal((await call("staff/action", act("revoke", 4), admin.cookie)).response.status, 200);
+    assert.equal((await login()).response.status, 403);
+    assert.equal(
+      (await DB.prepare("SELECT COUNT(*) AS n FROM user WHERE id=?").bind(id).first()).n,
+      1,
+    );
+    assert.equal(
+      (await call("staff/action", act("restore", 5), owner.cookie)).response.status,
+      200,
+    );
+    assert.equal(
+      (await call("staff/action", act("role", 6, { role: "moderator" }), owner.cookie)).response
+        .status,
+      200,
+    );
+    assert.equal((await call("staff/action", act("revoke", 7), admin.cookie)).response.status, 403);
+    assert.equal(
+      (await call("staff/action", act("role", 7, { role: "member" }), owner.cookie)).response
+        .status,
+      200,
+    );
+    assert.equal(
+      (
+        await DB.prepare("SELECT COUNT(*) AS n FROM moderation_audit WHERE target_id=?")
+          .bind(id)
+          .first()
+      ).n,
+      8,
+    );
+  } finally {
+    DB.close();
+  }
+});
+
+test("profile edits are private, validated, optimistic, and ignore role injection", async () => {
+  const { DB, call, signup } = setup();
+  try {
+    const user = await signup("profile@example.com");
+    const me = await call("library", undefined, user.cookie);
+    assert.ok(me.data.profile.member_since);
+    assert.ok(me.data.profile.last_online);
+    const profile = {
+      name: "Updated name",
+      introduction: "Hello <script>literal</script>",
+      portrait: "",
+      contact_email: "contact@example.com",
+      share_contact: false,
+      email_opt_in: true,
+      revision: 0,
+      role: "owner",
+    };
+    assert.equal(
+      (
+        await call(
+          "profile",
+          { ...profile, portrait: "https://tracking.example.com/image" },
+          user.cookie,
+        )
+      ).response.status,
+      400,
+    );
+    assert.equal((await call("profile", profile, user.cookie)).response.status, 200);
+    assert.equal(
+      (await call("profile", { ...profile, name: "Conflict" }, user.cookie)).response.status,
+      409,
+    );
+    const saved = await call("library", undefined, user.cookie);
+    assert.equal(saved.data.user.role, "member");
+    assert.equal(saved.data.profile.name, "Updated name");
+    assert.equal(saved.data.profile.email_opt_in, 1);
+    assert.equal(
+      (await call("profile", { ...profile, email_opt_in: false, revision: 1 }, user.cookie))
+        .response.status,
+      200,
+    );
+    assert.equal(
+      (await call("profile", { ...profile, revision: 2 }, user.cookie, "https://evil.example"))
+        .response.status,
+      403,
+    );
+  } finally {
+    DB.close();
+  }
+});
+
+test("campaign deletion requires linked DM, confirmation and current revision; saved state survives", async () => {
+  const { DB, call, signup } = setup();
+  try {
+    const dm = await signup("campaign-dm@example.com"),
+      player = await signup("campaign-player@example.com");
+    const room = {
+      code: "DELETE01",
+      revision: 1,
+      seats: [
+        { id: "dm-seat", token: "dm-token", role: "dm", purseIds: [] },
+        { id: "player-seat", token: "player-token", role: "player", purseIds: [] },
+      ],
+      table: { purses: [], holdings: [], ledger: [], shops: [], stock: [], notes: [] },
+      drafts: {},
+    };
+    await DB.prepare("INSERT INTO campaign_rooms(code,revision,body) VALUES (?,1,?)")
+      .bind(room.code, JSON.stringify(room))
+      .run();
+    for (const [u, token] of [
+      [dm, "dm-token"],
+      [player, "player-token"],
+    ])
+      assert.equal(
+        (await call("link", { code: room.code, token, name: "Saved campaign" }, u.cookie)).response
+          .status,
+        200,
+      );
+    room.table.notes = [
+      { id: "private", to: "player", text: "private message" },
+      { id: "party", to: "party", text: "party message" },
+    ];
+    room.table.realm = { scale: 2 };
+    await DB.prepare("UPDATE campaign_rooms SET body=? WHERE code=?")
+      .bind(JSON.stringify(room), room.code)
+      .run();
+    const body = { code: room.code, action: "delete", confirm: room.code, revision: 1 };
+    assert.equal((await call("campaign", body, player.cookie)).response.status, 403);
+    assert.equal(
+      (await call("campaign", { ...body, confirm: "wrong" }, dm.cookie)).response.status,
+      400,
+    );
+    assert.equal(
+      (await call("campaign", { ...body, revision: 0 }, dm.cookie)).response.status,
+      409,
+    );
+    assert.equal(
+      (await call("campaign", { action: "rename", code: room.code, name: "New title" }, dm.cookie))
+        .response.status,
+      200,
+    );
+    assert.equal((await call("campaign", body, dm.cookie)).response.status, 200);
+    assert.equal(
+      await DB.prepare("SELECT code FROM campaign_rooms WHERE code=?").bind(room.code).first(),
+      null,
+    );
+    const library = await call("library", undefined, dm.cookie);
+    assert.equal(library.data.members.length, 0);
+    assert.equal(library.data.backups.length, 1);
+    const saved = (await call("read-backup", { id: library.data.backups[0].id }, dm.cookie)).data
+      .payload;
+    assert.deepEqual(saved.notes, [{ id: "party", to: "party", text: "party message" }]);
+    assert.deepEqual(saved.settings, { scale: 2 });
+    assert.ok(saved.exportedAt);
+    assert.equal(
+      (await call("read-backup", { id: library.data.backups[0].id }, player.cookie)).response
+        .status,
+      404,
+    );
+  } finally {
+    DB.close();
+  }
+});

@@ -1,3 +1,4 @@
+import { MemberActivity } from "@/components/account/activity";
 import {
   createRootRoute,
   HeadContent,
@@ -54,6 +55,7 @@ export const Route = createRootRoute({
         </head>
         <body>
           <PreviewHostBridge />
+          <MemberActivity />
           {!publicPage && <OpeningDawn />}
           <AuthProvider>
             <LibraryProvider>

@@ -1,4 +1,14 @@
 import {
+  assertActive,
+  touchMember,
+  profileOf,
+  saveProfile,
+  directory,
+  moderation,
+  memberDetail,
+} from "./members.mjs";
+import { campaignAction } from "./account-campaigns.mjs";
+import {
   siteRole,
   publicAnnouncement,
   ownerOverview,
@@ -50,6 +60,16 @@ export function accountAuth(env) {
     advanced: { cookiePrefix: "lootsplit", ipAddress: { ipAddressHeaders: ["cf-connecting-ip"] } },
     rateLimit: { enabled: true, storage: "database", window: 60, max: 40 },
     plugins: [bearer({ requireSignature: true })],
+    databaseHooks: {
+      session: {
+        create: {
+          before: async (session) => {
+            await assertActive(env.DB, session.userId, true);
+            return { data: session };
+          },
+        },
+      },
+    },
   });
 }
 
@@ -187,6 +207,26 @@ export async function handleAccounts(request, env) {
     const session = await auth.api.getSession({ headers: request.headers });
     if (!session) fail("Sign in to open your account library.", 401);
     const userId = session.user.id;
+    await assertActive(db, userId);
+    await touchMember(db, userId);
+    if (path === "/api/account/profile" && request.method === "POST")
+      return cors(json(await saveProfile(db, userId, body)));
+    if (path === "/api/account/activity" && request.method === "GET")
+      return cors(json({ ok: true }));
+    if (path === "/api/account/staff/members" && request.method === "GET")
+      return cors(json(await directory(db, userId, new URL(request.url))));
+    if (path === "/api/account/staff/member" && request.method === "POST")
+      return cors(json(await memberDetail(db, userId, body.id)));
+    if (path === "/api/account/staff/action" && request.method === "POST") {
+      if (
+        body.action === "role" &&
+        Date.now() - new Date(session.session.createdAt).getTime() > 600000
+      )
+        fail("Sign out and sign in again before changing staff roles.", 403);
+      return cors(json(await moderation(db, userId, body)));
+    }
+    if (path === "/api/account/campaign" && request.method === "POST")
+      return cors(json(await campaignAction(db, userId, body)));
     if (path === "/api/account/owner/donations" && request.method === "POST")
       return cors(json(await saveDonations(db, userId, body)));
     if (path === "/api/account/owner" && request.method === "GET")
@@ -197,7 +237,7 @@ export async function handleAccounts(request, env) {
       const [members, backups, characters, recovery] = await Promise.all([
         db
           .prepare(
-            "SELECT code, seat_id, name, archived, updated_at FROM library_members WHERE user_id=? ORDER BY updated_at DESC",
+            "SELECT m.code,m.seat_id,m.name,m.archived,m.updated_at,r.body AS room_body,r.revision AS room_revision,m.token FROM library_members m LEFT JOIN campaign_rooms r ON r.code=m.code WHERE m.user_id=? ORDER BY m.updated_at DESC",
           )
           .bind(userId)
           .all(),
@@ -223,7 +263,21 @@ export async function handleAccounts(request, env) {
             email: session.user.email,
             role: await siteRole(db, userId),
           },
-          members: members.results,
+          profile: await profileOf(db, userId),
+          notices: (
+            await db
+              .prepare(
+                "SELECT action,reason,created_at FROM moderation_audit WHERE target_id=? AND action='warn' ORDER BY created_at DESC LIMIT 20",
+              )
+              .bind(userId)
+              .all()
+          ).results,
+          members: members.results.map(({ room_body, token, ...m }) => {
+            const seat = room_body
+              ? JSON.parse(room_body).seats.find((s) => s.id === m.seat_id && s.token === token)
+              : null;
+            return { ...m, role: seat?.role || null };
+          }),
           backups: backups.results,
           characters: characters.results.map((r) => ({ id: r.id, ...JSON.parse(r.body) })),
           hasRecoveryKey: !!recovery,

@@ -1,10 +1,8 @@
 const reject = (message, status = 400) => {
   throw Object.assign(new Error(message), { status });
 };
-export async function siteRole(db, userId) {
-  const row = await db.prepare("SELECT role FROM site_roles WHERE user_id=?").bind(userId).first();
-  return row?.role === "owner" ? "owner" : "member";
-}
+export { roleOf as siteRole } from "./members.mjs";
+import { roleOf as siteRole } from "./members.mjs";
 export async function publicAnnouncement(db) {
   const row = await db
     .prepare("SELECT title, message FROM site_settings WHERE id=1 AND published=1")

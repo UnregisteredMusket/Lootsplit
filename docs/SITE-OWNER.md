@@ -7,3 +7,17 @@ My account shows Owner controls: aggregate usage counts, a publishable homepage 
 Resources uses `src/lib/website/resources.ts`. Add the original source and applicable licenses for each future integrated resource, and retain item-level source credits. Donation links must be the owner's chosen payment destination. Lootsplit stores no payment details and promises no donor benefits.
 
 Verification: account API tests cover member denial, origin checks, conflict handling, audit counts, invalid donation URLs, public responses, and immediate role revocation. The local-only owner browser audit creates a disposable user, grants through the development DB, exercises both forms and public pages, then removes its role and user. Never run that fixture against production.
+
+## Member management
+
+Migration 0005 preserves existing owner grants while adding admin/moderator roles, account status, profiles, and a separate moderation audit trail. Only an owner may assign staff roles; ownership cannot be edited through this UI. Owners cannot moderate themselves, admins can moderate ordinary members only, and moderators have a 30-day suspension limit and cannot revoke accounts, permanently ban, restore access or change roles. Staff actions require a reason and current target revision. Role changes require a sign-in within ten minutes.
+
+Revocation preserves the account and its data. Bans end all sessions and clear linked push subscriptions; permanent bans have no expiry. Temporary bans expire automatically, after which the member must sign in again. Linked room tokens are checked independently so they cannot bypass account restrictions. Guest play stays supported, so these are account bans, not claims of device/IP-wide exclusion.
+
+Profiles and last-online timestamps are available to the member and staff. Last Online is approximate visible signed-in activity, updated at most once a minute and periodically while browsing. Dates before rollout have no fabricated activity. Ordinary moderators do not receive registration email addresses; messaging email is available to them only when the member explicitly enables it. Profile changes use optimistic revisions. Email opt-in is stored but no broadcast/delivery provider is configured and no email is sent.
+
+Shared deletion requires the linked DM, exact code confirmation, current room revision and no staged turns. A private backup retains the DM-visible saved state before the shared room and its memberships/subscriptions are deleted. Private player-to-player messages are excluded from that backup; device-local PDFs, catalogs, and copies stay on their devices. Local campaign deletion uses the existing confirmed device workflow.
+
+## Notifications
+
+The shipped Android APK has no Capacitor native push plugin or Firebase configuration, and its background push toggle explicitly remains disabled. Website Web Push exists separately. Native Android push requires Firebase Cloud Messaging integration, device token registration and secure server delivery, permission requests on Android 13+, a signed APK update, and actual-device testing. Email announcements require a verified sending domain/service, verified subscribers, unsubscribe handling and delivery/bounce controls before enabling sends. Registration email is not automatic mailing-list consent.
