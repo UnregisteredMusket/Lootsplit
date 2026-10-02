@@ -46,11 +46,46 @@ try {
   assert.equal(result.status, "healthy", JSON.stringify(result));
   assert.ok(result.stats.accounts >= 1);
   assert.ok(result.checks.every((check) => check.status === "healthy"));
+  const report = await fetch(origin + "/api/account/reports", {
+    method: "POST",
+    headers: { cookie, origin, "content-type": "application/json" },
+    body: JSON.stringify({
+      requestKey: crypto.randomUUID(),
+      title: "Worker report test",
+      area: "website",
+      description: "Disposable test",
+      steps: "",
+      expected: "",
+    }),
+  });
+  assert.equal(report.status, 201);
+  const reportId = (await report.json()).id;
+  const update = await fetch(origin + "/api/account/reports/update", {
+    method: "POST",
+    headers: { cookie, origin, "content-type": "application/json" },
+    body: JSON.stringify({
+      id: reportId,
+      status: "fixed",
+      priority: "normal",
+      response: "Verified on built Worker",
+      revision: 0,
+    }),
+  });
+  assert.equal(update.status, 200);
+  const detail = await fetch(origin + "/api/account/reports/detail", {
+    method: "POST",
+    headers: { cookie, origin, "content-type": "application/json" },
+    body: JSON.stringify({ id: reportId }),
+  });
+  const reportData = await detail.json();
+  assert.equal(reportData.status, "fixed");
+  assert.equal(reportData.history.length, 1);
   sql(`UPDATE site_roles SET role='moderator' WHERE user_id='${id}'`);
   assert.equal((await monitor()).status, 403);
   console.log(
     "PASS: built Worker monitoring authenticates roles, reads D1, checks actual ASSETS, and denies revoked admin access.",
   );
 } finally {
+  sql(`DELETE FROM bug_reports WHERE user_id='${id}'`);
   sql(`DELETE FROM user WHERE id='${id}'`);
 }

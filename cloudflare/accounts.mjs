@@ -1,3 +1,9 @@
+import {
+  createBugReport,
+  listBugReports,
+  bugReportDetail,
+  updateBugReport,
+} from "./bug-reports.mjs";
 import { serverMonitor } from "./monitoring.mjs";
 import {
   assertActive,
@@ -210,6 +216,14 @@ export async function handleAccounts(request, env) {
     const userId = session.user.id;
     await assertActive(db, userId);
     await touchMember(db, userId);
+    if (path === "/api/account/reports" && request.method === "GET")
+      return cors(json(await listBugReports(db, userId, new URL(request.url))));
+    if (path === "/api/account/reports" && request.method === "POST")
+      return cors(json(await createBugReport(db, userId, body), 201));
+    if (path === "/api/account/reports/detail" && request.method === "POST")
+      return cors(json(await bugReportDetail(db, userId, body.id)));
+    if (path === "/api/account/reports/update" && request.method === "POST")
+      return cors(json(await updateBugReport(db, userId, body)));
     if (path === "/api/account/monitor" && request.method === "GET")
       return cors(json(await serverMonitor(env, userId)));
     if (path === "/api/account/profile" && request.method === "POST")

@@ -1,3 +1,4 @@
+import { BugReports } from "@/components/account/bug-reports";
 import { ServerMonitor } from "@/components/account/server-monitor";
 import { ProfileControls } from "@/components/account/profile-controls";
 import { StaffControls } from "@/components/account/staff-controls";
@@ -176,6 +177,13 @@ function Account() {
           <p className="portal-message" role="status">
             {notice}
           </p>
+        )}
+        {!loading && (
+          <BugReports
+            key={library?.user.id ?? "guest"}
+            userId={library?.user.id}
+            role={library?.user.role}
+          />
         )}
         {(library?.user.role === "owner" || library?.user.role === "admin") && <ServerMonitor />}
         {library?.user.role === "owner" && <OwnerControls />}

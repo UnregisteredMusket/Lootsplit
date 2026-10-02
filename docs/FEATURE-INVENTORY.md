@@ -68,3 +68,10 @@ Not implemented or promised by this inventory: OCR, Google Drive backup integrat
 - Notification readiness distinguishes existing web push from unavailable email/native Android push.
 - Optional 30-second visible-page polling, manual refresh, cancellation, partial-failure display,
   stale snapshot labels, no-store responses, and explicit on-demand monitoring limitations.
+
+### Private bug reports
+- Signed-in members submit text reports from My account, with optional previewed app/device diagnostics. Help and app navigation link to the form.
+- Report history and responses are private to the reporter, owner and administrators; moderators cannot inspect other members' reports.
+- Owner/admin inbox supports status filtering, pagination, priorities, reporter-visible responses and audited updates with conflict detection.
+- Five reports per account per rolling 24 hours; retry receipts prevent duplicate submissions. No automatic campaign/file capture, uploads or email delivery.
+- Existing guest play, account permissions, saved campaigns and Android signing remain unchanged. Existing installed APKs can use the website; native navigation changes ship with a future APK release.

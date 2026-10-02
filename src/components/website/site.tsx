@@ -354,6 +354,17 @@ export function HelpPage() {
         <p className="ls-eyebrow">A GOOD START TO THE NEXT SESSION</p>
         <h1>A little help, adventurer.</h1>
         <p className="ls-intro">Installation, safe updates, and keeping your campaign with you.</p>
+        <section className="ls-help-block" id="bugs">
+          <h2>Report a bug</h2>
+          <p>
+            <Link to="/account" hash="bug-reports">
+              Sign in to submit a bug report
+            </Link>{" "}
+            and track its status in My account. Reports are private to you, the owner and
+            administrators. Device details are optional; campaign content is never attached
+            automatically.
+          </p>
+        </section>
         <section className="ls-help-block" id="android">
           <h2>Install or update on Android</h2>
           <ol>
