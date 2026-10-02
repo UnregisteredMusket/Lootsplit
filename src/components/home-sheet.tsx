@@ -1,3 +1,4 @@
+import { CharacterWorkspace } from "@/components/characters/workspace";
 import { getServerCloudTable } from "@/lib/quire/cloud-client";
 import { InventoryList, PortraitPicker } from "./ledger-art";
 import { getCloudTable, subscribeCloudTable } from "@/lib/quire/cloud-client";
@@ -35,7 +36,8 @@ export function HomeSheet() {
   if (!purse) {
     return (
       <>
-        <h1 className="font-display text-4xl tracking-tight">Sheet</h1>
+        <CharacterWorkspace campaignCode={cloud.code} />
+        <h2 className="font-display text-2xl tracking-tight">Device campaign</h2>
         <p className="mt-2 text-sm text-muted">
           No character is assigned to this browser on this device.
         </p>
@@ -48,6 +50,8 @@ export function HomeSheet() {
 
   return (
     <article>
+      <CharacterWorkspace campaignCode={cloud.code} />
+      <h2 className="mt-8 font-display text-2xl">Campaign inventory & imported sheet</h2>
       {mine.length > 1 ? (
         <label className="mb-4 block text-sm text-muted">
           Character

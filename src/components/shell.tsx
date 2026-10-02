@@ -140,6 +140,12 @@ export function Shell({
           <Link to="/account" className="mt-5 text-sm text-[var(--muted)]">
             My account & campaigns
           </Link>
+          <Link to="/characters" className="mt-2 text-sm text-[var(--muted)]">
+            Character sheets & rolls
+          </Link>
+          <Link to="/" search={{ view: "overview" }} className="mt-2 text-sm text-[var(--muted)]">
+            Campaign overview
+          </Link>
           <Link to="/account" hash="bug-reports" className="mt-2 text-sm text-[var(--muted)]">
             Report a bug
           </Link>
@@ -234,6 +240,21 @@ export function Shell({
               label="Market"
               onPick={() => setMore(false)}
             />
+            <Link
+              to="/characters"
+              className="flex min-h-11 items-center px-2 text-sm"
+              onClick={() => setMore(false)}
+            >
+              Character sheets & rolls
+            </Link>
+            <Link
+              to="/"
+              search={{ view: "overview" }}
+              className="flex min-h-11 items-center px-2 text-sm"
+              onClick={() => setMore(false)}
+            >
+              Campaign overview
+            </Link>
             <MoreLink to="/account" label="My account & campaigns" onPick={() => setMore(false)} />
             <Link
               to="/account"

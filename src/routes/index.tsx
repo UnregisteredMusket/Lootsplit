@@ -6,7 +6,12 @@ import { useSeat } from "@/lib/quire/seat";
 
 export const Route = createFileRoute("/")({
   validateSearch: (search: Record<string, unknown>) => ({
-    view: search.view === "sheet" ? ("sheet" as const) : ("home" as const),
+    view:
+      search.view === "sheet"
+        ? ("sheet" as const)
+        : search.view === "overview"
+          ? ("overview" as const)
+          : ("home" as const),
   }),
   component: Home,
 });
@@ -14,9 +19,9 @@ export const Route = createFileRoute("/")({
 function Home() {
   const seat = useSeat();
   const { view } = Route.useSearch();
-  if (seat.role === "player" && view === "sheet") {
+  if (seat.role === "player" && view !== "overview") {
     return (
-      <Shell width="prose">
+      <Shell>
         <HomeSheet />
       </Shell>
     );
