@@ -7,15 +7,20 @@ export function MemberActivity() {
     let busy = false;
     const checkedKey = "lootsplit.activity.checked.v1";
     const record = async () => {
-      if (stopped || busy || document.visibilityState !== "visible") return;
+      if (
+        stopped ||
+        busy ||
+        document.visibilityState !== "visible" ||
+        localStorage.getItem("lootsplit.account.active") !== "yes"
+      )
+        return;
       // Survive full-page navigation: frequent page visits must not multiply auth probes.
       const checked = Number(sessionStorage.getItem(checkedKey) || 0);
       if (Date.now() - checked < 240000) return;
       sessionStorage.setItem(checkedKey, String(Date.now()));
       busy = true;
       try {
-        const session = await accountRequest<{ user?: unknown } | null>("auth/get-session");
-        if (!stopped && session?.user) await accountRequest("activity");
+        await accountRequest("activity");
       } catch {
         /* Optional activity must not interrupt local play. */
       } finally {

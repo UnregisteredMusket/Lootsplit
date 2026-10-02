@@ -18,6 +18,10 @@ const DB = localAccountDb("data/account-dev.sqlite"),
 async function account(label) {
   const context = await browser.newContext({ viewport: { width: 1280, height: 900 } });
   context.setDefaultTimeout(20000);
+  // Each disposable actor models a separate client; avoid sharing other audits' IP budget.
+  await context.setExtraHTTPHeaders({
+    "cf-connecting-ip": label === "Staff Audit" ? "192.0.2.201" : "192.0.2.202",
+  });
   const email = `${label.toLowerCase().replaceAll(" ", "-")}-${Date.now()}@example.com`;
   const r = await context.request.post(origin + "/api/account/auth/sign-up/email", {
     headers: { origin },
@@ -155,6 +159,11 @@ try {
   console.log(
     "PASS: profile persistence, member isolation, warning, ban/session revocation, restore, staff grant/revoke, responsive staff UI.",
   );
+} catch (error) {
+  for (const context of browser.contexts())
+    for (const page of context.pages())
+      console.error((await page.locator("body").innerText()).slice(0, 2500));
+  throw error;
 } finally {
   for (const id of ids) await DB.prepare("DELETE FROM user WHERE id=?").bind(id).run();
   DB.close();

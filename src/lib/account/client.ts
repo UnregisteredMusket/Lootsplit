@@ -13,6 +13,10 @@ export async function accountRequest<T>(path: string, body?: unknown): Promise<T
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
   });
   const result = await response.json();
+  if (path === "activity" && response.status === 401)
+    localStorage.removeItem("lootsplit.account.active");
+  if (response.ok && path === "library") localStorage.setItem("lootsplit.account.active", "yes");
+  if (path === "auth/sign-out" && response.ok) localStorage.removeItem("lootsplit.account.active");
   if (!response.ok)
     throw new Error(
       result.error?.message ||
