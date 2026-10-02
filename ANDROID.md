@@ -8,7 +8,7 @@ After this change is deployed, the Worker accepts server-function calls from `ht
 
 ## Test APK
 
-The GitHub Action **Android test APK** builds `app-debug.apk`. Run it manually or push a prepared update to an `android/**` branch after verifying the web release. Version 1.3.0 uses Android version code 3. The APK is signed with the build machine's debug key, not a Play Store release key. A later test APK may not install over an older one if the debug key changed. Export and verify a backup of local campaigns before uninstalling an old test copy; uninstalling removes its local data.
+The GitHub Action **Android test APK** builds `app-debug.apk`. Run it manually or push a prepared update to an `android/**` branch after verifying the web release. Version 1.3.1 uses Android version code 4; the previous permanent-key 1.3.0 uses code 3. The APK is signed with the build machine's debug key, not a Play Store release key. A later test APK may not install over an older one if the debug key changed. Export and verify a backup of local campaigns before uninstalling an old test copy; uninstalling removes its local data.
 
 From a phone:
 
@@ -19,22 +19,9 @@ From a phone:
 
 ## Release signing
 
-Keep one upload keystore outside the repository. Use that same keystore for every update. A new keystore makes Android treat the app as a different application.
+The permanent signing key is already configured. Use the existing GitHub repository secrets for every update: `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, and `ANDROID_KEY_PASSWORD`. Do not generate a replacement key, retrieve secret values, or ask the owner to paste passwords. The owner retains the original private backup.
 
-Create it once, on a machine you control:
-
-```bash
-keytool -genkeypair -v -keystore lootsplit-release.jks -alias lootsplit -keyalg RSA -keysize 2048 -validity 10000
-```
-
-Store the file and both passwords somewhere private. For GitHub, add these repository secrets, not files in git:
-
-- `ANDROID_KEYSTORE_BASE64` — `base64 -w0 lootsplit-release.jks`
-- `ANDROID_KEYSTORE_PASSWORD`
-- `ANDROID_KEY_ALIAS` — `lootsplit`
-- `ANDROID_KEY_PASSWORD`
-
-Do not commit `*.jks`, `*.keystore`, or those passwords. The manual **Android signed release APK** workflow signs using these four repository secrets. It verifies the APK signature and uploads only the APK, never the keystore. Missing secrets stop the build. The decoded keystore is temporary and removed on exit. Debug builds remain separate and are not release updates.
+Do not commit `*.jks`, `*.keystore`, or those passwords. The **Android signed release APK** workflow signs using these four repository secrets. It verifies the APK signature and uploads only the APK, never the keystore. Missing secrets stop the build. The decoded keystore is temporary and removed on exit. Debug builds remain separate and are not release updates.
 
 The permanent keystore was generated on 2026-10-01, downloaded by the owner for backup, and configured through the four repository secrets. Its alias is `lootsplit`. The workflow requires certificate SHA-256 `BA:CA:95:A8:80:D1:4D:0D:8C:42:2C:39:7D:EC:D4:C9:BF:0E:7F:71:0A:3F:D6:A5:BE:1E:47:AB:D3:F7:30:A0` and refuses to upload an APK signed by another key. Keep the keystore and passwords backed up securely. Never generate a fresh key automatically during a build.
 
@@ -42,7 +29,7 @@ The first release-signed APK cannot normally replace the old debug-signed instal
 
 ## Releases from main (1.3.1 onward)
 
-`main` is the shared web/Android source. Increase `APP_VERSION`, Android `versionName`, and Android `versionCode` together, update `docs/RELEASE-NOTES.md`, and merge verified changes. A version-file change on main starts the signed-release workflow; it can also be run manually on main. Tests, type checking, both builds, monotonic version checks, and the permanent certificate check must pass. A versioned GitHub Release holds `Lootsplit-VERSION.apk` and `SHA256SUMS.txt`; do not overwrite an existing release. Actions artifacts remain available as secondary downloads.
+`main` is the shared web/Android source. Increase `APP_VERSION`, Android `versionName`, and Android `versionCode` together, update `docs/RELEASE-NOTES.md`, and merge verified changes. A version-file or signed-release-workflow change on main starts the signed-release workflow; it can also be run manually on main. Tests, type checking, both builds, monotonic version checks, and the permanent certificate check must pass. A versioned GitHub Release holds `Lootsplit-VERSION.apk` and `SHA256SUMS.txt`; do not overwrite an existing release. Actions artifacts remain available as secondary downloads.
 
 Android exports now ask whether to Save file or Share. Save file uses Android's document picker and reports success only after writing/closing the stream. Choose Downloads or another location outside app-private storage. Sharing only hands the file to another application: confirm that application's save/send completed. Cancelling preserves the campaign and named device backup. Neither private device backups nor shared room membership replace an external backup.
 
