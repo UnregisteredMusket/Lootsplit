@@ -140,6 +140,11 @@ export function Shell({
           <Link to="/account" className="mt-5 text-sm text-[var(--muted)]">
             My account & campaigns
           </Link>
+          {dm && (
+            <Link to="/encounters" className="mt-2 text-sm text-[var(--muted)]">
+              DM encounters
+            </Link>
+          )}
           <Link to="/characters" className="mt-2 text-sm text-[var(--muted)]">
             Character sheets & rolls
           </Link>
@@ -240,6 +245,15 @@ export function Shell({
               label="Market"
               onPick={() => setMore(false)}
             />
+            {dm && (
+              <Link
+                to="/encounters"
+                className="flex min-h-11 items-center px-2 text-sm"
+                onClick={() => setMore(false)}
+              >
+                DM encounters
+              </Link>
+            )}
             <Link
               to="/characters"
               className="flex min-h-11 items-center px-2 text-sm"

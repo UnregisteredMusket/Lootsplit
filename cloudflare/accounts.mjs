@@ -1,3 +1,4 @@
+import { handleEncounters } from "./encounters.mjs";
 import { handleCharacterPlay } from "./character-play.mjs";
 import {
   createBugReport,
@@ -217,6 +218,13 @@ export async function handleAccounts(request, env) {
     const userId = session.user.id;
     await assertActive(db, userId);
     await touchMember(db, userId);
+    if (
+      (path === "/api/account/encounters" && request.method === "GET") ||
+      (path.startsWith("/api/account/encounters/") && request.method === "POST")
+    ) {
+      const result = await handleEncounters(db, userId, path.slice("/api/account/".length), body);
+      if (result !== null) return cors(json(result));
+    }
     if (
       (path === "/api/account/sheets" && request.method === "GET") ||
       (path.startsWith("/api/account/sheets/") && request.method === "POST")

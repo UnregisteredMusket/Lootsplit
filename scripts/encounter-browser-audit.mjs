@@ -1,0 +1,216 @@
+import { chromium } from "playwright";
+import assert from "node:assert/strict";
+import { mkdir } from "node:fs/promises";
+import { localAccountDb } from "./account-dev-db.mjs";
+const origin = process.env.ENCOUNTER_ORIGIN || "http://127.0.0.1:8080";
+const output = process.env.ENCOUNTER_SCREENSHOTS || "test-results/encounters";
+await mkdir(output, { recursive: true });
+const browser = await chromium.launch({
+  headless: true,
+  executablePath: process.env.CHROMIUM_EXECUTABLE_PATH,
+  args: ["--no-sandbox"],
+});
+const db = localAccountDb("data/account-dev.sqlite");
+const errors = [],
+  code = "E" + Date.now().toString().slice(-10),
+  users = [];
+try {
+  async function actor(name, ip) {
+    const context = await browser.newContext({
+      viewport: { width: 1440, height: 1000 },
+      extraHTTPHeaders: { "cf-connecting-ip": ip },
+    });
+    const res = await context.request.post(origin + "/api/account/auth/sign-up/email", {
+      headers: { origin },
+      data: {
+        email: `encounter-${name}-${Date.now()}@example.com`,
+        name,
+        password: "Disposable encounter test password 123",
+      },
+    });
+    assert.equal(res.status(), 200, await res.text());
+    const id = (await res.json()).user.id;
+    users.push(id);
+    const page = await context.newPage();
+    page.setDefaultTimeout(30000);
+    page.on("pageerror", (e) => errors.push(e.message));
+    page.on("dialog", (d) => d.accept());
+    return { context, page, id };
+  }
+  const dm = await actor("DM", "192.0.2.221"),
+    player = await actor("Player", "192.0.2.222");
+  const room = {
+    code,
+    revision: 1,
+    turn: 0,
+    live: true,
+    seats: [
+      { id: "dmseat", token: "dm-token", role: "dm", name: "DM", purseIds: [] },
+      { id: "playerseat", token: "player-token", role: "player", name: "Hero", purseIds: ["hero"] },
+    ],
+    table: {
+      purses: [
+        {
+          id: "party",
+          name: "Party fund",
+          kind: "party",
+          coins: { cp: 0, sp: 0, ep: 0, gp: 10, pp: 0 },
+        },
+        {
+          id: "hero",
+          name: "Hero",
+          kind: "character",
+          coins: { cp: 0, sp: 0, ep: 0, gp: 0, pp: 0 },
+        },
+      ],
+      holdings: [],
+      ledger: [],
+      shops: [],
+      stock: [],
+      notes: [],
+      sheets: [],
+      loans: [],
+      listings: [],
+    },
+    drafts: {},
+    seen: { gifts: [], sales: [] },
+  };
+  await db
+    .prepare("INSERT INTO campaign_rooms VALUES (?,1,?)")
+    .bind(code, JSON.stringify(room))
+    .run();
+  for (const [a, s, t] of [
+    [dm, "dmseat", "dm-token"],
+    [player, "playerseat", "player-token"],
+  ])
+    await db
+      .prepare("INSERT INTO library_members VALUES (?,?,?,?,?,0,0)")
+      .bind(a.id, code, s, t, "The northern road")
+      .run();
+  const p = dm.page;
+  await p.goto(origin + "/encounters");
+  await p.getByRole("button", { name: "New encounter", exact: true }).click();
+  await p.getByRole("button", { name: "Add combatant", exact: true }).waitFor();
+  await p.locator(".quire-dawn").waitFor({ state: "hidden" });
+  const skip = p.getByRole("button", { name: /skip for now/i });
+  if (await skip.isVisible()) await skip.click();
+  await p.getByRole("button", { name: "Add combatant", exact: true }).click();
+  await p.getByLabel("Name", { exact: true }).fill("Rimrock ghoul");
+  await p.getByLabel("Initiative", { exact: true }).fill("17");
+  await p.getByLabel("HP", { exact: true }).fill("8");
+  await p.getByLabel("Conditions", { exact: true }).fill("Prone");
+  await p.getByRole("button", { name: "Save encounter", exact: true }).click();
+  await p.getByText("Encounter saved.", { exact: true }).waitFor();
+  await p.getByRole("button", { name: "Start encounter", exact: true }).click();
+  await p.getByRole("button", { name: "Next turn", exact: true }).click();
+  await p.getByRole("button", { name: "Save encounter", exact: true }).click();
+  await p.getByText("Encounter saved.", { exact: true }).waitFor();
+  await p.screenshot({ path: output + "/desktop-battle.png", fullPage: true });
+  await p.getByRole("button", { name: "Roll history", exact: true }).click();
+  await p.getByLabel("Manual total", { exact: true }).fill("18");
+  await p.getByRole("button", { name: "Record manual roll", exact: true }).click();
+  await p.getByText(/Encounter roll: 18/).waitFor();
+  assert.ok((await p.locator(".encounter-rolls").innerText()).includes("Manual"));
+  await p.getByRole("button", { name: "Builder & generator", exact: true }).click();
+  await p.getByLabel("Encounter name", { exact: true }).fill("Ambush on the northern road");
+  await p.getByLabel("Party size", { exact: true }).fill("5");
+  await p.getByLabel("Party level", { exact: true }).fill("3");
+  await p.getByLabel("Enemy name or type", { exact: true }).fill("goblin");
+  await p.getByRole("button", { name: "Search enemy index", exact: true }).click();
+  await p.getByRole("button", { name: "Add Goblin", exact: true }).waitFor({ timeout: 90000 });
+  await p.getByRole("button", { name: "Generate & add enemies", exact: true }).click();
+  await p.getByText(/Added .* enemies/).waitFor({ timeout: 90000 });
+  await p.getByRole("button", { name: "Save encounter", exact: true }).click();
+  await p.getByText("Encounter saved.", { exact: true }).waitFor();
+  await p.setViewportSize({ width: 390, height: 844 });
+  assert.ok(await p.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+  await p.screenshot({ path: output + "/mobile-builder.png", fullPage: true });
+  await p.getByRole("button", { name: "Loot & rewards", exact: true }).click();
+  await p.getByLabel("GP", { exact: true }).fill("25");
+  await p.getByRole("button", { name: "Add custom loot", exact: true }).click();
+  await p.getByLabel("Item name", { exact: true }).fill("Silver signet");
+  await p.getByRole("button", { name: "Assign all to party inventory", exact: true }).click();
+  await p.getByRole("button", { name: "Attach loot table", exact: true }).click();
+  await p.getByLabel("Result name", { exact: true }).fill("Hidden gem");
+  await p.getByLabel(/^Selected result/).selectOption("0");
+  await p.getByRole("button", { name: "Save encounter", exact: true }).click();
+  await p.getByText("Encounter saved.", { exact: true }).waitFor();
+  await p.getByRole("button", { name: "Conclude & review loot", exact: true }).click();
+  await p.getByRole("button", { name: "Transfer loot once", exact: true }).waitFor();
+  await p.getByRole("button", { name: "Assign all to party inventory", exact: true }).click();
+  await p.getByRole("button", { name: "Save encounter", exact: true }).click();
+  await p.getByText("Encounter saved.", { exact: true }).waitFor();
+  assert.ok(await p.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+  await p.screenshot({ path: output + "/mobile-loot-review.png", fullPage: true });
+  const d = await db
+    .prepare("SELECT id,revision FROM dm_encounters WHERE user_id=?")
+    .bind(dm.id)
+    .first();
+  let lost = false;
+  await p.route("**/api/account/encounters/award", async (route) => {
+    if (!lost) {
+      lost = true;
+      await route.fetch();
+      await route.abort("failed");
+    } else await route.continue();
+  });
+  await p.getByRole("button", { name: "Transfer loot once", exact: true }).click();
+  await p.getByRole("alert").waitFor();
+  await p.getByRole("button", { name: "Transfer loot once", exact: true }).click();
+  await p.getByText(/locked against a second award/).waitFor();
+  const updated = JSON.parse(
+    (await db.prepare("SELECT body FROM campaign_rooms WHERE code=?").bind(code).first()).body,
+  );
+  assert.equal(updated.table.holdings.length, 2);
+  assert.equal(updated.table.purses[0].coins.gp, 35);
+  await p.reload();
+  await p.getByRole("button", { name: /Ambush on the northern road/ }).click();
+  await p.getByText(/locked against a second award/).waitFor();
+  await player.page.goto(origin + "/encounters");
+  await player.page.getByText("Your next encounter starts with a campaign").waitFor();
+  const denied = await player.context.request.post(origin + "/api/account/encounters/detail", {
+    headers: { origin },
+    data: { id: d.id },
+  });
+  assert.equal(denied.status(), 404);
+  assert.deepEqual(errors, []);
+  console.log(
+    JSON.stringify({
+      ok: true,
+      desktop: true,
+      mobile: true,
+      manualRoll: true,
+      generator: true,
+      lootReview: true,
+      lostResponseExactlyOnce: true,
+      playerDenied: true,
+      screenshots: output,
+    }),
+  );
+} catch (error) {
+  for (const context of browser.contexts())
+    for (const page of context.pages()) {
+      await page.screenshot({ path: output + "/failure.png", fullPage: true }).catch(() => {});
+      console.error((await page.locator("body").innerText()).slice(-5000));
+    }
+  throw error;
+} finally {
+  await browser.close();
+  await db
+    .prepare(
+      "DELETE FROM dm_encounter_rolls WHERE encounter_id IN (SELECT id FROM dm_encounters WHERE code=?)",
+    )
+    .bind(code)
+    .run();
+  await db
+    .prepare(
+      "DELETE FROM dm_encounter_awards WHERE encounter_id IN (SELECT id FROM dm_encounters WHERE code=?)",
+    )
+    .bind(code)
+    .run();
+  await db.prepare("DELETE FROM dm_encounters WHERE code=?").bind(code).run();
+  await db.prepare("DELETE FROM library_members WHERE code=?").bind(code).run();
+  await db.prepare("DELETE FROM campaign_rooms WHERE code=?").bind(code).run();
+  for (const id of users) await db.prepare("DELETE FROM user WHERE id=?").bind(id).run();
+  db.close();
+}
