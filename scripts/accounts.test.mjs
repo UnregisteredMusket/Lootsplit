@@ -610,3 +610,94 @@ test("server monitoring reports partial failure without leaking database excepti
   assert.equal(result.checks[1].status, "healthy");
   assert.doesNotMatch(JSON.stringify(result), /sensitive|credentials/);
 });
+
+test("bug reports keep member data private, enforce quotas and safely audit triage", async () => {
+  const { DB, call, signup } = setup();
+  try {
+    const a = await signup("bug-a@example.com"),
+      b = await signup("bug-b@example.com");
+    const payload = {
+      requestKey: crypto.randomUUID(),
+      title: "Shop stops responding",
+      area: "shops",
+      description: "<script>alert(1)</script>",
+      steps: "Open shop",
+      expected: "Items load",
+      diagnostics: {
+        appVersion: "1.3.1",
+        platform: "web",
+        browser: "test",
+        viewport: "390 × 844",
+        token: "must not store",
+      },
+      status: "fixed",
+      user_id: b.data.user.id,
+    };
+    assert.equal((await call("reports")).response.status, 401);
+    assert.equal(
+      (await call("reports", payload, a.cookie, "https://evil.example")).response.status,
+      403,
+    );
+    assert.equal(
+      (await call("reports", { ...payload, title: "x".repeat(121) }, a.cookie)).response.status,
+      400,
+    );
+    const first = await call("reports", payload, a.cookie);
+    assert.equal(first.response.status, 201, JSON.stringify(first.data));
+    const id = first.data.id;
+    assert.equal((await call("reports", payload, a.cookie)).data.id, id);
+    assert.equal((await call("reports", undefined, a.cookie)).data.reports.length, 1);
+    assert.equal((await call("reports", undefined, b.cookie)).data.reports.length, 0);
+    assert.equal((await call("reports/detail", { id }, b.cookie)).response.status, 404);
+    const detail = (await call("reports/detail", { id }, a.cookie)).data;
+    assert.equal(detail.status, "new");
+    assert.equal(detail.diagnostics.token, undefined);
+    assert.equal(detail.description, payload.description);
+    assert.equal(detail.user_id, undefined);
+    for (let i = 0; i < 4; i++)
+      assert.equal(
+        (await call("reports", { ...payload, requestKey: crypto.randomUUID() }, a.cookie)).response
+          .status,
+        201,
+      );
+    assert.equal(
+      (await call("reports", { ...payload, requestKey: crypto.randomUUID() }, a.cookie)).response
+        .status,
+      429,
+    );
+    assert.equal((await call("reports", payload, a.cookie)).data.id, id);
+    const update = {
+      id,
+      status: "reviewing",
+      priority: "high",
+      response: "Reproduced; investigating.",
+      revision: 0,
+    };
+    assert.equal((await call("reports/update", update, a.cookie)).response.status, 403);
+    await DB.prepare("INSERT INTO site_roles VALUES (?,'moderator',?)")
+      .bind(b.data.user.id, Date.now())
+      .run();
+    assert.equal((await call("reports?scope=all", undefined, b.cookie)).response.status, 403);
+    await DB.prepare("UPDATE site_roles SET role='admin' WHERE user_id=?")
+      .bind(b.data.user.id)
+      .run();
+    assert.equal((await call("reports?scope=all", undefined, b.cookie)).data.reports.length, 5);
+    assert.equal((await call("reports/update", update, b.cookie)).response.status, 200);
+    assert.equal((await call("reports/update", update, b.cookie)).response.status, 409);
+    const revised = (await call("reports/detail", { id }, a.cookie)).data;
+    assert.equal(revised.response, update.response);
+    assert.equal(revised.revision, 1);
+    assert.equal(revised.history.length, 1);
+    assert.equal(
+      (await call("reports?status=reviewing", undefined, a.cookie)).data.reports.length,
+      1,
+    );
+    assert.equal((await call("reports?offset=-1", undefined, a.cookie)).response.status, 400);
+    await DB.prepare("UPDATE member_access SET status='revoked' WHERE user_id=?")
+      .bind(b.data.user.id)
+      .run();
+    assert.equal((await call("reports?scope=all", undefined, b.cookie)).response.status, 403);
+  } finally {
+    DB.close();
+  }
+});

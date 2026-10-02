@@ -38,7 +38,17 @@ import { loadSeatLock } from "@/lib/quire/lock";
 import { getOnline, subscribeOnline } from "@/lib/mobile/online";
 import { watchCrashes } from "@/lib/quire/reports";
 
-type Dest = "/account" | "/welcome" | "/downloads" | "/" | "/market" | "/catalog" | "/party" | "/books" | "/share" | "/settings";
+type Dest =
+  | "/account"
+  | "/welcome"
+  | "/downloads"
+  | "/"
+  | "/market"
+  | "/catalog"
+  | "/party"
+  | "/books"
+  | "/share"
+  | "/settings";
 
 export function Shell({
   children,
@@ -127,15 +137,24 @@ export function Shell({
             <QuillMark />
             Lootsplit
           </Link>
-          <Link to="/account" className="mt-5 text-sm text-[var(--muted)]">My account & campaigns</Link>
-          <Link to="/welcome" className="mt-2 text-sm text-[var(--muted)]">Website & downloads</Link>
+          <Link to="/account" className="mt-5 text-sm text-[var(--muted)]">
+            My account & campaigns
+          </Link>
+          <Link to="/account" hash="bug-reports" className="mt-2 text-sm text-[var(--muted)]">
+            Report a bug
+          </Link>
+          <Link to="/welcome" className="mt-2 text-sm text-[var(--muted)]">
+            Website & downloads
+          </Link>
           <nav className="mt-8 flex flex-1 flex-col gap-2" aria-label="Sections">
             {navLinks("rail")}
           </nav>
           <div className="rounded-xl border border-lead/20 p-4 text-sm text-muted">
             <p className="text-xs tracking-widest text-lead uppercase">Campaign ledger</p>
             <p className="mt-2">Manage party funds, inventory, and shops.</p>
-            <a href="/welcome" className="mt-3 inline-flex min-h-11 items-center text-lead">Website & downloads ↗</a>
+            <a href="/welcome" className="mt-3 inline-flex min-h-11 items-center text-lead">
+              Website & downloads ↗
+            </a>
           </div>
         </aside>
         <div className="min-w-0">
@@ -216,8 +235,18 @@ export function Shell({
               onPick={() => setMore(false)}
             />
             <MoreLink to="/account" label="My account & campaigns" onPick={() => setMore(false)} />
+            <Link
+              to="/account"
+              hash="bug-reports"
+              className="flex min-h-11 items-center px-2 text-sm"
+              onClick={() => setMore(false)}
+            >
+              Report a bug
+            </Link>
             <MoreLink to="/downloads" label="Website & downloads" onPick={() => setMore(false)} />
-            {!dm ? <MoreLink to="/catalog" label="Reference & names" onPick={() => setMore(false)} /> : null}
+            {!dm ? (
+              <MoreLink to="/catalog" label="Reference & names" onPick={() => setMore(false)} />
+            ) : null}
             {dm ? (
               <MoreLink to="/catalog" label="Catalog" onPick={() => setMore(false)} />
             ) : (
@@ -233,7 +262,9 @@ export function Shell({
               label={dm ? "Settings" : "Device backups"}
               onPick={() => setMore(false)}
             />
-            <a href="/welcome" className="flex min-h-11 items-center px-2 text-sm">Website & downloads ↗</a>
+            <a href="/welcome" className="flex min-h-11 items-center px-2 text-sm">
+              Website & downloads ↗
+            </a>
           </div>
         </div>
       ) : null}
