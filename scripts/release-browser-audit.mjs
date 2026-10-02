@@ -25,7 +25,7 @@ async function bounded(label, work) {
 async function visit(page, url) {
   await page.goto(url);
   // Server-rendered controls appear before hydration; wait for the client to attach handlers.
-  await page.waitForTimeout(1800);
+  await page.locator(".role-chip:enabled").waitFor();
 }
 async function open(width = 390) {
   const context = await browser.newContext({
@@ -116,6 +116,10 @@ try {
     ),
   );
   await player.reload();
+  // The SSR heading is present before the restored client room is ready. Wait
+  // for hydration and the persisted membership before invoking recovery APIs.
+  await player.locator(".role-chip:enabled").waitFor();
+  await player.getByRole("button", { name: "Share join link", exact: true }).waitFor();
   await player.getByRole("heading", { name: "Campaign", exact: true }).waitFor();
   assert.ok(
     await player.evaluate(() =>
@@ -164,6 +168,7 @@ try {
     "PASS: fresh invitation, restored-room explanation, interrupted purchase queue/reload/retry, DM/player responsive routes, clean runtime.",
   );
 } catch (error) {
+  console.error("Browser runtime errors:", errors);
   for (const [i, c] of browser.contexts().entries())
     for (const p of c.pages()) {
       await p.screenshot({ path: `test-results/failure-${i}.png` }).catch(() => {});
