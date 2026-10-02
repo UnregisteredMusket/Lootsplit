@@ -36,6 +36,7 @@ jobs:
           node scripts/member-browser-audit.mjs
           node scripts/monitor-browser-audit.mjs
           node scripts/bug-browser-audit.mjs
+          node scripts/character-browser-audit.mjs
           node scripts/website-browser-audit.mjs
       - name: Built Worker account checks
         timeout-minutes: 4

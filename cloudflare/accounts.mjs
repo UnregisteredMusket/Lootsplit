@@ -1,3 +1,4 @@
+import { handleCharacterPlay } from "./character-play.mjs";
 import {
   createBugReport,
   listBugReports,
@@ -216,6 +217,19 @@ export async function handleAccounts(request, env) {
     const userId = session.user.id;
     await assertActive(db, userId);
     await touchMember(db, userId);
+    if (
+      (path === "/api/account/sheets" && request.method === "GET") ||
+      (path.startsWith("/api/account/sheets/") && request.method === "POST")
+    ) {
+      const result = await handleCharacterPlay(
+        db,
+        userId,
+        path.slice("/api/account/".length),
+        body,
+        new URL(request.url),
+      );
+      if (result !== null) return cors(json(result));
+    }
     if (path === "/api/account/reports" && request.method === "GET")
       return cors(json(await listBugReports(db, userId, new URL(request.url))));
     if (path === "/api/account/reports" && request.method === "POST")

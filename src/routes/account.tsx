@@ -1,3 +1,4 @@
+import { blankSheet } from "@/lib/characters/model.mjs";
 import { BugReports } from "@/components/account/bug-reports";
 import { ServerMonitor } from "@/components/account/server-monitor";
 import { ProfileControls } from "@/components/account/profile-controls";
@@ -194,6 +195,16 @@ function Account() {
                 Staff warning ({new Date(n.created_at).toLocaleDateString()}): {n.reason}
               </p>
             ))}
+            <section className="portal-card">
+              <h2>Interactive character sheets</h2>
+              <p>
+                Create a full character, assign a campaign, track HP and spells, and roll with your
+                party.
+              </p>
+              <Link to="/characters" className="portal-button">
+                Open character sheets & rolls
+              </Link>
+            </section>
             <ProfileControls profile={library.profile} onSaved={reload} />
             {library.user.role !== "member" && (
               <StaffControls userId={library.user.id} role={library.user.role} />
@@ -592,6 +603,25 @@ function Account() {
                         })}
                       >
                         Add to campaign
+                      </button>
+                      <button
+                        className="portal-button secondary"
+                        disabled={busy}
+                        onClick={action(async () => {
+                          await accountRequest("sheets/save", {
+                            sheet: {
+                              ...blankSheet(),
+                              name: c.name,
+                              description: c.description,
+                              portrait: c.portrait,
+                            },
+                          });
+                          setNotice(
+                            `${c.name} now has a full character sheet. Open Character sheets & rolls to play.`,
+                          );
+                        })}
+                      >
+                        Create full sheet from profile
                       </button>
                       <button
                         className="portal-text-button"

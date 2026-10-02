@@ -13,6 +13,7 @@ import { Route as IndexRouteImport } from './routes/index'
 import { Route as AccountRouteImport } from './routes/account'
 import { Route as BooksRouteImport } from './routes/books'
 import { Route as CatalogRouteImport } from './routes/catalog'
+import { Route as CharactersRouteImport } from './routes/characters'
 import { Route as DonateRouteImport } from './routes/donate'
 import { Route as DownloadsRouteImport } from './routes/downloads'
 import { Route as FavoritesRouteImport } from './routes/favorites'
@@ -47,6 +48,11 @@ const BooksRoute = BooksRouteImport.update({
 const CatalogRoute = CatalogRouteImport.update({
   id: '/catalog',
   path: '/catalog',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CharactersRoute = CharactersRouteImport.update({
+  id: '/characters',
+  path: '/characters',
   getParentRoute: () => rootRouteImport,
 } as any)
 const DonateRoute = DonateRouteImport.update({
@@ -130,6 +136,7 @@ export interface FileRoutesByFullPath {
   '/account': typeof AccountRoute
   '/books': typeof BooksRoute
   '/catalog': typeof CatalogRoute
+  '/characters': typeof CharactersRoute
   '/donate': typeof DonateRoute
   '/downloads': typeof DownloadsRoute
   '/favorites': typeof FavoritesRoute
@@ -151,6 +158,7 @@ export interface FileRoutesByTo {
   '/account': typeof AccountRoute
   '/books': typeof BooksRoute
   '/catalog': typeof CatalogRoute
+  '/characters': typeof CharactersRoute
   '/donate': typeof DonateRoute
   '/downloads': typeof DownloadsRoute
   '/favorites': typeof FavoritesRoute
@@ -173,6 +181,7 @@ export interface FileRoutesById {
   '/account': typeof AccountRoute
   '/books': typeof BooksRoute
   '/catalog': typeof CatalogRoute
+  '/characters': typeof CharactersRoute
   '/donate': typeof DonateRoute
   '/downloads': typeof DownloadsRoute
   '/favorites': typeof FavoritesRoute
@@ -196,6 +205,7 @@ export interface FileRouteTypes {
     | '/account'
     | '/books'
     | '/catalog'
+    | '/characters'
     | '/donate'
     | '/downloads'
     | '/favorites'
@@ -217,6 +227,7 @@ export interface FileRouteTypes {
     | '/account'
     | '/books'
     | '/catalog'
+    | '/characters'
     | '/donate'
     | '/downloads'
     | '/favorites'
@@ -238,6 +249,7 @@ export interface FileRouteTypes {
     | '/account'
     | '/books'
     | '/catalog'
+    | '/characters'
     | '/donate'
     | '/downloads'
     | '/favorites'
@@ -260,6 +272,7 @@ export interface RootRouteChildren {
   AccountRoute: typeof AccountRoute
   BooksRoute: typeof BooksRoute
   CatalogRoute: typeof CatalogRoute
+  CharactersRoute: typeof CharactersRoute
   DonateRoute: typeof DonateRoute
   DownloadsRoute: typeof DownloadsRoute
   FavoritesRoute: typeof FavoritesRoute
@@ -305,6 +318,13 @@ declare module '@tanstack/react-router' {
       path: '/catalog'
       fullPath: '/catalog'
       preLoaderRoute: typeof CatalogRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/characters': {
+      id: '/characters'
+      path: '/characters'
+      fullPath: '/characters'
+      preLoaderRoute: typeof CharactersRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/donate': {
@@ -420,6 +440,7 @@ const rootRouteChildren: RootRouteChildren = {
   AccountRoute: AccountRoute,
   BooksRoute: BooksRoute,
   CatalogRoute: CatalogRoute,
+  CharactersRoute: CharactersRoute,
   DonateRoute: DonateRoute,
   DownloadsRoute: DownloadsRoute,
   FavoritesRoute: FavoritesRoute,

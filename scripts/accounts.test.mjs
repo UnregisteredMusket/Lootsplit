@@ -701,3 +701,41 @@ test("bug reports keep member data private, enforce quotas and safely audit tria
     DB.close();
   }
 });
+
+test("interactive sheets require active accounts and reject cross-origin changes", async () => {
+  const { DB, call, signup } = setup();
+  try {
+    assert.equal((await call("sheets")).response.status, 401);
+    const a = await signup("sheet-api@example.com");
+    const { blankSheet } = await import("../src/lib/characters/model.mjs");
+    const body = { sheet: blankSheet() };
+    assert.equal(
+      (await call("sheets/save", body, a.cookie, "https://evil.example")).response.status,
+      403,
+    );
+    const saved = await call("sheets/save", body, a.cookie);
+    assert.equal(saved.response.status, 200, JSON.stringify(saved.data));
+    assert.equal((await call("sheets", undefined, a.cookie)).data.characters.length, 1);
+    await DB.prepare("UPDATE member_access SET status='revoked' WHERE user_id=?")
+      .bind(a.data.user.id)
+      .run();
+    assert.equal(
+      (
+        await call(
+          "sheets/roll",
+          {
+            id: saved.data.id,
+            revision: 0,
+            kind: "ability",
+            key: "str",
+            requestKey: crypto.randomUUID(),
+          },
+          a.cookie,
+        )
+      ).response.status,
+      403,
+    );
+  } finally {
+    DB.close();
+  }
+});

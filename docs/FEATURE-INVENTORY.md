@@ -75,3 +75,14 @@ Not implemented or promised by this inventory: OCR, Google Drive backup integrat
 - Owner/admin inbox supports status filtering, pagination, priorities, reporter-visible responses and audited updates with conflict detection.
 - Five reports per account per rolling 24 hours; retry receipts prevent duplicate submissions. No automatic campaign/file capture, uploads or email delivery.
 - Existing guest play, account permissions, saved campaigns and Android signing remain unchanged. Existing installed APKs can use the website; native navigation changes ship with a future APK release.
+
+### Account-linked interactive character play
+- `/characters` provides full editable account sheets with species, classes/subclasses, background, level, abilities, proficiency/training, HP/temp HP, AC, initiative, speed, death saves, inspiration, attacks/damage, spells/preparation/slots, equipment, currency, resources, features, custom content and source credits.
+- Player Home now opens the full sheet workspace. Campaign overview remains available explicitly; legacy imported sheets, portraits, handouts and financial actions remain beneath the account sheet.
+- Save/reload uses revisions to prevent overwriting another device. Export preserves a draft. JSON/PDF imports create new characters; existing reusable profiles can create full sheets. PDFs remain local and only explicitly imported extracted fields are uploaded.
+- A sheet can be assigned to an existing controlled campaign purse through an active saved account membership. No currency or inventory is transferred on assignment. Shared financial state remains authoritative in the existing campaign ledger; standalone coins and equipment/loadout notes stay separate.
+- Ability, save, skill, initiative, attack, damage and spell rolls use persisted sheet values and server crypto dice. Single d20 rolls support advantage/disadvantage. Custom formulas support NdS +/- modifier. Receipts deduplicate retries after network failures.
+- Campaign logs are readable by current members; standalone logs are private. Logs retain old results with pagination. Only the campaign DM can enable physical/manual results, which are visibly labeled and checked at submission time. Site staff role alone grants no campaign-sheet access.
+- DMs can inspect assigned character sheets and roll for them, but cannot silently overwrite another member's sheet. Players cannot assign sheets to other players' purses.
+- Open5e SRD 2014/2024 spell search imports descriptions and source attribution; custom content and imported legacy text remain editable. Creation/leveling, conditions, spell effects, hit dice and class rules are manually maintained; this release does not add automated leveling or encounter tracking.
+- Existing APK users access the new sheet via the website until a signed APK update is distributed. Mobile build compatibility remains tested.
