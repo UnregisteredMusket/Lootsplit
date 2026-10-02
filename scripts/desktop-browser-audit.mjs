@@ -4,6 +4,7 @@ import { mkdir, readFile } from "node:fs/promises";
 import { blankSheet } from "../src/lib/characters/model.mjs";
 import { blankEncounter, blankCombatant } from "../src/lib/encounters/model.mjs";
 
+const allScreens = process.argv.includes("--all-screens");
 const baseline = process.argv.includes("--baseline"),
   compare = process.argv.includes("--compare");
 const output = process.env.DESKTOP_SCREENSHOTS || "test-results/desktop";
@@ -111,7 +112,8 @@ async function capture(name, mobile = false) {
     await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1),
     `${name}: overflow`,
   );
-  const expected = compare && mobile ? await readFile(`${output}/before/${name}.png`) : null;
+  const expected =
+    compare && (mobile || allScreens) ? await readFile(`${output}/before/${name}.png`) : null;
   const image = await page.screenshot({
     path: `${output}/${baseline ? "before" : "after"}/${name}.png`,
     fullPage: true,
@@ -121,6 +123,7 @@ async function capture(name, mobile = false) {
   if (!expected || image.equals(expected)) return;
   // Chromium occasionally changes a few rounded-edge pixels by one color value.
   // Allow only that rasterization noise, never a dimension, spacing or text change.
+  // Desktop audit confirmed 20 pixels at one circular portrait edge (max delta 1).
   const difference = await page.evaluate(
     async (images) => {
       const decoded = await Promise.all(
@@ -153,8 +156,8 @@ async function capture(name, mobile = false) {
     [expected.toString("base64"), image.toString("base64")],
   );
   assert.ok(
-    difference.pixels <= 16 && difference.shade <= 1,
-    `${name}: mobile screenshot changed (${JSON.stringify(difference)})`,
+    difference.pixels <= (mobile ? 16 : 32) && difference.shade <= 1,
+    `${name}: baseline screenshot changed (${JSON.stringify(difference)})`,
   );
   console.log(`${name}: layout unchanged; ${difference.pixels} edge pixels differ by one shade.`);
 }
@@ -221,7 +224,7 @@ try {
       await visit(seat === "dm" ? "/" : "/characters");
       await capture(`${seat}-${width}`, true);
     }
-    if (!baseline)
+    if (!baseline || allScreens)
       for (const width of [1024, 1440, 1920, 2560]) {
         await page.setViewportSize({ width, height: 1080 });
         for (const [name, path] of [
@@ -252,7 +255,7 @@ try {
   console.log(
     baseline
       ? "PASS: mobile baselines captured."
-      : `PASS: desktop fills 1024–2560px; DM panels and player tools visible; no overflow/runtime errors${compare ? "; all 18 mobile screenshots match (at most 16 edge pixels may differ by one shade)" : ""}.`,
+      : `PASS: desktop fills 1024–2560px; DM panels and player tools visible; no overflow/runtime errors${compare ? "; all compared screenshots match (up to 16 mobile / 32 desktop edge pixels may differ by one shade)" : ""}.`,
   );
 } finally {
   await context.close();

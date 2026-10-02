@@ -120,7 +120,12 @@ export function DmDesk() {
               const live = profiles.find((x) => x.purse_id === p.id),
                 old = sheets.find((s) => s.purseId === p.id);
               return (
-                <a href={`/party#purse-${p.id}`} key={p.id}>
+                <a
+                  href={
+                    live ? `/characters?id=${encodeURIComponent(live.id)}` : `/party#purse-${p.id}`
+                  }
+                  key={p.id}
+                >
                   <LedgerArt
                     kind="portrait"
                     src={live?.body.portrait || p.portrait}

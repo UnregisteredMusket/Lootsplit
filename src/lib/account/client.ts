@@ -1,4 +1,5 @@
 import { API_ORIGIN } from "../mobile/origin";
+import { announceSheetChange } from "../quire/party-sheet-links";
 const native = () => import.meta.env.VITE_MOBILE === "true";
 const TOKEN = "lootsplit.account.token.v1";
 export async function accountRequest<T>(
@@ -32,6 +33,7 @@ export async function accountRequest<T>(
   const nextToken = response.headers.get("set-auth-token");
   if (native() && nextToken) localStorage.setItem(TOKEN, nextToken);
   if (path === "auth/sign-out") localStorage.removeItem(TOKEN);
+  if (path.startsWith("auth/")) announceSheetChange();
   return result as T;
 }
 export type AccountLibrary = {

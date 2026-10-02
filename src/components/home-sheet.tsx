@@ -12,6 +12,7 @@ import { loadHandouts, type Handout } from "@/lib/quire/handouts";
 import { formatCoins, formatCopper, toCopper } from "@/lib/quire/money";
 import { Fold } from "@/components/ui";
 import { useSeat } from "@/lib/quire/seat";
+import { allowContextChange } from "@/lib/quire/use-draft-guard";
 
 export function HomeSheet() {
   const { ready, purses, holdings, sheets } = useEconomy();
@@ -50,14 +51,16 @@ export function HomeSheet() {
 
   return (
     <article>
-      <CharacterWorkspace campaignCode={cloud.code} />
+      <CharacterWorkspace campaignCode={cloud.code} purseId={purse.id} />
       <h2 className="mt-8 font-display text-2xl">Campaign inventory & imported sheet</h2>
       {mine.length > 1 ? (
         <label className="mb-4 block text-sm text-muted">
           Character
           <select
             value={purse.id}
-            onChange={(event) => setPicked(event.target.value)}
+            onChange={(event) => {
+              if (allowContextChange()) setPicked(event.target.value);
+            }}
             className="mt-1 min-h-11 w-full rounded-xl border border-lead/30 bg-elevated px-3 text-base"
             aria-label="Character"
           >

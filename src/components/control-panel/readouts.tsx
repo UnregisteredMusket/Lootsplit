@@ -1,3 +1,5 @@
+import { getCampaigns, serverCampaigns, subscribeCampaigns } from "@/lib/quire/campaigns";
+import { readPartySheetLinks, subscribeSheetChanges } from "@/lib/quire/party-sheet-links";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { accountRequest } from "@/lib/account/client";
 import { getCloudTable, getServerCloudTable, subscribeCloudTable } from "@/lib/quire/cloud-client";
@@ -16,40 +18,78 @@ export type SheetReadout = {
   };
 };
 export function useSheetReadouts() {
-  const room = useSyncExternalStore(subscribeCloudTable, getCloudTable, getServerCloudTable),
-    seat = useSeat();
-  const [rows, setRows] = useState<SheetReadout[]>([]);
+  const room = useSyncExternalStore(subscribeCloudTable, getCloudTable, getServerCloudTable);
+  const campaigns = useSyncExternalStore(subscribeCampaigns, getCampaigns, serverCampaigns);
+  const seat = useSeat();
+  const scope = `${campaigns.activeId}:${room.joined}:${room.code}:${seat.role}`;
+  const [snapshot, setSnapshot] = useState<{ scope: string; rows: SheetReadout[] }>({
+    scope: "",
+    rows: [],
+  });
   useEffect(() => {
-    const c = new AbortController();
-    setRows([]);
-    if (!room.joined || !room.code || seat.role !== "dm") return;
+    let stopped = false,
+      request: AbortController | undefined;
+    const save = (rows: SheetReadout[]) => {
+      if (!stopped) setSnapshot({ scope, rows });
+    };
+    save([]);
+    if (seat.role !== "dm") return;
+    async function roster(code: string, signal: AbortSignal) {
+      const result = await accountRequest<{
+        characters: { id: string; purseId: string; body: SheetReadout["body"] }[];
+      }>("sheets/campaign", { code }, signal);
+      return result.characters.map((row) => ({
+        id: row.id,
+        purse_id: row.purseId,
+        body: row.body,
+      }));
+    }
     async function load() {
+      request?.abort();
+      const current = new AbortController();
+      request = current;
       try {
-        const list = await accountRequest<{ characters: { id: string }[] }>(
-          "sheets/campaign",
-          { code: room.code },
-          c.signal,
-        );
-        const details = await Promise.allSettled(
-          list.characters.map((x) =>
-            accountRequest<SheetReadout>("sheets/detail", { id: x.id }, c.signal),
-          ),
-        );
-        if (!c.signal.aborted)
-          setRows(details.flatMap((x) => (x.status === "fulfilled" ? [x.value] : [])));
+        let rows: SheetReadout[];
+        if (room.joined && room.code) rows = await roster(room.code, current.signal);
+        else {
+          const own = await accountRequest<{
+            userId: string;
+            characters: (SheetReadout & { campaign_code: string })[];
+            campaigns: { code: string; role: string }[];
+          }>("sheets", undefined, current.signal);
+          const savedRoom = own.campaigns.find(
+            (c) => c.role === "dm" && campaigns.activeId === `account-${own.userId}-${c.code}`,
+          );
+          if (savedRoom) rows = await roster(savedRoom.code, current.signal);
+          else
+            rows = readPartySheetLinks(own.userId, campaigns.activeId).flatMap((link) => {
+              const sheet = own.characters.find((r) => r.id === link.sheetId && !r.campaign_code);
+              return sheet ? [{ ...sheet, purse_id: link.purseId }] : [];
+            });
+        }
+        if (!current.signal.aborted) save(rows);
       } catch {
-        if (!c.signal.aborted) setRows([]);
+        if (!current.signal.aborted) save([]);
       }
     }
-    void load();
-    const onFocus = () => void load();
-    window.addEventListener("focus", onFocus);
-    return () => {
-      c.abort();
-      window.removeEventListener("focus", onFocus);
+    const refresh = () => {
+      if (document.visibilityState !== "hidden") void load();
     };
-  }, [room.code, room.joined, room.revision, seat.role]);
-  return rows;
+    void load();
+    const timer = window.setInterval(refresh, 15000);
+    const unsubscribe = subscribeSheetChanges(refresh);
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", refresh);
+    return () => {
+      stopped = true;
+      request?.abort();
+      window.clearInterval(timer);
+      unsubscribe();
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", refresh);
+    };
+  }, [scope, room.code, room.joined, room.revision, campaigns.activeId, seat.role]);
+  return snapshot.scope === scope ? snapshot.rows : [];
 }
 export function HpBar({ hp, max }: { hp: number; max: number }) {
   return (

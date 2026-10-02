@@ -37,7 +37,7 @@ export const Route = createRootRoute({
       { rel: "apple-touch-icon", href: "/__grok/icon-180.png" },
     ],
   }),
-  component: () => {
+  component: function RootDocument() {
     const pathname = useRouterState({ select: (state) => state.location.pathname });
     const publicPage = [
       "/welcome",
