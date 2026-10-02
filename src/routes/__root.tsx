@@ -40,8 +40,7 @@ export const Route = createRootRoute({
       </head>
       <body>
         <PreviewHostBridge />
-        {publicPage ? <Outlet /> : <>
-        <OpeningDawn />
+        {!publicPage && <OpeningDawn />}
         <AuthProvider>
           <LibraryProvider>
             <PrefsProvider>
@@ -51,7 +50,6 @@ export const Route = createRootRoute({
             </PrefsProvider>
           </LibraryProvider>
         </AuthProvider>
-        </>}
         <Scripts />
       </body>
     </html>
