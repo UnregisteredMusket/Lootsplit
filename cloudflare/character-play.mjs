@@ -62,7 +62,11 @@ export async function handleCharacterPlay(db, user, path, body, url) {
         if (e.status !== 403) throw e;
       }
     }
-    return { characters: rows.results.map((r) => ({ ...r, body: JSON.parse(r.body) })), campaigns };
+    return {
+      userId: user,
+      characters: rows.results.map((r) => ({ ...r, body: JSON.parse(r.body) })),
+      campaigns,
+    };
   }
   if (path === "sheets/save") {
     const parsed = sheetSchema.safeParse(body.sheet);
@@ -162,11 +166,15 @@ export async function handleCharacterPlay(db, user, path, body, url) {
       .bind(code)
       .all();
     return {
-      characters: rows.results.map((r) => ({
-        id: r.id,
-        name: JSON.parse(r.body).name,
-        purseId: r.purse_id,
-      })),
+      characters: rows.results.map((r) => {
+        const { name, portrait, classes, level, hp, maxHp, ac } = JSON.parse(r.body);
+        return {
+          id: r.id,
+          name,
+          purseId: r.purse_id,
+          body: { name, portrait, classes, level, hp, maxHp, ac },
+        };
+      }),
       manualAllowed: await policy(db, code),
     };
   }

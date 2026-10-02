@@ -74,6 +74,7 @@ test("account characters enforce ownership, campaign assignments, DM policy, sta
     sheet.scores.str = 18;
     const { id } = await call("player", "/save", { sheet });
     assert.equal((await call("other", "")).characters.length, 0);
+    assert.equal((await call("player", "")).userId, "player");
     await assert.rejects(call("other", "/detail", { id }), (e) => e.status === 404);
     await assert.rejects(
       call("other", "/save", { id, sheet, revision: 0 }),
@@ -101,6 +102,28 @@ test("account characters enforce ownership, campaign assignments, DM policy, sta
     const d = await call("dm", "/detail", { id });
     assert.equal(d.editable, false);
     assert.equal(d.campaign.coins.gp, 7);
+    const roster = await call("dm", "/campaign", { code: "PLAYTEST" });
+    assert.deepEqual(roster.characters, [
+      {
+        id,
+        name: sheet.name,
+        purseId: "purse",
+        body: {
+          name: sheet.name,
+          portrait: sheet.portrait,
+          classes: sheet.classes,
+          level: sheet.level,
+          hp: sheet.hp,
+          maxHp: sheet.maxHp,
+          ac: sheet.ac,
+        },
+      },
+    ]);
+    for (const viewer of ["player", "other"])
+      await assert.rejects(
+        call(viewer, "/campaign", { code: "PLAYTEST" }),
+        (e) => e.status === 403,
+      );
     await assert.rejects(call("dm", "/save", { id, sheet, revision: 2 }), (e) => e.status === 404);
     await assert.rejects(
       call("player", "/policy", { code: "PLAYTEST", allowed: true }),

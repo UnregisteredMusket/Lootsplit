@@ -1,6 +1,8 @@
 import { chromium } from "playwright";
-import { readFile } from "node:fs/promises";
+import { readFile, mkdir } from "node:fs/promises";
 import assert from "node:assert/strict";
+const output = process.env.BACKUP_SCREENSHOTS || "test-results/backups";
+await mkdir(output, { recursive: true });
 const browser = await chromium.launch({
   headless: true,
   executablePath: process.env.CHROMIUM_EXECUTABLE_PATH,
@@ -35,7 +37,8 @@ try {
   await page
     .getByText("Password changed. Locked saves use the new one.", { exact: true })
     .waitFor();
-  await page.getByRole("button", { name: "Export", exact: true }).click();
+  const savedBackup = page.locator("li").filter({ hasText: "Encrypted audit backup" });
+  await savedBackup.getByRole("button", { name: "Export", exact: true }).click();
   dialog = page.getByRole("dialog");
   await dialog.getByLabel("Password", { exact: true }).fill("changed-password");
   const got = page.waitForEvent("download");
@@ -45,7 +48,7 @@ try {
   assert.equal(body.kind, "lootsplit-locked");
   assert.equal(body.iterations, 210000);
   assert.equal(body.purses, undefined);
-  await page.getByRole("button", { name: "Load", exact: true }).click();
+  await savedBackup.getByRole("button", { name: "Load", exact: true }).click();
   await page
     .getByRole("alertdialog")
     .getByRole("button", { name: "Load backup", exact: true })
@@ -62,7 +65,7 @@ try {
   const direct = JSON.parse(await readFile(await (await directDownload).path(), "utf8"));
   assert.equal(direct.kind, "lootsplit-locked");
   assert.equal(await page.getByText("Google Drive", { exact: true }).count(), 0);
-  await page.screenshot({path:"/workspace/screenshots/lootsplit-device-backups.png"});
+  await page.screenshot({ path: output + "/device-backups.png" });
   assert.deepEqual(errors, []);
   console.log(
     JSON.stringify({
@@ -78,7 +81,7 @@ try {
   );
 } catch (e) {
   console.error((await page.locator("body").innerText()).slice(0, 5000));
-  await page.screenshot({ path: "/workspace/screenshots/lootsplit-backup-failure.png" });
+  await page.screenshot({ path: output + "/failure.png" });
   throw e;
 } finally {
   await browser.close();

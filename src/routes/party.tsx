@@ -23,11 +23,16 @@ import { Button, Modal, Segmented, TextInput } from "@/components/ui";
 import { RemoveButton } from "@/components/quire-ui";
 
 export const Route = createFileRoute("/party")({
-  validateSearch: (search: Record<string, unknown>): { action?: string } => ({
+  validateSearch: (
+    search: Record<string, unknown>,
+  ): { action?: string; section?: "funds" | "characters" } => ({
     action:
       search.action === "add" || search.action === "give" || search.action === "pay"
         ? search.action
         : "",
+    ...(search.section === "funds" || search.section === "characters"
+      ? { section: search.section }
+      : {}),
   }),
   component: PartyPage,
 });
@@ -36,11 +41,12 @@ function PartyPage() {
   const economy = useEconomy();
   const profiles = useSheetReadouts();
   const [section, setSection] = useState("characters");
+  const { action: initialAction, section: requestedSection } = Route.useSearch();
   useEffect(() => {
-    const query = new URLSearchParams(location.search).get("section");
-    if (query === "funds" || location.hash.startsWith("#purse-")) setSection("funds");
-  }, []);
-  const { action: initialAction } = Route.useSearch();
+    if (requestedSection === "funds" || initialAction || location.hash.startsWith("#purse-"))
+      setSection("funds");
+    else if (requestedSection === "characters") setSection("characters");
+  }, [requestedSection, initialAction]);
   const [action, setAction] = useState(initialAction ?? "");
   useEffect(() => setAction(initialAction ?? ""), [initialAction]);
   const seat = useSeat();

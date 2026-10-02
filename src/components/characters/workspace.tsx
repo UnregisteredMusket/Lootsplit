@@ -1,8 +1,19 @@
 import { useDraftGuard } from "@/lib/quire/use-draft-guard";
 import { Dices, Heart, Shield, Footprints, Swords, Sparkles } from "lucide-react";
 import { HpBar } from "@/components/control-panel/readouts";
-import { useEffect, useRef, useState, type FormEvent } from "react";
-import { Link } from "@tanstack/react-router";
+import { useEffect, useRef, useState, useSyncExternalStore, type FormEvent } from "react";
+import { getCampaigns, serverCampaigns, subscribeCampaigns } from "@/lib/quire/campaigns";
+import { getCloudTable, getServerCloudTable, subscribeCloudTable } from "@/lib/quire/cloud-client";
+import { useEconomy } from "@/lib/quire/economy-context";
+import { useSeat } from "@/lib/quire/seat";
+import { getSeat } from "@/lib/quire/table";
+import {
+  readPartySheetLinks,
+  writePartySheetLink,
+  announceSheetChange,
+} from "@/lib/quire/party-sheet-links";
+import type { Purse, Holding } from "@/lib/quire/types";
+import { Link, useRouterState } from "@tanstack/react-router";
 import { z } from "zod";
 import { accountRequest } from "@/lib/account/client";
 import {
@@ -34,6 +45,14 @@ type Campaign = {
   role: string;
   purses: { id: string; name: string }[];
 };
+type DeviceCampaign = {
+  code: string;
+  campaignId: string;
+  name: string;
+  ownerId: string;
+  purses: Purse[];
+  holdings: Holding[];
+};
 type Detail = Row & {
   editable: boolean;
   assignmentError: string;
@@ -62,14 +81,33 @@ type Roll = {
 const errorText = (e: unknown) =>
   e instanceof Error ? e.message : "Unable to complete the request.";
 const number = (value: string) => Number(value) || 0;
-export function CharacterWorkspace({ campaignCode = "" }: { campaignCode?: string }) {
+export function CharacterWorkspace({
+  campaignCode = "",
+  purseId = "",
+}: {
+  campaignCode?: string;
+  purseId?: string;
+}) {
+  const registry = useSyncExternalStore(subscribeCampaigns, getCampaigns, serverCampaigns);
+  const room = useSyncExternalStore(subscribeCloudTable, getCloudTable, getServerCloudTable);
+  const economy = useEconomy();
+  const seat = useSeat();
+  const activeCode = room.joined ? room.code : campaignCode;
+  const requestedId = useRouterState({
+    select: (state) => {
+      const id = (state.location.search as { id?: unknown }).id;
+      return typeof id === "string" && id.length <= 256 ? id : "";
+    },
+  });
+  const selectionContext = `${registry.activeId}:${purseId}`;
+  const previousContext = useRef(selectionContext);
+  const previousRequest = useRef(requestedId);
   const [data, setData] = useState<{
+      userId?: string;
       characters: Row[];
       campaigns: Campaign[];
     } | null>(null),
-    [selected, setSelected] = useState(
-      typeof window !== "undefined" ? new URLSearchParams(location.search).get("id") || "" : "",
-    ),
+    [selected, setSelected] = useState(requestedId),
     [error, setError] = useState(""),
     [loading, setLoading] = useState(true),
     [reload, setReload] = useState(0),
@@ -78,16 +116,33 @@ export function CharacterWorkspace({ campaignCode = "" }: { campaignCode?: strin
   useEffect(() => {
     const c = new AbortController();
     setLoading(true);
-    accountRequest<{ characters: Row[]; campaigns: Campaign[] }>("sheets", undefined, c.signal)
+    accountRequest<{ userId?: string; characters: Row[]; campaigns: Campaign[] }>(
+      "sheets",
+      undefined,
+      c.signal,
+    )
       .then((d) => {
+        const contextChanged = previousContext.current !== selectionContext;
+        const requestChanged = previousRequest.current !== requestedId;
+        previousContext.current = selectionContext;
+        previousRequest.current = requestedId;
         setData(d);
         setError("");
+        const local = readPartySheetLinks(d.userId || "", registry.activeId).find(
+          (link) => link.purseId === purseId,
+        );
+        const linked = activeCode
+          ? d.characters.find((r) => r.campaign_code === activeCode && r.purse_id === purseId)?.id
+          : d.characters.find((r) => r.id === local?.sheetId && !r.campaign_code)?.id;
         setSelected(
           (v) =>
-            v ||
-            d.characters.find((r) => r.campaign_code === campaignCode)?.id ||
-            d.characters[0]?.id ||
-            "",
+            ((requestChanged || contextChanged) && requestedId) ||
+            (!contextChanged && v) ||
+            (purseId
+              ? linked || ""
+              : d.characters.find((r) => activeCode && r.campaign_code === activeCode)?.id ||
+                d.characters[0]?.id ||
+                ""),
         );
       })
       .catch((e) => {
@@ -97,7 +152,20 @@ export function CharacterWorkspace({ campaignCode = "" }: { campaignCode?: strin
         if (!c.signal.aborted) setLoading(false);
       });
     return () => c.abort();
-  }, [reload, campaignCode]);
+  }, [reload, activeCode, purseId, registry.activeId, selectionContext, requestedId]);
+  const deviceCampaign: DeviceCampaign | undefined =
+    !room.joined && economy.ready && data?.userId
+      ? {
+          code: `device:${registry.activeId}`,
+          campaignId: registry.activeId,
+          name: registry.campaigns.find((c) => c.id === registry.activeId)?.name || "Campaign",
+          ownerId: data.userId,
+          purses: economy.purses.filter(
+            (p) => p.kind === "character" && (seat.role === "dm" || seat.purseIds.includes(p.id)),
+          ),
+          holdings: economy.holdings,
+        }
+      : undefined;
   async function create(sheet = blankSheet()) {
     if (dirtyRef.current && !window.confirm("Discard unsaved changes to open a new character?"))
       return;
@@ -242,6 +310,7 @@ export function CharacterWorkspace({ campaignCode = "" }: { campaignCode?: strin
               key={selected}
               id={selected}
               campaigns={data.campaigns}
+              deviceCampaign={deviceCampaign}
               changed={() => setReload((n) => n + 1)}
               onDirty={(v) => {
                 dirtyRef.current = v;
@@ -261,11 +330,13 @@ function CharacterEditor({
   campaigns,
   changed,
   onDirty,
+  deviceCampaign,
 }: {
   id: string;
   campaigns: Campaign[];
   changed: () => void;
   onDirty?: (dirty: boolean) => void;
+  deviceCampaign?: DeviceCampaign;
 }) {
   const [playView, setPlayView] = useState(true),
     [playTab, setPlayTab] = useState("actions");
@@ -279,21 +350,31 @@ function CharacterEditor({
     [code, setCode] = useState(""),
     [purse, setPurse] = useState(""),
     [rollRefresh, setRollRefresh] = useState(0);
+  // Only context identity changes reload the sheet; ledger refreshes must preserve drafts.
+  const deviceCampaignRef = useRef(deviceCampaign);
+  deviceCampaignRef.current = deviceCampaign;
   useEffect(() => {
+    const currentDevice = deviceCampaignRef.current;
     const c = new AbortController();
     accountRequest<Detail>("sheets/detail", { id }, c.signal)
       .then((d) => {
         setDetail(d);
         setSheet(d.body);
-        setCode(d.campaign_code);
-        setPurse(d.purse_id);
+        const local =
+          currentDevice &&
+          readPartySheetLinks(currentDevice.ownerId, currentDevice.campaignId).find(
+            (link) =>
+              link.sheetId === id && currentDevice.purses.some((p) => p.id === link.purseId),
+          );
+        setCode(d.campaign_code || (local ? currentDevice!.code : ""));
+        setPurse(d.purse_id || local?.purseId || "");
         setError("");
       })
       .catch((e) => {
         if (!c.signal.aborted) setError(errorText(e));
       });
     return () => c.abort();
-  }, [id, reload]);
+  }, [id, reload, deviceCampaign?.code, deviceCampaign?.ownerId]);
   const dirty = !!sheet && JSON.stringify(sheet) !== JSON.stringify(detail?.body);
   useEffect(() => {
     onDirty?.(dirty);
@@ -315,6 +396,7 @@ function CharacterEditor({
       setNotice("Character saved to your account.");
       setDetail({ ...detail, body: parsed, revision: detail.revision + 1 });
       setSheet(parsed);
+      announceSheetChange();
       changed();
     } catch (e) {
       setError(errorText(e));
@@ -327,12 +409,45 @@ function CharacterEditor({
     setBusy(true);
     setError("");
     try {
+      if (deviceCampaign && code === deviceCampaign.code) {
+        if (getCloudTable().joined || getCampaigns().activeId !== deviceCampaign.campaignId)
+          throw new Error("Reopen the current campaign before linking this sheet.");
+        const own = await accountRequest<{ userId: string; characters: Row[] }>("sheets");
+        const current = own.characters.find((row) => row.id === id);
+        if (own.userId !== deviceCampaign.ownerId || !current)
+          throw new Error("Sign in to the sheet’s account before linking it.");
+        if (current.campaign_code)
+          throw new Error(
+            "Choose Standalone character and save before linking a sheet assigned to an online campaign.",
+          );
+        const activeSeat = getSeat();
+        const controlled = deviceCampaign.purses.filter(
+          (p) => activeSeat.role === "dm" || activeSeat.purseIds.includes(p.id),
+        );
+        writePartySheetLink(
+          own.userId,
+          deviceCampaign.campaignId,
+          id,
+          purse,
+          controlled.map((p) => p.id),
+        );
+        announceSheetChange();
+        setNotice(
+          "Character linked to this device campaign. Party opens this sheet; currency and inventory remain in the campaign ledger. Rolls remain private until assigned to an online campaign.",
+        );
+        setReload((n) => n + 1);
+        changed();
+        return;
+      }
       await accountRequest("sheets/assign", {
         id,
         code,
         purseId: purse,
         revision: detail.revision,
       });
+      if (deviceCampaign)
+        writePartySheetLink(deviceCampaign.ownerId, deviceCampaign.campaignId, id, "", []);
+      announceSheetChange();
       setNotice(
         code
           ? "Character assigned. Campaign inventory and currency are shown from the shared ledger."
@@ -349,6 +464,21 @@ function CharacterEditor({
   if (!sheet || !detail)
     return <p role={error ? "alert" : "status"}>{error || "Loading character…"}</p>;
   const editable = detail.editable;
+  const deviceLink =
+    deviceCampaign && !detail.campaign_code && editable
+      ? readPartySheetLinks(deviceCampaign.ownerId, deviceCampaign.campaignId).find(
+          (link) => link.sheetId === id,
+        )
+      : undefined;
+  const devicePurse = deviceCampaign?.purses.find((p) => p.id === deviceLink?.purseId);
+  const campaignLedger =
+    detail.campaign ||
+    (devicePurse
+      ? {
+          coins: devicePurse.coins,
+          holdings: deviceCampaign!.holdings.filter((h) => h.purseId === devicePurse.id),
+        }
+      : null);
   const set = <K extends keyof Sheet>(key: K, value: Sheet[K]) =>
     setSheet({ ...sheet, [key]: value });
   const rollButton = (label: string, kind: string, key = "") => (
@@ -1242,29 +1372,33 @@ function CharacterEditor({
           {tab === "gear" && (
             <section className="sheet-card">
               <h3>Inventory & currency</h3>
-              {detail.campaign ? (
+              {campaignLedger ? (
                 <>
-                  <p>Live campaign ledger. Use Party or Market to move money and items.</p>
+                  <p>
+                    {devicePurse ? "Device campaign ledger." : "Live campaign ledger."} Use Party or
+                    Market to move money and items.
+                  </p>
                   <div className="sheet-vitals">
-                    {Object.entries(detail.campaign.coins).map(([k, v]) => (
+                    {Object.entries(campaignLedger.coins).map(([k, v]) => (
                       <strong key={k}>
                         {v} {k}
                       </strong>
                     ))}
                   </div>
                   <ul>
-                    {detail.campaign.holdings.map((h) => (
+                    {campaignLedger.holdings.map((h) => (
                       <li key={h.id}>
                         {h.name} × {h.quantity}
                       </li>
                     ))}
                   </ul>
-                  <Link to="/party" search={{ action: "" }}>
+                  <Link to="/party" search={{ action: "", section: "funds" }}>
                     Open party inventory
                   </Link>
                   <p>
-                    Use My account to resume this campaign before making transactions. Reload sheet
-                    to refresh ledger totals.
+                    {devicePurse
+                      ? "This device campaign keeps its existing balances and inventory; linking a sheet does not transfer anything."
+                      : "Use My account to resume this campaign before making transactions. Reload sheet to refresh ledger totals."}
                   </p>
                 </>
               ) : (
@@ -1501,6 +1635,11 @@ function CharacterEditor({
                       }}
                     >
                       <option value="">Standalone character</option>
+                      {!!deviceCampaign?.purses.length && (
+                        <option value={deviceCampaign.code}>
+                          {deviceCampaign.name} · this device
+                        </option>
+                      )}
                       {campaigns.map((c) => (
                         <option key={c.code} value={c.code}>
                           {c.name} · {c.code}
@@ -1517,13 +1656,14 @@ function CharacterEditor({
                         onChange={(e) => setPurse(e.target.value)}
                       >
                         <option value="">Choose controlled character</option>
-                        {campaigns
-                          .find((c) => c.code === code)
-                          ?.purses.map((p) => (
-                            <option key={p.id} value={p.id}>
-                              {p.name}
-                            </option>
-                          ))}
+                        {(deviceCampaign?.code === code
+                          ? deviceCampaign.purses
+                          : campaigns.find((c) => c.code === code)?.purses
+                        )?.map((p) => (
+                          <option key={p.id} value={p.id}>
+                            {p.name}
+                          </option>
+                        ))}
                       </select>
                     </label>
                   )}
@@ -1533,7 +1673,11 @@ function CharacterEditor({
                   >
                     Save campaign assignment
                   </button>
-                  <p>Missing a campaign? Save its membership from My account first.</p>
+                  <p>
+                    {deviceCampaign?.code === code
+                      ? "This link is saved for this account and campaign on this device. Your account sheet stays private; online campaign membership and roll sharing are unchanged."
+                      : "Missing a campaign? Save its membership from My account first."}
+                  </p>
                 </>
               )}
             </section>
