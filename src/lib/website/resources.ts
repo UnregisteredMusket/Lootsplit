@@ -1,9 +1,20 @@
 /** Add every new third-party content/data resource here when integrating it. */
 export const resources = [
   {
+    name: "D&D 2014 encounter difficulty",
+    description:
+      "Encounter estimates use the 2014 Basic Rules XP thresholds and party-size multipliers. The generator is an editable estimate; terrain, tactics and house rules require DM judgment.",
+    links: [
+      {
+        label: "Building Combat Encounters (2014)",
+        url: "https://www.dndbeyond.com/sources/dnd/basic-rules-2014/building-combat-encounters",
+      },
+    ],
+  },
+  {
     name: "Open5e",
     description:
-      "Lootsplit uses Open5e to retrieve SRD equipment, spells, and other supported reference entries. Imported entries keep their individual source credits.",
+      "Lootsplit uses Open5e to retrieve SRD equipment, spells, SRD creatures for encounter generation, and other supported reference entries. Imported entries keep their individual source credits.",
     links: [
       { label: "Visit Open5e", url: "https://open5e.com" },
       { label: "Open5e licensing", url: "https://open5e.com/legal" },

@@ -16,6 +16,7 @@ import { Route as CatalogRouteImport } from './routes/catalog'
 import { Route as CharactersRouteImport } from './routes/characters'
 import { Route as DonateRouteImport } from './routes/donate'
 import { Route as DownloadsRouteImport } from './routes/downloads'
+import { Route as EncountersRouteImport } from './routes/encounters'
 import { Route as FavoritesRouteImport } from './routes/favorites'
 import { Route as HelpRouteImport } from './routes/help'
 import { Route as MarketRouteImport } from './routes/market'
@@ -63,6 +64,11 @@ const DonateRoute = DonateRouteImport.update({
 const DownloadsRoute = DownloadsRouteImport.update({
   id: '/downloads',
   path: '/downloads',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const EncountersRoute = EncountersRouteImport.update({
+  id: '/encounters',
+  path: '/encounters',
   getParentRoute: () => rootRouteImport,
 } as any)
 const FavoritesRoute = FavoritesRouteImport.update({
@@ -139,6 +145,7 @@ export interface FileRoutesByFullPath {
   '/characters': typeof CharactersRoute
   '/donate': typeof DonateRoute
   '/downloads': typeof DownloadsRoute
+  '/encounters': typeof EncountersRoute
   '/favorites': typeof FavoritesRoute
   '/help': typeof HelpRoute
   '/market': typeof MarketRoute
@@ -161,6 +168,7 @@ export interface FileRoutesByTo {
   '/characters': typeof CharactersRoute
   '/donate': typeof DonateRoute
   '/downloads': typeof DownloadsRoute
+  '/encounters': typeof EncountersRoute
   '/favorites': typeof FavoritesRoute
   '/help': typeof HelpRoute
   '/market': typeof MarketRoute
@@ -184,6 +192,7 @@ export interface FileRoutesById {
   '/characters': typeof CharactersRoute
   '/donate': typeof DonateRoute
   '/downloads': typeof DownloadsRoute
+  '/encounters': typeof EncountersRoute
   '/favorites': typeof FavoritesRoute
   '/help': typeof HelpRoute
   '/market': typeof MarketRoute
@@ -208,6 +217,7 @@ export interface FileRouteTypes {
     | '/characters'
     | '/donate'
     | '/downloads'
+    | '/encounters'
     | '/favorites'
     | '/help'
     | '/market'
@@ -230,6 +240,7 @@ export interface FileRouteTypes {
     | '/characters'
     | '/donate'
     | '/downloads'
+    | '/encounters'
     | '/favorites'
     | '/help'
     | '/market'
@@ -252,6 +263,7 @@ export interface FileRouteTypes {
     | '/characters'
     | '/donate'
     | '/downloads'
+    | '/encounters'
     | '/favorites'
     | '/help'
     | '/market'
@@ -275,6 +287,7 @@ export interface RootRouteChildren {
   CharactersRoute: typeof CharactersRoute
   DonateRoute: typeof DonateRoute
   DownloadsRoute: typeof DownloadsRoute
+  EncountersRoute: typeof EncountersRoute
   FavoritesRoute: typeof FavoritesRoute
   HelpRoute: typeof HelpRoute
   MarketRoute: typeof MarketRoute
@@ -339,6 +352,13 @@ declare module '@tanstack/react-router' {
       path: '/downloads'
       fullPath: '/downloads'
       preLoaderRoute: typeof DownloadsRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/encounters': {
+      id: '/encounters'
+      path: '/encounters'
+      fullPath: '/encounters'
+      preLoaderRoute: typeof EncountersRouteImport
       parentRoute: typeof rootRouteImport
     }
     '/favorites': {
@@ -443,6 +463,7 @@ const rootRouteChildren: RootRouteChildren = {
   CharactersRoute: CharactersRoute,
   DonateRoute: DonateRoute,
   DownloadsRoute: DownloadsRoute,
+  EncountersRoute: EncountersRoute,
   FavoritesRoute: FavoritesRoute,
   HelpRoute: HelpRoute,
   MarketRoute: MarketRoute,

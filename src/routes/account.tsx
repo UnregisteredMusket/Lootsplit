@@ -205,6 +205,17 @@ function Account() {
                 Open character sheets & rolls
               </Link>
             </section>
+            {library.members.some((m) => m.role === "dm") && (
+              <section className="portal-card">
+                <h2>DM encounters</h2>
+                <p>
+                  Save encounters to your profile, track battles and review loot before awarding it.
+                </p>
+                <Link to="/encounters" className="portal-button">
+                  Open DM encounters
+                </Link>
+              </section>
+            )}
             <ProfileControls profile={library.profile} onSaved={reload} />
             {library.user.role !== "member" && (
               <StaffControls userId={library.user.id} role={library.user.role} />

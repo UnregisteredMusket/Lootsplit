@@ -438,3 +438,33 @@ input,select,textarea { max-width: 100%; }
 @media(max-width:700px) { .sheet-grid { grid-template-columns:1fr; } .ability-grid { grid-template-columns:repeat(2,minmax(0,1fr)); } .resource-row { grid-template-columns:repeat(2,minmax(0,1fr)); } .skill-row { grid-template-columns:minmax(0,1fr) 100px 48px; } .character-savebar button { flex:1; } }
 @media(max-width:700px) { .character-savebar { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); } .character-savebar strong { grid-column:1 / -1; } .character-savebar button { overflow-wrap:normal; } }
 .sheet-edit-fields { min-width:0; border:0; padding:0; margin:0; }
+
+/* DM encounter desk: extends the existing responsive character and ledger controls. */
+.encounter-layout { display:grid; grid-template-columns:210px minmax(0,1fr); gap:1.25rem; align-items:start; }
+.encounter-library h2 { font-size:1.5rem; }
+.encounter-library-row { display:grid; text-align:left; width:100%; gap:.3rem; margin:.6rem 0; }
+.encounter-library-row span { font-size:.8rem; font-weight:400; text-transform:capitalize; }
+.encounter-panel { border:1px solid var(--sheet-line); border-radius:1rem; padding:1.2rem; margin-bottom:1rem; background:var(--color-elevated,var(--color-bg)); min-width:0; }
+.encounter-panel h3,.encounter-workspace button { display:flex; align-items:center; gap:.45rem; }
+.encounter-heading { display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:.6rem; }
+.encounter-badge { display:inline-flex; align-items:center; gap:.4rem; border:1px solid var(--sheet-line); border-radius:2rem; padding:.35rem .7rem; font-size:.8rem; }
+.encounter-tabs { display:flex; flex-wrap:wrap; gap:.5rem; margin-top:1rem; }
+.encounter-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(145px,1fr)); gap:.75rem; margin:1rem 0; }
+.encounter-coins { display:grid; grid-template-columns:repeat(5,minmax(0,1fr)); gap:.5rem; margin:1rem 0; }
+.encounter-vitals { display:grid; grid-template-columns:repeat(3,minmax(0,1fr)); gap:.6rem; margin:.75rem 0; }
+.encounter-combatant { border:1px solid var(--sheet-line); border-radius:.75rem; padding:1rem; margin:1rem 0; }
+.encounter-combatant.is-active { border:2px solid var(--color-lead); background:color-mix(in srgb,var(--color-lead) 8%,var(--color-bg)); }
+.encounter-estimate,.encounter-notice,.encounter-award { border-left:3px solid var(--color-lead); padding:.75rem 1rem; margin:1rem 0; background:color-mix(in srgb,var(--color-lead) 8%,var(--color-bg)); }
+.encounter-estimate { display:flex; flex-wrap:wrap; gap:.5rem; justify-content:space-between; }
+.encounter-index-row { display:flex; justify-content:space-between; align-items:center; gap:.75rem; padding:.85rem 0; border-top:1px solid var(--sheet-line); }
+.encounter-table-entry { display:grid; grid-template-columns:minmax(0,2fr) minmax(60px,1fr) minmax(60px,1fr); gap:.5rem; padding:.6rem 0; border-bottom:1px solid var(--sheet-line); }
+.encounter-table-entry button { grid-column:1/-1; justify-self:start; }
+.encounter-fieldset { border:0; min-width:0; }
+.encounter-catalog { margin:.5rem .5rem .5rem 0; }
+.encounter-empty { padding:2rem; }
+.encounter-import { max-width:260px; }
+.encounter-rolls li { display:flex; justify-content:space-between; gap:1rem; padding:.9rem 0; border-top:1px solid var(--sheet-line); }
+.encounter-rolls span { display:block; font-size:.8rem; margin-top:.35rem; }
+@media(max-width:800px) { .encounter-layout { grid-template-columns:minmax(0,1fr); } .encounter-library { max-height:240px; overflow:auto; } .encounter-panel { padding:.9rem; } }
+@media(max-width:430px) { .encounter-vitals { grid-template-columns:repeat(2,minmax(0,1fr)); } .encounter-coins { grid-template-columns:repeat(3,minmax(0,1fr)); } .encounter-grid { grid-template-columns:minmax(0,1fr); } .encounter-index-row { flex-wrap:wrap; } }
+.encounter-workspace .encounter-library-row { display:grid; }
