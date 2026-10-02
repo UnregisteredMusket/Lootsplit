@@ -172,7 +172,6 @@ async function seedEconomy(): Promise<void> {
     }
   }
   const party = crypto.randomUUID();
-  const ivo = crypto.randomUUID();
   const shop = crypto.randomUUID();
   const purses: Purse[] = [
     {
@@ -181,13 +180,15 @@ async function seedEconomy(): Promise<void> {
       kind: "party",
       coins: { cp: 30, sp: 18, ep: 0, gp: 45, pp: 0 },
     },
-    {
-      id: ivo,
-      name: "Ivo",
-      kind: "character",
-      control: "player",
-      coins: { cp: 0, sp: 6, ep: 0, gp: 8, pp: 0 },
-    },
+    ...["Drugis Falkson", "Sigurdr Falkson", "Hemi", "Hrogvir", "Kaito"].map(
+      (name): Purse => ({
+        id: crypto.randomUUID(),
+        name,
+        kind: "character",
+        control: "player",
+        coins: emptyCoins(),
+      }),
+    ),
   ];
   const holdings: Holding[] = [
     {
