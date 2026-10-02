@@ -37,3 +37,11 @@ No feature below may be removed, disabled, hidden or reduced without explicit us
 | Android bundled client, native share/file save, network/back behavior and permanent signing | Android |
 
 Not implemented or promised by this inventory: OCR, user registration, Google Drive, native Android push, online presence, or editors for every kind of image.
+
+## Website and optional account library
+- Public welcome, Android download, desktop installation guidance, changelog and help pages alongside the existing app URL.
+- Fixed-version Android download endpoint verifies the release checksum; original GitHub and Drive alternatives remain available.
+- Optional email/password accounts with server-side sessions, rate limiting, sign-out, and single-use rotating recovery keys. Email delivery is not configured.
+- Account-owned campaign memberships, resume with fresh room/seat validation, archive/unarchive and forget. Existing guest room workflows remain available.
+- Explicit private cloud backup versions, download, delete and restore into a new local campaign. PDFs/reference content remain device-local; encrypted device backups remain the route for protected saves.
+- Reusable character names, portraits and notes; adding a profile to a local DM campaign creates an empty purse and does not transfer wealth or inventory.
