@@ -1,5 +1,6 @@
 import type { CatalogItem, ItemCategory } from "./types.ts";
 export const OPEN5E_KINDS = [
+  { value: "creatures", label: "Creatures" },
   { value: "items", label: "Equipment" },
   { value: "magicitems", label: "Magic items" },
   { value: "spells", label: "Spells" },
@@ -7,7 +8,12 @@ export const OPEN5E_KINDS = [
 ] as const;
 export type OpenKind = (typeof OPEN5E_KINDS)[number]["value"];
 export type OpenEdition = "srd-2014" | "srd-2024";
-export type OpenQuery = { kind: OpenKind; edition: OpenEdition; query: string; page: number };
+export type OpenQuery = {
+  kind: OpenKind;
+  edition: OpenEdition;
+  query: string;
+  page: number;
+};
 export type OpenEntry = {
   key: string;
   name: string;
@@ -61,13 +67,19 @@ export function normalizeOpenPage(payload: unknown, q: OpenQuery): OpenPage {
   const entries = data.results.flatMap((value): OpenEntry[] => {
     const r = { ...record(value) };
     let doc = record(r.document);
-    if (q.kind === "conditions" && !text(r.name).toLowerCase().includes(q.query.toLowerCase())) return [];
+    if (q.kind === "conditions" && !text(r.name).toLowerCase().includes(q.query.toLowerCase()))
+      return [];
     // Conditions are shared concepts; only their per-source descriptions belong to an edition.
     if (q.kind === "conditions" && doc.key === "core") {
-      const description = Array.isArray(r.descriptions) ? r.descriptions.map(record).find(d => d.document === q.edition) : undefined;
+      const description = Array.isArray(r.descriptions)
+        ? r.descriptions.map(record).find((d) => d.document === q.edition)
+        : undefined;
       if (!description) return [];
       r.desc = text(description.desc);
-      doc = {key:q.edition,name:`System Reference Document ${q.edition === "srd-2014" ? "5.1" : "5.2"}`};
+      doc = {
+        key: q.edition,
+        name: `System Reference Document ${q.edition === "srd-2014" ? "5.1" : "5.2"}`,
+      };
     }
     if (doc.key !== q.edition || !text(r.key) || !text(r.name)) return [];
     const version = q.edition === "srd-2014" ? "5.1" : "5.2";
@@ -121,6 +133,29 @@ export function normalizeOpenPage(payload: unknown, q: OpenQuery): OpenPage {
       if (Array.isArray(r.classes)) facts.push(`Classes: ${r.classes.map(name).join(", ")}`);
       if (text(r.reaction_condition)) facts.push(`Reaction: ${r.reaction_condition}`);
     }
+    let creatureText = "";
+    if (q.kind === "creatures") {
+      for (const [label, value] of [
+        ["Type", name(r.type)],
+        ["Size", name(r.size)],
+        ["Armor class", r.armor_class],
+        ["Hit points", r.hit_points],
+        ["Challenge rating", r.challenge_rating],
+        ["XP", r.experience_points],
+      ] as const) {
+        if (value !== undefined && value !== null && value !== "") facts.push(`${label}: ${value}`);
+      }
+      creatureText = ["traits", "actions", "bonus_actions", "reactions", "legendary_actions"]
+        .flatMap((key) =>
+          Array.isArray(r[key])
+            ? r[key].map((value: unknown) => {
+                const action = record(value);
+                return `${text(action.name)}: ${text(action.desc)}`;
+              })
+            : [],
+        )
+        .join("\n\n");
+    }
     if (r.requires_attunement)
       facts.push(
         `Requires attunement${text(r.attunement_detail) ? `: ${r.attunement_detail}` : ""}`,
@@ -143,7 +178,7 @@ export function normalizeOpenPage(payload: unknown, q: OpenQuery): OpenPage {
       {
         key: text(r.key),
         name: text(r.name),
-        description: [text(r.desc), text(r.higher_level), propertyText]
+        description: [text(r.desc), text(r.higher_level), propertyText, creatureText]
           .filter(Boolean)
           .join("\n\n"),
         facts,
@@ -157,7 +192,11 @@ export function normalizeOpenPage(payload: unknown, q: OpenQuery): OpenPage {
       },
     ];
   });
-  return { entries, count: q.kind === "conditions" ? entries.length : data.count, more: q.kind !== "conditions" && typeof data.next === "string" };
+  return {
+    entries,
+    count: q.kind === "conditions" ? entries.length : data.count,
+    more: q.kind !== "conditions" && typeof data.next === "string",
+  };
 }
 export function openCatalogItem(
   entry: OpenEntry,

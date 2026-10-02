@@ -1,4 +1,12 @@
-import { forwardRef, useState, type ButtonHTMLAttributes, type InputHTMLAttributes, type ReactNode, type SelectHTMLAttributes, type TextareaHTMLAttributes } from "react";
+import {
+  forwardRef,
+  useState,
+  type ButtonHTMLAttributes,
+  type InputHTMLAttributes,
+  type ReactNode,
+  type SelectHTMLAttributes,
+  type TextareaHTMLAttributes,
+} from "react";
 import * as AlertDialog from "@radix-ui/react-alert-dialog";
 import * as Dialog from "@radix-ui/react-dialog";
 import { ChevronDown, Minus, Plus, X } from "lucide-react";
@@ -70,7 +78,9 @@ export function Fold({
         >
           <span className="min-w-0">
             <span className="block text-sm font-medium">{title}</span>
-            {hint && !open ? <span className="mt-0.5 block truncate text-sm text-muted">{hint}</span> : null}
+            {hint && !open ? (
+              <span className="mt-0.5 block truncate text-sm text-muted">{hint}</span>
+            ) : null}
           </span>
           <ChevronDown className={cn("size-4 shrink-0 text-faint", open && "rotate-180")} />
         </button>
@@ -149,12 +159,16 @@ export function Field({
 }) {
   return (
     <label className="block">
-      <span className={cn("mb-1 block text-sm font-medium", tone === "paper" ? "text-ink" : "text-fg")}>
+      <span
+        className={cn("mb-1 block text-sm font-medium", tone === "paper" ? "text-ink" : "text-fg")}
+      >
         {label}
       </span>
       {children}
       {hint ? (
-        <span className={cn("mt-1 block text-sm", tone === "paper" ? "text-paper-muted" : "text-muted")}>
+        <span
+          className={cn("mt-1 block text-sm", tone === "paper" ? "text-paper-muted" : "text-muted")}
+        >
           {hint}
         </span>
       ) : null}
@@ -223,11 +237,13 @@ export function Modal({
   onOpenChange,
   title,
   children,
+  returnFocus,
 }: {
   open: boolean;
   onOpenChange: (open: boolean) => void;
   title: string;
   children: ReactNode;
+  returnFocus?: string;
 }) {
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
@@ -236,10 +252,23 @@ export function Modal({
         <Dialog.Content
           className="modal-pop rounded-xl border border-border bg-elevated p-4 text-fg"
           aria-describedby={undefined}
+          onCloseAutoFocus={
+            returnFocus
+              ? (event) => {
+                  event.preventDefault();
+                  document.querySelector<HTMLElement>(returnFocus)?.focus();
+                }
+              : undefined
+          }
         >
           <div className="flex items-start justify-between gap-3">
-            <Dialog.Title className="font-display text-2xl leading-tight tracking-tight">{title}</Dialog.Title>
-            <Dialog.Close className="grid size-11 shrink-0 place-items-center rounded-sm hover:bg-subtle" aria-label="Close">
+            <Dialog.Title className="font-display text-2xl leading-tight tracking-tight">
+              {title}
+            </Dialog.Title>
+            <Dialog.Close
+              className="grid size-11 shrink-0 place-items-center rounded-sm hover:bg-subtle"
+              aria-label="Close"
+            >
               <X className="size-4" />
             </Dialog.Close>
           </div>
@@ -273,7 +302,9 @@ export function Confirm({
           <AlertDialog.Title className="font-display text-2xl leading-tight tracking-tight">
             {title}
           </AlertDialog.Title>
-          <AlertDialog.Description className="mt-2 text-sm text-muted">{body}</AlertDialog.Description>
+          <AlertDialog.Description className="mt-2 text-sm text-muted">
+            {body}
+          </AlertDialog.Description>
           <div className="mt-4 flex flex-wrap justify-end gap-2">
             <AlertDialog.Cancel asChild>
               <Button variant="secondary">Cancel</Button>
@@ -330,7 +361,11 @@ export function ChoiceGrid<T extends string | number>({
       <legend className="mb-2 text-sm font-medium">{label}</legend>
       <div className="flex flex-wrap gap-2" role="group" aria-label={label}>
         {options.map((option) => (
-          <ToggleButton key={String(option.value)} pressed={option.value === value} onClick={() => onChange(option.value)}>
+          <ToggleButton
+            key={String(option.value)}
+            pressed={option.value === value}
+            onClick={() => onChange(option.value)}
+          >
             {option.label}
           </ToggleButton>
         ))}
@@ -362,7 +397,10 @@ export function Switch({
         aria-checked={checked}
         aria-label={label}
         onClick={() => onChange(!checked)}
-        className={cn("relative h-11 w-16 shrink-0 rounded-full motion-colors", checked ? "bg-accent" : "border border-border bg-subtle")}
+        className={cn(
+          "relative h-11 w-16 shrink-0 rounded-full motion-colors",
+          checked ? "bg-accent" : "border border-border bg-subtle",
+        )}
       >
         <span
           className={cn(

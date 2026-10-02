@@ -2,16 +2,25 @@ import { chromium } from "playwright";
 import assert from "node:assert/strict";
 import { mkdir } from "node:fs/promises";
 const origin = process.env.AUDIT_ORIGIN || "http://127.0.0.1:8080";
-const browser = await chromium.launch({ headless: true, executablePath: process.env.CHROMIUM_EXECUTABLE_PATH || undefined, args: ["--no-sandbox"] });
+const browser = await chromium.launch({
+  headless: true,
+  executablePath: process.env.CHROMIUM_EXECUTABLE_PATH || undefined,
+  args: ["--no-sandbox"],
+});
 await mkdir("test-results", { recursive: true });
 const errors = [];
 async function bounded(label, work) {
   let timer;
   try {
-    return await Promise.race([work(), new Promise((_, reject) => {
-      timer = setTimeout(() => reject(new Error(`Timed out: ${label}`)), 30000);
-    })]);
-  } finally { clearTimeout(timer); }
+    return await Promise.race([
+      work(),
+      new Promise((_, reject) => {
+        timer = setTimeout(() => reject(new Error(`Timed out: ${label}`)), 30000);
+      }),
+    ]);
+  } finally {
+    clearTimeout(timer);
+  }
 }
 async function visit(page, url) {
   await page.goto(url);
@@ -19,7 +28,9 @@ async function visit(page, url) {
   await page.waitForTimeout(1800);
 }
 async function open(width = 390) {
-  const context = await browser.newContext({ viewport: { width, height: 844 } });
+  const context = await browser.newContext({
+    viewport: { width, height: 844 },
+  });
   context.setDefaultTimeout(20000);
   context.setDefaultNavigationTimeout(30000);
   const page = await context.newPage();
@@ -30,9 +41,9 @@ async function open(width = 390) {
   await skip.waitFor();
   await skip.click();
   await page.getByRole("link", { name: "Party", exact: true }).first().waitFor();
-  await page.getByText("Campaign treasury", { exact: true }).waitFor();
+  await page.getByRole("heading", { name: "Campaign control", exact: true }).waitFor();
   await page.waitForTimeout(2000); // Initial Vite dependency optimization can reload once.
-  await page.getByText("Campaign treasury", { exact: true }).waitFor();
+  await page.getByRole("heading", { name: "Campaign control", exact: true }).waitFor();
   if (await skip.isVisible()) await skip.click();
   await page.getByRole("dialog").waitFor({ state: "hidden" });
   return page;
@@ -81,14 +92,23 @@ try {
   assert.equal(new URL(player.url()).searchParams.has("join"), false);
   console.log("Audit: interrupt purchase and restore queue");
   // Interrupt only API transport so the app and saved queue can reload normally.
-  await player.route("**/_serverFn/**", (route) => route.request().postData()?.includes("commands") ? route.abort("failed") : route.continue());
-  await bounded("queue interrupted purchase", () => player.evaluate(async () => {
-    const c = await import("/src/lib/quire/cloud-client.ts");
-    const e = await import("/src/lib/quire/economy.ts");
-    const p = (await e.listPurses()).find((p) => p.kind === "character");
-    const stock = (await e.listStock()).find((s) => s.copper === 2);
-    await c.queueCommand({ kind: "buy", purseId: p.id, stockId: stock.id, quantity: 1 });
-  }));
+  await player.route("**/_serverFn/**", (route) =>
+    route.request().postData()?.includes("commands") ? route.abort("failed") : route.continue(),
+  );
+  await bounded("queue interrupted purchase", () =>
+    player.evaluate(async () => {
+      const c = await import("/src/lib/quire/cloud-client.ts");
+      const e = await import("/src/lib/quire/economy.ts");
+      const p = (await e.listPurses()).find((p) => p.kind === "character");
+      const stock = (await e.listStock()).find((s) => s.copper === 2);
+      await c.queueCommand({
+        kind: "buy",
+        purseId: p.id,
+        stockId: stock.id,
+        quantity: 1,
+      });
+    }),
+  );
   console.log("Audit: interrupted command returned; reload saved queue");
   assert.ok(
     await player.evaluate(() =>
@@ -96,7 +116,7 @@ try {
     ),
   );
   await player.reload();
-  await player.getByRole("heading", { name: "Multiplayer", exact: true }).waitFor();
+  await player.getByRole("heading", { name: "Campaign", exact: true }).waitFor();
   assert.ok(
     await player.evaluate(() =>
       Object.values(localStorage).some((v) => v.includes("pending") && v.includes("stockId")),
@@ -104,11 +124,13 @@ try {
   );
   await player.unroute("**/_serverFn/**");
   console.log("Audit: saved queue restored; retry transport");
-  await bounded("retry restored purchase", () => player.evaluate(async () => {
-    const c = await import("/src/lib/quire/cloud-client.ts");
-    await c.refreshShared();
-    await c.retryPending();
-  }));
+  await bounded("retry restored purchase", () =>
+    player.evaluate(async () => {
+      const c = await import("/src/lib/quire/cloud-client.ts");
+      await c.refreshShared();
+      await c.retryPending();
+    }),
+  );
   const count = await player.evaluate(
     async () => (await import("/src/lib/quire/cloud-client.ts")).getCloudTable().pending,
   );
@@ -129,7 +151,9 @@ try {
     }
     await visit(page, origin + "/");
     await page.waitForTimeout(500);
-    await page.screenshot({ path: `test-results/${page === dm ? "dm" : "player"}-mobile.png` });
+    await page.screenshot({
+      path: `test-results/${page === dm ? "dm" : "player"}-mobile.png`,
+    });
   }
   const desktop = await open(1280);
   await visit(desktop, origin + "/");

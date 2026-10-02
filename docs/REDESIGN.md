@@ -65,3 +65,19 @@ Final suite: 192 script tests, 99 app tests and 55 auth/app-data tests passed (3
 
 ### Deployment and rollback
 Checkpoint branch `checkpoint/pre-redesign-1.2.3` points to e6776f55ad557fe5e5fdd6927bdfc8d0df0aa003. Web release d7dd030 is on `main` and `feature/illustrated-ledger`. Deploy server and matching assets together through the existing Cloudflare build; preserve D1. Roll back code through a revert/redeployment without deleting or restoring D1. Keep new client backups; older binaries do not understand the new journal fields.
+
+## Mobile control panel redesign — October 2, 2026
+
+Preservation baseline: `1af467ad2ab0c5eb0c2e403ea7e38f607ecfb706` on main, with remote checkpoint `checkpoint/pre-mobile-control-panel`. Work branch: `redesign/mobile-control-panel`.
+
+The approved concept uses dark ink, ivory and brass, serif headings, readable sans-serif controls, portraits, compact cards and five role-specific tabs. The DM Desk allocates its upper region to readouts and lower region to six configurable destinations. Settings & Management is a header gear that opens role-specific accordion categories. All legacy financial, sharing, account, backup, PDF and import/export workflows keep their existing routes and permission checks.
+
+### Data and compatibility
+No database migration or economic behavior change. Shortcut preferences use a versioned, sanitized, campaign-specific localStorage key; they are described as device settings and are not part of campaign backups. Readouts use authorized account endpoints or existing imported sheets; missing health data is not fabricated. Custom colors/light mode remain respected. Private PDF books retain DM-only access; shared handouts are separately visible to players. Library creature/spell tiles open the corresponding public SRD reference section with attribution.
+
+### Verification
+The new control-panel browser audit covers role tabs, six-button mobile fit, customization/reordering/reload persistence, settings categories, keyboard focus return, light/dark appearance and 320/390/768/1440 layouts. Existing character and multiplayer recovery audits now use the updated navigation. Encounter browser checks use a deterministic creature index by default; set `ENCOUNTER_LIVE_INDEX=1` to also exercise external Open5e availability. All award/retry/permission checks still reach the real local server. The production encounter server is unchanged.
+
+A fresh Android package is a separate signed release; this change updates the shared web/mobile source and verifies the mobile bundle without changing the published APK metadata.
+
+Final local release checks: 377 tests passed and four existing template tests skipped; TypeScript, Cloudflare build and mobile bundle passed. Character play/edit/reload, account backup/recovery, multiplayer queue recovery, encounter review/award retry and the control-panel browser audits passed. Dark/light and mobile/desktop screenshots were inspected; light theme switching adjusts the page color for readable contrast.

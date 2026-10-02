@@ -18,7 +18,7 @@ export const LOOKS: Look[] = [
 ];
 
 export const DEFAULT_ACCENT = "#c8a96b";
-export const DEFAULT_GROUND = "#0c1424";
+export const DEFAULT_GROUND = "#0b1720";
 
 export function themeVars(appearance: Appearance, accent: string, ground: string): Record<string, string> {
   const dark = appearance === "dark";

@@ -1,19 +1,20 @@
+import { allowContextChange } from "@/lib/quire/use-draft-guard";
 import { useChatUnread } from "@/lib/quire/use-chat-unread";
+import { ManagementPanel, CampaignPanel } from "./control-panel/settings";
+import { getCampaigns, subscribeCampaigns, serverCampaigns } from "@/lib/quire/campaigns";
 import { SyncStatus } from "./sync-status";
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
 import {
-  Coins,
-  Ellipsis,
+  Backpack,
+  BookOpen,
+  ChevronDown,
+  MessageCircle,
+  Swords,
+  UserRound,
   Home,
-  Hourglass,
-  Library,
-  Radio,
-  Scale,
-  ScrollText,
   Search,
   Settings,
   Users,
-  Smartphone,
   Store,
 } from "lucide-react";
 import {
@@ -25,7 +26,7 @@ import {
   type ReactNode,
 } from "react";
 import { Toaster } from "sonner";
-import { getCloudWatch, subscribeCloudWatch, type CloudWatch } from "@/lib/quire/cloud-turn";
+import { getCloudWatch } from "@/lib/quire/cloud-turn";
 import { useLibrary } from "@/lib/quire/library";
 import { usePrefs } from "@/lib/quire/prefs";
 import { useSeat, useSeatKnown } from "@/lib/quire/seat";
@@ -39,6 +40,9 @@ import { getOnline, subscribeOnline } from "@/lib/mobile/online";
 import { watchCrashes } from "@/lib/quire/reports";
 
 type Dest =
+  | "/encounters"
+  | "/characters"
+  | "/library"
   | "/account"
   | "/welcome"
   | "/downloads"
@@ -63,13 +67,21 @@ export function Shell({
   const seatKnown = useSeatKnown();
   const { prefs } = usePrefs();
   const navigate = useNavigate();
-  const pathname = useRouterState({ select: (state) => state.location.pathname });
+  const pathname = useRouterState({
+    select: (state) => state.location.pathname,
+  });
   const search = useRouterState({ select: (state) => state.location.search });
   const query = searchString(search);
   const [draft, setDraft] = useState(query);
   const [switching, setSwitching] = useState(false);
   const [leaving, setLeaving] = useState(false);
-  const [more, setMore] = useState(false);
+  const [management, setManagement] = useState(false);
+  const [campaignOpen, setCampaignOpen] = useState(false);
+  const campaigns = useSyncExternalStore(subscribeCampaigns, getCampaigns, serverCampaigns);
+  const campaignName =
+    campaigns.campaigns.find((c) => c.id === campaigns.activeId)?.name || "Campaign";
+  const overlayRef = useRef(false);
+  overlayRef.current = management || campaignOpen;
   const [blocked, setBlocked] = useState<string | null>(null);
   const dirty = useRef(false);
 
@@ -80,6 +92,19 @@ export function Shell({
     let live = true;
     void import("@capacitor/app").then(({ App }) => {
       void App.addListener("backButton", ({ canGoBack }) => {
+        if (overlayRef.current) {
+          setManagement(false);
+          setCampaignOpen(false);
+          return;
+        }
+        const close = document.querySelector<HTMLButtonElement>(
+          '[role="dialog"] button[aria-label="Close"]',
+        );
+        if (close) {
+          close.click();
+          return;
+        }
+        if (!allowContextChange()) return;
         if (canGoBack) window.history.back();
         else void App.exitApp();
       }).then((handle) => {
@@ -112,9 +137,6 @@ export function Shell({
     return () => window.clearTimeout(handle);
   }, [draft, navigate]);
 
-  const view = searchView(search);
-  const onHome = pathname === "/" && view !== "sheet";
-  const onSheet = pathname === "/" && view === "sheet";
   const inBooks =
     pathname === "/books" || pathname.startsWith("/book/") || pathname.startsWith("/read/");
   const dm = seat.role === "dm";
@@ -126,7 +148,9 @@ export function Shell({
   }
 
   return (
-    <div className="loot-shell min-h-dvh bg-bg text-fg">
+    <div
+      className={`loot-shell concept-shell min-h-dvh bg-bg text-fg ${dm ? "role-dm" : "role-player"}`}
+    >
       <div className="lg:grid lg:grid-cols-[15rem_minmax(0,1fr)]">
         <aside className="sticky top-0 z-20 hidden h-dvh flex-col border-r border-lead/40 bg-bg/95 px-3 py-5 lg:flex">
           <Link
@@ -137,26 +161,7 @@ export function Shell({
             <QuillMark />
             Lootsplit
           </Link>
-          <Link to="/account" className="mt-5 text-sm text-[var(--muted)]">
-            My account & campaigns
-          </Link>
-          {dm && (
-            <Link to="/encounters" className="mt-2 text-sm text-[var(--muted)]">
-              DM encounters
-            </Link>
-          )}
-          <Link to="/characters" className="mt-2 text-sm text-[var(--muted)]">
-            Character sheets & rolls
-          </Link>
-          <Link to="/" search={{ view: "overview" }} className="mt-2 text-sm text-[var(--muted)]">
-            Campaign overview
-          </Link>
-          <Link to="/account" hash="bug-reports" className="mt-2 text-sm text-[var(--muted)]">
-            Report a bug
-          </Link>
-          <Link to="/welcome" className="mt-2 text-sm text-[var(--muted)]">
-            Website & downloads
-          </Link>
+          <p className="rail-caption">Your campaign companion</p>
           <nav className="mt-8 flex flex-1 flex-col gap-2" aria-label="Sections">
             {navLinks("rail")}
           </nav>
@@ -171,30 +176,49 @@ export function Shell({
         <div className="min-w-0">
           <header className="sticky top-0 z-20 border-b border-lead/50 bg-bg/90 pt-[env(safe-area-inset-top)] backdrop-blur-sm">
             <div className="mx-auto flex w-full max-w-6xl items-center gap-3 px-4 py-3 lg:px-8">
-              <Link
-                to="/"
-                search={{ view: "home" }}
-                className="inline-flex items-center gap-2 font-display text-3xl leading-none tracking-tight lg:hidden"
+              <button
+                className="campaign-switcher"
+                onClick={() => {
+                  if (allowContextChange()) setCampaignOpen(true);
+                }}
+                aria-label="Select campaign"
+                aria-haspopup="dialog"
               >
-                <QuillMark />
-                Lootsplit
-              </Link>
-              {inBooks ? (
-                <form onSubmit={onSubmit} className="hidden min-w-0 flex-1 lg:block lg:max-w-xl">
-                  <SearchField />
-                </form>
-              ) : null}
-              <div className="ml-auto flex items-center">
-                <ModeMark />
-                <SeatMark
-                  role={seat.role}
-                  known={seatKnown}
-                  onPress={() => void requestRoleChange()}
-                />
+                <span>{campaignName}</span>
+                <ChevronDown size={16} />
+              </button>
+              <button
+                className="role-chip"
+                aria-label={dm ? "Dungeon master. Change role." : "Player. Change role."}
+                onClick={() => void requestRoleChange()}
+                disabled={!seatKnown}
+              >
+                {seatKnown ? (dm ? "DM" : "Player") : "…"}
+              </button>
+              <div className="header-actions">
+                <a
+                  className="header-icon"
+                  href="/share?chat=1"
+                  aria-label={unreadCount ? `Messages, ${unreadCount} unread` : "Messages"}
+                >
+                  <MessageCircle size={23} />
+                  {unreadCount > 0 && (
+                    <span className="chat-nav-badge">{unreadCount > 99 ? "99+" : unreadCount}</span>
+                  )}
+                </a>
+                <button
+                  className="header-icon settings-trigger"
+                  aria-label="Settings & Management"
+                  aria-haspopup="dialog"
+                  aria-expanded={management}
+                  onClick={() => setManagement(true)}
+                >
+                  <Settings size={23} />
+                </button>
               </div>
             </div>
             {inBooks ? (
-              <form onSubmit={onSubmit} className="mx-auto w-full max-w-6xl px-4 pb-3 lg:hidden">
+              <form onSubmit={onSubmit} className="mx-auto w-full max-w-6xl px-4 pb-3">
                 <SearchField />
               </form>
             ) : null}
@@ -219,7 +243,7 @@ export function Shell({
           <OfflineNote />
           <main
             className={cn(
-              "mx-auto w-full px-4 pt-6 pb-28 lg:px-8 lg:pt-8 lg:pb-12",
+              "concept-main mx-auto w-full px-4 pt-6 pb-28 lg:px-8 lg:pt-8 lg:pb-12",
               width === "prose" ? "max-w-3xl" : "max-w-6xl",
             )}
           >
@@ -228,81 +252,19 @@ export function Shell({
           </main>
         </div>
       </div>
-      {more ? (
-        <div className="fixed inset-x-0 bottom-[calc(4rem+env(safe-area-inset-bottom))] z-30 border-t border-lead/30 bg-elevated lg:hidden">
-          <div className="mx-auto flex max-w-3xl flex-col px-2 py-2">
-            {dm ? (
-              <MoreLink
-                to="/books"
-                search={{ q: "" }}
-                label="Books"
-                onPick={() => setMore(false)}
-              />
-            ) : null}
-            <MoreLink
-              to="/market"
-              search={{ book: "" }}
-              label="Market"
-              onPick={() => setMore(false)}
-            />
-            {dm && (
-              <Link
-                to="/encounters"
-                className="flex min-h-11 items-center px-2 text-sm"
-                onClick={() => setMore(false)}
-              >
-                DM encounters
-              </Link>
-            )}
-            <Link
-              to="/characters"
-              className="flex min-h-11 items-center px-2 text-sm"
-              onClick={() => setMore(false)}
-            >
-              Character sheets & rolls
-            </Link>
-            <Link
-              to="/"
-              search={{ view: "overview" }}
-              className="flex min-h-11 items-center px-2 text-sm"
-              onClick={() => setMore(false)}
-            >
-              Campaign overview
-            </Link>
-            <MoreLink to="/account" label="My account & campaigns" onPick={() => setMore(false)} />
-            <Link
-              to="/account"
-              hash="bug-reports"
-              className="flex min-h-11 items-center px-2 text-sm"
-              onClick={() => setMore(false)}
-            >
-              Report a bug
-            </Link>
-            <MoreLink to="/downloads" label="Website & downloads" onPick={() => setMore(false)} />
-            {!dm ? (
-              <MoreLink to="/catalog" label="Reference & names" onPick={() => setMore(false)} />
-            ) : null}
-            {dm ? (
-              <MoreLink to="/catalog" label="Catalog" onPick={() => setMore(false)} />
-            ) : (
-              <MoreLink
-                to="/"
-                search={{ view: "sheet" }}
-                label="Character sheet"
-                onPick={() => setMore(false)}
-              />
-            )}
-            <MoreLink
-              to="/settings"
-              label={dm ? "Settings" : "Device backups"}
-              onPick={() => setMore(false)}
-            />
-            <a href="/welcome" className="flex min-h-11 items-center px-2 text-sm">
-              Website & downloads ↗
-            </a>
-          </div>
-        </div>
-      ) : null}
+      <ManagementPanel
+        open={management}
+        onOpenChange={setManagement}
+        dm={dm}
+        campaign={campaignName}
+        onRoleChange={() => void requestRoleChange()}
+      />
+      <CampaignPanel
+        open={campaignOpen}
+        onOpenChange={setCampaignOpen}
+        dm={dm}
+        campaign={campaignName}
+      />
       <nav
         className="fixed inset-x-0 bottom-0 z-20 border-t border-lead/40 bg-bg/92 pb-[env(safe-area-inset-bottom)] backdrop-blur-sm lg:hidden"
         aria-label="Sections"
@@ -336,7 +298,7 @@ export function Shell({
   );
 
   async function requestRoleChange() {
-    if (!seatKnown) return;
+    if (!seatKnown || !allowContextChange()) return;
     const reason = roleChangeBlocked();
     if (reason) return;
     const lock = await loadSeatLock().catch(() => null);
@@ -366,123 +328,91 @@ export function Shell({
   }
 
   function navLinks(layout: "tab" | "rail") {
-    if (layout === "rail") {
-      return (
-        <>
-          <NavLink
-            layout={layout}
-            to="/"
-            search={{ view: "home" }}
-            active={onHome}
-            icon={dm ? <Scale className="size-4" /> : <Home className="size-4" />}
-            label="Home"
-          />
-          <NavLink
-            layout={layout}
-            to="/market"
-            search={{ book: "" }}
-            active={pathname.startsWith("/market") || pathname.startsWith("/shop/")}
-            icon={<Store className="size-4" />}
-            label="Market"
-          />
-          <NavLink
-            layout={layout}
-            to="/party"
-            active={pathname === "/party"}
-            icon={<Coins className="size-4" />}
-            label="Party"
-          />
-          {dm ? (
-            <NavLink
-              layout={layout}
-              to="/catalog"
-              active={pathname === "/catalog"}
-              icon={<Library className="size-4" />}
-              label="Catalog"
-            />
-          ) : (
-            <NavLink
-              layout={layout}
-              to="/"
-              search={{ view: "sheet" }}
-              active={onSheet}
-              icon={<ScrollText className="size-4" />}
-              label="Sheet"
-            />
-          )}
-          {dm ? (
-            <NavLink
-              layout={layout}
-              to="/books"
-              search={{ q: "" }}
-              active={inBooks}
-              icon={<Library className="size-4" />}
-              label="Books"
-            />
-          ) : null}
-          <NavLink
-            layout={layout}
-            to="/share"
-            active={pathname === "/share"}
-            icon={<Users className="size-4" />}
-            label="Multiplayer"
-            badge={unreadCount}
-          />
-          <NavLink
-            layout={layout}
-            to="/settings"
-            active={pathname === "/settings"}
-            icon={<Settings className="size-4" />}
-            label={dm ? "Settings" : "Device backups"}
-          />
-        </>
-      );
-    }
+    const library =
+      pathname === "/library" || pathname === "/catalog" || inBooks || pathname === "/favorites";
+    const links = dm
+      ? [
+          {
+            to: "/",
+            label: "Desk",
+            icon: Home,
+            active: pathname === "/",
+            search: { view: "home" },
+          },
+          {
+            to: "/encounters",
+            label: "Encounters",
+            icon: Swords,
+            active: pathname === "/encounters",
+          },
+          {
+            to: "/party",
+            label: "Party",
+            icon: Users,
+            active: pathname === "/party" || pathname === "/characters",
+          },
+          {
+            to: "/market",
+            label: "Market",
+            icon: Store,
+            active: pathname === "/market" || pathname.startsWith("/shop/"),
+            search: { book: "" },
+          },
+          { to: "/library", label: "Library", icon: BookOpen, active: library },
+        ]
+      : [
+          {
+            to: "/",
+            label: "Character",
+            icon: UserRound,
+            active:
+              (pathname === "/" && (search as { view?: string }).view !== "overview") ||
+              pathname === "/characters",
+            search: { view: "home" },
+          },
+          {
+            to: "/party",
+            label: "Inventory",
+            icon: Backpack,
+            active: pathname === "/party",
+          },
+          {
+            to: "/share",
+            label: "Campaign",
+            icon: MessageCircle,
+            active:
+              pathname === "/share" ||
+              (pathname === "/" && (search as { view?: string }).view === "overview"),
+          },
+          {
+            to: "/market",
+            label: "Market",
+            icon: Store,
+            active: pathname === "/market" || pathname.startsWith("/shop/"),
+            search: { book: "" },
+          },
+          { to: "/library", label: "Library", icon: BookOpen, active: library },
+        ];
     return (
       <>
-        <NavLink
-          layout={layout}
-          to="/"
-          search={{ view: "home" }}
-          active={onHome}
-          icon={<Home className="size-5" />}
-          label="Home"
-        />
-        <NavLink
-          layout={layout}
-          to="/market"
-          search={{ book: "" }}
-          active={pathname.startsWith("/market") || pathname.startsWith("/shop/")}
-          icon={<Store className="size-5" />}
-          label="Market"
-        />
-        <NavLink
-          layout={layout}
-          to="/party"
-          active={pathname === "/party"}
-          icon={<Coins className="size-5" />}
-          label="Party"
-        />
-        <NavLink
-          layout={layout}
-          to="/share"
-          active={pathname === "/share"}
-          icon={<Users className="size-5" />}
-          label="Multiplayer"
-          badge={unreadCount}
-        />
-        <button
-          type="button"
-          aria-expanded={more}
-          onClick={() => setMore((open) => !open)}
-          className={cn(
-            "inline-flex min-h-16 flex-col items-center justify-center gap-1 text-sm",
-            more ? "text-lead" : "text-muted",
-          )}
-        >
-          <Ellipsis className="size-5" />
-          More
-        </button>
+        {links.map((link) => (
+          <NavLink
+            key={link.label}
+            layout={layout}
+            to={link.to as Dest}
+            search={link.search as never}
+            active={link.active}
+            icon={<link.icon className="size-5" />}
+            label={link.label}
+            badge={link.to === "/share" ? unreadCount : 0}
+          />
+        ))}
+        {layout === "rail" && (
+          <button className="rail-settings" onClick={() => setManagement(true)}>
+            <Settings size={20} />
+            Settings & Management
+          </button>
+        )}
       </>
     );
   }
@@ -526,66 +456,6 @@ export function KeptByDm() {
         prices, the catalog, PDFs, and price settings.
       </p>
     </Shell>
-  );
-}
-
-const LOCAL_WATCH: CloudWatch = { joined: false, mine: true, live: false, who: "" };
-
-function ModeMark() {
-  const watch = useSyncExternalStore(subscribeCloudWatch, getCloudWatch, () => LOCAL_WATCH);
-  const mode = !watch.joined ? "local" : watch.live ? "live" : "turns";
-  const label = mode === "live" ? "Live Mode" : mode === "turns" ? "Turn-based Mode" : "Local Mode";
-  const Icon = mode === "live" ? Radio : mode === "turns" ? Hourglass : Smartphone;
-  return (
-    <Link
-      to="/share"
-      title={label}
-      aria-label={label}
-      className={cn(
-        "inline-flex min-h-11 items-center justify-center gap-2 px-2",
-        mode === "live" ? "text-accent" : mode === "turns" ? "text-lead" : "text-faint",
-      )}
-    >
-      <Icon className="size-4" aria-hidden="true" />
-      <span className="hidden text-xs sm:inline">{label}</span>
-    </Link>
-  );
-}
-
-function SeatMark({
-  role,
-  known,
-  className,
-  onPress,
-}: {
-  role: "dm" | "player";
-  known: boolean;
-  className?: string;
-  onPress: () => void;
-}) {
-  const player = role === "player";
-  return (
-    <button
-      type="button"
-      disabled={!known}
-      onClick={onPress}
-      className={cn(
-        "inline-flex min-h-11 items-center gap-1.5 text-xs font-medium tracking-wide text-faint uppercase",
-        className,
-      )}
-      aria-label={
-        known ? (player ? "Player. Change role." : "Dungeon master. Change role.") : "Role"
-      }
-    >
-      <span
-        className={cn(
-          "size-1.5 rounded-full",
-          known ? (player ? "bg-accent" : "bg-lead") : "bg-faint",
-        )}
-        aria-hidden="true"
-      />
-      {known ? (player ? "Player" : "Dungeon master") : "…"}
-    </button>
   );
 }
 
@@ -657,34 +527,6 @@ function NavLink({
           </span>
         ) : null}
       </span>
-      {label}
-    </Link>
-  );
-}
-
-function searchView(search: unknown): "home" | "sheet" {
-  if (typeof search !== "object" || search === null || !("view" in search)) return "home";
-  return search.view === "sheet" ? "sheet" : "home";
-}
-
-function MoreLink({
-  to,
-  search,
-  label,
-  onPick,
-}: {
-  to: Dest;
-  search?: { q: string } | { book: string } | { view: "sheet" };
-  label: string;
-  onPick: () => void;
-}) {
-  return (
-    <Link
-      to={to}
-      search={search as never}
-      onClick={onPick}
-      className="flex min-h-11 items-center px-2 text-sm"
-    >
       {label}
     </Link>
   );

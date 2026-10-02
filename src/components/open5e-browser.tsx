@@ -37,6 +37,10 @@ export function Open5eBrowser() {
     [cached, setCached] = useState("");
   const [searched, setSearched] = useState<OpenQuery | null>(null);
   const request = useRef(0);
+  useEffect(() => {
+    const section = new URLSearchParams(location.search).get("kind");
+    if (OPEN5E_KINDS.some((k) => k.value === section)) setKind(section as OpenKind);
+  }, []);
   useEffect(
     () => () => {
       request.current++;

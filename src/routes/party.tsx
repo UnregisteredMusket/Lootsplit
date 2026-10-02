@@ -1,3 +1,5 @@
+import { useSheetReadouts, HpBar } from "@/components/control-panel/readouts";
+import { Shield, Backpack } from "lucide-react";
 import { LedgerArt, PortraitPicker, InventoryList } from "@/components/ledger-art";
 import { getCloudTable } from "@/lib/quire/cloud-client";
 import { createFileRoute } from "@tanstack/react-router";
@@ -32,6 +34,12 @@ export const Route = createFileRoute("/party")({
 
 function PartyPage() {
   const economy = useEconomy();
+  const profiles = useSheetReadouts();
+  const [section, setSection] = useState("characters");
+  useEffect(() => {
+    const query = new URLSearchParams(location.search).get("section");
+    if (query === "funds" || location.hash.startsWith("#purse-")) setSection("funds");
+  }, []);
   const { action: initialAction } = Route.useSearch();
   const [action, setAction] = useState(initialAction ?? "");
   useEffect(() => setAction(initialAction ?? ""), [initialAction]);
@@ -52,216 +60,347 @@ function PartyPage() {
       <div className="flex items-center justify-between gap-3">
         <div>
           <p className="eyebrow">Party overview</p>
-          <h1 className="font-display text-4xl tracking-tight">Party</h1>
+          <h1 className="font-display text-4xl tracking-tight">
+            {seat.role === "dm" ? "Party" : "Inventory & purse"}
+          </h1>
         </div>
         <Button
           disabled={!economy.ready || visible.length === 0 || readOnly}
-          onClick={() => setAction("add")}
+          onClick={() => {
+            setSection("funds");
+            setAction("add");
+          }}
         >
           + Add loot
         </Button>
       </div>
-      {!economy.ready ? <p className="mt-6 text-muted">Loading…</p> : null}
-      {economy.ready ? (
-        <>
-          <section className="wealth-card mt-5 rounded-2xl border border-lead/25 bg-elevated p-5">
-            <p className="text-xs tracking-[0.16em] text-faint uppercase">Combined wealth</p>
-            <p className="mt-1 font-display text-4xl tracking-tight text-lead">
-              {formatCopper(coin + goods)}
-            </p>
-            <div className="mt-3 grid grid-cols-3 gap-2 text-sm">
-              <span>
-                <span className="block text-xs text-faint">Coin</span>
-                {formatCopper(coin)}
-              </span>
-              <span>
-                <span className="block text-xs text-faint">Items</span>
-                {formatCopper(itemValue(economy.holdings, visible, "item"))}
-              </span>
-              <span>
-                <span className="block text-xs text-faint">Property</span>
-                {formatCopper(itemValue(economy.holdings, visible, "property"))}
-              </span>
-            </div>
-          </section>
-          <h2 className="mt-5 text-sm font-medium text-muted">Members · {visible.length}</h2>
-          <ul className="mt-1 divide-y divide-border border-y border-border">
-            {visible.map((purse) => {
-              const worth =
-                toCopper(purse.coins) +
-                economy.holdings
-                  .filter((holding) => holding.purseId === purse.id)
-                  .reduce((sum, holding) => sum + holding.unitCopper * holding.quantity, 0);
+      {seat.role === "dm" && (
+        <div className="mode-switch party-sections" role="tablist" aria-label="Party sections">
+          {[
+            ["characters", "Characters"],
+            ["funds", "Funds & inventory"],
+          ].map(([k, label]) => (
+            <button role="tab" aria-selected={section === k} key={k} onClick={() => setSection(k!)}>
+              {label}
+            </button>
+          ))}
+          <a href="/?view=overview#journal">Ledger</a>
+        </div>
+      )}
+      {seat.role === "dm" && section === "characters" && (
+        <div className="party-profile-list">
+          {visible
+            .filter((p) => p.kind === "character")
+            .map((p) => {
+              const live = profiles.find((r) => r.purse_id === p.id),
+                old = economy.sheets.find((r) => r.purseId === p.id);
               return (
-                <li key={purse.id}>
-                  <a
-                    onClick={() => {
-                      const detail = document.getElementById(`purse-${purse.id}`);
-                      if (detail instanceof HTMLDetailsElement) detail.open = true;
-                    }}
-                    href={`#purse-${purse.id}`}
-                    className="flex min-h-11 items-center justify-between gap-3 text-sm"
-                  >
-                    <span className="flex items-center gap-3 py-2">
-                      <LedgerArt kind="portrait" src={purse.portrait} className="round" />
-                      {purse.name}
-                    </span>
-                    <span className="tabular-nums text-lead">{formatCopper(worth)}</span>
-                  </a>
-                </li>
-              );
-            })}
-          </ul>
-          {seat.role === "dm" && economy.loans.some((loan) => loan.status === "pending") ? (
-            <section className="mt-4">
-              <h2 className="text-sm font-medium text-muted">Pending</h2>
-              <ul>
-                {economy.loans
-                  .filter((loan) => loan.status === "pending")
-                  .map((loan) => (
-                    <li
-                      key={loan.id}
-                      className="flex items-baseline justify-between gap-3 border-b border-border/70 py-2 text-sm"
-                    >
-                      <span>{loan.purseName} · loan</span>
-                      <span className="tabular-nums text-lead">{formatCopper(loan.copper)}</span>
-                    </li>
-                  ))}
-              </ul>
-            </section>
-          ) : null}
-          <p className="mt-1 text-sm text-muted">
-            10 copper = 1 silver. 10 silver = 1 gold. 10 gold = 1 platinum. Electrum is half a gold.
-          </p>
-          {seat.role === "dm" ? (
-            <div className="mt-4 flex flex-wrap gap-2">
-              <Button variant="secondary" onClick={() => void economy.createPurse("character")}>
-                Add character
-              </Button>
-              <Button variant="secondary" onClick={() => void economy.createPurse("party")}>
-                Add party fund
-              </Button>
-            </div>
-          ) : (
-            <p className="mt-3 text-sm text-muted">
-              You can spend only the characters on your link. You can give coins or holdings to the
-              other players named on that link.
-            </p>
-          )}
-          <div className="mt-6 grid gap-4 lg:grid-cols-2">
-            {visible.map((purse) => (
-              <details
-                key={purse.id}
-                id={`purse-${purse.id}`}
-                className="member-detail rounded-xl border border-lead/20 bg-elevated"
-              >
-                <summary className="flex min-h-14 cursor-pointer items-center justify-between p-4">
-                  <span>{purse.name}</span>
-                  <span className="text-sm text-lead">Manage funds +</span>
-                </summary>
-                <PurseCard purse={purse} />
-              </details>
-            ))}
-          </div>
-          <InventoryList
-            holdings={economy.holdings.filter((h) => visible.some((p) => p.id === h.purseId))}
-          />
-          <h2 className="mt-8 font-display text-2xl tracking-tight">Manage holdings & property</h2>
-          <ul className="mt-3 divide-y divide-border border-y border-border">
-            {economy.holdings
-              .filter((holding) => visible.some((purse) => purse.id === holding.purseId))
-              .map((holding) => {
-                const owner = economy.purses.find((purse) => purse.id === holding.purseId);
-                return (
-                  <li key={holding.id} className="py-3">
-                    <div className="flex items-baseline justify-between gap-3">
+                <article key={p.id} className="party-profile">
+                  <LedgerArt kind="portrait" src={live?.body.portrait || p.portrait} />
+                  <div className="party-profile-body">
+                    <h2>{p.name}</h2>
+                    <p>
+                      {live
+                        ? `Level ${live.body.level} · ${live.body.classes}`
+                        : old?.classLevel || "Character"}
+                    </p>
+                    <div className="party-hp">
+                      {live
+                        ? `${live.body.hp} / ${live.body.maxHp} HP`
+                        : old?.hitPoints
+                          ? `${old.hitPoints} HP · imported sheet`
+                          : "HP not recorded"}
                       <span>
-                        <span className="block">{holding.name}</span>
-                        <span className="text-sm text-muted">
-                          {owner?.name ?? "Unassigned"} · {holding.kind} · × {holding.quantity}
-                        </span>
-                      </span>
-                      <span className="text-right text-sm tabular-nums">
-                        {formatCopper(holding.unitCopper * holding.quantity)}
-                        <DollarLine copper={holding.unitCopper * holding.quantity} />
+                        <Shield size={15} /> {live?.body.ac || old?.armorClass || "—"}
                       </span>
                     </div>
-                    {seat.role === "dm" ? (
-                      <div>
-                        <label className="mt-2 block text-sm text-muted">
-                          Inventory category
-                          <input
-                            className="ledger-search"
-                            aria-label={`Category for ${holding.name}`}
-                            defaultValue={holding.category || holding.kind}
-                            maxLength={80}
-                            onBlur={(e) => {
-                              const category = e.target.value.trim();
-                              if (category && category !== holding.category)
-                                void economy.updateHolding({ ...holding, category });
-                            }}
-                          />
-                        </label>
-                        <RemoveButton
-                          className="mt-1"
-                          label="Remove"
-                          title={`Remove ${holding.name}?`}
-                          body="This item is deleted. Money already in an account is not changed."
-                          onRemove={() => void economy.deleteHolding(holding.id)}
-                        />
-                      </div>
-                    ) : null}
-                  </li>
-                );
-              })}
-          </ul>
-          <div className="mt-5 flex gap-3">
-            <Button onClick={() => setAction("add")} disabled={visible.length === 0 || readOnly}>
-              Add loot
-            </Button>
-            <Button
-              variant="secondary"
-              onClick={() => setAction("give")}
-              disabled={visible.length === 0}
-            >
-              Give
-            </Button>
-            <Button
-              variant="secondary"
-              onClick={() => setAction("pay")}
-              disabled={visible.length === 0 || readOnly}
-            >
-              Payment
-            </Button>
-          </div>
-          <Modal
-            open={action !== ""}
-            onOpenChange={(open) => {
-              if (!open) setAction("");
-            }}
-            title={
-              action === "add"
-                ? "Add loot"
-                : action === "give"
-                  ? "Give to a player"
-                  : "Record a payment"
-            }
-          >
-            {readOnly && action !== "give" ? (
-              <p>
-                Only the DM can directly edit funds and inventory in shared modes. Use Buy, Sell,
-                Give, or Request loan.
+                    {live && <HpBar hp={live.body.hp} max={live.body.maxHp} />}
+                    <div className="party-profile-actions">
+                      {live ? (
+                        <a
+                          href={`/characters?id=${encodeURIComponent(live.id)}`}
+                          className="gold-link"
+                        >
+                          Open sheet
+                        </a>
+                      ) : (
+                        <a
+                          href={`#purse-${p.id}`}
+                          onClick={() => {
+                            setSection("funds");
+                            setTimeout(() => {
+                              const el = document.getElementById(
+                                `purse-${p.id}`,
+                              ) as HTMLDetailsElement | null;
+                              if (el) {
+                                el.open = true;
+                                el.scrollIntoView();
+                              }
+                            }, 50);
+                          }}
+                          className="gold-link"
+                        >
+                          Imported sheet
+                        </a>
+                      )}
+                      <a
+                        href={`#purse-${p.id}`}
+                        onClick={() => {
+                          setSection("funds");
+                          setTimeout(() => {
+                            const el = document.getElementById(
+                              `purse-${p.id}`,
+                            ) as HTMLDetailsElement | null;
+                            if (el) {
+                              el.open = true;
+                              el.scrollIntoView();
+                            }
+                          }, 50);
+                        }}
+                      >
+                        <Backpack size={15} />
+                        Inventory
+                      </a>
+                    </div>
+                  </div>
+                </article>
+              );
+            })}
+          <a href="/share" className="settings-link">
+            Manage members & permissions →
+          </a>
+          <a href="/characters" className="settings-link">
+            Account character sheets & rolls →
+          </a>
+          <button className="gold-link" onClick={() => setSection("funds")}>
+            Add characters, party funds & loot
+          </button>
+        </div>
+      )}
+      <div hidden={seat.role === "dm" && section !== "funds"}>
+        {!economy.ready ? <p className="mt-6 text-muted">Loading…</p> : null}
+        {economy.ready ? (
+          <>
+            <section className="wealth-card mt-5 rounded-2xl border border-lead/25 bg-elevated p-5">
+              <p className="text-xs tracking-[0.16em] text-faint uppercase">Combined wealth</p>
+              <p className="mt-1 font-display text-4xl tracking-tight text-lead">
+                {formatCopper(coin + goods)}
               </p>
-            ) : action === "add" ? (
-              <AddHolding purses={visible} />
-            ) : action === "give" ? (
-              <GiveToPlayer purses={visible} />
-            ) : (
-              <Payment purses={visible} />
+              <div className="mt-3 grid grid-cols-3 gap-2 text-sm">
+                <span>
+                  <span className="block text-xs text-faint">Coin</span>
+                  {formatCopper(coin)}
+                </span>
+                <span>
+                  <span className="block text-xs text-faint">Items</span>
+                  {formatCopper(itemValue(economy.holdings, visible, "item"))}
+                </span>
+                <span>
+                  <span className="block text-xs text-faint">Property</span>
+                  {formatCopper(itemValue(economy.holdings, visible, "property"))}
+                </span>
+              </div>
+            </section>
+            <InventoryList
+              holdings={economy.holdings.filter((h) => visible.some((p) => p.id === h.purseId))}
+            />
+            {!visible.length && seat.role === "player" && (
+              <p className="inventory-empty">
+                No character assigned on this device.{" "}
+                <a href="/share">Open your campaign to choose a character →</a>
+              </p>
             )}
-          </Modal>
-        </>
-      ) : null}
+            <details className="inventory-management" open={seat.role === "dm" || undefined}>
+              <summary>Wallets, transfers & property</summary>
+              <h2 className="mt-5 text-sm font-medium text-muted">Members · {visible.length}</h2>
+              <ul className="mt-1 divide-y divide-border border-y border-border">
+                {visible.map((purse) => {
+                  const worth =
+                    toCopper(purse.coins) +
+                    economy.holdings
+                      .filter((holding) => holding.purseId === purse.id)
+                      .reduce((sum, holding) => sum + holding.unitCopper * holding.quantity, 0);
+                  return (
+                    <li key={purse.id}>
+                      <a
+                        onClick={() => {
+                          const detail = document.getElementById(`purse-${purse.id}`);
+                          if (detail instanceof HTMLDetailsElement) detail.open = true;
+                        }}
+                        href={`#purse-${purse.id}`}
+                        className="flex min-h-11 items-center justify-between gap-3 text-sm"
+                      >
+                        <span className="flex items-center gap-3 py-2">
+                          <LedgerArt kind="portrait" src={purse.portrait} className="round" />
+                          {purse.name}
+                        </span>
+                        <span className="tabular-nums text-lead">{formatCopper(worth)}</span>
+                      </a>
+                    </li>
+                  );
+                })}
+              </ul>
+              {seat.role === "dm" && economy.loans.some((loan) => loan.status === "pending") ? (
+                <section className="mt-4">
+                  <h2 className="text-sm font-medium text-muted">Pending</h2>
+                  <ul>
+                    {economy.loans
+                      .filter((loan) => loan.status === "pending")
+                      .map((loan) => (
+                        <li
+                          key={loan.id}
+                          className="flex items-baseline justify-between gap-3 border-b border-border/70 py-2 text-sm"
+                        >
+                          <span>{loan.purseName} · loan</span>
+                          <span className="tabular-nums text-lead">
+                            {formatCopper(loan.copper)}
+                          </span>
+                        </li>
+                      ))}
+                  </ul>
+                </section>
+              ) : null}
+              <p className="mt-1 text-sm text-muted">
+                10 copper = 1 silver. 10 silver = 1 gold. 10 gold = 1 platinum. Electrum is half a
+                gold.
+              </p>
+              {seat.role === "dm" ? (
+                <div className="mt-4 flex flex-wrap gap-2">
+                  <Button variant="secondary" onClick={() => void economy.createPurse("character")}>
+                    Add character
+                  </Button>
+                  <Button variant="secondary" onClick={() => void economy.createPurse("party")}>
+                    Add party fund
+                  </Button>
+                </div>
+              ) : (
+                <p className="mt-3 text-sm text-muted">
+                  You can spend only the characters on your link. You can give coins or holdings to
+                  the other players named on that link.
+                </p>
+              )}
+              <div className="mt-6 grid gap-4 lg:grid-cols-2">
+                {visible.map((purse) => (
+                  <details
+                    key={purse.id}
+                    id={`purse-${purse.id}`}
+                    className="member-detail rounded-xl border border-lead/20 bg-elevated"
+                  >
+                    <summary className="flex min-h-14 cursor-pointer items-center justify-between p-4">
+                      <span>{purse.name}</span>
+                      <span className="text-sm text-lead">Manage funds +</span>
+                    </summary>
+                    <PurseCard purse={purse} />
+                  </details>
+                ))}
+              </div>
+
+              <h2 className="mt-8 font-display text-2xl tracking-tight">
+                Manage holdings & property
+              </h2>
+              <ul className="mt-3 divide-y divide-border border-y border-border">
+                {economy.holdings
+                  .filter((holding) => visible.some((purse) => purse.id === holding.purseId))
+                  .map((holding) => {
+                    const owner = economy.purses.find((purse) => purse.id === holding.purseId);
+                    return (
+                      <li key={holding.id} className="py-3">
+                        <div className="flex items-baseline justify-between gap-3">
+                          <span>
+                            <span className="block">{holding.name}</span>
+                            <span className="text-sm text-muted">
+                              {owner?.name ?? "Unassigned"} · {holding.kind} · × {holding.quantity}
+                            </span>
+                          </span>
+                          <span className="text-right text-sm tabular-nums">
+                            {formatCopper(holding.unitCopper * holding.quantity)}
+                            <DollarLine copper={holding.unitCopper * holding.quantity} />
+                          </span>
+                        </div>
+                        {seat.role === "dm" ? (
+                          <div>
+                            <label className="mt-2 block text-sm text-muted">
+                              Inventory category
+                              <input
+                                className="ledger-search"
+                                aria-label={`Category for ${holding.name}`}
+                                defaultValue={holding.category || holding.kind}
+                                maxLength={80}
+                                onBlur={(e) => {
+                                  const category = e.target.value.trim();
+                                  if (category && category !== holding.category)
+                                    void economy.updateHolding({
+                                      ...holding,
+                                      category,
+                                    });
+                                }}
+                              />
+                            </label>
+                            <RemoveButton
+                              className="mt-1"
+                              label="Remove"
+                              title={`Remove ${holding.name}?`}
+                              body="This item is deleted. Money already in an account is not changed."
+                              onRemove={() => void economy.deleteHolding(holding.id)}
+                            />
+                          </div>
+                        ) : null}
+                      </li>
+                    );
+                  })}
+              </ul>
+              <div className="mt-5 flex gap-3">
+                <Button
+                  onClick={() => setAction("add")}
+                  disabled={visible.length === 0 || readOnly}
+                >
+                  Add loot
+                </Button>
+                <Button
+                  variant="secondary"
+                  onClick={() => setAction("give")}
+                  disabled={visible.length === 0}
+                >
+                  Give
+                </Button>
+                <Button
+                  variant="secondary"
+                  onClick={() => setAction("pay")}
+                  disabled={visible.length === 0 || readOnly}
+                >
+                  Payment
+                </Button>
+              </div>
+            </details>
+            <Modal
+              open={action !== ""}
+              onOpenChange={(open) => {
+                if (!open) setAction("");
+              }}
+              title={
+                action === "add"
+                  ? "Add loot"
+                  : action === "give"
+                    ? "Give to a player"
+                    : "Record a payment"
+              }
+            >
+              {readOnly && action !== "give" ? (
+                <p>
+                  Only the DM can directly edit funds and inventory in shared modes. Use Buy, Sell,
+                  Give, or Request loan.
+                </p>
+              ) : action === "add" ? (
+                <AddHolding purses={visible} />
+              ) : action === "give" ? (
+                <GiveToPlayer purses={visible} />
+              ) : (
+                <Payment purses={visible} />
+              )}
+            </Modal>
+          </>
+        ) : null}
+      </div>
     </Shell>
   );
 }
@@ -436,7 +575,12 @@ function PurseCard({ purse }: { purse: Purse }) {
 }
 
 function itemValue(
-  holdings: { purseId: string; kind: string; unitCopper: number; quantity: number }[],
+  holdings: {
+    purseId: string;
+    kind: string;
+    unitCopper: number;
+    quantity: number;
+  }[],
   purses: { id: string }[],
   kind: "item" | "property",
 ) {

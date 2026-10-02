@@ -468,3 +468,1150 @@ input,select,textarea { max-width: 100%; }
 @media(max-width:800px) { .encounter-layout { grid-template-columns:minmax(0,1fr); } .encounter-library { max-height:240px; overflow:auto; } .encounter-panel { padding:.9rem; } }
 @media(max-width:430px) { .encounter-vitals { grid-template-columns:repeat(2,minmax(0,1fr)); } .encounter-coins { grid-template-columns:repeat(3,minmax(0,1fr)); } .encounter-grid { grid-template-columns:minmax(0,1fr); } .encounter-index-row { flex-wrap:wrap; } }
 .encounter-workspace .encounter-library-row { display:grid; }
+
+/* Approved mobile control panel: shared tokens preserve custom/light themes. */
+.concept-shell {
+  --panel: color-mix(in srgb, var(--color-bg) 92%, var(--color-fg));
+  --edge: color-mix(in srgb, var(--color-fg) 18%, var(--color-bg));
+  background-image: radial-gradient(
+    ellipse at top right,
+    color-mix(in srgb, var(--color-accent) 4%, transparent),
+    transparent 45%
+  );
+}
+.concept-shell .concept-main {
+  padding-top: 1rem;
+  max-width: 74rem;
+}
+.concept-shell main::before,
+.concept-shell main::after {
+  content: none;
+}
+.concept-shell h1 {
+  font-size: 2.1rem;
+  line-height: 1.12;
+  font-weight: 700;
+}
+.concept-shell h2 {
+  font-size: 1.55rem;
+  line-height: 1.2;
+}
+.concept-shell > div > div > header {
+  background: color-mix(in srgb, var(--color-bg) 97%, transparent);
+}
+.campaign-switcher {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  min-width: 0;
+  max-width: 18rem;
+  border: 1px solid var(--edge);
+  border-radius: 7px;
+  padding: 0.35rem 0.55rem;
+  min-height: 44px;
+  text-align: left;
+  font-size: 0.95rem;
+}
+.campaign-switcher span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.campaign-switcher svg {
+  flex-shrink: 0;
+  color: var(--color-lead);
+}
+.role-chip {
+  border: 1px solid color-mix(in srgb, var(--color-lead) 40%, transparent);
+  background: color-mix(in srgb, var(--color-lead) 12%, var(--color-bg));
+  border-radius: 6px;
+  color: var(--color-lead);
+  padding: 0.3rem 0.5rem;
+  font-size: 0.82rem;
+  min-height: 36px;
+}
+.header-actions {
+  display: flex;
+  gap: 0.15rem;
+  margin-left: auto;
+  flex-shrink: 0;
+}
+.header-icon {
+  position: relative;
+  width: 44px;
+  height: 44px;
+  display: grid;
+  place-items: center;
+  border-radius: 8px;
+}
+.header-icon:hover {
+  background: var(--panel);
+}
+.settings-trigger {
+  color: var(--color-lead);
+}
+.header-icon .chat-nav-badge {
+  top: 0;
+  right: 0;
+  background: #b63042;
+  color: #fff;
+}
+.rail-caption {
+  color: var(--color-muted);
+  font-size: 0.8rem;
+  margin: 1rem 0.5rem;
+}
+.rail-settings {
+  display: flex;
+  gap: 0.75rem;
+  align-items: center;
+  padding: 0.75rem;
+  margin-top: auto;
+  text-align: left;
+}
+.concept-shell .loot-nav-tab {
+  font-size: 0.76rem;
+  min-height: 66px;
+  gap: 0.35rem;
+  position: relative;
+  color: var(--color-muted);
+}
+.concept-shell .loot-nav-tab[aria-current="page"] {
+  color: var(--color-lead);
+}
+.concept-shell .loot-nav-tab[aria-current="page"]::before {
+  content: "";
+  position: absolute;
+  top: 0;
+  width: 28px;
+  height: 2px;
+  background: var(--color-lead);
+}
+.concept-shell button.bg-lead,
+.gold-link {
+  background: linear-gradient(
+    130deg,
+    color-mix(in srgb, var(--color-lead) 83%, white),
+    var(--color-lead)
+  );
+  color: var(--color-bg);
+  border: 1px solid color-mix(in srgb, var(--color-lead) 75%, white);
+  box-shadow: inset 0 1px #fff3;
+}
+.gold-link {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 44px;
+  border-radius: 7px;
+  padding: 0.5rem 0.85rem;
+  font-weight: 600;
+  gap: 0.5rem;
+}
+.panel-heading {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 0.75rem;
+  margin-bottom: 0.65rem;
+}
+.panel-heading > a {
+  font-size: 0.8rem;
+  display: flex;
+  align-items: center;
+  gap: 0.2rem;
+  color: var(--color-muted);
+  min-height: 40px;
+}
+.desk-status {
+  display: flex;
+  align-items: center;
+  gap: 0.4rem;
+  font-size: 0.85rem;
+  color: var(--color-muted);
+  margin: 0.5rem 0 1rem;
+}
+.status-dot,
+.status-attention {
+  height: 8px;
+  width: 8px;
+  background: #61bba3;
+  border-radius: 50%;
+}
+.status-attention {
+  background: #e1b36a;
+}
+.readout-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.65rem;
+}
+.readout {
+  display: flex;
+  align-items: center;
+  gap: 0.7rem;
+  border: 1px solid var(--edge);
+  border-radius: 8px;
+  background: linear-gradient(120deg, var(--panel), var(--color-bg));
+  min-height: 86px;
+  padding: 0.75rem;
+  min-width: 0;
+}
+.readout > svg {
+  width: 26px;
+  height: 26px;
+  color: var(--color-lead);
+  flex-shrink: 0;
+}
+.readout span {
+  min-width: 0;
+}
+.readout small {
+  display: block;
+  color: var(--color-muted);
+  font-size: 0.76rem;
+  overflow-wrap: anywhere;
+}
+.readout strong {
+  display: block;
+  font-family: var(--font-display);
+  font-size: 1.5rem;
+  line-height: 1.12;
+  font-weight: 600;
+  overflow-wrap: anywhere;
+}
+.party-glance {
+  margin-top: 1rem;
+}
+.glance-strip {
+  display: flex;
+  gap: 0.55rem;
+  overflow-x: auto;
+  padding-bottom: 0.6rem;
+}
+.glance-strip > a {
+  flex: 1 0 54px;
+  max-width: 78px;
+  min-width: 0;
+  text-align: center;
+  font-size: 0.75rem;
+}
+.glance-strip .ledger-art {
+  width: 48px;
+  height: 48px;
+  margin: auto;
+  border: 1px solid var(--edge);
+  border-radius: 50%;
+}
+.glance-strip span:not(.health-track) {
+  display: block;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.glance-strip small {
+  display: block;
+  font-size: 0.67rem;
+  color: var(--color-muted);
+  line-height: 1.1;
+  min-height: 18px;
+  margin: 0.2rem 0;
+}
+.health-track {
+  display: block !important;
+  height: 5px;
+  border-radius: 8px;
+  border: 1px solid var(--edge);
+  background: var(--panel);
+  overflow: hidden;
+  width: 100%;
+}
+.health-track > span {
+  display: block;
+  height: 100%;
+  background: linear-gradient(90deg, #b34859, #e48b83);
+}
+.desk-shortcuts {
+  margin-top: 1.15rem;
+  border-top: 1px solid var(--edge);
+  padding-top: 0.8rem;
+}
+.desk-shortcuts .panel-heading button {
+  min-height: 36px;
+  padding: 0 0.75rem;
+  font-size: 0.8rem;
+}
+.shortcut-grid {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.65rem;
+}
+.shortcut-button {
+  display: flex;
+  align-items: center;
+  gap: 0.85rem;
+  padding: 1rem;
+  min-height: 74px;
+  background: linear-gradient(125deg, var(--panel), var(--color-bg));
+  border: 1px solid var(--edge);
+  border-radius: 8px;
+  font-size: 1rem;
+  line-height: 1.15;
+}
+.shortcut-button:first-child {
+  border-color: var(--color-lead);
+  background: color-mix(in srgb, var(--color-lead) 10%, var(--color-bg));
+}
+.shortcut-button svg {
+  width: 29px;
+  height: 29px;
+  color: var(--color-lead);
+  flex-shrink: 0;
+}
+.shortcut-button:hover {
+  border-color: var(--color-lead);
+}
+.shortcut-hint {
+  font-size: 0.75rem;
+  color: var(--color-muted);
+  margin-top: 0.5rem;
+}
+.desk-overview {
+  margin-top: 1rem;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 1rem;
+  font-size: 0.85rem;
+  min-height: 44px;
+  color: var(--color-muted);
+}
+.shortcut-editor {
+  display: grid;
+  gap: 0.8rem;
+}
+.shortcut-edit-row {
+  padding: 0.8rem;
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.6rem;
+  align-items: end;
+}
+.shortcut-edit-row label,
+.setting-preferences label {
+  display: grid;
+  gap: 0.3rem;
+  font-size: 0.9rem;
+}
+.shortcut-edit-row input,
+.shortcut-edit-row select,
+.setting-preferences select {
+  width: 100%;
+  min-width: 0;
+  min-height: 44px;
+  background: var(--color-bg);
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  padding: 0.4rem;
+}
+.management-scope {
+  color: var(--color-muted);
+  font-size: 0.95rem;
+  margin-top: -0.7rem;
+  margin-bottom: 1rem;
+}
+.management-group {
+  border: 1px solid var(--color-border);
+  border-radius: 8px;
+  margin-top: 0.45rem;
+  overflow: hidden;
+}
+.management-category {
+  display: flex;
+  align-items: center;
+  gap: 0.8rem;
+  min-height: 52px;
+  padding: 0.55rem 0.75rem;
+  width: 100%;
+  text-align: left;
+  background: color-mix(in srgb, var(--color-elevated) 80%, var(--color-bg));
+}
+.management-category > svg:first-child {
+  color: var(--color-lead);
+  width: 23px;
+  height: 23px;
+  flex-shrink: 0;
+}
+.management-category span {
+  flex: 1;
+}
+.management-category > svg:last-child {
+  width: 16px;
+  height: 16px;
+}
+.management-category[aria-expanded="true"] {
+  color: var(--color-lead);
+}
+.management-content {
+  padding: 0.8rem;
+  border-top: 1px solid var(--color-border);
+  font-size: 0.9rem;
+}
+.settings-link {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  min-height: 46px;
+  padding: 0.55rem 0.1rem;
+  border-bottom: 1px solid
+    color-mix(in srgb, var(--color-border) 60%, transparent);
+}
+.settings-link:last-child {
+  border-bottom: 0;
+}
+.management-footer {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.5rem;
+  font-size: 0.8rem;
+  margin-top: 1rem;
+}
+.setting-preferences {
+  display: grid;
+  gap: 1rem;
+}
+.modal-pop {
+  border-color: color-mix(in srgb, var(--color-lead) 65%, var(--color-border));
+  background: var(--color-bg);
+  border-radius: 14px;
+  max-height: calc(100dvh - 3rem - env(safe-area-inset-top));
+  overscroll-behavior: contain;
+}
+.library-banner {
+  background:
+    linear-gradient(90deg, var(--color-bg), transparent),
+    url("/art/landscape.webp") center/cover;
+  min-height: 106px;
+  display: flex;
+  gap: 1rem;
+  align-items: center;
+  border-radius: 9px;
+  padding: 1rem;
+}
+.library-banner svg {
+  color: var(--color-lead);
+}
+.library-banner p {
+  font-size: 0.9rem;
+  color: var(--color-muted);
+}
+.hub-search {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  min-height: 48px;
+  border: 1px solid var(--edge);
+  border-radius: 8px;
+  margin: 1rem 0;
+  padding: 0.5rem 0.75rem;
+}
+.hub-search input {
+  width: 100%;
+  min-width: 0;
+  background: transparent;
+  outline: none;
+}
+.library-tiles {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 0.65rem;
+}
+.library-tiles > a {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  text-align: center;
+  gap: 0.4rem;
+  min-height: 112px;
+  border: 1px solid var(--edge);
+  border-radius: 8px;
+  background: var(--panel);
+  padding: 0.6rem;
+}
+.library-tiles svg {
+  color: var(--color-lead);
+  height: 30px;
+  width: 30px;
+}
+.library-tiles small {
+  font-size: 0.7rem;
+  color: var(--color-muted);
+}
+.reference-list > a {
+  display: flex;
+  gap: 0.8rem;
+  align-items: center;
+  min-height: 78px;
+  border-bottom: 1px solid var(--edge);
+}
+.reference-list > a > span:nth-child(2) {
+  flex: 1;
+}
+.reference-list small {
+  display: block;
+  font-size: 0.78rem;
+  color: var(--color-muted);
+}
+.reference-list .ledger-art {
+  width: 44px;
+  height: 48px;
+  border-radius: 6px;
+}
+.party-sections {
+  margin-top: 1rem;
+}
+.party-sections > a {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 0.5rem 0.8rem;
+}
+.party-profile-list {
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 1rem;
+}
+.party-profile {
+  display: flex;
+  gap: 0.8rem;
+  align-items: stretch;
+  background: linear-gradient(110deg, var(--panel), var(--color-bg));
+  padding: 0.7rem;
+  border: 1px solid var(--edge);
+  border-radius: 9px;
+}
+.party-profile > .ledger-art {
+  width: 80px;
+  min-height: 108px;
+  height: auto;
+  object-fit: cover;
+  border-radius: 6px;
+}
+.party-profile-body {
+  flex: 1;
+  min-width: 0;
+}
+.party-profile h2 {
+  font-size: 1.2rem;
+}
+.party-profile p {
+  font-size: 0.78rem;
+  color: var(--color-muted);
+}
+.party-hp {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  font-size: 0.8rem;
+  margin: 0.4rem 0;
+  gap: 0.5rem;
+}
+.party-hp > span {
+  display: flex;
+  align-items: center;
+  gap: 0.25rem;
+  color: var(--color-muted);
+}
+.party-profile-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+}
+.party-profile-actions > a {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.3rem;
+  font-size: 0.8rem;
+  min-height: 38px;
+  border: 1px solid var(--edge);
+  padding: 0.4rem 0.6rem;
+  border-radius: 6px;
+  flex: 1;
+}
+.concept-shell .shop-tile .market-shop {
+  border-radius: 10px;
+  background: var(--panel);
+  padding: 0.85rem;
+}
+.concept-shell .market-shop .ledger-art {
+  width: 86px;
+  height: 98px;
+  border-radius: 6px;
+}
+.concept-shell .wealth-card {
+  background: linear-gradient(125deg, var(--panel), var(--color-bg));
+  border-radius: 10px;
+}
+.concept-shell .mode-switch {
+  border: 1px solid var(--edge);
+  border-radius: 8px;
+  padding: 3px;
+  gap: 3px;
+  background: var(--panel);
+}
+.concept-shell .mode-switch button[aria-selected="true"],
+.concept-shell .mode-switch button[aria-pressed="true"] {
+  background: var(--color-lead);
+  color: var(--color-bg);
+  border-radius: 5px;
+}
+.concept-shell .character-play {
+  --sheet-line: var(--edge);
+}
+.concept-shell .character-heading h1 {
+  font-size: 2rem;
+}
+.concept-shell .character-heading > div > p:not(.eyebrow) {
+  font-size: 0.9rem;
+}
+.concept-shell .character-title {
+  gap: 0.85rem;
+  flex-wrap: nowrap;
+}
+.concept-shell .character-title img {
+  width: 90px;
+  height: 100px;
+  border-radius: 8px;
+}
+.concept-shell .character-title h2 {
+  font-size: 1.8rem;
+}
+.concept-shell .character-title p {
+  font-size: 0.85rem;
+}
+.concept-shell .sheet-tabs {
+  background: var(--panel);
+  border: 1px solid var(--edge);
+  border-radius: 8px;
+  gap: 0;
+  padding: 3px;
+}
+.concept-shell .sheet-tabs button {
+  border: 0;
+  background: transparent;
+  white-space: nowrap;
+  font-size: 0.85rem;
+}
+.concept-shell .sheet-tabs button[aria-pressed="true"],
+.concept-shell .encounter-tabs button[aria-pressed="true"] {
+  background: var(--color-lead);
+  color: var(--color-bg);
+}
+.concept-shell .sheet-vitals {
+  border: 0;
+  background: transparent;
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  padding: 0;
+  gap: 0.5rem;
+}
+.concept-shell .sheet-vitals > strong {
+  padding: 0.65rem;
+  border: 1px solid var(--edge);
+  background: var(--panel);
+  border-radius: 8px;
+  font-weight: 500;
+  text-align: center;
+}
+.concept-shell .sheet-card,
+.concept-shell .encounter-panel {
+  border-radius: 9px;
+  background: var(--panel);
+}
+.concept-shell .encounter-combatant {
+  background: var(--color-bg);
+}
+.concept-shell .encounter-tabs {
+  flex-wrap: nowrap;
+  overflow: auto;
+  gap: 0.25rem;
+}
+.concept-shell .encounter-tabs button {
+  flex-shrink: 0;
+  font-size: 0.8rem;
+}
+.concept-shell .character-savebar {
+  border-color: var(--edge);
+  padding: 0.55rem;
+  font-size: 0.8rem;
+}
+.concept-shell .character-savebar button {
+  font-size: 0.8rem;
+  min-height: 38px;
+}
+.concept-shell .character-savebar strong {
+  flex-basis: 100%;
+}
+.concept-shell .sheet-card h3 {
+  font-size: 1.3rem;
+}
+@media (min-width: 800px) {
+  .dm-control-panel {
+    max-width: 950px;
+    margin: auto;
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 1.8rem;
+  }
+  .desk-shortcuts {
+    margin-top: 0;
+    padding-top: 0;
+    border-top: 0;
+  }
+  .desk-overview {
+    grid-column: 1/-1;
+  }
+  .shortcut-button {
+    min-height: 95px;
+  }
+  .party-profile-list {
+    grid-template-columns: 1fr 1fr;
+  }
+  .party-profile-list > a,
+  .party-profile-list > button {
+    grid-column: 1/-1;
+  }
+  .library-tiles {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+}
+@media (max-width: 430px) {
+  .concept-shell > div > div > header > div:first-child {
+    gap: 0.45rem;
+    padding: 0.55rem 0.75rem;
+  }
+  .campaign-switcher {
+    flex: 1;
+    font-size: 0.85rem;
+  }
+  .concept-shell .concept-main {
+    padding-inline: 0.85rem;
+  }
+  .role-chip {
+    font-size: 0.75rem;
+  }
+  .shortcut-button {
+    padding: 0.8rem;
+    min-height: 76px;
+    gap: 0.65rem;
+    font-size: 0.9rem;
+  }
+  .readout {
+    padding: 0.6rem;
+    gap: 0.5rem;
+    min-height: 80px;
+  }
+  .readout strong {
+    font-size: 1.3rem;
+  }
+  .readout svg {
+    width: 23px;
+  }
+  .party-glance .panel-heading h2,
+  .desk-shortcuts .panel-heading h2 {
+    font-size: 1.4rem;
+  }
+  .concept-shell .sheet-vitals > strong {
+    font-size: 0.9rem;
+  }
+  .party-profile > .ledger-art {
+    width: 68px;
+  }
+  .management-category {
+    min-height: 50px;
+  }
+}
+.play-mode-switch {
+  display: flex;
+  gap: 0.4rem;
+  margin-bottom: 0.6rem;
+}
+.concept-shell .play-mode-switch button {
+  padding: 0.35rem 0.75rem;
+  min-height: 36px;
+  font-size: 0.82rem;
+}
+.play-mode-switch button[aria-pressed="true"] {
+  background: var(--color-lead);
+  color: var(--color-bg);
+}
+.play-vitals {
+  display: grid;
+  grid-template-columns: 1.3fr 0.8fr 1fr;
+  gap: 0.5rem;
+  margin: 1rem 0;
+}
+.concept-shell .play-vitals > button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 0.5rem;
+  position: relative;
+  padding: 0.75rem 0.4rem 1rem;
+  background: var(--panel);
+}
+.play-vitals svg {
+  width: 20px;
+  height: 20px;
+  color: var(--color-lead);
+}
+.play-vitals > button:first-child svg {
+  color: #d77880;
+}
+.play-vitals span {
+  font-size: 0.72rem;
+}
+.play-vitals strong {
+  display: block;
+  font-size: 1.3rem;
+  font-family: var(--font-display);
+}
+.play-vitals .health-track {
+  position: absolute;
+  bottom: 5px;
+  left: 8px;
+  width: calc(100% - 16px);
+}
+.play-action-row {
+  display: flex;
+  gap: 0.7rem;
+  align-items: flex-start;
+  border: 1px solid var(--edge);
+  background: var(--panel);
+  border-radius: 8px;
+  padding: 0.85rem;
+  margin: 0.65rem 0;
+}
+.play-action-row > svg {
+  color: var(--color-lead);
+  width: 22px;
+  height: 22px;
+  flex-shrink: 0;
+  margin-top: 0.2rem;
+}
+.play-action-row > div {
+  flex: 1;
+  min-width: 0;
+}
+.play-action-row h3 {
+  margin: 0 !important;
+  font-size: 1.3rem !important;
+}
+.play-action-row p {
+  margin: 0.2rem 0 !important;
+  font-size: 0.85rem;
+}
+.play-action-row small {
+  color: var(--color-muted);
+  font-size: 0.8rem;
+}
+.play-action-rolls {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.5rem;
+  flex-wrap: wrap;
+}
+.play-action-rolls .quick-roll {
+  flex: 1 1 120px;
+}
+.play-action-rolls .quick-roll button {
+  font-size: 0.8rem;
+}
+.play-action-rolls .quick-roll select {
+  font-size: 0.8rem;
+}
+.play-resource {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border: 1px solid var(--edge);
+  border-radius: 8px;
+  padding: 0.6rem 0.8rem;
+  margin: 0.6rem 0;
+}
+.play-resource small {
+  display: block;
+  color: var(--color-muted);
+}
+.concept-shell .slot-summary {
+  display: flex;
+  width: 100%;
+  justify-content: space-between;
+  gap: 1rem;
+  align-items: center;
+  margin: 0.7rem 0;
+  font-weight: 500;
+}
+.slot-summary span {
+  font-size: 0.8rem;
+  color: var(--color-muted);
+}
+.play-dice-link {
+  width: 100%;
+  margin: 0.6rem 0;
+}
+.play-skills {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  gap: 0.6rem;
+}
+.play-skills .quick-roll {
+  display: flex;
+  flex-direction: column;
+}
+.play-skills button {
+  font-size: 0.8rem;
+}
+.play-skills select {
+  font-size: 0.8rem !important;
+}
+.condition-pill {
+  display: inline-block;
+  border: 1px solid var(--color-danger);
+  border-radius: 20px;
+  padding: 0.3rem 0.7rem;
+  font-size: 0.8rem;
+}
+.character-library-controls {
+  border: 1px solid var(--edge);
+  border-radius: 8px;
+  padding: 0 0.7rem;
+}
+.character-library-controls > summary {
+  font-size: 0.85rem;
+  color: var(--color-muted);
+}
+.concept-shell .character-play > .character-heading {
+  margin-bottom: 0.5rem;
+}
+.concept-shell .character-heading .eyebrow {
+  font-size: 0.65rem;
+}
+.concept-shell .character-heading > div > p:last-child:not(.eyebrow) {
+  font-size: 0.8rem;
+}
+.concept-shell .encounter-combatant {
+  padding: 0;
+  overflow: hidden;
+}
+.concept-shell .combat-summary {
+  display: flex;
+  gap: 0.65rem;
+  align-items: center;
+  padding: 0.75rem;
+  list-style: none;
+  min-height: 74px;
+}
+.combat-summary::-webkit-details-marker {
+  display: none;
+}
+.initiative-number {
+  font-size: 1.3rem;
+  font-family: var(--font-display);
+  min-width: 22px;
+  text-align: center;
+}
+.combat-portrait {
+  width: 38px;
+  height: 44px;
+  border: 1px solid var(--edge);
+  display: grid;
+  place-items: center;
+  border-radius: 50%;
+  color: var(--color-lead);
+  flex-shrink: 0;
+}
+.combat-identity {
+  flex: 1;
+  min-width: 0;
+}
+.combat-identity strong {
+  font-size: 0.95rem;
+  display: block;
+  margin-bottom: 0.35rem;
+}
+.combat-hp {
+  font-size: 0.8rem;
+  text-align: right;
+  max-width: 110px;
+}
+.combat-hp small {
+  display: block;
+  color: var(--color-muted);
+  font-size: 0.7rem;
+}
+.combat-expanded {
+  padding: 0.8rem;
+  border-top: 1px solid var(--edge);
+}
+.combat-quick-adjust {
+  display: flex;
+  align-items: end;
+  gap: 0.5rem;
+}
+.combat-quick-adjust > label {
+  flex: 1;
+  max-width: 130px;
+}
+.combat-quick-adjust button {
+  flex: 1;
+}
+.combat-quick-adjust button:nth-child(2) {
+  border-color: #c06571;
+  color: #f0a7a7;
+}
+.combat-quick-adjust button:nth-child(3) {
+  border-color: #4d9c86;
+  color: #79c8ad;
+}
+.concept-shell .encounter-library > details > summary {
+  border: 1px solid var(--edge);
+  padding: 0.7rem;
+  border-radius: 8px;
+  font-size: 0.9rem;
+}
+.concept-shell .encounter-workspace .character-heading {
+  margin-bottom: 0.6rem;
+}
+.concept-shell .encounter-workspace .character-heading > div > p:last-child {
+  font-size: 0.8rem;
+}
+.concept-shell .encounter-editor > .encounter-panel {
+  padding: 0.8rem;
+}
+.concept-shell .encounter-editor .character-savebar button:first-child {
+  background: var(--color-lead);
+  color: var(--color-bg);
+}
+
+/* Small screens keep the readouts and all six controls together; large reading
+   settings and longer custom labels can still scroll without clipping. */
+@media (max-width: 799px) {
+  .dm-control-panel .panel-heading {
+    margin-bottom: 0.3rem;
+  }
+  .dm-control-panel .desk-status {
+    margin: 0.3rem 0 0.65rem;
+  }
+  .dm-control-panel .readout-grid {
+    gap: 0.5rem;
+  }
+  .dm-control-panel .readout {
+    min-height: 68px;
+    padding: 0.55rem;
+  }
+  .dm-control-panel .readout strong {
+    font-size: 1.2rem;
+    line-height: 1.1;
+  }
+  .dm-control-panel .readout small {
+    font-family: var(--font-sans);
+    line-height: 1.25;
+  }
+  .dm-control-panel .party-glance {
+    margin-top: 0.6rem;
+  }
+  .dm-control-panel .glance-strip {
+    padding-bottom: 0.15rem;
+  }
+  .dm-control-panel .glance-strip .ledger-art {
+    width: 42px;
+    height: 42px;
+  }
+  .dm-control-panel .glance-strip small {
+    min-height: 14px;
+    margin: 0.1rem 0;
+  }
+  .dm-control-panel .desk-shortcuts {
+    margin-top: 0.65rem;
+    padding-top: 0.55rem;
+  }
+  .dm-control-panel .shortcut-grid {
+    gap: 0.5rem;
+  }
+  .dm-control-panel .shortcut-button {
+    min-height: 64px;
+    padding: 0.6rem 0.75rem;
+  }
+  .dm-control-panel .shortcut-button svg {
+    width: 26px;
+    height: 26px;
+  }
+  .dm-control-panel .shortcut-hint {
+    margin-top: 0.3rem;
+  }
+  .dm-control-panel .desk-overview {
+    margin-top: 0.3rem;
+  }
+}
+.concept-shell {
+  font-family: var(--font-sans);
+}
+.inventory-management {
+  margin-top: 1.25rem;
+  border: 1px solid var(--edge);
+  border-radius: 8px;
+  padding: 0.1rem 0.8rem 0.8rem;
+}
+.inventory-management > summary {
+  padding: 0.7rem 0;
+  font-size: 1rem;
+  color: var(--color-lead);
+  cursor: pointer;
+}
+.inventory-empty {
+  margin: 1rem 0;
+  color: var(--color-muted);
+}
+.concept-shell .inventory-panel {
+  margin-top: 1rem;
+}
+.concept-shell .inventory-row {
+  border: 1px solid var(--edge);
+  background: var(--panel);
+  border-radius: 8px;
+  margin: 0.6rem 0;
+  padding: 0.7rem;
+}
+.concept-shell .inventory-row .ledger-art {
+  width: 48px;
+  height: 54px;
+  border-radius: 5px;
+}
+.campaign-rolls .sheet-card {
+  padding: 1rem;
+}
+
+.reference-handout {
+  border: 1px solid var(--edge);
+  border-radius: 8px;
+  margin: 0.6rem 0;
+  padding: 0.75rem;
+}
+.reference-handout summary {
+  font-size: 1rem;
+  color: var(--color-lead);
+  cursor: pointer;
+  min-height: 32px;
+}
+.reference-handout p {
+  padding-top: 0.7rem;
+  font-size: 0.9rem;
+  line-height: 1.6;
+}
