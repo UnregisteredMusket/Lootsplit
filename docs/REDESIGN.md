@@ -81,3 +81,10 @@ The new control-panel browser audit covers role tabs, six-button mobile fit, cus
 A fresh Android package is a separate signed release; this change updates the shared web/mobile source and verifies the mobile bundle without changing the published APK metadata.
 
 Final local release checks: 377 tests passed and four existing template tests skipped; TypeScript, Cloudflare build and mobile bundle passed. Character play/edit/reload, account backup/recovery, multiplayer queue recovery, encounter review/award retry and the control-panel browser audits passed. Dark/light and mobile/desktop screenshots were inspected; light theme switching adjusts the page color for readable contrast.
+
+### Desktop workspace follow-up
+The desktop app uses the full content width beside the existing navigation rail. Layout overrides start at 1024 CSS pixels; mobile rules are unchanged. DM readouts/shortcuts share the top row and activity, review queue, and session/economy panels use the space below. Character Play has a companion column for dice/history, encounters keep their saved list visible by default, and card grids add columns as space permits. Campaign support tools occupy a separate desktop column without changing selected-tab behavior.
+
+Validation uses `scripts/desktop-browser-audit.mjs`: save mobile baselines with `--baseline` on the previous release, then run `--compare` against the same disposable persistent profile. It checks all five destinations and settings for both roles at 390px, plus DM Desk/Player sheet at 320/768/1023px. Desktop checks cover both roles and all five destinations at 1024/1440/1920/2560px, full-width content, side-by-side player tools, overflow and runtime errors. Account-linked sheet/encounter fixtures are explicitly layout-only; separate real-server audits retain authorization and write coverage. CI runs the desktop checks on every pull request.
+
+The mobile comparison requires equal image dimensions and identical pixels, allowing only up to 16 pixels with a single color-value difference to account for Chromium rounded-edge rasterization. Larger differences fail.

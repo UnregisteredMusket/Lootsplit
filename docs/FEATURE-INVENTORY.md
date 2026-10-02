@@ -106,3 +106,10 @@ Not implemented or promised by this inventory: OCR, Google Drive backup integrat
 - Battle tracker has condensed combatants with expandable controls and bounded damage/healing adjustments. Existing generation, manual rolls, loot review and exactly-once award enforcement remain intact.
 - Library links to catalog, spells, creatures, names, private DM PDFs and shared handouts. Creature references preserve attribution and cannot be imported as shop goods. Shared roll history is available in Campaign → Rolls.
 - Settings dialogs restore focus, close with Escape and use scrollable mobile layouts. Android back closes overlays before navigation. Unsaved character/encounter drafts are guarded on navigation and campaign/role changes.
+
+## Desktop workspace adaptation
+- At the existing desktop navigation breakpoint (1024 CSS pixels), the app and header use the monitor width. All smaller layouts retain the approved mobile formatting.
+- DM Desk adds a clearly bounded recent-transactions table, the complete scrollable pending payment/loan queue, and active-session/economy readouts. Full history and existing review/session tools remain linked. Readouts use the existing authorized economy state and session accounting; they perform no financial writes.
+- Character Play places the existing dice tray and roll history beside vitals/actions. Edit retains the complete sheet editor. Saved encounters stay expanded by default in a sticky desktop sidebar; battle controls use the wider available area.
+- Party, market, inventory, and reference cards gain responsive columns. Campaign recovery, backups, and manual-sharing tools sit beside the selected room/chat/rolls/alerts panel. Inactive panels remain hidden.
+- No account, permission, save format, award, synchronization, theme, shortcut, or mobile navigation behavior is removed or replaced.

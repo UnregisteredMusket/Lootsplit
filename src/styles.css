@@ -1615,3 +1615,311 @@ input,select,textarea { max-width: 100%; }
   font-size: 0.9rem;
   line-height: 1.6;
 }
+
+/* Desktop workspace. Keep every layout below the existing lg breakpoint intact. */
+.campaign-support {
+  display: contents;
+}
+@media (min-width: 1024px) {
+  .concept-shell .concept-main {
+    max-width: none;
+    padding: 1.5rem clamp(1.5rem, 2.2vw, 3rem) 3rem;
+  }
+  .concept-shell > div > div > header > div,
+  .concept-shell > div > div > header > form {
+    max-width: none;
+    padding-inline: clamp(1.5rem, 2.2vw, 3rem);
+  }
+  .dm-control-panel {
+    max-width: none;
+    grid-template-columns: minmax(0, 1.4fr) minmax(300px, 1fr);
+    gap: 1.5rem;
+    align-items: start;
+  }
+  .dm-control-panel > * {
+    min-width: 0;
+  }
+  .dm-control-panel .desk-overview {
+    margin-top: 0;
+  }
+  .desktop-desk-panels {
+    grid-column: 1 / -1;
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 1rem;
+  }
+  .desktop-desk-card {
+    min-width: 0;
+    padding: 1.15rem;
+    border: 1px solid var(--edge);
+    border-radius: 10px;
+    background: var(--panel);
+  }
+  .desktop-activity {
+    grid-column: 1 / -1;
+  }
+  .desktop-desk-card .panel-heading {
+    flex-wrap: wrap;
+    gap: 0.5rem;
+  }
+  .desktop-desk-card .panel-heading h2 {
+    font-size: 1.45rem;
+  }
+  .desktop-desk-card a {
+    color: var(--color-lead);
+    font-size: 0.85rem;
+  }
+  .desktop-panel-note,
+  .desktop-panel-empty {
+    font-size: 0.85rem;
+    color: var(--color-muted);
+    line-height: 1.5;
+    margin: 0.65rem 0;
+  }
+  .desktop-panel-empty {
+    padding-block: 0.6rem;
+  }
+  .desktop-table-scroll {
+    overflow-x: auto;
+  }
+  .desktop-ledger {
+    width: 100%;
+    border-collapse: collapse;
+    font-size: 0.85rem;
+  }
+  .desktop-ledger th {
+    text-align: left;
+    color: var(--color-muted);
+    font-weight: 500;
+    font-size: 0.75rem;
+  }
+  .desktop-ledger th,
+  .desktop-ledger td {
+    padding: 0.7rem 0.6rem;
+    border-bottom: 1px solid var(--edge);
+    vertical-align: top;
+  }
+  .desktop-ledger th:first-child,
+  .desktop-ledger td:first-child {
+    padding-left: 0;
+  }
+  .desktop-ledger td:first-child {
+    min-width: 140px;
+    overflow-wrap: anywhere;
+  }
+  .desktop-ledger th:last-child,
+  .desktop-ledger td:last-child {
+    padding-right: 0;
+    text-align: right;
+    white-space: nowrap;
+    font-variant-numeric: tabular-nums;
+  }
+  .desktop-ledger time {
+    white-space: nowrap;
+    color: var(--color-muted);
+    font-size: 0.8rem;
+  }
+  .desktop-ledger tr:last-child td {
+    border-bottom: 0;
+  }
+  .desktop-incoming {
+    color: var(--color-lead);
+  }
+  .desktop-request-list {
+    max-height: 22rem;
+    overflow-y: auto;
+  }
+  .desktop-request-list li {
+    padding: 0.8rem 0;
+    border-top: 1px solid var(--edge);
+  }
+  .desktop-request-list li > div {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.75rem;
+    font-size: 0.9rem;
+  }
+  .desktop-request-list strong {
+    min-width: 0;
+    overflow-wrap: anywhere;
+  }
+  .desktop-request-list span {
+    flex-shrink: 0;
+    color: var(--color-lead);
+  }
+  .desktop-request-list p {
+    font-size: 0.8rem;
+    color: var(--color-muted);
+    margin-top: 0.25rem;
+    overflow-wrap: anywhere;
+  }
+  .desktop-session-name {
+    font-family: var(--font-display);
+    font-size: 1.2rem;
+    margin: 0.8rem 0;
+    overflow-wrap: anywhere;
+  }
+  .desktop-metrics > div {
+    display: flex;
+    justify-content: space-between;
+    gap: 0.7rem;
+    padding: 0.6rem 0;
+    font-size: 0.85rem;
+  }
+  .desktop-metrics dt {
+    color: var(--color-muted);
+  }
+  .desktop-metrics dd {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+  .desktop-economy-counts {
+    border-top: 1px solid var(--edge);
+    margin-top: 0.8rem;
+  }
+  .desktop-panel-link {
+    display: inline-flex;
+    align-items: center;
+    min-height: 44px;
+  }
+  .party-profile-list,
+  .market-grid {
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 310px), 1fr));
+    align-items: start;
+  }
+  .inventory-panel > ul,
+  .reference-list {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(min(100%, 300px), 1fr));
+    gap: 0.75rem 1rem;
+  }
+  .concept-shell .inventory-row {
+    margin: 0;
+  }
+  .reference-list > a {
+    padding: 0.6rem;
+    border: 1px solid var(--edge);
+    border-radius: 8px;
+  }
+  .play-sheet:has(> .play-surface) {
+    display: grid;
+    grid-template-columns: minmax(0, 1.6fr) minmax(280px, 1fr);
+    column-gap: 1.5rem;
+    align-items: start;
+  }
+  .play-sheet > * {
+    min-width: 0;
+  }
+  .play-sheet:has(> .play-surface) > * {
+    grid-column: 1 / -1;
+  }
+  .play-sheet:has(> .play-surface) > .character-title {
+    grid-column: 1;
+  }
+  .play-sheet:has(> .play-surface) > .play-mode-switch {
+    grid-column: 2;
+    justify-self: end;
+    align-self: center;
+    margin: 0;
+  }
+  .play-sheet:has(> .play-surface) > .play-surface {
+    grid-column: 1;
+  }
+  .play-surface > .play-vitals {
+    margin-top: 0;
+  }
+  .play-sheet:has(> .play-surface) > .sheet-edit-fields {
+    grid-column: 2;
+  }
+  .play-sheet:has(> .play-surface) > .sheet-edit-fields > .sheet-card:first-of-type {
+    margin-top: 0;
+  }
+  .concept-shell .character-savebar strong {
+    flex-basis: 180px;
+  }
+  .encounter-layout {
+    grid-template-columns: 230px minmax(0, 1fr);
+    gap: 1.5rem;
+  }
+  .encounter-library {
+    position: sticky;
+    top: 90px;
+    max-height: calc(100dvh - 115px);
+    overflow-y: auto;
+  }
+  .concept-main:has(> .multiplayer-heading) {
+    display: grid;
+    grid-template-columns: minmax(0, 1.7fr) minmax(280px, 1fr);
+    column-gap: 1.5rem;
+    align-content: start;
+    align-items: start;
+  }
+  .concept-main > .multiplayer-heading,
+  .concept-main:has(> .multiplayer-heading) > .mode-switch {
+    grid-column: 1 / -1;
+  }
+  .concept-main:has(> .multiplayer-heading)
+    > div:not([hidden]):not(.multiplayer-heading):not(.mode-switch):not(.campaign-support) {
+    grid-column: 1;
+    grid-row: 3;
+  }
+  .campaign-support {
+    display: block;
+    grid-column: 2;
+    grid-row: 3;
+    min-width: 0;
+  }
+  .campaign-support > .loot-fold:first-child {
+    margin-top: 0;
+  }
+}
+@media (min-width: 1440px) {
+  .dm-control-panel {
+    grid-template-columns: minmax(0, 1.5fr) minmax(360px, 1fr);
+  }
+  .dm-control-panel .readout-grid {
+    grid-template-columns: repeat(4, minmax(0, 1fr));
+  }
+  .dm-control-panel .readout {
+    align-items: flex-start;
+  }
+  .dm-control-panel .shortcut-grid {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+  .dm-control-panel .shortcut-button {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 0.5rem;
+    min-height: 108px;
+  }
+  .encounter-layout {
+    grid-template-columns: 270px minmax(0, 1fr);
+  }
+  .ability-grid {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+  .play-surface > div:has(> .play-action-row) {
+    display: grid;
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+    gap: 0.75rem;
+    align-items: start;
+  }
+  .play-surface .play-action-row {
+    margin: 0;
+  }
+  .play-actions > .quick-roll {
+    grid-column: 1 / -1;
+    max-width: 360px;
+  }
+  .desktop-desk-panels {
+    grid-template-columns: minmax(0, 2fr) repeat(2, minmax(0, 1fr));
+  }
+  .desktop-activity {
+    grid-column: auto;
+  }
+}
+@media (min-width: 1600px) {
+  .encounter-vitals {
+    grid-template-columns: repeat(6, minmax(0, 1fr));
+  }
+}
