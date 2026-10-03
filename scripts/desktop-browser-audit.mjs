@@ -107,8 +107,11 @@ async function visit(path) {
   await page.evaluate(() => document.fonts.ready);
   if (path.startsWith("/characters"))
     await page.getByRole("heading", { name: "Mira Ashfall", exact: true }).waitFor();
-  if (path.startsWith("/encounters"))
+  if (path.startsWith("/encounters")) {
+    await page.getByLabel("Save in", { exact: true }).selectOption(campaign.code);
+    await page.getByRole("button", { name: /Ambush on the northern road/ }).click();
     await page.getByRole("button", { name: "Save encounter", exact: true }).waitFor();
+  }
   await page.waitForTimeout(150);
 }
 async function capture(name, mobile = false) {
