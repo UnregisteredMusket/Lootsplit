@@ -21,6 +21,8 @@ assert.equal(session.status, 200);
 assert.equal(await session.json(), null);
 const privateLibrary = await fetch(`${origin}/api/account/library`, { signal: AbortSignal.timeout(15000) });
 assert.equal(privateLibrary.status, 401);
+const privateSheets = await fetch(`${origin}/api/account/sheets`, { signal: AbortSignal.timeout(15000) });
+assert.equal(privateSheets.status, 401);
 const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_EXECUTABLE_PATH || undefined, args: ["--no-sandbox"] });
 const errors = [];
 await mkdir("test-results/live-release", { recursive: true });
@@ -30,8 +32,11 @@ try {
     const page = await context.newPage();
     page.on("pageerror", error => errors.push(error.message));
     page.on("response", response => {
+      const path = new URL(response.url()).pathname;
+      // Anonymous app startup probes account sheets; denial is the required policy.
+      if (response.status() === 401 && path === "/api/account/sheets") return;
       if (response.url().startsWith(origin) && response.status() >= 400)
-        errors.push(`${response.status()} ${new URL(response.url()).pathname}`);
+        errors.push(`${response.status()} ${path}`);
     });
     await page.goto(origin, { waitUntil: "networkidle" });
     const title = page.getByRole("button", { name: "Lootsplit. Click to continue", exact: true });
