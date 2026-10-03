@@ -1,3 +1,4 @@
+import { AppLink } from "@/components/app-link";
 import { FantasyIcon } from "@/components/fantasy-icon";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { Search } from "lucide-react";
@@ -51,7 +52,7 @@ function LibraryHub() {
     {
       name: "Handouts",
       icon: "Handouts",
-      url: "#handouts",
+      url: "/library#handouts",
       note: "Campaign references",
     },
     {
@@ -83,25 +84,25 @@ function LibraryHub() {
         {tiles
           .filter((x) => (x.name + " " + x.note).toLowerCase().includes(query.toLowerCase()))
           .map((x) => (
-            <a href={x.url} key={x.name}>
+            <AppLink href={x.url} key={x.name}>
               <FantasyIcon ui={x.icon} size={36} />
               <strong>{x.name}</strong>
               <small>{x.note}</small>
-            </a>
+            </AppLink>
           ))}
       </div>
       {dm && (
         <>
           <div className="panel-heading mt-6">
             <h2>Catalog references</h2>
-            <a href="/catalog">View all →</a>
+            <AppLink href="/catalog">View all →</AppLink>
           </div>
           <div className="reference-list">
             {catalog
               .filter((x) => x.name.toLowerCase().includes(query.toLowerCase()))
               .slice(0, 6)
               .map((x) => (
-                <a href="/catalog" key={x.id}>
+                <AppLink href="/catalog" key={x.id}>
                   <LedgerArt kind="item" entry={x} />
                   <span>
                     <strong>{x.name}</strong>
@@ -110,12 +111,12 @@ function LibraryHub() {
                     </small>
                   </span>
                   <span>›</span>
-                </a>
+                </AppLink>
               ))}
           </div>
-          <a href="/books" className="gold-link mt-4">
+          <AppLink href="/books" className="gold-link mt-4">
             Open books & import PDF
-          </a>
+          </AppLink>
           <p className="text-sm text-muted mt-2">Private PDFs stay on this device.</p>
         </>
       )}

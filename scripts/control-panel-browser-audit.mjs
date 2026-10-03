@@ -1,4 +1,4 @@
-import { openApplication, continueIntoApp } from "./title-screen-navigation.mjs";
+import { openApplication } from "./title-screen-navigation.mjs";
 import { chromium } from "playwright";
 import assert from "node:assert/strict";
 import { mkdir } from "node:fs/promises";
@@ -62,7 +62,7 @@ try {
   assert.equal(await page.locator(".shortcut-button").nth(1).innerText(), "Party messages");
   assert.equal(await page.locator(".shortcut-button").nth(1).getAttribute("href"), "/share?chat=1");
   await page.locator(".shortcut-button").nth(1).click();
-  await continueIntoApp(page);
+  assert.equal(await page.locator(".loot-opening").count(), 0, "Shortcut keeps the app open");
   await page.locator('[role="tab"][aria-selected="true"]').filter({ hasText: "Chat" }).waitFor();
   assert.equal(
     await page.getByRole("tab", { name: "Chat", exact: true }).getAttribute("aria-selected"),

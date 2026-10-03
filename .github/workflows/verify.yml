@@ -51,6 +51,7 @@ jobs:
           node --experimental-strip-types scripts/bug-audit-permission-transfers.mjs
           node scripts/encounter-browser-audit.mjs
           node scripts/control-panel-browser-audit.mjs
+          node scripts/library-navigation-browser-audit.mjs
           node scripts/desktop-browser-audit.mjs
           node scripts/website-browser-audit.mjs
       - name: Built Worker account checks

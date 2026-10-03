@@ -1,3 +1,4 @@
+import { AppLink } from "@/components/app-link";
 import { FantasyIcon } from "@/components/fantasy-icon";
 import { useEffect, useState } from "react";
 import { ArrowUp, ArrowDown } from "lucide-react";
@@ -63,10 +64,10 @@ export function Shortcuts({ campaignId }: { campaignId: string }) {
         {items.map((item, i) => {
           const target = shortcutDestinations.find((x) => x.id === item.destination)!;
           return (
-            <a key={i} href={target.href} className="shortcut-button">
+            <AppLink key={i} href={target.href} className="shortcut-button">
               <FantasyIcon ui={item.icon} size={40} />
               <span>{item.label}</span>
-            </a>
+            </AppLink>
           );
         })}
       </div>

@@ -11,8 +11,11 @@ export async function continueIntoApp(page) {
   const path = new URL(page.url()).pathname.replace(/\/$/, "") || "/";
   if (publicPaths.has(path)) return;
   const title = page.getByRole("button", { name: "Lootsplit. Click to continue", exact: true });
-  await title.waitFor({ state: "visible" });
-  await title.click();
+  await page.waitForFunction(() =>
+    document.querySelector(".loot-opening") ||
+    sessionStorage.getItem("lootsplit.opening.dismissed.v1") === "1",
+  );
+  if (await title.isVisible()) await title.click();
   await title.waitFor({ state: "detached" });
 }
 export async function openApplication(page, ...args) {
