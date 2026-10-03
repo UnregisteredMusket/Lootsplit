@@ -1,3 +1,5 @@
+import { HelpContent } from "../help-content";
+import { APP_DESCRIPTION } from "@/lib/help/content";
 import { GoldSpentCounter } from "./gold-counter";
 import { SiteAnnouncement } from "./announcement";
 import { Link, useRouterState } from "@tanstack/react-router";
@@ -106,10 +108,7 @@ export function WelcomePage() {
             <br />
             <em>Less bookkeeping.</em>
           </h1>
-          <p className="ls-intro">
-            A shared ledger for your next great campaign. Track the treasure, stock the shops, and
-            keep every party member on the same page.
-          </p>
+          <p className="ls-intro">{APP_DESCRIPTION}</p>
           <div className="ls-actions">
             <a className="ls-button" href="/">
               Open browser app <ArrowRight size={18} />
@@ -222,8 +221,9 @@ export function DownloadsPage() {
             <span className="ls-tag">SIGNED RELEASE</span>
             <h2>Android</h2>
             <p>
-              The app on your phone, with native file saving and sharing. The new account library is
-              available on the website first. Shared rooms connect when you’re online.
+              The app on your phone, with native file saving and sharing. Browser updates and the
+              published APK have separate release schedules. Use the website for the latest tools;
+              shared rooms connect when you’re online.
             </p>
             <div className="ls-version">
               Version {release.version} <span>Android 7.0+ · APK</span>
@@ -365,93 +365,13 @@ export function HelpPage() {
   return (
     <Website>
       <section className="ls-wrap ls-section ls-reading">
-        <p className="ls-eyebrow">A GOOD START TO THE NEXT SESSION</p>
+        <p className="ls-eyebrow">THE LOOTSPLIT FIELD GUIDE</p>
         <h1>A little help, adventurer.</h1>
-        <p className="ls-intro">Installation, safe updates, and keeping your campaign with you.</p>
-        <section className="ls-help-block" id="bugs">
-          <h2>Report a bug</h2>
-          <p>
-            <Link to="/account" hash="bug-reports">
-              Sign in to submit a bug report
-            </Link>{" "}
-            and track its status in My account. Reports are private to you, the owner and
-            administrators. Device details are optional; campaign content is never attached
-            automatically.
-          </p>
-        </section>
-        <section className="ls-help-block" id="android">
-          <h2>Install or update on Android</h2>
-          <ol>
-            <li>
-              In your existing app, export a campaign backup and keep it outside the app’s storage.
-            </li>
-            <li>
-              Use <Link to="/downloads">Download for Android</Link>. If an in-app browser blocks the
-              download, open this page in Chrome. The GitHub link is a second download option.
-            </li>
-            <li>
-              Open the APK in Files → Downloads. If Android asks, allow installation from that
-              browser or file manager, then return to the installer.
-            </li>
-            <li>
-              Choose Install or Update. The permanent release updates permanently signed 1.3.0 and
-              1.3.1 installations in place.
-            </li>
-          </ol>
-          <details className="ls-details">
-            <summary>Android says “App not installed”</summary>
-            <div>
-              <p>
-                An older debug-signed build cannot be updated with the permanent signing key. First
-                export and verify a backup. Only then uninstall the old debug build, install this
-                release, and restore your backup. Do not uninstall a working app just to
-                troubleshoot a failed download.
-              </p>
-            </div>
-          </details>
-        </section>
-        <section className="ls-help-block" id="desktop">
-          <h2>Use Lootsplit on your PC</h2>
-          <p>
-            Open the <a href="/">browser app</a> in your desktop browser and bookmark it. There is
-            no separate PC installer yet. If your browser offers an “Install app” or “Create
-            shortcut” command, you can use it for quicker access.
-          </p>
-          <p>
-            Keep using the same browser profile and website address to access its local campaigns. A
-            shortcut does not create a cloud backup or automatically synchronize with Android.
-          </p>
-        </section>
-        <section className="ls-help-block" id="backups">
-          <h2>Keep saves and devices in sync</h2>
-          <p>
-            Local campaigns belong to the device and browser where you created them. Clearing
-            browser data or uninstalling the app can remove those saves.
-          </p>
-          <p>
-            Use Device backups to export a file outside app storage. To move a local campaign,
-            transfer and import that backup on the other device. For shared play, host or join a
-            Live or Turn-based room through Multiplayer. A shared action is saved when the server
-            accepts it.
-          </p>
-          <p>
-            Optional accounts now provide saved campaign memberships, private cloud backups, and
-            reusable character profiles on the website. Use My account to explicitly save a
-            membership or backup. Private PDFs stay device-local. Your current guest, local,
-            manual-sharing, and multiplayer options remain available.
-          </p>
-        </section>
-        <section className="ls-help-block">
-          <h2>Starting with your party</h2>
-          <p>
-            Open the app as a dungeon master to manage the campaign, party, and shops. In
-            Multiplayer, choose a shared mode and send an invitation to your players. Players join
-            and take an assigned character; their permissions depend on the campaign.
-          </p>
-          <a className="ls-button" href="/">
-            Open Lootsplit <ArrowRight size={18} />
-          </a>
-        </section>
+        <p className="ls-intro">
+          Menus, money, encounters and recovery. Find a topic and jump straight to the tool you
+          need.
+        </p>
+        <HelpContent />
       </section>
     </Website>
   );

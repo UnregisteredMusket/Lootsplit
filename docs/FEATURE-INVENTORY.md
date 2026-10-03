@@ -156,3 +156,9 @@ Not implemented or promised by this inventory: OCR, Google Drive backup integrat
 - Local approvals run under one IndexedDB write transaction; shared actions retain authoritative role, turn, revision, and retry checks. Session summaries include the approved downtime and exclude internal lender transfers from received/spent totals.
 
 Validation for this change: 427 automated tests passed (four existing skips), TypeScript passed, lint passed with existing warnings, Cloudflare and mobile builds passed. Desktop (1440px) and mobile (390px) browser audits passed on development and built production output, including campaign isolation, reload persistence, loan funding/repayment, inventory-linked revenue, recurring expenses, preview and explicit next-session approval. Screenshots inspected; no horizontal overflow or uncaught page errors. The user authorized GitHub publication and website deployment on October 3, 2026. No Android APK has been released for this change.
+
+## Unified help and navigation
+
+- Website Help and the in-app Help dialog share a searchable, grouped field guide covering role-specific menus, rules, finance/downtime, encounters, accounts, privacy, recovery and installation.
+- Topic links retain query/hash destinations, open addressed settings/session/recovery disclosures and native finance/review panels, and preserve role checks. Existing Android, desktop and backup help anchors remain available.
+- Updated app metadata and descriptions reflect the current web feature set; website and APK release schedules remain distinct. Theme exploration is separate and does not alter the live layout, icons or theme.

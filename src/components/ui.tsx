@@ -1,5 +1,7 @@
+import { useRouterState } from "@tanstack/react-router";
 import {
   forwardRef,
+  useEffect,
   useState,
   type ButtonHTMLAttributes,
   type InputHTMLAttributes,
@@ -58,17 +60,32 @@ export function Fold({
   hint,
   children,
   defaultOpen = false,
+  anchorId,
   actions,
 }: {
   title: string;
   hint?: string;
   children: ReactNode;
   defaultOpen?: boolean;
+  anchorId?: string;
   actions?: ReactNode;
 }) {
   const [open, setOpen] = useState(defaultOpen);
+  const hash = useRouterState({ select: (s) => s.location.hash });
+  useEffect(() => {
+    if (anchorId && hash === anchorId) {
+      setOpen(true);
+      requestAnimationFrame(() =>
+        document.getElementById(anchorId)?.scrollIntoView({ block: "start" }),
+      );
+    }
+  }, [hash, anchorId]);
   return (
-    <section className="loot-fold mt-4 rounded-lg border border-border">
+    <section
+      id={anchorId}
+      className="loot-fold mt-4 rounded-lg border border-border"
+      style={anchorId ? { scrollMarginTop: "6rem" } : undefined}
+    >
       <div className="flex items-stretch">
         <button
           type="button"
