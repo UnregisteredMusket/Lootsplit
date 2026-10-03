@@ -40,3 +40,7 @@ The bundled Android client must be updated by installing the newer signed APK. C
 Version **1.3.2**, Android version code **5**, is signed with the permanent certificate and published in GitHub release `android-v1.3.2`. Release workflow 37091668595 passed all verification and signing gates. The owner installed the preceding test candidate successfully. The signed APK checksum is `47c78585b88f11752c803df76dc2b5c8151a1fd1bcd08e47aa0954fccc458d01`.
 
 After each signed release, verify the actual APK certificate, version and checksum, update `src/lib/website/release.json`, and deploy the website. Confirm `/downloads`, `/updates`, and the actual `/download/android` bytes agree before calling publication complete. The changelog and download summary share the versioned data; unreleased entries stay hidden until the download metadata advances. Do not overwrite previous release history.
+
+### Next Android update
+
+Include the new original pixel-art startup animation in the next versioned Android release and list it under added features in that release's website changelog. It shows a hooded adventurer dragging a bouncing loot sack from left to right, with alternating steps, locally bundled artwork, and reduced-motion support. Website deployment does not change the already-published 1.3.2 APK.

@@ -1,0 +1,101 @@
+.quire-dawn.loot-opening {
+  overflow: hidden;
+  animation: loot-opening-out 2.1s var(--ease-smooth-out) forwards;
+}
+.loot-opening .quire-dawn-name {
+  font-size: clamp(2rem, 9vw, 3.4rem);
+}
+@keyframes loot-opening-out {
+  0%,
+  88% {
+    opacity: 1;
+  }
+  100% {
+    opacity: 0;
+  }
+}
+
+.loot-loader-track {
+  position: relative;
+  width: 100vw;
+  height: 144px;
+  margin-top: 1rem;
+}
+.loot-loader-track::after {
+  content: "";
+  position: absolute;
+  inset: auto 0 12px;
+  height: 2px;
+  background: linear-gradient(90deg, transparent, #8b795a55 20%, #8b795a55 80%, transparent);
+}
+.loot-loader-traveler {
+  position: absolute;
+  width: 240px;
+  height: 144px;
+  animation: loot-cross 2s linear both;
+  will-change: transform;
+}
+.loot-loader-traveler svg {
+  display: block;
+  width: 100%;
+  height: 100%;
+}
+.loot-loader-body {
+  animation: loot-strain 0.32s steps(2, end) infinite;
+}
+.loot-loader-bag {
+  animation: loot-drag 0.32s steps(2, end) infinite;
+}
+.loot-loader-dust {
+  animation: loot-dust 0.32s steps(2, end) infinite;
+}
+.loot-loader-step-a {
+  animation: loot-step 0.32s steps(1, end) infinite;
+}
+.loot-loader-step-b {
+  animation: loot-step 0.32s steps(1, end) -0.16s infinite;
+}
+@keyframes loot-cross {
+  from {
+    transform: translateX(-240px);
+  }
+  to {
+    transform: translateX(100vw);
+  }
+}
+@keyframes loot-strain {
+  50% {
+    transform: translateY(1px);
+  }
+}
+@keyframes loot-drag {
+  50% {
+    transform: translateY(-1px);
+  }
+}
+@keyframes loot-dust {
+  50% {
+    opacity: 0.25;
+    transform: translateX(-2px);
+  }
+}
+@keyframes loot-step {
+  0%,
+  100% {
+    opacity: 1;
+  }
+  50% {
+    opacity: 0;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .quire-dawn.loot-opening {
+    display: none;
+    animation: none;
+  }
+  .quire-dawn-name,
+  .loot-loader-traveler,
+  .loot-loader-traveler svg g {
+    animation: none;
+  }
+}
