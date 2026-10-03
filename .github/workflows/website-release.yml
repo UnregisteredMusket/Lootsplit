@@ -43,14 +43,10 @@ jobs:
           run-id: ${{ github.event.workflow_run.id }}
           github-token: ${{ github.token }}
       - name: Validate the exact verified artifact
-        env:
-          GITHUB_SHA: ${{ env.RELEASE_SHA }}
         run: node scripts/release-artifact.mjs verify
       - run: npx playwright install --with-deps chromium
       - name: Check current main, existing bindings and applied migrations; deploy without rebuild
         env:
-          GITHUB_SHA: ${{ env.RELEASE_SHA }}
-          GITHUB_REF: refs/heads/main
           GH_TOKEN: ${{ github.token }}
           CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
           CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}

@@ -15,6 +15,12 @@ for (let attempt = 0; attempt < 12; attempt++) {
   await new Promise(resolve => setTimeout(resolve, 5000));
 }
 assert.equal(identity?.commit, expected, "Live release does not match the verified artifact");
+// Confirm the account service is configured and private data remains protected.
+const session = await fetch(`${origin}/api/account/auth/get-session`, { signal: AbortSignal.timeout(15000) });
+assert.equal(session.status, 200);
+assert.equal(await session.json(), null);
+const privateLibrary = await fetch(`${origin}/api/account/library`, { signal: AbortSignal.timeout(15000) });
+assert.equal(privateLibrary.status, 401);
 const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_EXECUTABLE_PATH || undefined, args: ["--no-sandbox"] });
 const errors = [];
 await mkdir("test-results/live-release", { recursive: true });

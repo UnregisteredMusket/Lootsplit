@@ -25,7 +25,7 @@ export function verifyArtifact(directory, expectedSha) {
 
 if (process.argv[1]?.endsWith("/release-artifact.mjs")) {
   const mode = process.argv[2];
-  const commit = process.env.GITHUB_SHA || execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim();
+  const commit = process.env.RELEASE_SHA || process.env.GITHUB_SHA || execFileSync("git", ["rev-parse", "HEAD"], { encoding: "utf8" }).trim();
   assert.match(commit, /^[a-f0-9]{40}$/);
   if (mode === "prepare") {
     rmSync(root, { recursive: true, force: true });

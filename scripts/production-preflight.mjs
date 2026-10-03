@@ -23,6 +23,7 @@ export async function cfRequest(path, body) {
   return result.result;
 }
 if (process.argv[1]?.endsWith("/production-preflight.mjs")) {
+  const releaseSha = process.env.RELEASE_SHA || process.env.GITHUB_SHA;
   assert.equal(process.env.GITHUB_REPOSITORY, "UnregisteredMusket/Lootsplit");
   assert.equal(process.env.GITHUB_REF, "refs/heads/main");
   for (const key of ["CLOUDFLARE_ACCOUNT_ID", "CLOUDFLARE_API_TOKEN", "GH_TOKEN"])
@@ -32,8 +33,8 @@ if (process.argv[1]?.endsWith("/production-preflight.mjs")) {
     signal: AbortSignal.timeout(30000),
   });
   assert.ok(response.ok, "Unable to verify current main");
-  assertCurrentMain(process.env.GITHUB_SHA, (await response.json()).object.sha);
-  const manifest = verifyArtifact("dist/website-release", process.env.GITHUB_SHA);
+  assertCurrentMain(releaseSha, (await response.json()).object.sha);
+  const manifest = verifyArtifact("dist/website-release", releaseSha);
   const settings = await cfRequest("workers/scripts/lootsplit/settings");
   const bindings = settings.bindings;
   assert.equal(bindings.find(b => b.name === "DB")?.id ?? bindings.find(b => b.name === "DB")?.database_id, "0a200e96-ae2e-47b5-9869-c1f4d316148f");
