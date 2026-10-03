@@ -1,3 +1,4 @@
+import { readLocalEncounters } from "../encounters/local.ts";
 import { loadJournal, readJournal, type Journal } from "./journal.ts";
 import { blankSheet } from "../characters/model.mjs";
 import { statsOnly, editCharacter, editLegacyCharacter } from "../characters/campaign-sheet.mjs";
@@ -1443,6 +1444,7 @@ export async function postCopper(purseId: string, copper: number, summary: strin
 }
 
 export type QuireFile = {
+  localEncounters?: ReturnType<typeof readLocalEncounters>;
   journal?: Journal;
   gifts?: import("./gift.ts").PlayerGift[];
   sales?: import("./market.ts").ListingSale[];
@@ -1501,10 +1503,12 @@ export async function snapshot(): Promise<QuireFile> {
   const baseRow = request<{ value: ReportBase } | undefined>(
     tx.objectStore("meta").get("shareBase"),
   );
+  const encountersRow = request<{ rows: unknown } | undefined>(tx.objectStore("meta").get("localEncounters"));
   const lockRow = request<unknown>(tx.objectStore("meta").get("seatLock"));
   const seatLock = readSeatLock(await lockRow);
   const file: QuireFile = {
     kind: "quire",
+    localEncounters: readLocalEncounters((await encountersRow)?.rows),
     shareBase: (await baseRow)?.value,
     version: 2,
     exportedAt: Date.now(),
@@ -1765,6 +1769,7 @@ export function readQuireFile(value: unknown): QuireFile {
   }
   validateEconomyRows(file as QuireFile);
   readJournal(file.journal);
+  readLocalEncounters(file.localEncounters);
   return file as QuireFile;
 }
 
@@ -1788,6 +1793,7 @@ export async function restore(file: QuireFile): Promise<void> {
   const tx = db.transaction([...stores], "readwrite");
   const done = finish(tx);
   for (const store of stores) tx.objectStore(store).clear();
+  tx.objectStore("meta").put({ id: "localEncounters", rows: readLocalEncounters(file.localEncounters) });
   for (const purse of file.purses) tx.objectStore("purses").put(purse);
   for (const holding of file.holdings) tx.objectStore("holdings").put(holding);
   for (const shop of file.shops) tx.objectStore("shops").put(normalizeShop(shop));

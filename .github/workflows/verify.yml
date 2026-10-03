@@ -50,6 +50,7 @@ jobs:
           node scripts/bug-audit-data-integrity.mjs
           node --experimental-strip-types scripts/bug-audit-permission-transfers.mjs
           node scripts/encounter-browser-audit.mjs
+          node scripts/local-encounter-browser-audit.mjs
           node scripts/control-panel-browser-audit.mjs
           node scripts/library-navigation-browser-audit.mjs
           node scripts/desktop-browser-audit.mjs

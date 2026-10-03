@@ -306,3 +306,39 @@ test("an inventory write failure rolls back receipt acquisition and the encounte
     db.close();
   }
 });
+
+test("account-only drafts require no DM membership and cannot change another user's campaign", async () => {
+  const { db, call } = await fixture();
+  try {
+    const id = crypto.randomUUID();
+    await call("stranger", "/create", { id, code: "personal" });
+    const list = await call("stranger", "");
+    assert.ok(list.campaigns.some((c) => c.code === "personal"));
+    assert.ok(list.encounters.some((e) => e.id === id));
+    let d = await call("stranger", "/detail", { id });
+    assert.deepEqual(d.purses, []);
+    await assert.rejects(call("player", "/detail", { id }), (e) => e.status === 404);
+    d.body.name = "Account preparation";
+    await call("stranger", "/save", { id, revision: 0, encounter: d.body });
+    await assert.rejects(
+      call("stranger", "/save", { id, revision: 0, encounter: d.body }),
+      (e) => e.status === 409,
+    );
+    const key = crypto.randomUUID();
+    const roll = { id, revision: 1, requestKey: key, manual: true, total: 12, formula: "1d20" };
+    assert.equal((await call("stranger", "/roll", roll)).total, 12);
+    await call("stranger", "/roll", roll);
+    assert.equal((await call("stranger", "/log", { id })).rolls.length, 1);
+    await call("stranger", "/start", { id, revision: 1 });
+    await call("stranger", "/conclude", { id, revision: 2 });
+    await assert.rejects(call("stranger", "/award", { id, revision: 3 }), /Import this draft/);
+    // The same portable body can become a campaign-owned draft without changing its source.
+    d = await call("stranger", "/detail", { id });
+    const imported = crypto.randomUUID();
+    await call("dm", "/create", { id: imported, code: "BATTLE", encounter: d.body });
+    assert.equal((await call("dm", "/detail", { id: imported })).body.name, "Account preparation");
+    assert.equal((await call("stranger", "/detail", { id })).status, "review");
+  } finally {
+    db.close();
+  }
+});

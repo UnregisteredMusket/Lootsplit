@@ -129,6 +129,7 @@ try {
     });
   }
   await openApplication(p, origin + "/encounters");
+  await p.getByLabel("Save in", { exact: true }).selectOption(code);
   await p.getByRole("button", { name: "New encounter", exact: true }).click();
   await p.getByRole("button", { name: "Add combatant", exact: true }).waitFor();
   await p.locator(".quire-dawn").waitFor({ state: "hidden" });
@@ -207,15 +208,51 @@ try {
   assert.equal(updated.table.holdings.length, 2);
   assert.equal(updated.table.purses[0].coins.gp, 35);
   await reloadApplication(p);
+  await p.getByLabel("Save in", { exact: true }).selectOption(code);
   await p.getByRole("button", { name: /Ambush on the northern road/ }).click();
   await p.getByText(/locked against a second award/).waitFor();
   await openApplication(player.page, origin + "/encounters");
-  await player.page.getByText("Your next encounter starts with a campaign").waitFor();
+  await player.page.getByLabel("Save in", { exact: true }).selectOption("personal");
+  assert.equal(
+    await player.page
+      .getByLabel("Save in", { exact: true })
+      .locator(`option[value="${code}"]`)
+      .count(),
+    0,
+  );
   const denied = await player.context.request.post(origin + "/api/account/encounters/detail", {
     headers: { origin },
     data: { id: d.id },
   });
   assert.equal(denied.status(), 404);
+  // A website account can prepare its own drafts even while its local campaign seat is a player.
+  await player.page.evaluate(async () => {
+    const t = await import("/src/lib/quire/table.ts");
+    const e = await import("/src/lib/quire/economy.ts");
+    const purses = await e.listPurses();
+    t.setSeat({ ...t.getSeat(), role: "player", purseIds: [purses.find(p => p.kind === "character").id] });
+  });
+  await openApplication(player.page, origin + "/account");
+  await player.page.getByRole("link", { name: "Open DM encounters", exact: true }).click();
+  await player.page.getByLabel("Save in", { exact: true }).waitFor();
+  assert.equal(await player.page.getByLabel("Save in", { exact: true }).inputValue(), "personal");
+  assert.equal(await player.page.getByLabel("Save in", { exact: true }).locator('option[value="device"]').count(), 0);
+  await player.page.getByRole("button", { name: "New encounter", exact: true }).click();
+  await player.page.getByRole("button", { name: "Builder & generator", exact: true }).click();
+  await player.page.getByLabel("Encounter name", { exact: true }).fill("Account-only preparation");
+  await player.page.getByRole("button", { name: "Save encounter", exact: true }).click();
+  await player.page.getByText("Encounter saved.", { exact: true }).waitFor();
+  const downloaded = player.page.waitForEvent("download");
+  await player.page.getByRole("button", { name: "Export draft", exact: true }).click();
+  const portable = await (await downloaded).path();
+  const guest = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  await guest.addInitScript(() => localStorage.setItem("quire.guide.offer.v3", "seen"));
+  const app = await guest.newPage();
+  await openApplication(app, origin + "/encounters");
+  await app.getByLabel("Import encounter JSON").setInputFiles(portable);
+  await app.getByRole("heading", { name: "Account-only preparation", exact: true }).waitFor();
+  await app.getByText("Saved on this device", { exact: true }).waitFor();
+  await guest.close();
   assert.deepEqual(errors, []);
   console.log(
     JSON.stringify({

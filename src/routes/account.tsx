@@ -205,17 +205,22 @@ function Account() {
                 Open character sheets & rolls
               </Link>
             </section>
-            {library.members.some((m) => m.role === "dm") && (
+            {
               <section className="portal-card">
                 <h2>DM encounters</h2>
                 <p>
-                  Save encounters to your profile, track battles and review loot before awarding it.
+                  Build private encounters in your account and export them to the app. You can also
+                  build directly in the app without signing in.
                 </p>
-                <Link to="/encounters" className="portal-button">
+                <Link
+                  to="/encounters"
+                  search={{ storage: "personal" } as never}
+                  className="portal-button"
+                >
                   Open DM encounters
                 </Link>
               </section>
-            )}
+            }
             <ProfileControls profile={library.profile} onSaved={reload} />
             {library.user.role !== "member" && (
               <StaffControls userId={library.user.id} role={library.user.role} />
