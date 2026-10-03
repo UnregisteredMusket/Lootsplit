@@ -1,3 +1,8 @@
+import { encounterRequest } from "@/lib/encounters/client";
+import { localEncounterRequest } from "@/lib/encounters/local";
+import { useSeat } from "@/lib/quire/seat";
+import { getCampaigns, serverCampaigns, subscribeCampaigns } from "@/lib/quire/campaigns";
+import { useSyncExternalStore } from "react";
 import { FantasyIcon } from "@/components/fantasy-icon";
 import { useDraftGuard } from "@/lib/quire/use-draft-guard";
 import { useDesktop } from "@/lib/quire/use-desktop";
@@ -65,31 +70,85 @@ const defaults: Filters = {
 };
 const n = (value: string) => Number(value) || 0;
 export function EncounterWorkspace() {
+  const seat = useSeat();
+  const campaign = useSyncExternalStore(subscribeCampaigns, getCampaigns, serverCampaigns);
+  const personal =
+    typeof window !== "undefined" &&
+    new URLSearchParams(location.search).get("storage") === "personal";
+  if (seat.role !== "dm" && !personal)
+    return (
+      <section className="encounter-panel">
+        <h1>Encounters</h1>
+        <p>Only the DM can manage this campaign’s encounters.</p>
+      </section>
+    );
+  return (
+    <EncounterLibrary key={`${campaign.activeId}-${seat.role}`} allowDevice={seat.role === "dm"} />
+  );
+}
+function EncounterLibrary({ allowDevice }: { allowDevice: boolean }) {
   const desktop = useDesktop();
   const [library, setLibrary] = useState<{
       campaigns: Campaign[];
       encounters: Summary[];
     } | null>(null),
-    [code, setCode] = useState(""),
+    [code, setCode] = useState(() =>
+      typeof window !== "undefined" &&
+      new URLSearchParams(location.search).get("storage") === "personal"
+        ? "personal"
+        : "",
+    ),
     [selected, setSelected] = useState(""),
     [refresh, setRefresh] = useState(0),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false);
+  const selectedCode = useRef(code);
+  selectedCode.current = code;
   const dirty = useRef(false),
     createKey = useRef("");
   useEffect(() => {
     const c = new AbortController();
-    accountRequest<{ campaigns: Campaign[]; encounters: Summary[] }>(
-      "encounters",
-      undefined,
-      c.signal,
-    )
+    type Library = { campaigns: Campaign[]; encounters: Summary[] };
+    const local = (
+      allowDevice
+        ? localEncounterRequest<Library>("encounters")
+        : Promise.resolve<Library>({ campaigns: [], encounters: [] })
+    ).then((data) => {
+      if (!c.signal.aborted) {
+        setLibrary((previous) =>
+          previous
+            ? {
+                ...previous,
+                encounters: [
+                  ...data.encounters,
+                  ...previous.encounters.filter((r) => r.code !== "device"),
+                ],
+              }
+            : data,
+        );
+        setCode(
+          (v) =>
+            v ||
+            (getCloudTable().joined ? getCloudTable().code : allowDevice ? "device" : "personal"),
+        );
+      }
+      return data;
+    });
+    Promise.all([
+      local,
+      accountRequest<Library>("encounters", undefined, c.signal).catch(() => null),
+    ])
+      .then(([local, cloud]) => ({
+        campaigns: [...local.campaigns, ...(cloud?.campaigns || [])],
+        encounters: [...local.encounters, ...(cloud?.encounters || [])],
+      }))
       .then((data) => {
+        if (c.signal.aborted) return;
         setLibrary(data);
         const current = getCloudTable().code;
         setCode(
           (v) =>
-            v ||
+            (data.campaigns.some((c) => c.code === v) ? v : "") ||
             data.campaigns.find((x) => x.code === current)?.code ||
             data.campaigns[0]?.code ||
             "",
@@ -97,7 +156,9 @@ export function EncounterWorkspace() {
         const params = new URLSearchParams(location.search);
         if (params.has("resume") || params.has("review")) {
           const eligible = data.encounters.filter(
-            (x) => (!current || x.code === current) && x.status !== "awarded",
+            (x) =>
+              x.code === (selectedCode.current || (getCloudTable().joined ? current : "device")) &&
+              x.status !== "awarded",
           );
           const match =
             eligible.find((x) => x.status === (params.has("review") ? "review" : "active")) ||
@@ -110,7 +171,7 @@ export function EncounterWorkspace() {
         if (!c.signal.aborted) setError(message(e));
       });
     return () => c.abort();
-  }, [refresh]);
+  }, [refresh, allowDevice]); // Destination changes do not reload or discard an open draft.
   function canLeave() {
     return (
       !dirty.current ||
@@ -125,7 +186,7 @@ export function EncounterWorkspace() {
     setError("");
     try {
       createKey.current ||= crypto.randomUUID();
-      const r = await accountRequest<{ id: string }>("encounters/create", {
+      const r = await encounterRequest<{ id: string }>("encounters/create", {
         code,
         id: createKey.current,
         encounter,
@@ -158,24 +219,14 @@ export function EncounterWorkspace() {
         </p>
       )}
       {!library ? (
-        <p>
-          Sign in to load your saved DM encounters. <Link to="/account">My account</Link>
-        </p>
-      ) : !library.campaigns.length ? (
-        <div className="encounter-panel">
-          <h2>Your next encounter starts with a campaign</h2>
-          <p>
-            Host a campaign in Multiplayer, then save its DM membership in My account. Encounters
-            are private to that DM account and saved across devices.
-          </p>
-          <Link to="/account">My account & campaigns →</Link>
-        </div>
+        <p>Loading encounters…</p>
       ) : (
         <>
           <div className="character-toolbar">
             <label>
-              DM campaign
+              Save in
               <select
+                aria-label="Save in"
                 value={code}
                 onChange={(e) => {
                   if (canLeave()) {
@@ -188,12 +239,16 @@ export function EncounterWorkspace() {
               >
                 {library.campaigns.map((c) => (
                   <option key={c.code} value={c.code}>
-                    {c.name} · {c.code}
+                    {c.name}
+                    {!["device", "personal"].includes(c.code) ? ` · ${c.code}` : ""}
                   </option>
                 ))}
               </select>
             </label>
-            <button disabled={busy || !code} onClick={() => void create()}>
+            <button
+              disabled={busy || !library.campaigns.some((c) => c.code === code)}
+              onClick={() => void create()}
+            >
               <FantasyIcon ui="Encounters" size={22} /> New encounter
             </button>
             <label className="encounter-import">
@@ -201,7 +256,7 @@ export function EncounterWorkspace() {
               <input
                 type="file"
                 accept=".json,application/json"
-                disabled={busy}
+                disabled={busy || !library.campaigns.some((c) => c.code === code)}
                 onChange={async (e) => {
                   const file = e.target.files?.[0];
                   e.target.value = "";
@@ -213,10 +268,17 @@ export function EncounterWorkspace() {
                     const body = encounterSchema.parse(v.body || v);
                     await create({
                       ...body,
-                      loot: body.loot.filter((item) => !item.sourceTableId),
+                      coinPurseId: "",
+                      loot: body.loot
+                        .filter((item) => !item.sourceTableId)
+                        .map((item) => ({ ...item, purseId: "" })),
                       tables: body.tables.map((t) => ({
                         ...t,
                         selected: null,
+                        entries: t.entries.map((entry) => ({
+                          ...entry,
+                          loot: { ...entry.loot, purseId: "" },
+                        })),
                       })),
                     });
                   } catch (err) {
@@ -226,6 +288,16 @@ export function EncounterWorkspace() {
               />
             </label>
           </div>
+          <p className="text-sm text-muted">
+            {!library.campaigns.length
+              ? "Sign in to load your account drafts."
+              : code === "device"
+                ? "Saved on this device. Build here without an account, or import an exported encounter."
+                : code === "personal"
+                  ? "Saved to your account. Export a draft to import it into the app or a DM campaign."
+                  : "Saved to this multiplayer DM campaign."}{" "}
+            <Link to="/account">My account</Link>
+          </p>
           <div className="encounter-layout">
             <aside className="encounter-library">
               <details open={!selected || desktop}>
@@ -276,7 +348,10 @@ export function EncounterWorkspace() {
                   before play. Physical dice and manually entered results are always available to
                   the DM.
                 </p>
-                <button disabled={busy} onClick={() => void create()}>
+                <button
+                  disabled={busy || !library.campaigns.some((c) => c.code === code)}
+                  onClick={() => void create()}
+                >
                   Build an encounter
                 </button>
               </div>
@@ -326,10 +401,10 @@ function EncounterEditor({
     path: string;
     body: Record<string, unknown>;
   } | null>(null);
-  const { catalog } = useEconomy();
+  const { catalog, reload: reloadEconomy } = useEconomy();
   useEffect(() => {
     const c = new AbortController();
-    accountRequest<Detail>("encounters/detail", { id }, c.signal)
+    encounterRequest<Detail>("encounters/detail", { id }, c.signal)
       .then((d) => {
         setDetail(d);
         setDraft(d.body);
@@ -350,7 +425,7 @@ function EncounterEditor({
   }, [id, reload]); // callback only updates parent's ref
   useEffect(() => {
     const c = new AbortController();
-    accountRequest<{ rolls: Roll[]; more: boolean }>("encounters/log", { id }, c.signal)
+    encounterRequest<{ rolls: Roll[]; more: boolean }>("encounters/log", { id }, c.signal)
       .then((r) => {
         setRolls(r.rolls);
         setMoreRolls(r.more);
@@ -373,17 +448,18 @@ function EncounterEditor({
     setError("");
     setNotice("");
     try {
-      await accountRequest(`encounters/${path}`, {
+      await encounterRequest(`encounters/${path}`, {
         id,
         revision: detail.revision,
         ...extra,
       });
-      const saved = await accountRequest<Detail>("encounters/detail", { id });
+      const saved = await encounterRequest<Detail>("encounters/detail", { id });
       setDetail(saved);
       setDraft(saved.body);
       setDirty(false);
       onDirty(false);
       onSaved();
+      if (path === "award" && id.startsWith("local-")) await reloadEconomy();
       setNotice(
         path === "award"
           ? "Loot transferred. This encounter cannot award loot again."
@@ -409,7 +485,7 @@ function EncounterEditor({
         difficulty: draft.difficulty,
       };
       if (generate) {
-        const r = await accountRequest<{ combatants: Combatant[] }>("encounters/generate", {
+        const r = await encounterRequest<{ combatants: Combatant[] }>("encounters/generate", {
           code: detail.code,
           filters: f,
         });
@@ -423,7 +499,7 @@ function EncounterEditor({
           `Added ${r.combatants.length} enemies. Review the estimated difficulty and adjust as needed.`,
         );
       } else {
-        const r = await accountRequest<{
+        const r = await encounterRequest<{
           creatures: typeof index;
           more: boolean;
         }>("encounters/index", { code: detail.code, filters: f, page });
@@ -458,9 +534,9 @@ function EncounterEditor({
         };
       const pending = pendingRoll.current;
       if (!pending) return;
-      const r = await accountRequest<Roll>(pending.path, pending.body);
+      const r = await encounterRequest<Roll>(pending.path, pending.body);
       pendingRoll.current = null;
-      const history = await accountRequest<{ rolls: Roll[]; more: boolean }>("encounters/log", {
+      const history = await encounterRequest<{ rolls: Roll[]; more: boolean }>("encounters/log", {
         id,
       });
       setRolls(history.rolls);
@@ -521,7 +597,11 @@ function EncounterEditor({
             <h2>{draft.name}</h2>
           </div>
           <span className="encounter-badge">
-            {dirty ? "Unsaved changes" : "Saved to your profile"}
+            {dirty
+              ? "Unsaved changes"
+              : id.startsWith("local-")
+                ? "Saved on this device"
+                : "Saved to your profile"}
           </span>
         </div>
         <div className="character-savebar">
@@ -1524,7 +1604,7 @@ function EncounterEditor({
               onClick={async () => {
                 setBusy(true);
                 try {
-                  const r = await accountRequest<{
+                  const r = await encounterRequest<{
                     rolls: Roll[];
                     more: boolean;
                   }>("encounters/log", { id, before: rolls.at(-1)?.seq });

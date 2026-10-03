@@ -1,6 +1,5 @@
 import {
   encounterSchema,
-  combatantSchema,
   generatorSchema,
   generateEncounter,
   blankEncounter,
@@ -19,6 +18,7 @@ const parse = (schema, v) => {
   return r.data;
 };
 export async function dmMembership(db, user, code) {
+  if (code === "personal") return { personal: true, room: { table: { purses: [] } } };
   const m = await db
     .prepare("SELECT * FROM library_members WHERE user_id=? AND code=?")
     .bind(user, text(code, 16))
@@ -43,6 +43,16 @@ async function detail(db, user, id) {
 }
 const view = (r) => ({ ...r, user_id: undefined, body: JSON.parse(r.body) });
 async function save(db, user, d, encounter, status = d.row.status) {
+  if (d.personal) {
+    const result = await db
+      .prepare(
+        "UPDATE dm_encounters SET body=?,status=?,revision=revision+1,updated_at=? WHERE id=? AND user_id=? AND revision=? AND code='personal'",
+      )
+      .bind(JSON.stringify(encounter), status, Date.now(), d.row.id, user, d.row.revision)
+      .run();
+    if (!result.meta.changes) fail("Encounter changed. Export your draft and reload.", 409);
+    return { id: d.row.id };
+  }
   const result = await db
     .prepare(
       `UPDATE dm_encounters SET body=?,status=?,revision=revision+1,updated_at=? WHERE id=? AND user_id=? AND revision=? AND EXISTS(SELECT 1 FROM campaign_rooms WHERE code=? AND body=?) AND EXISTS(SELECT 1 FROM library_members WHERE user_id=? AND code=? AND seat_id=? AND token=?)`,
@@ -66,69 +76,15 @@ async function save(db, user, d, encounter, status = d.row.status) {
     fail("Encounter or campaign changed. Export your draft, then reload before retrying.", 409);
   return { id: d.row.id };
 }
-let creatureCache = null;
-export async function creatureIndex() {
-  if (creatureCache && Date.now() - creatureCache.at < 3600000) return creatureCache.rows;
-  const rows = [];
-  for (let page = 1; page <= 10; page++) {
-    const url = new URL("https://api.open5e.com/v2/creatures/");
-    url.search = new URLSearchParams({
-      document__key__in: "srd-2014",
-      limit: "500",
-      page: String(page),
-      ordering: "name",
-    }).toString();
-    const response = await fetch(url, {
-      signal: AbortSignal.timeout(15000),
-      headers: { Accept: "application/json" },
-    });
-    if (!response.ok)
-      fail("Open5e is unavailable. Saved encounters and custom enemies remain available.", 503);
-    const data = await response.json();
-    if (!Array.isArray(data.results)) fail("Open5e returned an unexpected creature index.", 503);
-    for (const c of data.results) {
-      if (c.document?.key !== "srd-2014") continue;
-      const r = combatantSchema.safeParse({
-        id: c.key,
-        name: c.name,
-        side: "enemy",
-        hp: c.hit_points,
-        maxHp: c.hit_points,
-        ac: c.armor_class,
-        initiative: null,
-        initiativeBonus: c.initiative_bonus ?? c.modifiers?.dexterity ?? 0,
-        conditions: "",
-        cr: Number(c.challenge_rating),
-        xp: c.experience_points,
-        sourceKey: c.key,
-        source:
-          "SRD 5.1 by Wizards of the Coast LLC · CC BY 4.0 · via Open5e · https://www.dndbeyond.com/srd · https://creativecommons.org/licenses/by/4.0/legalcode",
-        notes: [...(c.traits || []), ...(c.actions || [])]
-          .map((a) => `${a.name}: ${a.desc}`)
-          .join("\n\n")
-          .slice(0, 16000),
-      });
-      if (r.success)
-        rows.push({
-          ...r.data,
-          type: c.type?.name || "",
-          environments: (c.environments || []).map((e) => e.name).join(", "),
-        });
-    }
-    if (!data.next) {
-      creatureCache = { at: Date.now(), rows };
-      return rows;
-    }
-  }
-  fail("Open5e index exceeds the supported size. Please use custom enemies for now.", 503);
-}
+export { creatureIndex } from "../src/lib/encounters/index.mjs";
+import { creatureIndex } from "../src/lib/encounters/index.mjs";
 export async function handleEncounters(db, user, path, body = {}) {
   if (path === "encounters") {
     const ms = await db
       .prepare("SELECT code,name FROM library_members WHERE user_id=? AND archived=0")
       .bind(user)
       .all();
-    const campaigns = [];
+    const campaigns = [{ code: "personal", name: "My account drafts", purses: [] }];
     for (const m of ms.results) {
       try {
         const d = await dmMembership(db, user, m.code);
@@ -172,6 +128,15 @@ export async function handleEncounters(db, user, path, body = {}) {
     if (prior) {
       if (prior.user_id !== user || prior.code !== code)
         fail("Encounter key is already in use.", 409);
+      return { id };
+    }
+    if (d.personal) {
+      await db
+        .prepare(
+          "INSERT INTO dm_encounters(id,user_id,code,body,created_at,updated_at) VALUES (?,?,?,?,?,?)",
+        )
+        .bind(id, user, code, JSON.stringify(encounter), Date.now(), Date.now())
+        .run();
       return { id };
     }
     const created = await db
@@ -244,6 +209,8 @@ export async function handleEncounters(db, user, path, body = {}) {
     };
   }
   if (path === "encounters/award") {
+    if (d.personal)
+      fail("Import this draft into a device or DM campaign before transferring loot.");
     const old = await db
       .prepare("SELECT body FROM dm_encounter_awards WHERE encounter_id=?")
       .bind(d.row.id)
@@ -335,25 +302,34 @@ export async function handleEncounters(db, user, path, body = {}) {
         ...(manual ? { dice: [], total: body.total } : throwDice(formula)),
       };
     }
-    await db
-      .prepare(
-        `INSERT INTO dm_encounter_rolls(encounter_id,request_key,body,created_at) SELECT ?,?,?,? WHERE EXISTS(SELECT 1 FROM dm_encounters WHERE id=? AND revision=?) AND EXISTS(SELECT 1 FROM campaign_rooms WHERE code=? AND body=?) AND EXISTS(SELECT 1 FROM library_members WHERE user_id=? AND code=? AND seat_id=? AND token=?) ON CONFLICT(encounter_id,request_key) DO NOTHING`,
-      )
-      .bind(
-        d.row.id,
-        key,
-        JSON.stringify(result),
-        Date.now(),
-        d.row.id,
-        d.row.revision,
-        d.row.code,
-        d.raw,
-        user,
-        d.row.code,
-        d.m.seat_id,
-        d.m.token,
-      )
-      .run();
+    if (d.personal) {
+      await db
+        .prepare(
+          "INSERT INTO dm_encounter_rolls(encounter_id,request_key,body,created_at) SELECT ?,?,?,? WHERE EXISTS(SELECT 1 FROM dm_encounters WHERE id=? AND user_id=? AND revision=?) ON CONFLICT(encounter_id,request_key) DO NOTHING",
+        )
+        .bind(d.row.id, key, JSON.stringify(result), Date.now(), d.row.id, user, d.row.revision)
+        .run();
+    } else {
+      await db
+        .prepare(
+          `INSERT INTO dm_encounter_rolls(encounter_id,request_key,body,created_at) SELECT ?,?,?,? WHERE EXISTS(SELECT 1 FROM dm_encounters WHERE id=? AND revision=?) AND EXISTS(SELECT 1 FROM campaign_rooms WHERE code=? AND body=?) AND EXISTS(SELECT 1 FROM library_members WHERE user_id=? AND code=? AND seat_id=? AND token=?) ON CONFLICT(encounter_id,request_key) DO NOTHING`,
+        )
+        .bind(
+          d.row.id,
+          key,
+          JSON.stringify(result),
+          Date.now(),
+          d.row.id,
+          d.row.revision,
+          d.row.code,
+          d.raw,
+          user,
+          d.row.code,
+          d.m.seat_id,
+          d.m.token,
+        )
+        .run();
+    }
     const receipt = await db
       .prepare("SELECT body FROM dm_encounter_rolls WHERE encounter_id=? AND request_key=?")
       .bind(d.row.id, key)

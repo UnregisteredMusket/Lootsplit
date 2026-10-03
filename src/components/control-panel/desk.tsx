@@ -1,3 +1,5 @@
+import { localEncounterRequest } from "@/lib/encounters/local";
+import { encounterRequest } from "@/lib/encounters/client";
 import { AppLink } from "@/components/app-link";
 import { FantasyIcon } from "@/components/fantasy-icon";
 import { useEffect, useState, useSyncExternalStore } from "react";
@@ -28,15 +30,17 @@ export function DmDesk() {
     const c = new AbortController();
     setEncounter(null);
     setAccountState("");
-    if (!room.code || !room.joined) return;
-    accountRequest<{
+    const load = room.joined ? accountRequest : localEncounterRequest;
+    load<{
       encounters: { id: string; code: string; name: string; status: string }[];
     }>("encounters", undefined, c.signal)
       .then(async (d) => {
-        const rows = d.encounters.filter((x) => x.code === room.code && x.status !== "awarded");
+        const rows = d.encounters.filter(
+          (x) => x.code === (room.joined ? room.code : "device") && x.status !== "awarded",
+        );
         const x = rows.find((x) => x.status === "active") || rows[0];
         if (x) {
-          const detail = await accountRequest<{ body: { round: number } }>(
+          const detail = await encounterRequest<{ body: { round: number } }>(
             "encounters/detail",
             { id: x.id },
             c.signal,
@@ -48,7 +52,7 @@ export function DmDesk() {
         if (!c.signal.aborted) setAccountState("Sign in to view");
       });
     return () => c.abort();
-  }, [room.code, room.joined, room.revision]);
+  }, [room.code, room.joined, room.revision, campaigns.activeId]);
   const party = purses.filter((p) => p.kind === "character"),
     session = journal.sessions.find((x) => !x.endedAt),
     fund = purses.filter((p) => p.kind === "party").reduce((sum, p) => sum + toCopper(p.coins), 0),
