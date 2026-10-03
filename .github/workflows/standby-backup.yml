@@ -1,6 +1,9 @@
 name: Encrypted offsite database backup
 on:
   workflow_dispatch:
+  push:
+    branches: [main]
+    paths: [scripts/standby-backup.mjs, .github/workflows/standby-backup.yml]
   schedule:
     - cron: '17 9 * * *'
 permissions:

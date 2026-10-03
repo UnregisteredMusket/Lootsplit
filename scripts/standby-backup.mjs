@@ -6,6 +6,8 @@ import { appendFileSync, mkdirSync, readFileSync, writeFileSync, rmSync } from "
 import { dirname } from "node:path";
 import { migrationIdentity } from "./standby-artifact.mjs";
 
+let recoveryStage = "configuration";
+class SafeBackupError extends Error {}
 const magic = Buffer.from("LOOTSPLIT-BACKUP-1\n");
 export const primaryOrigin = "https://lootsplit.oliverstorie2017.workers.dev";
 export const productionDatabase = "0a200e96-ae2e-47b5-9869-c1f4d316148f";
@@ -63,7 +65,7 @@ export async function exportD1({ accountId, token, fetcher = fetch }) {
   let bookmark;
   for (let attempt = 0; attempt < 180; attempt++) {
     const response = await fetcher(endpoint, { method: "POST", headers: { authorization: `Bearer ${token}`, "content-type": "application/json" }, body: JSON.stringify({ output_format: "polling", current_bookmark: bookmark }), signal: AbortSignal.timeout(30000) });
-    assert.ok(response.ok, `D1 export HTTP ${response.status}`);
+    if (!response.ok) throw new SafeBackupError(`D1 export HTTP ${response.status}`);
     const body = await response.json();
     assert.ok(body.success && body.result?.success, "D1 export failed");
     const state = body.result;
@@ -75,7 +77,8 @@ export async function exportD1({ accountId, token, fetcher = fetch }) {
       assert.ok(download.ok, "Snapshot download failed");
       return download.text();
     }
-    assert.equal(state.status, "active", "D1 export failed");
+    assert.notEqual(state.status, "error", "D1 export failed");
+    assert.ok(typeof state.at_bookmark === "string" && state.at_bookmark.length > 0, "Missing export bookmark");
     bookmark = state.at_bookmark;
     await new Promise((resolve) => setTimeout(resolve, 1000));
   }
@@ -105,13 +108,22 @@ async function main() {
   const mode = process.argv[2], path = process.argv[3];
   if (mode === "export") {
     keyBytes(process.env.BACKUP_ENCRYPTION_KEY); // Fail before asking D1 to pause queries.
+    recoveryStage = "primary release identity";
     const identity = await fetch(`${primaryOrigin}/assets/release-identity.json`, { cache: "no-store", signal: AbortSignal.timeout(20000) });
     assert.ok(identity.ok, "Primary release identity unavailable");
     const { commit } = await identity.json();
+    recoveryStage = "Cloudflare export";
     const sql = await exportD1({ accountId: process.env.CLOUDFLARE_ACCOUNT_ID, token: process.env.CLOUDFLARE_API_TOKEN });
+    recoveryStage = "snapshot schema and integrity validation";
     const snapshot = makeSnapshot(sql, commit);
+    recoveryStage = "encryption and restore verification";
+    const encrypted = seal(snapshot, process.env.BACKUP_ENCRYPTION_KEY);
+    const recovered = unseal(encrypted, process.env.BACKUP_ENCRYPTION_KEY);
+    assert.equal(recovered.sha256, hash(recovered.sql));
+    makeSnapshot(recovered.sql, recovered.sourceCommit);
+    recoveryStage = "encrypted artifact write";
     mkdirSync("recovery/encrypted", { recursive: true, mode: 0o700 });
-    writeFileSync(`recovery/encrypted/${snapshot.snapshotId}.enc`, seal(snapshot, process.env.BACKUP_ENCRYPTION_KEY), { flag: "wx", mode: 0o600 });
+    writeFileSync(`recovery/encrypted/${snapshot.snapshotId}.enc`, encrypted, { flag: "wx", mode: 0o600 });
     const message = `Encrypted snapshot ${snapshot.snapshotId} captured ${snapshot.createdAt}; source ${commit}.\n`;
     console.log(message.trim());
     if (process.env.GITHUB_STEP_SUMMARY) appendFileSync(process.env.GITHUB_STEP_SUMMARY, message);
@@ -124,8 +136,8 @@ async function main() {
     console.log(`Restore ${id} is authorized for the verified primary fence. Import into a NEW Turso database.`);
   } else throw new Error("Use export, restore <encrypted-file> <new-db-file>, or authorize <restored-db-file>");
 }
-if (process.argv[1]?.endsWith("/standby-backup.mjs")) main().catch(() => {
+if (process.argv[1]?.endsWith("/standby-backup.mjs")) main().catch((error) => {
   // Never print SDK/API errors that could contain SQL, signed URLs or credentials.
-  console.error("Backup/recovery failed. Check credentials, matching migrations, primary fencing and destination; no live database was overwritten.");
+  console.error(`Backup/recovery failed at ${recoveryStage}${error instanceof SafeBackupError ? `: ${error.message}` : ""}. No live database was overwritten.`);
   process.exitCode = 1;
 });
