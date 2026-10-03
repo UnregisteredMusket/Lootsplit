@@ -1,3 +1,4 @@
+import { GoldSpentCounter } from "./gold-counter";
 import { SiteAnnouncement } from "./announcement";
 import { Link, useRouterState } from "@tanstack/react-router";
 import {
@@ -124,9 +125,7 @@ export function WelcomePage() {
         <span className="ls-hero-caption">YOUR NEXT CHAPTER STARTS HERE</span>
       </section>
       <div className="ls-strip">
-        <span>
-          <Coins size={18} /> Every coin accounted for
-        </span>
+        <GoldSpentCounter />
         <span>
           <Users size={18} /> One party, a shared ledger
         </span>

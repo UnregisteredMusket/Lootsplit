@@ -53,6 +53,11 @@ Not implemented or promised by this inventory: OCR, Google Drive backup integrat
 
 ## Website owner and credits
 
+- Homepage gold-spent counter uses recorded purchases and outgoing payments in current shared
+  campaigns. Reusable campaign/player-wallet analytics preserve existing ledger, inventory,
+  finance and backup behavior. Only spending is public; additional aggregate metrics are
+  owner-only until explicitly selected for publication. Local-only saves remain local.
+
 - Resources lists Open5e, imported SRD versions and licenses, and bundled font licenses; extend the resource registry for future integrations.
 - Donate is public and optional. An owner can set or clear an external HTTPS donation URL; no payment credentials are stored by Lootsplit.
 - My account exposes Owner controls only for a server-assigned owner role: aggregate site counts, homepage announcement publish/hide, and donation destination.
