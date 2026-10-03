@@ -52,7 +52,10 @@ let view = initialView;
 export function getServerCloudTable() {
   return initialView;
 }
-let timer: ReturnType<typeof setInterval> | undefined;
+let timer: ReturnType<typeof setTimeout> | undefined;
+let polling = false;
+let pollGeneration = 0;
+let pollFailures = 0;
 let chain: Promise<unknown> = Promise.resolve();
 export async function requestCampaignRoll(body: { purseId: string; [key: string]: unknown }) {
   const s = requireSession();
@@ -113,7 +116,7 @@ function serial<T>(fn: () => Promise<T>): Promise<T> {
   chain = next.catch(() => undefined);
   return next;
 }
-function publish(next: Partial<typeof view>) {
+function publish(next: Partial<typeof view>, dataChanged = true) {
   const previous = view;
   view = { ...view, ...next };
   if (previous.joined && view.joined) {
@@ -124,7 +127,10 @@ function publish(next: Partial<typeof view>) {
     if (previous.seats.length < view.seats.length)
       notify("Player joined", "A participant joined the campaign.", "joined");
   }
-  setCloudWatch({ joined: view.joined, mine: view.mine, live: view.live, who: view.who });
+  setCloudWatch(
+    { joined: view.joined, mine: view.mine, live: view.live, who: view.who },
+    dataChanged,
+  );
   for (const fn of listeners) fn();
 }
 export function getCloudTable() {
@@ -147,11 +153,40 @@ function fail(error: unknown) {
   publish({ status: "attention", error: message });
   return message;
 }
+function stopPolling() {
+  polling = false;
+  pollGeneration++;
+  pollFailures = 0;
+  if (timer) clearTimeout(timer);
+  timer = undefined;
+}
 function start() {
-  if (!timer)
-    timer = setInterval(() => {
-      void serial(refresh).catch(fail);
-    }, 2000);
+  if (polling) return;
+  polling = true;
+  const generation = ++pollGeneration;
+  const schedule = () => {
+    if (!polling || generation !== pollGeneration) return;
+    const delay = Math.min(30000, 2000 * 2 ** pollFailures);
+    timer = setTimeout(async () => {
+      timer = undefined;
+      if (!polling || generation !== pollGeneration) return;
+      if (navigator.onLine !== false && document.visibilityState !== "hidden") {
+        try {
+          await serial(async () => {
+            if (generation === pollGeneration) await refresh();
+          });
+          pollFailures = 0;
+        } catch (error) {
+          if (generation === pollGeneration) {
+            pollFailures = Math.min(4, pollFailures + 1);
+            fail(error);
+          }
+        }
+      }
+      schedule();
+    }, delay);
+  };
+  schedule();
 }
 async function accept(remote: RoomView, committed = false) {
   const s = requireSession();
@@ -194,27 +229,32 @@ async function accept(remote: RoomView, committed = false) {
   }
   if (s.role === "player")
     setSeat({ ...getSeat(), role: "player", purseIds: remote.purseIds, shopIds: remote.shopIds });
-  publish({
-    joined: true,
-    mine: remote.mine,
-    live: remote.live,
-    who: remote.who,
-    code: remote.code,
-    role: s.role,
-    seats: remote.seats,
-    seatId: remote.seatId,
-    revision: remote.revision,
-    pending: s.pending.length,
-    status: s.pending.length ? (view.error ? "attention" : "pending") : "synced",
-    error: s.pending.length ? view.error : "",
-    lastSync: Date.now(),
-  });
+  publish(
+    {
+      joined: true,
+      mine: remote.mine,
+      live: remote.live,
+      who: remote.who,
+      code: remote.code,
+      role: s.role,
+      seats: remote.seats,
+      seatId: remote.seatId,
+      revision: remote.revision,
+      pending: s.pending.length,
+      status: s.pending.length ? (view.error ? "attention" : "pending") : "synced",
+      error: s.pending.length ? view.error : "",
+      lastSync: Date.now(),
+    },
+    changed || committed,
+  );
   start();
 }
 async function refresh() {
   const s = session();
   if (!s) return;
+  const campaignKey = key();
   const remote = await pullCloudTable({ data: { code: s.code, token: s.token } });
+  if (key() !== campaignKey || session()?.token !== s.token) return;
   await accept(remote);
 }
 export async function refreshShared() {
@@ -435,8 +475,7 @@ export function leaveTable() {
   if (hasPendingChanges())
     throw new Error("Export and resolve your pending actions before disconnecting.");
   if (typeof localStorage !== "undefined") localStorage.removeItem(key());
-  if (timer) clearInterval(timer);
-  timer = undefined;
+  stopPolling();
   publish({
     joined: false,
     mine: true,
@@ -464,8 +503,7 @@ export async function disconnectClosedRoom() {
 export function resumeTable() {
   if (typeof localStorage === "undefined") return;
   if (sessionKey && sessionKey !== key()) {
-    if (timer) clearInterval(timer);
-    timer = undefined;
+    stopPolling();
   }
   sessionKey = key();
   const saved = session();
@@ -538,8 +576,7 @@ export async function resumeAccountMembership(
       throw new Error(
         "This device has an unfinished turn for that campaign. Reopen its existing device campaign and resolve it before resuming.",
       );
-    if (timer) clearInterval(timer);
-    timer = undefined;
+    stopPolling();
     selectAccountCampaign(id, member.name, {
       role,
       purseIds: remote.purseIds,

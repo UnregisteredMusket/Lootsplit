@@ -8,7 +8,15 @@ export function getCloudWatch(): CloudWatch {
   return watch;
 }
 
-export function setCloudWatch(next: CloudWatch) {
+export function setCloudWatch(next: CloudWatch, dataChanged = true) {
+  if (
+    !dataChanged &&
+    next.joined === watch.joined &&
+    next.mine === watch.mine &&
+    next.live === watch.live &&
+    next.who === watch.who
+  )
+    return;
   watch = next;
   for (const listener of listeners) listener();
 }

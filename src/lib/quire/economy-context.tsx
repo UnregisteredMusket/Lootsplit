@@ -11,6 +11,7 @@ import {
   useEffect,
   useMemo,
   useState,
+  useRef,
   type ReactNode,
 } from "react";
 import { toast } from "sonner";
@@ -223,7 +224,10 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
   const [loans, setLoans] = useState<LoanAsk[]>([]);
   const [sheets, setSheets] = useState<CharacterSheet[]>([]);
 
+  const reloadSequence = useRef(0);
   const reload = useCallback(async () => {
+    const sequence = ++reloadSequence.current;
+    const campaignKey = localStorage.getItem("quire.campaign.v1");
     await ensureEconomy();
     // A once-per-campaign safety copy. Never bypass an existing password-protected-save policy.
     if (
@@ -265,6 +269,12 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
       loadLoans(),
       loadSheets(),
     ]);
+    const nextJournal = await loadJournal();
+    if (
+      sequence !== reloadSequence.current ||
+      campaignKey !== localStorage.getItem("quire.campaign.v1")
+    )
+      return;
     setPurses(nextPurses.sort((a, b) => a.name.localeCompare(b.name)));
     setHoldings(nextHoldings.sort((a, b) => a.name.localeCompare(b.name)));
     setShops(nextShops.sort((a, b) => a.name.localeCompare(b.name)));
@@ -276,7 +286,7 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
     setListings(nextListings);
     setLoans(nextLoans);
     setSheets(nextSheets);
-    setJournal(await loadJournal());
+    setJournal(nextJournal);
     setReady(true);
   }, []);
 
