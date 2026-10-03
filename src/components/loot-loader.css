@@ -7,10 +7,21 @@
   width: 100%;
   height: 100dvh;
   cursor: pointer;
+  color: #392719;
+  background-color: #e8d4a5;
+  background-image:
+    radial-gradient(ellipse at 50% 42%, #fff5d655 10%, transparent 65%),
+    radial-gradient(ellipse at 0% 0%, #75431855, transparent 48%),
+    radial-gradient(ellipse at 100% 100%, #75431866, transparent 48%),
+    repeating-linear-gradient(0deg, #6e452106 0px, #6e452106 1px, transparent 1px, transparent 4px),
+    repeating-linear-gradient(92deg, #fff8de12 0px, #fff8de12 1px, transparent 1px, transparent 7px);
+  box-shadow: inset 0 0 80px #78451e38, inset 0 0 12px #59351c35;
 }
 .loot-opening .quire-dawn-name {
   font-size: clamp(2rem, 9vw, 3.4rem);
   animation: pane-in 1.8s ease-out both;
+  color: #392719;
+  text-shadow: 0 1px 0 #fff7df80;
 }
 .loot-loader-track {
   position: relative;
@@ -169,12 +180,12 @@
   position: absolute;
   bottom: max(3rem, env(safe-area-inset-bottom));
   font-family: var(--font-display);
-  color: var(--color-fg);
+  color: #49321e;
   font-size: 1rem;
   letter-spacing: 0.12em;
 }
 .loot-opening:focus-visible {
-  outline: 2px solid #edc566;
+  outline: 2px solid #79512c;
   outline-offset: -8px;
 }
 .loot-coins {
