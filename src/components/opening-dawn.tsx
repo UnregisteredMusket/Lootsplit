@@ -1,4 +1,5 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
+import { OpeningLandscape } from "./opening-landscape";
 import { LootLoader } from "./loot-loader";
 
 export function OpeningDawn({ children }: { children: ReactNode }) {
@@ -22,7 +23,10 @@ export function OpeningDawn({ children }: { children: ReactNode }) {
       aria-label="Lootsplit. Click to continue"
     >
       <span className="quire-dawn-name">Lootsplit</span>
-      <LootLoader />
+      <span className="loot-opening-scene">
+        <OpeningLandscape />
+        <LootLoader />
+      </span>
       <span className="loot-opening-continue">click to continue</span>
     </button>
   );

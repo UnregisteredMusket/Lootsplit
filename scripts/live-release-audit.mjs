@@ -53,6 +53,17 @@ try {
     await page.goto(origin, { waitUntil: "networkidle" });
     const title = page.getByRole("button", { name: "Lootsplit. Click to continue", exact: true });
     await title.waitFor();
+    const sceneBox = await page.locator(".loot-opening-scene").boundingBox();
+    const nameBox = await page.locator(".quire-dawn-name").boundingBox();
+    assert.ok(sceneBox && nameBox);
+    assert.ok(Math.abs(sceneBox.width - sceneBox.height) < 1, "Landscape stays square");
+    assert.ok(nameBox.y + nameBox.height < sceneBox.y, "Title sits above landscape");
+    if (width === 390)
+      assert.ok(
+        Math.abs(sceneBox.width - width) < 1,
+        "Mobile landscape is flush with viewport edges",
+      );
+
     assert.equal(
       await title.evaluate((el) => getComputedStyle(el).backgroundColor),
       "rgb(232, 212, 165)",
