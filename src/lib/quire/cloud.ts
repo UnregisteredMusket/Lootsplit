@@ -1,4 +1,4 @@
-import { readJournal, type Journal } from "./journal.ts";
+import { readJournal, preserveJournalMetadata, type Journal } from "./journal.ts";
 import { validateEconomyRows } from "./validation.ts";
 import { clampRealm } from "./scale.ts";
 import type { RealmSettings } from "./types.ts";
@@ -160,6 +160,8 @@ export function endDmTurn(room: CloudRoom, token: string, table: CloudTable, bas
   const seat = room.live ? seated(room, token) : requireTurn(room, token);
   if (seat.role !== "dm") throw new Error("Only the dungeon master can publish the whole table.");
   expectRevision(room, baseRevision);
+  if (room.table.journal?.finance && !table.journal?.finance)
+    table = { ...table, journal: preserveJournalMetadata(table.journal, room.table.journal) };
   if (room.live) return { ...room, table, revision: room.revision + 1 };
   return advance({ ...room, table });
 }

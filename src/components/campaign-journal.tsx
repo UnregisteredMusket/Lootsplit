@@ -1,3 +1,4 @@
+import { CampaignFinance } from "./campaign-finance";
 import { useState } from "react";
 import { toast } from "sonner";
 import { useEconomy } from "@/lib/quire/economy-context";
@@ -36,6 +37,8 @@ export function CampaignJournal() {
   const [copper, setCopper] = useState("");
   const [purseId, setPurse] = useState("");
   const [busy, setBusy] = useState(false);
+  const downtime = journal.finance?.downtime.find((d) => d.status === "pending");
+  const [approveDowntime, setApproveDowntime] = useState("");
   const active = journal.sessions.find((x) => !x.endedAt);
   const accounts = dm ? purses : purses.filter((x) => seat.purseIds.includes(x.id));
   const run = async (work: () => Promise<void>) => {
@@ -68,7 +71,16 @@ export function CampaignJournal() {
           <form
             onSubmit={(e) => {
               e.preventDefault();
-              void run(() => command({ kind: "session", name, end: false }));
+              void run(() =>
+                command({
+                  kind: "session",
+                  name,
+                  end: false,
+                  ...(downtime && approveDowntime === downtime.id
+                    ? { downtimeId: downtime.id }
+                    : {}),
+                }),
+              );
             }}
             className="flex flex-wrap gap-2"
           >
@@ -81,8 +93,25 @@ export function CampaignJournal() {
               value={name}
               onChange={(e) => setName(e.target.value)}
             />
-            <Button disabled={busy} type="submit">
-              {active ? "End & start next" : "Start session"}
+            {downtime && (
+              <label className="text-sm">
+                <input
+                  type="checkbox"
+                  checked={approveDowntime === downtime.id}
+                  onChange={(e) => setApproveDowntime(e.target.checked ? downtime.id : "")}
+                />{" "}
+                I approve the <a href="#campaign-finance">downtime calculations</a> below.
+              </label>
+            )}
+            <Button
+              disabled={busy || (!!downtime && approveDowntime !== downtime.id)}
+              type="submit"
+            >
+              {downtime
+                ? "Approve downtime & start session"
+                : active
+                  ? "End & start next"
+                  : "Start session"}
             </Button>
             {active ? (
               <Button
@@ -123,6 +152,7 @@ export function CampaignJournal() {
           a measure of newly earned wealth or changes in item valuations.
         </p>
       </Fold>
+      <CampaignFinance />
       <details id="review-inbox" className="review-inbox">
         <summary>
           {dm ? "Review inbox" : "Payment requests"} ·{" "}

@@ -2,7 +2,7 @@ import { rememberSave, listSaves } from "./saves.ts";
 import { subscribeSheetChanges, readPartySheetLinks } from "./party-sheet-links.ts";
 import { loadJournal, type Journal } from "./journal.ts";
 import { applyCommand, type CommandInput } from "./commands.ts";
-import { economySnapshot, applyCloudTable } from "./economy.ts";
+import { economySnapshot, applyCloudTable, executeFinanceCommand } from "./economy.ts";
 import { loadSeatLock, passwordMatches } from "./lock.ts";
 import {
   createContext,
@@ -444,6 +444,15 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
       command: async (input) => {
         if (getCloudWatch().joined) {
           await queueCommand(input);
+          await reload();
+          return;
+        }
+        if (
+          input.kind.startsWith("finance-") ||
+          input.kind.startsWith("downtime-") ||
+          input.kind === "session"
+        ) {
+          await executeFinanceCommand(input);
           await reload();
           return;
         }

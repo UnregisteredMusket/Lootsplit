@@ -1,3 +1,5 @@
+import { applyCommand, type CommandInput } from "./commands.ts";
+import { loanFromRequest, readFinance, assertFinanceAccountRemovable } from "./finance.ts";
 import { readLocalEncounters } from "../encounters/local.ts";
 import { loadJournal, readJournal, type Journal } from "./journal.ts";
 import { blankSheet } from "../characters/model.mjs";
@@ -813,16 +815,18 @@ export async function removeHolding(id: string): Promise<void> {
 }
 
 export async function removePurse(id: string): Promise<void> {
-  const db = await quireDb();
-  const holdings = await request(
-    db.transaction("holdings").objectStore("holdings").index("purseId").getAll(id),
-  );
-  const tx = db.transaction(["purses", "holdings", "meta"], "readwrite");
-  const done = finish(tx);
-  tx.objectStore("purses").delete(id);
-  for (const holding of holdings) tx.objectStore("holdings").delete(holding.id);
-  await audit(tx, "Removed account and its holdings", "management", id);
-  await done;
+  await atomic(["purses", "holdings", "meta"], async (tx) => {
+    const row = await request<{ value: unknown } | undefined>(
+      tx.objectStore("meta").get("journal"),
+    );
+    assertFinanceAccountRemovable(readJournal(row?.value).finance, id);
+    const holdings = await request<Holding[]>(
+      tx.objectStore("holdings").index("purseId").getAll(id),
+    );
+    tx.objectStore("purses").delete(id);
+    for (const holding of holdings) tx.objectStore("holdings").delete(holding.id);
+    await audit(tx, "Removed account and its holdings", "management", id);
+  });
 }
 
 export async function addPricedStock(
@@ -1250,6 +1254,13 @@ export async function decideLoan(id: string, status: LoanStatus): Promise<void> 
       const purse = await request<Purse | undefined>(tx.objectStore("purses").get(loan.purseId));
       if (!purse) throw new Error("This account no longer exists.");
       tx.objectStore("purses").put({ ...purse, coins: gain(purse.coins, loan.copper) });
+      const row = await request<{ value: unknown } | undefined>(
+        tx.objectStore("meta").get("journal"),
+      );
+      const journal = readJournal(row?.value);
+      (journal.finance ??= readFinance()).loans.push(loanFromRequest(loan));
+      journal.finance = readFinance(journal.finance);
+      tx.objectStore("meta").put({ id: "journal", value: journal });
       tx.objectStore("ledger").put(
         logLine(
           purse.id,
@@ -1341,7 +1352,7 @@ export async function voidLedgerLine(id: string): Promise<void> {
   );
   const line = lines.find((item) => item.id === id);
   if (!line) throw new Error("That line is not in this browser on this device.");
-  if (/^(Sold |Gave |Approved a loan |Bought .* from the market)/.test(line.summary))
+  if (/^(Finance:|Sold |Gave |Approved a loan |Bought .* from the market)/.test(line.summary))
     throw new Error(
       "This trade cannot be reversed safely from the ledger. Record a compensating payment or transfer and correct the holding instead.",
     );
@@ -1503,7 +1514,9 @@ export async function snapshot(): Promise<QuireFile> {
   const baseRow = request<{ value: ReportBase } | undefined>(
     tx.objectStore("meta").get("shareBase"),
   );
-  const encountersRow = request<{ rows: unknown } | undefined>(tx.objectStore("meta").get("localEncounters"));
+  const encountersRow = request<{ rows: unknown } | undefined>(
+    tx.objectStore("meta").get("localEncounters"),
+  );
   const lockRow = request<unknown>(tx.objectStore("meta").get("seatLock"));
   const seatLock = readSeatLock(await lockRow);
   const file: QuireFile = {
@@ -1793,7 +1806,10 @@ export async function restore(file: QuireFile): Promise<void> {
   const tx = db.transaction([...stores], "readwrite");
   const done = finish(tx);
   for (const store of stores) tx.objectStore(store).clear();
-  tx.objectStore("meta").put({ id: "localEncounters", rows: readLocalEncounters(file.localEncounters) });
+  tx.objectStore("meta").put({
+    id: "localEncounters",
+    rows: readLocalEncounters(file.localEncounters),
+  });
   for (const purse of file.purses) tx.objectStore("purses").put(purse);
   for (const holding of file.holdings) tx.objectStore("holdings").put(holding);
   for (const shop of file.shops) tx.objectStore("shops").put(normalizeShop(shop));
@@ -1935,4 +1951,42 @@ async function audit(
     ...(change ? { change } : {}),
   });
   store.put({ id: "journal", value: journal });
+}
+
+/** Read, calculate and commit campaign finances under one IndexedDB write lock. */
+export async function executeFinanceCommand(input: CommandInput): Promise<void> {
+  if (!(
+    input.kind.startsWith("finance-") ||
+    input.kind.startsWith("downtime-") ||
+    input.kind === "session"
+  ))
+    throw Error("Not a finance command.");
+  await atomic(["purses", "holdings", "ledger", "meta"], async (tx) => {
+    const [purses, holdings, ledger, meta] = await Promise.all([
+      request<Purse[]>(tx.objectStore("purses").getAll()),
+      request<Holding[]>(tx.objectStore("holdings").getAll()),
+      request<LedgerLine[]>(tx.objectStore("ledger").getAll()),
+      request<{ id: string; value?: unknown }[]>(tx.objectStore("meta").getAll()),
+    ]);
+    const seat = getSeat();
+    const next = applyCommand(
+      {
+        purses,
+        holdings,
+        ledger,
+        shops: [],
+        stock: [],
+        listings: [],
+        sheets: [],
+        notes: [],
+        loans: readLoans(meta.find((x) => x.id === "loans")),
+        journal: readJournal(meta.find((x) => x.id === "journal")?.value),
+      },
+      { id: "local", token: "", name: "Local", role: seat.role, purseIds: seat.purseIds },
+      { ...input, id: crypto.randomUUID() },
+    );
+    for (const p of next.purses) tx.objectStore("purses").put(p);
+    for (const l of next.ledger) tx.objectStore("ledger").put(l);
+    tx.objectStore("meta").put({ id: "journal", value: next.journal });
+  });
 }

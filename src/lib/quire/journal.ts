@@ -1,9 +1,11 @@
 import { z } from "zod";
+import { financeSchema } from "./finance.ts";
 import { quireDb, request } from "./db.ts";
 import type { LedgerLine } from "./types.ts";
 const id = z.string().min(1).max(150),
   at = z.number().int().nonnegative();
 export const journalSchema = z.object({
+  finance: financeSchema.optional(),
   sessions: z
     .array(
       z.object({
@@ -92,9 +94,13 @@ export function sessionSummary(
 /** Older clients omit optional change metadata. Preserve it during their journal patches. */
 export function preserveJournalMetadata(value: unknown, current: Journal): Journal {
   const next = readJournal(value);
-  const changes = new Map(current.events.map(event => [event.id, event.change]));
-  return { ...next, events: next.events.map(event => {
-    const change = event.change ?? changes.get(event.id);
-    return change ? { ...event, change } : event;
-  }) };
+  const changes = new Map(current.events.map((event) => [event.id, event.change]));
+  return readJournal({
+    ...next,
+    ...(next.finance ? {} : current.finance ? { finance: current.finance } : {}),
+    events: next.events.map((event) => {
+      const change = event.change ?? changes.get(event.id);
+      return change ? { ...event, change } : event;
+    }),
+  });
 }

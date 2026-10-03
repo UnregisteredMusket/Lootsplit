@@ -1,3 +1,13 @@
+import {
+  assertFinanceAccountRemovable,
+  termsSchema,
+  ruleSchema,
+  readFinance,
+  loanFromRequest,
+  previewDowntime,
+  applyDowntime,
+  financeMove,
+} from "./finance.ts";
 import { readJournal, preserveJournalMetadata } from "./journal.ts";
 import { z } from "zod";
 import { sheetSchema } from "../characters/model.mjs";
@@ -13,6 +23,23 @@ const base = { id };
 export const commandSchema = z.discriminatedUnion("kind", [
   z.object({
     ...base,
+    kind: z.literal("finance-loan"),
+    terms: termsSchema,
+    principal: amount.min(1),
+    sourceLoanId: id.optional(),
+  }),
+  z.object({ ...base, kind: z.literal("finance-terms"), loanId: id, terms: termsSchema }),
+  z.object({ ...base, kind: z.literal("finance-repay"), loanId: id, copper: amount.min(1) }),
+  z.object({ ...base, kind: z.literal("finance-rule"), rule: ruleSchema }),
+  z.object({
+    ...base,
+    kind: z.literal("downtime-plan"),
+    name: z.string().trim().min(1).max(100),
+    days: z.number().int().min(1).max(3650),
+  }),
+  z.object({ ...base, kind: z.literal("downtime-cancel"), downtimeId: id }),
+  z.object({
+    ...base,
     kind: z.literal("character"),
     purseId: id,
     before: sheetSchema,
@@ -23,6 +50,7 @@ export const commandSchema = z.discriminatedUnion("kind", [
     kind: z.literal("session"),
     name: z.string().trim().min(1).max(100),
     end: z.boolean(),
+    downtimeId: id.optional(),
   }),
   z.object({
     ...base,
@@ -188,7 +216,140 @@ export function applyCommand(input: CloudTable, seat: CloudSeat, raw: Command): 
       ? null
       : (t.purses.find((p) => p.id === purseId)?.sheet?.scores.cha ??
         charismaScore(t.sheets.find((s) => s.purseId === purseId)));
-  if (cmd.kind === "character") {
+  const finance = () => (journal.finance ??= readFinance());
+  const editableFinance = () => {
+    dm();
+    const f = finance();
+    if (f.downtime.some((d) => d.status === "pending"))
+      throw Error("Cancel the pending downtime before changing finance agreements.");
+    return f;
+  };
+  if (cmd.kind === "finance-loan") {
+    const f = editableFinance();
+    own(cmd.terms.purseId);
+    if (cmd.terms.lenderId === cmd.terms.purseId)
+      throw Error("Borrower and lender must be different accounts.");
+    if (cmd.terms.lenderId) own(cmd.terms.lenderId);
+    if (cmd.sourceLoanId) {
+      const request = t.loans.find((l) => l.id === cmd.sourceLoanId && l.status === "approved");
+      if (
+        !request ||
+        request.purseId !== cmd.terms.purseId ||
+        request.copper !== cmd.principal ||
+        cmd.terms.lenderId
+      )
+        throw Error(
+          "Choose an approved legacy loan with the original borrower and amount, and an external lender.",
+        );
+      if (f.loans.some((l) => l.sourceLoanId === cmd.sourceLoanId))
+        throw Error("This loan is already tracked.");
+    } else {
+      if (cmd.terms.lenderId)
+        financeMove(
+          t,
+          cmd.terms.lenderId,
+          -cmd.principal,
+          cmd.id + "-lender",
+          `${cmd.terms.name}: loan advanced`,
+          at,
+          true,
+        );
+      financeMove(
+        t,
+        cmd.terms.purseId,
+        cmd.principal,
+        cmd.id + "-borrower",
+        `${cmd.terms.name}: loan received`,
+        at,
+        !!cmd.terms.lenderId,
+      );
+      if (!cmd.terms.lenderId) t.ledger[t.ledger.length - 1].transactionType = "loan";
+    }
+    f.loans.push({
+      ...loanFromRequest({
+        id: cmd.id,
+        purseId: cmd.terms.purseId,
+        note: cmd.terms.name,
+        copper: cmd.principal,
+      }),
+      ...cmd.terms,
+      id: cmd.id,
+      sourceLoanId: cmd.sourceLoanId,
+    });
+    event(`Loan recorded: ${cmd.terms.name}`, "management", cmd.terms.purseId);
+  } else if (cmd.kind === "finance-terms") {
+    const f = editableFinance(),
+      l = f.loans.find((l) => l.id === cmd.loanId);
+    if (!l) throw Error("Loan not found.");
+    if (l.purseId !== cmd.terms.purseId || l.lenderId !== cmd.terms.lenderId)
+      throw Error("Borrower and lender cannot change after a loan is recorded.");
+    if (l.carryDays && l.periodDays !== cmd.terms.periodDays)
+      throw Error("Finish the current interest period before changing its length.");
+    Object.assign(l, cmd.terms);
+    event(`Loan terms updated: ${l.name}`, "management", l.purseId);
+  } else if (cmd.kind === "finance-repay") {
+    const f = editableFinance(),
+      l = f.loans.find((l) => l.id === cmd.loanId);
+    if (!l || cmd.copper > l.principal + l.interest)
+      throw Error("Repayment exceeds the outstanding debt.");
+    financeMove(t, l.purseId, -cmd.copper, cmd.id, `${l.name}: manual repayment`, at, !!l.lenderId);
+    if (l.lenderId)
+      financeMove(
+        t,
+        l.lenderId,
+        cmd.copper,
+        cmd.id + "-lender",
+        `${l.name}: repayment received`,
+        at,
+        true,
+      );
+    const interest = Math.min(l.interest, cmd.copper);
+    l.interest -= interest;
+    l.principal -= cmd.copper - interest;
+    l.due = Math.max(0, l.due - cmd.copper);
+    l.paid += cmd.copper;
+    event(`Loan repaid: ${l.name}`, "management", l.purseId);
+  } else if (cmd.kind === "finance-rule") {
+    const f = editableFinance();
+    own(cmd.rule.purseId);
+    if (
+      cmd.rule.holdingId &&
+      !t.holdings.some((h) => h.id === cmd.rule.holdingId && h.purseId === cmd.rule.purseId)
+    )
+      throw Error("Choose inventory owned by this campaign account.");
+    const prior = f.rules.find((r) => r.id === cmd.rule.id);
+    if (prior && prior.purseId !== cmd.rule.purseId)
+      throw Error("Keep the original account; create a new schedule to use another account.");
+    if (prior && prior.kind !== cmd.rule.kind)
+      throw Error("Create a new schedule to change between income and expense.");
+    if (prior?.carryDays && prior.periodDays !== cmd.rule.periodDays)
+      throw Error("Finish the current period before changing its length.");
+    const next = { ...cmd.rule, carryDays: prior?.carryDays ?? 0, arrears: prior?.arrears ?? 0 };
+    if (prior) Object.assign(prior, next);
+    else f.rules.push(next);
+    event(`Finance schedule updated: ${cmd.rule.name}`, "management", cmd.rule.purseId);
+  } else if (cmd.kind === "downtime-plan") {
+    dm();
+    const f = finance();
+    const quote = previewDowntime(t, f, cmd.days);
+    for (const d of f.downtime) if (d.status === "pending") d.status = "cancelled";
+    f.downtime.push({
+      id: cmd.id,
+      name: cmd.name,
+      days: cmd.days,
+      fromDay: f.day,
+      at,
+      status: "pending",
+      quote,
+    });
+    event(`Prepared ${cmd.days} in-game downtime days for DM review`);
+  } else if (cmd.kind === "downtime-cancel") {
+    dm();
+    const d = finance().downtime.find((d) => d.id === cmd.downtimeId);
+    if (!d || d.status !== "pending") throw Error("This downtime is already decided.");
+    d.status = "cancelled";
+    event("Cancelled pending downtime; no funds moved");
+  } else if (cmd.kind === "character") {
     editCharacter(t, seat, cmd, cmd.id, at);
     event(
       `Character sheet updated: ${t.purses.find((p) => p.id === cmd.purseId)?.name}`,
@@ -204,6 +365,15 @@ export function applyCommand(input: CloudTable, seat: CloudSeat, raw: Command): 
       active.endedAt = at;
       active.endLedgerIds = t.ledger.map((x) => x.id);
     }
+    if (
+      !cmd.end &&
+      journal.finance?.downtime.some((d) => d.status === "pending") &&
+      !cmd.downtimeId
+    )
+      throw Error(
+        "Review and approve or cancel pending downtime before starting the next session.",
+      );
+    if (cmd.end && cmd.downtimeId) throw Error("Approve downtime when starting the next session.");
     if (!cmd.end)
       journal.sessions.push({
         id: cmd.id,
@@ -211,6 +381,10 @@ export function applyCommand(input: CloudTable, seat: CloudSeat, raw: Command): 
         startedAt: at,
         startLedgerIds: t.ledger.map((x) => x.id),
       });
+    if (!cmd.end && cmd.downtimeId) {
+      applyDowntime(t, cmd.downtimeId, cmd.id, at);
+      event("Applied approved downtime finances once", "session");
+    }
     event(
       cmd.end ? `Ended session: ${active?.name ?? cmd.name}` : `Started session: ${cmd.name}`,
       "session",
@@ -343,7 +517,8 @@ export function applyCommand(input: CloudTable, seat: CloudSeat, raw: Command): 
     l.status = cmd.status;
     if (cmd.status === "approved") {
       coins(l.purseId, l.copper);
-      log(l.purseId, "Loan approved", l.copper);
+      log(l.purseId, "Finance: Loan approved", l.copper);
+      finance().loans.push(loanFromRequest(l));
     }
   } else if (cmd.kind === "message") {
     if (seat.role === "player") {
@@ -379,6 +554,8 @@ export function applyCommand(input: CloudTable, seat: CloudSeat, raw: Command): 
   } else if (cmd.kind === "patch") {
     dm();
     for (const change of cmd.changes) {
+      if (change.store === "purses" && change.after === null)
+        assertFinanceAccountRemovable(t.journal?.finance, change.id);
       if (change.store === "journal") {
         const currentJournal = readJournal(t.journal);
         if (!same(currentJournal, preserveJournalMetadata(change.before, currentJournal)))
@@ -450,6 +627,7 @@ export function applyCommand(input: CloudTable, seat: CloudSeat, raw: Command): 
       ];
     }
   }
+  if (journal.finance) journal.finance = readFinance(journal.finance);
   validateEconomyRows(t);
   return t;
 }

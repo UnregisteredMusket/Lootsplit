@@ -139,3 +139,15 @@ Not implemented or promised by this inventory: OCR, Google Drive backup integrat
   Existing IDs and source URLs resolve directly; older/custom entries use visual name/category
   matching. No schema migration or external artwork network dependency. Artist credits and
   license links are on Resources. The published Android APK remains a separate release.
+
+## Campaign finances and downtime
+
+- The existing campaign session area includes a collapsible DM finance section; navigation and existing inventory, trading, loan requests, and session controls remain available.
+- Loans track remaining principal, interest, period length, simple/compound interest, scheduled installments, overdue payments and cumulative repayments. Approved requests create zero-interest, manual-repayment debts; earlier approved loans can be adopted without crediting funds again. New loans can use an external lender or transfer an existing campaign purse's funds.
+- Recurring revenue and expenses use in-game periods, carry incomplete days, retain unpaid expenses, and can be paused or edited. Revenue may reference an existing owned inventory holding without consuming, transferring, or selling it.
+- DM sets 1–3650 downtime days and reviews a stored preview. Explicit approval while starting a session applies coins, debt changes, ledger entries, in-game time and a receipt together. A changed preview is rejected; repeat approvals cannot settle twice. Cancelling changes no balances or elapsed days.
+- Settlement order: all revenue, loans in creation order, then expenses. Interest is calculated per full period on remaining principal (plus unpaid interest when compounding), before its scheduled installment; sub-copper interest carries forward. Repayments cover interest first, never exceed debt, and never overdraw purses. Arrears remain visible; pausing stops accrual and settlement attempts without forgiving them.
+- Financial state is stored in the campaign journal, included in device backups and shared-room persistence, and excluded from player room projections. Account-owned character profiles are never modified. Old saves remain readable. Finance ledger entries cannot be independently voided, preventing disagreement with the debt record.
+- Local approvals run under one IndexedDB write transaction; shared actions retain authoritative role, turn, revision, and retry checks. Session summaries include the approved downtime and exclude internal lender transfers from received/spent totals.
+
+Validation for this change: 427 automated tests passed (four existing skips), TypeScript passed, lint passed with existing warnings, Cloudflare and mobile builds passed. Desktop (1440px) and mobile (390px) browser audits passed on development and built production output, including campaign isolation, reload persistence, loan funding/repayment, inventory-linked revenue, recurring expenses, preview and explicit next-session approval. Screenshots inspected; no horizontal overflow or uncaught page errors. The user authorized GitHub publication and website deployment on October 3, 2026. No Android APK has been released for this change.

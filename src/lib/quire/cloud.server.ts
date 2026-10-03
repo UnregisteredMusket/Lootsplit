@@ -323,6 +323,7 @@ function view(room: CloudRoom, seat: CloudSeat): RoomView {
             journal: room.table.journal
               ? {
                   ...room.table.journal,
+                  finance: undefined,
                   requests: room.table.journal.requests.filter((r) =>
                     seat.purseIds.includes(r.purseId),
                   ),
