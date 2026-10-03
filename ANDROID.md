@@ -43,4 +43,4 @@ After each signed release, verify the actual APK certificate, version and checks
 
 ### Next Android update
 
-Include the new original pixel-art startup animation in the next versioned Android release and list it under added features in that release's website changelog. It shows a hooded adventurer dragging a bouncing loot sack from left to right, with alternating steps, locally bundled artwork, and reduced-motion support. Website deployment does not change the already-published 1.3.2 APK.
+Include the new original 16-bit-style startup animation in the next versioned Android release and list it under added features in that release's website changelog. It shows a shaded hooded adventurer bracing and trembling against a heavy loot sack, then hauling it forward in short intervals, with planted feet during each struggle and steps during each pull, locally bundled artwork, and reduced-motion support. Website deployment does not change the already-published 1.3.2 APK.

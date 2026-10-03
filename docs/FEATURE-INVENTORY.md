@@ -41,7 +41,7 @@ Not implemented or promised by this inventory: OCR, Google Drive backup integrat
 ## Website and optional account library
 
 - Public welcome, Android download, desktop installation guidance, changelog and help pages alongside the existing app URL.
-- App startup shows an original animated pixel adventurer dragging loot left to right; reduced-motion preferences skip the splash. The animation is bundled locally for web and Android.
+- App startup shows an original 16-bit-style adventurer struggling, then dragging heavy loot forward in short repeated pulls; reduced-motion preferences skip the splash. The animation is bundled locally for web and Android.
 - Versioned website changelogs retain previous entries and describe added features, improvements and summarized fixes for every Android update. The signed-release gate requires matching notes before publication.
 - Fixed-version Android download endpoint verifies the release checksum; original GitHub and Drive alternatives remain available.
 - Optional email/password accounts with server-side sessions, rate limiting, sign-out, and single-use rotating recovery keys. Email delivery is not configured.

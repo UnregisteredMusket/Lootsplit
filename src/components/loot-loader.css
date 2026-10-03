@@ -14,8 +14,8 @@
     opacity: 0;
   }
 }
-
 .loot-loader-track {
+  --loot-stride: calc((100vw + 256px) / 32);
   position: relative;
   width: 100vw;
   height: 144px;
@@ -24,68 +24,156 @@
 .loot-loader-track::after {
   content: "";
   position: absolute;
-  inset: auto 0 12px;
+  inset: auto 0 10px;
   height: 2px;
   background: linear-gradient(90deg, transparent, #8b795a55 20%, #8b795a55 80%, transparent);
 }
+/* The carrier advances one stride per second. The sprite supplies the gradual
+   pull within that second, so its reset meets the next stride without a jump.
+   Start halfway across the route so even a brief startup shows the struggle. */
 .loot-loader-traveler {
   position: absolute;
-  width: 240px;
+  width: 256px;
   height: 144px;
-  animation: loot-cross 2s linear both;
+  animation: loot-cross 32s steps(32, end) -16s infinite;
   will-change: transform;
 }
 .loot-loader-traveler svg {
   display: block;
   width: 100%;
   height: 100%;
+  animation: loot-haul 1s linear infinite;
 }
 .loot-loader-body {
-  animation: loot-strain 0.32s steps(2, end) infinite;
+  animation: loot-strain 1s steps(1, end) infinite;
 }
 .loot-loader-bag {
-  animation: loot-drag 0.32s steps(2, end) infinite;
+  animation: loot-drag 1s steps(1, end) infinite;
 }
 .loot-loader-dust {
-  animation: loot-dust 0.32s steps(2, end) infinite;
+  animation: loot-dust 1s steps(1, end) infinite;
+}
+.loot-loader-sweat {
+  animation: loot-sweat 1s steps(1, end) infinite;
 }
 .loot-loader-step-a {
-  animation: loot-step 0.32s steps(1, end) infinite;
+  animation: loot-step-a 1s steps(1, end) infinite;
 }
 .loot-loader-step-b {
-  animation: loot-step 0.32s steps(1, end) -0.16s infinite;
+  animation: loot-step-b 1s steps(1, end) infinite;
 }
 @keyframes loot-cross {
   from {
-    transform: translateX(-240px);
+    transform: translateX(-256px);
   }
   to {
     transform: translateX(100vw);
   }
 }
+@keyframes loot-haul {
+  0%,
+  60% {
+    transform: translateX(0);
+  }
+  90%,
+  100% {
+    transform: translateX(var(--loot-stride));
+  }
+}
+/* Feet stay planted throughout the effort; only the torso trembles. */
 @keyframes loot-strain {
-  50% {
-    transform: translateY(1px);
+  0%,
+  12%,
+  28%,
+  44%,
+  90%,
+  100% {
+    transform: translate(0, 0);
+  }
+  20%,
+  36%,
+  52%,
+  60% {
+    transform: translate(1px, 1px);
+  }
+  70%,
+  80% {
+    transform: translate(0, 1px);
   }
 }
 @keyframes loot-drag {
-  50% {
+  0%,
+  60%,
+  75%,
+  90%,
+  100% {
+    transform: translateY(0);
+  }
+  65%,
+  80% {
     transform: translateY(-1px);
   }
 }
 @keyframes loot-dust {
-  50% {
-    opacity: 0.25;
-    transform: translateX(-2px);
+  0%,
+  59%,
+  95%,
+  100% {
+    opacity: 0;
+    transform: translateX(0);
+  }
+  60%,
+  75% {
+    opacity: 0.7;
+    transform: translateX(-1px);
+  }
+  85% {
+    opacity: 0.3;
+    transform: translateX(-4px);
   }
 }
-@keyframes loot-step {
+@keyframes loot-sweat {
   0%,
+  20%,
+  65%,
+  100% {
+    opacity: 0;
+    transform: translateY(0);
+  }
+  28%,
+  44% {
+    opacity: 0.9;
+    transform: translateY(1px);
+  }
+  52% {
+    opacity: 0.6;
+    transform: translateY(3px);
+  }
+}
+@keyframes loot-step-a {
+  0%,
+  60%,
+  75%,
+  90%,
   100% {
     opacity: 1;
   }
-  50% {
+  65%,
+  80% {
     opacity: 0;
+  }
+}
+@keyframes loot-step-b {
+  0%,
+  60%,
+  75%,
+  90%,
+  100% {
+    opacity: 0;
+  }
+  65%,
+  80% {
+    opacity: 1;
   }
 }
 @media (prefers-reduced-motion: reduce) {
@@ -95,6 +183,7 @@
   }
   .quire-dawn-name,
   .loot-loader-traveler,
+  .loot-loader-traveler svg,
   .loot-loader-traveler svg g {
     animation: none;
   }

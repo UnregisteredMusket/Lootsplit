@@ -1,47 +1,82 @@
 import "./loot-loader.css";
 
-/** Original pixel artwork, drawn on an integer grid so it stays sharp at every frame. */
+/** Original 16-bit-style pixel sprite: layered cloth, leather, metal and skin shading. */
 export function LootLoader() {
   return (
     <div className="loot-loader-track" aria-hidden="true">
       <div className="loot-loader-traveler">
-        <svg viewBox="0 0 80 48" fill="none" shapeRendering="crispEdges" focusable="false">
-          <g className="loot-loader-dust" fill="#8b795a">
-            <path d="M2 41h3v2H2zM7 44h2v2H7zM1 46h2v1H1z" />
+        <svg viewBox="0 0 128 72" fill="none" shapeRendering="crispEdges" focusable="false">
+          <path fill="#050c14" opacity=".45" d="M9 65h45v3H9zM72 65h42v3H72z" />
+          <g className="loot-loader-dust" fill="#9b8664">
+            <path d="M2 61h3v2H2zM6 65h2v2H6zM1 68h2v1H1zM10 63h2v1h-2z" />
           </g>
           <g className="loot-loader-bag">
-            <path fill="#33291e" d="M17 21h12v4h4v4h4v10h-3v4H13v-3H9V29h4v-5h4z" />
-            <path fill="#9d6b36" d="M18 24h10v3h4v4h3v7h-4v3H15v-3h-4v-8h4v-3h3z" />
-            <path fill="#c99b56" d="M18 27h8v3h-8v8h-4v-7h4zM20 38h10v2H20z" />
-            <path fill="#73502e" d="M28 29h4v9h-4zM19 23h10v3H19z" />
-            <path fill="#f2cf76" d="M18 20h5v3h-5zM24 18h5v4h-5zM28 21h4v3h-4z" />
-            <path fill="#fff0b4" d="M19 20h2v1h-2zM25 18h2v1h-2z" />
-            <path fill="#e3b566" d="M20 31h6v2h-6zM22 29h2v8h-2zM20 35h6v2h-6z" />
+            <path fill="#292322" d="M27 25h17v5h6v6h6v8h3v15h-4v6H14v-3H9V45h3v-8h7v-6h8z" />
+            <path fill="#715032" d="M27 30h16v4h6v6h5v6h2v12h-5v5H16v-4h-4V46h3v-7h7v-5h5z" />
+            <path fill="#aa7743" d="M26 35h16v4h6v7h4v12h-5v3H19v-4h-4V46h5v-7h6z" />
+            <path fill="#c79a58" d="M26 38h10v3H24v5h-4v10h-3V45h5v-5h4zM24 58h18v2H24z" />
+            <path fill="#deb976" d="M25 40h4v2h-4zM21 45h2v6h-2zM26 58h9v1h-9z" />
+            <path fill="#825932" d="M42 38h3v7h4v12h-5v3h-4v-3h3V45h-1zM27 33h13v3H27z" />
+            <path fill="#d9b87e" d="M26 31h17v2H26zM29 28h12v2H29z" />
+            <path fill="#a47733" d="M24 25h8v5h-8zM32 21h10v8H32zM42 25h7v5h-7z" />
+            <path fill="#ecc86a" d="M25 24h7v4h-7zM33 21h8v5h-8zM42 24h6v4h-6z" />
+            <path fill="#fff0ad" d="M26 24h5v1h-5zM34 21h5v1h-5zM43 24h3v1h-3z" />
+            <path fill="#735034" d="M31 44h9v2h-9zM29 46h2v9h-2zM39 46h2v9h-2zM31 55h8v2h-8z" />
+            <path fill="#edc879" d="M32 45h6v2h-6zM34 43h2v13h-2zM31 49h7v2h-7zM32 53h6v2h-6z" />
+            <path fill="#795734" d="M18 55h2v2h-2zM22 57h2v2h-2zM47 52h2v2h-2z" />
           </g>
+          {/* The fixed rope stays taut while the upper body strains against it. */}
+          <path fill="#72563a" d="M43 31h11v-2h11v-2h12v-2h4v3h-4v2H65v2H54v2H43z" />
+          <path fill="#e1c18a" d="M43 31h11v-2h11v-2h12v-2h3v1h-3v2H65v2H54v2H43z" />
           <g className="loot-loader-body">
-            {/* Taut rope runs back from the adventurer's hand to the sack. */}
-            <path fill="#d1ac70" d="M29 24h8v-2h7v-2h8v2h-7v2h-7v2h-9z" />
-            <path fill="#172536" d="M53 7h11v3h4v12h-5v4h-6v6H43v-6h3v-9h3v-6h4z" />
-            <path fill="#496b76" d="M54 9h9v3h-8v5h-4v9h-5v-8h4v-6h4z" />
-            <path fill="#283f52" d="M53 18h9v7h-5v8H44v-6h5v-5h4z" />
-            <path fill="#71939a" d="M55 10h7v2h-7zM51 17h3v7h-3z" />
-            <path fill="#d7a573" d="M59 13h6v3h3v3h-5v3h-5v-5h1zM48 21h5v4h-5z" />
-            <path fill="#f3c996" d="M61 13h4v3h-4zM49 21h3v2h-3z" />
-            <path fill="#182333" d="M64 14h2v2h-2z" />
-            <path fill="#b69454" d="M47 28h12v3H47z" />
-            <path fill="#f4d38a" d="M53 28h3v3h-3z" />
-            <path fill="#7c4f35" d="M58 23h4v10h-4z" />
-            <path fill="#d7c8a4" d="M60 29h2v9h-2z" />
+            {/* Forward-leaning hood and cloak. */}
+            <path fill="#142031" d="M91 8h16v3h6v5h4v15h-6v5h-8v8h-8v6H71v-7h4V30h5v-9h5v-8h6z" />
+            <path fill="#304c60" d="M92 10h14v3h6v5h-9v7h-7v7h-7v9h-6v7H74v-5h4V31h5v-9h5v-8h4z" />
+            <path fill="#517b88" d="M92 12h12v2H93v4h-4v7h-4v9h-4v8h-4V31h5v-9h4v-8h6z" />
+            <path fill="#81a7ad" d="M93 12h10v1H93zM89 18h2v5h-2zM85 25h2v6h-2z" />
+            <path fill="#21364b" d="M92 29h7v10h-7v9H80v-5h5v-8h7zM78 38h3v7h-3z" />
+            {/* Face, brow, nose, jaw and stubble. */}
+            <path fill="#90634d" d="M102 17h9v4h5v7h-7v5h-9V23h2z" />
+            <path fill="#d9a477" d="M103 18h7v4h6v4h-8v4h-6v-8h1z" />
+            <path fill="#f4c79a" d="M104 18h5v3h-5zM110 22h5v2h-5zM103 25h4v2h-4z" />
+            <path fill="#563e39" d="M107 28h3v3h-7v-2h4zM108 20h4v1h-4z" />
+            <path fill="#151e2a" d="M110 21h2v2h-2z" />
+            {/* Both hands grip the rope behind him. */}
+            <path fill="#1c3044" d="M91 27h7v5h-5v4H81v-3h-5v-7h7v3h8z" />
+            <path fill="#547985" d="M91 28h5v3h-5v2H82v-3h9z" />
+            <path fill="#e1b184" d="M76 25h5v7h-5zM81 28h5v5h-5z" />
+            <path fill="#f7d2a3" d="M77 25h3v2h-3zM82 28h3v2h-3z" />
+            <path fill="#ad7958" d="M77 30h3v1h-3zM82 31h3v1h-3z" />
+            {/* Belt, buckle, side pouch and sheathed sword. */}
+            <path fill="#6e4a33" d="M77 44h21v5H77z" />
+            <path fill="#ac8150" d="M78 44h19v2H78z" />
+            <path fill="#ecd18b" d="M87 44h6v5h-6z" />
+            <path fill="#543e30" d="M89 45h2v3h-2zM95 39h7v10h-7z" />
+            <path fill="#b98b57" d="M96 40h5v3h-5z" />
+            <path fill="#303242" d="M102 38h3v20h-3z" />
+            <path fill="#b5bdba" d="M103 41h1v15h-1z" />
+            <path fill="#d1af63" d="M100 38h7v2h-7zM102 34h3v4h-3zM102 56h3v3h-3z" />
           </g>
           <g className="loot-loader-step-a">
-            <path fill="#263749" d="M46 32h7v5h-4v4h-5v-5h2zM54 32h5v4h4v4h-5v-3h-4z" />
-            <path fill="#956841" d="M43 40h7v4H40v-2h3zM59 39h6v3h3v2H58v-3h1z" />
-            <path fill="#c0965d" d="M43 40h5v1h-5zM61 39h3v1h-3z" />
+            <path
+              fill="#152435"
+              d="M78 49h11v7h-5v4h-5v4H69v-5h6v-5h3zM90 49h9v7h5v4h5v4h-9v-4h-5v-4h-5z"
+            />
+            <path fill="#3c5566" d="M79 50h6v5h-5v4h-5v-2h3v-4h1zM92 50h5v6h4v3h-3v-2h-3v-3h-3z" />
+            <path fill="#765139" d="M71 59h10v4h-3v3H65v-3h6zM100 59h8v4h6v3h-15v-3h1z" />
+            <path
+              fill="#b28756"
+              d="M72 59h8v2h-8zM101 59h6v2h-6zM66 64h10v1H66zM101 64h11v1h-11z"
+            />
           </g>
           <g className="loot-loader-step-b">
-            <path fill="#263749" d="M47 32h6v7h3v3h-6v-4h-3zM54 32h5v4h-4v4h-5v-4h4z" />
-            <path fill="#956841" d="M50 40h7v2h3v2H50zM47 39h5v4H42v-2h5z" />
-            <path fill="#c0965d" d="M51 40h4v1h-4zM47 39h4v1h-4z" />
+            <path fill="#152435" d="M78 49h10v7h5v7H82v-5h-4zM91 49h9v6h-6v5h-5v4H78v-4h8v-6h5z" />
+            <path fill="#3c5566" d="M80 50h5v6h4v4h-4v-4h-5zM93 50h5v3h-6v6h-4v-3h3v-3h2z" />
+            <path fill="#765139" d="M84 60h9v3h7v3H83zM79 60h8v3h-5v3H73v-3h6z" />
+            <path fill="#b28756" d="M85 60h7v2h-7zM79 60h6v2h-6zM85 64h12v1H85z" />
+          </g>
+          <g className="loot-loader-sweat" fill="#a4d5db">
+            <path d="M117 13h2v4h-2zM119 17h2v3h-2z" />
           </g>
         </svg>
       </div>
