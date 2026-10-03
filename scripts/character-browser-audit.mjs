@@ -39,6 +39,10 @@ try {
   const player = await actor("Player", "192.0.2.230"),
     dm = await actor("DM", "192.0.2.231");
   const room = {
+    code,
+    revision: 1,
+    live: true,
+    turn: 0,
     seats: [
       {
         id: "player",
@@ -50,6 +54,8 @@ try {
       { id: "dm", token: "dm-token", role: "dm", name: "DM", purseIds: [] },
     ],
     table: {
+      sheets: [],
+      ledger: [],
       purses: [
         {
           id: "hero",
@@ -58,7 +64,17 @@ try {
           coins: { cp: 3, sp: 2, ep: 0, gp: 17, pp: 0 },
         },
       ],
-      holdings: [{ id: "sword", purseId: "hero", name: "Campaign sword", quantity: 1 }],
+      holdings: [
+        {
+          id: "sword",
+          purseId: "hero",
+          name: "Campaign sword",
+          quantity: 1,
+          kind: "item",
+          unitCopper: 100,
+          notes: "",
+        },
+      ],
     },
   };
   await db
@@ -76,7 +92,7 @@ try {
   const page = player.page;
   await page.goto(origin + "/characters");
   await page.locator(".character-library-controls > summary").click();
-  await page.getByRole("button", { name: "Create character", exact: true }).click();
+  await page.getByRole("button", { name: "Create account-only character", exact: true }).click();
   await page.getByRole("heading", { name: "New adventurer", exact: true }).waitFor();
   await page.locator(".quire-dawn").waitFor({ state: "hidden" });
   await page.getByRole("button", { name: "Edit sheet", exact: true }).click();
@@ -155,12 +171,12 @@ try {
   await page.getByLabel("Manual roll total", { exact: true }).fill("18");
   await page.getByRole("button", { name: "Record manual roll", exact: true }).click();
   await page.getByText(/Custom roll: 18 · Manual result/).waitFor();
-  await dm.page.getByRole("button", { name: "Refresh roll log", exact: true }).click();
+  await dm.page.getByRole("button", { name: "Refresh roll log", exact: true }).last().click();
   await dm.page.getByText(/MANUAL RESULT/).waitFor();
   await dm.page.getByRole("button", { name: "Mira Ashfall · View sheet", exact: true }).click();
   await dm.page.getByText("DM read-only view", { exact: true }).waitFor();
-  await dm.page.getByRole("button", { name: "Edit sheet", exact: true }).click();
-  assert.equal(await dm.page.getByLabel("Current HP", { exact: true }).isEnabled(), false);
+  await dm.page.getByRole("button", { name: "Edit sheet", exact: true }).last().click();
+  assert.equal(await dm.page.getByLabel("Current HP", { exact: true }).last().isEnabled(), false);
   await page.setViewportSize({ width: 390, height: 844 });
   await page.getByRole("button", { name: "Combat", exact: true }).click();
   assert.equal(

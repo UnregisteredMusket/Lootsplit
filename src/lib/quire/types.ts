@@ -7,6 +7,16 @@ export type Coins = {
 };
 
 export type Purse = {
+  sheet?: import("../characters/model.mjs").PlaySheet;
+  sheetRevision?: number;
+  profileId?: string;
+  sheetReadOnlyForDm?: boolean;
+  rolls?: Array<
+    ReturnType<typeof import("../characters/campaign-roll.mjs").makeCampaignRoll> & {
+      seq: number;
+      at: number;
+    }
+  >;
   portrait?: string;
   id: string;
   name: string;
@@ -22,6 +32,8 @@ export function characterControl(purse: Purse): "player" | "npc" | null {
 }
 
 export type Holding = {
+  weight?: number;
+  equipped?: boolean;
   image?: string;
   category?: string;
   id: string;

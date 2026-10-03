@@ -1,5 +1,7 @@
 import { readJournal, preserveJournalMetadata } from "./journal.ts";
 import { z } from "zod";
+import { sheetSchema } from "../characters/model.mjs";
+import { editCharacter, legacyCharacter, statsOnly } from "../characters/campaign-sheet.mjs";
 import type { CloudTable, CloudSeat } from "./cloud.ts";
 import { fromCopper, toCopper, spendCoins, priceAfterCharisma } from "./money.ts";
 import { charismaScore, readSheets } from "./sheet.ts";
@@ -9,6 +11,13 @@ const id = z.string().min(1).max(150),
   qty = amount.min(1).max(100000);
 const base = { id };
 export const commandSchema = z.discriminatedUnion("kind", [
+  z.object({
+    ...base,
+    kind: z.literal("character"),
+    purseId: id,
+    before: sheetSchema,
+    sheet: sheetSchema,
+  }),
   z.object({
     ...base,
     kind: z.literal("session"),
@@ -172,8 +181,16 @@ export function applyCommand(input: CloudTable, seat: CloudSeat, raw: Command): 
   const score = (purseId: string) =>
     t.purses.find((p) => p.id === purseId)?.kind === "party"
       ? null
-      : charismaScore(t.sheets.find((s) => s.purseId === purseId));
-  if (cmd.kind === "portrait") {
+      : (t.purses.find((p) => p.id === purseId)?.sheet?.scores.cha ??
+        charismaScore(t.sheets.find((s) => s.purseId === purseId)));
+  if (cmd.kind === "character") {
+    editCharacter(t, seat, cmd, cmd.id, at);
+    event(
+      `Character sheet updated: ${t.purses.find((p) => p.id === cmd.purseId)?.name}`,
+      "management",
+      cmd.purseId,
+    );
+  } else if (cmd.kind === "portrait") {
     own(cmd.purseId).portrait = cmd.portrait;
   } else if (cmd.kind === "session") {
     dm();
@@ -357,6 +374,22 @@ export function applyCommand(input: CloudTable, seat: CloudSeat, raw: Command): 
       if (JSON.stringify(old?.abilities) !== JSON.stringify(s.abilities))
         throw new Error("Ask the DM to import or change ability scores in shared modes.");
     }
+    const p = own(s.purseId),
+      converted = legacyCharacter(s, s.name || p.name);
+    if (
+      seat.role !== "dm" &&
+      !same(converted.scores, p.sheet?.scores || legacyCharacter(undefined, p.name).scores)
+    )
+      throw Error("Ask the DM to change ability scores.");
+    p.sheet = statsOnly({
+      ...converted,
+      attacks: p.sheet?.attacks || [],
+      spells: p.sheet?.spells || [],
+      slots: p.sheet?.slots || [],
+      resources: p.sheet?.resources || [],
+    });
+    p.name = converted.name;
+    p.sheetRevision = (p.sheetRevision || 0) + 1;
     t.sheets = [...t.sheets.filter((x) => x.purseId !== s.purseId), s];
   } else if (cmd.kind === "patch") {
     dm();

@@ -133,13 +133,13 @@ export function DmDesk() {
                   />
                   <span>{p.name.split(" ")[0]}</span>
                   <small>
-                    {live
+                    {live?.body.maxHp
                       ? `${live.body.hp}/${live.body.maxHp}`
                       : old?.hitPoints
                         ? `${old.hitPoints} HP`
                         : "HP —"}
                   </small>
-                  {live && <HpBar hp={live.body.hp} max={live.body.maxHp} />}
+                  {!!live?.body.maxHp && <HpBar hp={live.body.hp} max={live.body.maxHp} />}
                 </a>
               );
             })}

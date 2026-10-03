@@ -48,13 +48,36 @@ test("account characters enforce ownership, campaign assignments, DM policy, sta
         .bind(user, user, user + "@example.com")
         .run();
     const room = {
+      code: "PLAYTEST",
+      revision: 1,
+      live: true,
+      turn: 0,
       seats: [
         { id: "pseat", token: "ptoken", role: "player", name: "Player", purseIds: ["purse"] },
         { id: "dmseat", token: "dmtoken", role: "dm", name: "DM", purseIds: [] },
       ],
       table: {
-        purses: [{ id: "purse", kind: "character", name: "Hero", coins: { gp: 7 } }],
-        holdings: [{ id: "sword", purseId: "purse", name: "Sword", quantity: 1 }],
+        ledger: [],
+        sheets: [],
+        purses: [
+          {
+            id: "purse",
+            kind: "character",
+            name: "Hero",
+            coins: { cp: 0, sp: 0, ep: 0, gp: 7, pp: 0 },
+          },
+        ],
+        holdings: [
+          {
+            id: "sword",
+            purseId: "purse",
+            name: "Sword",
+            quantity: 1,
+            kind: "item",
+            unitCopper: 100,
+            notes: "",
+          },
+        ],
       },
     };
     await db
@@ -105,7 +128,7 @@ test("account characters enforce ownership, campaign assignments, DM policy, sta
     const roster = await call("dm", "/campaign", { code: "PLAYTEST" });
     assert.deepEqual(roster.characters, [
       {
-        id,
+        id: `campaign:PLAYTEST:purse`,
         name: sheet.name,
         purseId: "purse",
         body: {
@@ -131,7 +154,7 @@ test("account characters enforce ownership, campaign assignments, DM policy, sta
     );
     const manual = {
       id,
-      revision: 2,
+      revision: d.revision,
       kind: "ability",
       key: "str",
       manual: true,

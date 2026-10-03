@@ -2,6 +2,24 @@ import { createServerFn } from "@tanstack/react-start";
 import type { CloudTable } from "./cloud.ts";
 import type { BillFile } from "./table.ts";
 
+export const rollCampaignCharacter = createServerFn({ method: "POST" })
+  .validator(
+    (input: {
+      code: string;
+      token: string;
+      purseId: string;
+      log?: boolean;
+      before?: number;
+      [key: string]: unknown;
+    }) => input,
+  )
+  .handler(async ({ data }) => {
+    const { guardMemberSeat } = await import("./member-access.server.ts");
+    await guardMemberSeat(data);
+    const { characterRoll } = await import("./cloud.server.ts");
+    return characterRoll(data);
+  });
+
 export const openCloudTable = createServerFn({ method: "POST" })
   .validator((input: { name: string; table: CloudTable }) => input)
   .handler(async ({ data }) => {

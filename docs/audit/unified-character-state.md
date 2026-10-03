@@ -1,0 +1,21 @@
+# Unified character state repair
+
+This replaces the optional-link approach in PR #11. That release did not connect ordinary character creation and therefore did not resolve the user's reported split between Party and character sheets.
+
+## Data and behavior
+
+A campaign character uses its existing purse ID as its character ID. Its full sheet is composed from persisted character statistics, that same purse's wallet, and holdings with that purse ID. The stored statistics contain no second spendable wallet or equipment list. Both character creation paths produce a playable character. Party/Desk and Player Home read this aggregate directly, without a separate account-roster fetch.
+
+DM sheet edits can adjust funds/items through the same authoritative state. Player changes cannot add money, insert/revalue/duplicate items, spend another character's assets, or change price-affecting Charisma. Existing buy/sell/give/request/award paths remain. Equipment metadata uses stable item IDs. Sheet edits compare only the field groups being changed: an HP save cannot roll back a simultaneous purchase, and stale wallet/inventory edits fail. DM metadata edits preserve the current wallet, sheet and roll history.
+
+Existing explicit account assignments and local references migrate statistics only. No name-based matching occurs. Existing campaign balances and holdings remain authoritative. Unassigned private profiles remain in the account library; a DM can explicitly add one to the current campaign, with a recorded import of its assets. Identity/statistics now travel in ordinary campaign saves, backups, live/turn modes and manual sharing. Original PDFs remain local. Account-owned sheets retain their DM read-only boundary; standalone profiles, import/export and account roll histories remain available.
+
+Local guest sheets support device dice with clearly labeled receipts. Shared dice use server values and existing campaign logs, retain manual-policy enforcement and deduplicate retries. Other players do not receive private full sheets in the room response. Manual/offline reports require DM review of their resulting wallets, items and transfers before import; a rejected report writes nothing. Local device owners can edit their own storage, so manual files require this approval rather than claiming server verification.
+
+## Three verification passes
+
+1. **Individual functions and permissions.** Character projection, ordinary creation, DM financial edits, player metadata/HP edits, invalid grants, cross-character ownership, duplicate inventory IDs, stale updates, legacy fallback, and snapshot/restore. Real D1-compatible room/account endpoint tests cover forged requests, server receipts, manual-roll policy, existing account migration and private-sheet filtering. Manual report rejection/approval checks validate actual persisted state.
+2. **Shared workflows.** Browser tests create a character through the normal UI, edit HP to 10/115, verify Party/Desk, change coins/items from the sheet, change funds through its dedicated tab, restore into another campaign, migrate an existing explicit profile without importing its wealth, join a player, save shared HP/equipped changes, and open the same character on Player Home. Separate account, combat/spell/resource/dice, encounter, loot-award and control-panel audits exercise adjacent features. The party audit no longer begins by manually assigning the character under test.
+3. **Whole client and release.** Mobile/desktop role routes, 320–2560px overflow checks, menus, settings, guest sheets, complete regression suite, static checks, Cloudflare build and Android-compatible mobile build. No stylesheet or navigation-layout changes were made. Functional content changes include valid sheet links for every party character, unified gear fields and manual-report approval.
+
+Verification scripts: `scripts/party-sheet-browser-audit.mjs`, `scripts/character-browser-audit.mjs`, `scripts/campaign-server.test.mjs`, `src/lib/quire/campaign-character.test.ts`, and `src/lib/quire/local-report.test.ts`. CI also runs the existing full feature suite and built Worker checks. These passes verify the affected functionality and preserved integration paths; they are not a claim that every possible execution branch of the application has been proven.

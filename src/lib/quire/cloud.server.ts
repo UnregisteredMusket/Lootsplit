@@ -11,6 +11,127 @@ import {
 import { canReadNote } from "./chat-visibility.ts";
 import { characterControl } from "./types.ts";
 import type { BillFile } from "./table.ts";
+import { characterSheet } from "../characters/campaign-sheet.mjs";
+import { makeCampaignRoll } from "../characters/campaign-roll.mjs";
+import { manualCharacterRolls, database } from "./room-store.server.ts";
+
+export async function characterRoll(input: {
+  code: string;
+  token: string;
+  purseId: string;
+  log?: boolean;
+  before?: number;
+  [key: string]: unknown;
+}) {
+  const room = await must(input.code);
+  const seat = room.seats.find((s) => s.token === input.token);
+  const p = room.table.purses.find((p) => p.id === input.purseId && p.kind === "character");
+  if (!seat || !p || (seat.role !== "dm" && !seat.purseIds.includes(p.id)))
+    throw Error("You do not control this character.");
+  if (input.policy) return { manualAllowed: await manualCharacterRolls(room.code) };
+  const db = database();
+  if (db) {
+    if (input.log) {
+      const rows = await db
+        .prepare(
+          "SELECT seq,body,created_at FROM play_rolls WHERE code=? AND (character_id=? OR character_id=? OR character_id=?) AND seq<? ORDER BY seq DESC LIMIT 51",
+        )
+        .bind(
+          room.code,
+          `party:${p.id}`,
+          p.profileId || "",
+          `campaign:${room.code}:${p.id}`,
+          input.before || Number.MAX_SAFE_INTEGER,
+        )
+        .all();
+      return {
+        rolls: rows.results
+          .slice(0, 50)
+          .map((r) => ({ ...JSON.parse(r.body), seq: r.seq, at: r.created_at })),
+        more: rows.results.length > 50,
+      };
+    }
+    const receipt = `${room.code}:${p.id}:${input.requestKey}`;
+    const prior = await db
+      .prepare("SELECT body FROM play_rolls WHERE id=?")
+      .bind(receipt)
+      .first<{ body: string }>();
+    if (prior) return JSON.parse(prior.body);
+    if ((p.sheetRevision || 0) !== input.revision)
+      throw Error("Reload your character before rolling.");
+    const roll = {
+      ...makeCampaignRoll(
+        characterSheet(
+          p,
+          room.table.holdings,
+          room.table.sheets.find((s) => s.purseId === p.id),
+        ),
+        input,
+        seat.name,
+        p.id,
+        "server",
+        await manualCharacterRolls(room.code),
+      ),
+      id: receipt,
+    };
+    await db
+      .prepare(
+        "INSERT INTO play_rolls(id,user_id,character_id,code,request_key,body,created_at) SELECT ?,NULL,?,?,?,?,? WHERE EXISTS(SELECT 1 FROM campaign_rooms WHERE code=? AND body=?) AND (?=0 OR EXISTS(SELECT 1 FROM play_policies WHERE code=? AND manual_allowed=1)) ON CONFLICT(id) DO NOTHING",
+      )
+      .bind(
+        receipt,
+        `party:${p.id}`,
+        room.code,
+        String(input.requestKey),
+        JSON.stringify(roll),
+        Date.now(),
+        room.code,
+        JSON.stringify(room),
+        input.manual ? 1 : 0,
+        room.code,
+      )
+      .run();
+    const saved = await db
+      .prepare("SELECT body FROM play_rolls WHERE id=?")
+      .bind(receipt)
+      .first<{ body: string }>();
+    if (!saved) throw Error("Campaign changed. Reload and retry.");
+    return JSON.parse(saved.body);
+  }
+  const rolls = p.rolls || [];
+  if (input.log) {
+    const filtered = rolls
+      .filter((r) => r.seq < (input.before || Infinity))
+      .slice()
+      .reverse();
+    return { rolls: filtered.slice(0, 50), more: filtered.length > 50 };
+  }
+  const prior = rolls.find((r) => r.id === input.requestKey);
+  if (prior) return prior;
+  if ((p.sheetRevision || 0) !== input.revision)
+    throw Error("Reload your character before rolling.");
+  const roll = {
+    ...makeCampaignRoll(
+      characterSheet(
+        p,
+        room.table.holdings,
+        room.table.sheets.find((s) => s.purseId === p.id),
+      ),
+      input,
+      seat.name,
+      p.id,
+      "server",
+      false,
+    ),
+    seq: rolls.length + 1,
+    at: Date.now(),
+  };
+  p.rolls = [...rolls, roll];
+  const base = room.revision;
+  room.revision++;
+  await updateRoom(room, base);
+  return roll;
+}
 
 export async function openRoom(input: {
   name: string;
@@ -54,11 +175,7 @@ export async function previewRoom(
   };
 }
 
-export async function joinRoom(input: {
-  code: string;
-  purseId: string;
-  name: string;
-}): Promise<{
+export async function joinRoom(input: { code: string; purseId: string; name: string }): Promise<{
   token: string;
   seatId: string;
   revision: number;
@@ -191,10 +308,29 @@ function view(room: CloudRoom, seat: CloudSeat): RoomView {
         ? { ...room.table, notes: room.table.notes.filter((note) => canReadNote(note, seat)) }
         : {
             ...room.table,
-            notes: room.table.notes.filter(
-              (note) => canReadNote(note, seat),
-            ),
-            journal: room.table.journal ? {...room.table.journal, requests:room.table.journal.requests.filter(r=>seat.purseIds.includes(r.purseId)),events:room.table.journal.events.filter(e=>!e.purseId||seat.purseIds.includes(e.purseId)).map(({change, ...event}) => event)}:undefined,
+            purses: room.table.purses.map((p) => {
+              if (seat.purseIds.includes(p.id)) return p;
+              const {
+                sheet: _sheet,
+                sheetRevision: _revision,
+                profileId: _profile,
+                rolls: _rolls,
+                ...publicPurse
+              } = p;
+              return publicPurse;
+            }),
+            notes: room.table.notes.filter((note) => canReadNote(note, seat)),
+            journal: room.table.journal
+              ? {
+                  ...room.table.journal,
+                  requests: room.table.journal.requests.filter((r) =>
+                    seat.purseIds.includes(r.purseId),
+                  ),
+                  events: room.table.journal.events
+                    .filter((e) => !e.purseId || seat.purseIds.includes(e.purseId))
+                    .map(({ change, ...event }) => event),
+                }
+              : undefined,
             loans: room.table.loans.filter((loan) => seat.purseIds.includes(loan.purseId)),
             sheets: room.table.sheets.filter((sheet) => seat.purseIds.includes(sheet.purseId)),
           },
@@ -205,7 +341,8 @@ async function freshCode(): Promise<string> {
   const alphabet = "ABCDEFGHJKLMNPQRSTUVWXYZ23456789";
   for (let attempt = 0; attempt < 20; attempt += 1) {
     let code = "";
-    for (const byte of crypto.getRandomValues(new Uint8Array(8))) code += alphabet[byte % alphabet.length];
+    for (const byte of crypto.getRandomValues(new Uint8Array(8)))
+      code += alphabet[byte % alphabet.length];
     if (!(await readRoom(code))) return code;
   }
   throw new Error("Could not open a table. Try again.");
@@ -270,10 +407,16 @@ export async function submitCommands(input: {
     try {
       await updateRoom(next, room.revision);
       if (!input.stage) {
-        const fresh = next.table.notes.filter((note) => !room.table.notes.some((old) => old.id === note.id));
+        const fresh = next.table.notes.filter(
+          (note) => !room.table.notes.some((old) => old.id === note.id),
+        );
         if (fresh.length) {
-          try { const { pushMessages } = await import("./push.server.ts"); await pushMessages(next, seat.id, fresh); }
-          catch { console.warn("Background notification failed; campaign changes remain saved."); }
+          try {
+            const { pushMessages } = await import("./push.server.ts");
+            await pushMessages(next, seat.id, fresh);
+          } catch {
+            console.warn("Background notification failed; campaign changes remain saved.");
+          }
         }
       }
       return view(next, seat);

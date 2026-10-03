@@ -1,4 +1,6 @@
-import {getCloudTable} from "@/lib/quire/cloud-client";
+import { Link } from "@tanstack/react-router";
+import { characterSheet } from "@/lib/characters/campaign-sheet.mjs";
+import { getCloudTable } from "@/lib/quire/cloud-client";
 import { useEconomy } from "@/lib/quire/economy-context";
 import { formatCoins, toCopper } from "@/lib/quire/money";
 import { useSeat } from "@/lib/quire/seat";
@@ -15,13 +17,43 @@ const ABILITIES: { key: AbilityKey; label: string }[] = [
 ];
 
 export function CharacterSheetPanel({ purseId, face = true }: { purseId: string; face?: boolean }) {
-  const { sheets, importSheet, updateSheet } = useEconomy();
+  const { sheets, purses, holdings, importSheet, updateSheet } = useEconomy();
   const seat = useSeat();
-  const sheet = sheets.find((item) => item.purseId === purseId);
-  const canImport = seat.role === "dm" || (!getCloudTable().joined && seat.purseIds.includes(purseId));
+  const original = sheets.find((item) => item.purseId === purseId);
+  const p = purses.find((p) => p.id === purseId);
+  const current = p ? characterSheet(p, holdings, original) : null;
+  const sheet =
+    original && current
+      ? {
+          ...original,
+          name: current.name,
+          race: current.species,
+          classLevel: current.classes,
+          hitPoints: `${current.hp} / ${current.maxHp}`,
+          armorClass: String(current.ac),
+          speed: current.speed,
+          coins: current.coins,
+          abilities: Object.fromEntries(
+            Object.entries(current.scores).map(([key, score]) => [
+              key,
+              { score: String(score), modifier: "" },
+            ]),
+          ) as CharacterSheet["abilities"],
+          equipment: current.equipment.map((i) => `${i.name} × ${i.quantity}`).join("\n"),
+        }
+      : original;
+  const canImport =
+    seat.role === "dm" || (!getCloudTable().joined && seat.purseIds.includes(purseId));
 
   return (
     <div className="mt-4">
+      <Link
+        to="/characters"
+        search={{ id: `party:${purseId}` }}
+        className="inline-flex min-h-11 items-center text-sm underline"
+      >
+        Open character sheet
+      </Link>
       {canImport ? (
         <label className="inline-flex min-h-11 cursor-pointer items-center text-sm underline">
           Import a D&D 5e (2014) character sheet
@@ -40,7 +72,11 @@ export function CharacterSheetPanel({ purseId, face = true }: { purseId: string;
       ) : null}
       {face && sheet ? <SheetView sheet={sheet} /> : null}
       {sheet ? <BlankFields sheet={sheet} onSave={(next) => void updateSheet(next)} /> : null}
-      {!sheet && canImport ? <p className="mt-2 text-sm text-muted">A filled PDF or a JSON export. A scan without selectable text cannot be read.</p> : null}
+      {!sheet && canImport ? (
+        <p className="mt-2 text-sm text-muted">
+          A filled PDF or a JSON export. A scan without selectable text cannot be read.
+        </p>
+      ) : null}
     </div>
   );
 }
@@ -70,7 +106,9 @@ export function SheetBody({ sheet }: { sheet: CharacterSheet }) {
             <div key={ability.key} className="rounded-sm border border-border px-1 py-2">
               <p className="text-[10px] tracking-wide text-muted">{ability.label}</p>
               <p className="font-display text-lg leading-tight">{row.score || "–"}</p>
-              <p className="text-xs tabular-nums text-muted">{showMod(row.modifier, row.score) || ""}</p>
+              <p className="text-xs tabular-nums text-muted">
+                {showMod(row.modifier, row.score) || ""}
+              </p>
             </div>
           );
         })}
@@ -85,8 +123,20 @@ export function SheetBody({ sheet }: { sheet: CharacterSheet }) {
           ))}
         </ul>
       ) : null}
-      {saves.length > 0 ? <Line label="Saves" value={saves.map((ability) => `${ability.label} ${showMod(sheet.saves[ability.key])}`).join(" · ")} /> : null}
-      {sheet.skills.length > 0 ? <Line label="Skills" value={sheet.skills.map((skill) => `${skill.name} ${showMod(skill.bonus)}`).join(", ")} /> : null}
+      {saves.length > 0 ? (
+        <Line
+          label="Saves"
+          value={saves
+            .map((ability) => `${ability.label} ${showMod(sheet.saves[ability.key])}`)
+            .join(" · ")}
+        />
+      ) : null}
+      {sheet.skills.length > 0 ? (
+        <Line
+          label="Skills"
+          value={sheet.skills.map((skill) => `${skill.name} ${showMod(skill.bonus)}`).join(", ")}
+        />
+      ) : null}
       {coins ? <Line label="Coins on the sheet" value={coins} /> : null}
       <Block label="Traits" value={sheet.traits} />
       <Block label="Ideals" value={sheet.ideals} />
@@ -101,13 +151,27 @@ export function SheetBody({ sheet }: { sheet: CharacterSheet }) {
   );
 }
 
-function BlankFields({ sheet, onSave }: { sheet: CharacterSheet; onSave: (sheet: CharacterSheet) => void }) {
+function BlankFields({
+  sheet,
+  onSave,
+}: {
+  sheet: CharacterSheet;
+  onSave: (sheet: CharacterSheet) => void;
+}) {
   const fields: Array<{ label: string; value: string; set: (value: string) => CharacterSheet }> = [
     { label: "Name", value: sheet.name, set: (value) => ({ ...sheet, name: value }) },
     { label: "Class", value: sheet.classLevel, set: (value) => ({ ...sheet, classLevel: value }) },
     { label: "Race", value: sheet.race, set: (value) => ({ ...sheet, race: value }) },
-    { label: "Armor class", value: sheet.armorClass, set: (value) => ({ ...sheet, armorClass: value }) },
-    { label: "Hit points", value: sheet.hitPoints, set: (value) => ({ ...sheet, hitPoints: value }) },
+    {
+      label: "Armor class",
+      value: sheet.armorClass,
+      set: (value) => ({ ...sheet, armorClass: value }),
+    },
+    {
+      label: "Hit points",
+      value: sheet.hitPoints,
+      set: (value) => ({ ...sheet, hitPoints: value }),
+    },
   ];
   const abilities: Array<{ key: AbilityKey; label: string }> = [
     { key: "str", label: "Strength" },
@@ -119,16 +183,23 @@ function BlankFields({ sheet, onSave }: { sheet: CharacterSheet; onSave: (sheet:
   ];
   const blanks = [
     ...fields.filter((field) => !field.value.trim()),
-    ...abilities.filter((ability) => !sheet.abilities[ability.key].score.trim()).map((ability) => ({
-      label: ability.label,
-      value: "",
-      set: (value: string) => ({ ...sheet, abilities: { ...sheet.abilities, [ability.key]: { score: value, modifier: "" } } }),
-    })),
+    ...abilities
+      .filter((ability) => !sheet.abilities[ability.key].score.trim())
+      .map((ability) => ({
+        label: ability.label,
+        value: "",
+        set: (value: string) => ({
+          ...sheet,
+          abilities: { ...sheet.abilities, [ability.key]: { score: value, modifier: "" } },
+        }),
+      })),
   ];
   if (blanks.length === 0) return null;
   return (
     <div className="mt-3">
-      <p className="text-sm text-muted">Still blank: {blanks.map((field) => field.label).join(", ")}.</p>
+      <p className="text-sm text-muted">
+        Still blank: {blanks.map((field) => field.label).join(", ")}.
+      </p>
       <div className="mt-2 grid grid-cols-2 gap-2">
         {blanks.map((field) => (
           <label key={field.label} className="text-xs text-muted">
