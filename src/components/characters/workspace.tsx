@@ -108,6 +108,8 @@ export function CharacterWorkspace({
     },
   });
   const selectionContext = `${registry.activeId}:${activeCode}:${purseId}:${seat.role}:${seat.purseIds.join(",")}`;
+  const campaignContext = `${registry.activeId}:${activeCode}:${purseId}`;
+  const previousCampaignContext = useRef(campaignContext);
   const previousContext = useRef(selectionContext);
   const previousRequest = useRef(requestedId);
   const resolvedSelection = useRef("");
@@ -154,6 +156,8 @@ export function CharacterWorkspace({
     if (!economy.ready) return;
     const c = new AbortController();
     const contextChanged = previousContext.current !== selectionContext;
+    const campaignChanged = previousCampaignContext.current !== campaignContext;
+    previousCampaignContext.current = campaignContext;
     const requestChanged = previousRequest.current !== requestedId;
     previousContext.current = selectionContext;
     previousRequest.current = requestedId;
@@ -168,6 +172,7 @@ export function CharacterWorkspace({
     const select = (d: { userId?: string; characters: Row[] }) => {
       if (c.signal.aborted) return;
       const rows = campaignRowsRef.current;
+      const firstSelection = !resolvedSelection.current;
       const restoreSelection = resolvedSelection.current !== selectionContext;
       resolvedSelection.current = selectionContext;
       let remembered = "";
@@ -191,9 +196,9 @@ export function CharacterWorkspace({
           : d.characters.find((r) => r.id === local?.sheetId && !r.campaign_code)?.id);
       setSelected((v) => {
         if (
-          !contextChanged &&
+          (firstSelection || !campaignChanged) &&
           requestedId &&
-          (requestChanged || v === requestedId) &&
+          (firstSelection || requestChanged || contextChanged || v === requestedId) &&
           (rows.some((r) => r.id === requestedId) ||
             d.characters.some((r) => r.id === requestedId) ||
             requestedId.startsWith("campaign:"))
@@ -248,6 +253,7 @@ export function CharacterWorkspace({
     purseId,
     registry.activeId,
     selectionContext,
+    campaignContext,
     requestedId,
     economy.ready,
     campaignIds,
