@@ -1,6 +1,6 @@
 import { chromium } from "playwright";
 import assert from "node:assert/strict";
-import { mkdir } from "node:fs/promises";
+import { mkdir, writeFile } from "node:fs/promises";
 import { openApplication } from "./title-screen-navigation.mjs";
 const origin = process.env.AUDIT_ORIGIN || "http://127.0.0.1:8080";
 const output = "test-results/help";
@@ -9,18 +9,20 @@ const browser = await chromium.launch({
   executablePath: process.env.CHROMIUM_EXECUTABLE_PATH || undefined,
   args: ["--no-sandbox"],
 });
+let activePage;
 try {
   for (const width of [1280, 390]) {
     const context = await browser.newContext({ viewport: { width, height: 844 } });
     await context.addInitScript(() => localStorage.setItem("quire.guide.offer.v3", "seen"));
     const page = await context.newPage();
+    activePage = page;
     page.setDefaultTimeout(20000);
     const errors = [];
     page.on("pageerror", (e) => errors.push(e.message));
     await openApplication(page, origin + "/help");
     const search = page.getByRole("searchbox");
     await search.fill("downtime");
-    await page.locator("#downtime > summary").waitFor();
+    await page.locator("#downtime[open]").waitFor();
     assert.ok((await page.locator(".help-topic[open]").count()) > 0);
     await search.fill("no-such-help-topic");
     await page.getByText("0 matching topics", { exact: true }).waitFor();
@@ -66,6 +68,12 @@ try {
   console.log(
     "Help: search, jump navigation, legacy anchors, settings/finance/session links and in-app guide passed at desktop/mobile widths.",
   );
+} catch (error) {
+  if (activePage && !activePage.isClosed()) {
+    await activePage.screenshot({ path: `${output}/failure.png`, fullPage: true });
+    await writeFile(`${output}/failure.txt`, await activePage.locator("body").innerText());
+  }
+  throw error;
 } finally {
   await browser.close();
 }

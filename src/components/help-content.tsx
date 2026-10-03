@@ -12,6 +12,8 @@ export function HelpContent({
   onNavigate?: () => void;
 }) {
   const [query, setQuery] = useState("");
+  const [interactive, setInteractive] = useState(false);
+  useEffect(() => setInteractive(true), []);
   const inputId = useId();
   const hash = useRouterState({ select: (s) => s.location.hash });
   const prefix = embedded ? "guide-" : "";
@@ -33,6 +35,7 @@ export function HelpContent({
         <input
           id={inputId}
           type="search"
+          disabled={!interactive}
           value={query}
           onChange={(e) => setQuery(e.target.value)}
           placeholder="Try downtime, coins, import, backups…"
@@ -42,6 +45,7 @@ export function HelpContent({
         {HELP_GROUPS.map((group) => (
           <button
             type="button"
+            disabled={!interactive}
             key={group.id}
             onClick={() => {
               setQuery("");
