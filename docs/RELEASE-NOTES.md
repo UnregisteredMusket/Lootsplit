@@ -1,3 +1,22 @@
+# Lootsplit 1.3.2 — prepared, not published
+
+Android version code 5. This candidate retains the existing package identity and permanent signing certificate and updates permanently signed 1.3.x installations in place.
+
+- Brings the current DM/Player interface, responsive desktop layout, settings panels, encounters, manual gameplay and loot review into the bundled Android client.
+- Connects party readouts and character sheets to one character state; wallet and inventory updates retain permission and duplicate-award checks.
+- Fixes older sheet edits discarding advanced character data or bypassing DM read-only protection.
+- Retains imported levels and skill/save/initiative bonuses; local rolls use the displayed character values.
+- Fixes stale characters and permission errors when switching local campaigns.
+- Allows HP saves with existing long inventory names, notes and IDs without changing those items.
+- Preserves item metadata and every queued offline transfer; report replay cannot award the same transfer again.
+- Keeps current mobile formatting and desktop space usage unchanged.
+
+## Candidate verification
+
+See `docs/audit/2026-10-02-bug-fixes.md` for sequential before/after evidence and release gates. The public download remains 1.3.1 until the new signed APK and checksum exist. Real-device upgrade, file-picker and force-close checks remain separate from automated verification.
+
+---
+
 # Lootsplit 1.3.1
 
 - Retains all campaign, finance, PDF, reference, multiplayer and appearance features.

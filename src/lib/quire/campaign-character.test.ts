@@ -151,3 +151,37 @@ test("old campaign characters receive a sheet without inventing HP or changing t
   assert.equal(s.maxHp, 0);
   assert.equal(s.coins.gp, 47);
 });
+
+test("existing inventory text and IDs remain lossless while players save unrelated HP", async () => {
+  const t = fixture();
+  t.holdings[0] = {
+    ...t.holdings[0],
+    id: "item-".repeat(40),
+    name: "  " + "Long item description ".repeat(12) + "  ",
+    notes: "Notes and enchantment details. ".repeat(600),
+  };
+  const before = characterSheet(t.purses[0], t.holdings);
+  const next = edit(t, player, { hp: 3 }, before);
+  assert.equal(next.purses[0].sheet?.hp, 3);
+  assert.deepEqual(next.holdings, t.holdings);
+  assert.throws(
+    () =>
+      edit(t, player, { equipment: before.equipment.map((h) => ({ ...h, quantity: 99 })) }, before),
+    /Only the DM/,
+  );
+  assert.throws(
+    () =>
+      edit(
+        t,
+        player,
+        { equipment: before.equipment.map((h) => ({ ...h, name: "Revalued item" })) },
+        before,
+      ),
+    /Only the DM/,
+  );
+  await applyCloudTable(t);
+  await saveCampaignCharacter({ purseId: "hero", before, sheet: { ...before, hp: 3 } });
+  const saved = await economySnapshot();
+  assert.equal(saved.purses[0].sheet?.hp, 3);
+  assert.deepEqual(saved.holdings, t.holdings);
+});

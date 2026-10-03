@@ -16,7 +16,7 @@ import type { Purse, Holding } from "@/lib/quire/types";
 import { Link, useRouterState } from "@tanstack/react-router";
 import { z } from "zod";
 import { characterRequest as accountRequest } from "@/lib/characters/campaign-client";
-import { characterSheet } from "@/lib/characters/campaign-sheet.mjs";
+import { characterSheet, legacyCharacter } from "@/lib/characters/campaign-sheet.mjs";
 import {
   createCampaignCharacter,
   bindCampaignProfile,
@@ -107,7 +107,7 @@ export function CharacterWorkspace({
       return typeof id === "string" && id.length <= 256 ? id : "";
     },
   });
-  const selectionContext = `${registry.activeId}:${purseId}`;
+  const selectionContext = `${registry.activeId}:${activeCode}:${purseId}:${seat.role}:${seat.purseIds.join(",")}`;
   const previousContext = useRef(selectionContext);
   const previousRequest = useRef(requestedId);
   const [accountData, setData] = useState<{
@@ -146,8 +146,53 @@ export function CharacterWorkspace({
       }
     : accountData;
   const dirtyRef = useRef(false);
+  const campaignRowsRef = useRef(campaignRows);
+  campaignRowsRef.current = campaignRows;
+  const campaignIds = campaignRows.map((row) => row.id).join("|");
   useEffect(() => {
+    if (!economy.ready) return;
     const c = new AbortController();
+    const contextChanged = previousContext.current !== selectionContext;
+    const requestChanged = previousRequest.current !== requestedId;
+    previousContext.current = selectionContext;
+    previousRequest.current = requestedId;
+    const localRows = campaignRowsRef.current;
+    const localDefault = purseId
+      ? localRows.find((row) => row.purse_id === purseId)?.id || ""
+      : localRows[0]?.id || "";
+    if (contextChanged)
+      setSelected(localRows.some((row) => row.id === requestedId) ? requestedId : localDefault);
+    else if (requestChanged) setSelected(requestedId || localDefault);
+    else setSelected((v) => v || requestedId || localDefault);
+    const select = (d: { userId?: string; characters: Row[] }) => {
+      if (c.signal.aborted) return;
+      const rows = campaignRowsRef.current;
+      const local = readPartySheetLinks(d.userId || "", registry.activeId).find(
+        (link) => link.purseId === purseId,
+      );
+      const linked =
+        rows.find((r) => r.purse_id === purseId)?.id ||
+        (activeCode
+          ? d.characters.find((r) => r.campaign_code === activeCode && r.purse_id === purseId)?.id
+          : d.characters.find((r) => r.id === local?.sheetId && !r.campaign_code)?.id);
+      setSelected((v) => {
+        if (!contextChanged && requestedId && (requestChanged || v === requestedId))
+          return requestedId;
+        if (
+          v &&
+          (rows.some((r) => r.id === v) ||
+            d.characters.some((r) => r.id === v) ||
+            v.startsWith("campaign:"))
+        )
+          return v;
+        return purseId
+          ? linked || ""
+          : rows[0]?.id ||
+              d.characters.find((r) => activeCode && r.campaign_code === activeCode)?.id ||
+              d.characters[0]?.id ||
+              "";
+      });
+    };
     setLoading(true);
     accountRequest<{ userId?: string; characters: Row[]; campaigns: Campaign[] }>(
       "sheets",
@@ -155,40 +200,17 @@ export function CharacterWorkspace({
       c.signal,
     )
       .then((d) => {
-        const contextChanged = previousContext.current !== selectionContext;
-        const requestChanged = previousRequest.current !== requestedId;
-        previousContext.current = selectionContext;
-        previousRequest.current = requestedId;
+        if (c.signal.aborted) return;
         setData(d);
         setError("");
-        const local = readPartySheetLinks(d.userId || "", registry.activeId).find(
-          (link) => link.purseId === purseId,
-        );
-        const linked =
-          campaignRows.find((r) => r.purse_id === purseId)?.id ||
-          (activeCode
-            ? d.characters.find((r) => r.campaign_code === activeCode && r.purse_id === purseId)?.id
-            : d.characters.find((r) => r.id === local?.sheetId && !r.campaign_code)?.id);
-        setSelected(
-          (v) =>
-            ((requestChanged || contextChanged) && requestedId) ||
-            (!contextChanged && v) ||
-            (purseId
-              ? linked || ""
-              : campaignRows[0]?.id ||
-                d.characters.find((r) => activeCode && r.campaign_code === activeCode)?.id ||
-                d.characters[0]?.id ||
-                ""),
-        );
+        select(d);
       })
       .catch((e) => {
-        if (!c.signal.aborted) {
-          setData({ characters: [], campaigns: [] });
-          setSelected(
-            (v) => requestedId || v || (purseId ? `party:${purseId}` : campaignRows[0]?.id || ""),
-          );
-          if (!/sign in|member|account|authenticated/i.test(errorText(e))) setError(errorText(e));
-        }
+        if (c.signal.aborted) return;
+        const empty = { characters: [], campaigns: [] };
+        setData(empty);
+        select(empty);
+        setError(/sign in|member|account|authenticated/i.test(errorText(e)) ? "" : errorText(e));
       })
       .finally(() => {
         if (!c.signal.aborted) setLoading(false);
@@ -202,6 +224,7 @@ export function CharacterWorkspace({
     selectionContext,
     requestedId,
     economy.ready,
+    campaignIds,
   ]);
   const deviceCampaign: DeviceCampaign | undefined =
     !room.joined && economy.ready && data?.userId
@@ -331,38 +354,8 @@ export function CharacterWorkspace({
                       }
                     }
                     const old = await readCharacterSheet(f),
-                      next = blankSheet();
-                    next.name = old.name || f.name;
-                    next.species = old.race;
-                    next.classes = old.classLevel;
-                    next.background = old.background;
-                    next.features = old.features;
-                    next.description = [old.traits, old.ideals, old.bonds, old.flaws]
-                      .filter(Boolean)
-                      .join("\n");
-                    next.notes = [old.attacks, old.equipment, old.spells, old.proficiencies]
-                      .filter(Boolean)
-                      .join("\n\n");
+                      next = legacyCharacter(old, old.name || f.name);
                     next.coins = old.coins;
-                    for (const a of abilities as Ability[]) {
-                      const score = Number(old.abilities[a].score);
-                      if (score >= 1 && score <= 30) next.scores[a] = score;
-                      if (old.saves[a].trim() && Number.isFinite(Number(old.saves[a])))
-                        next.saves[a].extra = Number(old.saves[a]) - modifier(next.scores[a]);
-                    }
-                    for (const skill of old.skills) {
-                      const a = skills[skill.name as keyof typeof skills] as Ability;
-                      if (a && Number.isFinite(Number(skill.bonus)))
-                        next.skills[skill.name] = {
-                          rank: 0,
-                          extra: Number(skill.bonus) - modifier(next.scores[a]),
-                        };
-                    }
-                    if (Number(old.armorClass) > 0) next.ac = Number(old.armorClass);
-                    if (Number(old.hitPoints) > 0) next.hp = next.maxHp = Number(old.hitPoints);
-                    if (Number(old.proficiency) > 0) next.proficiency = Number(old.proficiency);
-                    next.hitDice = old.hitDice;
-                    next.speed = old.speed || next.speed;
                     next.source =
                       "Imported character sheet; review stats and convert imported notes into attacks, equipment and spells as needed.";
                     await create(sheetSchema.parse(next));
@@ -375,7 +368,7 @@ export function CharacterWorkspace({
           </details>
           {selected && (
             <CharacterEditor
-              key={selected}
+              key={`${selectionContext}:${selected}`}
               id={selected}
               campaigns={data.campaigns}
               deviceCampaign={deviceCampaign}
@@ -432,8 +425,12 @@ function CharacterEditor({
   useEffect(() => {
     const currentDevice = deviceCampaignRef.current;
     const c = new AbortController();
+    setDetail(null);
+    setSheet(null);
+    setError("");
     accountRequest<Detail>("sheets/detail", { id }, c.signal)
       .then((d) => {
+        if (c.signal.aborted) return;
         loadedCampaign.current = activeCampaignId;
         setDetail(d);
         setSheet(d.body);
@@ -2293,7 +2290,7 @@ function DmCampaigns({ campaigns }: { campaigns: Campaign[] }) {
           </ul>
           {selected && (
             <CharacterEditor
-              key={selected}
+              key={`${code}:${selected}`}
               id={selected}
               campaigns={campaigns}
               changed={() => setReload((n) => n + 1)}

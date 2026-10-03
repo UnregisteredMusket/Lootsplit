@@ -3,13 +3,14 @@ import { getCloudTable, requestCampaignRoll } from "./cloud-client";
 import { getSeat } from "./table";
 import { characterSheet } from "../characters/campaign-sheet.mjs";
 import { makeCampaignRoll } from "../characters/campaign-roll.mjs";
+import { readSheets } from "./sheet";
 import type { Purse, Holding } from "./types";
 export async function campaignRollRequest(path: string, body: any): Promise<any> {
   const purseId = body.id.slice(6);
   if (getCloudTable().joined)
     return requestCampaignRoll({ ...body, purseId, log: path === "sheets/log" });
   const db = await quireDb();
-  const tx = db.transaction(["purses", "holdings"], "readwrite");
+  const tx = db.transaction(["purses", "holdings", "meta"], "readwrite");
   const done = new Promise<void>((resolve, reject) => {
     tx.oncomplete = () => resolve();
     tx.onerror = tx.onabort = () => reject(tx.error || Error("Roll could not be saved."));
@@ -33,8 +34,11 @@ export async function campaignRollRequest(path: string, body: any): Promise<any>
     if ((p.sheetRevision || 0) !== body.revision)
       throw Error("Reload your character before rolling.");
     const holdings = await request<Holding[]>(tx.objectStore("holdings").getAll());
+    const legacy = readSheets(await request(tx.objectStore("meta").get("sheets"))).find(
+      (s) => s.purseId === p.id,
+    );
     const roll = {
-      ...makeCampaignRoll(characterSheet(p, holdings), body, p.name, p.id, "device", true),
+      ...makeCampaignRoll(characterSheet(p, holdings, legacy), body, p.name, p.id, "device", true),
       seq: rolls.length + 1,
       at: Date.now(),
     };

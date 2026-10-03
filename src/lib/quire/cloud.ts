@@ -107,11 +107,8 @@ export function applyBillToTable(table: CloudTable, bill: BillFile, seen: CloudS
       holdings.push({
         id: crypto.randomUUID(),
         purseId: purse.id,
-        name: gift.holding.name,
-        kind: gift.holding.kind,
-        quantity: gift.holding.quantity,
-        unitCopper: gift.holding.unitCopper,
-        notes: "",
+        ...gift.holding,
+        notes: gift.holding.notes ?? "",
       });
     }
     giftSeen.add(gift.id);

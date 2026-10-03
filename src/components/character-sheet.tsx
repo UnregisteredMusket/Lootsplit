@@ -42,8 +42,10 @@ export function CharacterSheetPanel({ purseId, face = true }: { purseId: string;
           equipment: current.equipment.map((i) => `${i.name} × ${i.quantity}`).join("\n"),
         }
       : original;
+  const readOnly = seat.role === "dm" && !!p?.sheetReadOnlyForDm;
   const canImport =
-    seat.role === "dm" || (!getCloudTable().joined && seat.purseIds.includes(purseId));
+    !readOnly &&
+    (seat.role === "dm" || (!getCloudTable().joined && seat.purseIds.includes(purseId)));
 
   return (
     <div className="mt-4">
@@ -71,7 +73,13 @@ export function CharacterSheetPanel({ purseId, face = true }: { purseId: string;
         </label>
       ) : null}
       {face && sheet ? <SheetView sheet={sheet} /> : null}
-      {sheet ? <BlankFields sheet={sheet} onSave={(next) => void updateSheet(next)} /> : null}
+      {sheet ? (
+        <BlankFields
+          disabled={readOnly}
+          sheet={sheet}
+          onSave={(next) => void updateSheet(next, sheet)}
+        />
+      ) : null}
       {!sheet && canImport ? (
         <p className="mt-2 text-sm text-muted">
           A filled PDF or a JSON export. A scan without selectable text cannot be read.
@@ -152,9 +160,11 @@ export function SheetBody({ sheet }: { sheet: CharacterSheet }) {
 }
 
 function BlankFields({
+  disabled,
   sheet,
   onSave,
 }: {
+  disabled?: boolean;
   sheet: CharacterSheet;
   onSave: (sheet: CharacterSheet) => void;
 }) {
@@ -207,6 +217,7 @@ function BlankFields({
             <input
               aria-label={field.label}
               defaultValue=""
+              disabled={disabled}
               onBlur={(event) => {
                 const value = event.target.value.trim();
                 if (value) onSave(field.set(value));
