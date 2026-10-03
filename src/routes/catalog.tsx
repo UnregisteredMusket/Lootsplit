@@ -1,3 +1,4 @@
+import { FantasyIcon } from "@/components/fantasy-icon";
 import { createFileRoute } from "@tanstack/react-router";
 import { Dices } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
@@ -247,8 +248,17 @@ function GoodsPane() {
           <li key={item.id} className="border-b border-border py-3">
             <div className="flex items-baseline justify-between gap-3">
               <span className="min-w-0">
-                <span className="block">{item.name}</span>
+                <span className="block">
+                  <FantasyIcon entry={item} className="fantasy-inline" />
+                  {item.name}
+                </span>
                 <span className="text-sm text-muted">
+                  <FantasyIcon
+                    entry={{ category: item.category }}
+                    categoryOnly
+                    size={20}
+                    className="fantasy-inline"
+                  />
                   {labelOf(CATEGORIES, item.category)} · {item.rarity}
                   {dollars(item.baseCopper) ? ` · ${dollars(item.baseCopper)}` : ""}
                   {item.origin === "pdf"

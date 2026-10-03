@@ -313,7 +313,10 @@ function PartyPage() {
                       <li key={holding.id} className="py-3">
                         <div className="flex items-baseline justify-between gap-3">
                           <span>
-                            <span className="block">{holding.name}</span>
+                            <span className="fantasy-reference-title">
+                              <LedgerArt kind={holding.kind} src={holding.image} entry={holding} />
+                              <span>{holding.name}</span>
+                            </span>
                             <span className="text-sm text-muted">
                               {owner?.name ?? "Unassigned"} · {holding.kind} · × {holding.quantity}
                             </span>

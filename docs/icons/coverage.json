@@ -1,0 +1,59 @@
+{
+  "metadata": {
+    "date": "2026-10-03",
+    "purpose": "Implementation mapping proposal; not deployed",
+    "scope": "All Item, MagicItem, Spell and Creature fixtures for SRD 2014 and SRD 2024, matching current Lootsplit import filters. Not the full third-party Open5e catalog.",
+    "sourceMethod": "Open5e official GitHub fixtures; live API returned HTTP 403 in research environment. Live counts may differ.",
+    "open5eCommit": "1253adb7e58dde6cae556c6bd3515dcb521b723e",
+    "gameIconsCommit": "82d948812bfe3f269ef8f731dcdb07b08160edc4",
+    "lootsplitCommitReviewed": "58371b79c9c23d1d94b58a53977c0d6913dfe48f",
+    "matchingPolicy": "Specific concept > name family > exact icon-name candidate > spell damage type > category > kind default. Generic shared icons explicitly permitted by user. Icon paths verified; visual/semantic review not completed for every record.",
+    "totalRecords": 3013,
+    "iconsInUpstreamTree": 4180
+  },
+  "byEditionAndKind": {
+    "srd-2014": {
+      "items": 237,
+      "magicitems": 499,
+      "spells": 319,
+      "creatures": 325
+    },
+    "srd-2024": {
+      "items": 203,
+      "magicitems": 760,
+      "spells": 339,
+      "creatures": 331
+    }
+  },
+  "matchTypes": {
+    "family": 1865,
+    "category": 776,
+    "name-match-candidate": 44,
+    "curated-concept": 234,
+    "damage-type": 94
+  },
+  "selectedAssetCount": 352,
+  "byKind": {
+    "items": {
+      "family": 253,
+      "category": 159,
+      "name-match-candidate": 28
+    },
+    "magicitems": {
+      "family": 1112,
+      "category": 147
+    },
+    "spells": {
+      "curated-concept": 234,
+      "category": 326,
+      "damage-type": 94,
+      "name-match-candidate": 4
+    },
+    "creatures": {
+      "family": 500,
+      "category": 144,
+      "name-match-candidate": 12
+    }
+  },
+  "sharedIconPolicy": "Intentional: categories and families share icons; no promise of distinct artwork per record."
+}

@@ -1,27 +1,13 @@
+import { FantasyIcon } from "@/components/fantasy-icon";
 import { useState } from "react";
-import {
-  ChevronDown,
-  Coins,
-  Dices,
-  Grid2X2,
-  HelpCircle,
-  Palette,
-  Save,
-  Settings,
-  Shield,
-  Users,
-  Map,
-  UserRound,
-  Bell,
-  LogIn,
-} from "lucide-react";
+import { ChevronDown, LogIn } from "lucide-react";
 import { Button, Modal } from "@/components/ui";
 import { luminance, DEFAULT_GROUND } from "@/lib/quire/theme";
 import { usePrefs } from "@/lib/quire/prefs";
 import { Campaigns } from "@/components/campaigns";
 type Group = {
   name: string;
-  icon: typeof Settings;
+  icon: string;
   links?: [string, string][];
   content?: React.ReactNode;
 };
@@ -92,7 +78,7 @@ export function ManagementPanel({
     ? [
         {
           name: "Campaign",
-          icon: Map,
+          icon: "Campaign",
           links: [
             ["Campaign overview & sessions", "/?view=overview"],
             ["Manage saved campaigns", "/account"],
@@ -101,7 +87,7 @@ export function ManagementPanel({
         },
         {
           name: "Players & permissions",
-          icon: Users,
+          icon: "Party",
           links: [
             ["Party & character assignments", "/party"],
             ["Room members & permissions", "/share"],
@@ -110,7 +96,7 @@ export function ManagementPanel({
         },
         {
           name: "Gameplay",
-          icon: Dices,
+          icon: "Dice",
           links: [
             ["Encounter desk & generator", "/encounters"],
             ["Character rolls & manual-roll policy", "/characters#dm-roll-controls"],
@@ -119,7 +105,7 @@ export function ManagementPanel({
         },
         {
           name: "Economy",
-          icon: Coins,
+          icon: "Treasury",
           links: [
             ["Currency, price modifiers & shop defaults", "/settings#economy"],
             ["Shops & stock", "/market"],
@@ -128,7 +114,7 @@ export function ManagementPanel({
         },
         {
           name: "Dashboard",
-          icon: Grid2X2,
+          icon: "Desk",
           content: (
             <>
               <p>Choose the label, icon and destination for each of your six shortcut buttons.</p>
@@ -140,7 +126,7 @@ export function ManagementPanel({
         },
         {
           name: "Appearance & notifications",
-          icon: Palette,
+          icon: "Appearance",
           content: appearance,
           links: [
             ["Custom colors & display preferences", "/settings#appearance"],
@@ -149,7 +135,7 @@ export function ManagementPanel({
         },
         {
           name: "Account & backups",
-          icon: Save,
+          icon: "save",
           links: [
             ["Profile, security & cloud backups", "/account"],
             ["Device backups & restore", "/settings#backups"],
@@ -157,7 +143,7 @@ export function ManagementPanel({
         },
         {
           name: "Help & administration",
-          icon: HelpCircle,
+          icon: "Help",
           links: [
             ["Guides & help", "/help"],
             ["Report a bug", "/account#bug-reports"],
@@ -169,7 +155,7 @@ export function ManagementPanel({
     : [
         {
           name: "Character",
-          icon: UserRound,
+          icon: "Character",
           links: [
             ["My character sheets & imports", "/characters"],
             ["Assigned character & handouts", "/?view=sheet"],
@@ -177,7 +163,7 @@ export function ManagementPanel({
         },
         {
           name: "Campaign",
-          icon: Map,
+          icon: "Campaign",
           links: [
             ["Join & connection settings", "/share"],
             ["Saved campaign memberships", "/account"],
@@ -186,7 +172,7 @@ export function ManagementPanel({
         },
         {
           name: "Rolls",
-          icon: Dices,
+          icon: "Dice",
           content: (
             <p>
               Manual results are controlled by the campaign DM. Each roll form shows whether they
@@ -195,20 +181,20 @@ export function ManagementPanel({
           ),
           links: [["Dice rolls & history", "/characters#dice"]],
         },
-        { name: "Appearance", icon: Palette, content: appearance },
+        { name: "Appearance", icon: "Appearance", content: appearance },
         {
           name: "Notifications",
-          icon: Bell,
+          icon: "Notifications",
           links: [["Messages & turn alerts", "/share?tab=notifications"]],
         },
         {
           name: "Account & privacy",
-          icon: Shield,
+          icon: "Privacy",
           links: [["Profile, password, recovery & privacy", "/account"]],
         },
         {
           name: "Backups",
-          icon: Save,
+          icon: "save",
           links: [
             ["Device backups & restore", "/settings#backups"],
             ["Private cloud backup library", "/account"],
@@ -216,7 +202,7 @@ export function ManagementPanel({
         },
         {
           name: "Help",
-          icon: HelpCircle,
+          icon: "Help",
           links: [
             ["Guides & help", "/help"],
             ["Report a bug", "/account#bug-reports"],
@@ -241,7 +227,6 @@ export function ManagementPanel({
             : "Your character & personal preferences"}
         </p>
         {groups.map((g) => {
-          const Icon = g.icon;
           return (
             <section className="management-group" key={g.name}>
               <button
@@ -249,7 +234,7 @@ export function ManagementPanel({
                 aria-expanded={expanded === g.name}
                 onClick={() => setExpanded(expanded === g.name ? "" : g.name)}
               >
-                <Icon aria-hidden="true" />
+                <FantasyIcon ui={g.icon} size={28} />
                 <span>{g.name}</span>
                 <ChevronDown className={expanded === g.name ? "rotate-180" : ""} />
               </button>

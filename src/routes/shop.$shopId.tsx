@@ -1,3 +1,4 @@
+import { FantasyIcon } from "@/components/fantasy-icon";
 import { getServerCloudTable } from "@/lib/quire/cloud-client";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState, useSyncExternalStore } from "react";
@@ -401,7 +402,10 @@ function StockRow({
     return (
       <li className="flex flex-wrap items-center gap-3 py-3">
         <span className="min-w-0 flex-1">
-          <span className="block">{line.name}</span>
+          <span className="block">
+            <FantasyIcon entry={line} className="fantasy-inline" />
+            {line.name}
+          </span>
           <span className="text-sm text-muted">
             {formatCopper(unit)}
             {reduced ? ` · ${percent}% off · was ${formatCopper(asking)}` : ""}
@@ -428,6 +432,7 @@ function StockRow({
 
   return (
     <li className="flex flex-col gap-2 py-3">
+      <FantasyIcon entry={line} size={32} />
       <TextInput
         aria-label="Good"
         defaultValue={line.name}

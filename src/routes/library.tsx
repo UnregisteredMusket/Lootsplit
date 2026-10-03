@@ -1,13 +1,6 @@
+import { FantasyIcon } from "@/components/fantasy-icon";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import {
-  BookOpen,
-  ScrollText,
-  Sparkles,
-  Skull,
-  Feather,
-  Search,
-  Library as LibraryIcon,
-} from "lucide-react";
+import { Search } from "lucide-react";
 import { useEffect, useState } from "react";
 import { Shell } from "@/components/shell";
 import { useSeat } from "@/lib/quire/seat";
@@ -29,19 +22,19 @@ function LibraryHub() {
   const tiles = [
     {
       name: "Catalog",
-      icon: LibraryIcon,
+      icon: "Catalog",
       url: dm ? "/catalog?pane=goods" : "/catalog?pane=open5e",
       note: dm ? "Items & services" : "Open rules & items",
     },
     {
       name: "Creatures",
-      icon: Skull,
+      icon: "Creatures",
       url: "/catalog?pane=open5e&kind=creatures",
       note: "Open5e index",
     },
     {
       name: "Spells",
-      icon: Sparkles,
+      icon: "Spells",
       url: "/catalog?pane=open5e&kind=spells",
       note: "Rules & references",
     },
@@ -49,7 +42,7 @@ function LibraryHub() {
       ? [
           {
             name: "Books",
-            icon: BookOpen,
+            icon: "Books",
             url: "/books",
             note: "Private PDF library",
           },
@@ -57,13 +50,13 @@ function LibraryHub() {
       : []),
     {
       name: "Handouts",
-      icon: ScrollText,
+      icon: "Handouts",
       url: "#handouts",
       note: "Campaign references",
     },
     {
       name: "Names",
-      icon: Feather,
+      icon: "Names",
       url: "/catalog?pane=names",
       note: "Generator & lexicon",
     },
@@ -71,7 +64,7 @@ function LibraryHub() {
   return (
     <Shell>
       <div className="library-banner">
-        <BookOpen size={32} />
+        <FantasyIcon ui="Library" size={40} />
         <div>
           <h1>Library</h1>
           <p>Your references, close at hand.</p>
@@ -91,7 +84,7 @@ function LibraryHub() {
           .filter((x) => (x.name + " " + x.note).toLowerCase().includes(query.toLowerCase()))
           .map((x) => (
             <a href={x.url} key={x.name}>
-              <x.icon />
+              <FantasyIcon ui={x.icon} size={36} />
               <strong>{x.name}</strong>
               <small>{x.note}</small>
             </a>
@@ -109,7 +102,7 @@ function LibraryHub() {
               .slice(0, 6)
               .map((x) => (
                 <a href="/catalog" key={x.id}>
-                  <LedgerArt kind="item" />
+                  <LedgerArt kind="item" entry={x} />
                   <span>
                     <strong>{x.name}</strong>
                     <small>

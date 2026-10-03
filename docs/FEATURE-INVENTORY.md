@@ -127,3 +127,15 @@ Not implemented or promised by this inventory: OCR, Google Drive backup integrat
 - Character Play places the existing dice tray and roll history beside vitals/actions. Edit retains the complete sheet editor. Saved encounters stay expanded by default in a sticky desktop sidebar; battle controls use the wider available area.
 - Party, market, inventory, and reference cards gain responsive columns. Campaign recovery, backups, and manual-sharing tools sit beside the selected room/chat/rolls/alerts panel. Inactive panels remain hidden.
 - No account, permission, save format, award, synchronization, theme, shortcut, or mobile navigation behavior is removed or replaced.
+
+### Fantasy icon system
+
+- Locally bundled Game-icons artwork across role-specific navigation, dashboard shortcuts,
+  library destinations, Open5e records, catalog/shop listings, holdings, character spells and
+  equipment, encounter creatures and loot. Custom item images and portraits are preserved.
+- 3,013 SRD 2014/2024 record mappings, specific/family artwork and generic fallbacks, with
+  colored spell-school, creature-type, item-category, damage-type and condition symbols.
+- Artwork matching does not modify identities, prices, stats, permissions or saved campaigns.
+  Existing IDs and source URLs resolve directly; older/custom entries use visual name/category
+  matching. No schema migration or external artwork network dependency. Artist credits and
+  license links are on Resources. The published Android APK remains a separate release.

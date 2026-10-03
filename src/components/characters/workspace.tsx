@@ -1,5 +1,6 @@
+import { FantasyIcon } from "@/components/fantasy-icon";
 import { useDraftGuard } from "@/lib/quire/use-draft-guard";
-import { Dices, Heart, Shield, Footprints, Swords, Sparkles } from "lucide-react";
+import { Heart, Shield, Footprints } from "lucide-react";
 import { HpBar } from "@/components/control-panel/readouts";
 import { useEffect, useRef, useState, useSyncExternalStore, type FormEvent } from "react";
 import { getCampaigns, serverCampaigns, subscribeCampaigns } from "@/lib/quire/campaigns";
@@ -832,7 +833,7 @@ function CharacterEditor({
               )}
               {sheet.attacks.map((a, i) => (
                 <div key={i} className="play-action-row">
-                  <Swords />
+                  <FantasyIcon entry={{ ...a, kind: "items" }} size={36} />
                   <div>
                     <h3>{a.name}</h3>
                     <p>
@@ -853,7 +854,7 @@ function CharacterEditor({
             <div>
               {sheet.spells.map((spell, i) => (
                 <div className="play-action-row" key={i}>
-                  <Sparkles />
+                  <FantasyIcon entry={{ ...spell, kind: "spells" }} size={36} />
                   <div>
                     <h3>{spell.name}</h3>
                     <p>
@@ -931,7 +932,7 @@ function CharacterEditor({
             <span>{sheet.slots.reduce((n, x) => n + x.max - x.used, 0)} remaining · Manage →</span>
           </button>
           <a className="gold-link play-dice-link" href="#dice">
-            <Dices size={21} />
+            <FantasyIcon ui="Dice" size={25} />
             Roll dice / manual result
           </a>
         </section>
@@ -1409,6 +1410,7 @@ function CharacterEditor({
               {sheet.spells.map((s, i) => (
                 <details key={i} className="sheet-row">
                   <summary>
+                    <FantasyIcon entry={{ ...s, kind: "spells" }} className="fantasy-inline" />
                     {s.name} · {s.level === 0 ? "Cantrip" : `Level ${s.level}`}{" "}
                     {s.prepared ? "· Prepared" : ""}
                   </summary>
@@ -1545,6 +1547,7 @@ function CharacterEditor({
                   <ul>
                     {campaignLedger.holdings.map((h) => (
                       <li key={h.id}>
+                        <FantasyIcon entry={h} size={28} className="fantasy-inline" />
                         {h.name} × {h.quantity}
                       </li>
                     ))}
@@ -1582,6 +1585,7 @@ function CharacterEditor({
               </p>
               {sheet.equipment.map((item, i) => (
                 <div className="sheet-row" key={i}>
+                  <FantasyIcon entry={item} size={36} />
                   <Text
                     label={`Item ${i + 1} name`}
                     value={item.name}
@@ -2386,7 +2390,10 @@ function ReferenceSearch({ onAdd }: { onAdd: (e: OpenEntry) => void }) {
       {error && <p role="status">{error}</p>}
       {entries.map((e) => (
         <div key={e.key} className="sheet-row">
-          <strong>{e.name}</strong>
+          <strong>
+            <FantasyIcon entry={e} className="fantasy-inline" />
+            {e.name}
+          </strong>
           <p>{e.facts.join(" · ")}</p>
           <button onClick={() => onAdd(e)}>Add {e.name}</button>
           <small>{e.source}</small>

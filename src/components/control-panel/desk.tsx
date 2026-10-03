@@ -1,6 +1,7 @@
+import { FantasyIcon } from "@/components/fantasy-icon";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { Link } from "@tanstack/react-router";
-import { Coins, Gift, ScrollText, Swords, ChevronRight } from "lucide-react";
+import { ChevronRight } from "lucide-react";
 import { useEconomy } from "@/lib/quire/economy-context";
 import { getCampaigns, serverCampaigns, subscribeCampaigns } from "@/lib/quire/campaigns";
 import { getCloudTable, getServerCloudTable, subscribeCloudTable } from "@/lib/quire/cloud-client";
@@ -77,28 +78,28 @@ export function DmDesk() {
         </p>
         <div className="readout-grid">
           <a href="/?view=overview#journal" className="readout">
-            <ScrollText />
+            <FantasyIcon ui="Campaign" size={30} />
             <span>
               <small>Current session</small>
               <strong>{session?.name || "No active session"}</strong>
             </span>
           </a>
           <a href="/party?section=funds" className="readout">
-            <Coins />
+            <FantasyIcon ui="Treasury" size={30} />
             <span>
               <small>Party funds</small>
               <strong>{formatCopper(fund)}</strong>
             </span>
           </a>
           <a href="/?view=overview#review" className="readout">
-            <Gift />
+            <FantasyIcon ui="gift" size={30} />
             <span>
               <small>Pending reviews</small>
               <strong>{pending}</strong>
             </span>
           </a>
           <a href="/encounters?resume=1" className="readout">
-            <Swords />
+            <FantasyIcon ui="Encounters" size={30} />
             <span>
               <small>Encounter</small>
               <strong>

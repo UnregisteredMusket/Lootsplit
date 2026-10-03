@@ -1,18 +1,6 @@
+import { FantasyIcon } from "@/components/fantasy-icon";
 import { useEffect, useState } from "react";
-import {
-  ArrowUp,
-  ArrowDown,
-  BookOpen,
-  Coins,
-  Dices,
-  Gift,
-  MessageCircle,
-  Save,
-  ScrollText,
-  Store,
-  Swords,
-  Users,
-} from "lucide-react";
+import { ArrowUp, ArrowDown } from "lucide-react";
 import { toast } from "sonner";
 import { Button, Modal } from "@/components/ui";
 import {
@@ -21,18 +9,6 @@ import {
   shortcutDestinations,
   shortcutIcons,
 } from "@/lib/quire/shortcuts.mjs";
-export const actionIcons: Record<string, typeof Swords> = {
-  swords: Swords,
-  gift: Gift,
-  coins: Coins,
-  store: Store,
-  scroll: ScrollText,
-  dice: Dices,
-  users: Users,
-  message: MessageCircle,
-  book: BookOpen,
-  save: Save,
-};
 type Shortcut = { destination: string; label: string; icon: string };
 export function Shortcuts({ campaignId }: { campaignId: string }) {
   const key = `lootsplit.shortcuts.v1.${campaignId}`;
@@ -86,10 +62,9 @@ export function Shortcuts({ campaignId }: { campaignId: string }) {
       <div className="shortcut-grid">
         {items.map((item, i) => {
           const target = shortcutDestinations.find((x) => x.id === item.destination)!;
-          const Icon = actionIcons[item.icon] || Swords;
           return (
             <a key={i} href={target.href} className="shortcut-button">
-              <Icon aria-hidden="true" />
+              <FantasyIcon ui={item.icon} size={40} />
               <span>{item.label}</span>
             </a>
           );

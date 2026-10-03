@@ -1,3 +1,5 @@
+import type { IconEntry } from "@/lib/icons/resolve";
+import { FantasyIcon } from "@/components/fantasy-icon";
 import { useState } from "react";
 import { toast } from "sonner";
 import { useEconomy } from "@/lib/quire/economy-context";
@@ -7,11 +9,16 @@ export function LedgerArt({
   src,
   kind,
   className = "",
+  entry,
 }: {
   src?: string;
+  entry?: IconEntry;
   kind: "portrait" | "shop" | "item" | "property";
   className?: string;
 }) {
+  const [failedSrc, setFailedSrc] = useState<string>();
+  if (kind === "item" && (!src || src === "/art/item-default.webp" || failedSrc === src))
+    return <FantasyIcon entry={entry} size={56} className={`ledger-art ${className}`} />;
   return (
     <img
       src={src || `/art/${kind}-default.webp`}
@@ -19,6 +26,10 @@ export function LedgerArt({
       loading="lazy"
       className={`ledger-art ${className}`}
       onError={(e) => {
+        if (kind === "item") {
+          setFailedSrc(src);
+          return;
+        }
         e.currentTarget.onerror = null;
         e.currentTarget.src = `/art/${kind}-default.webp`;
       }}
@@ -127,6 +138,12 @@ export function InventoryList({ holdings }: { holdings: Holding[] }) {
       <div className="filter-chips">
         {categories.map((x) => (
           <button key={x} aria-pressed={x === category} onClick={() => setCategory(x)}>
+            <FantasyIcon
+              entry={{ category: x }}
+              categoryOnly
+              size={22}
+              className="fantasy-inline"
+            />
             {x}
           </button>
         ))}
@@ -134,7 +151,7 @@ export function InventoryList({ holdings }: { holdings: Holding[] }) {
       <ul>
         {shown.map((x) => (
           <li key={x.id} className="inventory-row">
-            <LedgerArt kind={x.kind} src={x.image} />
+            <LedgerArt kind={x.kind} src={x.image} entry={x} />
             <span className="min-w-0 flex-1">
               <strong>{x.name}</strong>
               <small>
