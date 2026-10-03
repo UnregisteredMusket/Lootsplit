@@ -2,24 +2,39 @@ import { useEffect, useRef, useState, type ReactNode } from "react";
 import { OpeningLandscape } from "./opening-landscape";
 import { LootLoader } from "./loot-loader";
 
-export function OpeningDawn({ children }: { children: ReactNode }) {
-  const [on, setOn] = useState(true);
-  const [ready, setReady] = useState(false);
+const openingSessionKey = "lootsplit.opening.dismissed.v1";
+// Storage can be unavailable in private/restricted webviews. Keep SPA navigation safe there too.
+let dismissedInDocument = false;
+
+export function OpeningDawn({ children, bypass = false }: { children: ReactNode; bypass?: boolean }) {
+  const [on, setOn] = useState<boolean | null>(null);
   const screen = useRef<HTMLButtonElement>(null);
   useEffect(() => {
-    setReady(true);
+    let dismissed = dismissedInDocument;
+    try {
+      dismissed ||= sessionStorage.getItem(openingSessionKey) === "1";
+    } catch { /* An unavailable browser store must not block entry. */ }
+    setOn(!dismissed);
   }, []);
   useEffect(() => {
-    if (ready) screen.current?.focus({ preventScroll: true });
-  }, [ready]);
-  if (!on) return <>{children}</>;
+    if (on && !bypass) screen.current?.focus({ preventScroll: true });
+  }, [on, bypass]);
+  function enter() {
+    dismissedInDocument = true;
+    try {
+      sessionStorage.setItem(openingSessionKey, "1");
+    } catch { /* The in-memory fallback still protects client-side navigation. */ }
+    setOn(false);
+  }
+  if (bypass || on === false) return <>{children}</>;
+  // Resolve tab-session storage before painting, so refreshes cannot flash the opening.
+  if (on === null) return null;
   return (
     <button
       ref={screen}
       type="button"
-      disabled={!ready}
       className="quire-dawn loot-opening"
-      onClick={() => setOn(false)}
+      onClick={enter}
       aria-label="Lootsplit. Click to continue"
     >
       <span className="quire-dawn-name">Lootsplit</span>

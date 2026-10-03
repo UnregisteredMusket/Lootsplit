@@ -75,5 +75,5 @@ export const Route = createRootRoute({
 });
 
 function OpeningGate({ publicPage, children }: { publicPage: boolean; children: React.ReactNode }) {
-  return publicPage ? <>{children}</> : <OpeningDawn>{children}</OpeningDawn>;
+  return <OpeningDawn bypass={publicPage}>{children}</OpeningDawn>;
 }

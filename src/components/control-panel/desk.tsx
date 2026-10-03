@@ -1,3 +1,4 @@
+import { AppLink } from "@/components/app-link";
 import { FantasyIcon } from "@/components/fantasy-icon";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { Link } from "@tanstack/react-router";
@@ -77,28 +78,28 @@ export function DmDesk() {
               : "Opening campaign"}
         </p>
         <div className="readout-grid">
-          <a href="/?view=overview#journal" className="readout">
+          <AppLink href="/?view=overview#journal" className="readout">
             <FantasyIcon ui="Campaign" size={30} />
             <span>
               <small>Current session</small>
               <strong>{session?.name || "No active session"}</strong>
             </span>
-          </a>
-          <a href="/party?section=funds" className="readout">
+          </AppLink>
+          <AppLink href="/party?section=funds" className="readout">
             <FantasyIcon ui="Treasury" size={30} />
             <span>
               <small>Party funds</small>
               <strong>{formatCopper(fund)}</strong>
             </span>
-          </a>
-          <a href="/?view=overview#review" className="readout">
+          </AppLink>
+          <AppLink href="/?view=overview#review" className="readout">
             <FantasyIcon ui="gift" size={30} />
             <span>
               <small>Pending reviews</small>
               <strong>{pending}</strong>
             </span>
-          </a>
-          <a href="/encounters?resume=1" className="readout">
+          </AppLink>
+          <AppLink href="/encounters?resume=1" className="readout">
             <FantasyIcon ui="Encounters" size={30} />
             <span>
               <small>Encounter</small>
@@ -107,7 +108,7 @@ export function DmDesk() {
               </strong>
               {encounter && <small>{encounter.name}</small>}
             </span>
-          </a>
+          </AppLink>
         </div>
         <section className="party-glance">
           <div className="panel-heading">
@@ -121,7 +122,7 @@ export function DmDesk() {
               const live = profiles.find((x) => x.purse_id === p.id),
                 old = sheets.find((s) => s.purseId === p.id);
               return (
-                <a
+                <AppLink
                   href={
                     live ? `/characters?id=${encodeURIComponent(live.id)}` : `/party#purse-${p.id}`
                   }
@@ -141,7 +142,7 @@ export function DmDesk() {
                         : "HP —"}
                   </small>
                   {!!live?.body.maxHp && <HpBar hp={live.body.hp} max={live.body.maxHp} />}
-                </a>
+                </AppLink>
               );
             })}
           </div>
@@ -150,9 +151,9 @@ export function DmDesk() {
       </div>
       <Shortcuts campaignId={campaigns.activeId} />
       <DesktopDeskPanels />
-      <a href="/?view=overview" className="desk-overview">
+      <AppLink href="/?view=overview" className="desk-overview">
         Full campaign overview, activity & tools <ChevronRight size={18} />
-      </a>
+      </AppLink>
     </div>
   );
 }
