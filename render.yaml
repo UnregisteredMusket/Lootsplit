@@ -1,0 +1,24 @@
+services:
+  - type: web
+    name: lootsplit-standby
+    runtime: node
+    plan: free
+    region: virginia
+    branch: main
+    autoDeployTrigger: off
+    buildCommand: node scripts/install-standby.mjs
+    startCommand: node dist/standby-release/runtime/server.mjs
+    healthCheckPath: /healthz
+    envVars:
+      - key: NODE_VERSION
+        value: '22'
+      - key: NODE_ENV
+        value: production
+      - key: STANDBY_MODE
+        value: locked
+      - key: STANDBY_RELEASE_SHA
+        sync: false
+      - key: ACCOUNT_SECRET
+        generateValue: true
+# Add Turso credentials and activation values only during the documented recovery.
+# No Render database, persistent disk, worker, cron, or paid plan is provisioned.
