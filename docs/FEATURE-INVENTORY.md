@@ -40,6 +40,8 @@ Not implemented or promised by this inventory: OCR, Google Drive backup integrat
 
 ## Website and optional account library
 
+- Optional locked Render standby, verified portable releases, encrypted offsite D1 snapshots, and manual fenced recovery to a new Turso/libSQL database. See `docs/STANDBY.md`; snapshots exclude device-only campaigns/PDFs. Existing primary, Android and offline behavior is preserved.
+
 - Public welcome, Android download, desktop installation guidance, changelog and help pages alongside the existing app URL.
 - App startup has a click/tap/keyboard-to-continue title screen. The title fades in once; a 15-second loop shows a 16-bit-style adventurer struggling and dragging a heavy sack, spilling coins from its bottom, with a rogue following to collect them. Reduced-motion preferences show a static title screen. Artwork is bundled locally for web and Android.
 - Versioned website changelogs retain previous entries and describe added features, improvements and summarized fixes for every Android update. The signed-release gate requires matching notes before publication.

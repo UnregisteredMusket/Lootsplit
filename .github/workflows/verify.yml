@@ -22,8 +22,10 @@ jobs:
       - run: npm run lint
       - run: npm run build:cloudflare
       - run: node scripts/release-artifact.mjs prepare
+      - run: node scripts/standby-artifact.mjs prepare
       - run: npm run build:mobile
       - run: npx playwright install --with-deps chromium
+      - run: node scripts/standby-artifact-audit.mjs
       - name: Browser recovery and UI checks
         timeout-minutes: 9
         run: |
@@ -67,6 +69,14 @@ jobs:
         run: node scripts/live-release-audit.mjs
       - name: Confirm audited bytes are unchanged
         run: node scripts/release-artifact.mjs verify
+      - run: node scripts/standby-artifact.mjs verify
+      - uses: actions/upload-artifact@v4
+        with:
+          name: standby-release-${{ github.sha }}
+          path: dist/standby-release/
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 30
       - uses: actions/upload-artifact@v4
         with:
           name: website-release-${{ github.sha }}

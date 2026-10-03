@@ -1,6 +1,13 @@
 /** Add every new third-party content/data resource here when integrating it. */
 export const resources = [
   {
+    name: "Standby database connectivity",
+    description: "The optional recovery server uses Turso's libSQL TypeScript client, distributed under the MIT License.",
+    links: [
+      { label: "libSQL client source and license", url: "https://github.com/tursodatabase/libsql-client-ts" },
+    ],
+  },
+  {
     name: "D&D 2014 encounter difficulty",
     description:
       "Encounter estimates use the 2014 Basic Rules XP thresholds and party-size multipliers. The generator is an editable estimate; terrain, tactics and house rules require DM judgment.",

@@ -1,4 +1,5 @@
 node_modules
+recovery/
 .vercel
 .grok/*
 !.grok/app-env.json

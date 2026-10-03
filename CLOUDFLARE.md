@@ -1,5 +1,8 @@
 # Website releases on Cloudflare
 
+Optional free standby and encrypted offsite recovery: [docs/STANDBY.md](docs/STANDBY.md).
+Never clear the Worker `RECOVERY_FENCE` secret during a standby recovery or deployment.
+
 Production stays at https://lootsplit.oliverstorie2017.workers.dev/ using the existing
 Worker `lootsplit`, D1 database `lootsplit` (`0a200e96-ae2e-47b5-9869-c1f4d316148f`),
 `DB`, `ASSETS`, `ROOM_ENTRY_LIMIT`, `CF_VERSION_METADATA`, `ACCOUNT_ORIGIN`, and
