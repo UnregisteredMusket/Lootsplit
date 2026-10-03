@@ -1,10 +1,27 @@
 /** Add every new third-party content/data resource here when integrating it. */
 export const resources = [
   {
-    name: "Standby database connectivity",
-    description: "The optional recovery server uses Turso's libSQL TypeScript client, distributed under the MIT License.",
+    name: "Game-icons.net fantasy icons",
+    description:
+      "Icons made by Lorc, Delapouite, Carl Olsen, Caro Asercion, Cathelineau, DarkZaitzev, Faithtoken, Lucas, Sbed, SeregaCthtuf, Skoll, Willdabeast and Zeromancer. Licensed under CC BY 3.0 (Zeromancer: CC0). Lootsplit removes the square backgrounds and applies category colors and framing. Icons are bundled locally; existing custom artwork is preserved.",
     links: [
-      { label: "libSQL client source and license", url: "https://github.com/tursodatabase/libsql-client-ts" },
+      { label: "Game-icons.net", url: "https://game-icons.net/" },
+      { label: "CC BY 3.0 license", url: "https://creativecommons.org/licenses/by/3.0/" },
+      { label: "CC0 license", url: "https://creativecommons.org/publicdomain/zero/1.0/" },
+      { label: "Artist credits and adaptations", url: "/icons/game-icons/ATTRIBUTION.txt" },
+      { label: "Original license and author links", url: "/icons/game-icons/LICENSE.txt" },
+      { label: "Individual icon sources", url: "/icons/game-icons/sources.json" },
+    ],
+  },
+  {
+    name: "Standby database connectivity",
+    description:
+      "The optional recovery server uses Turso's libSQL TypeScript client, distributed under the MIT License.",
+    links: [
+      {
+        label: "libSQL client source and license",
+        url: "https://github.com/tursodatabase/libsql-client-ts",
+      },
     ],
   },
   {

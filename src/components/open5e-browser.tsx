@@ -1,3 +1,4 @@
+import { FantasyIcon } from "@/components/fantasy-icon";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { toast } from "sonner";
 import { Button, Select, TextInput } from "./ui";
@@ -236,13 +237,22 @@ function OpenResult({ entry }: { entry: OpenEntry }) {
     <li className="rounded-lg border border-border p-4">
       <details>
         <summary className="cursor-pointer min-h-11">
-          <span className="font-display text-xl">{entry.name}</span>
+          <span className="fantasy-reference-title font-display text-xl">
+            <FantasyIcon entry={entry} size={44} />
+            <span>{entry.name}</span>
+          </span>
           <span className="mt-1 block text-xs text-muted">
             {entry.source}
             {item ? ` · ${entry.copper === null ? "Set a price" : formatCopper(entry.copper)}` : ""}
           </span>
         </summary>
         <div className="mt-3 text-sm">
+          <div className="fantasy-category-strip">
+            <span>
+              <FantasyIcon entry={entry} categoryOnly size={24} />
+              {entry.facts.find((f) => /^(School|Type): /.test(f)) || entry.kind}
+            </span>
+          </div>
           <ul className="mb-3 text-muted">
             {entry.facts.map((f, i) => (
               <li key={i}>{f}</li>

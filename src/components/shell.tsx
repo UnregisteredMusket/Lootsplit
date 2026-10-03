@@ -1,22 +1,11 @@
+import { FantasyIcon } from "@/components/fantasy-icon";
 import { allowContextChange } from "@/lib/quire/use-draft-guard";
 import { useChatUnread } from "@/lib/quire/use-chat-unread";
 import { ManagementPanel, CampaignPanel } from "./control-panel/settings";
 import { getCampaigns, subscribeCampaigns, serverCampaigns } from "@/lib/quire/campaigns";
 import { SyncStatus } from "./sync-status";
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
-import {
-  Backpack,
-  BookOpen,
-  ChevronDown,
-  MessageCircle,
-  Swords,
-  UserRound,
-  Home,
-  Search,
-  Settings,
-  Users,
-  Store,
-} from "lucide-react";
+import { ChevronDown, Search } from "lucide-react";
 import {
   useEffect,
   useRef,
@@ -201,7 +190,7 @@ export function Shell({
                   href="/share?chat=1"
                   aria-label={unreadCount ? `Messages, ${unreadCount} unread` : "Messages"}
                 >
-                  <MessageCircle size={23} />
+                  <FantasyIcon ui="Messages" size={27} />
                   {unreadCount > 0 && (
                     <span className="chat-nav-badge">{unreadCount > 99 ? "99+" : unreadCount}</span>
                   )}
@@ -213,7 +202,7 @@ export function Shell({
                   aria-expanded={management}
                   onClick={() => setManagement(true)}
                 >
-                  <Settings size={23} />
+                  <FantasyIcon ui="Settings" size={23} />
                 </button>
               </div>
             </div>
@@ -335,36 +324,36 @@ export function Shell({
           {
             to: "/",
             label: "Desk",
-            icon: Home,
+            icon: "Desk",
             active: pathname === "/",
             search: { view: "home" },
           },
           {
             to: "/encounters",
             label: "Encounters",
-            icon: Swords,
+            icon: "Encounters",
             active: pathname === "/encounters",
           },
           {
             to: "/party",
             label: "Party",
-            icon: Users,
+            icon: "Party",
             active: pathname === "/party" || pathname === "/characters",
           },
           {
             to: "/market",
             label: "Market",
-            icon: Store,
+            icon: "Market",
             active: pathname === "/market" || pathname.startsWith("/shop/"),
             search: { book: "" },
           },
-          { to: "/library", label: "Library", icon: BookOpen, active: library },
+          { to: "/library", label: "Library", icon: "Library", active: library },
         ]
       : [
           {
             to: "/",
             label: "Character",
-            icon: UserRound,
+            icon: "Character",
             active:
               (pathname === "/" && (search as { view?: string }).view !== "overview") ||
               pathname === "/characters",
@@ -373,13 +362,13 @@ export function Shell({
           {
             to: "/party",
             label: "Inventory",
-            icon: Backpack,
+            icon: "Inventory",
             active: pathname === "/party",
           },
           {
             to: "/share",
             label: "Campaign",
-            icon: MessageCircle,
+            icon: "Campaign",
             active:
               pathname === "/share" ||
               (pathname === "/" && (search as { view?: string }).view === "overview"),
@@ -387,11 +376,11 @@ export function Shell({
           {
             to: "/market",
             label: "Market",
-            icon: Store,
+            icon: "Market",
             active: pathname === "/market" || pathname.startsWith("/shop/"),
             search: { book: "" },
           },
-          { to: "/library", label: "Library", icon: BookOpen, active: library },
+          { to: "/library", label: "Library", icon: "Library", active: library },
         ];
     return (
       <>
@@ -402,14 +391,14 @@ export function Shell({
             to={link.to as Dest}
             search={link.search as never}
             active={link.active}
-            icon={<link.icon className="size-5" />}
+            icon={<FantasyIcon ui={link.icon} size={26} />}
             label={link.label}
             badge={link.to === "/share" ? unreadCount : 0}
           />
         ))}
         {layout === "rail" && (
           <button className="rail-settings" onClick={() => setManagement(true)}>
-            <Settings size={20} />
+            <FantasyIcon ui="Settings" size={20} />
             Settings & Management
           </button>
         )}

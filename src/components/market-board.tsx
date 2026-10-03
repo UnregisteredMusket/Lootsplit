@@ -1,3 +1,4 @@
+import { FantasyIcon } from "@/components/fantasy-icon";
 import { useEffect, useState, type FormEvent } from "react";
 import { useEconomy } from "@/lib/quire/economy-context";
 import { formatCopper, parsePrice, priceAfterCharisma, charismaOffPercent } from "@/lib/quire/money";
@@ -39,7 +40,7 @@ function Listings() {
       <ul className="mt-3 flex flex-col gap-3">
         {shown.map((listing) => (
           <li key={listing.id} className="rounded-lg border border-border p-3">
-            <p className="font-medium">{listing.name}</p>
+            <p className="font-medium"><FantasyIcon entry={listing} className="fantasy-inline" />{listing.name}</p>
             <p className="text-sm text-muted">
               {listing.kind === "property" ? "Property" : "Holding"} · {formatCopper(listing.copper)}
               {dollars(listing.copper) ? ` (${dollars(listing.copper)})` : ""} · {listing.quantity === null ? "Unlimited" : `${listing.quantity} left`}

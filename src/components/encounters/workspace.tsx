@@ -1,3 +1,4 @@
+import { FantasyIcon } from "@/components/fantasy-icon";
 import { useDraftGuard } from "@/lib/quire/use-draft-guard";
 import { useDesktop } from "@/lib/quire/use-desktop";
 import { HpBar } from "@/components/control-panel/readouts";
@@ -5,7 +6,7 @@ import { getCloudTable } from "@/lib/quire/cloud-client";
 import { useEffect, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { z } from "zod";
-import { Swords, Shield, Gift, Dices } from "lucide-react";
+import { Shield } from "lucide-react";
 import { accountRequest } from "@/lib/account/client";
 import { useEconomy } from "@/lib/quire/economy-context";
 import { downloadJson } from "@/lib/quire/table";
@@ -193,7 +194,7 @@ export function EncounterWorkspace() {
               </select>
             </label>
             <button disabled={busy || !code} onClick={() => void create()}>
-              <Swords size={16} /> New encounter
+              <FantasyIcon ui="Encounters" size={22} /> New encounter
             </button>
             <label className="encounter-import">
               Import encounter JSON
@@ -268,7 +269,7 @@ export function EncounterWorkspace() {
               />
             ) : (
               <div className="encounter-panel encounter-empty">
-                <Swords size={40} />
+                <FantasyIcon ui="Encounters" size={40} />
                 <h2>Set the scene</h2>
                 <p>
                   Create an encounter, choose enemies from the index or generator, and attach loot
@@ -612,7 +613,7 @@ function EncounterEditor({
           <div className="encounter-panel">
             <div className="encounter-heading">
               <h3>
-                <Swords size={22} /> Initiative & combat
+                <FantasyIcon ui="Encounters" size={26} /> Initiative & combat
               </h3>
               <span>Round {draft.round}</span>
             </div>
@@ -658,7 +659,7 @@ function EncounterEditor({
                   <summary className="combat-summary" onClick={() => setExpanded(c.id)}>
                     <span className="initiative-number">{c.initiative ?? "—"}</span>
                     <span className="combat-portrait">
-                      <Swords size={23} />
+                      <FantasyIcon entry={{ ...c, kind: "creatures" }} size={36} />
                     </span>
                     <span className="combat-identity">
                       <strong>{c.name}</strong>
@@ -911,7 +912,7 @@ function EncounterEditor({
               not awarded automatically.
             </p>
             <h3>
-              <Dices size={22} /> Generate editable enemies
+              <FantasyIcon ui="Dice" size={26} /> Generate editable enemies
             </h3>
             <div className="encounter-grid">
               <label>
@@ -1005,7 +1006,10 @@ function EncounterEditor({
             {index.map((c) => (
               <div key={c.sourceKey} className="encounter-index-row">
                 <div>
-                  <strong>{c.name}</strong>
+                  <strong>
+                    <FantasyIcon entry={{ ...c, kind: "creatures" }} className="fantasy-inline" />
+                    {c.name}
+                  </strong>
                   <p>
                     CR {c.cr} · {c.type} · HP {c.maxHp} · AC {c.ac}
                   </p>
@@ -1042,7 +1046,8 @@ function EncounterEditor({
         {tab === "loot" && (
           <div className="encounter-panel">
             <h3>
-              <Gift size={22} /> {review ? "Review the loot award" : "Assigned loot"}
+              <FantasyIcon ui="gift" size={26} />{" "}
+              {review ? "Review the loot award" : "Assigned loot"}
             </h3>
             <p>
               {review
@@ -1129,12 +1134,14 @@ function EncounterEditor({
                       })
                     }
                   >
+                    <FantasyIcon entry={c} className="fantasy-inline" />
                     Add {c.name}
                   </button>
                 ))}
             </details>
             {draft.loot.map((l, i) => (
               <article className="encounter-combatant" key={l.id}>
+                <FantasyIcon entry={l} size={32} />
                 <div className="encounter-grid">
                   <label>
                     Item name
@@ -1450,7 +1457,7 @@ function EncounterEditor({
       {tab === "rolls" && (
         <div className="encounter-panel">
           <h3>
-            <Dices size={22} /> Encounter rolls
+            <FantasyIcon ui="Dice" size={26} /> Encounter rolls
           </h3>
           <p>
             Physical results are labeled Manual. App-generated dice are rolled and recorded by the
