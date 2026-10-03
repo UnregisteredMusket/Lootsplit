@@ -93,4 +93,13 @@ jobs:
           mkdir -p release
           cp android/app/build/outputs/apk/release/app-release.apk "release/Lootsplit-$version.apk"
           (cd release && sha256sum "Lootsplit-$version.apk" > SHA256SUMS.txt)
-          gh release create "android-v$version" "release/Lootsplit-$version.apk" release/SHA256SUMS.txt --target "$GITHUB_SHA" --title "Lootsplit $version for Android" --notes-file docs/RELEASE-NOTES.md
+          python3 - <<'PY'
+          from pathlib import Path
+          import re
+          notes = Path("docs/RELEASE-NOTES.md").read_text().split("\n---\n", 1)[0]
+          notes = re.sub(r"^(# Lootsplit [0-9.]+).*", r"\1", notes, count=1)
+          notes = notes.replace("This candidate retains", "This release retains").replace("## Candidate verification", "## Verification")
+          notes = re.sub(r"The public download remains [0-9.]+ until the new signed APK and checksum exist\. ?", "", notes)
+          Path("release/RELEASE-NOTES.md").write_text(notes)
+          PY
+          gh release create "android-v$version" "release/Lootsplit-$version.apk" release/SHA256SUMS.txt --target "$GITHUB_SHA" --title "Lootsplit $version for Android" --notes-file release/RELEASE-NOTES.md

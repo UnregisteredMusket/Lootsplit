@@ -3,6 +3,9 @@ import { DatabaseSync } from "node:sqlite";
 import { readFileSync, readdirSync } from "node:fs";
 export function localAccountDb(filename = ":memory:") {
   const sqlite = new DatabaseSync(filename);
+  // Browser fixtures and the dev server open this same local file in separate processes.
+  // Wait for short writes to finish instead of failing immediately with SQLITE_BUSY.
+  sqlite.exec("PRAGMA busy_timeout=5000");
   sqlite.exec(
     "PRAGMA foreign_keys=ON; CREATE TABLE IF NOT EXISTS account_dev_migrations (name TEXT PRIMARY KEY)",
   );
