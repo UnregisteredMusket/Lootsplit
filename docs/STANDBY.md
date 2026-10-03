@@ -22,6 +22,12 @@ References: [Render Free](https://render.com/docs/free), [Render edge network](h
 4. Create a Turso Free account and libSQL group. Rehearse a **synthetic** import into a new disposable database using a database-scoped token. Verify the remote adapter before declaring recovery ready. Never activate both hosts or test on real campaigns. A fresh database is created from the latest restore during recovery.
 5. Enable encrypted backups below. Keep the decryption key securely outside GitHub/Cloudflare too. Without it, backups cannot be recovered.
 
+## Remote setup rehearsal
+
+The deployed free service is `lootsplit-standby` in Render My Workspace (Virginia), at https://lootsplit-standby.onrender.com. It remains locked until deliberate recovery. `GET /healthz` reports the pinned release; normal application requests return 503.
+
+Store database-scoped `TURSO_DATABASE_URL` and `TURSO_AUTH_TOKEN` as GitHub **production environment secrets**. The `Verify remote standby recovery` workflow checks only the dedicated empty `lootsplit-standby-*` libSQL database. It imports an encrypted synthetic snapshot and all migrations inside a transaction that is rolled back, then checks durable reconnect and atomic retry guards using a uniquely named fixture table that it removes. It refuses a populated database and never accesses Cloudflare production. The final step reports missing backup settings without printing secret values. This rehearsal verifies the remote SQL recovery path; it does not activate the standby or claim a production backup has been captured.
+
 ## Encrypted daily backups
 
 Generate 32 random bytes as 64 hexadecimal characters in a password manager or trusted local tool. Save it as GitHub **production environment secret** `BACKUP_ENCRYPTION_KEY`, retaining a separate secure copy. Never paste it into an issue, source file, command argument, screenshot or chat.
