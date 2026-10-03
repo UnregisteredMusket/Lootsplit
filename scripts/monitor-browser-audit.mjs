@@ -1,3 +1,4 @@
+import { openApplication, reloadApplication } from "./title-screen-navigation.mjs";
 import { chromium } from "playwright";
 import assert from "node:assert/strict";
 import { mkdir } from "node:fs/promises";
@@ -34,7 +35,7 @@ try {
   assert.equal(signup.status(), 200);
   id = (await signup.json()).user.id;
   await DB.prepare("INSERT INTO site_roles VALUES (?,'admin',?)").bind(id, Date.now()).run();
-  await page.goto(origin + "/account");
+  await openApplication(page, origin + "/account");
   await page.getByRole("button", { name: "Open server monitor", exact: true }).click();
   await page.getByText("Total accounts", { exact: true }).waitFor();
   // Local dev has no ASSETS binding; partial failure must preserve real database counts.
@@ -54,14 +55,14 @@ try {
   await page.getByRole("button", { name: "Refresh server status", exact: true }).click();
   await page.getByText("Status unavailable", { exact: true }).waitFor();
   assert.equal(await page.getByText("Total accounts", { exact: true }).count(), 0);
-  await page.reload();
+  await reloadApplication(page);
   await page.getByRole("heading", { name: "Monitor Audit’s library", exact: true }).waitFor();
   assert.equal(
     await page.getByRole("heading", { name: "Server monitoring", exact: true }).count(),
     0,
   );
   await DB.prepare("UPDATE site_roles SET role='owner' WHERE user_id=?").bind(id).run();
-  await page.reload();
+  await reloadApplication(page);
   await page.getByRole("button", { name: "Open server monitor", exact: true }).click();
   await page.getByText("Total accounts", { exact: true }).waitFor();
   await page.getByRole("button", { name: "Close server monitor", exact: true }).click();

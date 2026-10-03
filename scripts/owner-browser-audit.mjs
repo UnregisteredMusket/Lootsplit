@@ -1,3 +1,4 @@
+import { openApplication, reloadApplication } from "./title-screen-navigation.mjs";
 import { chromium } from "playwright";
 import assert from "node:assert/strict";
 import { mkdir } from "node:fs/promises";
@@ -29,7 +30,7 @@ try {
   assert.equal(signup.status(), 200);
   id = (await signup.json()).user.id;
   await DB.prepare("INSERT INTO site_roles VALUES (?,'owner',?)").bind(id, Date.now()).run();
-  await page.goto(origin + "/account");
+  await openApplication(page, origin + "/account");
   await page.getByRole("heading", { name: "Owner controls", exact: true }).waitFor();
   await page.getByLabel("Donation page URL").fill("https://example.com/support");
   await page.getByRole("button", { name: "Save donation link", exact: true }).click();
@@ -40,7 +41,7 @@ try {
     .fill("Literal <script> text stays text.");
   await page.getByRole("button", { name: "Publish announcement", exact: true }).click();
   await page.getByText("Announcement published on the homepage.", { exact: true }).waitFor();
-  await page.goto(origin + "/welcome");
+  await openApplication(page, origin + "/welcome");
   await page.getByText("Literal <script> text stays text.", { exact: true }).waitFor();
   await page.getByRole("link", { name: "Donate", exact: true }).first().click();
   const link = page.getByRole("link", { name: "Make a donation" });
@@ -51,7 +52,7 @@ try {
     await page.getByRole("link", { name: "Visit Open5e" }).getAttribute("href"),
     "https://open5e.com",
   );
-  await page.goto(origin + "/account");
+  await openApplication(page, origin + "/account");
   await page.getByLabel("Donation page URL").fill("");
   await page.getByRole("button", { name: "Save donation link", exact: true }).click();
   await page.getByText("Donations are hidden until you add a link.", { exact: true }).waitFor();
@@ -59,19 +60,20 @@ try {
   await page.getByText("Announcement is hidden. Your draft is saved.", { exact: true }).waitFor();
   await page.setViewportSize({ width: 390, height: 844 });
   assert.equal(await page.evaluate(() => document.documentElement.scrollWidth > innerWidth), false);
-  await page.locator(".quire-dawn").waitFor({state:"hidden"});
+  await page.locator(".quire-dawn").waitFor({ state: "hidden" });
   await page.screenshot({
     path: process.env.OWNER_SCREENSHOT || "test-results/owner-mobile.png",
     fullPage: true,
   });
   await DB.prepare("DELETE FROM site_roles WHERE user_id=?").bind(id).run();
-  await page.reload();
+  await reloadApplication(page);
   await page.getByRole("heading", { name: "Audit Owner’s library", exact: true }).waitFor();
   assert.equal(await page.getByRole("heading", { name: "Owner controls", exact: true }).count(), 0);
   assert.deepEqual(errors, []);
   console.log("Owner browser audit passed");
 } catch (error) {
- console.error(await page.locator("body").innerText()); throw error;
+  console.error(await page.locator("body").innerText());
+  throw error;
 } finally {
   if (id) await DB.prepare("DELETE FROM user WHERE id=?").bind(id).run();
   DB.close();

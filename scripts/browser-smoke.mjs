@@ -1,4 +1,5 @@
 #!/usr/bin/env node
+import { openApplication } from "./title-screen-navigation.mjs";
 import { mkdirSync, readFileSync, realpathSync, statSync, writeFileSync } from "node:fs";
 import { dirname } from "node:path";
 import { chromium } from "playwright";
@@ -108,7 +109,10 @@ try {
     page.on("pageerror", (err) => errors.pageErrors.push(String(err?.message || err)));
     // `domcontentloaded`, not `networkidle`: Vite keeps an HMR websocket open, so
     // networkidle never settles and would burn the whole timeout.
-    const resp = await page.goto(url, { waitUntil: "domcontentloaded", timeout: timeoutMs });
+    const resp = await openApplication(page, url, {
+      waitUntil: "domcontentloaded",
+      timeout: timeoutMs,
+    });
     const status = resp?.status() ?? 0;
     await page.waitForTimeout(1800);
 

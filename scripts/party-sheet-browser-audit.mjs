@@ -1,3 +1,4 @@
+import { openApplication } from "./title-screen-navigation.mjs";
 import { chromium } from "playwright";
 import assert from "node:assert/strict";
 import { mkdir } from "node:fs/promises";
@@ -41,7 +42,7 @@ async function actor(name, ip) {
   return { page, context, id };
 }
 async function visit(page, path) {
-  await page.goto(origin + path);
+  await openApplication(page, origin + path);
   await page.locator(".role-chip:enabled").waitFor();
   await page.locator(".quire-dawn").waitFor({ state: "hidden" });
 }

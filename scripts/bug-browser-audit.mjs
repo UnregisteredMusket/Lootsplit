@@ -1,3 +1,4 @@
+import { openApplication } from "./title-screen-navigation.mjs";
 import { chromium } from "playwright";
 import assert from "node:assert/strict";
 import { mkdir } from "node:fs/promises";
@@ -35,7 +36,7 @@ try {
     const page = await context.newPage();
     page.setDefaultTimeout(20000);
     page.on("pageerror", (e) => errors.push(e.message));
-    await page.goto(origin + "/account#bug-reports");
+    await openApplication(page, origin + "/account#bug-reports");
     await page.locator("#bug-reports h2").waitFor();
     await page.locator(".quire-dawn").waitFor({ state: "hidden" });
     return { page, context };

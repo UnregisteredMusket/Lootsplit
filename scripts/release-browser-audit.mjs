@@ -1,3 +1,4 @@
+import { openApplication, reloadApplication } from "./title-screen-navigation.mjs";
 import { chromium } from "playwright";
 import assert from "node:assert/strict";
 import { mkdir } from "node:fs/promises";
@@ -23,7 +24,7 @@ async function bounded(label, work) {
   }
 }
 async function visit(page, url) {
-  await page.goto(url);
+  await openApplication(page, url);
   // Server-rendered controls appear before hydration; wait for the client to attach handlers.
   await page.locator(".role-chip:enabled").waitFor();
 }
@@ -115,7 +116,7 @@ try {
       Object.values(localStorage).some((v) => v.includes("pending") && v.includes("stockId")),
     ),
   );
-  await player.reload();
+  await reloadApplication(player);
   // The SSR heading is present before the restored client room is ready. Wait
   // for hydration and the persisted membership before invoking recovery APIs.
   await player.locator(".role-chip:enabled").waitFor();

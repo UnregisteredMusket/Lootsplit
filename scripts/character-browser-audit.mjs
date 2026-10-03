@@ -1,3 +1,4 @@
+import { openApplication, reloadApplication } from "./title-screen-navigation.mjs";
 import { chromium } from "playwright";
 import assert from "node:assert/strict";
 import { mkdir } from "node:fs/promises";
@@ -90,7 +91,7 @@ try {
       .bind(a.id, code, seat, token, "Test adventure")
       .run();
   const page = player.page;
-  await page.goto(origin + "/characters");
+  await openApplication(page, origin + "/characters");
   await page.locator(".character-library-controls > summary").click();
   await page.getByRole("button", { name: "Create account-only character", exact: true }).click();
   await page.getByRole("heading", { name: "New adventurer", exact: true }).waitFor();
@@ -163,7 +164,7 @@ try {
   await page.getByRole("button", { name: "Inventory & currency", exact: true }).click();
   await page.getByText("Campaign sword × 1", { exact: true }).waitFor();
   await page.getByText("17 gp", { exact: true }).waitFor();
-  await dm.page.goto(origin + "/characters");
+  await openApplication(dm.page, origin + "/characters");
   await dm.page.getByLabel("Allow manual rolls in this campaign", { exact: true }).check();
   await page.getByRole("button", { name: "Reload sheet", exact: true }).click();
   await page.getByLabel("Enter a manual total", { exact: true }).waitFor();
@@ -190,7 +191,7 @@ try {
   await page.getByRole("button", { name: "Actions", exact: true }).click();
   await page.locator(".character-title").scrollIntoViewIfNeeded();
   await page.screenshot({ path: output + "/mobile.png" });
-  await page.reload();
+  await reloadApplication(page);
   await page.getByRole("heading", { name: "Mira Ashfall", exact: true }).waitFor();
   await page.getByRole("button", { name: "Edit sheet", exact: true }).click();
   assert.equal(await page.getByLabel("Current HP", { exact: true }).inputValue(), "8");
@@ -205,7 +206,7 @@ try {
       openedAt: Date.now(),
     });
   });
-  await page.goto(origin + "/");
+  await openApplication(page, origin + "/");
   await page.getByRole("button", { name: "Not now", exact: true }).click();
   await page.getByRole("heading", { name: "Character sheets", exact: true }).waitFor();
   assert.deepEqual(errors, []);

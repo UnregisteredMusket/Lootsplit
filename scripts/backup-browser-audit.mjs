@@ -1,3 +1,4 @@
+import { openApplication } from "./title-screen-navigation.mjs";
 import { chromium } from "playwright";
 import { readFile, mkdir } from "node:fs/promises";
 import assert from "node:assert/strict";
@@ -13,7 +14,7 @@ const errors = [];
 page.on("pageerror", (e) => errors.push(e.message));
 const origin = process.env.AUDIT_ORIGIN || "http://127.0.0.1:8081";
 try {
-  await page.goto(origin + "/settings");
+  await openApplication(page, origin + "/settings");
   await page.waitForTimeout(1800);
   const skip = page.getByRole("button", { name: "Not now", exact: true });
   if (await skip.isVisible()) await skip.click();

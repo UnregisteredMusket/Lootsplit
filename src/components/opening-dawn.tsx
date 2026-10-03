@@ -1,17 +1,29 @@
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { LootLoader } from "./loot-loader";
 
-export function OpeningDawn() {
+export function OpeningDawn({ children }: { children: ReactNode }) {
   const [on, setOn] = useState(true);
+  const [ready, setReady] = useState(false);
+  const screen = useRef<HTMLButtonElement>(null);
   useEffect(() => {
-    const handle = window.setTimeout(() => setOn(false), 2200);
-    return () => window.clearTimeout(handle);
+    setReady(true);
   }, []);
-  if (!on) return null;
+  useEffect(() => {
+    if (ready) screen.current?.focus({ preventScroll: true });
+  }, [ready]);
+  if (!on) return <>{children}</>;
   return (
-    <div className="quire-dawn loot-opening" aria-hidden="true">
-      <p className="quire-dawn-name">Lootsplit</p>
+    <button
+      ref={screen}
+      type="button"
+      disabled={!ready}
+      className="quire-dawn loot-opening"
+      onClick={() => setOn(false)}
+      aria-label="Lootsplit. Click to continue"
+    >
+      <span className="quire-dawn-name">Lootsplit</span>
       <LootLoader />
-    </div>
+      <span className="loot-opening-continue">click to continue</span>
+    </button>
   );
 }

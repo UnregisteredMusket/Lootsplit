@@ -1,3 +1,4 @@
+import { openApplication } from "./title-screen-navigation.mjs";
 import { chromium } from "playwright";
 import assert from "node:assert/strict";
 import { mkdir } from "node:fs/promises";
@@ -31,7 +32,9 @@ try {
       ["resources", "Resources & credits"],
       ["donate", "Support Lootsplit"],
     ]) {
-      const response = await page.goto(`${origin}/${path}`, { waitUntil: "networkidle" });
+      const response = await openApplication(page, `${origin}/${path}`, {
+        waitUntil: "networkidle",
+      });
       assert.equal(response.status(), 200);
       await page.getByRole("heading", { level: 1 }).filter({ hasText: heading }).waitFor();
       if (path === "updates") {

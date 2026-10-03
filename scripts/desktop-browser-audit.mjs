@@ -1,3 +1,4 @@
+import { openApplication } from "./title-screen-navigation.mjs";
 import { chromium } from "playwright";
 import assert from "node:assert/strict";
 import { mkdir, readFile } from "node:fs/promises";
@@ -97,7 +98,10 @@ await context.route("**/api/account/encounters/log", (r) =>
   r.fulfill({ json: { rolls: [], more: false } }),
 );
 async function visit(path) {
-  await page.goto(origin + (path === "/characters" ? "/characters?id=layout-hero" : path));
+  await openApplication(
+    page,
+    origin + (path === "/characters" ? "/characters?id=layout-hero" : path),
+  );
   await page.locator(".role-chip:enabled").waitFor();
   await page.locator(".quire-dawn").waitFor({ state: "hidden" });
   await page.evaluate(() => document.fonts.ready);

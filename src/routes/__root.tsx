@@ -56,19 +56,24 @@ export const Route = createRootRoute({
         <body>
           <PreviewHostBridge />
           <MemberActivity />
-          {!publicPage && <OpeningDawn />}
-          <AuthProvider>
-            <LibraryProvider>
-              <PrefsProvider>
-                <EconomyProvider>
-                  <Outlet />
-                </EconomyProvider>
-              </PrefsProvider>
-            </LibraryProvider>
-          </AuthProvider>
+          <OpeningGate publicPage={publicPage}>
+            <AuthProvider>
+              <LibraryProvider>
+                <PrefsProvider>
+                  <EconomyProvider>
+                    <Outlet />
+                  </EconomyProvider>
+                </PrefsProvider>
+              </LibraryProvider>
+            </AuthProvider>
+          </OpeningGate>
           <Scripts />
         </body>
       </html>
     );
   },
 });
+
+function OpeningGate({ publicPage, children }: { publicPage: boolean; children: React.ReactNode }) {
+  return publicPage ? <>{children}</> : <OpeningDawn>{children}</OpeningDawn>;
+}

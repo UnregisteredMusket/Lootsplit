@@ -1,3 +1,4 @@
+import { openApplication, reloadApplication } from "./title-screen-navigation.mjs";
 import { chromium } from "playwright";
 import assert from "node:assert/strict";
 import { mkdir } from "node:fs/promises";
@@ -127,7 +128,7 @@ try {
       });
     });
   }
-  await p.goto(origin + "/encounters");
+  await openApplication(p, origin + "/encounters");
   await p.getByRole("button", { name: "New encounter", exact: true }).click();
   await p.getByRole("button", { name: "Add combatant", exact: true }).waitFor();
   await p.locator(".quire-dawn").waitFor({ state: "hidden" });
@@ -205,10 +206,10 @@ try {
   );
   assert.equal(updated.table.holdings.length, 2);
   assert.equal(updated.table.purses[0].coins.gp, 35);
-  await p.reload();
+  await reloadApplication(p);
   await p.getByRole("button", { name: /Ambush on the northern road/ }).click();
   await p.getByText(/locked against a second award/).waitFor();
-  await player.page.goto(origin + "/encounters");
+  await openApplication(player.page, origin + "/encounters");
   await player.page.getByText("Your next encounter starts with a campaign").waitFor();
   const denied = await player.context.request.post(origin + "/api/account/encounters/detail", {
     headers: { origin },

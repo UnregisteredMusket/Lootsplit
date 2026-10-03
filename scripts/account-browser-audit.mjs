@@ -1,3 +1,4 @@
+import { openApplication, reloadApplication } from "./title-screen-navigation.mjs";
 import { chromium } from "playwright";
 import assert from "node:assert/strict";
 import { mkdir } from "node:fs/promises";
@@ -12,7 +13,7 @@ const browser = await chromium.launch({
 await mkdir("test-results", { recursive: true });
 const errors = [];
 async function visit(page, path) {
-  await page.goto(origin + path);
+  await openApplication(page, origin + path);
   await page.waitForTimeout(1600);
 }
 try {
@@ -109,7 +110,7 @@ try {
   await visit(other, "/account");
   await other.getByRole("button", { name: "Save current membership", exact: true }).click();
   await other.getByRole("button", { name: "Resume", exact: true }).waitFor();
-  await page.reload();
+  await reloadApplication(page);
   await page.getByRole("button", { name: "Resume", exact: true }).click();
   await page.waitForURL((url) => url.origin === origin && url.pathname === "/");
   await page.getByText("Campaign control", { exact: true }).waitFor();
@@ -130,7 +131,7 @@ try {
   await page.getByLabel("New password", { exact: true }).fill("new browser testing password 2026");
   await page.getByRole("button", { name: "Reset password", exact: true }).click();
   await page.getByRole("status").filter({ hasText: "Password changed" }).waitFor();
-  await other.reload();
+  await reloadApplication(other);
   await other.getByRole("button", { name: "Sign in", exact: true }).last().waitFor();
   assert.deepEqual(errors, []);
   console.log(

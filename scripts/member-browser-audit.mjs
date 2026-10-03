@@ -1,3 +1,4 @@
+import { openApplication, reloadApplication } from "./title-screen-navigation.mjs";
 import { chromium } from "playwright";
 import assert from "node:assert/strict";
 import { mkdir } from "node:fs/promises";
@@ -38,7 +39,7 @@ try {
   const owner = await account("Staff Audit"),
     member = await account("Member Audit");
   await DB.prepare("INSERT INTO site_roles VALUES (?,'owner',?)").bind(owner.id, Date.now()).run();
-  await member.page.goto(origin + "/account");
+  await openApplication(member.page, origin + "/account");
   await member.page.getByRole("heading", { name: "Profile & preferences" }).waitFor();
   await member.page.getByLabel("Introduction", { exact: true }).fill("A tabletop adventurer.");
   await member.page.getByLabel("Messaging email", { exact: true }).fill("messages@example.com");
@@ -47,7 +48,7 @@ try {
     .check();
   await member.page.getByRole("button", { name: "Save member profile", exact: true }).click();
   await member.page.getByText("Profile saved.", { exact: true }).waitFor();
-  await member.page.reload();
+  await reloadApplication(member.page);
   await member.page.getByLabel("Introduction", { exact: true }).waitFor();
   assert.equal(
     await member.page.getByLabel("Introduction", { exact: true }).inputValue(),
@@ -57,7 +58,7 @@ try {
     await member.page.getByRole("heading", { name: "Member management", exact: true }).count(),
     0,
   );
-  await owner.page.goto(origin + "/account");
+  await openApplication(owner.page, origin + "/account");
   await owner.page.getByRole("heading", { name: "Member management", exact: true }).waitFor();
   await owner.page.getByLabel("Search members", { exact: true }).fill(member.email);
   await owner.page.getByRole("button", { name: "Search / refresh members" }).click();
@@ -79,7 +80,7 @@ try {
     await owner.page.getByText("Member action saved.", { exact: true }).waitFor();
   }
   await action("warn", "Please keep profiles friendly.");
-  await member.page.reload();
+  await reloadApplication(member.page);
   await member.page.getByText(/Staff warning.*Please keep profiles friendly/).waitFor();
   await owner.page.getByRole("button", { name: "Manage Member Audit", exact: true }).click();
   await action("ban", "Temporary test suspension.", { label: "Ban duration", value: "1" });
@@ -124,7 +125,7 @@ try {
     data: { code, token: "audit-dm-token", name: "Disposable shared campaign" },
   });
   assert.equal(linked.status(), 200);
-  await owner.page.reload();
+  await reloadApplication(owner.page);
   await owner.page.getByRole("button", { name: "Delete shared campaign", exact: true }).waitFor();
   owner.page.once("dialog", (d) => d.accept(code));
   await owner.page.getByRole("button", { name: "Delete shared campaign", exact: true }).click();

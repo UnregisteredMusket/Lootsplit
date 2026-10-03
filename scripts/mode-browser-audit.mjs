@@ -1,6 +1,7 @@
+import { openApplication, reloadApplication } from "./title-screen-navigation.mjs";
 import { chromium } from "playwright";
 import assert from "node:assert/strict";
-import {readFile} from "node:fs/promises";
+import { readFile } from "node:fs/promises";
 const origin = process.env.AUDIT_ORIGIN || "http://127.0.0.1:8081";
 const browser = await chromium.launch({
   headless: true,
@@ -15,7 +16,7 @@ async function open() {
   contexts.push(context);
   const page = await context.newPage();
   page.on("pageerror", (e) => errors.push(e.message));
-  await page.goto(origin + "/share");
+  await openApplication(page, origin + "/share");
   await page.waitForTimeout(1800);
   const skip = page.getByRole("button", { name: "Not now", exact: true });
   if (await skip.isVisible()) await skip.click();
@@ -43,46 +44,51 @@ try {
   await dm.getByText("Browser player", { exact: true }).waitFor();
   await dm.getByRole("button", { name: "Submit changes and end turn", exact: true }).click();
   await player.getByRole("button", { name: "Submit changes and end turn", exact: true }).waitFor();
-  await player.goto(origin + "/market");
+  await openApplication(player, origin + "/market");
   await player.getByRole("link").filter({ hasText: "Hearth" }).first().click();
   await player.getByRole("button", { name: /^Buy / }).first().click();
   await player.getByText("1 pending action", { exact: false }).first().waitFor();
-  await player.reload();
+  await reloadApplication(player);
   await player.getByText("1 pending action", { exact: false }).first().waitFor();
   results.push("Turn draft survives page reload");
-  await player.goto(origin + "/settings");
-  await player.getByRole("button", {name:"Download backup",exact:true}).click();
-  await player.getByText(/Submit or resolve your pending actions before saving a campaign backup/).waitFor();
+  await openApplication(player, origin + "/settings");
+  await player.getByRole("button", { name: "Download backup", exact: true }).click();
+  await player
+    .getByText(/Submit or resolve your pending actions before saving a campaign backup/)
+    .waitFor();
   results.push("Turn backup refuses unsubmitted draft");
-  await player.goto(origin + "/share");
+  await openApplication(player, origin + "/share");
   await player.getByRole("button", { name: "Submit changes and end turn", exact: true }).click();
   await player.getByText(/Waiting for Dungeon master · Synced/).waitFor();
   results.push("Player purchase submitted and turn returned to DM");
-  await player.goto(origin + "/settings");
+  await openApplication(player, origin + "/settings");
   let downloading = player.waitForEvent("download");
-  await player.getByRole("button", {name:"Download backup",exact:true}).click();
+  await player.getByRole("button", { name: "Download backup", exact: true }).click();
   let backup = JSON.parse(await readFile(await (await downloading).path(), "utf8"));
-  assert.equal(backup.kind,"quire");
-  assert.equal(await player.getByRole("button",{name:"Load",exact:true}).first().isDisabled(),true);
+  assert.equal(backup.kind, "quire");
+  assert.equal(
+    await player.getByRole("button", { name: "Load", exact: true }).first().isDisabled(),
+    true,
+  );
   results.push("Turn-based player backup downloads without restoring over shared room");
-  await player.goto(origin + "/share");
+  await openApplication(player, origin + "/share");
   await dm.getByRole("button", { name: "Live Mode", exact: true }).click();
   await dm.getByRole("button", { name: "Change mode", exact: true }).click();
   await player.getByText("Live · Synced", { exact: true }).waitFor();
-  await player.goto(origin + "/market");
+  await openApplication(player, origin + "/market");
   await player.getByRole("link").filter({ hasText: "Hearth" }).first().click();
   await player.getByRole("button", { name: /^Buy / }).first().click();
   await player.getByText("Live · Synced", { exact: true }).waitFor();
   results.push("Live purchase accepted and synchronized");
-  await dm.goto(origin + "/settings");
+  await openApplication(dm, origin + "/settings");
   downloading = dm.waitForEvent("download");
-  await dm.getByRole("button", {name:"Download backup",exact:true}).click();
+  await dm.getByRole("button", { name: "Download backup", exact: true }).click();
   backup = JSON.parse(await readFile(await (await downloading).path(), "utf8"));
-  assert.equal(backup.kind,"quire");
+  assert.equal(backup.kind, "quire");
   assert.ok(backup.purses.length > 0);
   results.push("Live DM campaign backup downloads");
-  await dm.goto(origin + "/share");
-  await player.goto(origin + "/share");
+  await openApplication(dm, origin + "/share");
+  await openApplication(player, origin + "/share");
   await player.getByRole("button", { name: /Messages/ }).click();
   await player.getByRole("textbox", { name: "Message", exact: true }).fill("Browser sync test");
   await player.getByRole("button", { name: "Save message", exact: true }).click();
