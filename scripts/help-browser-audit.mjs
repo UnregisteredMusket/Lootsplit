@@ -20,7 +20,7 @@ try {
     await openApplication(page, origin + "/help");
     const search = page.getByRole("searchbox");
     await search.fill("downtime");
-    await page.getByText("Preview downtime and start the next session", { exact: true }).waitFor();
+    await page.locator("#downtime > summary").waitFor();
     assert.ok((await page.locator(".help-topic[open]").count()) > 0);
     await search.fill("no-such-help-topic");
     await page.getByText("0 matching topics", { exact: true }).waitFor();
@@ -48,7 +48,7 @@ try {
     await page.getByRole("button", { name: "Help", exact: true }).click();
     const guide = page.getByRole("dialog", { name: "How Lootsplit works", exact: true });
     await guide.getByRole("searchbox").fill("encounter");
-    await guide.getByText("Build, run and import encounters", { exact: true }).waitFor();
+    await guide.locator("#guide-encounters > summary").waitFor();
     await guide.getByRole("link", { name: "Encounter builder & tracker", exact: false }).click();
     await page.locator(".encounter-workspace").waitFor();
     assert.equal(await page.locator(".loot-opening").count(), 0);

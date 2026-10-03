@@ -37,6 +37,7 @@ jobs:
             if curl -fsS http://127.0.0.1:8080/ > /dev/null; then break; fi
             sleep 2
           done
+          node scripts/help-browser-audit.mjs
           node scripts/release-browser-audit.mjs
           AUDIT_ORIGIN=http://127.0.0.1:8080 node scripts/backup-browser-audit.mjs
           node scripts/account-browser-audit.mjs
@@ -55,7 +56,6 @@ jobs:
           node scripts/control-panel-browser-audit.mjs
           node scripts/library-navigation-browser-audit.mjs
           node scripts/desktop-browser-audit.mjs
-          node scripts/help-browser-audit.mjs
           node scripts/game-analytics-browser-audit.mjs
           node scripts/website-browser-audit.mjs
       - name: Built Worker account checks
