@@ -26,6 +26,16 @@ const short = z.string().trim().max(120),
   bonus = z.number().int().min(-100).max(100);
 const ability = z.enum(["str", "dex", "con", "int", "wis", "cha"]);
 const training = z.object({ rank: z.number().int().min(0).max(2), extra: bonus });
+// Both views store the same holdings. Keep existing names/notes/IDs lossless;
+// account and shared-command request limits bound transport size.
+export const inventoryFields = {
+  id: z.string().min(1),
+  name: z.string(),
+  kind: z.enum(["item", "property"]),
+  unitCopper: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
+  quantity: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
+  notes: z.string(),
+};
 export const sheetSchema = z
   .object({
     version: z.literal(1),
@@ -97,20 +107,16 @@ export const sheetSchema = z
         }),
       )
       .max(50),
-    equipment: z
-      .array(
-        z.object({
-          id: z.string().min(1).max(150).optional(),
-          kind: z.enum(["item", "property"]).optional(),
-          unitCopper: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER).optional(),
-          name: short.min(1),
-          quantity: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
-          weight: z.number().min(0).max(9999),
-          equipped: z.boolean(),
-          notes,
-        }),
-      )
-      .max(10000),
+    equipment: z.array(
+      z.object({
+        ...inventoryFields,
+        id: inventoryFields.id.optional(),
+        kind: inventoryFields.kind.optional(),
+        unitCopper: inventoryFields.unitCopper.optional(),
+        weight: z.number().min(0).max(9999),
+        equipped: z.boolean(),
+      }),
+    ),
     coins: z.object({
       cp: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
       sp: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),

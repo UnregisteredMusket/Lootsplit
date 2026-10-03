@@ -34,3 +34,7 @@ The first release-signed APK cannot normally replace the old debug-signed instal
 Android exports now ask whether to Save file or Share. Save file uses Android's document picker and reports success only after writing/closing the stream. Choose Downloads or another location outside app-private storage. Sharing only hands the file to another application: confirm that application's save/send completed. Cancelling preserves the campaign and named device backup. Neither private device backups nor shared room membership replace an external backup.
 
 The bundled Android client must be updated by installing the newer signed APK. Changes deployed to the website do not rewrite its bundled interface. The backend remains the existing Cloudflare Worker.
+
+## Prepared next update
+
+The sequential bug-fix candidate is version **1.3.2**, Android version code **5**. It is prepared on a release branch; 1.3.1 remains the published download until the signed release workflow completes. Merge the verified candidate to main to run the existing release workflow with the permanent repository signing secrets. Verify the resulting certificate/checksum before updating the website's pinned download metadata.

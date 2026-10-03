@@ -184,7 +184,7 @@ type EconomyApi = {
   decideLoan: (id: string, status: LoanStatus) => Promise<void>;
   sheets: CharacterSheet[];
   importSheet: (purseId: string, file: File) => Promise<void>;
-  updateSheet: (sheet: CharacterSheet) => Promise<void>;
+  updateSheet: (sheet: CharacterSheet, before?: CharacterSheet) => Promise<void>;
   voidLine: (id: string) => Promise<void>;
   setRealm: (settings: RealmSettings, options?: { reprice?: boolean }) => Promise<void>;
   addGoods: (rows: CatalogItem[]) => Promise<number>;
@@ -636,12 +636,12 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
             : "Character sheet imported.",
         );
       },
-      updateSheet: (sheet) =>
+      updateSheet: (sheet, before) =>
         getCloudWatch().joined
-          ? shared({ kind: "sheet", sheet })
+          ? shared({ kind: "sheet", sheet, before })
           : run(async () => {
               ownPurse(sheet.purseId);
-              await updateCharacterSheet(sheet);
+              await updateCharacterSheet(sheet, before);
             }),
       voidLine: (id) =>
         run(async () => {

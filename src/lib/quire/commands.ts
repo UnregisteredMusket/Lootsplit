@@ -1,7 +1,7 @@
 import { readJournal, preserveJournalMetadata } from "./journal.ts";
 import { z } from "zod";
 import { sheetSchema } from "../characters/model.mjs";
-import { editCharacter, legacyCharacter, statsOnly } from "../characters/campaign-sheet.mjs";
+import { editCharacter, editLegacyCharacter } from "../characters/campaign-sheet.mjs";
 import type { CloudTable, CloudSeat } from "./cloud.ts";
 import { fromCopper, toCopper, spendCoins, priceAfterCharisma } from "./money.ts";
 import { charismaScore, readSheets } from "./sheet.ts";
@@ -80,7 +80,12 @@ export const commandSchema = z.discriminatedUnion("kind", [
     purseId: z.string().max(150),
     text: z.string().trim().min(1).max(500),
   }),
-  z.object({ ...base, kind: z.literal("sheet"), sheet: z.unknown() }),
+  z.object({
+    ...base,
+    kind: z.literal("sheet"),
+    sheet: z.unknown(),
+    before: z.unknown().optional(),
+  }),
   z.object({
     ...base,
     kind: z.literal("patch"),
@@ -368,29 +373,9 @@ export function applyCommand(input: CloudTable, seat: CloudSeat, raw: Command): 
   } else if (cmd.kind === "sheet") {
     const s = readSheets([cmd.sheet])[0];
     if (!s) throw new Error("Invalid character sheet.");
-    own(s.purseId); // Players may maintain sheets, but financial bonuses are DM-controlled online.
-    if (seat.role !== "dm") {
-      const old = t.sheets.find((x) => x.purseId === s.purseId);
-      if (JSON.stringify(old?.abilities) !== JSON.stringify(s.abilities))
-        throw new Error("Ask the DM to import or change ability scores in shared modes.");
-    }
-    const p = own(s.purseId),
-      converted = legacyCharacter(s, s.name || p.name);
-    if (
-      seat.role !== "dm" &&
-      !same(converted.scores, p.sheet?.scores || legacyCharacter(undefined, p.name).scores)
-    )
-      throw Error("Ask the DM to change ability scores.");
-    p.sheet = statsOnly({
-      ...converted,
-      attacks: p.sheet?.attacks || [],
-      spells: p.sheet?.spells || [],
-      slots: p.sheet?.slots || [],
-      resources: p.sheet?.resources || [],
-    });
-    p.name = converted.name;
-    p.sheetRevision = (p.sheetRevision || 0) + 1;
-    t.sheets = [...t.sheets.filter((x) => x.purseId !== s.purseId), s];
+    const before = cmd.before === undefined ? undefined : readSheets([cmd.before])[0];
+    if (cmd.before !== undefined && !before) throw Error("Invalid character baseline.");
+    editLegacyCharacter(t, seat, s, before);
   } else if (cmd.kind === "patch") {
     dm();
     for (const change of cmd.changes) {
@@ -450,6 +435,15 @@ export function applyCommand(input: CloudTable, seat: CloudSeat, raw: Command): 
         throw new Error(
           `Conflict in ${change.store}. Export your pending changes, then refresh and retry.`,
         );
+      if (change.store === "purses" && current?.sheetReadOnlyForDm && change.after !== null) {
+        const after = change.after as import("./types.ts").Purse;
+        if (
+          !same(current.sheet, after.sheet) ||
+          current.profileId !== after.profileId ||
+          !after.sheetReadOnlyForDm
+        )
+          throw Error("Only the profile owner can edit this character sheet.");
+      }
       (t as any)[change.store] = [
         ...rows.filter((x) => rowId(x) !== change.id),
         ...(change.after === null ? [] : [change.after]),

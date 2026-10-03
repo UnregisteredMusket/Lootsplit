@@ -1,6 +1,6 @@
 import { loadJournal, readJournal, type Journal } from "./journal.ts";
 import { blankSheet } from "../characters/model.mjs";
-import { statsOnly, editCharacter, legacyCharacter } from "../characters/campaign-sheet.mjs";
+import { statsOnly, editCharacter, editLegacyCharacter } from "../characters/campaign-sheet.mjs";
 import { getCloudWatch } from "./cloud-turn.ts";
 import { verifyReportBase, type ReportBase } from "./local-report.ts";
 import { coinsSchema, validateEconomyRows } from "./validation.ts";
@@ -32,6 +32,7 @@ import { loadHandouts, readHandouts, type Handout } from "./handouts.ts";
 import { APP_VERSION } from "./version.ts";
 import {
   giftParts,
+  itemForGift,
   giftSummary,
   loadGifts,
   loadRoster,
@@ -1036,12 +1037,7 @@ export async function giveToPlayer(input: {
       throw new Error("That holding is not yours.");
     if (!Number.isSafeInteger(quantity) || quantity < 1 || holdingRow.quantity < quantity)
       throw new Error("You do not have that many.");
-    moved = {
-      name: holdingRow.name,
-      kind: holdingRow.kind,
-      quantity,
-      unitCopper: holdingRow.unitCopper,
-    };
+    moved = itemForGift(holdingRow, quantity);
   }
   if (copper === 0 && !moved) throw new Error("Give coins, an item, or a holding.");
   const nextCoins = copper > 0 ? spendCoins(from.coins, copper) : from.coins;
@@ -1070,10 +1066,11 @@ export async function giveToPlayer(input: {
       (!holdingRow || holdingRow.purseId !== from.id || holdingRow.quantity < moved.quantity)
     )
       throw new Error("You do not have that many.");
+    if (holdingRow && moved) gift.holding = moved = itemForGift(holdingRow, moved.quantity);
+    const pendingRow =
+      sitting.role === "player" ? await request(tx.objectStore("meta").get("gifts")) : null;
     const pending =
-      sitting.role === "player"
-        ? [...readGifts(await request(tx.objectStore("meta").get("gifts"))), gift]
-        : null;
+      sitting.role === "player" ? [...readGifts(pendingRow?.gifts ?? pendingRow), gift] : null;
     tx.objectStore("purses").put({ ...from, coins: nextCoins });
     if (holdingRow && moved) {
       if (holdingRow.quantity === moved.quantity) tx.objectStore("holdings").delete(holdingRow.id);
@@ -1092,11 +1089,8 @@ export async function giveToPlayer(input: {
         tx.objectStore("holdings").put({
           id: crypto.randomUUID(),
           purseId: to.id,
-          name: moved.name,
-          kind: moved.kind,
-          quantity: moved.quantity,
-          unitCopper: moved.unitCopper,
-          notes: "",
+          ...moved,
+          notes: moved.notes ?? "",
         });
       }
     }
@@ -1323,36 +1317,19 @@ export function sheetGaps(sheet: CharacterSheet): string[] {
   return gaps;
 }
 
-export async function updateCharacterSheet(sheet: CharacterSheet): Promise<void> {
+export async function updateCharacterSheet(
+  sheet: CharacterSheet,
+  before?: CharacterSheet,
+): Promise<void> {
   await atomic(["purses", "meta"], async (tx) => {
     const p = await request<Purse | undefined>(tx.objectStore("purses").get(sheet.purseId));
-    const seat = getSeat();
-    if (!p || (seat.role !== "dm" && !seat.purseIds.includes(p.id)))
-      throw Error("You do not control this character.");
-    const legacy = legacyCharacter(sheet, sheet.name || p.name);
-    if (
-      seat.role !== "dm" &&
-      JSON.stringify(legacy.scores) !==
-        JSON.stringify(p.sheet?.scores || legacyCharacter(undefined, p.name).scores)
-    )
-      throw Error("Ask the DM to change ability scores.");
-    p.sheet = statsOnly({
-      ...legacy,
-      attacks: p.sheet?.attacks || [],
-      spells: p.sheet?.spells || [],
-      resources: p.sheet?.resources || [],
-      slots: p.sheet?.slots || [],
-    });
-    p.name = legacy.name;
-    p.sheetRevision = (p.sheetRevision || 0) + 1;
-    tx.objectStore("purses").put(p);
     const row = await request<{ sheets: CharacterSheet[] } | undefined>(
       tx.objectStore("meta").get("sheets"),
     );
-    tx.objectStore("meta").put({
-      id: "sheets",
-      sheets: [...(row?.sheets || []).filter((s) => s.purseId !== p.id), sheet],
-    });
+    const table = { purses: p ? [p] : [], sheets: row?.sheets || [] };
+    editLegacyCharacter(table, getSeat(), sheet, before);
+    tx.objectStore("purses").put(table.purses[0]);
+    tx.objectStore("meta").put({ id: "sheets", sheets: table.sheets });
   });
 }
 

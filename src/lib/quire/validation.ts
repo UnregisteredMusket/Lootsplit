@@ -1,5 +1,5 @@
 import { z } from "zod";
-import { sheetSchema } from "../characters/model.mjs";
+import { sheetSchema, inventoryFields } from "../characters/model.mjs";
 const id = z.string().min(1);
 const amount = z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER);
 export const coinsSchema = z.object({ cp: amount, sp: amount, ep: amount, gp: amount, pp: amount });
@@ -19,19 +19,15 @@ const purse = z.object({
   coins: coinsSchema,
   control: z.enum(["player", "npc"]).optional(),
 });
-const holding = z.object({
-  weight: z.number().min(0).max(9999).optional(),
-  equipped: z.boolean().optional(),
-  id,
+export const holdingSchema = z.object({
+  ...inventoryFields,
   purseId: id,
-  name: z.string(),
-  kind: z.enum(["item", "property"]),
   image: artworkSchema.optional(),
   category: z.string().max(80).optional(),
-  quantity: amount,
-  unitCopper: amount,
-  notes: z.string(),
+  weight: z.number().min(0).max(9999).optional(),
+  equipped: z.boolean().optional(),
 });
+
 const shop = z.object({
   id,
   closed: z.boolean().optional(),
@@ -69,7 +65,7 @@ export function validateEconomyRows(value: {
   stock: unknown;
   ledger: unknown;
 }): void {
-  const schemas = { purses: purse, holdings: holding, shops: shop, stock, ledger };
+  const schemas = { purses: purse, holdings: holdingSchema, shops: shop, stock, ledger };
   for (const key of Object.keys(schemas) as (keyof typeof schemas)[]) {
     const rows = value[key];
     if (!z.array(schemas[key]).safeParse(rows).success)

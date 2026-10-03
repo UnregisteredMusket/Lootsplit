@@ -1,11 +1,18 @@
 import { formatCopper } from "./money.ts";
 import { quireDb } from "./db.ts";
+import { holdingSchema } from "./validation.ts";
+import type { Holding } from "./types.ts";
 
 export type GiftHolding = {
   name: string;
   kind: "item" | "property";
   quantity: number;
   unitCopper: number;
+  notes?: string;
+  weight?: number;
+  image?: string;
+  category?: string;
+  equipped?: boolean;
 };
 
 export type PlayerGift = {
@@ -55,7 +62,8 @@ export function readRoster(value: unknown): RosterPerson[] {
     const person = item as Partial<RosterPerson>;
     const id = typeof person.id === "string" ? person.id : "";
     const name = typeof person.name === "string" ? person.name.trim() : "";
-    if (!id || !name || seen.has(id) || (person.kind !== "character" && person.kind !== "party")) continue;
+    if (!id || !name || seen.has(id) || (person.kind !== "character" && person.kind !== "party"))
+      continue;
     seen.add(id);
     people.push({ id, name, kind: person.kind });
   }
@@ -64,7 +72,8 @@ export function readRoster(value: unknown): RosterPerson[] {
 
 export async function loadGifts(): Promise<PlayerGift[]> {
   const row = await meta("gifts");
-  if (typeof row === "object" && row !== null && "gifts" in row) return readGifts((row as { gifts?: unknown }).gifts);
+  if (typeof row === "object" && row !== null && "gifts" in row)
+    return readGifts((row as { gifts?: unknown }).gifts);
   return readGifts(row);
 }
 
@@ -74,7 +83,8 @@ export async function loadRoster(): Promise<RosterPerson[]> {
 
 export async function loadGiftSeen(): Promise<string[]> {
   const row = await meta("giftSeen");
-  if (typeof row !== "object" || row === null || !("ids" in row) || !Array.isArray(row.ids)) return [];
+  if (typeof row !== "object" || row === null || !("ids" in row) || !Array.isArray(row.ids))
+    return [];
   return row.ids.filter((id): id is string => typeof id === "string" && id.length > 0);
 }
 
@@ -101,7 +111,8 @@ function normalizeGift(value: unknown): PlayerGift | null {
   const fromName = typeof gift.fromName === "string" ? gift.fromName : "";
   const toName = typeof gift.toName === "string" ? gift.toName : "";
   const copper = Number(gift.copper);
-  if (!id || !fromId || !toId || !fromName || !toName || !Number.isFinite(copper) || copper < 0) return null;
+  if (!id || !fromId || !toId || !fromName || !toName || !Number.isFinite(copper) || copper < 0)
+    return null;
   return {
     id,
     at: Number.isFinite(gift.at) ? Number(gift.at) : 0,
@@ -114,15 +125,20 @@ function normalizeGift(value: unknown): PlayerGift | null {
   };
 }
 
+const giftHoldingSchema = holdingSchema.omit({ id: true, purseId: true }).partial({ notes: true });
+
+// Carry all supported item metadata, matching shared transfers, without copying ownership IDs.
+export function itemForGift(holding: Holding, quantity: number): GiftHolding {
+  return giftHoldingSchema.parse({ ...holding, quantity });
+}
+
 function normalizeHolding(value: unknown): GiftHolding | null {
   if (typeof value !== "object" || value === null) return null;
   const holding = value as Partial<GiftHolding>;
-  const name = typeof holding.name === "string" ? holding.name.trim() : "";
   const quantity = Math.floor(Number(holding.quantity));
   const unitCopper = Math.round(Number(holding.unitCopper));
-  if (!name || !Number.isFinite(quantity) || quantity < 1 || !Number.isFinite(unitCopper) || unitCopper < 0) return null;
-  if (holding.kind !== "item" && holding.kind !== "property") return null;
-  return { name, kind: holding.kind, quantity, unitCopper };
+  const result = giftHoldingSchema.safeParse({ ...holding, quantity, unitCopper });
+  return result.success && quantity >= 1 ? result.data : null;
 }
 
 function peopleOf(value: unknown): unknown[] {
