@@ -55,6 +55,7 @@ jobs:
           node scripts/control-panel-browser-audit.mjs
           node scripts/library-navigation-browser-audit.mjs
           node scripts/desktop-browser-audit.mjs
+          node scripts/game-analytics-browser-audit.mjs
           node scripts/website-browser-audit.mjs
       - name: Built Worker account checks
         timeout-minutes: 4
@@ -68,6 +69,7 @@ jobs:
           ACCOUNT_AUDIT_ORIGIN=http://127.0.0.1:8082 node scripts/account-browser-audit.mjs
           node scripts/monitor-worker-audit.mjs
           AUDIT_ORIGIN=http://127.0.0.1:8082 node scripts/finance-browser-audit.mjs
+          AUDIT_ORIGIN=http://127.0.0.1:8082 node scripts/game-analytics-browser-audit.mjs
           AUDIT_ORIGIN=http://127.0.0.1:8082 node scripts/website-browser-audit.mjs
       - name: Verify title screen on the built artifact
         env:

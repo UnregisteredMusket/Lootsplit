@@ -1,3 +1,4 @@
+import { publicAnalytics, ownerAnalytics } from "./game-analytics.mjs";
 import { handleEncounters } from "./encounters.mjs";
 import { handleCharacterPlay } from "./character-play.mjs";
 import {
@@ -213,6 +214,8 @@ export async function handleAccounts(request, env) {
     }
     if (path === "/api/account/site-donations" && request.method === "GET")
       return cors(json(await publicDonations(db)));
+    if (path === "/api/account/site-analytics" && request.method === "GET")
+      return cors(json(await publicAnalytics(db)));
     const session = await auth.api.getSession({ headers: request.headers });
     if (!session) fail("Sign in to open your account library.", 401);
     const userId = session.user.id;
@@ -268,6 +271,8 @@ export async function handleAccounts(request, env) {
       return cors(json(await campaignAction(db, userId, body)));
     if (path === "/api/account/owner/donations" && request.method === "POST")
       return cors(json(await saveDonations(db, userId, body)));
+    if (path === "/api/account/owner/analytics" && request.method === "GET")
+      return cors(json(await ownerAnalytics(db, userId)));
     if (path === "/api/account/owner" && request.method === "GET")
       return cors(json(await ownerOverview(db, userId)));
     if (path === "/api/account/owner/announcement" && request.method === "POST")
