@@ -1,4 +1,4 @@
-import { openApplication, reloadApplication } from "./title-screen-navigation.mjs";
+import { openApplication, reloadApplication, continueIntoApp } from "./title-screen-navigation.mjs";
 import { chromium } from "playwright";
 import assert from "node:assert/strict";
 import { mkdir } from "node:fs/promises";
@@ -47,6 +47,7 @@ try {
   await page.getByRole("link", { name: "Downloads", exact: true }).first().click();
   await page.getByRole("heading", { name: "One party. Your platform.", exact: true }).waitFor();
   await page.getByRole("link", { name: "My account", exact: true }).first().click();
+  await continueIntoApp(page);
   await page.getByRole("heading", { name: "Good to see you again", exact: true }).waitFor();
   console.log("Account audit: sign up");
   const email = `browser-${Date.now()}@example.com`,
@@ -95,6 +96,7 @@ try {
   other.on("dialog", (d) => d.accept());
   await other.getByRole("button", { name: "Restore as new", exact: true }).click();
   await other.waitForURL((url) => url.origin === origin && url.pathname === "/");
+  await continueIntoApp(other);
   await other.getByText("Campaign control", { exact: true }).waitFor();
   assert.ok(
     await other.evaluate(() => JSON.parse(localStorage.getItem("quire.campaigns.v1")).length >= 2),
@@ -113,6 +115,7 @@ try {
   await reloadApplication(page);
   await page.getByRole("button", { name: "Resume", exact: true }).click();
   await page.waitForURL((url) => url.origin === origin && url.pathname === "/");
+  await continueIntoApp(page);
   await page.getByText("Campaign control", { exact: true }).waitFor();
   assert.ok(
     await page.evaluate(() => localStorage.getItem("quire.campaign.v1").startsWith("account-")),

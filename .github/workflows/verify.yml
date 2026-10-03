@@ -21,6 +21,7 @@ jobs:
       - run: npm run typecheck
       - run: npm run lint
       - run: npm run build:cloudflare
+      - run: node scripts/release-artifact.mjs prepare
       - run: npm run build:mobile
       - run: npx playwright install --with-deps chromium
       - name: Browser recovery and UI checks
@@ -51,7 +52,7 @@ jobs:
         timeout-minutes: 4
         run: |
           npx wrangler d1 migrations apply DB --local
-          npx wrangler dev --local --port 8082 --var ACCOUNT_ORIGIN:http://127.0.0.1:8082 --var ACCOUNT_SECRET:disposable-ci-only-account-secret-123456789 > /tmp/lootsplit-worker.log 2>&1 &
+          npx wrangler dev --config dist/website-release/wrangler.toml --no-bundle --persist-to .wrangler/state --local --port 8082 --var ACCOUNT_ORIGIN:http://127.0.0.1:8082 --var ACCOUNT_SECRET:disposable-ci-only-account-secret-123456789 > /tmp/lootsplit-worker.log 2>&1 &
           for attempt in $(seq 1 45); do
             if curl -fsS http://127.0.0.1:8082/welcome > /dev/null; then break; fi
             sleep 2
@@ -59,6 +60,20 @@ jobs:
           ACCOUNT_AUDIT_ORIGIN=http://127.0.0.1:8082 node scripts/account-browser-audit.mjs
           node scripts/monitor-worker-audit.mjs
           AUDIT_ORIGIN=http://127.0.0.1:8082 node scripts/website-browser-audit.mjs
+      - name: Verify title screen on the built artifact
+        env:
+          AUDIT_ORIGIN: http://127.0.0.1:8082
+          EXPECTED_RELEASE_SHA: ${{ github.sha }}
+        run: node scripts/live-release-audit.mjs
+      - name: Confirm audited bytes are unchanged
+        run: node scripts/release-artifact.mjs verify
+      - uses: actions/upload-artifact@v4
+        with:
+          name: website-release-${{ github.sha }}
+          path: dist/website-release/
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 30
       - uses: actions/upload-artifact@v4
         if: always()
         with:
