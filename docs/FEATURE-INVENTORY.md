@@ -41,6 +41,7 @@ Not implemented or promised by this inventory: OCR, Google Drive backup integrat
 ## Website and optional account library
 
 - Public welcome, Android download, desktop installation guidance, changelog and help pages alongside the existing app URL.
+- Versioned website changelogs retain previous entries and describe added features, improvements and summarized fixes for every Android update. The signed-release gate requires matching notes before publication.
 - Fixed-version Android download endpoint verifies the release checksum; original GitHub and Drive alternatives remain available.
 - Optional email/password accounts with server-side sessions, rate limiting, sign-out, and single-use rotating recovery keys. Email delivery is not configured.
 - Account-owned campaign memberships, resume with fresh room/seat validation, archive/unarchive and forget. Existing guest room workflows remain available.

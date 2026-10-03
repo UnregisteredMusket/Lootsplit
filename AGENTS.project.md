@@ -6,6 +6,8 @@ Use docs/FEATURE-INVENTORY.md and docs/REDESIGN.md as the preservation baseline.
 
 The production application uses Cloudflare Workers/D1, not the original template's Vercel/Grok deployment. Develop the shared web client first; retain Android compatibility and the permanent signing certificate. Main is the canonical release source. Increment Android versionCode for each distributed update. Never generate or commit a signing key or passwords.
 
+Every Android update must include a versioned website changelog describing added features, improvements, and summarized bug fixes. Add its entry to src/lib/website/changelog.json before release; explicitly say when a category has no changes. Preserve earlier entries. After verifying the signed APK, update src/lib/website/release.json and deploy the website so its download and changelog match. An Android publication is not complete until both are live and verified.
+
 Keep local, turn-based, live and manual sharing available. Private PDFs stay device-local. Do not silently truncate history, expire/delete rooms or campaigns, or introduce account registration/Google Drive without a user request.
 
 Credit every newly integrated third-party content, data, art, or reference resource in src/lib/website/resources.ts (the Resources page), including its original source and applicable license. Keep existing per-entry attributions intact. Donation destinations are owner-configured HTTPS links; never invent a payment destination or promise donor benefits.

@@ -1,5 +1,6 @@
 import { readFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
+import { validateWebsiteChangelog } from "./website-changelog.mjs";
 const version = readFileSync("src/lib/quire/version.ts", "utf8").match(
   /APP_VERSION = "([^"]+)"/,
 )?.[1];
@@ -13,10 +14,21 @@ if (
   code < 1
 )
   throw Error("Android and app release versions must match.");
-const versionCommit = execFileSync("git", ["log", "-1", "--format=%H", "--", "src/lib/quire/version.ts"], { encoding: "utf8" }).trim();
-const previousSource = execFileSync("git", ["show", `${versionCommit}^:android/app/build.gradle`], { encoding: "utf8" });
+validateWebsiteChangelog(
+  JSON.parse(readFileSync("src/lib/website/changelog.json", "utf8")),
+  version,
+);
+const versionCommit = execFileSync(
+  "git",
+  ["log", "-1", "--format=%H", "--", "src/lib/quire/version.ts"],
+  { encoding: "utf8" },
+).trim();
+const previousSource = execFileSync("git", ["show", `${versionCommit}^:android/app/build.gradle`], {
+  encoding: "utf8",
+});
 const previousCode = Number(previousSource.match(/versionCode (\d+)/)?.[1]);
-if (code <= previousCode) throw Error("Increase Android versionCode for a newly distributed update.");
+if (code <= previousCode)
+  throw Error("Increase Android versionCode for a newly distributed update.");
 const repo = process.env.GITHUB_REPOSITORY;
 if (!repo) throw Error("Release validation requires GitHub Actions context.");
 const releases = JSON.parse(

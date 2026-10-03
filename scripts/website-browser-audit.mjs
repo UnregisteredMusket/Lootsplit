@@ -1,6 +1,8 @@
 import { chromium } from "playwright";
 import assert from "node:assert/strict";
 import { mkdir } from "node:fs/promises";
+import { readFileSync } from "node:fs";
+const release = JSON.parse(readFileSync("src/lib/website/release.json", "utf8"));
 const origin = process.env.AUDIT_ORIGIN || "http://127.0.0.1:8080";
 const output = process.env.WEBSITE_SCREENSHOTS || "test-results/website";
 await mkdir(output, { recursive: true });
@@ -32,6 +34,15 @@ try {
       const response = await page.goto(`${origin}/${path}`, { waitUntil: "networkidle" });
       assert.equal(response.status(), 200);
       await page.getByRole("heading", { level: 1 }).filter({ hasText: heading }).waitFor();
+      if (path === "updates") {
+        const latest = page.locator(".ls-release").first();
+        await latest
+          .getByRole("heading", { name: `Version ${release.version}`, exact: true })
+          .waitFor();
+        for (const category of ["Added features", "Improvements", "Bug fixes"])
+          await latest.getByRole("heading", { name: category, exact: true }).waitFor();
+        assert.equal(await latest.locator("ul").count(), 3);
+      }
       assert.equal(
         await page.evaluate(() => document.documentElement.scrollWidth > innerWidth),
         false,
@@ -45,6 +56,12 @@ try {
     assert.equal(await download.getAttribute("href"), "/download/android");
     await page.getByText("Release details & file verification", { exact: true }).click();
     await page.locator(".ls-hash").waitFor({ state: "visible" });
+    assert.equal(await page.locator(".ls-hash").textContent(), release.sha256);
+    await page
+      .getByText(`Permanently signed Android release, version code ${release.versionCode}.`, {
+        exact: false,
+      })
+      .waitFor();
     await page.getByRole("link", { name: "Installation & update guide" }).click();
     assert.match(page.url(), /\/help#android$/);
     await page.getByRole("link", { name: "Open app", exact: true }).click();

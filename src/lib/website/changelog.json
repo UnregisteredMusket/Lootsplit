@@ -1,0 +1,41 @@
+[
+  {
+    "version": "1.3.2",
+    "date": "2026-10-02",
+    "summary": "Connected character sheets, reliable campaign switching, and safer inventory transfers.",
+    "features": [
+      "The Android client now includes the current Dungeon Master control panel, player tools, settings panels, encounters, manual gameplay and loot review.",
+      "Party readouts and character sheets share character stats, funds and inventory, with permissions protecting changes."
+    ],
+    "improvements": [
+      "Imported character levels and skill, save and initiative bonuses carry through to character displays and the dice tray.",
+      "Item transfers retain notes, weight, artwork, category and equipped state across local, shared and manual play.",
+      "The familiar mobile formatting and expanded desktop layout are preserved."
+    ],
+    "fixes": [
+      "Older character editors no longer discard advanced sheet details or bypass Dungeon Master read-only protection.",
+      "Local dice rolls now use the saved character's bonuses.",
+      "Switching campaigns, reloading account characters and opening player links selects the intended character without stale permission errors.",
+      "Existing long inventory names, notes and IDs no longer prevent HP changes from saving.",
+      "Multiple queued offline gifts are preserved, and replaying a transfer report cannot award the same items twice."
+    ]
+  },
+  {
+    "version": "1.3.1",
+    "date": "2026-10-02",
+    "summary": "Safer Android exports, clearer shared-room switching, and verified release downloads.",
+    "features": [
+      "Android exports offer Save file alongside Share, so you can choose a persistent location outside app storage.",
+      "New campaigns start with the Greyhaven default party; existing campaigns remain unchanged.",
+      "New ledger events record explicit transaction types and structured price history."
+    ],
+    "improvements": [
+      "Joining an invitation while already connected offers an explicit choice and creates a backup before switching rooms.",
+      "Backup recovery guidance is clearer, including the limits of device-local backups and browser background notifications.",
+      "Release downloads include checksums, automated release checks and verification of the permanent signing certificate."
+    ],
+    "fixes": [
+      "Cancelling a Save file export keeps the campaign and named device backup intact; successful saving is reported after the file has been written and closed."
+    ]
+  }
+]

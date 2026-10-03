@@ -8,7 +8,7 @@ After this change is deployed, the Worker accepts server-function calls from `ht
 
 ## Test APK
 
-The GitHub Action **Android test APK** builds `app-debug.apk`. Run it manually or push a prepared update to an `android/**` branch after verifying the web release. Version 1.3.1 uses Android version code 4; the previous permanent-key 1.3.0 uses code 3. The APK is signed with the build machine's debug key, not a Play Store release key. A later test APK may not install over an older one if the debug key changed. Export and verify a backup of local campaigns before uninstalling an old test copy; uninstalling removes its local data.
+The GitHub Action **Android test APK** builds `app-debug.apk`. Run it manually or push a prepared update to an `android/**` branch after verifying the web release. Version 1.3.2 uses Android version code 5; the previous permanent-key 1.3.0 uses code 3. The APK is signed with the build machine's debug key, not a Play Store release key. A later test APK may not install over an older one if the debug key changed. Export and verify a backup of local campaigns before uninstalling an old test copy; uninstalling removes its local data.
 
 From a phone:
 
@@ -29,12 +29,14 @@ The first release-signed APK cannot normally replace the old debug-signed instal
 
 ## Releases from main (1.3.1 onward)
 
-`main` is the shared web/Android source. Increase `APP_VERSION`, Android `versionName`, and Android `versionCode` together, update `docs/RELEASE-NOTES.md`, and merge verified changes. A version-file or signed-release-workflow change on main starts the signed-release workflow; it can also be run manually on main. Tests, type checking, both builds, monotonic version checks, and the permanent certificate check must pass. A versioned GitHub Release holds `Lootsplit-VERSION.apk` and `SHA256SUMS.txt`; do not overwrite an existing release. Actions artifacts remain available as secondary downloads.
+`main` is the shared web/Android source. Increase `APP_VERSION`, Android `versionName`, and Android `versionCode` together, update `docs/RELEASE-NOTES.md` and add a versioned entry to `src/lib/website/changelog.json`, then merge verified changes. Every Android update requires added features, improvements, and summarized bug fixes on the website; use “None in this release” where applicable and preserve prior entries. The release gate rejects missing or incomplete changelog entries. A version-file or signed-release-workflow change on main starts the signed-release workflow; it can also be run manually on main. Tests, type checking, both builds, monotonic version checks, and the permanent certificate check must pass. A versioned GitHub Release holds `Lootsplit-VERSION.apk` and `SHA256SUMS.txt`; do not overwrite an existing release. Actions artifacts remain available as secondary downloads.
 
 Android exports now ask whether to Save file or Share. Save file uses Android's document picker and reports success only after writing/closing the stream. Choose Downloads or another location outside app-private storage. Sharing only hands the file to another application: confirm that application's save/send completed. Cancelling preserves the campaign and named device backup. Neither private device backups nor shared room membership replace an external backup.
 
 The bundled Android client must be updated by installing the newer signed APK. Changes deployed to the website do not rewrite its bundled interface. The backend remains the existing Cloudflare Worker.
 
-## Prepared next update
+## Published update — October 2, 2026
 
-The sequential bug-fix candidate is version **1.3.2**, Android version code **5**. It is prepared on a release branch; 1.3.1 remains the published download until the signed release workflow completes. Merge the verified candidate to main to run the existing release workflow with the permanent repository signing secrets. Verify the resulting certificate/checksum before updating the website's pinned download metadata.
+Version **1.3.2**, Android version code **5**, is signed with the permanent certificate and published in GitHub release `android-v1.3.2`. Release workflow 37091668595 passed all verification and signing gates. The owner installed the preceding test candidate successfully. The signed APK checksum is `47c78585b88f11752c803df76dc2b5c8151a1fd1bcd08e47aa0954fccc458d01`.
+
+After each signed release, verify the actual APK certificate, version and checksum, update `src/lib/website/release.json`, and deploy the website. Confirm `/downloads`, `/updates`, and the actual `/download/android` bytes agree before calling publication complete. The changelog and download summary share the versioned data; unreleased entries stay hidden until the download metadata advances. Do not overwrite previous release history.

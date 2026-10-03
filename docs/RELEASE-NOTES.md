@@ -1,6 +1,6 @@
-# Lootsplit 1.3.2 — prepared, not published
+# Lootsplit 1.3.2
 
-Android version code 5. This candidate retains the existing package identity and permanent signing certificate and updates permanently signed 1.3.x installations in place.
+Android version code 5. This release retains the existing package identity and permanent signing certificate and updates permanently signed 1.3.x installations in place.
 
 - Brings the current DM/Player interface, responsive desktop layout, settings panels, encounters, manual gameplay and loot review into the bundled Android client.
 - Connects party readouts and character sheets to one character state; wallet and inventory updates retain permission and duplicate-award checks.
@@ -11,9 +11,17 @@ Android version code 5. This candidate retains the existing package identity and
 - Preserves item metadata and every queued offline transfer; report replay cannot award the same transfer again.
 - Keeps current mobile formatting and desktop space usage unchanged.
 
-## Candidate verification
+## Verification
 
-See `docs/audit/2026-10-02-bug-fixes.md` for sequential before/after evidence and release gates. The public download remains 1.3.1 until the new signed APK and checksum exist. Real-device upgrade, file-picker and force-close checks remain separate from automated verification.
+See `docs/audit/2026-10-02-bug-fixes.md` for sequential before/after evidence and release gates. Real-device upgrade, file-picker and force-close checks remain separate from automated verification.
+
+## Published — October 2, 2026
+
+[Download Android 1.3.2](https://github.com/UnregisteredMusket/Lootsplit/releases/download/android-v1.3.2/Lootsplit-1.3.2.apk) · [Checksums](https://github.com/UnregisteredMusket/Lootsplit/releases/download/android-v1.3.2/SHA256SUMS.txt) · [Website changelog](https://lootsplit.oliverstorie2017.workers.dev/updates)
+
+Signed release run 37091668595 passed from main commit `1f0da5a`: 396 passing tests, four existing skips, typecheck, lint, web/mobile builds, browser recovery and responsive checks, built Worker checks, Android compilation and permanent-certificate verification. The downloaded APK independently confirms version 1.3.2, code 5, the existing package identity and permanent certificate. SHA-256: `47c78585b88f11752c803df76dc2b5c8151a1fd1bcd08e47aa0954fccc458d01`, matching the published checksum and GitHub asset digest. The owner successfully installed the test candidate. Device file-picker and force-close behavior have not been independently retested here.
+
+Every future Android release must include a website changelog with added features, improvements and summarized fixes. Earlier release entries remain available.
 
 ---
 

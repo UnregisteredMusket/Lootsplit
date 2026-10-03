@@ -13,7 +13,20 @@ import {
 } from "lucide-react";
 import type { ReactNode } from "react";
 import release from "@/lib/website/release.json";
+import changelog from "@/lib/website/changelog.json";
 import "./website.css";
+
+const publishedChangelog = changelog
+  .filter(
+    (entry) => entry.version.localeCompare(release.version, undefined, { numeric: true }) <= 0,
+  )
+  .sort((a, b) => b.version.localeCompare(a.version, undefined, { numeric: true }));
+const currentChanges = publishedChangelog.find((entry) => entry.version === release.version)!;
+const changeCategories = [
+  ["features", "Added features"],
+  ["improvements", "Improvements"],
+  ["fixes", "Bug fixes"],
+] as const;
 
 export function Website({ children }: { children: ReactNode }) {
   const path = useRouterState({ select: (s) => s.location.pathname });
@@ -223,7 +236,7 @@ export function DownloadsPage() {
               Having trouble? <a href={release.apkUrl}>Download from GitHub</a> or open this page in
               Chrome.{" "}
               <a href="https://drive.google.com/file/d/1MT4by-7mNe7-7PANKbTwcbBOcd2CSKrr/view">
-                Alternate download on Google Drive
+                Earlier Android release on Google Drive
               </a>
               .
             </p>
@@ -267,7 +280,10 @@ export function DownloadsPage() {
         <details className="ls-details">
           <summary>Release details & file verification</summary>
           <div>
-            <p>Published {release.date}. Permanently signed Android release, version code 4.</p>
+            <p>
+              Published {release.date}. Permanently signed Android release, version code{" "}
+              {release.versionCode}.
+            </p>
             <p>SHA-256 for {release.filename}:</p>
             <code className="ls-hash">{release.sha256}</code>
             <p>
@@ -282,10 +298,7 @@ export function DownloadsPage() {
             Read the changelog <ArrowRight size={16} />
           </Link>
         </div>
-        <p className="ls-copy">
-          Save exports to a chosen Android folder, navigate clearer invitations and backups, and see
-          more useful transaction history.
-        </p>
+        <p className="ls-copy">{currentChanges.summary}</p>
       </section>
     </Website>
   );
@@ -300,45 +313,47 @@ export function UpdatesPage() {
         <p className="ls-intro">
           New releases, practical improvements, and what changed at the table.
         </p>
-        <article className="ls-release">
-          <div className="ls-release-meta">
-            <span className="ls-tag">LATEST ANDROID RELEASE</span>
-            <time dateTime="2026-10-02">{release.date}</time>
-          </div>
-          <h2>Version {release.version}</h2>
-          <p className="ls-copy">
-            Better exports, clearer recovery, and a more useful record of your campaign.
-          </p>
-          <ul>
-            <li>
-              <strong>Choose where your files go.</strong> Android exports offer Save file alongside
-              Share.
-            </li>
-            <li>
-              <strong>Switch rooms with more confidence.</strong> Invitations provide an explicit
-              choice when you are already connected, with a backup before switching.
-            </li>
-            <li>
-              <strong>Understand your records.</strong> New events record transaction types and
-              structured price history, while older saves stay readable.
-            </li>
-            <li>
-              <strong>Clearer backup guidance.</strong> Device recovery and browser background
-              notifications have more precise instructions.
-            </li>
-            <li>
-              <strong>Your party is ready.</strong> New installations include the Greyhaven default
-              party. Existing campaigns stay unchanged.
-            </li>
-          </ul>
-          <Link className="ls-button" to="/downloads">
-            Get version {release.version} <ArrowDownToLine size={17} />
-          </Link>
-          <p className="ls-small-copy">
-            Physical-device file saving, force-close recovery, and notification delivery still
-            require device validation.
-          </p>
-        </article>
+        {publishedChangelog.map((entry) => (
+          <article className="ls-release" key={entry.version} id={`android-${entry.version}`}>
+            <div className="ls-release-meta">
+              <span className="ls-tag">
+                {entry.version === release.version ? "LATEST ANDROID RELEASE" : "ANDROID RELEASE"}
+              </span>
+              <time dateTime={entry.date}>
+                {new Date(`${entry.date}T00:00:00Z`).toLocaleDateString("en-US", {
+                  month: "long",
+                  day: "numeric",
+                  year: "numeric",
+                  timeZone: "UTC",
+                })}
+              </time>
+            </div>
+            <h2>Version {entry.version}</h2>
+            <p className="ls-copy">{entry.summary}</p>
+            {changeCategories.map(([category, heading]) => (
+              <div key={category}>
+                <h3>{heading}</h3>
+                <ul>
+                  {entry[category].map((item) => (
+                    <li key={item}>{item}</li>
+                  ))}
+                </ul>
+              </div>
+            ))}
+            {entry.version === release.version ? (
+              <Link className="ls-button" to="/downloads">
+                Get version {entry.version} <ArrowDownToLine size={17} />
+              </Link>
+            ) : (
+              <a
+                className="ls-text-link"
+                href={`https://github.com/UnregisteredMusket/Lootsplit/releases/tag/android-v${entry.version}`}
+              >
+                View this release on GitHub <ArrowRight size={17} />
+              </a>
+            )}
+          </article>
+        ))}
         <a className="ls-text-link" href={release.historyUrl}>
           Browse earlier releases on GitHub <ArrowRight size={17} />
         </a>
