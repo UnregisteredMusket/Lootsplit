@@ -92,6 +92,22 @@ try {
       false,
     );
     await page.screenshot({ path: `test-results/live-release/title-${width}.png` });
+    await page.waitForFunction(() => {
+      const time = Number(
+        document.querySelector(".loot-loader-track")?.getAttribute("data-loop-time"),
+      );
+      return time >= 10.4 && time <= 11.2;
+    });
+    const rider = page.locator(".loot-mounted-hunter");
+    assert.equal(await rider.evaluate((el) => getComputedStyle(el).visibility), "visible");
+    const riderBox = await rider.boundingBox();
+    const rogueBox = await page.locator(".loot-loader-rogue").boundingBox();
+    assert.ok(
+      riderBox && rogueBox && riderBox.x + riderBox.width < rogueBox.x,
+      "Mounted hunter follows at a distance behind the rogue",
+    );
+    await page.locator(".hunter-map").waitFor();
+    await page.screenshot({ path: `test-results/live-release/mounted-hunter-${width}.png` });
     await title.click();
     await title.waitFor({ state: "detached" });
     await page.getByRole("link", { name: "Party", exact: true }).first().waitFor();

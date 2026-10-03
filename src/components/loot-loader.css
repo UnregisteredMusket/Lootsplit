@@ -314,3 +314,80 @@
     bottom: 4%;
   }
 }
+
+.loot-mounted-hunter {
+  position: absolute;
+  top: -40px;
+  width: 240px;
+  height: 184px;
+  transform: translateX(-240px);
+  visibility: hidden;
+  will-change: transform;
+}
+.loot-mounted-hunter svg {
+  width: 100%;
+  height: 100%;
+  display: block;
+}
+.hunter-horse-body {
+  animation: hunter-walk-bob 1.1s steps(4, end) infinite;
+}
+.hunter-horse-legs-near {
+  transform-origin: 60px 60px;
+  animation: hunter-near-step 1.1s steps(4, end) infinite;
+}
+.hunter-horse-legs-far {
+  transform-origin: 60px 60px;
+  animation: hunter-near-step 1.1s steps(4, end) -0.55s infinite;
+}
+.hunter-horse-tail {
+  transform-origin: 22px 48px;
+  animation: hunter-tail 2.2s steps(4, end) infinite;
+}
+.hunter-map {
+  animation: hunter-map 1.1s steps(2, end) infinite;
+}
+@keyframes hunter-walk-bob {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(1px);
+  }
+}
+@keyframes hunter-near-step {
+  0%,
+  100% {
+    transform: skewX(-8deg);
+  }
+  50% {
+    transform: skewX(8deg);
+  }
+}
+@keyframes hunter-tail {
+  0%,
+  100% {
+    transform: rotate(-3deg);
+  }
+  50% {
+    transform: rotate(6deg);
+  }
+}
+@keyframes hunter-map {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(0.5px);
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .loot-mounted-hunter {
+    display: none;
+  }
+  .loot-mounted-hunter * {
+    animation: none !important;
+  }
+}

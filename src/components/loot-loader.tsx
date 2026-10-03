@@ -1,7 +1,9 @@
 import { useEffect, useRef } from "react";
 import "./loot-loader.css";
+import { LootMountedHunter } from "./loot-mounted-hunter";
+import { LootSpriteDetail } from "./loot-sprite-detail";
 
-/** Original 16-bit-style pixel sprite: layered cloth, leather, metal and skin shading. */
+/** Original 32-bit-era-style pixel sprite: layered cloth, leather, metal and skin shading. */
 export function LootLoader() {
   const track = useRef<HTMLDivElement>(null);
   useEffect(() => {
@@ -9,6 +11,7 @@ export function LootLoader() {
     if (!root) return;
     const carrier = root.querySelector<HTMLElement>(".loot-loader-traveler")!;
     const rogue = root.querySelector<HTMLElement>(".loot-loader-rogue")!;
+    const hunter = root.querySelector<HTMLElement>(".loot-mounted-hunter")!;
     const coins = [...root.querySelectorAll<SVGElement>(".loot-ground-coin")];
     const reduced = window.matchMedia("(prefers-reduced-motion: reduce)");
     let frame = 0;
@@ -22,12 +25,17 @@ export function LootLoader() {
     };
     const draw = (now: number) => {
       const time = ((now - start) % 15000) / 1000;
+      root.dataset.loopTime = time.toFixed(2);
       const width = root.clientWidth;
       const distance = width + 400;
       const x = -256 + progress(time) * distance;
       const thiefX = -256 + progress(time - 2) * distance;
       carrier.style.transform = `translateX(${reduced.matches ? width * 0.5 - 80 : x}px)`;
       rogue.style.transform = `translateX(${reduced.matches ? width * 0.5 - 190 : thiefX}px)`;
+      // The horse enters after nine seconds, well behind the rogue, then exits before reset.
+      const hunterProgress = Math.min(1, Math.max(0, (time - 9) / 5.8));
+      hunter.style.transform = `translateX(${-240 + hunterProgress * (width + 280)}px)`;
+      hunter.style.visibility = !reduced.matches && time >= 9 ? "visible" : "hidden";
       rogue.classList.toggle(
         "is-collecting",
         time > 2 && ((time - 2) % 1 > 0.6 || (time - 2) % 1 < 0.25),
@@ -102,6 +110,7 @@ export function LootLoader() {
             <path fill="#303242" d="M102 38h3v20h-3z" />
             <path fill="#b5bdba" d="M103 41h1v15h-1z" />
             <path fill="#d1af63" d="M100 38h7v2h-7zM102 34h3v4h-3zM102 56h3v3h-3z" />
+            <LootSpriteDetail />
           </g>
           <g className="loot-loader-step-a">
             <path
@@ -162,6 +171,7 @@ export function LootLoader() {
             <path fill="#303242" d="M102 38h3v20h-3z" />
             <path fill="#b5bdba" d="M103 41h1v15h-1z" />
             <path fill="#d1af63" d="M100 38h7v2h-7zM102 34h3v4h-3zM102 56h3v3h-3z" />
+            <LootSpriteDetail rogue />
           </g>
           <g className="loot-loader-step-a">
             <path
@@ -190,6 +200,7 @@ export function LootLoader() {
           </g>
         </svg>
       </div>
+      <LootMountedHunter />
     </div>
   );
 }
