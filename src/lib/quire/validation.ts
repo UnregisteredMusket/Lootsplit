@@ -1,12 +1,17 @@
 import { z } from "zod";
+import { sheetSchema } from "../characters/model.mjs";
 const id = z.string().min(1);
 const amount = z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER);
 export const coinsSchema = z.object({ cp: amount, sp: amount, ep: amount, gp: amount, pp: amount });
 export const artworkSchema = z
   .string()
-  .max(100000)
+  .max(500000)
   .regex(/^(data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+|\/art\/[a-z0-9-]+\.webp)$/);
 const purse = z.object({
+  sheet: sheetSchema.optional(),
+  sheetRevision: z.number().int().nonnegative().optional(),
+  profileId: z.string().max(150).optional(),
+  sheetReadOnlyForDm: z.boolean().optional(),
   id,
   name: z.string(),
   kind: z.enum(["party", "character"]),
@@ -15,6 +20,8 @@ const purse = z.object({
   control: z.enum(["player", "npc"]).optional(),
 });
 const holding = z.object({
+  weight: z.number().min(0).max(9999).optional(),
+  equipped: z.boolean().optional(),
   id,
   purseId: id,
   name: z.string(),

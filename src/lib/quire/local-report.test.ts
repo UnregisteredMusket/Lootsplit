@@ -96,3 +96,30 @@ test("backups preserve report baselines and pending sale/transfer metadata", asy
   assert.equal(round.gifts?.[0]?.id, "gift");
   assert.equal(round.sales?.[0]?.id, "sale");
 });
+
+test("manual player reports require explicit DM approval of actual balances and inventory before any writes", async () => {
+  await applyCloudTable(initial());
+  const file = report("A"),
+    before = await economySnapshot();
+  const previous = (globalThis as any).window;
+  let prompt = "";
+  (globalThis as any).window = {
+    localStorage: { getItem: () => null },
+    confirm: (message: string) => {
+      prompt = message;
+      return false;
+    },
+  };
+  try {
+    await assert.rejects(applyBill(file), /not approved/);
+    assert.match(prompt, /10 gp → 9 gp/);
+    assert.match(prompt, /1 × Last item/);
+    assert.deepEqual(await economySnapshot(), before);
+    (globalThis as any).window.confirm = () => true;
+    await applyBill(file);
+    assert.equal((await economySnapshot()).purses.find((p) => p.id === "A")?.coins.gp, 9);
+  } finally {
+    if (previous === undefined) delete (globalThis as any).window;
+    else (globalThis as any).window = previous;
+  }
+});

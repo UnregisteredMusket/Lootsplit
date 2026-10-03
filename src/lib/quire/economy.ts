@@ -1,4 +1,6 @@
 import { loadJournal, readJournal, type Journal } from "./journal.ts";
+import { blankSheet } from "../characters/model.mjs";
+import { statsOnly, editCharacter, legacyCharacter } from "../characters/campaign-sheet.mjs";
 import { getCloudWatch } from "./cloud-turn.ts";
 import { verifyReportBase, type ReportBase } from "./local-report.ts";
 import { coinsSchema, validateEconomyRows } from "./validation.ts";
@@ -56,7 +58,6 @@ import {
   loadSheets,
   mergeSheets,
   readSheets,
-  saveSheet,
   type CharacterSheet,
 } from "./sheet.ts";
 import { readCharacterSheet } from "./sheet-file.ts";
@@ -561,6 +562,115 @@ export async function savePurse(purse: Purse): Promise<void> {
   });
 }
 
+export async function updatePurseMetadata(input: Purse): Promise<void> {
+  await atomic(["purses", "meta"], async (tx) => {
+    const current = await request<Purse | undefined>(tx.objectStore("purses").get(input.id));
+    if (!current) throw Error("Character no longer exists.");
+    // A rename/portrait edit cannot restore an old wallet, sheet or roll history.
+    tx.objectStore("purses").put({
+      ...current,
+      name: input.name,
+      portrait: input.portrait,
+      control: input.control,
+    });
+    await audit(tx, `Updated account: ${input.name}`, "management", input.id);
+  });
+}
+
+export async function saveCampaignCharacter(input: {
+  purseId: string;
+  before: import("../characters/model.mjs").PlaySheet;
+  sheet: import("../characters/model.mjs").PlaySheet;
+}) {
+  return atomic(["purses", "holdings", "ledger", "meta"], async (tx) => {
+    const purses = await request<Purse[]>(tx.objectStore("purses").getAll());
+    const holdings = await request<Holding[]>(tx.objectStore("holdings").getAll());
+    const legacy = await request<{ sheets: CharacterSheet[] } | undefined>(
+      tx.objectStore("meta").get("sheets"),
+    );
+    const table = { purses, holdings, ledger: [] as LedgerLine[], sheets: legacy?.sheets || [] };
+    editCharacter(table, getSeat(), input, crypto.randomUUID());
+    validateEconomyRows({ ...table, shops: [], stock: [] });
+    const p = table.purses.find((p) => p.id === input.purseId)!;
+    tx.objectStore("purses").put(p);
+    for (const h of holdings.filter((h) => h.purseId === p.id))
+      tx.objectStore("holdings").delete(h.id);
+    for (const h of table.holdings.filter((h) => h.purseId === p.id))
+      tx.objectStore("holdings").put(h);
+    for (const line of table.ledger) tx.objectStore("ledger").put(line);
+    await audit(tx, `Character sheet updated: ${p.name}`, "management", p.id);
+  });
+}
+
+export async function createCampaignCharacter(sheet = blankSheet()): Promise<string> {
+  if (getSeat().role !== "dm") throw Error("Ask the DM to add a campaign character.");
+  sheet = { ...sheet, equipment: sheet.equipment.map(({ id: _id, ...item }) => item) };
+  const p = blankPurse("character");
+  p.name = sheet.name;
+  p.portrait = sheet.portrait || undefined;
+  return atomic(["purses", "holdings", "ledger", "meta"], async (tx) => {
+    const table = {
+      purses: [p],
+      holdings: [] as Holding[],
+      ledger: [] as LedgerLine[],
+      sheets: [],
+    };
+    editCharacter(
+      table,
+      getSeat(),
+      { purseId: p.id, before: { ...p.sheet!, name: p.name, portrait: p.portrait || "" }, sheet },
+      p.id,
+    );
+    validateEconomyRows({ ...table, shops: [], stock: [] });
+    tx.objectStore("purses").put(p);
+    for (const h of table.holdings) tx.objectStore("holdings").put(h);
+    for (const l of table.ledger) tx.objectStore("ledger").put(l);
+    await audit(tx, `Created character: ${p.name}`, "management", p.id);
+    return p.id;
+  });
+}
+
+/** Adopt an explicitly selected/previously linked profile, never match by name.
+ * Private profile money/gear stay in that profile until a DM explicitly awards them. */
+export async function bindCampaignProfile(
+  purseId: string,
+  profileId: string,
+  sheet: import("../characters/model.mjs").PlaySheet,
+  migration = false,
+) {
+  if (getSeat().role !== "dm")
+    throw Error("Ask the DM to import the character into this campaign.");
+  await atomic(["purses", "meta"], async (tx) => {
+    const p = await request<Purse | undefined>(tx.objectStore("purses").get(purseId));
+    if (!p || p.kind !== "character") throw Error("Character no longer exists.");
+    if (migration && p.sheet) return;
+    p.sheet = statsOnly(sheet);
+    p.name = sheet.name;
+    p.portrait = sheet.portrait || undefined;
+    p.profileId = profileId;
+    p.sheetRevision = (p.sheetRevision || 0) + 1;
+    tx.objectStore("purses").put(p);
+    await audit(
+      tx,
+      `Imported character profile: ${p.name}; existing funds and inventory preserved`,
+      "management",
+      p.id,
+    );
+  });
+}
+
+export async function unbindCampaignProfile(profileId: string) {
+  if (getSeat().role !== "dm") throw Error("Ask the DM to detach this account profile.");
+  await atomic(["purses"], async (tx) => {
+    const purses = await request<Purse[]>(tx.objectStore("purses").getAll());
+    for (const p of purses.filter((p) => p.profileId === profileId)) {
+      delete p.profileId;
+      delete p.sheetReadOnlyForDm;
+      tx.objectStore("purses").put(p);
+    }
+  });
+}
+
 export async function saveShop(shop: Shop): Promise<void> {
   const db = await quireDb();
   await atomic(["shops", "meta"], async (tx) => {
@@ -763,6 +873,9 @@ function logLine(
 }
 
 async function charismaOf(purseId: string): Promise<number | null> {
+  const p = (await listPurses()).find((p) => p.id === purseId);
+  if (p?.kind === "party") return null;
+  if (p?.sheet) return p.sheet.scores.cha;
   const sheets = await loadSheets();
   return charismaScore(sheets.find((sheet) => sheet.purseId === purseId));
 }
@@ -1172,7 +1285,7 @@ export async function decideLoan(id: string, status: LoanStatus): Promise<void> 
 export async function importCharacterSheet(purseId: string, file: File): Promise<string[]> {
   const body = await readCharacterSheet(file);
   const sheet: CharacterSheet = { ...body, purseId, importedAt: Date.now() };
-  await saveSheet(sheet);
+  await updateCharacterSheet(sheet);
   const db = await quireDb();
   const purse = await request<Purse | undefined>(
     db.transaction("purses").objectStore("purses").get(purseId),
@@ -1183,7 +1296,8 @@ export async function importCharacterSheet(purseId: string, file: File): Promise
   const fresh = await request<Purse | undefined>(
     db.transaction("purses").objectStore("purses").get(purseId),
   );
-  if (!fresh || toCopper(fresh.coins) > 0 || toCopper(sheet.coins) === 0) return sheetGaps(sheet);
+  if (getSeat().role !== "dm" || !fresh || toCopper(fresh.coins) > 0 || toCopper(sheet.coins) === 0)
+    return sheetGaps(sheet);
   await setCoins(fresh.id, sheet.coins, "Brought from the character sheet");
   return sheetGaps(sheet);
 }
@@ -1210,7 +1324,36 @@ export function sheetGaps(sheet: CharacterSheet): string[] {
 }
 
 export async function updateCharacterSheet(sheet: CharacterSheet): Promise<void> {
-  await saveSheet(sheet);
+  await atomic(["purses", "meta"], async (tx) => {
+    const p = await request<Purse | undefined>(tx.objectStore("purses").get(sheet.purseId));
+    const seat = getSeat();
+    if (!p || (seat.role !== "dm" && !seat.purseIds.includes(p.id)))
+      throw Error("You do not control this character.");
+    const legacy = legacyCharacter(sheet, sheet.name || p.name);
+    if (
+      seat.role !== "dm" &&
+      JSON.stringify(legacy.scores) !==
+        JSON.stringify(p.sheet?.scores || legacyCharacter(undefined, p.name).scores)
+    )
+      throw Error("Ask the DM to change ability scores.");
+    p.sheet = statsOnly({
+      ...legacy,
+      attacks: p.sheet?.attacks || [],
+      spells: p.sheet?.spells || [],
+      resources: p.sheet?.resources || [],
+      slots: p.sheet?.slots || [],
+    });
+    p.name = legacy.name;
+    p.sheetRevision = (p.sheetRevision || 0) + 1;
+    tx.objectStore("purses").put(p);
+    const row = await request<{ sheets: CharacterSheet[] } | undefined>(
+      tx.objectStore("meta").get("sheets"),
+    );
+    tx.objectStore("meta").put({
+      id: "sheets",
+      sheets: [...(row?.sheets || []).filter((s) => s.purseId !== p.id), sheet],
+    });
+  });
 }
 
 export async function voidLedgerLine(id: string): Promise<void> {
@@ -1464,6 +1607,35 @@ export async function applyTable(file: TableFile): Promise<void> {
 export async function applyBill(file: BillFile): Promise<number> {
   if (getCloudWatch().joined)
     throw new Error("Return to Local Mode before importing or restoring campaign data.");
+  if (getSeat().role !== "dm") throw new Error("Only the DM can approve a player activity report.");
+  // Manual/offline files cannot prove that a player did not edit their device.
+  // Require explicit DM approval of actual resulting assets, not claimed receipts.
+  if (typeof window !== "undefined") {
+    const campaign = activeDatabaseName();
+    const current = await listPurses();
+    const changes = file.purses.map((p) => {
+      const before = current.find((x) => x.id === p.id);
+      const inventory =
+        file.holdings
+          .filter((h) => h.purseId === p.id)
+          .map((h) => `${h.quantity} × ${h.name} (${formatCopper(h.unitCopper)} each)`)
+          .join("; ") || "empty";
+      return `${p.name}: ${formatCopper(toCopper(before?.coins || emptyCoins()))} → ${formatCopper(toCopper(p.coins))}\nInventory after import: ${inventory}`;
+    });
+    for (const gift of readGifts(file.gifts)) {
+      changes.push(
+        `Transfer from ${gift.fromName} to ${gift.toName}: ${formatCopper(gift.copper)}${gift.holding ? `; ${gift.holding.quantity} × ${gift.holding.name} (${formatCopper(gift.holding.unitCopper)} each)` : ""}`,
+      );
+    }
+    if (
+      !window.confirm(
+        `Approve this manual player report? These changes are not server-verified.\n\n${changes.join("\n\n")}\n\nOnly approve funds and items authorized by your campaign.`,
+      )
+    )
+      throw new Error("Player report was not approved. No campaign data changed.");
+    if (campaign !== activeDatabaseName() || getSeat().role !== "dm")
+      throw new Error("Campaign changed during review. Reopen the report in the correct campaign.");
+  }
   const db = await quireDb();
   // Read and apply inside one transaction: a second import cannot pass the same baseline concurrently.
   const tx = db.transaction(
@@ -1683,6 +1855,9 @@ export function blankPurse(kind: Purse["kind"]): Purse {
     kind,
     control: kind === "character" ? "player" : undefined,
     coins: emptyCoins(),
+    ...(kind === "character"
+      ? { sheet: statsOnly({ ...blankSheet(), name: "New character" }), sheetRevision: 0 }
+      : {}),
   };
 }
 

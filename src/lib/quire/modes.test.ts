@@ -30,6 +30,10 @@ sql.exec(
           args = v;
           return this;
         },
+        async all() {
+          if (query.includes("FROM play_characters")) return { results: [] }; // This fixture has no account profiles.
+          return { results: sql.prepare(query).all(...args) };
+        },
         async first() {
           return sql.prepare(query).get(...args) ?? null;
         },

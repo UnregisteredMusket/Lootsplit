@@ -54,6 +54,17 @@ export function getServerCloudTable() {
 }
 let timer: ReturnType<typeof setInterval> | undefined;
 let chain: Promise<unknown> = Promise.resolve();
+export async function requestCampaignRoll(body: { purseId: string; [key: string]: unknown }) {
+  const s = requireSession();
+  if (
+    !body.policy &&
+    !body.log &&
+    s.pending.some((c) => c.kind === "character" && c.purseId === body.purseId)
+  )
+    throw Error("Submit your pending character changes before rolling.");
+  const { rollCampaignCharacter } = await import("./cloud-api");
+  return rollCampaignCharacter({ data: { ...body, code: s.code, token: s.token } });
+}
 let sessionKey = "";
 const key = () =>
   `quire.cloud.v2.${typeof localStorage === "undefined" ? "main" : localStorage.getItem("quire.campaign.v1") || "main"}`;
@@ -441,7 +452,10 @@ export function leaveTable() {
 }
 export async function disconnectClosedRoom() {
   const saved = await exportPending();
-  if (!saved) throw new Error("Share the recovery file before disconnecting. Pending actions are still on this device.");
+  if (!saved)
+    throw new Error(
+      "Share the recovery file before disconnecting. Pending actions are still on this device.",
+    );
   const s = requireSession();
   s.pending = [];
   remember(s);
@@ -495,7 +509,9 @@ export async function importPending(file: File) {
 export function sendRoomMessage(command: Extract<Command, { kind: "message" }>) {
   return serial(async () => {
     const s = requireSession();
-    const remote = await submitCloudCommands({ data: { code: s.code, token: s.token, batchId: command.id, commands: [command] } });
+    const remote = await submitCloudCommands({
+      data: { code: s.code, token: s.token, batchId: command.id, commands: [command] },
+    });
     await accept(remote);
   });
 }
@@ -504,21 +520,42 @@ export function roomCredentials() {
   return { code: s.code, token: s.token };
 }
 
-export async function resumeAccountMembership(member: import('../account/client').AccountMembership) {
+export async function resumeAccountMembership(
+  member: import("../account/client").AccountMembership,
+) {
   return serial(async () => {
-    if (hasPendingChanges()) throw new Error('Submit or resolve your pending actions before switching campaigns.');
+    if (hasPendingChanges())
+      throw new Error("Submit or resolve your pending actions before switching campaigns.");
     const remote = await pullCloudTable({ data: { code: member.code, token: member.token } });
-    const role = remote.seats.find(s => s.id === remote.seatId)?.role;
-    if (!role || (role === 'player' && !remote.purseIds.length) || remote.seatId !== member.seatId) throw new Error('This membership has changed. Refresh your account library.');
-    const { selectAccountCampaign } = await import('./campaigns');
+    const role = remote.seats.find((s) => s.id === remote.seatId)?.role;
+    if (!role || (role === "player" && !remote.purseIds.length) || remote.seatId !== member.seatId)
+      throw new Error("This membership has changed. Refresh your account library.");
+    const { selectAccountCampaign } = await import("./campaigns");
     const id = `account-${member.userId}-${member.code}`;
     const targetKey = `quire.cloud.v2.${id}`;
-    const existing = JSON.parse(localStorage.getItem(targetKey) || 'null') as Session | null;
-    if (existing?.pending?.length) throw new Error('This device has an unfinished turn for that campaign. Reopen its existing device campaign and resolve it before resuming.');
+    const existing = JSON.parse(localStorage.getItem(targetKey) || "null") as Session | null;
+    if (existing?.pending?.length)
+      throw new Error(
+        "This device has an unfinished turn for that campaign. Reopen its existing device campaign and resolve it before resuming.",
+      );
     if (timer) clearInterval(timer);
     timer = undefined;
-    selectAccountCampaign(id, member.name, { role, purseIds: remote.purseIds, shopIds: remote.shopIds, openedAt: Date.now() });
-    remember({ code: member.code, token: member.token, seatId: remote.seatId, role, purseIds: remote.purseIds, revision: 0, pending: [], batchId: crypto.randomUUID() });
-    window.location.assign('/');
+    selectAccountCampaign(id, member.name, {
+      role,
+      purseIds: remote.purseIds,
+      shopIds: remote.shopIds,
+      openedAt: Date.now(),
+    });
+    remember({
+      code: member.code,
+      token: member.token,
+      seatId: remote.seatId,
+      role,
+      purseIds: remote.purseIds,
+      revision: 0,
+      pending: [],
+      batchId: crypto.randomUUID(),
+    });
+    window.location.assign("/");
   });
 }

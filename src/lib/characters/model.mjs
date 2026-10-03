@@ -39,7 +39,11 @@ export const sheetSchema = z
     portrait: z
       .string()
       .max(500000)
-      .refine((v) => !v || /^data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+$/.test(v)),
+      .refine(
+        (v) =>
+          !v ||
+          /^(data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+|\/art\/[a-z0-9-]+\.webp)$/.test(v),
+      ),
     scores: z.object({
       str: n.max(30).min(1),
       dex: n.max(30).min(1),
@@ -52,7 +56,9 @@ export const sheetSchema = z
     saves: z.record(ability, training),
     skills: z
       .record(z.string().max(40), training)
-      .refine((v) => Object.keys(v).length <= 18 && Object.keys(v).every((k) => Object.hasOwn(skills, k))),
+      .refine(
+        (v) => Object.keys(v).length <= 18 && Object.keys(v).every((k) => Object.hasOwn(skills, k)),
+      ),
     hp: n,
     maxHp: n,
     tempHp: n,
@@ -94,20 +100,23 @@ export const sheetSchema = z
     equipment: z
       .array(
         z.object({
+          id: z.string().min(1).max(150).optional(),
+          kind: z.enum(["item", "property"]).optional(),
+          unitCopper: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER).optional(),
           name: short.min(1),
-          quantity: n,
+          quantity: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
           weight: z.number().min(0).max(9999),
           equipped: z.boolean(),
           notes,
         }),
       )
-      .max(200),
+      .max(10000),
     coins: z.object({
-      cp: z.number().int().min(0).max(999999),
-      sp: z.number().int().min(0).max(999999),
-      ep: z.number().int().min(0).max(999999),
-      gp: z.number().int().min(0).max(999999),
-      pp: z.number().int().min(0).max(999999),
+      cp: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
+      sp: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
+      ep: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
+      gp: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
+      pp: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER),
     }),
     features: notes,
     notes,

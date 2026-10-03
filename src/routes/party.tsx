@@ -51,7 +51,7 @@ function PartyPage() {
   useEffect(() => setAction(initialAction ?? ""), [initialAction]);
   const seat = useSeat();
   const cloud = getCloudTable();
-  const readOnly = cloud.joined && (seat.role === "player" || !cloud.mine);
+  const readOnly = seat.role === "player" || (cloud.joined && !cloud.mine);
   const visible =
     seat.role === "player"
       ? economy.purses.filter((purse) => seat.purseIds.includes(purse.id))
@@ -106,12 +106,12 @@ function PartyPage() {
                   <div className="party-profile-body">
                     <h2>{p.name}</h2>
                     <p>
-                      {live
-                        ? `Level ${live.body.level} · ${live.body.classes}`
+                      {live && p.sheet
+                        ? `Level ${live.body.level}${live.body.classes ? ` · ${live.body.classes}` : ""}`
                         : old?.classLevel || "Character"}
                     </p>
                     <div className="party-hp">
-                      {live
+                      {live?.body.maxHp
                         ? `${live.body.hp} / ${live.body.maxHp} HP`
                         : old?.hitPoints
                           ? `${old.hitPoints} HP · imported sheet`
@@ -120,7 +120,7 @@ function PartyPage() {
                         <Shield size={15} /> {live?.body.ac || old?.armorClass || "—"}
                       </span>
                     </div>
-                    {live && <HpBar hp={live.body.hp} max={live.body.maxHp} />}
+                    {!!live?.body.maxHp && <HpBar hp={live.body.hp} max={live.body.maxHp} />}
                     <div className="party-profile-actions">
                       {live ? (
                         <a
@@ -415,7 +415,7 @@ function PurseCard({ purse }: { purse: Purse }) {
   const { updatePurse, setPurseCoins, deletePurse } = useEconomy();
   const seat = useSeat();
   const cloud = getCloudTable();
-  const readOnly = cloud.joined && (seat.role === "player" || !cloud.mine);
+  const readOnly = seat.role === "player" || (cloud.joined && !cloud.mine);
   const dollars = useDollarText();
   const [coins, setCoins] = useState(purse.coins);
   const purseDollars = dollars(toCopper(purse.coins));
