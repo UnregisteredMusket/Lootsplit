@@ -53,6 +53,11 @@ try {
     await page.goto(origin, { waitUntil: "networkidle" });
     const title = page.getByRole("button", { name: "Lootsplit. Click to continue", exact: true });
     await title.waitFor();
+    await page.waitForFunction(() => {
+      const button = document.querySelector(".loot-opening");
+      const traveler = document.querySelector(".loot-loader-traveler");
+      return button && !button.disabled && traveler?.style.transform;
+    });
     const sceneBox = await page.locator(".loot-opening-scene").boundingBox();
     const nameBox = await page.locator(".quire-dawn-name").boundingBox();
     assert.ok(sceneBox && nameBox);
