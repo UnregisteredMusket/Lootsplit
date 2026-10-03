@@ -7,7 +7,7 @@ const publicPaths = new Set([
   "/resources",
   "/donate",
 ]);
-async function continueIntoApp(page) {
+export async function continueIntoApp(page) {
   const path = new URL(page.url()).pathname.replace(/\/$/, "") || "/";
   if (publicPaths.has(path)) return;
   const title = page.getByRole("button", { name: "Lootsplit. Click to continue", exact: true });

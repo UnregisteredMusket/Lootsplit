@@ -1,4 +1,4 @@
-import { openApplication } from "./title-screen-navigation.mjs";
+import { openApplication, continueIntoApp } from "./title-screen-navigation.mjs";
 import { chromium } from "playwright";
 import assert from "node:assert/strict";
 import { mkdir } from "node:fs/promises";
@@ -205,6 +205,7 @@ try {
     .first()
     .getByRole("link", { name: "Open sheet", exact: true })
     .click();
+  await continueIntoApp(gp);
   await edit(gp);
   await gp.getByRole("button", { name: "Roll dice", exact: true }).click();
   await gp.locator(".roll-log li").waitFor();

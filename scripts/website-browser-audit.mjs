@@ -1,4 +1,4 @@
-import { openApplication } from "./title-screen-navigation.mjs";
+import { openApplication, continueIntoApp } from "./title-screen-navigation.mjs";
 import { chromium } from "playwright";
 import assert from "node:assert/strict";
 import { mkdir } from "node:fs/promises";
@@ -68,6 +68,7 @@ try {
     await page.getByRole("link", { name: "Installation & update guide" }).click();
     assert.match(page.url(), /\/help#android$/);
     await page.getByRole("link", { name: "Open app", exact: true }).click();
+    await continueIntoApp(page);
     await page.getByRole("link", { name: "Party", exact: true }).first().waitFor();
     assert.equal(new URL(page.url()).pathname, "/");
     await context.close();

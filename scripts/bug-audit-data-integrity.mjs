@@ -1,3 +1,4 @@
+import { openApplication } from "./title-screen-navigation.mjs";
 import { chromium } from "playwright";
 import { mkdir, writeFile } from "node:fs/promises";
 const browser = await chromium.launch({
@@ -14,7 +15,7 @@ const p = await context.newPage();
 p.setDefaultTimeout(15000);
 const results = [];
 async function visit(path) {
-  await p.goto(origin + path);
+  await openApplication(p, origin + path);
   await p.locator(".role-chip:enabled").waitFor();
   await p.locator(".quire-dawn").waitFor({ state: "hidden" });
 }
