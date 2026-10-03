@@ -110,6 +110,7 @@ export function CharacterWorkspace({
   const selectionContext = `${registry.activeId}:${activeCode}:${purseId}:${seat.role}:${seat.purseIds.join(",")}`;
   const previousContext = useRef(selectionContext);
   const previousRequest = useRef(requestedId);
+  const resolvedSelection = useRef("");
   const [accountData, setData] = useState<{
       userId?: string;
       characters: Row[];
@@ -167,6 +168,19 @@ export function CharacterWorkspace({
     const select = (d: { userId?: string; characters: Row[] }) => {
       if (c.signal.aborted) return;
       const rows = campaignRowsRef.current;
+      const restoreSelection = resolvedSelection.current !== selectionContext;
+      resolvedSelection.current = selectionContext;
+      let remembered = "";
+      if (restoreSelection && !requestedId && !dirtyRef.current) {
+        try {
+          remembered =
+            sessionStorage.getItem(
+              `quire.character.selection:${d.userId || "guest"}:${selectionContext}`,
+            ) || "";
+        } catch {
+          /* Storage can be unavailable in private browsing. */
+        }
+      }
       const local = readPartySheetLinks(d.userId || "", registry.activeId).find(
         (link) => link.purseId === purseId,
       );
@@ -176,8 +190,20 @@ export function CharacterWorkspace({
           ? d.characters.find((r) => r.campaign_code === activeCode && r.purse_id === purseId)?.id
           : d.characters.find((r) => r.id === local?.sheetId && !r.campaign_code)?.id);
       setSelected((v) => {
-        if (!contextChanged && requestedId && (requestChanged || v === requestedId))
+        if (
+          !contextChanged &&
+          requestedId &&
+          (requestChanged || v === requestedId) &&
+          (rows.some((r) => r.id === requestedId) ||
+            d.characters.some((r) => r.id === requestedId) ||
+            requestedId.startsWith("campaign:"))
+        )
           return requestedId;
+        if (
+          remembered &&
+          (rows.some((r) => r.id === remembered) || d.characters.some((r) => r.id === remembered))
+        )
+          return remembered;
         if (
           v &&
           (rows.some((r) => r.id === v) ||
@@ -239,6 +265,18 @@ export function CharacterWorkspace({
           holdings: economy.holdings,
         }
       : undefined;
+  function chooseCharacter(id: string) {
+    resolvedSelection.current = selectionContext;
+    setSelected(id);
+    try {
+      sessionStorage.setItem(
+        `quire.character.selection:${data?.userId || "guest"}:${selectionContext}`,
+        id,
+      );
+    } catch {
+      /* Selection still works when storage is unavailable. */
+    }
+  }
   async function create(sheet = blankSheet(), standalone = false) {
     if (dirtyRef.current && !window.confirm("Discard unsaved changes to open a new character?"))
       return;
@@ -255,7 +293,7 @@ export function CharacterWorkspace({
         await economy.reload();
         id = `party:${created}`;
       } else id = (await accountRequest<{ id: string }>("sheets/save", { sheet })).id;
-      setSelected(id);
+      chooseCharacter(id);
       setReload((n) => n + 1);
     } catch (e) {
       setError(errorText(e));
@@ -305,7 +343,7 @@ export function CharacterWorkspace({
                       !dirtyRef.current ||
                       window.confirm("Discard unsaved changes and switch characters?")
                     )
-                      setSelected(e.target.value);
+                      chooseCharacter(e.target.value);
                   }}
                 >
                   <option value="">Choose a character</option>
