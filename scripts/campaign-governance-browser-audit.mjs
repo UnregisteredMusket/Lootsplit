@@ -138,20 +138,29 @@ try {
     [player, "player", "player-token", "player"],
   ]) {
     await visit(a.page, "/party");
-    await a.page.evaluate(
-      async (m) => (await import("/src/lib/quire/cloud-client.ts")).resumeAccountMembership(m),
-      {
-        userId: a.id,
-        code,
-        seatId,
-        token,
-        role,
-        purseIds: role === "player" ? ["hero"] : [],
-        name: "Governance audit",
-      },
-    );
-    await a.page.waitForLoadState("domcontentloaded");
+    await Promise.all([
+      a.page.waitForNavigation({ waitUntil: "domcontentloaded" }),
+      a.page
+        .evaluate(
+          async (m) => (await import("/src/lib/quire/cloud-client.ts")).resumeAccountMembership(m),
+          {
+            userId: a.id,
+            code,
+            seatId,
+            token,
+            role,
+            purseIds: role === "player" ? ["hero"] : [],
+            name: "Governance audit",
+          },
+        )
+        .catch((error) => {
+          // Successful membership changes deliberately reload the document.
+          // Require that navigation above; propagate every unrelated failure.
+          if (!error.message.includes("Execution context was destroyed")) throw error;
+        }),
+    ]);
   }
+  console.log("Governance audit: membership resumed; verify locked gameplay");
   await visit(player.page, "/characters?id=party%3Ahero");
   await player.page.getByRole("heading", { name: "Governance hero", exact: true }).waitFor();
   await player.page.getByRole("button", { name: "Edit sheet", exact: true }).click();
@@ -168,6 +177,7 @@ try {
   await save(player.page);
   assert.equal((await state(player.page)).holdings[0].quantity, 1);
   await visit(host.page, "/party");
+  console.log("Governance audit: open/close editing and verify change report");
   await host.page.getByLabel("Allow character editing", { exact: true }).click();
   await player.page.getByRole("button", { name: "Character details", exact: true }).click();
   await enabled(species, true);
@@ -177,7 +187,10 @@ try {
   await enabled(species, false);
   await host.page.screenshot({ path: output + "/party-desktop.png", fullPage: true });
   await visit(host.page, "/?view=overview#journal");
-  const changes = host.page.locator(".loot-fold").filter({has:host.page.getByRole("button",{name:/^Character edit reports/})}).first();
+  const changes = host.page
+    .locator(".loot-fold")
+    .filter({ has: host.page.getByRole("button", { name: /^Character edit reports/ }) })
+    .first();
   await changes.locator(":scope > div > button").first().click();
   await changes.getByText("Governance hero", { exact: false }).first().waitFor();
   await changes.locator("details > summary").click();
@@ -196,6 +209,7 @@ try {
     false,
   );
   await visit(player.page, "/share");
+  console.log("Governance audit: leave room and retain authorized reports");
   await player.page.getByRole("button", { name: "Leave room", exact: true }).click();
   await player.page
     .getByRole("dialog")
@@ -208,11 +222,17 @@ try {
   assert.equal(records.status(), 200);
   assert.equal((await records.json()).reports.length, 1);
   await visit(host.page, "/settings");
-  const test = host.page.locator(".loot-fold").filter({has:host.page.getByRole("button",{name:/^Test mode/})}).first();
+  console.log("Governance audit: owner Test mode configuration and reset");
+  const test = host.page
+    .locator(".loot-fold")
+    .filter({ has: host.page.getByRole("button", { name: /^Test mode/ }) })
+    .first();
   await test.locator(":scope > div > button").first().click();
   await test.getByLabel("Characters", { exact: true }).fill("2");
-  await test.getByLabel("Enable Test mode", { exact: true }).click();
-  await host.page.waitForLoadState("domcontentloaded");
+  await Promise.all([
+    host.page.waitForNavigation({ waitUntil: "domcontentloaded" }),
+    test.getByLabel("Enable Test mode", { exact: true }).click(),
+  ]);
   await visit(host.page, "/");
   await host.page
     .getByRole("button", { name: "Reset Test mode — clear all data", exact: true })
