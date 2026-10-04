@@ -13,7 +13,7 @@ export async function continueIntoApp(page) {
   const title = page.getByRole("button", { name: "Lootsplit. Click to continue", exact: true });
   await page.waitForFunction(() =>
     document.querySelector(".loot-opening") ||
-    sessionStorage.getItem("lootsplit.opening.dismissed.v1") === "1",
+    document.querySelector(".concept-shell"),
   );
   if (await title.isVisible()) await title.click();
   await title.waitFor({ state: "detached" });
