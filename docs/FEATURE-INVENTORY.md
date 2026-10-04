@@ -167,3 +167,5 @@ Validation for this change: 427 automated tests passed (four existing skips), Ty
 
 - Gear menu (both roles) and Settings → Colors switch between Light · Adventurer’s Ledger and Dark · Ironbound Dragon. Selection persists in the existing device preferences. New installations default to Ironbound Dragon; existing saved/custom palettes remain readable and unchanged until selected.
 - Parchment grain, metal/leather finishes, engraved borders and brass framing change appearance only; all layouts, routes, icons, permissions and saved campaigns remain intact. Light surfaces use dark ink and readable secondary/action colors. Legacy looks, custom colors, reading size and reduced motion remain available.
+
+- Device Roll mode is available in the settings menu for both roles and in Settings. Pen & Paper mode records physical final totals across character quick actions/custom dice and encounter/weighted loot-table rolls; Virtual Mode generates dice. Selection persists per device and respects shared-campaign manual-roll permission. Manual weighted totals are range-checked, labeled and deduplicated in encounter history; switching modes never rewrites pending roll receipts.
