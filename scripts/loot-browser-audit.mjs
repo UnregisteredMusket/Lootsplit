@@ -66,7 +66,7 @@ try {
       ),
     );
     await page.route("**/_serverFn/**", (route) => route.abort());
-    await page.getByRole("button", { name: "Open5e loot", exact: true }).click();
+    await page.getByRole("tab", { name: "Open5e loot", exact: true }).click();
     await page.getByLabel("Search by name", { exact: true }).fill("Longsword");
     await page.getByRole("button", { name: "Search Open5e", exact: true }).click();
     await page.getByText("Longsword", { exact: true }).click();

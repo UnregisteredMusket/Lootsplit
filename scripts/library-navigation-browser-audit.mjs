@@ -80,6 +80,11 @@ try {
     await page.goForward();
     await page.waitForURL("**/account");
     await stillOpen();
+    // A required data-context reload skips the full opening exactly once.
+    await page.evaluate(() => sessionStorage.setItem("lootsplit.navigation.resume.v1", JSON.stringify({path:"/",at:Date.now()})));
+    await page.goto(origin + "/");
+    await page.locator(".shortcut-grid").waitFor();
+    assert.equal(await page.locator(".loot-opening").count(), 0);
     // Fresh document loads must restore the title, even with a legacy dismissal flag.
     await page.goto(origin + "/library");
     await page.getByRole("button", { name: "Lootsplit. Click to continue", exact: true }).click();
