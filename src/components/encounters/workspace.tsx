@@ -1,3 +1,4 @@
+import { usePrefs } from "@/lib/quire/prefs";
 import { encounterRequest } from "@/lib/encounters/client";
 import { localEncounterRequest } from "@/lib/encounters/local";
 import { useSeat } from "@/lib/quire/seat";
@@ -371,6 +372,10 @@ function EncounterEditor({
   onDirty: (v: boolean) => void;
   onSaved: () => void;
 }) {
+  const { prefs, setPrefs } = usePrefs();
+  const manual = prefs.rollMode === "manual";
+  const setManual = (value: boolean) => setPrefs({ rollMode: value ? "manual" : "virtual" });
+  const [tableTotals, setTableTotals] = useState<Record<string, string>>({});
   const [detail, setDetail] = useState<Detail | null>(null),
     [draft, setDraft] = useState<Encounter | null>(null),
     [tab, setTab] = useState(
@@ -394,7 +399,6 @@ function EncounterEditor({
     [moreRolls, setMoreRolls] = useState(false),
     [rollLabel, setRollLabel] = useState("Encounter roll"),
     [formula, setFormula] = useState("1d20"),
-    [manual, setManual] = useState(true),
     [total, setTotal] = useState(""),
     [lootSearch, setLootSearch] = useState("");
   const pendingRoll = useRef<{
@@ -528,7 +532,7 @@ function EncounterEditor({
             formula,
             label: rollLabel,
             manual,
-            total: total.trim() === "" ? null : Number(total),
+            total: (tableId ? tableTotals[tableId] ?? "" : total).trim() === "" ? null : Number(tableId ? tableTotals[tableId] : total),
             tableId,
           },
         };
@@ -1485,12 +1489,18 @@ function EncounterEditor({
                           ))}
                         </select>
                       </label>
+                      {manual && <label>
+                        Physical table total (1–{t.entries.reduce((sum, row) => sum + row.weight, 0)})
+                        <input aria-label={`${t.name} physical table total`} type="number" step="1" min="1"
+                          max={t.entries.reduce((sum, row) => sum + row.weight, 0)} value={tableTotals[t.id] ?? ""}
+                          onChange={(e) => setTableTotals({ ...tableTotals, [t.id]: e.target.value })} />
+                      </label>}
                       <div className="character-toolbar">
                         <button
-                          disabled={dirty || !!pendingRoll.current}
+                          disabled={dirty || !!pendingRoll.current || (manual && !(tableTotals[t.id] ?? "").trim())}
                           onClick={() => void roll(t.id)}
                         >
-                          Roll saved loot table
+                          {manual ? "Record physical loot-table roll" : "Roll saved loot table"}
                         </button>
                         <button
                           onClick={() =>
@@ -1540,8 +1550,7 @@ function EncounterEditor({
             <FantasyIcon ui="Dice" size={26} /> Encounter rolls
           </h3>
           <p>
-            Physical results are labeled Manual. App-generated dice are rolled and recorded by the
-            server. Apply results to initiative, HP and gameplay yourself.
+            Physical results are labeled Manual. Virtual rolls are generated and recorded by the app. Changing the source changes your device’s Roll mode setting. Apply results to initiative, HP and gameplay yourself.
           </p>
           <fieldset disabled={busy || readOnly || review || dirty} className="encounter-fieldset">
             <div className="encounter-grid">
