@@ -131,7 +131,7 @@ try {
   async function endSession(p) {
     await visit(p, "/share");
     await p.getByRole("button", { name: "End session", exact: true }).click();
-    await p.getByRole("dialog").getByRole("button", { name: "End session", exact: true }).click();
+    await p.getByRole("alertdialog").getByRole("button", { name: "End session", exact: true }).click();
     await p.getByRole("button", { name: "Start a room", exact: true }).waitFor();
   }
   await endSession(page);
