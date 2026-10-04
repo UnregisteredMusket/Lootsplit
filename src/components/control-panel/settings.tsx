@@ -2,7 +2,7 @@ import { FantasyIcon } from "@/components/fantasy-icon";
 import { useState } from "react";
 import { ChevronDown, LogIn } from "lucide-react";
 import { Button, Modal } from "@/components/ui";
-import { luminance, DEFAULT_GROUND } from "@/lib/quire/theme";
+import { FANTASY_LOOKS } from "@/lib/quire/theme";
 import { usePrefs } from "@/lib/quire/prefs";
 import { Campaigns } from "@/components/campaigns";
 type Group = {
@@ -35,19 +35,12 @@ export function ManagementPanel({
           value={prefs.appearance}
           onChange={(e) => {
             const appearance = e.target.value as "dark" | "light";
-            const pale = luminance(prefs.ground) >= 0.55;
-            setPrefs({
-              appearance,
-              ...(appearance === "light" && !pale
-                ? { ground: "#f6f1e6" }
-                : appearance === "dark" && pale
-                  ? { ground: DEFAULT_GROUND }
-                  : {}),
-            });
+            const look = FANTASY_LOOKS[appearance];
+            setPrefs({ appearance, accent: look.accent, ground: look.ground });
           }}
         >
-          <option value="dark">Dark ledger</option>
-          <option value="light">Light ledger</option>
+          <option value="dark">Dark · Ironbound Dragon</option>
+          <option value="light">Light · Adventurer’s Ledger</option>
         </select>
       </label>
       <label>

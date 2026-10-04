@@ -130,7 +130,7 @@ try {
     await page.evaluate(() =>
       getComputedStyle(document.documentElement).getPropertyValue("--color-bg").trim(),
     ),
-    "#f6f1e6",
+    "#dfcca2",
   );
   await capture("player-settings-light");
   await dialog.getByLabel("Theme", { exact: true }).selectOption("dark");
