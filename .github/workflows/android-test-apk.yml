@@ -6,13 +6,31 @@ on:
     branches:
       - 'android/**'
       - 'improvement/**'
+    paths:
+      - 'android/**'
+      - 'src/**'
+      - 'public/**'
+      - 'cloudflare/**'
+      - 'package*.json'
+      - 'capacitor.config.*'
+      - 'vite*.config.*'
+      - 'scripts/prepare-mobile.mjs'
+      - 'scripts/with-app-env.mjs'
+      - 'scripts/app-env-plugin.mjs'
+      - '.grok/app-env.json'
+      - '.github/workflows/android-test-apk.yml'
 
 permissions:
   contents: read
 
+concurrency:
+  group: android-test-${{ github.ref }}
+  cancel-in-progress: true
+
 jobs:
   test-apk:
     runs-on: ubuntu-latest
+    timeout-minutes: 20
     steps:
       - uses: actions/checkout@v4
       - uses: actions/setup-node@v4
