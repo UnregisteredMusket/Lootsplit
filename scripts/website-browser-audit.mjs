@@ -31,12 +31,35 @@ try {
       ["help", "A little help, adventurer."],
       ["resources", "Resources & credits"],
       ["donate", "Support Lootsplit"],
+      ["account", "Welcome to your next chapter."],
     ]) {
       const response = await openApplication(page, `${origin}/${path}`, {
         waitUntil: "networkidle",
       });
       assert.equal(response.status(), 200);
       await page.getByRole("heading", { level: 1 }).filter({ hasText: heading }).waitFor();
+      if (path === "account") {
+        assert.equal(await page.locator(".ls-header").count(), 1);
+        assert.equal(await page.locator(".portal-header").count(), 0);
+        assert.equal(
+          await page.locator('.ls-header nav a[href="/account"]').getAttribute("aria-current"),
+          "page",
+        );
+        const theme = await page.evaluate(() => {
+          const site = getComputedStyle(document.querySelector(".ls-site"));
+          const account = getComputedStyle(document.querySelector(".ls-account"));
+          return {
+            siteBackground: site.backgroundColor,
+            accountBackground: account.backgroundColor,
+            siteFont: site.fontFamily,
+            accountFont: account.fontFamily,
+            headingFont: getComputedStyle(document.querySelector(".ls-account h1")).fontFamily,
+          };
+        });
+        assert.equal(theme.accountBackground, theme.siteBackground);
+        assert.equal(theme.accountFont, theme.siteFont);
+        assert.match(theme.headingFont, /Cormorant Garamond/);
+      }
       if (path === "updates") {
         const latest = page.locator(".ls-release").first();
         await latest
@@ -75,7 +98,7 @@ try {
   }
   assert.deepEqual(failures, []);
   console.log(
-    JSON.stringify({ ok: true, widths: [1280, 390], pages: 6, externalFailures }, null, 2),
+    JSON.stringify({ ok: true, widths: [1280, 390], pages: 7, externalFailures }, null, 2),
   );
 } finally {
   await browser.close();

@@ -44,7 +44,9 @@ export function Website({ children }: { children: ReactNode }) {
           Lootsplit<span>THE PARTY LEDGER</span>
         </Link>
         <nav aria-label="Website">
-          <Link to="/account">My account</Link>
+          <Link to="/account" aria-current={path === "/account" ? "page" : undefined}>
+            My account
+          </Link>
           <Link to="/resources" aria-current={path === "/resources" ? "page" : undefined}>
             Resources
           </Link>
