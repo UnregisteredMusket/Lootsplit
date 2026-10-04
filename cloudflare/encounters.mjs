@@ -1,3 +1,4 @@
+import { rollLootTable } from "../src/lib/encounters/roll-table.mjs";
 import {
   encounterSchema,
   generatorSchema,
@@ -259,33 +260,11 @@ export async function handleEncounters(db, user, path, body = {}) {
     if (body.tableId) {
       const table = e.tables.find((t) => t.id === body.tableId);
       if (!table) fail("Loot table not found.");
-      const totalWeight = table.entries.reduce((s, r) => s + r.weight, 0);
-      const ceiling = Math.floor(4294967296 / totalWeight) * totalWeight;
-      const bytes = new Uint32Array(1);
-      do {
-        crypto.getRandomValues(bytes);
-      } while (bytes[0] >= ceiling);
-      const die = (bytes[0] % totalWeight) + 1,
-        dice = { dice: [die], total: die, modifier: 0 };
-      let n = dice.total,
-        selected = table.entries.length - 1;
-      for (let i = 0; i < table.entries.length; i++) {
-        n -= table.entries[i].weight;
-        if (n <= 0) {
-          selected = i;
-          break;
-        }
+      try {
+        result = rollLootTable(table, manual, body.total, "server");
+      } catch (error) {
+        fail(error.message);
       }
-      // Return a persisted draw. The DM applies and saves its index like a physical result.
-      result = {
-        label: table.name,
-        formula: `1d${totalWeight}`,
-        source: "server",
-        ...dice,
-        selected,
-        tableId: table.id,
-        resultName: table.entries[selected].loot.name,
-      };
     } else {
       const formula = text(body.formula, 120);
       try {
