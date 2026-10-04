@@ -48,7 +48,7 @@ try {
       });
       assert.ok(contrast.ratio >= 4.5);
       assert.equal(contrast.darkInk, mode === "light");
-      await page.getByRole("button", { name: "Settings & Management", exact: true }).click();
+      await page.locator(".settings-trigger").click();
       const dialog = page.getByRole("dialog", { name: "Settings & Management", exact: true });
       await dialog.getByRole("button", { name: "Appearance & notifications", exact: true }).click();
       const select = dialog.getByLabel("Theme", { exact: true });
