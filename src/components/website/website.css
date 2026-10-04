@@ -596,7 +596,7 @@
   --portal-muted: var(--site-muted);
   --portal-gold: var(--site-gold);
   min-height: 0;
-  background: inherit;
+  background: #0d1724;
   color: inherit;
   font: inherit;
 }
