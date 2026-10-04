@@ -17,6 +17,7 @@ export function accountDevPlugin() {
         if (!req.url?.startsWith("/api/account/")) return next();
         try {
           const origin = `http://${req.headers.host}`;
+          globalThis.__env__ = {DB, ACCOUNT_SECRET:readFileSync(secretPath,"utf8"), ACCOUNT_ORIGIN:origin};
           const request = new Request(origin + req.url, {
             method: req.method,
             headers: req.headers,

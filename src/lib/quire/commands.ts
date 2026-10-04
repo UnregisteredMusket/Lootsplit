@@ -8,10 +8,12 @@ import {
   applyDowntime,
   financeMove,
 } from "./finance.ts";
+import { assertMerchantSale, isService, stockCategory } from "./merchant.ts";
+import { archiveSession } from "./session-records.ts";
 import { readJournal, preserveJournalMetadata } from "./journal.ts";
 import { z } from "zod";
 import { sheetSchema } from "../characters/model.mjs";
-import { editCharacter, editLegacyCharacter } from "../characters/campaign-sheet.mjs";
+import { characterSheet, editCharacter, editLegacyCharacter } from "../characters/campaign-sheet.mjs";
 import type { CloudTable, CloudSeat } from "./cloud.ts";
 import { fromCopper, toCopper, spendCoins, priceAfterCharisma } from "./money.ts";
 import { charismaScore, readSheets } from "./sheet.ts";
@@ -38,6 +40,8 @@ export const commandSchema = z.discriminatedUnion("kind", [
     days: z.number().int().min(1).max(3650),
   }),
   z.object({ ...base, kind: z.literal("downtime-cancel"), downtimeId: id }),
+  z.object({ ...base, kind: z.literal("journal-note"), title: z.string().trim().min(1).max(100), text: z.string().max(12000), visibility: z.enum(["dm", "party", "player"]), purseId: z.string(), reportIds: z.array(id).default([]) }),
+  z.object({ ...base, kind: z.literal("character-editing"), purseId: id, allowed: z.boolean() }),
   z.object({
     ...base,
     kind: z.literal("character"),
@@ -349,6 +353,28 @@ export function applyCommand(input: CloudTable, seat: CloudSeat, raw: Command): 
     if (!d || d.status !== "pending") throw Error("This downtime is already decided.");
     d.status = "cancelled";
     event("Cancelled pending downtime; no funds moved");
+  } else if (cmd.kind === "journal-note") {
+    if (cmd.visibility === "dm") dm();
+    if (seat.role !== "dm" || cmd.visibility === "player") {
+      const p = own(cmd.purseId);
+      if (p.kind !== "character") throw Error("Choose your character.");
+    }
+    if (cmd.reportIds.some(id => !journal.reports?.some(r => r.id === id))) throw Error("Session report not found.");
+    (journal.entries ??= []).push({ ...cmd, at, authorId: seat.id });
+  } else if (cmd.kind === "character-editing") {
+    dm();
+    const p = own(cmd.purseId);
+    if (p.kind !== "character") throw Error("Choose a character.");
+    if (p.editingAllowed === cmd.allowed) return t;
+    const sheet = characterSheet(p, t.holdings, t.sheets.find(s => s.purseId === p.id));
+    if (cmd.allowed) p.editBaseline = sheet;
+    else {
+      const before = p.editBaseline || sheet;
+      (journal.editReports ??= []).push({ id: cmd.id, purseId: p.id, name: p.name, at, before, after: sheet });
+      delete p.editBaseline;
+    }
+    p.editingAllowed = cmd.allowed;
+    event(`${p.name}: character editing ${cmd.allowed ? "opened" : "closed; change report saved"}`, "management", p.id);
   } else if (cmd.kind === "character") {
     editCharacter(t, seat, cmd, cmd.id, at);
     event(
@@ -357,13 +383,16 @@ export function applyCommand(input: CloudTable, seat: CloudSeat, raw: Command): 
       cmd.purseId,
     );
   } else if (cmd.kind === "portrait") {
-    own(cmd.purseId).portrait = cmd.portrait;
+    const p = own(cmd.purseId);
+    if (seat.role !== "dm" && !p.editingAllowed) throw Error("Character editing is locked. Ask the DM to open editing.");
+    p.portrait = cmd.portrait;
   } else if (cmd.kind === "session") {
     dm();
     const active = journal.sessions.find((x) => !x.endedAt);
     if (active) {
       active.endedAt = at;
       active.endLedgerIds = t.ledger.map((x) => x.id);
+      archiveSession(t, active.id, active.name, at);
     }
     if (
       !cmd.end &&
@@ -432,9 +461,10 @@ export function applyCommand(input: CloudTable, seat: CloudSeat, raw: Command): 
       priceAfterCharisma(Math.round(s.copper * shop.sellRate), score(cmd.purseId)) * cmd.quantity;
     coins(cmd.purseId, -cost);
     if (s.quantity !== null) s.quantity -= cmd.quantity;
-    t.holdings.push({
+    if (!isService(s)) t.holdings.push({
       id: cmd.id + "-item",
       purseId: cmd.purseId,
+      category: stockCategory(s, shop),
       name: s.name,
       kind: "item",
       quantity: cmd.quantity,
@@ -467,6 +497,7 @@ export function applyCommand(input: CloudTable, seat: CloudSeat, raw: Command): 
     if (!h || !s) throw new Error("Item or shop no longer exists.");
     if (s.closed) throw new Error("This shop is closed.");
     own(h.purseId);
+    assertMerchantSale(h, s);
     if (h.quantity < cmd.quantity) throw new Error("Not enough items to sell.");
     const paid = Math.round(h.unitCopper * s.buyRate) * cmd.quantity;
     coins(h.purseId, paid);

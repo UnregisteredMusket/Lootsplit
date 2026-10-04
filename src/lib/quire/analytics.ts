@@ -56,7 +56,11 @@ export function campaignAnalytics(
   const result = emptyMetrics();
   const scope = purseIds ? new Set(purseIds) : null;
   const included = (id: string) => !scope || scope.has(id);
-  const rows = [...new Map(table.ledger.map((line) => [line.id, line])).values()];
+  const historical = (table.journal?.reports || []).flatMap(r => {
+    const snapshot = JSON.parse(r.snapshot);
+    return (snapshot.ledger || []) as LedgerLine[];
+  });
+  const rows = [...new Map([...historical, ...table.ledger].map((line) => [line.id, line])).values()];
   const byId = new Map(rows.map((line) => [line.id, line]));
   const voided = new Set<string>();
   for (const row of rows) {

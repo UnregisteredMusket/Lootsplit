@@ -152,7 +152,7 @@ export function editLegacyCharacter(table, seat, incoming, before) {
         ? !same(incoming.abilities[a], baseline.abilities[a])
         : incoming.abilities[a].score.trim()
     ) {
-      if (seat.role !== "dm" && converted.scores[a] !== current.scores[a])
+      if (seat.role !== "dm" && !p.editingAllowed && converted.scores[a] !== current.scores[a])
         throw Error("Ask the DM to change ability scores.");
       if (prior && current.scores[a] !== prior.scores[a])
         throw Error("This character changed elsewhere. Reload before editing.");
@@ -203,6 +203,7 @@ export function editLegacyCharacter(table, seat, incoming, before) {
     .map((field) => String(incoming[/** @type {keyof typeof incoming} */ (field)] || "").trim())
     .filter((text) => text && !next.notes.includes(text));
   if (excerpts.length) next.notes = [next.notes, ...excerpts].filter(Boolean).join("\n\n");
+  assertGameplayEdit(p, seat, current, next);
   p.sheet = sheetSchema.parse(statsOnly(next));
   p.name = p.sheet.name;
   p.sheetRevision = (p.sheetRevision || 0) + 1;
@@ -251,6 +252,7 @@ export function editCharacter(table, seat, input, receipt, at = Date.now()) {
     table.holdings,
     table.sheets?.find((s) => s.purseId === p.id),
   );
+  assertGameplayEdit(p, seat, before, next);
   const statChange = !same(statsOnly(before), statsOnly(next));
   if (statChange && seat.role === "dm" && p.sheetReadOnlyForDm)
     throw Error(
@@ -258,13 +260,16 @@ export function editCharacter(table, seat, input, receipt, at = Date.now()) {
     );
   const coinChange = !same(before.coins, next.coins);
   const itemChange = !same(before.equipment, next.equipment);
-  const grant =
-    coinChange || !same(financialItems(before.equipment), financialItems(next.equipment));
+  const consumption = seat.role !== "dm" && next.equipment.every(item => {
+    const old = before.equipment.find(x => x.id === item.id);
+    return old && item.quantity <= old.quantity && same({ ...item, quantity: old.quantity, equipped: old.equipped }, old);
+  });
+  const grant = coinChange || (!consumption && !same(financialItems(before.equipment), financialItems(next.equipment)));
   if (grant && seat.role !== "dm")
     throw Error(
       "Only the DM can add or adjust funds and items. Use purchases, transfers or a DM-approved award.",
     );
-  if (seat.role !== "dm" && before.scores.cha !== next.scores.cha)
+  if (seat.role !== "dm" && !p.editingAllowed && before.scores.cha !== next.scores.cha)
     throw Error("Ask the DM to change Charisma used for campaign prices.");
   if (
     (statChange && !same(statsOnly(before), statsOnly(current))) ||
@@ -316,4 +321,29 @@ export function editCharacter(table, seat, input, receipt, at = Date.now()) {
         (itemChange ? " inventory" : ""),
     });
   return characterSheet(p, table.holdings);
+}
+
+/** Authoritative gameplay allowlist. Permission to build a sheet never grants money/items.
+ * @param {import('../quire/types.ts').Purse} purse
+ * @param {{role:string}} seat
+ * @param {import('./model.mjs').PlaySheet} before
+ * @param {import('./model.mjs').PlaySheet} next */
+export function assertGameplayEdit(purse, seat, before, next) {
+  if (seat.role === "dm" || purse.editingAllowed === true) return;
+  const normalize = (/** @type {import('./model.mjs').PlaySheet} */ sheet) => ({
+    ...sheet, hp: 0, tempHp: 0, inspiration: false, deathSuccesses: 0, deathFailures: 0,
+    conditions: "", notes: "", coins: {}, equipment: [],
+    resources: sheet.resources.map(({current, ...r}) => r),
+    slots: sheet.slots.map(({used, ...r}) => r),
+    spells: sheet.spells.map(({prepared, ...r}) => r),
+  });
+  if (!same(normalize(before), normalize(next)))
+    throw Error("Character editing is locked. Only the DM can approve these changes. Ask the DM to open editing; gameplay actions remain available.");
+  if (!same(before.coins, next.coins)) throw Error("Only the DM can adjust funds.");
+  for (const item of next.equipment) {
+    const old = before.equipment.find(x => x.id === item.id);
+    if (!old || item.quantity > old.quantity ||
+        !same({...item, quantity: old.quantity, equipped: old.equipped}, old))
+      throw Error("Only the DM can approve item changes; players may equip or consume existing items while editing is locked.");
+  }
 }

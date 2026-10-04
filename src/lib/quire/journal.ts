@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { sheetSchema } from "../characters/model.mjs";
 import { financeSchema } from "./finance.ts";
 import { quireDb, request } from "./db.ts";
 import type { LedgerLine } from "./types.ts";
@@ -6,6 +7,9 @@ const id = z.string().min(1).max(150),
   at = z.number().int().nonnegative();
 export const journalSchema = z.object({
   finance: financeSchema.optional(),
+  reports: z.array(z.object({ id, name: z.string().max(100), at, seatIds: z.array(id).optional(), snapshot: z.string() })).optional(),
+  entries: z.array(z.object({ id, at, authorId: id, purseId: z.string(), visibility: z.enum(["dm", "party", "player"]), title: z.string().max(100), text: z.string().max(12000), reportIds: z.array(id).default([]) })).optional(),
+  editReports: z.array(z.object({ id, purseId: id, name: z.string(), at, before: sheetSchema, after: sheetSchema })).optional(),
   sessions: z
     .array(
       z.object({
@@ -98,6 +102,9 @@ export function preserveJournalMetadata(value: unknown, current: Journal): Journ
   return readJournal({
     ...next,
     ...(next.finance ? {} : current.finance ? { finance: current.finance } : {}),
+    ...(current.reports || next.reports ? { reports: [...new Map([...(current.reports || []), ...(next.reports || [])].map(r => [r.id, r])).values()] } : {}),
+    ...(current.entries || next.entries ? { entries: [...new Map([...(current.entries || []), ...(next.entries || [])].map(e => [e.id, e])).values()] } : {}),
+    ...(current.editReports || next.editReports ? { editReports: [...new Map([...(current.editReports || []), ...(next.editReports || [])].map(r => [r.id, r])).values()] } : {}),
     events: next.events.map((event) => {
       const change = event.change ?? changes.get(event.id);
       return change ? { ...event, change } : event;

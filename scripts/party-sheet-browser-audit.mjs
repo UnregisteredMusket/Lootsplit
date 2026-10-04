@@ -178,7 +178,7 @@ try {
   await player.page.getByRole("button", { name: "Inventory & currency", exact: true }).click();
   assert.equal(
     await player.page.getByLabel("Sentinel sword quantity", { exact: true }).isEnabled(),
-    false,
+    true,
   );
   assert.equal(
     await player.page.getByRole("button", { name: "Add equipment", exact: true }).count(),

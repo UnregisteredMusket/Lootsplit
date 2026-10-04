@@ -69,6 +69,7 @@ type Detail = Row & {
   campaign: null | {
     code: string;
     role: string;
+    editingAllowed?: boolean;
     manualAllowed: boolean;
     coins: Sheet["coins"];
     holdings: { id: string; name: string; quantity: number }[];
@@ -621,7 +622,8 @@ function CharacterEditor({
   }
   if (!sheet || !detail)
     return <p role={error ? "alert" : "status"}>{error || "Loading character…"}</p>;
-  const editable = detail.editable;
+  const canPlay = detail.editable && !detail.assignmentError;
+  const editable = canPlay && (!detail.campaign || detail.campaign.role === "dm" || (livePurse ? livePurse.editingAllowed === true : detail.campaign.editingAllowed === true));
   const deviceLink =
     deviceCampaign && !detail.campaign_code && editable
       ? readPartySheetLinks(deviceCampaign.ownerId, deviceCampaign.campaignId).find(
@@ -722,15 +724,16 @@ function CharacterEditor({
           Edit sheet
         </button>
       </div>
+      {canPlay && !editable && <p role="status">Character editing is locked by the DM. Rolls, health, resources, equipped items and consumption remain available.</p>}
       <div className="character-savebar">
         <strong role="status">
           {dirty
             ? "Unsaved changes — save before rolling"
             : editable
               ? "Saved character"
-              : "DM read-only view"}
+              : canPlay ? "Saved character" : "DM read-only view"}
         </strong>
-        {editable && (
+        {canPlay && (
           <button disabled={busy || !dirty} onClick={() => void save()}>
             {busy ? "Saving…" : "Save character"}
           </button>
@@ -908,7 +911,7 @@ function CharacterEditor({
                 </small>
               </div>
               <button
-                disabled={!editable || busy || r.current <= 0}
+                disabled={!canPlay || busy || r.current <= 0}
                 onClick={() =>
                   set(
                     "resources",
@@ -973,16 +976,16 @@ function CharacterEditor({
                         key={k}
                         label={["Current HP", "Maximum HP", "Temporary HP", "Armor class"][i]}
                         value={sheet[k]}
-                        disabled={!editable}
+                        disabled={k === "hp" || k === "tempHp" ? !canPlay : !editable}
                         onChange={(v) => set(k, v)}
                       />
                     ))}
                   </div>
-                  <HealthActions sheet={sheet} change={setSheet} disabled={!editable} />
+                  <HealthActions sheet={sheet} change={setSheet} disabled={!canPlay} />
                   <Text
                     label="Conditions"
                     value={sheet.conditions}
-                    disabled={!editable}
+                    disabled={!canPlay}
                     onChange={(v) => set("conditions", v)}
                   />
                   <div className="field-grid">
@@ -990,14 +993,14 @@ function CharacterEditor({
                       label="Death save successes"
                       value={sheet.deathSuccesses}
                       max={3}
-                      disabled={!editable}
+                      disabled={!canPlay}
                       onChange={(v) => set("deathSuccesses", v)}
                     />
                     <Num
                       label="Death save failures"
                       value={sheet.deathFailures}
                       max={3}
-                      disabled={!editable}
+                      disabled={!canPlay}
                       onChange={(v) => set("deathFailures", v)}
                     />
                   </div>
@@ -1009,7 +1012,7 @@ function CharacterEditor({
                   <Check
                     label="Inspiration"
                     value={sheet.inspiration}
-                    disabled={!editable}
+                    disabled={!canPlay}
                     onChange={(v) => set("inspiration", v)}
                   />
                 </section>
@@ -1136,7 +1139,7 @@ function CharacterEditor({
                     <Num
                       label={`${r.name} remaining`}
                       value={r.current}
-                      disabled={!editable}
+                      disabled={!canPlay}
                       onChange={(v) =>
                         set(
                           "resources",
@@ -1181,7 +1184,7 @@ function CharacterEditor({
                       </select>
                     </label>
                     <button
-                      disabled={!editable || r.current === 0}
+                      disabled={!canPlay || r.current === 0}
                       onClick={() =>
                         set(
                           "resources",
@@ -1380,7 +1383,7 @@ function CharacterEditor({
                     }
                   />
                   <button
-                    disabled={!editable || slot.used >= slot.max}
+                    disabled={!canPlay || slot.used >= slot.max}
                     onClick={() =>
                       set(
                         "slots",
@@ -1602,11 +1605,11 @@ function CharacterEditor({
                     <Num
                       label={`${item.name} quantity`}
                       value={item.quantity}
-                      disabled={!canManageInventory}
+                      disabled={!canPlay}
                       onChange={(v) =>
                         set(
                           "equipment",
-                          sheet.equipment.map((x, j) => (j === i ? { ...x, quantity: v } : x)),
+                          sheet.equipment.map((x, j) => (j === i ? { ...x, quantity: canManageInventory ? v : Math.min(x.quantity, v) } : x)),
                         )
                       }
                     />
@@ -1626,7 +1629,7 @@ function CharacterEditor({
                   <Check
                     label={`Equip ${item.name}`}
                     value={item.equipped}
-                    disabled={!editable}
+                    disabled={!canPlay}
                     onChange={(v) =>
                       set(
                         "equipment",

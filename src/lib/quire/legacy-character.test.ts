@@ -109,6 +109,7 @@ test("player-owned sheet protection applies to legacy edits and generic patches 
     ],
   });
   assert.equal(next.purses[0].coins.gp, 20);
+  Object.assign(p, {editingAllowed: true});
   const owner = { ...dm, role: "player" as const, purseIds: [p.id] };
   assert.equal(
     applyCommand(table, owner, {

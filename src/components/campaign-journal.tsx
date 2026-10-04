@@ -1,3 +1,5 @@
+import { downloadJson } from "@/lib/quire/table";
+import { JournalNotes } from "./journal-notes";
 import { useDisclosureAnchor } from "@/lib/help/use-disclosure-anchor";
 import { CampaignFinance } from "./campaign-finance";
 import { useState } from "react";
@@ -135,7 +137,8 @@ export function CampaignJournal() {
           </p>
         ) : null}
         {[...journal.sessions].reverse().map((session) => {
-          const sum = sessionSummary(ledger, session, dm ? undefined : seat.purseIds);
+          const archived = journal.reports?.find(r => r.id === session.id);
+          const sum = sessionSummary(archived ? JSON.parse(archived.snapshot).ledger : ledger, session, dm ? undefined : seat.purseIds);
           return (
             <div className="journal-entry" key={session.id}>
               <strong>{session.name}</strong>
@@ -154,6 +157,13 @@ export function CampaignJournal() {
           Received/spent excludes internal coin transfers. Net is the balance movement; this is not
           a measure of newly earned wealth or changes in item valuations.
         </p>
+      </Fold>
+      <JournalNotes />
+      <Fold title="Character edit reports" hint="Before and after each DM editing window.">
+        {(journal.editReports || []).filter(r => dm || seat.purseIds.includes(r.purseId)).map(r => <details className="journal-entry" key={r.id}><summary>{r.name} · {new Date(r.at).toLocaleString()}</summary>{Object.keys(r.after).filter(key => JSON.stringify(r.before[key as keyof typeof r.before]) !== JSON.stringify(r.after[key as keyof typeof r.after])).map(key => <p key={key} className="break-words"><strong>{key}</strong>: {JSON.stringify(r.before[key as keyof typeof r.before])} → {JSON.stringify(r.after[key as keyof typeof r.after])}</p>)}<Button variant="secondary" onClick={() => void downloadJson("lootsplit-character-edits-"+r.id+".json", r)}>Download changes</Button></details>)}
+      </Fold>
+      <Fold title="Archived session reports" hint="Recorded before active logs are cleared.">
+        {(journal.reports || []).map(r => <div key={r.id} className="journal-entry"><strong>{r.name}</strong><Button variant="secondary" onClick={() => void downloadJson("lootsplit-session-"+r.id+".json", JSON.parse(r.snapshot))}>Download session report</Button></div>)}
       </Fold>
       <CampaignFinance />
       <details ref={reviewRef} id="review-inbox" className="review-inbox">

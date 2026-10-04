@@ -43,14 +43,15 @@ export const previewCloudTable = createServerFn({ method: "POST" })
   });
 
 export const joinCloudTable = createServerFn({ method: "POST" })
-  .validator((input: { code: string; purseId: string; name: string }) => input)
+  .validator((input: { code: string; purseId: string; name: string; invitation?: string }) => input)
   .handler(async ({ data }) => {
     const { guardMemberSeat } = await import("./member-access.server.ts");
     await guardMemberSeat(data);
     const { limitRoomEntry } = await import("./room-limits.server.ts");
     await limitRoomEntry("join");
     const { joinRoom } = await import("./cloud.server.ts");
-    return joinRoom(data);
+    const { currentAccountId } = await import("./member-access.server.ts");
+    return joinRoom({ ...data, userId: await currentAccountId() });
   });
 
 export const pullCloudTable = createServerFn({ method: "POST" })
@@ -128,7 +129,7 @@ export const manageCloudRoom = createServerFn({ method: "POST" })
     (input: {
       code: string;
       token: string;
-      action: "release" | "permission" | "start" | "discard";
+      action: "release" | "leave" | "kick" | "ban" | "invite" | "permission" | "start" | "discard";
       seatId: string;
       allowParty?: boolean;
     }) => input,

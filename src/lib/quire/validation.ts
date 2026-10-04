@@ -10,6 +10,8 @@ export const artworkSchema = z
 const purse = z.object({
   sheet: sheetSchema.optional(),
   sheetRevision: z.number().int().nonnegative().optional(),
+  editingAllowed: z.boolean().optional(),
+  editBaseline: sheetSchema.optional(),
   profileId: z.string().max(150).optional(),
   sheetReadOnlyForDm: z.boolean().optional(),
   id,
@@ -21,6 +23,7 @@ const purse = z.object({
 });
 export const holdingSchema = z.object({
   ...inventoryFields,
+  service: z.boolean().optional(),
   purseId: id,
   image: artworkSchema.optional(),
   category: z.string().max(80).optional(),
@@ -29,6 +32,8 @@ export const holdingSchema = z.object({
 });
 
 const shop = z.object({
+  acceptedCategories: z.array(z.string().max(80)).max(20).optional(),
+  acceptAnyCategory: z.boolean().optional(),
   id,
   closed: z.boolean().optional(),
   image: artworkSchema.optional(),
@@ -40,6 +45,8 @@ const shop = z.object({
   buyRate: z.number().finite().nonnegative(),
 });
 const stock = z.object({
+  service: z.boolean().optional(),
+  category: z.string().max(80).optional(),
   id,
   shopId: id,
   name: z.string(),

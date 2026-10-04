@@ -17,3 +17,17 @@ export async function guardMemberSeat(input: unknown) {
   )
     throw new Error("This campaign seat belongs to a restricted account.");
 }
+
+/** Resolve optional signed-in identity from the request, never from a supplied user ID. */
+export async function currentAccountId(): Promise<string | undefined> {
+  const env = (globalThis as typeof globalThis & {__env__?: any}).__env__;
+  if (!env?.DB || !env?.ACCOUNT_SECRET || !env?.ACCOUNT_ORIGIN) return undefined;
+  const { getRequest } = await import("@tanstack/react-start/server");
+  const { accountAuth } = await import("../../../cloudflare/accounts.mjs");
+  const session = await accountAuth(env).api.getSession({ headers: getRequest().headers });
+  if (!session) return undefined;
+  const row = await env.DB.prepare("SELECT status,ban_until FROM member_access WHERE user_id=?").bind(session.user.id).first();
+  if (row?.status === "revoked" || (row?.status === "banned" && (!row.ban_until || row.ban_until > Date.now())))
+    throw Error("Account access is restricted.");
+  return session.user.id;
+}

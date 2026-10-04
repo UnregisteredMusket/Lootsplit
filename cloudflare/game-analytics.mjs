@@ -35,7 +35,7 @@ async function collect(db) {
       json_extract(body, '$.table.purses') AS purses,
       json_extract(body, '$.table.holdings') AS holdings,
       json_extract(body, '$.table.journal') AS journal
-      FROM campaign_rooms WHERE code > ? ORDER BY code LIMIT 100`,
+      FROM campaign_rooms WHERE code > ? AND COALESCE(json_extract(body, '$.testMode'), 0) = 0 ORDER BY code LIMIT 100`,
       )
       .bind(after)
       .all();

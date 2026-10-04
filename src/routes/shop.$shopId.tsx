@@ -280,6 +280,13 @@ function ShelfTuning({ shop }: { shop: Shop }) {
           </option>
         ))}
       </Select>
+      <label className="flex min-h-11 items-center gap-2">
+        <input type="checkbox" checked={shop.acceptAnyCategory === true} onChange={e => void updateShop({...shop,acceptAnyCategory:e.target.checked})} />
+        DM exception: buy all item categories
+      </label>
+      <fieldset><legend className="text-sm">Additional categories this merchant buys</legend>
+        {SHOP_KINDS.filter(o => o.value !== "mixed").map(o => <label key={o.value} className="mr-3 inline-flex min-h-11 items-center gap-2"><input type="checkbox" checked={(shop.acceptedCategories || [shop.category]).includes(o.value)} onChange={e => { const categories = new Set(shop.acceptedCategories || [shop.category]); if (e.target.checked) categories.add(o.value); else categories.delete(o.value); void updateShop({...shop,acceptedCategories:[...categories]}); }} />{o.label}</label>)}
+      </fieldset>
       <div className="grid grid-cols-2 gap-2">
         {WEALTHS.map((option) => (
           <Button

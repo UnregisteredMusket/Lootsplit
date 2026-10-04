@@ -1,3 +1,5 @@
+import { ownerTestMode } from "./test-mode.mjs";
+import { campaignRecords } from "./campaign-records.mjs";
 import { publicAnalytics, ownerAnalytics } from "./game-analytics.mjs";
 import { handleEncounters } from "./encounters.mjs";
 import { handleCharacterPlay } from "./character-play.mjs";
@@ -124,7 +126,7 @@ async function roomSeat(db, code, token) {
   const row = await db.prepare("SELECT body FROM campaign_rooms WHERE code = ?").bind(code).first();
   const room = row ? JSON.parse(row.body) : null;
   const seat = room?.seats.find((s) => s.token === token);
-  if (!seat)
+  if (!seat || room.closed)
     fail("This campaign membership is no longer available. Ask the DM for a new invitation.", 403);
   return { room, seat };
 }
@@ -277,6 +279,8 @@ export async function handleAccounts(request, env) {
       return cors(json(await ownerOverview(db, userId)));
     if (path === "/api/account/owner/announcement" && request.method === "POST")
       return cors(json(await saveAnnouncement(db, userId, body)));
+    if (path === "/api/account/owner/test-mode" && request.method === "POST") return cors(json(await ownerTestMode(db,userId,body)));
+    if (path === "/api/account/records" && request.method === "GET") return cors(json(await campaignRecords(db, userId)));
     if (path === "/api/account/library" && request.method === "GET") {
       const [members, backups, characters, recovery] = await Promise.all([
         db
@@ -318,7 +322,7 @@ export async function handleAccounts(request, env) {
           ).results,
           members: members.results.map(({ room_body, token, ...m }) => {
             const seat = room_body
-              ? JSON.parse(room_body).seats.find((s) => s.id === m.seat_id && s.token === token)
+              ? (JSON.parse(room_body).closed ? null : JSON.parse(room_body).seats.find((s) => s.id === m.seat_id && s.token === token))
               : null;
             return { ...m, role: seat?.role || null };
           }),

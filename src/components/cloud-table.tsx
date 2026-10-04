@@ -87,7 +87,7 @@ export function CloudTable() {
       file,
     });
     if (host) await chooseTableMode("local");
-    else leaveTable();
+    else await leaveTable();
     setCode(invitation);
     setJoining(true);
     setCharacters([]);
@@ -178,7 +178,7 @@ export function CloudTable() {
         body={
           host
             ? "A device backup will be saved first. This ends your hosted room for everyone and invalidates its code. Then you can choose a character in the invited room."
-            : "A device backup will be saved first. You will leave this room; its host may need to release your character if you return. Then you can choose a character in the invited room."
+            : "A device backup will be saved first. You will leave this room; your character becomes available for reassignment. Then you can choose a character in the invited room."
         }
         confirmLabel={host ? "Back up, end room and continue" : "Back up and continue"}
         onConfirm={() => {
@@ -335,7 +335,7 @@ export function CloudTable() {
                   onSubmit={(event) => {
                     event.preventDefault();
                     run(async () => {
-                      await joinTable(code, purseId, name);
+                      await joinTable(code, purseId, name, new URLSearchParams(location.search).get("invitation") || undefined);
                       setJoining(false);
                     }, "You joined the room.");
                   }}
@@ -489,6 +489,11 @@ export function CloudTable() {
               <p className="mb-3 text-sm text-muted">
                 Manage who can spend party funds or release a character so someone can join again.
               </p>
+              {cloud.departed.map(item => <div key={item.id} className="border-b py-3">
+                <p>{item.name} · {item.status}</p>
+                {item.status === "kicked" && <Button disabled={unavailable} variant="secondary" onClick={() => run(() => manageParticipant("invite", item.id))}>Create fresh invitation</Button>}
+                {item.invitation && <Button variant="secondary" onClick={() => { const url = new URL("/share", location.origin); url.searchParams.set("join", cloud.code); url.searchParams.set("invitation", item.invitation!); void navigator.clipboard.writeText(url.href).then(() => toast.success("Fresh invitation copied"), () => window.prompt("Copy fresh invitation", url.href)); }}>Copy fresh invitation</Button>}
+              </div>)}
               {cloud.seats.map((item) => (
                 <div key={item.id} className="border-b border-border py-3 last:border-0">
                   <p className="font-medium">{item.name || "Dungeon master"}</p>
@@ -520,8 +525,10 @@ export function CloudTable() {
                           disabled={unavailable}
                           onClick={() => setRelease(item.id)}
                         >
-                          Release character
+                          Dismiss player
                         </Button>
+                        <Button variant="ghost" disabled={unavailable} onClick={() => { if (window.confirm("Kick this player? Rejoining requires a fresh invitation. Pending turns must be resolved first.")) run(() => manageParticipant("kick", item.id)); }}>Kick</Button>
+                        <Button variant="ghost" disabled={unavailable} onClick={() => { if (window.confirm("Ban this player from this campaign? Campaign access and reports will be blocked.")) run(() => manageParticipant("ban", item.id)); }}>Ban</Button>
                       </>
                     ) : null}
                   </div>
@@ -548,7 +555,7 @@ export function CloudTable() {
         title={nextMode === "local" ? "End this session?" : "Change session mode?"}
         body={
           nextMode === "local"
-            ? "This closes the room for everyone and invalidates the code. Each device keeps its last synchronized copy. Pending changes must be resolved first."
+            ? "This archives the session and closes the room for everyone. Player access is cleared; authorized reports remain in My account. Pending changes must be resolved first."
             : "Players must submit or discard pending changes before the mode can change."
         }
         confirmLabel={nextMode === "local" ? "End session" : "Change mode"}
@@ -576,11 +583,11 @@ export function CloudTable() {
         open={leaving}
         onOpenChange={setLeaving}
         title="Leave this room?"
-        body="This device keeps its last synchronized copy. Resolve pending changes first. Ask the host to release your character before you rejoin."
+        body="Resolve pending changes first. Leaving releases your character and clears campaign access from this device. Authorized reports remain in My account."
         confirmLabel="Leave room"
         onConfirm={() => {
           setLeaving(false);
-          run(async () => leaveTable(), "You left the room.");
+          run(async () => { await leaveTable(); }, "You left the room.");
         }}
       />
     </div>

@@ -9,6 +9,8 @@ export type Coins = {
 export type Purse = {
   sheet?: import("../characters/model.mjs").PlaySheet;
   sheetRevision?: number;
+  editingAllowed?: boolean;
+  editBaseline?: import("../characters/model.mjs").PlaySheet;
   profileId?: string;
   sheetReadOnlyForDm?: boolean;
   rolls?: Array<
@@ -32,6 +34,7 @@ export function characterControl(purse: Purse): "player" | "npc" | null {
 }
 
 export type Holding = {
+  service?: boolean;
   weight?: number;
   equipped?: boolean;
   image?: string;
@@ -64,6 +67,8 @@ export type ItemCategory =
 export type ShopCategory = ItemCategory | "mixed";
 
 export type Shop = {
+  acceptedCategories?: string[];
+  acceptAnyCategory?: boolean;
   closed?: boolean;
   image?: string;
   id: string;
@@ -79,6 +84,8 @@ export type Shop = {
 };
 
 export type StockLine = {
+  service?: boolean;
+  category?: string;
   id: string;
   shopId: string;
   name: string;

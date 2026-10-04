@@ -42,7 +42,7 @@ export function CharacterSheetPanel({ purseId, face = true }: { purseId: string;
           equipment: current.equipment.map((i) => `${i.name} × ${i.quantity}`).join("\n"),
         }
       : original;
-  const readOnly = seat.role === "dm" && !!p?.sheetReadOnlyForDm;
+  const readOnly = seat.role === "dm" ? !!p?.sheetReadOnlyForDm : p?.editingAllowed !== true;
   const canImport =
     !readOnly &&
     (seat.role === "dm" || (!getCloudTable().joined && seat.purseIds.includes(purseId)));

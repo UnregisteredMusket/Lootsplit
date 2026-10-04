@@ -452,8 +452,7 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
         }
         if (
           input.kind.startsWith("finance-") ||
-          input.kind.startsWith("downtime-") ||
-          input.kind === "session"
+          input.kind.startsWith("downtime-")
         ) {
           await executeFinanceCommand(input);
           await reload();

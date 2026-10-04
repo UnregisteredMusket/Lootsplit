@@ -22,6 +22,7 @@ import { usePrefs } from "@/lib/quire/prefs";
 import { useSeat, useSeatKnown } from "@/lib/quire/seat";
 import { setSeat } from "@/lib/quire/table";
 import { BillReceipt } from "@/components/bill-receipt";
+import { getCloudTable, getServerCloudTable, subscribeCloudTable } from "@/lib/quire/cloud-client";
 import { SeatSwitch } from "@/components/seat-switch";
 import { Confirm, Modal } from "@/components/ui";
 import { cn } from "@/lib/cn";
@@ -51,6 +52,7 @@ export function Shell({
   children: ReactNode;
   width?: "wide" | "prose";
 }) {
+  const testRoom = useSyncExternalStore(subscribeCloudTable,getCloudTable,getServerCloudTable);
   const { job } = useLibrary();
   const seat = useSeat();
   const { count: unreadCount } = useChatUnread();
@@ -187,7 +189,7 @@ export function Shell({
                 onClick={() => void requestRoleChange()}
                 disabled={!seatKnown}
               >
-                {seatKnown ? (dm ? "DM" : "Player") : "…"}
+                {seatKnown ? (dm ? "DM" : "Player") : "…"}{testRoom.testMode && <span className="ml-2 text-negative">Test mode</span>}
               </button>
               <div className="header-actions">
                 <AppLink

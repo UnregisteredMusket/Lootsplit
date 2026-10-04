@@ -1,3 +1,4 @@
+import { emptyCloudTable } from "./cloud.ts";
 import { reloadCampaignContext } from "./navigation-launch.ts";
 import { rememberSave } from "./saves.ts";
 import { loadSeatLock } from "./lock.ts";
@@ -40,6 +41,8 @@ const initialView = {
   code: "",
   role: "dm" as "dm" | "player",
   seats: [] as RoomView["seats"],
+  departed: [] as NonNullable<RoomView["departed"]>,
+  testMode: false,
   revision: 0,
   seatId: "",
   pending: 0,
@@ -239,6 +242,8 @@ async function accept(remote: RoomView, committed = false) {
       code: remote.code,
       role: s.role,
       seats: remote.seats,
+      departed: remote.departed || [],
+      testMode: remote.testMode === true,
       seatId: remote.seatId,
       revision: remote.revision,
       pending: s.pending.length,
@@ -254,7 +259,18 @@ async function refresh() {
   const s = session();
   if (!s) return;
   const campaignKey = key();
-  const remote = await pullCloudTable({ data: { code: s.code, token: s.token } });
+  let remote: RoomView;
+  try { remote = await pullCloudTable({ data: { code: s.code, token: s.token } }); } catch (error) {
+    if (key() !== campaignKey || session()?.token !== s.token) return;
+    const message = error instanceof Error ? error.message : "";
+    if (/^(This room is closed\.|No table uses that code\.|This browser is not seated at that table\.|This campaign seat belongs to a restricted account\.)$/.test(message)) {
+      if (s.pending.length) localStorage.setItem(`lootsplit.revoked-recovery:${s.code}`, JSON.stringify({code:s.code,commands:s.pending,exportedAt:Date.now()}));
+      await detachTable(s.role === "player");
+      notify("Campaign access ended", "Your seat was released. Authorized session reports remain in My account.", "mode");
+      return;
+    }
+    throw error;
+  }
   if (key() !== campaignKey || session()?.token !== s.token) return;
   await accept(remote);
 }
@@ -283,7 +299,7 @@ export async function openTable(name: string) {
 export async function lookupTable(code: string) {
   return previewCloudTable({ data: { code: code.trim().toUpperCase() } });
 }
-export async function joinTable(code: string, purseId: string, name: string) {
+export async function joinTable(code: string, purseId: string, name: string, invitation?: string) {
   return serial(async () => {
     if (hasPendingChanges())
       throw new Error("Resolve pending changes before joining another campaign.");
@@ -295,7 +311,7 @@ export async function joinTable(code: string, purseId: string, name: string) {
       });
     }
     const joined = await joinCloudTable({
-      data: { code: code.trim().toUpperCase(), purseId, name },
+      data: { code: code.trim().toUpperCase(), purseId, name, invitation },
     });
     remember({
       ...joined,
@@ -438,7 +454,7 @@ export function chooseTableMode(mode: "local" | "turns" | "live") {
       const s = session();
       if (s) {
         await closeCloudTable({ data: { code: s.code, token: s.token } });
-        leaveTable();
+        await detachTable(false);
       }
       return;
     }
@@ -458,7 +474,7 @@ export function skipTableTurn() {
   });
 }
 export function manageParticipant(
-  action: "release" | "permission" | "start" | "discard",
+  action: "release" | "kick" | "ban" | "invite" | "permission" | "start" | "discard",
   seatId: string,
   allowParty?: boolean,
 ) {
@@ -472,23 +488,22 @@ export function manageParticipant(
 export function releasePlayerSeat() {
   if (view.joined) throw new Error("Leave the shared campaign before changing roles.");
 }
-export function leaveTable() {
-  if (hasPendingChanges())
-    throw new Error("Export and resolve your pending actions before disconnecting.");
+async function detachTable(clearPlayerCopy: boolean) {
+  if (clearPlayerCopy) {
+    await applyCloudTable(emptyCloudTable());
+    setSeat({ role: "player", purseIds: [], shopIds: [], openedAt: Date.now() });
+  }
   if (typeof localStorage !== "undefined") localStorage.removeItem(key());
   stopPolling();
-  publish({
-    joined: false,
-    mine: true,
-    live: false,
-    who: "",
-    code: "",
-    seats: [],
-    revision: 0,
-    pending: 0,
-    status: "local",
-    error: "",
-  });
+  publish({ ...initialView });
+}
+export async function leaveTable() {
+  if (hasPendingChanges())
+    throw new Error("Export and resolve your pending actions before disconnecting.");
+  const s = session();
+  if (s?.role === "dm") throw Error("The DM must end the session before leaving.");
+  if (s) await manageCloudRoom({data:{code:s.code,token:s.token,action:"leave",seatId:s.seatId}});
+  await detachTable(true);
 }
 export async function disconnectClosedRoom() {
   const saved = await exportPending();
@@ -499,7 +514,7 @@ export async function disconnectClosedRoom() {
   const s = requireSession();
   s.pending = [];
   remember(s);
-  leaveTable();
+  await detachTable(s.role === "player");
 }
 export function resumeTable() {
   if (typeof localStorage === "undefined") return;
@@ -597,3 +612,5 @@ export async function resumeAccountMembership(
     reloadCampaignContext();
   });
 }
+
+export async function clearAccountRoom() { await detachTable(true); }
