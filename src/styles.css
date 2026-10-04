@@ -2049,3 +2049,7 @@ input,select,textarea { max-width: 100%; }
   color: #382719;
   border-color: var(--fantasy-metal);
 }
+
+/* Only the logo is shown for slow navigation/data-context reloads. */
+.loot-route-loading { position: fixed; inset: 0; z-index: 10000; display: grid; place-items: center; background: var(--color-bg, #10182c); }
+.loot-route-loading img { width: 56px; height: 56px; }

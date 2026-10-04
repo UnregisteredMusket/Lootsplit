@@ -1,3 +1,4 @@
+import { AppLink } from "@/components/app-link";
 import { getServerCloudTable } from "@/lib/quire/cloud-client";
 import { useSyncExternalStore } from "react";
 import { getCloudTable, subscribeCloudTable } from "@/lib/quire/cloud-client";
@@ -77,7 +78,7 @@ function SharePage() {
           ) : (
             <p className="sheet-card">
               Join an online campaign to see shared rolls.{" "}
-              <a href="/characters#dice">Your private dice and roll history →</a>
+              <AppLink href="/characters#dice">Your private dice and roll history →</AppLink>
             </p>
           )}
         </div>

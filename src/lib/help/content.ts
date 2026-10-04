@@ -53,7 +53,7 @@ export const HELP_GROUPS: HelpGroup[] = [
         paragraphs: [
           "Campaign characters use the same character ID, purse and inventory as Party. Changes to permitted coin and equipment fields stay connected to those records. Standalone account characters are separate reusable profiles: their private money and equipment are not silently merged into a campaign.",
           "Play shows vitals, attacks, spells, skills and dice. Edit changes the sheet; save your changes before leaving. Supported JSON and text/form-based PDF imports can be reviewed before saving. Image-only scans are not supported. Species, classes, levels, conditions, spell effects, hit dice and house rules are maintained manually.",
-          "Players control assigned characters and permitted actions. They cannot create money, revalue inventory or change price-affecting Charisma. DM financial adjustments are recorded in the ledger. Buying, selling, transfers and DM awards update the existing inventory.",
+          "Players control assigned characters and permitted actions. They cannot create money, revalue inventory or change price-affecting Charisma. DM financial adjustments are recorded in the ledger. Buying, selling, transfers and DM awards update the existing inventory. In Party → Add loot, choose Custom loot for items or property, or Open5e loot to search SRD equipment and magic items. Review the item value, quantity, recipient and source notes, then confirm Add holding. Open5e search needs a connection unless saved results are available; custom loot works offline.",
         ],
         links: [
           ["Character sheets", "/characters"],

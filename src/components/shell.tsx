@@ -1,3 +1,4 @@
+import { AppLink } from "@/components/app-link";
 import { FantasyIcon } from "@/components/fantasy-icon";
 import { allowContextChange } from "@/lib/quire/use-draft-guard";
 import { useChatUnread } from "@/lib/quire/use-chat-unread";
@@ -161,9 +162,9 @@ export function Shell({
           <div className="rounded-xl border border-lead/20 p-4 text-sm text-muted">
             <p className="text-xs tracking-widest text-lead uppercase">Campaign ledger</p>
             <p className="mt-2">Manage party funds, inventory, and shops.</p>
-            <a href="/welcome" className="mt-3 inline-flex min-h-11 items-center text-lead">
+            <AppLink href="/welcome" className="mt-3 inline-flex min-h-11 items-center text-lead">
               Website & downloads ↗
-            </a>
+            </AppLink>
           </div>
         </aside>
         <div className="min-w-0">
@@ -189,7 +190,7 @@ export function Shell({
                 {seatKnown ? (dm ? "DM" : "Player") : "…"}
               </button>
               <div className="header-actions">
-                <a
+                <AppLink
                   className="header-icon"
                   href="/share?chat=1"
                   aria-label={unreadCount ? `Messages, ${unreadCount} unread` : "Messages"}
@@ -198,7 +199,7 @@ export function Shell({
                   {unreadCount > 0 && (
                     <span className="chat-nav-badge">{unreadCount > 99 ? "99+" : unreadCount}</span>
                   )}
-                </a>
+                </AppLink>
                 <button
                   className="header-icon settings-trigger"
                   aria-label="Settings & Management"

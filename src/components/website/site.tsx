@@ -1,3 +1,4 @@
+import { AppLink } from "@/components/app-link";
 import { HelpContent } from "../help-content";
 import { APP_DESCRIPTION } from "@/lib/help/content";
 import { GoldSpentCounter } from "./gold-counter";
@@ -63,9 +64,9 @@ export function Website({ children }: { children: ReactNode }) {
             Help
           </Link>
         </nav>
-        <a className="ls-button ls-small" href="/">
+        <AppLink className="ls-button ls-small" href="/">
           Open app <ArrowRight size={16} />
-        </a>
+        </AppLink>
       </header>
       <main id="main">{children}</main>
       <footer className="ls-footer ls-wrap">
@@ -112,9 +113,9 @@ export function WelcomePage() {
           </h1>
           <p className="ls-intro">{APP_DESCRIPTION}</p>
           <div className="ls-actions">
-            <a className="ls-button" href="/">
+            <AppLink className="ls-button" href="/">
               Open browser app <ArrowRight size={18} />
-            </a>
+            </AppLink>
             <Link className="ls-button ls-secondary" to="/downloads">
               <ArrowDownToLine size={18} /> Get Lootsplit
             </Link>
@@ -146,9 +147,9 @@ export function WelcomePage() {
             From the first copper piece to a dragon’s hoard, give your campaign’s economy a home.
             Keep money, inventory, merchants, and the story behind every purchase together.
           </p>
-          <a className="ls-text-link" href="/">
+          <AppLink className="ls-text-link" href="/">
             Start your ledger <ArrowRight size={17} />
-          </a>
+          </AppLink>
         </div>
         <div className="ls-feature-list">
           {[
@@ -256,9 +257,9 @@ export function DownloadsPage() {
             <div className="ls-version">
               Always the deployed web version<span>Desktop & mobile browsers</span>
             </div>
-            <a className="ls-button ls-secondary" href="/">
+            <AppLink className="ls-button ls-secondary" href="/">
               Open browser app <ArrowRight size={18} />
-            </a>
+            </AppLink>
             <p className="ls-small-copy">
               A native Windows or macOS installer is not available yet.
             </p>

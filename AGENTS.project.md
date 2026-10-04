@@ -11,3 +11,5 @@ Every Android update must include a versioned website changelog describing added
 Keep local, turn-based, live and manual sharing available. Private PDFs stay device-local. Do not silently truncate history, expire/delete rooms or campaigns, or introduce account registration/Google Drive without a user request.
 
 Credit every newly integrated third-party content, data, art, or reference resource in src/lib/website/resources.ts (the Resources page), including its original source and applicable license. Keep existing per-entry attributions intact. Donation destinations are owner-configured HTTPS links; never invent a payment destination or promise donor benefits.
+
+Internal navigation must use TanStack Link or the shared AppLink, including menu-generated destinations, query strings and hashes. Plain anchors are reserved for external URLs, hash-only scrolling, and download/API endpoints. The title screen is once per running document: internal navigation must never restart it; a fresh app document still shows it. Navigation regression audits must click real links and assert the title stays absent without using helpers that dismiss it automatically.

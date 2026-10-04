@@ -1,3 +1,5 @@
+import { Open5eBrowser } from "@/components/open5e-browser";
+import { AppLink } from "@/components/app-link";
 import { useSheetReadouts, HpBar } from "@/components/control-panel/readouts";
 import { Shield, Backpack } from "lucide-react";
 import { LedgerArt, PortraitPicker, InventoryList } from "@/components/ledger-art";
@@ -90,7 +92,7 @@ function PartyPage() {
               {label}
             </button>
           ))}
-          <a href="/?view=overview#journal">Ledger</a>
+          <AppLink href="/?view=overview#journal">Ledger</AppLink>
         </div>
       )}
       {seat.role === "dm" && section === "characters" && (
@@ -123,12 +125,12 @@ function PartyPage() {
                     {!!live?.body.maxHp && <HpBar hp={live.body.hp} max={live.body.maxHp} />}
                     <div className="party-profile-actions">
                       {live ? (
-                        <a
+                        <AppLink
                           href={`/characters?id=${encodeURIComponent(live.id)}`}
                           className="gold-link"
                         >
                           Open sheet
-                        </a>
+                        </AppLink>
                       ) : (
                         <a
                           href={`#purse-${p.id}`}
@@ -172,12 +174,12 @@ function PartyPage() {
                 </article>
               );
             })}
-          <a href="/share" className="settings-link">
+          <AppLink href="/share" className="settings-link">
             Manage members & permissions →
-          </a>
-          <a href="/characters" className="settings-link">
+          </AppLink>
+          <AppLink href="/characters" className="settings-link">
             Account character sheets & rolls →
-          </a>
+          </AppLink>
           <button className="gold-link" onClick={() => setSection("funds")}>
             Add characters, party funds & loot
           </button>
@@ -213,7 +215,7 @@ function PartyPage() {
             {!visible.length && seat.role === "player" && (
               <p className="inventory-empty">
                 No character assigned on this device.{" "}
-                <a href="/share">Open your campaign to choose a character →</a>
+                <AppLink href="/share">Open your campaign to choose a character →</AppLink>
               </p>
             )}
             <details className="inventory-management" open={seat.role === "dm" || undefined}>
@@ -613,73 +615,145 @@ function AddHolding({ purses }: { purses: Purse[] }) {
   const [kind, setKind] = useState<"item" | "property">("item");
   const [price, setPrice] = useState("");
   const [qty, setQty] = useState("1");
+  const [source, setSource] = useState<"custom" | "open5e">("custom");
+  const [notes, setNotes] = useState("");
+  const [category, setCategory] = useState("");
+  const [saving, setSaving] = useState(false);
+  const [error, setError] = useState("");
 
   useEffect(() => {
     if (!purses.some((purse) => purse.id === purseId)) setPurseId(purses[0]?.id ?? "");
   }, [purses, purseId]);
 
   return (
-    <form
-      className="mt-4 flex flex-col gap-2"
-      onSubmit={(event) => {
-        event.preventDefault();
-        const copper = parsePrice(price);
-        if (!purseId || !name.trim() || copper === null) return;
-        void addHolding(
-          purseId,
-          name.trim(),
-          kind,
-          Math.max(1, Math.floor(Number(qty) || 1)),
-          copper,
-        );
-        setName("");
-        setPrice("");
-      }}
-    >
+    <>
       <Segmented
-        label="Holding kind"
-        value={kind}
-        onChange={setKind}
+        label="Loot source"
+        value={source}
+        onChange={setSource}
         options={[
-          { value: "item", label: "Item" },
-          { value: "property", label: "Property" },
+          { value: "custom", label: "Custom loot" },
+          { value: "open5e", label: "Open5e loot" },
         ]}
       />
-      <TextInput
-        value={name}
-        onChange={(event) => setName(event.target.value)}
-        placeholder="Name"
-        aria-label="Holding name"
-      />
-      <div className="grid grid-cols-2 gap-2">
-        <TextInput
-          value={price}
-          onChange={(event) => setPrice(event.target.value)}
-          placeholder="Value, 80 gp"
-          aria-label="Holding value"
+      {source === "open5e" && (
+        <Open5eBrowser
+          onSelect={(item) => {
+            setName(item.name);
+            setKind("item");
+            setPrice(formatCopper(item.baseCopper));
+            setNotes(item.notes);
+            setCategory(item.category);
+            setSource("custom");
+            setError("");
+          }}
         />
-        <TextInput
-          value={qty}
-          onChange={(event) => setQty(event.target.value)}
-          aria-label="Holding quantity"
-        />
-      </div>
-      <select
-        aria-label="Holding owner"
-        value={purseId}
-        onChange={(event) => setPurseId(event.target.value)}
-        className="min-h-11 rounded-sm border border-border bg-subtle px-3 text-base text-fg"
-      >
-        {purses.map((purse) => (
-          <option key={purse.id} value={purse.id}>
-            {purse.name}
-          </option>
-        ))}
-      </select>
-      <Button type="submit" variant="secondary">
-        Add holding
-      </Button>
-    </form>
+      )}
+      {source === "custom" && (
+        <form
+          className="mt-4 flex flex-col gap-2"
+          onSubmit={async (event) => {
+            event.preventDefault();
+            if (saving) return;
+            const copper = parsePrice(price),
+              quantity = Number(qty);
+            if (
+              !purseId ||
+              !name.trim() ||
+              copper === null ||
+              !Number.isSafeInteger(quantity) ||
+              quantity < 1
+            ) {
+              setError("Enter a name, value, recipient, and a positive whole-number quantity.");
+              return;
+            }
+            setSaving(true);
+            setError("");
+            try {
+              await addHolding(purseId, name.trim(), kind, quantity, copper, { notes, category });
+              setName("");
+              setPrice("");
+              setNotes("");
+              setCategory("");
+              setQty("1");
+            } catch (error) {
+              setError(
+                error instanceof Error
+                  ? error.message
+                  : "Could not add loot. Your draft has been kept.",
+              );
+            } finally {
+              setSaving(false);
+            }
+          }}
+        >
+          <Segmented
+            label="Holding kind"
+            value={kind}
+            onChange={setKind}
+            options={[
+              { value: "item", label: "Item" },
+              { value: "property", label: "Property" },
+            ]}
+          />
+          <TextInput
+            value={name}
+            onChange={(event) => setName(event.target.value)}
+            placeholder="Name"
+            aria-label="Holding name"
+          />
+          <div className="grid grid-cols-2 gap-2">
+            <TextInput
+              value={price}
+              onChange={(event) => setPrice(event.target.value)}
+              placeholder="Value, 80 gp"
+              aria-label="Holding value"
+            />
+            <TextInput
+              value={qty}
+              onChange={(event) => setQty(event.target.value)}
+              aria-label="Holding quantity"
+            />
+          </div>
+          <select
+            aria-label="Holding owner"
+            value={purseId}
+            onChange={(event) => setPurseId(event.target.value)}
+            className="min-h-11 rounded-sm border border-border bg-subtle px-3 text-base text-fg"
+          >
+            {purses.map((purse) => (
+              <option key={purse.id} value={purse.id}>
+                {purse.name}
+              </option>
+            ))}
+          </select>
+          <TextInput
+            aria-label="Holding category"
+            placeholder="Category (optional)"
+            value={category}
+            maxLength={80}
+            onChange={(event) => setCategory(event.target.value)}
+          />
+          <label className="text-sm">
+            Notes & source
+            <textarea
+              aria-label="Holding notes"
+              className="w-full min-h-24 rounded-sm border border-border bg-subtle p-3 text-fg"
+              value={notes}
+              onChange={(event) => setNotes(event.target.value)}
+            />
+          </label>
+          {error && (
+            <p role="alert" className="text-sm">
+              {error}
+            </p>
+          )}
+          <Button type="submit" variant="secondary" disabled={saving || !purses.length}>
+            {saving ? "Adding…" : "Add holding"}
+          </Button>
+        </form>
+      )}
+    </>
   );
 }
 

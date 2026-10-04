@@ -1,3 +1,4 @@
+import { RouteLoading } from "@/components/route-loading";
 import { APP_DESCRIPTION } from "@/lib/help/content";
 import { MemberActivity } from "@/components/account/activity";
 import {
@@ -56,6 +57,7 @@ export const Route = createRootRoute({
         <body>
           <PreviewHostBridge />
           <MemberActivity />
+          <RouteLoading />
           <OpeningGate publicPage={publicPage}>
             <AuthProvider>
               <LibraryProvider>
