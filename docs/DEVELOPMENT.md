@@ -1,5 +1,11 @@
 # Development and verification
 
+Start with [the coding session manual](CODING-MANUAL.md). Run `npm run dev:doctor` to inspect the environment. `npm run verify:focus -- dm-resume` (or `layout`, `library`, `recovery`, `accounts`) runs current source with a disposable server/database without altering an existing development session. Each run writes `test-results/focused/TIMESTAMP-SCENARIO/` with its checkpoint, server log, Playwright JSON report and failure traces/screenshots. The account audit's default command still runs every scenario on development, packaged Worker and standby. Scenario filters are forbidden in CI.
+
+The focused launcher uses a separate Vite cache as well as a separate database, so shared installed packages do not disturb another running development server. Known late-discovered router dependencies are prebundled up front to avoid the first-load reload observed during local verification.
+
+The account browser checks use Playwright Test from the already installed `playwright` package. There is no new service subscription. Reusable fixtures live in `scripts/browser/account-fixtures.mjs`; scenarios in `scripts/browser/account.spec.mjs`; the coverage manifest in `scripts/account-scenarios.mjs`. UI signup/linking/restore remain explicitly covered; only unrelated scenario prerequisites use the real local account API.
+
 Use Node 22 (`nvm use`; version declared in `.nvmrc`). The optional repository dev container uses the same Node major, installs the locked npm dependencies and Chromium, and checks that the browser launches. Its setup command is also available as `npm run dev:setup` on a disposable Linux development checkout. Setup has bounded install timeouts and never adds production credentials.
 
 `npm run verify:quick` runs unit tests, type checking and lint before submitting a change. It does not replace the full release gate. Start the shared client with `npm run dev`, as required by the environment wrapper. Browser scripts create disposable accounts and campaigns: run them only against a separate development checkout/database, never a personal development database or production. CI supplies a fresh checkout and database per job.
@@ -15,13 +21,16 @@ Pull requests run the complete `Verify preserved functionality` workflow. Featur
 | Development / accounts | Accounts, roles, moderation, monitoring, bug reports and character/party sheets |
 | Development / gameplay | Data integrity, transfers, encounters, finance, controls, navigation and loot |
 | Development / desktop | Desktop/mobile layout, public analytics and website |
-| Packaged Worker and title screen | Existing Worker account, monitoring, finance, theme, help, analytics, website, navigation, loot and title checks |
+| Packaged Worker / accounts | Existing Worker account, monitoring and finance checks |
+| Packaged Worker / interface | Existing Worker theme, help, analytics, website, navigation, loot and title checks |
 | Packaged standby | Locked transport and disposable account/library browser verification |
 | verify | Fails unless every required job succeeded; skipped/missing/cancelled is a failure |
 
 The four development groups start alongside the build. Each has its own runner, local SQLite data, browser profiles and server. Packaged checks download the build job's exact artifact IDs and verify every file hash before and after their audits. They never rebuild application code. Website/standby publishers still require the entire main-push workflow to succeed; candidate artifact existence alone never authorizes publication. Main-only publishing, stale-commit rejection, serialized deployment, migration checks, signing and production read-only audits are retained.
 
 Every original bounded check is listed in `scripts/verification-baseline.json`; the regression test rejects omissions and duplicate commands. Extend coverage when adding a feature. Do not remove entries to accommodate a failed audit.
+
+Both packaged Worker groups use separate runners/databases and the same verified artifact ID. Matrix failure aggregation remains required by `verify`. `npm run verify:timings` reads existing step checkpoints and writes sorted JSON/Markdown stage timings. CI includes this report in every job's summary and diagnostic artifact, including failed jobs. Compare elapsed pipeline time separately from summed runner time.
 
 ## Failed groups and recovery
 

@@ -147,6 +147,8 @@ function authPopupPlugin(): Plugin {
 // The dev server starts once `src/router.tsx` and `src/routes/` exist — see
 // AGENTS.md § "First scaffold".
 export default defineConfig(({ command, isPreview }) => ({
+  // Focused snapshots share locked packages, never a running server's dependency cache.
+  cacheDir: process.env.LOOTSPLIT_VITE_CACHE_DIR,
   server: {
     host: "0.0.0.0",
     allowedHosts: ["terminal.local"],
@@ -159,6 +161,16 @@ export default defineConfig(({ command, isPreview }) => ({
     strictPort: true,
   },
   resolve: { tsconfigPaths: true },
+  // Start's generated client imports these after the initial static scan. Prebundle
+  // them up front so first-load development checks do not race an optimizer reload.
+  optimizeDeps: {
+    include: [
+      "@tanstack/router-core",
+      "@tanstack/router-core/isServer",
+      "@tanstack/router-core/ssr/client",
+      "seroval",
+    ],
+  },
   plugins: [
     accountDevPlugin(),
     pgliteBootstrapPlugin(),

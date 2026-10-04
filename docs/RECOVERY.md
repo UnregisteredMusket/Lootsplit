@@ -1,5 +1,7 @@
 # Resume Lootsplit after an interruption
 
+Future coding sessions: also read `docs/CODING-MANUAL.md` for focused verification, first-failure diagnostics, and release procedures.
+
 Chat disconnects do not stop GitHub Actions. Do not restart a release just because a chat timed out. These safeguards cannot prevent ChatGPT or the user's network from disconnecting.
 
 ## Recovery prompt
@@ -55,3 +57,11 @@ References: [GitHub workflow-run behavior](https://docs.github.com/en/actions/re
 - Next authorized fix: DMs saving campaigns on separate devices cannot resume ended shared sessions. The existing library discarded the DM role for closed rooms, and resume returned the player-only invitation error. A failing regression reproduced this using two signed-in sessions and two saved campaigns.
 - Work branch: `fix/dm-account-resume`. Add an explicit, revision-checked Reopen as DM action using the account's existing seat/token on the server. Preserve all campaign content, pending actions and player restrictions. Existing ended player sessions must not regain access automatically.
 - Cross-device browser coverage is added to the existing account audit, so development, packaged Worker and standby paths all exercise the fix. Check the branch PR and full main/deployment results before claiming completion; do not rerun active jobs.
+
+## Development feedback checkpoint — 2026-10-04
+
+- Starting main: `9819c1662e3bdf8d864ce4c2360b53e6c57a1ba6`; DM-resume PR #32 is complete. Main verification 37228977373 and production deployment/read-only audits 37229289860 passed.
+- Authorized scope: improve focused verification, reliable browser readiness, automatic traces, reusable fixtures, ready development tooling, timing visibility and durable instructions for future sessions.
+- Branch: `improvement/development-feedback`. Inspect its PR/latest run before continuing. Focused local checks precede full CI; all preservation gates and production data protections remain required. No gameplay feature or application permission changes are intended.
+
+- Local validation: isolated DM-resume scenario passed (22.5s); complete four-scenario account suite passed (42.7s). Failure screenshots/traces were generated and inspected during local diagnosis. Unit tests (460 passed across the updated suite, 4 existing skips), type checking, lint (existing warnings only), and web build passed. Node 22 and a compatible local Chromium were used; a local injected proxy warning required suppressing Node warnings for the legacy stderr-JSON unit test only. CI uses its standard environment. Check the PR for subsequent packaged and release results.

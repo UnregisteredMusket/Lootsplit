@@ -61,6 +61,9 @@ jobs:
           retention-days: 30
           # A deliberate build-job rerun replaces the candidate and reruns its dependants.
           overwrite: true
+      - name: Summarize measured verification stages
+        if: always()
+        run: node scripts/verification-timing.mjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -173,6 +176,9 @@ jobs:
       - name: dev-website
         if: matrix.group == 'desktop'
         run: node scripts/recovery-step.mjs dev-website 240 node scripts/website-browser-audit.mjs
+      - name: Summarize measured verification stages
+        if: always()
+        run: node scripts/verification-timing.mjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:
@@ -181,8 +187,13 @@ jobs:
           retention-days: 30
 
   worker:
-    name: Packaged Worker and title screen
+    name: Packaged Worker / ${{ matrix.group }}
     needs: build
+    strategy:
+      fail-fast: false
+      max-parallel: 2
+      matrix:
+        group: [accounts, interface]
     runs-on: ubuntu-latest
     timeout-minutes: 15
     steps:
@@ -212,50 +223,63 @@ jobs:
           echo "Built Worker did not become ready" >&2
           exit 1
       - name: worker-account
+        if: matrix.group == 'accounts'
         env:
           ACCOUNT_AUDIT_ORIGIN: http://127.0.0.1:8082
         run: node scripts/recovery-step.mjs worker-account 180 node scripts/account-browser-audit.mjs
       - name: worker-monitor
+        if: matrix.group == 'accounts'
         run: node scripts/recovery-step.mjs worker-monitor 180 node scripts/monitor-worker-audit.mjs
       - name: worker-finance
+        if: matrix.group == 'accounts'
         env:
           AUDIT_ORIGIN: http://127.0.0.1:8082
         run: node scripts/recovery-step.mjs worker-finance 180 node scripts/finance-browser-audit.mjs
       - name: worker-theme
+        if: matrix.group == 'interface'
         env:
           AUDIT_ORIGIN: http://127.0.0.1:8082
         run: node scripts/recovery-step.mjs worker-theme 180 node scripts/theme-browser-audit.mjs
       - name: worker-help
+        if: matrix.group == 'interface'
         env:
           AUDIT_ORIGIN: http://127.0.0.1:8082
         run: node scripts/recovery-step.mjs worker-help 180 node scripts/help-browser-audit.mjs
       - name: worker-game-analytics
+        if: matrix.group == 'interface'
         env:
           AUDIT_ORIGIN: http://127.0.0.1:8082
         run: node scripts/recovery-step.mjs worker-game-analytics 180 node scripts/game-analytics-browser-audit.mjs
       - name: worker-website
+        if: matrix.group == 'interface'
         env:
           AUDIT_ORIGIN: http://127.0.0.1:8082
         run: node scripts/recovery-step.mjs worker-website 180 node scripts/website-browser-audit.mjs
       - name: worker-library-navigation
+        if: matrix.group == 'interface'
         env:
           AUDIT_ORIGIN: http://127.0.0.1:8082
         run: node scripts/recovery-step.mjs worker-library-navigation 180 node scripts/library-navigation-browser-audit.mjs
       - name: worker-loot
+        if: matrix.group == 'interface'
         env:
           AUDIT_ORIGIN: http://127.0.0.1:8082
         run: node scripts/recovery-step.mjs worker-loot 180 node scripts/loot-browser-audit.mjs
       - name: Verify title screen on the built artifact
+        if: matrix.group == 'interface'
         env:
           AUDIT_ORIGIN: http://127.0.0.1:8082
           EXPECTED_RELEASE_SHA: ${{ github.sha }}
         run: node scripts/recovery-step.mjs built-live-check 240 node scripts/live-release-audit.mjs
       - name: Confirm audited bytes are unchanged
         run: node scripts/release-artifact.mjs verify
+      - name: Summarize measured verification stages
+        if: always()
+        run: node scripts/verification-timing.mjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:
-          name: browser-audit-worker-${{ github.run_attempt }}
+          name: browser-audit-worker-${{ matrix.group }}-${{ github.run_attempt }}
           path: test-results/
           retention-days: 30
 
@@ -281,6 +305,9 @@ jobs:
       - name: standby-audit
         run: node scripts/recovery-step.mjs standby-audit 300 node scripts/standby-artifact-audit.mjs
       - run: node scripts/standby-artifact.mjs verify
+      - name: Summarize measured verification stages
+        if: always()
+        run: node scripts/verification-timing.mjs
       - uses: actions/upload-artifact@v4
         if: always()
         with:
