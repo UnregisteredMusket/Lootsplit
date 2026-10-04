@@ -5,6 +5,7 @@ import { applyTheme, DEFAULT_ACCENT, DEFAULT_GROUND, type Appearance } from "./t
 import type { Wealth } from "./types.ts";
 
 export type AppPrefs = {
+  rollMode: "manual" | "virtual";
   showDollars: boolean;
   confirmRemoves: boolean;
   repriceOnRealm: boolean;
@@ -27,6 +28,7 @@ export type AppPrefs = {
 };
 
 export const DEFAULT_PREFS: AppPrefs = {
+  rollMode: "virtual",
   showDollars: true,
   confirmRemoves: false,
   repriceOnRealm: false,
@@ -68,6 +70,7 @@ function hexColor(value: unknown, fallback: string): string {
 export function normalizePrefs(input: Partial<AppPrefs> | null | undefined): AppPrefs {
   const wealth = WEALTHS.includes(input?.defaultWealth as Wealth) ? (input?.defaultWealth as Wealth) : DEFAULT_PREFS.defaultWealth;
   return {
+    rollMode: input?.rollMode === "manual" ? "manual" : "virtual",
     showDollars: flag(input?.showDollars, DEFAULT_PREFS.showDollars),
     confirmRemoves: flag(input?.confirmRemoves, DEFAULT_PREFS.confirmRemoves),
     repriceOnRealm: flag(input?.repriceOnRealm, DEFAULT_PREFS.repriceOnRealm),

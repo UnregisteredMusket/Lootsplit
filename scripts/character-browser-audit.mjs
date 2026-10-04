@@ -172,8 +172,14 @@ try {
   await page.getByLabel("Manual roll total", { exact: true }).fill("18");
   await page.getByRole("button", { name: "Record manual roll", exact: true }).click();
   await page.getByText(/Custom roll: 18 · Manual result/).waitFor();
+  assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem("quire.prefs.v1")).rollMode), "manual");
+  await page.getByRole("button", { name: "Abilities & skills", exact: true }).click();
+  const physical = page.getByLabel("Roll DEX +3 manual total", { exact: true });
+  await physical.fill("19");
+  await page.locator(".quick-roll").filter({ has: physical }).getByRole("button", { name: "Record DEX +3", exact: true }).click();
+  await page.locator(".quick-roll output").filter({ hasText: "19 · Manual result" }).waitFor();
   await dm.page.getByRole("button", { name: "Refresh roll log", exact: true }).last().click();
-  await dm.page.getByText(/MANUAL RESULT/).waitFor();
+  await dm.page.getByText(/MANUAL RESULT · 1d20\+3/).waitFor();
   await dm.page.getByRole("button", { name: "Mira Ashfall · View sheet", exact: true }).click();
   await dm.page.getByText("DM read-only view", { exact: true }).waitFor();
   await dm.page.getByRole("button", { name: "Edit sheet", exact: true }).last().click();

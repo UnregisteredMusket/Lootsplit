@@ -1,3 +1,4 @@
+import { RollModeSetting } from "@/components/roll-mode-setting";
 import { Link, createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
 import { toast } from "sonner";
@@ -76,6 +77,7 @@ function SettingsPage() {
     <Shell width="prose">
       <h1 className="font-display text-4xl tracking-tight">Device backups</h1>
       <p className="mt-2 text-sm text-muted">Keep a copy of the campaign data available on this device. Full campaign restoration is a DM action in Local Mode.</p>
+      <Fold anchorId="gameplay" title="Roll mode" defaultOpen><RollModeSetting /></Fold>
       {ready ? <div id="backups"><SaveFolder /></div> : <p>Loading…</p>}
       <Fold title="Diagnostic reports" hint="Download an error report to share manually."><Diagnostics /></Fold>
     </Shell>
@@ -89,11 +91,12 @@ function SettingsPage() {
         <h1 className="font-display text-4xl tracking-tight">Settings</h1>
         <p className="text-sm text-faint">Version {APP_VERSION}</p>
       </div>
-      <p className="mt-2 text-sm text-muted">Manage backups, economy settings, and appearance.</p>
+      <p className="mt-2 text-sm text-muted">Manage roll mode, backups, economy settings, and appearance.</p>
       {!ready ? <p className="mt-6 text-muted">Loading…</p> : null}
       {ready ? (
         <>
           <Link to="/share" className="quick-action mt-5">Multiplayer — rooms, players & notifications →</Link>
+          <Fold anchorId="gameplay" title="Roll mode" hint="Physical dice or in-app dice."><RollModeSetting /></Fold>
           <PasswordSettings />
           <div id="backups"><SaveFolder /></div>
           <Fold title="Diagnostic reports" hint="Download an error report to share manually.">

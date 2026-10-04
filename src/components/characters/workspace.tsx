@@ -1,3 +1,4 @@
+import { usePrefs } from "@/lib/quire/prefs";
 import { FantasyIcon } from "@/components/fantasy-icon";
 import { useDraftGuard } from "@/lib/quire/use-draft-guard";
 import { Heart, Shield, Footprints } from "lucide-react";
@@ -2041,14 +2042,20 @@ function QuickRoll({
   disabled: boolean;
   onRoll: () => void;
 }) {
+  const { prefs } = usePrefs();
+  const manual = prefs.rollMode === "manual";
+  const allowed = !detail.campaign_code || !!detail.campaign?.manualAllowed;
+  const [manualTotal, setManualTotal] = useState("");
+  const validTotal = manualTotal.trim() !== "" && Number.isSafeInteger(Number(manualTotal)) && Math.abs(Number(manualTotal)) <= 100000;
   const [mode, setMode] = useState("normal"),
     [busy, setBusy] = useState(false),
     [result, setResult] = useState("");
   const retry = useRef({ signature: "", key: "" });
   async function roll() {
+    if (manual && (!allowed || !validTotal)) return;
     setBusy(true);
     try {
-      const signature = JSON.stringify([detail.id, detail.revision, kind, rollKey, mode]);
+      const signature = JSON.stringify([detail.id, detail.revision, kind, rollKey, mode, manual, manualTotal]);
       if (retry.current.signature !== signature)
         retry.current = { signature, key: crypto.randomUUID() };
       const r = await accountRequest<Roll>("sheets/roll", {
@@ -2057,9 +2064,11 @@ function QuickRoll({
         kind,
         key: rollKey,
         mode,
+        manual,
+        ...(manual ? { total: Number(manualTotal) } : {}),
         requestKey: retry.current.key,
       });
-      setResult(`${r.total} · ${r.dice.join(", ")} ${signed(r.modifier)} · ${r.mode}`);
+      setResult(r.source === "manual" ? `${r.total} · Manual result` : `${r.total} · ${r.dice.join(", ")} ${signed(r.modifier)} · ${r.mode}`);
       retry.current = { signature: "", key: "" };
       onRoll();
     } catch (e) {
@@ -2076,10 +2085,17 @@ function QuickRoll({
   }
   return (
     <div className="quick-roll">
-      <button disabled={disabled || busy} onClick={() => void roll()}>
-        {label}
+      {manual && <label>
+        {label} · final total
+        <input aria-label={`${label} manual total`} type="number" step="1" min="-100000" max="100000"
+          value={manualTotal} disabled={disabled || busy || !allowed}
+          onChange={(e) => setManualTotal(e.target.value)} />
+      </label>}
+      {manual && !allowed && <p>The DM has disabled manual rolls in this campaign.</p>}
+      <button disabled={disabled || busy || (manual && (!allowed || !validTotal))} onClick={() => void roll()}>
+        {manual ? `Record ${label.replace(/^Roll /, "")}` : label}
       </button>
-      {d20 && (
+      {d20 && !manual && (
         <select
           aria-label={`${label} mode`}
           value={mode}
@@ -2107,10 +2123,12 @@ function DiceTray({
   disabled: boolean;
   onRoll: () => void;
 }) {
+  const { prefs, setPrefs } = usePrefs();
+  const manual = prefs.rollMode === "manual";
+  const setManual = (value: boolean) => setPrefs({ rollMode: value ? "manual" : "virtual" });
   const [formula, setFormula] = useState("1d20"),
     [label, setLabel] = useState("Custom roll"),
-    [manual, setManual] = useState(false),
-    [total, setTotal] = useState(0),
+    [total, setTotal] = useState(""),
     [busy, setBusy] = useState(false),
     [result, setResult] = useState("");
   const retry = useRef({ signature: "", key: "" });
@@ -2124,7 +2142,7 @@ function DiceTray({
       formula,
       label,
       manual,
-      total,
+      ...(manual ? { total: total.trim() === "" ? undefined : Number(total) } : {}),
     };
     const signature = JSON.stringify(payload);
     if (retry.current.signature !== signature)
@@ -2152,17 +2170,15 @@ function DiceTray({
         <Text label="Roll label" value={label} onChange={setLabel} />
         <Text label="Dice formula" value={formula} onChange={setFormula} />
       </div>
-      <p>Examples: 1d20+5, 2d6+3. Online dice are generated and recorded by the server.</p>
+      <p>Examples: 1d20+5, 2d6+3. Changing the roll source also changes your device’s Roll mode setting.</p>
       <Check label="Enter a manual total" value={manual} disabled={!allowed} onChange={setManual} />
       {!allowed && <p>The DM has disabled manual rolls. Reload the sheet after a policy change.</p>}
       {manual && (
-        <Num
-          label="Manual roll total"
-          value={total}
-          min={-100000}
-          max={100000}
-          onChange={setTotal}
-        />
+        <label>Manual roll total
+          <input aria-label="Manual roll total" type="number" step="1" min="-100000" max="100000" required
+            value={total} onChange={(e) => setTotal(e.target.value)} />
+          <span>Final total, including modifiers.</span>
+        </label>
       )}
       <button disabled={disabled || busy || (manual && !allowed)}>
         {busy ? "Recording…" : manual ? "Record manual roll" : "Roll dice"}

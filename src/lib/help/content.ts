@@ -64,6 +64,7 @@ export const HELP_GROUPS: HelpGroup[] = [
         id: "rolls",
         title: "Dice rolls and game rules",
         paragraphs: [
+          "Choose Pen & Paper mode or Virtual Mode in the gear menu (Gameplay for DMs, Rolls for players), or Settings → Roll mode. Your choice is saved on this device and applies to character quick actions, custom dice, encounter rolls and weighted loot-table draws. Pen & Paper mode records physical totals including modifiers; Virtual Mode generates dice. Campaign manual-roll permissions still apply. Switching a roll form’s source also changes this device setting.",
           "Use the sheet’s dice controls for ability checks, saves, skills, attacks, damage and spells. Single d20 rolls support advantage and disadvantage; custom rolls support dice and modifiers. Shared rolls use server-generated dice; local rolls are labeled as device rolls. Each result is recorded in its available history.",
           "The campaign DM controls whether physical/manual results are allowed. Those results are labeled separately. Rolling does not automatically apply damage, conditions, death-save outcomes, spell effects or your table’s combat rules. Encounter XP is an estimate, not an automatic character reward.",
         ],
@@ -71,6 +72,7 @@ export const HELP_GROUPS: HelpGroup[] = [
           ["Sheet dice", "/characters#dice"],
           ["Shared roll history", "/share?tab=rolls"],
           ["DM roll controls", "/characters#dm-roll-controls"],
+          ["Roll mode settings", "/settings#gameplay"],
         ],
       },
       {
