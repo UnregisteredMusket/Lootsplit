@@ -148,6 +148,7 @@ try {
   await p.getByText("Encounter saved.", { exact: true }).waitFor();
   await p.screenshot({ path: output + "/desktop-battle.png", fullPage: true });
   await p.getByRole("button", { name: "Roll history", exact: true }).click();
+  await p.getByLabel("Roll source", { exact: true }).selectOption("manual");
   await p.getByLabel("Manual total", { exact: true }).fill("18");
   await p.getByRole("button", { name: "Record manual roll", exact: true }).click();
   await p.getByText(/Encounter roll: 18/).waitFor();
