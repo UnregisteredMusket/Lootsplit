@@ -189,6 +189,13 @@ test("loot tables resolve once, review precedes atomic award, and retries cannot
       requestKey: crypto.randomUUID(),
     });
     assert.equal(draw.selected, 0);
+    const physical = { id, revision: 1, tableId: "table", manual: true, total: 1, requestKey: crypto.randomUUID() };
+    const manualDraw = await call("dm", "/roll", physical);
+    assert.equal(manualDraw.source, "manual");
+    assert.deepEqual(manualDraw.dice, []);
+    assert.equal(manualDraw.selected, 0);
+    assert.deepEqual(await call("dm", "/roll", physical), manualDraw);
+    await assert.rejects(call("dm", "/roll", { ...physical, total: 2, requestKey: crypto.randomUUID() }), /physical table total/);
     e.tables[0].selected = draw.selected;
     await call("dm", "/save", { id, revision: 1, encounter: e });
     await call("dm", "/conclude", { id, revision: 2 });
