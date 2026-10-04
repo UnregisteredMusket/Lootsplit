@@ -179,7 +179,7 @@ try {
   await page.locator(".quick-roll").filter({ has: physical }).getByRole("button", { name: "Record DEX +3", exact: true }).click();
   await page.locator(".quick-roll output").filter({ hasText: "19 · Manual result" }).waitFor();
   await dm.page.getByRole("button", { name: "Refresh roll log", exact: true }).last().click();
-  await dm.page.getByText(/MANUAL RESULT/).waitFor();
+  await dm.page.getByText(/MANUAL RESULT · 1d20\+3/).waitFor();
   await dm.page.getByRole("button", { name: "Mira Ashfall · View sheet", exact: true }).click();
   await dm.page.getByText("DM read-only view", { exact: true }).waitFor();
   await dm.page.getByRole("button", { name: "Edit sheet", exact: true }).last().click();
