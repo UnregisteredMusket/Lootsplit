@@ -137,12 +137,20 @@ try {
       .getByRole("button", { name: "End session", exact: true })
       .click();
     await p.getByRole("button", { name: "Start a room", exact: true }).waitFor();
+    await p.locator('.multiplayer-hub[aria-busy="false"]').waitFor();
   }
   await endSession(page);
   // The other device created the first room; this device now creates and saves the second.
   await page.getByRole("button", { name: "Start a room", exact: true }).click();
+  const roomError = page.locator('[data-sonner-toast][data-type="error"]').first();
+  const creationFailure = roomError.waitFor().then(async () => {
+    throw new Error(`Second room creation: ${await roomError.innerText()}`);
+  });
   await page.getByRole("button", { name: "Create room", exact: true }).click();
-  await page.getByRole("button", { name: "Share join link", exact: true }).waitFor();
+  await Promise.race([
+    page.getByRole("button", { name: "Share join link", exact: true }).waitFor(),
+    creationFailure,
+  ]);
   await visit(page, "/account");
   await page.getByRole("button", { name: "Save current membership", exact: true }).click();
   await page.getByRole("status").filter({ hasText: "This membership is saved" }).waitFor();
