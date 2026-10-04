@@ -75,6 +75,8 @@ try {
   assert.equal(await dialog.locator(".management-category").count(), 8);
   await dialog.getByRole("button", { name: "Economy", exact: true }).click();
   await dialog.getByRole("link", { name: /Currency, price modifiers/ }).waitFor();
+  await dialog.getByRole("button", { name: "Gameplay", exact: true }).click();
+  await dialog.getByLabel("Roll mode", { exact: true }).selectOption("manual");
   await capture("dm-settings");
   await page.keyboard.press("Escape");
   await dialog.waitFor({ state: "hidden" });
@@ -134,6 +136,9 @@ try {
   );
   await capture("player-settings-light");
   await dialog.getByLabel("Theme", { exact: true }).selectOption("dark");
+  await dialog.getByRole("button", { name: "Rolls", exact: true }).click();
+  assert.equal(await dialog.getByLabel("Roll mode", { exact: true }).inputValue(), "manual");
+  await dialog.getByLabel("Roll mode", { exact: true }).selectOption("virtual");
   await capture("player-settings");
   await page.keyboard.press("Escape");
   for (const [name, path] of [
