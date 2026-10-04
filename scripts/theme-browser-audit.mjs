@@ -66,6 +66,15 @@ try {
     await reloadApplication(page);
     await page.waitForFunction(() => document.documentElement.style.getPropertyValue("--color-bg") === "#10241c");
     assert.equal(await page.getByRole("button", { name: "Grove", exact: true }).getAttribute("aria-pressed"), "true");
+    await openApplication(page, origin + "/settings#gameplay");
+    const rolls = page.getByLabel("Roll mode", { exact: true });
+    assert.equal(await rolls.inputValue(), "virtual");
+    await rolls.selectOption("manual");
+    await reloadApplication(page);
+    assert.equal(await rolls.inputValue(), "manual");
+    await rolls.selectOption("virtual");
+    await reloadApplication(page);
+    assert.equal(await rolls.inputValue(), "virtual");
     assert.deepEqual(errors, []);
     await context.close();
   }
