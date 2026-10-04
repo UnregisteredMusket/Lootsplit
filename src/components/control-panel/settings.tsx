@@ -1,3 +1,4 @@
+import { RollModeSetting } from "@/components/roll-mode-setting";
 import { FantasyIcon } from "@/components/fantasy-icon";
 import { useState } from "react";
 import { ChevronDown, LogIn } from "lucide-react";
@@ -90,6 +91,7 @@ export function ManagementPanel({
         {
           name: "Gameplay",
           icon: "Dice",
+          content: <RollModeSetting />,
           links: [
             ["Encounter desk & generator", "/encounters"],
             ["Character rolls & manual-roll policy", "/characters#dm-roll-controls"],
@@ -166,12 +168,7 @@ export function ManagementPanel({
         {
           name: "Rolls",
           icon: "Dice",
-          content: (
-            <p>
-              Manual results are controlled by the campaign DM. Each roll form shows whether they
-              are available.
-            </p>
-          ),
+          content: <RollModeSetting />,
           links: [["Dice rolls & history", "/characters#dice"]],
         },
         { name: "Appearance", icon: "Appearance", content: appearance },
