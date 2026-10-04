@@ -14,7 +14,7 @@ import { usePrefs, type AppPrefs } from "@/lib/quire/prefs";
 import { useSeat } from "@/lib/quire/seat";
 import { APP_VERSION } from "@/lib/quire/version";
 import { basketNote, DEFAULT_REALM, realmNote, scalePrice, SEASON_NAMES } from "@/lib/quire/scale";
-import { DEFAULT_ACCENT, DEFAULT_GROUND, LOOKS, luminance } from "@/lib/quire/theme";
+import { DEFAULT_ACCENT, DEFAULT_GROUND, FANTASY_LOOKS, LOOKS, luminance } from "@/lib/quire/theme";
 import type { ItemCategory, ItemRarity, RealmSettings, Wealth } from "@/lib/quire/types";
 
 export const Route = createFileRoute("/settings")({
@@ -311,21 +311,19 @@ function SettingsPage() {
             </div>
           </Fold>
 
-          <Fold anchorId="appearance" title="Colors" hint="Light or dark, a ready-made look, or your own colors.">
-            <p className="mt-2 text-sm text-muted">Light or dark, a ready-made look, or your own accent and page color.</p>
+          <Fold anchorId="appearance" title="Colors" hint="Fantasy light and dark themes, or your own colors.">
+            <p className="mt-2 text-sm text-muted">Adventurer’s Ledger brings parchment and dark ink to light mode. Ironbound Dragon uses dark iron and antique brass. Your choice is saved on this device; custom colors are still available.</p>
             <div className="mt-4">
               <ChoiceGrid
                 label="Mode"
                 value={prefs.appearance}
                 options={[
-                  { value: "dark", label: "Dark" },
-                  { value: "light", label: "Light" },
+                  { value: "dark", label: "Dark · Ironbound Dragon" },
+                  { value: "light", label: "Light · Adventurer’s Ledger" },
                 ]}
                 onChange={(appearance) => {
-                  const pale = luminance(prefs.ground) >= 0.55;
-                  if (appearance === "light" && !pale) setPrefs({ appearance, ground: "#f6f1e6" });
-                  else if (appearance === "dark" && pale) setPrefs({ appearance, ground: DEFAULT_GROUND });
-                  else setPrefs({ appearance });
+                  const look = FANTASY_LOOKS[appearance];
+                  setPrefs({ appearance, accent: look.accent, ground: look.ground });
                 }}
               />
             </div>

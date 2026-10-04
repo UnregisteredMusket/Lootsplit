@@ -162,3 +162,8 @@ Validation for this change: 427 automated tests passed (four existing skips), Ty
 - Website Help and the in-app Help dialog share a searchable, grouped field guide covering role-specific menus, rules, finance/downtime, encounters, accounts, privacy, recovery and installation.
 - Topic links retain query/hash destinations, open addressed settings/session/recovery disclosures and native finance/review panels, and preserve role checks. Existing Android, desktop and backup help anchors remain available.
 - Updated app metadata and descriptions reflect the current web feature set; website and APK release schedules remain distinct. Theme exploration is separate and does not alter the live layout, icons or theme.
+
+## Fantasy appearance modes
+
+- Gear menu (both roles) and Settings → Colors switch between Light · Adventurer’s Ledger and Dark · Ironbound Dragon. Selection persists in the existing device preferences. New installations default to Ironbound Dragon; existing saved/custom palettes remain readable and unchanged until selected.
+- Parchment grain, metal/leather finishes, engraved borders and brass framing change appearance only; all layouts, routes, icons, permissions and saved campaigns remain intact. Light surfaces use dark ink and readable secondary/action colors. Legacy looks, custom colors, reading size and reduced motion remain available.

@@ -1964,3 +1964,87 @@ input,select,textarea { max-width: 100%; }
 }
 /* Match the original compact readout footprint so long labels retain their space. */
 .readout > .fantasy-icon { --icon-size: 22px !important; }
+
+/* Fantasy finishes use the existing geometry and icons. Legacy/custom palettes remain available. */
+:root[data-fantasy-theme="adventurers-ledger"] {
+  --fantasy-metal: #a57b3f;
+  --fantasy-title: #642d23;
+  --fantasy-wear: #85551b24;
+  --fantasy-chrome: #d3b789;
+  --fantasy-chrome-ink: #382719;
+  --fantasy-inner: #b79a6a;
+}
+:root[data-fantasy-theme="ironbound-dragon"] {
+  --fantasy-metal: #9d8050;
+  --fantasy-title: #e6c38a;
+  --fantasy-wear: #0b080644;
+  --fantasy-chrome: #252527;
+  --fantasy-chrome-ink: #eee0c4;
+  --fantasy-inner: #4a3e2d;
+}
+:root[data-fantasy-theme]:not([data-fantasy-theme=""]) .concept-shell {
+  background:
+    radial-gradient(ellipse at 5% 35%, var(--fantasy-wear), transparent 55%),
+    radial-gradient(ellipse at 100% 80%, var(--fantasy-wear), transparent 50%),
+    repeating-linear-gradient(4deg, transparent 0 3px, #74532b08 4px, transparent 5px),
+    var(--color-bg);
+}
+:root[data-fantasy-theme]:not([data-fantasy-theme=""]) .concept-shell :is(h1,h2,h3) {
+  color: var(--fantasy-title);
+  font-variant: small-caps;
+}
+:root[data-fantasy-theme]:not([data-fantasy-theme=""]) .concept-shell > div > div > header,
+:root[data-fantasy-theme]:not([data-fantasy-theme=""]) .concept-shell > nav,
+:root[data-fantasy-theme]:not([data-fantasy-theme=""]) .concept-shell > div > aside {
+  background: repeating-linear-gradient(83deg, transparent 0 3px, #0000000a 4px, #ffffff05 5px), var(--fantasy-chrome);
+  color: var(--fantasy-chrome-ink);
+  border-color: var(--fantasy-metal);
+  box-shadow: inset 0 2px 0 #e1bd7833, inset 0 -2px 0 #00000020;
+}
+:root[data-fantasy-theme]:not([data-fantasy-theme=""]) :is(.readout,.shortcut-button,.loot-fold,.modal-pop) {
+  border-color: var(--fantasy-metal);
+  border-radius: 3px;
+  background-image: linear-gradient(120deg, var(--color-elevated), var(--color-bg));
+  box-shadow: inset 0 0 0 2px var(--color-bg), inset 0 0 0 3px var(--fantasy-inner), 0 2px 3px #00000018;
+}
+:root[data-fantasy-theme]:not([data-fantasy-theme=""]) .shortcut-button {
+  position: relative;
+}
+:root[data-fantasy-theme]:not([data-fantasy-theme=""]) .shortcut-button::after {
+  content: "";
+  position: absolute;
+  right: 5px;
+  bottom: 5px;
+  width: 7px;
+  height: 7px;
+  border-right: 1px solid var(--fantasy-metal);
+  border-bottom: 1px solid var(--fantasy-metal);
+  pointer-events: none;
+}
+:root[data-fantasy-theme]:not([data-fantasy-theme=""]) :is(.campaign-switcher,.desk-shortcuts) {
+  border-color: var(--fantasy-metal);
+}
+:root[data-fantasy-theme]:not([data-fantasy-theme=""]) .glance-strip .ledger-art {
+  border-color: var(--fantasy-metal);
+  box-shadow: 0 0 0 2px var(--color-bg), 0 0 0 3px var(--color-border);
+}
+:root[data-fantasy-theme]:not([data-fantasy-theme=""]) .role-chip {
+  background: radial-gradient(circle at 30% 20%, #a43e34, #591e20);
+  border-color: #ba7e53;
+  color: #f0d6a0;
+  box-shadow: inset 0 0 0 2px #571d1d, 0 2px 2px #0003;
+}
+/* Light surfaces always carry dark ink. Filled badges retain their contrasting ink. */
+:root[data-appearance="light"] .concept-shell button.bg-lead,
+:root[data-appearance="light"] .gold-link {
+  background: var(--color-lead);
+  color: var(--color-bg);
+  border-color: var(--color-lead);
+}
+:root[data-appearance="light"] .combat-quick-adjust button:nth-child(2) { color: #8b263b; }
+:root[data-appearance="light"] .combat-quick-adjust button:nth-child(3) { color: #205b46; }
+:root[data-fantasy-theme="adventurers-ledger"] :is(.concept-shell,.modal-pop) :is(button.bg-lead,.gold-link) {
+  background: linear-gradient(135deg, #e5c58b, #c3a066);
+  color: #382719;
+  border-color: var(--fantasy-metal);
+}

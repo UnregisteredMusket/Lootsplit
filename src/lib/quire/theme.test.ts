@@ -25,3 +25,20 @@ test("gold accent text remains readable on a light page without losing the chose
     assert.ok((Math.max(a,b)+0.05)/(Math.min(a,b)+0.05) >= 4.5);
   }
 });
+
+// Both approved palettes must keep ordinary and secondary copy readable on app surfaces.
+test("fantasy modes keep text contrast and preserve legacy/custom choices", async () => {
+  const { FANTASY_LOOKS, fantasyLook } = await import("./theme.ts");
+  for (const look of Object.values(FANTASY_LOOKS)) {
+    assert.equal(fantasyLook(look.appearance, look.accent, look.ground)?.id, look.id);
+    const vars = themeVars(look.appearance, look.accent, look.ground);
+    for (const ink of ["--color-fg", "--color-muted", "--color-faint", "--color-lead"]) {
+      for (const surface of ["--color-bg", "--color-elevated", "--color-subtle"]) {
+        const a = luminance(vars[ink]!); const b = luminance(vars[surface]!);
+        assert.ok((Math.max(a,b)+0.05)/(Math.min(a,b)+0.05) >= 4.5, `${look.id}: ${ink} on ${surface}`);
+      }
+    }
+  }
+  assert.equal(fantasyLook("dark", "#c8a96b", "#0b1720"), undefined);
+  assert.equal(fantasyLook("light", "#123456", "#f6f1e6"), undefined);
+});

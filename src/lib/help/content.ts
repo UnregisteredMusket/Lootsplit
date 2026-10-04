@@ -253,7 +253,7 @@ export const HELP_GROUPS: HelpGroup[] = [
         id: "appearance",
         title: "Appearance, reading size and motion",
         paragraphs: [
-          "Open the gear for your role’s Appearance controls. Choose light or dark, change PDF reading size, and toggle dollar estimates. DM Settings also contains ready-made looks and custom accent/page colors. These are display preferences, not campaign economy changes.",
+          "Open the gear for your role’s Appearance controls. Choose Light · Adventurer’s Ledger for aged parchment and dark ink, or Dark · Ironbound Dragon for dark iron and antique brass. Your theme is saved on this device and stays selected after reload. You can also change PDF reading size and toggle dollar estimates. DM Settings also contains ready-made looks and custom accent/page colors. These are display preferences, not campaign economy changes.",
           "The opening animation follows the device’s reduced-motion preference. After dismissal, internal navigation and refresh keep the app open in that tab session; a fresh session can show the opening again. Display options do not change your character, coins or rules.",
         ],
         links: [

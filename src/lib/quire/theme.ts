@@ -8,7 +8,19 @@ export type Look = {
   ground: string;
 };
 
+export const FANTASY_LOOKS: Record<Appearance, Look> = {
+  light: { id: "adventurers-ledger", label: "Adventurer’s Ledger", appearance: "light", accent: "#7c3224", ground: "#dfcca2" },
+  dark: { id: "ironbound-dragon", label: "Ironbound Dragon", appearance: "dark", accent: "#d4ac67", ground: "#26221e" },
+};
+
+export function fantasyLook(appearance: Appearance, accent: string, ground: string): Look | undefined {
+  const look = FANTASY_LOOKS[appearance];
+  return accent.toLowerCase() === look.accent && ground.toLowerCase() === look.ground ? look : undefined;
+}
+
 export const LOOKS: Look[] = [
+  FANTASY_LOOKS.light,
+  FANTASY_LOOKS.dark,
   { id: "glass", label: "Glass", appearance: "dark", accent: "#e0a04a", ground: "#10182c" },
   { id: "ink", label: "Ink", appearance: "dark", accent: "#c4a574", ground: "#14120e" },
   { id: "grove", label: "Grove", appearance: "dark", accent: "#7dcea0", ground: "#10241c" },
@@ -17,17 +29,18 @@ export const LOOKS: Look[] = [
   { id: "ledger", label: "Ledger", appearance: "light", accent: "#8a5a12", ground: "#f3ead7" },
 ];
 
-export const DEFAULT_ACCENT = "#c8a96b";
-export const DEFAULT_GROUND = "#0b1720";
+export const DEFAULT_ACCENT = FANTASY_LOOKS.dark.accent;
+export const DEFAULT_GROUND = FANTASY_LOOKS.dark.ground;
 
 export function themeVars(appearance: Appearance, accent: string, ground: string): Record<string, string> {
   const dark = appearance === "dark";
-  const fg = dark ? "#f6f1e6" : "#1c1422";
-  const elevated = mix(ground, dark ? "#ffffff" : "#000000", dark ? 0.08 : 0.045);
+  const fantasy = fantasyLook(appearance, accent, ground);
+  const fg = fantasy ? (dark ? "#eee0c4" : "#382719") : dark ? "#f6f1e6" : "#1c1422";
+  const elevated = fantasy ? (dark ? "#3b3227" : "#edddba") : mix(ground, dark ? "#ffffff" : "#000000", dark ? 0.08 : 0.045);
   const subtle = mix(ground, dark ? "#ffffff" : "#000000", dark ? 0.14 : 0.07);
   const border = mix(ground, accent, dark ? 0.42 : 0.34);
-  const muted = mix(fg, ground, 0.34);
-  const faint = mix(fg, ground, 0.55);
+  const muted = fantasy ? (dark ? "#bdab8e" : "#60462f") : mix(fg, ground, 0.34);
+  const faint = fantasy ? muted : mix(fg, ground, 0.32);
   const paper = dark ? "#f7f1e4" : "#fffaf3";
   // Keep the chosen accent while adapting text and primary controls to the page.
   const target = luminance(ground) > 0.3 ? "#000000" : "#ffffff";
@@ -36,7 +49,7 @@ export function themeVars(appearance: Appearance, accent: string, ground: string
     return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05);
   };
   let lead = accent;
-  for (let step = 1; step <= 20 && Math.min(contrast(lead, ground), contrast(lead, elevated)) < 4.5; step++) {
+  for (let step = 1; step <= 20 && Math.min(contrast(lead, ground), contrast(lead, elevated), contrast(lead, subtle)) < 4.5; step++) {
     lead = mix(accent, target, step / 20);
   }
   return {
@@ -64,6 +77,8 @@ export function applyTheme(appearance: Appearance, accent: string, ground: strin
   for (const [key, value] of Object.entries(themeVars(appearance, accent, ground))) {
     root.style.setProperty(key, value);
   }
+  root.dataset.appearance = appearance;
+  root.dataset.fantasyTheme = fantasyLook(appearance, accent, ground)?.id ?? "";
   root.style.colorScheme = appearance === "light" ? "light" : "dark";
   document.querySelector('meta[name="theme-color"]')?.setAttribute("content", ground);
 }
