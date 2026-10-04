@@ -1,7 +1,0 @@
-**/.env*
-**/*.db*
-**/*.sql
-**/*.enc
-**/*.log
-**/node_modules
-**/.git
