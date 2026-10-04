@@ -220,6 +220,14 @@ try {
     false,
   );
   await visit(player.page, "/share");
+  await player.page.locator(".settings-trigger").click();
+  await player.page.getByRole("dialog").waitFor();
+  await player.page.waitForLoadState("networkidle");
+  assert.equal(
+    await player.page.getByRole("link", { name: "Test mode (owner)", exact: false }).count(),
+    0,
+  );
+  await player.page.getByRole("dialog").getByRole("button", { name: "Close", exact: true }).click();
   console.log("Governance audit: leave room and retain authorized reports");
   await player.page.getByRole("button", { name: "Leave room", exact: true }).click();
   await player.page
@@ -232,13 +240,18 @@ try {
   const records = await player.context.request.get(origin + "/api/account/records");
   assert.equal(records.status(), 200);
   assert.equal((await records.json()).reports.length, 1);
-  await visit(host.page, "/settings");
+  // Exercise the real gear menu; the full settings route alone missed this link.
+  await host.page.locator(".settings-trigger").click();
+  await host.page.getByRole("link", { name: "Test mode (owner)", exact: false }).click();
+  assert.equal(await host.page.locator(".loot-opening").count(), 0);
+  assert.equal(new URL(host.page.url()).hash, "#test-mode");
   console.log("Governance audit: owner Test mode configuration and reset");
   const test = host.page
     .locator(".loot-fold")
     .filter({ has: host.page.getByRole("button", { name: /^Test mode/ }) })
     .first();
-  await test.locator(":scope > div > button").first().click();
+  await test.getByLabel("Characters", { exact: true }).waitFor();
+  await host.page.screenshot({ path: output + "/test-settings-desktop.png", fullPage: true });
   await test.getByLabel("Characters", { exact: true }).fill("2");
   await Promise.all([
     host.page.waitForNavigation({ waitUntil: "domcontentloaded" }),
@@ -278,6 +291,12 @@ try {
   assert.equal((await state(host.page)).ledger.length, 0);
   await host.page.setViewportSize({ width: 390, height: 844 });
   await host.page.screenshot({ path: output + "/test-mode-mobile.png", fullPage: true });
+  await host.page.locator(".settings-trigger").click();
+  await host.page.getByRole("link", { name: "Test mode (owner)", exact: false }).waitFor();
+  await host.page.screenshot({ path: output + "/test-menu-mobile.png", fullPage: true });
+  await host.page.getByRole("link", { name: "Test mode (owner)", exact: false }).click();
+  await host.page.getByLabel("Enable Test mode", { exact: true }).waitFor();
+  assert.equal(await host.page.locator(".loot-opening").count(), 0);
   assert.equal(
     await host.page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1),
     false,

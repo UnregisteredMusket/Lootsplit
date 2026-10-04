@@ -1,7 +1,8 @@
 import { AppLink } from "@/components/app-link";
 import { RollModeSetting } from "@/components/roll-mode-setting";
 import { FantasyIcon } from "@/components/fantasy-icon";
-import { useState } from "react";
+import { useEffect, useState } from "react";
+import { accountRequest, type AccountLibrary } from "@/lib/account/client";
 import { ChevronDown, LogIn } from "lucide-react";
 import { Button, Modal } from "@/components/ui";
 import { FANTASY_LOOKS } from "@/lib/quire/theme";
@@ -27,7 +28,17 @@ export function ManagementPanel({
   onRoleChange: () => void;
 }) {
   const { prefs, setPrefs } = usePrefs(),
-    [expanded, setExpanded] = useState("");
+    [expanded, setExpanded] = useState(""),
+    [owner, setOwner] = useState(false);
+  useEffect(() => {
+    setOwner(false);
+    if (!open) return;
+    const controller = new AbortController();
+    accountRequest<AccountLibrary>("library", undefined, controller.signal)
+      .then((library) => setOwner(library.user.role === "owner"))
+      .catch(() => {});
+    return () => controller.abort();
+  }, [open]);
   const appearance = (
     <div className="setting-preferences">
       <label>
@@ -217,6 +228,16 @@ export function ManagementPanel({
             ? "Campaign controls & personal preferences"
             : "Your character & personal preferences"}
         </p>
+        {owner && (
+          <AppLink
+            href="/settings#test-mode"
+            className="settings-link"
+            onClick={() => onOpenChange(false)}
+          >
+            Test mode (owner)
+            <span aria-hidden="true">›</span>
+          </AppLink>
+        )}
         {groups.map((g) => {
           return (
             <section className="management-group" key={g.name}>

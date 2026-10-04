@@ -60,6 +60,7 @@ export function TestModeSettings() {
   return (
     <Fold
       title="Test mode"
+      anchorId="test-mode"
       hint="Owner-only sandbox. Excluded from public and owner gameplay analytics."
     >
       <label className="flex min-h-11 items-center gap-2">
