@@ -18,6 +18,7 @@ import { emptyCoins } from "./money.ts";
 import { applyCommand, tablePatch } from "./commands.ts";
 import { verifyReportBase } from "./local-report.ts";
 const sql = new DatabaseSync(":memory:");
+sql.exec("CREATE TABLE library_members(user_id TEXT, code TEXT, seat_id TEXT, token TEXT)");
 sql.exec(
   readFileSync(new URL("../../../drizzle/0000_mysterious_lord_tyger.sql", import.meta.url), "utf8"),
 );

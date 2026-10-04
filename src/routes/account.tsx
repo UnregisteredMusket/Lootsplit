@@ -1,3 +1,4 @@
+import { AccountSessionRecords } from "@/components/account/session-records";
 import { blankSheet } from "@/lib/characters/model.mjs";
 import { BugReports } from "@/components/account/bug-reports";
 import { ServerMonitor } from "@/components/account/server-monitor";
@@ -36,7 +37,7 @@ import {
   subscribeCloudTable,
   resumeAccountMembership,
   hasPendingChanges,
-  leaveTable,
+  clearAccountRoom,
 } from "@/lib/quire/cloud-client";
 import { useEconomy } from "@/lib/quire/economy-context";
 import { useSeat } from "@/lib/quire/seat";
@@ -130,7 +131,7 @@ function Account() {
       throw new Error("Submit or resolve your pending campaign actions before signing out.");
     await accountRequest("auth/sign-out", {});
     const current = localStorage.getItem("quire.campaign.v1") || "";
-    if (current.startsWith("account-") && cloud.joined) leaveTable();
+    if (current.startsWith("account-") && cloud.joined) await clearAccountRoom();
     for (const k of Object.keys(localStorage))
       if (k.startsWith("quire.cloud.v2.account-")) localStorage.removeItem(k);
     setLibrary(null);
@@ -223,6 +224,7 @@ function Account() {
                   </Link>
                 </section>
               }
+              <AccountSessionRecords />
               <ProfileControls profile={library.profile} onSaved={reload} />
               {library.user.role !== "member" && (
                 <StaffControls userId={library.user.id} role={library.user.role} />
@@ -465,7 +467,7 @@ function Account() {
                                   confirm,
                                   revision: m.room_revision,
                                 });
-                                if (cloud.joined && cloud.code === m.code) leaveTable();
+                                if (cloud.joined && cloud.code === m.code) await clearAccountRoom();
                                 await reload();
                                 setNotice(
                                   "Shared campaign deleted. Its saved state is in Cloud backups.",

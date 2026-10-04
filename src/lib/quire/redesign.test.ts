@@ -147,8 +147,9 @@ test("payment approvals require DM, debit once, and fail atomically on insuffici
   );
   assert.equal(large.journal!.requests[0]!.status, "pending");
 });
-test("players can update only owned portraits and cannot smuggle financial patches", () => {
+test("players can update only owned portraits during an approved edit window and cannot smuggle financial patches", () => {
   const t = fixture();
+  t.purses[0].editingAllowed = true;
   assert.throws(
     () =>
       applyCommand(t, player, {
@@ -215,6 +216,7 @@ test("new journal and artwork survive room persistence and backup round trip", a
     name: "Preservation",
     end: false,
   });
+  t = applyCommand(t, dm, { id:"open", kind:"character-editing", purseId:"a", allowed:true });
   t = applyCommand(t, player, {
     id: "p",
     kind: "portrait",
@@ -269,7 +271,7 @@ test("session boundaries remain exact for transactions in the same millisecond",
       purseId: "a",
       quantity: 1,
     });
-    assert.deepEqual(sessionSummary(t.ledger, t.journal!.sessions[0]!), {
+    assert.deepEqual(sessionSummary(JSON.parse(t.journal!.reports![0].snapshot).ledger, t.journal!.sessions[0]!), {
       net: -10,
       received: 0,
       spent: 10,

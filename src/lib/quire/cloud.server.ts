@@ -1,4 +1,4 @@
-import { readRoom, createRoom, updateRoom, deleteRoom } from "./room-store.server.ts";
+import { readRoom, createRoom, updateRoom } from "./room-store.server.ts";
 import {
   claimSeat,
   readCloudTable,
@@ -8,6 +8,7 @@ import {
   type CloudSeat,
   type CloudTable,
 } from "./cloud.ts";
+import { archiveSession, projectRecord } from "./session-records.ts";
 import { canReadNote } from "./chat-visibility.ts";
 import { characterControl } from "./types.ts";
 import type { BillFile } from "./table.ts";
@@ -175,7 +176,7 @@ export async function previewRoom(
   };
 }
 
-export async function joinRoom(input: { code: string; purseId: string; name: string }): Promise<{
+export async function joinRoom(input: { code: string; purseId: string; name: string; invitation?: string; userId?: string }): Promise<{
   token: string;
   seatId: string;
   revision: number;
@@ -183,7 +184,17 @@ export async function joinRoom(input: { code: string; purseId: string; name: str
   shopIds: string[];
 }> {
   const room = await must(input.code);
+  if (room.testMode) throw Error("Test rooms are private to the owner.");
+  const blocked = input.userId && room.blockedUsers?.[input.userId];
+  if (blocked === "banned") throw Error("You are banned from this campaign.");
+  const restriction = room.departed?.find(s => s.purseIds.includes(input.purseId) && (s.status === "kicked" || s.status === "banned"));
+  if (restriction?.status === "banned") throw Error("This character is blocked from joining. Ask the DM.");
+  if ((blocked === "kicked" || restriction) && (!input.invitation || room.invitations?.[input.purseId] !== input.invitation))
+    throw Error("A fresh invitation from the DM is required.");
   const claimed = claimSeat(room, input.purseId, input.name);
+  if (input.invitation && room.invitations?.[input.purseId] !== input.invitation) throw Error("This invitation has expired.");
+  if (input.userId && claimed.room.blockedUsers) delete claimed.room.blockedUsers[input.userId];
+  if (claimed.room.invitations) delete claimed.room.invitations[input.purseId];
   const next = { ...claimed.room, revision: claimed.room.revision + 1 };
   await updateRoom(next, room.revision);
   return {
@@ -236,7 +247,15 @@ export async function closeRoom(input: { code: string; token: string }): Promise
     throw new Error("Only the dungeon master can return to Local Mode.");
   if (Object.values(room.drafts ?? {}).some((c) => c.length))
     throw new Error("Submit or discard pending turns before closing the campaign.");
-  await deleteRoom(room.code, room.revision);
+  const next = structuredClone(room);
+  const active = next.table.journal?.sessions.find(s => !s.endedAt);
+  if (active) { active.endedAt = Date.now(); active.endLedgerIds = next.table.ledger.map(l => l.id); }
+  archiveSession(next.table, active?.id || crypto.randomUUID(), active?.name || "Room closed");
+  for (const report of next.table.journal?.reports || []) if (!report.seatIds) report.seatIds = room.seats.map(s => s.id);
+  next.closed = true;
+  next.revision++;
+  for (const p of next.table.purses) { p.editingAllowed = false; delete p.editBaseline; }
+  await updateRoom(next, room.revision);
 }
 
 export async function passTurn(input: { code: string; token: string }): Promise<RoomView> {
@@ -272,16 +291,20 @@ export type RoomView = {
   acknowledged: string[];
   table: CloudTable;
   live: boolean;
+  departed?: Array<{ id: string; name: string; status: string; invitation?: string }>;
+  testMode?: boolean;
 };
 
 async function must(code: string): Promise<CloudRoom> {
   const room = await readRoom(code.trim().toUpperCase());
   if (!room) throw new Error("No table uses that code.");
+  if (room.closed) throw new Error("This room is closed.");
   return room;
 }
 
 function view(room: CloudRoom, seat: CloudSeat): RoomView {
   const current = room.seats[room.turn];
+  const journal = projectRecord({ ...room.table, journal: room.table.journal }, seat).journal;
   return {
     code: room.code,
     revision: room.revision,
@@ -289,6 +312,8 @@ function view(room: CloudRoom, seat: CloudSeat): RoomView {
     mine: room.live || current?.id === seat.id,
     who: room.live ? "everyone" : (current?.name ?? "Someone"),
     live: room.live === true,
+    testMode: room.testMode === true,
+    departed: seat.role === "dm" ? room.departed?.map(s => ({ id: s.id, name: s.name, status: s.status, invitation: s.purseIds.map(id => room.invitations?.[id]).find(Boolean) })) : undefined,
     seatId: seat.id,
     purseIds: seat.purseIds,
     shopIds: room.table.shops.map((shop) => shop.id),
@@ -305,7 +330,7 @@ function view(room: CloudRoom, seat: CloudSeat): RoomView {
     draft: JSON.stringify(room.drafts?.[seat.id] ?? []),
     table:
       seat.role === "dm"
-        ? { ...room.table, notes: room.table.notes.filter((note) => canReadNote(note, seat)) }
+        ? { ...room.table, journal, notes: room.table.notes.filter((note) => canReadNote(note, seat)) }
         : {
             ...room.table,
             purses: room.table.purses.map((p) => {
@@ -314,20 +339,22 @@ function view(room: CloudRoom, seat: CloudSeat): RoomView {
                 sheet: _sheet,
                 sheetRevision: _revision,
                 profileId: _profile,
+                editBaseline: _editBaseline,
                 rolls: _rolls,
                 ...publicPurse
               } = p;
               return publicPurse;
             }),
             notes: room.table.notes.filter((note) => canReadNote(note, seat)),
-            journal: room.table.journal
+            journal: journal
               ? {
-                  ...room.table.journal,
+                  ...journal,
                   finance: undefined,
-                  requests: room.table.journal.requests.filter((r) =>
+                  editReports: journal.editReports?.filter(r => seat.purseIds.includes(r.purseId)),
+                  requests: journal.requests.filter((r) =>
                     seat.purseIds.includes(r.purseId),
                   ),
-                  events: room.table.journal.events
+                  events: journal.events
                     .filter((e) => !e.purseId || seat.purseIds.includes(e.purseId))
                     .map(({ change, ...event }) => event),
                 }
@@ -387,6 +414,8 @@ export async function submitCommands(input: {
       table = applyCommand(table, seat, command);
       seen.add(key);
     }
+    for (const report of table.journal?.reports || [])
+      if (!room.table.journal?.reports?.some(r => r.id === report.id)) report.seatIds = room.seats.map(s => s.id);
     const drafts = { ...(room.drafts ?? {}) };
     if (input.stage) {
       drafts[seat.id] = commands;
@@ -432,33 +461,50 @@ export async function submitCommands(input: {
 export async function manageRoom(input: {
   code: string;
   token: string;
-  action: "release" | "permission" | "start" | "discard";
+  action: "release" | "leave" | "kick" | "ban" | "invite" | "permission" | "start" | "discard";
   seatId: string;
   allowParty?: boolean;
 }): Promise<RoomView> {
   const room = await must(input.code),
     caller = room.seats.find((s) => s.token === input.token);
   if (!caller) throw new Error("Session not found.");
-  if (input.action !== "discard" && caller.role !== "dm")
+  if (input.action !== "discard" && input.action !== "leave" && caller.role !== "dm")
     throw new Error("Only the DM can manage participants.");
-  const target = room.seats.find((s) => s.id === input.seatId);
+  const target = room.seats.find((s) => s.id === input.seatId) ||
+    (input.action === "invite" ? room.departed?.find(s => s.id === input.seatId) : undefined);
   if (!target) throw new Error("Participant not found.");
+  if (input.action === "leave" && (caller.role !== "player" || target.id !== caller.id))
+    throw Error("Only players can leave their own seat. The DM must close the room.");
   if (input.action === "discard" && caller.role !== "dm" && target.id !== caller.id)
     throw new Error("Only your own pending changes can be discarded.");
   const next = structuredClone(room);
   next.revision++;
-  if (input.action === "release") {
+  if (["release", "leave", "kick", "ban"].includes(input.action)) {
     if (target.role === "dm") throw new Error("The DM cannot be removed.");
     if (next.drafts?.[target.id]?.length)
       throw new Error(
         "This player has pending changes. Export or discard them before releasing the character.",
       );
     const current = room.seats[room.turn]?.id;
+    const db = database();
+    const member = db ? await db.prepare("SELECT user_id FROM library_members WHERE code=? AND seat_id=? AND token=?").bind(room.code, target.id, target.token).first<{user_id:string}>() : null;
+    const finalStatus = input.action === "release" ? "dismissed" : input.action === "leave" ? "left" : input.action === "kick" ? "kicked" : "banned";
+    next.departed = [...(next.departed || []).filter(s => s.id !== target.id), { ...target, status: finalStatus as "left" | "dismissed" | "kicked" | "banned", userId: member?.user_id }];
+    if (member && (input.action === "kick" || input.action === "ban"))
+      (next.blockedUsers ??= {})[member.user_id] = input.action === "ban" ? "banned" : "kicked";
+    const { applyCommand } = await import("./commands.ts");
+    for (const p of next.table.purses.filter(p => target.purseIds.includes(p.id) && p.editingAllowed))
+      next.table = applyCommand(next.table, caller.role === "dm" ? caller : room.seats.find(s => s.role === "dm")!, { id: crypto.randomUUID(), kind: "character-editing", purseId:p.id, allowed:false });
+    if (next.drafts) delete next.drafts[target.id];
     next.seats = next.seats.filter((s) => s.id !== target.id);
     next.turn = Math.max(
       0,
       next.seats.findIndex((s) => s.id === current),
     );
+  } else if (input.action === "invite") {
+    if (target.role !== "player" || (target as { status?: string }).status === "banned") throw Error("Banned participants cannot be invited.");
+    for (const id of target.purseIds.filter(id => room.table.purses.some(p => p.id === id && p.kind === "character")))
+      (next.invitations ??= {})[id] = crypto.randomUUID();
   } else if (input.action === "permission") {
     if (target.role === "dm") throw new Error("The DM already controls all accounts.");
     if (next.drafts?.[target.id]?.length)

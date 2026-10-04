@@ -37,6 +37,7 @@ jobs:
             if curl -fsS http://127.0.0.1:8080/ > /dev/null; then break; fi
             sleep 2
           done
+          node scripts/campaign-governance-browser-audit.mjs
           node scripts/theme-browser-audit.mjs
           node scripts/help-browser-audit.mjs
           node scripts/release-browser-audit.mjs

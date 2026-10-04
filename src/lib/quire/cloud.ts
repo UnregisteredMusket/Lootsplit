@@ -47,6 +47,12 @@ export type CloudRoom = {
   seen: CloudSeen;
   commands?: string[];
   batches?: string[];
+  closed?: boolean;
+  testMode?: boolean;
+  testTemplate?: CloudTable;
+  departed?: Array<CloudSeat & { status: "left" | "dismissed" | "kicked" | "banned"; userId?: string }>;
+  invitations?: Record<string, string>;
+  blockedUsers?: Record<string, "kicked" | "banned">;
   drafts?: Record<string, import("./commands.ts").Command[]>;
 };
 

@@ -177,3 +177,12 @@ Validation for this change: 427 automated tests passed (four existing skips), Ty
 
 - Party Add loot offers custom items/property and SRD 2014/2024 Open5e equipment/magic items. Search selection fills a review draft; confirmation saves recipient, quantity, value, category and source/attribution notes through existing DM inventory permissions. Search failure supports cached results and custom entry; failed saves retain the draft.
 - Slow route transitions show only the Lootsplit logo. Required account campaign restore/resume reloads use a short-lived, single-use startup handoff so they do not replay the title. Fresh launches and explicit refreshes still show the title.
+
+## Campaign governance and session records
+
+- DM character-edit windows beside party names, with complete before/after reports. Locked players retain health, rolls, resources, equipment and consumption; structural edits and funds/items remain server-authorized.
+- Authoritative leave/dismiss/kick/ban controls revoke seats. Kicks require fresh invitations; bans block campaign/report access. Closed rooms retain authorized archives while denying character selection and edits.
+- Session reports archive financial activity, character changes and authorized messages before active logs clear; DM reports indicate player-private messages without exposing contents. Account reports survive departure according to permissions.
+- DM-private, party-shared and private-player journal entries can attach prior session reports.
+- Merchant sale categories have DM-configurable exceptions. Service purchases are recorded and cannot be resold.
+- Owner-only isolated Test mode has a settings configurator, header indicator and red DM-home reset; Test rooms are excluded from gameplay analytics.

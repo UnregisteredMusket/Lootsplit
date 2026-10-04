@@ -13,6 +13,8 @@ export type ComposeInput = {
 };
 
 export type ShelfDraft = {
+  service?: boolean;
+  category?: string;
   name: string;
   copper: number;
   baseCopper: number;
@@ -65,6 +67,8 @@ export function composeShelf(catalog: CatalogItem[], input: ComposeInput, rng: (
     for (const item of group.slice(0, cap)) {
       lines.push({
         name: item.name,
+        service: item.service,
+        category: item.category,
         baseCopper: item.baseCopper,
         copper: scalePrice(item.baseCopper, {
           wealth: input.wealth,

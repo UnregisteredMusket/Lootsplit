@@ -185,6 +185,7 @@ test("account characters enforce ownership, campaign assignments, DM policy, sta
       }),
       (e) => e.status === 409,
     );
+    Object.assign(room, JSON.parse((await db.prepare("SELECT body FROM campaign_rooms WHERE code=?").bind("PLAYTEST").first()).body));
     room.seats = room.seats.filter((s) => s.role === "dm");
     await db
       .prepare("UPDATE campaign_rooms SET body=? WHERE code=?")
@@ -195,9 +196,9 @@ test("account characters enforce ownership, campaign assignments, DM policy, sta
       (e) => e.status === 403,
     );
     await assert.rejects(call("player", "/log", { code: "PLAYTEST" }), (e) => e.status === 403);
-    assert.ok((await call("player", "/detail", { id })).assignmentError);
-    await call("player", "/assign", { id, code: "", purseId: "", revision: 2 });
-    assert.equal((await call("player", "/detail", { id })).campaign, null);
+    await assert.rejects(call("player", "/detail", { id }), e => e.status === 403);
+    assert.equal((await call("player", "")).characters.some(r => r.id === id), false);
+    await assert.rejects(call("player", "/assign", { id, code: "", purseId: "", revision: 2 }), e => e.status === 403);
     assert.equal((await call("dm", "/log", { code: "PLAYTEST" })).rolls.length, 1);
   } finally {
     db.close();

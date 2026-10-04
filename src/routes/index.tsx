@@ -1,3 +1,4 @@
+import { TestResetButton } from "@/components/test-mode";
 import { createFileRoute } from "@tanstack/react-router";
 import { DmDesk } from "@/components/control-panel/desk";
 import { HomeBoard } from "@/components/home-board";
@@ -27,5 +28,5 @@ function Home() {
       </Shell>
     );
   }
-  return <Shell>{view === "overview" ? <HomeBoard /> : <DmDesk />}</Shell>;
+  return <Shell><TestResetButton />{view === "overview" ? <HomeBoard /> : <DmDesk />}</Shell>;
 }

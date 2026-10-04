@@ -16,7 +16,7 @@ async function membership(db, user, code) {
   const row = await db.prepare("SELECT body FROM campaign_rooms WHERE code=?").bind(code).first();
   const room = row ? JSON.parse(row.body) : null;
   const seat = room?.seats.find((s) => s.id === m?.seat_id && s.token === m?.token);
-  if (!seat) fail("Save an active campaign membership in My account first.", 403);
+  if (!seat || room.closed) fail("Save an active campaign membership in My account first.", 403);
   await hydrateCampaignCharacters(db, room);
   return { room, seat, raw: JSON.stringify(room) };
 }
@@ -42,6 +42,12 @@ async function character(db, user, id, own = false) {
   }
   const row = await db.prepare("SELECT * FROM play_characters WHERE id=?").bind(text(id)).first();
   if (!row) fail("Character not found.", 404);
+  if (row.campaign_code) {
+    const { room, seat } = await membership(db, user, row.campaign_code);
+    if (!room.table.purses.some(p => p.id === row.purse_id) ||
+        (seat.role !== "dm" && !seat.purseIds.includes(row.purse_id)))
+      fail("This character is no longer assigned to your campaign seat.", 403);
+  }
   if (row.user_id !== user) {
     if (own || !row.campaign_code) fail("Character not found.", 404);
     const { seat } = await membership(db, user, row.campaign_code);
@@ -90,10 +96,12 @@ export async function handleCharacterPlay(db, user, path, body, url) {
       if (r.campaign_code) {
         try {
           const { room, seat } = await membership(db, user, r.campaign_code);
-          if (seat.role === "dm" || seat.purseIds.includes(r.purse_id))
-            body = campaignBody(room, r.purse_id);
+          if (seat.role !== "dm" && !seat.purseIds.includes(r.purse_id)) continue;
+          if (!room.table.purses.some(p => p.id === r.purse_id)) continue;
+          body = campaignBody(room, r.purse_id);
         } catch (e) {
-          if (e.status !== 403) throw e;
+          if (e.status !== 403 && e.status !== 404) throw e;
+          continue;
         }
       }
       characters.push({ ...r, body });
@@ -165,7 +173,6 @@ export async function handleCharacterPlay(db, user, path, body, url) {
       projected = JSON.parse(r.body),
       revision = r.revision;
     if (r.campaign_code) {
-      try {
         const { room, seat } = await membership(db, user, r.campaign_code);
         const p = room.table.purses.find((p) => p.id === r.purse_id);
         if (!p || (seat.role !== "dm" && !seat.purseIds.includes(p.id)))
@@ -175,14 +182,11 @@ export async function handleCharacterPlay(db, user, path, body, url) {
         campaign = {
           code: r.campaign_code,
           role: seat.role,
+          editingAllowed: seat.role === "dm" || p.editingAllowed === true,
           manualAllowed: await policy(db, r.campaign_code),
           coins: p.coins,
           holdings: room.table.holdings.filter((h) => h.purseId === p.id),
         };
-      } catch (e) {
-        if (e.status !== 403) throw e;
-        assignmentError = e.message;
-      }
     }
     return {
       ...r,

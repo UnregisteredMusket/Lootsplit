@@ -55,6 +55,7 @@ export async function characterRequest<T>(
       campaign: {
         code: getCloudTable().code,
         role: seat.role,
+        editingAllowed: seat.role === "dm" || p.editingAllowed === true,
         manualAllowed: policy.manualAllowed,
         coins: body.coins,
         holdings: table.holdings.filter((h) => h.purseId === p.id),

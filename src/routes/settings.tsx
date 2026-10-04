@@ -1,3 +1,4 @@
+import { TestModeSettings } from "@/components/test-mode";
 import { RollModeSetting } from "@/components/roll-mode-setting";
 import { Link, createFileRoute } from "@tanstack/react-router";
 import { useEffect, useRef, useState } from "react";
@@ -482,6 +483,7 @@ function SettingsPage() {
             .catch(() => toast.error("This campaign could not be reset."));
         }}
       />
+      <TestModeSettings />
     </Shell>
   );
 }

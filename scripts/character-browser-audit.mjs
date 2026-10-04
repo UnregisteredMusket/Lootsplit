@@ -61,6 +61,7 @@ try {
         {
           id: "hero",
           name: "Campaign hero",
+          editingAllowed: true,
           kind: "character",
           coins: { cp: 3, sp: 2, ep: 0, gp: 17, pp: 0 },
         },

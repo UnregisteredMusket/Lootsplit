@@ -2,6 +2,7 @@ import { statsOnly, characterSheet } from "../src/lib/characters/campaign-sheet.
 /** Upgrade only explicit existing assignments. Never match names or import wealth.
  * @param {any} db @param {import("../src/lib/quire/cloud.ts").CloudRoom} room */
 export async function hydrateCampaignCharacters(db, room) {
+  if (room.closed) return room;
   if (!room.table.purses.some((p) => p.kind === "character" && !p.sheet)) return room;
   const rows = await db
     .prepare("SELECT id,body,purse_id,user_id FROM play_characters WHERE campaign_code=?")

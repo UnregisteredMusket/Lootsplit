@@ -1,3 +1,4 @@
+import { assertMerchantSale, isService, stockCategory } from "./merchant.ts";
 import { applyCommand, type CommandInput } from "./commands.ts";
 import { loanFromRequest, readFinance, assertFinanceAccountRemovable } from "./finance.ts";
 import { readLocalEncounters } from "../encounters/local.ts";
@@ -474,6 +475,8 @@ export async function openComposedShop(input: {
     const stock: StockLine = {
       id: crypto.randomUUID(),
       shopId: shop.id,
+      service: line.service,
+      category: line.category,
       name: line.name,
       copper: line.copper,
       quantity: line.quantity,
@@ -935,13 +938,14 @@ export async function buyFromShop(input: {
         holding.name.toLowerCase() === stock.name.toLowerCase() && holding.kind === "item",
     );
     tx.objectStore("purses").put({ ...purse, coins });
-    tx.objectStore("holdings").put(
+    if (!isService(stock)) tx.objectStore("holdings").put(
       existing
-        ? { ...existing, quantity: existing.quantity + quantity, unitCopper: stock.copper }
+        ? { ...existing, category: stockCategory(stock, shop), quantity: existing.quantity + quantity, unitCopper: stock.copper }
         : {
             id: crypto.randomUUID(),
             purseId: purse.id,
             name: stock.name,
+            category: stockCategory(stock, shop),
             kind: "item",
             quantity,
             unitCopper: stock.copper,
@@ -973,6 +977,7 @@ export async function sellToShop(input: {
     const shop = await request<Shop | undefined>(tx.objectStore("shops").get(input.shopId));
     if (!holding || !shop) throw new Error("That sale cannot be made.");
     if (shop.closed) throw new Error("This shop is closed.");
+    assertMerchantSale(holding, shop);
     if (holding.quantity < quantity) throw new Error("You do not have that many.");
     const purse = await request<Purse | undefined>(tx.objectStore("purses").get(holding.purseId));
     if (!purse) throw new Error("This account no longer exists.");
