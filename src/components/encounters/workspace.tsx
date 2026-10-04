@@ -1581,6 +1581,7 @@ function EncounterEditor({
               <label>
                 Roll source
                 <select
+                  aria-label="Roll source"
                   value={manual ? "manual" : "server"}
                   onChange={(e) => setManual(e.target.value === "manual")}
                 >
