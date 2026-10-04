@@ -10,6 +10,8 @@ const browser = await chromium.launch({
 });
 await mkdir("test-results", { recursive: true });
 const errors = [];
+const diagnostic = process.env.AUDIT_RECOVERY_DIAGNOSTICS === "1";
+const activeRequests = new Map();
 async function bounded(label, work) {
   let timer;
   try {
@@ -77,6 +79,11 @@ try {
   assert.match(code, /^[A-Z2-9]{8}$/);
   console.log("Audit: room created; open player");
   const player = await open();
+  if (diagnostic) {
+    player.on("request", (request) => activeRequests.set(request, Date.now()));
+    player.on("requestfinished", (request) => activeRequests.delete(request));
+    player.on("requestfailed", (request) => activeRequests.delete(request));
+  }
   await visit(player, origin + "/share?join=" + code);
   await player.getByPlaceholder("Enter your code").waitFor();
   assert.equal(await player.getByPlaceholder("Enter your code").inputValue(), code);
@@ -129,10 +136,23 @@ try {
   );
   await player.unroute("**/_serverFn/**");
   console.log("Audit: saved queue restored; retry transport");
-  await bounded("retry restored purchase", () =>
+  await bounded("import restored client", () =>
+    player.evaluate(async () => {
+      await import("/src/lib/quire/cloud-client.ts");
+      return true;
+    }),
+  );
+  console.log("Audit: recovery client imported; refresh room");
+  await bounded("refresh restored room", () =>
     player.evaluate(async () => {
       const c = await import("/src/lib/quire/cloud-client.ts");
       await c.refreshShared();
+    }),
+  );
+  console.log("Audit: restored room refreshed; retry purchase");
+  await bounded("retry restored purchase", () =>
+    player.evaluate(async () => {
+      const c = await import("/src/lib/quire/cloud-client.ts");
       await c.retryPending();
     }),
   );
@@ -170,8 +190,28 @@ try {
   );
 } catch (error) {
   console.error("Browser runtime errors:", errors);
+  if (diagnostic)
+    console.error(
+      "Pending browser requests:",
+      [...activeRequests].map(([r, at]) => ({
+        path: new URL(r.url()).pathname,
+        method: r.method(),
+        elapsed: Date.now() - at,
+      })),
+    );
   for (const [i, c] of browser.contexts().entries())
     for (const p of c.pages()) {
+      if (diagnostic)
+        console.error(
+          "Browser state:",
+          await p
+            .evaluate(async () => ({
+              ready: document.readyState,
+              visibility: document.visibilityState,
+              locks: await navigator.locks.query(),
+            }))
+            .catch(() => null),
+        );
       await p.screenshot({ path: `test-results/failure-${i}.png` }).catch(() => {});
       console.error((await p.locator("body").innerText()).slice(-4500));
     }

@@ -1,0 +1,43 @@
+name: Connection recovery diagnostic
+on:
+  push:
+    branches: [fix/recovery-audit]
+permissions:
+  contents: read
+jobs:
+  recovery:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Start disposable development server
+        run: |
+          npm run dev > /tmp/lootsplit-recovery-dev.log 2>&1 &
+          for attempt in $(seq 1 45); do
+            if curl --max-time 2 -fsS http://127.0.0.1:8080/ > /dev/null; then exit 0; fi
+            sleep 2
+          done
+          exit 1
+      - run: node scripts/campaign-governance-browser-audit.mjs && node scripts/theme-browser-audit.mjs && node scripts/help-browser-audit.mjs
+      - name: Reproduce connection recovery
+        env:
+          AUDIT_RECOVERY_DIAGNOSTICS: "1"
+        run: |
+          for attempt in 1 2 3; do
+            node scripts/release-browser-audit.mjs || exit 1
+          done
+      - name: Collect diagnostics
+        if: always()
+        run: cp /tmp/lootsplit-recovery-dev.log test-results/recovery-dev.log
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: connection-recovery-diagnostic
+          path: test-results/
+          retention-days: 7
