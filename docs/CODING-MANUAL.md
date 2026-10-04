@@ -51,6 +51,8 @@ Optimize the slowest required job, because parallel jobs overlap. Do not add the
 
 Report implementation/debugging time, PR verification, main verification and deployment separately when explaining total task duration. Label estimates. Do not describe a four-minute check as a four-minute completed update.
 
+The user requests speed improvements as **before → after, absolute time saved, and percentage reduction**. Calculate `(oldSeconds - newSeconds) / oldSeconds × 100`. Compare the same scope/environment, identify the run or measurement, and say when a comparable baseline is unavailable. Report total task time separately from test execution time; overlapping jobs cannot be added to derive wall time.
+
 ## 6. Publish and recover safely
 
 - Follow the user's existing authorization. Preserve all release gates, main-only publishing, stale-commit rejection, serialized deployment and immutable artifact hashes.
