@@ -7,7 +7,10 @@ await mkdir("test-results/library-navigation", { recursive: true });
 try {
   for (const width of [390, 1440]) {
     const context = await browser.newContext({ viewport: { width, height: 900 } });
-    await context.addInitScript(() => localStorage.setItem("quire.guide.offer.v3", "seen"));
+    await context.addInitScript(() => {
+      localStorage.setItem("quire.guide.offer.v3", "seen");
+      sessionStorage.setItem("lootsplit.opening.dismissed.v1", "1");
+    });
     const page = await context.newPage();
     const errors = [];
     page.on("pageerror", e => errors.push(e.message));
@@ -46,11 +49,13 @@ try {
     await page.goBack();
     await page.getByRole("heading", { name: "Library", exact: true }).waitFor();
     await stillOpen();
-    // Real document navigation and refresh must also retain the session dismissal.
+    // Fresh document loads must restore the title, even with a legacy dismissal flag.
     await page.goto(origin + "/library");
+    await page.getByRole("button", { name: "Lootsplit. Click to continue", exact: true }).click();
     await page.getByRole("heading", { name: "Library", exact: true }).waitFor();
     assert.equal(await page.locator(".loot-opening").count(), 0);
     await page.reload();
+    await page.getByRole("button", { name: "Lootsplit. Click to continue", exact: true }).click();
     await page.getByRole("heading", { name: "Library", exact: true }).waitFor();
     assert.equal(await page.locator(".loot-opening").count(), 0);
     assert.deepEqual(errors, []);
