@@ -1,5 +1,7 @@
 # Lootsplit preservation contract
 
+Every coding session must read `docs/CODING-MANUAL.md` before editing. Use its focused reproduction → local verification → full CI → verified release procedure. `README.md` is the human-facing entry point. Keep these instructions and actual commands in sync when the workflow changes. Written instructions do not replace automated release gates.
+
 After a timeout, network failure or interrupted task, read `docs/RECOVERY.md` first. Reconcile the working tree, GitHub runs and live release before retrying any write. Use `npm run recover:status`; checkpoint and push finished work in small commits. A chat timeout does not establish that the external operation failed. Preserve all release gates and report email configuration honestly.
 
 The user requires preservation of every existing feature, UI capability, saved campaign, permission and supported platform. Do not remove, disable, hide, or replace a feature with a reduced version without the user's explicit approval. Full implementation permission is not removal permission.

@@ -1,0 +1,66 @@
+# Lootsplit coding session manual
+
+Read this at the start of every task, including a new chat, recovered workspace, or handoff. The current user's scope and authorization remain authoritative. This manual does not grant new permission to publish, send email, or change infrastructure.
+
+## 1. Recover the actual state before editing
+
+1. Read `AGENTS.project.md`, this manual, and `docs/RECOVERY.md` after any interruption. Consult `docs/FEATURE-INVENTORY.md` for affected behavior.
+2. Inspect `git status --short --branch`, the recent log, current remote main and the relevant PR. Preserve uncommitted work. Use an isolated branch/worktree if another task is active; do not overwrite or stop its processes.
+3. Check existing verification/deployment runs and the production release identity. A successful merge is not a successful release. An interrupted chat is not proof that a merge or deployment failed.
+4. Reuse completed authorized work. Do not automatically rerun tests, deployments, campaign actions or other mutations after an uncertain response. Identify the actual failed stage first.
+
+## 2. Define the smallest useful reproduction
+
+Write down the behavior being changed, the affected data/permissions, and one exact acceptance scenario. For a bug, demonstrate that the scenario fails before changing the implementation where practical. Read existing helpers and tests before creating another implementation.
+
+Prefer a direct unit/API regression for logic and permissions, plus a browser scenario for what a person clicks and sees. Preserve meaningful user flows even when fixtures prepare unrelated prerequisite data. Never replace a user-visible check with a database assertion alone.
+
+Account scenario mapping:
+
+| Scenario | Required coverage |
+| --- | --- |
+| `layout` | Public/account pages at mobile and desktop widths, real navigation between pages |
+| `library` | UI signup and recovery-key display, character profile, backup/restore, second-device sign-in, linking and resuming a shared membership |
+| `dm-resume` | Two devices and two saved rooms; end, reopen as verified DM, resume each from either device, correct room/role, no title replay, mobile/desktop cards |
+| `recovery` | UI recovery-key password reset and revocation of another signed-in device |
+
+## 3. Use the focused local loop before full CI
+
+1. Run `npm run dev:doctor`. If setup is missing, select the Node version in `.nvmrc`, then run `npm run dev:setup`. Setup reuses a matching dependency fingerprint and an already launchable browser. The development container is optional; no production credentials are needed.
+2. Run `npm run verify:focus -- SCENARIO`. The command copies current tracked/unignored source into a temporary workspace, uses an empty database and new browser contexts, starts `npm run dev` on its own strict loopback port, records diagnostics, and removes only that temporary workspace on completion.
+3. Read a failure's report/trace immediately. Make a targeted correction and rerun that scenario. Use a small repeat only to investigate an observed intermittent failure, not as a default ritual.
+4. Once the focused behavior passes, run the related backend/permission tests and `npm run verify:quick`. When changing account-test setup, run `npm run verify:focus -- accounts` to check all scenarios together before submitting CI.
+5. Submit the complete release suite once the local scenario and related checks are stable. If local verification is genuinely blocked, record the exact environment/access blocker and what was verified; do not claim a pass or weaken the release gate. Use CI to resolve that documented gap, not as the ordinary editing loop.
+
+There is no requirement to rerun unrelated local browser suites after each keystroke. All existing full PR/main preservation gates remain required. A checkpoint push is allowed before checks finish; do not portray it as a verified release.
+
+## 4. Write tests that diagnose failures
+
+- Use visible roles, labels and scoped locators. Read the actual UI before choosing selectors (for example, an end-session confirmation is an `alertdialog`).
+- Wait for the required state or completed operation. Do not add fixed sleeps to hide missing readiness checks. Keep waits that intentionally verify time-dependent animation or recovery behavior, with an explanatory comment.
+- Give scenarios independent accounts, cookies, storage and campaign data. Shared setup belongs in fixtures, not a preceding test. Use real local API endpoints for unrelated setup and real UI actions for the behavior under test.
+- The account suite uses Playwright Test with `forbidOnly: true`, no retries, failure screenshots and traces. Additional browser contexts are recorded by the runner too. Never turn retries into a way to make a flaky release look green.
+- Focused selection rejects unknown scenarios and is refused in CI. The unchanged account audit entry point runs every required scenario by default. Add new scenarios to the manifest and preservation mapping.
+- Traces may contain disposable passwords, keys and cookies. Use them only with synthetic local data; never post their contents to a public PR or email. Existing artifact access controls apply. Failure emails remain sanitized summaries.
+
+## 5. Inspect performance before optimizing
+
+Every bounded verification step already saves start, finish, outcome, commit, run and attempt. `npm run verify:timings` produces a sorted report; CI attaches it to each job summary and diagnostic artifact. Account reports also contain per-scenario durations.
+
+Optimize the slowest required job, because parallel jobs overlap. Do not add their durations together and call that user waiting time. Packaged account/finance checks and interface/title checks run on separate disposable runners against the same immutable build artifact. More concurrency may consume more runner-minutes; measure elapsed time and queueing before adding more jobs.
+
+Report implementation/debugging time, PR verification, main verification and deployment separately when explaining total task duration. Label estimates. Do not describe a four-minute check as a four-minute completed update.
+
+## 6. Publish and recover safely
+
+- Follow the user's existing authorization. Preserve all release gates, main-only publishing, stale-commit rejection, serialized deployment and immutable artifact hashes.
+- After a code change, fresh complete verification is required. After a diagnosed transient CI failure on unchanged code, retain successful independent groups and rerun only the necessary failed jobs. Rebuilding requires rechecking dependent packages.
+- Check exact PR head and successful checks before merge; reconcile remote main again if it has moved. Never claim deployment merely because a PR merged.
+- Confirm the deployment job, expected live commit, and read-only production desktop/mobile audit before saying it is live. Never run destructive browser fixtures against production.
+- Before a handoff/interruption, record branch/PR, latest commit, tests and their environment, run links, remaining failure and next action in the PR or `docs/RECOVERY.md`. Push useful completed checkpoints so temporary workspace loss does not erase them.
+
+## Tooling and scope
+
+Playwright (including its test runner), TypeScript, ESLint and GitHub Actions are already installed. Reuse them before adding another service or paid dependency. Keep application refactors limited to the behavior being changed; shared test fixtures do not justify an unrelated rewrite of gameplay or account permissions.
+
+Sources: [Playwright assertions](https://playwright.dev/docs/test-assertions), [test isolation and debugging](https://playwright.dev/docs/best-practices), [traces](https://playwright.dev/docs/trace-viewer).

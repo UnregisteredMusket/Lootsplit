@@ -1,3 +1,7 @@
+# Lootsplit: read before every coding session
+
+Read `AGENTS.project.md` and `docs/CODING-MANUAL.md` first. After an interruption also read `docs/RECOVERY.md` and reconcile current repository, CI and live state before repeating an action. Use focused local verification before full CI; the manual contains the commands and required preservation procedures. The original scaffold guidance below applies where consistent with the current Lootsplit project instructions (production is Cloudflare Workers/D1).
+
 # App Builder Workspace
 
 **The single source of truth** for the App Builder sandbox contract. You are
