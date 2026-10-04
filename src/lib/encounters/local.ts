@@ -1,3 +1,4 @@
+import { rollLootTable } from "./roll-table.mjs";
 import { z } from "zod";
 import { quireDb, request, activeDatabaseName } from "../quire/db.ts";
 import { getSeat } from "../quire/table.ts";
@@ -172,28 +173,7 @@ export async function localEncounterRequest<T>(path: string, input: unknown = {}
           if (b.tableId) {
             const t = r.body.tables.find((t) => t.id === b.tableId);
             if (!t) throw new Error("Loot table not found.");
-            const weight = t.entries.reduce((sum, e) => sum + e.weight, 0);
-            const limit = Math.floor(4294967296 / weight) * weight;
-            const bytes = new Uint32Array(1);
-            do {
-              crypto.getRandomValues(bytes);
-            } while (bytes[0] >= limit);
-            const total = (bytes[0] % weight) + 1;
-            let remainder = total,
-              selected = 0;
-            for (; selected < t.entries.length - 1; selected++) {
-              remainder -= t.entries[selected].weight;
-              if (remainder <= 0) break;
-            }
-            draw = {
-              label: t.name,
-              formula: `1d${weight}`,
-              source: "app",
-              total,
-              selected,
-              tableId: t.id,
-              resultName: t.entries[selected].loot.name,
-            };
+            draw = rollLootTable(t, b.manual === true, b.total, "app");
           } else {
             const formula = b.formula || "1d20";
             parseDice(formula);
