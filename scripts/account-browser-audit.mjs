@@ -23,16 +23,6 @@ try {
   context.setDefaultTimeout(20000);
   const page = await context.newPage();
   page.on("pageerror", (e) => errors.push(e.message));
-  await context.exposeBinding("auditNotice", (_source, text) => console.log("Account UI notice:", text));
-  await context.addInitScript(() => {
-    new MutationObserver(() => {
-      const text = [...document.querySelectorAll("[data-sonner-toast]")].map((node) => node.textContent).join(" | ");
-      if (text && text !== window.__auditNotice) {
-        window.__auditNotice = text;
-        void window.auditNotice(text);
-      }
-    }).observe(document, { childList: true, subtree: true });
-  });
   // Warm Vite before checking for module errors.
   await visit(page, "/welcome");
   await page.waitForTimeout(2500);
@@ -140,8 +130,12 @@ try {
     .members[0].code;
   async function endSession(p) {
     await visit(p, "/share");
+    await p.getByRole("status").filter({ hasText: "Connected · All changes saved" }).waitFor();
     await p.getByRole("button", { name: "End session", exact: true }).click();
-    await p.getByRole("alertdialog").getByRole("button", { name: "End session", exact: true }).click();
+    await p
+      .getByRole("alertdialog")
+      .getByRole("button", { name: "End session", exact: true })
+      .click();
     await p.getByRole("button", { name: "Start a room", exact: true }).waitFor();
   }
   await endSession(page);
@@ -201,7 +195,7 @@ try {
   await page.getByLabel("New password", { exact: true }).fill("new browser testing password 2026");
   await page.getByRole("button", { name: "Reset password", exact: true }).click();
   await page.getByRole("status").filter({ hasText: "Password changed" }).waitFor();
-  await reloadApplication(other);
+  await visit(other, "/account");
   await other.getByRole("button", { name: "Sign in", exact: true }).last().waitFor();
   assert.deepEqual(errors, []);
   console.log(
@@ -210,8 +204,17 @@ try {
 } catch (error) {
   for (const [index, context] of browser.contexts().entries()) {
     for (const [pageIndex, page] of context.pages().entries()) {
-      console.error("Account audit page:", page.url(), (await page.locator("body").innerText()).slice(-6000));
-      await page.screenshot({ path: `test-results/account-failure-${index}-${pageIndex}.png`, fullPage: true });
+      console.error(
+        "Account audit page:",
+        page.url(),
+        (await page.locator("body").innerText())
+          .replace(/[a-f0-9]{64}/gi, "[test recovery key redacted]")
+          .slice(-6000),
+      );
+      await page.screenshot({
+        path: `test-results/account-failure-${index}-${pageIndex}.png`,
+        fullPage: true,
+      });
     }
   }
   throw error;
