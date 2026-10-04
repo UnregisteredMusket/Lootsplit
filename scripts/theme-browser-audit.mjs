@@ -8,6 +8,13 @@ await mkdir(output, { recursive: true });
 const browser = await chromium.launch({ args: ["--no-sandbox"] });
 let page;
 try {
+  // Vite's first dependency discovery can reload the client. Warm its actual entry
+  // before collecting errors from the fresh, isolated test contexts below.
+  const warmup = await browser.newPage();
+  await openApplication(warmup, origin + "/settings#appearance");
+  await warmup.getByLabel("Accent color", { exact: true }).waitFor();
+  await warmup.waitForLoadState("networkidle");
+  await warmup.close();
   for (const width of [390, 1280]) {
     const context = await browser.newContext({ viewport: { width, height: 844 } });
     await context.addInitScript(() => localStorage.setItem("quire.guide.offer.v3", "seen"));
