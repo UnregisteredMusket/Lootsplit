@@ -1,3 +1,4 @@
+import { useDisclosureAnchor } from "@/lib/help/use-disclosure-anchor";
 import { useState } from "react";
 import { toast } from "sonner";
 import { useEconomy } from "@/lib/quire/economy-context";
@@ -16,6 +17,7 @@ const defaults: Terms = {
   payment: 0,
 };
 export function CampaignFinance() {
+  const anchorRef = useDisclosureAnchor("campaign-finance");
   const { journal, purses, holdings, loans: requests, command } = useEconomy();
   const seat = useSeat();
   const f = readFinance(journal.finance),
@@ -66,7 +68,7 @@ export function CampaignFinance() {
     setPrincipal(l.principal);
   };
   return (
-    <details className="review-inbox" id="campaign-finance">
+    <details ref={anchorRef} className="review-inbox" id="campaign-finance">
       <summary>Campaign finances & downtime{pending ? " · Awaiting DM approval" : ""}</summary>
       <p className="text-sm text-muted">
         Campaign records only. Uses the existing party/character purses and inventory, independently

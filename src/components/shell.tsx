@@ -74,6 +74,10 @@ export function Shell({
   const [blocked, setBlocked] = useState<string | null>(null);
   const dirty = useRef(false);
 
+  const destinationHash = useRouterState({ select: (state) => state.location.hash });
+  useEffect(() => {
+    if (destinationHash === "management") setManagement(true);
+  }, [destinationHash]);
   useEffect(() => watchCrashes(), []);
   useEffect(() => {
     if (import.meta.env.VITE_MOBILE !== "true") return;

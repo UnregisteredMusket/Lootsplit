@@ -1,3 +1,4 @@
+import { APP_DESCRIPTION } from "@/lib/help/content";
 import { MemberActivity } from "@/components/account/activity";
 import {
   createRootRoute,
@@ -25,8 +26,7 @@ export const Route = createRootRoute({
       { title: APP_NAME },
       {
         name: "description",
-        content:
-          "Track campaign money, shops, and prices. Create shops from an item catalog, and read names and prices from PDFs you import.",
+        content: APP_DESCRIPTION,
       },
       { name: "theme-color", content: "#10182c" },
     ],

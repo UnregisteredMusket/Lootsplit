@@ -1,0 +1,112 @@
+.help-guide {
+  --help-text: var(--color-fg);
+  --help-muted: var(--color-muted);
+  --help-fill: var(--color-elevated);
+  --help-line: var(--color-border);
+  --help-link: var(--color-lead);
+  color: var(--help-text);
+}
+.ls-site .help-guide {
+  --help-text: #eee9dd;
+  --help-muted: #bec6ca;
+  --help-fill: #14202c;
+  --help-line: #354451;
+  --help-link: #e0bc78;
+}
+.help-search {
+  display: grid;
+  gap: 8px;
+  font-weight: 500;
+}
+.help-search input {
+  width: 100%;
+  min-height: 46px;
+  padding: 10px 12px;
+  border: 1px solid var(--help-line);
+  border-radius: 6px;
+  background: var(--help-fill);
+  color: var(--help-text);
+  font: inherit;
+  font-size: 16px;
+}
+.help-search input::placeholder {
+  color: var(--help-muted);
+  opacity: 1;
+}
+.help-quick-links {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin: 16px 0;
+}
+.help-quick-links button {
+  padding: 10px 12px;
+  min-height: 44px;
+  border: 1px solid var(--help-line);
+  border-radius: 6px;
+  background: var(--help-fill);
+  color: var(--help-text);
+  text-align: left;
+  font: inherit;
+  font-size: 14px;
+}
+.help-result {
+  color: var(--help-muted);
+  margin-bottom: 24px;
+  font-size: 14px;
+}
+.help-group,
+.help-topic {
+  scroll-margin-top: 100px;
+}
+.help-group {
+  margin: 28px 0;
+}
+.help-group h2 {
+  font-family: var(--font-display, Georgia), serif;
+  font-size: 24px;
+  margin-bottom: 12px;
+}
+.help-topic {
+  border-bottom: 1px solid var(--help-line);
+}
+.help-topic summary {
+  padding: 16px 4px;
+  font-size: 16px;
+  font-weight: 500;
+  cursor: pointer;
+}
+.help-topic summary small {
+  display: block;
+  margin: 5px 0 0 18px;
+  color: var(--help-muted);
+  font-size: 12px;
+  font-weight: 400;
+}
+.help-topic-body {
+  padding: 0 4px 18px;
+}
+.help-topic-body p {
+  color: var(--help-muted);
+  font-size: 15px;
+  line-height: 1.65;
+  margin: 0 0 12px;
+}
+.help-destinations {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px 20px;
+}
+.help-destinations a {
+  color: var(--help-link);
+  font-size: 14px;
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.help-guide :focus-visible {
+  outline: 2px solid var(--help-link);
+  outline-offset: 3px;
+}

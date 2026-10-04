@@ -1,3 +1,4 @@
+import { useDisclosureAnchor } from "@/lib/help/use-disclosure-anchor";
 import { CampaignFinance } from "./campaign-finance";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -29,6 +30,7 @@ function RecordedChange({ change }: { change: NonNullable<Journal["events"][numb
   );
 }
 export function CampaignJournal() {
+  const reviewRef = useDisclosureAnchor("review-inbox");
   const { journal, ledger, purses, command, loans, decideLoan } = useEconomy();
   const seat = useSeat();
   const dm = seat.role === "dm";
@@ -64,6 +66,7 @@ export function CampaignJournal() {
   return (
     <div className="campaign-journal" id="review">
       <Fold
+        anchorId="sessions"
         title={active ? `Session · ${active.name}` : "Play sessions"}
         hint="Named sessions, with recorded coin movement."
       >
@@ -153,7 +156,7 @@ export function CampaignJournal() {
         </p>
       </Fold>
       <CampaignFinance />
-      <details id="review-inbox" className="review-inbox">
+      <details ref={reviewRef} id="review-inbox" className="review-inbox">
         <summary>
           {dm ? "Review inbox" : "Payment requests"} ·{" "}
           {pending.length + requests.filter((x) => x.status === "pending").length} pending

@@ -100,8 +100,7 @@ function SettingsPage() {
             <Diagnostics />
           </Fold>
 
-          <div id="economy" />
-          <Fold title="Price modifiers" hint="Season, shortages, war, and the value of a gold piece." defaultOpen>
+          <Fold anchorId="economy" title="Price modifiers" hint="Season, shortages, war, and the value of a gold piece." defaultOpen>
             <p className="mt-2 text-sm text-muted">
               {realmNote(draft, { dollars: prefs.showDollars })}
             </p>
@@ -312,8 +311,7 @@ function SettingsPage() {
             </div>
           </Fold>
 
-          <div id="appearance" />
-          <Fold title="Colors" hint="Light or dark, a ready-made look, or your own colors.">
+          <Fold anchorId="appearance" title="Colors" hint="Light or dark, a ready-made look, or your own colors.">
             <p className="mt-2 text-sm text-muted">Light or dark, a ready-made look, or your own accent and page color.</p>
             <div className="mt-4">
               <ChoiceGrid

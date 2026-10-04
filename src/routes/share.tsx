@@ -2,7 +2,7 @@ import { getServerCloudTable } from "@/lib/quire/cloud-client";
 import { useSyncExternalStore } from "react";
 import { getCloudTable, subscribeCloudTable } from "@/lib/quire/cloud-client";
 import { useEffect, useState } from "react";
-import { Link, createFileRoute } from "@tanstack/react-router";
+import { Link, createFileRoute, useRouterState } from "@tanstack/react-router";
 import { CloudTable } from "@/components/cloud-table";
 import { Notices } from "@/components/notices";
 import { Shell } from "@/components/shell";
@@ -19,13 +19,16 @@ export const Route = createFileRoute("/share")({ component: SharePage });
 function SharePage() {
   const [openChat, setOpenChat] = useState(false);
   const [tab, setTab] = useState("room");
+  const locationSearch = useRouterState({ select: (s) => s.location.searchStr });
   useEffect(() => {
     const chat = new URLSearchParams(window.location.search).get("chat") === "1";
     setOpenChat(chat);
     if (chat) setTab("chat");
-    else if (new URLSearchParams(window.location.search).get("tab") === "notifications")
-      setTab("notifications");
-  }, []);
+    else {
+      const next = new URLSearchParams(locationSearch).get("tab");
+      setTab(next && ["room", "chat", "rolls", "notifications"].includes(next) ? next : "room");
+    }
+  }, [locationSearch]);
   const room = useSyncExternalStore(subscribeCloudTable, getCloudTable, getServerCloudTable);
   const seat = useSeat();
   const { count } = useChatUnread();
@@ -85,7 +88,11 @@ function SharePage() {
         </Fold>
       </div>
       <div className="campaign-support">
-        <Fold title="Connection & recovery" hint="Pending changes, retry, and recovery files.">
+        <Fold
+          anchorId="connection-recovery"
+          title="Connection & recovery"
+          hint="Pending changes, retry, and recovery files."
+        >
           <SyncStatus />
           <p className="text-sm text-muted">
             Shared changes are saved when the server accepts them. Offline changes stay pending
