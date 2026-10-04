@@ -1,6 +1,65 @@
 const fail = (message, status = 400) => {
   throw Object.assign(new Error(message), { status });
 };
+
+export async function resumeCampaignMembership(db, userId, body) {
+  const member = await db
+    .prepare("SELECT * FROM library_members WHERE user_id=? AND code=?")
+    .bind(userId, body.code)
+    .first();
+  if (!member) fail("Campaign not found.", 404);
+  const row = await db
+    .prepare("SELECT body,revision FROM campaign_rooms WHERE code=?")
+    .bind(member.code)
+    .first();
+  const room = row ? JSON.parse(row.body) : null;
+  // Ownership is the saved account membership plus the current server seat, never a client role.
+  const seat = room?.seats.find((s) => s.id === member.seat_id && s.token === member.token);
+  if (!seat || (room.closed && seat.role !== "dm"))
+    fail("This campaign membership is no longer available. Ask the DM for a new invitation.", 403);
+  let reopened = false;
+  if (room.closed) {
+    if (body.reopen !== true)
+      fail("This session has ended. Use Reopen as DM in My campaigns to continue it.", 409);
+    if (body.revision !== row.revision)
+      fail("The campaign changed. Refresh My campaigns before reopening it.", 409);
+    if (Object.values(room.drafts || {}).some((draft) => draft.length))
+      fail("This campaign has pending turns. Resolve them before reopening it.", 409);
+    const next = structuredClone(room);
+    next.closed = false;
+    next.revision = row.revision + 1;
+    const players = next.seats.filter((s) => s.role === "player");
+    // Closing ended these player sessions. Reopening must not silently restore revoked access.
+    next.departed = [
+      ...(next.departed || []).filter((s) => !players.some((p) => p.id === s.id)),
+      ...players.map((s) => ({ ...s, status: "dismissed" })),
+    ];
+    next.seats = next.seats.filter((s) => s.role === "dm");
+    next.turn = next.seats.findIndex((s) => s.id === seat.id);
+    const saved = await db
+      .prepare("UPDATE campaign_rooms SET body=?,revision=? WHERE code=? AND revision=?")
+      .bind(JSON.stringify(next), next.revision, member.code, row.revision)
+      .run();
+    if (saved.meta.changes !== 1)
+      fail("The campaign changed. Refresh My campaigns before reopening it.", 409);
+    reopened = true;
+  }
+  await db
+    .prepare("UPDATE library_members SET updated_at=? WHERE user_id=? AND code=?")
+    .bind(Date.now(), userId, member.code)
+    .run();
+  return {
+    code: member.code,
+    token: member.token,
+    seatId: seat.id,
+    role: seat.role,
+    purseIds: seat.purseIds,
+    name: member.name,
+    userId,
+    reopened,
+  };
+}
+
 export async function campaignAction(db, userId, body) {
   if (typeof body.code !== "string" || !["rename", "delete"].includes(body.action))
     fail("Invalid campaign action.");

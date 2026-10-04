@@ -125,6 +125,63 @@ try {
       JSON.parse(localStorage.getItem("quire.campaigns.v1")).some((c) => c.id === "main"),
     ),
   );
+  console.log("Account audit: DM reopens two ended campaigns across devices");
+  const firstCode = (await (await context.request.get(origin + "/api/account/library")).json())
+    .members[0].code;
+  async function endSession(p) {
+    await visit(p, "/share");
+    await p.getByRole("button", { name: "End session", exact: true }).click();
+    await p.getByRole("dialog").getByRole("button", { name: "End session", exact: true }).click();
+    await p.getByRole("button", { name: "Start a room", exact: true }).waitFor();
+  }
+  await endSession(page);
+  // The other device created the first room; this device now creates and saves the second.
+  await page.getByRole("button", { name: "Start a room", exact: true }).click();
+  await page.getByRole("button", { name: "Create room", exact: true }).click();
+  await page.getByRole("button", { name: "Share join link", exact: true }).waitFor();
+  await visit(page, "/account");
+  await page.getByRole("button", { name: "Save current membership", exact: true }).click();
+  await page.getByRole("status").filter({ hasText: "This membership is saved" }).waitFor();
+  const saved = (await (await context.request.get(origin + "/api/account/library")).json()).members;
+  assert.equal(saved.length, 2);
+  const secondCode = saved.find((m) => m.code !== firstCode).code;
+  await endSession(page);
+  for (const [p, width] of [
+    [page, 390],
+    [other, 1360],
+  ]) {
+    await p.setViewportSize({ width, height: 900 });
+    await visit(p, "/account");
+    await p.getByRole("button", { name: "Reopen as DM", exact: true }).nth(1).waitFor();
+    assert.equal(
+      await p.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1),
+      true,
+    );
+    await p.screenshot({ path: `test-results/dm-resume-closed-${width}.png`, fullPage: true });
+  }
+  async function resumeFromAccount(p, code, label) {
+    await visit(p, "/account");
+    const card = p.locator("article.portal-card").filter({ hasText: code });
+    await card.getByRole("button", { name: label, exact: true }).click();
+    await p.waitForURL((url) => url.origin === origin && url.pathname === "/");
+    await p.getByRole("button", { name: "Dungeon master. Change role.", exact: true }).waitFor();
+    assert.equal(
+      await p.locator(".loot-opening").count(),
+      0,
+      "Account resume must not replay startup",
+    );
+    const active = await p.evaluate(() => {
+      const id = localStorage.getItem("quire.campaign.v1");
+      const session = JSON.parse(localStorage.getItem(`quire.cloud.v2.${id}`));
+      return { code: session.code, role: session.role };
+    });
+    assert.deepEqual(active, { code, role: "dm" });
+  }
+  await resumeFromAccount(other, secondCode, "Reopen as DM");
+  await resumeFromAccount(page, firstCode, "Reopen as DM");
+  // Both saved campaigns also remain resumable after the first reopen, on either device.
+  await resumeFromAccount(page, secondCode, "Resume");
+  await resumeFromAccount(other, firstCode, "Resume");
   await visit(page, "/account");
   console.log("Account audit: recover and revoke other sessions");
   await page.getByRole("button", { name: "Sign out", exact: true }).click();
