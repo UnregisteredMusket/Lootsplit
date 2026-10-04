@@ -55,6 +55,8 @@ Not implemented or promised by this inventory: OCR, Google Drive backup integrat
 
 ## Website owner and credits
 
+- Owner-only Test mode controls appear at the bottom of Settings & Management, with character count, starting gold and HP configurable directly in the menu. The separate test campaign, DM reset and analytics exclusion remain available.
+
 - Homepage gold-spent counter uses recorded purchases and outgoing payments in current shared
   campaigns. Reusable campaign/player-wallet analytics preserve existing ledger, inventory,
   finance and backup behavior. Only spending is public; additional aggregate metrics are
