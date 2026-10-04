@@ -2093,7 +2093,7 @@ function QuickRoll({
       </label>}
       {manual && !allowed && <p>The DM has disabled manual rolls in this campaign.</p>}
       <button disabled={disabled || busy || (manual && (!allowed || !validTotal))} onClick={() => void roll()}>
-        {manual ? `Record ${label}` : label}
+        {manual ? `Record ${label.replace(/^Roll /, "")}` : label}
       </button>
       {d20 && !manual && (
         <select
