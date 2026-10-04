@@ -26,7 +26,8 @@
     "build:cloudflare": "VITE_AUTH_ENABLED=false node scripts/with-app-env.mjs vite build",
     "deploy:cloudflare": "node scripts/require-github-release.mjs",
     "build:mobile": "VITE_AUTH_ENABLED=false VITE_MOBILE=true node scripts/with-app-env.mjs vite build --config vite.mobile.config.ts && node scripts/prepare-mobile.mjs",
-    "build:android": "npm run build:mobile && npx cap sync android && cd android && ./gradlew assembleDebug"
+    "build:android": "npm run build:mobile && npx cap sync android && cd android && ./gradlew assembleDebug",
+    "recover:status": "node scripts/recovery-status.mjs"
   },
   "dependencies": {
     "@capacitor/app": "^8.1.1",

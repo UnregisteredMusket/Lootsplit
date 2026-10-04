@@ -40,6 +40,8 @@ Not implemented or promised by this inventory: OCR, Google Drive backup integrat
 
 ## Website and optional account library
 
+- Development/release recovery: bounded per-stage verification, durable GitHub job/artifact checkpoints, an explicit resume prompt/status command, and independent failure reports with optional configured email delivery. See `docs/RECOVERY.md`. No gameplay, saved data, account permissions or platform support is altered.
+
 - Optional locked Render standby, verified portable releases, encrypted offsite D1 snapshots, and manual fenced recovery to a new Turso/libSQL database. See `docs/STANDBY.md`; snapshots exclude device-only campaigns/PDFs. Existing primary, Android and offline behavior is preserved.
 
 - Public welcome, Android download, desktop installation guidance, changelog and help pages alongside the existing app URL.
