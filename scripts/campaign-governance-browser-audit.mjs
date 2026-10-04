@@ -212,7 +212,7 @@ try {
   console.log("Governance audit: leave room and retain authorized reports");
   await player.page.getByRole("button", { name: "Leave room", exact: true }).click();
   await player.page
-    .getByRole("dialog")
+    .getByRole("alertdialog")
     .getByRole("button", { name: "Leave room", exact: true })
     .click();
   for (let n = 0; n < 80 && (await state(player.page)).purses.length; n++)
@@ -272,6 +272,15 @@ try {
   console.log(
     "PASS: desktop/mobile DM edit toggle and change report, locked construction, health/equip/consume gameplay, archival before clearing logs, voluntary leave, account reports, owner Test configurator/indicator/reset and isolated campaign data.",
   );
+} catch (error) {
+  for (const [index, context] of browser.contexts().entries()) {
+    for (const [pageIndex, page] of context.pages().entries()) {
+      await page
+        .screenshot({ path: `${output}/failure-${index}-${pageIndex}.png`, fullPage: true })
+        .catch(() => {});
+    }
+  }
+  throw error;
 } finally {
   for (const code of codes)
     await db.prepare("DELETE FROM campaign_rooms WHERE code=?").bind(code).run();
