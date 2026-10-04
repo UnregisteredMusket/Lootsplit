@@ -519,6 +519,18 @@ function EncounterEditor({
   }
   async function roll(tableId?: string, retry = false) {
     if (!detail || !draft) return;
+    if (!retry && manual) {
+      const raw = tableId ? tableTotals[tableId] ?? "" : total;
+      const value = Number(raw);
+      const maximum = tableId
+        ? draft.tables.find((table) => table.id === tableId)?.entries.reduce((sum, row) => sum + row.weight, 0) ?? 0
+        : 100000;
+      const minimum = tableId ? 1 : -100000;
+      if (!raw.trim() || !Number.isSafeInteger(value) || value < minimum || value > maximum) {
+        setError(`Enter a whole-number physical total from ${minimum} to ${maximum}.`);
+        return;
+      }
+    }
     setBusy(true);
     setError("");
     try {
