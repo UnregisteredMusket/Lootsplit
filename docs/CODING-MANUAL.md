@@ -17,12 +17,12 @@ Prefer a direct unit/API regression for logic and permissions, plus a browser sc
 
 Account scenario mapping:
 
-| Scenario | Required coverage |
-| --- | --- |
-| `layout` | Public/account pages at mobile and desktop widths, real navigation between pages |
-| `library` | UI signup and recovery-key display, character profile, backup/restore, second-device sign-in, linking and resuming a shared membership |
+| Scenario    | Required coverage                                                                                                                                     |
+| ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `layout`    | Public/account pages at mobile and desktop widths, real navigation between pages                                                                      |
+| `library`   | UI signup and recovery-key display, character profile, backup/restore, second-device sign-in, linking and resuming a shared membership                |
 | `dm-resume` | Two devices and two saved rooms; end, reopen as verified DM, resume each from either device, correct room/role, no title replay, mobile/desktop cards |
-| `recovery` | UI recovery-key password reset and revocation of another signed-in device |
+| `recovery`  | UI recovery-key password reset and revocation of another signed-in device                                                                             |
 
 ## 3. Use the focused local loop before full CI
 
@@ -45,7 +45,11 @@ There is no requirement to rerun unrelated local browser suites after each keyst
 
 ## 5. Inspect performance before optimizing
 
+The user requires measured slowdowns of **15% or above**, including exactly 15%, against the last logged comparable duration to be recorded on GitHub. Faster and sub-15% runs do not get log entries or change that reference. Read `docs/PERFORMANCE.md`. CI workflows/jobs/steps are collected automatically; record measured local tests, functions, deployments, actions and audits with `npm run performance:record -- measurement.json` and commit the resulting entry. Every full audit must fetch and analyze the persistent regression log, check recorder freshness, and document new/unresolved findings with baseline/current duration, added time, percentage increase, evidence and follow-up. An unavailable log is an audit gap. Repeated rises in the logged threshold are a performance trend requiring investigation. Report the original reference → latest logged duration, cumulative added time and percentage increase, number of increases, affected operations, and whether total workflow time also worsened. Preserve every qualifying entry so an increasing threshold cannot hide the accumulated slowdown.
+
 Every bounded verification step already saves start, finish, outcome, commit, run and attempt. `npm run verify:timings` produces a sorted report; CI attaches it to each job summary and diagnostic artifact. Account reports also contain per-scenario durations.
+
+After fixing and confirming a slowdown with a successful comparable verification, use `npm run performance:resolve -- resolution.json` and commit the resolution record. Close the old trend, retain its evidence, and start the next trend from the verified post-fix duration. A faster run by itself does not authorize resetting the reference. Follow `docs/PERFORMANCE.md` for matching scopes and rejecting stale reset requests.
 
 Optimize the slowest required job, because parallel jobs overlap. Do not add their durations together and call that user waiting time. Packaged account/finance checks and interface/title checks run on separate disposable runners against the same immutable build artifact. More concurrency may consume more runner-minutes; measure elapsed time and queueing before adding more jobs.
 
