@@ -176,7 +176,7 @@ try {
   await page.getByRole("button", { name: "Abilities & skills", exact: true }).click();
   const physical = page.getByLabel("Roll DEX +3 manual total", { exact: true });
   await physical.fill("19");
-  await page.getByRole("button", { name: "Record Roll DEX +3", exact: true }).click();
+  await page.getByRole("button", { name: "Record DEX +3", exact: true }).click();
   await page.locator(".quick-roll output").filter({ hasText: "19 · Manual result" }).waitFor();
   await dm.page.getByRole("button", { name: "Refresh roll log", exact: true }).last().click();
   await dm.page.getByText(/MANUAL RESULT/).waitFor();
