@@ -40,6 +40,8 @@ Not implemented or promised by this inventory: OCR, Google Drive backup integrat
 
 ## Website and optional account library
 
+- Development/release recovery: bounded per-stage verification, durable GitHub job/artifact checkpoints, an explicit resume prompt/status command, and independent failure reports with optional configured email delivery. See `docs/RECOVERY.md`. No gameplay, saved data, account permissions or platform support is altered.
+
 - Optional locked Render standby, verified portable releases, encrypted offsite D1 snapshots, and manual fenced recovery to a new Turso/libSQL database. See `docs/STANDBY.md`; snapshots exclude device-only campaigns/PDFs. Existing primary, Android and offline behavior is preserved.
 
 - Public welcome, Android download, desktop installation guidance, changelog and help pages alongside the existing app URL.
@@ -52,6 +54,8 @@ Not implemented or promised by this inventory: OCR, Google Drive backup integrat
 - Reusable character names, portraits and notes; adding a profile to a local DM campaign creates an empty purse and does not transfer wealth or inventory.
 
 ## Website owner and credits
+
+- Owner-only Test mode controls appear at the bottom of Settings & Management, with character count, starting gold and HP configurable directly in the menu. The separate test campaign, DM reset and analytics exclusion remain available.
 
 - Homepage gold-spent counter uses recorded purchases and outgoing payments in current shared
   campaigns. Reusable campaign/player-wallet analytics preserve existing ledger, inventory,

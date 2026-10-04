@@ -2,6 +2,7 @@ import { AppLink } from "@/components/app-link";
 import { RollModeSetting } from "@/components/roll-mode-setting";
 import { FantasyIcon } from "@/components/fantasy-icon";
 import { useState } from "react";
+import { TestModeSettings } from "@/components/test-mode";
 import { ChevronDown, LogIn } from "lucide-react";
 import { Button, Modal } from "@/components/ui";
 import { FANTASY_LOOKS } from "@/lib/quire/theme";
@@ -263,6 +264,7 @@ export function ManagementPanel({
             My account
           </AppLink>
         </div>
+        {open && <TestModeSettings inMenu />}
       </div>
     </Modal>
   );

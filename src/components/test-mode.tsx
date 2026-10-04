@@ -15,7 +15,7 @@ import { emptyCloudTable } from "@/lib/quire/cloud";
 import { setSeat } from "@/lib/quire/table";
 import { getCampaigns, switchCampaign } from "@/lib/quire/campaigns";
 import { Fold, Button } from "./ui";
-export function TestModeSettings() {
+export function TestModeSettings({ inMenu = false }: { inMenu?: boolean }) {
   const cloud = useSyncExternalStore(subscribeCloudTable, getCloudTable, getServerCloudTable);
   const [owner, setOwner] = useState(false),
     [count, setCount] = useState(4),
@@ -60,6 +60,7 @@ export function TestModeSettings() {
   return (
     <Fold
       title="Test mode"
+      anchorId={inMenu ? undefined : "test-mode"}
       hint="Owner-only sandbox. Excluded from public and owner gameplay analytics."
     >
       <label className="flex min-h-11 items-center gap-2">

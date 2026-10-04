@@ -220,6 +220,23 @@ try {
     false,
   );
   await visit(player.page, "/share");
+  const [memberLibrary] = await Promise.all([
+    player.page.waitForResponse(
+      (response) => response.url().endsWith("/api/account/library") && response.ok(),
+    ),
+    player.page.locator(".settings-trigger").click(),
+  ]);
+  assert.equal((await memberLibrary.json()).user.role, "member");
+  await player.page.getByRole("dialog").waitFor();
+  await player.page.waitForLoadState("networkidle");
+  assert.equal(
+    await player.page
+      .getByRole("dialog")
+      .getByRole("button", { name: /^Test mode/ })
+      .count(),
+    0,
+  );
+  await player.page.getByRole("dialog").getByRole("button", { name: "Close", exact: true }).click();
   console.log("Governance audit: leave room and retain authorized reports");
   await player.page.getByRole("button", { name: "Leave room", exact: true }).click();
   await player.page
@@ -232,13 +249,36 @@ try {
   const records = await player.context.request.get(origin + "/api/account/records");
   assert.equal(records.status(), 200);
   assert.equal((await records.json()).reports.length, 1);
-  await visit(host.page, "/settings");
+  // Test controls belong inside the bottom of the actual gear menu on mobile.
+  await host.page.setViewportSize({ width: 390, height: 844 });
+  const menuUrl = host.page.url();
+  await host.page.locator(".settings-trigger").click();
+  const menu = host.page.getByRole("dialog", { name: "Settings & Management" });
+  await menu.getByRole("button", { name: /^Test mode/ }).click();
+  assert.equal(await host.page.locator(".loot-opening").count(), 0);
+  assert.equal(host.page.url(), menuUrl);
   console.log("Governance audit: owner Test mode configuration and reset");
-  const test = host.page
+  const test = menu
     .locator(".loot-fold")
     .filter({ has: host.page.getByRole("button", { name: /^Test mode/ }) })
     .first();
-  await test.locator(":scope > div > button").first().click();
+  await test.getByLabel("Characters", { exact: true }).waitFor();
+  assert.equal(
+    await menu
+      .locator(".management-panel > :last-child")
+      .getByLabel("Enable Test mode", { exact: true })
+      .count(),
+    1,
+  );
+  assert.equal(
+    await menu.evaluate((element) => element.scrollWidth > element.clientWidth + 1),
+    false,
+  );
+  await test.scrollIntoViewIfNeeded();
+  await host.page.screenshot({ path: output + "/test-settings-menu-mobile.png", fullPage: true });
+  await host.page.setViewportSize({ width: 1360, height: 1000 });
+  await test.scrollIntoViewIfNeeded();
+  await host.page.screenshot({ path: output + "/test-settings-menu-desktop.png", fullPage: true });
   await test.getByLabel("Characters", { exact: true }).fill("2");
   await Promise.all([
     host.page.waitForNavigation({ waitUntil: "domcontentloaded" }),
@@ -278,6 +318,15 @@ try {
   assert.equal((await state(host.page)).ledger.length, 0);
   await host.page.setViewportSize({ width: 390, height: 844 });
   await host.page.screenshot({ path: output + "/test-mode-mobile.png", fullPage: true });
+  await host.page.locator(".settings-trigger").click();
+  const activeMenu = host.page.getByRole("dialog", { name: "Settings & Management" });
+  await activeMenu.getByRole("button", { name: /^Test mode/ }).click();
+  const activeToggle = activeMenu.getByLabel("Enable Test mode", { exact: true });
+  await activeToggle.waitFor();
+  assert.equal(await activeToggle.isChecked(), true);
+  await activeToggle.scrollIntoViewIfNeeded();
+  await host.page.screenshot({ path: output + "/test-menu-mobile.png", fullPage: true });
+  assert.equal(await host.page.locator(".loot-opening").count(), 0);
   assert.equal(
     await host.page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1),
     false,
