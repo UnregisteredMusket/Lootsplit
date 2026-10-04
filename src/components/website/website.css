@@ -589,3 +589,67 @@
 .ls-donation { margin-top: 32px; }
 .ls-header nav { flex-wrap: wrap; }
 @media (max-width: 1050px) { .ls-header { flex-wrap: wrap; } .ls-header nav { gap: 8px 18px; } }
+
+/* Account tools share the public website palette and typography. */
+.ls-site .ls-account {
+  --portal-ink: #f3ecdc;
+  --portal-muted: var(--site-muted);
+  --portal-gold: var(--site-gold);
+  min-height: 0;
+  background: inherit;
+  color: inherit;
+  font: inherit;
+}
+.ls-site .ls-account .portal-content {
+  max-width: 1184px;
+  padding: 60px 36px 72px;
+}
+.ls-site .ls-account h1,
+.ls-site .ls-account h2,
+.ls-site .ls-account h3 {
+  font-family: "Cormorant Garamond", serif;
+  font-weight: 600;
+}
+.ls-site .ls-account .portal-card {
+  background: #152432;
+  border-color: #ffffff20;
+  border-radius: 4px;
+}
+.ls-site .ls-account .portal-button {
+  min-height: 52px;
+  padding: 12px 24px;
+  border-radius: 4px;
+  font-size: 16px;
+  font-weight: 600;
+  color: #17212c !important;
+}
+.ls-site .ls-account .portal-button:hover {
+  background: #f2d6a1;
+}
+.ls-site .ls-account .portal-button.secondary {
+  background: #102032b3;
+  color: #f5edda !important;
+  border-color: #859087;
+}
+.ls-site .ls-account .portal-button.secondary:hover {
+  background: #203349;
+}
+.ls-site .ls-account .portal-form input,
+.ls-site .ls-account .portal-form textarea,
+.ls-site .ls-account .portal-form select,
+.ls-site .ls-account .owner-form input,
+.ls-site .ls-account .owner-form textarea,
+.ls-site .ls-account .owner-form select,
+.ls-site .ls-account .portal-key code {
+  background: #0d1724;
+  color: var(--portal-ink);
+}
+.ls-site .ls-account .owner-stats > div,
+.ls-site .ls-account .monitor-service {
+  background: #152432;
+}
+@media (max-width: 800px) {
+  .ls-site .ls-account .portal-content {
+    padding: 35px 20px 48px;
+  }
+}
