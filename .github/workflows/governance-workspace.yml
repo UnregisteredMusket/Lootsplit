@@ -9,15 +9,20 @@ jobs:
   snapshot:
     if: github.repository == 'UnregisteredMusket/Lootsplit'
     runs-on: ubuntu-latest
-    timeout-minutes: 5
+    timeout-minutes: 10
     steps:
       - uses: actions/checkout@v4
         with:
           persist-credentials: false
-      - name: Package source for isolated verification
-        run: git archive --format=zip --output=/tmp/lootsplit-source.zip HEAD
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: Package locked dependencies for isolated tests
+        run: tar -czf /tmp/lootsplit-dependencies.tar.gz node_modules
       - uses: actions/upload-artifact@v4
         with:
-          name: lootsplit-governance-source
-          path: /tmp/lootsplit-source.zip
+          name: lootsplit-governance-dependencies
+          path: /tmp/lootsplit-dependencies.tar.gz
           retention-days: 1
