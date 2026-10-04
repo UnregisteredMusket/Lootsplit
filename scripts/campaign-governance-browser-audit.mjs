@@ -230,7 +230,10 @@ try {
   await player.page.getByRole("dialog").waitFor();
   await player.page.waitForLoadState("networkidle");
   assert.equal(
-    await player.page.getByRole("link", { name: "Test mode (owner)", exact: false }).count(),
+    await player.page
+      .getByRole("dialog")
+      .getByRole("button", { name: /^Test mode/ })
+      .count(),
     0,
   );
   await player.page.getByRole("dialog").getByRole("button", { name: "Close", exact: true }).click();
@@ -247,10 +250,6 @@ try {
   assert.equal(records.status(), 200);
   assert.equal((await records.json()).reports.length, 1);
   // Test controls belong inside the bottom of the actual gear menu on mobile.
-  await player.page.locator(".settings-trigger").click();
-  const playerMenu = player.page.getByRole("dialog", { name: "Settings & Management" });
-  assert.equal(await playerMenu.getByRole("button", { name: /^Test mode/ }).count(), 0);
-  await playerMenu.getByRole("button", { name: "Close", exact: true }).click();
   await host.page.setViewportSize({ width: 390, height: 844 });
   const menuUrl = host.page.url();
   await host.page.locator(".settings-trigger").click();
@@ -320,10 +319,13 @@ try {
   await host.page.setViewportSize({ width: 390, height: 844 });
   await host.page.screenshot({ path: output + "/test-mode-mobile.png", fullPage: true });
   await host.page.locator(".settings-trigger").click();
-  await host.page.getByRole("link", { name: "Test mode (owner)", exact: false }).waitFor();
+  const activeMenu = host.page.getByRole("dialog", { name: "Settings & Management" });
+  await activeMenu.getByRole("button", { name: /^Test mode/ }).click();
+  const activeToggle = activeMenu.getByLabel("Enable Test mode", { exact: true });
+  await activeToggle.waitFor();
+  assert.equal(await activeToggle.isChecked(), true);
+  await activeToggle.scrollIntoViewIfNeeded();
   await host.page.screenshot({ path: output + "/test-menu-mobile.png", fullPage: true });
-  await host.page.getByRole("link", { name: "Test mode (owner)", exact: false }).click();
-  await host.page.getByLabel("Enable Test mode", { exact: true }).waitFor();
   assert.equal(await host.page.locator(".loot-opening").count(), 0);
   assert.equal(
     await host.page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1),
