@@ -426,6 +426,7 @@ input,select,textarea { max-width: 100%; }
 .skill-row { display:grid; grid-template-columns:minmax(0,1fr) 112px 60px; align-items:start; gap:.4rem; margin:.6rem 0; }
 .quick-roll { display:flex; flex-wrap:wrap; gap:.3rem; min-width:0; }
 .quick-roll button { flex:1; text-align:left; }
+.quick-roll > label { flex-basis:100%; min-width:0; width:100%; font-size:.8rem; }
 .quick-roll select { font-size:.8rem; }
 .quick-roll output { flex-basis:100%; font-size:.85rem; }
 .character-play .character-check { display:flex; align-items:center; gap:.6rem; margin:.8rem 0; }
