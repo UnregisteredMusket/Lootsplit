@@ -19,7 +19,7 @@ import {
   moderation,
   memberDetail,
 } from "./members.mjs";
-import { campaignAction } from "./account-campaigns.mjs";
+import { campaignAction, resumeCampaignMembership } from "./account-campaigns.mjs";
 import {
   siteRole,
   publicAnnouncement,
@@ -321,10 +321,13 @@ export async function handleAccounts(request, env) {
               .all()
           ).results,
           members: members.results.map(({ room_body, token, ...m }) => {
-            const seat = room_body
-              ? (JSON.parse(room_body).closed ? null : JSON.parse(room_body).seats.find((s) => s.id === m.seat_id && s.token === token))
-              : null;
-            return { ...m, role: seat?.role || null };
+            const room = room_body ? JSON.parse(room_body) : null;
+            const seat = room?.seats.find((s) => s.id === m.seat_id && s.token === token);
+            return {
+              ...m,
+              role: seat && (!room.closed || seat.role === "dm") ? seat.role : null,
+              closed: room?.closed === true,
+            };
           }),
           backups: backups.results,
           characters: characters.results.map((r) => ({ id: r.id, ...JSON.parse(r.body) })),
@@ -362,27 +365,11 @@ export async function handleAccounts(request, env) {
       return cors(json({ ok: true }));
     }
     if (path === "/api/account/resume" && request.method === "POST") {
-      const row = await db
-        .prepare("SELECT * FROM library_members WHERE user_id=? AND code=?")
-        .bind(userId, text(body.code, 16))
-        .first();
-      if (!row) fail("Campaign not found.", 404);
-      const { seat } = await roomSeat(db, row.code, row.token);
-      if (seat.id !== row.seat_id) fail("This membership has changed.", 403);
-      await db
-        .prepare("UPDATE library_members SET updated_at=? WHERE user_id=? AND code=?")
-        .bind(Date.now(), userId, row.code)
-        .run();
       return cors(
-        json({
-          code: row.code,
-          token: row.token,
-          seatId: seat.id,
-          role: seat.role,
-          purseIds: seat.purseIds,
-          name: row.name,
-          userId,
-        }),
+        json(await resumeCampaignMembership(db, userId, {
+          ...body,
+          code: text(body.code, 16).toUpperCase(),
+        })),
       );
     }
     if (path === "/api/account/archive" && request.method === "POST") {

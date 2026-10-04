@@ -42,6 +42,7 @@ export type AccountLibrary = {
   notices: { action: string; reason: string; created_at: number }[];
   members: {
     role: "dm" | "player" | null;
+    closed: boolean;
     room_revision: number | null;
     code: string;
     seat_id: string;

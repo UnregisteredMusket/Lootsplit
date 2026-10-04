@@ -37,4 +37,6 @@ Android test installers retain manual dispatch and relevant branch pushes, filte
 
 Before parallelization, successful verification runs 37219404249 and 37223208369 took 509 and 659 seconds. Browser audits consumed 439 and 555 seconds (about 84–86%); web/mobile builds took 6 and 13 seconds combined. Compare new workflow wall time from first job start to aggregate-gate completion, excluding unrelated deployment time. Concurrency can use more runner-minutes despite lower elapsed time; queue availability affects actual results.
 
+First full parallel PR run: [37226001213](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37226001213), 296 seconds (4m 56s), including job handoffs. All groups passed. This is 42–55% less elapsed time than the two sequential baselines; future duration depends on added coverage and available runners.
+
 References: [GitHub job matrices](https://docs.github.com/en/actions/how-tos/write-workflows/choose-what-workflows-do/run-job-variations), [partial reruns](https://docs.github.com/en/actions/how-tos/manage-workflow-runs/re-run-workflows-and-jobs), [Node dev container](https://github.com/devcontainers/images/tree/main/src/javascript-node).

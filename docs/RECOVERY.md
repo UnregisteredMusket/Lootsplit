@@ -48,3 +48,10 @@ References: [GitHub workflow-run behavior](https://docs.github.com/en/actions/re
 - Starting production/main commit: `c0ba1b98ce691eff88117b2ea6abb34644f11815`; owner Test mode menu update is already live.
 - Work branch: `improvement/workflow-speed`. Inspect its latest PR and current Actions results before continuing. Merge only after all changed-workflow checks pass; then observe main verification and the automatic publisher. Do not duplicate a running merge or release.
 - Release safeguards and every existing audit remain required. Production data and Android signing configuration are outside this change.
+
+## DM account-resume checkpoint — 2026-10-04
+
+- Workflow-speed PR #31 is merged at `a60a2525678d55de178b718aece323337c20deeb`. PR verification run 37226001213 completed in 296 seconds including job handoffs; main verification 37226495127 and deployment 37226757969 succeeded. Live identity was confirmed.
+- Next authorized fix: DMs saving campaigns on separate devices cannot resume ended shared sessions. The existing library discarded the DM role for closed rooms, and resume returned the player-only invitation error. A failing regression reproduced this using two signed-in sessions and two saved campaigns.
+- Work branch: `fix/dm-account-resume`. Add an explicit, revision-checked Reopen as DM action using the account's existing seat/token on the server. Preserve all campaign content, pending actions and player restrictions. Existing ended player sessions must not regain access automatically.
+- Cross-device browser coverage is added to the existing account audit, so development, packaged Worker and standby paths all exercise the fix. Check the branch PR and full main/deployment results before claiming completion; do not rerun active jobs.

@@ -2,6 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { localAccountDb } from "./account-dev-db.mjs";
 import { handleAccounts } from "../cloudflare/accounts.mjs";
+import { closeRoom, roomState } from "../src/lib/quire/cloud.server.ts";
 const origin = "http://localhost:8080";
 function setup() {
   const DB = localAccountDb();
@@ -44,6 +45,159 @@ function setup() {
   };
   return { DB, env, call, signup };
 }
+test("a DM can reopen both saved campaigns from independent signed-in devices without restoring old player access", async () => {
+  const { DB, env, call, signup } = setup();
+  globalThis.__env__ = env;
+  try {
+    const phone = await signup("dm-resume@example.com");
+    const desktop = await call("auth/sign-in/email", {
+      email: "dm-resume@example.com",
+      password: "a long unique test password",
+    });
+    assert.equal(desktop.response.status, 200);
+    assert.notEqual(phone.cookie, desktop.cookie);
+    const player = await signup("resume-player@example.com");
+    for (const [code, device, gp] of [
+      ["PHONE123", phone, 23],
+      ["DESK1234", desktop, 47],
+    ]) {
+      const room = {
+        code,
+        revision: 1,
+        closed: false,
+        live: true,
+        turn: 0,
+        seats: [
+          { id: "dm", token: `${code}-dm-token`, name: "DM", role: "dm", purseIds: [] },
+          {
+            id: "player",
+            token: `${code}-player-token`,
+            name: "Player",
+            role: "player",
+            purseIds: ["hero"],
+          },
+        ],
+        table: {
+          purses: [
+            {
+              id: "hero",
+              name: "Hero",
+              kind: "character",
+              coins: { cp: 0, sp: 0, ep: 0, gp, pp: 0 },
+            },
+          ],
+          holdings: [],
+          ledger: [],
+          shops: [],
+          stock: [],
+          listings: [],
+          loans: [],
+          sheets: [],
+          notes: [],
+        },
+        seen: { gifts: [], sales: [] },
+      };
+      await DB.prepare("INSERT INTO campaign_rooms(code,revision,body) VALUES (?,1,?)")
+        .bind(code, JSON.stringify(room))
+        .run();
+      assert.equal(
+        (await call("link", { code, token: room.seats[0].token, name: code }, device.cookie))
+          .response.status,
+        200,
+      );
+      assert.equal(
+        (await call("link", { code, token: room.seats[1].token, name: code }, player.cookie))
+          .response.status,
+        200,
+      );
+      await closeRoom({ code, token: room.seats[0].token });
+    }
+    const library = (await call("library", undefined, desktop.cookie)).data;
+    assert.equal(library.members.length, 2);
+    for (const member of library.members) {
+      assert.equal(member.role, "dm", "A closed shared session must retain its linked DM identity");
+      assert.equal(member.closed, true);
+      const before = JSON.parse(
+        (await DB.prepare("SELECT body FROM campaign_rooms WHERE code=?").bind(member.code).first())
+          .body,
+      );
+      const request = { code: member.code, reopen: true, revision: member.room_revision };
+      assert.equal(
+        (await call("resume", { ...request, role: "dm" }, player.cookie)).response.status,
+        403,
+      );
+      assert.equal(
+        (await call("resume", { code: member.code }, phone.cookie)).response.status,
+        409,
+      );
+      assert.equal(
+        (await call("resume", { ...request, revision: 0 }, phone.cookie)).response.status,
+        409,
+      );
+      const pending = { ...before, drafts: { dm: [{ id: "keep-pending-action" }] } };
+      await DB.prepare("UPDATE campaign_rooms SET body=? WHERE code=?")
+        .bind(JSON.stringify(pending), member.code)
+        .run();
+      assert.equal((await call("resume", request, phone.cookie)).response.status, 409);
+      assert.deepEqual(
+        JSON.parse(
+          (
+            await DB.prepare("SELECT body FROM campaign_rooms WHERE code=?")
+              .bind(member.code)
+              .first()
+          ).body,
+        ),
+        pending,
+        "Pending actions must never be discarded by reopen",
+      );
+      await DB.prepare("UPDATE campaign_rooms SET body=? WHERE code=?")
+        .bind(JSON.stringify(before), member.code)
+        .run();
+      const resumed = await call("resume", request, desktop.cookie);
+      assert.equal(resumed.response.status, 200, JSON.stringify(resumed.data));
+      assert.equal(resumed.data.role, "dm");
+      assert.equal(resumed.data.reopened, true);
+      const after = JSON.parse(
+        (await DB.prepare("SELECT body FROM campaign_rooms WHERE code=?").bind(member.code).first())
+          .body,
+      );
+      assert.equal(after.closed, false);
+      assert.deepEqual(
+        after.table,
+        before.table,
+        "Money, inventory, journal and campaign data are preserved",
+      );
+      assert.equal(after.revision, before.revision + 1);
+      assert.deepEqual(
+        after.seats.map((s) => s.role),
+        ["dm"],
+      );
+      await assert.rejects(
+        roomState({ code: member.code, token: `${member.code}-player-token` }),
+        /not seated/,
+      );
+      assert.equal((await call("resume", request, player.cookie)).response.status, 403);
+      assert.equal(
+        (await call("resume", request, phone.cookie)).response.status,
+        200,
+        "A repeated DM resume is safe across devices",
+      );
+      assert.equal(
+        JSON.parse(
+          (
+            await DB.prepare("SELECT body FROM campaign_rooms WHERE code=?")
+              .bind(member.code)
+              .first()
+          ).body,
+        ).revision,
+        after.revision,
+      );
+    }
+  } finally {
+    DB.close();
+    delete globalThis.__env__;
+  }
+});
 test("accounts enforce owner isolation, CSRF, durable sessions, and revoked memberships", async () => {
   const { DB, call, signup } = setup();
   try {

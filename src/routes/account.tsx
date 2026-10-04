@@ -408,8 +408,9 @@ function Account() {
                   </button>
                 </div>
                 <p className="portal-subtle">
-                  Open or join a shared campaign in the app, then save its membership here. Your DM
-                  controls your access. Linking does not upload a local-only campaign.
+                  Open or join a shared campaign in the app, then save its membership here. DMs can
+                  resume or reopen their saved shared sessions on any signed-in device. Players need
+                  an active seat from their DM. Linking does not upload a local-only campaign.
                 </p>
                 <label className="portal-check">
                   <input
@@ -431,6 +432,13 @@ function Account() {
                         <p className="portal-subtle">
                           Last used {new Date(m.updated_at).toLocaleDateString()}
                         </p>
+                        {m.role === "dm" && (
+                          <p className="portal-subtle">
+                            {m.closed
+                              ? "You are the DM. This session has ended. Reopen its saved shared state to continue; players will need to rejoin."
+                              : "You are the DM of this campaign."}
+                          </p>
+                        )}
                         <div className="portal-actions">
                           <button
                             className="portal-button secondary"
@@ -481,13 +489,21 @@ function Account() {
                             className="portal-button"
                             disabled={busy}
                             onClick={action(async () => {
+                              if (hasPendingChanges())
+                                throw new Error(
+                                  "Submit or resolve pending actions before switching campaigns.",
+                                );
                               const member = await accountRequest<AccountMembership>("resume", {
                                 code: m.code,
+                                ...(m.closed && m.role === "dm"
+                                  ? { reopen: true, revision: m.room_revision }
+                                  : {}),
                               });
                               await resumeAccountMembership(member);
                             })}
                           >
-                            Resume <ArrowRight size={16} />
+                            {m.closed && m.role === "dm" ? "Reopen as DM" : "Resume"}{" "}
+                            <ArrowRight size={16} />
                           </button>
                           <button
                             aria-label={`${m.archived ? "Unarchive" : "Archive"} ${m.name}`}

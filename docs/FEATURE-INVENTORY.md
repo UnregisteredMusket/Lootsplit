@@ -52,6 +52,7 @@ Not implemented or promised by this inventory: OCR, Google Drive backup integrat
 - Fixed-version Android download endpoint verifies the release checksum; original GitHub and Drive alternatives remain available.
 - Optional email/password accounts with server-side sessions, rate limiting, sign-out, and single-use rotating recovery keys. Email delivery is not configured.
 - Account-owned campaign memberships, resume with fresh room/seat validation, archive/unarchive and forget. Existing guest room workflows remain available.
+- Linked DMs can explicitly reopen their ended shared sessions from My account on any signed-in device. Server-verified DM ownership and a current revision are required; campaign state and authorized reports survive, pending turns are protected, and former player sessions stay disconnected until players rejoin.
 - Explicit private cloud backup versions, download, delete and restore into a new local campaign. PDFs/reference content remain device-local; encrypted device backups remain the route for protected saves.
 - Reusable character names, portraits and notes; adding a profile to a local DM campaign creates an empty purse and does not transfer wealth or inventory.
 
