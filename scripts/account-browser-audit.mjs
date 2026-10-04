@@ -23,6 +23,16 @@ try {
   context.setDefaultTimeout(20000);
   const page = await context.newPage();
   page.on("pageerror", (e) => errors.push(e.message));
+  await context.exposeBinding("auditNotice", (_source, text) => console.log("Account UI notice:", text));
+  await context.addInitScript(() => {
+    new MutationObserver(() => {
+      const text = [...document.querySelectorAll("[data-sonner-toast]")].map((node) => node.textContent).join(" | ");
+      if (text && text !== window.__auditNotice) {
+        window.__auditNotice = text;
+        void window.auditNotice(text);
+      }
+    }).observe(document, { childList: true, subtree: true });
+  });
   // Warm Vite before checking for module errors.
   await visit(page, "/welcome");
   await page.waitForTimeout(2500);
@@ -197,6 +207,14 @@ try {
   console.log(
     "Account audit passed: layouts, signup, profiles, cross-device library, restore, recovery, session revocation.",
   );
+} catch (error) {
+  for (const [index, context] of browser.contexts().entries()) {
+    for (const [pageIndex, page] of context.pages().entries()) {
+      console.error("Account audit page:", page.url(), (await page.locator("body").innerText()).slice(-6000));
+      await page.screenshot({ path: `test-results/account-failure-${index}-${pageIndex}.png`, fullPage: true });
+    }
+  }
+  throw error;
 } finally {
   await browser.close();
 }
