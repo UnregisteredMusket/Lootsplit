@@ -157,6 +157,7 @@ type EconomyApi = {
     kind: Holding["kind"],
     quantity: number,
     unitCopper: number,
+    metadata?: Pick<Holding, "notes" | "category">,
   ) => Promise<void>;
   deleteHolding: (id: string) => Promise<void>;
   buy: (stockId: string, purseId: string, quantity: number) => Promise<void>;
@@ -388,9 +389,10 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
   );
 
   const run = useCallback(
-    async (work: () => Promise<unknown>, ok?: string) => {
+    async (work: () => Promise<unknown>, ok?: string, rethrow = false) => {
       const gate = getCloudWatch();
       if (gate.joined && !gate.mine) {
+        if (rethrow) throw new Error(`It is ${gate.who}'s turn.`);
         toast.error(`It is ${gate.who}'s turn.`);
         return;
       }
@@ -403,6 +405,7 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
             gate.joined && hasPendingChanges() ? "Action saved as pending. Check sync status." : ok,
           );
       } catch (error) {
+        if (rethrow) throw error;
         fault(error, "That change could not be saved.");
       }
     },
@@ -556,7 +559,7 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
           dmOnly();
           await saveHolding(holding);
         }),
-      addHolding: (purseId, name, kind, quantity, unitCopper) =>
+      addHolding: (purseId, name, kind, quantity, unitCopper, metadata) =>
         run(async () => {
           dmOnly();
           await saveHolding({
@@ -566,9 +569,10 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
             kind,
             quantity,
             unitCopper,
-            notes: "",
+            notes: metadata?.notes ?? "",
+            ...(metadata?.category ? { category: metadata.category } : {}),
           });
-        }, "Holding added."),
+        }, "Holding added.", true),
       deleteHolding: (id) =>
         run(async () => {
           dmOnly();

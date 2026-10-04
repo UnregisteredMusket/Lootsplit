@@ -169,3 +169,11 @@ Validation for this change: 427 automated tests passed (four existing skips), Ty
 - Parchment grain, metal/leather finishes, engraved borders and brass framing change appearance only; all layouts, routes, icons, permissions and saved campaigns remain intact. Light surfaces use dark ink and readable secondary/action colors. Legacy looks, custom colors, reading size and reduced motion remain available.
 
 - Device Roll mode is available in the settings menu for both roles and in Settings. Pen & Paper mode records physical final totals across character quick actions/custom dice and encounter/weighted loot-table rolls; Virtual Mode generates dice. Selection persists per device and respects shared-campaign manual-roll permission. Manual weighted totals are range-checked, labeled and deduplicated in encounter history; switching modes never rewrites pending roll receipts.
+
+## Internal navigation preservation
+
+- Session journal, desktop ledger/review/payment links, Settings & Management, campaign controls, account return links, party sheets and chat use the shared router navigation without restarting the title screen. Query strings, hashes, and browser back/forward remain supported.
+- An AST regression check rejects raw app-route anchors; desktop/mobile browser checks exercise the actual session/account links, preserve document identity, and verify the title stays dismissed. The same browser audit runs against development and built Worker output. Fresh document starts still display the opening animation.
+
+- Party Add loot offers custom items/property and SRD 2014/2024 Open5e equipment/magic items. Search selection fills a review draft; confirmation saves recipient, quantity, value, category and source/attribution notes through existing DM inventory permissions. Search failure supports cached results and custom entry; failed saves retain the draft.
+- Slow route transitions show only the Lootsplit logo. Required account campaign restore/resume reloads use a short-lived, single-use startup handoff so they do not replay the title. Fresh launches and explicit refreshes still show the title.

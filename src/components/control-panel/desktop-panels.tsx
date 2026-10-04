@@ -1,3 +1,4 @@
+import { AppLink } from "@/components/app-link";
 import { useEconomy } from "@/lib/quire/economy-context";
 import { formatCopper } from "@/lib/quire/money";
 import { sessionSummary } from "@/lib/quire/journal";
@@ -31,7 +32,7 @@ export function DesktopDeskPanels() {
       >
         <div className="panel-heading">
           <h2 id="desktop-activity-heading">Recent activity</h2>
-          <a href="/?view=overview#journal">Full ledger →</a>
+          <AppLink href="/?view=overview#journal">Full ledger →</AppLink>
         </div>
         <p className="desktop-panel-note">
           {recent.length
@@ -76,14 +77,14 @@ export function DesktopDeskPanels() {
         ) : (
           <p className="desktop-panel-empty">
             No transactions recorded yet.{" "}
-            <a href="/party?section=funds&action=pay">Record a payment →</a>
+            <AppLink href="/party?section=funds&action=pay">Record a payment →</AppLink>
           </p>
         )}
       </section>
       <section className="desktop-desk-card" aria-labelledby="desktop-review-heading">
         <div className="panel-heading">
           <h2 id="desktop-review-heading">Review queue</h2>
-          <a href="/?view=overview#review">Open review →</a>
+          <AppLink href="/?view=overview#review">Open review →</AppLink>
         </div>
         <p className="desktop-panel-note">
           {requests.length} pending {requests.length === 1 ? "request" : "requests"}
@@ -153,9 +154,9 @@ export function DesktopDeskPanels() {
             <dd>{holdings.length}</dd>
           </div>
         </dl>
-        <a href="/?view=overview#journal" className="desktop-panel-link">
+        <AppLink href="/?view=overview#journal" className="desktop-panel-link">
           Session journal →
-        </a>
+        </AppLink>
       </section>
     </div>
   );

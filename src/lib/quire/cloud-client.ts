@@ -1,3 +1,4 @@
+import { reloadCampaignContext } from "./navigation-launch.ts";
 import { rememberSave } from "./saves.ts";
 import { loadSeatLock } from "./lock.ts";
 import { notify } from "./notify.ts";
@@ -593,6 +594,6 @@ export async function resumeAccountMembership(
       pending: [],
       batchId: crypto.randomUUID(),
     });
-    window.location.assign("/");
+    reloadCampaignContext();
   });
 }

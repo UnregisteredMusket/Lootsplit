@@ -56,6 +56,7 @@ jobs:
           node scripts/finance-browser-audit.mjs
           node scripts/control-panel-browser-audit.mjs
           node scripts/library-navigation-browser-audit.mjs
+          node scripts/loot-browser-audit.mjs
           node scripts/desktop-browser-audit.mjs
           node scripts/game-analytics-browser-audit.mjs
           node scripts/website-browser-audit.mjs
@@ -75,6 +76,8 @@ jobs:
           AUDIT_ORIGIN=http://127.0.0.1:8082 node scripts/help-browser-audit.mjs
           AUDIT_ORIGIN=http://127.0.0.1:8082 node scripts/game-analytics-browser-audit.mjs
           AUDIT_ORIGIN=http://127.0.0.1:8082 node scripts/website-browser-audit.mjs
+          AUDIT_ORIGIN=http://127.0.0.1:8082 node scripts/library-navigation-browser-audit.mjs
+          AUDIT_ORIGIN=http://127.0.0.1:8082 node scripts/loot-browser-audit.mjs
       - name: Verify title screen on the built artifact
         env:
           AUDIT_ORIGIN: http://127.0.0.1:8082

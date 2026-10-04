@@ -49,6 +49,49 @@ try {
     await page.goBack();
     await page.getByRole("heading", { name: "Library", exact: true }).waitFor();
     await stillOpen();
+    // Exercise actual reported entry points. Never use openApplication here:
+    // that helper would dismiss the regression instead of detecting it.
+    await page.locator('nav[aria-label="Sections"]:visible').getByRole("link", { name: "Desk", exact: true }).click();
+    await page.locator(".shortcut-grid").waitFor();
+    if (width === 1440) {
+      await page.getByRole("link", { name: "Session journal →", exact: true }).click();
+      await page.waitForURL("**/?view=overview#journal");
+      await page.locator("#journal").waitFor();
+      await stillOpen();
+      await page.goBack();
+      await page.locator(".shortcut-grid").waitFor();
+    }
+    await page.locator('nav[aria-label="Sections"]:visible').getByRole("link", { name: "Party", exact: true }).click();
+    await page.getByRole("link", { name: "Ledger", exact: true }).click();
+    await page.waitForURL("**/?view=overview#journal");
+    await page.locator("#journal").waitFor();
+    await stillOpen();
+    await page.locator('nav[aria-label="Sections"]:visible').getByRole("link", { name: "Desk", exact: true }).click();
+    await page.locator(".shortcut-grid").waitFor();
+    await page.locator(".settings-trigger").click();
+    await page.locator(".management-footer").getByRole("link", { name: "My account", exact: true }).click();
+    await page.waitForURL("**/account");
+    await page.getByRole("heading", { name: "Welcome to your next chapter.", exact: true }).waitFor();
+    await stillOpen();
+    await page.screenshot({ path: `test-results/library-navigation/account-${width}.png` });
+    await page.getByRole("link", { name: "Open app", exact: true }).click();
+    await page.locator(".shortcut-grid").waitFor();
+    await stillOpen();
+    await page.locator(".campaign-switcher").click();
+    await page.getByRole("link", { name: "Saved account campaigns →", exact: true }).click();
+    await page.waitForURL("**/account");
+    await stillOpen();
+    await page.goBack();
+    await page.locator(".shortcut-grid").waitFor();
+    await stillOpen();
+    await page.goForward();
+    await page.waitForURL("**/account");
+    await stillOpen();
+    // A required data-context reload skips the full opening exactly once.
+    await page.evaluate(() => sessionStorage.setItem("lootsplit.navigation.resume.v1", JSON.stringify({path:"/",at:Date.now()})));
+    await page.goto(origin + "/");
+    await page.locator(".shortcut-grid").waitFor();
+    assert.equal(await page.locator(".loot-opening").count(), 0);
     // Fresh document loads must restore the title, even with a legacy dismissal flag.
     await page.goto(origin + "/library");
     await page.getByRole("button", { name: "Lootsplit. Click to continue", exact: true }).click();

@@ -1,3 +1,4 @@
+import { reloadCampaignContext } from "../quire/navigation-launch.ts";
 import { getCampaigns, createCampaign } from "../quire/campaigns";
 import { getSeat } from "../quire/table";
 import { loadSeatLock } from "../quire/lock";
@@ -57,7 +58,7 @@ export async function restoreAccountBackup(id: string, name: string) {
   createCampaign(`${name} (restored)`);
   await ensureEconomy();
   await restore(file);
-  window.location.assign("/");
+  reloadCampaignContext();
 }
 export async function addAccountCharacter(profile: CharacterProfile) {
   if (getCloudTable().joined || getSeat().role !== "dm")

@@ -1,3 +1,5 @@
+import { consumeNavigationResume } from "@/lib/quire/navigation-launch";
+import { LogoLoading } from "./route-loading";
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { OpeningLandscape } from "./opening-landscape";
 import { LootLoader } from "./loot-loader";
@@ -10,6 +12,9 @@ export function OpeningDawn({ children, bypass = false }: { children: ReactNode;
   const [on, setOn] = useState<boolean | null>(null);
   const screen = useRef<HTMLButtonElement>(null);
   useEffect(() => {
+    if (!dismissedInDocument) {
+      try { dismissedInDocument = consumeNavigationResume(sessionStorage, location.pathname); } catch { /* Storage may be blocked. */ }
+    }
     setOn(!dismissedInDocument);
   }, []);
   useEffect(() => {
@@ -21,7 +26,7 @@ export function OpeningDawn({ children, bypass = false }: { children: ReactNode;
   }
   if (bypass || on === false) return <>{children}</>;
   // Wait for hydration before showing the interactive opening.
-  if (on === null) return null;
+  if (on === null) return <LogoLoading />;
   return (
     <button
       ref={screen}

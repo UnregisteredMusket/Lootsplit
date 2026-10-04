@@ -16,7 +16,7 @@ import {
   type OpenQuery,
 } from "@/lib/quire/open5e";
 import { searchOpen5e } from "@/lib/quire/open5e-api";
-import type { ItemCategory } from "@/lib/quire/types";
+import type { CatalogItem, ItemCategory } from "@/lib/quire/types";
 const CACHE = "lootsplit.open5e.search.v1";
 type CacheRow = { key: string; at: string; data: OpenPage };
 function cache(): CacheRow[] {
@@ -27,7 +27,7 @@ function cache(): CacheRow[] {
     return [];
   }
 }
-export function Open5eBrowser() {
+export function Open5eBrowser({ onSelect }: { onSelect?: (item: CatalogItem) => void } = {}) {
   const [kind, setKind] = useState<OpenKind>("items"),
     [edition, setEdition] = useState<OpenEdition>("srd-2014"),
     [query, setQuery] = useState("");
@@ -40,8 +40,8 @@ export function Open5eBrowser() {
   const request = useRef(0);
   useEffect(() => {
     const section = new URLSearchParams(location.search).get("kind");
-    if (OPEN5E_KINDS.some((k) => k.value === section)) setKind(section as OpenKind);
-  }, []);
+    if (!onSelect && OPEN5E_KINDS.some((k) => k.value === section)) setKind(section as OpenKind);
+  }, [onSelect]);
   useEffect(
     () => () => {
       request.current++;
@@ -104,8 +104,9 @@ export function Open5eBrowser() {
     <section className="mt-6">
       <h2 className="font-display text-2xl">Open5e reference</h2>
       <p className="mt-2 text-sm text-muted">
-        Search the open rules. Review an item, set its shop price, then add a copy to your catalog.
-        Imported copies stay on this device and never change automatically.
+        {onSelect
+          ? "Search equipment or magic items, review the value, then choose the recipient and quantity. Nothing is added until you confirm Add holding."
+          : "Search the open rules. Review an item, set its shop price, then add a copy to your catalog. Imported copies stay on this device and never change automatically."}
       </p>
       <form onSubmit={submit} className="mt-4 grid gap-3">
         <div className="grid grid-cols-2 gap-2">
@@ -119,7 +120,9 @@ export function Open5eBrowser() {
           <label className="text-sm">
             Reference section
             <Select value={kind} onChange={(e) => setKind(e.target.value as OpenKind)}>
-              {OPEN5E_KINDS.map((k) => (
+              {OPEN5E_KINDS.filter(
+                (k) => !onSelect || ["items", "magicitems"].includes(k.value),
+              ).map((k) => (
                 <option key={k.value} value={k.value}>
                   {k.label}
                 </option>
@@ -158,7 +161,11 @@ export function Open5eBrowser() {
       ) : null}
       <ul className="mt-4 grid gap-3">
         {result?.entries.map((entry) => (
-          <OpenResult key={entry.key} entry={entry} />
+          <OpenResult
+            key={`${entry.edition}:${entry.kind}:${entry.key}`}
+            entry={entry}
+            onSelect={onSelect}
+          />
         ))}
       </ul>
       {result ? (
@@ -208,7 +215,13 @@ export function Open5eBrowser() {
     </section>
   );
 }
-function OpenResult({ entry }: { entry: OpenEntry }) {
+function OpenResult({
+  entry,
+  onSelect,
+}: {
+  entry: OpenEntry;
+  onSelect?: (item: CatalogItem) => void;
+}) {
   const { catalog, addGoods } = useEconomy(),
     seat = useSeat();
   const [price, setPrice] = useState(entry.copper === null ? "" : formatCopper(entry.copper)),
@@ -219,6 +232,10 @@ function OpenResult({ entry }: { entry: OpenEntry }) {
     item = ["items", "magicitems"].includes(entry.kind);
   async function add() {
     if (copper === null || saving) return;
+    if (onSelect) {
+      onSelect(openCatalogItem(entry, copper, category));
+      return;
+    }
     setSaving(true);
     try {
       const count = await addGoods([openCatalogItem(entry, copper, category)]);
@@ -264,7 +281,7 @@ function OpenResult({ entry }: { entry: OpenEntry }) {
           {item && seat.role === "dm" ? (
             <div className="mt-4 grid gap-2">
               <label>
-                Catalog category
+                {onSelect ? "Item category" : "Catalog category"}
                 <Select
                   value={category}
                   onChange={(e) => setCategory(e.target.value as ItemCategory)}
@@ -277,7 +294,7 @@ function OpenResult({ entry }: { entry: OpenEntry }) {
                 </Select>
               </label>
               <label>
-                Shop list price
+                {onSelect ? "Loot value per item" : "Shop list price"}
                 <TextInput
                   value={price}
                   onChange={(e) => setPrice(e.target.value)}
@@ -289,8 +306,17 @@ function OpenResult({ entry }: { entry: OpenEntry }) {
                   No reliable listed price. Choose your campaign's price before importing.
                 </p>
               ) : null}
-              <Button disabled={imported || saving || copper === null} onClick={() => void add()}>
-                {imported ? "Already in catalog" : saving ? "Saving…" : "Add to catalog"}
+              <Button
+                disabled={(!onSelect && imported) || saving || copper === null}
+                onClick={() => void add()}
+              >
+                {onSelect
+                  ? "Use this loot"
+                  : imported
+                    ? "Already in catalog"
+                    : saving
+                      ? "Saving…"
+                      : "Add to catalog"}
               </Button>
             </div>
           ) : null}

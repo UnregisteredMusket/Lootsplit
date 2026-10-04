@@ -1,3 +1,4 @@
+import { AppLink } from "@/components/app-link";
 import { RollModeSetting } from "@/components/roll-mode-setting";
 import { FantasyIcon } from "@/components/fantasy-icon";
 import { useState } from "react";
@@ -113,9 +114,9 @@ export function ManagementPanel({
           content: (
             <>
               <p>Choose the label, icon and destination for each of your six shortcut buttons.</p>
-              <a href="/?view=home&customize=1" className="settings-link">
+              <AppLink href="/?view=home&customize=1" className="settings-link">
                 Customize & reorder shortcuts →
-              </a>
+              </AppLink>
             </>
           ),
         },
@@ -232,7 +233,7 @@ export function ManagementPanel({
                 <div className="management-content">
                   {g.content}
                   {g.links?.map(([label, href]) => (
-                    <a
+                    <AppLink
                       key={href + label}
                       href={href}
                       className="settings-link"
@@ -240,7 +241,7 @@ export function ManagementPanel({
                     >
                       {label}
                       <span aria-hidden="true">›</span>
-                    </a>
+                    </AppLink>
                   ))}
                 </div>
               )}
@@ -258,9 +259,9 @@ export function ManagementPanel({
             <LogIn size={16} />
             Change device role
           </Button>
-          <a href="/account" onClick={() => onOpenChange(false)}>
+          <AppLink href="/account" onClick={() => onOpenChange(false)}>
             My account
-          </a>
+          </AppLink>
         </div>
       </div>
     </Modal>
@@ -293,12 +294,12 @@ export function CampaignPanel({
           joining a different one.
         </p>
       )}
-      <a href="/account" className="settings-link">
+      <AppLink href="/account" className="settings-link">
         Saved account campaigns →
-      </a>
-      <a href="/share" className="settings-link">
+      </AppLink>
+      <AppLink href="/share" className="settings-link">
         Room, invitations & connections →
-      </a>
+      </AppLink>
     </Modal>
   );
 }
