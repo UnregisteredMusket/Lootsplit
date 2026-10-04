@@ -61,6 +61,12 @@ async function save(page) {
   await page.getByText("Saved character", { exact: true }).waitFor();
 }
 try {
+  // Stabilize Vite's first dependency discovery before collecting application errors.
+  const warmup = await browser.newPage();
+  await openApplication(warmup, origin + "/settings#appearance");
+  await warmup.getByLabel("Accent color", { exact: true }).waitFor();
+  await warmup.waitForLoadState("networkidle");
+  await warmup.close();
   const host = await actor("Owner", "192.0.2.211"),
     player = await actor("Player", "192.0.2.212");
   await db
@@ -159,6 +165,11 @@ try {
           if (!error.message.includes("Execution context was destroyed")) throw error;
         }),
     ]);
+    // DOMContentLoaded precedes the async client entry. Let the new document
+    // hydrate before a later visit can cancel its module request.
+    await a.page.locator(".role-chip:enabled").waitFor();
+    await a.page.locator(".quire-dawn").waitFor({ state: "hidden" });
+    await a.page.waitForLoadState("networkidle");
   }
   console.log("Governance audit: membership resumed; verify locked gameplay");
   await visit(player.page, "/characters?id=party%3Ahero");
@@ -233,6 +244,9 @@ try {
     host.page.waitForNavigation({ waitUntil: "domcontentloaded" }),
     test.getByLabel("Enable Test mode", { exact: true }).click(),
   ]);
+  await host.page.locator(".role-chip:enabled").waitFor();
+  await host.page.locator(".quire-dawn").waitFor({ state: "hidden" });
+  await host.page.waitForLoadState("networkidle");
   await visit(host.page, "/");
   await host.page
     .getByRole("button", { name: "Reset Test mode — clear all data", exact: true })
