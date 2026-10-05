@@ -4,10 +4,28 @@ Measured slowdowns of **15% or more** against the last logged comparable duratio
 
 GitHub step timestamps have one-second resolution. Queue time is separate; overlapping jobs are not added together. Full audits must review this log and the measurement policy in main's `docs/PERFORMANCE.md`.
 
+## Repeated increases
+
+Open trends require investigation. Resolved trends retain their history; each verified reset begins a separate trend.
+
+| Operation | State | Logged increases | Original → latest | Total added | Cumulative increase |
+| --- | --- | ---: | ---: | ---: | ---: |
+| Development / desktop / Run actions/setup-node@v4 | open | 2 | 3s → 7s | +4s | +133.33% |
+| Packaged Worker / interface / Run actions/setup-node@v4 | open | 2 | 2s → 5s | +3s | +150% |
+
 ## Recorded slowdowns
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-05T01:56:58Z | step: Packaged Worker / interface / worker-loot | 4s → 5s | +1s | +25% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37233368939/job/111527693168) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37253238957/job/111585184649) |
+| 2026-10-05T01:56:11Z | step: Packaged Worker / accounts / Run actions/upload-artifact@v4 | 1s → 2s | +1s | +100% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37233368939/job/111527693152) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37253238957/job/111585184615) |
+| 2026-10-05T01:55:48Z | step: Packaged Worker / accounts / Run actions/download-artifact@v4 | 1s → 2s | +1s | +100% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37233368939/job/111527693152) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37253238957/job/111585184615) |
+| 2026-10-05T01:55:25Z | step: Packaged standby / Run actions/setup-node@v4 | 3s → 7s | +4s | +133.33% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37233368939/job/111527693178) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37253238957/job/111585184591) |
+| 2026-10-05T01:55:23Z | step: Packaged Worker / interface / Run actions/setup-node@v4 | 3s → 5s | +2s | +66.67% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37235490768/job/111533864529) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37253238957/job/111585184649) |
+| 2026-10-05T01:55:12Z | step: Development / gameplay / dev-bug-edge-cases | 9s → 11s | +2s | +22.22% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37233368939/job/111527537884) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37253238957/job/111584990582) |
+| 2026-10-05T01:54:22Z | step: Development / desktop / Run actions/setup-node@v4 | 5s → 7s | +2s | +40% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37235490768/job/111533630459) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37253238957/job/111584990553) |
+| 2026-10-05T01:54:18Z | step: Code checks and immutable builds / Run actions/setup-node@v4 | 3s → 4s | +1s | +33.33% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37233368939/job/111527537780) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37253238957/job/111584990612) |
+| 2026-10-05T01:54:16Z | step: Development / governance / Run actions/checkout@v4 | 1s → 2s | +1s | +100% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37233368939/job/111527537913) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37253238957/job/111584990606) |
 | 2026-10-04T21:25:28Z | step: deploy / Run actions/download-artifact@v4 | 1s → 2s | +1s | +100% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37233916181/job/111529154869) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37235992107/job/111535079328) |
 | 2026-10-04T21:25:12Z | step: deploy / Run actions/setup-node@v4 | 2s → 6s | +4s | +200% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37233916181/job/111529154869) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37235992107/job/111535079328) |
 | 2026-10-04T21:25:03.000Z | queue: Deploy verified website / initial queue | 4s → 10s | +6s | +150% | failure | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37233916181) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37235992107) |
