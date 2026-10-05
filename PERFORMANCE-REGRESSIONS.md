@@ -20,7 +20,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Development / gameplay / dev-bug-data-integrity | open | 3 | 4s → 7s | +3s | +75% |
 | Code checks and immutable builds | open | 2 | 48s → 82s | +34s | +70.83% |
 | Development / gameplay / dev-encounter | open | 4 | 8s → 27s | +19s | +237.5% |
-| Packaged Worker / interface / Run actions/setup-node@v4 | open | 3 | 2s → 6s | +4s | +200% |
+| Packaged Worker / interface / Run actions/setup-node@v4 | open | 4 | 2s → 8s | +6s | +300% |
 | Packaged Worker / accounts / Run npm ci | open | 2 | 8s → 14s | +6s | +75% |
 | Packaged Worker / interface / Run actions/download-artifact@v4 | open | 2 | 1s → 3s | +2s | +200% |
 | Packaged Worker / accounts / Start disposable built Worker | open | 2 | 5s → 7s | +2s | +40% |
@@ -85,12 +85,15 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | report | open | 2 | 7s → 12s | +5s | +71.43% |
 | Report workflow failure | open | 2 | 7s → 12s | +5s | +71.43% |
 | Packaged Worker / accounts / worker-finance | open | 2 | 11s → 15s | +4s | +36.36% |
+| Verify preserved functionality | open | 2 | 220s → 338s | +118s | +53.64% |
 | Packaged Worker / interface / worker-help | open | 2 | 6s → 25s | +19s | +316.67% |
 
 ## Recorded slowdowns
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-05T23:56:54.000Z | workflow: Verify preserved functionality | 266s → 338s | +72s | +27.07% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37300924028) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37390831478) |
+| 2026-10-05T23:52:41Z | step: Packaged Worker / interface / Run actions/setup-node@v4 | 6s → 8s | +2s | +33.33% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37263207826/job/111614761214) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37390831478/job/112035588481) |
 | 2026-10-05T23:44:13Z | step: verify / Run actions/checkout@v4 | 1s → 2s | +1s | +100% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37233687309/job/111529121545) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37389751532/job/112033097198) |
 | 2026-10-05T23:43:33Z | job: Packaged Worker / interface | 123s → 142s | +19s | +15.45% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37233687309/job/111528724093) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37389751532/job/112032198346) |
 | 2026-10-05T23:41:25Z | step: Development / gameplay / dev-local-encounter | 6s → 7s | +1s | +16.67% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37233687309/job/111528483514) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37389751532/job/112031761500) |
