@@ -190,8 +190,16 @@ try {
     timeout: 10000,
   });
 
-  await host.page.getByRole("dialog").getByRole("button",{name:"Close",exact:true}).click();
+  await host.page.getByRole("dialog").getByRole("button", { name: "Close", exact: true }).click();
   await host.page.locator("#purse-hero > summary").click();
+  const secondDevice = await browser.newContext({
+    storageState: { cookies: await player.context.cookies(), origins: [] },
+    viewport: { width: 390, height: 844 },
+  });
+  await secondDevice.addInitScript(() => localStorage.setItem("quire.guide.offer.v3", "seen"));
+  const secondPage = await secondDevice.newPage();
+  await visit(secondPage, `/characters?id=${encodeURIComponent(`campaign:${code}:hero`)}`);
+  await secondPage.getByRole("heading", { name: "Governance hero", exact: true }).waitFor();
   const portrait = host.page.locator("#purse-hero .portrait-picker input[type=file]");
   // A tiny synthetic PNG, never a real campaign portrait.
   const picture = await host.page.evaluate(() => {
@@ -211,11 +219,17 @@ try {
   await expect(
     host.page.locator("[data-sonner-toast]").filter({ hasText: "Portrait saved" }),
   ).toBeVisible();
-  await expect(player.page.getByAltText("Character portrait",{exact:true})).toHaveAttribute(
+  await expect(player.page.getByAltText("Character portrait", { exact: true })).toHaveAttribute(
     "src",
     /^data:image/,
     { timeout: 10000 },
   );
+  await expect(secondPage.getByAltText("Character portrait", { exact: true })).toHaveAttribute(
+    "src",
+    /^data:image/,
+    { timeout: 15000 },
+  );
+  await secondDevice.close();
   await host.page.getByRole("link", { name: "Open character sheet", exact: true }).click();
   await expect(
     host.page.locator("[data-sonner-toast]").filter({ hasText: "Portrait saved" }),
@@ -236,7 +250,7 @@ try {
   await player.page.getByLabel("Equip Potion", { exact: true }).check();
   await player.page.getByLabel("Potion quantity", { exact: true }).fill("1");
   await save(player.page);
-  assert.equal((await state(player.page)).holdings[0].quantity, 1);
+  assert.equal((await state(player.page)).holdings.find((h) => h.name === "Potion").quantity, 1);
   await visit(host.page, "/party");
   console.log("Governance audit: open/close editing and verify change report");
   await host.page.getByLabel("Allow character editing", { exact: true }).click();
@@ -246,6 +260,28 @@ try {
   await save(player.page);
   await host.page.getByLabel("Allow character editing", { exact: true }).click();
   await enabled(species, false);
+  console.log("Governance audit: independent immediate permission grant");
+  await host.page.locator(".settings-trigger").click();
+  const permissionsMenu = host.page.getByRole("dialog", { name: "Settings & Management" });
+  await permissionsMenu.getByRole("button", { name: /^Players & permissions/ }).click();
+  await permissionsMenu
+    .getByText("Governance hero · Individual permissions", { exact: true })
+    .click();
+  const maxPermission = permissionsMenu.getByLabel("Governance hero: Maximum HP", { exact: true });
+  await maxPermission.click();
+  await expect(maxPermission).toBeChecked();
+  await player.page.getByRole("button", { name: "Combat", exact: true }).click();
+  await enabled(player.page.getByLabel("Maximum HP", { exact: true }), true);
+  assert.equal(await player.page.getByLabel("Armor class", { exact: true }).isEnabled(), false);
+  await player.page.getByLabel("Maximum HP", { exact: true }).fill("25");
+  await save(player.page);
+  await expect
+    .poll(async () => (await state(host.page)).purses.find((p) => p.id === "hero").sheet.maxHp)
+    .toBe(25);
+  await maxPermission.click();
+  await expect(maxPermission).not.toBeChecked();
+  await enabled(player.page.getByLabel("Maximum HP", { exact: true }), false);
+  await permissionsMenu.getByRole("button", { name: "Close", exact: true }).click();
   await host.page.screenshot({ path: output + "/party-desktop.png", fullPage: true });
   await visit(host.page, "/?view=overview#journal");
   const changes = host.page
@@ -274,9 +310,22 @@ try {
   await host.page.setViewportSize({ width: 390, height: 844 });
   await host.page.locator(".journal-book").screenshot({ path: output + "/journal-mobile.png" });
   await host.page.setViewportSize({ width: 1360, height: 1000 });
+  await sessions.getByLabel("Session name", { exact: true }).fill("Next session");
+  await sessions.getByRole("button", { name: "Start session", exact: true }).click();
+  const downtimeDialog = host.page.getByRole("dialog", {
+    name: "Set downtime before this session",
+  });
+  await expect(downtimeDialog).toBeVisible();
+  await downtimeDialog.getByLabel("Downtime days", { exact: true }).fill("0");
+  await downtimeDialog
+    .getByRole("button", { name: "Use 0 days & start session", exact: true })
+    .click();
+  await expect(downtimeDialog).toBeHidden();
+  await expect
+    .poll(async () => (await state(host.page)).journal.downtimePrompt?.enabled)
+    .toBe(false);
   await player.page.setViewportSize({ width: 390, height: 844 });
   await player.page.screenshot({ path: output + "/locked-player-mobile.png", fullPage: true });
-  console.log("Mobile overflow", await player.page.evaluate(() => ({width:innerWidth, scroll:document.documentElement.scrollWidth, elements:[...document.querySelectorAll("body *")].filter(e=>e.getBoundingClientRect().right>innerWidth+1 && getComputedStyle(e).position!=="fixed").map(e=>({tag:e.tagName,cls:e.className,right:e.getBoundingClientRect().right,text:e.textContent?.slice(0,70)})).slice(-25)})));
   assert.equal(
     await player.page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1),
     false,
@@ -398,7 +447,17 @@ try {
     "PASS: desktop/mobile DM edit toggle and change report, locked construction, health/equip/consume gameplay, archival before clearing logs, voluntary leave, account reports, owner Test configurator/indicator/reset and isolated campaign data.",
   );
 } catch (error) {
-  for (const context of browser.contexts()) for (const page of context.pages()) console.error("Synthetic sync diagnostic", await page.evaluate(async()=>{const x=(await import("/src/lib/quire/cloud-client.ts")).getCloudTable();return {status:x.status,error:x.error,pending:x.pending};}).catch(()=>null));
+  for (const context of browser.contexts())
+    for (const page of context.pages())
+      console.error(
+        "Synthetic sync diagnostic",
+        await page
+          .evaluate(async () => {
+            const x = (await import("/src/lib/quire/cloud-client.ts")).getCloudTable();
+            return { status: x.status, error: x.error, pending: x.pending };
+          })
+          .catch(() => null),
+      );
   for (const [index, context] of browser.contexts().entries()) {
     for (const [pageIndex, page] of context.pages().entries()) {
       await page

@@ -131,7 +131,9 @@ export function preserveJournalMetadata(value: unknown, current: Journal): Journ
   const changes = new Map(current.events.map((event) => [event.id, event.change]));
   return readJournal({
     ...next,
-    ...((next.downtimePrompt ?? current.downtimePrompt) ? {downtimePrompt:next.downtimePrompt ?? current.downtimePrompt} : {}),
+    ...((next.downtimePrompt ?? current.downtimePrompt)
+      ? { downtimePrompt: next.downtimePrompt ?? current.downtimePrompt }
+      : {}),
     ...(next.finance ? {} : current.finance ? { finance: current.finance } : {}),
     ...(current.reports || next.reports
       ? {

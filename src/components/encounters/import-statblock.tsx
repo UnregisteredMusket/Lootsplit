@@ -23,7 +23,7 @@ export function ImportStatblock({
   }
   return (
     <div>
-      <label className="quick-action">
+      <label className="quick-action relative overflow-hidden">
         {busy ? progress || "Reading statblock…" : "Import statblock picture"}
         <input
           type="file"

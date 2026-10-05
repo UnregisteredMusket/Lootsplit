@@ -94,7 +94,7 @@ export function characterSheet(purse, holdings = [], legacy) {
     coins: { ...purse.coins },
     equipment: holdings
       .filter((h) => h.purseId === purse.id)
-      .sort((a,b) => a.id < b.id ? -1 : a.id > b.id ? 1 : 0)
+      .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
       .map((h) => ({
         id: h.id,
         name: h.name,
@@ -381,9 +381,9 @@ export function assertGameplayEdit(purse, seat, before, next) {
     notes: "",
     coins: {},
     equipment: [],
-    resources: sheet.resources.map(({ current, ...r }) => r),
-    slots: sheet.slots.map(({ used, ...r }) => r),
-    spells: sheet.spells.map(({ prepared, ...r }) => r),
+    resources: sheet.resources.map(({ current: _current, ...r }) => r),
+    slots: sheet.slots.map(({ used: _used, ...r }) => r),
+    spells: sheet.spells.map(({ prepared: _prepared, ...r }) => r),
   });
   const permitted = (/** @type {import("./model.mjs").PlaySheet} */ sheet) =>
     Object.fromEntries(

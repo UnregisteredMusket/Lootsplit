@@ -36,7 +36,10 @@ export async function createOcrReader(progress?: (message: string) => void) {
         return created;
       }),
     );
-    await worker.setParameters({ tessedit_pageseg_mode: PSM.AUTO, preserve_interword_spaces: "1" });
+    await worker!.setParameters({
+      tessedit_pageseg_mode: PSM.AUTO,
+      preserve_interword_spaces: "1",
+    });
     return {
       async read(image: ImageLike, page = 1) {
         const { data } = await bounded(worker!.recognize(image, {}, { text: true, blocks: true }));

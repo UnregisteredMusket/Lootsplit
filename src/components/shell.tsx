@@ -17,7 +17,6 @@ import {
 } from "react";
 import { getCloudWatch } from "@/lib/quire/cloud-turn";
 import { useLibrary } from "@/lib/quire/library";
-import { usePrefs } from "@/lib/quire/prefs";
 import { useSeat, useSeatKnown } from "@/lib/quire/seat";
 import { setSeat } from "@/lib/quire/table";
 import { BillReceipt } from "@/components/bill-receipt";
@@ -56,7 +55,6 @@ export function Shell({
   const seat = useSeat();
   const { count: unreadCount } = useChatUnread();
   const seatKnown = useSeatKnown();
-  const { prefs } = usePrefs();
   const navigate = useNavigate();
   const pathname = useRouterState({
     select: (state) => state.location.pathname,

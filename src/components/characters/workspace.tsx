@@ -729,11 +729,17 @@ function CharacterEditor({
         onImport={(imported, fields) => {
           const next = { ...sheet };
           for (const key of Object.keys(imported) as (keyof Sheet)[]) {
-            if(key === "version" || !canEdit(key)) continue;
+            if (key === "version" || !canEdit(key)) continue;
             if (!fields || fields.includes(key)) (next as any)[key] = imported[key];
             else {
-              const parts=fields.filter(field=>field.startsWith(key+".")).map(field=>field.slice(key.length+1));
-              if(parts.length) (next as any)[key]={...(sheet as any)[key],...Object.fromEntries(parts.map(part=>[part,(imported as any)[key][part]]))};
+              const parts = fields
+                .filter((field) => field.startsWith(key + "."))
+                .map((field) => field.slice(key.length + 1));
+              if (parts.length)
+                (next as any)[key] = {
+                  ...(sheet as any)[key],
+                  ...Object.fromEntries(parts.map((part) => [part, (imported as any)[key][part]])),
+                };
             }
           }
           // Existing canonical item IDs are retained; imported items are new drafts.

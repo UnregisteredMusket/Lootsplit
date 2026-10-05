@@ -19,7 +19,7 @@ export function ImportCharacterSheet({
     [error, setError] = useState("");
   return (
     <div className="character-import">
-      <label className="quick-action">
+      <label className="quick-action relative overflow-hidden">
         {busy ? "Reading character sheet…" : label}
         <input
           type="file"

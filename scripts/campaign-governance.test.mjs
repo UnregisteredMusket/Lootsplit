@@ -532,13 +532,31 @@ test("zero downtime is an explicit persistent preference and cannot be changed b
   assert.deepEqual(after.ledger, before.ledger);
 });
 
-test("canonical inventory order is identical on devices and server after DM awards",()=>{
- const t=fixture();
- const award={id:"award-a",purseId:"hero",name:"Shield",kind:"item",quantity:1,unitCopper:1000,notes:""};
- const server=[...t.holdings,award],device=[award,...t.holdings];
- assert.deepEqual(characterSheet(t.purses[0],server),characterSheet(t.purses[0],device));
- const before=characterSheet(t.purses[0],device);
- t.holdings=server;
- const next=applyCommand(t,player,{id:"equip-after-award",kind:"character",purseId:"hero",before,sheet:{...before,equipment:before.equipment.map(x=>x.id===award.id?{...x,equipped:true}:x)}});
- assert.equal(next.holdings.find(h=>h.id===award.id).equipped,true);
+test("canonical inventory order is identical on devices and server after DM awards", () => {
+  const t = fixture();
+  const award = {
+    id: "award-a",
+    purseId: "hero",
+    name: "Shield",
+    kind: "item",
+    quantity: 1,
+    unitCopper: 1000,
+    notes: "",
+  };
+  const server = [...t.holdings, award],
+    device = [award, ...t.holdings];
+  assert.deepEqual(characterSheet(t.purses[0], server), characterSheet(t.purses[0], device));
+  const before = characterSheet(t.purses[0], device);
+  t.holdings = server;
+  const next = applyCommand(t, player, {
+    id: "equip-after-award",
+    kind: "character",
+    purseId: "hero",
+    before,
+    sheet: {
+      ...before,
+      equipment: before.equipment.map((x) => (x.id === award.id ? { ...x, equipped: true } : x)),
+    },
+  });
+  assert.equal(next.holdings.find((h) => h.id === award.id).equipped, true);
 });

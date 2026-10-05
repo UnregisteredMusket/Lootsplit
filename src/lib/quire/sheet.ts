@@ -136,21 +136,30 @@ export function sheetFromText(text: string): SheetDraft | null {
         new RegExp(`(?:^|\\n)\\s*${ability.key}\\s+(\\d{1,2})\\s+\\(?([+-]?\\d{1,2})\\)?`, "i"),
       ) ||
       flat.match(
-        new RegExp(`${ability.label}\\s+(\\d{1,2})\\s*(?:\\(\\s*([+-]?\\d{1,2})\\s*\\))?`, "i"),
+        new RegExp(
+          `(?:^|\\n)\\s*${ability.label}[ \t:]+(\\d{1,2})\\s*(?:\\(\\s*([+-]?\\d{1,2})\\s*\\))?`,
+          "i",
+        ),
       );
     if (!match?.[1]) continue;
     put(map, ability.key, match[1]);
     if (match[2]) put(map, `${ability.key}mod`, match[2]);
   }
-  const ac = flat.match(/armor class\s+(\d{1,2})/i);
-  const init = flat.match(/initiative\s+([+-]?\d{1,2})/i);
-  const speed = flat.match(/speed\s+(\d{1,3}\s*(?:ft\.?)?)/i);
+  const ac = flat.match(/armor class[\s:]+(\d{1,2})/i);
+  const init = flat.match(/initiative[\s:]+([+-]?\d{1,2})/i);
+  const speed = flat.match(/speed[\s:]+(\d{1,3}\s*(?:ft\.?)?)/i);
   const hp =
-    flat.match(/hit point maximum\s+(\d{1,4})/i) || flat.match(/\bhp\s+max(?:imum)?\s+(\d{1,4})/i);
+    flat.match(/hit point maximum[\s:]+(\d{1,4})/i) ||
+    flat.match(/\bhp\s+max(?:imum)?[\s:]+(\d{1,4})/i);
   if (ac) put(map, "ac", ac[1] ?? "");
   if (init) put(map, "initiative", init[1] ?? "");
   if (speed) put(map, "speed", speed[1] ?? "");
   if (hp) put(map, "hpmax", hp[1] ?? "");
+  const hpPair = flat.match(/(?:^|\n)\s*(?:hit points|hp)[ \t:]+(\d{1,4})[ \t]*\/[ \t]*(\d{1,4})/i);
+  if (hpPair) {
+    put(map, "hpcurrent", hpPair[1]!);
+    put(map, "hpmax", hpPair[2]!);
+  }
   const headings = [
     "personality traits",
     "traits",

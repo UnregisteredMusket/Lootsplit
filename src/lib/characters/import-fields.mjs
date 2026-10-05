@@ -35,16 +35,14 @@ export function importedArrays(legacy) {
         line = heading[3];
       }
       if (level === null || !line.trim()) return [];
-      return line
-        .split(/[,;]+/)
-        .map((name) => ({
-          name: name.trim().slice(0, 120),
-          level: level ?? 0,
-          prepared: false,
-          description: "Imported from character sheet. Review spell details.",
-          formula: "",
-          source: "Imported character sheet",
-        }));
+      return line.split(/[,;]+/).map((name) => ({
+        name: name.trim().slice(0, 120),
+        level: level ?? 0,
+        prepared: false,
+        description: "Imported from character sheet. Review spell details.",
+        formula: "",
+        source: "Imported character sheet",
+      }));
     });
   const resources = String(legacy.features || "")
     .split(/\n/)
@@ -82,11 +80,13 @@ export function importedFieldNames(legacy) {
     .map(([, target]) => target);
   if (legacy.classLevel && /\d/.test(legacy.classLevel)) fields.push("level");
   if (legacy.hitPoints) fields.push("hp", "maxHp");
-  for(const [key,value] of Object.entries(legacy.abilities)) if(value.score) fields.push(`scores.${key}`);
-  for(const [key,value] of Object.entries(legacy.saves)) if(value) fields.push(`saves.${key}`);
-  for(const skill of legacy.skills) fields.push(`skills.${skill.name}`);
-  const arrays=importedArrays(legacy);
-  for(const key of ["attacks","equipment","spells"]) if(arrays[/** @type {"attacks"|"equipment"|"spells"} */ (key)].length)fields.push(key);
+  for (const [key, value] of Object.entries(legacy.abilities))
+    if (value.score) fields.push(`scores.${key}`);
+  for (const [key, value] of Object.entries(legacy.saves)) if (value) fields.push(`saves.${key}`);
+  for (const skill of legacy.skills) fields.push(`skills.${skill.name}`);
+  const arrays = importedArrays(legacy);
+  for (const key of ["attacks", "equipment", "spells"])
+    if (arrays[/** @type {"attacks"|"equipment"|"spells"} */ (key)].length) fields.push(key);
   if (
     [
       legacy.traits,
@@ -99,7 +99,8 @@ export function importedFieldNames(legacy) {
   )
     fields.push("description");
   if (legacy.features && importedArrays(legacy).resources.length) fields.push("resources");
-  for(const [key,value] of Object.entries(legacy.coins)) if(value>0)fields.push(`coins.${key}`);
+  for (const [key, value] of Object.entries(legacy.coins))
+    if (value > 0) fields.push(`coins.${key}`);
   if ([legacy.attacks, legacy.equipment, legacy.spells, legacy.proficiencies].some(Boolean))
     fields.push("notes");
   return fields;

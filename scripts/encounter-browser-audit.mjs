@@ -1,10 +1,12 @@
+import { scanFixture, scannedPdf } from "./ocr-browser-fixtures.mjs";
+import { expect } from "playwright/test";
 import { openApplication, reloadApplication } from "./title-screen-navigation.mjs";
 import { chromium } from "playwright";
 import assert from "node:assert/strict";
 import { mkdir } from "node:fs/promises";
 import { generateEncounter } from "../src/lib/encounters/model.mjs";
 import { localAccountDb } from "./account-dev-db.mjs";
-const origin = process.env.ENCOUNTER_ORIGIN || "http://127.0.0.1:8080";
+const origin = process.env.ENCOUNTER_ORIGIN || process.env.AUDIT_ORIGIN || "http://127.0.0.1:8080";
 const output = process.env.ENCOUNTER_SCREENSHOTS || "test-results/encounters";
 await mkdir(output, { recursive: true });
 const browser = await chromium.launch({
@@ -154,6 +156,24 @@ try {
   await p.getByText(/Encounter roll: 18/).waitFor();
   assert.ok((await p.locator(".encounter-rolls").innerText()).includes("Manual"));
   await p.getByRole("button", { name: "Builder & generator", exact: true }).click();
+  const scan = await scanFixture(p, [
+    "Goblin",
+    "Small humanoid, neutral evil",
+    "Armor Class 15 (leather armor)",
+    "Hit Points 7 (2d6)",
+    "Speed 30 ft.",
+    "Challenge 1/4 (50 XP)",
+    "Actions",
+    "Scimitar. +4 to hit, 1d6+2 slashing.",
+  ]);
+  await p
+    .getByLabel("Import statblock picture", { exact: true })
+    .setInputFiles({ name: "goblin.png", mimeType: "image/png", buffer: scan });
+  const review = p.getByRole("dialog", { name: "Review statblock" });
+  await expect(review).toBeVisible({ timeout: 90000 });
+  await expect(review).toContainText("Goblin · AC 15 · HP 7");
+  await review.getByRole("button", { name: "Add reviewed creature", exact: true }).click();
+  await p.getByRole("button", { name: "Builder & generator", exact: true }).click();
   await p.getByLabel("Encounter name", { exact: true }).fill("Ambush on the northern road");
   await p.getByLabel("Party size", { exact: true }).fill("5");
   await p.getByLabel("Party level", { exact: true }).fill("3");
@@ -231,13 +251,23 @@ try {
     const t = await import("/src/lib/quire/table.ts");
     const e = await import("/src/lib/quire/economy.ts");
     const purses = await e.listPurses();
-    t.setSeat({ ...t.getSeat(), role: "player", purseIds: [purses.find(p => p.kind === "character").id] });
+    t.setSeat({
+      ...t.getSeat(),
+      role: "player",
+      purseIds: [purses.find((p) => p.kind === "character").id],
+    });
   });
   await openApplication(player.page, origin + "/account");
   await player.page.getByRole("link", { name: "Open DM encounters", exact: true }).click();
   await player.page.getByLabel("Save in", { exact: true }).waitFor();
   assert.equal(await player.page.getByLabel("Save in", { exact: true }).inputValue(), "personal");
-  assert.equal(await player.page.getByLabel("Save in", { exact: true }).locator('option[value="device"]').count(), 0);
+  assert.equal(
+    await player.page
+      .getByLabel("Save in", { exact: true })
+      .locator('option[value="device"]')
+      .count(),
+    0,
+  );
   await player.page.getByRole("button", { name: "New encounter", exact: true }).click();
   await player.page.getByRole("button", { name: "Builder & generator", exact: true }).click();
   await player.page.getByLabel("Encounter name", { exact: true }).fill("Account-only preparation");
@@ -254,6 +284,45 @@ try {
   await app.getByRole("heading", { name: "Account-only preparation", exact: true }).waitFor();
   await app.getByText("Saved on this device", { exact: true }).waitFor();
   await guest.close();
+  // A signed-in player can find and import a personal sheet; no campaign grant is required.
+  await openApplication(player.page, origin + "/characters");
+  const characterScan = await scanFixture(
+    player.page,
+    [
+      "Character Name: Scan Hero",
+      "Class and Level: Fighter 4",
+      "Race: Human",
+      "Armor Class: 19",
+      "Hit Points: 47 / 53",
+      "Strength: 20",
+      "Dexterity: 18",
+      "Constitution: 20",
+      "Intelligence: 8",
+      "Wisdom: 9",
+      "Charisma: 12",
+      "Equipment:",
+      "Shield",
+      "Potion x 2",
+    ],
+    "image/jpeg",
+  );
+  await player.page
+    .getByLabel("Import a new character", { exact: true })
+    .setInputFiles({
+      name: "scanned-sheet.pdf",
+      mimeType: "application/pdf",
+      buffer: scannedPdf(characterScan),
+    });
+  const characterReview = player.page.getByRole("dialog", { name: "Review imported character" });
+  await expect(characterReview).toBeVisible({ timeout: 90000 });
+  await expect(characterReview).toContainText("Scan Hero");
+  await expect(characterReview).toContainText("HP 47/53 · AC 19");
+  await characterReview
+    .getByRole("button", { name: "Use reviewed character", exact: true })
+    .click();
+  await expect(player.page.getByRole("heading", { name: "Scan Hero", exact: true })).toBeVisible();
+  await player.page.getByRole("button", { name: "Edit sheet", exact: true }).click();
+  await expect(player.page.getByLabel("Maximum HP", { exact: true })).toHaveValue("53");
   assert.deepEqual(errors, []);
   console.log(
     JSON.stringify({

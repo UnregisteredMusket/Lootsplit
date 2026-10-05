@@ -55,3 +55,24 @@ test("statblock imports explicit combat values and retains all actions, refusing
   assert.equal(c.notes, text);
   assert.throws(() => parseStatblock("Goblin\nArmor Class 15"));
 });
+
+test("partial imports name only extracted nested fields", () => {
+  const partial = sheetFromFields({ CharacterName: "Partial", STR: "18", GP: "4" });
+  const fields = importedFieldNames(partial);
+  assert.ok(fields.includes("scores.str"));
+  assert.ok(fields.includes("coins.gp"));
+  for (const absent of ["scores.dex", "coins.cp", "equipment", "spells", "attacks"])
+    assert.ok(!fields.includes(absent));
+});
+
+test("colon-labeled scan text preserves abilities, armor and current/max HP", () => {
+  const legacy = sheetFromText(
+    "Character Name: Scan Hero\nClass and Level: Fighter 4\nRace: Human\nArmor Class: 19\nHit Points: 47 / 53\nStrength: 20\nDexterity: 18\nConstitution: 20\nIntelligence: 8\nWisdom: 9\nCharisma: 12",
+  );
+  const sheet = legacyCharacter(legacy, legacy.name);
+  assert.equal(sheet.ac, 19);
+  assert.equal(sheet.hp, 47);
+  assert.equal(sheet.maxHp, 53);
+  assert.equal(sheet.scores.str, 20);
+  assert.equal(sheet.scores.dex, 18);
+});
