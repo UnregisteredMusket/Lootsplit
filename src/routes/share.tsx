@@ -22,9 +22,11 @@ function SharePage() {
   const [tab, setTab] = useState("room");
   const locationSearch = useRouterState({ select: (s) => s.location.searchStr });
   useEffect(() => {
-    const chat = new URLSearchParams(window.location.search).get("chat") === "1";
+    const params = new URLSearchParams(locationSearch);
+    const chat = !params.has("join") && params.get("chat") === "1";
     setOpenChat(chat);
-    if (chat) setTab("chat");
+    if (params.has("join")) setTab("room");
+    else if (chat) setTab("chat");
     else {
       const next = new URLSearchParams(locationSearch).get("tab");
       setTab(next && ["room", "chat", "rolls", "notifications"].includes(next) ? next : "room");

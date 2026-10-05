@@ -1,5 +1,6 @@
-import {getCloudTable} from "@/lib/quire/cloud-client";
-import { useEffect, useState } from "react";
+import {getCloudTable, getServerCloudTable, subscribeCloudTable} from "@/lib/quire/cloud-client";
+import { useEffect, useState, useSyncExternalStore } from "react";
+import { API_ORIGIN } from "@/lib/mobile/origin";
 import { toast } from "sonner";
 import { useEconomy } from "@/lib/quire/economy-context";
 import { characterControl } from "@/lib/quire/types";
@@ -15,6 +16,7 @@ import { loadSeatLock } from "@/lib/quire/lock";
 import { Button, Switch, Confirm } from "@/components/ui";
 
 export function TableShare() {
+  const room = useSyncExternalStore(subscribeCloudTable, getCloudTable, getServerCloudTable);
   const { shops, stock, purses, holdings, realm } = useEconomy();
   const [shopOn, setShopOn] = useState<Record<string, boolean>>({});
   const [partyOn, setPartyOn] = useState<Record<string, boolean>>({});
@@ -65,14 +67,25 @@ export function TableShare() {
     });
   }
 
-  async function copyPlayerLink(characterId: string, name: string) {
+  async function copyPlayerLink(characterId: string, name: string, offline = false) {
+    const current = getCloudTable();
+    const origin = import.meta.env.VITE_MOBILE === "true" ? API_ORIGIN : window.location.origin;
+    if (current.joined && !offline) {
+      const url = new URL("/share", origin);
+      url.searchParams.set("join", current.code);
+      url.searchParams.set("character", characterId);
+      await copyText(url.href);
+      toast.success(`${name}'s invitation to room ${current.code} copied.`);
+      return;
+    }
+    if (current.joined && !window.confirm("Create an offline copy? This link does not join your shared room. Changes require manual reports and will not sync with Live or Turn-based play.")) return;
     const file = await tableFor(characterId);
     if (!file) {
       toast("Choose at least one shop.");
       return;
     }
     const payload = await encodeLinkPayload(file);
-    const url = seatHref("player", payload, window.location.origin);
+    const url = seatHref("player", payload, origin);
     if (url.length > 48000) {
       toast.error("That shop list is too long for a link. Download the file instead.");
       return;
@@ -82,6 +95,7 @@ export function TableShare() {
   }
 
   async function downloadPlayerFile(characterId: string, name: string) {
+    if (getCloudTable().joined && !window.confirm("Download an offline copy? This file does not join your shared room. Use Copy link to invite this player to the current room.")) return;
     const file = await tableFor(characterId);
     if (!file) {
       toast("Choose at least one shop.");
@@ -94,7 +108,9 @@ export function TableShare() {
   return (
     <div>
       <p className="max-w-prose text-sm text-muted">
-        Each player gets their own link. Turn party fund on or off, then copy that player's link. The device that opens it can buy only for that character, plus the shared account if you left the switch on.
+        {room.joined
+          ? `Copy link invites the player to room ${room.code} with their character selected. Shared permissions are managed in Players & permissions. The shop and party-fund choices below apply only to offline copies, which do not sync.`
+          : "Each player gets their own offline copy. Turn party fund on or off, then copy that player's link. The device that opens it can buy only for that character, plus the shared account if you left the switch on. Use an online room for automatic synchronization."}
       </p>
       <fieldset className="mt-4">
         <legend className="mb-2 text-sm font-medium">Shops they can buy from</legend>
@@ -135,6 +151,7 @@ export function TableShare() {
               <Button variant="secondary" onClick={() => void downloadPlayerFile(character.id, character.name).catch(() => toast.error("That file could not be saved."))}>
                 Download file
               </Button>
+              {room.joined && <Button variant="ghost" onClick={() => void copyPlayerLink(character.id, character.name, true).catch(() => toast.error("Could not copy the link."))}>Copy offline snapshot link</Button>}
             </div>
           </li>
         ))}

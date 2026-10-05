@@ -25,8 +25,11 @@ Account scenario mapping:
 | `recovery`  | UI recovery-key password reset and revocation of another signed-in device                                                                             |
 | `portrait-resume` | Both portrait upload controls, Party cards and decoded images on two devices, server readout, desktop DM resume/reopen, failed-upload recovery and turn preservation |
 | `campaign-choice` | Automatic membership linking, explicit separate-room creation, retry of failed linking without creating another room, duplicate-name warning and deliberate older-room resume |
+| `invitations` | Copy the real player invite in a shared room; verify its room and character, existing-session conflict, same-document navigation, explicit switching and confirmed destination |
 
 Portrait sync verification must exercise the real upload → room creation → account save → second-device resume path. Also interrupt an upload: a local preview or a saved membership is not proof the image reached the server. Preserve pending commands and their retry IDs; never repair sync by overwriting the whole room from one device.
+
+Invitation investigations must test the actual copied/shared URL, including the player-specific Copy link control. A legacy `?as=player#t...` link is an offline snapshot, not a shared-room invitation. Never infer or merge a room from a campaign/character name. Preserve deliberate offline sharing, but make its lack of synchronization explicit. Test existing memberships, route/back/forward changes and unavailable invited characters; validate the target before leaving a current room. Use only disposable campaigns.
 
 For cross-device discrepancies, establish both actual room identities and sync states before diagnosing data loss. The same account or campaign name does not prove the same room. Saved memberships select rooms by code; names only help the user choose. Keep real room codes, credentials, screenshots and campaign contents out of public investigation checkpoints. Do not auto-merge same-name rooms or force all signed-in devices into one campaign. Preserve deliberate multi-campaign use.
 
