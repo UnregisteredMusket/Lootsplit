@@ -15,6 +15,7 @@ export function TableShare() {
   async function copyPlayerLink(id: string) {
     const current = getCloudTable();
     if (!current.joined || current.role !== "dm") throw Error("Start a session before inviting players.");
+    if (!current.lastSync) throw Error("Wait for the current session to finish loading before copying its invitation.");
     const origin = import.meta.env.VITE_MOBILE === "true" ? API_ORIGIN : window.location.origin;
     const url = new URL("/share", origin);
     url.searchParams.set("join", current.code);
@@ -24,7 +25,7 @@ export function TableShare() {
     toast.success("Current session invitation copied.");
   }
   return <div><p>Player invitations work only during the current session. Manage each player's permissions in Players & permissions. Offline play is available only to the campaign's DM.</p>
-    {!room.joined ? <p>Start a room to invite players. Existing campaign backups and activity reports remain readable by the DM.</p> : <ul className="mt-4 space-y-3">{characters.map(p => <li key={p.id} className="ledger-card"><p>{p.name}</p><Button variant="secondary" onClick={() => void copyPlayerLink(p.id).catch(e => toast.error(e.message))}>Copy link</Button></li>)}</ul>}
+    {!room.joined ? <p>Start a room to invite players. Existing campaign backups and activity reports remain readable by the DM.</p> : <ul className="mt-4 space-y-3">{characters.map(p => <li key={p.id} className="ledger-card"><p>{p.name}</p><Button variant="secondary" disabled={!room.lastSync} onClick={() => void copyPlayerLink(p.id).catch(e => toast.error(e.message))}>Copy link</Button></li>)}</ul>}
   </div>;
 }
 

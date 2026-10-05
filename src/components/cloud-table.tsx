@@ -60,7 +60,8 @@ export function CloudTable() {
   const [release, setRelease] = useState<string | null>(null);
   const [leaving, setLeaving] = useState(false);
   const host = cloud.joined && cloud.role === "dm";
-  const unavailable = busy || !online;
+  // Restored credentials arrive before the authoritative session mode/invitation.
+  const unavailable = busy || !online || (cloud.joined && cloud.lastSync === 0);
   const savedRooms = hostAccount?.members.filter((m) => !m.archived && m.role) || [];
 
   async function prepareHosting() {
@@ -519,13 +520,13 @@ export function CloudTable() {
             <p className="mb-3 text-sm text-muted">Use Copy session code or Share join link to invite players. The campaign ID alone does not grant access.</p>
             <div className="grid grid-cols-2 gap-3">
               <Button
-                disabled={busy}
+                disabled={unavailable}
                 onClick={() => run(() => copyText(cloud.sessionId ? `${cloud.code}.${cloud.sessionId}` : cloud.code), "Room code copied.")}
               >
                 <Copy size={17} />
                 Copy session code
               </Button>
-              <Button variant="secondary" disabled={busy} onClick={() => run(invitePlayers)}>
+              <Button variant="secondary" disabled={unavailable} onClick={() => run(invitePlayers)}>
                 <Users size={17} />
                 Share join link
               </Button>

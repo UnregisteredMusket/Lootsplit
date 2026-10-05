@@ -5,7 +5,7 @@ import { openApplication, reloadApplication } from "./title-screen-navigation.mj
 const origin = process.env.AUDIT_ORIGIN || "http://127.0.0.1:8080";
 const output = "test-results/themes";
 await mkdir(output, { recursive: true });
-const browser = await chromium.launch({ args: ["--no-sandbox"] });
+const browser = await chromium.launch({ executablePath: process.env.CHROMIUM_EXECUTABLE_PATH || undefined, args: ["--no-sandbox"] });
 let page;
 try {
   // Vite's first dependency discovery can reload the client. Warm its actual entry

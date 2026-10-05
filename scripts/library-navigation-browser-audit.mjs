@@ -1,3 +1,4 @@
+import { prepareDmFixture } from "./title-screen-navigation.mjs";
 import { chromium } from "playwright";
 import assert from "node:assert/strict";
 import { mkdir } from "node:fs/promises";
@@ -14,6 +15,7 @@ try {
     const page = await context.newPage();
     const errors = [];
     page.on("pageerror", e => errors.push(e.message));
+    await prepareDmFixture(page, origin); // Real account setup before the navigation assertions.
     await page.goto(origin);
     await page.getByRole("button", { name: "Lootsplit. Click to continue", exact: true }).waitFor();
     await page.getByRole("button", { name: "Lootsplit. Click to continue", exact: true }).click();
@@ -71,7 +73,7 @@ try {
     await page.locator(".settings-trigger").click();
     await page.locator(".management-footer").getByRole("link", { name: "My account", exact: true }).click();
     await page.waitForURL("**/account");
-    await page.getByRole("heading", { name: "Welcome to your next chapter.", exact: true }).waitFor();
+    await page.getByRole("heading", { name: "Disposable audit DM’s library", exact: true }).waitFor();
     await stillOpen();
     await page.screenshot({ path: `test-results/library-navigation/account-${width}.png` });
     await page.getByRole("link", { name: "Open app", exact: true }).click();

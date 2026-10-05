@@ -23,7 +23,7 @@ const page = context.pages()[0] || (await context.newPage()),
 page.setDefaultTimeout(20000);
   page.on("response", response => { if (response.status() >= 400) console.error(`HTTP ${response.status()} ${new URL(response.url()).pathname}`); });
 page.on("pageerror", (e) => errors.push(e.message));
-await context.setExtraHTTPHeaders({ "cf-connecting-ip": `2001:db8::${crypto.randomUUID().slice(0, 4)}:${crypto.randomUUID().slice(0, 4)}` });
+await context.setExtraHTTPHeaders({ "cf-connecting-ip": `2001:db8:${crypto.randomUUID().slice(0, 4)}:${crypto.randomUUID().slice(0, 4)}::1` });
 await context.addInitScript(() => localStorage.setItem("quire.guide.offer.v3", "seen"));
 // Layout-only fixtures; authorization and writes use the separate real-server audits.
 const sheet = {

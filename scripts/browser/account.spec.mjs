@@ -357,6 +357,7 @@ test("portrait-resume", async ({ devices, baseURL: origin }) => {
 
   // Saving account membership must not silently commit or end a turn.
   await visitPage(desktop, origin, "/share");
+  await expect(desktop.getByRole("button", { name: "Live", exact: true })).toHaveAttribute("aria-pressed", "true");
   await desktop.getByRole("button", { name: "Turn-based", exact: true }).click();
   await desktop
     .getByRole("alertdialog")
