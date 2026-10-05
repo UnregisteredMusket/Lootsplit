@@ -11,8 +11,10 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Operation | State | Logged increases | Original → latest | Total added | Cumulative increase |
 | --- | --- | ---: | ---: | ---: | ---: |
 | Development / desktop / Run actions/setup-node@v4 | open | 2 | 3s → 7s | +4s | +133.33% |
+| Development / desktop / Run npm ci | open | 2 | 11s → 16s | +5s | +45.45% |
 | Development / gameplay / Start disposable development server | open | 2 | 4s → 8s | +4s | +100% |
-| Packaged Worker / interface / Run actions/setup-node@v4 | open | 2 | 2s → 5s | +3s | +150% |
+| Development / gameplay / dev-encounter | open | 2 | 8s → 14s | +6s | +75% |
+| Packaged Worker / interface / Run actions/setup-node@v4 | open | 3 | 2s → 6s | +4s | +200% |
 | Packaged Worker / accounts / Run npm ci | open | 2 | 8s → 14s | +6s | +75% |
 | Packaged Worker / accounts / Start disposable built Worker | open | 2 | 5s → 7s | +2s | +40% |
 | Packaged Worker / accounts / worker-monitor | open | 2 | 5s → 7s | +2s | +40% |
@@ -21,6 +23,18 @@ Open trends require investigation. Resolved trends retain their history; each ve
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-05T04:25:01Z | job: Packaged Worker / accounts | 85s → 104s | +19s | +22.35% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37233368939/job/111527693152) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37263207826/job/111614761044) |
+| 2026-10-05T04:24:59Z | step: Development / desktop / Run actions/upload-artifact@v4 | 3s → 4s | +1s | +33.33% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37233368939/job/111527537922) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37263207826/job/111614535461) |
+| 2026-10-05T04:24:38Z | step: Development / desktop / dev-game-analytics | 5s → 6s | +1s | +20% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37233368939/job/111527537922) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37263207826/job/111614535461) |
+| 2026-10-05T04:24:24Z | step: Development / governance / dev-campaign-governance | 27s → 49s | +22s | +81.48% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37233368939/job/111527537913) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37263207826/job/111614535336) |
+| 2026-10-05T04:23:30Z | step: Development / gameplay / dev-encounter | 12s → 14s | +2s | +16.67% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37235490768/job/111533630411) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37263207826/job/111614535340) |
+| 2026-10-05T04:23:25Z | step: Packaged Worker / interface / Run actions/setup-node@v4 | 5s → 6s | +1s | +20% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37253238957/job/111585184649) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37263207826/job/111614761214) |
+| 2026-10-05T04:23:18Z | step: Packaged Worker / interface / Set up job | 1s → 2s | +1s | +100% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37233368939/job/111527693168) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37263207826/job/111614761214) |
+| 2026-10-05T04:23:11Z | step: Code checks and immutable builds / Post Run actions/setup-node@v4 | 1s → 2s | +1s | +100% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37235490768/job/111533630184) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37263207826/job/111614535233) |
+| 2026-10-05T04:23:07Z | step: Development / governance / Run npm ci | 12s → 17s | +5s | +41.67% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37233368939/job/111527537913) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37263207826/job/111614535336) |
+| 2026-10-05T04:22:32Z | step: Development / desktop / Run npm ci | 13s → 16s | +3s | +23.08% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37235490768/job/111533630459) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37263207826/job/111614535461) |
+| 2026-10-05T04:22:17Z | step: Development / accounts / Run actions/checkout@v4 | 1s → 2s | +1s | +100% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37235490768/job/111533630375) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37263207826/job/111614535383) |
+| 2026-10-05T04:22:15Z | step: Development / accounts / Set up job | 1s → 3s | +2s | +200% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37233368939/job/111527537940) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37263207826/job/111614535383) |
 | 2026-10-05T02:11:27Z | step: deploy / Check current main, existing bindings and applied migrations; deploy without rebuild | 9s → 11s | +2s | +22.22% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37233916181/job/111529154869) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37254338872/job/111588122821) |
 | 2026-10-05T02:10:27Z | job: verify | 5s → 6s | +1s | +20% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37233687309/job/111529121545) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37254074683/job/111588083728) |
 | 2026-10-05T02:09:27Z | step: Development / accounts / Run actions/upload-artifact@v4 | 1s → 2s | +1s | +100% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37233687309/job/111528483533) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37254074683/job/111587377896) |
