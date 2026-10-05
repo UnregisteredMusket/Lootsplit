@@ -20,6 +20,8 @@ All six account scenarios then passed in 87.373s runner time while quick checks 
 
 ## Performance review
 
+PR run 37279628295 passed every group except governance's dev-release audit, which timed out at restored-room refresh after removing network interception. The server log had no runtime error, and the unchanged audit passed locally with diagnostics enabled. The test now keeps its handler installed and toggles the injected command failure off to restore transport without removing interception during background polling. The updated audit also passed locally. CI now retains request and lock diagnostics on a recurrence. This is a fixture stabilization with an unresolved historical timeout cause; no production synchronization fix or performance-trend reset is claimed. Fresh complete CI is required.
+
 Read-only history sync found 196 qualifying observations, no new observations since the prior audit, no pending runs and 43 repeated open trends. Latest inspected automated recorder 37274181669 succeeded. The retained history covers the prior release through 06:04 UTC; the prior release asset readiness increase remains recorded (2.465s → 22.623s, +20.158s/+817.77%). No trends are reset: neither room selection nor a faster individual run diagnoses and fixes these timing causes.
 
 Previous comparable complete-release totals: PR verification 216s (37269780574), main verification 228s (37270098428), deployment 125s (37270395853). Final PR notes must compare those elapsed scopes independently and include absolute/percentage differences. Do not add overlapping jobs. New browser coverage increases the account workload; retain qualifying CI increases under the existing operation names, explain the extra coverage, and inspect the critical job rather than treating every increase as unexplained application slowdown.
@@ -76,4 +78,3 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Packaged Worker / accounts / Run actions/setup-node@v4 | open | 2 | 3s → 5s | +2s | +66.67% |
 | Development / accounts / dev-account | open | 2 | 59s → 85s | +26s | +44.07% |
 | Packaged Worker / accounts / worker-account | open | 2 | 25s → 40s | +15s | +60% |
-
