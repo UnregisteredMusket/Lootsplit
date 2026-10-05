@@ -23,8 +23,10 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Packaged Worker / interface / Run actions/download-artifact@v4 | open | 2 | 1s → 3s | +2s | +200% |
 | Packaged Worker / accounts / Start disposable built Worker | open | 2 | 5s → 7s | +2s | +40% |
 | Packaged Worker / accounts / worker-monitor | open | 2 | 5s → 7s | +2s | +40% |
+| Code checks and immutable builds / Run actions/setup-node@v4 | open | 2 | 2s → 5s | +3s | +150% |
 | Development / governance / Run npm ci | open | 2 | 7s → 17s | +10s | +142.86% |
 | Development / governance / Start disposable development server | open | 2 | 4s → 8s | +4s | +100% |
+| Packaged Worker / interface / Run actions/setup-node@v4 | open | 2 | 3s → 5s | +2s | +66.67% |
 | Development / governance / dev-campaign-governance | open | 2 | 18s → 48s | +30s | +166.67% |
 | Packaged standby / standby-audit | open | 2 | 20s → 42s | +22s | +110% |
 | Packaged standby | open | 2 | 62s → 94s | +32s | +51.61% |
@@ -35,19 +37,45 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Packaged Worker / accounts / Run actions/download-artifact@v4 | open | 2 | 1s → 3s | +2s | +200% |
 | Packaged Worker / accounts / Run actions/upload-artifact@v4 | open | 2 | 1s → 3s | +2s | +200% |
 | Packaged Worker / accounts / worker-account | open | 2 | 22s → 40s | +18s | +81.82% |
-| Development / gameplay / Run actions/setup-node@v4 | open | 2 | 2s → 4s | +2s | +100% |
+| Development / gameplay / Run actions/setup-node@v4 | open | 3 | 2s → 7s | +5s | +250% |
+| Development / accounts / Run actions/setup-node@v4 | open | 2 | 3s → 7s | +4s | +133.33% |
+| Development / desktop / Run actions/setup-node@v4 | open | 2 | 2s → 7s | +5s | +250% |
+| Development / accounts / Run npm ci | open | 2 | 11s → 16s | +5s | +45.45% |
 | Packaged standby / Run actions/setup-node@v4 | open | 2 | 2s → 4s | +2s | +100% |
 | Packaged Worker / interface / Run npm ci | open | 2 | 11s → 15s | +4s | +36.36% |
 | Development / gameplay / Run actions/upload-artifact@v4 | open | 2 | 1s → 3s | +2s | +200% |
+| Development / accounts / Run actions/upload-artifact@v4 | open | 2 | 1s → 3s | +2s | +200% |
 | deploy / Check current main, existing bindings and applied migrations; deploy without rebuild | open | 2 | 9s → 15s | +6s | +66.67% |
 | Packaged Worker / accounts | open | 2 | 85s → 120s | +35s | +41.18% |
 | Code checks and immutable builds / Run actions/upload-artifact@v4 | open | 2 | 2s → 4s | +2s | +100% |
+| Development / gameplay / dev-encounter | open | 2 | 11s → 19s | +8s | +72.73% |
+| Code checks and immutable builds / Run actions/upload-artifact@v4 | open | 2 | 2s → 4s | +2s | +100% |
 | Packaged Worker / accounts / Run actions/setup-node@v4 | open | 2 | 3s → 5s | +2s | +66.67% |
+| Development / accounts / dev-account | open | 2 | 59s → 85s | +26s | +44.07% |
+| Packaged Worker / accounts / worker-account | open | 2 | 25s → 40s | +15s | +60% |
 
 ## Recorded slowdowns
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-05T06:01:12Z | job: Development / accounts | 152s → 199s | +47s | +30.92% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37233687309/job/111528483533) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37270098428/job/111635070946) |
+| 2026-10-05T06:01:09Z | step: Development / accounts / Run actions/upload-artifact@v4 | 2s → 3s | +1s | +50% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37254074683/job/111587377896) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37270098428/job/111635070946) |
+| 2026-10-05T06:01:05Z | job: Packaged Worker / accounts | 94s → 110s | +16s | +17.02% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37233687309/job/111528724125) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37270098428/job/111635376907) |
+| 2026-10-05T06:00:43Z | step: Packaged Worker / accounts / worker-account | 30s → 40s | +10s | +33.33% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37267485071/job/111627511946) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37270098428/job/111635376907) |
+| 2026-10-05T06:00:32Z | step: Development / accounts / dev-monitor | 3s → 4s | +1s | +33.33% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37233687309/job/111528483533) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37270098428/job/111635070946) |
+| 2026-10-05T06:00:18Z | step: Development / accounts / dev-account | 73s → 85s | +12s | +16.44% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37267485071/job/111627248790) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37270098428/job/111635070946) |
+| 2026-10-05T06:00:06Z | step: Packaged Worker / interface / Run npx playwright install --with-deps chromium | 21s → 29s | +8s | +38.1% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37233687309/job/111528724093) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37270098428/job/111635376794) |
+| 2026-10-05T05:59:22Z | step: Development / gameplay / dev-encounter | 16s → 19s | +3s | +18.75% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37263545529/job/111615524878) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37270098428/job/111635071060) |
+| 2026-10-05T05:59:22Z | step: Packaged Worker / interface / Run actions/setup-node@v4 | 4s → 5s | +1s | +25% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37235752710/job/111534622155) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37270098428/job/111635376794) |
+| 2026-10-05T05:59:05Z | step: Code checks and immutable builds / Run actions/upload-artifact@v4 | 3s → 4s | +1s | +33.33% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37263545529/job/111615524657) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37270098428/job/111635070872) |
+| 2026-10-05T05:58:53Z | step: Development / accounts / Start disposable development server | 6s → 9s | +3s | +50% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37233687309/job/111528483533) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37270098428/job/111635070946) |
+| 2026-10-05T05:58:26Z | step: Code checks and immutable builds / unit-tests | 11s → 13s | +2s | +18.18% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37233687309/job/111528483329) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37270098428/job/111635070872) |
+| 2026-10-05T05:58:20Z | step: Development / accounts / Run npm ci | 13s → 16s | +3s | +23.08% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37254074683/job/111587377896) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37270098428/job/111635070946) |
+| 2026-10-05T05:58:04Z | step: Development / accounts / Run actions/setup-node@v4 | 5s → 7s | +2s | +40% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37254074683/job/111587377896) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37270098428/job/111635070946) |
+| 2026-10-05T05:58:02Z | step: Development / desktop / Run actions/setup-node@v4 | 4s → 7s | +3s | +75% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37254074683/job/111587377958) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37270098428/job/111635071034) |
+| 2026-10-05T05:58:01Z | step: Development / gameplay / Run actions/setup-node@v4 | 4s → 7s | +3s | +75% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37267485071/job/111627248809) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37270098428/job/111635071060) |
+| 2026-10-05T05:58:00Z | step: Code checks and immutable builds / Run actions/setup-node@v4 | 3s → 5s | +2s | +66.67% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37235752710/job/111534383925) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37270098428/job/111635070872) |
+| 2026-10-05T05:57:55Z | step: Development / desktop / Run actions/checkout@v4 | 1s → 2s | +1s | +100% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37233687309/job/111528483481) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37270098428/job/111635071034) |
 | 2026-10-05T05:55:33Z | step: Development / gameplay / dev-finance | 17s → 20s | +3s | +17.65% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37233368939/job/111527537884) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37269780574/job/111634124581) |
 | 2026-10-05T05:55:07Z | step: Development / gameplay / dev-encounter | 20s → 27s | +7s | +35% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37267183280/job/111626360168) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37269780574/job/111634124581) |
 | 2026-10-05T05:54:44Z | step: Code checks and immutable builds / Run actions/upload-artifact@v4 | 3s → 4s | +1s | +33.33% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37267183280/job/111626360207) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37269780574/job/111634124361) |
