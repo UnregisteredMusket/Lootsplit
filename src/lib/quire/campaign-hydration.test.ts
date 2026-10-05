@@ -1,0 +1,30 @@
+import assert from 'node:assert/strict';
+import test from 'node:test';
+import 'fake-indexeddb/auto';
+import {setEphemeralCampaign} from './guest-storage.ts';
+import {closeQuireDb} from './db.ts';
+import {ensureEconomy,applyCloudTable,listPurses,listShops,listStock} from './economy.ts';
+import {emptyCloudTable} from './cloud.ts';
+import {fromCopper} from './money.ts';
+const values=new Map<string,string>();
+const storage={getItem:(key:string)=>values.get(key)??null,setItem:(key:string,value:string)=>{values.set(key,value);},removeItem:(key:string)=>{values.delete(key);}};
+Object.assign(globalThis,{sessionStorage:storage,localStorage:storage,window:{localStorage:storage,location:{search:'',hash:''}}});
+const saved=()=>({...emptyCloudTable(),purses:[{id:'saved-hero',name:'Saved hero',kind:'character' as const,coins:fromCopper(3700)}]});
+test('guest memory starts empty and never gains sample inventory after hydration',async()=>{
+ setEphemeralCampaign(true);closeQuireDb();
+ const before=await indexedDB.databases();
+ await ensureEconomy();
+ assert.deepEqual(await listPurses(),[]);
+ await applyCloudTable(saved());await ensureEconomy();
+ assert.deepEqual(await listPurses(),saved().purses);
+ assert.deepEqual(await listShops(),[]);assert.deepEqual(await listStock(),[]);
+ assert.deepEqual(await indexedDB.databases(),before,'Guest hydration never opens a persistent campaign database');
+});
+test('restoring an owned campaign before initialization retains exactly its saved inventory',async()=>{
+ setEphemeralCampaign(false);closeQuireDb();
+ storage.setItem('quire.campaign.v1','restored');
+ storage.setItem('quire.campaigns.v1',JSON.stringify([{id:'restored',db:'quire-hydration-restore'}]));
+ await applyCloudTable(saved());await ensureEconomy();
+ assert.deepEqual(await listPurses(),saved().purses);
+ assert.deepEqual(await listShops(),[]);assert.deepEqual(await listStock(),[]);
+});
