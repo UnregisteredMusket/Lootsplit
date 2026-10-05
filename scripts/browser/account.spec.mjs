@@ -244,12 +244,46 @@ test("portrait-resume", async ({ devices, baseURL: origin }) => {
   await expect(phone.getByText("Portrait saved on this device", { exact: true })).toBeVisible();
   let portrait = await card.locator(".portrait-picker img").getAttribute("src");
   expect(portrait).toMatch(/^data:image/);
+  const sheetPath = `/characters?id=${encodeURIComponent(`party:${id.slice(6)}`)}`;
+  async function expectPartyPortrait(page, expected) {
+    await visitPage(page, origin, "/party?section=characters");
+    const profile = page.locator("article.party-profile").filter({
+      has: page.getByRole("link", { name: "Open sheet", exact: true }).and(
+        page.locator(`a[href="${sheetPath}"]`),
+      ),
+    });
+    const image = profile.locator("img");
+    await expect(image).toHaveAttribute("src", expected);
+    await expect.poll(() => image.evaluate((img) => img.naturalWidth)).toBeGreaterThan(0);
+  }
+  await expectPartyPortrait(phone, portrait);
   const [member] = await createAndSaveRoom(phone, origin);
 
   await visitPage(desktop, origin, "/account");
   await desktop.getByRole("button", { name: "Resume", exact: true }).click();
   await desktop.waitForURL((url) => url.pathname === "/");
   await continueIntoApp(desktop);
+  await expectPartyPortrait(desktop, portrait);
+
+  // The full character sheet has a separate upload/save path. Verify its saved
+  // portrait in the actual Party cards on both devices and the server readout.
+  await visitPage(phone, origin, sheetPath);
+  await phone.getByRole("button", { name: "Edit sheet", exact: true }).click();
+  await phone.getByRole("button", { name: "Character details", exact: true }).click();
+  await phone.getByLabel("Character portrait", { exact: true }).setInputFiles({
+    name: "synthetic-sheet-portrait.png",
+    mimeType: "image/png",
+    buffer: Buffer.from(picture, "base64"),
+  });
+  await phone.getByRole("button", { name: "Save character", exact: true }).click();
+  await expect(phone.getByRole("button", { name: "Save character", exact: true })).toBeDisabled();
+  portrait = `data:image/png;base64,${picture}`;
+  await expectPartyPortrait(phone, portrait);
+  const sheetSaved = await accountPost(desktop.context(), origin, "sheets/detail", {
+    id: `campaign:${member.code}:${id.slice(6)}`,
+  });
+  expect(sheetSaved.body.portrait).toBe(portrait);
+  await expectPartyPortrait(desktop, portrait);
   await visitPage(desktop, origin, "/party?section=funds");
   const restored = desktop.locator(`#${id}`);
   await restored.locator(":scope > summary").click();

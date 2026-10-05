@@ -1,5 +1,14 @@
 # Resume Lootsplit after an interruption
 
+## Portraits still differ across devices — 2026-10-05 follow-up
+
+- Base/main/live at investigation: `612ee4612e9b699d746e708acd4094c4ff80d38b` (PR #38). Production release identity reports main verification run `37270098428`. PR #37's pending-upload safeguard is already deployed; do not present it as another new fix.
+- User confirms the missing desktop portraits remain visible in the phone website's Party cards. This establishes an available phone display, not server persistence. No private campaign data or user screenshots are committed here.
+- Branch `fix/portrait-display-sync` adds coverage of Party cards and the full character-sheet portrait upload/Save character path to `portrait-resume`. Both device cards, decoded images, and the account server readout agree in a fresh synthetic campaign. Existing blocked-upload retry, account linking, reopen and turn-preservation checks also pass. **No application code was changed; the user's remaining mismatch is not reproduced or resolved.**
+- Focused check passed on Node 22.23.3/Linux x64/Chromium with disposable local database: scenario 30.149 seconds, runner 30.797 seconds, including setup 36.331 seconds (`2026-10-05T07:19:32.267Z`–`07:20:08.598Z`). Coverage is broader than the prior portrait scenario, so these timings do not establish a comparable slowdown or speedup. No performance trend is reset.
+- Next evidence needed: compare the Multiplayer room code and phone sync status on both actual devices. Same account/campaign title alone does not establish the same room. Preserve phone browser storage and pending actions; do not clear storage, resume over an unsaved copy, replace a shared table, or claim recovery. If codes match and the phone says Synced, inspect a safely exported local copy alongside the authorized server readout to identify the divergent portrait field/revision. Do not publish tokens or user campaign contents.
+- This is an investigation checkpoint, not a release. Complete the confirmed reproduction and implementation before fresh full verification and deployment. The focused test's success does not verify the user's actual campaign.
+
 ## Live portrait resume checkpoint — 2026-10-05
 
 - Starting main/live `b35e096db4b20927a8beaa0ab94c8c36084c9632` (PR #36 deployment 37263801298 passed). Branch `fix/live-portrait-resume` investigates the user's mobile website → saved Live membership → desktop DM resume report.
