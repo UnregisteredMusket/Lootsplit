@@ -84,6 +84,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-05T11:42:36Z | step: Packaged Worker / interface / worker-help | 6s → 11s | +5s | +83.33% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37300924028/job/111734235590) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37304415063/job/111744921767) |
 | 2026-10-05T11:35:37.000Z | workflow: Verify preserved functionality | 205s → 277s | +72s | +35.12% | failure | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37233687309) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37303426479) |
 | 2026-10-05T11:35:28Z | job: Development / accounts | 199s → 266s | +67s | +33.67% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37270098428/job/111635070946) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37303426479/job/111741324413) |
 | 2026-10-05T11:35:03Z | step: Development / accounts / dev-character | 12s → 14s | +2s | +16.67% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37233687309/job/111528483533) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37303426479/job/111741324413) |
