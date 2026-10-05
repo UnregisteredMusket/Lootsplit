@@ -2,22 +2,21 @@
 import assert from "node:assert/strict";
 import { mkdir, writeFile } from "node:fs/promises";
 import { chromium } from "playwright";
+import { verifyArtifact } from "./release-artifact.mjs";
+import { waitForRelease } from "./release-readiness.mjs";
 const origin = process.env.AUDIT_ORIGIN || "http://127.0.0.1:8082";
 const expected = process.env.EXPECTED_RELEASE_SHA;
 assert.match(expected || "", /^[a-f0-9]{40}$/);
-let identity;
-for (let attempt = 0; attempt < 12; attempt++) {
-  const response = await fetch(`${origin}/assets/release-identity.json?verify=${expected}`, {
-    cache: "no-store",
-    signal: AbortSignal.timeout(15000),
-  });
-  if (response.ok && response.headers.get("content-type")?.includes("json")) {
-    identity = await response.json();
-    if (identity.commit === expected) break;
-  }
-  await new Promise((resolve) => setTimeout(resolve, 5000));
-}
-assert.equal(identity?.commit, expected, "Live release does not match the verified artifact");
+await mkdir("test-results/live-release", { recursive: true });
+const readiness = await waitForRelease({
+  origin,
+  manifest: verifyArtifact("dist/website-release", expected),
+  onReport: (report) =>
+    writeFile("test-results/live-release/readiness.json", JSON.stringify(report, null, 2)),
+});
+console.log(
+  `Release assets ready: ${readiness.attempts.at(-1).assetCount} matching JavaScript/CSS files in ${readiness.durationMs}ms (${readiness.attempts.length} probes).`,
+);
 // Confirm the account service is configured and private data remains protected.
 const session = await fetch(`${origin}/api/account/auth/get-session`, {
   signal: AbortSignal.timeout(15000),

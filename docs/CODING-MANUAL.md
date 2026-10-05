@@ -63,6 +63,8 @@ The user requests speed improvements as **before → after, absolute time saved,
 - After a code change, fresh complete verification is required. After a diagnosed transient CI failure on unchanged code, retain successful independent groups and rerun only the necessary failed jobs. Rebuilding requires rechecking dependent packages.
 - Check exact PR head and successful checks before merge; reconcile remote main again if it has moved. Never claim deployment merely because a PR merged.
 - Confirm the deployment job, expected live commit, and read-only production desktop/mobile audit before saying it is live. Never run destructive browser fixtures against production.
+- The live audit first checks the expected identity, every packaged JavaScript/CSS file's content type and SHA-256, and HTML bundle references. Only those read-only readiness probes may repeat within a bounded deadline; browser assertions still run once. Inspect `live-release/readiness.json` for asset URLs, HTTP status, edge ray and Worker version before diagnosing a rollout failure. A matching identity alone is insufficient.
+- If upload succeeded but its live check failed, use **Verify existing live website (read only)** with the deployed SHA and its successful main verification run ID. It downloads the original artifact and performs no deploy, rebuild, database write or campaign action. Do not rerun the deployment job merely to repeat its audit.
 - Before a handoff/interruption, record branch/PR, latest commit, tests and their environment, run links, remaining failure and next action in the PR or `docs/RECOVERY.md`. Push useful completed checkpoints so temporary workspace loss does not erase them.
 
 ## Tooling and scope

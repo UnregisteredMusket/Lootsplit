@@ -1,5 +1,12 @@
 # Resume Lootsplit after an interruption
 
+## Missing-assets checkpoint — 2026-10-05
+
+- Starting main `325c0be2ca23578ac578b6114d51558654596c8e` (PR #34). Main verification [37235752710](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37235752710) passed. [Deployment 37235992107](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37235992107) uploaded Worker version `9f4f1bd8-8514-4753-addc-5e463ad1adfd` but failed its browser audit immediately afterwards.
+- The saved audit reports four 404s for new JavaScript/CSS bundles despite a matching live release identity. The exact deployed artifact contains all four, its Nitro manifest lists them, and upload logs confirm they uploaded successfully. Later delivery succeeded without another deploy. This establishes a transient delivery/readiness failure; the saved evidence cannot establish which edge/Worker version answered those original 404s.
+- Branch `fix/missing-release-assets`: route build assets directly through ASSETS after the recovery fence; prevent caching of failed assets and stale HTML; attach Worker version diagnostics; verify all packaged JS/CSS bytes and current document references before the unchanged browser gates. Regression tests cover matching identity with missing assets, wrong bytes/types, stale document references, bounded failure and successful readiness after a transient 404.
+- The new **Verify existing live website (read only)** workflow can repeat production verification using an existing deployed SHA and main verification artifact run ID without re-uploading. Missing/expired artifacts remain a verification blocker. Consult the branch PR for latest CI/release results; this checkpoint is not a live-success claim.
+
 Future coding sessions: also read `docs/CODING-MANUAL.md` for focused verification, first-failure diagnostics, and release procedures.
 
 Chat disconnects do not stop GitHub Actions. Do not restart a release just because a chat timed out. These safeguards cannot prevent ChatGPT or the user's network from disconnecting.

@@ -1,0 +1,48 @@
+name: Verify existing live website (read only)
+on:
+  workflow_dispatch:
+    inputs:
+      release_sha:
+        description: Exact deployed main commit to verify
+        required: true
+      verification_run_id:
+        description: Successful main verification run containing its immutable website artifact
+        required: true
+permissions:
+  contents: read
+  actions: read
+jobs:
+  verify:
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    env:
+      EXPECTED_RELEASE_SHA: ${{ inputs.release_sha }}
+      RELEASE_SHA: ${{ inputs.release_sha }}
+      AUDIT_ORIGIN: https://lootsplit.oliverstorie2017.workers.dev
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - uses: actions/download-artifact@v4
+        with:
+          name: website-release-${{ inputs.release_sha }}
+          path: dist/website-release
+          run-id: ${{ inputs.verification_run_id }}
+          github-token: ${{ github.token }}
+      - run: node scripts/release-artifact.mjs verify
+      - run: npx playwright install --with-deps chromium
+      - name: Verify identity, asset bytes and desktop/mobile behavior without deploying
+        run: |
+          node scripts/live-release-audit.mjs
+          node scripts/website-browser-audit.mjs
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: live-verification-${{ inputs.release_sha }}-${{ github.run_id }}-${{ github.run_attempt }}
+          path: test-results/
+          retention-days: 30

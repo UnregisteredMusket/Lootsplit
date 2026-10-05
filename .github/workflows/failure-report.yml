@@ -5,6 +5,7 @@ on:
       [
         Verify preserved functionality,
         Deploy verified website,
+        Verify existing live website (read only),
         Publish verified standby,
         Android signed release APK,
         Android test APK,
