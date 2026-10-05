@@ -123,7 +123,35 @@ test("dm-resume", async ({ devices, baseURL: origin }, testInfo) => {
   const { other } = await signedInDevices(devices, origin);
   const firstCode = (await createAndSaveRoom(other, origin))[0].code;
   await visit(page, "/account");
+  // Simulate navigation/storage interruption during the first account campaign
+  // hydration. Its durable revision must remain old so a reload repairs the copy.
+  await page.addInitScript(() => {
+    const clear = IDBObjectStore.prototype.clear;
+    IDBObjectStore.prototype.clear = function (...args) {
+      const result = clear.apply(this, args);
+      if (
+        this.name === "purses" &&
+        localStorage.getItem("quire.campaign.v1")?.startsWith("account-") &&
+        !sessionStorage.getItem("audit-allow-hydration")
+      ) {
+        sessionStorage.setItem("audit-interrupted-hydration", "yes");
+        queueMicrotask(() => this.transaction.abort());
+      }
+      return result;
+    };
+  });
   await page.getByRole("button", { name: "Resume", exact: true }).click();
+  await page.waitForFunction(() => sessionStorage.getItem("audit-interrupted-hydration") === "yes");
+  await expect
+    .poll(() =>
+      page.evaluate(() => {
+        const id = localStorage.getItem("quire.campaign.v1");
+        return JSON.parse(localStorage.getItem(`quire.cloud.v2.${id}`)).revision;
+      }),
+    )
+    .toBe(0);
+  await page.evaluate(() => sessionStorage.setItem("audit-allow-hydration", "yes"));
+  await visit(page, "/share");
   await expect(
     page.getByRole("button", { name: "Dungeon master. Change role.", exact: true }),
   ).toBeVisible();

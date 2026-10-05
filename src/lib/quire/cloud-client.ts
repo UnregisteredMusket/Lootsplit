@@ -207,7 +207,6 @@ async function accept(remote: RoomView, committed = false) {
   if (changed && !s.pending.length) s.batchId = crypto.randomUUID();
   s.revision = remote.revision;
   s.purseIds = remote.purseIds;
-  remember(s);
   if (!s.pending.length && (changed || committed)) {
     await applyCloudTable(remote.table);
   } else if (changed) {
@@ -231,6 +230,10 @@ async function accept(remote: RoomView, committed = false) {
       await rememberIncoming(remote.table.notes);
     }
   }
+  // Persist the revision only after the local table has committed. Navigation can
+  // interrupt IndexedDB hydration; saving the revision first made the next page
+  // treat an empty/incomplete local copy as already synchronized.
+  remember(s);
   if (s.role === "player")
     setSeat({ ...getSeat(), role: "player", purseIds: remote.purseIds, shopIds: remote.shopIds });
   publish(
