@@ -23,7 +23,11 @@ const worker = (await import("../dist/standby-release/worker/worker.js")).defaul
 globalThis.__env__ = env;
 const server = createServer(async (incoming, outgoing) => {
   try {
-    await sendResponse(await worker.fetch(incomingRequest(incoming, env.ACCOUNT_ORIGIN), env, { waitUntil: (promise) => promise.catch(() => {}), passThroughOnException() {} }), outgoing);
+    // This loopback-only synthetic server emulates the trusted reverse proxy.
+    // incomingRequest correctly discards a caller's CF header in production;
+    // without this proxy hop all test devices share localhost's auth quota.
+    incoming.headers["x-forwarded-for"] = incoming.headers["cf-connecting-ip"] || incoming.socket.remoteAddress;
+    await sendResponse(await worker.fetch(incomingRequest(incoming, env.ACCOUNT_ORIGIN, true), env, { waitUntil: (promise) => promise.catch(() => {}), passThroughOnException() {} }), outgoing);
   } catch (error) { console.error(error); outgoing.statusCode = 500; outgoing.end("Synthetic audit failed"); }
 });
 server.listen(8094, "127.0.0.1"); await once(server, "listening");

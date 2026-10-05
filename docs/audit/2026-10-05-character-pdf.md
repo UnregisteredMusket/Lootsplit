@@ -54,3 +54,10 @@ Prior comparable PR verification 211s, main verification 202s, deployment 105s. 
 | Development / gameplay / Run actions/upload-artifact@v4                                       | open  |                2 |           1s → 3s |         +2s |               +200% |
 | deploy / Check current main, existing bindings and applied migrations; deploy without rebuild | open  |                2 |          9s → 15s |         +6s |             +66.67% |
 | Packaged Worker / accounts                                                                    | open  |                2 |        85s → 120s |        +35s |             +41.18% |
+
+
+## Diagnosed standby test isolation failure
+
+PR run 37269258333 passed every group except the standby account audit. Its final portrait scenario received HTTP 429 while creating the synthetic account. The Node transport correctly discards caller CF identity headers outside its trusted proxy mode; the audit had therefore grouped every synthetic device under localhost. Minute-window timing concealed this on earlier runs. This is a fixture isolation defect, not evidence that the PDF import failed.
+
+The loopback-only audit server now emulates the trusted proxy hop using the fixture's distinct device addresses. Production transport, account limits, security settings and all five scenarios are unchanged. A direct-transport regression assertion confirms spoofed forwarding headers still cannot replace the socket IP. The same immutable standby artifact from the failed job was verified by manifest/hash and passed the entire local five-scenario audit with this correction: 37.1s browser execution, 38.184s audit process. Complete quick checks also passed again (486 pass / 4 existing skips / clean types / 35 existing warnings). They overlapped the local audit; this is an initial measurement, not a claimed comparable improvement. A fresh complete CI run remains required because test source changed.
