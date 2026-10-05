@@ -56,6 +56,29 @@ export async function prepareDmFixture(page, origin) {
   await page.goto(origin + "/");
   await continueIntoApp(page);
   const claim = page.getByRole("button", { name: "Claim this device’s existing DM campaign", exact: true });
-  await claim.waitFor(); await claim.click();
+  const ready = page.getByText("Campaign control", { exact: true });
+  await claim.or(ready).first().waitFor();
+  if (await claim.isVisible()) await claim.click();
   await page.getByText("Campaign control", { exact: true }).waitFor();
+}
+
+/** Prefer visible real router links; hidden desktop links must not force mobile reloads. */
+export async function navigateApplication(page, destination) {
+  const target = new URL(destination);
+  if (page.url().startsWith(target.origin)) {
+    const links = page.locator("a[href]");
+    for (let i = 0; i < await links.count(); i++) {
+      const link = links.nth(i);
+      if (!await link.isVisible()) continue;
+      const url = new URL(await link.getAttribute("href"), page.url());
+      if (url.origin !== target.origin || url.pathname !== target.pathname ||
+          (!target.search && url.search && !((target.pathname === "/market" && url.searchParams.get("book") === "") || (target.pathname === "/" && url.searchParams.get("view") === "home"))) ||
+          [...target.searchParams].some(([key, value]) => url.searchParams.get(key) !== value)) continue;
+      await link.click();
+      await page.waitForURL(u => u.pathname === target.pathname && [...target.searchParams].every(([k, v]) => u.searchParams.get(k) === v));
+      if (await page.locator(".loot-opening").count()) throw Error("Internal navigation replayed the title screen.");
+      return;
+    }
+  }
+  await openApplication(page, destination);
 }

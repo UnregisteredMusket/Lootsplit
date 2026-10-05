@@ -559,11 +559,37 @@ test("ownership", async ({ devices, baseURL: origin }, testInfo) => {
   await visitPage(dm, origin, "/");
   await expect(dm.getByText("Create an account or sign in to proceed as a Dungeon Master in your own campaign", { exact: true })).toBeVisible();
   expect(await dm.evaluate(async () => (await indexedDB.databases()).length)).toBe(0);
+  // A pre-account device save must survive the migration gate unchanged.
+  await dm.evaluate(async () => {
+    const db = await new Promise((resolve, reject) => {
+      const open = indexedDB.open("quire", 3);
+      open.onupgradeneeded = () => {
+        for (const name of ["books", "articles", "purses", "holdings", "shops", "stock", "ledger", "meta", "catalog", "lexicon"]) {
+          const store = open.result.createObjectStore(name, { keyPath: "id" });
+          if (name === "articles") store.createIndex("bookId", "bookId");
+          if (name === "holdings") store.createIndex("purseId", "purseId");
+          if (name === "stock") store.createIndex("shopId", "shopId");
+        }
+      };
+      open.onsuccess = () => resolve(open.result); open.onerror = () => reject(open.error);
+    });
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction(["purses", "meta"], "readwrite");
+      tx.objectStore("purses").put({ id: "legacy-hero", name: "Preserved legacy hero", kind: "character", control: "player", coins: { cp: 3, sp: 2, ep: 0, gp: 37, pp: 0 } });
+      tx.objectStore("meta").put({ id: "seeded" });
+      tx.oncomplete = resolve; tx.onerror = () => reject(tx.error);
+    });
+    db.close();
+  });
   const owner = credentials();
   await accountPost(devices.context, origin, "auth/sign-up/email", owner);
   await visitPage(dm, origin, "/");
   await dm.getByRole("button", { name: "Claim this device’s existing DM campaign", exact: true }).click();
   await expect(dm.getByText("Campaign control", { exact: true })).toBeVisible();
+  const guide = dm.getByRole("button", { name: "Not now", exact: true });
+  if (await guide.isVisible()) await guide.click();
+  await visitPage(dm, origin, "/party");
+  await expect(dm.getByText("Preserved legacy hero", { exact: true }).first()).toBeVisible();
   const members = await createAndSaveRoom(dm, origin);
   const code = members[0].code;
   await visitPage(dm, origin, "/share");

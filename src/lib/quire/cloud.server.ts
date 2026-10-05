@@ -202,7 +202,6 @@ export async function joinRoom(input: { code: string; purseId: string; name: str
   if ((blocked === "kicked" || restriction) && (!input.invitation || room.invitations?.[input.purseId] !== input.invitation))
     throw Error("A fresh invitation from the DM is required.");
   const previous = input.userId && room.departed?.find(s => s.userId === input.userId && s.status === "dismissed");
-  if (previous && !previous.purseIds.includes(input.purseId)) throw Error("Choose your previously assigned character or ask the DM to reassign you.");
   const claimed = claimSeat(room, input.purseId, input.name);
   claimed.seat.userId = input.userId;
   if (previous) claimed.seat.id = previous.id;

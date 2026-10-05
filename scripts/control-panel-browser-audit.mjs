@@ -1,4 +1,4 @@
-import { openApplication } from "./title-screen-navigation.mjs";
+import { openApplication, navigateApplication } from "./title-screen-navigation.mjs";
 import { chromium } from "playwright";
 import assert from "node:assert/strict";
 import { mkdir } from "node:fs/promises";
@@ -19,13 +19,10 @@ try {
   await context.addInitScript(() => localStorage.setItem("quire.guide.offer.v3", "seen"));
   const page = await context.newPage();
   page.setDefaultTimeout(20000);
+  page.on("response", response => { if (response.status() >= 400) console.error(`HTTP ${response.status()} ${new URL(response.url()).pathname}`); });
   page.on("pageerror", (e) => errors.push(e.message));
   async function visit(path) {
-    // Exercise real internal links during the navigation matrix. A user moving
-    // between tabs does not reload the document or reauthenticate every time.
-    const link = page.locator(`a[href="${path}"]`).first();
-    if (page.url().startsWith(origin) && await link.isVisible()) await link.click();
-    else await openApplication(page, origin + path);
+    await navigateApplication(page, origin + path);
     await page.locator(".concept-main").waitFor();
     await page.locator(".quire-dawn").waitFor({ state: "hidden" });
     await page
@@ -62,7 +59,7 @@ try {
   await page.getByLabel("Label", { exact: true }).first().fill("Party messages");
   await page.getByRole("button", { name: "Move button 1 down", exact: true }).click();
   await page.getByRole("button", { name: "Save shortcuts", exact: true }).click();
-  await visit("/");
+  await openApplication(page, origin + "/"); // Explicit reload verifies persisted shortcut edits.
   assert.equal(await page.locator(".shortcut-button").nth(1).innerText(), "Party messages");
   assert.equal(await page.locator(".shortcut-button").nth(1).getAttribute("href"), "/share?chat=1");
   await page.locator(".shortcut-button").nth(1).click();

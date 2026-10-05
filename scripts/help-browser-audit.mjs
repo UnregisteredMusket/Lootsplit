@@ -1,7 +1,7 @@
 import { chromium } from "playwright";
 import assert from "node:assert/strict";
 import { mkdir, writeFile } from "node:fs/promises";
-import { openApplication } from "./title-screen-navigation.mjs";
+import { openApplication, prepareDmFixture } from "./title-screen-navigation.mjs";
 const origin = process.env.AUDIT_ORIGIN || "http://127.0.0.1:8080";
 const output = "test-results/help";
 await mkdir(output, { recursive: true });
@@ -37,6 +37,10 @@ try {
       await page.evaluate(() => document.documentElement.scrollWidth > innerWidth),
       false,
     );
+    // Public help stays anonymous; protected destinations require a real DM account.
+    await prepareDmFixture(page, origin);
+    await openApplication(page, origin + "/help#downtime");
+    await page.locator("#downtime[open]").waitFor();
     await page.getByRole("link", { name: "Play sessions", exact: false }).click();
     // First entry into the application may show the one-time opening.
     const { continueIntoApp } = await import("./title-screen-navigation.mjs");

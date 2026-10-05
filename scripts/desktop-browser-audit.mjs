@@ -1,4 +1,4 @@
-import { openApplication } from "./title-screen-navigation.mjs";
+import { navigateApplication } from "./title-screen-navigation.mjs";
 import { chromium } from "playwright";
 import assert from "node:assert/strict";
 import { mkdir, readFile } from "node:fs/promises";
@@ -21,7 +21,9 @@ const context = await chromium.launchPersistentContext("test-results/desktop-pro
 const page = context.pages()[0] || (await context.newPage()),
   errors = [];
 page.setDefaultTimeout(20000);
+  page.on("response", response => { if (response.status() >= 400) console.error(`HTTP ${response.status()} ${new URL(response.url()).pathname}`); });
 page.on("pageerror", (e) => errors.push(e.message));
+await context.setExtraHTTPHeaders({ "cf-connecting-ip": `2001:db8::${crypto.randomUUID().slice(0, 4)}:${crypto.randomUUID().slice(0, 4)}` });
 await context.addInitScript(() => localStorage.setItem("quire.guide.offer.v3", "seen"));
 // Layout-only fixtures; authorization and writes use the separate real-server audits.
 const sheet = {
@@ -98,7 +100,7 @@ await context.route("**/api/account/encounters/log", (r) =>
   r.fulfill({ json: { rolls: [], more: false } }),
 );
 async function visit(path) {
-  await openApplication(
+  await navigateApplication(
     page,
     origin + (path === "/characters" ? "/characters?id=layout-hero" : path),
   );

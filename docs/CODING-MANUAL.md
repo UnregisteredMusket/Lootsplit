@@ -27,6 +27,8 @@ Account scenario mapping:
 | `campaign-choice` | Automatic membership linking, explicit separate-room creation, retry of failed linking without creating another room, duplicate-name warning and deliberate older-room resume |
 | `invitations` | Copy the real player invite in a shared room; verify its room and character, existing-session conflict, same-document navigation, explicit switching and confirmed destination |
 
+| `ownership` | Anonymous gate, legacy save claim, guest memory/reconnect, expired links, account-player cross-device resume, and tab closure without ending the session |
+
 Portrait sync verification must exercise the real upload → room creation → account save → second-device resume path. Also interrupt an upload: a local preview or a saved membership is not proof the image reached the server. Preserve pending commands and their retry IDs; never repair sync by overwriting the whole room from one device.
 
 Invitation investigations must test the actual copied/shared URL, including the player-specific Copy link control. A legacy `?as=player#t...` link is an offline snapshot, not a shared-room invitation. Never infer or merge a room from a campaign/character name. Offline player sharing is retired by the authorized account-owned model; preserve legacy saves and DM report recovery. Test existing memberships, route/back/forward changes and unavailable invited characters; validate the target before leaving a current room. Use only disposable campaigns.
