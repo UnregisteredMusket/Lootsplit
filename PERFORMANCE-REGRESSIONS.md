@@ -35,7 +35,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Publish verified standby | open | 2 | 10s → 18s | +8s | +80% |
 | publish | open | 2 | 10s → 18s | +8s | +80% |
 | deploy / Run actions/download-artifact@v4 | open | 3 | 1s → 6s | +5s | +500% |
-| Code checks and immutable builds / Run actions/setup-node@v4 | open | 2 | 3s → 6s | +3s | +100% |
+| Code checks and immutable builds / Run actions/setup-node@v4 | open | 3 | 3s → 9s | +6s | +200% |
 | Development / gameplay / dev-bug-edge-cases | open | 2 | 9s → 13s | +4s | +44.44% |
 | Packaged Worker / accounts / Run actions/download-artifact@v4 | open | 2 | 1s → 3s | +2s | +200% |
 | Packaged Worker / accounts / Run actions/upload-artifact@v4 | open | 2 | 1s → 3s | +2s | +200% |
@@ -50,26 +50,37 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Development / gameplay / Run actions/upload-artifact@v4 | open | 2 | 1s → 3s | +2s | +200% |
 | Development / accounts / Run actions/upload-artifact@v4 | open | 2 | 1s → 3s | +2s | +200% |
 | deploy / Check current main, existing bindings and applied migrations; deploy without rebuild | open | 2 | 9s → 15s | +6s | +66.67% |
-| Packaged Worker / accounts | open | 3 | 85s → 138s | +53s | +62.35% |
+| Packaged Worker / accounts | open | 4 | 85s → 166s | +81s | +95.29% |
 | Development / gameplay / Run npx playwright install --with-deps chromium | open | 2 | 21s → 31s | +10s | +47.62% |
 | Code checks and immutable builds / Run actions/upload-artifact@v4 | open | 2 | 2s → 4s | +2s | +100% |
 | Development / gameplay / dev-encounter | open | 2 | 11s → 19s | +8s | +72.73% |
 | deploy / Verify deployed identity and read-only desktop/mobile website behavior | open | 2 | 44s → 69s | +25s | +56.82% |
-| Code checks and immutable builds / Run actions/upload-artifact@v4 | open | 2 | 2s → 4s | +2s | +100% |
+| Code checks and immutable builds / Run actions/upload-artifact@v4 | open | 3 | 2s → 5s | +3s | +150% |
 | Packaged Worker / accounts / Run actions/setup-node@v4 | open | 3 | 3s → 7s | +4s | +133.33% |
-| Development / accounts / dev-account | open | 3 | 57s → 129s | +72s | +126.32% |
+| Development / accounts / dev-account | open | 4 | 57s → 156s | +99s | +173.68% |
 | Packaged Worker / interface / worker-help | open | 2 | 6s → 22s | +16s | +266.67% |
 | Packaged standby / standby-audit | open | 4 | 28s → 78s | +50s | +178.57% |
 | Packaged standby / Set up job | open | 2 | 1s → 3s | +2s | +200% |
 | Development / accounts / dev-account | open | 3 | 59s → 114s | +55s | +93.22% |
 | Packaged Worker / accounts / worker-account | open | 4 | 25s → 60s | +35s | +140% |
+| Verify preserved functionality / initial queue | open | 2 | 3s → 94s | +91s | +3033.33% |
 | Packaged Worker / accounts | open | 2 | 94s → 135s | +41s | +43.62% |
 | production release asset readiness | open | 2 | 2.465s → 27.818s | +25.353s | +1028.52% |
+| Development / accounts | open | 2 | 152s → 257s | +105s | +69.08% |
 
 ## Recorded slowdowns
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-05T11:13:38.000Z | workflow: Verify preserved functionality | 220s → 266s | +46s | +20.91% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37233368939) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37300924028) |
+| 2026-10-05T11:13:31Z | job: Packaged Worker / accounts | 138s → 166s | +28s | +20.29% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37284669067/job/111681081082) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37300924028/job/111734235551) |
+| 2026-10-05T11:13:29Z | job: Development / accounts | 202s → 257s | +55s | +27.23% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37279628295/job/111664400273) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37300924028/job/111733697351) |
+| 2026-10-05T11:12:34Z | step: Development / accounts / dev-account | 129s → 156s | +27s | +20.93% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37292539956/job/111706095989) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37300924028/job/111733697351) |
+| 2026-10-05T11:11:40Z | step: Packaged Worker / accounts / Run npx playwright install --with-deps chromium | 23s → 28s | +5s | +21.74% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37233368939/job/111527693152) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37300924028/job/111734235551) |
+| 2026-10-05T11:10:37Z | step: Code checks and immutable builds / Run actions/upload-artifact@v4 | 1s → 2s | +1s | +100% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37233368939/job/111527537780) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37300924028/job/111733696893) |
+| 2026-10-05T11:10:31Z | step: Code checks and immutable builds / Run actions/upload-artifact@v4 | 4s → 5s | +1s | +25% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37269780574/job/111634124361) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37300924028/job/111733696893) |
+| 2026-10-05T11:09:26Z | step: Code checks and immutable builds / Run actions/setup-node@v4 | 6s → 9s | +3s | +50% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37269258333/job/111632648929) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37300924028/job/111733696893) |
+| 2026-10-05T11:09:12.000Z | queue: Verify preserved functionality / initial queue | 31s → 94s | +63s | +203.23% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37269258333) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37300924028) |
 | 2026-10-05T11:09:21Z | step: report / Run actions/setup-node@v4 | 1s → 3s | +2s | +200% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37253465966/job/111585637487) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37301090506/job/111733716644) |
 | 2026-10-05T11:07:44Z | step: Packaged Worker / interface / Run npm ci | 13s → 15s | +2s | +15.38% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37233368939/job/111527693168) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37300754865/job/111733075935) |
 | 2026-10-05T11:07:36Z | step: Packaged Worker / accounts / Run actions/setup-node@v4 | 5s → 7s | +2s | +40% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37269150846/job/111632435687) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37300754865/job/111733075958) |
