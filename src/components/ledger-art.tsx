@@ -3,6 +3,7 @@ import { FantasyIcon } from "@/components/fantasy-icon";
 import { useState } from "react";
 import { toast } from "sonner";
 import { useEconomy } from "@/lib/quire/economy-context";
+import { getCloudTable, hasPendingChanges } from "@/lib/quire/cloud-client";
 import type { Holding, Purse } from "@/lib/quire/types";
 import { formatCopper } from "@/lib/quire/money";
 export function LedgerArt({
@@ -79,7 +80,17 @@ export function PortraitPicker({ purse }: { purse: Purse }) {
                 purseId: purse.id,
                 portrait: canvas.toDataURL("image/webp", 0.75),
               });
-              toast.success("Portrait saved");
+              const sync = getCloudTable();
+              if (sync.joined && hasPendingChanges()) {
+                if (sync.live || sync.error)
+                  toast.warning(
+                    "Portrait kept on this device. It has not synced to the campaign. Open Multiplayer to retry.",
+                  );
+                else
+                  toast.info("Portrait queued for your turn. Submit the turn to sync it.");
+              } else {
+                toast.success(sync.joined ? "Portrait saved" : "Portrait saved on this device");
+              }
             } catch (err) {
               toast.error(err instanceof Error ? err.message : "Could not save portrait");
             } finally {

@@ -577,6 +577,26 @@ export function roomCredentials() {
   return { code: s.code, token: s.token };
 }
 
+/** Account resume reads the server copy, not this device's optimistic edits. */
+export function prepareAccountMembership() {
+  return serial(async () => {
+    await refresh();
+    requireSession();
+    if (view.live && hasPendingChanges()) {
+      try {
+        // Retain the existing command/batch IDs: a lost response may already
+        // have committed, and retrying must never duplicate campaign actions.
+        await flush();
+      } catch {
+        throw new Error(
+          "Campaign changes have not synced. They are kept on this device. Open Multiplayer to retry, then save this membership again.",
+        );
+      }
+    }
+    return roomCredentials();
+  });
+}
+
 export async function resumeAccountMembership(
   member: import("../account/client").AccountMembership,
 ) {

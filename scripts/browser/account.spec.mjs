@@ -217,3 +217,133 @@ test("recovery", async ({ devices, baseURL: origin }) => {
   await visit(other, "/account");
   await other.getByRole("button", { name: "Sign in", exact: true }).last().waitFor();
 });
+
+test("portrait-resume", async ({ devices, baseURL: origin }) => {
+  const desktop = devices.page;
+  const { other: phone } = await signedInDevices(devices, origin);
+  await phone.setViewportSize({ width: 390, height: 844 });
+  await visitPage(phone, origin, "/party?section=funds");
+  const card = phone.locator('details[id^="purse-"]').first();
+  await card.locator(":scope > summary").click();
+  const id = await card.getAttribute("id");
+  const picture = await phone.evaluate(() => {
+    const c = document.createElement("canvas");
+    c.width = c.height = 32;
+    const ctx = c.getContext("2d");
+    ctx.fillStyle = "#d93025";
+    ctx.fillRect(0, 0, 32, 32);
+    ctx.fillStyle = "#1a73e8";
+    ctx.fillRect(0, 0, 16, 16);
+    return c.toDataURL("image/png").split(",")[1];
+  });
+  await card.locator('.portrait-picker input[type="file"]').setInputFiles({
+    name: "synthetic-portrait.png",
+    mimeType: "image/png",
+    buffer: Buffer.from(picture, "base64"),
+  });
+  await expect(phone.getByText("Portrait saved on this device", { exact: true })).toBeVisible();
+  let portrait = await card.locator(".portrait-picker img").getAttribute("src");
+  expect(portrait).toMatch(/^data:image/);
+  const [member] = await createAndSaveRoom(phone, origin);
+
+  await visitPage(desktop, origin, "/account");
+  await desktop.getByRole("button", { name: "Resume", exact: true }).click();
+  await desktop.waitForURL((url) => url.pathname === "/");
+  await continueIntoApp(desktop);
+  await visitPage(desktop, origin, "/party?section=funds");
+  const restored = desktop.locator(`#${id}`);
+  await restored.locator(":scope > summary").click();
+  await expect(restored.locator(".portrait-picker img")).toHaveAttribute("src", portrait);
+  await expect
+    .poll(() => restored.locator(".portrait-picker img").evaluate((img) => img.naturalWidth))
+    .toBeGreaterThan(0);
+
+  // A phone can render its optimistic local portrait even when the upload fails.
+  // Account linking must not promise another device can see those pending edits.
+  await visitPage(phone, origin, "/party?section=funds");
+  await phone.locator(`#${id} > summary`).click();
+  const replacement = await phone.evaluate(() => {
+    const c = document.createElement("canvas");
+    c.width = c.height = 32;
+    const ctx = c.getContext("2d");
+    ctx.fillStyle = "#188038";
+    ctx.fillRect(0, 0, 32, 32);
+    return c.toDataURL("image/png").split(",")[1];
+  });
+  let blocked = 0;
+  const rejectPortrait = async (route) => {
+    if (route.request().postData()?.includes('"portrait"')) {
+      blocked++;
+      return route.abort("failed");
+    }
+    return route.continue();
+  };
+  await phone.route("**/_serverFn/**", rejectPortrait);
+  await phone.locator(`#${id} .portrait-picker input[type=file]`).setInputFiles({
+    name: "replacement-portrait.png",
+    mimeType: "image/png",
+    buffer: Buffer.from(replacement, "base64"),
+  });
+  await expect.poll(() => blocked).toBeGreaterThan(0);
+  await expect(phone.getByText("Portrait saved", { exact: true })).toHaveCount(0);
+  await expect(phone.getByText(/Portrait kept on this device.*not synced/)).toBeVisible();
+  const pendingPortrait = await phone.locator(`#${id} .portrait-picker img`).getAttribute("src");
+  expect(pendingPortrait).not.toBe(portrait);
+  await expect(restored.locator(".portrait-picker img")).toHaveAttribute("src", portrait);
+  portrait = pendingPortrait;
+  await visitPage(phone, origin, "/account");
+  await phone.getByRole("button", { name: "Save current membership", exact: true }).click();
+  await expect(phone.getByText(/Campaign changes have not synced/)).toBeVisible();
+  await expect(
+    phone.getByRole("status").filter({ hasText: "This membership is saved" }),
+  ).toHaveCount(0);
+  await phone.unroute("**/_serverFn/**", rejectPortrait);
+  await phone.getByRole("button", { name: "Save current membership", exact: true }).click();
+  await expect(
+    phone.getByRole("status").filter({ hasText: "This membership is saved" }),
+  ).toBeVisible();
+
+  await expect(restored.locator(".portrait-picker img")).toHaveAttribute("src", portrait);
+  await endSession(desktop, origin);
+  await visitPage(desktop, origin, "/account");
+  await desktop.getByRole("button", { name: "Reopen as DM", exact: true }).click();
+  await desktop.waitForURL((url) => url.pathname === "/");
+  await continueIntoApp(desktop);
+  await visitPage(desktop, origin, "/party?section=funds");
+  await desktop.locator(`#${id} > summary`).click();
+  await expect(desktop.locator(`#${id} .portrait-picker img`)).toHaveAttribute("src", portrait);
+  expect(member.role).toBe("dm");
+
+  // Saving account membership must not silently commit or end a turn.
+  await visitPage(desktop, origin, "/share");
+  await desktop.getByRole("button", { name: "Turn-based", exact: true }).click();
+  await desktop
+    .getByRole("alertdialog")
+    .getByRole("button", { name: "Change mode", exact: true })
+    .click();
+  await expect(desktop.getByRole("button", { name: "Turn-based", exact: true })).toHaveAttribute(
+    "aria-pressed",
+    "true",
+  );
+  await visitPage(desktop, origin, "/party?section=funds");
+  await desktop.locator(`#${id} > summary`).click();
+  await desktop.locator(`#${id} .portrait-picker input[type=file]`).setInputFiles({
+    name: "turn-portrait.png",
+    mimeType: "image/png",
+    buffer: Buffer.from(picture, "base64"),
+  });
+  await expect(
+    desktop.getByText("Portrait queued for your turn. Submit the turn to sync it.", {
+      exact: true,
+    }),
+  ).toBeVisible();
+  await visitPage(desktop, origin, "/account");
+  await desktop.getByRole("button", { name: "Save current membership", exact: true }).click();
+  await expect(
+    desktop.getByRole("status").filter({ hasText: "Your turn still has pending changes" }),
+  ).toBeVisible();
+  const saved = await accountPost(desktop.context(), origin, "sheets/detail", {
+    id: `campaign:${member.code}:${id.slice(6)}`,
+  });
+  expect(saved.body.portrait).toBe(portrait);
+});

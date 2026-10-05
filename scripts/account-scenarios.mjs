@@ -1,5 +1,5 @@
 // Keep this list and the named Playwright tests in sync. CI always runs all of them.
-export const accountScenarios = ["layout", "library", "dm-resume", "recovery"];
+export const accountScenarios = ["layout", "library", "dm-resume", "recovery", "portrait-resume"];
 
 export function selectAccountScenario(args, ci = process.env.CI) {
   if (!args.length) return null;

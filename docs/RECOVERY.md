@@ -1,5 +1,11 @@
 # Resume Lootsplit after an interruption
 
+## Live portrait resume checkpoint — 2026-10-05
+
+- Starting main/live `b35e096db4b20927a8beaa0ab94c8c36084c9632` (PR #36 deployment 37263801298 passed). Branch `fix/live-portrait-resume` investigates the user's mobile website → saved Live membership → desktop DM resume report.
+- Normal resume/reopen preserved portraits in the clean reproduction. A failed upload falsely announced success because the optimistic command queue retained it locally; account membership linking did not check pending Live changes. The fix reports pending saves honestly and settles Live commands before linking, preserving retry IDs and local recovery data. It does not auto-commit turn-based edits.
+- `portrait-resume` joins all account release gates. Full local account coverage and `verify:quick` passed; see `docs/audit/2026-10-05-portrait-resume.md` and the latest PR for final focused, CI and deployment results. Do not infer the user's original image was recovered, or claim live success from this checkpoint.
+
 ## Missing-assets checkpoint — 2026-10-05
 
 - Starting main `325c0be2ca23578ac578b6114d51558654596c8e` (PR #34). Main verification [37235752710](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37235752710) passed. [Deployment 37235992107](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37235992107) uploaded Worker version `9f4f1bd8-8514-4753-addc-5e463ad1adfd` but failed its browser audit immediately afterwards.

@@ -6,7 +6,7 @@ import {
   captureDeviceBackup,
   getCloudTable,
   hasPendingChanges,
-  roomCredentials,
+  prepareAccountMembership,
 } from "../quire/cloud-client";
 import {
   readQuireFile,
@@ -42,9 +42,10 @@ export async function saveAccountBackup() {
   });
 }
 export async function linkCurrentCampaign() {
+  const credentials = await prepareAccountMembership();
   const state = getCampaigns();
   await accountRequest("link", {
-    ...roomCredentials(),
+    ...credentials,
     name: state.campaigns.find((c) => c.id === state.activeId)?.name || "Campaign",
   });
 }
