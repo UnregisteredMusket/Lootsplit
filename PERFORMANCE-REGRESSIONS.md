@@ -33,6 +33,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | publish / Run actions/download-artifact@v4 | open | 2 | 1s → 3s | +2s | +200% |
 | Publish verified standby | open | 2 | 10s → 18s | +8s | +80% |
 | publish | open | 2 | 10s → 18s | +8s | +80% |
+| deploy / Run actions/download-artifact@v4 | open | 2 | 1s → 3s | +2s | +200% |
 | Code checks and immutable builds / Run actions/setup-node@v4 | open | 2 | 3s → 6s | +3s | +100% |
 | Packaged Worker / accounts / Run actions/download-artifact@v4 | open | 2 | 1s → 3s | +2s | +200% |
 | Packaged Worker / accounts / Run actions/upload-artifact@v4 | open | 2 | 1s → 3s | +2s | +200% |
@@ -63,6 +64,8 @@ Open trends require investigation. Resolved trends retain their history; each ve
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-05T08:02:33Z | step: deploy / Run actions/download-artifact@v4 | 2s → 3s | +1s | +50% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37235992107/job/111535079328) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37281139424/job/111669265502) |
+| 2026-10-05T08:02:18Z | step: deploy / Run actions/checkout@v4 | 1s → 2s | +1s | +100% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37233916181/job/111529154869) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37281139424/job/111669265502) |
 | 2026-10-05T08:01:30Z | step: Packaged Worker / accounts / worker-account | 40s → 48s | +8s | +20% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37270098428/job/111635376907) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37280755805/job/111668498836) |
 | 2026-10-05T08:01:04Z | step: Packaged Worker / interface / worker-game-analytics | 3s → 4s | +1s | +33.33% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37233687309/job/111528724093) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37280755805/job/111668498796) |
 | 2026-10-05T08:00:13Z | step: Packaged Worker / accounts / Run npm ci | 13s → 15s | +2s | +15.38% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37233687309/job/111528724125) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37280755805/job/111668498836) |
