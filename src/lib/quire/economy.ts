@@ -1759,6 +1759,7 @@ export async function applySeatLink(): Promise<"player" | "dm" | "bill" | null> 
   if (typeof window === "undefined" || seatLinkClaimed) return null;
   const role = new URLSearchParams(window.location.search).get("as");
   if (role !== "dm" && role !== "player") return null;
+  if (["player"].includes(role)) throw new Error("Offline player links have retired. Ask the DM for the current session invitation. Existing saves are preserved.");
   seatLinkClaimed = true;
   const hash = window.location.hash;
   let result: "player" | "dm" | "bill" = role;

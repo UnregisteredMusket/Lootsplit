@@ -58,6 +58,7 @@ export type Seat = {
 
 export const DM_SEAT: Seat = { role: "dm", purseIds: [], shopIds: [], openedAt: 0, elevated: false };
 
+import { isEphemeralCampaign } from "./guest-storage.ts";
 const KEY = "quire.seat.v1";
 const listeners = new Set<() => void>();
 let seat: Seat = DM_SEAT;
@@ -71,7 +72,7 @@ function seatKey() {
 
 function remember(next: Seat) {
   seat = next;
-  if (typeof window !== "undefined") window.localStorage.setItem(seatKey(), JSON.stringify(next));
+  if (typeof window !== "undefined" && !isEphemeralCampaign()) window.localStorage.setItem(seatKey(), JSON.stringify(next));
   for (const listener of listeners) listener();
 }
 

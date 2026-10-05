@@ -84,7 +84,8 @@ try {
     player.on("requestfinished", (request) => activeRequests.delete(request));
     player.on("requestfailed", (request) => activeRequests.delete(request));
   }
-  await visit(player, origin + "/share?join=" + code);
+  const sessionId = await dm.evaluate(async () => (await import("/src/lib/quire/cloud-client.ts")).getCloudTable().sessionId);
+  await visit(player, origin + "/share?join=" + code + "&session=" + sessionId);
   await player.getByPlaceholder("Enter your code").waitFor();
   assert.equal(await player.getByPlaceholder("Enter your code").inputValue(), code);
   await player.getByRole("button", { name: "Find characters", exact: true }).click();
@@ -121,23 +122,10 @@ try {
       });
     }),
   );
-  console.log("Audit: interrupted command returned; reload saved queue");
-  assert.ok(
-    await player.evaluate(() =>
-      Object.values(localStorage).some((v) => v.includes("pending") && v.includes("stockId")),
-    ),
-  );
-  await reloadApplication(player);
-  // The SSR heading is present before the restored client room is ready. Wait
-  // for hydration and the persisted membership before invoking recovery APIs.
-  await player.locator(".role-chip:enabled").waitFor();
-  await player.getByRole("button", { name: "Share join link", exact: true }).waitFor();
-  await player.getByRole("heading", { name: "Campaign", exact: true }).waitFor();
-  assert.ok(
-    await player.evaluate(() =>
-      Object.values(localStorage).some((v) => v.includes("pending") && v.includes("stockId")),
-    ),
-  );
+  console.log("Audit: interrupted guest action remains in memory only");
+  assert.equal(await player.evaluate(() => Object.values(localStorage).some(v => v.includes("pending") && v.includes("stockId"))), false);
+  assert.equal(await player.evaluate(async () => (await import("/src/lib/quire/cloud-client.ts")).getCloudTable().pending), 1);
+  // Retry within the open document. Guest unsent actions intentionally do not survive reload.
   // Keep the handler installed while the restored client's background reads are
   // active. Restore transport by changing the fault, not by removing interception
   // during an in-flight poll. Browser context cleanup removes the handler later.
@@ -193,7 +181,7 @@ try {
   await desktop.screenshot({ path: "test-results/dm-desktop.png" });
   assert.deepEqual(errors, []);
   console.log(
-    "PASS: fresh invitation, restored-room explanation, interrupted purchase queue/reload/retry, DM/player responsive routes, clean runtime.",
+    "PASS: fresh invitation, restored-room explanation, interrupted guest purchase in-memory retry, DM/player responsive routes, clean runtime.",
   );
 } catch (error) {
   console.error("Browser runtime errors:", errors);

@@ -1,6 +1,8 @@
 import type { Article, Book, DraftArticle } from "./types.ts";
 
+import { isEphemeralCampaign } from "./guest-storage.ts";
 const DB_VERSION = 3;
+let memoryFactory: IDBFactory | undefined;
 
 export function activeDatabaseName(): string {
   if (typeof window === "undefined") return "quire";
@@ -25,15 +27,18 @@ export function request<T>(req: IDBRequest<T>): Promise<T> {
 let opening: Promise<IDBDatabase> | null = null;
 let openName = "";
 
-function database(): Promise<IDBDatabase> {
+async function database(): Promise<IDBDatabase> {
   if (typeof indexedDB === "undefined") {
     return Promise.reject(new Error("Library storage is only available in the browser."));
   }
-  const name = activeDatabaseName();
+  const memory = isEphemeralCampaign();
+  if (memory && !memoryFactory) { const { IDBFactory } = await import("fake-indexeddb"); memoryFactory = new IDBFactory(); }
+  const factory = memory ? memoryFactory! : indexedDB;
+  const name = memory ? "guest-memory" : activeDatabaseName();
   if (opening && openName === name) return opening;
   openName = name;
   opening = new Promise((resolve, reject) => {
-    const open = indexedDB.open(name, DB_VERSION);
+    const open = factory.open(name, DB_VERSION);
       open.onupgradeneeded = () => {
         const db = open.result;
         if (!db.objectStoreNames.contains("books")) db.createObjectStore("books", { keyPath: "id" });

@@ -15,9 +15,10 @@ test("linked room tokens honor active, expired, permanent and revoked account re
     ] as const) {
       global.__env__ = {
         DB: {
-          prepare: () => ({
+          prepare: (sql: string) => ({
             bind: (code: string, token: string) => {
               assert.equal(code, "ABC");
+              if (sql.includes("SELECT body")) return { first: async () => null };
               assert.equal(token, "token");
               return { first: async () => row };
             },

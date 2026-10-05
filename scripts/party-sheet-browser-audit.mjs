@@ -162,13 +162,14 @@ try {
     await (await import("/src/lib/account/transfers.ts")).linkCurrentCampaign();
     return c.getCloudTable().code;
   });
+  const sessionId = await dm.page.evaluate(async () => (await import("/src/lib/quire/cloud-client.ts")).getCloudTable().sessionId);
   await player.page.evaluate(
-    async ({ code, id }) => {
+    async ({ code, id, sessionId }) => {
       const c = await import("/src/lib/quire/cloud-client.ts");
-      await c.joinTable(code, id, "Player");
+      await c.joinTable(code, id, "Player", undefined, sessionId);
       await (await import("/src/lib/account/transfers.ts")).linkCurrentCampaign();
     },
-    { code, id },
+    { code, id, sessionId },
   );
   await visit(player.page, href);
   await player.page.getByRole("heading", { name: "Unified sentinel", exact: true }).waitFor();

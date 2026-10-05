@@ -27,6 +27,9 @@ export async function resumeCampaignMembership(db, userId, body) {
       fail("This campaign has pending turns. Resolve them before reopening it.", 409);
     const next = structuredClone(room);
     next.closed = false;
+    next.ownerId = userId;
+    next.sessionId = crypto.randomUUID();
+    next.invitations = {};
     next.revision = row.revision + 1;
     const players = next.seats.filter((s) => s.role === "player");
     // Closing ended these player sessions. Reopening must not silently restore revoked access.

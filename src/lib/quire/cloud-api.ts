@@ -28,22 +28,26 @@ export const openCloudTable = createServerFn({ method: "POST" })
     const { limitRoomEntry } = await import("./room-limits.server.ts");
     await limitRoomEntry("open");
     const { openRoom } = await import("./cloud.server.ts");
-    return openRoom(data);
+    const { currentAccountId } = await import("./member-access.server.ts");
+    const userId = await currentAccountId();
+    if (!userId) throw Error("Create an account or sign in to proceed as a Dungeon Master in your own campaign");
+    return openRoom({ ...data, userId });
   });
 
 export const previewCloudTable = createServerFn({ method: "POST" })
-  .validator((input: { code: string }) => input)
+  .validator((input: { code: string; sessionId?: string }) => input)
   .handler(async ({ data }) => {
     const { guardMemberSeat } = await import("./member-access.server.ts");
     await guardMemberSeat(data);
     const { limitRoomEntry } = await import("./room-limits.server.ts");
     await limitRoomEntry("lookup");
     const { previewRoom } = await import("./cloud.server.ts");
-    return previewRoom(data.code);
+    const { currentAccountId } = await import("./member-access.server.ts");
+    return previewRoom(data.code, data.sessionId, await currentAccountId());
   });
 
 export const joinCloudTable = createServerFn({ method: "POST" })
-  .validator((input: { code: string; purseId: string; name: string; invitation?: string }) => input)
+  .validator((input: { code: string; purseId: string; name: string; invitation?: string; sessionId?: string }) => input)
   .handler(async ({ data }) => {
     const { guardMemberSeat } = await import("./member-access.server.ts");
     await guardMemberSeat(data);

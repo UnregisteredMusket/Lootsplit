@@ -21,6 +21,10 @@ import { applyCommand, tablePatch, type Command, type CommandInput } from "./com
 import type { RoomView } from "./cloud.server.ts";
 import { rememberIncoming } from "./chat.ts";
 
+import { isEphemeralCampaign, setEphemeralCampaign } from "./guest-storage.ts";
+import { closeQuireDb } from "./db.ts";
+let playerSession: Session | null = null;
+const PLAYER_TICKET = "lootsplit.player.reconnect.v1";
 type Session = {
   code: string;
   token: string;
@@ -39,6 +43,7 @@ const initialView = {
   live: false,
   who: "",
   code: "",
+  sessionId: "",
   role: "dm" as "dm" | "player",
   seats: [] as RoomView["seats"],
   departed: [] as NonNullable<RoomView["departed"]>,
@@ -78,6 +83,13 @@ const key = () =>
 function session(): Session | null {
   if (typeof localStorage === "undefined") return null;
   try {
+    if (isEphemeralCampaign()) {
+      if (!playerSession) {
+        const ticket = JSON.parse(sessionStorage.getItem(PLAYER_TICKET) || "null");
+        if (ticket?.token && ticket?.code && ticket.role === "player") playerSession = { ...ticket, revision: 0, pending: [], batchId: crypto.randomUUID() };
+      }
+      return playerSession;
+    }
     let saved = JSON.parse(localStorage.getItem(key()) || "null");
     if (!saved && typeof sessionStorage !== "undefined") {
       const old = JSON.parse(sessionStorage.getItem("quire.cloud.v1") || "null");
@@ -100,6 +112,11 @@ function session(): Session | null {
   }
 }
 function remember(s: Session) {
+  if (s.role === "player") {
+    playerSession = s;
+    sessionStorage.setItem(PLAYER_TICKET, JSON.stringify({ code: s.code, token: s.token, seatId: s.seatId, role: s.role, purseIds: s.purseIds }));
+    return;
+  }
   localStorage.setItem(key(), JSON.stringify(s));
 }
 function requireSession() {
@@ -243,6 +260,7 @@ async function accept(remote: RoomView, committed = false) {
       live: remote.live,
       who: remote.who,
       code: remote.code,
+      sessionId: remote.sessionId || "",
       role: s.role,
       seats: remote.seats,
       departed: remote.departed || [],
@@ -267,7 +285,7 @@ async function refresh() {
     if (key() !== campaignKey || session()?.token !== s.token) return;
     const message = error instanceof Error ? error.message : "";
     if (/^(This room is closed\.|No table uses that code\.|This browser is not seated at that table\.|This campaign seat belongs to a restricted account\.)$/.test(message)) {
-      if (s.pending.length) localStorage.setItem(`lootsplit.revoked-recovery:${s.code}`, JSON.stringify({code:s.code,commands:s.pending,exportedAt:Date.now()}));
+      if (s.pending.length && !isEphemeralCampaign()) localStorage.setItem(`lootsplit.revoked-recovery:${s.code}`, JSON.stringify({code:s.code,commands:s.pending,exportedAt:Date.now()}));
       await detachTable(s.role === "player");
       notify("Campaign access ended", "Your seat was released. Authorized session reports remain in My account.", "mode");
       return;
@@ -299,27 +317,31 @@ export async function openTable(name: string) {
   remember({ ...opened, role: "dm", purseIds: [], pending: [], batchId: crypto.randomUUID() });
   await refresh();
 }
-export async function lookupTable(code: string) {
-  return previewCloudTable({ data: { code: code.trim().toUpperCase() } });
+export async function lookupTable(code: string, sessionId?: string) {
+  const [room, generation] = code.trim().split(".");
+  return previewCloudTable({ data: { code: room!.toUpperCase(), sessionId: sessionId || generation } });
 }
-export async function joinTable(code: string, purseId: string, name: string, invitation?: string) {
+export async function joinTable(code: string, purseId: string, name: string, invitation?: string, sessionId?: string) {
   return serial(async () => {
     if (hasPendingChanges())
       throw new Error("Resolve pending changes before joining another campaign.");
-    if (!(await loadSeatLock())?.protectSaves) {
+    if (!isEphemeralCampaign() && !(await loadSeatLock())?.protectSaves) {
       await rememberSave({
         name: `Before joining room ${code.trim().toUpperCase()}`,
         campaignId: localStorage.getItem("quire.campaign.v1") || "main",
         file: await snapshot(),
       });
     }
+    const [room, generation] = code.trim().split(".");
     const joined = await joinCloudTable({
-      data: { code: code.trim().toUpperCase(), purseId, name, invitation },
+      data: { code: room!.toUpperCase(), purseId, name, invitation, sessionId: sessionId || generation },
     });
+    setEphemeralCampaign(true);
+    closeQuireDb();
     remember({
       ...joined,
       revision: 0,
-      code: code.trim().toUpperCase(),
+      code: room!.toUpperCase(),
       role: "player",
       pending: [],
       batchId: crypto.randomUUID(),
@@ -496,7 +518,8 @@ async function detachTable(clearPlayerCopy: boolean) {
     await applyCloudTable(emptyCloudTable());
     setSeat({ role: "player", purseIds: [], shopIds: [], openedAt: Date.now() });
   }
-  if (typeof localStorage !== "undefined") localStorage.removeItem(key());
+  if (isEphemeralCampaign()) { playerSession = null; sessionStorage.removeItem(PLAYER_TICKET); }
+  else if (typeof localStorage !== "undefined") localStorage.removeItem(key());
   stopPolling();
   publish({ ...initialView });
 }
@@ -616,7 +639,9 @@ export async function resumeAccountMembership(
         "This device has an unfinished turn for that campaign. Reopen its existing device campaign and resolve it before resuming.",
       );
     stopPolling();
-    selectAccountCampaign(id, member.name, {
+    setEphemeralCampaign(role === "player");
+    closeQuireDb();
+    if (role === "dm") selectAccountCampaign(id, member.name, {
       role,
       purseIds: remote.purseIds,
       shopIds: remote.shopIds,
@@ -632,6 +657,7 @@ export async function resumeAccountMembership(
       pending: [],
       batchId: crypto.randomUUID(),
     });
+    if (role === "dm") localStorage.setItem(`quire.owner.${id}`, member.userId);
     reloadCampaignContext();
   });
 }

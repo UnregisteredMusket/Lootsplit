@@ -1,3 +1,4 @@
+import { CampaignGate } from "@/components/account/campaign-gate";
 import { AppNotifications } from "@/components/app-notifications";
 import { RouteLoading } from "@/components/route-loading";
 import { APP_DESCRIPTION } from "@/lib/help/content";
@@ -61,14 +62,14 @@ export const Route = createRootRoute({
           <RouteLoading />
           <OpeningGate publicPage={publicPage}>
             <AuthProvider>
-              <LibraryProvider>
+              <CampaignGate><LibraryProvider>
                 <PrefsProvider>
                   <EconomyProvider>
                     <AppNotifications />
                     <Outlet />
                   </EconomyProvider>
                 </PrefsProvider>
-              </LibraryProvider>
+              </LibraryProvider></CampaignGate>
             </AuthProvider>
           </OpeningGate>
           <Scripts />
