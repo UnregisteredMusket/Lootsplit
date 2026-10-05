@@ -5607,17 +5607,17 @@
   },
   "[\"local\",\"function\",\"production release asset readiness\",\"github-actions/ubuntu-latest/node22\",\"v1-identity-js-css-html\"]": {
     "schema": 1,
-    "id": "ci-function:37270395853:1:release-asset-readiness",
+    "id": "local:36c07557-3f1e-45e2-9031-bfe6c6b67bb6",
     "scope": "[\"local\",\"function\",\"production release asset readiness\",\"github-actions/ubuntu-latest/node22\",\"v1-identity-js-css-html\"]",
     "kind": "function",
     "name": "production release asset readiness",
     "environment": "github-actions/ubuntu-latest/node22",
-    "commit": "612ee4612e9b699d746e708acd4094c4ff80d38b",
-    "url": "https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37270395853",
+    "commit": "416fe5127c63348ed2f0f593f1d93187480faa50",
+    "url": "https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37285972298",
     "outcome": "success",
-    "startedAt": "2026-10-05T06:02:48.059Z",
-    "finishedAt": "2026-10-05T06:03:10.682Z",
-    "durationMs": 22623,
+    "startedAt": "2026-10-05T08:49:56.779Z",
+    "finishedAt": "2026-10-05T08:50:24.597Z",
+    "durationMs": 27818,
     "trendId": "ci-function:37267750797:1:release-asset-readiness"
   },
   "[\".github/workflows/verify.yml\",\"pull_request\",\"pull-request\",\"step\",\"Code checks and immutable builds / Summarize measured verification stages\",\"ubuntu-latest\",1]": {

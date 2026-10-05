@@ -61,11 +61,13 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Development / accounts / dev-account | open | 3 | 59s → 114s | +55s | +93.22% |
 | Packaged Worker / accounts / worker-account | open | 4 | 25s → 60s | +35s | +140% |
 | Packaged Worker / accounts | open | 2 | 94s → 135s | +41s | +43.62% |
+| production release asset readiness | open | 2 | 2.465s → 27.818s | +25.353s | +1028.52% |
 
 ## Recorded slowdowns
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-05T08:50:24.597Z | function: production release asset readiness | 22.623s → 27.818s | +5.195s | +22.96% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37270395853) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37285972298) |
 | 2026-10-05T08:51:05Z | step: deploy / Verify deployed identity and read-only desktop/mobile website behavior | 55s → 69s | +14s | +25.45% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37263801298/job/111616279155) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37285972298/job/111684838144) |
 | 2026-10-05T08:49:17Z | step: deploy / Run actions/download-artifact@v4 | 3s → 6s | +3s | +100% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37281139424/job/111669265502) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37285972298/job/111684838144) |
 | 2026-10-05T08:48:36Z | job: Packaged Worker / accounts | 110s → 135s | +25s | +22.73% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37270098428/job/111635376907) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37285563745/job/111683983887) |
