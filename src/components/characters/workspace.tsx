@@ -119,6 +119,7 @@ export function CharacterWorkspace({
   const previousContext = useRef(selectionContext);
   const previousRequest = useRef(requestedId);
   const resolvedSelection = useRef("");
+  const listRequest = useRef<AbortController | null>(null);
   const [accountData, setData] = useState<{
       userId?: string;
       characters: Row[];
@@ -161,6 +162,7 @@ export function CharacterWorkspace({
   useEffect(() => {
     if (!economy.ready) return;
     const c = new AbortController();
+    listRequest.current = c;
     const contextChanged = previousContext.current !== selectionContext;
     const campaignChanged = previousCampaignContext.current !== campaignContext;
     previousCampaignContext.current = campaignContext;
@@ -201,6 +203,7 @@ export function CharacterWorkspace({
           ? d.characters.find((r) => r.campaign_code === activeCode && r.purse_id === purseId)?.id
           : d.characters.find((r) => r.id === local?.sheetId && !r.campaign_code)?.id);
       setSelected((v) => {
+        if (c.signal.aborted) return v;
         if (
           (firstSelection || !campaignChanged) &&
           requestedId &&
@@ -305,6 +308,9 @@ export function CharacterWorkspace({
         await economy.reload();
         id = `party:${created}`;
       } else id = (await accountRequest<{ id: string }>("sheets/save", { sheet })).id;
+      // A list started before this save cannot resolve the newly created ID.
+      // Cancel it before selecting; queued selectors also check the abort signal.
+      listRequest.current?.abort();
       chooseCharacter(id);
       setReload((n) => n + 1);
     } catch (e) {
