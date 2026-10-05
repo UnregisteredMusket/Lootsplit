@@ -55,6 +55,7 @@ Not implemented or promised by this inventory: OCR, Google Drive backup integrat
 - Linked DMs can explicitly reopen their ended shared sessions from My account on any signed-in device. Server-verified DM ownership and a current revision are required; campaign state and authorized reports survive, pending turns are protected, and former player sessions stay disconnected until players rejoin.
 - Explicit private cloud backup versions, download, delete and restore into a new local campaign. PDFs/reference content remain device-local; encrypted device backups remain the route for protected saves.
 - Reusable character names, portraits and notes; adding a profile to a local DM campaign creates an empty purse and does not transfer wealth or inventory.
+- Portrait upload notices distinguish device-only saves, queued turns, confirmed shared saves and failed uploads. Saving a shared membership refreshes the server state and retries pending Live commands using their existing IDs; failed uploads keep their recovery copy and prevent a misleading cross-device success message. Turn-based membership saves remain available and explicitly identify the uncommitted turn; they never submit it automatically.
 
 ## Website owner and credits
 

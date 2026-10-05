@@ -23,6 +23,9 @@ Account scenario mapping:
 | `library`   | UI signup and recovery-key display, character profile, backup/restore, second-device sign-in, linking and resuming a shared membership                |
 | `dm-resume` | Two devices and two saved rooms; end, reopen as verified DM, resume each from either device, correct room/role, no title replay, mobile/desktop cards |
 | `recovery`  | UI recovery-key password reset and revocation of another signed-in device                                                                             |
+| `portrait-resume` | Mobile portrait upload, Live room creation/account linking, desktop DM resume/reopen, failed-upload warning and durable retry before membership save |
+
+Portrait sync verification must exercise the real upload → room creation → account save → second-device resume path. Also interrupt an upload: a local preview or a saved membership is not proof the image reached the server. Preserve pending commands and their retry IDs; never repair sync by overwriting the whole room from one device.
 
 ## 3. Use the focused local loop before full CI
 

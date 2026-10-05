@@ -400,7 +400,9 @@ function Account() {
                       await linkCurrentCampaign();
                       await reload();
                       setNotice(
-                        "This membership is saved. You can resume it on another signed-in device.",
+                        hasPendingChanges()
+                          ? "This membership is saved. Your turn still has pending changes; submit it in Multiplayer to share those changes."
+                          : "This membership is saved. You can resume it on another signed-in device.",
                       );
                     })}
                   >
