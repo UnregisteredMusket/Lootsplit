@@ -1,4 +1,4 @@
-import { navigateApplication } from "./title-screen-navigation.mjs";
+import { navigateApplication, openApplication, prepareDmFixture } from "./title-screen-navigation.mjs";
 import { chromium } from "playwright";
 import assert from "node:assert/strict";
 import { mkdir, readFile } from "node:fs/promises";
@@ -114,7 +114,15 @@ async function visit(path) {
     await page.getByRole("button", { name: /Ambush on the northern road/ }).click();
     await page.getByRole("button", { name: "Save encounter", exact: true }).waitFor();
   }
-  await page.waitForTimeout(150);
+  // URL and the previous screen's role chip can update before a lazy route settles.
+  // Wait for the destination content instead of a fixed delay before measuring it.
+  if (path === "/") await page.locator(".shortcut-grid").waitFor();
+  if (path === "/party") await page.getByRole("heading", { name: /^(Party|Inventory & purse)$/ }).waitFor();
+  if (path === "/market") await page.getByRole("heading", { name: "Market", exact: true }).waitFor();
+  if (path === "/library") await page.getByRole("heading", { name: "Library", exact: true }).waitFor();
+  if (path === "/share") await page.getByRole("heading", { name: "Campaign", exact: true }).waitFor();
+  await page.locator(".concept-main").waitFor();
+  await page.evaluate(() => document.fonts.ready);
 }
 async function capture(name, mobile = false) {
   assert.ok(
@@ -189,6 +197,10 @@ async function role(value) {
   }, value);
 }
 try {
+  // Persistent comparison profiles may have ended the preceding run in player view.
+  await openApplication(page, origin + "/account");
+  await prepareDmFixture(page, origin);
+  await role("dm");
   await visit("/");
   // Keep one disposable saved campaign identical across before/after captures.
   await page.evaluate(async () => {

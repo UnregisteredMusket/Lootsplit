@@ -294,7 +294,7 @@ function EncounterLibrary({ allowDevice }: { allowDevice: boolean }) {
             {!library.campaigns.length
               ? "Sign in to load your account drafts."
               : code === "device"
-                ? "Saved on this device. Build here without an account, or import an exported encounter."
+                ? "Saved in your owned device campaign. Build offline here, or import an exported encounter."
                 : code === "personal"
                   ? "Saved to your account. Export a draft to import it into the app or a DM campaign."
                   : "Saved to this multiplayer DM campaign."}{" "}

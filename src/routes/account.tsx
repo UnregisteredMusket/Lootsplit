@@ -212,7 +212,7 @@ function Account() {
                   <h2>DM encounters</h2>
                   <p>
                     Build private encounters in your account and export them to the app. You can
-                    also build directly in the app without signing in.
+                    also build directly in your account-owned campaign, including offline.
                   </p>
                   <Link
                     to="/encounters"

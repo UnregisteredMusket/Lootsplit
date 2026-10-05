@@ -216,7 +216,7 @@ export function DownloadsPage() {
         <p className="ls-eyebrow">TAKE LOOTSPLIT TO YOUR TABLE</p>
         <h1>One party. Your platform.</h1>
         <p className="ls-intro">
-          Play in your browser or download the Android app. Start without an account.
+          Play in your browser or download the Android app. Sign in to host, or join the DM’s current invitation as a guest.
         </p>
         <div className="ls-platforms">
           <article className="ls-platform ls-android">
