@@ -24,11 +24,19 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Publish verified standby | open | 2 | 10s → 18s | +8s | +80% |
 | publish | open | 2 | 10s → 18s | +8s | +80% |
 | Packaged Worker / interface / Run npm ci | open | 2 | 11s → 15s | +4s | +36.36% |
+| deploy / Check current main, existing bindings and applied migrations; deploy without rebuild | open | 2 | 9s → 15s | +6s | +66.67% |
 
 ## Recorded slowdowns
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-05T04:32:30Z | job: deploy | 98s → 128s | +30s | +30.61% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37233916181/job/111529154869) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37263801298/job/111616279155) |
+| 2026-10-05T04:32:30.000Z | workflow: Deploy verified website | 98s → 128s | +30s | +30.61% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37233916181) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37263801298) |
+| 2026-10-05T04:32:27Z | step: deploy / Verify deployed identity and read-only desktop/mobile website behavior | 44s → 55s | +11s | +25% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37233916181/job/111529154869) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37263801298/job/111616279155) |
+| 2026-10-05T04:31:32Z | step: deploy / Check current main, existing bindings and applied migrations; deploy without rebuild | 11s → 15s | +4s | +36.36% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37254338872/job/111588122821) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37263801298/job/111616279155) |
+| 2026-10-05T04:31:17Z | step: deploy / Run npx playwright install --with-deps chromium | 23s → 30s | +7s | +30.43% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37233916181/job/111529154869) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37263801298/job/111616279155) |
+| 2026-10-05T04:30:46Z | step: deploy / Install locked deploy and verification tools (no application build) | 13s → 15s | +2s | +15.38% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37233916181/job/111529154869) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37263801298/job/111616279155) |
+| 2026-10-05T04:30:24Z | step: deploy / Set up job | 1s → 2s | +1s | +100% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37233916181/job/111529154869) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37263801298/job/111616279155) |
 | 2026-10-05T04:30:37Z | job: publish | 14s → 18s | +4s | +28.57% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37235992149/job/111535079358) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37263801314/job/111616279480) |
 | 2026-10-05T04:30:37.000Z | workflow: Publish verified standby | 14s → 18s | +4s | +28.57% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37235992149) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37263801314) |
 | 2026-10-05T04:30:34Z | step: publish / Verify and publish the audited bytes without rebuilding | 5s → 7s | +2s | +40% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37233916244/job/111529155038) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37263801314/job/111616279480) |
