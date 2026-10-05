@@ -5,23 +5,18 @@
  */
 import { handleAccounts } from "./accounts.mjs";
 import { recoveryGuard } from "./recovery-guard.mjs";
+import { serveBuildAsset, releaseResponse } from "./release-assets.mjs";
 import handler from "../dist/server/index.mjs";
 
 export default {
   async fetch(request, env, context) {
     const recovery = await recoveryGuard(request, env);
     if (recovery) return recovery;
-    // Public release identity contains only the source commit and Actions run id.
-    if (new URL(request.url).pathname === "/assets/release-identity.json" &&
-        (request.method === "GET" || request.method === "HEAD")) {
-      const asset = await env.ASSETS.fetch(request);
-      const response = new Response(asset.body, asset);
-      response.headers.set("Cache-Control", "no-store");
-      return response;
-    }
+    const asset = await serveBuildAsset(request, env);
+    if (asset) return asset;
     const accountResponse = await handleAccounts(request, env);
     if (accountResponse) return accountResponse;
     globalThis.__env__ = env;
-    return handler.fetch(request, env, context);
+    return releaseResponse(await handler.fetch(request, env, context), env);
   },
 };
