@@ -1,3 +1,4 @@
+import { CharacterPermissions } from "@/components/character-permissions";
 import { toast } from "sonner";
 import { Open5eBrowser } from "@/components/open5e-browser";
 import { AppLink } from "@/components/app-link";
@@ -109,10 +110,23 @@ function PartyPage() {
                   <div className="party-profile-body">
                     <h2>{p.name}</h2>
                     <label className="flex min-h-11 items-center gap-2 text-sm">
-                      <input type="checkbox" checked={p.editingAllowed === true} disabled={readOnly}
-                        onChange={e => void economy.command({kind:"character-editing",purseId:p.id,allowed:e.target.checked}).catch(error => toast.error(error.message))} />
+                      <input
+                        type="checkbox"
+                        checked={p.editingAllowed === true}
+                        disabled={readOnly}
+                        onChange={(e) =>
+                          void economy
+                            .command({
+                              kind: "character-editing",
+                              purseId: p.id,
+                              allowed: e.target.checked,
+                            })
+                            .catch((error) => toast.error(error.message))
+                        }
+                      />
                       Allow character editing
                     </label>
+                    <CharacterPermissions purse={p} />
                     <p>
                       {live && p.sheet
                         ? `Level ${live.body.level}${live.body.classes ? ` · ${live.body.classes}` : ""}`

@@ -10,6 +10,9 @@ export type Purse = {
   sheet?: import("../characters/model.mjs").PlaySheet;
   sheetRevision?: number;
   editingAllowed?: boolean;
+  permissions?: Partial<
+    Record<import("../characters/permissions.mjs").CharacterPermission, boolean>
+  >;
   editBaseline?: import("../characters/model.mjs").PlaySheet;
   profileId?: string;
   sheetReadOnlyForDm?: boolean;

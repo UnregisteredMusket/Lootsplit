@@ -1,6 +1,21 @@
-import { createContext, useCallback, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
+import {
+  createContext,
+  useCallback,
+  useContext,
+  useEffect,
+  useMemo,
+  useState,
+  type ReactNode,
+} from "react";
 import { toast } from "sonner";
-import { deleteBook, listBooks, randomArticleId, renameBook, saveImport, setFavorite } from "./db.ts";
+import {
+  deleteBook,
+  listBooks,
+  randomArticleId,
+  renameBook,
+  saveImport,
+  setFavorite,
+} from "./db.ts";
 import { subscribeCampaigns } from "./campaigns.ts";
 import type { Book } from "./types.ts";
 
@@ -51,14 +66,20 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
     };
   }, []);
 
-  useEffect(() => subscribeCampaigns(() => {
-    setReady(false);
-    setBooks([]);
-    void refresh().finally(() => setReady(true));
-  }), [refresh]);
+  useEffect(
+    () =>
+      subscribeCampaigns(() => {
+        setReady(false);
+        setBooks([]);
+        void refresh().finally(() => setReady(true));
+      }),
+    [refresh],
+  );
 
   const importFiles = useCallback(async (files: FileList | File[]) => {
-    const list = [...files].filter((file) => file.type === "application/pdf" || /\.pdf$/i.test(file.name));
+    const list = [...files].filter(
+      (file) => file.type === "application/pdf" || /\.pdf$/i.test(file.name),
+    );
     if (list.length === 0) {
       toast.error("Choose a PDF.");
       return;
@@ -87,7 +108,10 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
           },
           result.articles,
         );
-        if(result.skippedPages.length)toast.warning(`${result.title}: ${result.skippedPages.length} pages had no selectable text (blank or scanned). They need OCR to extract text.`);
+        if (result.skippedPages.length)
+          toast.warning(
+            `${result.title}: ${result.skippedPages.length} pages have low-confidence OCR. Review the extracted text against the original before importing values.`,
+          );
         added += 1;
         setBooks(await listBooks());
       } catch (error) {
@@ -103,7 +127,9 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
     const next = title.trim();
     if (!next) return;
     await renameBook(id, next);
-    setBooks((current) => current.map((book) => (book.id === id ? { ...book, title: next } : book)));
+    setBooks((current) =>
+      current.map((book) => (book.id === id ? { ...book, title: next } : book)),
+    );
   }, []);
 
   const remove = useCallback(async (id: string) => {

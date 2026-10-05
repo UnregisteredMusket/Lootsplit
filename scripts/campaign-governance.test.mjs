@@ -436,3 +436,127 @@ test("owner Test mode rejects other accounts, excludes analytics, and resets onl
     db.close();
   }
 });
+
+test("individual grants apply immediately, remain scoped, and are revoked authoritatively", () => {
+  let t = fixture();
+  const grant = (permission, allowed = true) =>
+    (t = applyCommand(t, dm, {
+      id: crypto.randomUUID(),
+      kind: "character-permission",
+      purseId: "hero",
+      permission,
+      allowed,
+    }));
+  assert.throws(() =>
+    applyCommand(t, player, {
+      id: "escalate",
+      kind: "character-permission",
+      purseId: "hero",
+      permission: "coins",
+      allowed: true,
+    }),
+  );
+  grant("species");
+  t = edit(t, { species: "Elf" });
+  assert.equal(t.purses[0].sheet.species, "Elf");
+  assert.throws(() => edit(t, { maxHp: 99 }));
+  assert.throws(() => edit(t, { coins: { cp: 0, sp: 0, ep: 0, gp: 999, pp: 0 } }));
+  grant("coins");
+  t = edit(t, { coins: { cp: 0, sp: 0, ep: 0, gp: 105, pp: 0 } });
+  assert.equal(t.purses[0].coins.gp, 105);
+  assert.match(t.ledger.at(-1).summary, /DM-authorized player/);
+  assert.throws(() =>
+    edit(t, {
+      equipment: [{ name: "Unauthorized", quantity: 1, weight: 0, equipped: false, notes: "" }],
+    }),
+  );
+  grant("equipment");
+  t = edit(t, {
+    equipment: [
+      ...characterSheet(t.purses[0], t.holdings).equipment,
+      {
+        name: "Granted shield",
+        quantity: 1,
+        weight: 6,
+        equipped: false,
+        notes: "",
+        unitCopper: 1000,
+      },
+    ],
+  });
+  assert.equal(t.holdings.at(-1).name, "Granted shield");
+  grant("coins", false);
+  grant("species", false);
+  t = applyCommand(t, dm, {
+    id: "edit-open",
+    kind: "character-editing",
+    purseId: "hero",
+    allowed: true,
+  });
+  assert.throws(() => edit(t, { species: "Orc" }));
+  assert.throws(() => edit(t, { coins: { cp: 0, sp: 0, ep: 0, gp: 999, pp: 0 } }));
+  assert.throws(() =>
+    applyCommand(
+      t,
+      { ...player, purseIds: ["other"] },
+      {
+        id: "other-edit",
+        kind: "portrait",
+        purseId: "hero",
+        portrait: "/art/portrait-default.webp",
+      },
+    ),
+  );
+});
+
+test("portrait commands update canonical stats/revision and survive round trips", () => {
+  const t = applyCommand(fixture(), dm, {
+    id: "portrait-sync",
+    kind: "portrait",
+    purseId: "hero",
+    portrait: "data:image/png;base64,YQ==",
+  });
+  assert.equal(t.purses[0].sheet.portrait, "data:image/png;base64,YQ==");
+  assert.equal(t.purses[0].sheetRevision, 1);
+  assert.equal(characterSheet(t.purses[0], t.holdings).portrait, t.purses[0].sheet.portrait);
+});
+
+test("zero downtime is an explicit persistent preference and cannot be changed by players", () => {
+  const before = fixture();
+  assert.throws(() =>
+    applyCommand(before, player, { id: "p", kind: "downtime-preference", days: 0 }),
+  );
+  const after = applyCommand(before, dm, { id: "dm", kind: "downtime-preference", days: 0 });
+  assert.deepEqual(after.journal.downtimePrompt, { enabled: false, days: 0 });
+  assert.deepEqual(after.purses, before.purses);
+  assert.deepEqual(after.ledger, before.ledger);
+});
+
+test("canonical inventory order is identical on devices and server after DM awards", () => {
+  const t = fixture();
+  const award = {
+    id: "award-a",
+    purseId: "hero",
+    name: "Shield",
+    kind: "item",
+    quantity: 1,
+    unitCopper: 1000,
+    notes: "",
+  };
+  const server = [...t.holdings, award],
+    device = [award, ...t.holdings];
+  assert.deepEqual(characterSheet(t.purses[0], server), characterSheet(t.purses[0], device));
+  const before = characterSheet(t.purses[0], device);
+  t.holdings = server;
+  const next = applyCommand(t, player, {
+    id: "equip-after-award",
+    kind: "character",
+    purseId: "hero",
+    before,
+    sheet: {
+      ...before,
+      equipment: before.equipment.map((x) => (x.id === award.id ? { ...x, equipped: true } : x)),
+    },
+  });
+  assert.equal(next.holdings.find((h) => h.id === award.id).equipped, true);
+});

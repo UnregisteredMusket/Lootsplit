@@ -30,7 +30,8 @@ Account scenario mapping:
 2. Run `npm run verify:focus -- SCENARIO`. The command copies current tracked/unignored source into a temporary workspace, uses an empty database and new browser contexts, starts `npm run dev` on its own strict loopback port, records diagnostics, and removes only that temporary workspace on completion.
 3. Read a failure's report/trace immediately. Make a targeted correction and rerun that scenario. Use a small repeat only to investigate an observed intermittent failure, not as a default ritual.
 4. Once the focused behavior passes, run the related backend/permission tests and `npm run verify:quick`. When changing account-test setup, run `npm run verify:focus -- accounts` to check all scenarios together before submitting CI.
-5. Submit the complete release suite once the local scenario and related checks are stable. If local verification is genuinely blocked, record the exact environment/access blocker and what was verified; do not claim a pass or weaken the release gate. Use CI to resolve that documented gap, not as the ordinary editing loop.
+5. After dependency changes, validate a clean `npm ci` with the Node/npm versions used by CI in a disposable directory. Reusing installed modules can conceal an incomplete lockfile; do not regenerate it with a different npm major version.
+6. Submit the complete release suite once the local scenario and related checks are stable. If local verification is genuinely blocked, record the exact environment/access blocker and what was verified; do not claim a pass or weaken the release gate. Use CI to resolve that documented gap, not as the ordinary editing loop.
 
 There is no requirement to rerun unrelated local browser suites after each keystroke. All existing full PR/main preservation gates remain required. A checkpoint push is allowed before checks finish; do not portray it as a verified release.
 

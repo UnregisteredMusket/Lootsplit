@@ -1,3 +1,4 @@
+import { characterPermissionsSchema } from "../characters/permissions.mjs";
 import { z } from "zod";
 import { sheetSchema, inventoryFields } from "../characters/model.mjs";
 const id = z.string().min(1);
@@ -11,6 +12,7 @@ const purse = z.object({
   sheet: sheetSchema.optional(),
   sheetRevision: z.number().int().nonnegative().optional(),
   editingAllowed: z.boolean().optional(),
+  permissions: characterPermissionsSchema.optional(),
   editBaseline: sheetSchema.optional(),
   profileId: z.string().max(150).optional(),
   sheetReadOnlyForDm: z.boolean().optional(),

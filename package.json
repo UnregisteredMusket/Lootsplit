@@ -35,7 +35,12 @@
     "verify:timings": "node scripts/verification-timing.mjs",
     "performance:sync": "node scripts/performance-sync.mjs",
     "performance:record": "node scripts/performance-record.mjs",
-    "performance:resolve": "node scripts/performance-resolve.mjs"
+    "performance:resolve": "node scripts/performance-resolve.mjs",
+    "predev": "node scripts/prepare-ocr.mjs",
+    "prebuild": "node scripts/prepare-ocr.mjs",
+    "prebuild:dev": "node scripts/prepare-ocr.mjs",
+    "prebuild:cloudflare": "node scripts/prepare-ocr.mjs",
+    "prebuild:mobile": "node scripts/prepare-ocr.mjs"
   },
   "dependencies": {
     "@capacitor/app": "^8.1.1",
@@ -74,6 +79,7 @@
     "@tanstack/react-start": "^1.168.0",
     "@tanstack/react-table": "^8.21.0",
     "@tanstack/router-plugin": "^1.168.0",
+    "@tesseract.js-data/eng": "1.0.0",
     "@vitejs/plugin-react": "^5.2.0",
     "better-auth": "~1.6.30",
     "class-variance-authority": "^0.7.1",
@@ -99,6 +105,7 @@
     "sonner": "^2.0.7",
     "tailwind-merge": "^3.5.0",
     "tailwindcss": "^4.3.0",
+    "tesseract.js": "7.0.0",
     "tw-animate-css": "^1.3.4",
     "typescript": "^5.7.0",
     "vaul": "^1.1.2",

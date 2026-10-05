@@ -1,3 +1,4 @@
+import { PlayerPermissions } from "@/components/character-permissions";
 import { AppLink } from "@/components/app-link";
 import { RollModeSetting } from "@/components/roll-mode-setting";
 import { FantasyIcon } from "@/components/fantasy-icon";
@@ -83,6 +84,7 @@ export function ManagementPanel({
         },
         {
           name: "Players & permissions",
+          content: <PlayerPermissions />,
           icon: "Party",
           links: [
             ["Party & character assignments", "/party"],

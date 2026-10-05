@@ -1,3 +1,4 @@
+import { createOcrReader } from "./ocr";
 import { getDocument, GlobalWorkerOptions } from "pdfjs-dist";
 import workerUrl from "pdfjs-dist/build/pdf.worker.min.mjs?url";
 import {
@@ -29,6 +30,7 @@ export type PdfRead = {
   pageCount: number;
   articles: DraftArticle[];
   skippedPages: number[];
+  ocrPages?: number[];
 };
 
 function atomFromItem(item: PdfTextItem): TextAtom | null {
@@ -61,6 +63,7 @@ export async function readPdf(
     task.promise.then(resolve, reject);
   });
 
+  let ocr: Awaited<ReturnType<typeof createOcrReader>> | undefined;
   try {
     const meta = await doc.getMetadata().catch(() => ({ info: {} }));
     const info = meta.info as { Title?: unknown };
@@ -68,6 +71,7 @@ export async function readPdf(
     const title = metaTitle || file.name.replace(/\.pdf$/i, "").trim() || "Untitled PDF";
     const pages: PageText[] = [];
     const skippedPages: number[] = [];
+    const ocrPages: number[] = [];
     for (let number = 1; number <= doc.numPages; number += 1) {
       const page = await doc.getPage(number);
       const viewport = page.getViewport({ scale: 1 });
@@ -77,17 +81,29 @@ export async function readPdf(
         const atom = atomFromItem(item);
         return atom ? [atom] : [];
       });
-      if (!atoms.length) skippedPages.push(number);
-      pages.push({ width: viewport.width, lines: itemsToLines(atoms, number) });
+      if (
+        atoms
+          .map((a) => a.str)
+          .join("")
+          .trim().length < 100
+      ) {
+        ocr ??= await createOcrReader();
+        const canvas = await renderForOcr(page);
+        const result = await ocr.read(canvas, number);
+        pages.push({ width: canvas.width, lines: result.lines });
+        ocrPages.push(number);
+        if (result.confidence < 75) skippedPages.push(number);
+      } else pages.push({ width: viewport.width, lines: itemsToLines(atoms, number) });
       onProgress(number, doc.numPages);
       await page.cleanup();
     }
     const articles = buildArticles(pages);
     if (articles.length === 0) {
-      throw new Error("No selectable text was found. Scanned pages cannot be catalogued.");
+      throw new Error("No selectable text was found. Try a clearer scan.");
     }
-    return { title, pageCount: doc.numPages, articles, skippedPages };
+    return { title, pageCount: doc.numPages, articles, skippedPages, ocrPages };
   } finally {
+    await ocr?.close();
     await doc.cleanup();
     await task.destroy();
   }
@@ -95,7 +111,8 @@ export async function readPdf(
 
 export async function readPdfPlain(
   file: File,
-): Promise<{ fields: Record<string, string>; text: string }> {
+  onProgress?: (message: string) => void,
+): Promise<{ fields: Record<string, string>; text: string; warnings: string[] }> {
   ensureWorker();
   const data = new Uint8Array(await file.arrayBuffer());
   const task = getDocument({ data, verbosity: 0 });
@@ -106,7 +123,9 @@ export async function readPdfPlain(
     };
     task.promise.then(resolve, reject);
   });
+  let ocr: Awaited<ReturnType<typeof createOcrReader>> | undefined;
   try {
+    const warnings: string[] = [];
     const fields: Record<string, string> = {};
     const raw = await doc.getFieldObjects();
     if (raw) {
@@ -116,7 +135,7 @@ export async function readPdfPlain(
       }
     }
     const pages: string[] = [];
-    const last = Math.min(doc.numPages, 6);
+    const last = doc.numPages;
     for (let number = 1; number <= last; number += 1) {
       const page = await doc.getPage(number);
       const content = await page.getTextContent();
@@ -126,13 +145,29 @@ export async function readPdfPlain(
         return atom ? [atom] : [];
       });
       const lines = orderPage(itemsToLines(atoms, number), page.getViewport({ scale: 1 }).width);
-      if (lines.length) pages.push(lines.map((line) => line.text).join("\n"));
+      onProgress?.(`Reading page ${number} of ${last}`);
+      if (
+        lines
+          .map((l) => l.text)
+          .join("")
+          .trim().length >= 100
+      )
+        pages.push(lines.map((line) => line.text).join("\n"));
+      else {
+        ocr ??= await createOcrReader(onProgress);
+        const result = await ocr.read(await renderForOcr(page), number);
+        if (result.text.trim()) pages.push(result.text);
+        warnings.push(
+          `Page ${number}: scanned text (${Math.round(result.confidence)}% OCR confidence); compare every imported value with the original.`,
+        );
+      }
       await page.cleanup();
     }
     if (!pages.length && !Object.keys(fields).length)
       throw new Error("No selectable text or form fields were found. This PDF may need OCR first.");
-    return { fields, text: pages.join("\n\n") };
+    return { fields, text: pages.join("\n\n"), warnings };
   } finally {
+    await ocr?.close();
     await doc.cleanup();
     await task.destroy();
   }
@@ -149,4 +184,18 @@ function fieldText(entries: unknown): string {
     if (typeof value === "number" && Number.isFinite(value)) return String(value);
   }
   return "";
+}
+
+async function renderForOcr(
+  page: Awaited<ReturnType<Awaited<ReturnType<typeof getDocument>["promise"]>["getPage"]>>,
+) {
+  const original = page.getViewport({ scale: 1 });
+  const viewport = page.getViewport({
+    scale: Math.min(3, 2600 / Math.max(original.width, original.height)),
+  });
+  const canvas = document.createElement("canvas");
+  canvas.width = Math.ceil(viewport.width);
+  canvas.height = Math.ceil(viewport.height);
+  await page.render({ canvas, viewport }).promise;
+  return canvas;
 }

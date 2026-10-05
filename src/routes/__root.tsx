@@ -1,3 +1,4 @@
+import { AppNotifications } from "@/components/app-notifications";
 import { RouteLoading } from "@/components/route-loading";
 import { APP_DESCRIPTION } from "@/lib/help/content";
 import { MemberActivity } from "@/components/account/activity";
@@ -63,6 +64,7 @@ export const Route = createRootRoute({
               <LibraryProvider>
                 <PrefsProvider>
                   <EconomyProvider>
+                    <AppNotifications />
                     <Outlet />
                   </EconomyProvider>
                 </PrefsProvider>

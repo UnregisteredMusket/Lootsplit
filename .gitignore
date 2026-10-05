@@ -30,3 +30,6 @@ data/account-dev*
 
 # Generated browser verification artifacts.
 test-results/
+
+# Generated from pinned OCR packages for both web and Android builds.
+/public/ocr/

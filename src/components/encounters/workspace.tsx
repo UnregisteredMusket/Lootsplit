@@ -1,3 +1,4 @@
+import { ImportStatblock } from "./import-statblock";
 import { usePrefs } from "@/lib/quire/prefs";
 import { encounterRequest } from "@/lib/encounters/client";
 import { localEncounterRequest } from "@/lib/encounters/local";
@@ -520,10 +521,12 @@ function EncounterEditor({
   async function roll(tableId?: string, retry = false) {
     if (!detail || !draft) return;
     if (!retry && manual) {
-      const raw = tableId ? tableTotals[tableId] ?? "" : total;
+      const raw = tableId ? (tableTotals[tableId] ?? "") : total;
       const value = Number(raw);
       const maximum = tableId
-        ? draft.tables.find((table) => table.id === tableId)?.entries.reduce((sum, row) => sum + row.weight, 0) ?? 0
+        ? (draft.tables
+            .find((table) => table.id === tableId)
+            ?.entries.reduce((sum, row) => sum + row.weight, 0) ?? 0)
         : 100000;
       const minimum = tableId ? 1 : -100000;
       if (!raw.trim() || !Number.isSafeInteger(value) || value < minimum || value > maximum) {
@@ -544,7 +547,10 @@ function EncounterEditor({
             formula,
             label: rollLabel,
             manual,
-            total: (tableId ? tableTotals[tableId] ?? "" : total).trim() === "" ? null : Number(tableId ? tableTotals[tableId] : total),
+            total:
+              (tableId ? (tableTotals[tableId] ?? "") : total).trim() === ""
+                ? null
+                : Number(tableId ? tableTotals[tableId] : total),
             tableId,
           },
         };
@@ -1074,6 +1080,13 @@ function EncounterEditor({
                 />
               </label>
             </div>
+            <ImportStatblock
+              disabled={review || busy}
+              onImport={(creature) => {
+                change({ ...draft, combatants: [...draft.combatants, creature] });
+                setTab("battle");
+              }}
+            />
             <div className="character-toolbar">
               <button disabled={querying || review} onClick={() => void search(true)}>
                 {querying ? "Loading Open5e…" : "Generate & add enemies"}
@@ -1501,15 +1514,30 @@ function EncounterEditor({
                           ))}
                         </select>
                       </label>
-                      {manual && <label>
-                        Physical table total (1–{t.entries.reduce((sum, row) => sum + row.weight, 0)})
-                        <input aria-label={`${t.name} physical table total`} type="number" step="1" min="1"
-                          max={t.entries.reduce((sum, row) => sum + row.weight, 0)} value={tableTotals[t.id] ?? ""}
-                          onChange={(e) => setTableTotals({ ...tableTotals, [t.id]: e.target.value })} />
-                      </label>}
+                      {manual && (
+                        <label>
+                          Physical table total (1–
+                          {t.entries.reduce((sum, row) => sum + row.weight, 0)})
+                          <input
+                            aria-label={`${t.name} physical table total`}
+                            type="number"
+                            step="1"
+                            min="1"
+                            max={t.entries.reduce((sum, row) => sum + row.weight, 0)}
+                            value={tableTotals[t.id] ?? ""}
+                            onChange={(e) =>
+                              setTableTotals({ ...tableTotals, [t.id]: e.target.value })
+                            }
+                          />
+                        </label>
+                      )}
                       <div className="character-toolbar">
                         <button
-                          disabled={dirty || !!pendingRoll.current || (manual && !(tableTotals[t.id] ?? "").trim())}
+                          disabled={
+                            dirty ||
+                            !!pendingRoll.current ||
+                            (manual && !(tableTotals[t.id] ?? "").trim())
+                          }
                           onClick={() => void roll(t.id)}
                         >
                           {manual ? "Record physical loot-table roll" : "Roll saved loot table"}
@@ -1562,7 +1590,9 @@ function EncounterEditor({
             <FantasyIcon ui="Dice" size={26} /> Encounter rolls
           </h3>
           <p>
-            Physical results are labeled Manual. Virtual rolls are generated and recorded by the app. Changing the source changes your device’s Roll mode setting. Apply results to initiative, HP and gameplay yourself.
+            Physical results are labeled Manual. Virtual rolls are generated and recorded by the
+            app. Changing the source changes your device’s Roll mode setting. Apply results to
+            initiative, HP and gameplay yourself.
           </p>
           <fieldset disabled={busy || readOnly || review || dirty} className="encounter-fieldset">
             <div className="encounter-grid">

@@ -88,7 +88,18 @@ const FOUNDRY_SKILLS: Record<string, string> = {
   sur: "Survival",
 };
 
-const ALIGNMENTS = ["", "Lawful good", "Neutral good", "Chaotic good", "Lawful neutral", "Neutral", "Chaotic neutral", "Lawful evil", "Neutral evil", "Chaotic evil"];
+const ALIGNMENTS = [
+  "",
+  "Lawful good",
+  "Neutral good",
+  "Chaotic good",
+  "Lawful neutral",
+  "Neutral",
+  "Chaotic neutral",
+  "Lawful evil",
+  "Neutral evil",
+  "Chaotic evil",
+];
 
 export function sheetFromFields(fields: Record<string, string>): SheetDraft | null {
   const map = new Map<string, string>();
@@ -101,41 +112,134 @@ export function sheetFromFields(fields: Record<string, string>): SheetDraft | nu
 }
 
 export function sheetFromText(text: string): SheetDraft | null {
-  const flat = text.replace(/\u00a0/g, " ");
+  const flat = text.replace(/\u00a0/g, " ").replace(/[−–]/g, "-");
   const map = new Map<string, string>();
   const labeled = (label: string) => {
-    const match = flat.match(new RegExp(`${label}\\s*[:\\n]\\s*([^\\n]{1,80})`, "i"));
+    const match = flat.match(
+      new RegExp(`(?:^|\\n)\\s*${label}[ \t]*[:\\n][ \t]*([^\\n]{1,80})`, "i"),
+    );
     return match?.[1]?.trim() ?? "";
   };
   put(map, "charactername", labeled("character name") || labeled("name"));
-  put(map, "classlevel", labeled("class\\s*&\\s*level") || labeled("class and level") || labeled("class"));
+  put(
+    map,
+    "classlevel",
+    labeled("class\\s*&\\s*level") || labeled("class and level") || labeled("class"),
+  );
   put(map, "race", labeled("race"));
   put(map, "background", labeled("background"));
   put(map, "alignment", labeled("alignment"));
   put(map, "xp", labeled("experience points") || labeled("experience") || labeled("\\bxp\\b"));
   for (const ability of ABILITIES) {
     const match =
-      flat.match(new RegExp(`(?:^|\\n)\\s*${ability.key}\\s+(\\d{1,2})\\s+\\(?([+-]?\\d{1,2})\\)?`, "i")) ||
-      flat.match(new RegExp(`${ability.label}\\s+(\\d{1,2})\\s*(?:\\(\\s*([+-]?\\d{1,2})\\s*\\))?`, "i"));
+      flat.match(
+        new RegExp(`(?:^|\\n)\\s*${ability.key}\\s+(\\d{1,2})\\s+\\(?([+-]?\\d{1,2})\\)?`, "i"),
+      ) ||
+      flat.match(
+        new RegExp(
+          `(?:^|\\n)\\s*${ability.label}[ \t:]+(\\d{1,2})\\s*(?:\\(\\s*([+-]?\\d{1,2})\\s*\\))?`,
+          "i",
+        ),
+      );
     if (!match?.[1]) continue;
     put(map, ability.key, match[1]);
     if (match[2]) put(map, `${ability.key}mod`, match[2]);
   }
-  const ac = flat.match(/armor class\s+(\d{1,2})/i);
-  const init = flat.match(/initiative\s+([+-]?\d{1,2})/i);
-  const speed = flat.match(/speed\s+(\d{1,3}\s*(?:ft\.?)?)/i);
-  const hp = flat.match(/hit point maximum\s+(\d{1,4})/i) || flat.match(/\bhp\s+max(?:imum)?\s+(\d{1,4})/i);
+  const ac = flat.match(/armor class[\s:]+(\d{1,2})/i);
+  const init = flat.match(/initiative[\s:]+([+-]?\d{1,2})/i);
+  const speed = flat.match(/speed[\s:]+(\d{1,3}\s*(?:ft\.?)?)/i);
+  const hp =
+    flat.match(/hit point maximum[\s:]+(\d{1,4})/i) ||
+    flat.match(/\bhp\s+max(?:imum)?[\s:]+(\d{1,4})/i);
   if (ac) put(map, "ac", ac[1] ?? "");
   if (init) put(map, "initiative", init[1] ?? "");
   if (speed) put(map, "speed", speed[1] ?? "");
   if (hp) put(map, "hpmax", hp[1] ?? "");
+  const hpPair = flat.match(/(?:^|\n)\s*(?:hit points|hp)[ \t:]+(\d{1,4})[ \t]*\/[ \t]*(\d{1,4})/i);
+  if (hpPair) {
+    put(map, "hpcurrent", hpPair[1]!);
+    put(map, "hpmax", hpPair[2]!);
+  }
+  const headings = [
+    "personality traits",
+    "traits",
+    "ideals",
+    "bonds",
+    "flaws",
+    "features and traits",
+    "features",
+    "proficiencies",
+    "languages",
+    "attacks and spellcasting",
+    "attacks",
+    "equipment",
+    "spells",
+    "spellcasting",
+  ];
+  for (const [heading, key] of Object.entries({
+    "personality traits": "personalitytraits",
+    traits: "traits",
+    ideals: "ideals",
+    bonds: "bonds",
+    flaws: "flaws",
+    "features and traits": "featuresandtraits",
+    features: "features",
+    proficiencies: "proficiencies",
+    languages: "languages",
+    "attacks and spellcasting": "attacks",
+    attacks: "attacks",
+    equipment: "equipment",
+    spells: "spells",
+    spellcasting: "spells",
+  })) {
+    const start = new RegExp(`(?:^|\\n)[ \t]*${heading}[ \t]*:?[^\\S\\n]*(?:\\n|$)`, "i").exec(
+      flat,
+    );
+    if (start) {
+      const rest = flat.slice(start.index + start[0].length);
+      const stop = new RegExp(
+        `\\n[ \t]*(?:${headings.join("|")})[ \t]*:?[^\\S\\n]*(?:\\n|$)`,
+        "i",
+      ).exec(rest);
+      put(map, key, rest.slice(0, stop?.index ?? rest.length).trim());
+    } else put(map, key, labeled(heading));
+  }
+  for (const skill of SKILLS) {
+    const match = flat.match(
+      new RegExp(`(?:^|\\n)\\s*${skill.name}[ \t:]+([+-]?\\d{1,2})\\b`, "i"),
+    );
+    if (match) put(map, skill.keys[0]!, match[1]!);
+  }
+  for (const ability of ABILITIES) {
+    const save = flat.match(
+      new RegExp(
+        `(?:^|\\n)\\s*(?:${ability.key}|${ability.label})[ \t]+(?:save|saving throw)[ \t:]+([+-]?\\d{1,2})`,
+        "i",
+      ),
+    );
+    if (save) put(map, `${ability.key}save`, save[1]!);
+  }
+  for (const [key, pattern] of Object.entries({
+    profbonus: /proficiency(?: bonus)?[ \t:]+([+-]?\d{1,2})/i,
+    hpcurrent: /current hit points[ \t:]+(\d{1,4})/i,
+    hitdice: /hit dice[ \t:]+(\d+d\d+)/i,
+  })) {
+    const match = flat.match(pattern);
+    if (match) put(map, key, match[1]!);
+  }
+  for (const coin of ["cp", "sp", "ep", "gp", "pp"]) {
+    const match = flat.match(new RegExp(`\\b(\\d+)[ \t]+${coin}\\b`, "i"));
+    if (match) put(map, coin, match[1]!);
+  }
   return bodyFromMap(map);
 }
 
 export function sheetFromData(value: unknown): SheetDraft | null {
   if (typeof value !== "object" || value === null) return null;
   const record = value as Record<string, unknown>;
-  return sheetFromStored(record) ?? foundrySheet(record) ?? beyondSheet(record) ?? looseSheet(record);
+  return (
+    sheetFromStored(record) ?? foundrySheet(record) ?? beyondSheet(record) ?? looseSheet(record)
+  );
 }
 
 export function readSheets(value: unknown): CharacterSheet[] {
@@ -151,7 +255,10 @@ export function readSheets(value: unknown): CharacterSheet[] {
   return sheets;
 }
 
-export function mergeSheets(current: CharacterSheet[], incoming: CharacterSheet[]): CharacterSheet[] {
+export function mergeSheets(
+  current: CharacterSheet[],
+  incoming: CharacterSheet[],
+): CharacterSheet[] {
   const byId = new Map(current.map((sheet) => [sheet.purseId, sheet]));
   for (const sheet of incoming) byId.set(sheet.purseId, sheet);
   return [...byId.values()];
@@ -189,8 +296,18 @@ function bodyFromMap(map: Map<string, string>): SheetDraft | null {
   const abilities = emptyAbilities();
   let scores = 0;
   for (const ability of ABILITIES) {
-    const score = pick(map, ability.key, ability.label.toLowerCase(), `${ability.label.toLowerCase()}score`);
-    const modifier = pick(map, `${ability.key}mod`, `${ability.label.toLowerCase()}mod`, `${ability.label.toLowerCase()}modifier`);
+    const score = pick(
+      map,
+      ability.key,
+      ability.label.toLowerCase(),
+      `${ability.label.toLowerCase()}score`,
+    );
+    const modifier = pick(
+      map,
+      `${ability.key}mod`,
+      `${ability.label.toLowerCase()}mod`,
+      `${ability.label.toLowerCase()}modifier`,
+    );
     if (score) scores += 1;
     abilities[ability.key] = { score, modifier };
   }
@@ -201,7 +318,12 @@ function bodyFromMap(map: Map<string, string>): SheetDraft | null {
   const current = pick(map, "hpcurrent", "currenthp", "hitpoints");
   const max = pick(map, "hpmax", "maxhp", "hitpointmaximum");
   const temp = pick(map, "hptemp", "temphp");
-  const hitPoints = [current && max ? `${current} / ${max}` : max || current, temp ? `${temp} temp` : ""].filter(Boolean).join(", ");
+  const hitPoints = [
+    current && max ? `${current} / ${max}` : max || current,
+    temp ? `${temp} temp` : "",
+  ]
+    .filter(Boolean)
+    .join(", ");
   const dice = pick(map, "hd", "hitdice");
   const diceTotal = pick(map, "hdtotal", "hitdicetotal");
   const attacks = weaponLines(map) || pick(map, "attacksspellcasting", "attacks");
@@ -212,7 +334,9 @@ function bodyFromMap(map: Map<string, string>): SheetDraft | null {
     classLevel,
     background: pick(map, "background"),
     alignment: pick(map, "alignment"),
-    experience: pick(map, "xp", "experience", "experiencepoints"),
+    experience: /^[\d, ]+$/.test(pick(map, "xp", "experience", "experiencepoints"))
+      ? pick(map, "xp", "experience", "experiencepoints")
+      : "",
     abilities,
     saves: {
       str: pick(map, "ststrength", "strsave", "strengthsave"),
@@ -241,7 +365,13 @@ function bodyFromMap(map: Map<string, string>): SheetDraft | null {
     proficiencies: clip(pick(map, "proficiencieslang", "proficiencies", "languages")),
     attacks: clip(attacks),
     equipment: clip(pick(map, "equipment")),
-    spells: clip(pick(map, "spells", "spellcasting", "spellslist")),
+    spells: clip(
+      pick(map, "spells", "spellcasting", "spellslist") ||
+        [...map]
+          .filter(([key]) => /^spells?\d/.test(key))
+          .map(([, value]) => value)
+          .join("\n"),
+    ),
     coins: {
       cp: whole(pick(map, "cp", "copper")),
       sp: whole(pick(map, "sp", "silver")),
@@ -267,7 +397,11 @@ function weaponLines(map: Map<string, string>): string {
 function foundrySheet(record: Record<string, unknown>): SheetDraft | null {
   const system = record.system;
   if (typeof system !== "object" || system === null) return null;
-  const abilities = (system as { abilities?: Record<string, { value?: unknown; mod?: unknown; proficient?: unknown }> }).abilities;
+  const abilities = (
+    system as {
+      abilities?: Record<string, { value?: unknown; mod?: unknown; proficient?: unknown }>;
+    }
+  ).abilities;
   if (!abilities?.str || typeof abilities.str !== "object") return null;
   const map = new Map<string, string>();
   put(map, "charactername", typeof record.name === "string" ? record.name : "");
@@ -278,17 +412,24 @@ function foundrySheet(record: Record<string, unknown>): SheetDraft | null {
   const level = details.level;
   put(map, "classlevel", level === undefined ? "" : `Level ${String(level)}`);
   const xp = details.xp;
-  if (typeof xp === "object" && xp !== null && "value" in xp) put(map, "xp", String((xp as { value?: unknown }).value ?? ""));
+  if (typeof xp === "object" && xp !== null && "value" in xp)
+    put(map, "xp", String((xp as { value?: unknown }).value ?? ""));
   for (const ability of ABILITIES) {
     const row = abilities[ability.key];
     if (!row) continue;
     put(map, ability.key, String(row.value ?? ""));
     if (row.mod !== undefined) put(map, `${ability.key}mod`, String(row.mod));
-    if (row.proficient) put(map, `st${ability.label.toLowerCase()}`, showMod(String(row.mod ?? ""), String(row.value ?? "")));
+    if (row.proficient)
+      put(
+        map,
+        `st${ability.label.toLowerCase()}`,
+        showMod(String(row.mod ?? ""), String(row.value ?? "")),
+      );
   }
   const attributes = (system as { attributes?: Record<string, unknown> }).attributes ?? {};
   const ac = attributes.ac;
-  if (typeof ac === "object" && ac !== null && "value" in ac) put(map, "ac", String((ac as { value?: unknown }).value ?? ""));
+  if (typeof ac === "object" && ac !== null && "value" in ac)
+    put(map, "ac", String((ac as { value?: unknown }).value ?? ""));
   const hp = attributes.hp;
   if (typeof hp === "object" && hp !== null) {
     const current = (hp as { value?: unknown }).value;
@@ -297,12 +438,22 @@ function foundrySheet(record: Record<string, unknown>): SheetDraft | null {
     if (current !== undefined) put(map, "hpcurrent", String(current));
   }
   const movement = attributes.movement;
-  if (typeof movement === "object" && movement !== null && "walk" in movement) put(map, "speed", `${String((movement as { walk?: unknown }).walk ?? "")} ft`);
-  const skills = (system as { skills?: Record<string, { total?: unknown; mod?: unknown; proficient?: unknown }> }).skills ?? {};
+  if (typeof movement === "object" && movement !== null && "walk" in movement)
+    put(map, "speed", `${String((movement as { walk?: unknown }).walk ?? "")} ft`);
+  const skills =
+    (
+      system as {
+        skills?: Record<string, { total?: unknown; mod?: unknown; proficient?: unknown }>;
+      }
+    ).skills ?? {};
   for (const [key, skill] of Object.entries(FOUNDRY_SKILLS)) {
     const row = skills[key];
     if (!row || !row.proficient) continue;
-    put(map, key === "acr" ? "acrobatics" : skill.toLowerCase().replace(/[^a-z]/g, ""), String(row.total ?? row.mod ?? ""));
+    put(
+      map,
+      key === "acr" ? "acrobatics" : skill.toLowerCase().replace(/[^a-z]/g, ""),
+      String(row.total ?? row.mod ?? ""),
+    );
   }
   const currency = (system as { currency?: Partial<Coins> }).currency;
   if (currency) {
@@ -314,12 +465,19 @@ function foundrySheet(record: Record<string, unknown>): SheetDraft | null {
   }
   const items = Array.isArray(record.items) ? record.items : [];
   const classes = items
-    .filter((item) => item && typeof item === "object" && (item as { type?: string }).type === "class")
-    .map((item) => `${String((item as { name?: string }).name ?? "")} ${(item as { system?: { levels?: number } }).system?.levels ?? ""}`.trim())
+    .filter(
+      (item) => item && typeof item === "object" && (item as { type?: string }).type === "class",
+    )
+    .map((item) =>
+      `${String((item as { name?: string }).name ?? "")} ${(item as { system?: { levels?: number } }).system?.levels ?? ""}`.trim(),
+    )
     .filter(Boolean);
   if (classes.length > 0) put(map, "classlevel", classes.join(", "));
   const gear = items
-    .filter((item) => item && typeof item === "object" && (item as { type?: string }).type === "equipment")
+    .filter(
+      (item) =>
+        item && typeof item === "object" && (item as { type?: string }).type === "equipment",
+    )
     .map((item) => String((item as { name?: string }).name ?? ""))
     .filter(Boolean)
     .slice(0, 40);
@@ -331,12 +489,14 @@ function beyondSheet(record: Record<string, unknown>): SheetDraft | null {
   if (!Array.isArray(record.stats) || typeof record.name !== "string") return null;
   const map = new Map<string, string>();
   put(map, "charactername", record.name);
-  const stats = new Map(record.stats.flatMap((stat) => {
-    if (typeof stat !== "object" || stat === null) return [];
-    const id = Number((stat as { id?: unknown }).id);
-    const value = (stat as { value?: unknown }).value;
-    return Number.isFinite(id) ? [[id, String(value ?? "")]] : [];
-  }));
+  const stats = new Map(
+    record.stats.flatMap((stat) => {
+      if (typeof stat !== "object" || stat === null) return [];
+      const id = Number((stat as { id?: unknown }).id);
+      const value = (stat as { value?: unknown }).value;
+      return Number.isFinite(id) ? [[id, String(value ?? "")]] : [];
+    }),
+  );
   const order: AbilityKey[] = ["str", "dex", "con", "int", "wis", "cha"];
   for (let index = 0; index < order.length; index += 1) {
     const key = order[index];
@@ -344,7 +504,16 @@ function beyondSheet(record: Record<string, unknown>): SheetDraft | null {
     put(map, key, stats.get(index + 1) ?? "");
   }
   const race = record.race;
-  if (typeof race === "object" && race !== null) put(map, "race", String((race as { fullName?: string; baseName?: string }).fullName || (race as { baseName?: string }).baseName || ""));
+  if (typeof race === "object" && race !== null)
+    put(
+      map,
+      "race",
+      String(
+        (race as { fullName?: string; baseName?: string }).fullName ||
+          (race as { baseName?: string }).baseName ||
+          "",
+      ),
+    );
   const background = record.background;
   if (typeof background === "object" && background !== null) {
     const definition = (background as { definition?: { name?: string } }).definition;
@@ -387,7 +556,8 @@ function looseSheet(record: Record<string, unknown>): SheetDraft | null {
   if (abilities && typeof abilities === "object") {
     for (const ability of ABILITIES) {
       const value = (abilities as Record<string, unknown>)[ability.key];
-      if (typeof value === "number" || typeof value === "string") put(map, ability.key, String(value));
+      if (typeof value === "number" || typeof value === "string")
+        put(map, ability.key, String(value));
       if (typeof value === "object" && value !== null) {
         put(map, ability.key, String((value as { score?: unknown }).score ?? ""));
         put(map, `${ability.key}mod`, String((value as { modifier?: unknown }).modifier ?? ""));
@@ -398,14 +568,22 @@ function looseSheet(record: Record<string, unknown>): SheetDraft | null {
 }
 
 function sheetFromStored(record: Record<string, unknown>): SheetDraft | null {
-  if (record.edition !== "2014" || typeof record.abilities !== "object" || record.abilities === null) return null;
+  if (
+    record.edition !== "2014" ||
+    typeof record.abilities !== "object" ||
+    record.abilities === null
+  )
+    return null;
   const sheet = normalizeSheet({ ...record, purseId: "draft", importedAt: 0 });
   if (!sheet) return null;
   const { purseId: _purseId, importedAt: _importedAt, ...body } = sheet;
   return body;
 }
 
-export function mergeSheetBodies(primary: SheetDraft | null, extra: SheetDraft | null): SheetDraft | null {
+export function mergeSheetBodies(
+  primary: SheetDraft | null,
+  extra: SheetDraft | null,
+): SheetDraft | null {
   if (!primary) return extra;
   if (!extra) return primary;
   const abilities = emptyAbilities();
@@ -456,7 +634,12 @@ function normalizeSheet(value: unknown): CharacterSheet | null {
   for (const ability of ABILITIES) {
     const row = sheet.abilities?.[ability.key];
     abilities[ability.key] = {
-      score: typeof row?.score === "string" ? row.score : row?.score !== undefined ? String(row.score) : "",
+      score:
+        typeof row?.score === "string"
+          ? row.score
+          : row?.score !== undefined
+            ? String(row.score)
+            : "",
       modifier: typeof row?.modifier === "string" ? row.modifier : "",
     };
   }
@@ -524,7 +707,10 @@ function emptyAbilities(): CharacterSheet["abilities"] {
   };
 }
 
-function fillRecord(primary: Record<AbilityKey, string>, extra: Record<AbilityKey, string>): Record<AbilityKey, string> {
+function fillRecord(
+  primary: Record<AbilityKey, string>,
+  extra: Record<AbilityKey, string>,
+): Record<AbilityKey, string> {
   return {
     str: primary.str || extra.str,
     dex: primary.dex || extra.dex,
@@ -551,7 +737,10 @@ function put(map: Map<string, string>, key: string, value: string) {
 function clean(value: unknown): string {
   if (typeof value === "number" && Number.isFinite(value)) return String(value);
   if (typeof value !== "string") return "";
-  const text = value.replace(/\s+/g, " ").trim();
+  const text = value
+    .replace(/\r\n?/g, "\n")
+    .replace(/[^\S\n]+/g, " ")
+    .trim();
   if (!text || /^(off|false|undefined)$/i.test(text)) return "";
   return text;
 }
@@ -562,7 +751,8 @@ function text(value: unknown): string {
 
 function textOf(value: unknown): string {
   if (typeof value === "string") return value;
-  if (typeof value === "object" && value !== null && "name" in value) return String((value as { name?: unknown }).name ?? "");
+  if (typeof value === "object" && value !== null && "name" in value)
+    return String((value as { name?: unknown }).name ?? "");
   return "";
 }
 

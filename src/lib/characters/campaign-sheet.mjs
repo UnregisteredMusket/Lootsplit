@@ -1,3 +1,5 @@
+import { importedArrays } from "./import-fields.mjs";
+import { canEditCharacterField } from "./permissions.mjs";
 import { blankSheet, sheetSchema, abilities, skills, modifier } from "./model.mjs";
 
 /** The character ID is the purse ID. Wallet/holdings are the financial fields of
@@ -12,6 +14,7 @@ export function statsOnly(sheet) {
 export function legacyCharacter(legacy, name) {
   const s = { ...blankSheet(), name: name || "New character", hp: 0, maxHp: 0 };
   if (!legacy) return s;
+  Object.assign(s, importedArrays(legacy));
   s.species = legacy.race || "";
   s.classes = legacy.classLevel || "";
   s.level = legacyLevel(s.classes) ?? s.level;
@@ -22,7 +25,14 @@ export function legacyCharacter(legacy, name) {
   s.notes = [legacy.attacks, legacy.equipment, legacy.spells, legacy.proficiencies]
     .filter(Boolean)
     .join("\n\n");
-  s.description = [legacy.traits, legacy.ideals, legacy.bonds, legacy.flaws]
+  s.description = [
+    legacy.alignment && `Alignment: ${legacy.alignment}`,
+    legacy.experience && `Experience: ${legacy.experience}`,
+    legacy.traits,
+    legacy.ideals,
+    legacy.bonds,
+    legacy.flaws,
+  ]
     .filter(Boolean)
     .join("\n");
   for (const a of /** @type {Array<keyof typeof s.scores>} */ (abilities)) {
@@ -84,6 +94,7 @@ export function characterSheet(purse, holdings = [], legacy) {
     coins: { ...purse.coins },
     equipment: holdings
       .filter((h) => h.purseId === purse.id)
+      .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
       .map((h) => ({
         id: h.id,
         name: h.name,
@@ -152,7 +163,11 @@ export function editLegacyCharacter(table, seat, incoming, before) {
         ? !same(incoming.abilities[a], baseline.abilities[a])
         : incoming.abilities[a].score.trim()
     ) {
-      if (seat.role !== "dm" && !p.editingAllowed && converted.scores[a] !== current.scores[a])
+      if (
+        seat.role !== "dm" &&
+        !canEditCharacterField(p, "scores") &&
+        converted.scores[a] !== current.scores[a]
+      )
         throw Error("Ask the DM to change ability scores.");
       if (prior && current.scores[a] !== prior.scores[a])
         throw Error("This character changed elsewhere. Reload before editing.");
@@ -196,7 +211,12 @@ export function editLegacyCharacter(table, seat, incoming, before) {
     )
   )
     put("description");
-  // Imported free text has no one-to-one field in the playable arrays. Retain it
+  for (const field of /** @type {const} */ (["attacks", "spells", "resources"])) {
+    const source = field === "resources" ? "features" : field;
+    if (changed(/** @type {keyof typeof incoming} */ (source)) && converted[field].length)
+      put(/** @type {keyof typeof next} */ (field));
+  }
+  // Preserve imported prose as well as the structured values. Retain it
   // without replacing custom notes, attacks, spells, or equipment.
   const excerpts = ["attacks", "equipment", "spells", "proficiencies"]
     .filter((field) => changed(/** @type {keyof typeof incoming} */ (field)))
@@ -260,16 +280,34 @@ export function editCharacter(table, seat, input, receipt, at = Date.now()) {
     );
   const coinChange = !same(before.coins, next.coins);
   const itemChange = !same(before.equipment, next.equipment);
-  const consumption = seat.role !== "dm" && next.equipment.every(item => {
-    const old = before.equipment.find(x => x.id === item.id);
-    return old && item.quantity <= old.quantity && same({ ...item, quantity: old.quantity, equipped: old.equipped }, old);
-  });
-  const grant = coinChange || (!consumption && !same(financialItems(before.equipment), financialItems(next.equipment)));
-  if (grant && seat.role !== "dm")
+  const consumption =
+    seat.role !== "dm" &&
+    next.equipment.every((item) => {
+      const old = before.equipment.find((x) => x.id === item.id);
+      return (
+        old &&
+        item.quantity <= old.quantity &&
+        same({ ...item, quantity: old.quantity, equipped: old.equipped }, old)
+      );
+    });
+  const grant =
+    coinChange ||
+    (!consumption && !same(financialItems(before.equipment), financialItems(next.equipment)));
+  if (
+    seat.role !== "dm" &&
+    ((coinChange && !canEditCharacterField(p, "coins")) ||
+      (!consumption &&
+        !same(financialItems(before.equipment), financialItems(next.equipment)) &&
+        !canEditCharacterField(p, "equipment")))
+  )
     throw Error(
       "Only the DM can add or adjust funds and items. Use purchases, transfers or a DM-approved award.",
     );
-  if (seat.role !== "dm" && !p.editingAllowed && before.scores.cha !== next.scores.cha)
+  if (
+    seat.role !== "dm" &&
+    !canEditCharacterField(p, "scores") &&
+    before.scores.cha !== next.scores.cha
+  )
     throw Error("Ask the DM to change Charisma used for campaign prices.");
   if (
     (statChange && !same(statsOnly(before), statsOnly(current))) ||
@@ -316,7 +354,9 @@ export function editCharacter(table, seat, input, receipt, at = Date.now()) {
       transactionType: "adjustment",
       copper: value(p.coins) - value(current.coins),
       summary:
-        "DM character-sheet adjustment: " +
+        (seat.role === "dm"
+          ? "DM character-sheet adjustment: "
+          : "DM-authorized player adjustment: ") +
         (coinChange ? "funds" : "") +
         (itemChange ? " inventory" : ""),
     });
@@ -329,21 +369,44 @@ export function editCharacter(table, seat, input, receipt, at = Date.now()) {
  * @param {import('./model.mjs').PlaySheet} before
  * @param {import('./model.mjs').PlaySheet} next */
 export function assertGameplayEdit(purse, seat, before, next) {
-  if (seat.role === "dm" || purse.editingAllowed === true) return;
+  if (seat.role === "dm") return;
   const normalize = (/** @type {import('./model.mjs').PlaySheet} */ sheet) => ({
-    ...sheet, hp: 0, tempHp: 0, inspiration: false, deathSuccesses: 0, deathFailures: 0,
-    conditions: "", notes: "", coins: {}, equipment: [],
-    resources: sheet.resources.map(({current, ...r}) => r),
-    slots: sheet.slots.map(({used, ...r}) => r),
-    spells: sheet.spells.map(({prepared, ...r}) => r),
+    ...sheet,
+    hp: 0,
+    tempHp: 0,
+    inspiration: false,
+    deathSuccesses: 0,
+    deathFailures: 0,
+    conditions: "",
+    notes: "",
+    coins: {},
+    equipment: [],
+    resources: sheet.resources.map(({ current: _current, ...r }) => r),
+    slots: sheet.slots.map(({ used: _used, ...r }) => r),
+    spells: sheet.spells.map(({ prepared: _prepared, ...r }) => r),
   });
-  if (!same(normalize(before), normalize(next)))
-    throw Error("Character editing is locked. Only the DM can approve these changes. Ask the DM to open editing; gameplay actions remain available.");
-  if (!same(before.coins, next.coins)) throw Error("Only the DM can adjust funds.");
-  for (const item of next.equipment) {
-    const old = before.equipment.find(x => x.id === item.id);
-    if (!old || item.quantity > old.quantity ||
-        !same({...item, quantity: old.quantity, equipped: old.equipped}, old))
-      throw Error("Only the DM can approve item changes; players may equip or consume existing items while editing is locked.");
+  const permitted = (/** @type {import("./model.mjs").PlaySheet} */ sheet) =>
+    Object.fromEntries(
+      Object.entries(normalize(sheet)).map(([key, value]) => [
+        key,
+        canEditCharacterField(purse, key) ? null : value,
+      ]),
+    );
+  if (!same(permitted(before), permitted(next)))
+    throw Error(
+      "Character editing is locked. Only the DM can approve these changes. Ask the DM to open editing; gameplay actions remain available.",
+    );
+  if (!canEditCharacterField(purse, "coins") && !same(before.coins, next.coins))
+    throw Error("Only the DM can adjust funds.");
+  for (const item of canEditCharacterField(purse, "equipment") ? [] : next.equipment) {
+    const old = before.equipment.find((x) => x.id === item.id);
+    if (
+      !old ||
+      item.quantity > old.quantity ||
+      !same({ ...item, quantity: old.quantity, equipped: old.equipped }, old)
+    )
+      throw Error(
+        "Only the DM can approve item changes; players may equip or consume existing items while editing is locked.",
+      );
   }
 }

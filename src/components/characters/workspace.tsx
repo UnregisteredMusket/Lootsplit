@@ -1,3 +1,5 @@
+import { ImportCharacterSheet } from "./import-sheet";
+import { canEditCharacterField, characterPermissions } from "@/lib/characters/permissions.mjs";
 import { usePrefs } from "@/lib/quire/prefs";
 import { FantasyIcon } from "@/components/fantasy-icon";
 import { useDraftGuard } from "@/lib/quire/use-draft-guard";
@@ -13,12 +15,13 @@ import {
   readPartySheetLinks,
   writePartySheetLink,
   announceSheetChange,
+  subscribeSheetChanges,
 } from "@/lib/quire/party-sheet-links";
 import type { Purse, Holding } from "@/lib/quire/types";
 import { Link, useRouterState } from "@tanstack/react-router";
 import { z } from "zod";
 import { characterRequest as accountRequest } from "@/lib/characters/campaign-client";
-import { characterSheet, legacyCharacter } from "@/lib/characters/campaign-sheet.mjs";
+import { characterSheet } from "@/lib/characters/campaign-sheet.mjs";
 import {
   createCampaignCharacter,
   bindCampaignProfile,
@@ -34,7 +37,6 @@ import {
   signed,
   rollSpec,
 } from "@/lib/characters/model.mjs";
-import { readCharacterSheet } from "@/lib/quire/sheet-file";
 import { searchOpen5e } from "@/lib/quire/open5e-api";
 import type { OpenEntry } from "@/lib/quire/open5e";
 import { downloadJson } from "@/lib/quire/table";
@@ -70,6 +72,7 @@ type Detail = Row & {
     code: string;
     role: string;
     editingAllowed?: boolean;
+    permissions?: Purse["permissions"];
     manualAllowed: boolean;
     coins: Sheet["coins"];
     holdings: { id: string; name: string; quantity: number }[];
@@ -339,6 +342,11 @@ export function CharacterWorkspace({
         )
       ) : (
         <>
+          <ImportCharacterSheet
+            label="Import a new character"
+            disabled={creating || (!data.userId && seat.role !== "dm")}
+            onImport={(sheet) => create(sheet)}
+          />
           <details className="character-library-controls">
             <summary>My characters · select, create or import</summary>
             <div className="character-toolbar">
@@ -375,43 +383,6 @@ export function CharacterWorkspace({
                 Refresh character list
               </button>
             </div>
-            <details>
-              <summary>Import an existing character</summary>
-              <p>
-                Import a Lootsplit sheet JSON or a supported 2014 PDF/JSON as a new character.
-                Review the result before assigning it. Original PDFs remain on your device;
-                extracted sheet fields are saved to your account.
-              </p>
-              <input
-                aria-label="Import account character"
-                type="file"
-                accept=".json,.pdf"
-                disabled={creating}
-                onChange={async (e) => {
-                  const f = e.target.files?.[0];
-                  e.target.value = "";
-                  if (!f) return;
-                  try {
-                    if (f.size > 10 * 1024 * 1024) throw Error("Use a file smaller than 10 MB.");
-                    if (f.name.toLowerCase().endsWith(".json")) {
-                      const raw = JSON.parse(await f.text());
-                      if (raw.version === 1) {
-                        await create(sheetSchema.parse(raw));
-                        return;
-                      }
-                    }
-                    const old = await readCharacterSheet(f),
-                      next = legacyCharacter(old, old.name || f.name);
-                    next.coins = old.coins;
-                    next.source =
-                      "Imported character sheet; review stats and convert imported notes into attacks, equipment and spells as needed.";
-                    await create(sheetSchema.parse(next));
-                  } catch (e) {
-                    setError(errorText(e));
-                  }
-                }}
-              />
-            </details>
           </details>
           {selected && (
             <CharacterEditor
@@ -502,9 +473,31 @@ function CharacterEditor({
     return () => onDirty?.(false);
   }, [dirty, onDirty]);
   useDraftGuard(dirty, "character");
+  const liveRoom = getCloudTable();
   const livePurse = campaignEconomy.purses.find(
-    (p) => `party:${p.id}` === id || p.profileId === id,
+    (p) =>
+      `party:${p.id}` === id ||
+      p.profileId === id ||
+      (liveRoom.joined && `campaign:${liveRoom.code}:${p.id}` === id),
   );
+  const [remoteRefresh, setRemoteRefresh] = useState(0);
+  useEffect(() => {
+    // A saved account sheet can be open without joining that room on this device.
+    // Refresh its authorized server projection, but never replace an unsaved draft.
+    const refresh = () => {
+      if (document.visibilityState !== "hidden") setRemoteRefresh((n) => n + 1);
+    };
+    window.addEventListener("focus", refresh);
+    document.addEventListener("visibilitychange", refresh);
+    const unsubscribe = subscribeSheetChanges(refresh);
+    const timer = !livePurse ? window.setInterval(refresh, 10000) : undefined;
+    return () => {
+      window.removeEventListener("focus", refresh);
+      document.removeEventListener("visibilitychange", refresh);
+      unsubscribe();
+      window.clearInterval(timer);
+    };
+  }, [id, !!livePurse]);
   const liveSignature = livePurse
     ? JSON.stringify([
         livePurse,
@@ -512,7 +505,7 @@ function CharacterEditor({
       ])
     : "";
   useEffect(() => {
-    if (!liveSignature || dirty || busy) return;
+    if (dirty || busy) return;
     const c = new AbortController();
     void accountRequest<Detail>("sheets/detail", { id }, c.signal)
       .then((d) => {
@@ -525,7 +518,7 @@ function CharacterEditor({
         if (!c.signal.aborted) setError(errorText(e));
       });
     return () => c.abort();
-  }, [liveSignature, dirty, busy, id]);
+  }, [liveSignature, remoteRefresh, dirty, busy, id]);
 
   async function save(e?: FormEvent) {
     e?.preventDefault();
@@ -623,7 +616,12 @@ function CharacterEditor({
   if (!sheet || !detail)
     return <p role={error ? "alert" : "status"}>{error || "Loading character…"}</p>;
   const canPlay = detail.editable && !detail.assignmentError;
-  const editable = canPlay && (!detail.campaign || detail.campaign.role === "dm" || (livePurse ? livePurse.editingAllowed === true : detail.campaign.editingAllowed === true));
+  const canEdit = (field: string) =>
+    canPlay &&
+    (!detail.campaign ||
+      detail.campaign.role === "dm" ||
+      canEditCharacterField(livePurse || detail.campaign, field));
+  const editable = Object.keys(characterPermissions).some(canEdit);
   const deviceLink =
     deviceCampaign && !detail.campaign_code && editable
       ? readPartySheetLinks(deviceCampaign.ownerId, deviceCampaign.campaignId).find(
@@ -639,7 +637,8 @@ function CharacterEditor({
           holdings: deviceCampaign!.holdings.filter((h) => h.purseId === devicePurse.id),
         }
       : null);
-  const canManageInventory = editable && (!campaignLedger || detail.campaign?.role === "dm");
+  const canManageInventory = canEdit("equipment");
+  const canManageCurrency = canEdit("coins");
   const set = <K extends keyof Sheet>(key: K, value: Sheet[K]) =>
     setSheet({ ...sheet, [key]: value });
   const rollButton = (label: string, kind: string, key = "") => (
@@ -665,7 +664,7 @@ function CharacterEditor({
         )}
         <select
           aria-label={`${name} proficiency`}
-          disabled={!editable}
+          disabled={!canEdit(group)}
           value={row.rank}
           onChange={(e) =>
             set(group, {
@@ -686,7 +685,7 @@ function CharacterEditor({
           type="number"
           min={-100}
           max={100}
-          disabled={!editable}
+          disabled={!canEdit(group)}
           value={row.extra}
           onChange={(e) =>
             set(group, {
@@ -724,14 +723,50 @@ function CharacterEditor({
           Edit sheet
         </button>
       </div>
-      {canPlay && !editable && <p role="status">Character editing is locked by the DM. Rolls, health, resources, equipped items and consumption remain available.</p>}
+      <ImportCharacterSheet
+        label="Import into this character"
+        disabled={!editable || busy || dirty}
+        onImport={(imported, fields) => {
+          const next = { ...sheet };
+          for (const key of Object.keys(imported) as (keyof Sheet)[]) {
+            if (key === "version" || !canEdit(key)) continue;
+            if (!fields || fields.includes(key)) (next as any)[key] = imported[key];
+            else {
+              const parts = fields
+                .filter((field) => field.startsWith(key + "."))
+                .map((field) => field.slice(key.length + 1));
+              if (parts.length)
+                (next as any)[key] = {
+                  ...(sheet as any)[key],
+                  ...Object.fromEntries(parts.map((part) => [part, (imported as any)[key][part]])),
+                };
+            }
+          }
+          // Existing canonical item IDs are retained; imported items are new drafts.
+          if (canEdit("equipment") && (!fields || fields.includes("equipment")))
+            next.equipment = imported.equipment.map((item) => ({ ...item, id: undefined }));
+          setSheet(next);
+          setPlayView(false);
+          setNotice(
+            "Imported draft ready. Review each tab, then Save character. Restricted fields were preserved.",
+          );
+        }}
+      />
+      {canPlay && !editable && (
+        <p role="status">
+          Character editing is locked by the DM. Rolls, health, resources, equipped items and
+          consumption remain available.
+        </p>
+      )}
       <div className="character-savebar">
         <strong role="status">
           {dirty
             ? "Unsaved changes — save before rolling"
             : editable
               ? "Saved character"
-              : canPlay ? "Saved character" : "DM read-only view"}
+              : canPlay
+                ? "Saved character"
+                : "DM read-only view"}
         </strong>
         {canPlay && (
           <button disabled={busy || !dirty} onClick={() => void save()}>
@@ -976,7 +1011,7 @@ function CharacterEditor({
                         key={k}
                         label={["Current HP", "Maximum HP", "Temporary HP", "Armor class"][i]}
                         value={sheet[k]}
-                        disabled={k === "hp" || k === "tempHp" ? !canPlay : !editable}
+                        disabled={k === "hp" || k === "tempHp" ? !canPlay : !canEdit(k)}
                         onChange={(v) => set(k, v)}
                       />
                     ))}
@@ -1026,7 +1061,7 @@ function CharacterEditor({
                     label="Initiative extra bonus"
                     value={sheet.initiative}
                     min={-100}
-                    disabled={!editable}
+                    disabled={!canEdit("initiative")}
                     onChange={(v) => set("initiative", v)}
                   />
                   {sheet.attacks.map((a, i) => (
@@ -1034,7 +1069,7 @@ function CharacterEditor({
                       <Text
                         label={`Attack ${i + 1} name`}
                         value={a.name}
-                        disabled={!editable}
+                        disabled={!canEdit("attacks")}
                         onChange={(v) =>
                           set(
                             "attacks",
@@ -1047,7 +1082,7 @@ function CharacterEditor({
                           label={`${a.name} attack bonus`}
                           value={a.bonus}
                           min={-100}
-                          disabled={!editable}
+                          disabled={!canEdit("attacks")}
                           onChange={(v) =>
                             set(
                               "attacks",
@@ -1058,7 +1093,7 @@ function CharacterEditor({
                         <Text
                           label={`${a.name} damage dice`}
                           value={a.damage}
-                          disabled={!editable}
+                          disabled={!canEdit("attacks")}
                           onChange={(v) =>
                             set(
                               "attacks",
@@ -1070,7 +1105,7 @@ function CharacterEditor({
                       <Text
                         label={`${a.name} notes`}
                         value={a.notes}
-                        disabled={!editable}
+                        disabled={!canEdit("attacks")}
                         onChange={(v) =>
                           set(
                             "attacks",
@@ -1081,7 +1116,7 @@ function CharacterEditor({
                       <div className="character-toolbar">
                         {rollButton(`Roll ${a.name} attack`, "attack", String(i))}
                         {rollButton(`Roll ${a.name} damage`, "damage", String(i))}
-                        {editable && (
+                        {canEdit("attacks") && (
                           <button
                             onClick={() =>
                               set(
@@ -1096,7 +1131,7 @@ function CharacterEditor({
                       </div>
                     </div>
                   ))}
-                  {editable && (
+                  {canEdit("attacks") && (
                     <button
                       onClick={() =>
                         set("attacks", [
@@ -1120,7 +1155,7 @@ function CharacterEditor({
                 <Text
                   label="Hit dice"
                   value={sheet.hitDice}
-                  disabled={!editable}
+                  disabled={!canEdit("hitDice")}
                   onChange={(v) => set("hitDice", v)}
                 />
                 {sheet.resources.map((r, i) => (
@@ -1128,7 +1163,7 @@ function CharacterEditor({
                     <Text
                       label={`Resource ${i + 1} name`}
                       value={r.name}
-                      disabled={!editable}
+                      disabled={!canEdit("resources")}
                       onChange={(v) =>
                         set(
                           "resources",
@@ -1150,7 +1185,7 @@ function CharacterEditor({
                     <Num
                       label={`${r.name} maximum`}
                       value={r.max}
-                      disabled={!editable}
+                      disabled={!canEdit("resources")}
                       onChange={(v) =>
                         set(
                           "resources",
@@ -1162,7 +1197,7 @@ function CharacterEditor({
                       Recovery
                       <select
                         aria-label={`${r.name} recovery`}
-                        disabled={!editable}
+                        disabled={!canEdit("resources")}
                         value={r.recovery}
                         onChange={(e) =>
                           set(
@@ -1196,7 +1231,7 @@ function CharacterEditor({
                     >
                       Use {r.name}
                     </button>
-                    {editable && (
+                    {canEdit("resources") && (
                       <button
                         onClick={() =>
                           set(
@@ -1210,7 +1245,7 @@ function CharacterEditor({
                     )}
                   </div>
                 ))}
-                {editable && (
+                {canEdit("resources") && (
                   <>
                     <button
                       onClick={() =>
@@ -1284,7 +1319,7 @@ function CharacterEditor({
                       value={sheet.scores[a]}
                       min={1}
                       max={30}
-                      disabled={!editable}
+                      disabled={!canEdit("scores")}
                       onChange={(v) => set("scores", { ...sheet.scores, [a]: v })}
                     />
                     {rollButton(
@@ -1324,7 +1359,7 @@ function CharacterEditor({
                 Spellcasting ability
                 <select
                   aria-label="Spellcasting ability"
-                  disabled={!editable}
+                  disabled={!canEdit("spellAbility")}
                   value={sheet.spellAbility}
                   onChange={(e) => set("spellAbility", e.target.value as Ability)}
                 >
@@ -1343,14 +1378,14 @@ function CharacterEditor({
                   label="Spell attack extra bonus"
                   value={sheet.spellAttackExtra}
                   min={-100}
-                  disabled={!editable}
+                  disabled={!canEdit("spellAttackExtra")}
                   onChange={(v) => set("spellAttackExtra", v)}
                 />
                 <Num
                   label="Spell DC extra bonus"
                   value={sheet.spellDcExtra}
                   min={-100}
-                  disabled={!editable}
+                  disabled={!canEdit("spellDcExtra")}
                   onChange={(v) => set("spellDcExtra", v)}
                 />
               </div>
@@ -1362,7 +1397,7 @@ function CharacterEditor({
                     label={`Level ${slot.level} slots maximum`}
                     value={slot.max}
                     max={99}
-                    disabled={!editable}
+                    disabled={!canEdit("slots")}
                     onChange={(v) =>
                       set(
                         "slots",
@@ -1374,7 +1409,7 @@ function CharacterEditor({
                     label={`Level ${slot.level} slots used`}
                     value={slot.used}
                     max={99}
-                    disabled={!editable}
+                    disabled={!canPlay}
                     onChange={(v) =>
                       set(
                         "slots",
@@ -1395,7 +1430,7 @@ function CharacterEditor({
                   </button>
                 </div>
               ))}
-              {editable && sheet.slots.length < 9 && (
+              {canEdit("slots") && sheet.slots.length < 9 && (
                 <button
                   onClick={() => {
                     const level = [1, 2, 3, 4, 5, 6, 7, 8, 9].find(
@@ -1421,7 +1456,7 @@ function CharacterEditor({
                   <Text
                     label={`Spell ${i + 1} name`}
                     value={s.name}
-                    disabled={!editable}
+                    disabled={!canEdit("spells")}
                     onChange={(v) =>
                       set(
                         "spells",
@@ -1433,7 +1468,7 @@ function CharacterEditor({
                     label={`${s.name} level`}
                     value={s.level}
                     max={9}
-                    disabled={!editable}
+                    disabled={!canEdit("spells")}
                     onChange={(v) =>
                       set(
                         "spells",
@@ -1444,7 +1479,7 @@ function CharacterEditor({
                   <Check
                     label={`Prepare ${s.name}`}
                     value={s.prepared}
-                    disabled={!editable}
+                    disabled={!canEdit("spells")}
                     onChange={(v) =>
                       set(
                         "spells",
@@ -1455,7 +1490,7 @@ function CharacterEditor({
                   <Text
                     label={`${s.name} roll formula`}
                     value={s.formula}
-                    disabled={!editable}
+                    disabled={!canEdit("spells")}
                     onChange={(v) =>
                       set(
                         "spells",
@@ -1467,7 +1502,7 @@ function CharacterEditor({
                     multiline
                     label={`${s.name} description`}
                     value={s.description}
-                    disabled={!editable}
+                    disabled={!canEdit("spells")}
                     onChange={(v) =>
                       set(
                         "spells",
@@ -1477,7 +1512,7 @@ function CharacterEditor({
                   />
                   <p className="character-source">{s.source}</p>
                   {s.formula && rollButton(`Roll ${s.name}`, "spell", String(i))}
-                  {editable && (
+                  {canEdit("spells") && (
                     <button
                       onClick={() =>
                         set(
@@ -1491,7 +1526,7 @@ function CharacterEditor({
                   )}
                 </details>
               ))}
-              {editable && (
+              {canEdit("spells") && (
                 <>
                   <button
                     onClick={() =>
@@ -1562,11 +1597,11 @@ function CharacterEditor({
                   <p>
                     {devicePurse
                       ? "This device campaign keeps its existing balances and inventory; linking a sheet does not transfer anything."
-                      : "Funds & inventory and this sheet share the same items and balances. Reload to see the latest transactions."}
+                      : "Funds & inventory and this sheet share the same items and balances. Live changes appear automatically when no edits are pending."}
                   </p>
                 </>
               ) : null}
-              {(!campaignLedger || canManageInventory) && (
+              {(!campaignLedger || canManageCurrency) && (
                 <>
                   <p>Character currency. Campaign changes update Funds & inventory when saved.</p>
                   <div className="field-grid">
@@ -1575,7 +1610,7 @@ function CharacterEditor({
                         key={k}
                         label={k.toUpperCase()}
                         value={sheet.coins[k]}
-                        disabled={!canManageInventory}
+                        disabled={!canManageCurrency}
                         onChange={(v) => set("coins", { ...sheet.coins, [k]: v })}
                       />
                     ))}
@@ -1584,8 +1619,9 @@ function CharacterEditor({
               )}
               <h4>Equipment & loadout</h4>
               <p>
-                Campaign equipment is the same inventory shown in Funds & inventory. Only the DM can
-                add or adjust items; players can equip their existing gear.
+                Campaign equipment is the same inventory shown in Funds & inventory. Players can
+                equip or consume existing gear; adding and editing items requires the DM’s inventory
+                permission.
               </p>
               {sheet.equipment.map((item, i) => (
                 <div className="sheet-row" key={i}>
@@ -1609,7 +1645,11 @@ function CharacterEditor({
                       onChange={(v) =>
                         set(
                           "equipment",
-                          sheet.equipment.map((x, j) => (j === i ? { ...x, quantity: canManageInventory ? v : Math.min(x.quantity, v) } : x)),
+                          sheet.equipment.map((x, j) =>
+                            j === i
+                              ? { ...x, quantity: canManageInventory ? v : Math.min(x.quantity, v) }
+                              : x,
+                          ),
                         )
                       }
                     />
@@ -1617,7 +1657,7 @@ function CharacterEditor({
                       label={`${item.name} unit weight`}
                       value={item.weight}
                       step="any"
-                      disabled={!editable}
+                      disabled={!canEdit("equipment")}
                       onChange={(v) =>
                         set(
                           "equipment",
@@ -1640,7 +1680,7 @@ function CharacterEditor({
                   <Text
                     label={`${item.name} notes`}
                     value={item.notes}
-                    disabled={!editable}
+                    disabled={!canEdit("equipment")}
                     onChange={(v) =>
                       set(
                         "equipment",
@@ -1703,7 +1743,7 @@ function CharacterEditor({
                       }[k]
                     }
                     value={sheet[k]}
-                    disabled={!editable}
+                    disabled={!canEdit(k)}
                     onChange={(v) => set(k, v)}
                   />
                 ))}
@@ -1712,21 +1752,21 @@ function CharacterEditor({
                   value={sheet.level}
                   min={1}
                   max={20}
-                  disabled={!editable}
+                  disabled={!canEdit("level")}
                   onChange={(v) => set("level", v)}
                 />
                 <Num
                   label="Proficiency bonus"
                   value={sheet.proficiency}
                   max={20}
-                  disabled={!editable}
+                  disabled={!canEdit("proficiency")}
                   onChange={(v) => set("proficiency", v)}
                 />
                 <label>
                   Rules edition
                   <select
                     aria-label="Rules edition"
-                    disabled={!editable}
+                    disabled={!canEdit("edition")}
                     value={sheet.edition}
                     onChange={(e) => set("edition", e.target.value as Sheet["edition"])}
                   >
@@ -1740,7 +1780,7 @@ function CharacterEditor({
                 Stats and class features are editable. Level changes do not automatically change
                 proficiency, HP, spells or features.
               </p>
-              {editable && (
+              {canEdit("portrait") && (
                 <label>
                   Portrait
                   <input
@@ -1775,7 +1815,7 @@ function CharacterEditor({
                     }[k]
                   }
                   value={sheet[k]}
-                  disabled={!editable}
+                  disabled={!canEdit(k)}
                   onChange={(v) => set(k, v)}
                 />
               ))}
@@ -2049,7 +2089,10 @@ function QuickRoll({
   const manual = prefs.rollMode === "manual";
   const allowed = !detail.campaign_code || !!detail.campaign?.manualAllowed;
   const [manualTotal, setManualTotal] = useState("");
-  const validTotal = manualTotal.trim() !== "" && Number.isSafeInteger(Number(manualTotal)) && Math.abs(Number(manualTotal)) <= 100000;
+  const validTotal =
+    manualTotal.trim() !== "" &&
+    Number.isSafeInteger(Number(manualTotal)) &&
+    Math.abs(Number(manualTotal)) <= 100000;
   const [mode, setMode] = useState("normal"),
     [busy, setBusy] = useState(false),
     [result, setResult] = useState("");
@@ -2058,7 +2101,15 @@ function QuickRoll({
     if (manual && (!allowed || !validTotal)) return;
     setBusy(true);
     try {
-      const signature = JSON.stringify([detail.id, detail.revision, kind, rollKey, mode, manual, manualTotal]);
+      const signature = JSON.stringify([
+        detail.id,
+        detail.revision,
+        kind,
+        rollKey,
+        mode,
+        manual,
+        manualTotal,
+      ]);
       if (retry.current.signature !== signature)
         retry.current = { signature, key: crypto.randomUUID() };
       const r = await accountRequest<Roll>("sheets/roll", {
@@ -2071,7 +2122,11 @@ function QuickRoll({
         ...(manual ? { total: Number(manualTotal) } : {}),
         requestKey: retry.current.key,
       });
-      setResult(r.source === "manual" ? `${r.total} · Manual result` : `${r.total} · ${r.dice.join(", ")} ${signed(r.modifier)} · ${r.mode}`);
+      setResult(
+        r.source === "manual"
+          ? `${r.total} · Manual result`
+          : `${r.total} · ${r.dice.join(", ")} ${signed(r.modifier)} · ${r.mode}`,
+      );
       retry.current = { signature: "", key: "" };
       onRoll();
     } catch (e) {
@@ -2088,14 +2143,26 @@ function QuickRoll({
   }
   return (
     <div className="quick-roll">
-      {manual && <label>
-        {label} · final total
-        <input aria-label={`${label} manual total`} type="number" step="1" min="-100000" max="100000"
-          value={manualTotal} disabled={disabled || busy || !allowed}
-          onChange={(e) => setManualTotal(e.target.value)} />
-      </label>}
+      {manual && (
+        <label>
+          {label} · final total
+          <input
+            aria-label={`${label} manual total`}
+            type="number"
+            step="1"
+            min="-100000"
+            max="100000"
+            value={manualTotal}
+            disabled={disabled || busy || !allowed}
+            onChange={(e) => setManualTotal(e.target.value)}
+          />
+        </label>
+      )}
       {manual && !allowed && <p>The DM has disabled manual rolls in this campaign.</p>}
-      <button disabled={disabled || busy || (manual && (!allowed || !validTotal))} onClick={() => void roll()}>
+      <button
+        disabled={disabled || busy || (manual && (!allowed || !validTotal))}
+        onClick={() => void roll()}
+      >
         {manual ? `Record ${label.replace(/^Roll /, "")}` : label}
       </button>
       {d20 && !manual && (
@@ -2173,13 +2240,25 @@ function DiceTray({
         <Text label="Roll label" value={label} onChange={setLabel} />
         <Text label="Dice formula" value={formula} onChange={setFormula} />
       </div>
-      <p>Examples: 1d20+5, 2d6+3. Changing the roll source also changes your device’s Roll mode setting.</p>
+      <p>
+        Examples: 1d20+5, 2d6+3. Changing the roll source also changes your device’s Roll mode
+        setting.
+      </p>
       <Check label="Enter a manual total" value={manual} disabled={!allowed} onChange={setManual} />
       {!allowed && <p>The DM has disabled manual rolls. Reload the sheet after a policy change.</p>}
       {manual && (
-        <label>Manual roll total
-          <input aria-label="Manual roll total" type="number" step="1" min="-100000" max="100000" required
-            value={total} onChange={(e) => setTotal(e.target.value)} />
+        <label>
+          Manual roll total
+          <input
+            aria-label="Manual roll total"
+            type="number"
+            step="1"
+            min="-100000"
+            max="100000"
+            required
+            value={total}
+            onChange={(e) => setTotal(e.target.value)}
+          />
           <span>Final total, including modifiers.</span>
         </label>
       )}
