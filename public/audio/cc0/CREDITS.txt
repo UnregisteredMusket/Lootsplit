@@ -1,0 +1,10 @@
+80 CC0 RPG SFX — rubberduck
+Source: https://opengameart.org/content/80-cc0-rpg-sfx
+Archive: https://opengameart.org/sites/default/files/80-CC0-RPG-SFX_0.zip
+License: CC0 1.0 Universal https://creativecommons.org/publicdomain/zero/1.0/
+Retrieved 2026-10-05. Original recordings converted to mono 44.1 kHz PCM WAV.
+coins.wav: item_coins_01.ogg
+loot.wav: item_gem_01.ogg
+page.wav: book_01.ogg
+
+Original archive SHA-256: 1c2f06ff4e8563b5b8b745b23cf213c1474142a69bb82bd8f5e10d9b3f7a7bbd

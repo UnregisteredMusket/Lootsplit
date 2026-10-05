@@ -1,3 +1,4 @@
+import { SoundSettings } from "@/components/sound-settings";
 import { PlayerPermissions } from "@/components/character-permissions";
 import { AppLink } from "@/components/app-link";
 import { RollModeSetting } from "@/components/roll-mode-setting";
@@ -68,6 +69,7 @@ export function ManagementPanel({
         />
         Show dollar estimates
       </label>
+      <SoundSettings />
       <p>Motion follows your device’s reduced-motion preference.</p>
     </div>
   );

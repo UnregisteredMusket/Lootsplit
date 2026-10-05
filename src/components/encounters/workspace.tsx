@@ -1,3 +1,4 @@
+import { playSound } from "@/lib/quire/sound";
 import { ImportStatblock } from "./import-statblock";
 import { usePrefs } from "@/lib/quire/prefs";
 import { encounterRequest } from "@/lib/encounters/client";
@@ -465,6 +466,7 @@ function EncounterEditor({
       onDirty(false);
       onSaved();
       if (path === "award" && id.startsWith("local-")) await reloadEconomy();
+      if (path === "award") void playSound("loot");
       setNotice(
         path === "award"
           ? "Loot transferred. This encounter cannot award loot again."

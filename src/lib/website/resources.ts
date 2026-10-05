@@ -1,6 +1,15 @@
 /** Add every new third-party content/data resource here when integrating it. */
 export const resources = [
   {
+    name: "CC0 fantasy sound effects — rubberduck",
+    description: "Coin, loot and page-turn feedback from 80 CC0 RPG SFX by rubberduck, dedicated to the public domain under CC0 1.0. Selected OGG recordings converted to mono 44.1 kHz WAV for local web and Android playback. Sound effects are optional and never contain campaign data.",
+    links: [
+      { label: "Original sound pack", url: "https://opengameart.org/content/80-cc0-rpg-sfx" },
+      { label: "CC0 1.0", url: "https://creativecommons.org/publicdomain/zero/1.0/" },
+      { label: "File credits", url: "/audio/cc0/CREDITS.txt" },
+    ],
+  },
+  {
     name: "In-memory player storage",
     description: "fake-indexeddb implements the IndexedDB API in JavaScript memory (Apache License 2.0). Lootsplit uses it for player sessions so campaign contents are not written to persistent browser databases.",
     links: [{ label: "Source and license", url: "https://github.com/dumbmatter/fakeIndexedDB" }],

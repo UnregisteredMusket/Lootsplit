@@ -1,3 +1,4 @@
+import { SoundSettings } from "@/components/sound-settings";
 import { TestModeSettings } from "@/components/test-mode";
 import { RollModeSetting } from "@/components/roll-mode-setting";
 import { Link, createFileRoute } from "@tanstack/react-router";
@@ -78,6 +79,7 @@ function SettingsPage() {
     <Shell width="prose">
       <h1 className="font-display text-4xl tracking-tight">Device backups</h1>
       <p className="mt-2 text-sm text-muted">Keep a copy of the campaign data available on this device. Full campaign restoration is a DM action in Local Mode.</p>
+      <Fold title="Sound effects"><SoundSettings /></Fold>
       <Fold anchorId="gameplay" title="Roll mode" defaultOpen><RollModeSetting /></Fold>
       {ready ? <div id="backups"><SaveFolder /></div> : <p>Loading…</p>}
       <Fold title="Diagnostic reports" hint="Download an error report to share manually."><Diagnostics /></Fold>
@@ -97,7 +99,8 @@ function SettingsPage() {
       {ready ? (
         <>
           <Link to="/share" className="quick-action mt-5">Multiplayer — rooms, players & notifications →</Link>
-          <Fold anchorId="gameplay" title="Roll mode" hint="Physical dice or in-app dice."><RollModeSetting /></Fold>
+          <Fold title="Sound effects"><SoundSettings /></Fold>
+      <Fold anchorId="gameplay" title="Roll mode" hint="Physical dice or in-app dice."><RollModeSetting /></Fold>
           <PasswordSettings />
           <div id="backups"><SaveFolder /></div>
           <Fold title="Diagnostic reports" hint="Download an error report to share manually.">
