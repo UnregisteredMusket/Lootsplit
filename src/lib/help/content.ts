@@ -186,6 +186,7 @@ export const HELP_GROUPS: HelpGroup[] = [
         paragraphs: [
           "Local: data belongs to this device. Use Manual sharing & files to send player links or files and receive activity reports. DM-selected shops and optional party-fund access define the player copy. Review and import returned reports; conflicting funds, inventory or stock changes are rejected. After accepting a report, send a fresh copy. Older-format reports may need manual reconciliation. Copying a link does not send it for you.",
           "Live: permitted actions synchronize when the server accepts them; participants do not wait for a transaction turn. Failed or offline actions stay pending for review or retry.",
+          "In Live or Turn-based play, Share join link and the player-specific Copy link open the current room. If another room is already connected, choose whether to stay or switch; the invitation is not yet accepted. Offline snapshot links and downloaded player files are separate manual copies and do not synchronize. Send a fresh room invitation to replace an older offline link.",
           "Turn-based: only the current participant makes transactions. Actions remain a draft until Submit changes and end turn commits them and passes control. Connected drafts are also saved on the server; offline actions remain on their original device. Chat is sent independently of transaction turns. Only the DM changes sharing modes.",
         ],
         links: [

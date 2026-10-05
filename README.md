@@ -6,6 +6,8 @@ Lootsplit is a shared party ledger and campaign application for web and Android.
 
 Sign in to the same account, then choose the saved campaign in **My account → My campaigns → Resume**. New shared rooms created while signed in are saved there automatically; a failed account save has a retry that keeps the existing room. **Start a room** creates a separate campaign copy. Copies can have the same name but do not share portraits, loot or later progress. The account page marks the room open on this device and warns before opening an older same-name entry. Existing rooms can still be added with **Save current membership**.
 
+For Live or Turn-based play, **Share join link** and each player's **Copy link** invite players to the current room. An existing connection requires an explicit choice before switching. **Copy offline snapshot link** and downloaded player files are separate manual copies, with a warning; they do not join or sync with the shared room. Older offline links cannot be converted automatically: send a fresh room invitation.
+
 ## Start here for every coding session
 
 Read [AGENTS.project.md](AGENTS.project.md), then the [Coding session manual](docs/CODING-MANUAL.md). After a timeout or interruption, also read [Recovery](docs/RECOVERY.md) and reconcile the repository, running jobs and live release before repeating an action.

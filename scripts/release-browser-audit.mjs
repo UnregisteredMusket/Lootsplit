@@ -93,10 +93,11 @@ try {
   await player.getByRole("button", { name: "Share join link", exact: true }).waitFor();
   console.log("Audit: player joined; test conflicting invitation");
   await visit(player, origin + "/share?join=TEST1234");
-  await player
-    .getByText(`Invitation to TEST1234. You are currently connected to ${code}.`, { exact: true })
-    .waitFor();
-  await player.getByRole("button", { name: "Stay in this room", exact: true }).click();
+  const invitation = player.getByRole("alertdialog", { name: "Invitation to a different room" });
+  await invitation.waitFor();
+  assert.ok((await invitation.innerText()).includes(`room ${code}`));
+  assert.ok((await invitation.innerText()).includes("TEST1234"));
+  await invitation.getByRole("button", { name: "Stay in this room", exact: true }).click();
   assert.equal(new URL(player.url()).searchParams.has("join"), false);
   console.log("Audit: interrupt purchase and restore queue");
   // Interrupt only API transport so the app and saved queue can reload normally.

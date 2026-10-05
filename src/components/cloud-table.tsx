@@ -2,7 +2,8 @@ import { getServerCloudTable } from "@/lib/quire/cloud-client";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { Copy, Crown, DoorOpen, Radio, Users, ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
-import { Link } from "@tanstack/react-router";
+import { Link, useRouter, useRouterState } from "@tanstack/react-router";
+import * as AlertDialog from "@radix-ui/react-alert-dialog";
 import { accountRequest, type AccountLibrary } from "@/lib/account/client";
 import { linkCurrentCampaign } from "@/lib/account/transfers";
 import {
@@ -30,6 +31,12 @@ import { loadSeatLock } from "@/lib/quire/lock";
 type Mode = "local" | "turns" | "live";
 
 export function CloudTable() {
+  const router = useRouter();
+  const search = useRouterState({ select: (s) => s.location.searchStr });
+  const params = new URLSearchParams(search);
+  const invitation = (params.get("join") || "").trim().toUpperCase();
+  const invitedCharacter = params.get("character") || "";
+  const invitationToken = params.get("invitation") || "";
   const seat = useSeat();
   const cloud = useSyncExternalStore(subscribeCloudTable, getCloudTable, getServerCloudTable);
   const online = useSyncExternalStore(subscribeOnline, getOnline, () => true);
@@ -39,7 +46,6 @@ export function CloudTable() {
   const [purseId, setPurseId] = useState("");
   const [busy, setBusy] = useState(false);
   const [joining, setJoining] = useState(false);
-  const [invitation, setInvitation] = useState("");
   const [switchInvite, setSwitchInvite] = useState(false);
   const [hosting, setHosting] = useState(false);
   const [hostAccount, setHostAccount] = useState<AccountLibrary | null>(null);
@@ -90,33 +96,32 @@ export function CloudTable() {
 
   useEffect(() => {
     resumeTable();
-    const invite = new URLSearchParams(window.location.search).get("join");
-    if (invite)
-      setInvitation(
-        invite
-          .toUpperCase()
-          .replace(/[^A-Z0-9]/g, "")
-          .slice(0, 12),
-      );
-    if (invite && !getCloudTable().joined) {
-      setCode(
-        invite
-          .toUpperCase()
-          .replace(/[^A-Z0-9]/g, "")
-          .slice(0, 12),
-      );
-      setJoining(true);
-    }
   }, []);
 
+  useEffect(() => {
+    setCharacters([]);
+    setLookedUp(false);
+    setPurseId("");
+    setSwitchInvite(false);
+    if (invitation && !getCloudTable().joined) {
+      setCode(invitation);
+      setJoining(true);
+      setHosting(false);
+    }
+  }, [invitation, invitedCharacter, invitationToken, cloud.joined]);
+
   function dismissInvitation() {
-    setInvitation("");
-    const url = new URL(window.location.href);
-    url.searchParams.delete("join");
-    window.history.replaceState(window.history.state, "", url);
+    const next = router.options.parseSearch!(window.location.search);
+    for (const key of ["join", "invitation", "character"]) delete next[key];
+    return router.navigate({ to: "/share", search: next as never, replace: true });
   }
 
   async function prepareInvitation() {
+    const requestedSearch = window.location.search;
+    // Validate the target before backing up or leaving an existing session.
+    const found = await lookupTable(invitation);
+    if (invitedCharacter && !found.characters.some((c) => c.id === invitedCharacter))
+      throw new Error("The invited character is unavailable. Ask the DM to release it or send a new invitation.");
     if ((await loadSeatLock())?.protectSaves)
       throw new Error(
         "Save a password-protected backup in Device backups, then leave or end this room before opening the invitation again.",
@@ -127,8 +132,11 @@ export function CloudTable() {
       campaignId: localStorage.getItem("quire.campaign.v1") || "main",
       file,
     });
+    if (window.location.search !== requestedSearch)
+      throw new Error("The invitation changed. Review the current link before switching rooms.");
     if (host) await chooseTableMode("local");
     else await leaveTable();
+    if (window.location.search !== requestedSearch) return;
     setCode(invitation);
     setJoining(true);
     setCharacters([]);
@@ -185,33 +193,32 @@ export function CloudTable() {
 
   return (
     <div className="multiplayer-hub" aria-busy={busy}>
-      {invitation && cloud.joined ? (
+      {invitation && cloud.joined && invitation === cloud.code ? (
         <div className="mb-4 rounded-xl border border-border p-4" role="status">
-          <p>
-            {invitation === cloud.code
-              ? `You are already connected to room ${cloud.code}.`
-              : `Invitation to ${invitation}. You are currently connected to ${cloud.code}.`}
-          </p>
+          <p>You are already connected to room {cloud.code}.</p>
           <div className="mt-3 flex flex-wrap gap-2">
             <Button variant="secondary" onClick={dismissInvitation}>
               Stay in this room
             </Button>
-            {invitation !== cloud.code ? (
-              <Button
-                disabled={unavailable || cloud.pending > 0}
-                onClick={() => setSwitchInvite(true)}
-              >
-                Switch rooms…
-              </Button>
-            ) : null}
           </div>
-          {cloud.pending > 0 ? (
-            <p className="mt-2 text-sm text-muted">
-              Submit or resolve pending actions before switching.
-            </p>
-          ) : null}
         </div>
       ) : null}
+      <AlertDialog.Root open={!!invitation && cloud.joined && invitation !== cloud.code && !switchInvite}>
+        <AlertDialog.Portal>
+          <AlertDialog.Overlay className="modal-overlay fixed inset-0 z-40" />
+          <AlertDialog.Content className="modal-pop rounded-xl border border-border bg-elevated p-4 text-fg">
+            <AlertDialog.Title className="font-display text-2xl">Invitation to a different room</AlertDialog.Title>
+            <AlertDialog.Description className="mt-2 text-sm text-muted">
+              This link is for room {invitation}. This device is still in room {cloud.code}; you have not joined the invited room.
+              {cloud.pending > 0 ? " Stay here to submit or resolve pending actions before switching." : " Choose which room to use."}
+            </AlertDialog.Description>
+            <div className="mt-4 flex flex-wrap gap-2">
+              <Button variant="secondary" disabled={busy} onClick={() => void dismissInvitation()}>Stay in this room</Button>
+              <Button disabled={unavailable || cloud.pending > 0} onClick={() => setSwitchInvite(true)}>Switch rooms…</Button>
+            </div>
+          </AlertDialog.Content>
+        </AlertDialog.Portal>
+      </AlertDialog.Root>
       <Confirm
         open={switchInvite}
         onOpenChange={setSwitchInvite}
@@ -386,6 +393,7 @@ export function CloudTable() {
                   setJoining(false);
                   setCharacters([]);
                   setLookedUp(false);
+                  void dismissInvitation();
                 }}
               >
                 <ArrowLeft size={16} />
@@ -398,11 +406,16 @@ export function CloudTable() {
                 onSubmit={(event) => {
                   event.preventDefault();
                   run(async () => {
+                    const requestedSearch = window.location.search;
                     const found = await lookupTable(code);
+                    if (window.location.search !== requestedSearch) return;
                     if (!found || !Array.isArray(found.characters))
                       throw new Error("Could not load this room. Try again.");
+                    const preferred = code === invitation ? invitedCharacter : "";
+                    if (preferred && !found.characters.some((c) => c.id === preferred))
+                      throw new Error("The invited character is unavailable. Ask the DM to release it or send a new invitation.");
                     setCharacters(found.characters);
-                    setPurseId(found.characters[0]?.id ?? "");
+                    setPurseId(preferred || found.characters[0]?.id || "");
                     setLookedUp(true);
                   });
                 }}
@@ -427,7 +440,7 @@ export function CloudTable() {
                   type="submit"
                   className="w-full"
                   variant="secondary"
-                  disabled={unavailable || code.length < 4}
+                  disabled={unavailable || !/^[A-Z0-9]{4,12}$/.test(code)}
                 >
                   {busy ? "Please wait…" : "Find characters"}
                 </Button>
@@ -444,9 +457,11 @@ export function CloudTable() {
                   onSubmit={(event) => {
                     event.preventDefault();
                     run(async () => {
-                      await joinTable(code, purseId, name, new URLSearchParams(location.search).get("invitation") || undefined);
+                      const requestedSearch = window.location.search;
+                      await joinTable(code, purseId, name, code === invitation ? invitationToken || undefined : undefined);
                       setJoining(false);
-                    }, "You joined the room.");
+                      if (window.location.search === requestedSearch) await dismissInvitation();
+                    }, `You joined room ${code}.`);
                   }}
                 >
                   <Field label="Your name">

@@ -6,6 +6,7 @@ export const accountScenarios = [
   "recovery",
   "portrait-resume",
   "campaign-choice",
+  "invitations",
 ];
 
 export function selectAccountScenario(args, ci = process.env.CI) {

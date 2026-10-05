@@ -1,5 +1,14 @@
 # Resume Lootsplit after an interruption
 
+## Invitation routing checkpoint — 2026-10-05
+
+- Prior PR #39 is fully released: main/live `2fa630f431d0e63df2c6f3ed83ecc8b3c40b1132`, main verification `37280755805`, deployment and production audits `37281139424`. Do not repeat that release.
+- New branch `fix/invitation-room-routing`: a disposable browser regression reproduced the player-specific Copy link control producing an offline `?as=player#t...` snapshot during Live play. This does not join the host room. The user's exact sent URL was not supplied, so it is a confirmed application defect, not proof of which control they used.
+- PR #40 first run `37284669067` caught an unrelated encounter-audit readiness race: the Save in select exists before its asynchronously loaded personal option, so an immediate value assertion read an empty string. The fixture now waits for the required personal value with Playwright's bounded assertion; permissions and production encounter code are unchanged. Verify the focused local encounter audit and subsequent exact-head full run before merging.
+- Shared player links now name the current room and character. Deliberate offline snapshots/files remain available with a warning. Conflicting existing sessions require an explicit choice; invitation query changes and back/forward navigation are observed, the Room panel takes priority, unavailable targets are checked before leaving, and consumed invitation parameters are cleared. An unavailable invited character never silently picks another character.
+- New `invitations` scenario exercises real share/copy controls, deliberate offline links, two distinct hosted rooms, existing player membership, unavailable-character protection, same-document/back/forward navigation and final connected room. Focused regression passed; check the PR for full local/CI/main/deployment results. Never claim release from this branch alone.
+- Preserve guest, account, live, turn-based and manual workflows; no real campaigns are mutated and no existing links are guessed into another room. Older offline links need a new invitation from the DM. Native code compatibility is checked, but a website release is not a new Android APK.
+
 ## Confirmed portrait recovery and prevention — 2026-10-05
 
 - The user confirmed the desktop portraits appeared after resuming the phone's actual room. This resolves the observed image discrepancy by room selection; it was not evidence of lost image bytes. The original two rooms and all user data remain intact.

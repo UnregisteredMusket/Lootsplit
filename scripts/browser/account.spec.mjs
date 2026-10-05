@@ -456,3 +456,102 @@ test("campaign-choice", async ({ devices, baseURL: origin }, testInfo) => {
   await expect(phone.locator(".room-code")).toHaveText(firstCode);
   expect((await members()).length).toBe(2);
 });
+
+test("invitations", async ({ devices, baseURL: origin }, testInfo) => {
+  async function openGuest(page) {
+    await visitPage(page, origin, "/share");
+    const guide = page.getByRole("button", { name: "Not now", exact: true });
+    if (await guide.isVisible()) await guide.click();
+    await expect(page.locator(".role-chip:enabled")).toBeVisible();
+  }
+  async function host(page) {
+    await openGuest(page);
+    await page.getByRole("button", { name: "Start a room", exact: true }).click();
+    await page.getByRole("button", { name: "Create room", exact: true }).click();
+    await expect(page.locator(".room-code")).toBeVisible();
+    await expect(page.locator('.multiplayer-hub[aria-busy="false"]')).toBeVisible();
+    return page.locator(".room-code").innerText();
+  }
+  const dm = devices.page;
+  const target = await host(dm);
+  await dm.evaluate(() => Object.defineProperty(navigator, "share", {
+    configurable: true, value: async (data) => { window.auditSharedLink = data.url; },
+  }));
+  await dm.getByRole("button", { name: "Share join link", exact: true }).click();
+  await expect.poll(() => dm.evaluate(() => window.auditSharedLink || "")).not.toBe("");
+  expect(new URL(await dm.evaluate(() => window.auditSharedLink)).searchParams.get("join")).toBe(target);
+  // Exercise the actual player-specific copy control, not a hand-built URL.
+  await dm.evaluate(() => Object.defineProperty(navigator, "clipboard", {
+    configurable: true, value: { writeText: async (text) => { window.auditCopiedLink = text; } },
+  }));
+  await dm.getByText("Manual sharing & files", { exact: true }).click();
+  await dm.getByRole("button", { name: "Copy link", exact: true }).first().click();
+  await expect.poll(() => dm.evaluate(() => window.auditCopiedLink || "")).not.toBe("");
+  const invite = new URL(await dm.evaluate(() => window.auditCopiedLink));
+  expect(invite.pathname).toBe("/share");
+  expect(invite.searchParams.get("join")).toBe(target);
+  expect(invite.searchParams.get("character")).toBeTruthy();
+  expect(invite.hash).toBe("");
+  let offlineWarning = "";
+  dm.once("dialog", (dialog) => { offlineWarning = dialog.message(); return dialog.dismiss(); });
+  await dm.getByRole("button", { name: "Copy offline snapshot link", exact: true }).first().click();
+  expect(offlineWarning).toContain("does not join your shared room");
+  expect(await dm.evaluate(() => window.auditCopiedLink)).toBe(invite.href);
+  dm.once("dialog", (dialog) => dialog.accept());
+  await dm.getByRole("button", { name: "Copy offline snapshot link", exact: true }).first().click();
+  await expect.poll(() => dm.evaluate(() => window.auditCopiedLink)).not.toBe(invite.href);
+  const offline = new URL(await dm.evaluate(() => window.auditCopiedLink));
+  expect(offline.searchParams.get("as")).toBe("player");
+  expect(offline.hash).toMatch(/^#t\./);
+
+  const { page: otherDm } = await devices.newDevice();
+  const previous = await host(otherDm);
+  expect(previous).not.toBe(target);
+  const { page: player } = await devices.newDevice(390);
+  await openGuest(player);
+  await visitPage(player, origin, `/share?join=${previous}`);
+  await player.getByRole("button", { name: "Find characters", exact: true }).click();
+  await player.getByPlaceholder("What should the party call you?").fill("Invitation player");
+  await player.getByRole("button", { name: "Join room", exact: true }).click();
+  await expect(player.locator(".room-code")).toHaveText(previous);
+
+  // Same-document navigation must update invitation state, including browser back/forward.
+  await player.evaluate((url) => history.pushState(null, "", url), invite.href + "&tab=chat");
+  const choice = player.getByRole("alertdialog", { name: "Invitation to a different room" });
+  await expect(choice).toBeVisible();
+  await expect(choice).toContainText(target);
+  await expect(choice).toContainText(previous);
+  await expect(player.locator('[role="tab"]').filter({ hasText: /^Room$/ })).toHaveAttribute("aria-selected", "true");
+  await player.screenshot({ path: testInfo.outputPath("invite-conflict-mobile.png"), fullPage: true });
+  await choice.getByRole("button", { name: "Stay in this room", exact: true }).click();
+  await expect.poll(() => new URL(player.url()).searchParams.has("join")).toBe(false);
+  await expect(player.locator(".room-code")).toHaveText(previous);
+  const unavailable = new URL(invite);
+  unavailable.searchParams.set("character", "unavailable-character");
+  await player.evaluate((url) => history.pushState(null, "", url), unavailable.href);
+  await choice.getByRole("button", { name: "Switch rooms…", exact: true }).click();
+  await player.getByRole("alertdialog", { name: "Switch to the invited room?" })
+    .getByRole("button", { name: "Back up and continue", exact: true }).click();
+  await expect(player.locator('[data-sonner-toast]').filter({ hasText: "The invited character is unavailable" })).toBeVisible();
+  await expect(player.locator(".room-code")).toHaveText(previous);
+  await choice.getByRole("button", { name: "Stay in this room", exact: true }).click();
+  await expect.poll(() => new URL(player.url()).searchParams.has("join")).toBe(false);
+  await player.evaluate((url) => history.pushState(null, "", url), invite.href);
+  await expect(choice).toBeVisible();
+  await player.goBack();
+  await expect(choice).toBeHidden();
+  await player.goForward();
+  await expect(choice).toBeVisible();
+  await choice.getByRole("button", { name: "Switch rooms…", exact: true }).click();
+  await player.getByRole("alertdialog", { name: "Switch to the invited room?" })
+    .getByRole("button", { name: "Back up and continue", exact: true }).click();
+  await expect(player.getByPlaceholder("Enter your code")).toHaveValue(target);
+  await player.getByRole("button", { name: "Find characters", exact: true }).click();
+  await expect(player.getByRole("combobox", { name: "Choose your character", exact: true })).toHaveValue(invite.searchParams.get("character"));
+  await player.getByRole("button", { name: "Join room", exact: true }).click();
+  await expect(player.locator(".room-code")).toHaveText(target);
+  await expect(dm.locator(".room-code")).toHaveText(target);
+  await expect(otherDm.locator(".room-code")).toHaveText(previous);
+  await expect(player.getByRole("status").filter({ hasText: "Connected · All changes saved" })).toBeVisible();
+  await expect.poll(() => new URL(player.url()).searchParams.has("join")).toBe(false);
+});
