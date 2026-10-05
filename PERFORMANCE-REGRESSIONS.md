@@ -58,6 +58,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-05T06:03:10.682Z | function: production release asset readiness | 2.465s → 22.623s | +20.158s | +817.77% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37267750797) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37270395853) |
 | 2026-10-05T06:01:49Z | step: publish / Set up job | 1s → 3s | +2s | +200% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37233916244/job/111529155038) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37270395844/job/111635958084) |
 | 2026-10-05T06:01:12Z | job: Development / accounts | 152s → 199s | +47s | +30.92% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37233687309/job/111528483533) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37270098428/job/111635070946) |
 | 2026-10-05T06:01:09Z | step: Development / accounts / Run actions/upload-artifact@v4 | 2s → 3s | +1s | +50% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37254074683/job/111587377896) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37270098428/job/111635070946) |

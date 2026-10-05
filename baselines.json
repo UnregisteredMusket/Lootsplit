@@ -5604,5 +5604,20 @@
     "finishedAt": "2026-10-05T06:01:38Z",
     "durationMs": 2000,
     "trendId": "37270098428:1:a8a8e8495379deb14f252af00e8c3241eb49b4ab80440740d79863bed0c79af6"
+  },
+  "[\"local\",\"function\",\"production release asset readiness\",\"github-actions/ubuntu-latest/node22\",\"v1-identity-js-css-html\"]": {
+    "schema": 1,
+    "id": "ci-function:37270395853:1:release-asset-readiness",
+    "scope": "[\"local\",\"function\",\"production release asset readiness\",\"github-actions/ubuntu-latest/node22\",\"v1-identity-js-css-html\"]",
+    "kind": "function",
+    "name": "production release asset readiness",
+    "environment": "github-actions/ubuntu-latest/node22",
+    "commit": "612ee4612e9b699d746e708acd4094c4ff80d38b",
+    "url": "https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37270395853",
+    "outcome": "success",
+    "startedAt": "2026-10-05T06:02:48.059Z",
+    "finishedAt": "2026-10-05T06:03:10.682Z",
+    "durationMs": 22623,
+    "trendId": "ci-function:37267750797:1:release-asset-readiness"
   }
 }
