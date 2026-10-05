@@ -58,6 +58,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Development / gameplay / Run actions/upload-artifact@v4 | open | 2 | 1s → 3s | +2s | +200% |
 | Development / accounts / Run actions/upload-artifact@v4 | open | 2 | 1s → 3s | +2s | +200% |
 | deploy / Check current main, existing bindings and applied migrations; deploy without rebuild | open | 2 | 9s → 15s | +6s | +66.67% |
+| Development / governance / dev-campaign-governance | open | 2 | 27s → 57s | +30s | +111.11% |
 | Packaged Worker / accounts | open | 4 | 85s → 166s | +81s | +95.29% |
 | Development / gameplay / Run npx playwright install --with-deps chromium | open | 2 | 21s → 31s | +10s | +47.62% |
 | Code checks and immutable builds / Run actions/upload-artifact@v4 | open | 2 | 2s → 4s | +2s | +100% |
@@ -74,17 +75,25 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Packaged Worker / accounts / worker-account | open | 5 | 25s → 75s | +50s | +200% |
 | Development / accounts / Run actions/upload-artifact@v4 | open | 2 | 1s → 3s | +2s | +200% |
 | Verify preserved functionality / initial queue | open | 2 | 3s → 94s | +91s | +3033.33% |
+| Development / governance | open | 2 | 160s → 213s | +53s | +33.13% |
 | Packaged Worker / accounts | open | 2 | 94s → 135s | +41s | +43.62% |
 | Development / accounts | open | 2 | 152s → 266s | +114s | +75% |
 | production release asset readiness | open | 2 | 2.465s → 27.818s | +25.353s | +1028.52% |
 | Packaged standby | open | 2 | 78s → 137s | +59s | +75.64% |
 | Development / accounts | open | 2 | 152s → 257s | +105s | +69.08% |
 | Packaged Worker / accounts / worker-finance | open | 2 | 11s → 15s | +4s | +36.36% |
+| Packaged Worker / interface / worker-help | open | 2 | 6s → 25s | +19s | +316.67% |
 
 ## Recorded slowdowns
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-05T23:35:58Z | job: Development / governance | 185s → 213s | +28s | +15.14% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37269258333/job/111632649174) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37389052554/job/112029497710) |
+| 2026-10-05T23:35:25Z | step: Packaged Worker / interface / worker-help | 11s → 25s | +14s | +127.27% | failure | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37304415063/job/111744921767) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37389052554/job/112029923814) |
+| 2026-10-05T23:34:59Z | step: Development / gameplay / dev-library-navigation | 12s → 17s | +5s | +41.67% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37300924028/job/111733697279) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37389052554/job/112029497830) |
+| 2026-10-05T23:34:22Z | step: Development / governance / dev-campaign-governance | 49s → 57s | +8s | +16.33% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37263207826/job/111614535336) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37389052554/job/112029497710) |
+| 2026-10-05T23:34:04Z | step: Development / gameplay / dev-local-encounter | 6s → 7s | +1s | +16.67% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37233368939/job/111527537884) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37389052554/job/112029497830) |
+| 2026-10-05T23:33:19Z | step: Development / governance / Run npx playwright install --with-deps chromium | 23s → 30s | +7s | +30.43% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37233368939/job/111527537913) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37389052554/job/112029497710) |
 | 2026-10-05T11:48:12Z | step: Packaged Worker / accounts / worker-account | 60s → 75s | +15s | +25% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37285563745/job/111683983887) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37304872866/job/111746559276) |
 | 2026-10-05T11:47:58Z | step: Development / accounts / dev-owner | 4s → 5s | +1s | +25% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37233687309/job/111528483533) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37304872866/job/111746024028) |
 | 2026-10-05T11:47:41Z | step: Packaged Worker / interface / worker-loot | 4s → 5s | +1s | +25% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37233687309/job/111528724093) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37304872866/job/111746559174) |
