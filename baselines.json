@@ -4914,19 +4914,19 @@
   },
   "[\".github/workflows/failure-report.yml\",\"workflow_run\",\"main\",\"queue\",\"Report workflow failure / initial queue\",\"ubuntu-latest\",\"full\"]": {
     "schema": 1,
-    "id": "37236129044:1:48e6ad2fae3bb807268ed73a6bec00a70bfae8e5b1c089c21634cab2209d6175",
+    "id": "37253465966:1:48e6ad2fae3bb807268ed73a6bec00a70bfae8e5b1c089c21634cab2209d6175",
     "scope": "[\".github/workflows/failure-report.yml\",\"workflow_run\",\"main\",\"queue\",\"Report workflow failure / initial queue\",\"ubuntu-latest\",\"full\"]",
     "kind": "queue",
     "name": "Report workflow failure / initial queue",
     "environment": "ubuntu-latest",
     "commit": "325c0be2ca23578ac578b6114d51558654596c8e",
-    "runId": 37236129044,
+    "runId": 37253465966,
     "attempt": 1,
-    "url": "https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37236129044",
+    "url": "https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37253465966",
     "outcome": "success",
-    "startedAt": "2026-10-04T21:26:55Z",
-    "finishedAt": "2026-10-04T21:26:58.000Z",
-    "durationMs": 3000,
+    "startedAt": "2026-10-05T01:57:38Z",
+    "finishedAt": "2026-10-05T01:58:17.000Z",
+    "durationMs": 39000,
     "trendId": "37236129044:1:48e6ad2fae3bb807268ed73a6bec00a70bfae8e5b1c089c21634cab2209d6175"
   },
   "[\".github/workflows/failure-report.yml\",\"workflow_run\",\"main\",\"step\",\"report / Set up job\",\"ubuntu-latest\",1]": {
@@ -5081,5 +5081,22 @@
     "finishedAt": "2026-10-05T01:56:36Z",
     "durationMs": 1000,
     "trendId": "37253238957:1:197e74b5bcc010bf2cea71d1b52b8c7c966cad28f892f9f9daa8be171296943d"
+  },
+  "[\".github/workflows/failure-report.yml\",\"workflow_run\",\"main\",\"step\",\"report / Run actions/setup-node@v4\",\"ubuntu-latest\",1]": {
+    "schema": 1,
+    "id": "37253465966:1:b5b463538ab840bf196d6d0815b2a857c0e65b8aeafc6917cbcd3ae49d785ac4",
+    "scope": "[\".github/workflows/failure-report.yml\",\"workflow_run\",\"main\",\"step\",\"report / Run actions/setup-node@v4\",\"ubuntu-latest\",1]",
+    "kind": "step",
+    "name": "report / Run actions/setup-node@v4",
+    "environment": "ubuntu-latest",
+    "commit": "325c0be2ca23578ac578b6114d51558654596c8e",
+    "runId": 37253465966,
+    "attempt": 1,
+    "url": "https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37253465966/job/111585637487",
+    "outcome": "success",
+    "startedAt": "2026-10-05T01:58:19Z",
+    "finishedAt": "2026-10-05T01:58:20Z",
+    "durationMs": 1000,
+    "trendId": "37253465966:1:b5b463538ab840bf196d6d0815b2a857c0e65b8aeafc6917cbcd3ae49d785ac4"
   }
 }

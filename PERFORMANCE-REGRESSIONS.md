@@ -17,6 +17,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-05T01:58:17.000Z | queue: Report workflow failure / initial queue | 3s → 39s | +36s | +1200% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37236129044) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37253465966) |
 | 2026-10-05T01:56:58Z | step: Packaged Worker / interface / worker-loot | 4s → 5s | +1s | +25% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37233368939/job/111527693168) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37253238957/job/111585184649) |
 | 2026-10-05T01:56:11Z | step: Packaged Worker / accounts / Run actions/upload-artifact@v4 | 1s → 2s | +1s | +100% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37233368939/job/111527693152) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37253238957/job/111585184615) |
 | 2026-10-05T01:55:48Z | step: Packaged Worker / accounts / Run actions/download-artifact@v4 | 1s → 2s | +1s | +100% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37233368939/job/111527693152) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37253238957/job/111585184615) |
