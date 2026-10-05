@@ -48,7 +48,7 @@ const ABILITIES: { key: AbilityKey; label: string }[] = [
 
 const SKILLS: { name: string; keys: string[] }[] = [
   { name: "Acrobatics", keys: ["acrobatics"] },
-  { name: "Animal Handling", keys: ["animalhandling"] },
+  { name: "Animal Handling", keys: ["animalhandling", "animal"] },
   { name: "Arcana", keys: ["arcana"] },
   { name: "Athletics", keys: ["athletics"] },
   { name: "Deception", keys: ["deception"] },
@@ -112,13 +112,19 @@ export function sheetFromFields(fields: Record<string, string>): SheetDraft | nu
 }
 
 export function sheetFromText(text: string): SheetDraft | null {
-  const flat = text.replace(/\u00a0/g, " ").replace(/[−–]/g, "-");
+  const flat = text
+    .replace(/\r\n?/g, "\n")
+    .replace(/\u00a0/g, " ")
+    .replace(/[−–]/g, "-");
   const map = new Map<string, string>();
   const labeled = (label: string) => {
     const match = flat.match(
-      new RegExp(`(?:^|\\n)\\s*${label}[ \t]*[:\\n][ \t]*([^\\n]{1,80})`, "i"),
+      new RegExp(`(?:^|\\n)[ \t]*${label}[ \t]*(:|\\n)[ \t]*([^\\n\\f]{1,80})`, "i"),
     );
-    return match?.[1]?.trim() ?? "";
+    const value = match?.[2]?.trim() ?? "";
+    // An empty box is followed by another printed label in many PDF exports.
+    // Explicit inline values (e.g. Name: Strength) remain valid.
+    return match?.[1] === "\n" && isPrintedLabel(value) ? "" : value;
   };
   put(map, "charactername", labeled("character name") || labeled("name"));
   put(
@@ -126,7 +132,7 @@ export function sheetFromText(text: string): SheetDraft | null {
     "classlevel",
     labeled("class\\s*&\\s*level") || labeled("class and level") || labeled("class"),
   );
-  put(map, "race", labeled("race"));
+  put(map, "race", labeled("race") || labeled("species"));
   put(map, "background", labeled("background"));
   put(map, "alignment", labeled("alignment"));
   put(map, "xp", labeled("experience points") || labeled("experience") || labeled("\\bxp\\b"));
@@ -160,22 +166,6 @@ export function sheetFromText(text: string): SheetDraft | null {
     put(map, "hpcurrent", hpPair[1]!);
     put(map, "hpmax", hpPair[2]!);
   }
-  const headings = [
-    "personality traits",
-    "traits",
-    "ideals",
-    "bonds",
-    "flaws",
-    "features and traits",
-    "features",
-    "proficiencies",
-    "languages",
-    "attacks and spellcasting",
-    "attacks",
-    "equipment",
-    "spells",
-    "spellcasting",
-  ];
   for (const [heading, key] of Object.entries({
     "personality traits": "personalitytraits",
     traits: "traits",
@@ -197,11 +187,16 @@ export function sheetFromText(text: string): SheetDraft | null {
     );
     if (start) {
       const rest = flat.slice(start.index + start[0].length);
-      const stop = new RegExp(
-        `\\n[ \t]*(?:${headings.join("|")})[ \t]*:?[^\\S\\n]*(?:\\n|$)`,
-        "i",
-      ).exec(rest);
-      put(map, key, rest.slice(0, stop?.index ?? rest.length).trim());
+      const lines = rest.split("\n");
+      const stop = lines.findIndex((line) => line.includes("\f") || isPrintedLabel(line));
+      put(
+        map,
+        key,
+        lines
+          .slice(0, stop < 0 ? lines.length : stop)
+          .join("\n")
+          .trim(),
+      );
     } else put(map, key, labeled(heading));
   }
   for (const skill of SKILLS) {
@@ -232,6 +227,91 @@ export function sheetFromText(text: string): SheetDraft | null {
     if (match) put(map, coin, match[1]!);
   }
   return bodyFromMap(map);
+}
+
+const PRINTED_LABELS = new Set([
+  "character name",
+  "name",
+  "class & level",
+  "class and level",
+  "class level",
+  "class",
+  "race",
+  "species",
+  "background",
+  "player name",
+  "experience points",
+  "experience",
+  "xp",
+  "alignment",
+  "faith",
+  "gender",
+  "size",
+  "weight",
+  "age",
+  "height",
+  "skin",
+  "eyes",
+  "hair",
+  "character appearance",
+  "character backstory",
+  "allies & organizations",
+  "treasure",
+  "personality traits",
+  "traits",
+  "ideals",
+  "bonds",
+  "flaws",
+  "features and traits",
+  "features & traits",
+  "features",
+  "proficiencies",
+  "other proficiencies & languages",
+  "languages",
+  "attacks and spellcasting",
+  "attacks & spellcasting",
+  "attacks",
+  "actions",
+  "equipment",
+  "spells",
+  "spellcasting",
+  "spellcasting class",
+  "spellcasting ability",
+  "spell save dc",
+  "spell attack bonus",
+  "spell name",
+  "spell level",
+  "cantrips",
+  "armor class",
+  "initiative",
+  "speed",
+  "inspiration",
+  "proficiency bonus",
+  "saving throws",
+  "skills",
+  "hit point maximum",
+  "current hit points",
+  "temporary hit points",
+  "hit dice",
+  "death saves",
+  "successes",
+  "failures",
+  "total",
+  "cp",
+  "sp",
+  "ep",
+  "gp",
+  "pp",
+  ...ABILITIES.map((a) => a.label.toLowerCase()),
+  ...SKILLS.map((s) => s.name.toLowerCase()),
+]);
+
+function isPrintedLabel(line: string): boolean {
+  const value = line.trim().toLowerCase();
+  return (
+    PRINTED_LABELS.has(value.replace(/\s*:.*/, "")) ||
+    /(?:©|copyright|all rights reserved)/i.test(value)
+  );
 }
 
 export function sheetFromData(value: unknown): SheetDraft | null {
@@ -313,20 +393,27 @@ function bodyFromMap(map: Map<string, string>): SheetDraft | null {
   }
   const name = pick(map, "charactername", "charname", "name", "fullname");
   const classLevel = pick(map, "classlevel", "classandlevel", "classes", "class");
-  const race = pick(map, "race", "ancestry");
+  const race = pick(map, "race", "ancestry", "species");
   if (scores < 3 && !name && !classLevel) return null;
   const current = pick(map, "hpcurrent", "currenthp", "hitpoints");
   const max = pick(map, "hpmax", "maxhp", "hitpointmaximum");
-  const temp = pick(map, "hptemp", "temphp");
+  const tempValue = pick(map, "hptemp", "temphp");
+  const temp = /^\d+$/.test(tempValue) ? tempValue : "";
   const hitPoints = [
     current && max ? `${current} / ${max}` : max || current,
     temp ? `${temp} temp` : "",
   ]
     .filter(Boolean)
     .join(", ");
-  const dice = pick(map, "hd", "hitdice");
+  const dice =
+    pick(map, "hd", "hitdice") || (/^\d+d\d+$/i.test(pick(map, "total")) ? pick(map, "total") : "");
   const diceTotal = pick(map, "hdtotal", "hitdicetotal");
-  const attacks = weaponLines(map) || pick(map, "attacksspellcasting", "attacks");
+  const attacks = [
+    weaponLines(map) || pick(map, "attacksspellcasting", "attacks"),
+    numberedValues(map, /^actions\d+$/),
+  ]
+    .filter(Boolean)
+    .join("\n");
   return {
     edition: "2014",
     name,
@@ -356,15 +443,18 @@ function bodyFromMap(map: Map<string, string>): SheetDraft | null {
     hitPoints,
     hitDice: diceTotal && dice ? `${diceTotal} × ${dice}` : diceTotal || dice,
     proficiency: pick(map, "profbonus", "proficiencybonus", "proficiency"),
-    passivePerception: pick(map, "passive", "passiveperception", "passivewisdom"),
+    passivePerception: pick(map, "passive", "passiveperception", "passivewisdom", "passive1"),
     traits: clip(pick(map, "personalitytraits", "traits")),
     ideals: clip(pick(map, "ideals")),
     bonds: clip(pick(map, "bonds")),
     flaws: clip(pick(map, "flaws")),
-    features: clip(pick(map, "featuresandtraits", "features", "classtraits")),
+    features: clip(
+      pick(map, "featuresandtraits", "features", "classtraits") ||
+        numberedValues(map, /^featurestraits\d+$/),
+    ),
     proficiencies: clip(pick(map, "proficiencieslang", "proficiencies", "languages")),
     attacks: clip(attacks),
-    equipment: clip(pick(map, "equipment")),
+    equipment: clip(pick(map, "equipment") || equipmentLines(map)),
     spells: clip(
       pick(map, "spells", "spellcasting", "spellslist") ||
         [...map]
@@ -380,6 +470,25 @@ function bodyFromMap(map: Map<string, string>): SheetDraft | null {
       pp: whole(pick(map, "pp", "platinum")),
     },
   };
+}
+
+function numberedValues(map: Map<string, string>, pattern: RegExp): string {
+  return [...map]
+    .filter(([key]) => pattern.test(key))
+    .sort(([a], [b]) => a.localeCompare(b, "en", { numeric: true }))
+    .map(([, value]) => value)
+    .join("\n");
+}
+
+function equipmentLines(map: Map<string, string>): string {
+  return [...map]
+    .filter(([key]) => /^eqname\d+$/.test(key))
+    .sort(([a], [b]) => a.localeCompare(b, "en", { numeric: true }))
+    .map(([key, name]) => {
+      const quantity = pick(map, key.replace("eqname", "eqqty"));
+      return /^\d+$/.test(quantity) ? `${name} × ${quantity}` : name;
+    })
+    .join("\n");
 }
 
 function weaponLines(map: Map<string, string>): string {

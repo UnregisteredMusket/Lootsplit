@@ -5,10 +5,12 @@ export function importedArrays(legacy) {
     .split(/\n/)
     .flatMap((line) => {
       const m = line.trim().match(/^(.+?)\s*(?:·|\||:)\s*([+-]?\d+)\s*(?:·|\||:)\s*(.+)$/);
-      if (!m || !/\d+d\d+/i.test(m[3])) return [];
-      return [
-        { name: m[1].slice(0, 120), bonus: Number(m[2]), damage: m[3].slice(0, 120), notes: line },
-      ];
+      if (!m) return [];
+      const damage = m[3]
+        .match(/^(\d*d\d+(?:\s*[+-]\s*\d+)?|\d+)(?=\s|$)/i)?.[1]
+        ?.replace(/\s/g, "");
+      if (!damage) return [];
+      return [{ name: m[1].slice(0, 120), bonus: Number(m[2]), damage, notes: line }];
     });
   const equipment = String(legacy.equipment || "")
     .split(/[\n,;]+/)

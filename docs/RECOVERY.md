@@ -89,3 +89,10 @@ References: [GitHub workflow-run behavior](https://docs.github.com/en/actions/re
 - Environment: each shell tool call has its own loopback namespace. Start the disposable Vite server and browser child in the same invocation. Node 22 and a compatible Chromium are available; do not retry inaccessible loopback ports in separate invocations. Old `.grok/skills/design-ui` referenced by the template is absent; current project preservation/manual and existing design tokens govern this update.
 
 - PR #36: https://github.com/UnregisteredMusket/Lootsplit/pull/36. First CI run 37263019567 failed only at `npm ci`: local npm 11 had omitted Nitro’s optional `lru-cache@11.5.3` peer from the lock. Regenerated with CI’s npm 10.9.9 in a disposable directory; no existing dependency versions changed. Check the next commit/run before continuing.
+
+## Character PDF import checkpoint — 2026-10-05
+
+- Portrait PR #37 is fully released at `c662deb270c61206d293cf9ab379781fcb414a29`: main verification 37267485071 and deployment/read-only production audits 37267750797 succeeded; live identity matched. Do not repeat that release.
+- Next authorized work: `fix/character-pdf-fields`. A supplied filled PDF retains page widgets but lacks the AcroForm index; the importer skipped values and turned static labels into character fields and inventory. Page-widget fallback, section boundaries, export aliases/columns and fixed-damage import are corrected.
+- Local source-PDF browser assertions, expanded encounter import UI/persistence audit and `verify:quick` passed (486 tests, 4 existing skips, clean types, 0 lint errors). Private inputs are not in GitHub. See `docs/audit/2026-10-05-character-pdf.md` for evidence, preservation and performance analysis.
+- Inspect the branch PR and exact current runs before proceeding. Full PR/main verification, automatic deployment and production asset/desktop/mobile audits are still required at this checkpoint. Do not claim live success from this branch or its merge.
