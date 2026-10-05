@@ -1,3 +1,4 @@
+import { isEphemeralCampaign } from "./guest-storage.ts";
 import { assertMerchantSale, isService, stockCategory } from "./merchant.ts";
 import { applyCommand, type CommandInput } from "./commands.ts";
 import { loanFromRequest, readFinance, assertFinanceAccountRemovable } from "./finance.ts";
@@ -151,7 +152,7 @@ let ensuring: Promise<void> | null = null;
 let ensuringName = "";
 
 export function ensureEconomy(): Promise<void> {
-  const name = activeDatabaseName();
+  const name = isEphemeralCampaign() ? "guest-memory" : activeDatabaseName();
   if (ensuring && ensuringName === name) return ensuring;
   ensuringName = name;
   ensuring = (async () => {
@@ -165,23 +166,23 @@ export function ensureEconomy(): Promise<void> {
 
 async function seedEconomy(): Promise<void> {
   const db = await quireDb();
-  const seeded = await request(db.transaction("meta").objectStore("meta").get("seeded"));
-  if (seeded) return;
+  // Serialize the initialization decision with cloud restoration. Checking in a
+  // separate read transaction let sample rows arrive after an authoritative save.
+  const tx = db.transaction([...ECONOMY], "readwrite");
+  const done = finish(tx);
+  const seeded = await request(tx.objectStore("meta").get("seeded"));
+  if (seeded) { await done; return; }
+  let blank = isEphemeralCampaign();
   if (typeof window !== "undefined") {
     try {
-      const registry = JSON.parse(localStorage.getItem("quire.campaigns.v1") || "[]") as {
-        id: string;
-        blank?: boolean;
-      }[];
-      if (registry.find((c) => c.id === localStorage.getItem("quire.campaign.v1"))?.blank) {
-        await request(
-          db.transaction("meta", "readwrite").objectStore("meta").put({ id: "seeded" }),
-        );
-        return;
-      }
-    } catch {
-      /* Original campaigns retain their existing initialization. */
-    }
+      const registry = JSON.parse(localStorage.getItem("quire.campaigns.v1") || "[]") as { id: string; blank?: boolean }[];
+      blank ||= !!registry.find(c => c.id === localStorage.getItem("quire.campaign.v1"))?.blank;
+    } catch { /* Original DM campaigns retain their existing initialization. */ }
+  }
+  if (blank) {
+    tx.objectStore("meta").put({ id: "seeded" });
+    await done;
+    return;
   }
   const party = crypto.randomUUID();
   const shop = crypto.randomUUID();
@@ -253,8 +254,6 @@ async function seedEconomy(): Promise<void> {
     baseCopper: copper,
     rarity,
   }));
-  const tx = db.transaction([...ECONOMY], "readwrite");
-  const done = finish(tx);
   for (const purse of purses) tx.objectStore("purses").put(purse);
   for (const holding of holdings) tx.objectStore("holdings").put(holding);
   for (const row of shops) tx.objectStore("shops").put(row);
@@ -1759,6 +1758,7 @@ export async function applySeatLink(): Promise<"player" | "dm" | "bill" | null> 
   if (typeof window === "undefined" || seatLinkClaimed) return null;
   const role = new URLSearchParams(window.location.search).get("as");
   if (role !== "dm" && role !== "player") return null;
+  if (["player"].includes(role)) throw new Error("Offline player links have retired. Ask the DM for the current session invitation. Existing saves are preserved.");
   seatLinkClaimed = true;
   const hash = window.location.hash;
   let result: "player" | "dm" | "bill" = role;
@@ -1944,6 +1944,7 @@ export async function applyCloudTable(table: CloudTable): Promise<void> {
     "readwrite",
   );
   const done = finish(tx);
+  tx.objectStore("meta").put({ id: "seeded" });
   for (const store of ["purses", "holdings", "shops", "stock", "ledger"] as const)
     tx.objectStore(store).clear();
   for (const purse of next.purses) tx.objectStore("purses").put(purse);

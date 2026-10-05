@@ -28,6 +28,7 @@ export type CloudTable = {
 };
 
 export type CloudSeat = {
+  userId?: string;
   id: string;
   token: string;
   name: string;
@@ -38,6 +39,8 @@ export type CloudSeat = {
 export type CloudSeen = { gifts: string[]; sales: string[] };
 
 export type CloudRoom = {
+  ownerId?: string;
+  sessionId?: string;
   code: string;
   revision: number;
   turn: number;

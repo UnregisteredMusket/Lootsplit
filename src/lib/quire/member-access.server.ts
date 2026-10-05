@@ -5,6 +5,15 @@ export async function guardMemberSeat(input: unknown) {
   const db = (globalThis as typeof globalThis & { __env__?: { DB?: Database } }).__env__?.DB;
   const data = input as { code?: string; token?: string };
   if (!db || !data.code || !data.token) return;
+  const roomRow = await db.prepare("SELECT body FROM campaign_rooms WHERE code=?").bind(data.code.trim().toUpperCase()).first<{ body: string }>();
+  const room = roomRow ? JSON.parse(roomRow.body) : null;
+  const seat = room?.seats?.find((s: { token: string }) => s.token === data.token);
+  if (seat?.role === "dm") {
+    const userId = await currentAccountId();
+    const linked = await db.prepare("SELECT user_id FROM library_members WHERE code=? AND seat_id=?").bind(room.code, seat.id).first<{ user_id: string }>();
+    const owner = room.ownerId || linked?.user_id;
+    if (!userId || (owner && userId !== owner)) throw Error("Sign in to the account that owns this campaign.");
+  }
   const row = await db
     .prepare(
       "SELECT a.status,a.ban_until FROM library_members m JOIN member_access a ON a.user_id=m.user_id WHERE m.code=? AND m.token=?",

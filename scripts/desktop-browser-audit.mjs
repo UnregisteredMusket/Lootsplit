@@ -1,4 +1,4 @@
-import { openApplication } from "./title-screen-navigation.mjs";
+import { navigateApplication, openApplication, prepareDmFixture } from "./title-screen-navigation.mjs";
 import { chromium } from "playwright";
 import assert from "node:assert/strict";
 import { mkdir, readFile } from "node:fs/promises";
@@ -21,7 +21,9 @@ const context = await chromium.launchPersistentContext("test-results/desktop-pro
 const page = context.pages()[0] || (await context.newPage()),
   errors = [];
 page.setDefaultTimeout(20000);
+  page.on("response", response => { if (response.status() >= 400) console.error(`HTTP ${response.status()} ${new URL(response.url()).pathname}`); });
 page.on("pageerror", (e) => errors.push(e.message));
+await context.setExtraHTTPHeaders({ "cf-connecting-ip": `2001:db8:${crypto.randomUUID().slice(0, 4)}:${crypto.randomUUID().slice(0, 4)}::1` });
 await context.addInitScript(() => localStorage.setItem("quire.guide.offer.v3", "seen"));
 // Layout-only fixtures; authorization and writes use the separate real-server audits.
 const sheet = {
@@ -98,7 +100,7 @@ await context.route("**/api/account/encounters/log", (r) =>
   r.fulfill({ json: { rolls: [], more: false } }),
 );
 async function visit(path) {
-  await openApplication(
+  await navigateApplication(
     page,
     origin + (path === "/characters" ? "/characters?id=layout-hero" : path),
   );
@@ -112,7 +114,15 @@ async function visit(path) {
     await page.getByRole("button", { name: /Ambush on the northern road/ }).click();
     await page.getByRole("button", { name: "Save encounter", exact: true }).waitFor();
   }
-  await page.waitForTimeout(150);
+  // URL and the previous screen's role chip can update before a lazy route settles.
+  // Wait for the destination content instead of a fixed delay before measuring it.
+  if (path === "/") await page.locator(".shortcut-grid").waitFor();
+  if (path === "/party") await page.getByRole("heading", { name: /^(Party|Inventory & purse)$/ }).waitFor();
+  if (path === "/market") await page.getByRole("heading", { name: "Market", exact: true }).waitFor();
+  if (path === "/library") await page.getByRole("heading", { name: "Library", exact: true }).waitFor();
+  if (path === "/share") await page.getByRole("heading", { name: "Campaign", exact: true }).waitFor();
+  await page.locator(".concept-main").waitFor();
+  await page.evaluate(() => document.fonts.ready);
 }
 async function capture(name, mobile = false) {
   assert.ok(
@@ -187,6 +197,10 @@ async function role(value) {
   }, value);
 }
 try {
+  // Persistent comparison profiles may have ended the preceding run in player view.
+  await openApplication(page, origin + "/account");
+  await prepareDmFixture(page, origin);
+  await role("dm");
   await visit("/");
   // Keep one disposable saved campaign identical across before/after captures.
   await page.evaluate(async () => {

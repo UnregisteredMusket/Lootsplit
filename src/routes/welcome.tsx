@@ -27,8 +27,8 @@ export function SiteFooter() {
     <footer className="portal-footer">
       <span>Lootsplit · More adventure. Less arithmetic.</span>
       <Link to="/downloads">Releases & help</Link>
-      <Link to="/" search={{ view: "home" }}>
-        Continue as guest
+      <Link to="/share">
+        Join a session as guest
       </Link>
     </footer>
   );

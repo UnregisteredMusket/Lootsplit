@@ -893,3 +893,42 @@ test("interactive sheets require active accounts and reject cross-origin changes
     DB.close();
   }
 });
+
+test("account-owned sessions rotate invitations, retain campaign data and reconnect only current account seats", async () => {
+  const { DB, env, call, signup } = setup();
+  globalThis.__env__ = env;
+  const { openRoom, previewRoom, joinRoom, manageRoom } = await import("../src/lib/quire/cloud.server.ts");
+  const { emptyCloudTable } = await import("../src/lib/quire/cloud.ts");
+  const { blankPurse } = await import("../src/lib/quire/economy.ts");
+  try {
+    const dm = await signup("owned-dm@example.com"), player = await signup("owned-player@example.com");
+    const dmId = (await call("library", undefined, dm.cookie)).data.user.id;
+    const playerId = (await call("library", undefined, player.cookie)).data.user.id;
+    const table = emptyCloudTable();
+    table.purses = [{ ...blankPurse("character"), id: "hero", name: "Hero" }, { ...blankPurse("character"), id: "other", name: "Other" }];
+    const opened = await openRoom({ name: "DM", table, userId: dmId });
+    const view = await roomState(opened);
+    assert.ok(view.sessionId);
+    assert.equal((await call("library", undefined, dm.cookie)).data.members[0].role, "dm");
+    await assert.rejects(previewRoom(opened.code), /expired/);
+    const joined = await joinRoom({ code: opened.code, sessionId: view.sessionId, purseId: "hero", name: "Player", userId: playerId });
+    const again = await joinRoom({ code: opened.code, sessionId: view.sessionId, purseId: "hero", name: "Player", userId: playerId });
+    assert.equal(again.token, joined.token);
+    assert.equal((await call("library", undefined, player.cookie)).data.members[0].role, "player");
+    await closeRoom(opened);
+    await assert.rejects(roomState({ ...joined, code: opened.code }), /closed/);
+    const member = (await call("library", undefined, dm.cookie)).data.members[0];
+    assert.equal((await call("resume", { code: opened.code, reopen: true, revision: member.room_revision }, dm.cookie)).response.status, 200);
+    const reopened = await roomState(opened);
+    assert.notEqual(reopened.sessionId, view.sessionId);
+    assert.deepEqual(reopened.table.purses.map(p => p.id), ["hero", "other"]);
+    await assert.rejects(joinRoom({ code: opened.code, sessionId: view.sessionId, purseId: "hero", name: "Player", userId: playerId }), /expired/);
+    await assert.rejects(roomState({ ...joined, code: opened.code }), /not seated/);
+    const fresh = await joinRoom({ code: opened.code, sessionId: reopened.sessionId, purseId: "hero", name: "Player", userId: playerId });
+    assert.notEqual(fresh.token, joined.token);
+    assert.equal((await call("resume", { code: opened.code }, player.cookie)).data.token, fresh.token);
+    await manageRoom({ ...opened, action: "release", seatId: fresh.seatId });
+    const reassigned = await joinRoom({ code: opened.code, sessionId: reopened.sessionId, purseId: "other", name: "Player", userId: playerId });
+    assert.deepEqual(reassigned.purseIds, ["other"], "The DM can release an account player for a different character assignment");
+  } finally { delete globalThis.__env__; DB.close(); }
+});

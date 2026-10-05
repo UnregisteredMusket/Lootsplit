@@ -42,6 +42,9 @@ export function createCampaign(name: string) {
   const id = crypto.randomUUID();
   const campaign: Campaign = { id, name: cleanName(name), db: `quire-${id}`, blank: true };
   state = { campaigns: [...state.campaigns, campaign], activeId: state.activeId };
+  const owner = sessionStorage.getItem("lootsplit.verified-account");
+  if (!owner) throw Error("Sign in before creating a campaign.");
+  localStorage.setItem(`quire.owner.${id}`, owner);
   persist();
   switchCampaign(id);
 }
@@ -64,6 +67,9 @@ export function switchCampaign(id: string) {
   boot();
   playersCannotChangeCampaigns();
   if (!state.campaigns.some((campaign) => campaign.id === id) || id === state.activeId) return;
+  const owner = localStorage.getItem(`quire.owner.${id}`);
+  if (owner && owner !== sessionStorage.getItem("lootsplit.verified-account")) throw Error("Sign in to the account that owns this campaign.");
+  if (!owner) throw Error("Claim this device campaign after signing in before opening it.");
   state = { ...state, activeId: id };
   persist();
   closeQuireDb();

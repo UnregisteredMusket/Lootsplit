@@ -350,18 +350,21 @@ export async function handleAccounts(request, env) {
     if (path === "/api/account/link" && request.method === "POST") {
       const code = text(body.code, 16).toUpperCase(),
         token = text(body.token, 128);
-      const { seat } = await roomSeat(db, code, token);
+      const { room, seat } = await roomSeat(db, code, token);
+      if ((room.ownerId && seat.role === "dm" && room.ownerId !== userId) || (seat.userId && seat.userId !== userId)) fail("This seat belongs to another account.", 409);
       const owner = await db
         .prepare("SELECT user_id FROM library_members WHERE code=? AND seat_id=?")
         .bind(code, seat.id)
         .first();
       if (owner && owner.user_id !== userId) fail("This seat is linked to another account.", 409);
-      await db
-        .prepare(
-          "INSERT INTO library_members (user_id,code,seat_id,token,name,archived,updated_at) VALUES (?,?,?,?,?,0,?) ON CONFLICT(user_id,code) DO UPDATE SET seat_id=excluded.seat_id,token=excluded.token,name=excluded.name,archived=0,updated_at=excluded.updated_at",
-        )
-        .bind(userId, code, seat.id, token, text(body.name), Date.now())
-        .run();
+      const prior = JSON.stringify(room);
+      seat.userId = userId;
+      if (seat.role === "dm") room.ownerId = userId;
+      const updated = await db.batch([
+        db.prepare("UPDATE campaign_rooms SET body=? WHERE code=? AND body=?").bind(JSON.stringify(room), code, prior),
+        db.prepare("INSERT INTO library_members (user_id,code,seat_id,token,name,archived,updated_at) SELECT ?,?,?,?,?,0,? WHERE EXISTS (SELECT 1 FROM campaign_rooms WHERE code=? AND body=?) ON CONFLICT(user_id,code) DO UPDATE SET seat_id=excluded.seat_id,token=excluded.token,name=excluded.name,archived=0,updated_at=excluded.updated_at").bind(userId, code, seat.id, token, text(body.name), Date.now(), code, JSON.stringify(room))
+      ]);
+      if (!updated[0].meta.changes) fail("The campaign changed. Retry saving this membership.", 409);
       return cors(json({ ok: true }));
     }
     if (path === "/api/account/resume" && request.method === "POST") {

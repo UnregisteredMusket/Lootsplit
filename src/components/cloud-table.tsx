@@ -37,6 +37,7 @@ export function CloudTable() {
   const invitation = (params.get("join") || "").trim().toUpperCase();
   const invitedCharacter = params.get("character") || "";
   const invitationToken = params.get("invitation") || "";
+  const invitationSession = params.get("session") || "";
   const seat = useSeat();
   const cloud = useSyncExternalStore(subscribeCloudTable, getCloudTable, getServerCloudTable);
   const online = useSyncExternalStore(subscribeOnline, getOnline, () => true);
@@ -59,7 +60,8 @@ export function CloudTable() {
   const [release, setRelease] = useState<string | null>(null);
   const [leaving, setLeaving] = useState(false);
   const host = cloud.joined && cloud.role === "dm";
-  const unavailable = busy || !online;
+  // Restored credentials arrive before the authoritative session mode/invitation.
+  const unavailable = busy || !online || (cloud.joined && cloud.lastSync === 0);
   const savedRooms = hostAccount?.members.filter((m) => !m.archived && m.role) || [];
 
   async function prepareHosting() {
@@ -89,7 +91,7 @@ export function CloudTable() {
       // Room creation already succeeded. Retry only the idempotent account link,
       // never creation: a second room would split subsequent campaign changes.
       setAccountSaveError(
-        "Room created, but not saved to your account. This room is still available on this device. Retry the account save to resume it elsewhere.",
+        "Room saved to your account, but its display name could not be updated. Retry the account save to finish naming it.",
       );
     }
   }
@@ -108,30 +110,32 @@ export function CloudTable() {
       setJoining(true);
       setHosting(false);
     }
-  }, [invitation, invitedCharacter, invitationToken, cloud.joined]);
+  }, [invitation, invitedCharacter, invitationToken, invitationSession, cloud.joined]);
 
   function dismissInvitation() {
     const next = router.options.parseSearch!(window.location.search);
-    for (const key of ["join", "invitation", "character"]) delete next[key];
+    for (const key of ["join", "invitation", "character", "session"]) delete next[key];
     return router.navigate({ to: "/share", search: next as never, replace: true });
   }
 
   async function prepareInvitation() {
     const requestedSearch = window.location.search;
     // Validate the target before backing up or leaving an existing session.
-    const found = await lookupTable(invitation);
+    const found = await lookupTable(invitation, invitationSession);
     if (invitedCharacter && !found.characters.some((c) => c.id === invitedCharacter))
       throw new Error("The invited character is unavailable. Ask the DM to release it or send a new invitation.");
     if ((await loadSeatLock())?.protectSaves)
       throw new Error(
         "Save a password-protected backup in Device backups, then leave or end this room before opening the invitation again.",
       );
+    if (host) {
     const file = await captureDeviceBackup();
     await rememberSave({
       name: `Before switching from ${cloud.code}`,
       campaignId: localStorage.getItem("quire.campaign.v1") || "main",
       file,
     });
+    }
     if (window.location.search !== requestedSearch)
       throw new Error("The invitation changed. Review the current link before switching rooms.");
     if (host) await chooseTableMode("local");
@@ -158,8 +162,8 @@ export function CloudTable() {
 
   async function invitePlayers() {
     const origin = import.meta.env.VITE_MOBILE === "true" ? API_ORIGIN : window.location.origin;
-    const url = `${origin}/share?join=${encodeURIComponent(cloud.code)}`;
-    const text = `Join my Lootsplit room. Code: ${cloud.code}`;
+    const url = `${origin}/share?join=${encodeURIComponent(cloud.code)}&session=${encodeURIComponent(cloud.sessionId)}`;
+    const text = `Join my Lootsplit room. Code: ${cloud.code}${cloud.sessionId ? "." + cloud.sessionId : ""}`;
     if (import.meta.env.VITE_MOBILE === "true") {
       const { Share } = await import("@capacitor/share");
       try {
@@ -301,6 +305,7 @@ export function CloudTable() {
                 Resume a saved campaign
               </Link>
               {checkingAccount && <p role="status">Checking your saved campaigns…</p>}
+              {!checkingAccount && !hostAccount && <p>Create an account or sign in to proceed as a Dungeon Master in your own campaign. <Link to="/account">Sign in</Link></p>}
               {savedRooms.length > 0 && (
                 <div className="mt-3 rounded-xl border border-lead/30 p-3">
                   <h3>You already have saved campaigns</h3>
@@ -365,7 +370,7 @@ export function CloudTable() {
                 className="mt-5 w-full min-h-12"
                 disabled={
                   unavailable ||
-                  checkingAccount ||
+                  checkingAccount || !hostAccount ||
                   (!!(savedRooms.length || accountCheckError) && !separateRoom)
                 }
                 onClick={() =>
@@ -407,7 +412,7 @@ export function CloudTable() {
                   event.preventDefault();
                   run(async () => {
                     const requestedSearch = window.location.search;
-                    const found = await lookupTable(code);
+                    const found = await lookupTable(code, code === invitation ? invitationSession : undefined);
                     if (window.location.search !== requestedSearch) return;
                     if (!found || !Array.isArray(found.characters))
                       throw new Error("Could not load this room. Try again.");
@@ -427,9 +432,9 @@ export function CloudTable() {
                     autoComplete="off"
                     spellCheck={false}
                     value={code}
-                    maxLength={12}
+                    maxLength={64}
                     onChange={(event) => {
-                      setCode(event.target.value.toUpperCase().replace(/[^A-Z0-9]/g, ""));
+                      setCode(event.target.value.replace(/[^a-zA-Z0-9.-]/g, ""));
                       setCharacters([]);
                       setLookedUp(false);
                     }}
@@ -440,7 +445,7 @@ export function CloudTable() {
                   type="submit"
                   className="w-full"
                   variant="secondary"
-                  disabled={unavailable || !/^[A-Z0-9]{4,12}$/.test(code)}
+                  disabled={unavailable || !/^[A-Z0-9]{4,12}(\.[a-f0-9-]{36})?$/i.test(code)}
                 >
                   {busy ? "Please wait…" : "Find characters"}
                 </Button>
@@ -458,7 +463,7 @@ export function CloudTable() {
                     event.preventDefault();
                     run(async () => {
                       const requestedSearch = window.location.search;
-                      await joinTable(code, purseId, name, code === invitation ? invitationToken || undefined : undefined);
+                      await joinTable(code, purseId, name, code === invitation ? invitationToken || undefined : undefined, code === invitation ? invitationSession : undefined);
                       setJoining(false);
                       if (window.location.search === requestedSearch) await dismissInvitation();
                     }, `You joined room ${code}.`);
@@ -488,8 +493,7 @@ export function CloudTable() {
                     </select>
                   </Field>
                   <p className="text-sm text-muted">
-                    Your local campaign is backed up automatically in Device backups before joining.
-                    DM-protected saves keep their existing restrictions.
+                    Guest campaign data stays in memory. Refreshing can reconnect during this session; ending the session revokes access. An existing DM device campaign is preserved separately.
                   </p>
                   <Button
                     type="submit"
@@ -509,19 +513,20 @@ export function CloudTable() {
             <p className="eyebrow">Your shared campaign</p>
             <h2>{host ? "Your party’s room" : "Adventure together"}</h2>
             <p className="text-muted">{host ? "You are the host" : "You joined as a player"}</p>
-            <p className="mt-5 text-xs tracking-widest uppercase text-muted">Room code</p>
-            <p className="room-code" aria-label={`Room code ${cloud.code}`}>
+            <p className="mt-5 text-xs tracking-widest uppercase text-muted">Campaign ID</p>
+            <p className="room-code" aria-label={`Campaign ID ${cloud.code}`}>
               {cloud.code}
             </p>
+            <p className="mb-3 text-sm text-muted">Use Copy session code or Share join link to invite players. The campaign ID alone does not grant access.</p>
             <div className="grid grid-cols-2 gap-3">
               <Button
-                disabled={busy}
-                onClick={() => run(() => copyText(cloud.code), "Room code copied.")}
+                disabled={unavailable}
+                onClick={() => run(() => copyText(cloud.sessionId ? `${cloud.code}.${cloud.sessionId}` : cloud.code), "Room code copied.")}
               >
                 <Copy size={17} />
-                Copy code
+                Copy session code
               </Button>
-              <Button variant="secondary" disabled={busy} onClick={() => run(invitePlayers)}>
+              <Button variant="secondary" disabled={unavailable} onClick={() => run(invitePlayers)}>
                 <Users size={17} />
                 Share join link
               </Button>
@@ -616,7 +621,7 @@ export function CloudTable() {
               {cloud.departed.map(item => <div key={item.id} className="border-b py-3">
                 <p>{item.name} · {item.status}</p>
                 {item.status === "kicked" && <Button disabled={unavailable} variant="secondary" onClick={() => run(() => manageParticipant("invite", item.id))}>Create fresh invitation</Button>}
-                {item.invitation && <Button variant="secondary" onClick={() => { const url = new URL("/share", location.origin); url.searchParams.set("join", cloud.code); url.searchParams.set("invitation", item.invitation!); void navigator.clipboard.writeText(url.href).then(() => toast.success("Fresh invitation copied"), () => window.prompt("Copy fresh invitation", url.href)); }}>Copy fresh invitation</Button>}
+                {item.invitation && <Button variant="secondary" onClick={() => { const url = new URL("/share", location.origin); url.searchParams.set("join", cloud.code); url.searchParams.set("session", cloud.sessionId); url.searchParams.set("invitation", item.invitation!); void navigator.clipboard.writeText(url.href).then(() => toast.success("Fresh invitation copied"), () => window.prompt("Copy fresh invitation", url.href)); }}>Copy fresh invitation</Button>}
               </div>)}
               {cloud.seats.map((item) => (
                 <div key={item.id} className="border-b border-border py-3 last:border-0">
@@ -695,7 +700,7 @@ export function CloudTable() {
           if (!open) setRelease(null);
         }}
         title="Release this character?"
-        body="Their old connection will stop working. They can join again with the room code. Pending actions must be resolved first."
+        body="Their old connection will stop working. They can join again with a current session invitation. Pending actions must be resolved first."
         confirmLabel="Release character"
         onConfirm={() => {
           const id = release;

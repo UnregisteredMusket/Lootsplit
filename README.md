@@ -6,7 +6,10 @@ Lootsplit is a shared party ledger and campaign application for web and Android.
 
 Sign in to the same account, then choose the saved campaign in **My account → My campaigns → Resume**. New shared rooms created while signed in are saved there automatically; a failed account save has a retry that keeps the existing room. **Start a room** creates a separate campaign copy. Copies can have the same name but do not share portraits, loot or later progress. The account page marks the room open on this device and warns before opening an older same-name entry. Existing rooms can still be added with **Save current membership**.
 
-For Live or Turn-based play, **Share join link** and each player's **Copy link** invite players to the current room. An existing connection requires an explicit choice before switching. **Copy offline snapshot link** and downloaded player files are separate manual copies, with a warning; they do not join or sync with the shared room. Older offline links cannot be converted automatically: send a fresh room invitation.
+For Live or Turn-based play, the DM must sign in. **Share join link** and each player's **Copy link** grant access only to the current session. **End session** saves the authoritative campaign with the DM and revokes player access; closing a tab or losing a connection does not end it. Reopening creates a fresh invitation generation. Old links stay invalid. Signed-in players are linked automatically and can resume on another device during the open session. Guests use an in-memory campaign and a tab-scoped reconnect ticket; they must join and be assigned a character again after the session ends. Unsent guest actions are not persisted across reloads. Offline play belongs to the DM; offline player links/files are retired, while old saves and DM activity-report imports remain preserved for recovery.
+
+At startup, choose an account campaign to load its server save. Existing device-only DM campaigns require an explicit **Claim this device’s existing DM campaign** after sign-in; claiming preserves the save. Offline edits stay in the owner's device copy until explicitly backed up or shared online. Do not overwrite a newer account campaign with an older device copy. Multiple campaigns remain separate.
+
 
 ## Start here for every coding session
 

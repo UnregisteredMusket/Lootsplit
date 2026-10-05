@@ -92,7 +92,9 @@ try {
     assert.match(page.url(), /\/help#android$/);
     await page.getByRole("link", { name: "Open app", exact: true }).click();
     await continueIntoApp(page);
-    await page.getByRole("link", { name: "Party", exact: true }).first().waitFor();
+    await page.getByText("Create an account or sign in to proceed as a Dungeon Master in your own campaign", { exact: true }).waitFor();
+    await page.getByRole("link", { name: "Create an account or sign in", exact: true }).waitFor();
+    assert.equal(await page.evaluate(async () => (await indexedDB.databases()).length), 0);
     assert.equal(new URL(page.url()).pathname, "/");
     await context.close();
   }

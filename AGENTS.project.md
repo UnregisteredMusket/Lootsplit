@@ -16,7 +16,7 @@ The production application uses Cloudflare Workers/D1, not the original template
 
 Every Android update must include a versioned website changelog describing added features, improvements, and summarized bug fixes. Add its entry to src/lib/website/changelog.json before release; explicitly say when a category has no changes. Preserve earlier entries. After verifying the signed APK, update src/lib/website/release.json and deploy the website so its download and changelog match. An Android publication is not complete until both are live and verified.
 
-Keep local, turn-based, live and manual sharing available. Private PDFs stay device-local. Do not silently truncate history, expire/delete rooms or campaigns, or introduce account registration/Google Drive without a user request.
+Keep DM offline, turn-based and live play available. The user authorized account-owned campaigns on 2026-10-05: account-required DM hosting, session-scoped invitations, in-memory guest play, explicit End session, and retirement of offline player copies. Preserve legacy saves and DM report imports for recovery. Private PDFs stay device-local. Do not silently truncate history, expire/delete rooms or campaigns, or introduce account registration/Google Drive without a user request.
 
 Credit every newly integrated third-party content, data, art, or reference resource in src/lib/website/resources.ts (the Resources page), including its original source and applicable license. Keep existing per-entry attributions intact. Donation destinations are owner-configured HTTPS links; never invent a payment destination or promise donor benefits.
 

@@ -36,6 +36,12 @@ export function SeatSwitch({
       setError("Disconnect from the shared campaign before changing roles.");
       return;
     }
+    const campaign = localStorage.getItem("quire.campaign.v1") || "main";
+    const owner = localStorage.getItem(`quire.owner.${campaign}`);
+    if (!owner || owner !== sessionStorage.getItem("lootsplit.verified-account")) {
+      setError("Sign in and open a campaign you own to act as its Dungeon Master.");
+      return;
+    }
     if (!lock) return;
     setBusy(true);
     try {

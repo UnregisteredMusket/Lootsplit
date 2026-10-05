@@ -149,6 +149,8 @@ try {
         blank: true,
       });
       localStorage.setItem("quire.campaigns.v1", JSON.stringify(rows));
+      // This synthetic second campaign belongs to the already authenticated fixture DM.
+      localStorage.setItem("quire.owner.finance-isolation", localStorage.getItem(`quire.owner.${active || "main"}`));
       localStorage.setItem("quire.campaign.v1", "finance-isolation");
       return active;
     });

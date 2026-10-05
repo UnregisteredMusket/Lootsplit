@@ -6,7 +6,8 @@ import {ensureEconomy,listPurses,savePurse} from './economy.ts';
 import {fromCopper} from './money.ts';
 const values=new Map<string,string>();
 const storage={getItem:(key:string)=>values.get(key)??null,setItem:(key:string,value:string)=>{values.set(key,value);},removeItem:(key:string)=>{values.delete(key);}};
-Object.assign(globalThis,{localStorage:storage,window:{localStorage:storage,location:{search:'',hash:''}}});
+storage.setItem("lootsplit.verified-account", "fixture-owner");
+Object.assign(globalThis,{sessionStorage:storage,localStorage:storage,window:{localStorage:storage,location:{search:'',hash:''}}});
 test('disposable current and last campaigns delete while other campaigns and backups remain',async()=>{
  const first=getCampaigns().activeId;
  await ensureEconomy();

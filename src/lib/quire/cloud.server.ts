@@ -137,6 +137,7 @@ export async function characterRoll(input: {
 export async function openRoom(input: {
   name: string;
   table: CloudTable;
+  userId?: string;
 }): Promise<{ code: string; token: string; seatId: string; revision: number }> {
   const table = readCloudTable(input.table);
   if (!table || table.purses.length === 0) throw new Error("The table has no characters to share.");
@@ -146,9 +147,12 @@ export async function openRoom(input: {
     token: crypto.randomUUID(),
     name: input.name.trim() || "Dungeon master",
     role: "dm",
+    userId: input.userId,
     purseIds: [],
   };
   await createRoom({
+    ownerId: input.userId,
+    sessionId: input.userId ? crypto.randomUUID() : undefined,
     code,
     revision: 1,
     turn: 0,
@@ -162,21 +166,24 @@ export async function openRoom(input: {
 
 export async function previewRoom(
   code: string,
+  sessionId?: string,
+  userId?: string,
 ): Promise<{ characters: { id: string; name: string }[] }> {
   const room = await must(code);
+  requireInvitationSession(room, sessionId);
   return {
     characters: room.table.purses
       .filter(
         (purse) =>
           purse.kind === "character" &&
           characterControl(purse) === "player" &&
-          !room.seats.some((seat) => seat.purseIds.includes(purse.id)),
+          !room.seats.some((seat) => seat.purseIds.includes(purse.id) && (!userId || seat.userId !== userId)),
       )
       .map((purse) => ({ id: purse.id, name: purse.name })),
   };
 }
 
-export async function joinRoom(input: { code: string; purseId: string; name: string; invitation?: string; userId?: string }): Promise<{
+export async function joinRoom(input: { code: string; purseId: string; name: string; invitation?: string; userId?: string; sessionId?: string }): Promise<{
   token: string;
   seatId: string;
   revision: number;
@@ -185,13 +192,19 @@ export async function joinRoom(input: { code: string; purseId: string; name: str
 }> {
   const room = await must(input.code);
   if (room.testMode) throw Error("Test rooms are private to the owner.");
+  requireInvitationSession(room, input.sessionId);
+  const existing = input.userId && room.seats.find(s => s.userId === input.userId && s.role === "player");
+  if (existing) return { token: existing.token, seatId: existing.id, revision: room.revision, purseIds: existing.purseIds, shopIds: room.table.shops.map(s => s.id) };
   const blocked = input.userId && room.blockedUsers?.[input.userId];
   if (blocked === "banned") throw Error("You are banned from this campaign.");
   const restriction = room.departed?.find(s => s.purseIds.includes(input.purseId) && (s.status === "kicked" || s.status === "banned"));
   if (restriction?.status === "banned") throw Error("This character is blocked from joining. Ask the DM.");
   if ((blocked === "kicked" || restriction) && (!input.invitation || room.invitations?.[input.purseId] !== input.invitation))
     throw Error("A fresh invitation from the DM is required.");
+  const previous = input.userId && room.departed?.find(s => s.userId === input.userId && s.status === "dismissed");
   const claimed = claimSeat(room, input.purseId, input.name);
+  claimed.seat.userId = input.userId;
+  if (previous) claimed.seat.id = previous.id;
   if (input.invitation && room.invitations?.[input.purseId] !== input.invitation) throw Error("This invitation has expired.");
   if (input.userId && claimed.room.blockedUsers) delete claimed.room.blockedUsers[input.userId];
   if (claimed.room.invitations) delete claimed.room.invitations[input.purseId];
@@ -272,6 +285,7 @@ export async function passTurn(input: { code: string; token: string }): Promise<
 }
 
 export type RoomView = {
+  sessionId?: string;
   code: string;
   revision: number;
   turn: number;
@@ -295,6 +309,11 @@ export type RoomView = {
   testMode?: boolean;
 };
 
+function requireInvitationSession(room: CloudRoom, sessionId?: string) {
+  if (room.sessionId && room.sessionId !== sessionId)
+    throw Error("This invitation has expired. Ask the DM for the current session link.");
+}
+
 async function must(code: string): Promise<CloudRoom> {
   const room = await readRoom(code.trim().toUpperCase());
   if (!room) throw new Error("No table uses that code.");
@@ -307,6 +326,7 @@ function view(room: CloudRoom, seat: CloudSeat): RoomView {
   const journal = projectRecord({ ...room.table, journal: room.table.journal }, seat).journal;
   return {
     code: room.code,
+    sessionId: room.sessionId,
     revision: room.revision,
     turn: room.turn,
     mine: room.live || current?.id === seat.id,

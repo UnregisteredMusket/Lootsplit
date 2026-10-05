@@ -1,244 +1,58 @@
 import {getCloudTable, getServerCloudTable, subscribeCloudTable} from "@/lib/quire/cloud-client";
-import { useEffect, useState, useSyncExternalStore } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { API_ORIGIN } from "@/lib/mobile/origin";
 import { toast } from "sonner";
 import { useEconomy } from "@/lib/quire/economy-context";
 import { characterControl } from "@/lib/quire/types";
 import { useSeat } from "@/lib/quire/seat";
-import { loadNotes } from "@/lib/quire/chat";
-import { loadGifts } from "@/lib/quire/gift";
-import { loadListings, loadLoans, loadSales } from "@/lib/quire/market";
-import { loadHandouts } from "@/lib/quire/handouts";
-import { loadSheets } from "@/lib/quire/sheet";
-import { buildBill, buildTable, copyText, downloadJson, encodeLinkPayload, seatHref } from "@/lib/quire/table";
-import { snapshot } from "@/lib/quire/economy";
-import { loadSeatLock } from "@/lib/quire/lock";
-import { Button, Switch, Confirm } from "@/components/ui";
+import { copyText } from "@/lib/quire/table";
+import { Button, Confirm } from "@/components/ui";
 
 export function TableShare() {
   const room = useSyncExternalStore(subscribeCloudTable, getCloudTable, getServerCloudTable);
-  const { shops, stock, purses, holdings, realm } = useEconomy();
-  const [shopOn, setShopOn] = useState<Record<string, boolean>>({});
-  const [partyOn, setPartyOn] = useState<Record<string, boolean>>({});
-  const characters = purses.filter((purse) => purse.kind === "character" && characterControl(purse) !== "npc");
-  const npcs = purses.filter((purse) => characterControl(purse) === "npc");
-  const parties = purses.filter((purse) => purse.kind === "party");
-
-  useEffect(() => {
-    setShopOn((current) => {
-      const next = { ...current };
-      for (const shop of shops) {
-        if (next[shop.id] === undefined) next[shop.id] = true;
-      }
-      return next;
-    });
-  }, [shops]);
-
-  function pickedShops() {
-    return shops.filter((shop) => shopOn[shop.id]);
-  }
-
-  function pursesFor(characterId: string) {
-    const character = characters.find((purse) => purse.id === characterId);
-    if (!character) return [];
-    return partyOn[characterId] ? [...parties, character] : [character];
-  }
-
-  async function tableFor(characterId: string) {
-    const chosenShops = pickedShops();
-    const chosenPurses = pursesFor(characterId);
-    if (chosenShops.length === 0 || chosenPurses.length === 0) return null;
-    const roster = [...characters, ...parties]
-      .filter((purse) => !chosenPurses.some((chosen) => chosen.id === purse.id))
-      .map((purse) => ({ id: purse.id, name: purse.name, kind: purse.kind }));
-    return buildTable({
-      realm,
-      shops: chosenShops,
-      stock,
-      purses: chosenPurses,
-      holdings,
-      seatLock: await loadSeatLock(),
-      notes: await loadNotes(),
-      roster,
-      listings: await loadListings(),
-      loans: await loadLoans(),
-      sheets: await loadSheets(),
-      handouts: await loadHandouts(),
-    });
-  }
-
-  async function copyPlayerLink(characterId: string, name: string, offline = false) {
+  const { purses } = useEconomy();
+  const characters = purses.filter(p => p.kind === "character" && characterControl(p) !== "npc");
+  async function copyPlayerLink(id: string) {
     const current = getCloudTable();
+    if (!current.joined || current.role !== "dm") throw Error("Start a session before inviting players.");
+    if (!current.lastSync) throw Error("Wait for the current session to finish loading before copying its invitation.");
     const origin = import.meta.env.VITE_MOBILE === "true" ? API_ORIGIN : window.location.origin;
-    if (current.joined && !offline) {
-      const url = new URL("/share", origin);
-      url.searchParams.set("join", current.code);
-      url.searchParams.set("character", characterId);
-      await copyText(url.href);
-      toast.success(`${name}'s invitation to room ${current.code} copied.`);
-      return;
-    }
-    if (current.joined && !window.confirm("Create an offline copy? This link does not join your shared room. Changes require manual reports and will not sync with Live or Turn-based play.")) return;
-    const file = await tableFor(characterId);
-    if (!file) {
-      toast("Choose at least one shop.");
-      return;
-    }
-    const payload = await encodeLinkPayload(file);
-    const url = seatHref("player", payload, origin);
-    if (url.length > 48000) {
-      toast.error("That shop list is too long for a link. Download the file instead.");
-      return;
-    }
-    await copyText(url);
-    toast.success(`${name}'s link copied.`);
+    const url = new URL("/share", origin);
+    url.searchParams.set("join", current.code);
+    url.searchParams.set("session", current.sessionId);
+    url.searchParams.set("character", id);
+    await copyText(url.href);
+    toast.success("Current session invitation copied.");
   }
-
-  async function downloadPlayerFile(characterId: string, name: string) {
-    if (getCloudTable().joined && !window.confirm("Download an offline copy? This file does not join your shared room. Use Copy link to invite this player to the current room.")) return;
-    const file = await tableFor(characterId);
-    if (!file) {
-      toast("Choose at least one shop.");
-      return;
-    }
-    const saved = await downloadJson(`lootsplit-${name.replace(/\s+/g, "-").toLowerCase()}.json`, file);
-    if (saved) toast.success(`${name}'s file saved.`);
-  }
-
-  return (
-    <div>
-      <p className="max-w-prose text-sm text-muted">
-        {room.joined
-          ? `Copy link invites the player to room ${room.code} with their character selected. Shared permissions are managed in Players & permissions. The shop and party-fund choices below apply only to offline copies, which do not sync.`
-          : "Each player gets their own offline copy. Turn party fund on or off, then copy that player's link. The device that opens it can buy only for that character, plus the shared account if you left the switch on. Use an online room for automatic synchronization."}
-      </p>
-      <fieldset className="mt-4">
-        <legend className="mb-2 text-sm font-medium">Shops they can buy from</legend>
-        <div className="flex flex-col gap-2">
-          {shops.map((shop) => (
-            <label key={shop.id} className="flex min-h-11 items-center gap-3 text-sm">
-              <input
-                type="checkbox"
-                className="size-5 accent-accent"
-                checked={Boolean(shopOn[shop.id])}
-                onChange={() => setShopOn((current) => ({ ...current, [shop.id]: !current[shop.id] }))}
-              />
-              {shop.name}
-            </label>
-          ))}
-        </div>
-      </fieldset>
-      {characters.length === 0 ? <p className="mt-4 text-sm text-muted">Mark a character as Player on the Party page, then copy their link.</p> : null}
-      {npcs.length > 0 ? (
-        <p className="mt-3 text-sm text-muted">NPCs do not get a link: {npcs.map((purse) => purse.name).join(", ")}.</p>
-      ) : null}
-      <ul className="mt-4 flex flex-col gap-4">
-        {characters.map((character) => (
-          <li key={character.id} className="rounded-lg border border-border p-3">
-            <p className="font-medium">{character.name}</p>
-            {parties.length > 0 ? (
-              <Switch
-                label="Can spend the party fund"
-                hint="Off means this player can spend only their own coins."
-                checked={Boolean(partyOn[character.id])}
-                onChange={(checked) => setPartyOn((current) => ({ ...current, [character.id]: checked }))}
-              />
-            ) : null}
-            <div className="mt-2 flex flex-wrap gap-2">
-              <Button variant="secondary" onClick={() => void copyPlayerLink(character.id, character.name).catch(() => toast.error("Could not copy the link."))}>
-                Copy link
-              </Button>
-              <Button variant="secondary" onClick={() => void downloadPlayerFile(character.id, character.name).catch(() => toast.error("That file could not be saved."))}>
-                Download file
-              </Button>
-              {room.joined && <Button variant="ghost" onClick={() => void copyPlayerLink(character.id, character.name, true).catch(() => toast.error("Could not copy the link."))}>Copy offline snapshot link</Button>}
-            </div>
-          </li>
-        ))}
-      </ul>
-    </div>
-  );
+  return <div><p>Player invitations work only during the current session. Manage each player's permissions in Players & permissions. Offline play is available only to the campaign's DM.</p>
+    {!room.joined ? <p>Start a room to invite players. Existing campaign backups and activity reports remain readable by the DM.</p> : <ul className="mt-4 space-y-3">{characters.map(p => <li key={p.id} className="ledger-card"><p>{p.name}</p><Button variant="secondary" disabled={!room.lastSync} onClick={() => void copyPlayerLink(p.id).catch(e => toast.error(e.message))}>Copy link</Button></li>)}</ul>}
+  </div>;
 }
 
 export function TableDesk() {
   const seat = useSeat();
-  const { openCounter, takeBill, sendBill } = useEconomy();
+  const { takeBill } = useEconomy();
   const [incoming,setIncoming]=useState<File|null>(null);
 
-  async function read(file: File | undefined, kind: "counter" | "bill") {
+  async function read(file: File | undefined, _kind: "counter" | "bill") {
     if (!file) return;
     try {
-      if (kind === "counter") await openCounter(file);
-      else setIncoming(file);
+      setIncoming(file);
     } catch (error) {
       toast.error(error instanceof Error ? error.message : "That file could not be read.");
     }
   }
 
   if(getCloudTable().joined)return <p className="text-sm text-muted">Shared modes synchronize player activity directly. Return to Local Mode before importing or exporting player reports.</p>;
-  if (seat.role === "player") {
-    return (
-      <div>
-        <p className="text-sm text-muted">
-          Buy and sell with a character, or with the party fund. Give coins or holdings to another player from the Party page. Copy the activity report link when you are done, then share it with the DM. It lists every purchase and gift in this browser on this device.
-        </p>
-        <div className="mt-4 flex flex-wrap gap-2">
-          <Button
-            variant="secondary"
-            onClick={() => {
-              void (async () => {
-                const file = await snapshot();
-                const gifts = await loadGifts();
-                const bill = buildBill({ ...file, notes: await loadNotes(), gifts, loans: await loadLoans(), sales: await loadSales(), sheets: await loadSheets() }, seat);
-                const payload = await encodeLinkPayload(bill);
-                const url = seatHref("dm", payload, window.location.origin);
-                if (url.length > 48000) {
-                  toast.error("This activity report is too long for a link. Send the file.");
-                  return;
-                }
-                await copyText(url);
-
-
-                toast.success("Activity report copied. Share this report with the DM to import the player activity.");
-              })().catch((error: unknown) => toast.error(error instanceof Error ? error.message : "Could not copy the activity report link."));
-            }}
-          >
-            Copy activity report link
-          </Button>
-          <Button
-            variant="secondary"
-            onClick={() => {
-              void sendBill()
-                .then(() => toast.success("Activity report saved. Send that file if the link is inconvenient."))
-                .catch((error: unknown) => toast.error(error instanceof Error ? error.message : "Could not write the activity report."));
-            }}
-          >
-            Download activity report
-          </Button>
-        </div>
-      </div>
-    );
-  }
+  if (seat.role === "player") return <p>Join the DM’s current session to play. Campaign data stays with the DM.</p>;
 
   return (
     <div>
       <Confirm open={incoming!==null} onOpenChange={open=>{if(!open)setIncoming(null);}} title="Import player activity?" body={incoming ? `${incoming.name}: account, inventory, and stock changes will be checked against the original player copy. Conflicting reports are rejected without applying changes. Export a backup first if you need a recovery copy.` : ""} confirmLabel="Check and import" onConfirm={()=>{const file=incoming;setIncoming(null);if(file)void takeBill(file).catch(e=>toast.error(e instanceof Error?e.message:"Import failed."));}} />
       <p className="text-sm text-muted">
-        Open a player file in this browser on this device, or import an activity report from a player. An activity report lists what was bought and who paid. Conflicting funds, inventory, or stock changes are rejected. After accepting a report, send the player a fresh copy before they continue.
+        Import an existing player activity report to recover earlier offline play. Conflicting funds, inventory, and stock changes are rejected. Players must use a current session invitation for future play.
       </p>
       <div className="mt-4 flex flex-wrap gap-2">
-        <label className="inline-flex min-h-11 cursor-pointer items-center rounded-sm border border-border px-4 text-sm">
-          Open a player file
-          <input
-            type="file"
-            accept="application/json,.json"
-            className="sr-only"
-            onChange={(event) => {
-              void read(event.target.files?.[0], "counter");
-              event.target.value = "";
-            }}
-          />
-        </label>
         <label className="inline-flex min-h-11 cursor-pointer items-center rounded-sm border border-border px-4 text-sm">
           Import player activity
           <input

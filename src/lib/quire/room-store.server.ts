@@ -9,7 +9,7 @@ type Statement = {
   first: <T>() => Promise<T | null>;
   run: () => Promise<Result>;
 };
-type Database = { prepare: (sql: string) => Statement };
+type Database = { prepare: (sql: string) => Statement; batch: (statements: Statement[]) => Promise<Result[]> };
 export function database(): Database | undefined {
   const env = (globalThis as typeof globalThis & { __env__?: { DB?: Database; ASSETS?: unknown } })
     .__env__;
@@ -62,10 +62,10 @@ export async function readRoom(code: string): Promise<CloudRoom | null> {
 export async function createRoom(room: CloudRoom): Promise<void> {
   const db = database();
   if (db) {
-    await db
-      .prepare("INSERT INTO campaign_rooms (code, revision, body) VALUES (?, ?, ?)")
-      .bind(room.code, room.revision, JSON.stringify(room))
-      .run();
+    const insert = db.prepare("INSERT INTO campaign_rooms (code, revision, body) VALUES (?, ?, ?)").bind(room.code, room.revision, JSON.stringify(room));
+    const members = accountSeats(db, room);
+    if (members.length) await db.batch([insert, ...members]);
+    else await insert.run();
     return;
   }
   const rooms = await localRooms();
@@ -76,10 +76,10 @@ export async function createRoom(room: CloudRoom): Promise<void> {
 export async function updateRoom(room: CloudRoom, baseRevision: number): Promise<void> {
   const db = database();
   if (db) {
-    const result = await db
-      .prepare("UPDATE campaign_rooms SET revision = ?, body = ? WHERE code = ? AND revision = ?")
-      .bind(room.revision, JSON.stringify(room), room.code, baseRevision)
-      .run();
+    const update = db.prepare("UPDATE campaign_rooms SET revision = ?, body = ? WHERE code = ? AND revision = ?")
+      .bind(room.revision, JSON.stringify(room), room.code, baseRevision);
+    const members = accountSeats(db, room);
+    const result = members.length ? (await db.batch([update, ...members]))[0]! : await update.run();
     if (!result.meta.changes)
       throw new Error("The table changed. Refresh before sending your turn.");
     return;
@@ -101,4 +101,10 @@ export async function deleteRoom(code: string, baseRevision: number): Promise<vo
     return;
   }
   await localSave((await localRooms()).filter((room) => room.code !== code));
+}
+
+function accountSeats(db: Database, room: CloudRoom): Statement[] {
+  return room.seats.filter(s => s.userId).map(s => db.prepare(
+    "INSERT INTO library_members (user_id,code,seat_id,token,name,archived,updated_at) SELECT ?,?,?,?,?,0,? WHERE EXISTS (SELECT 1 FROM campaign_rooms WHERE code=? AND body=?) ON CONFLICT(user_id,code) DO UPDATE SET seat_id=excluded.seat_id,token=excluded.token,updated_at=excluded.updated_at WHERE library_members.seat_id<>excluded.seat_id OR library_members.token<>excluded.token"
+  ).bind(s.userId, room.code, s.id, s.token, "Campaign", Date.now(), room.code, JSON.stringify(room)));
 }

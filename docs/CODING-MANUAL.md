@@ -27,9 +27,11 @@ Account scenario mapping:
 | `campaign-choice` | Automatic membership linking, explicit separate-room creation, retry of failed linking without creating another room, duplicate-name warning and deliberate older-room resume |
 | `invitations` | Copy the real player invite in a shared room; verify its room and character, existing-session conflict, same-document navigation, explicit switching and confirmed destination |
 
+| `ownership` | Anonymous gate, legacy save claim, guest memory/reconnect, expired links, account-player cross-device resume, and tab closure without ending the session |
+
 Portrait sync verification must exercise the real upload → room creation → account save → second-device resume path. Also interrupt an upload: a local preview or a saved membership is not proof the image reached the server. Preserve pending commands and their retry IDs; never repair sync by overwriting the whole room from one device.
 
-Invitation investigations must test the actual copied/shared URL, including the player-specific Copy link control. A legacy `?as=player#t...` link is an offline snapshot, not a shared-room invitation. Never infer or merge a room from a campaign/character name. Preserve deliberate offline sharing, but make its lack of synchronization explicit. Test existing memberships, route/back/forward changes and unavailable invited characters; validate the target before leaving a current room. Use only disposable campaigns.
+Invitation investigations must test the actual copied/shared URL, including the player-specific Copy link control. A legacy `?as=player#t...` link is an offline snapshot, not a shared-room invitation. Never infer or merge a room from a campaign/character name. Offline player sharing is retired by the authorized account-owned model; preserve legacy saves and DM report recovery. Test existing memberships, route/back/forward changes and unavailable invited characters; validate the target before leaving a current room. Use only disposable campaigns.
 
 For cross-device discrepancies, establish both actual room identities and sync states before diagnosing data loss. The same account or campaign name does not prove the same room. Saved memberships select rooms by code; names only help the user choose. Keep real room codes, credentials, screenshots and campaign contents out of public investigation checkpoints. Do not auto-merge same-name rooms or force all signed-in devices into one campaign. Preserve deliberate multi-campaign use.
 
@@ -82,3 +84,7 @@ The user requests speed improvements as **before → after, absolute time saved,
 Playwright (including its test runner), TypeScript, ESLint and GitHub Actions are already installed. Reuse them before adding another service or paid dependency. Keep application refactors limited to the behavior being changed; shared test fixtures do not justify an unrelated rewrite of gameplay or account permissions.
 
 Sources: [Playwright assertions](https://playwright.dev/docs/test-assertions), [test isolation and debugging](https://playwright.dev/docs/best-practices), [traces](https://playwright.dev/docs/trace-viewer).
+
+## Account-owned campaign acceptance
+
+The `ownership` scenario must cover anonymous entry restrictions, explicit legacy DM-save claim, authenticated room creation, guest join and reload without persistent campaign storage, End session revocation, and expired links after reopen. Account DM resume must retain all campaign data across devices. Never close a hosted session from tab unload or sign-out. Verify authenticated player membership resume with the current invitation; do not restore access from an ended session's token. New player data belongs in memory; pending guest actions must not be written to localStorage or IndexedDB. Existing device saves require explicit migration/claim and must never be silently deleted. Use real account endpoints for synthetic DM test fixtures, never a production auth bypass.

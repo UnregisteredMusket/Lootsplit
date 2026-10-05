@@ -130,8 +130,7 @@ function Account() {
     if (hasPendingChanges())
       throw new Error("Submit or resolve your pending campaign actions before signing out.");
     await accountRequest("auth/sign-out", {});
-    const current = localStorage.getItem("quire.campaign.v1") || "";
-    if (current.startsWith("account-") && cloud.joined) await clearAccountRoom();
+    if (cloud.joined) await clearAccountRoom(true);
     for (const k of Object.keys(localStorage))
       if (k.startsWith("quire.cloud.v2.account-")) localStorage.removeItem(k);
     setLibrary(null);
@@ -163,7 +162,7 @@ function Account() {
               <p className="portal-lead">
                 {library
                   ? "Your campaigns, recovery copies and characters, ready when you are."
-                  : "Sign in to return to your campaigns across devices. Guest and offline play stay available."}
+                  : "Sign in to return to your campaigns across devices. Guests join with a current invitation. Offline campaigns belong to their signed-in DM."}
               </p>
             </div>
             {library && (
@@ -213,7 +212,7 @@ function Account() {
                   <h2>DM encounters</h2>
                   <p>
                     Build private encounters in your account and export them to the app. You can
-                    also build directly in the app without signing in.
+                    also build directly in your account-owned campaign, including offline.
                   </p>
                   <Link
                     to="/encounters"
@@ -380,8 +379,8 @@ function Account() {
                   Signing in does not upload any campaign automatically. Your PDFs stay on your
                   device.
                 </p>
-                <Link to="/" search={{ view: "home" }}>
-                  Continue as guest →
+                <Link to="/share">
+                  Join a session as guest →
                 </Link>
               </aside>
             </div>

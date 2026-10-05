@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { mkdir } from "node:fs/promises";
 import { localAccountDb } from "./account-dev-db.mjs";
 import { blankSheet } from "../src/lib/characters/model.mjs";
-const origin = "http://127.0.0.1:8080",
+const origin = process.env.AUDIT_ORIGIN || "http://127.0.0.1:8080",
   output = process.env.PARTY_SCREENSHOTS || "test-results/party-sheets";
 await mkdir(output, { recursive: true });
 const browser = await chromium.launch({
@@ -162,13 +162,14 @@ try {
     await (await import("/src/lib/account/transfers.ts")).linkCurrentCampaign();
     return c.getCloudTable().code;
   });
+  const sessionId = await dm.page.evaluate(async () => (await import("/src/lib/quire/cloud-client.ts")).getCloudTable().sessionId);
   await player.page.evaluate(
-    async ({ code, id }) => {
+    async ({ code, id, sessionId }) => {
       const c = await import("/src/lib/quire/cloud-client.ts");
-      await c.joinTable(code, id, "Player");
+      await c.joinTable(code, id, "Player", undefined, sessionId);
       await (await import("/src/lib/account/transfers.ts")).linkCurrentCampaign();
     },
-    { code, id },
+    { code, id, sessionId },
   );
   await visit(player.page, href);
   await player.page.getByRole("heading", { name: "Unified sentinel", exact: true }).waitFor();

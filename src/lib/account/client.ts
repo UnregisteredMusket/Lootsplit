@@ -2,7 +2,20 @@ import { API_ORIGIN } from "../mobile/origin";
 import { announceSheetChange } from "../quire/party-sheet-links";
 const native = () => import.meta.env.VITE_MOBILE === "true";
 const TOKEN = "lootsplit.account.token.v1";
-export async function accountRequest<T>(
+// Coalesce the startup gate and account controls' identity reads. This is UI
+// state only: every server mutation independently authenticates the request.
+let identityRead: { until: number; result: Promise<unknown> } | undefined;
+export function accountRequest<T>(path: string, body?: unknown, signal?: AbortSignal): Promise<T> {
+  if (body !== undefined && path.startsWith("auth/")) identityRead = undefined;
+  if (path === "auth/get-session" && body === undefined && !signal) {
+    if (identityRead && identityRead.until > Date.now()) return identityRead.result as Promise<T>;
+    const result = accountRequestCore<T>(path).catch(e => { identityRead = undefined; throw e; });
+    identityRead = { until: Date.now() + 2500, result };
+    return result;
+  }
+  return accountRequestCore<T>(path, body, signal);
+}
+async function accountRequestCore<T>(
   path: string,
   body?: unknown,
   signal?: AbortSignal,
@@ -33,7 +46,8 @@ export async function accountRequest<T>(
   const nextToken = response.headers.get("set-auth-token");
   if (native() && nextToken) localStorage.setItem(TOKEN, nextToken);
   if (path === "auth/sign-out") localStorage.removeItem(TOKEN);
-  if (path.startsWith("auth/")) announceSheetChange();
+  if (body !== undefined && path.startsWith("auth/")) { identityRead = undefined; announceSheetChange(); }
+  if (response.ok && ["auth/sign-in/email", "auth/sign-up/email", "auth/sign-out"].includes(path)) window.dispatchEvent(new Event("lootsplit-account-changed"));
   return result as T;
 }
 export type AccountLibrary = {
