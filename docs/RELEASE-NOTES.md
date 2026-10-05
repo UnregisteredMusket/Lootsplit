@@ -1,3 +1,37 @@
+# Lootsplit 1.4.0 — release candidate
+
+Android version code 6. This candidate retains package `com.unregisteredmusket.lootsplit` and the existing permanent signing certificate for in-place updates of permanently signed installations.
+
+## Added features
+
+- Animated opening scene with a loot-hauling adventurer, coin-collecting rogue, and reduced-motion support.
+- Adventurer’s Ledger light theme and Ironbound Dragon dark theme, plus Pen & Paper and Virtual roll modes.
+- Optional CC0 coin, loot and page-turn sound effects, with device volume and preview controls; automatic sounds default off.
+- Account-owned DM campaigns with explicit End session, expiring invitations and guest play without persistent campaign storage.
+- Party Add loot supports Open5e search and custom items; scanned character/statblock imports offer local OCR and review.
+
+## Improvements
+
+- Brings the bundled Android interface up to date with the verified website, retaining existing campaigns, exports and permanent signing identity.
+- DMs can resume saved campaigns across devices, reopen ended sessions, and control character editing and granular player permissions.
+- Clearer room selection, automatic membership linking and pending-upload feedback help prevent duplicate rooms and unsaved portraits.
+- Includes updated journal, encounter, loot, notification and owner testing controls.
+
+## Bug fixes
+
+- Internal navigation no longer restarts the title screen when opening account, journal or ledger pages.
+- Shared player invitations point to the intended room and character and ask before switching an existing session.
+- Imported characters remain selected when older list requests finish, and filled PDF fields preserve supported values for review.
+- Character assignment, Live updates and inventory awards retain authorization and duplicate-award protections.
+
+## Candidate verification
+
+Complete PR/main preservation checks and the signed Android workflow are required before publication. The workflow verifies version ordering and the permanent certificate and publishes a checksum. Afterward the website download metadata must be updated and its deployed APK bytes verified. Real-device upgrade, file-picker and force-close checks are not represented as automated verification.
+
+The public download remains 1.3.2 until the new signed APK and checksum exist.
+
+---
+
 # Lootsplit 1.3.2
 
 Android version code 5. This release retains the existing package identity and permanent signing certificate and updates permanently signed 1.3.x installations in place.

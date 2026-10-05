@@ -1,3 +1,10 @@
+# Android 1.4.0 release checkpoint — 2026-10-05
+
+- User explicitly requested publication. Branch `release/android-1.4.0` starts from verified main/live `cbed0613755e98548ebeba30c4fe1c592ef7d239`.
+- Version 1.4.0, code 6, uses the existing permanent signing secrets and package identity. No key rotation, campaign migration or APK overwrite is authorized.
+- Version/changelog/release-note preparation only; website download remains 1.3.2 until the actual signed APK passes certificate/version/checksum verification.
+- Next: verify and merge this release PR; observe main verification and automatic signed-release workflow; inspect/download the resulting APK; update release.json and verify website deployment, downloads, updates and download bytes. Do not restart an active workflow after a timeout.
+
 # Resume Lootsplit after an interruption
 
 ## Invitation routing checkpoint — 2026-10-05
