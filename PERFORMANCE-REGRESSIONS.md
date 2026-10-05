@@ -70,6 +70,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-05T11:09:21Z | step: report / Run actions/setup-node@v4 | 1s → 3s | +2s | +200% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37253465966/job/111585637487) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37301090506/job/111733716644) |
 | 2026-10-05T11:07:44Z | step: Packaged Worker / interface / Run npm ci | 13s → 15s | +2s | +15.38% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37233368939/job/111527693168) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37300754865/job/111733075935) |
 | 2026-10-05T11:07:36Z | step: Packaged Worker / accounts / Run actions/setup-node@v4 | 5s → 7s | +2s | +40% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37269150846/job/111632435687) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37300754865/job/111733075958) |
 | 2026-10-05T11:07:27Z | step: Packaged Worker / accounts / Set up job | 2s → 3s | +1s | +50% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37233368939/job/111527693152) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37300754865/job/111733075958) |
