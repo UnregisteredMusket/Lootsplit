@@ -4319,19 +4319,19 @@
   },
   "[\".github/workflows/website-release.yml\",\"workflow_run\",\"main\",\"step\",\"deploy / Run actions/upload-artifact@v4\",\"ubuntu-latest\",1]": {
     "schema": 1,
-    "id": "37233916181:1:449573c5d51f2d686f88bab549113496e4e00bfc47ab998c21dc9125f4bf928c",
+    "id": "37267750797:1:449573c5d51f2d686f88bab549113496e4e00bfc47ab998c21dc9125f4bf928c",
     "scope": "[\".github/workflows/website-release.yml\",\"workflow_run\",\"main\",\"step\",\"deploy / Run actions/upload-artifact@v4\",\"ubuntu-latest\",1]",
     "kind": "step",
     "name": "deploy / Run actions/upload-artifact@v4",
     "environment": "ubuntu-latest",
-    "commit": "306db53d49711a7321c97e90e25bfae4704db87d",
-    "runId": 37233916181,
+    "commit": "c662deb270c61206d293cf9ab379781fcb414a29",
+    "runId": 37267750797,
     "attempt": 1,
-    "url": "https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37233916181/job/111529154869",
+    "url": "https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37267750797/job/111628032976",
     "outcome": "success",
-    "startedAt": "2026-10-04T20:56:19Z",
-    "finishedAt": "2026-10-04T20:56:20Z",
-    "durationMs": 1000,
+    "startedAt": "2026-10-05T05:27:34Z",
+    "finishedAt": "2026-10-05T05:27:36Z",
+    "durationMs": 2000,
     "trendId": "37233916181:1:449573c5d51f2d686f88bab549113496e4e00bfc47ab998c21dc9125f4bf928c"
   },
   "[\".github/workflows/website-release.yml\",\"workflow_run\",\"main\",\"workflow\",\"Deploy verified website\",\"ubuntu-latest\",\"full\"]": {
@@ -5436,5 +5436,22 @@
     "finishedAt": "2026-10-05T05:23:29Z",
     "durationMs": 1000,
     "trendId": "37267485071:1:d2ba901b76602516317522d3965f9a7c4adf699a4cce7a3f603456320d63d66d"
+  },
+  "[\".github/workflows/website-release.yml\",\"workflow_run\",\"main\",\"step\",\"deploy / Validate the exact verified artifact\",\"ubuntu-latest\",1]": {
+    "schema": 1,
+    "id": "37267750797:1:460f0a03633124d32812bf081a726a51e95d53b376f73747e82c97577e39fdaa",
+    "scope": "[\".github/workflows/website-release.yml\",\"workflow_run\",\"main\",\"step\",\"deploy / Validate the exact verified artifact\",\"ubuntu-latest\",1]",
+    "kind": "step",
+    "name": "deploy / Validate the exact verified artifact",
+    "environment": "ubuntu-latest",
+    "commit": "c662deb270c61206d293cf9ab379781fcb414a29",
+    "runId": 37267750797,
+    "attempt": 1,
+    "url": "https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37267750797/job/111628032976",
+    "outcome": "success",
+    "startedAt": "2026-10-05T05:26:12Z",
+    "finishedAt": "2026-10-05T05:26:13Z",
+    "durationMs": 1000,
+    "trendId": "37267750797:1:460f0a03633124d32812bf081a726a51e95d53b376f73747e82c97577e39fdaa"
   }
 }
