@@ -38,7 +38,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Packaged Worker / accounts / Run actions/download-artifact@v4 | open | 2 | 1s → 3s | +2s | +200% |
 | Packaged Worker / accounts / Run actions/upload-artifact@v4 | open | 2 | 1s → 3s | +2s | +200% |
 | Code checks and immutable builds / Run actions/upload-artifact@v4 | open | 2 | 2s → 4s | +2s | +100% |
-| Packaged Worker / accounts / worker-account | open | 3 | 22s → 50s | +28s | +127.27% |
+| Packaged Worker / accounts / worker-account | open | 4 | 22s → 58s | +36s | +163.64% |
 | Development / gameplay / Run actions/setup-node@v4 | open | 3 | 2s → 7s | +5s | +250% |
 | Development / accounts / Run actions/setup-node@v4 | open | 2 | 3s → 7s | +4s | +133.33% |
 | Development / desktop / Run actions/setup-node@v4 | open | 2 | 2s → 7s | +5s | +250% |
@@ -48,7 +48,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Development / gameplay / Run actions/upload-artifact@v4 | open | 2 | 1s → 3s | +2s | +200% |
 | Development / accounts / Run actions/upload-artifact@v4 | open | 2 | 1s → 3s | +2s | +200% |
 | deploy / Check current main, existing bindings and applied migrations; deploy without rebuild | open | 2 | 9s → 15s | +6s | +66.67% |
-| Packaged Worker / accounts | open | 2 | 85s → 120s | +35s | +41.18% |
+| Packaged Worker / accounts | open | 3 | 85s → 138s | +53s | +62.35% |
 | Development / gameplay / Run npx playwright install --with-deps chromium | open | 2 | 21s → 31s | +10s | +47.62% |
 | Code checks and immutable builds / Run actions/upload-artifact@v4 | open | 2 | 2s → 4s | +2s | +100% |
 | Development / gameplay / dev-encounter | open | 2 | 11s → 19s | +8s | +72.73% |
@@ -64,6 +64,9 @@ Open trends require investigation. Resolved trends retain their history; each ve
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-05T08:40:07Z | job: Packaged Worker / accounts | 120s → 138s | +18s | +15% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37267183280/job/111626615798) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37284669067/job/111681081082) |
+| 2026-10-05T08:39:44Z | step: Packaged Worker / accounts / worker-account | 50s → 58s | +8s | +16% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37279628295/job/111664793033) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37284669067/job/111681081082) |
+| 2026-10-05T08:39:37Z | step: Packaged standby / Run actions/upload-artifact@v4 | 2s → 3s | +1s | +50% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37233368939/job/111527693178) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37284669067/job/111681080987) |
 | 2026-10-05T08:02:33Z | step: deploy / Run actions/download-artifact@v4 | 2s → 3s | +1s | +50% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37235992107/job/111535079328) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37281139424/job/111669265502) |
 | 2026-10-05T08:02:18Z | step: deploy / Run actions/checkout@v4 | 1s → 2s | +1s | +100% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37233916181/job/111529154869) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37281139424/job/111669265502) |
 | 2026-10-05T08:01:30Z | step: Packaged Worker / accounts / worker-account | 40s → 48s | +8s | +20% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37270098428/job/111635376907) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37280755805/job/111668498836) |
