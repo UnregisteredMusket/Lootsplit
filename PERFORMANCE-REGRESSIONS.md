@@ -21,12 +21,19 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Development / governance / Run npm ci | open | 2 | 7s → 17s | +10s | +142.86% |
 | Development / governance / Start disposable development server | open | 2 | 4s → 8s | +4s | +100% |
 | Development / governance / dev-campaign-governance | open | 2 | 18s → 48s | +30s | +166.67% |
+| Publish verified standby | open | 2 | 10s → 18s | +8s | +80% |
+| publish | open | 2 | 10s → 18s | +8s | +80% |
 | Packaged Worker / interface / Run npm ci | open | 2 | 11s → 15s | +4s | +36.36% |
 
 ## Recorded slowdowns
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-05T04:30:37Z | job: publish | 14s → 18s | +4s | +28.57% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37235992149/job/111535079358) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37263801314/job/111616279480) |
+| 2026-10-05T04:30:37.000Z | workflow: Publish verified standby | 14s → 18s | +4s | +28.57% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37235992149) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37263801314) |
+| 2026-10-05T04:30:34Z | step: publish / Verify and publish the audited bytes without rebuilding | 5s → 7s | +2s | +40% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37233916244/job/111529155038) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37263801314/job/111616279480) |
+| 2026-10-05T04:30:25Z | step: publish / Run actions/setup-node@v4 | 1s → 3s | +2s | +200% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37233916244/job/111529155038) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37263801314/job/111616279480) |
+| 2026-10-05T04:30:22Z | step: publish / Run actions/checkout@v4 | 1s → 2s | +1s | +100% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37233916244/job/111529155038) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37263801314/job/111616279480) |
 | 2026-10-05T04:29:13Z | step: Packaged standby / Run actions/upload-artifact@v4 | 1s → 2s | +1s | +100% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37233687309/job/111528724085) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37263545529/job/111615780341) |
 | 2026-10-05T04:28:31Z | step: Development / governance / dev-campaign-governance | 26s → 48s | +22s | +84.62% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37235752710/job/111534384084) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37263545529/job/111615524904) |
 | 2026-10-05T04:28:21Z | step: Packaged Worker / interface / Run npm ci | 13s → 15s | +2s | +15.38% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37254074683/job/111587619426) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37263545529/job/111615780393) |
