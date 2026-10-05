@@ -1,5 +1,5 @@
 export const APP_DESCRIPTION =
-  "Manage tabletop campaigns with character sheets, shared funds, inventory, shops, encounters, and DM-approved downtime finances. Play locally or in shared rooms, with optional accounts and backups.";
+  "Manage tabletop campaigns with character sheets, shared funds, inventory, shops, encounters, and DM-approved downtime finances. Play locally or in shared rooms, with account-owned campaigns, guest invitations and backups.";
 export type HelpTopic = {
   id: string;
   title: string;
@@ -80,7 +80,7 @@ export const HELP_GROUPS: HelpGroup[] = [
         title: "Build, run and import encounters",
         audience: "DM tools; account drafts optional",
         paragraphs: [
-          "Build encounters in the app without an account. Local encounters belong to the current device campaign. Signing in also enables private account drafts; you do not need a multiplayer DM campaign to create those drafts. Export encounter JSON on the website and import it into the app when you want to move a draft.",
+          "Build encounters in your owned campaign after signing in. Offline encounters belong to the DM’s device copy. Signing in also enables private account drafts; you do not need a multiplayer DM campaign to create those drafts. Export encounter JSON on the website and import it into the app when you want to move a draft.",
           "Add or generate creatures, edit the party and difficulty, then track initiative, rounds, HP, AC and conditions. Difficulty uses 2014 encounter XP thresholds and group-size multipliers; terrain, tactics and house rules still need DM judgment. The tracker does not execute combat rules automatically.",
           "Conclude the encounter, review generated or chosen loot, set item and coin recipients, then explicitly transfer the award. A confirmed award is applied only once. Account drafts cannot award into campaigns; shared campaign awards require the active DM’s permission. Imported drafts reset outcomes, award receipts and recipients so they can be reused safely.",
         ],
@@ -184,10 +184,10 @@ export const HELP_GROUPS: HelpGroup[] = [
         id: "modes",
         title: "Local, Live and Turn-based play",
         paragraphs: [
-          "Local: data belongs to this device. Use Manual sharing & files to send player links or files and receive activity reports. DM-selected shops and optional party-fund access define the player copy. Review and import returned reports; conflicting funds, inventory or stock changes are rejected. After accepting a report, send a fresh copy. Older-format reports may need manual reconciliation. Copying a link does not send it for you.",
+          "Offline play is for a DM working on a campaign they own. Sign in and explicitly claim an existing device-only DM save to preserve it. Player offline copies are retired; DMs can still import legacy activity reports for recovery. Back up offline changes before switching to an account campaign.",
           "Live: permitted actions synchronize when the server accepts them; participants do not wait for a transaction turn. Failed or offline actions stay pending for review or retry.",
-          "In Live or Turn-based play, Share join link and the player-specific Copy link open the current room. If another room is already connected, choose whether to stay or switch; the invitation is not yet accepted. Offline snapshot links and downloaded player files are separate manual copies and do not synchronize. Send a fresh room invitation to replace an older offline link.",
-          "Turn-based: only the current participant makes transactions. Actions remain a draft until Submit changes and end turn commits them and passes control. Connected drafts are also saved on the server; offline actions remain on their original device. Chat is sent independently of transaction turns. Only the DM changes sharing modes.",
+          "In Live or Turn-based play, Share join link and the player-specific Copy link open the current room. If another room is already connected, choose whether to stay or switch; the invitation is not yet accepted. Invitations expire when the DM ends the session and stay invalid after reopening. Send a fresh session invitation to replace an older link. Closing a tab does not end the session.",
+          "Turn-based: only the current participant makes transactions. Actions remain a draft until Submit changes and end turn commits them and passes control. Connected drafts are also saved on the server; guest unsent actions remain only in memory and can be lost on reload. Chat is sent independently of transaction turns. Only the DM changes sharing modes.",
         ],
         links: [
           ["Rooms & sharing", "/share"],
@@ -200,7 +200,7 @@ export const HELP_GROUPS: HelpGroup[] = [
         paragraphs: [
           "The campaign DM manages shop prices, catalog, books, character assignment, shared-fund access, turns and approvals. A site staff role does not grant permission to someone else’s campaign. Shared play checks permissions on the server.",
           "Change device role is in the gear’s Settings & Management panel. Set a campaign password in Settings before switching to Player if you want returning to DM to require that password. Shared connections block local role switching; disconnect or return to Local Mode first.",
-          "Optional accounts provide saved memberships, private cloud backup versions, profile/privacy controls, recovery keys and reusable characters. Saving a membership is not the same as uploading a campaign backup. Keep your recovery key securely; recovery keys rotate when used. Email delivery and email alerts are not configured.",
+          "DMs require accounts. Signed-in players receive saved memberships automatically; guests need a current invitation. Accounts also provide private cloud backup versions, profile/privacy controls, recovery keys and reusable characters. Saving a membership is not the same as uploading a campaign backup. Keep your recovery key securely; recovery keys rotate when used. Email delivery and email alerts are not configured.",
         ],
         links: [
           ["Settings & Management", "/?view=home#management"],
@@ -213,7 +213,7 @@ export const HELP_GROUPS: HelpGroup[] = [
         id: "notifications",
         title: "Chat and notifications",
         paragraphs: [
-          "Campaign → Chat supports party and permitted private conversations. Shared-mode chat is independent of transaction turns. In Local Mode, offline messages travel with player copies and reports. Messages and activity reports are not sent to people automatically.",
+          "Campaign → Chat supports party and permitted private conversations. Shared-mode chat is independent of transaction turns. Players chat only within an open shared session. Messages and activity reports are not sent to people automatically.",
           "Campaign → Alerts has message, turn and room notices. Allow browser permission when requested. Supported browsers can enable separate background new-message web push for shared rooms; message text stays out of those notifications. Delivery depends on browser/device support and permissions. This is not email delivery or native Android push.",
         ],
         links: [

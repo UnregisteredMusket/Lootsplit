@@ -174,7 +174,11 @@ function fail(error: unknown) {
   publish({ status: "attention", error: message });
   return message;
 }
+function warnUnsentPlayerActions(event: BeforeUnloadEvent) {
+  if (isEphemeralCampaign() && session()?.pending.length) { event.preventDefault(); event.returnValue = ""; }
+}
 function stopPolling() {
+  if (typeof window !== "undefined") window.removeEventListener("beforeunload", warnUnsentPlayerActions);
   polling = false;
   pollGeneration++;
   pollFailures = 0;
@@ -182,6 +186,7 @@ function stopPolling() {
   timer = undefined;
 }
 function start() {
+  window.addEventListener("beforeunload", warnUnsentPlayerActions);
   if (polling) return;
   polling = true;
   const generation = ++pollGeneration;
@@ -662,4 +667,4 @@ export async function resumeAccountMembership(
   });
 }
 
-export async function clearAccountRoom() { await detachTable(true); }
+export async function clearAccountRoom(preserveDmCopy = false) { await detachTable(!(preserveDmCopy && session()?.role === "dm")); }

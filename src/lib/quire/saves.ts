@@ -1,3 +1,4 @@
+import { isEphemeralCampaign } from "./guest-storage.ts";
 import type { QuireFile } from "./economy.ts";
 import type { LockedFile } from "./lock.ts";
 
@@ -22,6 +23,7 @@ function request<T>(req: IDBRequest<T>): Promise<T> {
 }
 
 function database(): Promise<IDBDatabase> {
+  if (isEphemeralCampaign()) return Promise.reject(new Error("Device campaign backups are available only to their DM."));
   if (typeof indexedDB === "undefined") {
     return Promise.reject(
       new Error("Saves stay on this device, and this browser cannot store them."),
@@ -65,6 +67,7 @@ export function nameFromImport(filename: string): string {
 }
 
 export async function listSaves(campaignId?: string): Promise<LocalSave[]> {
+  if (isEphemeralCampaign()) return [];
   const db = await database();
   const store = db.transaction("saves").objectStore("saves");
   const rows = await request<LocalSave[]>(

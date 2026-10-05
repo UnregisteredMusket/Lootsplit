@@ -512,17 +512,18 @@ export function CloudTable() {
             <p className="eyebrow">Your shared campaign</p>
             <h2>{host ? "Your party’s room" : "Adventure together"}</h2>
             <p className="text-muted">{host ? "You are the host" : "You joined as a player"}</p>
-            <p className="mt-5 text-xs tracking-widest uppercase text-muted">Room code</p>
-            <p className="room-code" aria-label={`Room code ${cloud.code}`}>
+            <p className="mt-5 text-xs tracking-widest uppercase text-muted">Campaign ID</p>
+            <p className="room-code" aria-label={`Campaign ID ${cloud.code}`}>
               {cloud.code}
             </p>
+            <p className="mb-3 text-sm text-muted">Use Copy session code or Share join link to invite players. The campaign ID alone does not grant access.</p>
             <div className="grid grid-cols-2 gap-3">
               <Button
                 disabled={busy}
                 onClick={() => run(() => copyText(cloud.sessionId ? `${cloud.code}.${cloud.sessionId}` : cloud.code), "Room code copied.")}
               >
                 <Copy size={17} />
-                Copy code
+                Copy session code
               </Button>
               <Button variant="secondary" disabled={busy} onClick={() => run(invitePlayers)}>
                 <Users size={17} />
@@ -698,7 +699,7 @@ export function CloudTable() {
           if (!open) setRelease(null);
         }}
         title="Release this character?"
-        body="Their old connection will stop working. They can join again with the room code. Pending actions must be resolved first."
+        body="Their old connection will stop working. They can join again with a current session invitation. Pending actions must be resolved first."
         confirmLabel="Release character"
         onConfirm={() => {
           const id = release;

@@ -32,7 +32,7 @@ async function database(): Promise<IDBDatabase> {
     return Promise.reject(new Error("Library storage is only available in the browser."));
   }
   const memory = isEphemeralCampaign();
-  if (memory && !memoryFactory) { const { IDBFactory } = await import("fake-indexeddb"); memoryFactory = new IDBFactory(); }
+  if (memory && !memoryFactory) { const { IDBFactory } = await import("fake-indexeddb"); memoryFactory ||= new IDBFactory(); }
   const factory = memory ? memoryFactory! : indexedDB;
   const name = memory ? "guest-memory" : activeDatabaseName();
   if (opening && openName === name) return opening;

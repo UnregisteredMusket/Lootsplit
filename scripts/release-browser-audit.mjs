@@ -1,4 +1,4 @@
-import { openApplication, reloadApplication } from "./title-screen-navigation.mjs";
+import { openApplication } from "./title-screen-navigation.mjs";
 import { chromium } from "playwright";
 import assert from "node:assert/strict";
 import { mkdir } from "node:fs/promises";
@@ -112,7 +112,8 @@ try {
     player.evaluate(async () => {
       const c = await import("/src/lib/quire/cloud-client.ts");
       const e = await import("/src/lib/quire/economy.ts");
-      const p = (await e.listPurses()).find((p) => p.kind === "character");
+      const controlled = (await import("/src/lib/quire/table.ts")).getSeat().purseIds;
+      const p = (await e.listPurses()).find((p) => controlled.includes(p.id));
       const stock = (await e.listStock()).find((s) => s.copper === 2);
       await c.queueCommand({
         kind: "buy",

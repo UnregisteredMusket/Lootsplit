@@ -1,6 +1,11 @@
 /** Add every new third-party content/data resource here when integrating it. */
 export const resources = [
   {
+    name: "In-memory player storage",
+    description: "fake-indexeddb implements the IndexedDB API in JavaScript memory (Apache License 2.0). Lootsplit uses it for player sessions so campaign contents are not written to persistent browser databases.",
+    links: [{ label: "Source and license", url: "https://github.com/dumbmatter/fakeIndexedDB" }],
+  },
+  {
     name: "Tesseract.js local OCR",
     description:
       "Tesseract.js and Tesseract (Apache License 2.0), with the MIT-licensed English data package read scanned PDFs and statblock pictures on your device. Lootsplit bundles the worker, recognition models and compatible WASM cores; private files are not sent to an OCR service.",

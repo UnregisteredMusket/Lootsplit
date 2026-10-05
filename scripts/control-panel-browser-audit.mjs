@@ -21,7 +21,11 @@ try {
   page.setDefaultTimeout(20000);
   page.on("pageerror", (e) => errors.push(e.message));
   async function visit(path) {
-    await openApplication(page, origin + path);
+    // Exercise real internal links during the navigation matrix. A user moving
+    // between tabs does not reload the document or reauthenticate every time.
+    const link = page.locator(`a[href="${path}"]`).first();
+    if (page.url().startsWith(origin) && await link.isVisible()) await link.click();
+    else await openApplication(page, origin + path);
     await page.locator(".concept-main").waitFor();
     await page.locator(".quire-dawn").waitFor({ state: "hidden" });
     await page

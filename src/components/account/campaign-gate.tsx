@@ -35,9 +35,10 @@ export function CampaignGate({ children }: { children: ReactNode }) {
       const id = localStorage.getItem("quire.campaign.v1") || "main";
       const owner = localStorage.getItem(`quire.owner.${id}`);
       const ticket = sessionStorage.getItem("lootsplit.player.reconnect.v1");
-      const offlineOwner = !navigator.onLine && owner && owner === sessionStorage.getItem("lootsplit.verified-account");
-      if (next) sessionStorage.setItem("lootsplit.verified-account", next.user.id);
-      else if (navigator.onLine) sessionStorage.removeItem("lootsplit.verified-account");
+      const offlineOwner = !navigator.onLine && owner && owner === localStorage.getItem("lootsplit.offline-owner");
+      if (next) { sessionStorage.setItem("lootsplit.verified-account", next.user.id); localStorage.setItem("lootsplit.offline-owner", next.user.id); }
+      else if (offlineOwner) sessionStorage.setItem("lootsplit.verified-account", owner!);
+      else if (navigator.onLine) { sessionStorage.removeItem("lootsplit.verified-account"); localStorage.removeItem("lootsplit.offline-owner"); }
       const owned = !!(next && owner === next.user.id) || !!offlineOwner;
       setEphemeralCampaign(!!ticket || !owned);
       if (!owned || ticket) setSeat({ role: "player", purseIds: [], shopIds: [], openedAt: Date.now() });
@@ -58,14 +59,23 @@ export function CampaignGate({ children }: { children: ReactNode }) {
     } catch (e) { setError(e instanceof Error ? e.message : "Unable to resume campaign."); }
     finally { setBusy(false); }
   }
-  function claim() {
+  async function claim() {
     const id = localStorage.getItem("quire.campaign.v1") || "main";
     const owner = localStorage.getItem(`quire.owner.${id}`);
     if (!library || (owner && owner !== library.user.id)) return;
     const seat = JSON.parse(localStorage.getItem(id === "main" ? "quire.seat.v1" : `quire.seat.v1.${id}`) || "null");
     if (seat?.role === "player") { setError("This is a player copy. Resume a campaign you own from My account."); return; }
-    localStorage.setItem(`quire.owner.${id}`, library.user.id);
-    setEphemeralCampaign(false); closeQuireDb(); setSeat(DM_SEAT); setAllowed(true);
+    setBusy(true); setError("");
+    try {
+      const saved = JSON.parse(localStorage.getItem(`quire.cloud.v2.${id}`) || "null");
+      if (saved?.role === "dm" && saved.code && saved.token) {
+        const campaigns = JSON.parse(localStorage.getItem("quire.campaigns.v1") || "[]");
+        await accountRequest("link", { code: saved.code, token: saved.token, name: campaigns.find((c: { id: string; name: string }) => c.id === id)?.name || "Campaign" });
+      }
+      localStorage.setItem(`quire.owner.${id}`, library.user.id);
+      setEphemeralCampaign(false); closeQuireDb(); setSeat(DM_SEAT); setAllowed(true);
+    } catch (e) { setError(e instanceof Error ? e.message : "The device campaign could not be claimed. Your save is unchanged."); }
+    finally { setBusy(false); }
   }
   return <main className="mx-auto max-w-xl space-y-4 p-6">
     <h1 className="text-3xl">{library ? "Choose your campaign" : "Welcome to Lootsplit"}</h1>
@@ -73,7 +83,7 @@ export function CampaignGate({ children }: { children: ReactNode }) {
       <p>Your account owns your campaigns. Choose one to load its saved data.</p>
       {library.members.filter(m => m.role === "dm" && !m.archived).map(m => <section className="ledger-card" key={m.code}><h2>{m.name}</h2><p>{m.closed ? "Session ended" : "Session open"}</p><Button disabled={busy} onClick={() => void resume(m)}>{m.closed ? "Reopen as DM" : "Resume"}</Button></section>)}
       <Link to="/account" className="settings-link">My account and saved campaigns</Link>
-      <Button disabled={busy} variant="secondary" onClick={claim}>Claim this device’s existing DM campaign</Button>
+      <Button disabled={busy} variant="secondary" onClick={() => void claim()}>Claim this device’s existing DM campaign</Button>
       <p className="text-sm">Existing device saves are preserved. Claiming enables offline DM play; start a room to save the shared campaign to your account.</p>
     </>}
     {error && <p role="alert">{error}</p>}

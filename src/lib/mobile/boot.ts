@@ -11,8 +11,13 @@ export function installMobileApi(): void {
     const raw = typeof input === "string" ? input : input instanceof URL ? input.href : input.url;
     const next = rewriteServerFnUrl(raw, window.location.origin);
     if (!next) return base(input, init);
-    if (typeof Request !== "undefined" && input instanceof Request) return base(new Request(next, input), init);
-    return base(next, init);
+    // Only the fixed Worker server-function destination receives account credentials.
+    const headers = new Headers(init?.headers ?? (input instanceof Request ? input.headers : undefined));
+    const token = localStorage.getItem("lootsplit.account.token.v1");
+    if (token) headers.set("authorization", `Bearer ${token}`);
+    const options = { ...init, headers };
+    if (typeof Request !== "undefined" && input instanceof Request) return base(new Request(next, input), options);
+    return base(next, options);
   };
 }
 

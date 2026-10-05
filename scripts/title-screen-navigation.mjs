@@ -45,6 +45,7 @@ export async function prepareDmFixture(page, origin) {
   const session = await page.context().request.get(origin + "/api/account/auth/get-session");
   if (!session.ok()) throw Error(`Fixture identity: ${session.status()}`);
   if (!(await session.json())?.user) {
+    await page.context().setExtraHTTPHeaders({ "cf-connecting-ip": `2001:db8::${crypto.randomUUID().slice(0, 4)}:${crypto.randomUUID().slice(0, 4)}` });
     const response = await page.context().request.post(origin + "/api/account/auth/sign-up/email", { headers: { origin }, data: { name: "Disposable audit DM", email: `dm-${crypto.randomUUID()}@example.com`, password: "disposable audit password 2026" } });
     if (!response.ok()) throw Error(`Fixture signup: ${response.status()} ${await response.text()}`);
   }

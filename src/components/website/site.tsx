@@ -87,7 +87,7 @@ export function Website({ children }: { children: ReactNode }) {
         <p>
           A companion for your tabletop adventures.
           <br />
-          Accounts are optional.
+          DMs need an account. Players can join as guests with a current session invitation.
         </p>
       </footer>
     </div>

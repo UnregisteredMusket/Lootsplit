@@ -109,7 +109,8 @@ try {
     await page.screenshot({ path: `test-results/live-release/mounted-hunter-${width}.png` });
     await title.click();
     await title.waitFor({ state: "detached" });
-    await page.getByRole("link", { name: "Party", exact: true }).first().waitFor();
+    await page.getByRole("link", { name: "Create an account or sign in", exact: true }).waitFor();
+    assert.equal(await page.evaluate(async () => (await indexedDB.databases()).length), 0);
     await page.screenshot({ path: `test-results/live-release/app-${width}.png` });
     await context.close();
   }
@@ -125,7 +126,8 @@ try {
   await title.focus();
   await page.keyboard.press("Enter");
   await title.waitFor({ state: "detached" });
-  await page.getByRole("link", { name: "Party", exact: true }).first().waitFor();
+  await page.getByRole("link", { name: "Create an account or sign in", exact: true }).waitFor();
+    assert.equal(await page.evaluate(async () => (await indexedDB.databases()).length), 0);
   await reduced.close();
   assert.deepEqual(errors, []);
   console.log(

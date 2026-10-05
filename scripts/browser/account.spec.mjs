@@ -559,7 +559,8 @@ test("ownership", async ({ devices, baseURL: origin }, testInfo) => {
   await visitPage(dm, origin, "/");
   await expect(dm.getByText("Create an account or sign in to proceed as a Dungeon Master in your own campaign", { exact: true })).toBeVisible();
   expect(await dm.evaluate(async () => (await indexedDB.databases()).length)).toBe(0);
-  await accountPost(devices.context, origin, "auth/sign-up/email", credentials());
+  const owner = credentials();
+  await accountPost(devices.context, origin, "auth/sign-up/email", owner);
   await visitPage(dm, origin, "/");
   await dm.getByRole("button", { name: "Claim this device’s existing DM campaign", exact: true }).click();
   await expect(dm.getByText("Campaign control", { exact: true })).toBeVisible();
@@ -590,4 +591,27 @@ test("ownership", async ({ devices, baseURL: origin }, testInfo) => {
   await visitPage(guest, origin, new URL(link).pathname + new URL(link).search);
   await guest.getByRole("button", { name: "Find characters", exact: true }).click();
   await expect(guest.locator('[data-sonner-toast]').filter({ hasText: "invitation has expired" })).toBeVisible();
+  const returning = credentials();
+  await accountPost(guest.context(), origin, "auth/sign-up/email", returning);
+  await visitPage(dm, origin, "/share");
+  await dm.evaluate(() => Object.defineProperty(navigator, "share", { configurable: true, value: async data => { window.invitationForTest = data.url; } }));
+  await dm.getByRole("button", { name: "Share join link", exact: true }).click();
+  const freshLink = new URL(await dm.evaluate(() => window.invitationForTest));
+  await visitPage(guest, origin, freshLink.pathname + freshLink.search);
+  await guest.getByRole("button", { name: "Find characters", exact: true }).click();
+  await guest.getByPlaceholder("What should the party call you?").fill("Returning player");
+  await guest.getByRole("button", { name: "Join room", exact: true }).click();
+  await expect(guest.locator(".room-code")).toHaveText(code);
+  const { page: secondPlayer, context: playerContext } = await devices.newDevice();
+  await accountPost(playerContext, origin, "auth/sign-in/email", returning);
+  await visitPage(secondPlayer, origin, "/account");
+  await secondPlayer.getByRole("button", { name: "Resume", exact: true }).click();
+  await secondPlayer.waitForURL(u => u.pathname === "/"); await continueIntoApp(secondPlayer);
+  await visitPage(secondPlayer, origin, "/share");
+  await expect(secondPlayer.locator(".room-code")).toHaveText(code);
+  expect(await secondPlayer.evaluate(async () => (await indexedDB.databases()).length)).toBe(0);
+  // Closing the DM's tab is not End session; a fresh player reload still reconnects.
+  await dm.close();
+  await secondPlayer.reload(); await continueIntoApp(secondPlayer);
+  await expect(secondPlayer.locator(".room-code")).toHaveText(code);
 });
