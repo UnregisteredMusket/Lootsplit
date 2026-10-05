@@ -70,6 +70,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-05T11:00:50Z | step: report / Save report and send configured email | 1s → 2s | +1s | +100% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37236129044/job/111535473202) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37300186442/job/111730797765) |
 | 2026-10-05T11:00:25Z | step: Packaged Worker / accounts / worker-account | 75s → 95s | +20s | +26.67% | failure | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37292539956/job/111706490425) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37299751759/job/111729876465) |
 | 2026-10-05T11:00:01Z | step: Packaged standby / standby-audit | 60s → 78s | +18s | +30% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37285117292/job/111682503127) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37299751759/job/111729876507) |
 | 2026-10-05T10:59:40Z | step: Development / gameplay / dev-library-navigation | 18s → 31s | +13s | +72.22% | failure | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37233368939/job/111527537884) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37299751759/job/111729400454) |

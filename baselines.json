@@ -4965,19 +4965,19 @@
   },
   "[\".github/workflows/failure-report.yml\",\"workflow_run\",\"main\",\"step\",\"report / Save report and send configured email\",\"ubuntu-latest\",1]": {
     "schema": 1,
-    "id": "37236129044:1:6ac7f678bcc0fdc5cc4bca81603b1143e600469fe45a7fb312529b8760bddd28",
+    "id": "37300186442:1:6ac7f678bcc0fdc5cc4bca81603b1143e600469fe45a7fb312529b8760bddd28",
     "scope": "[\".github/workflows/failure-report.yml\",\"workflow_run\",\"main\",\"step\",\"report / Save report and send configured email\",\"ubuntu-latest\",1]",
     "kind": "step",
     "name": "report / Save report and send configured email",
     "environment": "ubuntu-latest",
-    "commit": "325c0be2ca23578ac578b6114d51558654596c8e",
-    "runId": 37236129044,
+    "commit": "416fe5127c63348ed2f0f593f1d93187480faa50",
+    "runId": 37300186442,
     "attempt": 1,
-    "url": "https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37236129044/job/111535473202",
+    "url": "https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37300186442/job/111730797765",
     "outcome": "success",
-    "startedAt": "2026-10-04T21:27:01Z",
-    "finishedAt": "2026-10-04T21:27:02Z",
-    "durationMs": 1000,
+    "startedAt": "2026-10-05T11:00:48Z",
+    "finishedAt": "2026-10-05T11:00:50Z",
+    "durationMs": 2000,
     "trendId": "37236129044:1:6ac7f678bcc0fdc5cc4bca81603b1143e600469fe45a7fb312529b8760bddd28"
   },
   "[\".github/workflows/failure-report.yml\",\"workflow_run\",\"main\",\"step\",\"report / Run actions/upload-artifact@v4\",\"ubuntu-latest\",1]": {
@@ -6226,5 +6226,22 @@
     "finishedAt": "2026-10-05T09:34:21Z",
     "durationMs": 21000,
     "trendId": "37290872931:1:37df4cb90452b3699910d8cc9d7bb25a6f5d240796e6361d75b864956f6c2c9c"
+  },
+  "[\".github/workflows/failure-report.yml\",\"workflow_run\",\"main\",\"step\",\"report / Post Run actions/checkout@v4\",\"ubuntu-latest\",1]": {
+    "schema": 1,
+    "id": "37300186442:1:c096de7d7ce2ebe10fd98da523c9fdd99cf25b8a0808ced1a0eabcad6fd1ac7c",
+    "scope": "[\".github/workflows/failure-report.yml\",\"workflow_run\",\"main\",\"step\",\"report / Post Run actions/checkout@v4\",\"ubuntu-latest\",1]",
+    "kind": "step",
+    "name": "report / Post Run actions/checkout@v4",
+    "environment": "ubuntu-latest",
+    "commit": "416fe5127c63348ed2f0f593f1d93187480faa50",
+    "runId": 37300186442,
+    "attempt": 1,
+    "url": "https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37300186442/job/111730797765",
+    "outcome": "success",
+    "startedAt": "2026-10-05T11:00:50Z",
+    "finishedAt": "2026-10-05T11:00:51Z",
+    "durationMs": 1000,
+    "trendId": "37300186442:1:c096de7d7ce2ebe10fd98da523c9fdd99cf25b8a0808ced1a0eabcad6fd1ac7c"
   }
 }
