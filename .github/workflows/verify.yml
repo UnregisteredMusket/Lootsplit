@@ -106,6 +106,9 @@ jobs:
       - name: dev-theme
         if: matrix.group == 'governance'
         run: node scripts/recovery-step.mjs dev-theme 240 node scripts/theme-browser-audit.mjs
+      - name: dev-sound
+        if: matrix.group == 'governance'
+        run: node scripts/recovery-step.mjs dev-sound 180 node scripts/sound-browser-audit.mjs
       - name: dev-help
         if: matrix.group == 'governance'
         run: node scripts/recovery-step.mjs dev-help 240 node scripts/help-browser-audit.mjs
@@ -240,6 +243,11 @@ jobs:
         env:
           AUDIT_ORIGIN: http://127.0.0.1:8082
         run: node scripts/recovery-step.mjs worker-theme 180 node scripts/theme-browser-audit.mjs
+      - name: worker-sound
+        if: matrix.group == 'interface'
+        env:
+          AUDIT_ORIGIN: http://127.0.0.1:8082
+        run: node scripts/recovery-step.mjs worker-sound 180 node scripts/sound-browser-audit.mjs
       - name: worker-help
         if: matrix.group == 'interface'
         env:

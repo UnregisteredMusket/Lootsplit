@@ -1,3 +1,4 @@
+import { configureSound, unlockSound, playSound } from "./sound.ts";
 import { createContext, useContext, useEffect, useMemo, useState, type ReactNode } from "react";
 import { useEconomy } from "./economy-context.tsx";
 import { formatDollars } from "./money.ts";
@@ -5,6 +6,8 @@ import { applyTheme, DEFAULT_ACCENT, DEFAULT_GROUND, type Appearance } from "./t
 import type { Wealth } from "./types.ts";
 
 export type AppPrefs = {
+  soundEnabled: boolean;
+  soundVolume: number;
   rollMode: "manual" | "virtual";
   showDollars: boolean;
   confirmRemoves: boolean;
@@ -28,6 +31,8 @@ export type AppPrefs = {
 };
 
 export const DEFAULT_PREFS: AppPrefs = {
+  soundEnabled: false,
+  soundVolume: 0.35,
   rollMode: "virtual",
   showDollars: true,
   confirmRemoves: false,
@@ -70,6 +75,8 @@ function hexColor(value: unknown, fallback: string): string {
 export function normalizePrefs(input: Partial<AppPrefs> | null | undefined): AppPrefs {
   const wealth = WEALTHS.includes(input?.defaultWealth as Wealth) ? (input?.defaultWealth as Wealth) : DEFAULT_PREFS.defaultWealth;
   return {
+    soundEnabled: flag(input?.soundEnabled, false),
+    soundVolume: num(input?.soundVolume, 0, 1, 0.35),
     rollMode: input?.rollMode === "manual" ? "manual" : "virtual",
     showDollars: flag(input?.showDollars, DEFAULT_PREFS.showDollars),
     confirmRemoves: flag(input?.confirmRemoves, DEFAULT_PREFS.confirmRemoves),
@@ -130,6 +137,29 @@ export function PrefsProvider({ children }: { children: ReactNode }) {
   useEffect(() => {
     applyTheme(prefs.appearance, prefs.accent, prefs.ground);
   }, [prefs.appearance, prefs.accent, prefs.ground]);
+
+  useEffect(() => {
+    configureSound(prefs.soundEnabled, prefs.soundVolume);
+    if (!ready || !prefs.soundEnabled) return;
+    const gesture = () => unlockSound();
+    const navigation = (event: MouseEvent) => {
+      if (event.defaultPrevented || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) return;
+      const link = event.target instanceof Element ? event.target.closest("a[href]") : null;
+      if (!(link instanceof HTMLAnchorElement) || link.target === "_blank" || link.hasAttribute("download")) return;
+      const target = new URL(link.href);
+      if (target.origin === location.origin && !target.pathname.startsWith("/api/") && !target.pathname.startsWith("/assets/") && target.pathname !== location.pathname)
+        void playSound("page");
+    };
+    window.addEventListener("pointerdown", gesture);
+    window.addEventListener("keydown", gesture);
+    document.addEventListener("click", navigation, true);
+    return () => {
+      configureSound(false, prefs.soundVolume);
+      window.removeEventListener("pointerdown", gesture);
+      window.removeEventListener("keydown", gesture);
+      document.removeEventListener("click", navigation, true);
+    };
+  }, [ready, prefs.soundEnabled, prefs.soundVolume]);
 
   const api = useMemo<PrefsApi>(
     () => ({

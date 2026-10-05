@@ -1,3 +1,4 @@
+import { playSound } from "@/lib/quire/sound";
 import { useState } from "react";
 import { toast } from "sonner";
 import { useEconomy } from "@/lib/quire/economy-context";
@@ -43,6 +44,7 @@ export function JournalNotes() {
               key={entry.id}
               aria-current={!composing && current?.id === entry.id ? "page" : undefined}
               onClick={() => {
+                void playSound("page");
                 setSelected(entry.id);
                 setWriting(false);
               }}

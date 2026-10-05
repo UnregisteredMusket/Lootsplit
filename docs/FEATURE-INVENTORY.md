@@ -220,3 +220,9 @@ Validation for this change: 427 automated tests passed (four existing skips), Ty
 ## Authorized account-owned campaign model (2026-10-05)
 
 DMs sign in and own their hosted campaigns. Open sessions survive closed tabs; explicit End session preserves the server campaign and revokes players. Reopening rotates invitations. Signed-in players get account memberships automatically. Guests keep campaign contents only in document memory, with a session-scoped reconnect credential; a new session requires joining/assignment again. DM offline play remains available for owned device copies, with explicit legacy-save claiming and existing backups preserved. Offline player copies are intentionally retired; legacy DM report imports remain for recovery. Multiple campaigns remain independent.
+
+## Optional CC0 sound effects
+
+- Device-local, default-off sound preference, volume and three previews in DM/player Settings and the management panel. No campaign audio preference is synchronized.
+- Coins accompany successful local financial actions and confirmed shared trades; pending or failed actions do not announce success. Encounter loot awards and journal/page navigation have distinct cues.
+- No startup/history playback, background-tab playback or remote audio dependency; missing/blocked playback cannot block gameplay. Sources and CC0 credits ship with three small WAV files.

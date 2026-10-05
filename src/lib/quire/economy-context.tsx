@@ -1,3 +1,4 @@
+import { playSound } from "./sound.ts";
 import { rememberSave, listSaves } from "./saves.ts";
 import { subscribeSheetChanges, readPartySheetLinks } from "./party-sheet-links.ts";
 import { loadJournal, type Journal } from "./journal.ts";
@@ -400,6 +401,7 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
         if (gate.joined) await runSharedMutation(work);
         else await work();
         await reload();
+        if (ok && !hasPendingChanges() && ["Purchase recorded.", "Sale recorded.", "Coin updated.", "Ledger updated.", "Transfer recorded and added to party messages."].includes(ok)) void playSound("coins");
         if (ok)
           toast.success(
             gate.joined && hasPendingChanges() ? "Action saved as pending. Check sync status." : ok,
@@ -430,6 +432,7 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
       try {
         await queueCommand(command);
         await reload();
+        if (!hasPendingChanges() && ["buy", "sell", "listing", "give"].includes(command.kind)) void playSound("coins");
       } catch (error) {
         fault(error, "Action failed. Check sync status.");
       }
