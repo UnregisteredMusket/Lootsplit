@@ -204,3 +204,8 @@ Validation for this change: 427 automated tests passed (four existing skips), Ty
 - Pinned local Tesseract.js OCR supports scanned pages and statblock pictures; recognition assets load only when needed. All PDF pages are considered. Image imports require source review; numeric validation rejects unreadable required creature fields. OCR confidence is not a correctness guarantee.
 - Downtime is offered when starting a session. An explicit zero-day choice persists per campaign and disables subsequent reminders; campaign finance controls can re-enable it. Positive downtime still uses the existing preview and explicit approval before any money/time changes.
 - Session notes appear as a book with contents, dated reading/writing pages and mobile layout. Existing party collaboration, DM-private/player-private visibility and session report attachments remain intact.
+
+## Filled character PDF fidelity
+
+- Character import reads both indexed form fields and filled page widgets without an AcroForm index. Empty printed headings, page boundaries and copyright footers do not become inventory or identity values. Scanned/image, labeled-text and JSON imports remain supported and reviewed.
+- Known numbered feature/action and equipment fields preserve their content and quantities. Fixed-damage attacks and simple damage dice retain damage-type prose in notes and expose a valid playable formula. Fixed values do not generate random dice or allow advantage/disadvantage. Partial existing-sheet imports retain unspecified values and never silently remove existing campaign items.

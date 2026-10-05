@@ -234,6 +234,10 @@ export function rollSpec(s, kind, key) {
 export const signed = (n) => (n >= 0 ? `+${n}` : String(n));
 /** @param {string} input */
 export function parseDice(input) {
+  // Some attacks have fixed damage (for example an unarmed strike).
+  // A constant keeps that value exact without inventing a die roll.
+  if (/^\d{1,4}$/.test(input.trim()) && Number(input) <= 1000)
+    return { count: 0, sides: 0, modifier: Number(input) };
   const m = /^(\d{1,2})?d(\d{1,4})([+-]\d{1,4})?$/i.exec(input.replace(/\s/g, ""));
   if (!m) throw Error("Use a dice formula such as 1d20+5 or 2d6+3.");
   const count = Number(m[1] || 1),

@@ -110,6 +110,8 @@ test("Node transport cannot spoof account IP/origin, static traversal is blocked
   const request = incomingRequest({ method: "GET", url: "/welcome", headers: { host: "evil.example", "cf-connecting-ip": "1.2.3.4", "x-forwarded-for": "spoofed, 192.0.2.7" }, socket: { remoteAddress: "127.0.0.1" } }, "https://standby.example", true);
   assert.equal(request.url, "https://standby.example/welcome");
   assert.equal(request.headers.get("cf-connecting-ip"), "192.0.2.7");
+  const direct = incomingRequest({ method: "GET", url: "/welcome", headers: { "cf-connecting-ip": "192.0.2.8", "x-forwarded-for": "192.0.2.9" }, socket: { remoteAddress: "127.0.0.1" } }, "https://standby.example");
+  assert.equal(direct.headers.get("cf-connecting-ip"), "127.0.0.1");
   const assets = staticAssets("public");
   assert.equal((await assets.fetch(new Request("https://standby.example/%2e%2e%2fpackage.json"))).status, 404);
   let time = 0; const limiter = roomEntryLimit(() => time);

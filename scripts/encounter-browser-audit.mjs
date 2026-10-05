@@ -1,4 +1,5 @@
 import { scanFixture, scannedPdf } from "./ocr-browser-fixtures.mjs";
+import { characterPdf, characterPdfFields } from "./character-pdf-fixtures.mjs";
 import { expect } from "playwright/test";
 import { openApplication, reloadApplication } from "./title-screen-navigation.mjs";
 import { chromium } from "playwright";
@@ -306,13 +307,11 @@ try {
     ],
     "image/jpeg",
   );
-  await player.page
-    .getByLabel("Import a new character", { exact: true })
-    .setInputFiles({
-      name: "scanned-sheet.pdf",
-      mimeType: "application/pdf",
-      buffer: scannedPdf(characterScan),
-    });
+  await player.page.getByLabel("Import a new character", { exact: true }).setInputFiles({
+    name: "scanned-sheet.pdf",
+    mimeType: "application/pdf",
+    buffer: scannedPdf(characterScan),
+  });
   const characterReview = player.page.getByRole("dialog", { name: "Review imported character" });
   await expect(characterReview).toBeVisible({ timeout: 90000 });
   await expect(characterReview).toContainText("Scan Hero");
@@ -323,6 +322,34 @@ try {
   await expect(player.page.getByRole("heading", { name: "Scan Hero", exact: true })).toBeVisible();
   await player.page.getByRole("button", { name: "Edit sheet", exact: true }).click();
   await expect(player.page.getByLabel("Maximum HP", { exact: true })).toHaveValue("53");
+  // Both normal form indexes and orphaned filled page widgets must work through the real picker.
+  for (const indexed of [false, true]) {
+    const name = indexed ? "Indexed hero" : "Widget hero";
+    await openApplication(player.page, origin + "/characters");
+    await player.page.getByLabel("Import a new character", { exact: true }).setInputFiles({
+      name: "filled-sheet.pdf",
+      mimeType: "application/pdf",
+      buffer: characterPdf({ indexed, fields: { ...characterPdfFields, CharacterName: name } }),
+    });
+    const review = player.page.getByRole("dialog", { name: "Review imported character" });
+    await expect(review).toBeVisible();
+    const extracted = JSON.parse(await review.locator("pre").textContent());
+    assert.equal(extracted.name, name);
+    assert.equal(extracted.classes, "Fighter 4");
+    assert.equal(extracted.species, "Variant Human");
+    assert.deepEqual(extracted.scores, { str: 19, dex: 10, con: 18, int: 8, wis: 10, cha: 12 });
+    assert.equal(extracted.hitDice, "4d10");
+    assert.equal(extracted.maxHp, 44);
+    assert.equal(extracted.attacks[0].damage, "5");
+    assert.deepEqual(extracted.equipment, []);
+    assert.deepEqual(extracted.spells, []);
+    assert.match(extracted.features, /First feature[\s\S]*Third feature/);
+    assert.match(extracted.notes, /First action[\s\S]*Second action/);
+    await review.getByRole("button", { name: "Use reviewed character", exact: true }).click();
+    await expect(player.page.getByRole("heading", { name, exact: true })).toBeVisible();
+    await reloadApplication(player.page);
+    await expect(player.page.getByRole("heading", { name, exact: true })).toBeVisible();
+  }
   assert.deepEqual(errors, []);
   console.log(
     JSON.stringify({

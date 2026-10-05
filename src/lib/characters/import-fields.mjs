@@ -5,10 +5,15 @@ export function importedArrays(legacy) {
     .split(/\n/)
     .flatMap((line) => {
       const m = line.trim().match(/^(.+?)\s*(?:·|\||:)\s*([+-]?\d+)\s*(?:·|\||:)\s*(.+)$/);
-      if (!m || !/\d+d\d+/i.test(m[3])) return [];
-      return [
-        { name: m[1].slice(0, 120), bonus: Number(m[2]), damage: m[3].slice(0, 120), notes: line },
-      ];
+      if (!m) return [];
+      const formula = m[3].match(/^(\d*d\d+(?:\s*[+-]\s*\d+)?|\d+)(?=\s|$)/i)?.[1];
+      if (!formula) return [];
+      // Compound/alternative damage must not silently become just its first term.
+      // Preserve unsupported expressions for review and the existing roll validation.
+      const damage = /[\d+]/.test(m[3].slice(formula.length))
+        ? m[3].slice(0, 120)
+        : formula.replace(/\s/g, "");
+      return [{ name: m[1].slice(0, 120), bonus: Number(m[2]), damage, notes: line }];
     });
   const equipment = String(legacy.equipment || "")
     .split(/[\n,;]+/)

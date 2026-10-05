@@ -138,6 +138,16 @@ export async function readPdfPlain(
     const last = doc.numPages;
     for (let number = 1; number <= last; number += 1) {
       const page = await doc.getPage(number);
+      // Some exports retain filled page widgets but lose /AcroForm/Fields.
+      // getTextContent reads their printed labels, not the widget values.
+      for (const annotation of await page.getAnnotations()) {
+        if (annotation.subtype !== "Widget" || !annotation.fieldName) continue;
+        const value = fieldText([annotation]);
+        if (!value) continue;
+        if (fields[annotation.fieldName] && fields[annotation.fieldName] !== value) {
+          warnings.push(`Conflicting PDF values for ${annotation.fieldName}; review this field.`);
+        } else fields[annotation.fieldName] = value;
+      }
       const content = await page.getTextContent();
       const atoms = content.items.flatMap((item) => {
         if (!("str" in item)) return [];
@@ -165,7 +175,7 @@ export async function readPdfPlain(
     }
     if (!pages.length && !Object.keys(fields).length)
       throw new Error("No selectable text or form fields were found. This PDF may need OCR first.");
-    return { fields, text: pages.join("\n\n"), warnings };
+    return { fields, text: pages.join("\n\f\n"), warnings };
   } finally {
     await ocr?.close();
     await doc.cleanup();

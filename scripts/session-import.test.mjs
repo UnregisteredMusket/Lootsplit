@@ -1,9 +1,47 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { sheetFromFields, sheetFromText } from "../src/lib/quire/sheet.ts";
+import { sheetFromFields, sheetFromText, mergeSheetBodies } from "../src/lib/quire/sheet.ts";
 import { legacyCharacter } from "../src/lib/characters/campaign-sheet.mjs";
 import { importedFieldNames } from "../src/lib/characters/import-fields.mjs";
 import { parseStatblock } from "../src/lib/encounters/statblock.mjs";
+import { characterPdfFields, characterPdfLabels } from "./character-pdf-fixtures.mjs";
+
+test("page-widget export aliases keep values and empty sections never become inventory", () => {
+  const fields = characterPdfFields,
+    labels = characterPdfLabels;
+  assert.equal(sheetFromText(labels), null);
+  const source = mergeSheetBodies(sheetFromFields(fields), sheetFromText(labels));
+  const sheet = legacyCharacter(source, source.name);
+  assert.equal(sheet.name, "Widget hero");
+  assert.equal(sheet.classes, "Fighter 4");
+  assert.equal(sheet.level, 4);
+  assert.equal(sheet.species, "Variant Human");
+  assert.equal(sheet.initiative, 0);
+  assert.equal(sheet.proficiency, 2);
+  assert.equal(sheet.hitDice, "4d10");
+  assert.deepEqual(sheet.equipment, []);
+  assert.deepEqual(sheet.spells, []);
+  assert.equal(source.alignment, "");
+  assert.equal(source.traits, "");
+  assert.equal(source.flaws, "");
+  assert.match(sheet.features, /First feature[\s\S]*Second feature[\s\S]*Third feature/);
+  assert.match(sheet.notes, /First action[\s\S]*Second action/);
+  assert.equal(sheet.attacks[0].name, "Unarmed Strike");
+  assert.equal(sheet.attacks[0].damage, "5");
+  assert.equal(source.skills.find((x) => x.name === "Animal Handling").bonus, "+0");
+});
+
+test("blank printed sections do not consume the next heading, page or footer", () => {
+  const s = sheetFromText(
+    "Character Name: Review hero\nPersonality Traits\nIdeals\nBonds\nFlaws\nEquipment\nTM & © Example. All Rights Reserved.\nGENDER\nAGE\nALIGNMENT\nFAITH\nCHARACTER APPEARANCE",
+  );
+  assert.equal(s.traits, "");
+  assert.equal(s.ideals, "");
+  assert.equal(s.bonds, "");
+  assert.equal(s.flaws, "");
+  assert.equal(s.equipment, "");
+  assert.equal(s.alignment, "");
+});
 
 test("printed/form character fields populate each relevant playable tab without losing source", () => {
   const source = sheetFromFields({
@@ -30,6 +68,16 @@ test("printed/form character fields populate each relevant playable tab without 
   assert.equal(source.experience, "");
   const sheet = legacyCharacter(source, source.name);
   assert.equal(sheet.attacks[0].bonus, 7);
+  assert.equal(sheet.attacks[0].damage, "1d8+5");
+  assert.match(sheet.attacks[0].notes, /slashing/);
+  const compound = sheetFromFields({
+    CharacterName: "Review hero",
+    Attacks: "Sword · +7 · 1d8+5 slashing + 1d6 fire",
+  });
+  assert.equal(
+    legacyCharacter(compound, compound.name).attacks[0].damage,
+    "1d8+5 slashing + 1d6 fire",
+  );
   assert.equal(sheet.equipment[1].quantity, 2);
   assert.equal(sheet.spells.length, 3);
   assert.equal(sheet.spells[1].level, 1);
@@ -42,6 +90,29 @@ test("printed/form character fields populate each relevant playable tab without 
   assert.ok(importedFieldNames(source).includes("equipment"));
   const partial = sheetFromText("Character Name: Partial\nRace: Human");
   assert.deepEqual(importedFieldNames(partial).sort(), ["name", "species"]);
+});
+
+test("section boundaries preserve real equipment, explicit names and separate pages", () => {
+  const s = sheetFromText(
+    "Character Name: Strength\nEquipment\nRope\nPotion x 2\n\f\nNew page text\nIdeals: Help others\nBonds: My crew\nFlaws: Reckless",
+  );
+  assert.equal(s.name, "Strength");
+  assert.equal(s.equipment, "Rope\nPotion x 2");
+  assert.equal(s.ideals, "Help others");
+  const fields = sheetFromFields({
+    CharacterName: "Table hero",
+    "Eq Name0": "Faith",
+    "Eq Qty0": "2",
+    "Eq Name1": "Rope",
+    "Eq Qty1": "1",
+  });
+  assert.deepEqual(
+    legacyCharacter(fields, fields.name).equipment.map((x) => [x.name, x.quantity]),
+    [
+      ["Faith", 2],
+      ["Rope", 1],
+    ],
+  );
 });
 
 test("statblock imports explicit combat values and retains all actions, refusing missing HP", () => {
