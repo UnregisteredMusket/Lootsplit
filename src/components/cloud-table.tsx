@@ -2,6 +2,9 @@ import { getServerCloudTable } from "@/lib/quire/cloud-client";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { Copy, Crown, DoorOpen, Radio, Users, ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
+import { Link } from "@tanstack/react-router";
+import { accountRequest, type AccountLibrary } from "@/lib/account/client";
+import { linkCurrentCampaign } from "@/lib/account/transfers";
 import {
   captureDeviceBackup,
   chooseTableMode,
@@ -39,6 +42,11 @@ export function CloudTable() {
   const [invitation, setInvitation] = useState("");
   const [switchInvite, setSwitchInvite] = useState(false);
   const [hosting, setHosting] = useState(false);
+  const [hostAccount, setHostAccount] = useState<AccountLibrary | null>(null);
+  const [checkingAccount, setCheckingAccount] = useState(false);
+  const [accountCheckError, setAccountCheckError] = useState("");
+  const [separateRoom, setSeparateRoom] = useState(false);
+  const [accountSaveError, setAccountSaveError] = useState("");
   const [hostMode, setHostMode] = useState<"live" | "turns">("live");
   const [lookedUp, setLookedUp] = useState(false);
   const [nextMode, setNextMode] = useState<Mode | null>(null);
@@ -46,6 +54,39 @@ export function CloudTable() {
   const [leaving, setLeaving] = useState(false);
   const host = cloud.joined && cloud.role === "dm";
   const unavailable = busy || !online;
+  const savedRooms = hostAccount?.members.filter((m) => !m.archived && m.role) || [];
+
+  async function prepareHosting() {
+    setHosting(true);
+    setCheckingAccount(true);
+    setHostAccount(null);
+    setAccountCheckError("");
+    setSeparateRoom(false);
+    try {
+      const session = await accountRequest<{ user: unknown } | null>("auth/get-session");
+      if (session?.user) setHostAccount(await accountRequest<AccountLibrary>("library"));
+    } catch {
+      setAccountCheckError(
+        "Your saved campaigns could not be checked. You can retry or deliberately create a separate room.",
+      );
+    } finally {
+      setCheckingAccount(false);
+    }
+  }
+
+  async function saveCreatedMembership() {
+    try {
+      await linkCurrentCampaign();
+      setAccountSaveError("");
+      toast.success("Room saved to My account. Resume this campaign on your other devices.");
+    } catch {
+      // Room creation already succeeded. Retry only the idempotent account link,
+      // never creation: a second room would split subsequent campaign changes.
+      setAccountSaveError(
+        "Room created, but not saved to your account. This room is still available on this device. Retry the account save to resume it elsewhere.",
+      );
+    }
+  }
 
   useEffect(() => {
     resumeTable();
@@ -192,6 +233,14 @@ export function CloudTable() {
         />
         {status}
       </p>
+      {cloud.joined && accountSaveError && (
+        <div className="ledger-card" role="alert">
+          <p>{accountSaveError}</p>
+          <Button disabled={unavailable} onClick={() => run(saveCreatedMembership)}>
+            Retry account save
+          </Button>
+        </div>
+      )}
       {!cloud.joined ? (
         <>
           {!joining && !hosting ? (
@@ -206,7 +255,11 @@ export function CloudTable() {
               </p>
               <div className="mt-6 grid gap-3 sm:grid-cols-2">
                 {seat.role === "dm" ? (
-                  <Button className="min-h-14" disabled={!online} onClick={() => setHosting(true)}>
+                  <Button
+                    className="min-h-14"
+                    disabled={unavailable}
+                    onClick={() => run(prepareHosting)}
+                  >
                     <Crown size={18} />
                     Start a room
                   </Button>
@@ -234,8 +287,52 @@ export function CloudTable() {
               </Button>
               <h2 className="mt-3 text-3xl">Start a room</h2>
               <p className="mt-2 text-muted">
-                Share this device’s current campaign. Players join with their own characters.
+                Create a new shared room from this device’s current campaign. To continue a campaign
+                from another device, resume it from My account.
               </p>
+              <Link to="/account" className="settings-link">
+                Resume a saved campaign
+              </Link>
+              {checkingAccount && <p role="status">Checking your saved campaigns…</p>}
+              {savedRooms.length > 0 && (
+                <div className="mt-3 rounded-xl border border-lead/30 p-3">
+                  <h3>You already have saved campaigns</h3>
+                  <ul>
+                    {savedRooms.map((m) => (
+                      <li key={m.code}>
+                        {m.name} · {m.code}
+                      </li>
+                    ))}
+                  </ul>
+                  <p>
+                    Creating another room makes a separate copy. Portraits, loot and later changes
+                    will not sync between those rooms.
+                  </p>
+                </div>
+              )}
+              {accountCheckError && (
+                <div role="alert">
+                  <p>{accountCheckError}</p>
+                  <Button
+                    disabled={unavailable}
+                    variant="secondary"
+                    onClick={() => run(prepareHosting)}
+                  >
+                    Retry account check
+                  </Button>
+                </div>
+              )}
+              {(savedRooms.length > 0 || accountCheckError) && (
+                <label className="mt-3 flex min-h-11 items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={separateRoom}
+                    disabled={unavailable}
+                    onChange={(e) => setSeparateRoom(e.target.checked)}
+                  />
+                  Create a separate room from this device’s copy
+                </label>
+              )}
               <div className="mode-switch mt-5" role="group" aria-label="Session mode">
                 <button
                   aria-pressed={hostMode === "live"}
@@ -259,9 +356,21 @@ export function CloudTable() {
               </p>
               <Button
                 className="mt-5 w-full min-h-12"
-                disabled={unavailable}
+                disabled={
+                  unavailable ||
+                  checkingAccount ||
+                  (!!(savedRooms.length || accountCheckError) && !separateRoom)
+                }
                 onClick={() =>
-                  run(() => chooseTableMode(hostMode), "Room ready. Invite your players.")
+                  run(async () => {
+                    await chooseTableMode(hostMode);
+                    if (hostAccount) await saveCreatedMembership();
+                    else
+                      toast.success(
+                        "Room ready. Invite your players. Save its membership in My account to resume on another device.",
+                      );
+                    setHosting(false);
+                  })
                 }
               >
                 {busy ? "Starting…" : "Create room"}

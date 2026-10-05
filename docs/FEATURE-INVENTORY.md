@@ -209,3 +209,9 @@ Validation for this change: 427 automated tests passed (four existing skips), Ty
 
 - Character import reads both indexed form fields and filled page widgets without an AcroForm index. Empty printed headings, page boundaries and copyright footers do not become inventory or identity values. Scanned/image, labeled-text and JSON imports remain supported and reviewed.
 - Known numbered feature/action and equipment fields preserve their content and quantities. Fixed-damage attacks and simple damage dice retain damage-type prose in notes and expose a valid playable formula. Fixed values do not generate random dice or allow advantage/disadvantage. Partial existing-sheet imports retain unspecified values and never silently remove existing campaign items.
+
+## Cross-device campaign selection
+
+- Creating a shared room while signed in saves its membership to My account automatically. A failed account link reports partial success and retries the existing room's membership; it never creates a replacement room.
+- Room creation offers saved-campaign resume first. Existing saved rooms, or an unavailable account lookup, require an explicit separate-room choice before creating another copy. Guest, local, live and turn-based play remain available.
+- My campaigns identifies the room open on this device and includes the time of the last account open/save. Duplicate names are labelled as separate rooms; opening an older same-name entry checks fresh account metadata and asks for confirmation. Names never establish ownership or merge campaign data. Explicit selection still permits different campaigns on different devices.

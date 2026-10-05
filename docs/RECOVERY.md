@@ -1,5 +1,12 @@
 # Resume Lootsplit after an interruption
 
+## Confirmed portrait recovery and prevention — 2026-10-05
+
+- The user confirmed the desktop portraits appeared after resuming the phone's actual room. This resolves the observed image discrepancy by room selection; it was not evidence of lost image bytes. The original two rooms and all user data remain intact.
+- Continuing branch `fix/portrait-display-sync` adds safeguards: auto-save new signed-in room membership; failed-link retry without another room creation; explicit separate-room choice when saved rooms exist or the account check fails; clearer current-room/duplicate-name labels; fresh account metadata and confirmation before opening an older same-name entry. Guest play and deliberate multiple rooms remain available. No rooms are merged by name or automatically switched across devices.
+- New `campaign-choice` browser regression failed before implementation because a newly created room was absent from the account library. It now passes automatic linking, duplicate prevention, failed-link retry, cancellation and deliberate older-room resume. All six local account scenarios and `verify:quick` passed (486 tests, four existing skips; clean types, zero lint errors/35 existing warnings).
+- Full PR/main verification, deployment and live assets/desktop/mobile audit remain required before this prevention update is called live. Check the branch PR and current runs. The user's recovered portraits do not prove a new deployment.
+
 ## Portraits still differ across devices — 2026-10-05 follow-up
 
 - Base/main/live at investigation: `612ee4612e9b699d746e708acd4094c4ff80d38b` (PR #38). Production release identity reports main verification run `37270098428`. PR #37's pending-upload safeguard is already deployed; do not present it as another new fix.

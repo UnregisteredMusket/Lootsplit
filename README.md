@@ -2,6 +2,10 @@
 
 Lootsplit is a shared party ledger and campaign application for web and Android. Production runs on Cloudflare Workers and D1; GitHub Actions verifies and publishes the exact tested artifact from `main`.
 
+## Continue a campaign on another device
+
+Sign in to the same account, then choose the saved campaign in **My account → My campaigns → Resume**. New shared rooms created while signed in are saved there automatically; a failed account save has a retry that keeps the existing room. **Start a room** creates a separate campaign copy. Copies can have the same name but do not share portraits, loot or later progress. The account page marks the room open on this device and warns before opening an older same-name entry. Existing rooms can still be added with **Save current membership**.
+
 ## Start here for every coding session
 
 Read [AGENTS.project.md](AGENTS.project.md), then the [Coding session manual](docs/CODING-MANUAL.md). After a timeout or interruption, also read [Recovery](docs/RECOVERY.md) and reconcile the repository, running jobs and live release before repeating an action.

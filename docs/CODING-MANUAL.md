@@ -23,9 +23,12 @@ Account scenario mapping:
 | `library`   | UI signup and recovery-key display, character profile, backup/restore, second-device sign-in, linking and resuming a shared membership                |
 | `dm-resume` | Two devices and two saved rooms; end, reopen as verified DM, resume each from either device, correct room/role, no title replay, mobile/desktop cards |
 | `recovery`  | UI recovery-key password reset and revocation of another signed-in device                                                                             |
-| `portrait-resume` | Mobile portrait upload, Live room creation/account linking, desktop DM resume/reopen, failed-upload warning and durable retry before membership save |
+| `portrait-resume` | Both portrait upload controls, Party cards and decoded images on two devices, server readout, desktop DM resume/reopen, failed-upload recovery and turn preservation |
+| `campaign-choice` | Automatic membership linking, explicit separate-room creation, retry of failed linking without creating another room, duplicate-name warning and deliberate older-room resume |
 
 Portrait sync verification must exercise the real upload → room creation → account save → second-device resume path. Also interrupt an upload: a local preview or a saved membership is not proof the image reached the server. Preserve pending commands and their retry IDs; never repair sync by overwriting the whole room from one device.
+
+For cross-device discrepancies, establish both actual room identities and sync states before diagnosing data loss. The same account or campaign name does not prove the same room. Saved memberships select rooms by code; names only help the user choose. Keep real room codes, credentials, screenshots and campaign contents out of public investigation checkpoints. Do not auto-merge same-name rooms or force all signed-in devices into one campaign. Preserve deliberate multi-campaign use.
 
 ## 3. Use the focused local loop before full CI
 
