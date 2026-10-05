@@ -60,6 +60,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-05T07:50:18Z | step: report / Run actions/checkout@v4 | 1s → 2s | +1s | +100% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37236129044/job/111535473202) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37279973920/job/111665529992) |
 | 2026-10-05T07:49:53Z | job: Development / accounts | 152s → 202s | +50s | +32.89% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37233368939/job/111527537940) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37279628295/job/111664400273) |
 | 2026-10-05T07:49:39Z | job: Packaged standby | 78s → 110s | +32s | +41.03% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37233368939/job/111527693178) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37279628295/job/111664793023) |
 | 2026-10-05T07:49:36Z | step: Packaged Worker / accounts / worker-account | 40s → 50s | +10s | +25% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37267183280/job/111626615798) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37279628295/job/111664793033) |
