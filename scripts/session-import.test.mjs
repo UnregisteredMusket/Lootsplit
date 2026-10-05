@@ -70,6 +70,14 @@ test("printed/form character fields populate each relevant playable tab without 
   assert.equal(sheet.attacks[0].bonus, 7);
   assert.equal(sheet.attacks[0].damage, "1d8+5");
   assert.match(sheet.attacks[0].notes, /slashing/);
+  const compound = sheetFromFields({
+    CharacterName: "Review hero",
+    Attacks: "Sword · +7 · 1d8+5 slashing + 1d6 fire",
+  });
+  assert.equal(
+    legacyCharacter(compound, compound.name).attacks[0].damage,
+    "1d8+5 slashing + 1d6 fire",
+  );
   assert.equal(sheet.equipment[1].quantity, 2);
   assert.equal(sheet.spells.length, 3);
   assert.equal(sheet.spells[1].level, 1);
