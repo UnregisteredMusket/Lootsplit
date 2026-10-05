@@ -33,7 +33,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | publish / Run actions/download-artifact@v4 | open | 2 | 1s → 3s | +2s | +200% |
 | Publish verified standby | open | 2 | 10s → 18s | +8s | +80% |
 | publish | open | 2 | 10s → 18s | +8s | +80% |
-| deploy / Run actions/download-artifact@v4 | open | 2 | 1s → 3s | +2s | +200% |
+| deploy / Run actions/download-artifact@v4 | open | 3 | 1s → 6s | +5s | +500% |
 | Code checks and immutable builds / Run actions/setup-node@v4 | open | 2 | 3s → 6s | +3s | +100% |
 | Packaged Worker / accounts / Run actions/download-artifact@v4 | open | 2 | 1s → 3s | +2s | +200% |
 | Packaged Worker / accounts / Run actions/upload-artifact@v4 | open | 2 | 1s → 3s | +2s | +200% |
@@ -52,6 +52,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Development / gameplay / Run npx playwright install --with-deps chromium | open | 2 | 21s → 31s | +10s | +47.62% |
 | Code checks and immutable builds / Run actions/upload-artifact@v4 | open | 2 | 2s → 4s | +2s | +100% |
 | Development / gameplay / dev-encounter | open | 2 | 11s → 19s | +8s | +72.73% |
+| deploy / Verify deployed identity and read-only desktop/mobile website behavior | open | 2 | 44s → 69s | +25s | +56.82% |
 | Code checks and immutable builds / Run actions/upload-artifact@v4 | open | 2 | 2s → 4s | +2s | +100% |
 | Packaged Worker / accounts / Run actions/setup-node@v4 | open | 2 | 3s → 5s | +2s | +66.67% |
 | Development / accounts / dev-account | open | 2 | 57s → 101s | +44s | +77.19% |
@@ -65,6 +66,8 @@ Open trends require investigation. Resolved trends retain their history; each ve
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-05T08:51:05Z | step: deploy / Verify deployed identity and read-only desktop/mobile website behavior | 55s → 69s | +14s | +25.45% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37263801298/job/111616279155) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37285972298/job/111684838144) |
+| 2026-10-05T08:49:17Z | step: deploy / Run actions/download-artifact@v4 | 3s → 6s | +3s | +100% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37281139424/job/111669265502) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37285972298/job/111684838144) |
 | 2026-10-05T08:48:36Z | job: Packaged Worker / accounts | 110s → 135s | +25s | +22.73% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37270098428/job/111635376907) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37285563745/job/111683983887) |
 | 2026-10-05T08:48:33Z | step: Packaged Worker / accounts / worker-finance | 11s → 13s | +2s | +18.18% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37233687309/job/111528724125) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37285563745/job/111683983887) |
 | 2026-10-05T08:48:13Z | step: Packaged Worker / accounts / worker-account | 48s → 60s | +12s | +25% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37280755805/job/111668498836) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37285563745/job/111683983887) |
