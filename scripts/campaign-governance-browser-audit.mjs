@@ -1,4 +1,5 @@
 import { chromium } from "playwright";
+import { expect } from "playwright/test";
 import assert from "node:assert/strict";
 import { mkdir } from "node:fs/promises";
 import { localAccountDb } from "./account-dev-db.mjs";
@@ -171,6 +172,55 @@ try {
     await a.page.locator(".quire-dawn").waitFor({ state: "hidden" });
     await a.page.waitForLoadState("networkidle");
   }
+  console.log("Governance audit: live account character receives loot and portrait without reload");
+  await visit(player.page, `/characters?id=${encodeURIComponent(`campaign:${code}:hero`)}`);
+  await player.page.getByRole("heading", { name: "Governance hero", exact: true }).waitFor();
+  await player.page.getByRole("button", { name: "Edit sheet", exact: true }).click();
+  await player.page.getByRole("button", { name: "Inventory & currency", exact: true }).click();
+  await visit(host.page, "/party");
+  await host.page
+    .getByRole("button", { name: "Add characters, party funds & loot", exact: true })
+    .click();
+  await host.page.getByRole("button", { name: /^Add loot/ }).click();
+  await host.page.getByLabel("Holding name", { exact: true }).fill("Live award shield");
+  await host.page.getByLabel("Holding value", { exact: true }).fill("10 gp");
+  await host.page.getByLabel("Holding owner", { exact: true }).selectOption("hero");
+  await host.page.getByRole("button", { name: "Add holding", exact: true }).click();
+  await expect(player.page.locator('input[value="Live award shield"]')).toBeVisible({
+    timeout: 10000,
+  });
+
+  await host.page.getByRole("dialog").getByRole("button",{name:"Close",exact:true}).click();
+  await host.page.locator("#purse-hero > summary").click();
+  const portrait = host.page.locator("#purse-hero .portrait-picker input[type=file]");
+  // A tiny synthetic PNG, never a real campaign portrait.
+  const picture = await host.page.evaluate(() => {
+    const c = document.createElement("canvas");
+    c.width = 8;
+    c.height = 8;
+    const x = c.getContext("2d");
+    x.fillStyle = "red";
+    x.fillRect(0, 0, 8, 8);
+    return c.toDataURL("image/png").split(",")[1];
+  });
+  await portrait.setInputFiles({
+    name: "portrait.png",
+    mimeType: "image/png",
+    buffer: Buffer.from(picture, "base64"),
+  });
+  await expect(
+    host.page.locator("[data-sonner-toast]").filter({ hasText: "Portrait saved" }),
+  ).toBeVisible();
+  await expect(player.page.getByAltText("Character portrait",{exact:true})).toHaveAttribute(
+    "src",
+    /^data:image/,
+    { timeout: 10000 },
+  );
+  await host.page.getByRole("link", { name: "Open character sheet", exact: true }).click();
+  await expect(
+    host.page.locator("[data-sonner-toast]").filter({ hasText: "Portrait saved" }),
+  ).toHaveCount(0);
+
   console.log("Governance audit: membership resumed; verify locked gameplay");
   await visit(player.page, "/characters?id=party%3Ahero");
   await player.page.getByRole("heading", { name: "Governance hero", exact: true }).waitFor();
@@ -213,8 +263,20 @@ try {
     await host.page.waitForTimeout(250);
   assert.equal((await state(host.page)).journal.reports.length, 1);
   assert.equal((await state(host.page)).ledger.length, 0);
+  await host.page.getByLabel("Journal entry title", { exact: true }).fill("The first chronicle");
+  await host.page
+    .getByLabel("Journal entry text", { exact: true })
+    .fill("We found the ancient gate. The party will return at dawn.");
+  await host.page.getByLabel("Journal visibility", { exact: true }).selectOption("party");
+  await host.page.getByRole("button", { name: "Save note", exact: true }).click();
+  await expect(host.page.locator(".journal-reading")).toContainText("ancient gate");
+  await host.page.locator(".journal-book").screenshot({ path: output + "/journal-desktop.png" });
+  await host.page.setViewportSize({ width: 390, height: 844 });
+  await host.page.locator(".journal-book").screenshot({ path: output + "/journal-mobile.png" });
+  await host.page.setViewportSize({ width: 1360, height: 1000 });
   await player.page.setViewportSize({ width: 390, height: 844 });
   await player.page.screenshot({ path: output + "/locked-player-mobile.png", fullPage: true });
+  console.log("Mobile overflow", await player.page.evaluate(() => ({width:innerWidth, scroll:document.documentElement.scrollWidth, elements:[...document.querySelectorAll("body *")].filter(e=>e.getBoundingClientRect().right>innerWidth+1 && getComputedStyle(e).position!=="fixed").map(e=>({tag:e.tagName,cls:e.className,right:e.getBoundingClientRect().right,text:e.textContent?.slice(0,70)})).slice(-25)})));
   assert.equal(
     await player.page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1),
     false,
@@ -336,6 +398,7 @@ try {
     "PASS: desktop/mobile DM edit toggle and change report, locked construction, health/equip/consume gameplay, archival before clearing logs, voluntary leave, account reports, owner Test configurator/indicator/reset and isolated campaign data.",
   );
 } catch (error) {
+  for (const context of browser.contexts()) for (const page of context.pages()) console.error("Synthetic sync diagnostic", await page.evaluate(async()=>{const x=(await import("/src/lib/quire/cloud-client.ts")).getCloudTable();return {status:x.status,error:x.error,pending:x.pending};}).catch(()=>null));
   for (const [index, context] of browser.contexts().entries()) {
     for (const [pageIndex, page] of context.pages().entries()) {
       await page

@@ -48,7 +48,7 @@ export function CharacterSheetPanel({ purseId, face = true }: { purseId: string;
     (seat.role === "dm" || (!getCloudTable().joined && seat.purseIds.includes(purseId)));
 
   return (
-    <div className="mt-4">
+    <div className="mt-4 flex flex-wrap gap-x-4">
       <Link
         to="/characters"
         search={{ id: `party:${purseId}` }}
@@ -61,7 +61,7 @@ export function CharacterSheetPanel({ purseId, face = true }: { purseId: string;
           Import a D&D 5e (2014) character sheet
           <input
             type="file"
-            accept="application/pdf,application/json,.pdf,.json"
+            accept="application/pdf,application/json,image/png,image/jpeg,image/webp,.pdf,.json,.png,.jpg,.webp"
             className="sr-only"
             aria-label="Import a 2014 character sheet"
             onChange={(event) => {
@@ -82,7 +82,8 @@ export function CharacterSheetPanel({ purseId, face = true }: { purseId: string;
       ) : null}
       {!sheet && canImport ? (
         <p className="mt-2 text-sm text-muted">
-          A filled PDF or a JSON export. A scan without selectable text cannot be read.
+          Import a filled PDF, scan, image or JSON export. Review extracted values against the
+          original.
         </p>
       ) : null}
     </div>

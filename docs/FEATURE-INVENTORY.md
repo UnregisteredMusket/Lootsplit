@@ -193,3 +193,13 @@ Validation for this change: 427 automated tests passed (four existing skips), Ty
 - DM-private, party-shared and private-player journal entries can attach prior session reports.
 - Merchant sale categories have DM-configurable exceptions. Service purchases are recorded and cannot be resold.
 - Owner-only isolated Test mode has a settings configurator, header indicator and red DM-home reset; Test rooms are excluded from gameplay analytics.
+
+## Session feedback improvements
+
+- One persistent notification host with explicit close controls; completed notices clear on internal navigation without replaying the title screen.
+- Account-campaign, current-party and standalone account sheet views refresh across devices without overwriting dirty drafts. Canonical inventory is ordered by stable IDs before financial conflict checks. Portrait commands update both canonical portrait fields and revision.
+- Players & permissions exposes each restricted character field independently, including separate inventory/currency grants. Overrides win over the general editing window. Player grants apply on save with server validation, ownership checks and financial ledger records; ordinary gameplay remains available. No grant allows editing another player's character.
+- Visible new-character and current-character import controls accept supported JSON, PDF and images. Partial imports preserve unspecified/restricted existing fields. Explicit attacks, equipment, spell levels and resource counts populate playable tabs, with original prose retained. Existing funds and inventory are not duplicated by legacy reimports.
+- Pinned local Tesseract.js OCR supports scanned pages and statblock pictures; recognition assets load only when needed. All PDF pages are considered. Image imports require source review; numeric validation rejects unreadable required creature fields. OCR confidence is not a correctness guarantee.
+- Downtime is offered when starting a session. An explicit zero-day choice persists per campaign and disables subsequent reminders; campaign finance controls can re-enable it. Positive downtime still uses the existing preview and explicit approval before any money/time changes.
+- Session notes appear as a book with contents, dated reading/writing pages and mobile layout. Existing party collaboration, DM-private/player-private visibility and session report attachments remain intact.

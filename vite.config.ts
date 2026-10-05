@@ -169,6 +169,7 @@ export default defineConfig(({ command, isPreview }) => ({
       "@tanstack/router-core/isServer",
       "@tanstack/router-core/ssr/client",
       "seroval",
+      "tesseract.js",
     ],
   },
   plugins: [

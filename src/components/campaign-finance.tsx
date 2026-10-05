@@ -83,6 +83,20 @@ export function CampaignFinance() {
           {error}
         </p>
       )}
+      <label className="flex min-h-11 items-center gap-2">
+        <input
+          type="checkbox"
+          checked={journal.downtimePrompt?.enabled !== false}
+          disabled={busy}
+          onChange={(e) =>
+            void run({
+              kind: "downtime-preference",
+              days: e.target.checked ? Math.max(1, days) : 0,
+            })
+          }
+        />
+        Remind me to set downtime before sessions
+      </label>
       <details open={pending ? true : undefined}>
         <summary>Set downtime & review calculations</summary>
         <form

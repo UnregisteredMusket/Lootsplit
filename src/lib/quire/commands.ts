@@ -1,4 +1,9 @@
 import {
+  characterPermissionSchema,
+  canEditCharacterField,
+  characterPermissions,
+} from "../characters/permissions.mjs";
+import {
   assertFinanceAccountRemovable,
   termsSchema,
   ruleSchema,
@@ -13,7 +18,11 @@ import { archiveSession } from "./session-records.ts";
 import { readJournal, preserveJournalMetadata } from "./journal.ts";
 import { z } from "zod";
 import { sheetSchema } from "../characters/model.mjs";
-import { characterSheet, editCharacter, editLegacyCharacter } from "../characters/campaign-sheet.mjs";
+import {
+  characterSheet,
+  editCharacter,
+  editLegacyCharacter,
+} from "../characters/campaign-sheet.mjs";
 import type { CloudTable, CloudSeat } from "./cloud.ts";
 import { fromCopper, toCopper, spendCoins, priceAfterCharisma } from "./money.ts";
 import { charismaScore, readSheets } from "./sheet.ts";
@@ -23,6 +32,18 @@ const id = z.string().min(1).max(150),
   qty = amount.min(1).max(100000);
 const base = { id };
 export const commandSchema = z.discriminatedUnion("kind", [
+  z.object({
+    ...base,
+    kind: z.literal("downtime-preference"),
+    days: z.number().int().min(0).max(3650),
+  }),
+  z.object({
+    ...base,
+    kind: z.literal("character-permission"),
+    purseId: id,
+    permission: characterPermissionSchema,
+    allowed: z.boolean(),
+  }),
   z.object({
     ...base,
     kind: z.literal("finance-loan"),
@@ -40,7 +61,15 @@ export const commandSchema = z.discriminatedUnion("kind", [
     days: z.number().int().min(1).max(3650),
   }),
   z.object({ ...base, kind: z.literal("downtime-cancel"), downtimeId: id }),
-  z.object({ ...base, kind: z.literal("journal-note"), title: z.string().trim().min(1).max(100), text: z.string().max(12000), visibility: z.enum(["dm", "party", "player"]), purseId: z.string(), reportIds: z.array(id).default([]) }),
+  z.object({
+    ...base,
+    kind: z.literal("journal-note"),
+    title: z.string().trim().min(1).max(100),
+    text: z.string().max(12000),
+    visibility: z.enum(["dm", "party", "player"]),
+    purseId: z.string(),
+    reportIds: z.array(id).default([]),
+  }),
   z.object({ ...base, kind: z.literal("character-editing"), purseId: id, allowed: z.boolean() }),
   z.object({
     ...base,
@@ -332,10 +361,14 @@ export function applyCommand(input: CloudTable, seat: CloudSeat, raw: Command): 
     if (prior) Object.assign(prior, next);
     else f.rules.push(next);
     event(`Finance schedule updated: ${cmd.rule.name}`, "management", cmd.rule.purseId);
+  } else if (cmd.kind === "downtime-preference") {
+    dm();
+    journal.downtimePrompt = { enabled: cmd.days > 0, days: cmd.days };
   } else if (cmd.kind === "downtime-plan") {
     dm();
     const f = finance();
     const quote = previewDowntime(t, f, cmd.days);
+    journal.downtimePrompt = { enabled: true, days: cmd.days };
     for (const d of f.downtime) if (d.status === "pending") d.status = "cancelled";
     f.downtime.push({
       id: cmd.id,
@@ -359,22 +392,48 @@ export function applyCommand(input: CloudTable, seat: CloudSeat, raw: Command): 
       const p = own(cmd.purseId);
       if (p.kind !== "character") throw Error("Choose your character.");
     }
-    if (cmd.reportIds.some(id => !journal.reports?.some(r => r.id === id))) throw Error("Session report not found.");
+    if (cmd.reportIds.some((id) => !journal.reports?.some((r) => r.id === id)))
+      throw Error("Session report not found.");
     (journal.entries ??= []).push({ ...cmd, at, authorId: seat.id });
+  } else if (cmd.kind === "character-permission") {
+    dm();
+    const p = own(cmd.purseId);
+    if (p.kind !== "character") throw Error("Choose a character.");
+    (p.permissions ??= {})[cmd.permission] = cmd.allowed;
+    event(
+      `${p.name}: ${characterPermissions[cmd.permission]} ${cmd.allowed ? "allowed" : "restricted"}`,
+      "management",
+      p.id,
+    );
   } else if (cmd.kind === "character-editing") {
     dm();
     const p = own(cmd.purseId);
     if (p.kind !== "character") throw Error("Choose a character.");
     if (p.editingAllowed === cmd.allowed) return t;
-    const sheet = characterSheet(p, t.holdings, t.sheets.find(s => s.purseId === p.id));
+    const sheet = characterSheet(
+      p,
+      t.holdings,
+      t.sheets.find((s) => s.purseId === p.id),
+    );
     if (cmd.allowed) p.editBaseline = sheet;
     else {
       const before = p.editBaseline || sheet;
-      (journal.editReports ??= []).push({ id: cmd.id, purseId: p.id, name: p.name, at, before, after: sheet });
+      (journal.editReports ??= []).push({
+        id: cmd.id,
+        purseId: p.id,
+        name: p.name,
+        at,
+        before,
+        after: sheet,
+      });
       delete p.editBaseline;
     }
     p.editingAllowed = cmd.allowed;
-    event(`${p.name}: character editing ${cmd.allowed ? "opened" : "closed; change report saved"}`, "management", p.id);
+    event(
+      `${p.name}: character editing ${cmd.allowed ? "opened" : "closed; change report saved"}`,
+      "management",
+      p.id,
+    );
   } else if (cmd.kind === "character") {
     editCharacter(t, seat, cmd, cmd.id, at);
     event(
@@ -384,8 +443,11 @@ export function applyCommand(input: CloudTable, seat: CloudSeat, raw: Command): 
     );
   } else if (cmd.kind === "portrait") {
     const p = own(cmd.purseId);
-    if (seat.role !== "dm" && !p.editingAllowed) throw Error("Character editing is locked. Ask the DM to open editing.");
+    if (seat.role !== "dm" && !canEditCharacterField(p, "portrait"))
+      throw Error("Character editing is locked. Ask the DM to open editing.");
     p.portrait = cmd.portrait;
+    if (p.sheet) p.sheet.portrait = cmd.portrait;
+    p.sheetRevision = (p.sheetRevision || 0) + 1;
   } else if (cmd.kind === "session") {
     dm();
     const active = journal.sessions.find((x) => !x.endedAt);
@@ -461,16 +523,17 @@ export function applyCommand(input: CloudTable, seat: CloudSeat, raw: Command): 
       priceAfterCharisma(Math.round(s.copper * shop.sellRate), score(cmd.purseId)) * cmd.quantity;
     coins(cmd.purseId, -cost);
     if (s.quantity !== null) s.quantity -= cmd.quantity;
-    if (!isService(s)) t.holdings.push({
-      id: cmd.id + "-item",
-      purseId: cmd.purseId,
-      category: stockCategory(s, shop),
-      name: s.name,
-      kind: "item",
-      quantity: cmd.quantity,
-      unitCopper: s.copper,
-      notes: s.notes,
-    });
+    if (!isService(s))
+      t.holdings.push({
+        id: cmd.id + "-item",
+        purseId: cmd.purseId,
+        category: stockCategory(s, shop),
+        name: s.name,
+        kind: "item",
+        quantity: cmd.quantity,
+        unitCopper: s.copper,
+        notes: s.notes,
+      });
     log(cmd.purseId, `Bought ${cmd.quantity} ${s.name} from ${shop.name}`, -cost, shop.id);
   } else if (cmd.kind === "listing") {
     own(cmd.purseId);

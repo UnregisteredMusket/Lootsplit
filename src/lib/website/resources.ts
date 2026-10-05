@@ -1,6 +1,16 @@
 /** Add every new third-party content/data resource here when integrating it. */
 export const resources = [
   {
+    name: "Tesseract.js local OCR",
+    description:
+      "Tesseract.js and Tesseract (Apache License 2.0), with the MIT-licensed English data package read scanned PDFs and statblock pictures on your device. Lootsplit bundles the worker, recognition models and compatible WASM cores; private files are not sent to an OCR service.",
+    links: [
+      { label: "Tesseract.js source", url: "https://github.com/naptha/tesseract.js" },
+      { label: "English language data", url: "https://github.com/naptha/tessdata" },
+      { label: "Apache License 2.0", url: "https://www.apache.org/licenses/LICENSE-2.0" },
+    ],
+  },
+  {
     name: "Game-icons.net fantasy icons",
     description:
       "Icons made by Lorc, Delapouite, Carl Olsen, Caro Asercion, Cathelineau, DarkZaitzev, Faithtoken, Lucas, Sbed, SeregaCthtuf, Skoll, Willdabeast and Zeromancer. Licensed under CC BY 3.0 (Zeromancer: CC0). Lootsplit removes the square backgrounds and applies category colors and framing. Icons are bundled locally; existing custom artwork is preserved.",

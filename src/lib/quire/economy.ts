@@ -4,7 +4,13 @@ import { loanFromRequest, readFinance, assertFinanceAccountRemovable } from "./f
 import { readLocalEncounters } from "../encounters/local.ts";
 import { loadJournal, readJournal, type Journal } from "./journal.ts";
 import { blankSheet } from "../characters/model.mjs";
-import { statsOnly, editCharacter, editLegacyCharacter } from "../characters/campaign-sheet.mjs";
+import {
+  statsOnly,
+  editCharacter,
+  editLegacyCharacter,
+  characterSheet,
+  legacyCharacter,
+} from "../characters/campaign-sheet.mjs";
 import { getCloudWatch } from "./cloud-turn.ts";
 import { verifyReportBase, type ReportBase } from "./local-report.ts";
 import { coinsSchema, validateEconomyRows } from "./validation.ts";
@@ -938,20 +944,26 @@ export async function buyFromShop(input: {
         holding.name.toLowerCase() === stock.name.toLowerCase() && holding.kind === "item",
     );
     tx.objectStore("purses").put({ ...purse, coins });
-    if (!isService(stock)) tx.objectStore("holdings").put(
-      existing
-        ? { ...existing, category: stockCategory(stock, shop), quantity: existing.quantity + quantity, unitCopper: stock.copper }
-        : {
-            id: crypto.randomUUID(),
-            purseId: purse.id,
-            name: stock.name,
-            category: stockCategory(stock, shop),
-            kind: "item",
-            quantity,
-            unitCopper: stock.copper,
-            notes: stock.notes,
-          },
-    );
+    if (!isService(stock))
+      tx.objectStore("holdings").put(
+        existing
+          ? {
+              ...existing,
+              category: stockCategory(stock, shop),
+              quantity: existing.quantity + quantity,
+              unitCopper: stock.copper,
+            }
+          : {
+              id: crypto.randomUUID(),
+              purseId: purse.id,
+              name: stock.name,
+              category: stockCategory(stock, shop),
+              kind: "item",
+              quantity,
+              unitCopper: stock.copper,
+              notes: stock.notes,
+            },
+      );
     if (stock.quantity !== null)
       tx.objectStore("stock").put({ ...stock, quantity: stock.quantity - quantity });
     const percent = score === null ? 0 : charismaOffPercent(score);
@@ -1296,20 +1308,33 @@ export async function decideLoan(id: string, status: LoanStatus): Promise<void> 
 export async function importCharacterSheet(purseId: string, file: File): Promise<string[]> {
   const body = await readCharacterSheet(file);
   const sheet: CharacterSheet = { ...body, purseId, importedAt: Date.now() };
-  await updateCharacterSheet(sheet);
-  const db = await quireDb();
-  const purse = await request<Purse | undefined>(
-    db.transaction("purses").objectStore("purses").get(purseId),
-  );
-  if (!purse || purse.kind !== "character") return sheetGaps(sheet);
-  if ((purse.name === "New character" || !purse.name.trim()) && sheet.name)
-    await savePurse({ ...purse, name: sheet.name });
-  const fresh = await request<Purse | undefined>(
-    db.transaction("purses").objectStore("purses").get(purseId),
-  );
-  if (getSeat().role !== "dm" || !fresh || toCopper(fresh.coins) > 0 || toCopper(sheet.coins) === 0)
-    return sheetGaps(sheet);
-  await setCoins(fresh.id, sheet.coins, "Brought from the character sheet");
+  await atomic(["purses", "holdings", "ledger", "meta"], async (tx) => {
+    const purses = await request<Purse[]>(tx.objectStore("purses").getAll());
+    const holdings = await request<Holding[]>(tx.objectStore("holdings").getAll());
+    const old = await request<{ sheets: CharacterSheet[] } | undefined>(
+      tx.objectStore("meta").get("sheets"),
+    );
+    const table = { purses, holdings, ledger: [] as LedgerLine[], sheets: old?.sheets || [] };
+    editLegacyCharacter(table, getSeat(), sheet);
+    const purse = table.purses.find((p) => p.id === purseId)!;
+    const before = characterSheet(purse, holdings, sheet);
+    const next: import("../characters/model.mjs").PlaySheet = { ...before };
+    const imported = legacyCharacter(sheet, sheet.name);
+    // Reimporting never duplicates or replaces existing spendable campaign assets.
+    if (getSeat().role === "dm") {
+      if (!before.equipment.length && imported.equipment.length)
+        next.equipment = imported.equipment;
+      if (toCopper(before.coins) === 0 && toCopper(sheet.coins) > 0) next.coins = sheet.coins;
+    }
+    editCharacter(table, getSeat(), { purseId, before, sheet: next }, crypto.randomUUID());
+    validateEconomyRows({ ...table, shops: [], stock: [] });
+    tx.objectStore("purses").put(purse);
+    tx.objectStore("meta").put({ id: "sheets", sheets: table.sheets });
+    for (const item of table.holdings.filter((h) => h.purseId === purseId))
+      tx.objectStore("holdings").put(item);
+    for (const line of table.ledger) tx.objectStore("ledger").put(line);
+    await audit(tx, `Imported character sheet: ${purse.name}`, "management", purse.id);
+  });
   return sheetGaps(sheet);
 }
 

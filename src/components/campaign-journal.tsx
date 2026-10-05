@@ -9,7 +9,7 @@ import { useSeat } from "@/lib/quire/seat";
 import type { Journal } from "@/lib/quire/journal";
 import { sessionSummary } from "@/lib/quire/journal";
 import { formatCopper } from "@/lib/quire/money";
-import { Button, Fold } from "./ui";
+import { Button, Fold, Modal } from "./ui";
 function RecordedChange({ change }: { change: NonNullable<Journal["events"][number]["change"]> }) {
   const keys = [
     ...new Set([...Object.keys(change.before || {}), ...Object.keys(change.after || {})]),
@@ -37,6 +37,8 @@ export function CampaignJournal() {
   const seat = useSeat();
   const dm = seat.role === "dm";
   const [name, setName] = useState("");
+  const [downtimeOpen, setDowntimeOpen] = useState(false);
+  const [days, setDays] = useState(journal.downtimePrompt?.days ?? 0);
   const [note, setNote] = useState("");
   const [copper, setCopper] = useState("");
   const [purseId, setPurse] = useState("");
@@ -76,6 +78,10 @@ export function CampaignJournal() {
           <form
             onSubmit={(e) => {
               e.preventDefault();
+              if (!downtime && journal.downtimePrompt?.enabled !== false) {
+                setDowntimeOpen(true);
+                return;
+              }
               void run(() =>
                 command({
                   kind: "session",
@@ -137,8 +143,12 @@ export function CampaignJournal() {
           </p>
         ) : null}
         {[...journal.sessions].reverse().map((session) => {
-          const archived = journal.reports?.find(r => r.id === session.id);
-          const sum = sessionSummary(archived ? JSON.parse(archived.snapshot).ledger : ledger, session, dm ? undefined : seat.purseIds);
+          const archived = journal.reports?.find((r) => r.id === session.id);
+          const sum = sessionSummary(
+            archived ? JSON.parse(archived.snapshot).ledger : ledger,
+            session,
+            dm ? undefined : seat.purseIds,
+          );
           return (
             <div className="journal-entry" key={session.id}>
               <strong>{session.name}</strong>
@@ -158,12 +168,97 @@ export function CampaignJournal() {
           a measure of newly earned wealth or changes in item valuations.
         </p>
       </Fold>
+      <Modal
+        open={downtimeOpen}
+        onOpenChange={setDowntimeOpen}
+        title="Set downtime before this session"
+      >
+        <p>
+          How many in-game days passed? Choose 0 to continue without downtime and turn off future
+          reminders. You can change this in Campaign finances & downtime.
+        </p>
+        <label>
+          Downtime days
+          <input
+            className="ledger-search"
+            aria-label="Downtime days"
+            type="number"
+            min={0}
+            max={3650}
+            value={days}
+            onChange={(e) => setDays(Number(e.target.value))}
+          />
+        </label>
+        <Button
+          disabled={busy || !Number.isSafeInteger(days) || days < 0 || days > 3650}
+          onClick={() =>
+            void run(async () => {
+              if (days === 0) {
+                await command({ kind: "downtime-preference", days: 0 });
+                await command({ kind: "session", name, end: false });
+              } else {
+                await command({ kind: "downtime-plan", name: "Before " + name, days });
+              }
+              setDowntimeOpen(false);
+              if (days > 0) {
+                const finance = document.getElementById(
+                  "campaign-finance",
+                ) as HTMLDetailsElement | null;
+                if (finance) {
+                  finance.open = true;
+                  finance.scrollIntoView();
+                }
+              }
+            })
+          }
+        >
+          {days === 0 ? "Use 0 days & start session" : "Preview downtime calculations"}
+        </Button>
+      </Modal>
       <JournalNotes />
       <Fold title="Character edit reports" hint="Before and after each DM editing window.">
-        {(journal.editReports || []).filter(r => dm || seat.purseIds.includes(r.purseId)).map(r => <details className="journal-entry" key={r.id}><summary>{r.name} · {new Date(r.at).toLocaleString()}</summary>{Object.keys(r.after).filter(key => JSON.stringify(r.before[key as keyof typeof r.before]) !== JSON.stringify(r.after[key as keyof typeof r.after])).map(key => <p key={key} className="break-words"><strong>{key}</strong>: {JSON.stringify(r.before[key as keyof typeof r.before])} → {JSON.stringify(r.after[key as keyof typeof r.after])}</p>)}<Button variant="secondary" onClick={() => void downloadJson("lootsplit-character-edits-"+r.id+".json", r)}>Download changes</Button></details>)}
+        {(journal.editReports || [])
+          .filter((r) => dm || seat.purseIds.includes(r.purseId))
+          .map((r) => (
+            <details className="journal-entry" key={r.id}>
+              <summary>
+                {r.name} · {new Date(r.at).toLocaleString()}
+              </summary>
+              {Object.keys(r.after)
+                .filter(
+                  (key) =>
+                    JSON.stringify(r.before[key as keyof typeof r.before]) !==
+                    JSON.stringify(r.after[key as keyof typeof r.after]),
+                )
+                .map((key) => (
+                  <p key={key} className="break-words">
+                    <strong>{key}</strong>: {JSON.stringify(r.before[key as keyof typeof r.before])}{" "}
+                    → {JSON.stringify(r.after[key as keyof typeof r.after])}
+                  </p>
+                ))}
+              <Button
+                variant="secondary"
+                onClick={() => void downloadJson("lootsplit-character-edits-" + r.id + ".json", r)}
+              >
+                Download changes
+              </Button>
+            </details>
+          ))}
       </Fold>
       <Fold title="Archived session reports" hint="Recorded before active logs are cleared.">
-        {(journal.reports || []).map(r => <div key={r.id} className="journal-entry"><strong>{r.name}</strong><Button variant="secondary" onClick={() => void downloadJson("lootsplit-session-"+r.id+".json", JSON.parse(r.snapshot))}>Download session report</Button></div>)}
+        {(journal.reports || []).map((r) => (
+          <div key={r.id} className="journal-entry">
+            <strong>{r.name}</strong>
+            <Button
+              variant="secondary"
+              onClick={() =>
+                void downloadJson("lootsplit-session-" + r.id + ".json", JSON.parse(r.snapshot))
+              }
+            >
+              Download session report
+            </Button>
+          </div>
+        ))}
       </Fold>
       <CampaignFinance />
       <details ref={reviewRef} id="review-inbox" className="review-inbox">

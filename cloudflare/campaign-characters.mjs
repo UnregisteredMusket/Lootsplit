@@ -17,7 +17,8 @@ export async function hydrateCampaignCharacters(db, room) {
     const body = JSON.parse(r.body);
     p.sheet = statsOnly(body);
     p.name = body.name;
-    p.portrait = body.portrait || undefined;
+    p.portrait = p.portrait || body.portrait || undefined;
+    p.sheet.portrait = p.portrait || "";
     p.profileId = r.id;
     const owner = await db
       .prepare("SELECT seat_id,token FROM library_members WHERE user_id=? AND code=?")

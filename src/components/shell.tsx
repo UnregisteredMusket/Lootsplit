@@ -15,7 +15,6 @@ import {
   type FormEvent,
   type ReactNode,
 } from "react";
-import { Toaster } from "sonner";
 import { getCloudWatch } from "@/lib/quire/cloud-turn";
 import { useLibrary } from "@/lib/quire/library";
 import { usePrefs } from "@/lib/quire/prefs";
@@ -52,7 +51,7 @@ export function Shell({
   children: ReactNode;
   width?: "wide" | "prose";
 }) {
-  const testRoom = useSyncExternalStore(subscribeCloudTable,getCloudTable,getServerCloudTable);
+  const testRoom = useSyncExternalStore(subscribeCloudTable, getCloudTable, getServerCloudTable);
   const { job } = useLibrary();
   const seat = useSeat();
   const { count: unreadCount } = useChatUnread();
@@ -189,7 +188,8 @@ export function Shell({
                 onClick={() => void requestRoleChange()}
                 disabled={!seatKnown}
               >
-                {seatKnown ? (dm ? "DM" : "Player") : "…"}{testRoom.testMode && <span className="ml-2 text-negative">Test mode</span>}
+                {seatKnown ? (dm ? "DM" : "Player") : "…"}
+                {testRoom.testMode && <span className="ml-2 text-negative">Test mode</span>}
               </button>
               <div className="header-actions">
                 <AppLink
@@ -267,7 +267,6 @@ export function Shell({
       >
         <div className="mx-auto grid max-w-3xl grid-cols-5">{navLinks("tab")}</div>
       </nav>
-      <Toaster theme={prefs.appearance === "light" ? "light" : "dark"} position="top-center" />
       <BillReceipt />
       <SeatSwitch open={switching} onOpenChange={setSwitching} seat={seat} />
       <Confirm

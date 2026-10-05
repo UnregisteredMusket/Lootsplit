@@ -15,6 +15,7 @@ export default tseslint.config(
       ".vercel/**",
       ".nitro/**",
       "node_modules/**",
+      "public/ocr/**", // Generated, pinned third-party runtime; source is not app code.
       "src/routeTree.gen.ts",
     ],
   },

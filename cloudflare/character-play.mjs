@@ -44,8 +44,10 @@ async function character(db, user, id, own = false) {
   if (!row) fail("Character not found.", 404);
   if (row.campaign_code) {
     const { room, seat } = await membership(db, user, row.campaign_code);
-    if (!room.table.purses.some(p => p.id === row.purse_id) ||
-        (seat.role !== "dm" && !seat.purseIds.includes(row.purse_id)))
+    if (
+      !room.table.purses.some((p) => p.id === row.purse_id) ||
+      (seat.role !== "dm" && !seat.purseIds.includes(row.purse_id))
+    )
       fail("This character is no longer assigned to your campaign seat.", 403);
   }
   if (row.user_id !== user) {
@@ -97,7 +99,7 @@ export async function handleCharacterPlay(db, user, path, body, url) {
         try {
           const { room, seat } = await membership(db, user, r.campaign_code);
           if (seat.role !== "dm" && !seat.purseIds.includes(r.purse_id)) continue;
-          if (!room.table.purses.some(p => p.id === r.purse_id)) continue;
+          if (!room.table.purses.some((p) => p.id === r.purse_id)) continue;
           body = campaignBody(room, r.purse_id);
         } catch (e) {
           if (e.status !== 403 && e.status !== 404) throw e;
@@ -173,20 +175,21 @@ export async function handleCharacterPlay(db, user, path, body, url) {
       projected = JSON.parse(r.body),
       revision = r.revision;
     if (r.campaign_code) {
-        const { room, seat } = await membership(db, user, r.campaign_code);
-        const p = room.table.purses.find((p) => p.id === r.purse_id);
-        if (!p || (seat.role !== "dm" && !seat.purseIds.includes(p.id)))
-          fail("This character is no longer assigned to your campaign seat.", 403);
-        projected = campaignBody(room, p.id);
-        revision = p.sheetRevision || 0;
-        campaign = {
-          code: r.campaign_code,
-          role: seat.role,
-          editingAllowed: seat.role === "dm" || p.editingAllowed === true,
-          manualAllowed: await policy(db, r.campaign_code),
-          coins: p.coins,
-          holdings: room.table.holdings.filter((h) => h.purseId === p.id),
-        };
+      const { room, seat } = await membership(db, user, r.campaign_code);
+      const p = room.table.purses.find((p) => p.id === r.purse_id);
+      if (!p || (seat.role !== "dm" && !seat.purseIds.includes(p.id)))
+        fail("This character is no longer assigned to your campaign seat.", 403);
+      projected = campaignBody(room, p.id);
+      revision = p.sheetRevision || 0;
+      campaign = {
+        code: r.campaign_code,
+        role: seat.role,
+        editingAllowed: seat.role === "dm" || p.editingAllowed === true,
+        permissions: p.permissions || {},
+        manualAllowed: await policy(db, r.campaign_code),
+        coins: p.coins,
+        holdings: room.table.holdings.filter((h) => h.purseId === p.id),
+      };
     }
     return {
       ...r,
