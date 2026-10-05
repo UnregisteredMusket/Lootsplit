@@ -260,8 +260,9 @@ try {
   });
   await openApplication(player.page, origin + "/account");
   await player.page.getByRole("link", { name: "Open DM encounters", exact: true }).click();
-  await player.page.getByLabel("Save in", { exact: true }).waitFor();
-  assert.equal(await player.page.getByLabel("Save in", { exact: true }).inputValue(), "personal");
+  // The select mounts before the account request populates its options. Its
+  // DOM value is temporarily empty even though the requested scope is personal.
+  await expect(player.page.getByLabel("Save in", { exact: true })).toHaveValue("personal");
   assert.equal(
     await player.page
       .getByLabel("Save in", { exact: true })
