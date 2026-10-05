@@ -179,8 +179,11 @@ test("dm-resume", async ({ devices, baseURL: origin }, testInfo) => {
   async function resumeFromAccount(p, code, label) {
     await visit(p, "/account");
     const card = p.locator("article.portal-card").filter({ hasText: code });
+    const acceptSeparate = (dialog) => dialog.accept();
+    p.on("dialog", acceptSeparate);
     await card.getByRole("button", { name: label, exact: true }).click();
     await p.waitForURL((url) => url.origin === origin && url.pathname === "/");
+    p.off("dialog", acceptSeparate);
     await p.getByRole("button", { name: "Dungeon master. Change role.", exact: true }).waitFor();
     assert.equal(
       await p.locator(".loot-opening").count(),
@@ -244,12 +247,46 @@ test("portrait-resume", async ({ devices, baseURL: origin }) => {
   await expect(phone.getByText("Portrait saved on this device", { exact: true })).toBeVisible();
   let portrait = await card.locator(".portrait-picker img").getAttribute("src");
   expect(portrait).toMatch(/^data:image/);
+  const sheetPath = `/characters?id=${encodeURIComponent(`party:${id.slice(6)}`)}`;
+  async function expectPartyPortrait(page, expected) {
+    await visitPage(page, origin, "/party?section=characters");
+    const profile = page.locator("article.party-profile").filter({
+      has: page
+        .getByRole("link", { name: "Open sheet", exact: true })
+        .and(page.locator(`a[href="${sheetPath}"]`)),
+    });
+    const image = profile.locator("img");
+    await expect(image).toHaveAttribute("src", expected);
+    await expect.poll(() => image.evaluate((img) => img.naturalWidth)).toBeGreaterThan(0);
+  }
+  await expectPartyPortrait(phone, portrait);
   const [member] = await createAndSaveRoom(phone, origin);
 
   await visitPage(desktop, origin, "/account");
   await desktop.getByRole("button", { name: "Resume", exact: true }).click();
   await desktop.waitForURL((url) => url.pathname === "/");
   await continueIntoApp(desktop);
+  await expectPartyPortrait(desktop, portrait);
+
+  // The full character sheet has a separate upload/save path. Verify its saved
+  // portrait in the actual Party cards on both devices and the server readout.
+  await visitPage(phone, origin, sheetPath);
+  await phone.getByRole("button", { name: "Edit sheet", exact: true }).click();
+  await phone.getByRole("button", { name: "Character details", exact: true }).click();
+  await phone.getByLabel("Character portrait", { exact: true }).setInputFiles({
+    name: "synthetic-sheet-portrait.png",
+    mimeType: "image/png",
+    buffer: Buffer.from(picture, "base64"),
+  });
+  await phone.getByRole("button", { name: "Save character", exact: true }).click();
+  await expect(phone.getByRole("button", { name: "Save character", exact: true })).toBeDisabled();
+  portrait = `data:image/png;base64,${picture}`;
+  await expectPartyPortrait(phone, portrait);
+  const sheetSaved = await accountPost(desktop.context(), origin, "sheets/detail", {
+    id: `campaign:${member.code}:${id.slice(6)}`,
+  });
+  expect(sheetSaved.body.portrait).toBe(portrait);
+  await expectPartyPortrait(desktop, portrait);
   await visitPage(desktop, origin, "/party?section=funds");
   const restored = desktop.locator(`#${id}`);
   await restored.locator(":scope > summary").click();
@@ -346,4 +383,76 @@ test("portrait-resume", async ({ devices, baseURL: origin }) => {
     id: `campaign:${member.code}:${id.slice(6)}`,
   });
   expect(saved.body.portrait).toBe(portrait);
+});
+
+test("campaign-choice", async ({ devices, baseURL: origin }, testInfo) => {
+  const desktop = devices.page;
+  const { other: phone } = await signedInDevices(devices, origin);
+  await phone.setViewportSize({ width: 390, height: 844 });
+  const members = async () => {
+    const response = await desktop.context().request.get(`${origin}/api/account/library`);
+    expect(response.ok()).toBeTruthy();
+    return (await response.json()).members;
+  };
+  await visitPage(phone, origin, "/share");
+  await phone.getByRole("button", { name: "Start a room", exact: true }).click();
+  await phone.getByRole("button", { name: "Create room", exact: true }).click();
+  await phone.getByRole("button", { name: "Share join link", exact: true }).waitFor();
+  // No manual trip to My account: the new room must be available on device two.
+  await expect.poll(async () => (await members()).length).toBe(1);
+  const firstCode = (await members())[0].code;
+
+  await visitPage(desktop, origin, "/share");
+  await desktop.getByRole("button", { name: "Start a room", exact: true }).click();
+  await expect(
+    desktop.getByRole("link", { name: "Resume a saved campaign", exact: true }),
+  ).toBeVisible();
+  await expect(
+    desktop.getByRole("heading", { name: "You already have saved campaigns", exact: true }),
+  ).toBeVisible();
+  await expect(desktop.getByRole("button", { name: "Create room", exact: true })).toBeDisabled();
+  await desktop.screenshot({
+    path: testInfo.outputPath("saved-campaign-choice.png"),
+    fullPage: true,
+  });
+  await desktop
+    .getByRole("checkbox", { name: "Create a separate room from this device’s copy", exact: true })
+    .check();
+
+  let blocked = 0;
+  const rejectLink = (route) => {
+    blocked++;
+    return route.abort("failed");
+  };
+  await desktop.route("**/api/account/link", rejectLink);
+  await desktop.getByRole("button", { name: "Create room", exact: true }).click();
+  await expect.poll(() => blocked).toBe(1);
+  await expect(
+    desktop.getByRole("alert").filter({ hasText: "Room created, but not saved to your account" }),
+  ).toBeVisible();
+  const secondCode = await desktop.locator(".room-code").innerText();
+  expect(secondCode).not.toBe(firstCode);
+  expect((await members()).length).toBe(1);
+  await desktop.unroute("**/api/account/link", rejectLink);
+  await desktop.getByRole("button", { name: "Retry account save", exact: true }).click();
+  await expect.poll(async () => (await members()).length).toBe(2);
+  await expect(desktop.locator(".room-code")).toHaveText(secondCode);
+
+  await visitPage(phone, origin, "/account");
+  const old = phone.locator("article.portal-card").filter({ hasText: firstCode });
+  await expect(old.getByText("Open on this device", { exact: true })).toBeVisible();
+  let warning = "";
+  phone.once("dialog", async (dialog) => {
+    warning = dialog.message();
+    await dialog.dismiss();
+  });
+  await old.getByRole("button", { name: "Resume", exact: true }).click();
+  await expect.poll(() => warning).toContain("separate rooms");
+  expect(new URL(phone.url()).pathname).toBe("/account");
+  phone.once("dialog", (dialog) => dialog.accept());
+  await old.getByRole("button", { name: "Resume", exact: true }).click();
+  await phone.waitForURL((url) => url.pathname === "/");
+  await visitPage(phone, origin, "/share");
+  await expect(phone.locator(".room-code")).toHaveText(firstCode);
+  expect((await members()).length).toBe(2);
 });

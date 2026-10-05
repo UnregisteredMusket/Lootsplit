@@ -10,7 +10,7 @@ const browser = await chromium.launch({
 });
 await mkdir("test-results", { recursive: true });
 const errors = [];
-const diagnostic = process.env.AUDIT_RECOVERY_DIAGNOSTICS === "1";
+const diagnostic = process.env.AUDIT_RECOVERY_DIAGNOSTICS === "1" || process.env.CI === "true";
 const activeRequests = new Map();
 async function bounded(label, work) {
   let timer;
@@ -100,8 +100,11 @@ try {
   assert.equal(new URL(player.url()).searchParams.has("join"), false);
   console.log("Audit: interrupt purchase and restore queue");
   // Interrupt only API transport so the app and saved queue can reload normally.
+  let interruptCommands = true;
   await player.route("**/_serverFn/**", (route) =>
-    route.request().postData()?.includes("commands") ? route.abort("failed") : route.continue(),
+    interruptCommands && route.request().postData()?.includes("commands")
+      ? route.abort("failed")
+      : route.continue(),
   );
   await bounded("queue interrupted purchase", () =>
     player.evaluate(async () => {
@@ -134,7 +137,10 @@ try {
       Object.values(localStorage).some((v) => v.includes("pending") && v.includes("stockId")),
     ),
   );
-  await player.unroute("**/_serverFn/**");
+  // Keep the handler installed while the restored client's background reads are
+  // active. Restore transport by changing the fault, not by removing interception
+  // during an in-flight poll. Browser context cleanup removes the handler later.
+  interruptCommands = false;
   console.log("Audit: saved queue restored; retry transport");
   await bounded("import restored client", () =>
     player.evaluate(async () => {

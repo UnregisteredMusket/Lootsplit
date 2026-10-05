@@ -431,9 +431,23 @@ function Account() {
                           {m.archived ? "ARCHIVED" : "SHARED CAMPAIGN"} · {m.code}
                         </span>
                         <h3>{m.name}</h3>
+                        {cloud.joined && cloud.code === m.code && (
+                          <p className="portal-message">Open on this device</p>
+                        )}
                         <p className="portal-subtle">
-                          Last used {new Date(m.updated_at).toLocaleDateString()}
+                          Last opened or saved {new Date(m.updated_at).toLocaleString()}
                         </p>
+                        {library.members.some(
+                          (other) =>
+                            !other.archived &&
+                            other.code !== m.code &&
+                            other.name.trim().toLowerCase() === m.name.trim().toLowerCase(),
+                        ) && (
+                          <p className="portal-subtle">
+                            Other rooms share this name. Each room has separate portraits, loot and
+                            progress.
+                          </p>
+                        )}
                         {m.role === "dm" && (
                           <p className="portal-subtle">
                             {m.closed
@@ -495,10 +509,35 @@ function Account() {
                                 throw new Error(
                                   "Submit or resolve pending actions before switching campaigns.",
                                 );
+                              // Another device may have saved a newer room since this page
+                              // opened. Names are a warning only, never campaign identity.
+                              const fresh = await accountRequest<AccountLibrary>("library");
+                              setLibrary(fresh);
+                              const target = fresh.members.find((member) => member.code === m.code);
+                              if (!target)
+                                throw new Error(
+                                  "This saved campaign is no longer available. Refresh My campaigns.",
+                                );
+                              const newer = fresh.members.find(
+                                (other) =>
+                                  !other.archived &&
+                                  other.role &&
+                                  other.code !== target.code &&
+                                  other.name.trim().toLowerCase() ===
+                                    target.name.trim().toLowerCase() &&
+                                  other.updated_at > target.updated_at,
+                              );
+                              if (
+                                newer &&
+                                !window.confirm(
+                                  `Another campaign named “${target.name}” was opened or saved more recently (${newer.code}). These are separate rooms; portraits, loot and progress do not sync between them. Continue opening this older entry (${target.code})?`,
+                                )
+                              )
+                                return;
                               const member = await accountRequest<AccountMembership>("resume", {
-                                code: m.code,
-                                ...(m.closed && m.role === "dm"
-                                  ? { reopen: true, revision: m.room_revision }
+                                code: target.code,
+                                ...(target.closed && target.role === "dm"
+                                  ? { reopen: true, revision: target.room_revision }
                                   : {}),
                               });
                               await resumeAccountMembership(member);

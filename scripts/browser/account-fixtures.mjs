@@ -84,12 +84,19 @@ export async function createAndSaveRoom(page, origin) {
   const skip = page.getByRole("button", { name: "Not now", exact: true });
   if (await skip.isVisible()) await skip.click();
   await page.getByRole("button", { name: "Start a room", exact: true }).click();
+  await expect(page.locator('.multiplayer-hub[aria-busy="false"]')).toBeVisible();
+  const separate = page.getByRole("checkbox", {
+    name: "Create a separate room from this device’s copy",
+    exact: true,
+  });
+  if (await separate.isVisible()) await separate.check();
   await page.getByRole("button", { name: "Create room", exact: true }).click();
   const ready = page.getByRole("button", { name: "Share join link", exact: true });
   const error = page.locator('[data-sonner-toast][data-type="error"]').first();
   await expect(ready.or(error).first()).toBeVisible();
   if (await error.isVisible()) throw new Error(`Room creation: ${await error.innerText()}`);
   await expect(ready).toBeVisible();
+  await expect(page.locator('.multiplayer-hub[aria-busy="false"]')).toBeVisible();
   await visit(page, origin, "/account");
   await page.getByRole("button", { name: "Save current membership", exact: true }).click();
   await expect(
