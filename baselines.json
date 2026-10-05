@@ -5749,5 +5749,22 @@
     "finishedAt": "2026-10-05T08:01:56Z",
     "durationMs": 1000,
     "trendId": "37280755805:1:356d39b2f855cc7f10613120c2b4ef5c301f6c1b9046ad249ec4006b703c5968"
+  },
+  "[\".github/workflows/standby-release.yml\",\"workflow_run\",\"main\",\"step\",\"publish / Complete job\",\"ubuntu-latest\",1]": {
+    "schema": 1,
+    "id": "37281139400:1:9f1893535a4427f03924a84920d484b81b8e44500f4b785eacbffd7cee9906a3",
+    "scope": "[\".github/workflows/standby-release.yml\",\"workflow_run\",\"main\",\"step\",\"publish / Complete job\",\"ubuntu-latest\",1]",
+    "kind": "step",
+    "name": "publish / Complete job",
+    "environment": "ubuntu-latest",
+    "commit": "2fa630f431d0e63df2c6f3ed83ecc8b3c40b1132",
+    "runId": 37281139400,
+    "attempt": 1,
+    "url": "https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37281139400/job/111669265177",
+    "outcome": "success",
+    "startedAt": "2026-10-05T08:02:25Z",
+    "finishedAt": "2026-10-05T08:02:26Z",
+    "durationMs": 1000,
+    "trendId": "37281139400:1:9f1893535a4427f03924a84920d484b81b8e44500f4b785eacbffd7cee9906a3"
   }
 }
