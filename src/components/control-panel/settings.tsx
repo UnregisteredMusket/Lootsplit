@@ -120,9 +120,16 @@ export function ManagementPanel({
           icon: "Desk",
           content: (
             <>
-              <p>Choose the label, icon and destination for each of your six shortcut buttons.</p>
-              <AppLink href="/?view=home&customize=1" className="settings-link">
-                Customize & reorder shortcuts →
+              <p>
+                The Desk uses swipeable information panels. Previously saved shortcuts remain
+                accessible in their settings.
+              </p>
+              <AppLink
+                href="/?view=home&customize=1#saved-shortcuts"
+                className="settings-link"
+                onClick={() => onOpenChange(false)}
+              >
+                Saved shortcut settings →
               </AppLink>
             </>
           ),

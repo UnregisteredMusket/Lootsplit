@@ -18,7 +18,7 @@ The DM Desk and new player Home keep the existing theme and five mobile navigati
 | Journal | Existing visibility rules and writing tools | Existing private/shared entries and attachments |
 | Shop Management | Browse Market | Opening schedules and downtime-driven restocking |
 
-Player Home shows six fixed icon buttons for everyone, including guests: Character Sheet, Bank, My Finances, Properties, Journal and Party chat. There is no player shortcut editor or duplicate feature-card list. Signed-in DMs can still customize six Desk shortcuts and save them across devices. Conflicting saves ask for a reload. Existing DM device shortcuts are offered as the initial account configuration; a previously verified campaign owner can still read cached DM destinations offline, but account customization requires connectivity. Existing player preference records remain compatible and are not deleted.
+Player Home shows six fixed icon buttons for everyone, including guests: Character Sheet, Bank, My Finances, Properties, Journal and Party chat. There is no player shortcut editor or duplicate feature-card list. The DM Desk now uses five swipeable information panels, grouped campaign tools, and a visible Multiplayer settings button. Previously saved DM shortcuts remain accessible through Dashboard → Saved shortcut settings and can still be saved across devices. Conflicting saves ask for a reload. Existing DM device shortcuts are offered as the initial account configuration; a previously verified campaign owner can still read cached DM destinations offline, but account customization requires connectivity. Existing player preference records remain compatible and are not deleted.
 
 Player Home links to the full Character Sheet, Inventory, Campaign/chat and existing tools. Campaign funds remain separate from standalone account characters. Property descriptions never grant authority to change price, ownership or income. Foreclosures and new special-property purchase rules are not included.
 
@@ -26,7 +26,7 @@ Player Home links to the full Character Sheet, Inventory, Campaign/chat and exis
 
 ## Unified DM home
 
-Campaign control combines the DM Desk and campaign overview. The top keeps status, party readouts and customizable shortcuts, followed by one set of feature links. Expand Campaign treasury, Activity & balances, Play sessions, or Campaign tools for totals, transactions, session controls, backups and campaign management. On desktop, Activity & balances retains the full review queue and transaction table. Old `?view=overview` DM links open the same screen; feature screens return to Desk. Player Home is unchanged.
+Campaign control combines the DM Desk and campaign overview. Connection state, encounter status, pending reviews and Multiplayer settings stay visible. Swipe or use named selectors/arrows for Session, Party, Funds, Activity and Rolls; desktop shows several panels together. Session & records and Economy & properties group the feature links. Expand Campaign treasury, Activity & balances, Play sessions, or Campaign tools for totals, transactions, session controls, backups and campaign management. On desktop, Activity & balances retains the full review queue and transaction table. Old `?view=overview` DM links open the same screen; feature screens return to Desk. Player Home is unchanged.
 
 ## Continue a campaign on another device
 

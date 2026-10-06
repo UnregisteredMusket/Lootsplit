@@ -71,6 +71,7 @@ try {
     await reloadApplication(page);
     async function go(feature){
       await page.locator('nav[aria-label="Sections"]:visible').getByRole("link",{name:"Desk",exact:true}).click();
+      if (["financial","bank","shops","properties"].includes(feature)) await page.getByRole("button",{name:/^Economy & properties/}).click();
       await page.locator('.feature-cards').locator(`a[href^="/features/${feature}?"]`).click();
       assert.equal(await page.locator(".loot-opening").count(),0);
     }

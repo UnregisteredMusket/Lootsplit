@@ -1,4 +1,4 @@
-import { openApplication, navigateApplication } from "./title-screen-navigation.mjs";
+import { reloadApplication, navigateApplication } from "./title-screen-navigation.mjs";
 import { chromium } from "playwright";
 import { expect } from "playwright/test";
 import assert from "node:assert/strict";
@@ -50,11 +50,29 @@ try {
     "Market",
     "Library",
   ]);
-  await expect(page.getByRole("button", { name: "Customize", exact: true })).toBeEnabled();
-  assert.equal(await page.locator(".shortcut-button").count(), 6);
-  const last = await page.locator(".shortcut-button").last().boundingBox();
-  const bar = await nav.boundingBox();
-  assert.ok(last.y + last.height <= bar.y, "All six default controls fit above the mobile tabs");
+  assert.equal(await page.locator(".shortcut-button").count(), 0, "Main Desk has no shortcut grid");
+  const information = page.getByRole("region", {name:"Campaign information",exact:true});
+  await expect(information).toBeVisible();
+  assert.equal(await page.locator(".information-panel").count(), 5);
+  await page.locator('.information-selectors').getByRole("button", {name:"Funds",exact:true}).click();
+  await expect(page.locator('.information-selectors').getByRole("button", {name:"Funds",exact:true})).toHaveAttribute("aria-pressed", "true");
+  await page.getByRole("button", {name:"Next information panel",exact:true}).click();
+  await expect(page.locator('.information-selectors').getByRole("button", {name:"Activity",exact:true})).toHaveAttribute("aria-pressed", "true");
+  await page.locator('.information-selectors').getByRole("button", {name:"Session",exact:true}).click();
+  await expect(page.locator('.information-selectors').getByRole("button", {name:"Session",exact:true})).toHaveAttribute("aria-pressed", "true");
+  // Native horizontal input must work too, independent of the jump controls.
+  const stripBounds = await page.locator('.information-strip').boundingBox();
+  await page.mouse.move(stripBounds.x + stripBounds.width / 2, stripBounds.y + 30);
+  await page.mouse.wheel(stripBounds.width, 0);
+  await expect(page.locator('.information-selectors').getByRole("button", {name:"Party",exact:true})).toHaveAttribute("aria-pressed", "true");
+  await page.locator('.information-selectors').getByRole("button", {name:"Session",exact:true}).click();
+  await expect(page.locator('.information-selectors').getByRole("button", {name:"Session",exact:true})).toHaveAttribute("aria-pressed", "true");
+  await page.evaluate(() => { window.multiplayerNavigationMarker = "same-document"; });
+  await page.getByRole("link", {name:"Multiplayer settings",exact:true}).click();
+  await expect(page.getByRole("tab", {name:"Room",exact:true})).toHaveAttribute("aria-selected", "true");
+  assert.equal(await page.evaluate(() => window.multiplayerNavigationMarker), "same-document");
+  assert.equal(await page.locator(".loot-opening").count(), 0);
+  await nav.getByRole("link", {name:"Desk",exact:true}).click();
   await capture("dm-desk");
   await page.evaluate(() => { window.reviewNavigationMarker = "same-document"; });
   await page.locator(".readout").filter({ hasText: "Pending reviews" }).click();
@@ -65,7 +83,7 @@ try {
   await page.getByRole("link", { name: "Return to Desk", exact: true }).click();
   // Both historical entry URLs now expose one DM home without duplicate sections.
   await page.evaluate(() => { window.unifiedHomeMarker = "same-document"; });
-  await page.locator('.readout').filter({hasText:"Current session"}).click();
+  await page.locator(".session-readout").click();
   await expect(page.locator("#sessions").getByLabel("Session name", {exact:true})).toBeVisible();
   assert.equal(await page.locator(".loot-opening").count(), 0);
   assert.equal(await page.evaluate(() => window.unifiedHomeMarker), "same-document");
@@ -73,7 +91,7 @@ try {
   await page.evaluate(() => { window.unifiedHomeMarker = "same-document"; });
   await expect(page.getByRole("heading", {name:"Campaign control",exact:true})).toHaveCount(1);
   await expect(page.locator(".feature-cards")).toHaveCount(1);
-  await expect(page.locator(".desk-shortcuts")).toHaveCount(1);
+  await expect(page.locator(".desk-shortcuts")).toHaveCount(0);
   assert.equal(await page.locator(".desk-overview").count(), 0);
   await page.getByRole("button", {name:/^Campaign treasury/}).click();
   await expect(page.getByRole("link", {name:"Add loot",exact:true})).toBeVisible();
@@ -90,7 +108,9 @@ try {
   await capture("unified-dm-home");
   await visit("/");
 
-  await page.getByRole("button", { name: "Customize", exact: true }).click();
+  await page.getByRole("button", { name: "Settings & Management", exact: true }).click();
+  await page.getByRole("dialog").getByRole("button", {name:"Dashboard",exact:true}).click();
+  await page.getByRole("link", {name:"Saved shortcut settings →",exact:true}).click();
   await page.getByLabel("Button 1", { exact: true }).selectOption("chat");
   await page.getByLabel("Label", { exact: true }).first().fill("Party messages");
   await page.getByRole("button", { name: "Move button 1 down", exact: true }).click();
@@ -103,10 +123,11 @@ try {
     await preferencesReady;
     await route.fulfill({ response });
   });
-  await openApplication(page, origin + "/"); // Explicit reload verifies persisted shortcut edits.
+  await reloadApplication(page); // Explicit reload verifies persisted shortcut edits.
   await expect(page.getByRole("status").filter({ hasText: "Loading your account shortcuts" })).toBeVisible();
   assert.equal(await page.locator(".shortcut-button").count(), 0, "Default destinations cannot be clicked while saved preferences load");
   releasePreferences();
+  await page.getByRole("dialog", {name:"Customize shortcuts",exact:true}).getByRole("button",{name:"Close",exact:true}).click();
   await expect(page.locator(".shortcut-button").nth(1)).toHaveText("Party messages");
   await page.unroute("**/api/account/shortcuts?role=dm");
   assert.equal(await page.locator(".shortcut-button").nth(1).getAttribute("href"), "/share?chat=1");
@@ -214,13 +235,18 @@ try {
     t.setSeat({ ...t.getSeat(), role: "dm" });
   });
   await visit("/");
+  await page.locator(".information-selectors").getByRole("button",{name:"Rolls",exact:true}).click();
+  await expect(page.locator(".information-selectors").getByRole("button",{name:"Rolls",exact:true})).toHaveAttribute("aria-pressed","true");
+  await expect(page.getByRole("button",{name:"Next information panel",exact:true})).toBeDisabled();
+  await page.locator(".information-selectors").getByRole("button",{name:"Session",exact:true}).click();
+  await expect(page.locator(".information-selectors").getByRole("button",{name:"Session",exact:true})).toHaveAttribute("aria-pressed","true");
   await capture("dm-desktop");
   await page.setViewportSize({ width: 320, height: 740 });
   await visit("/");
   await capture("dm-small");
   assert.deepEqual(errors, []);
   console.log(
-    "PASS: role navigation, six-button fit, shortcut edit/reorder/persistence, settings scope, light/dark, focus restoration, 320/390/768/1440 layouts.",
+    "PASS: swipeable summaries, native horizontal input, jump/arrows, multiplayer Room entry, grouped tools, saved-shortcut persistence, role/settings preservation, 320/390/768/1440 layouts.",
   );
 } finally {
   await browser.close();
