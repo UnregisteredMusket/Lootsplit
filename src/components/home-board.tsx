@@ -363,16 +363,16 @@ export function HomeBoard({ embedded = false }: { embedded?: boolean }) {
           </span>
         </Link>
       ) : null}
-      <Link to="/share" className="connection-link">
+      {seat.role === "player" && <Link to="/share" className="connection-link">
         Multiplayer · Room, chat & connection status →
-      </Link>
+      </Link>}
       <div id="journal">
         <CampaignJournal section={embedded ? "sessions" : "overview"} />
       </div>
-      <Fold title="Campaign tools" hint="Multiplayer, display options, and this campaign.">
-        <Link to="/share" className="quick-action primary">
+      <Fold title="Campaign tools" hint={seat.role === "dm" ? "Display options, backups, and this campaign." : "Multiplayer, display options, and this campaign."}>
+        {seat.role === "player" && <Link to="/share" className="quick-action primary">
           Open Multiplayer — host or join a room
-        </Link>
+        </Link>}
 
         <div className="mt-3">
           <Switch

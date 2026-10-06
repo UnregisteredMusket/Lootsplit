@@ -51,6 +51,9 @@ try {
     "Library",
   ]);
   assert.equal(await page.locator(".shortcut-button").count(), 0, "Main Desk has no shortcut grid");
+  await expect(page.getByRole("link", {name:"Multiplayer settings",exact:true})).toHaveCount(1);
+  await expect(page.getByRole("link", {name:/Multiplayer · Room, chat & connection status/})).toHaveCount(0);
+  await expect(page.getByRole("link", {name:"Open Multiplayer — host or join a room",exact:true})).toHaveCount(0);
   const information = page.getByRole("region", {name:"Campaign information",exact:true});
   await expect(information).toBeVisible();
   assert.equal(await page.locator(".information-panel").count(), 5);
@@ -78,6 +81,10 @@ try {
   await page.locator(".readout").filter({ hasText: "Pending reviews" }).click();
   await expect(page.getByRole("heading", { name: "Review Inbox", exact: true })).toBeVisible();
   await expect(page.locator("#review-inbox")).toBeVisible();
+  await expect(page.locator("#review-inbox summary")).toContainText("Payments & loans awaiting approval");
+  await expect(page.getByText("No payments or loans need approval.", {exact:true})).toBeVisible();
+  await expect(page.getByLabel("Payment account", {exact:true})).toHaveCount(0);
+  await expect(page.getByRole("button", {name:"Submit request",exact:true})).toHaveCount(0);
   assert.equal(await page.evaluate(() => window.reviewNavigationMarker), "same-document");
   assert.equal(await page.locator(".loot-opening").count(), 0);
   await page.getByRole("link", { name: "Return to Desk", exact: true }).click();
@@ -97,6 +104,7 @@ try {
   await expect(page.getByRole("link", {name:"Add loot",exact:true})).toBeVisible();
   await page.getByRole("link", {name:"Review requests",exact:true}).click();
   await expect(page.getByRole("heading", {name:"Bank",exact:true})).toBeVisible();
+  await expect(page.getByRole("heading", {name:"Queue a character payment for approval",exact:true})).toBeVisible();
   await page.getByRole("link", {name:"Return to Desk",exact:true}).click();
   await page.getByRole("button", {name:/^Activity & balances/}).click();
   await expect(page.getByRole("heading", {name:"Recent activity",exact:true})).toHaveCount(1);
@@ -189,6 +197,16 @@ try {
     "Library",
   ]);
   await capture("player-character");
+  await nav.getByRole("link", {name:"Home",exact:true}).click();
+  await page.getByRole("link", {name:"Bank",exact:true}).click();
+  await expect(page.getByRole("heading", {name:"Request approval to spend coins",exact:true})).toBeVisible();
+  const paymentPurse = await page.getByLabel("Payment account", {exact:true}).inputValue();
+  assert.ok(paymentPurse, "Player request is assigned to their character");
+  await page.getByLabel("Payment amount in copper", {exact:true}).fill("1");
+  await page.getByLabel("Payment description", {exact:true}).fill("Review audit inn bill");
+  await page.getByRole("button", {name:"Submit request",exact:true}).click();
+  await expect(page.locator("#review-inbox .journal-entry").filter({hasText:"Review audit inn bill"})).toContainText("pending");
+  await visit("/characters");
   await page.getByRole("button", { name: "Settings & Management", exact: true }).click();
   await dialog.getByRole("button", { name: "Character", exact: true }).waitFor();
   assert.equal(await dialog.getByRole("button", { name: "Economy", exact: true }).count(), 0);
@@ -235,6 +253,13 @@ try {
     t.setSeat({ ...t.getSeat(), role: "dm" });
   });
   await visit("/");
+  await page.locator(".readout").filter({hasText:"Pending reviews"}).click();
+  const paymentRequest = page.locator("#review-inbox .journal-entry").filter({hasText:"Review audit inn bill"});
+  await expect(paymentRequest.getByRole("button", {name:"Approve payment",exact:true})).toBeVisible();
+  await paymentRequest.getByRole("button", {name:"Decline",exact:true}).click();
+  await expect(paymentRequest).toContainText("denied");
+  await expect(page.getByLabel("Payment account", {exact:true})).toHaveCount(0);
+  await page.getByRole("link", {name:"Return to Desk",exact:true}).click();
   await page.locator(".information-selectors").getByRole("button",{name:"Rolls",exact:true}).click();
   await expect(page.locator(".information-selectors").getByRole("button",{name:"Rolls",exact:true})).toHaveAttribute("aria-pressed","true");
   await expect(page.getByRole("button",{name:"Next information panel",exact:true})).toBeDisabled();

@@ -109,7 +109,7 @@ function FeaturePage() {
             )}
             {feature === "review" && (
               <>
-                {(!code || code === room.code) && <CampaignJournal section="bank" />}
+                {(!code || code === room.code) && <CampaignJournal section="bank" reviewOnly />}
                 {code || room.joined ? (
                   <CharacterImportReviews code={code || room.code} />
                 ) : (

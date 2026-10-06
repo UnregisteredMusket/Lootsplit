@@ -1,3 +1,7 @@
+# DM review clarity — 2026-10-06 UTC
+
+Baseline main/live8a8e28c3afda624abd33c7e43a602fe061891ae5, completed PR55/release. Branch fix/dm-review-local-play removes duplicate DM multiplayer entries and the DM inbox composer; all financial actions remain in Bank/player views. Clarifies current offline dependencies and records the offline pass-phone design, not a new offline turn engine. Quick508 pass/four skips, clean types/lint, web/mobile builds and control-panel26.138s/finance25.633s passed locally with Node22.23.3/Chromium133. See docs/audit/2026-10-06-dm-review-clarity.md. Existing gated website publication authorization applies. No migration or signed APK update. Inspect exact PR/main/deployment/live state before claiming release or retrying writes.
+
 # Unified DM home — 2026-10-06 UTC
 
 - User requested combining DM control panel and campaign overview to reduce clutter. Branch `fix/unified-dm-home`; baseline clean main/live3c3336c8d5708dd9b1ce907d6f65a5d8c77663af. PR52 was fully verified/deployed (main37429247281, deploy37429724509); its PR body supersedes historical pending notes below. No migration needs repeating.
