@@ -33,6 +33,8 @@ const id = z.string().min(1).max(150),
   qty = amount.min(1).max(100000);
 const base = { id };
 export const commandSchema = z.discriminatedUnion("kind", [
+  z.object({ ...base, kind: z.literal("bank-repay"), loanId: id, copper: amount.min(1) }),
+  z.object({ ...base, kind: z.literal("property-details"), holdingId: id, before: z.object({name:z.string(),notes:z.string()}), name: z.string().trim().min(1).max(160), notes: z.string().max(4000) }),
   z.object({ ...base, kind: z.literal("shop-schedule"), shopId: id, schedule: shopScheduleSchema.nullable() }),
   z.object({ ...base, kind: z.literal("property-plan"), holdingId: id, income: amount, upkeep: amount, periodDays: z.number().int().min(1).max(3650), active: z.boolean() }),
   z.object({
@@ -260,7 +262,14 @@ export function applyCommand(input: CloudTable, seat: CloudSeat, raw: Command): 
       throw Error("Cancel the pending downtime before changing finance agreements.");
     return f;
   };
-  if (cmd.kind === "shop-schedule") {
+  if (cmd.kind === "property-details") {
+    const h = t.holdings.find(h => h.id === cmd.holdingId && h.kind === "property" && h.quantity > 0);
+    if (!h) throw Error("Property no longer exists.");
+    own(h.purseId);
+    if (h.name !== cmd.before.name || h.notes !== cmd.before.notes) throw Error("Property details changed. Reload before saving.");
+    h.name = cmd.name; h.notes = cmd.notes;
+    event(`Property details updated: ${h.name}`, "management", h.purseId);
+  } else if (cmd.kind === "shop-schedule") {
     const f = editableFinance();
     const shop = t.shops.find((s) => s.id === cmd.shopId);
     if (!shop) throw Error("Shop no longer exists.");
@@ -349,11 +358,13 @@ export function applyCommand(input: CloudTable, seat: CloudSeat, raw: Command): 
       throw Error("Finish the current interest period before changing its length.");
     Object.assign(l, cmd.terms);
     event(`Loan terms updated: ${l.name}`, "management", l.purseId);
-  } else if (cmd.kind === "finance-repay") {
-    const f = editableFinance(),
+  } else if (cmd.kind === "finance-repay" || cmd.kind === "bank-repay") {
+    const f = cmd.kind === "finance-repay" ? editableFinance() : finance(),
       l = f.loans.find((l) => l.id === cmd.loanId);
     if (!l || cmd.copper > l.principal + l.interest)
       throw Error("Repayment exceeds the outstanding debt.");
+    own(l.purseId);
+    if (f.downtime.some(d => d.status === "pending")) throw Error("The DM must settle or cancel pending downtime before repayment.");
     financeMove(t, l.purseId, -cmd.copper, cmd.id, `${l.name}: manual repayment`, at, !!l.lenderId);
     if (l.lenderId)
       financeMove(

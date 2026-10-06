@@ -29,6 +29,7 @@ import { Route as UpdatesRouteImport } from './routes/updates'
 import { Route as WelcomeRouteImport } from './routes/welcome'
 import { Route as BookBookIdRouteImport } from './routes/book.$bookId'
 import { Route as DownloadAndroidRouteImport } from './routes/download.android'
+import { Route as FeaturesFeatureRouteImport } from './routes/features.$feature'
 import { Route as ReadArticleIdRouteImport } from './routes/read.$articleId'
 import { Route as ShopShopIdRouteImport } from './routes/shop.$shopId'
 
@@ -132,6 +133,11 @@ const DownloadAndroidRoute = DownloadAndroidRouteImport.update({
   path: '/download/android',
   getParentRoute: () => rootRouteImport,
 } as any)
+const FeaturesFeatureRoute = FeaturesFeatureRouteImport.update({
+  id: '/features/$feature',
+  path: '/features/$feature',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ReadArticleIdRoute = ReadArticleIdRouteImport.update({
   id: '/read/$articleId',
   path: '/read/$articleId',
@@ -164,6 +170,7 @@ export interface FileRoutesByFullPath {
   '/welcome': typeof WelcomeRoute
   '/book/$bookId': typeof BookBookIdRoute
   '/download/android': typeof DownloadAndroidRoute
+  '/features/$feature': typeof FeaturesFeatureRoute
   '/read/$articleId': typeof ReadArticleIdRoute
   '/shop/$shopId': typeof ShopShopIdRoute
 }
@@ -188,6 +195,7 @@ export interface FileRoutesByTo {
   '/welcome': typeof WelcomeRoute
   '/book/$bookId': typeof BookBookIdRoute
   '/download/android': typeof DownloadAndroidRoute
+  '/features/$feature': typeof FeaturesFeatureRoute
   '/read/$articleId': typeof ReadArticleIdRoute
   '/shop/$shopId': typeof ShopShopIdRoute
 }
@@ -213,6 +221,7 @@ export interface FileRoutesById {
   '/welcome': typeof WelcomeRoute
   '/book/$bookId': typeof BookBookIdRoute
   '/download/android': typeof DownloadAndroidRoute
+  '/features/$feature': typeof FeaturesFeatureRoute
   '/read/$articleId': typeof ReadArticleIdRoute
   '/shop/$shopId': typeof ShopShopIdRoute
 }
@@ -239,6 +248,7 @@ export interface FileRouteTypes {
     | '/welcome'
     | '/book/$bookId'
     | '/download/android'
+    | '/features/$feature'
     | '/read/$articleId'
     | '/shop/$shopId'
   fileRoutesByTo: FileRoutesByTo
@@ -263,6 +273,7 @@ export interface FileRouteTypes {
     | '/welcome'
     | '/book/$bookId'
     | '/download/android'
+    | '/features/$feature'
     | '/read/$articleId'
     | '/shop/$shopId'
   id:
@@ -287,6 +298,7 @@ export interface FileRouteTypes {
     | '/welcome'
     | '/book/$bookId'
     | '/download/android'
+    | '/features/$feature'
     | '/read/$articleId'
     | '/shop/$shopId'
   fileRoutesById: FileRoutesById
@@ -312,6 +324,7 @@ export interface RootRouteChildren {
   WelcomeRoute: typeof WelcomeRoute
   BookBookIdRoute: typeof BookBookIdRoute
   DownloadAndroidRoute: typeof DownloadAndroidRoute
+  FeaturesFeatureRoute: typeof FeaturesFeatureRoute
   ReadArticleIdRoute: typeof ReadArticleIdRoute
   ShopShopIdRoute: typeof ShopShopIdRoute
 }
@@ -458,6 +471,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DownloadAndroidRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/features/$feature': {
+      id: '/features/$feature'
+      path: '/features/$feature'
+      fullPath: '/features/$feature'
+      preLoaderRoute: typeof FeaturesFeatureRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/read/$articleId': {
       id: '/read/$articleId'
       path: '/read/$articleId'
@@ -496,6 +516,7 @@ const rootRouteChildren: RootRouteChildren = {
   WelcomeRoute: WelcomeRoute,
   BookBookIdRoute: BookBookIdRoute,
   DownloadAndroidRoute: DownloadAndroidRoute,
+  FeaturesFeatureRoute: FeaturesFeatureRoute,
   ReadArticleIdRoute: ReadArticleIdRoute,
   ShopShopIdRoute: ShopShopIdRoute,
 }

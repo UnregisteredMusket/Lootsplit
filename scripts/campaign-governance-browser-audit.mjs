@@ -83,6 +83,7 @@ try {
     seats: [
       { id: "dm", token: "host-token", name: "DM", role: "dm", purseIds: [] },
       { id: "player", token: "player-token", name: "Player", role: "player", purseIds: ["hero"] },
+      { id: "guest", token: "guest-token", name: "Guest", role: "player", purseIds: ["hero"] },
     ],
     seen: { gifts: [], sales: [] },
     table: {
@@ -96,6 +97,7 @@ try {
         },
       ],
       holdings: [
+        {id:"home-inn",purseId:"hero",name:"Player inn",kind:"property",quantity:1,unitCopper:20000,notes:"A small inn"},
         {
           id: "potion",
           purseId: "hero",
@@ -115,6 +117,7 @@ try {
       sheets: [],
       notes: [],
       journal: {
+        finance:{day:0,loans:[{id:"home-debt",name:"Bank test debt",purseId:"hero",lenderId:"",rateBps:0,periodDays:7,compound:false,payment:0,principal:100,interest:0,due:0,carryDays:0,interestRemainder:0,paid:0}],rules:[{id:"home-income",name:"Inn revenue",purseId:"hero",kind:"income",copper:20,periodDays:7,holdingId:"home-inn",active:true,carryDays:0,arrears:0}],downtime:[]},
         sessions: [
           {
             id: "audit-session",
@@ -172,6 +175,56 @@ try {
     await a.page.locator(".quire-dawn").waitFor({ state: "hidden" });
     await a.page.waitForLoadState("networkidle");
   }
+  const guestContext=await browser.newContext({viewport:{width:390,height:844}});
+  await guestContext.addInitScript(()=>localStorage.setItem("quire.guide.offer.v3","seen"));
+  const guestPage=await guestContext.newPage();
+  guestPage.guestAccessAudit=true;
+  await openApplication(guestPage,origin+"/?as=player");
+  await Promise.all([
+    guestPage.waitForNavigation({waitUntil:"domcontentloaded"}),
+    guestPage.evaluate(async code=>(await import("/src/lib/quire/cloud-client.ts")).resumeAccountMembership({userId:"",code,seatId:"guest",token:"guest-token",role:"player",purseIds:["hero"],name:"Guest feature fixture"}),code).catch(e=>{if(!e.message.includes("Execution context was destroyed"))throw e;})
+  ]);
+  await guestPage.getByRole("heading",{name:"Home",exact:true}).waitFor();
+  await expect(guestPage.locator('.feature-cards a[href^="/features/bank?"]')).toBeVisible();
+  assert.equal(await guestPage.getByRole("button",{name:"Customize",exact:true}).count(),0);
+  assert.equal(await guestPage.evaluate(()=>Object.keys(localStorage).some(k=>k.startsWith("lootsplit.account-shortcuts"))),false);
+  await guestContext.close();
+  console.log("Feature screens: player Home, bank repayment, property permissions and account shortcuts");
+  await player.page.setViewportSize({width:390,height:844});
+  await visit(player.page,"/");
+  await player.page.getByRole("heading",{name:"Home",exact:true}).waitFor();
+  await player.page.evaluate(()=>window.featureDocumentMarker="same-document");
+  await player.page.locator('.feature-cards a[href^="/features/bank?"]').click();
+  await player.page.getByLabel("Repayment in copper",{exact:true}).fill("25");
+  await player.page.getByRole("button",{name:"Make repayment",exact:true}).click();
+  await expect.poll(async()=> (await state(host.page)).journal.finance.loans[0].principal).toBe(75);
+  assert.equal(await player.page.getByLabel("Loan name",{exact:true}).count(),0,"Players cannot edit loan terms");
+  await player.page.getByRole("link",{name:"Return to Home",exact:true}).click();
+  await player.page.locator('.feature-cards a[href^="/features/properties?"]').click();
+  await player.page.getByLabel("Property name",{exact:true}).fill("Renamed player inn");
+  await player.page.getByRole("button",{name:"Save property details",exact:true}).click();
+  await expect.poll(async()=> (await state(host.page)).holdings.find(h=>h.id==="home-inn").name).toBe("Renamed player inn");
+  assert.equal((await state(host.page)).holdings.find(h=>h.id==="home-inn").unitCopper,20000);
+  assert.equal(await player.page.getByLabel("Property revenue (cp)",{exact:true}).count(),0);
+  await player.page.locator(".feature-return a").click();
+  await player.page.locator('.feature-cards a[href^="/features/finances?"]').click();
+  await player.page.getByText(/Inn revenue.*2 sp every 7 days/).waitFor();
+  await player.page.screenshot({path:output+"/player-finances-mobile.png",fullPage:true});
+  await player.page.locator(".feature-return a").click();
+  await player.page.getByRole("button",{name:"Customize",exact:true}).click();
+  await player.page.getByLabel("Button 1",{exact:true}).selectOption("bank");
+  await player.page.getByLabel("Label",{exact:true}).first().fill("Personal bank");
+  await player.page.getByRole("button",{name:"Save shortcuts",exact:true}).click();
+  await expect(player.page.locator(".shortcut-button").first()).toContainText("Personal bank");
+  const second=await browser.newContext({storageState:await player.context.storageState(),extraHTTPHeaders:{"cf-connecting-ip":"192.0.2.215"}});
+  const read=await second.request.get(origin+"/api/account/shortcuts?role=player");
+  assert.equal((await read.json()).items[0].label,"Personal bank","Another signed-in browser receives account shortcuts");
+  await second.close();
+  assert.equal(await player.page.evaluate(()=>window.featureDocumentMarker),"same-document");
+  assert.equal(await player.page.locator(".loot-opening").count(),0);
+  assert.ok(await player.page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
+  await player.page.screenshot({path:output+"/player-home-mobile.png",fullPage:true});
+  await player.page.setViewportSize({width:1360,height:1000});
   console.log("Governance audit: live account character receives loot and portrait without reload");
   await visit(player.page, `/characters?id=${encodeURIComponent(`campaign:${code}:hero`)}`);
   await player.page.getByRole("heading", { name: "Governance hero", exact: true }).waitFor();
@@ -283,7 +336,7 @@ try {
   await enabled(player.page.getByLabel("Maximum HP", { exact: true }), false);
   await permissionsMenu.getByRole("button", { name: "Close", exact: true }).click();
   await host.page.screenshot({ path: output + "/party-desktop.png", fullPage: true });
-  await visit(host.page, "/?view=overview#journal");
+  await visit(host.page, "/features/reports");
   const changes = host.page
     .locator(".loot-fold")
     .filter({ has: host.page.getByRole("button", { name: /^Character edit reports/ }) })
@@ -292,6 +345,7 @@ try {
   await changes.getByText("Governance hero", { exact: false }).first().waitFor();
   await changes.locator("details > summary").click();
   await changes.getByText(/species.*Human.*Elf/).waitFor();
+  await visit(host.page,"/?view=overview");
   const sessions = host.page.locator("#sessions");
   await sessions.locator(":scope > div > button").first().click();
   await sessions.getByRole("button", { name: "End session", exact: true }).click();
@@ -299,6 +353,7 @@ try {
     await host.page.waitForTimeout(250);
   assert.equal((await state(host.page)).journal.reports.length, 1);
   assert.equal((await state(host.page)).ledger.length, 0);
+  await visit(host.page,"/features/journal");
   await host.page.getByLabel("Journal entry title", { exact: true }).fill("The first chronicle");
   await host.page
     .getByLabel("Journal entry text", { exact: true })
@@ -310,6 +365,8 @@ try {
   await host.page.setViewportSize({ width: 390, height: 844 });
   await host.page.locator(".journal-book").screenshot({ path: output + "/journal-mobile.png" });
   await host.page.setViewportSize({ width: 1360, height: 1000 });
+  await visit(host.page,"/?view=overview");
+  await sessions.locator(":scope > div > button").first().click();
   await sessions.getByLabel("Session name", { exact: true }).fill("Next session");
   await sessions.getByRole("button", { name: "Start session", exact: true }).click();
   const downtimeDialog = host.page.getByRole("dialog", {
@@ -444,7 +501,7 @@ try {
   );
   assert.deepEqual(errors, []);
   console.log(
-    "PASS: desktop/mobile DM edit toggle and change report, locked construction, health/equip/consume gameplay, archival before clearing logs, voluntary leave, account reports, owner Test configurator/indicator/reset and isolated campaign data.",
+    "PASS: guest Home without preferences, account player Home/repayment/property permissions/shortcuts, desktop/mobile DM edit toggle and change report, locked construction, health/equip/consume gameplay, archival before clearing logs, voluntary leave, account reports, owner Test configurator/indicator/reset and isolated campaign data.",
   );
 } catch (error) {
   for (const context of browser.contexts())

@@ -1,3 +1,5 @@
+import { useDraftGuard } from "@/lib/quire/use-draft-guard";
+import { FeatureLink } from "./feature-navigation";
 import { FantasyIcon } from "@/components/fantasy-icon";
 import { useEffect, useState, type FormEvent } from "react";
 import { useEconomy } from "@/lib/quire/economy-context";
@@ -9,15 +11,12 @@ import type { Listing } from "@/lib/quire/market";
 import { Button, Fold, Segmented, TextInput } from "@/components/ui";
 
 export function MarketBoard() {
-  const seat = useSeat();
   return (
     <>
       <Fold title="Holdings and property" hint="Items and places for sale, apart from the shops.">
         <Listings />
       </Fold>
-      <Fold title="Loans" hint="A player asks. The dungeon master approves or denies.">
-        {seat.role === "dm" ? <LoanQueue /> : <LoanAskForm />}
-      </Fold>
+      <section className="journal-entry"><p>Loans, repayments and financial requests</p><FeatureLink feature="bank">Open Bank</FeatureLink></section>
     </>
   );
 }
@@ -149,13 +148,15 @@ function ListingForm({ onAdd }: { onAdd: (input: { name: string; kind: Listing["
   );
 }
 
-function LoanAskForm() {
+export function LoanAskForm() {
   const { purses, loans, askLoan } = useEconomy();
   const seat = useSeat();
   const mine = purses.filter((purse) => seat.purseIds.includes(purse.id));
   const [purseId, setPurseId] = useState(mine[0]?.id ?? "");
+  const [busy,setBusy]=useState(false),[error,setError]=useState("");
   const [amount, setAmount] = useState("");
   const [note, setNote] = useState("");
+  useDraftGuard(!!amount || !!note, "loan request");
   const asked = loans.filter((loan) => mine.some((purse) => purse.id === loan.purseId));
 
   useEffect(() => {
@@ -178,13 +179,14 @@ function LoanAskForm() {
       {mine.length === 0 ? <p className="mt-3 text-sm text-muted">This link has no account to borrow for.</p> : (
         <form
           className="mt-3 flex flex-col gap-2"
-          onSubmit={(event) => {
+          onSubmit={async (event) => {
             event.preventDefault();
             const copper = parsePrice(amount);
             if (!purseId || copper === null || !note.trim()) return;
-            void askLoan(purseId, copper, note.trim());
-            setAmount("");
-            setNote("");
+            if(busy)return;setBusy(true);setError("");
+            try{await askLoan(purseId,copper,note.trim());setAmount("");setNote("");}
+            catch(e){setError(e instanceof Error?e.message:"Could not request loan.");}
+            finally{setBusy(false);}
           }}
         >
           <select value={purseId} onChange={(event) => setPurseId(event.target.value)} className="min-h-11 rounded-sm border border-border bg-subtle px-3 text-base text-fg" aria-label="Borrow for">
@@ -196,7 +198,8 @@ function LoanAskForm() {
           </select>
           <TextInput value={amount} onChange={(event) => setAmount(event.target.value)} placeholder="50 gp" aria-label="Loan amount" />
           <TextInput value={note} onChange={(event) => setNote(event.target.value)} placeholder="What it is for" aria-label="Loan reason" />
-          <Button type="submit" variant="secondary">
+          {error && <p role="alert">{error}</p>}
+          <Button disabled={busy} type="submit" variant="secondary">
             Request loan
           </Button>
         </form>
@@ -205,7 +208,7 @@ function LoanAskForm() {
   );
 }
 
-function LoanQueue() {
+export function LoanQueue() {
   const { loans, decideLoan } = useEconomy();
   const waiting = loans.filter((loan) => loan.status === "pending");
   const answered = loans.filter((loan) => loan.status !== "pending").slice(-6).reverse();

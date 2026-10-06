@@ -343,7 +343,7 @@ test("structured DM audit details stay server-side for player responses", async 
   assert.equal((await roomState(dm)).table.journal?.events[0]?.change?.after?.copper, 20);
 });
 
-test("campaign finance is DM-only in persisted room projections", async () => {
+test("players receive only their own finance agreements in persisted room projections", async () => {
   const { applyCommand } = await import("./commands.ts");
   let table: import("./cloud.ts").CloudTable = {
     ...emptyCloudTable(),
@@ -370,8 +370,8 @@ test("campaign finance is DM-only in persisted room projections", async () => {
   const host = await openRoom({ name: "Finance DM", table });
   const pc = await joinRoom({ code: host.code, purseId: "finance-pc", name: "PC" });
   assert.equal((await roomState(host)).table.journal?.finance?.loans[0].principal, 500);
-  assert.equal(
-    (await roomState({ code: host.code, token: pc.token })).table.journal?.finance,
-    undefined,
-  );
+  const projected=(await roomState({code:host.code,token:pc.token})).table.journal!.finance!;
+  assert.equal(projected.loans.length,1);
+  assert.equal(projected.loans[0].principal,500);
+  assert.deepEqual(projected.downtime,[]);
 });

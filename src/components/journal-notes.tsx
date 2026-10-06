@@ -1,3 +1,4 @@
+import { useDraftGuard } from "@/lib/quire/use-draft-guard";
 import { playSound } from "@/lib/quire/sound";
 import { useState } from "react";
 import { toast } from "sonner";
@@ -13,6 +14,7 @@ export function JournalNotes() {
     [visibility, setVisibility] = useState<"dm" | "party" | "player">(dm ? "dm" : "player"),
     [attachments, setAttachments] = useState<string[]>([]),
     [busy, setBusy] = useState(false);
+  useDraftGuard(!!title || !!text || attachments.length>0,"journal");
   const [selected, setSelected] = useState<string | null>(null);
   const [writing, setWriting] = useState(false);
   const entries = (journal.entries || []).filter(
@@ -25,7 +27,7 @@ export function JournalNotes() {
   const purseId =
     purses.find((p) => p.kind === "character" && seat.purseIds.includes(p.id))?.id || "";
   return (
-    <section className="journal-book" aria-label="Session journal">
+    <section id="journal" className="journal-book" aria-label="Session journal">
       <header>
         <div>
           <p className="journal-kicker">The campaign chronicle</p>

@@ -2014,7 +2014,7 @@ async function audit(
 export async function executeFinanceCommand(input: CommandInput): Promise<void> {
   if (!(
     input.kind.startsWith("finance-") ||
-    input.kind === "shop-schedule" || input.kind === "property-plan" ||
+    input.kind === "shop-schedule" || input.kind === "property-plan" || input.kind === "property-details" || input.kind === "bank-repay" ||
     input.kind.startsWith("downtime-") ||
     input.kind === "session"
   ))
@@ -2039,6 +2039,7 @@ export async function executeFinanceCommand(input: CommandInput): Promise<void> 
     for (const shop of next.shops) if (priorShops.get(shop.id) !== JSON.stringify(shop)) tx.objectStore("shops").put(shop);
     for (const line of next.stock) if (priorStock.get(line.id) !== line.quantity) tx.objectStore("stock").put(line);
     for (const p of next.purses) tx.objectStore("purses").put(p);
+    if (input.kind === "property-details") for (const h of next.holdings) tx.objectStore("holdings").put(h);
     if (input.kind === "session") {
       tx.objectStore("ledger").clear();
       tx.objectStore("meta").put({ id: "chat", notes: next.notes });

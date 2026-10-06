@@ -94,7 +94,7 @@ function PartyPage() {
               {label}
             </button>
           ))}
-          <AppLink href="/?view=overview#journal">Ledger</AppLink>
+          <AppLink href={seat.role === "dm" ? "/features/reports" : "/features/finances"}>Ledger</AppLink>
         </div>
       )}
       {seat.role === "dm" && section === "characters" && (

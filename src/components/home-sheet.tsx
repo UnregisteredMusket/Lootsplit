@@ -1,3 +1,4 @@
+import { FeatureLink } from "./feature-navigation";
 import { CharacterWorkspace } from "@/components/characters/workspace";
 import { getServerCloudTable } from "@/lib/quire/cloud-client";
 import { InventoryList, PortraitPicker } from "./ledger-art";
@@ -129,9 +130,7 @@ export function HomeSheet() {
         >
           Sell
         </Link>
-        <Link to="/market" search={{ book: "" }} className="quick-action">
-          Request loan
-        </Link>
+        <FeatureLink feature="bank">Request loan</FeatureLink>
         {!cloud.joined ? (
           <Link
             to="/party"

@@ -113,7 +113,7 @@ try {
   });
   await visit("/characters");
   assert.deepEqual(await nav.locator("a").allTextContents(), [
-    "Character",
+    "Home",
     "Inventory",
     "Campaign",
     "Market",

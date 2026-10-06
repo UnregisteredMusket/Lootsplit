@@ -359,3 +359,31 @@ test("property plans reuse linked recurring rules instead of duplicating income"
   assert.equal(t.journal!.finance!.rules[0].id, "legacy-property");
   assert.equal(toCopper(settle(t, 7).purses[0].coins), 1200);
 });
+
+test("bank repayment spends only the borrower's coins and preserves other permissions", () => {
+ const t=funded({payment:0});const loanId=t.journal!.finance!.loans[0].id;
+ const next=applyCommand(t,player,{id:"bank-pay",kind:"bank-repay",loanId,copper:100});
+ assert.equal(next.journal!.finance!.loans[0].principal,900);
+ assert.equal(toCopper(next.purses[0].coins),toCopper(t.purses[0].coins)-100);
+ assert.throws(()=>applyCommand(t,{...player,purseIds:["b"]},{id:"bad",kind:"bank-repay",loanId,copper:100}),/permission/);
+ const pending=act(t,{kind:"downtime-plan",name:"Pending",days:7});
+ assert.throws(()=>applyCommand(pending,player,{id:"pending-pay",kind:"bank-repay",loanId,copper:100}),/pending downtime/);
+});
+test("property description edits preserve ownership/value and reject stale or unauthorized writes",()=>{
+ const t=fixture(), h=t.holdings[0]; h.kind="property";
+ const cmd={id:"rename",kind:"property-details" as const,holdingId:h.id,before:{name:h.name,notes:h.notes},name:"New inn",notes:"New description"};
+ const next=applyCommand(t,player,cmd);
+ assert.deepEqual(next.holdings[0],{...h,name:cmd.name,notes:cmd.notes});
+ assert.throws(()=>applyCommand(next,player,cmd),/changed/);
+ assert.throws(()=>applyCommand(t,{...player,purseIds:["b"]},cmd),/permission/);
+});
+test("financial projections exclude other characters and all downtime quote snapshots",async()=>{
+ const {projectRecord}=await import("./session-records.ts");
+ let t=funded();t=act(t,{kind:"finance-loan",principal:700,terms:{...terms,name:"Private other debt",purseId:"b"}});
+ t=act(t,{kind:"downtime-plan",name:"Private preview",days:7});
+ const p=projectRecord(t,player);
+ assert.equal(p.journal!.finance!.loans.length,1);
+ assert.equal(p.journal!.finance!.loans[0].purseId,"a");
+ assert.deepEqual(p.journal!.finance!.downtime,[]);
+ assert.ok(!JSON.stringify(p.journal!.finance).includes("Private other debt"));
+});

@@ -27,7 +27,7 @@ try {
     const page = await context.newPage();
     lastPage = page;
     page.on("pageerror", (e) => errors.push(e.message));
-    await openApplication(page, origin + "/?view=overview");
+    await openApplication(page, origin + "/features/bank");
     await page.locator("#campaign-finance").waitFor();
     const notNow = page.getByRole("button", { name: "Not now", exact: true });
     if (await notNow.isVisible()) await notNow.click();
@@ -69,12 +69,12 @@ try {
       db.close();
     });
     await reloadApplication(page);
+    async function go(feature){
+      await page.locator('nav[aria-label="Sections"]:visible').getByRole("link",{name:"Desk",exact:true}).click();
+      await page.locator('.feature-cards').locator(`a[href^="/features/${feature}?"]`).click();
+      assert.equal(await page.locator(".loot-opening").count(),0);
+    }
     const finance = page.locator("#campaign-finance");
-    await finance.locator(":scope > summary").click();
-    await finance
-      .locator("summary")
-      .filter({ hasText: /^Loans & repayments/ })
-      .click();
     await page.getByLabel("Loan name", { exact: true }).fill("Guild debt");
     await page.getByLabel("Principal (cp)", { exact: true }).fill("1000");
     await page.getByLabel("Interest per period (%)", { exact: true }).fill("10");
@@ -82,11 +82,7 @@ try {
     await page.getByLabel("Scheduled repayment per period (cp)", { exact: true }).fill("200");
     await page.getByRole("button", { name: "Approve & fund loan", exact: true }).click();
     await finance.getByText("Guild debt · Finance party", { exact: true }).waitFor();
-    await finance
-      .locator("summary")
-      .filter({ hasText: /^Loans & repayments/ })
-      .click();
-    await finance.locator("summary").filter({ hasText: "Recurring revenue & expenses" }).click();
+    await go("financial");
     await page.getByLabel("Schedule name", { exact: true }).fill("Inn revenue");
     await page.getByLabel("Amount per period (cp)", { exact: true }).fill("100");
     await page.getByLabel("Every (in-game days)", { exact: true }).fill("7");
@@ -99,7 +95,7 @@ try {
     await page.getByLabel("Every (in-game days)", { exact: true }).fill("7");
     await page.getByRole("button", { name: "Save schedule", exact: true }).click();
     await finance.getByText("Upkeep · Finance party", { exact: true }).waitFor();
-    await finance.locator("summary").filter({ hasText: "Recurring revenue & expenses" }).click();
+    await go("downtime");
     await finance
       .locator("summary")
       .filter({ hasText: "Set downtime & review calculations" })
@@ -123,13 +119,9 @@ try {
     await approve.click();
     await finance.getByText(/In-game day 7/).waitFor();
     await page.getByText(/Received 1 gp · Spent 2 gp, 5 sp · Net/).waitFor();
+    await go("bank");
     await reloadApplication(page);
-    await finance.locator(":scope > summary").click();
     await finance.getByText(/Outstanding loans 9 gp · In-game day 7/).waitFor();
-    await finance
-      .locator("summary")
-      .filter({ hasText: /^Loans & repayments/ })
-      .click();
     await page.getByLabel("Repayment in copper for Guild debt", { exact: true }).fill("100");
     await page.getByRole("button", { name: "Record repayment", exact: true }).click();
     await finance.getByText(/Outstanding loans 8 gp · In-game day 7/).waitFor();
@@ -155,14 +147,12 @@ try {
       return active;
     });
     await reloadApplication(page);
-    await finance.locator(":scope > summary").click();
     await finance.getByText(/Outstanding loans 0 cp · In-game day 0/).waitFor();
     await page.evaluate((active) => localStorage.setItem("quire.campaign.v1", active), original);
     await reloadApplication(page);
-    await finance.locator(":scope > summary").click();
     await finance.getByText(/Outstanding loans 8 gp · In-game day 7/).waitFor();
+    await go("properties");
     const operations = page.locator("#campaign-operations");
-    await operations.locator(":scope > summary").click();
     await operations.getByText("Campaign inn · Unmanaged", { exact: true }).click();
     await operations.getByLabel("Property revenue (cp)", { exact: true }).fill("200");
     await operations.getByLabel("Property upkeep (cp)", { exact: true }).fill("40");
@@ -170,12 +160,14 @@ try {
     await operations.screenshot({ path: `${output}/property-form-${width}.png` });
     await operations.getByRole("button", { name: "Save Campaign inn plan", exact: true }).click();
     await operations.getByText("Campaign inn · Managed", { exact: true }).waitFor();
+    await go("shops");
     const shop = operations.locator("details").filter({ hasText: "Hearth & Nail" }).first();
     await shop.locator(":scope > summary").click();
     await shop.getByLabel("Restock every in-game days (0 disables)", { exact: true }).fill("7");
     await shop.getByLabel("Restock each finite item to at least", { exact: true }).fill("8");
     await shop.getByRole("button", { name: "Save Hearth & Nail schedule", exact: true }).click();
     await operations.getByText(/Hearth & Nail · Scheduled/).waitFor();
+    await go("downtime");
     await finance.locator("summary").filter({ hasText: "Set downtime & review calculations" }).click();
     await page.getByRole("button", { name: "Preview downtime", exact: true }).click();
     await finance.getByText(/stock lines topped up/).waitFor();
@@ -185,9 +177,10 @@ try {
     await page.getByRole("button", { name: "Approve downtime & start session", exact: true }).click();
     await finance.getByText(/In-game day 14/).waitFor();
     await reloadApplication(page);
-    await operations.locator(":scope > summary").click();
+    await go("shops");
     await operations.getByText(/Campaign day 14/).waitFor();
     await operations.getByText(/Hearth & Nail · Scheduled/).waitFor();
+    await go("properties");
     await operations.getByText("Campaign inn · Managed", { exact: true }).waitFor();
     assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1));
     await operations.screenshot({ path: `${output}/operations-${width}.png` });
@@ -200,7 +193,7 @@ try {
 } catch (error) {
   if (lastPage && !lastPage.isClosed()) {
     await lastPage.screenshot({ path: `${output}/failure.png`, fullPage: true });
-    console.error((await lastPage.locator("#campaign-finance").innerText()).slice(0, 4000));
+    console.error((await lastPage.locator("body").innerText()).slice(-4000));
   }
   throw error;
 } finally {

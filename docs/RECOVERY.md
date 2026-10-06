@@ -1,3 +1,12 @@
+# Feature screens — publication authorized, 2026-10-06 UTC
+
+- Branch `feature/feature-screens` based on released main `8614403c64469a93680fe6d0537139614aca96b2`. User approved the feature-screen/Player Home workshop and implementation. See `docs/audit/2026-10-06-feature-screens.md`, README and feature inventory for scope.
+- Source includes role-aware full feature screens, player Home, account shortcut API with additive migration0010, player-owned repayment/property-description commands and privacy-limited finance projection. No foreclosure/special acquisition rules, taxes, domain change or signed APK update.
+- Implementation checkpoint `735574d212cc2e0b12cf7c8bb8d95455a3bcbdaf`. Final local quick checks508 pass/four skips, types clean, lint0errors/34 existing warnings; web/mobile builds, all8 account scenarios, finance/control/navigation/character/expanded governance (anonymous guests)/help/desktop browser checks passed. See the audit for measured timings. Remaining changes after that application commit are documentation/performance records only.
+- User explicitly approved publication, additive account-shortcut migration0010 and full gated release on 2026-10-06. No external write yet at this checkpoint. Next: publish branch/PR, full exact-head checks, inspect/apply migration0010 once, gated merge/main verification/deployment and read-only live audit. Do not repeat already completed PR49 actions.
+- PR49 was confirmed merged/released: PR37411859467, main37412269946, website37412626230, standby37412626382, backup37412269948 succeeded. Performance history latest347 observations, pendingempty, recorder37412824045 success. Do not repeat migration0009 or the completed release.
+- Local runtime: Node22 under `/tmp/lootsplit-tools/node_modules/node/bin`, Chromium `/tmp/lootsplit-chromium/chromium`. Disposable source `/tmp/lootsplit-roadmap-verify`. Server and browser must run inside one shell invocation (loopback namespaces differ). Direct recovery GitHub HTTP403; read-only connector reconciliation worked. Cloudflare emulator previously blocked by environment `uv_interface_addresses`; do not weaken packaged-Worker CI.
+
 # Roadmap priorities — publication authorized, 2026-10-06 UTC
 
 - User explicitly approved publication to UnregisteredMusket/Lootsplit, full GitHub checks, additive production migration0009, and gated merge/deployment. The earlier automatic approval block below is historical and resolved by this permission.

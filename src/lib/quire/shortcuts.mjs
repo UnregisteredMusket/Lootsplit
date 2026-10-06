@@ -1,4 +1,6 @@
 export const shortcutDestinations = [
+  ...[["bank","Bank","coins"],["finances","My Finances","coins"],["properties","Properties","store"],["downtime","Downtime","scroll"],["financial","Financial Settings","coins"],["reports","Review Reports","book"],["review","Review Inbox","gift"],["journal","Journal","scroll"],["shops","Shop Management","store"]].map(([id,label,icon])=>({id,label,icon,href:`/features/${id}`})),
+  {id:"character",label:"Character Sheet",href:"/?view=sheet",icon:"users"},
   {
     id: "encounter",
     label: "Resume encounter",
@@ -21,7 +23,7 @@ export const shortcutDestinations = [
   {
     id: "session",
     label: "Session notes",
-    href: "/?view=overview#journal",
+    href: "/features/journal",
     icon: "scroll",
   },
   { id: "roll", label: "Roll dice", href: "/characters#dice", icon: "dice" },
@@ -35,15 +37,10 @@ export const shortcutDestinations = [
     href: "/settings#backups",
     icon: "save",
   },
-  {
-    id: "review",
-    label: "Review requests",
-    href: "/?view=overview#review",
-    icon: "gift",
-  },
+
 ];
 export const defaultShortcuts = shortcutDestinations
-  .slice(0, 6)
+  .filter(x=>["encounter","loot","funds","market","session","roll"].includes(x.id))
   .map((x) => ({ destination: x.id, label: x.label, icon: x.icon }));
 export const shortcutIcons = [
   "swords",
@@ -57,11 +54,16 @@ export const shortcutIcons = [
   "book",
   "save",
 ];
+export function destinationsFor(role = "dm") {
+  return shortcutDestinations.filter(x=>role === "dm" || !["encounter","loot","funds","downtime","financial","reports","review","shops","backup"].includes(x.id));
+}
 /** @param {unknown} raw */
-export function normalizeShortcuts(raw) {
-  return defaultShortcuts.map((fallback, i) => {
+export function normalizeShortcuts(raw, role = "dm") {
+  const available = destinationsFor(role);
+  const defaults = role === "player" ? ["character","bank","finances","properties","journal","chat"].map(id=>{const x=available.find(x=>x.id===id);return {destination:id,label:x?.label || id,icon:x?.icon || "book"};}) : defaultShortcuts;
+  return defaults.map((fallback, i) => {
     const x = Array.isArray(raw) ? raw[i] : null;
-    const target = shortcutDestinations.find((d) => d.id === x?.destination);
+    const target = available.find((d) => d.id === x?.destination);
     if (!target) return { ...fallback };
     return {
       destination: target.id,

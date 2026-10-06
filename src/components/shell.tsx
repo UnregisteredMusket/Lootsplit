@@ -1,3 +1,4 @@
+import { FeatureCards } from "./feature-navigation";
 import { AppLink } from "@/components/app-link";
 import { FantasyIcon } from "@/components/fantasy-icon";
 import { allowContextChange } from "@/lib/quire/use-draft-guard";
@@ -356,8 +357,8 @@ export function Shell({
       : [
           {
             to: "/",
-            label: "Character",
-            icon: "Character",
+            label: "Home",
+            icon: "Desk",
             active:
               (pathname === "/" && (search as { view?: string }).view !== "overview") ||
               pathname === "/characters",
@@ -388,6 +389,7 @@ export function Shell({
         ];
     return (
       <>
+        {layout === "rail" && <FeatureCards desktop />}
         {links.map((link) => (
           <NavLink
             key={link.label}

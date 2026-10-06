@@ -1,6 +1,7 @@
 import type { CloudTable, CloudSeat } from "./cloud.ts";
 import { canReadNote } from "./chat-visibility.ts";
 import { characterSheet } from "../characters/campaign-sheet.mjs";
+import { readFinance } from "./finance.ts";
 import { readJournal } from "./journal.ts";
 
 /** All report projections happen on the server before delivery. */
@@ -27,7 +28,10 @@ export function projectRecord(
     t.ledger = t.ledger.filter((l) => seat.purseIds.includes(l.purseId));
     t.holdings = t.holdings.filter((h) => seat.purseIds.includes(h.purseId));
     t.purses = t.purses.filter((p) => seat.purseIds.includes(p.id));
-    t.journal.finance = undefined;
+    if (t.journal.finance) {
+      const f = readFinance(t.journal.finance);
+      t.journal.finance = { day: f.day, loans: f.loans.filter(l => seat.purseIds.includes(l.purseId)), rules: f.rules.filter(r => seat.purseIds.includes(r.purseId)), downtime: [] };
+    }
     t.journal.requests = t.journal.requests.filter((r) => seat.purseIds.includes(r.purseId));
     t.journal.events = t.journal.events
       .filter((e) => !e.purseId || seat.purseIds.includes(e.purseId))

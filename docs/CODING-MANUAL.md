@@ -97,3 +97,11 @@ Shop calendars and property plans use the existing command/finance engine. Exerc
 For address changes run `npm run migration:check` and `scripts/domain-readiness.test.mjs`, then the complete preservation suite. Read `docs/plans/DOMAIN-READINESS.md`. An API-only two-origin test does not replace the real two-host browser/legacy-APK cutover rehearsal. Never change DNS or retire old endpoints from a preparation-only task. Economy/tax presets in `docs/plans/ECONOMY-MODES-AND-TAXES.md` require owner decisions before activation.
 
 Product screenshots are real UI captures from disposable local data (`scripts/capture-product-screenshots.mjs`), not screenshots of real user campaigns. Inspect images before placing them in `public/product/`; do not include account credentials or private campaign records. Keep them lazy-loaded and identify synthetic data in captions.
+
+## Feature-screen maintenance
+
+Feature navigation is presentation over the existing economy/session services. Keep mobile primary tabs at five; expose feature entry cards and a Return-to-origin footer. Use router links and verify no title-screen replay. Player Home must retain full-sheet access and guests must not get shortcut customization. Desktop may expose direct feature links.
+
+Account shortcut API/storage requires additive migration0010. Preserve user/role isolation, revision conflicts and readonly DM offline fallback; never store guest campaign data in preference caches. Repayment and property-description commands require server ownership checks, and property edits must preserve financial fields under concurrent changes. Finance projections expose only assigned loans/rules, never another character’s debt or downtime quotes.
+
+Related checks: accounts/finance/room-store regressions; finance, control-panel, library-navigation, character and campaign-governance browser audits. Governance exercises real player repayment/property edits and account shortcut persistence. Preserve complete release gates, migration review and separate Android signing/publication requirements. Foreclosure or special acquisition rules require a separate gameplay decision.
