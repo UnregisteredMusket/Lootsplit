@@ -1,3 +1,10 @@
+# Development workflow improvement — 2026-10-06 UTC
+
+- User authorized development/test improvements with no application behavior/setup changes and requested current README/manual. Branch `chore/development-workflow`, based on released main `9a67fd6f3530942f6449eb72a0638563f3ecd2df` (PR46, verification37402387007, deployed/live-audited37402773863). Prior integration release is complete; older blocked/publication checkpoints below are historical.
+- Account tests use two independent workers; all eight scenarios, assertions, timeouts, zero retries and full PR/main gates retained. Added HTML report and report/trace commands, browser version/path diagnostics. Reused existing Node22 development container; no new dependency or service. README, coding manual and development guide updated, including all eight focused scenario names.
+- Local comparison:115.095→77.797s for suite (32.4% saved);120.610→82.591s including setup (31.5% saved). Both8/8 passed, Node22.23.3/Chromium133, disposable databases. `verify:quick` passed497 tests,4 skipped; clean types, zero lint errors/35 existing warnings. Full CI with current browser remains required before release.
+- Next: publish PR, verify every group, compare CI account and total elapsed time; keep only reliable measured improvement. Do not repeat completed baseline or change application code to accommodate tests. Record final PR/main/deploy evidence in the PR before handoff.
+
 # Integration audit publication authorized — 2026-10-06 UTC
 
 - User explicitly approved pushing the audited changes to `UnregisteredMusket/Lootsplit`, full release checks, and gated merge/deployment. The earlier approval block below is historical and is resolved by this permission.

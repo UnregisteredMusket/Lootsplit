@@ -36,12 +36,22 @@ Use Node 22 (`nvm use`, or the included development container).
 | `npm run verify:focus -- dm-resume`              | Check two-device DM reopening with disposable data                                     |
 | `npm run verify:focus -- accounts`               | Run every account scenario in a disposable source snapshot                             |
 | `npm run verify:quick`                           | Unit tests, type checking and lint                                                     |
+| `npm run verify:report -- PATH/TO/html`         | Open the account HTML report, including failure screenshots and traces                 |
+| `npm run verify:trace -- PATH/TO/trace.zip`       | Inspect a single saved browser trace locally                                           |
 | `npm run verify:timings`                         | Summarize recorded verification durations                                              |
 | `npm run performance:sync`                       | Read GitHub timing history and collect a local snapshot without publishing             |
 | `npm run performance:record -- measurement.json` | Record a measured local operation for inclusion in the task's GitHub commit            |
 | `npm run performance:resolve -- resolution.json` | Record a verified resolution and reset request while preserving the previous trend     |
 | `npm run recover:status`                         | Inspect saved checkpoints and remote release state                                     |
 
-Focused scenario names: `layout`, `library`, `dm-resume`, `recovery`. Focused checks include current uncommitted source edits and exclude local databases, secrets and browser profiles. They do not deploy or replace the running development server.
+Focused scenario names: `layout`, `library`, `dm-resume`, `recovery`, `portrait-resume`, `campaign-choice`, `invitations`, `ownership`; use `accounts` for all eight. Focused checks include current uncommitted source edits and exclude local databases, secrets and browser profiles. They do not deploy or replace the running development server.
 
 [Development and CI details](docs/DEVELOPMENT.md) · [Feature preservation inventory](docs/FEATURE-INVENTORY.md) · [Android releases](ANDROID.md)
+
+## Faster development without changing the application
+
+Account scenarios run on two Playwright workers with independent accounts, rooms, storage and client identities. Every scenario remains required; retries stay disabled. Focused checks still isolate their server and database, and complete PR/main checks still gate publication.
+
+The existing `.devcontainer/devcontainer.json` provides Node22 and runs the locked dependency/browser setup. Use that container where supported, or `nvm use` then `npm run dev:setup`. `dev:doctor` reports the actual Chromium version and path; a custom browser launching successfully does not prove it supports every PDF/import feature. Do not substitute an older browser for release verification.
+
+After a failed focused run, use its printed diagnostics path: `npm run verify:report -- test-results/focused/TIMESTAMP-accounts/html`. Read the failing action, network activity and trace before rerunning. CI account reports are in `test-results/account/html` inside the existing audit artifacts. Reports contain disposable test credentials; keep them in the existing restricted diagnostic artifacts.
