@@ -1,8 +1,10 @@
-import { CampaignOperations } from "./campaign-operations";
+import { useDraftGuard } from "@/lib/quire/use-draft-guard";
+import { useNavigate } from "@tanstack/react-router";
+import { FeatureCards } from "./feature-navigation";
 import { downloadJson } from "@/lib/quire/table";
-import { JournalNotes } from "./journal-notes";
+
 import { useDisclosureAnchor } from "@/lib/help/use-disclosure-anchor";
-import { CampaignFinance } from "./campaign-finance";
+
 import { useState } from "react";
 import { toast } from "sonner";
 import { useEconomy } from "@/lib/quire/economy-context";
@@ -32,7 +34,8 @@ function RecordedChange({ change }: { change: NonNullable<Journal["events"][numb
     </details>
   );
 }
-export function CampaignJournal() {
+export function CampaignJournal({ section = "overview" }: { section?: "overview" | "sessions" | "bank" | "reports" }) {
+  const navigate=useNavigate();
   const reviewRef = useDisclosureAnchor("review-inbox");
   const { journal, ledger, purses, command, loans, decideLoan } = useEconomy();
   const seat = useSeat();
@@ -44,6 +47,7 @@ export function CampaignJournal() {
   const [copper, setCopper] = useState("");
   const [purseId, setPurse] = useState("");
   const [busy, setBusy] = useState(false);
+  useDraftGuard(!!note || !!copper, "payment request");
   const downtime = journal.finance?.downtime.find((d) => d.status === "pending");
   const [approveDowntime, setApproveDowntime] = useState("");
   const active = journal.sessions.find((x) => !x.endedAt);
@@ -70,7 +74,7 @@ export function CampaignJournal() {
   ].sort((a, b) => b.at - a.at);
   return (
     <div className="campaign-journal" id="review">
-      <Fold
+      {(section === "overview" || section === "sessions") && <><Fold
         anchorId="sessions"
         title={active ? `Session · ${active.name}` : "Play sessions"}
         hint="Named sessions, with recorded coin movement."
@@ -208,7 +212,7 @@ export function CampaignJournal() {
                 if (finance) {
                   finance.open = true;
                   finance.scrollIntoView();
-                }
+                } else {void navigate({to:"/features/$feature",params:{feature:"downtime"},search:{from:"/?view=overview",code:undefined}});}
               }
             })
           }
@@ -216,7 +220,9 @@ export function CampaignJournal() {
           {days === 0 ? "Use 0 days & start session" : "Preview downtime calculations"}
         </Button>
       </Modal>
-      <JournalNotes />
+      </>}
+      {section === "overview" && <FeatureCards />}
+      {section === "reports" && <>
       <Fold title="Character edit reports" hint="Before and after each DM editing window.">
         {(journal.editReports || [])
           .filter((r) => dm || seat.purseIds.includes(r.purseId))
@@ -261,11 +267,10 @@ export function CampaignJournal() {
           </div>
         ))}
       </Fold>
-      <CampaignOperations />
-      <CampaignFinance />
-      <details ref={reviewRef} id="review-inbox" className="review-inbox">
+      </>}
+      {section === "bank" && <details open ref={reviewRef} id="review-inbox" className="review-inbox">
         <summary>
-          {dm ? "Review inbox" : "Payment requests"} ·{" "}
+          {dm ? "Financial requests" : "Payment requests"} ·{" "}
           {pending.length + requests.filter((x) => x.status === "pending").length} pending
         </summary>
         <p className="text-sm text-muted">Normal authorized trading remains immediate.</p>
@@ -395,8 +400,8 @@ export function CampaignJournal() {
             Submit request
           </Button>
         </form>
-      </details>
-      <Fold
+      </details>}
+      {section === "reports" && <Fold
         title="Full activity"
         hint="Transactions and management events recorded by this version."
       >
@@ -411,7 +416,7 @@ export function CampaignJournal() {
           </div>
         ))}
         {!events.length ? <p>No activity recorded.</p> : null}
-      </Fold>
+      </Fold>}
     </div>
   );
 }

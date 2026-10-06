@@ -2186,3 +2186,14 @@ input,select,textarea { max-width: 100%; }
 .ls-product-shot figcaption { margin-top: .6rem; font-size: .95rem; line-height: 1.6; }
 .ls-platform-comparison { width: 100%; border-collapse: collapse; table-layout: fixed; }
 .ls-platform-comparison th, .ls-platform-comparison td { text-align: left; vertical-align: top; padding: .8rem .5rem; border-bottom: 1px solid currentColor; overflow-wrap: anywhere; }
+
+/* Feature workspaces reuse the existing parchment, panels and navigation. */
+.feature-screen { width: 100%; max-width: 76rem; margin-inline: auto; }
+.feature-screen > h1 { font-family: var(--font-display); font-size: clamp(2rem, 5vw, 3rem); margin-bottom: 1rem; }
+.feature-cards { display: grid; gap: .75rem; grid-template-columns: repeat(auto-fit,minmax(min(100%,17rem),1fr)); }
+.feature-cards h2 { font-size: 1.3rem; }
+.feature-return { margin-top: 2rem; padding-block: 1rem; border-top: 1px solid var(--color-border); }
+.feature-screen input:not([type=checkbox]), .feature-screen textarea, .feature-screen select { max-width: 100%; }
+.feature-screen .review-inbox { margin-block: 1rem; }
+.feature-desktop-links { display: none; }
+@media(min-width:1024px) { .feature-desktop-links { display: flex; flex-wrap: wrap; gap: .35rem; } .feature-desktop-links .journal-entry { padding: .25rem; margin:0; } }

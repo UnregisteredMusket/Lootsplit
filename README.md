@@ -2,6 +2,28 @@
 
 Lootsplit is a shared party ledger and campaign application for web and Android. Production runs on Cloudflare Workers and D1; GitHub Actions verifies and publishes the exact tested artifact from `main`.
 
+## Home and feature screens
+
+The DM Desk and new player Home keep the existing theme and five mobile navigation tabs. Open a compact feature card or saved shortcut to use a full feature screen. Bottom navigation still works; **Return to …** goes to the screen that opened it. Desktop also offers direct feature links.
+
+| Screen | Player access | DM access |
+| --- | --- | --- |
+| Bank | Loan applications, repayments and payment requests | Loan officer tools, terms and financial approvals |
+| My Finances | Assigned campaign characters’ funds, debts, recurring agreements and transactions | Use Review Reports |
+| Downtime | No settlement controls | Plan, review and approve campaign time/settlement |
+| Financial Settings | No economic controls | Prices/modifiers and recurring financial agreements |
+| Property Management | Own property name and descriptive notes | Property details, revenue and upkeep |
+| Review Reports | Own transactions remain in My Finances | Campaign balances, session reports, activity and price history |
+| Review Inbox | Submit character imports through the existing character workflow | Approve/deny character imports |
+| Journal | Existing visibility rules and writing tools | Existing private/shared entries and attachments |
+| Shop Management | Browse Market | Opening schedules and downtime-driven restocking |
+
+Signed-in users can customize six Home shortcuts, separately for DM/player roles, and save them to their account across devices. Conflicting saves ask for a reload. Guests use fixed feature buttons without a shortcut editor. Existing DM device shortcuts are offered as the initial account configuration; a previously verified campaign owner can still read cached DM destinations offline, but account customization requires connectivity.
+
+Player Home links to the full Character Sheet, Inventory, Campaign/chat and existing tools. Campaign funds remain separate from standalone account characters. Property descriptions never grant authority to change price, ownership or income. Foreclosures and new special-property purchase rules are not included.
+
+**Deployment requirement:** Migration `0010_account_shortcuts.sql` is additive and must be applied through the existing reviewed publication process before deployment. No new APK or domain change is included.
+
 ## Continue a campaign on another device
 
 Sign in to the same account, then choose the saved campaign in **My account → My campaigns → Resume**. New shared rooms created while signed in are saved there automatically; a failed account save has a retry that keeps the existing room. **Start a room** creates a separate campaign copy. Copies can have the same name but do not share portraits, loot or later progress. The account page marks the room open on this device and warns before opening an older same-name entry. Existing rooms can still be added with **Save current membership**.

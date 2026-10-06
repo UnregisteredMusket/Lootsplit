@@ -1,3 +1,4 @@
+import { accountShortcuts } from "./account-shortcuts.mjs";
 import { accountRequestOrigin } from "../src/lib/deployment/origins.mjs";
 import { ownerTestMode } from "./test-mode.mjs";
 import { campaignRecords } from "./campaign-records.mjs";
@@ -227,6 +228,7 @@ export async function handleAccounts(request, env) {
     const userId = session.user.id;
     await assertActive(db, userId);
     await touchMember(db, userId);
+    if (path === "/api/account/shortcuts" && ["GET","POST"].includes(request.method)) return cors(json(await accountShortcuts(db,userId,request.method,request.method === "GET" ? {role:new URL(request.url).searchParams.get("role")} : body)));
     if (
       (path === "/api/account/encounters" && request.method === "GET") ||
       (path.startsWith("/api/account/encounters/") && request.method === "POST")

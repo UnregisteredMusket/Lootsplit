@@ -1,3 +1,6 @@
+import { useEffect } from "react";
+import { useNavigate, useRouterState } from "@tanstack/react-router";
+import { PlayerHome } from "@/components/player-home";
 import { TestResetButton } from "@/components/test-mode";
 import { createFileRoute } from "@tanstack/react-router";
 import { DmDesk } from "@/components/control-panel/desk";
@@ -21,10 +24,12 @@ export const Route = createFileRoute("/")({
 function Home() {
   const seat = useSeat();
   const { view } = Route.useSearch();
+  const navigate=useNavigate(),hash=useRouterState({select:s=>s.location.hash});
+  useEffect(()=>{const feature=({journal:"journal",review:"bank","review-inbox":"bank","campaign-finance":"downtime","campaign-operations":"properties"} as Record<string,string>)[hash];if(feature)void navigate({to:"/features/$feature",params:{feature},search:{from:"/?view=overview",code:undefined},replace:true});},[hash,navigate]);
   if (seat.role === "player" && view !== "overview") {
     return (
       <Shell>
-        <HomeSheet />
+        {view === "sheet" ? <HomeSheet /> : <PlayerHome />}
       </Shell>
     );
   }

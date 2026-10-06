@@ -57,7 +57,7 @@ try {
     await page.locator(".shortcut-grid").waitFor();
     if (width === 1440) {
       await page.getByRole("link", { name: "Session journal →", exact: true }).click();
-      await page.waitForURL("**/?view=overview#journal");
+      await page.waitForURL(u=>u.pathname === "/features/journal");
       await page.locator("#journal").waitFor();
       await stillOpen();
       await page.goBack();
@@ -65,8 +65,8 @@ try {
     }
     await page.locator('nav[aria-label="Sections"]:visible').getByRole("link", { name: "Party", exact: true }).click();
     await page.getByRole("link", { name: "Ledger", exact: true }).click();
-    await page.waitForURL("**/?view=overview#journal");
-    await page.locator("#journal").waitFor();
+    await page.waitForURL(u=>u.pathname === "/features/reports");
+    await page.getByRole("heading",{name:"Review Reports",exact:true}).waitFor();
     await stillOpen();
     await page.locator('nav[aria-label="Sections"]:visible').getByRole("link", { name: "Desk", exact: true }).click();
     await page.locator(".shortcut-grid").waitFor();

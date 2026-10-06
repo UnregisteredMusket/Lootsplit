@@ -110,9 +110,11 @@ try {
   await page.getByRole("button", { name: "Save campaign assignment", exact: true }).click();
   await page.getByText(/Import submitted for DM review/).waitFor();
   await openApplication(dm.page, origin + "/characters");
+  await dm.page.getByRole("link",{name:"Review character imports →",exact:true}).click();
   await dm.page.getByText("Mira Ashfall · awaiting approval", { exact: true }).click();
   await dm.page.getByRole("button", { name: "Approve Mira Ashfall", exact: true }).click();
   await dm.page.getByText("No pending character imports.", { exact: true }).waitFor();
+  await dm.page.locator(".feature-return a").click();
   await reloadApplication(page);
   await page.getByRole("heading", { name: "Mira Ashfall", exact: true }).waitFor();
   await page.getByRole("button", { name: "Edit sheet", exact: true }).click();
@@ -221,7 +223,8 @@ try {
     });
   });
   await openApplication(page, origin + "/");
-  await page.getByRole("button", { name: "Not now", exact: true }).click();
+  await page.getByRole("heading", { name: "Home", exact: true }).waitFor();
+  await page.getByRole("link",{name:"Open Character Sheet →",exact:true}).first().click();
   await page.getByRole("heading", { name: "Character sheets", exact: true }).waitFor();
   assert.deepEqual(errors, []);
   console.log(

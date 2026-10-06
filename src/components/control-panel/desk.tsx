@@ -1,5 +1,6 @@
 import { localEncounterRequest } from "@/lib/encounters/local";
 import { encounterRequest } from "@/lib/encounters/client";
+import { FeatureCards } from "../feature-navigation";
 import { AppLink } from "@/components/app-link";
 import { FantasyIcon } from "@/components/fantasy-icon";
 import { useEffect, useState, useSyncExternalStore } from "react";
@@ -154,6 +155,7 @@ export function DmDesk() {
         </section>
       </div>
       <Shortcuts campaignId={campaigns.activeId} />
+      <FeatureCards />
       <DesktopDeskPanels />
       <AppLink href="/?view=overview" className="desk-overview">
         Full campaign overview, activity & tools <ChevronRight size={18} />

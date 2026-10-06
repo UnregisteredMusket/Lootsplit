@@ -932,3 +932,17 @@ test("account-owned sessions rotate invitations, retain campaign data and reconn
     assert.deepEqual(reassigned.purseIds, ["other"], "The DM can release an account player for a different character assignment");
   } finally { delete globalThis.__env__; DB.close(); }
 });
+
+test("account shortcuts persist by owner and role and reject stale writes",async()=>{
+ const {call,signup}=setup();const a=await signup("shortcuts-a@example.test"), b=await signup("shortcuts-b@example.test");
+ assert.equal((await call("shortcuts?role=player")).response.status,401);
+ const initial=await call("shortcuts?role=player",undefined,a.cookie);assert.equal(initial.data.revision,0);
+ const items=[{destination:"bank",label:"My bank",icon:"coins"}];
+ const saved=await call("shortcuts",{role:"player",revision:0,items},a.cookie);assert.equal(saved.response.status,200);assert.equal(saved.data.revision,1);
+ assert.equal((await call("shortcuts?role=player",undefined,a.cookie)).data.items[0].label,"My bank");
+ assert.equal((await call("shortcuts?role=player",undefined,b.cookie)).data.revision,0);
+ assert.equal((await call("shortcuts?role=dm",undefined,a.cookie)).data.revision,0);
+ assert.equal((await call("shortcuts",{role:"player",revision:0,items},a.cookie)).response.status,409);
+ const restricted=await call("shortcuts",{role:"player",revision:1,items:[{destination:"financial",label:"Forbidden",icon:"coins"}]},a.cookie);
+ assert.notEqual(restricted.data.items[0].destination,"financial");
+});

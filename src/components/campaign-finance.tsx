@@ -16,7 +16,7 @@ const defaults: Terms = {
   compound: false,
   payment: 0,
 };
-export function CampaignFinance() {
+export function CampaignFinance({ section = "all" }: { section?: "all" | "bank" | "downtime" | "settings" }) {
   const anchorRef = useDisclosureAnchor("campaign-finance");
   const { journal, purses, holdings, shops, loans: requests, command } = useEconomy();
   const seat = useSeat();
@@ -68,8 +68,8 @@ export function CampaignFinance() {
     setPrincipal(l.principal);
   };
   return (
-    <details ref={anchorRef} className="review-inbox" id="campaign-finance">
-      <summary>Campaign finances & downtime{pending ? " · Awaiting DM approval" : ""}</summary>
+    <details open={section !== "all" ? true : undefined} ref={anchorRef} className="review-inbox" id="campaign-finance">
+      <summary>{section === "bank" ? "Loans & repayments" : section === "settings" ? "Recurring financial agreements" : "Campaign finances & downtime"}{pending ? " · Awaiting DM approval" : ""}</summary>
       <p className="text-sm text-muted">
         Campaign records only. Uses the existing party/character purses and inventory, independently
         of account character profiles.
@@ -83,7 +83,7 @@ export function CampaignFinance() {
           {error}
         </p>
       )}
-      <label className="flex min-h-11 items-center gap-2">
+      {(section === "all" || section === "downtime") && <><label className="flex min-h-11 items-center gap-2">
         <input
           type="checkbox"
           checked={journal.downtimePrompt?.enabled !== false}
@@ -185,7 +185,8 @@ export function CampaignFinance() {
           </div>
         )}
       </details>
-      <details>
+      </>}
+      {(section === "all" || section === "bank") && <details open={section === "bank" ? true : undefined}>
         <summary>
           Loans & repayments · {f.loans.filter((l) => l.principal + l.interest > 0).length}{" "}
           outstanding
@@ -426,7 +427,8 @@ export function CampaignFinance() {
           )}
         </form>
       </details>
-      <details>
+      }
+      {(section === "all" || section === "settings") && <details open={section === "settings" ? true : undefined}>
         <summary>Recurring revenue & expenses</summary>
         {f.rules.map((r) => (
           <div className="journal-entry" key={r.id}>
@@ -572,7 +574,8 @@ export function CampaignFinance() {
           </fieldset>
         </form>
       </details>
-      <details>
+      }
+      {(section === "all" || section === "downtime") && <details>
         <summary>Downtime history</summary>
         {[...f.downtime].reverse().map((d) => (
           <details key={d.id} className="journal-entry">
@@ -593,7 +596,7 @@ export function CampaignFinance() {
             ))}
           </details>
         ))}
-      </details>
+      </details>}
     </details>
   );
 }

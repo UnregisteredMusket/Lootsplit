@@ -6,6 +6,7 @@ import { routeTree } from "./routeTree.gen";
 export function getRouter() {
   return createRouter({
     routeTree,
+    scrollRestoration: true,
     defaultErrorComponent: AppErrorComponent,
     defaultPendingComponent: LogoLoading,
     defaultPendingMs: 180,

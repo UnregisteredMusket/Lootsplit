@@ -32,7 +32,7 @@ export function DesktopDeskPanels() {
       >
         <div className="panel-heading">
           <h2 id="desktop-activity-heading">Recent activity</h2>
-          <AppLink href="/?view=overview#journal">Full ledger →</AppLink>
+          <AppLink href="/features/reports">Full ledger →</AppLink>
         </div>
         <p className="desktop-panel-note">
           {recent.length
@@ -84,7 +84,7 @@ export function DesktopDeskPanels() {
       <section className="desktop-desk-card" aria-labelledby="desktop-review-heading">
         <div className="panel-heading">
           <h2 id="desktop-review-heading">Review queue</h2>
-          <AppLink href="/?view=overview#review">Open review →</AppLink>
+          <AppLink href="/features/bank">Open review →</AppLink>
         </div>
         <p className="desktop-panel-note">
           {requests.length} pending {requests.length === 1 ? "request" : "requests"}
@@ -154,7 +154,7 @@ export function DesktopDeskPanels() {
             <dd>{holdings.length}</dd>
           </div>
         </dl>
-        <AppLink href="/?view=overview#journal" className="desktop-panel-link">
+        <AppLink href="/features/journal" className="desktop-panel-link">
           Session journal →
         </AppLink>
       </section>

@@ -369,7 +369,7 @@ function view(room: CloudRoom, seat: CloudSeat): RoomView {
             journal: journal
               ? {
                   ...journal,
-                  finance: undefined,
+                  finance: journal.finance,
                   editReports: journal.editReports?.filter(r => seat.purseIds.includes(r.purseId)),
                   requests: journal.requests.filter((r) =>
                     seat.purseIds.includes(r.purseId),

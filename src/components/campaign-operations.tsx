@@ -7,7 +7,7 @@ import type { CommandInput } from "@/lib/quire/commands";
 import type { Shop, Holding } from "@/lib/quire/types";
 import { useDisclosureAnchor } from "@/lib/help/use-disclosure-anchor";
 
-export function CampaignOperations() {
+export function CampaignOperations({ section = "all" }: { section?: "all" | "shops" | "properties" }) {
   const { shops, holdings, journal, command } = useEconomy();
   const seat = useSeat();
   const ref = useDisclosureAnchor("campaign-operations");
@@ -22,18 +22,20 @@ export function CampaignOperations() {
     catch (e) { setError(e instanceof Error ? e.message : "Unable to save campaign operations."); }
     finally { setBusy(false); }
   }
-  return <details ref={ref} id="campaign-operations" className="review-inbox">
-    <summary>Shop schedules & property management</summary>
+  return <details open ref={ref} id="campaign-operations" className="review-inbox">
+    <summary>{section === "shops" ? "Shop schedules" : section === "properties" ? "Property financial plans" : "Shop schedules & property management"}</summary>
     <p>Campaign day {finance.day}. Time advances only when the DM approves downtime. Opening days repeat from day 0. Restocking tops up finite stock without reducing surplus or changing unlimited stock.</p>
     {locked && !busy && <p>Cancel or settle the pending downtime before changing these plans.</p>}
     {error && <p role="alert">{error}</p>}
-    <h3>Shop schedules</h3>
+    {section !== "properties" && <><h3>Shop schedules</h3>
     {shops.map((s) => <ShopPlan key={`${s.id}:${JSON.stringify(s.schedule)}`} shop={s} day={finance.day} disabled={locked} save={save} />)}
     {!shops.length && <p>Create a shop in Shops & markets first.</p>}
-    <h3>Properties</h3>
+    </>}
+    {section !== "shops" && <><h3>Properties</h3>
     <p>Add a property in Funds & inventory, then set its revenue and upkeep here. Amounts below are for the entire holding, per period. Income, loan payments and upkeep use the same purses and approved downtime ledger. Unpaid upkeep remains owed.</p>
     {holdings.filter((h) => h.kind === "property" && h.quantity > 0).map((h) => <PropertyPlan key={`${h.id}:${JSON.stringify(finance.rules.filter((r) => r.holdingId === h.id))}`} holding={h} rules={finance.rules} disabled={locked} save={save} />)}
     {!holdings.some((h) => h.kind === "property" && h.quantity > 0) && <p>No owned properties yet.</p>}
+    </>}
   </details>;
 }
 function ShopPlan({ shop, day, disabled, save }: { shop: Shop; day: number; disabled: boolean; save: (c: CommandInput) => Promise<void> }) {
