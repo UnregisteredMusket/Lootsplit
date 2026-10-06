@@ -7,13 +7,23 @@ export default defineConfig({
   testMatch: "account.spec.mjs",
   forbidOnly: true,
   retries: 0,
-  workers: 1,
+  // Scenarios own their accounts, rooms, browser storage and rate-limit identities.
+  // Keep concurrency bounded: each scenario may open several simulated devices.
+  fullyParallel: true,
+  workers: 2,
   timeout: 60000,
   globalTimeout: 170000,
   expect: { timeout: 15000 },
   outputDir: resolve(process.env.AUDIT_RESULTS_DIR || "test-results/account", "artifacts"),
   reporter: [
     ["line"],
+    [
+      "html",
+      {
+        outputFolder: resolve(process.env.AUDIT_RESULTS_DIR || "test-results/account", "html"),
+        open: "never",
+      },
+    ],
     [
       "json",
       {

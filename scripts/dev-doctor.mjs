@@ -14,8 +14,17 @@ try {
     args: ["--no-sandbox"],
     timeout: 15000,
   });
+  const version = browser.version();
   await browser.close();
-  results.push({ check: "Dependencies and Chromium", ok: true });
+  results.push({
+    check: "Dependencies and Chromium",
+    ok: true,
+    detail: `Chromium ${version}; ${process.env.CHROMIUM_EXECUTABLE_PATH || chromium.executablePath()}`,
+  });
+  if (process.env.CHROMIUM_EXECUTABLE_PATH)
+    console.warn(
+      "Custom browser selected: launch success does not prove compatibility with every import/PDF feature. CI uses the locked Playwright browser.",
+    );
 } catch (error) {
   results.push({ check: "Dependencies and Chromium", ok: false, detail: error.message });
 }

@@ -1,0 +1,45 @@
+{
+  "environment": "Node22.23.3/Linux x64/Chromium133; separate cold Vite snapshots, same locked dependencies; one before/after pair",
+  "runs": [
+    {
+      "workers": 1,
+      "stats": {
+        "startTime": "2026-10-06T02:28:51.966Z",
+        "duration": 115094.86,
+        "expected": 8,
+        "skipped": 0,
+        "unexpected": 0,
+        "flaky": 0
+      },
+      "checkpoint": {
+        "scenario": "accounts",
+        "startedAt": "2026-10-06T02:28:46.469Z",
+        "status": "passed",
+        "commit": "9a67fd6f3530942f6449eb72a0638563f3ecd2df",
+        "dirty": false,
+        "finishedAt": "2026-10-06T02:30:47.079Z"
+      },
+      "totalMs": 120610.0
+    },
+    {
+      "workers": 2,
+      "stats": {
+        "startTime": "2026-10-06T02:31:02.725Z",
+        "duration": 77797.324,
+        "expected": 8,
+        "skipped": 0,
+        "unexpected": 0,
+        "flaky": 0
+      },
+      "checkpoint": {
+        "scenario": "accounts",
+        "startedAt": "2026-10-06T02:30:57.975Z",
+        "status": "passed",
+        "commit": "9a67fd6f3530942f6449eb72a0638563f3ecd2df",
+        "dirty": true,
+        "finishedAt": "2026-10-06T02:32:20.566Z"
+      },
+      "totalMs": 82591.0
+    }
+  ]
+}

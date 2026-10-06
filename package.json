@@ -33,6 +33,8 @@
     "dev:doctor": "node scripts/dev-doctor.mjs",
     "verify:focus": "node scripts/focused-check.mjs",
     "verify:timings": "node scripts/verification-timing.mjs",
+    "verify:report": "playwright show-report",
+    "verify:trace": "playwright show-trace",
     "performance:sync": "node scripts/performance-sync.mjs",
     "performance:record": "node scripts/performance-record.mjs",
     "performance:resolve": "node scripts/performance-resolve.mjs",
