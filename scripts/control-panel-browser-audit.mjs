@@ -1,5 +1,6 @@
 import { openApplication, navigateApplication } from "./title-screen-navigation.mjs";
 import { chromium } from "playwright";
+import { expect } from "playwright/test";
 import assert from "node:assert/strict";
 import { mkdir } from "node:fs/promises";
 
@@ -49,6 +50,7 @@ try {
     "Market",
     "Library",
   ]);
+  await expect(page.getByRole("button", { name: "Customize", exact: true })).toBeEnabled();
   assert.equal(await page.locator(".shortcut-button").count(), 6);
   const last = await page.locator(".shortcut-button").last().boundingBox();
   const bar = await nav.boundingBox();
@@ -59,8 +61,20 @@ try {
   await page.getByLabel("Label", { exact: true }).first().fill("Party messages");
   await page.getByRole("button", { name: "Move button 1 down", exact: true }).click();
   await page.getByRole("button", { name: "Save shortcuts", exact: true }).click();
+  await page.getByRole("dialog", { name: "Customize shortcuts", exact: true }).waitFor({ state: "hidden" }); // Closes only after the account write succeeds.
+  let releasePreferences;
+  const preferencesReady = new Promise(resolve => { releasePreferences = resolve; });
+  await page.route("**/api/account/shortcuts?role=dm", async route => {
+    const response = await route.fetch();
+    await preferencesReady;
+    await route.fulfill({ response });
+  });
   await openApplication(page, origin + "/"); // Explicit reload verifies persisted shortcut edits.
-  assert.equal(await page.locator(".shortcut-button").nth(1).innerText(), "Party messages");
+  await expect(page.getByRole("status").filter({ hasText: "Loading your account shortcuts" })).toBeVisible();
+  assert.equal(await page.locator(".shortcut-button").count(), 0, "Default destinations cannot be clicked while saved preferences load");
+  releasePreferences();
+  await expect(page.locator(".shortcut-button").nth(1)).toHaveText("Party messages");
+  await page.unroute("**/api/account/shortcuts?role=dm");
   assert.equal(await page.locator(".shortcut-button").nth(1).getAttribute("href"), "/share?chat=1");
   await page.locator(".shortcut-button").nth(1).click();
   assert.equal(await page.locator(".loot-opening").count(), 0, "Shortcut keeps the app open");
