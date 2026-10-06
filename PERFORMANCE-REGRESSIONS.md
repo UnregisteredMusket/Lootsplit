@@ -51,6 +51,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | publish / Run actions/download-artifact@v4 | open | 2 | 1s → 3s | +2s | +200% |
 | Publish verified standby | open | 2 | 10s → 18s | +8s | +80% |
 | publish | open | 2 | 10s → 18s | +8s | +80% |
+| Deploy verified website / initial queue | open | 2 | 4s → 6780s | +6776s | +169400% |
 | deploy / Run actions/download-artifact@v4 | open | 3 | 1s → 6s | +5s | +500% |
 | Code checks and immutable builds / Run actions/setup-node@v4 | open | 3 | 3s → 9s | +6s | +200% |
 | Development / gameplay / dev-bug-edge-cases | open | 3 | 9s → 15s | +6s | +66.67% |
@@ -129,6 +130,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-06T12:53:57.000Z | queue: Deploy verified website / initial queue | 10s → 6780s | +6770s | +67700% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37235992107) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37453589467) |
 | 2026-10-06T12:53:52Z | job: backup | 21s → 12154s | +12133s | +57776.19% | cancelled | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37290872931/job/111700688668) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37443527882/job/112202740268) |
 | 2026-10-06T12:53:52.000Z | workflow: Encrypted offsite database backup | 21s → 12154s | +12133s | +57776.19% | cancelled | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37290872931) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37443527882) |
 | 2026-10-06T11:00:40Z | step: Packaged Worker / accounts / worker-finance | 15s → 19s | +4s | +26.67% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37412269946/job/112103497296) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37453107393/job/112234598065) |
