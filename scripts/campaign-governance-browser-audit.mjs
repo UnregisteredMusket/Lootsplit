@@ -185,41 +185,39 @@ try {
     guestPage.evaluate(async code=>(await import("/src/lib/quire/cloud-client.ts")).resumeAccountMembership({userId:"",code,seatId:"guest",token:"guest-token",role:"player",purseIds:["hero"],name:"Guest feature fixture"}),code).catch(e=>{if(!e.message.includes("Execution context was destroyed"))throw e;})
   ]);
   await guestPage.getByRole("heading",{name:"Home",exact:true}).waitFor();
-  await expect(guestPage.locator('.feature-cards a[href^="/features/bank?"]')).toBeVisible();
+  await expect(guestPage.getByRole("region",{name:"Player features",exact:true}).getByRole("link")).toHaveText(["Character Sheet", "Bank", "My Finances", "Properties", "Journal", "Party chat"]);
+  await expect(guestPage.locator('.shortcut-grid a[href^="/features/bank?"]')).toBeVisible();
   assert.equal(await guestPage.getByRole("button",{name:"Customize",exact:true}).count(),0);
   assert.equal(await guestPage.evaluate(()=>Object.keys(localStorage).some(k=>k.startsWith("lootsplit.account-shortcuts"))),false);
   await guestContext.close();
-  console.log("Feature screens: player Home, bank repayment, property permissions and account shortcuts");
+  console.log("Feature screens: player Home, bank repayment, property permissions and fixed feature buttons");
   await player.page.setViewportSize({width:390,height:844});
   await visit(player.page,"/");
   await player.page.getByRole("heading",{name:"Home",exact:true}).waitFor();
   await player.page.evaluate(()=>window.featureDocumentMarker="same-document");
-  await player.page.locator('.feature-cards a[href^="/features/bank?"]').click();
+  await player.page.locator('.shortcut-grid a[href^="/features/bank?"]').click();
   await player.page.getByLabel("Repayment in copper",{exact:true}).fill("25");
   await player.page.getByRole("button",{name:"Make repayment",exact:true}).click();
   await expect.poll(async()=> (await state(host.page)).journal.finance.loans[0].principal).toBe(75);
   assert.equal(await player.page.getByLabel("Loan name",{exact:true}).count(),0,"Players cannot edit loan terms");
   await player.page.getByRole("link",{name:"Return to Home",exact:true}).click();
-  await player.page.locator('.feature-cards a[href^="/features/properties?"]').click();
+  await player.page.locator('.shortcut-grid a[href^="/features/properties?"]').click();
   await player.page.getByLabel("Property name",{exact:true}).fill("Renamed player inn");
   await player.page.getByRole("button",{name:"Save property details",exact:true}).click();
   await expect.poll(async()=> (await state(host.page)).holdings.find(h=>h.id==="home-inn").name).toBe("Renamed player inn");
   assert.equal((await state(host.page)).holdings.find(h=>h.id==="home-inn").unitCopper,20000);
   assert.equal(await player.page.getByLabel("Property revenue (cp)",{exact:true}).count(),0);
   await player.page.locator(".feature-return a").click();
-  await player.page.locator('.feature-cards a[href^="/features/finances?"]').click();
+  await player.page.locator('.shortcut-grid a[href^="/features/finances?"]').click();
   await player.page.getByText(/Inn revenue.*2 sp every 7 days/).waitFor();
   await player.page.screenshot({path:output+"/player-finances-mobile.png",fullPage:true});
   await player.page.locator(".feature-return a").click();
-  await player.page.getByRole("button",{name:"Customize",exact:true}).click();
-  await player.page.getByLabel("Button 1",{exact:true}).selectOption("bank");
-  await player.page.getByLabel("Label",{exact:true}).first().fill("Personal bank");
-  await player.page.getByRole("button",{name:"Save shortcuts",exact:true}).click();
-  await expect(player.page.locator(".shortcut-button").first()).toContainText("Personal bank");
-  const second=await browser.newContext({storageState:await player.context.storageState(),extraHTTPHeaders:{"cf-connecting-ip":"192.0.2.215"}});
-  const read=await second.request.get(origin+"/api/account/shortcuts?role=player");
-  assert.equal((await read.json()).items[0].label,"Personal bank","Another signed-in browser receives account shortcuts");
-  await second.close();
+  const playerFeatures = player.page.getByRole("region", {name:"Player features",exact:true});
+  await expect(playerFeatures.getByRole("link")).toHaveText(["Character Sheet", "Bank", "My Finances", "Properties", "Journal", "Party chat"]);
+  assert.equal(await player.page.getByRole("button",{name:"Customize",exact:true}).count(),0);
+  assert.equal(await player.page.locator(".feature-cards").count(),0,"No duplicate player feature cards");
+  await playerFeatures.getByRole("link",{name:"Journal",exact:true}).click();
+  await player.page.locator(".feature-return a").click();
   assert.equal(await player.page.evaluate(()=>window.featureDocumentMarker),"same-document");
   assert.equal(await player.page.locator(".loot-opening").count(),0);
   assert.ok(await player.page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
@@ -501,7 +499,7 @@ try {
   );
   assert.deepEqual(errors, []);
   console.log(
-    "PASS: guest Home without preferences, account player Home/repayment/property permissions/shortcuts, desktop/mobile DM edit toggle and change report, locked construction, health/equip/consume gameplay, archival before clearing logs, voluntary leave, account reports, owner Test configurator/indicator/reset and isolated campaign data.",
+    "PASS: guest Home without preferences, account player Home/repayment/property permissions/fixed buttons, desktop/mobile DM edit toggle and change report, locked construction, health/equip/consume gameplay, archival before clearing logs, voluntary leave, account reports, owner Test configurator/indicator/reset and isolated campaign data.",
   );
 } catch (error) {
   for (const context of browser.contexts())

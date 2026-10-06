@@ -224,7 +224,7 @@ try {
   });
   await openApplication(page, origin + "/");
   await page.getByRole("heading", { name: "Home", exact: true }).waitFor();
-  await page.getByRole("link",{name:"Open Character Sheet →",exact:true}).first().click();
+  await page.getByRole("link",{name:"Character Sheet",exact:true}).first().click();
   await page.getByRole("heading", { name: "Character sheets", exact: true }).waitFor();
   assert.deepEqual(errors, []);
   console.log(

@@ -31,7 +31,7 @@ export const HELP_GROUPS: HelpGroup[] = [
         title: "What each menu does",
         paragraphs: [
           "DM navigation: Desk shows campaign readouts and six customizable shortcuts; Encounters builds and runs encounters; Party holds character cards, purses and inventory; Market contains shops and trading; Library opens catalog, spells, creatures, names, handouts and private DM books.",
-          "Player navigation: Character opens your assigned sheet; Inventory opens your possessions and permitted financial actions; Campaign contains Room, Chat, Rolls and Alerts; Market opens trading; Library opens available references. The full campaign overview holds sessions, reviews and activity.",
+          "Player navigation: Home offers fixed buttons for Character Sheet, Bank, My Finances, Properties, Journal and Party chat; Inventory opens your possessions and permitted financial actions; Campaign contains Room, Chat, Rolls and Alerts; Market opens trading; Library opens available references. The full campaign overview holds sessions, reviews and activity.",
           "The gear opens Settings & Management. Its categories depend on your role. Use the campaign name to switch campaigns and the message icon for chat. On desktop the same destinations appear in the navigation rail. DM shortcuts can be renamed, reordered and given a different destination or icon.",
         ],
         links: [

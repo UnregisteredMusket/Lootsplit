@@ -18,11 +18,11 @@ The DM Desk and new player Home keep the existing theme and five mobile navigati
 | Journal | Existing visibility rules and writing tools | Existing private/shared entries and attachments |
 | Shop Management | Browse Market | Opening schedules and downtime-driven restocking |
 
-Signed-in users can customize six Home shortcuts, separately for DM/player roles, and save them to their account across devices. Conflicting saves ask for a reload. Guests use fixed feature buttons without a shortcut editor. Existing DM device shortcuts are offered as the initial account configuration; a previously verified campaign owner can still read cached DM destinations offline, but account customization requires connectivity.
+Player Home shows six fixed icon buttons for everyone, including guests: Character Sheet, Bank, My Finances, Properties, Journal and Party chat. There is no player shortcut editor or duplicate feature-card list. Signed-in DMs can still customize six Desk shortcuts and save them across devices. Conflicting saves ask for a reload. Existing DM device shortcuts are offered as the initial account configuration; a previously verified campaign owner can still read cached DM destinations offline, but account customization requires connectivity. Existing player preference records remain compatible and are not deleted.
 
 Player Home links to the full Character Sheet, Inventory, Campaign/chat and existing tools. Campaign funds remain separate from standalone account characters. Property descriptions never grant authority to change price, ownership or income. Foreclosures and new special-property purchase rules are not included.
 
-**Deployment requirement:** Migration `0010_account_shortcuts.sql` is additive and must be applied through the existing reviewed publication process before deployment. No new APK or domain change is included.
+**Deployment requirement:** Migration `0010_account_shortcuts.sql` is additive and was applied to production on October 6, 2026. New installations still require it; the fixed player buttons require no additional migration. No new APK or domain change is included.
 
 ## Continue a campaign on another device
 
