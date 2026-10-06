@@ -56,6 +56,33 @@ try {
   const bar = await nav.boundingBox();
   assert.ok(last.y + last.height <= bar.y, "All six default controls fit above the mobile tabs");
   await capture("dm-desk");
+  // Both historical entry URLs now expose one DM home without duplicate sections.
+  await page.evaluate(() => { window.unifiedHomeMarker = "same-document"; });
+  await page.locator('.readout').filter({hasText:"Current session"}).click();
+  await expect(page.locator("#sessions").getByLabel("Session name", {exact:true})).toBeVisible();
+  assert.equal(await page.locator(".loot-opening").count(), 0);
+  assert.equal(await page.evaluate(() => window.unifiedHomeMarker), "same-document");
+  await visit("/?view=overview"); // Explicitly open the historical URL; no separate overview link remains.
+  await page.evaluate(() => { window.unifiedHomeMarker = "same-document"; });
+  await expect(page.getByRole("heading", {name:"Campaign control",exact:true})).toHaveCount(1);
+  await expect(page.locator(".feature-cards")).toHaveCount(1);
+  await expect(page.locator(".desk-shortcuts")).toHaveCount(1);
+  assert.equal(await page.locator(".desk-overview").count(), 0);
+  await page.getByRole("button", {name:/^Campaign treasury/}).click();
+  await expect(page.getByRole("link", {name:"Add loot",exact:true})).toBeVisible();
+  await page.getByRole("link", {name:"Review requests",exact:true}).click();
+  await expect(page.getByRole("heading", {name:"Bank",exact:true})).toBeVisible();
+  await page.getByRole("link", {name:"Return to Desk",exact:true}).click();
+  await page.getByRole("button", {name:/^Activity & balances/}).click();
+  await expect(page.getByRole("heading", {name:"Recent activity",exact:true})).toHaveCount(1);
+  await page.getByRole("button", {name:/^Campaign tools/}).click();
+  await expect(page.getByRole("button", {name:"Download copy",exact:true})).toBeVisible();
+  await expect(page.getByText("Restore a copy", {exact:true})).toBeVisible();
+  assert.equal(await page.evaluate(() => window.unifiedHomeMarker), "same-document");
+  assert.equal(await page.locator(".loot-opening").count(), 0);
+  await capture("unified-dm-home");
+  await visit("/");
+
   await page.getByRole("button", { name: "Customize", exact: true }).click();
   await page.getByLabel("Button 1", { exact: true }).selectOption("chat");
   await page.getByLabel("Label", { exact: true }).first().fill("Party messages");

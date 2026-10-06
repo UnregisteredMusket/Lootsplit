@@ -36,7 +36,7 @@ export function screenName(href: string, dm: boolean) {
   if (url.pathname.startsWith("/features/") && featureScreens[feature])
     return featureScreens[feature].title;
   if (url.pathname === "/")
-    return url.searchParams.get("view") === "overview"
+    return dm ? "Desk" : url.searchParams.get("view") === "overview"
       ? "Campaign overview"
       : url.searchParams.get("view") === "sheet"
         ? "Character"

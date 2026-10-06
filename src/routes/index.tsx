@@ -33,5 +33,5 @@ function Home() {
       </Shell>
     );
   }
-  return <Shell><TestResetButton />{view === "overview" ? <HomeBoard /> : <DmDesk />}</Shell>;
+  return <Shell><TestResetButton />{seat.role === "player" ? <HomeBoard /> : <DmDesk />}</Shell>;
 }
