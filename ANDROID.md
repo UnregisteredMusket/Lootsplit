@@ -41,6 +41,10 @@ Version **1.3.2**, Android version code **5**, is signed with the permanent cert
 
 After each signed release, verify the actual APK certificate, version and checksum, update `src/lib/website/release.json`, and deploy the website. Confirm `/downloads`, `/updates`, and the actual `/download/android` bytes agree before calling publication complete. The changelog and download summary share the versioned data; unreleased entries stay hidden until the download metadata advances. Do not overwrite previous release history.
 
-### Next Android update
+## Published update — October 5, 2026
 
-Include the new original 16-bit-style startup animation in the next versioned Android release and list it under added features in that release's website changelog. It shows a shaded hooded adventurer bracing and trembling against a heavy loot sack, then hauling it forward in short intervals, with planted feet during each struggle and steps during each pull, locally bundled artwork, and reduced-motion support. The initial title fades in once and stays open until click/tap or keyboard activation. A 15-second scene repeats: the carrier spills coins from the bottom of the sack during each short pull, and a purple-hooded rogue follows to collect them. Website deployment does not change the already-published 1.3.2 APK.
+Version **1.4.0**, Android version code **6**, is published as `android-v1.4.0` from main `feea2b5047b967e3aeb54314d59acff5593d9881`. Signed workflow `37391400899` passed. Independent inspection of the downloaded APK confirms the permanent signing certificate, unchanged package identity, version/code and all three bundled CC0 sound files. SHA-256: `355baf1eca0c734e705006203eac300d4339558093506ad6f3a97c9477c507e0` (20,807,198 bytes), matching both the checksum file and GitHub asset digest.
+
+This update includes the animated opening, light/dark themes, optional sounds, account-owned campaigns, current character/session/import fixes and the other changes listed in the website changelog. It updates permanently signed installations in place. Physical-device upgrade, file-picker and force-close checks have not been independently repeated here.
+
+The publication follow-up advances release.json only after the APK verification above; its website deployment and actual download bytes must also be checked. See docs/RECOVERY.md for the import-audit timing correction and workflow recovery evidence.

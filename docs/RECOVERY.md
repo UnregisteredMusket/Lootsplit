@@ -1,3 +1,12 @@
+# Android 1.4.0 publication follow-up — 2026-10-05
+
+- Release preparation PR #44 merged to main `feea2b5047b967e3aeb54314d59acff5593d9881`. PR verification `37390831478`, main verification `37391401183` and website deployment/live audits `37391781088` passed.
+- Android workflow `37391400899` first attempt stopped at `dev-encounter`: its unrestricted name-heading assertion could match the import review's h3, so the test reloaded before the asynchronous save completed. Every other independent group passed; only gameplay job `112037078470` was rerun. The unchanged-code rerun passed and release-apk started. No check was removed or narrowed.
+- The follow-up test now waits for the import dialog to close and checks the saved editor h2 before reload, covering both scanned and filled PDFs. Local syntax checking passed; the full focused encounter run was blocked earlier by Chromium 133 lacking Uint8Array.toHex in PDF.js. Full CI with its current Chromium must verify the correction. Do not treat this local limitation as a passed import audit or a proven device failure.
+- Local release preparation: 491 tests passed, four skips, clean typecheck, zero lint errors / 35 existing warnings, successful web/mobile builds and Capacitor sync. Bundled Android assets rendered at 390/1280 widths without page errors. Physical-device install/file-picker/force-close checks are not claimed.
+- Android 1.4.0/code 6 is published. The downloaded 20,807,198-byte APK independently confirms package `com.unregisteredmusket.lootsplit`, permanent certificate `baca95a880d14d0d8c422c397decd4c9bf0e7f710a3fd6a5be1e47abd3f730a0` and SHA-256 `355baf1eca0c734e705006203eac300d4339558093506ad6f3a97c9477c507e0` matching SHA256SUMS.txt and GitHub digest. Three bundled WAV files are present.
+- Follow-up advances website download metadata and records release evidence. Next: complete its PR/main checks and website deployment, verify /downloads, /updates, and the actual /download/android bytes. Preserve prior release assets.
+
 # Android 1.4.0 release checkpoint — 2026-10-05
 
 - User explicitly requested publication. Branch `release/android-1.4.0` starts from verified main/live `cbed0613755e98548ebeba30c4fe1c592ef7d239`.

@@ -1,6 +1,6 @@
-# Lootsplit 1.4.0 — release candidate
+# Lootsplit 1.4.0
 
-Android version code 6. This candidate retains package `com.unregisteredmusket.lootsplit` and the existing permanent signing certificate for in-place updates of permanently signed installations.
+Android version code 6. This release retains package `com.unregisteredmusket.lootsplit` and the existing permanent signing certificate for in-place updates of permanently signed installations.
 
 ## Added features
 
@@ -24,11 +24,11 @@ Android version code 6. This candidate retains package `com.unregisteredmusket.l
 - Imported characters remain selected when older list requests finish, and filled PDF fields preserve supported values for review.
 - Character assignment, Live updates and inventory awards retain authorization and duplicate-award protections.
 
-## Candidate verification
+## Verification
 
-Complete PR/main preservation checks and the signed Android workflow are required before publication. The workflow verifies version ordering and the permanent certificate and publishes a checksum. Afterward the website download metadata must be updated and its deployed APK bytes verified. Real-device upgrade, file-picker and force-close checks are not represented as automated verification.
+PR #44 and main preservation checks passed. Signed Android workflow 37391400899 passed after a targeted rerun of the import-audit timing race documented in docs/RECOVERY.md. The downloaded APK independently confirms version 1.4.0, code 6, package com.unregisteredmusket.lootsplit and the existing permanent certificate. SHA-256: `355baf1eca0c734e705006203eac300d4339558093506ad6f3a97c9477c507e0`, matching SHA256SUMS.txt and the GitHub asset digest. Real-device upgrade, file-picker and force-close checks are not represented as automated verification.
 
-The public download remains 1.3.2 until the new signed APK and checksum exist.
+Published October 5, 2026 (America/New_York). [Download Android 1.4.0](https://github.com/UnregisteredMusket/Lootsplit/releases/download/android-v1.4.0/Lootsplit-1.4.0.apk) · [Checksums](https://github.com/UnregisteredMusket/Lootsplit/releases/download/android-v1.4.0/SHA256SUMS.txt). Website download metadata is advanced by the publication follow-up; verify its live deployment before treating website publication as complete.
 
 ---
 
