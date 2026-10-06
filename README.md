@@ -22,7 +22,7 @@ Signed-in users can customize six Home shortcuts, separately for DM/player roles
 
 Player Home links to the full Character Sheet, Inventory, Campaign/chat and existing tools. Campaign funds remain separate from standalone account characters. Property descriptions never grant authority to change price, ownership or income. Foreclosures and new special-property purchase rules are not included.
 
-**Release note:** this feature-screen update is implemented and locally verified, but not deployed. Migration `0010_account_shortcuts.sql` is additive and must be applied through the existing reviewed publication process before deployment. No new APK or domain change is included.
+**Deployment requirement:** Migration `0010_account_shortcuts.sql` is additive and must be applied through the existing reviewed publication process before deployment. No new APK or domain change is included.
 
 ## Continue a campaign on another device
 
