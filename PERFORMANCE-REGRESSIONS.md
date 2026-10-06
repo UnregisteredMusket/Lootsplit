@@ -57,7 +57,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Development / accounts / Run actions/setup-node@v4 | open | 2 | 3s → 7s | +4s | +133.33% |
 | Development / desktop / Run actions/setup-node@v4 | open | 2 | 2s → 7s | +5s | +250% |
 | Development / accounts / Run npm ci | open | 2 | 11s → 16s | +5s | +45.45% |
-| Packaged standby / Run actions/setup-node@v4 | open | 4 | 2s → 6s | +4s | +200% |
+| Packaged standby / Run actions/setup-node@v4 | open | 5 | 2s → 11s | +9s | +450% |
 | Packaged Worker / interface / Run npm ci | open | 2 | 11s → 15s | +4s | +36.36% |
 | Development / gameplay / Run actions/upload-artifact@v4 | open | 2 | 1s → 3s | +2s | +200% |
 | Development / accounts / Run actions/upload-artifact@v4 | open | 2 | 1s → 3s | +2s | +200% |
@@ -76,7 +76,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Packaged standby / standby-audit | open | 4 | 28s → 78s | +50s | +178.57% |
 | Packaged standby / Set up job | open | 2 | 1s → 3s | +2s | +200% |
 | Development / accounts / dev-account | open | 4 | 59s → 158s | +99s | +167.8% |
-| Packaged Worker / interface / worker-theme | open | 2 | 11s → 15s | +4s | +36.36% |
+| Packaged Worker / interface / worker-theme | open | 3 | 11s → 19s | +8s | +72.73% |
 | Packaged Worker / accounts / worker-account | open | 5 | 25s → 75s | +50s | +200% |
 | Development / accounts / Run actions/upload-artifact@v4 | open | 2 | 1s → 3s | +2s | +200% |
 | Verify preserved functionality / initial queue | open | 2 | 3s → 94s | +91s | +3033.33% |
@@ -91,14 +91,25 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Packaged Worker / interface / worker-game-analytics | open | 2 | 3s → 6s | +3s | +100% |
 | report | open | 2 | 7s → 12s | +5s | +71.43% |
 | Report workflow failure | open | 2 | 7s → 12s | +5s | +71.43% |
+| Packaged standby / Run npx playwright install --with-deps chromium | open | 2 | 21s → 38s | +17s | +80.95% |
+| Packaged Worker / accounts / worker-finance | open | 2 | 11s → 15s | +4s | +36.36% |
 | Packaged Worker / accounts / worker-finance | open | 2 | 11s → 15s | +4s | +36.36% |
 | Verify preserved functionality | open | 2 | 220s → 338s | +118s | +53.64% |
 | Packaged Worker / interface / worker-help | open | 2 | 6s → 25s | +19s | +316.67% |
+| Packaged Worker / interface / worker-loot | open | 2 | 4s → 6s | +2s | +50% |
 
 ## Recorded slowdowns
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-06T04:12:16Z | step: Packaged Worker / accounts / worker-finance | 13s → 15s | +2s | +15.38% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37285563745/job/111683983887) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37412269946/job/112103497296) |
+| 2026-10-06T04:12:09Z | step: Packaged Worker / interface / worker-loot | 5s → 6s | +1s | +20% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37304872866/job/111746559174) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37412269946/job/112103497361) |
+| 2026-10-06T04:12:08Z | step: Development / accounts / dev-party-sheet | 17s → 20s | +3s | +17.65% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37233687309/job/111528483533) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37412269946/job/112103114089) |
+| 2026-10-06T04:11:28Z | step: Packaged Worker / interface / worker-sound | 6s → 8s | +2s | +33.33% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37389751532/job/112032198346) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37412269946/job/112103497361) |
+| 2026-10-06T04:11:20Z | step: Packaged Worker / interface / worker-theme | 15s → 19s | +4s | +26.67% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37303426479/job/111741750660) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37412269946/job/112103497361) |
+| 2026-10-06T04:11:07Z | step: Packaged standby / Run npx playwright install --with-deps chromium | 31s → 38s | +7s | +22.58% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37285563745/job/111683983862) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37412269946/job/112103497246) |
+| 2026-10-06T04:10:13Z | step: Packaged standby / Run actions/setup-node@v4 | 6s → 11s | +5s | +83.33% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37304872866/job/111746559224) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37412269946/job/112103497246) |
+| 2026-10-06T04:09:28Z | step: Code checks and immutable builds / lint | 7s → 9s | +2s | +28.57% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37233687309/job/111528483329) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37412269946/job/112103113892) |
 | 2026-10-06T04:06:50Z | step: Development / accounts / dev-character | 13s → 16s | +3s | +23.08% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37233368939/job/111527537940) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37411859467/job/112101826738) |
 | 2026-10-06T04:05:29Z | step: Packaged Worker / interface / Run npx playwright install --with-deps chromium | 26s → 35s | +9s | +34.62% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37280342384/job/111667149206) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37411859467/job/112102163470) |
 | 2026-10-06T04:05:17Z | step: Development / gameplay / dev-finance | 20s → 28s | +8s | +40% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37269780574/job/111634124581) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37411859467/job/112101826784) |
