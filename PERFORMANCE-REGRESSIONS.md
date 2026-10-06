@@ -52,6 +52,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Packaged Worker / accounts / Run actions/download-artifact@v4 | open | 2 | 1s → 3s | +2s | +200% |
 | Packaged Worker / accounts / Run actions/upload-artifact@v4 | open | 2 | 1s → 3s | +2s | +200% |
 | Packaged Worker / interface / worker-loot | open | 2 | 4s → 6s | +2s | +50% |
+| Development / gameplay / Run npx playwright install --with-deps chromium | open | 2 | 25s → 41s | +16s | +64% |
 | Code checks and immutable builds / Run actions/upload-artifact@v4 | open | 2 | 2s → 4s | +2s | +100% |
 | Packaged Worker / accounts / worker-account | resolved | 6 | 22s → 95s | +73s | +331.82% |
 | Development / gameplay / Run actions/setup-node@v4 | open | 3 | 2s → 7s | +5s | +250% |
@@ -105,6 +106,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-06T06:33:55Z | step: Development / gameplay / Run npx playwright install --with-deps chromium | 33s → 41s | +8s | +24.24% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37253804812/job/111586605389) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37424344225/job/112140489817) |
 | 2026-10-06T06:31:12Z | step: Development / accounts / dev-party-sheet | 17s → 36s | +19s | +111.76% | failure | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37233368939/job/111527537940) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37423624096/job/112138597651) |
 | 2026-10-06T06:28:53Z | step: Packaged Worker / accounts / Run npx playwright install --with-deps chromium | 28s → 37s | +9s | +32.14% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37300924028/job/111734235551) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37423624096/job/112139010374) |
 | 2026-10-06T06:28:39Z | step: Development / governance / dev-campaign-governance | 57s → 70s | +13s | +22.81% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37389052554/job/112029497710) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37423624096/job/112138597433) |
