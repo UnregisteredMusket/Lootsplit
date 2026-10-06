@@ -5,7 +5,9 @@ import { mkdir } from "node:fs/promises";
 import { localAccountDb } from "./account-dev-db.mjs";
 import { blankSheet } from "../src/lib/characters/model.mjs";
 const origin = process.env.AUDIT_ORIGIN || "http://127.0.0.1:8080",
-  output = process.env.PARTY_SCREENSHOTS || "test-results/party-sheets";
+  output = process.env.PARTY_SCREENSHOTS || "test-results/party-sheets",
+  // The Desk summary shows the first four names; keep this created character in view.
+  characterName = "A unified sentinel";
 await mkdir(output, { recursive: true });
 const browser = await chromium.launch({
   headless: true,
@@ -68,10 +70,10 @@ try {
   await dm.page.getByLabel("Maximum HP", { exact: true }).fill("115");
   await dm.page.getByLabel("Current HP", { exact: true }).fill("10");
   await dm.page.getByRole("button", { name: "Character details", exact: true }).click();
-  await dm.page.getByLabel("Character name", { exact: true }).fill("Unified sentinel");
+  await dm.page.getByLabel("Character name", { exact: true }).fill(characterName);
   await save(dm.page);
   let t = await state(dm.page),
-    p = t.purses.find((p) => p.name === "Unified sentinel");
+    p = t.purses.find((p) => p.name === characterName);
   assert.ok(p?.sheet);
   const id = p.id,
     href = `/characters?id=${encodeURIComponent(`party:${id}`)}`;
@@ -85,7 +87,7 @@ try {
   assert.equal(t.purses.find((p) => p.id === id).coins.gp, 17);
   assert.equal(t.holdings.find((h) => h.purseId === id).quantity, 2);
   await visit(dm.page, "/party");
-  let card = dm.page.locator(".party-profile").filter({ hasText: "Unified sentinel" });
+  let card = dm.page.locator(".party-profile").filter({ hasText: characterName });
   await card.getByText("10 / 115 HP", { exact: false }).waitFor();
   assert.equal(
     await card.getByRole("link", { name: "Open sheet", exact: true }).getAttribute("href"),
@@ -94,7 +96,7 @@ try {
   await dm.page.getByRole("tab", { name: "Funds & inventory", exact: true }).click();
   const funds = dm.page
     .locator("section.rounded-xl")
-    .filter({ has: dm.page.locator('input[aria-label="Funds name"][value="Unified sentinel"]') });
+    .filter({ has: dm.page.locator(`input[aria-label="Funds name"][value="${characterName}"]`) });
   await dm.page.locator(`#purse-${id} > summary`).click();
   await funds.getByLabel("Gold", { exact: true }).fill("23");
   await funds.getByRole("button", { name: "Set coins", exact: true }).click();
@@ -110,7 +112,16 @@ try {
   await dm.page.getByLabel("Equip Sentinel sword", { exact: true }).check();
   await save(dm.page);
   await visit(dm.page, "/");
-  await dm.page.locator(".glance-strip").getByRole("link").filter({ hasText: "10/115" }).waitFor();
+  await dm.page.locator(".information-selectors").getByRole("button", { name: "Party", exact: true }).click();
+  const partyReadout = dm.page.getByRole("region", { name: "Party information", exact: true });
+  const characterReadout = partyReadout.getByRole("link").filter({ hasText: characterName });
+  await characterReadout.getByText("10/115 HP", { exact: false }).waitFor();
+  assert.equal(await characterReadout.getAttribute("href"), href);
+  assert.equal(await characterReadout.getByRole("meter").getAttribute("aria-valuenow"), "10");
+  assert.equal(await characterReadout.getByRole("meter").getAttribute("aria-valuemax"), "115");
+  await partyReadout.getByRole("link", { name: "View all characters →", exact: true }).click();
+  await card.getByText("10 / 115 HP", { exact: false }).waitFor();
+  assert.equal(await dm.page.locator(".party-profile").count(), t.purses.filter((p) => p.kind === "character").length);
   // Persistence is campaign data, not a localStorage association. Restore into a new campaign.
   await dm.page.evaluate(async () => {
     const e = await import("/src/lib/quire/economy.ts"),
@@ -172,7 +183,7 @@ try {
     { code, id, sessionId },
   );
   await visit(player.page, href);
-  await player.page.getByRole("heading", { name: "Unified sentinel", exact: true }).waitFor();
+  await player.page.getByRole("heading", { name: characterName, exact: true }).waitFor();
   await edit(player.page);
   await player.page.getByLabel("Current HP", { exact: true }).fill("7");
   await save(player.page);
@@ -195,7 +206,7 @@ try {
   await player.page.getByRole("link", { name: "Character Sheet", exact: true }).click();
   await player.page
     .getByRole("region", { name: "Interactive characters" })
-    .getByRole("heading", { name: "Unified sentinel", exact: true })
+    .getByRole("heading", { name: characterName, exact: true })
     .waitFor();
   // The helper provisions a disposable signed-in local DM; preserve full sheets and device dice.
   const guest = await browser.newContext({ viewport: { width: 390, height: 844 } });

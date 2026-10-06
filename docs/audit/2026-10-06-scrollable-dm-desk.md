@@ -45,3 +45,11 @@ A real mobile UI capture from the final local audit is available as lootsplit-dm
 The user subsequently explicitly approved publishing to UnregisteredMusket/Lootsplit and releasing the website after full checks. Before the approved push, recovery status and remote main were reconciled: main and live still match the baseline above. Full release verification is now authorized and remains pending at this checkpoint.
 
 CLI publication lacked GitHub credentials, so the connected integration created source commit 1d603fd1d2c8b4fb054f20d37aead690ee3878f7. Its tree eeb3ca014d358b10e1a71b124793e1455508afea exactly matches the locally tested source; the performance record references that source commit. Only documentation and the measurement reference changed afterward.
+
+## PR verification correction
+
+PR #55 head 2359b76d6ac43ebe0148eca6e166dc6320307eca, verification run 37485642730, passed code/builds, development gameplay/desktop/governance, packaged interface/accounts and standby. Development accounts passed its account and character scenarios, then dev-party-sheet timed out waiting for the retired .glance-strip selector. Production was not changed.
+
+The Party summary deliberately shows the first four alphabetical names, with a full-party link. The preservation fixture now creates A unified sentinel, selects the actual Party information panel, verifies 10/115 HP, the exact sheet link and meter values, then clicks View all characters and asserts the complete six-character list. All later two-way money/equipment, backup restore, legacy migration, player permissions, shared HP updates and mobile/desktop checks remain intact. Application code is unchanged.
+
+The complete corrected local party-sheet audit passed in 22.417s using Node22.23.3/Chromium133 and a disposable empty-database Vite snapshot. A first comparable local reference is recorded separately; there was no logged same-environment local party-sheet baseline. Full exact-head CI is required for this fixture correction. The failed CI party-sheet duration is 29s, up from its last comparable 21s (+8s, +38.10%), caused by the stale selector's 20s timeout; resolve that trend only after successful comparable CI verifies the correction.
