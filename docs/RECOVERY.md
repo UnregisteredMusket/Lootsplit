@@ -1,3 +1,9 @@
+# Fixed player feature buttons — 2026-10-06 UTC
+
+- Latest user request removes player shortcut customization and presents all six player services with existing shortcut-button styling. DM customization remains unchanged; existing player preference records are preserved. No migration, gameplay-rule or APK change.
+- Reconciled main/live at `474a14c203910ddbda7bdd294b8968d808549293`: PR51/main verification37425891304 and deployment37426315597 completed successfully with live audit. Earlier blocked checkpoints below are historical. Migration0010 already applied once; do not repeat it.
+- Branch `fix/player-home-buttons`. Player Home has one fixed grid, existing readouts, no duplicate feature cards. Governance covers signed-in/guest parity, return navigation and real repayment/property permissions; sheet audits click the new button. README/manual/inventory/help updated. Local verification passed:508 tests/four existing skips, clean types, zero lint errors/34 existing warnings; web/mobile builds; governance, character, party-sheet and DM control-panel browser checks. Mobile screenshot inspected: six fixed buttons, no overflow/editor/duplicate cards. Full CI/publication pending; existing gated publication authorization applies.
+
 # Shortcut readiness follow-up — 2026-10-06 UTC
 
 - PR50 passed full PR run37424344225 and merged as0b5a8f4750c7d42ac435ded25f1e2e124e7465d5. Production migration0010 was applied once at06:37:46UTC and verified. Do not apply it again.

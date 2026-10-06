@@ -192,7 +192,7 @@ try {
   assert.equal((await state(dm.page)).holdings.find((h) => h.purseId === id).equipped, false);
   await visit(player.page, "/");
   await player.page.getByRole("heading", { name: "Home", exact: true }).waitFor();
-  await player.page.getByRole("link", { name: "Open Character Sheet →", exact: true }).click();
+  await player.page.getByRole("link", { name: "Character Sheet", exact: true }).click();
   await player.page
     .getByRole("region", { name: "Interactive characters" })
     .getByRole("heading", { name: "Unified sentinel", exact: true })

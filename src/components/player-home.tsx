@@ -2,8 +2,13 @@ import { useEconomy } from "@/lib/quire/economy-context";
 import { useSeat } from "@/lib/quire/seat";
 import { formatCopper, toCopper } from "@/lib/quire/money";
 import { AppLink } from "./app-link";
-import { FeatureCards } from "./feature-navigation";
-import { Shortcuts } from "./control-panel/shortcuts";
+import { FantasyIcon } from "./fantasy-icon";
+import { normalizeShortcuts, shortcutDestinations } from "@/lib/quire/shortcuts.mjs";
+
+// Fixed player services share the existing destination labels and artwork.
+const playerServices = normalizeShortcuts(null, "player").map((item) =>
+  shortcutDestinations.find((target) => target.id === item.destination)!,
+);
 export function PlayerHome() {
   const { purses, ready } = useEconomy(),
     seat = useSeat();
@@ -24,9 +29,6 @@ export function PlayerHome() {
                 {p.sheet ? `HP ${p.sheet.hp}/${p.sheet.maxHp} · AC ${p.sheet.ac} · ` : ""}
                 {formatCopper(toCopper(p.coins))}
               </p>
-              <AppLink className="quick-action" href={`/?view=sheet`}>
-                Open Character Sheet →
-              </AppLink>
             </div>
           ))
         )}
@@ -34,8 +36,20 @@ export function PlayerHome() {
           Campaign, messages & session status →
         </AppLink>
       </section>
-      <Shortcuts campaignId="player" role="player" />
-      <FeatureCards />
+      <section className="desk-shortcuts" aria-label="Player features">
+        <div className="shortcut-grid">
+          {playerServices.map((service) => (
+            <AppLink
+              key={service.id}
+              className="shortcut-button"
+              href={service.href.startsWith("/features/") ? `${service.href}?from=%2F` : service.href}
+            >
+              <FantasyIcon ui={service.icon} size={40} />
+              <span>{service.label}</span>
+            </AppLink>
+          ))}
+        </div>
+      </section>
     </div>
   );
 }
