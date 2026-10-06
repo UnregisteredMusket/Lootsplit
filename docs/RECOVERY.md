@@ -1,3 +1,24 @@
+# Integration audit publication authorized — 2026-10-06 UTC
+
+- User explicitly approved pushing the audited changes to `UnregisteredMusket/Lootsplit`, full release checks, and gated merge/deployment. The earlier approval block below is historical and is resolved by this permission.
+- Remote main reconciled at `57903387de3dd600bb30bc68a69f24f164c51081`; audit branch not yet present remotely. Local implementation `efb1909`, verification/report checkpoint `a4e92f2`. Next: publish branch, open PR, observe complete exact-head verification, merge, observe main verification/deploy and verify live artifacts. Do not repeat completed local work or Android publication.
+
+# Integration audit local verification and publication block — 2026-10-06
+
+- Application implementation commit: `efb1909`, branch `audit/integration-consistency`. Four confirmed fixes and measured transaction/query reductions are documented in `docs/audit/2026-10-05-integration.md`. No UI formatting or signing changes.
+- Final `verify:quick`: 497 passed, 4 skipped; clean TypeScript; zero lint errors/35 existing warnings. Web and mobile builds passed. Final 13 focused regressions passed.
+- Account (8 scenarios), protected backup, finance, Party-sheet and data-integrity browsers passed. Governance failed twice in the working checkout, then passed unchanged in isolated `/tmp/lootsplit-integration-verify` at `efb1909`; earlier failures remain documented. Isolated sound, interrupted-purchase recovery, Library navigation and public/private analytics browser checks also passed. Local Chromium133 does not replace mandatory full current-browser CI; physical Android validation is not claimed.
+- **Publication blocked:** automatic approval review rejected `git push -u origin audit/integration-consistency`, citing potentially sensitive export to an unverified GitHub destination and requiring explicit publication permission. Do not bypass by another push method/API. No PR, merge or deploy occurred. Ask permission to push to `UnregisteredMusket/Lootsplit`, run complete checks and proceed with gated merge/deploy. Reconcile remote state before any later write; production remains the previously verified baseline below.
+- Keep local implementation and this report; do not repeat Android1.4.0 publication. After permission, complete exact-head PR/main checks, performance-history review and immutable live verification before calling these changes released.
+
+# Integration audit checkpoint — 2026-10-05
+
+- User requested full system integration/efficiency audit and fixes, with no UI reformatting. Baseline main/live `57903387de3dd600bb30bc68a69f24f164c51081` is already released; verification `37393097454`, deployment `37393529289`, Android 1.4.0/code 6 complete. Do not repeat the Android release.
+- Branch `audit/integration-consistency`: mixed-state shared/backup snapshots reproduced and corrected with coherent readonly transactions; financial views share the transaction reader; encounter listing query count 44→2 for 21 memberships; concurrent-local-Charisma pricing regression corrected for shops and listings. No schema/layout changes.
+- Deterministic regressions failed before fixes and pass afterward. Account suite (8 scenarios), protected backup, finance, party-sheet and data-integrity browser checks passed. Initial governance run timed out at Test mode after navigation; diagnostic screenshots retained. Inspect final focused rerun/CI before claiming release.
+- Local runtime Node22.23.3. Standard browser download invalid ZIP; available `/tmp/lootsplit-chromium/chromium` launches and is Chromium133. Run local server with `--host 127.0.0.1` in same shell as browser (network-interface enumeration is restricted). Full CI with its standard browser remains mandatory.
+- Report and source map: docs/audit/2026-10-05-integration.md. Performance snapshot:326 observations, zero pending/stale resolutions; 22 entries since prior304 reviewed. No historical reset or time-speedup claimed; snapshot transactions reduced8/9→1. Inspect PR/head/runs and live identity before resuming any publication.
+
 # Android 1.4.0 publication follow-up — 2026-10-05
 
 - Release preparation PR #44 merged to main `feea2b5047b967e3aeb54314d59acff5593d9881`. PR verification `37390831478`, main verification `37391401183` and website deployment/live audits `37391781088` passed.

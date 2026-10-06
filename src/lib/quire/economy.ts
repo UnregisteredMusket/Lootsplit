@@ -3,7 +3,7 @@ import { assertMerchantSale, isService, stockCategory } from "./merchant.ts";
 import { applyCommand, type CommandInput } from "./commands.ts";
 import { loanFromRequest, readFinance, assertFinanceAccountRemovable } from "./finance.ts";
 import { readLocalEncounters } from "../encounters/local.ts";
-import { loadJournal, readJournal, type Journal } from "./journal.ts";
+import { readJournal, type Journal } from "./journal.ts";
 import { blankSheet } from "../characters/model.mjs";
 import {
   statsOnly,
@@ -30,7 +30,6 @@ import {
 import { inventItemName } from "./names.ts";
 import { clampRealm, clampScale, inventedListPrice, scalePrice } from "./scale.ts";
 import {
-  loadNotes,
   readNotes,
   type ChatNote,
   postNotes,
@@ -39,13 +38,12 @@ import {
   replaceNotes,
 } from "./chat.ts";
 import { readCloudTable, applyBillToTable, type CloudTable } from "./cloud.ts";
-import { loadHandouts, readHandouts, type Handout } from "./handouts.ts";
+import { readHandouts, type Handout } from "./handouts.ts";
 import { APP_VERSION } from "./version.ts";
 import {
   giftParts,
   itemForGift,
   giftSummary,
-  loadGifts,
   loadRoster,
   readRoster,
   readGifts,
@@ -53,7 +51,6 @@ import {
 } from "./gift.ts";
 import {
   loadListings,
-  loadSales,
   loadLoans,
   readSales,
   mergeLoanLists,
@@ -886,12 +883,11 @@ function logLine(
   };
 }
 
-async function charismaOf(purseId: string): Promise<number | null> {
-  const p = (await listPurses()).find((p) => p.id === purseId);
-  if (p?.kind === "party") return null;
-  if (p?.sheet) return p.sheet.scores.cha;
-  const sheets = await loadSheets();
-  return charismaScore(sheets.find((sheet) => sheet.purseId === purseId));
+async function charismaOf(purse: Purse, tx: IDBTransaction): Promise<number | null> {
+  if (purse.kind === "party") return null;
+  if (purse.sheet) return purse.sheet.scores.cha;
+  const sheets = readSheets(await request(tx.objectStore("meta").get("sheets")));
+  return charismaScore(sheets.find((sheet) => sheet.purseId === purse.id));
 }
 
 async function atomic<T>(stores: string[], work: (tx: IDBTransaction) => Promise<T>): Promise<T> {
@@ -921,8 +917,7 @@ export async function buyFromShop(input: {
   const quantity = Math.floor(input.quantity);
   if (!Number.isSafeInteger(quantity) || quantity < 1)
     throw new Error("Choose a valid quantity of at least one.");
-  const score = await charismaOf(input.purseId);
-  await atomic(["purses", "holdings", "stock", "shops", "ledger"], async (tx) => {
+  await atomic(["purses", "holdings", "stock", "shops", "ledger", "meta"], async (tx) => {
     const stock = await request<StockLine | undefined>(tx.objectStore("stock").get(input.stockId));
     if (!stock) throw new Error("That item is no longer in the shop.");
     const shop = await request<Shop | undefined>(tx.objectStore("shops").get(stock.shopId));
@@ -931,6 +926,7 @@ export async function buyFromShop(input: {
     if (shop.closed) throw new Error("This shop is closed.");
     if (stock.quantity !== null && stock.quantity < quantity)
       throw new Error("The shop does not have that many.");
+    const score = await charismaOf(purse, tx);
     const unit = priceAfterCharisma(Math.round(stock.copper * shop.sellRate), score);
     const cost = unit * quantity;
     const coins = spendCoins(purse.coins, cost);
@@ -1168,7 +1164,6 @@ export async function buyListing(input: {
   const quantity = Math.floor(input.quantity);
   if (!Number.isSafeInteger(quantity) || quantity < 1)
     throw new Error("Choose a valid quantity of at least one.");
-  const score = await charismaOf(input.purseId);
   await atomic(["purses", "holdings", "ledger", "meta"], async (tx) => {
     const listings = readListings(await request(tx.objectStore("meta").get("listings")));
     const listing = listings.find((item) => item.id === input.listingId);
@@ -1177,6 +1172,7 @@ export async function buyListing(input: {
       throw new Error("There are not that many.");
     const purse = await request<Purse | undefined>(tx.objectStore("purses").get(input.purseId));
     if (!purse) throw new Error("This account no longer exists.");
+    const score = await charismaOf(purse, tx);
     const cost = priceAfterCharisma(listing.copper, score) * quantity;
     const coins = spendCoins(purse.coins, cost);
     if (!coins) throw new Error("Insufficient funds.");
@@ -1547,6 +1543,10 @@ export async function snapshot(): Promise<QuireFile> {
     tx.objectStore("meta").get("localEncounters"),
   );
   const lockRow = request<unknown>(tx.objectStore("meta").get("seatLock"));
+  const metadata = readCampaignMetadata(tx);
+  const gifts = request<{ gifts: unknown } | undefined>(tx.objectStore("meta").get("gifts"));
+  const sales = request(tx.objectStore("meta").get("sales"));
+  const done = finish(tx);
   const seatLock = readSeatLock(await lockRow);
   const file: QuireFile = {
     kind: "quire",
@@ -1567,15 +1567,13 @@ export async function snapshot(): Promise<QuireFile> {
     seatLock: seatLock ?? undefined,
     appVersion: APP_VERSION,
   };
-  await finish(tx);
-  file.listings = await loadListings();
-  file.loans = await loadLoans();
-  file.sheets = await loadSheets();
-  file.gifts = await loadGifts();
-  file.sales = await loadSales();
-  file.notes = await loadNotes();
-  file.handouts = await loadHandouts();
-  file.journal = await loadJournal();
+  const shared = await metadata;
+  Object.assign(file, {
+    listings: shared.listings, loans: shared.loans, sheets: shared.sheets,
+    notes: shared.notes, handouts: shared.handouts, journal: shared.journal,
+    gifts: readGifts((await gifts)?.gifts), sales: readSales(await sales),
+  });
+  await done;
   return file;
 }
 
@@ -1905,34 +1903,61 @@ export function blankShop(): Shop {
   };
 }
 
+// Enqueue every request before yielding: financial rows and their metadata must
+// describe the same committed state, including during another tab's save.
+function readCampaignMetadata(tx: IDBTransaction, includeReferences = true) {
+  const meta = tx.objectStore("meta");
+  return Promise.all([
+    request<Partial<RealmSettings> | undefined>(meta.get("settings")),
+    request(meta.get("listings")), request(meta.get("loans")),
+    request(meta.get("sheets")),
+    includeReferences ? request(meta.get("chat")) : Promise.resolve([]),
+    includeReferences ? request(meta.get("handouts")) : Promise.resolve([]),
+    request<{ value: unknown } | undefined>(meta.get("journal")),
+  ]).then(([realm, listings, loans, sheets, notes, handouts, journal]) => ({
+    realm: clampRealm(realm), listings: readListings(listings), loans: readLoans(loans),
+    sheets: readSheets(sheets), notes: readNotes(notes), handouts: readHandouts(handouts),
+    journal: readJournal(journal?.value),
+  }));
+}
+
+function readEconomyTransaction(tx: IDBTransaction, includeReferences = true): Promise<CloudTable & { realm: RealmSettings; journal: Journal }> {
+  return Promise.all([
+    request<Purse[]>(tx.objectStore("purses").getAll()),
+    request<Holding[]>(tx.objectStore("holdings").getAll()),
+    request<Shop[]>(tx.objectStore("shops").getAll()),
+    request<StockLine[]>(tx.objectStore("stock").getAll()),
+    request<LedgerLine[]>(tx.objectStore("ledger").getAll()),
+    readCampaignMetadata(tx, includeReferences),
+  ]).then(([purses, holdings, shops, stock, ledger, metadata]) => ({
+    purses, holdings, shops: shops.map(normalizeShop), stock: stock.map(normalizeStock),
+    ledger, ...metadata,
+  }));
+}
+
 export async function economySnapshot(): Promise<CloudTable> {
   const db = await quireDb();
-  const tx = db.transaction(["purses", "holdings", "shops", "stock", "ledger"], "readonly");
-  const purses = request<Purse[]>(tx.objectStore("purses").getAll());
-  const holdings = request<Holding[]>(tx.objectStore("holdings").getAll());
-  const shops = request<Shop[]>(tx.objectStore("shops").getAll());
-  const stock = request<StockLine[]>(tx.objectStore("stock").getAll());
-  const ledger = request<LedgerLine[]>(tx.objectStore("ledger").getAll());
-  const table: CloudTable = {
-    purses: await purses,
-    holdings: await holdings,
-    shops: (await shops).map((shop) => normalizeShop(shop)),
-    stock: (await stock).map((line) => normalizeStock(line)),
-    ledger: await ledger,
-    listings: [],
-    loans: [],
-    sheets: [],
-    notes: [],
-  };
-  await finish(tx);
-  table.realm = await loadRealm();
-  table.listings = await loadListings();
-  table.loans = await loadLoans();
-  table.sheets = await loadSheets();
-  table.notes = await loadNotes();
-  table.handouts = await loadHandouts();
-  table.journal = await loadJournal();
+  const tx = db.transaction([...ECONOMY], "readonly");
+  const [table] = await Promise.all([readEconomyTransaction(tx), finish(tx)]);
   return table;
+}
+
+/** One coherent read for all financial views, without copying private books. */
+export async function economyView() {
+  const db = await quireDb();
+  const tx = db.transaction([...ECONOMY, "catalog", "lexicon"], "readonly");
+  const [table, catalog, lexicon] = await Promise.all([
+    readEconomyTransaction(tx, false),
+    request<CatalogItem[]>(tx.objectStore("catalog").getAll()),
+    request<Lexeme[]>(tx.objectStore("lexicon").getAll()),
+    finish(tx),
+  ]);
+  return {
+    ...table,
+    ledger: table.ledger.sort((a, b) => b.at - a.at),
+    catalog: catalog.sort((a, b) => a.name.localeCompare(b.name)),
+    lexicon: lexicon.sort((a, b) => a.name.localeCompare(b.name)),
+  };
 }
 
 export async function applyCloudTable(table: CloudTable): Promise<void> {

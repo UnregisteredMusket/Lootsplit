@@ -1,0 +1,44 @@
+{
+  "before": {
+    "environment": "node22.23.3/linux-x64/fake-indexeddb/warm/20-purses-1000-ledger",
+    "results": [
+      {
+        "name": "campaign snapshot",
+        "iterations": 100,
+        "transactions": 800,
+        "startedAt": "2026-10-06T01:28:41.509Z",
+        "finishedAt": "2026-10-06T01:28:41.781Z",
+        "durationMs": 271.72672500000004
+      },
+      {
+        "name": "device backup",
+        "iterations": 100,
+        "transactions": 900,
+        "startedAt": "2026-10-06T01:28:41.813Z",
+        "finishedAt": "2026-10-06T01:28:42.103Z",
+        "durationMs": 289.61739
+      }
+    ]
+  },
+  "after": {
+    "environment": "node22.23.3/linux-x64/fake-indexeddb/warm/20-purses-1000-ledger",
+    "results": [
+      {
+        "name": "campaign snapshot",
+        "iterations": 100,
+        "transactions": 100,
+        "startedAt": "2026-10-06T01:29:37.872Z",
+        "finishedAt": "2026-10-06T01:29:38.151Z",
+        "durationMs": 278.560977
+      },
+      {
+        "name": "device backup",
+        "iterations": 100,
+        "transactions": 100,
+        "startedAt": "2026-10-06T01:29:38.195Z",
+        "finishedAt": "2026-10-06T01:29:38.498Z",
+        "durationMs": 302.773554
+      }
+    ]
+  }
+}
