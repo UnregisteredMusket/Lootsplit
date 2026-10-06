@@ -34,7 +34,7 @@ function RecordedChange({ change }: { change: NonNullable<Journal["events"][numb
     </details>
   );
 }
-export function CampaignJournal({ section = "overview" }: { section?: "overview" | "sessions" | "bank" | "reports" }) {
+export function CampaignJournal({ section = "overview", reviewOnly = false }: { section?: "overview" | "sessions" | "bank" | "reports"; reviewOnly?: boolean }) {
   const navigate=useNavigate();
   const reviewRef = useDisclosureAnchor("review-inbox");
   const { journal, ledger, purses, command, loans, decideLoan } = useEconomy();
@@ -270,10 +270,18 @@ export function CampaignJournal({ section = "overview" }: { section?: "overview"
       </>}
       {section === "bank" && <details open ref={reviewRef} id="review-inbox" className="review-inbox">
         <summary>
-          {dm ? "Financial requests" : "Payment requests"} ·{" "}
+          {dm ? "Payments & loans awaiting approval" : "My payment requests"} ·{" "}
           {pending.length + requests.filter((x) => x.status === "pending").length} pending
         </summary>
-        <p className="text-sm text-muted">Normal authorized trading remains immediate.</p>
+        <p className="text-sm text-muted">
+          {dm
+            ? "Review character spending requests and loan applications. Approving a payment deducts the requested coins from that character’s account; approving a loan credits their account."
+            : "Ask the DM to approve spending from your character’s account. Coins are deducted when the DM approves your payment."}
+          {" "}Permitted shop purchases use Buy in the Market.
+        </p>
+        {dm && !pending.length && !requests.some(x => x.status === "pending") && (
+          <p role="status">No payments or loans need approval.</p>
+        )}
         {pending.map((x) => (
           <div className="journal-entry" key={x.id}>
             <strong>
@@ -343,7 +351,7 @@ export function CampaignJournal({ section = "overview" }: { section?: "overview"
             ) : null}
           </div>
         ))}
-        <form
+        {(!dm || !reviewOnly) && <form
           className="mt-4 grid gap-3"
           onSubmit={(e) => {
             e.preventDefault();
@@ -359,10 +367,9 @@ export function CampaignJournal({ section = "overview" }: { section?: "overview"
             });
           }}
         >
-          <h3>Submit a payment for DM review</h3>
+          <h3>{dm ? "Queue a character payment for approval" : "Request approval to spend coins"}</h3>
           <p className="text-sm text-muted">
-            Approval spends the requested coins from the selected account once. It does not purchase
-            a shop item.
+            {dm ? "Record a proposed expense from the selected character or party account, then approve or decline it in Review Inbox. This queues an expense; it does not send a payment demand to a player." : "Enter an expense such as an inn bill or service. Approval spends these coins once. Use the Market to buy shop items."}
           </p>
           <select
             className="ledger-search"
@@ -397,9 +404,9 @@ export function CampaignJournal({ section = "overview" }: { section?: "overview"
             onChange={(e) => setNote(e.target.value)}
           />
           <Button disabled={busy || !accounts.length} type="submit">
-            Submit request
+            {dm ? "Queue payment" : "Submit request"}
           </Button>
-        </form>
+        </form>}
       </details>}
       {section === "reports" && <Fold
         title="Full activity"

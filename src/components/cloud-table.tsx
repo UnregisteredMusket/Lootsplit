@@ -286,7 +286,7 @@ export function CloudTable() {
                 </Button>
               </div>
               <p className="mt-4 text-sm text-muted">
-                Playing solo? Your local campaign is ready on Home.
+                Local DM play uses the owned campaign saved on this device and can continue without a connection. Shared Live and Turn-based rooms need Internet access, including passing a shared-room turn.
               </p>
             </div>
           ) : null}
@@ -365,7 +365,7 @@ export function CloudTable() {
               <p className="mt-3 text-sm text-muted">
                 {hostMode === "live"
                   ? "Everyone can make changes at the same time."
-                  : "One person makes changes at a time, then ends their turn."}
+                  : "Online turns: each person uses their own device. One person makes changes at a time, then submits them and ends their turn. A connection is required."}
               </p>
               <Button
                 className="mt-5 w-full min-h-12"
