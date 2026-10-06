@@ -63,7 +63,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Development / gameplay / Run actions/upload-artifact@v4 | open | 2 | 1s → 3s | +2s | +200% |
 | Development / accounts / Run actions/upload-artifact@v4 | open | 2 | 1s → 3s | +2s | +200% |
 | verify | open | 2 | 5s → 40s | +35s | +700% |
-| deploy / Check current main, existing bindings and applied migrations; deploy without rebuild | open | 2 | 9s → 15s | +6s | +66.67% |
+| deploy / Check current main, existing bindings and applied migrations; deploy without rebuild | open | 3 | 9s → 28s | +19s | +211.11% |
 | Development / governance / dev-campaign-governance | open | 2 | 27s → 57s | +30s | +111.11% |
 | Packaged Worker / accounts | open | 4 | 85s → 166s | +81s | +95.29% |
 | Development / gameplay / Run npx playwright install --with-deps chromium | open | 2 | 21s → 31s | +10s | +47.62% |
@@ -103,6 +103,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-06T04:14:00Z | step: deploy / Check current main, existing bindings and applied migrations; deploy without rebuild | 15s → 28s | +13s | +86.67% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37263801298/job/111616279155) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37412626230/job/112104223178) |
 | 2026-10-06T04:12:51.000Z | queue: Publish verified standby / initial queue | 4s → 5s | +1s | +25% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37235992149) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37412626382) |
 | 2026-10-06T04:12:16Z | step: Packaged Worker / accounts / worker-finance | 13s → 15s | +2s | +15.38% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37285563745/job/111683983887) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37412269946/job/112103497296) |
 | 2026-10-06T04:12:09Z | step: Packaged Worker / interface / worker-loot | 5s → 6s | +1s | +20% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37304872866/job/111746559174) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37412269946/job/112103497361) |
