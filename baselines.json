@@ -596,19 +596,19 @@
   },
   "[\".github/workflows/verify.yml\",\"pull_request\",\"pull-request\",\"step\",\"Development / governance / Run npx playwright install --with-deps chromium\",\"ubuntu-latest\",1]": {
     "schema": 1,
-    "id": "37389052554:1:e819bfff990b10ad209e025faa39f6526d5e0283bcd00c2b706db6b6c8f83bac",
+    "id": "37423565018:1:e819bfff990b10ad209e025faa39f6526d5e0283bcd00c2b706db6b6c8f83bac",
     "scope": "[\".github/workflows/verify.yml\",\"pull_request\",\"pull-request\",\"step\",\"Development / governance / Run npx playwright install --with-deps chromium\",\"ubuntu-latest\",1]",
     "kind": "step",
     "name": "Development / governance / Run npx playwright install --with-deps chromium",
     "environment": "ubuntu-latest",
-    "commit": "542d6187da90695991caacc143c8b4df3d831d13",
-    "runId": 37389052554,
+    "commit": "40322cac504f3c6144a546458a15c1fa78dbac30",
+    "runId": 37423565018,
     "attempt": 1,
-    "url": "https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37389052554/job/112029497710",
+    "url": "https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37423565018/job/112138077007",
     "outcome": "success",
-    "startedAt": "2026-10-05T23:32:49Z",
-    "finishedAt": "2026-10-05T23:33:19Z",
-    "durationMs": 30000,
+    "startedAt": "2026-10-06T06:24:58Z",
+    "finishedAt": "2026-10-06T06:25:37Z",
+    "durationMs": 39000,
     "trendId": "37233368939:1:e819bfff990b10ad209e025faa39f6526d5e0283bcd00c2b706db6b6c8f83bac"
   },
   "[\".github/workflows/verify.yml\",\"pull_request\",\"pull-request\",\"step\",\"Development / accounts / Start disposable development server\",\"ubuntu-latest\",1]": {
@@ -9279,5 +9279,22 @@
     "finishedAt": "2026-10-06T04:09:52Z",
     "durationMs": 1000,
     "trendId": "37412269946:1:d05e5c0f6f77a0fa304582a93b2e803739987d4cad976b9de48d25197785170f"
+  },
+  "[\".github/workflows/verify.yml\",\"pull_request\",\"pull-request\",\"step\",\"Development / gameplay / Summarize measured verification stages\",\"ubuntu-latest\",1]": {
+    "schema": 1,
+    "id": "37423565018:1:f00270eda748806ff4fe7927ac2da8b93408fb08741335ea1dafeee253dbcfe8",
+    "scope": "[\".github/workflows/verify.yml\",\"pull_request\",\"pull-request\",\"step\",\"Development / gameplay / Summarize measured verification stages\",\"ubuntu-latest\",1]",
+    "kind": "step",
+    "name": "Development / gameplay / Summarize measured verification stages",
+    "environment": "ubuntu-latest",
+    "commit": "40322cac504f3c6144a546458a15c1fa78dbac30",
+    "runId": 37423565018,
+    "attempt": 1,
+    "url": "https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37423565018/job/112138077034",
+    "outcome": "success",
+    "startedAt": "2026-10-06T06:26:07Z",
+    "finishedAt": "2026-10-06T06:26:08Z",
+    "durationMs": 1000,
+    "trendId": "37423565018:1:f00270eda748806ff4fe7927ac2da8b93408fb08741335ea1dafeee253dbcfe8"
   }
 }

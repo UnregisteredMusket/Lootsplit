@@ -98,11 +98,13 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Verify preserved functionality | open | 2 | 220s → 338s | +118s | +53.64% |
 | Packaged Worker / interface / worker-help | open | 2 | 6s → 25s | +19s | +316.67% |
 | Packaged Worker / interface / worker-loot | open | 2 | 4s → 6s | +2s | +50% |
+| Development / governance / Run npx playwright install --with-deps chromium | open | 2 | 23s → 39s | +16s | +69.57% |
 
 ## Recorded slowdowns
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-06T06:25:37Z | step: Development / governance / Run npx playwright install --with-deps chromium | 30s → 39s | +9s | +30% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37389052554/job/112029497710) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37423565018/job/112138077007) |
 | 2026-10-06T04:14:00Z | step: deploy / Check current main, existing bindings and applied migrations; deploy without rebuild | 15s → 28s | +13s | +86.67% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37263801298/job/111616279155) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37412626230/job/112104223178) |
 | 2026-10-06T04:12:51.000Z | queue: Publish verified standby / initial queue | 4s → 5s | +1s | +25% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37235992149) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37412626382) |
 | 2026-10-06T04:12:16Z | step: Packaged Worker / accounts / worker-finance | 13s → 15s | +2s | +15.38% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37285563745/job/111683983887) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37412269946/job/112103497296) |
