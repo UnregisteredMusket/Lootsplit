@@ -1,3 +1,10 @@
+# Shortcut readiness follow-up — 2026-10-06 UTC
+
+- PR50 passed full PR run37424344225 and merged as0b5a8f4750c7d42ac435ded25f1e2e124e7465d5. Production migration0010 was applied once at06:37:46UTC and verified. Do not apply it again.
+- Main run37424826185 failed only dev-control-panel. Its audit reloaded immediately after starting the asynchronous account save and immediately read default buttons during preference loading. All other independent groups passed. Deployment stayed blocked; live remains8614403.
+- Follow-up `fix/shortcut-readiness` hides shortcut destinations until account preferences arrive (verified DM offline cache remains), waits for confirmed save before reload, and deliberately holds the GET response to prove default destinations cannot be clicked. Focused control-panel and navigation checks passed; quick508 tests/four skips, clean types, lint0errors/34 existing warnings. Fresh full PR/main gates required for the correction.
+- Includes an evidence-backed resolution of PR50's separate party-sheet fixture timeout using successful comparable run37424344225. Historical timing entries remain intact. Existing publication authorization covers this release correction; no new permission required.
+
 # Feature screens — publication authorized, 2026-10-06 UTC
 
 - Branch `feature/feature-screens` based on released main `8614403c64469a93680fe6d0537139614aca96b2`. User approved the feature-screen/Player Home workshop and implementation. See `docs/audit/2026-10-06-feature-screens.md`, README and feature inventory for scope.

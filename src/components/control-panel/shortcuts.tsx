@@ -160,7 +160,9 @@ export function Shortcuts({
         )}
       </div>
       {error && <p role="alert">{error}</p>}
-      {!identity ? (
+      {!loaded && !error ? (
+        <p role="status" className="text-sm">Loading your account shortcuts…</p>
+      ) : !identity ? (
         <p className="text-sm">
           Sign in to save personal shortcuts. Use the campaign feature buttons.
         </p>
