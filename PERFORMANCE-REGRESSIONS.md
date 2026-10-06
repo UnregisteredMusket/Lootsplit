@@ -124,7 +124,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Development / gameplay / dev-bug-data-integrity | open | 2 | 5s → 7s | +2s | +40% |
 | Development / gameplay / dev-finance | open | 2 | 18s → 26s | +8s | +44.44% |
 | Packaged Worker / accounts / Run npx playwright install --with-deps chromium | open | 2 | 22s → 35s | +13s | +59.09% |
-| Packaged Worker / interface / worker-loot | open | 2 | 4s → 6s | +2s | +50% |
+| Packaged Worker / interface / worker-loot | open | 3 | 4s → 7s | +3s | +75% |
 | Development / governance / Run npx playwright install --with-deps chromium | open | 2 | 23s → 39s | +16s | +69.57% |
 | Development / gameplay / dev-library-navigation | resolved | 2 | 12s → 43s | +31s | +258.33% |
 | Packaged Worker / interface | open | 2 | 126s → 218s | +92s | +73.02% |
@@ -136,6 +136,9 @@ Open trends require investigation. Resolved trends retain their history; each ve
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-06T15:33:04Z | step: Packaged Worker / interface / worker-loot | 6s → 7s | +1s | +16.67% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37412269946/job/112103497361) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37487891026/job/112353413905) |
+| 2026-10-06T15:29:40Z | step: Code checks and immutable builds / Run npm ci | 14s → 19s | +5s | +35.71% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37233687309/job/111528483329) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37487891026/job/112352634423) |
+| 2026-10-06T14:22:19.857Z | audit: control-panel browser audit | 21.084s → 27.105s | +6.021s | +28.56% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/tree/fix/unified-dm-home) · [After](https://github.com/UnregisteredMusket/Lootsplit/tree/improvement/scrollable-dm-desk) |
 | 2026-10-06T15:26:08Z | step: Packaged standby / Run npm ci | 14s → 18s | +4s | +28.57% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37267183280/job/111626615723) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37487168511/job/112350898133) |
 | 2026-10-06T15:24:29Z | step: Code checks and immutable builds / Run npm ci | 13s → 16s | +3s | +23.08% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37235490768/job/111533630184) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37487168511/job/112350106248) |
 | 2026-10-06T15:17:42Z | step: Development / accounts / dev-party-sheet | 21s → 29s | +8s | +38.1% | failure | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37424344225/job/112140489799) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37485642730/job/112344809828) |
