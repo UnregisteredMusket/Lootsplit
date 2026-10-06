@@ -14,6 +14,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Development / gameplay / Run actions/setup-node@v4 | open | 2 | 3s → 7s | +4s | +133.33% |
 | Development / desktop / Run actions/setup-node@v4 | open | 2 | 3s → 7s | +4s | +133.33% |
 | Development / desktop / Run npm ci | open | 2 | 11s → 16s | +5s | +45.45% |
+| Code checks and immutable builds / unit-tests | open | 2 | 8s → 13s | +5s | +62.5% |
 | Code checks and immutable builds / typecheck | open | 2 | 7s → 14s | +7s | +100% |
 | Development / gameplay / Start disposable development server | open | 2 | 4s → 8s | +4s | +100% |
 | Code checks and immutable builds / mobile-build | open | 2 | 3s → 6s | +3s | +100% |
@@ -83,6 +84,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | production release asset readiness | open | 2 | 2.465s → 27.818s | +25.353s | +1028.52% |
 | Packaged standby | open | 2 | 78s → 137s | +59s | +75.64% |
 | Development / accounts | open | 2 | 152s → 257s | +105s | +69.08% |
+| Packaged Worker / interface / worker-game-analytics | open | 2 | 3s → 6s | +3s | +100% |
 | report | open | 2 | 7s → 12s | +5s | +71.43% |
 | Report workflow failure | open | 2 | 7s → 12s | +5s | +71.43% |
 | Packaged Worker / accounts / worker-finance | open | 2 | 11s → 15s | +4s | +36.36% |
@@ -93,6 +95,8 @@ Open trends require investigation. Resolved trends retain their history; each ve
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-06T02:03:06Z | step: Packaged Worker / interface / worker-game-analytics | 4s → 6s | +2s | +50% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37280342384/job/111667149206) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37402023907/job/112071458399) |
+| 2026-10-06T02:01:12Z | step: Code checks and immutable builds / unit-tests | 11s → 13s | +2s | +18.18% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37235490768/job/111533630184) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37402023907/job/112071117196) |
 | 2026-10-06T00:19:25Z | step: Development / governance / Run actions/upload-artifact@v4 | 2s → 3s | +1s | +50% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37235752710/job/111534384084) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37393097454/job/112042560491) |
 | 2026-10-06T00:04:06Z | job: verify / Development / gameplay | 88s → 115s | +27s | +30.68% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37391400899/job/112037078470) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37391400899/job/112038371624) |
 | 2026-10-06T00:02:18Z | step: verify / Development / gameplay / Run actions/setup-node@v4 | 2s → 4s | +2s | +100% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37391400899/job/112037078470) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37391400899/job/112038371624) |
