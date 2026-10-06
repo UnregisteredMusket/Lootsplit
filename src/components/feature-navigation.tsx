@@ -1,5 +1,6 @@
 import { useRouterState } from "@tanstack/react-router";
 import type { ReactNode } from "react";
+import { Fold } from "./ui";
 import { AppLink } from "./app-link";
 import { useSeat } from "@/lib/quire/seat";
 import { useEconomy } from "@/lib/quire/economy-context";
@@ -25,7 +26,13 @@ export function FeatureLink({
     </AppLink>
   );
 }
-export function FeatureCards({ desktop = false }: { desktop?: boolean }) {
+export function FeatureCards({
+  desktop = false,
+  grouped = false,
+}: {
+  desktop?: boolean;
+  grouped?: boolean;
+}) {
   const seat = useSeat(),
     dm = seat.role === "dm";
   const { journal, loans, holdings } = useEconomy();
@@ -33,6 +40,30 @@ export function FeatureCards({ desktop = false }: { desktop?: boolean }) {
   const cards = Object.entries(featureScreens).filter(
     ([id, x]) => (!x.dm || dm) && !(dm && id === "finances"),
   );
+  if (grouped && dm)
+    return (
+      <section className="feature-cards dm-tool-groups" aria-label="Campaign features">
+        <h2>Campaign tools</h2>
+        <Fold title="Sessions & records" hint="Journal, reports, downtime and reviews." defaultOpen>
+          <div className="dm-tool-links">
+            {(["journal", "reports", "downtime", "review"] as Feature[]).map((id) => (
+              <FeatureLink key={id} feature={id}>
+                {id === "reports" ? "Reports" : featureScreens[id].title}
+              </FeatureLink>
+            ))}
+          </div>
+        </Fold>
+        <Fold title="Economy & properties" hint="Bank, shops, property and financial rules.">
+          <div className="dm-tool-links">
+            {(["bank", "shops", "properties", "financial"] as Feature[]).map((id) => (
+              <FeatureLink key={id} feature={id}>
+                {featureScreens[id].title}
+              </FeatureLink>
+            ))}
+          </div>
+        </Fold>
+      </section>
+    );
   return (
     <section
       className={desktop ? "feature-desktop-links" : "feature-cards"}
@@ -59,7 +90,7 @@ export function FeatureCards({ desktop = false }: { desktop?: boolean }) {
                             : id === "reports"
                               ? "Sessions, activity & financial analysis"
                               : id === "review"
-                                ? "Character imports & nonfinancial approvals"
+                                ? "Financial requests & character imports"
                                 : "Shop availability & restocking"}
               </p>
             </>

@@ -30,14 +30,14 @@ export const HELP_GROUPS: HelpGroup[] = [
         id: "menus",
         title: "What each menu does",
         paragraphs: [
-          "DM navigation: Desk combines campaign control and overview, with readouts, six customizable shortcuts, feature links and expandable treasury, activity, sessions and campaign tools; Encounters builds and runs encounters; Party holds character cards, purses and inventory; Market contains shops and trading; Library opens catalog, spells, creatures, names, handouts and private DM books.",
+          "DM navigation: Desk combines campaign control and overview, with visible multiplayer settings, swipeable Session/Party/Funds/Activity/Rolls readouts, grouped feature links and expandable treasury, activity, sessions and campaign tools; Encounters builds and runs encounters; Party holds character cards, purses and inventory; Market contains shops and trading; Library opens catalog, spells, creatures, names, handouts and private DM books.",
           "Player navigation: Home offers fixed buttons for Character Sheet, Bank, My Finances, Properties, Journal and Party chat; Inventory opens your possessions and permitted financial actions; Campaign contains Room, Chat, Rolls and Alerts; Market opens trading; Library opens available references. The full campaign overview holds sessions, reviews and activity.",
-          "The gear opens Settings & Management. Its categories depend on your role. Use the campaign name to switch campaigns and the message icon for chat. On desktop the same destinations appear in the navigation rail. DM shortcuts can be renamed, reordered and given a different destination or icon.",
+          "The gear opens Settings & Management. Its categories depend on your role. Use the campaign name to switch campaigns and the message icon for chat. On desktop the same destinations appear in the navigation rail. The DM Desk uses swipeable summaries. Previously saved DM shortcuts can still be managed from Dashboard → Saved shortcut settings.",
         ],
         links: [
           ["Settings & Management", "/?view=home#management"],
           ["Campaign control / overview", "/?view=overview"],
-          ["Customize DM shortcuts", "/?view=home&customize=1"],
+          ["Saved DM shortcut settings", "/?view=home&customize=1#saved-shortcuts"],
           ["Open Library", "/library"],
         ],
       },

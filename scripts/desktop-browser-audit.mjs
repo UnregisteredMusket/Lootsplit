@@ -116,7 +116,7 @@ async function visit(path) {
   }
   // URL and the previous screen's role chip can update before a lazy route settles.
   // Wait for the destination content instead of a fixed delay before measuring it.
-  if (path === "/") await page.locator(".shortcut-grid").waitFor();
+  if (path === "/") await page.locator(".information-strip").waitFor();
   if (path === "/party") await page.getByRole("heading", { name: /^(Party|Inventory & purse)$/ }).waitFor();
   if (path === "/market") await page.getByRole("heading", { name: "Market", exact: true }).waitFor();
   if (path === "/library") await page.getByRole("heading", { name: "Library", exact: true }).waitFor();
