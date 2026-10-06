@@ -182,6 +182,25 @@ export function WelcomePage() {
           })}
         </div>
       </section>
+      <section className="ls-wrap ls-section" aria-labelledby="product-tour">
+        <p className="ls-eyebrow">SEE YOUR CAMPAIGN IN ACTION</p>
+        <h2 id="product-tour">One adventure. Connected records.</h2>
+        <p className="ls-copy">Keep character sheets, shared funds, inventory and purchases together. The DM controls access and approves changes that need a ruling.</p>
+        <figure className="ls-product-shot">
+          <img src="/product/party.png" alt="Lootsplit’s Party screen showing three example adventurers, their health, armor and sheet controls" width="1280" height="800" loading="lazy" decoding="async" />
+          <figcaption>Party overview: follow health and armor, open a character sheet, and manage player editing permissions. Screenshots use example campaign data.</figcaption>
+        </figure>
+        <figure className="ls-product-shot">
+          <img src="/product/market.png" alt="Lootsplit’s shop management screen with merchants and inventory controls" width="1280" height="800" loading="lazy" decoding="async" />
+          <figcaption>Bring merchants into your campaign. Purchases connect stock, character inventory, money and transaction history.</figcaption>
+        </figure>
+        <div className="ls-feature-list">
+          <article><BookOpen size={23} /><div><h3>Prepare, play, pick up next time</h3><p>Create an account to host a campaign. Invite players into a Live or Turn-based session; guests can join without an account. End the session to close access and keep the campaign with its DM.</p></div></article>
+          <article><Coins size={23} /><div><h3>Make downtime count</h3><p>Review loan interest, recurring revenue and expenses before settlement. Property plans and shop schedules follow the campaign’s in-game days, with DM approval.</p></div></article>
+          <article><Users size={23} /><div><h3>Choose how your table plays</h3><p>Use physical dice with permitted manual results, or virtual rolls with recorded outcomes. The DM can work offline on an owned device campaign; shared sessions need a connection.</p></div></article>
+        </div>
+        <Link className="ls-text-link" to="/help">Explore the application guide <ArrowRight size={17} /></Link>
+      </section>
       <section className="ls-wrap ls-callout">
         <div>
           <p className="ls-eyebrow">YOUR CAMPAIGNS, CLOSE AT HAND</p>
@@ -194,6 +213,22 @@ export function WelcomePage() {
         <Link className="ls-button ls-secondary" to="/account">
           My campaign library <ArrowRight size={18} />
         </Link>
+      </section>
+      <section className="ls-wrap ls-section" aria-labelledby="platform-comparison">
+        <h2 id="platform-comparison">Browser or Android?</h2>
+        <p className="ls-copy">Choose the version that fits your table. Android provides native device conveniences; campaign rules and server permissions stay shared.</p>
+        <table className="ls-platform-comparison">
+          <thead><tr><th scope="col">Capability</th><th scope="col">Browser</th><th scope="col">Android app</th></tr></thead>
+          <tbody>
+            <tr><th scope="row">Getting started</th><td>Open the website</td><td>Install the signed APK</td></tr>
+            <tr><th scope="row">Updates</th><td>Latest published web release</td><td>Install each published APK update</td></tr>
+            <tr><th scope="row">Campaign play</th><td>Live, Turn-based and owned DM local play</td><td>Same supported play modes; shared sessions require internet</td></tr>
+            <tr><th scope="row">Files and sharing</th><td>Browser downloads and supported share controls</td><td>Native file saving and Android share sheet</td></tr>
+            <tr><th scope="row">Device integration</th><td>Browser navigation and storage</td><td>Bundled client, Android back-button and network handling</td></tr>
+            <tr><th scope="row">Notifications</th><td>In-app alerts; browser notifications where supported and permitted</td><td>In-app alerts; native push is not included</td></tr>
+          </tbody>
+        </table>
+        <p className="ls-small-copy">Web and Android releases have separate schedules. Features shown on this page may reach the website before the next APK. Keep exported backups outside either application’s storage.</p>
       </section>
       <section className="ls-wrap ls-callout">
         <div>

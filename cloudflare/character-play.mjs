@@ -62,7 +62,33 @@ async function policy(db, code) {
     await db.prepare("SELECT manual_allowed FROM play_policies WHERE code=?").bind(code).first()
   )?.manual_allowed;
 }
-export async function handleCharacterPlay(db, user, path, body, url) {
+export async function handleCharacterPlay(db, user, path, body, url, approval = null) {
+  if (path === "sheets/imports") {
+    const { seat } = await membership(db, user, text(body.code, 16));
+    const rows = await db.prepare(seat.role === "dm"
+      ? "SELECT id,character_id,purse_id,body,status,created_at FROM character_imports WHERE code=? ORDER BY (status='pending') DESC,created_at DESC LIMIT 100"
+      : "SELECT id,character_id,purse_id,body,status,created_at FROM character_imports WHERE code=? AND user_id=? ORDER BY created_at DESC LIMIT 100")
+      .bind(...(seat.role === "dm" ? [body.code] : [body.code, user])).all();
+    return { requests: rows.results.map((r) => ({ ...r, body: JSON.parse(r.body) })) };
+  }
+  if (path === "sheets/review-import") {
+    const request = await db.prepare("SELECT * FROM character_imports WHERE id=?").bind(text(body.id)).first();
+    if (!request) fail("Import request not found.", 404);
+    const reviewer = await membership(db, user, request.code);
+    if (reviewer.seat.role !== "dm") fail("Only the campaign DM can review imports.", 403);
+    if (!["approved", "denied"].includes(body.decision)) fail("Choose approve or deny.");
+    if (request.status !== "pending") {
+      if (request.status !== body.decision) fail("This import was already reviewed.", 409);
+      return { ok: true, status: request.status };
+    }
+    if (body.decision === "denied") {
+      const result = await db.prepare("UPDATE character_imports SET status='denied',reviewed_at=?,reviewed_by=? WHERE id=? AND status='pending' AND EXISTS(SELECT 1 FROM campaign_rooms WHERE code=? AND body=?)")
+        .bind(Date.now(), user, request.id, request.code, reviewer.raw).run();
+      if (!result.meta.changes) fail("Campaign or request changed. Refresh before reviewing.", 409);
+      return { ok: true, status: "denied" };
+    }
+    return handleCharacterPlay(db, request.user_id, "sheets/assign", { id: request.character_id, code: request.code, purseId: request.purse_id, revision: request.source_revision }, url, { ...request, reviewer: user, reviewerRaw: reviewer.raw });
+  }
   if (path === "sheets") {
     const rows = await db
       .prepare(
@@ -205,6 +231,7 @@ export async function handleCharacterPlay(db, user, path, body, url) {
   if (path === "sheets/assign") {
     const r = await character(db, user, body.id, true);
     if (r.canonical) fail("This character already belongs to its campaign.");
+    if (r.revision !== body.revision) fail("Character changed. Reload before assigning.", 409);
     const code = text(body.code, 16),
       purse = text(body.purseId);
     if (code) {
@@ -235,16 +262,35 @@ export async function handleCharacterPlay(db, user, path, body, url) {
     if (code) {
       target = previous?.room.code === code ? previous : await membership(db, user, code);
       const { room, seat } = target;
-      if (!room.live && room.seats[room.turn]?.id !== seat.id)
+      const p = room.table.purses.find((p) => p.id === purse);
+      if (seat.role === "player" && !approval) {
+        const key = text(body.requestKey, 100);
+        if (!key) fail("Missing import retry identifier.");
+        const prior = await db.prepare("SELECT * FROM character_imports WHERE id=?").bind(key).first();
+        if (prior) {
+          if (prior.user_id !== user || prior.character_id !== r.id || prior.code !== code || prior.purse_id !== purse) fail("Import identifier already used.", 409);
+          return { ok: true, pending: prior.status === "pending", status: prior.status };
+        }
+        const pending = await db.prepare("SELECT id FROM character_imports WHERE user_id=? AND code=? AND purse_id=? AND status='pending'").bind(user, code, purse).first();
+        if (pending) fail("An import is already awaiting DM review for this character.", 409);
+        await db.prepare("INSERT INTO character_imports(id,user_id,character_id,code,purse_id,source_revision,target_revision,seat_id,seat_token,session_id,body,status,created_at) VALUES (?,?,?,?,?,?,?,?,?,?,?,'pending',?)")
+          .bind(key, user, r.id, code, purse, r.revision, p.sheetRevision || 0, seat.id, seat.token, room.sessionId || "", JSON.stringify(source), Date.now()).run();
+        return { ok: true, pending: true, status: "pending" };
+      }
+      if (approval) {
+        if (target.raw !== approval.reviewerRaw || seat.id !== approval.seat_id || seat.token !== approval.seat_token || (room.sessionId || "") !== approval.session_id || (p.sheetRevision || 0) !== approval.target_revision || JSON.stringify(source) !== approval.body)
+          fail("Character, session or access changed since submission. Deny this request and ask for a fresh import.", 409);
+      }
+      const actingSeat = approval ? room.seats.find((s) => s.role === "dm") : seat;
+      if (!room.live && room.seats[room.turn]?.id !== actingSeat?.id)
         fail("Wait for your campaign turn before assigning.", 409);
       if (Object.values(room.drafts || {}).some((d) => d.length))
         fail("Submit or discard pending turns before assigning.", 409);
-      const p = room.table.purses.find((p) => p.id === purse);
-      // A player may bring descriptive/combat fields, but cannot grant wealth or price bonuses.
+      // Approval authorizes the reviewed stats, never account wealth or equipment.
       const existing = campaignBody(room, purse);
       p.sheet = statsOnly({
         ...source,
-        ...(seat.role === "player"
+        ...(seat.role === "player" && !approval
           ? { scores: { ...source.scores, cha: existing.scores.cha } }
           : {}),
       });
@@ -272,7 +318,7 @@ export async function handleCharacterPlay(db, user, path, body, url) {
     try {
       const update = db
         .prepare(
-          "UPDATE play_characters SET body=?,campaign_code=?,purse_id=?,revision=revision+1,updated_at=? WHERE id=? AND user_id=? AND revision=? AND (?='' OR EXISTS(SELECT 1 FROM campaign_rooms WHERE code=? AND body=?)) AND (?='' OR EXISTS(SELECT 1 FROM campaign_rooms WHERE code=? AND body=?))",
+          "UPDATE play_characters SET body=?,campaign_code=?,purse_id=?,revision=revision+1,updated_at=? WHERE id=? AND user_id=? AND revision=? AND (?='' OR EXISTS(SELECT 1 FROM campaign_rooms WHERE code=? AND body=?)) AND (?='' OR EXISTS(SELECT 1 FROM campaign_rooms WHERE code=? AND body=?)) AND (?='' OR EXISTS(SELECT 1 FROM character_imports WHERE id=? AND status='pending'))",
         )
         .bind(
           JSON.stringify({
@@ -292,6 +338,8 @@ export async function handleCharacterPlay(db, user, path, body, url) {
           detached?.room.code || "",
           detached?.room.code || "",
           detached?.raw || "",
+          approval?.id || "",
+          approval?.id || "",
         );
       const statements = [update];
       if (target)
@@ -328,6 +376,8 @@ export async function handleCharacterPlay(db, user, path, body, url) {
               body.revision + 1,
             ),
         );
+      if (approval) statements.push(db.prepare("UPDATE character_imports SET status='approved',reviewed_at=?,reviewed_by=? WHERE id=? AND status='pending' AND EXISTS(SELECT 1 FROM play_characters WHERE id=? AND campaign_code=? AND purse_id=? AND revision=?) AND EXISTS(SELECT 1 FROM campaign_rooms WHERE code=? AND body=?)")
+        .bind(Date.now(), approval.reviewer, approval.id, r.id, code, purse, body.revision + 1, code, JSON.stringify(target.room)));
       const result = await db.batch(statements);
       if (result.some((x) => !x.meta.changes))
         fail("Character or campaign changed. Reload before assigning.", 409);

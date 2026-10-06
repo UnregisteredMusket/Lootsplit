@@ -1,3 +1,4 @@
+import { deploymentOrigins } from "../src/lib/deployment/origins.mjs";
 import { mkdirSync, readFileSync, writeFileSync, appendFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
@@ -95,7 +96,7 @@ async function main() {
   let live = "unconfirmed";
   try {
     const identity = await requestJson(
-      "https://lootsplit.oliverstorie2017.workers.dev/assets/release-identity.json",
+      `${deploymentOrigins.website}/assets/release-identity.json`,
       { cache: "no-store" },
     );
     if (/^[a-f0-9]{40}$/.test(identity.commit)) live = identity.commit;

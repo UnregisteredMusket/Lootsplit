@@ -21,7 +21,8 @@ import {
 } from "@/lib/quire/cloud-client";
 import { useSeat } from "@/lib/quire/seat";
 import { copyText } from "@/lib/quire/table";
-import { API_ORIGIN } from "@/lib/mobile/origin";
+import { invitationUrl } from "@/lib/quire/invitation-url";
+import { PlayerCharacterImport } from "./player-character-import";
 import { getOnline, subscribeOnline } from "@/lib/mobile/online";
 import { Button, TextInput, Confirm, Field, Fold } from "@/components/ui";
 
@@ -161,8 +162,7 @@ export function CloudTable() {
   }
 
   async function invitePlayers() {
-    const origin = import.meta.env.VITE_MOBILE === "true" ? API_ORIGIN : window.location.origin;
-    const url = `${origin}/share?join=${encodeURIComponent(cloud.code)}&session=${encodeURIComponent(cloud.sessionId)}`;
+    const url = invitationUrl({ origin: window.location.origin, native: import.meta.env.VITE_MOBILE === "true", code: cloud.code, session: cloud.sessionId });
     const text = `Join my Lootsplit room. Code: ${cloud.code}${cloud.sessionId ? "." + cloud.sessionId : ""}`;
     if (import.meta.env.VITE_MOBILE === "true") {
       const { Share } = await import("@capacitor/share");
@@ -345,7 +345,8 @@ export function CloudTable() {
                   Create a separate room from this device’s copy
                 </label>
               )}
-              <div className="mode-switch mt-5" role="group" aria-label="Session mode">
+              {!host && <PlayerCharacterImport key={cloud.code} code={cloud.code} />}
+          <div className="mode-switch mt-5" role="group" aria-label="Session mode">
                 <button
                   aria-pressed={hostMode === "live"}
                   onClick={() => setHostMode("live")}
@@ -532,6 +533,7 @@ export function CloudTable() {
               </Button>
             </div>
           </section>
+          {!host && <PlayerCharacterImport key={cloud.code} code={cloud.code} />}
           <div className="mode-switch mt-5" role="group" aria-label="Session mode">
             <button
               aria-pressed={cloud.live}

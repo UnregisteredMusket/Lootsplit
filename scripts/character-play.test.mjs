@@ -131,10 +131,39 @@ test("account characters enforce ownership, campaign assignments, DM policy, sta
     assert.equal(roll.source, "server");
     assert.deepEqual(await call("player", "/roll", solo), roll);
     await assert.rejects(call("dm", "/log", { id }), (e) => e.status === 404);
-    await call("player", "/assign", { id, code: "PLAYTEST", purseId: "purse", revision: 1 });
+    for (const change of ["denial", "sheet", "session"]) {
+      const key = crypto.randomUUID();
+      await call("player", "/assign", { id, code: "PLAYTEST", purseId: "purse", revision: 1, requestKey: key });
+      await assert.rejects(call("other", "/imports", { code: "PLAYTEST" }), (e) => e.status === 403);
+      if (change === "sheet") room.table.purses[0].sheetRevision = 1;
+      if (change === "session") room.sessionId = "new-session";
+      if (change !== "denial") {
+        await db.prepare("UPDATE campaign_rooms SET body=? WHERE code=?").bind(JSON.stringify(room), "PLAYTEST").run();
+        await assert.rejects(call("dm", "/review-import", { id: key, decision: "approved" }), (e) => e.status === 409);
+      }
+      await call("dm", "/review-import", { id: key, decision: "denied" });
+      assert.equal((await call("player", "/detail", { id })).campaign, null);
+    }
+    const requestKey = crypto.randomUUID();
+    const assignment = { id, code: "PLAYTEST", purseId: "purse", revision: 1, requestKey };
+    assert.equal((await call("player", "/assign", assignment)).pending, true);
+    assert.equal((await call("player", "/assign", assignment)).pending, true);
+    assert.equal((await call("player", "/detail", { id })).campaign, null);
+    const importRequest = (await call("dm", "/imports", { code: "PLAYTEST" })).requests.find((r) => r.id === requestKey);
+    assert.equal(importRequest.id, requestKey);
+    assert.equal(importRequest.seat_token, undefined);
+    await assert.rejects(call("player", "/review-import", { id: requestKey, decision: "approved" }), (e) => e.status === 403);
+    // A concurrent financial change is retained by approval.
+    room.table.purses[0].coins.gp = 9;
+    await db.prepare("UPDATE campaign_rooms SET body=? WHERE code=?").bind(JSON.stringify(room), "PLAYTEST").run();
+    await call("dm", "/review-import", { id: requestKey, decision: "approved" });
+    const approved = (await db.prepare("SELECT body FROM campaign_rooms WHERE code=?").bind("PLAYTEST").first()).body;
+    await call("dm", "/review-import", { id: requestKey, decision: "approved" });
+    assert.equal((await db.prepare("SELECT body FROM campaign_rooms WHERE code=?").bind("PLAYTEST").first()).body, approved);
+    await assert.rejects(call("dm", "/review-import", { id: requestKey, decision: "denied" }), (e) => e.status === 409);
     const d = await call("dm", "/detail", { id });
     assert.equal(d.editable, false);
-    assert.equal(d.campaign.coins.gp, 7);
+    assert.equal(d.campaign.coins.gp, 9);
     const roster = await call("dm", "/campaign", { code: "PLAYTEST" });
     assert.deepEqual(roster.characters, [
       {

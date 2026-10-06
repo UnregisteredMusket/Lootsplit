@@ -2179,3 +2179,10 @@ input,select,textarea { max-width: 100%; }
     flex-wrap: wrap;
   }
 }
+
+/* Product tour only; application layout and controls are unchanged. */
+.ls-product-shot { margin: 2rem 0; }
+.ls-product-shot img { display: block; width: 100%; height: auto; border: 1px solid currentColor; border-radius: .3rem; }
+.ls-product-shot figcaption { margin-top: .6rem; font-size: .95rem; line-height: 1.6; }
+.ls-platform-comparison { width: 100%; border-collapse: collapse; table-layout: fixed; }
+.ls-platform-comparison th, .ls-platform-comparison td { text-align: left; vertical-align: top; padding: .8rem .5rem; border-bottom: 1px solid currentColor; overflow-wrap: anywhere; }

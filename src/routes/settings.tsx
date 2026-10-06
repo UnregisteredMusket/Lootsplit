@@ -1,3 +1,4 @@
+import { MigrationReadiness } from "@/components/migration-readiness";
 import { SoundSettings } from "@/components/sound-settings";
 import { TestModeSettings } from "@/components/test-mode";
 import { RollModeSetting } from "@/components/roll-mode-setting";
@@ -81,7 +82,7 @@ function SettingsPage() {
       <p className="mt-2 text-sm text-muted">Keep a copy of the campaign data available on this device. Full campaign restoration is a DM action in Local Mode.</p>
       <Fold title="Sound effects"><SoundSettings /></Fold>
       <Fold anchorId="gameplay" title="Roll mode" defaultOpen><RollModeSetting /></Fold>
-      {ready ? <div id="backups"><SaveFolder /></div> : <p>Loading…</p>}
+      {ready ? <><MigrationReadiness /><div id="backups"><SaveFolder /></div></> : <p>Loading…</p>}
       <Fold title="Diagnostic reports" hint="Download an error report to share manually."><Diagnostics /></Fold>
     </Shell>
   );
@@ -102,7 +103,7 @@ function SettingsPage() {
           <Fold title="Sound effects"><SoundSettings /></Fold>
       <Fold anchorId="gameplay" title="Roll mode" hint="Physical dice or in-app dice."><RollModeSetting /></Fold>
           <PasswordSettings />
-          <div id="backups"><SaveFolder /></div>
+          <MigrationReadiness /><div id="backups"><SaveFolder /></div>
           <Fold title="Diagnostic reports" hint="Download an error report to share manually.">
             <Diagnostics />
           </Fold>

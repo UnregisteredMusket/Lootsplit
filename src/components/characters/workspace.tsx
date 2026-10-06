@@ -559,6 +559,7 @@ function CharacterEditor({
       setBusy(false);
     }
   }
+  const importKey = useRef(crypto.randomUUID());
   async function assign() {
     if (!detail) return;
     setBusy(true);
@@ -595,12 +596,18 @@ function CharacterEditor({
         changed();
         return;
       }
-      await accountRequest("sheets/assign", {
+      const result = await accountRequest<{ pending?: boolean }>("sheets/assign", {
+        requestKey: importKey.current,
         id,
         code,
         purseId: purse,
         revision: detail.assignmentRevision ?? detail.revision,
       });
+      importKey.current = crypto.randomUUID();
+      if (result.pending) {
+        setNotice("Import submitted for DM review. Campaign stats, money and items remain unchanged until approval.");
+        return;
+      }
       if (deviceCampaign) {
         await unbindCampaignProfile(id);
         writePartySheetLink(deviceCampaign.ownerId, deviceCampaign.campaignId, id, "", []);
@@ -1860,7 +1867,7 @@ function CharacterEditor({
                   <p>
                     A character belongs to one campaign at a time. The campaign DM can view the
                     assigned sheet; its rolls are visible to campaign members. Save changes before
-                    assigning.
+                    assigning. Player imports require DM approval; campaign money and items are preserved.
                   </p>
                   <label>
                     Campaign
@@ -2448,6 +2455,7 @@ function DmCampaigns({ campaigns }: { campaigns: Campaign[] }) {
               changed={() => setReload((n) => n + 1)}
             />
           )}
+          <CharacterImportReviews code={code} />
           <RollLog key={code} code={code} />
         </>
       )}
@@ -2505,4 +2513,46 @@ function ReferenceSearch({ onAdd }: { onAdd: (e: OpenEntry) => void }) {
       ))}
     </details>
   );
+}
+
+function CharacterImportReviews({ code }: { code: string }) {
+  const [requests, setRequests] = useState<{ id: string; purse_id: string; body: Sheet; status: string }[]>([]);
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const [refresh, setRefresh] = useState(0);
+  useEffect(() => {
+    const controller = new AbortController();
+    setRequests([]);
+    accountRequest<{ requests: typeof requests }>("sheets/imports", { code }, controller.signal)
+      .then((r) => setRequests(r.requests)).catch((e) => { if (!controller.signal.aborted) setError(errorText(e)); });
+    return () => controller.abort();
+  }, [code, refresh]);
+  async function review(id: string, decision: string) {
+    setBusy(true); setError("");
+    try { await accountRequest("sheets/review-import", { id, decision }); setRefresh((n) => n + 1); announceSheetChange(); }
+    catch (e) { setError(errorText(e)); }
+    finally { setBusy(false); }
+  }
+  return <section className="sheet-card">
+    <h3>Character import requests</h3>
+    <p>Review the submitted sheet before approving. Existing campaign money and items are preserved. Later character edits still follow campaign permissions.</p>
+    <button disabled={busy} onClick={() => setRefresh((n) => n + 1)}>Refresh import requests</button>
+    {error && <p role="alert">{error}</p>}
+    {requests.filter((r) => r.status === "pending").length === 0 && <p>No pending character imports.</p>}
+    {requests.filter((r) => r.status === "pending").map((r) => <details key={r.id}>
+      <summary>{r.body.name} · awaiting approval</summary>
+      <p>{r.body.classes} · Level {r.body.level} · HP {r.body.hp}/{r.body.maxHp} · AC {r.body.ac}</p>
+      <p>{Object.entries(r.body.scores).map(([k,v]) => `${k.toUpperCase()} ${v}`).join(" · ")}</p>
+      <details><summary>Full submitted sheet</summary><SubmittedFields value={r.body} /></details>
+      <button disabled={busy} onClick={() => void review(r.id, "approved")}>Approve {r.body.name}</button>
+      <button disabled={busy} onClick={() => void review(r.id, "denied")}>Deny {r.body.name}</button>
+    </details>)}
+  </section>;
+}
+
+function SubmittedFields({ value }: { value: unknown }) {
+  if (value === null || value === undefined || value === "") return <span>—</span>;
+  if (typeof value !== "object") return <span>{String(value)}</span>;
+  if (Array.isArray(value)) return <ul>{value.map((v, i) => <li key={i}><SubmittedFields value={v} /></li>)}</ul>;
+  return <dl>{Object.entries(value).filter(([k]) => k !== "portrait").map(([k, v]) => <div key={k}><dt>{k.replace(/([A-Z])/g, " $1").replace(/^./, (c) => c.toUpperCase())}</dt><dd><SubmittedFields value={v} /></dd></div>)}</dl>;
 }

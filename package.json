@@ -42,7 +42,8 @@
     "prebuild": "node scripts/prepare-ocr.mjs",
     "prebuild:dev": "node scripts/prepare-ocr.mjs",
     "prebuild:cloudflare": "node scripts/prepare-ocr.mjs",
-    "prebuild:mobile": "node scripts/prepare-ocr.mjs"
+    "prebuild:mobile": "node scripts/prepare-ocr.mjs",
+    "migration:check": "node scripts/domain-readiness.mjs"
   },
   "dependencies": {
     "@capacitor/app": "^8.1.1",
