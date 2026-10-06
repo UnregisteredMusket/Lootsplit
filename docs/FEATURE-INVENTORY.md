@@ -226,3 +226,9 @@ DMs sign in and own their hosted campaigns. Open sessions survive closed tabs; e
 - Device-local, default-off sound preference, volume and three previews in DM/player Settings and the management panel. No campaign audio preference is synchronized.
 - Coins accompany successful local financial actions and confirmed shared trades; pending or failed actions do not announce success. Encounter loot awards and journal/page navigation have distinct cues.
 - No startup/history playback, background-tab playback or remote audio dependency; missing/blocked playback cannot block gameplay. Sources and CC0 credits ship with three small WAV files.
+
+## Integration consistency audit (2026-10-05)
+
+- Campaign snapshots, full device backups and financial readouts read related balances, items and metadata in one readonly transaction. Existing schemas, private books, recovery metadata, sorting and permissions remain intact.
+- Local shop/market purchases calculate Charisma pricing inside the transaction that updates funds, stock, inventory and ledger; legacy sheets and party funds retain their existing behavior.
+- Account encounter listing uses a bounded membership/room join plus one projected encounter query, retaining current DM seat/token checks and unchanged mutation authorization. No UI reformatting or Android signing change.

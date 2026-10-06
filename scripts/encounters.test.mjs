@@ -349,3 +349,23 @@ test("account-only drafts require no DM membership and cannot change another use
     db.close();
   }
 });
+
+test('encounter listing uses bounded queries and preserves seat authorization across many campaigns', async () => {
+  const { db, room } = await fixture();
+  for (let i=0;i<20;i++) {
+    const code = `ROOM${i}`;
+    await db.prepare('INSERT INTO campaign_rooms VALUES (?,1,?)').bind(code,JSON.stringify({...room,code})).run();
+    await db.prepare('INSERT INTO library_members VALUES (?,?,?,?,?,0,0)').bind('dm',code,'dmseat',i===19?'revoked-token':'dm-token',code).run();
+  }
+  const prepare = db.prepare.bind(db);
+  let queries=0;
+  db.prepare = (sql) => { queries++; return prepare(sql); };
+  const result=await handleEncounters(db,'dm','encounters');
+  assert.equal(result.campaigns.length,21); // personal + BATTLE + 19 valid rooms
+  assert.ok(!result.campaigns.some(c=>c.code==='ROOM19'));
+  assert.ok(result.encounters.every(e=>e.code==='BATTLE'));
+  assert.ok(queries<=2,`Expected at most 2 queries, received ${queries}`);
+  const player=await handleEncounters(db,'player','encounters');
+  assert.deepEqual(player.campaigns.map(c=>c.code),['personal']);
+  assert.deepEqual(player.encounters,[]);
+});

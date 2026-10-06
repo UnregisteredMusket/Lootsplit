@@ -81,25 +81,27 @@ export { creatureIndex } from "../src/lib/encounters/index.mjs";
 import { creatureIndex } from "../src/lib/encounters/index.mjs";
 export async function handleEncounters(db, user, path, body = {}) {
   if (path === "encounters") {
+    // Read memberships and current seats together instead of issuing two more
+    // database round trips per saved campaign. Mutations retain dmMembership/CAS.
     const ms = await db
-      .prepare("SELECT code,name FROM library_members WHERE user_id=? AND archived=0")
+      .prepare(`SELECT m.code,m.name,m.seat_id,m.token,r.body AS room_body
+        FROM library_members m JOIN campaign_rooms r ON r.code=m.code
+        WHERE m.user_id=? AND m.archived=0`)
       .bind(user)
       .all();
     const campaigns = [{ code: "personal", name: "My account drafts", purses: [] }];
     for (const m of ms.results) {
-      try {
-        const d = await dmMembership(db, user, m.code);
-        campaigns.push({
-          ...m,
-          purses: d.room.table.purses.map((p) => ({ id: p.id, name: p.name, kind: p.kind })),
-        });
-      } catch (e) {
-        if (e.status !== 403) throw e;
-      }
+      const room = JSON.parse(m.room_body);
+      const seat = room.seats.find((s) => s.id === m.seat_id && s.token === m.token);
+      if (seat?.role !== "dm") continue;
+      campaigns.push({
+        code: m.code, name: m.name,
+        purses: room.table.purses.map((p) => ({ id: p.id, name: p.name, kind: p.kind })),
+      });
     }
     const rows = await db
       .prepare(
-        "SELECT id,code,body,status,revision,updated_at FROM dm_encounters WHERE user_id=? ORDER BY updated_at DESC",
+        "SELECT id,code,json_extract(body, '$.name') AS name,status,updated_at FROM dm_encounters WHERE user_id=? ORDER BY updated_at DESC",
       )
       .bind(user)
       .all();
@@ -110,7 +112,7 @@ export async function handleEncounters(db, user, path, body = {}) {
         .map((r) => ({
           id: r.id,
           code: r.code,
-          name: JSON.parse(r.body).name,
+          name: r.name,
           status: r.status,
           updated_at: r.updated_at,
         })),

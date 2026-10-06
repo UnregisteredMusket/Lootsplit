@@ -1,9 +1,9 @@
 import { playSound } from "./sound.ts";
 import { rememberSave, listSaves } from "./saves.ts";
 import { subscribeSheetChanges, readPartySheetLinks } from "./party-sheet-links.ts";
-import { loadJournal, type Journal } from "./journal.ts";
+import { type Journal } from "./journal.ts";
 import { applyCommand, type CommandInput } from "./commands.ts";
-import { economySnapshot, applyCloudTable, executeFinanceCommand } from "./economy.ts";
+import { economySnapshot, economyView, applyCloudTable, executeFinanceCommand } from "./economy.ts";
 import { loadSeatLock, passwordMatches } from "./lock.ts";
 import {
   createContext,
@@ -25,14 +25,6 @@ import {
   buyFromShop,
   ensureEconomy,
   inventGoods,
-  listCatalog,
-  listHoldings,
-  listLedger,
-  listLexicon,
-  listPurses,
-  listShops,
-  listStock,
-  loadRealm,
   openComposedShop,
   postCopper,
   readQuireFile,
@@ -84,7 +76,7 @@ import {
 import { loadNotes } from "./chat.ts";
 import { primeNotices } from "./notify.ts";
 import { loadGifts } from "./gift.ts";
-import { loadListings, loadLoans, loadSales } from "./market.ts";
+import { loadLoans, loadSales } from "./market.ts";
 import { loadSheets } from "./sheet.ts";
 import type { CharacterSheet } from "./sheet.ts";
 import type { Listing, LoanAsk, LoanStatus } from "./market.ts";
@@ -246,32 +238,12 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
         localStorage.setItem(marker, "1");
       }
     }
-    const [
-      nextPurses,
-      nextHoldings,
-      nextShops,
-      nextStock,
-      nextLedger,
-      nextCatalog,
-      nextLexicon,
-      nextRealm,
-      nextListings,
-      nextLoans,
-      nextSheets,
-    ] = await Promise.all([
-      listPurses(),
-      listHoldings(),
-      listShops(),
-      listStock(),
-      listLedger(),
-      listCatalog(),
-      listLexicon(),
-      loadRealm(),
-      loadListings(),
-      loadLoans(),
-      loadSheets(),
-    ]);
-    const nextJournal = await loadJournal();
+    const {
+      purses: nextPurses, holdings: nextHoldings, shops: nextShops,
+      stock: nextStock, ledger: nextLedger, catalog: nextCatalog,
+      lexicon: nextLexicon, realm: nextRealm, listings: nextListings,
+      loans: nextLoans, sheets: nextSheets, journal: nextJournal,
+    } = await economyView();
     if (
       sequence !== reloadSequence.current ||
       campaignKey !== localStorage.getItem("quire.campaign.v1")
