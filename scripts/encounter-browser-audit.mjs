@@ -320,7 +320,8 @@ try {
   await characterReview
     .getByRole("button", { name: "Use reviewed character", exact: true })
     .click();
-  await expect(player.page.getByRole("heading", { name: "Scan Hero", exact: true })).toBeVisible();
+  await expect(characterReview).toBeHidden();
+  await expect(player.page.getByRole("heading", { name: "Scan Hero", exact: true, level: 2 })).toBeVisible();
   await player.page.getByRole("button", { name: "Edit sheet", exact: true }).click();
   await expect(player.page.getByLabel("Maximum HP", { exact: true })).toHaveValue("53");
   // Both normal form indexes and orphaned filled page widgets must work through the real picker.
@@ -347,9 +348,11 @@ try {
     assert.match(extracted.features, /First feature[\s\S]*Third feature/);
     assert.match(extracted.notes, /First action[\s\S]*Second action/);
     await review.getByRole("button", { name: "Use reviewed character", exact: true }).click();
-    await expect(player.page.getByRole("heading", { name, exact: true })).toBeVisible();
+    // The review also contains the name: wait for its async save before reloading.
+    await expect(review).toBeHidden();
+    await expect(player.page.getByRole("heading", { name, exact: true, level: 2 })).toBeVisible();
     await reloadApplication(player.page);
-    await expect(player.page.getByRole("heading", { name, exact: true })).toBeVisible();
+    await expect(player.page.getByRole("heading", { name, exact: true, level: 2 })).toBeVisible();
   }
   assert.deepEqual(errors, []);
   console.log(
