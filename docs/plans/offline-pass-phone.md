@@ -1,5 +1,7 @@
 # Offline turns on the DM’s phone
 
+**PARKED — not authorized for implementation.** Follow the [implementation README and express-authorization gate](offline-pass-phone/README.md). This feature starts only after a later owner message expressly authorizes it; routine development is unaffected.
+
 Requested October 6, 2026. This is the next gameplay design; the current maintenance update changes navigation/inbox clarity, not the turn engine or offline launch.
 
 ## Current behavior

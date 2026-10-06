@@ -49,6 +49,10 @@ The homepage includes real screenshots with synthetic data and a browser/Android
 
 **Settings → Prepare for a future website address change** shows sync/private-document considerations and guides use of existing backups. No domain migration is active. See [domain preparation and activation gates](docs/plans/DOMAIN-READINESS.md) and run `npm run migration:check` when editing addresses. [Economy modes and tax rules](docs/plans/ECONOMY-MODES-AND-TAXES.md) are proposals awaiting approval, not active gameplay settings.
 
+## Parked future feature — offline pass-phone turns
+
+The [implementation task list](docs/plans/offline-pass-phone/README.md) is **parked until the owner expressly authorizes starting it in a later message**. It covers same-device player turns, permissions, browser offline launch, backups and platform verification. This documentation request does not authorize implementation or release. The hold applies only to this feature; unrelated development continues normally. Keep this documentation branch separate from main until later authorized work begins.
+
 ## Start here for every coding session
 
 Read [AGENTS.project.md](AGENTS.project.md), then the [Coding session manual](docs/CODING-MANUAL.md). After a timeout or interruption, also read [Recovery](docs/RECOVERY.md) and reconcile the repository, running jobs and live release before repeating an action.
