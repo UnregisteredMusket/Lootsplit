@@ -83,6 +83,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Code checks and immutable builds / Run actions/upload-artifact@v4 | open | 2 | 2s → 4s | +2s | +100% |
 | Packaged standby / Run actions/checkout@v4 | open | 2 | 1s → 23s | +22s | +2200% |
 | Development / gameplay / dev-encounter | open | 4 | 11s → 32s | +21s | +190.91% |
+| publish / Verify and publish the audited bytes without rebuilding | open | 2 | 5s → 10s | +5s | +100% |
 | deploy / Install locked deploy and verification tools (no application build) | open | 2 | 13s → 19s | +6s | +46.15% |
 | deploy / Verify deployed identity and read-only desktop/mobile website behavior | open | 3 | 44s → 81s | +37s | +84.09% |
 | Deploy verified website | open | 2 | 98s → 156s | +58s | +59.18% |
@@ -143,6 +144,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-06T20:31:19Z | step: publish / Verify and publish the audited bytes without rebuilding | 7s → 10s | +3s | +42.86% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37263801314/job/111616279480) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37527030701/job/112486520581) |
 | 2026-10-06T20:30:55.000Z | workflow: Verify preserved functionality | 277s → 744s | +467s | +168.59% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37303426479) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37525444442) |
 | 2026-10-06T20:30:44Z | job: Development / accounts | 266s → 732s | +466s | +175.19% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37303426479/job/111741324413) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37525444442/job/112481149959) |
 | 2026-10-06T20:27:37Z | step: Development / accounts / Run npx playwright install --with-deps chromium | 31s → 523s | +492s | +1587.1% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37263545529/job/111615524873) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37525444442/job/112481149959) |
