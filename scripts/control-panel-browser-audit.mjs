@@ -56,6 +56,13 @@ try {
   const bar = await nav.boundingBox();
   assert.ok(last.y + last.height <= bar.y, "All six default controls fit above the mobile tabs");
   await capture("dm-desk");
+  await page.evaluate(() => { window.reviewNavigationMarker = "same-document"; });
+  await page.locator(".readout").filter({ hasText: "Pending reviews" }).click();
+  await expect(page.getByRole("heading", { name: "Review Inbox", exact: true })).toBeVisible();
+  await expect(page.locator("#review-inbox")).toBeVisible();
+  assert.equal(await page.evaluate(() => window.reviewNavigationMarker), "same-document");
+  assert.equal(await page.locator(".loot-opening").count(), 0);
+  await page.getByRole("link", { name: "Return to Desk", exact: true }).click();
   // Both historical entry URLs now expose one DM home without duplicate sections.
   await page.evaluate(() => { window.unifiedHomeMarker = "same-document"; });
   await page.locator('.readout').filter({hasText:"Current session"}).click();

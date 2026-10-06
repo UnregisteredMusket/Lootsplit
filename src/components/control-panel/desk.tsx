@@ -97,7 +97,7 @@ export function DmDesk() {
               <strong>{formatCopper(fund)}</strong>
             </span>
           </AppLink>
-          <AppLink href="/features/bank?from=%2F" className="readout">
+          <AppLink href="/features/review?from=%2F" className="readout">
             <FantasyIcon ui="gift" size={30} />
             <span>
               <small>Pending reviews</small>

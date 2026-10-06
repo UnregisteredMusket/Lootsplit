@@ -255,3 +255,5 @@ Release status must be taken from the latest recovery checkpoint/PR, not this im
 - Property description commands verify ownership and compare previous name/notes before changing only those fields. Ownership, price, quantity and recurring economics remain protected. Journal/property/request drafts use the existing navigation guard.
 - Review Reports uses shared session-summary calculations and archived records. Owner/site analytics remain in the owner account area. Downtime remains separate from Bank. New foreclosures and special property acquisition workflows are deferred.
 - Additive migration0010 stores only account shortcut preferences. Existing saves, exports, backups, play modes, Android signing and campaign/account separation remain unchanged.
+
+- DM Pending reviews opens Review Inbox, which exposes the current campaign’s existing payment/loan decisions alongside character-import reviews. Explicit reviews of another saved room do not show the active campaign’s financial queue. Bank retains its financial controls.
