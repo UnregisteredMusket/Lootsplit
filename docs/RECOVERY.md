@@ -4,6 +4,8 @@
 - DM `/` and legacy `?view=overview` now share Campaign control. One readout/shortcut/feature list; expandable treasury, activity/balances, sessions and campaign tools. Desktop table/complete review queue retained within activity. Session readout opens actual session controls. Player routes, saved data and gameplay rules unchanged.
 - Local verification passed:508 tests/four existing skips, clean types, zero lint errors/34 existing warnings, web/mobile builds. Expanded control-panel21.084s, governance62.342s, desktop42.652s and help passed; mobile screenshots inspected. The first test-only document-marker assertion incorrectly spanned an intentional legacy-URL document open; corrected to measure actual session/Bank/return clicks independently. No application navigation defect was found. Full exact-head PR/main verification and deployed audit remain pending. Existing gated publication authorization applies; no new APK, migration or domain work.
 
+- PR53 initial run37438052113 found an outdated library-navigation fixture: desktop Session journal link now lives inside Activity & balances. The audit now opens that section before clicking the same real link; all no-reload/title assertions remain. Focused navigation passed18.928s, including Library/Journal/ledger/account links, back/forward, title behavior and both widths. Fresh full exact-head checks required; no merge/deploy performed.
+
 # Fixed player feature buttons — 2026-10-06 UTC
 
 - Latest user request removes player shortcut customization and presents all six player services with existing shortcut-button styling. DM customization remains unchanged; existing player preference records are preserved. No migration, gameplay-rule or APK change.

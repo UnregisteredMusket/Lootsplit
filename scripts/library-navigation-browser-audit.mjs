@@ -56,6 +56,7 @@ try {
     await page.locator('nav[aria-label="Sections"]:visible').getByRole("link", { name: "Desk", exact: true }).click();
     await page.locator(".shortcut-grid").waitFor();
     if (width === 1440) {
+      await page.getByRole("button", { name: /^Activity & balances/ }).click();
       await page.getByRole("link", { name: "Session journal →", exact: true }).click();
       await page.waitForURL(u=>u.pathname === "/features/journal");
       await page.locator("#journal").waitFor();
