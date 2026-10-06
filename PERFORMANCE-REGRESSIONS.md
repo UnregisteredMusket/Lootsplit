@@ -34,7 +34,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Development / governance / Run npm ci | open | 2 | 7s → 17s | +10s | +142.86% |
 | Development / governance / Run npx playwright install --with-deps chromium | open | 2 | 17s → 42s | +25s | +147.06% |
 | Development / governance / Start disposable development server | open | 2 | 4s → 8s | +4s | +100% |
-| Packaged Worker / interface / Run actions/setup-node@v4 | open | 2 | 3s → 5s | +2s | +66.67% |
+| Packaged Worker / interface / Run actions/setup-node@v4 | open | 3 | 3s → 7s | +4s | +133.33% |
 | Packaged Worker / accounts / Run actions/setup-node@v4 | open | 2 | 2s → 8s | +6s | +300% |
 | Development / governance / dev-campaign-governance | open | 4 | 18s → 69s | +51s | +283.33% |
 | Packaged standby / Run npm ci | open | 2 | 10s → 15s | +5s | +50% |
@@ -108,13 +108,14 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | report | open | 2 | 7s → 12s | +5s | +71.43% |
 | Report workflow failure | open | 2 | 7s → 12s | +5s | +71.43% |
 | Packaged standby / Run npx playwright install --with-deps chromium | open | 2 | 21s → 38s | +17s | +80.95% |
-| Packaged Worker / accounts / worker-finance | open | 2 | 11s → 15s | +4s | +36.36% |
+| Packaged Worker / accounts / worker-finance | open | 3 | 11s → 19s | +8s | +72.73% |
 | Packaged Worker / accounts / worker-finance | open | 2 | 11s → 15s | +4s | +36.36% |
 | Packaged Worker / accounts / Run npx playwright install --with-deps chromium | open | 2 | 23s → 37s | +14s | +60.87% |
 | Verify preserved functionality | open | 3 | 220s → 403s | +183s | +83.18% |
 | Development / gameplay / dev-bug-edge-cases | open | 2 | 9s → 15s | +6s | +66.67% |
 | Packaged Worker / interface / worker-help | open | 2 | 6s → 25s | +19s | +316.67% |
 | Development / desktop / Run npx playwright install --with-deps chromium | open | 2 | 21s → 42s | +21s | +100% |
+| Development / gameplay / dev-bug-data-integrity | open | 2 | 5s → 7s | +2s | +40% |
 | Development / gameplay / dev-finance | open | 2 | 18s → 26s | +8s | +44.44% |
 | Packaged Worker / accounts / Run npx playwright install --with-deps chromium | open | 2 | 22s → 35s | +13s | +59.09% |
 | Packaged Worker / interface / worker-loot | open | 2 | 4s → 6s | +2s | +50% |
@@ -128,6 +129,10 @@ Open trends require investigation. Resolved trends retain their history; each ve
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-06T11:00:40Z | step: Packaged Worker / accounts / worker-finance | 15s → 19s | +4s | +26.67% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37412269946/job/112103497296) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37453107393/job/112234598065) |
+| 2026-10-06T10:58:07Z | step: Packaged Worker / interface / Run actions/setup-node@v4 | 5s → 7s | +2s | +40% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37270098428/job/111635376794) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37453107393/job/112234598017) |
+| 2026-10-06T10:57:49Z | step: Development / gameplay / dev-bug-data-integrity | 6s → 7s | +1s | +16.67% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37304872866/job/111746024055) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37453107393/job/112234113513) |
+| 2026-10-06T10:57:00Z | step: Development / gameplay / Run npm ci | 13s → 15s | +2s | +15.38% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37233687309/job/111528483514) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37453107393/job/112234113513) |
 | 2026-10-06T10:55:06Z | step: Packaged Worker / interface / worker-library-navigation | 9s → 11s | +2s | +22.22% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37438630832/job/112187667724) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37452559678/job/112232862548) |
 | 2026-10-06T10:54:49Z | step: Development / gameplay / dev-loot | 7s → 9s | +2s | +28.57% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37235490768/job/111533630411) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37452559678/job/112232333381) |
 | 2026-10-06T10:52:51Z | step: Development / gameplay / dev-bug-edge-cases | 13s → 15s | +2s | +15.38% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37292539956/job/111706095806) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37452559678/job/112232333381) |
