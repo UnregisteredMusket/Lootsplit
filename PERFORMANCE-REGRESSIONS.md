@@ -81,7 +81,10 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Code checks and immutable builds / Run actions/upload-artifact@v4 | open | 2 | 2s → 4s | +2s | +100% |
 | Packaged standby / Run actions/checkout@v4 | open | 2 | 1s → 23s | +22s | +2200% |
 | Development / gameplay / dev-encounter | open | 4 | 11s → 32s | +21s | +190.91% |
-| deploy / Verify deployed identity and read-only desktop/mobile website behavior | open | 2 | 44s → 69s | +25s | +56.82% |
+| deploy / Install locked deploy and verification tools (no application build) | open | 2 | 13s → 19s | +6s | +46.15% |
+| deploy / Verify deployed identity and read-only desktop/mobile website behavior | open | 3 | 44s → 81s | +37s | +84.09% |
+| Deploy verified website | open | 2 | 98s → 156s | +58s | +59.18% |
+| deploy | open | 2 | 98s → 156s | +58s | +59.18% |
 | Code checks and immutable builds / Run actions/upload-artifact@v4 | open | 3 | 2s → 5s | +3s | +150% |
 | Packaged Worker / accounts / Run actions/setup-node@v4 | open | 3 | 3s → 7s | +4s | +133.33% |
 | Packaged standby / Run npm ci | open | 2 | 12s → 18s | +6s | +50% |
@@ -93,6 +96,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Development / accounts / dev-account | open | 4 | 59s → 158s | +99s | +167.8% |
 | Packaged Worker / interface / worker-theme | open | 4 | 11s → 25s | +14s | +127.27% |
 | Packaged Worker / accounts / worker-account | open | 5 | 25s → 75s | +50s | +200% |
+| deploy / Run actions/upload-artifact@v4 | open | 2 | 1s → 3s | +2s | +200% |
 | Development / accounts / Run actions/upload-artifact@v4 | open | 2 | 1s → 3s | +2s | +200% |
 | Verify preserved functionality / initial queue | open | 2 | 3s → 94s | +91s | +3033.33% |
 | Development / desktop / Set up job | open | 2 | 1s → 4s | +3s | +300% |
@@ -136,6 +140,11 @@ Open trends require investigation. Resolved trends retain their history; each ve
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-06T15:36:32Z | job: deploy | 128s → 156s | +28s | +21.88% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37263801298/job/111616279155) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37488564832/job/112354942283) |
+| 2026-10-06T15:36:32.000Z | workflow: Deploy verified website | 128s → 156s | +28s | +21.88% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37263801298) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37488564832) |
+| 2026-10-06T15:36:29Z | step: deploy / Run actions/upload-artifact@v4 | 2s → 3s | +1s | +50% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37267750797/job/111628032976) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37488564832/job/112354942283) |
+| 2026-10-06T15:36:26Z | step: deploy / Verify deployed identity and read-only desktop/mobile website behavior | 69s → 81s | +12s | +17.39% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37285972298/job/111684838144) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37488564832/job/112354942283) |
+| 2026-10-06T15:34:25Z | step: deploy / Install locked deploy and verification tools (no application build) | 15s → 19s | +4s | +26.67% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37263801298/job/111616279155) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37488564832/job/112354942283) |
 | 2026-10-06T15:33:04Z | step: Packaged Worker / interface / worker-loot | 6s → 7s | +1s | +16.67% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37412269946/job/112103497361) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37487891026/job/112353413905) |
 | 2026-10-06T15:29:40Z | step: Code checks and immutable builds / Run npm ci | 14s → 19s | +5s | +35.71% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37233687309/job/111528483329) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37487891026/job/112352634423) |
 | 2026-10-06T14:22:19.857Z | audit: control-panel browser audit | 21.084s → 27.105s | +6.021s | +28.56% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/tree/fix/unified-dm-home) · [After](https://github.com/UnregisteredMusket/Lootsplit/tree/improvement/scrollable-dm-desk) |
