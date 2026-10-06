@@ -30,10 +30,18 @@ Initial local failures were stale selectors for the removed grid/current-session
 
 Read the persistent performance-history branch at e5ba8d14bad0bac16fe6fb2dbdfad79987fa5b17, including state, regression log, baselines and resolutions. Recorder scanAfter2026-10-06T12:55:56.779Z had no pending runs; latest recorder run37472116481 succeeded. History is retained, with no trend reset.
 
-The latest logged comparable local control-panel reference was21.084s. Final27.105s adds6.021s (+28.56%). The new audit adds native scrolling, selectors/arrows and multiplayer clicks, and reaches the retained shortcut editor through settings. Record the qualifying increase with that workload explanation; this is not evidence that a campaign operation is28.56% slower. No separate production-runtime benchmark was taken.
+The latest logged comparable local control-panel reference was 21.084s. Final 27.105s adds 6.021s (+28.56%). The new audit adds native scrolling, selectors/arrows and multiplayer clicks, and reaches the retained shortcut editor through settings. The qualifying increase is recorded in performance/manual-measurements.jsonl with the same environment and scope; this is not evidence that a campaign operation is 28.56% slower. No separate production-runtime benchmark was taken. Its timestamps are reconstructed from the retained final log's last write time and measured child duration; the runner retained duration but did not emit ISO timestamps.
 
 Existing open CI trends include development finance17→28s (+64.71%), packaged finance11→19s (+72.73%), full verification220→403s (+83.18%), and website deployment queue4→6780s. Repeated node setup/browser installation and queue delays remain separate from application behavior. The prior control-panel and Library navigation timeout trends have verified resolution records. Continue observing the new exact-head run; do not reset unrelated infrastructure trends or add overlapping job durations.
 
 ## Release checkpoint
 
-Baseline main/live e84e24b178df950905b6f716309eabb5371643c4; main verification37453107393 and deployment37453589467 succeeded before this change. Work branch improvement/scrollable-dm-desk. Local source is verified; exact-head PR checks, main verification, deployment and immutable-asset/read-only live audits remain required. Inspect current GitHub state before retrying any publication.
+Baseline main/live e84e24b178df950905b6f716309eabb5371643c4; main verification37453107393 and deployment37453589467 succeeded before this change. Work branch improvement/scrollable-dm-desk. Verified local implementation commit 064e121794b477e944545885d2bd19b48a009ecf.
+
+Automatic approval review rejected the GitHub push because the UI request was not accepted as explicit authorization to publish the code and documentation to that external repository. No push, PR, full CI, merge or deployment occurred for this update. Do not retry through another route. Obtain explicit publication approval, then reconcile GitHub state before proceeding. Exact-head PR checks, main verification, deployment and immutable-asset/read-only live audits remain required.
+
+A real mobile UI capture from the final local audit is available as lootsplit-dm-screen.png for user review. It uses synthetic fixture data, not a live user campaign. The screenshot was saved separately; repository code remains in the existing local Git checkout.
+
+The user subsequently explicitly approved publishing to UnregisteredMusket/Lootsplit and releasing the website after full checks. Before the approved push, recovery status and remote main were reconciled: main and live still match the baseline above. Full release verification is now authorized and remains pending at this checkpoint.
+
+CLI publication lacked GitHub credentials, so the connected integration created source commit 1d603fd1d2c8b4fb054f20d37aead690ee3878f7. Its tree eeb3ca014d358b10e1a71b124793e1455508afea exactly matches the locally tested source; the performance record references that source commit. Only documentation and the measurement reference changed afterward.
