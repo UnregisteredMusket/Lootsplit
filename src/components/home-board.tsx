@@ -1,3 +1,7 @@
+import type { ReactNode } from "react";
+import { DesktopDeskPanels } from "./control-panel/desktop-panels";
+import { useDesktop } from "@/lib/quire/use-desktop";
+import { AppLink } from "./app-link";
 import { sessionSummary } from "@/lib/quire/journal";
 import { CampaignJournal } from "./campaign-journal";
 import { LedgerArt } from "./ledger-art";
@@ -28,7 +32,28 @@ import { formatCoins, formatCopper, toCopper } from "@/lib/quire/money";
 import { usePrefs } from "@/lib/quire/prefs";
 import { useSeat } from "@/lib/quire/seat";
 
-export function HomeBoard() {
+function OverviewSection({
+  embedded,
+  title,
+  hint,
+  children,
+}: {
+  embedded: boolean;
+  title: string;
+  hint?: string;
+  children: ReactNode;
+}) {
+  return embedded ? (
+    <Fold title={title} hint={hint}>
+      {children}
+    </Fold>
+  ) : (
+    <>{children}</>
+  );
+}
+
+export function HomeBoard({ embedded = false }: { embedded?: boolean }) {
+  const desktop = useDesktop();
   const { ready, purses, holdings, ledger, shops, loans, journal, sheets, download, restoreFile } =
     useEconomy();
   const seat = useSeat();
@@ -72,239 +97,257 @@ export function HomeBoard() {
 
   return (
     <>
-      <div className="flex items-end justify-between gap-3">
-        <div>
-          <p className="eyebrow">
-            {seat.role === "dm" ? "Campaign overview" : "Campaign overview"}
-          </p>
-          <h1 className="mt-1 font-display text-4xl tracking-tight">{campaign}</h1>
-          <p className="text-sm text-muted">
-            {seat.role === "dm"
-              ? `${purses.filter((purse) => purse.kind === "character").length} character${purses.filter((purse) => purse.kind === "character").length === 1 ? "" : "s"}.`
-              : `Playing as ${
-                  mine
-                    .filter((p) => p.kind === "character")
-                    .map((p) => p.name)
-                    .join(", ") || "an unassigned character"
-                }`}
-          </p>
+      {!embedded && (
+        <div className="flex items-end justify-between gap-3">
+          <div>
+            <p className="eyebrow">
+              {seat.role === "dm" ? "Campaign overview" : "Campaign overview"}
+            </p>
+            <h1 className="mt-1 font-display text-4xl tracking-tight">{campaign}</h1>
+            <p className="text-sm text-muted">
+              {seat.role === "dm"
+                ? `${purses.filter((purse) => purse.kind === "character").length} character${purses.filter((purse) => purse.kind === "character").length === 1 ? "" : "s"}.`
+                : `Playing as ${
+                    mine
+                      .filter((p) => p.kind === "character")
+                      .map((p) => p.name)
+                      .join(", ") || "an unassigned character"
+                  }`}
+            </p>
+          </div>
+          <Guide />
         </div>
-        <Guide />
-      </div>
+      )}
       <TurnLine />
       {!ready ? <p className="mt-6 text-muted">Loading…</p> : null}
       {ready ? (
         <>
-          <div className="dashboard-top mt-6 grid gap-4 lg:grid-cols-[1.5fr_1fr]">
-            <Card className="wealth-card relative overflow-hidden">
-              <div className="flex items-center justify-between">
-                <p className="eyebrow">
-                  {seat.role === "dm" ? "Campaign treasury" : "Your treasury"}
+          <OverviewSection
+            embedded={embedded}
+            title="Campaign treasury"
+            hint={`${formatCopper(coin)} in coins · ${formatCopper(lootValue)} in holdings`}
+          >
+            <div className="dashboard-top mt-6 grid gap-4 lg:grid-cols-[1.5fr_1fr]">
+              <Card className="wealth-card relative overflow-hidden">
+                <div className="flex items-center justify-between">
+                  <p className="eyebrow">
+                    {seat.role === "dm" ? "Campaign treasury" : "Your treasury"}
+                  </p>
+                  <Coins className="size-6 text-lead" aria-hidden="true" />
+                </div>
+                <p className="treasury-value mt-4 font-display text-lead">{formatCopper(coin)}</p>
+                <p className="mt-1 text-sm text-muted">
+                  {session !== 0 ? (
+                    <>
+                      <MoneyLine copper={session} label={formatCopper(Math.abs(session))} />{" "}
+                      {activeSession ? `net this session · ${activeSession.name}` : "net today"}
+                    </>
+                  ) : activeSession ? (
+                    `No net coin movement · ${activeSession.name}`
+                  ) : (
+                    "No coin moved today"
+                  )}
                 </p>
-                <Coins className="size-6 text-lead" aria-hidden="true" />
-              </div>
-              <p className="treasury-value mt-4 font-display text-lead">{formatCopper(coin)}</p>
-              <p className="mt-1 text-sm text-muted">
-                {session !== 0 ? (
+                <div className="mt-6 grid grid-cols-2 gap-4 border-t border-lead/20 pt-4">
+                  <div>
+                    <p className="text-sm text-muted">Holdings value</p>
+                    <p className="mt-1 text-lg tabular-nums">{formatCopper(lootValue)}</p>
+                  </div>
+                  <div>
+                    <p className="text-sm text-muted">Total wealth</p>
+                    <p className="mt-1 text-lg tabular-nums">{formatCopper(coin + lootValue)}</p>
+                  </div>
+                </div>
+              </Card>
+              <div className="grid grid-cols-2 gap-3">
+                <Link to="/party" className="stat-card">
+                  <Package className="size-5 text-lead" />
+                  <p className="mt-4 font-display text-3xl">{loot.length}</p>
+                  <p className="text-sm text-muted">Recorded holdings</p>
+                </Link>
+                <Link to="/market" search={{ book: "" }} className="stat-card">
+                  <Store className="size-5 text-lead" />
+                  <p className="mt-4 font-display text-3xl">
+                    {seat.role === "dm"
+                      ? shops.filter((shop) => !shop.closed).length
+                      : shops.filter((shop) => !shop.closed && seat.shopIds.includes(shop.id))
+                          .length}
+                  </p>
+                  <p className="text-sm text-muted">Open shops</p>
+                </Link>
+                {!embedded && (
                   <>
-                    <MoneyLine copper={session} label={formatCopper(Math.abs(session))} />{" "}
-                    {activeSession ? `net this session · ${activeSession.name}` : "net today"}
+                    <Link to="/party" className="stat-card hidden sm:block">
+                      <Users className="size-5 text-lead" />
+                      <p className="mt-4 font-display text-3xl">
+                        {mine.filter((purse) => purse.kind === "character").length}
+                      </p>
+                      <p className="text-sm text-muted">Characters</p>
+                    </Link>
+                    <Link
+                      to={seat.role === "dm" ? "/" : "/party"}
+                      search={seat.role === "dm" ? { view: "home" } : { action: "" }}
+                      hash={seat.role === "dm" ? "review-inbox" : undefined}
+                      onClick={() => {
+                        if (seat.role !== "dm") return;
+                        const el = document.getElementById("review-inbox");
+                        if (el instanceof HTMLDetailsElement) el.open = true;
+                      }}
+                      className="stat-card hidden sm:block"
+                    >
+                      <ScrollText className="size-5 text-lead" />
+                      <p className="mt-4 font-display text-3xl">
+                        {seat.role === "dm"
+                          ? loans.filter((loan) => loan.status === "pending").length +
+                            journal.requests.filter((x) => x.status === "pending").length
+                          : loot.filter((holding) => holding.kind === "property").length}
+                      </p>
+                      <p className="text-sm text-muted">
+                        {seat.role === "dm" ? "Review inbox" : "Properties"}
+                      </p>
+                    </Link>
                   </>
-                ) : activeSession ? (
-                  `No net coin movement · ${activeSession.name}`
-                ) : (
-                  "No coin moved today"
                 )}
-              </p>
-              <div className="mt-6 grid grid-cols-2 gap-4 border-t border-lead/20 pt-4">
-                <div>
-                  <p className="text-sm text-muted">Holdings value</p>
-                  <p className="mt-1 text-lg tabular-nums">{formatCopper(lootValue)}</p>
-                </div>
-                <div>
-                  <p className="text-sm text-muted">Total wealth</p>
-                  <p className="mt-1 text-lg tabular-nums">{formatCopper(coin + lootValue)}</p>
-                </div>
               </div>
-            </Card>
-            <div className="grid grid-cols-2 gap-3">
-              <Link to="/party" className="stat-card">
-                <Package className="size-5 text-lead" />
-                <p className="mt-4 font-display text-3xl">{loot.length}</p>
-                <p className="text-sm text-muted">Recorded holdings</p>
-              </Link>
-              <Link to="/market" search={{ book: "" }} className="stat-card">
-                <Store className="size-5 text-lead" />
-                <p className="mt-4 font-display text-3xl">
-                  {seat.role === "dm"
-                    ? shops.filter((shop) => !shop.closed).length
-                    : shops.filter((shop) => !shop.closed && seat.shopIds.includes(shop.id)).length}
-                </p>
-                <p className="text-sm text-muted">Open shops</p>
-              </Link>
-              <Link to="/party" className="stat-card hidden sm:block">
-                <Users className="size-5 text-lead" />
-                <p className="mt-4 font-display text-3xl">
-                  {mine.filter((purse) => purse.kind === "character").length}
-                </p>
-                <p className="text-sm text-muted">Characters</p>
+            </div>
+            <div className="quick-actions mt-4 grid grid-cols-2 gap-3 md:grid-cols-4">
+              {seat.role === "dm" ? (
+                <Link to="/party" search={{ action: "add" }} className="quick-action primary">
+                  <Plus className="size-4" />
+                  Add loot
+                </Link>
+              ) : (
+                <Link to="/" search={{ view: "sheet" }} className="quick-action primary">
+                  <Package className="size-4" />
+                  Your inventory
+                </Link>
+              )}
+              {seat.role === "dm" ? (
+                <AppLink href="/features/bank?from=%2F" className="quick-action">
+                  <ScrollText className="size-4" />
+                  Review requests
+                </AppLink>
+              ) : (
+                <Link to="/party" search={{ action: "give" }} className="quick-action">
+                  <ArrowUpRight className="size-4" />
+                  Give
+                </Link>
+              )}
+              <Link to="/market" search={{ book: "" }} className="quick-action">
+                <Store className="size-4" />
+                {seat.role === "dm" ? "Manage shops" : "Browse market"}
               </Link>
               <Link
-                to={seat.role === "dm" ? "/" : "/party"}
-                search={seat.role === "dm" ? { view: "home" } : { action: "" }}
-                hash={seat.role === "dm" ? "review-inbox" : undefined}
-                onClick={() => {
-                  if (seat.role !== "dm") return;
-                  const el = document.getElementById("review-inbox");
-                  if (el instanceof HTMLDetailsElement) el.open = true;
-                }}
-                className="stat-card hidden sm:block"
+                to={seat.role === "dm" ? "/settings" : "/party"}
+                search={seat.role === "dm" ? undefined : { action: "" }}
+                className="quick-action"
               >
-                <ScrollText className="size-5 text-lead" />
-                <p className="mt-4 font-display text-3xl">
-                  {seat.role === "dm"
-                    ? loans.filter((loan) => loan.status === "pending").length +
-                      journal.requests.filter((x) => x.status === "pending").length
-                    : loot.filter((holding) => holding.kind === "property").length}
-                </p>
-                <p className="text-sm text-muted">
-                  {seat.role === "dm" ? "Review inbox" : "Properties"}
-                </p>
+                <SlidersHorizontal className="size-4" />
+                {seat.role === "dm" ? "Economy rules" : "Your party"}
               </Link>
             </div>
-          </div>
-          <div className="quick-actions mt-4 grid grid-cols-2 gap-3 md:grid-cols-4">
-            {seat.role === "dm" ? (
-              <Link to="/party" search={{ action: "add" }} className="quick-action primary">
-                <Plus className="size-4" />
-                Add loot
-              </Link>
-            ) : (
-              <Link to="/" search={{ view: "sheet" }} className="quick-action primary">
-                <Package className="size-4" />
-                Your inventory
-              </Link>
-            )}
-            {seat.role === "dm" ? (
-              <a
-                href="#review-inbox"
-                className="quick-action"
-                onClick={() => {
-                  const el = document.getElementById("review-inbox");
-                  if (el instanceof HTMLDetailsElement) el.open = true;
-                }}
-              >
-                <ScrollText className="size-4" />
-                Review requests
-              </a>
-            ) : (
-              <Link to="/party" search={{ action: "give" }} className="quick-action">
-                <ArrowUpRight className="size-4" />
-                Give
-              </Link>
-            )}
-            <Link to="/market" search={{ book: "" }} className="quick-action">
-              <Store className="size-4" />
-              {seat.role === "dm" ? "Manage shops" : "Browse market"}
-            </Link>
-            <Link
-              to={seat.role === "dm" ? "/settings" : "/party"}
-              search={seat.role === "dm" ? undefined : { action: "" }}
-              className="quick-action"
-            >
-              <SlidersHorizontal className="size-4" />
-              {seat.role === "dm" ? "Economy rules" : "Your party"}
-            </Link>
-          </div>
-          <div className="mt-7 grid grid-cols-1 gap-6 lg:grid-cols-[1.5fr_1fr]">
-            <section className="min-w-0">
-              <div className="section-heading">
-                <h2>Recent activity</h2>
-                <span className="text-sm text-faint">Latest transactions</span>
-              </div>
-              {recent.length === 0 ? (
-                <EmptyState
-                  title="No transactions yet"
-                  body="Record a payment or trade at a shop to see your activity."
-                  action={
-                    <Link
-                      to="/party"
-                      search={{ action: "pay" }}
-                      className="inline-flex min-h-11 items-center gap-2 text-sm text-lead"
-                    >
-                      <Plus className="size-4" />
-                      Record a payment
-                    </Link>
-                  }
-                />
-              ) : (
-                <ul className="activity-list">
-                  {recent.map((line) => (
-                    <li key={line.id} className="activity-row">
-                      <span className="activity-icon">
-                        {line.copper >= 0 ? (
-                          <ArrowDownLeft className="size-4" />
-                        ) : (
-                          <ArrowUpRight className="size-4" />
-                        )}
-                      </span>
-                      <span className="min-w-0 flex-1">
-                        <span className="block truncate text-sm">{line.summary}</span>
-                        <span className="text-sm text-faint">
-                          {purses.find((purse) => purse.id === line.purseId)?.name} ·{" "}
-                          {when(line.at)}
-                        </span>
-                      </span>
-                      <MoneyLine copper={line.copper} label={formatCopper(Math.abs(line.copper))} />
-                    </li>
-                  ))}
-                </ul>
-              )}
-            </section>
-            <section className="min-w-0">
-              <div className="section-heading">
-                <h2>{seat.role === "dm" ? "Party funds" : "Your funds"}</h2>
-                <Link to="/party" className="text-sm text-lead">
-                  View all
-                </Link>
-              </div>
-              {mine.length === 0 ? (
-                <EmptyState
-                  title="No account assigned"
-                  body="Your character’s coins will appear when an account is assigned."
-                />
-              ) : (
-                <ul className="purse-list">
-                  {mine.slice(0, 6).map((purse) => (
-                    <li key={purse.id}>
-                      <Link
-                        to="/party"
-                        search={{ action: "" }}
-                        className="flex min-h-16 items-center gap-3 border-b border-border/50 py-3"
-                      >
-                        <LedgerArt kind="portrait" src={purse.portrait} className="round" />
-                        <span className="min-w-0 flex-1">
-                          <span className="block truncate text-sm">{purse.name}</span>
-                          <span className="text-xs text-faint">
-                            {purse.kind === "party" ? "Shared fund" : "Character"}
+          </OverviewSection>
+          <OverviewSection
+            embedded={embedded}
+            title="Activity & balances"
+            hint="Recent transactions, review queue, account balances and messages."
+          >
+            {embedded && <DesktopDeskPanels />}
+            <div className="mt-7 grid grid-cols-1 gap-6 lg:grid-cols-[1.5fr_1fr]">
+              {(!embedded || !desktop) && (
+                <section className="min-w-0">
+                  <div className="section-heading">
+                    <h2>Recent activity</h2>
+                    <span className="text-sm text-faint">Latest transactions</span>
+                  </div>
+                  {recent.length === 0 ? (
+                    <EmptyState
+                      title="No transactions yet"
+                      body="Record a payment or trade at a shop to see your activity."
+                      action={
+                        <Link
+                          to="/party"
+                          search={{ action: "pay" }}
+                          className="inline-flex min-h-11 items-center gap-2 text-sm text-lead"
+                        >
+                          <Plus className="size-4" />
+                          Record a payment
+                        </Link>
+                      }
+                    />
+                  ) : (
+                    <ul className="activity-list">
+                      {recent.map((line) => (
+                        <li key={line.id} className="activity-row">
+                          <span className="activity-icon">
+                            {line.copper >= 0 ? (
+                              <ArrowDownLeft className="size-4" />
+                            ) : (
+                              <ArrowUpRight className="size-4" />
+                            )}
                           </span>
-                        </span>
-                        <span className="text-sm tabular-nums text-lead">
-                          {formatCoins(purse.coins)}
-                        </span>
-                      </Link>
-                    </li>
-                  ))}
-                </ul>
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate text-sm">{line.summary}</span>
+                            <span className="text-sm text-faint">
+                              {purses.find((purse) => purse.id === line.purseId)?.name} ·{" "}
+                              {when(line.at)}
+                            </span>
+                          </span>
+                          <MoneyLine
+                            copper={line.copper}
+                            label={formatCopper(Math.abs(line.copper))}
+                          />
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </section>
               )}
-              {messages.length > 0 ? (
-                <Link to="/share" className="mt-4 block rounded-xl border border-lead/20 p-4">
-                  <p className="eyebrow">Latest message</p>
-                  <p className="mt-2 truncate text-sm">{messages[0]?.text}</p>
-                </Link>
-              ) : null}
-            </section>
-          </div>
+              <section className="min-w-0">
+                <div className="section-heading">
+                  <h2>{seat.role === "dm" ? "Party funds" : "Your funds"}</h2>
+                  <Link to="/party" className="text-sm text-lead">
+                    View all
+                  </Link>
+                </div>
+                {mine.length === 0 ? (
+                  <EmptyState
+                    title="No account assigned"
+                    body="Your character’s coins will appear when an account is assigned."
+                  />
+                ) : (
+                  <ul className="purse-list">
+                    {mine.slice(0, 6).map((purse) => (
+                      <li key={purse.id}>
+                        <Link
+                          to="/party"
+                          search={{ action: "" }}
+                          className="flex min-h-16 items-center gap-3 border-b border-border/50 py-3"
+                        >
+                          <LedgerArt kind="portrait" src={purse.portrait} className="round" />
+                          <span className="min-w-0 flex-1">
+                            <span className="block truncate text-sm">{purse.name}</span>
+                            <span className="text-xs text-faint">
+                              {purse.kind === "party" ? "Shared fund" : "Character"}
+                            </span>
+                          </span>
+                          <span className="text-sm tabular-nums text-lead">
+                            {formatCoins(purse.coins)}
+                          </span>
+                        </Link>
+                      </li>
+                    ))}
+                  </ul>
+                )}
+                {messages.length > 0 ? (
+                  <Link to="/share" className="mt-4 block rounded-xl border border-lead/20 p-4">
+                    <p className="eyebrow">Latest message</p>
+                    <p className="mt-2 truncate text-sm">{messages[0]?.text}</p>
+                  </Link>
+                ) : null}
+              </section>
+            </div>
+          </OverviewSection>
         </>
       ) : null}
       {seat.role === "player" && mine.find((p) => p.kind === "character") ? (
@@ -324,14 +367,13 @@ export function HomeBoard() {
         Multiplayer · Room, chat & connection status →
       </Link>
       <div id="journal">
-        <CampaignJournal />
+        <CampaignJournal section={embedded ? "sessions" : "overview"} />
       </div>
       <Fold title="Campaign tools" hint="Multiplayer, display options, and this campaign.">
         <Link to="/share" className="quick-action primary">
           Open Multiplayer — host or join a room
         </Link>
 
-        <TurnLine />
         <div className="mt-3">
           <Switch
             checked={prefs.showDollars}

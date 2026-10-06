@@ -2197,3 +2197,9 @@ input,select,textarea { max-width: 100%; }
 .feature-screen .review-inbox { margin-block: 1rem; }
 .feature-desktop-links { display: none; }
 @media(min-width:1024px) { .feature-desktop-links { display: flex; flex-wrap: wrap; gap: .35rem; } .feature-desktop-links .journal-entry { padding: .25rem; margin:0; } }
+
+/* The unified DM home keeps detailed campaign tools below the compact controls. */
+.dm-campaign-details {
+  grid-column: 1 / -1;
+  min-width: 0;
+}

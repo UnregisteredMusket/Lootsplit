@@ -123,8 +123,9 @@ Not implemented or promised by this inventory: OCR, Google Drive backup integrat
 
 ## Mobile control panel redesign
 
-- DM bottom navigation: Desk, Encounters, Party, Market, Library. Player navigation: Character, Inventory, Campaign, Market, Library. Existing routes remain reachable through these destinations, the full campaign overview and role-specific settings.
+- DM bottom navigation: Desk, Encounters, Party, Market, Library. Player navigation: Character, Inventory, Campaign, Market, Library. Existing routes remain reachable through these destinations, the unified DM Campaign control screen and role-specific settings. Legacy DM overview URLs resolve to that same screen; the player overview remains available.
 - Campaign selector, unread-message action and Settings & Management gear replace the old header menus. Settings uses role-specific accordions; account privileges and server campaign permissions remain authoritative.
+- DM Desk and campaign overview share one Campaign control screen. Treasury, activity/balances, sessions and campaign tools expand in place; one feature-card list and one shortcut grid remain. Backups, dollar display, campaigns, session archive controls and transaction/review details are retained.
 - DM Desk reads current local/shared state: session, shared party funds, pending requests/loans, current account encounter, and compact portrait/HP readouts. Unrecorded HP is marked unknown.
 - Six account-saved DM shortcuts support destination, label, icon and order customization across devices. Existing DM device shortcuts seed the first explicit account save; verified DM owners retain read-only cached destinations offline. All players, including guests, have the same six fixed shortcut-style buttons (Character Sheet, Bank, My Finances, Properties, Journal, Party chat), without customization or duplicate feature cards. Existing player preference records remain preserved. They navigate to existing tools and cannot directly award loot or perform financial mutations.
 - Party has detailed authorized character cards and a Funds & inventory view. Player Inventory puts searchable item cards first; wallets, transfers and property remain expandable.
@@ -136,7 +137,7 @@ Not implemented or promised by this inventory: OCR, Google Drive backup integrat
 ## Desktop workspace adaptation
 
 - At the existing desktop navigation breakpoint (1024 CSS pixels), the app and header use the monitor width. All smaller layouts retain the approved mobile formatting.
-- DM Desk adds a clearly bounded recent-transactions table, the complete scrollable pending payment/loan queue, and active-session/economy readouts. Full history and existing review/session tools remain linked. Readouts use the existing authorized economy state and session accounting; they perform no financial writes.
+- DM Desk’s expandable Activity & balances section adds a clearly bounded recent-transactions table, the complete scrollable pending payment/loan queue, and active-session/economy readouts. Full history and existing review/session tools remain linked. Readouts use the existing authorized economy state and session accounting; they perform no financial writes.
 - Character Play places the existing dice tray and roll history beside vitals/actions. Edit retains the complete sheet editor. Saved encounters stay expanded by default in a sticky desktop sidebar; battle controls use the wider available area.
 - Party, market, inventory, and reference cards gain responsive columns. Campaign recovery, backups, and manual-sharing tools sit beside the selected room/chat/rolls/alerts panel. Inactive panels remain hidden.
 - No account, permission, save format, award, synchronization, theme, shortcut, or mobile navigation behavior is removed or replaced.

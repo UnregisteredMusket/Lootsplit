@@ -1,3 +1,9 @@
+# Unified DM home — 2026-10-06 UTC
+
+- User requested combining DM control panel and campaign overview to reduce clutter. Branch `fix/unified-dm-home`; baseline clean main/live3c3336c8d5708dd9b1ce907d6f65a5d8c77663af. PR52 was fully verified/deployed (main37429247281, deploy37429724509); its PR body supersedes historical pending notes below. No migration needs repeating.
+- DM `/` and legacy `?view=overview` now share Campaign control. One readout/shortcut/feature list; expandable treasury, activity/balances, sessions and campaign tools. Desktop table/complete review queue retained within activity. Session readout opens actual session controls. Player routes, saved data and gameplay rules unchanged.
+- Local verification passed:508 tests/four existing skips, clean types, zero lint errors/34 existing warnings, web/mobile builds. Expanded control-panel21.084s, governance62.342s, desktop42.652s and help passed; mobile screenshots inspected. The first test-only document-marker assertion incorrectly spanned an intentional legacy-URL document open; corrected to measure actual session/Bank/return clicks independently. No application navigation defect was found. Full exact-head PR/main verification and deployed audit remain pending. Existing gated publication authorization applies; no new APK, migration or domain work.
+
 # Fixed player feature buttons — 2026-10-06 UTC
 
 - Latest user request removes player shortcut customization and presents all six player services with existing shortcut-button styling. DM customization remains unchanged; existing player preference records are preserved. No migration, gameplay-rule or APK change.

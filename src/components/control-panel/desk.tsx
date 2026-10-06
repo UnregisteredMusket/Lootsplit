@@ -14,7 +14,7 @@ import { accountRequest } from "@/lib/account/client";
 import { LedgerArt } from "@/components/ledger-art";
 import { Guide } from "@/components/guide";
 import { Shortcuts } from "./shortcuts";
-import { DesktopDeskPanels } from "./desktop-panels";
+import { HomeBoard } from "../home-board";
 import { useSheetReadouts, HpBar } from "./readouts";
 export function DmDesk() {
   const { ready, purses, sheets, journal, loans } = useEconomy(),
@@ -83,7 +83,7 @@ export function DmDesk() {
               : "Opening campaign"}
         </p>
         <div className="readout-grid">
-          <AppLink href="/?view=overview#journal" className="readout">
+          <AppLink href="/?view=home#sessions" className="readout">
             <FantasyIcon ui="Campaign" size={30} />
             <span>
               <small>Current session</small>
@@ -97,7 +97,7 @@ export function DmDesk() {
               <strong>{formatCopper(fund)}</strong>
             </span>
           </AppLink>
-          <AppLink href="/?view=overview#review" className="readout">
+          <AppLink href="/features/bank?from=%2F" className="readout">
             <FantasyIcon ui="gift" size={30} />
             <span>
               <small>Pending reviews</small>
@@ -156,10 +156,9 @@ export function DmDesk() {
       </div>
       <Shortcuts campaignId={campaigns.activeId} />
       <FeatureCards />
-      <DesktopDeskPanels />
-      <AppLink href="/?view=overview" className="desk-overview">
-        Full campaign overview, activity & tools <ChevronRight size={18} />
-      </AppLink>
+      <section className="dm-campaign-details" aria-label="Campaign details">
+        <HomeBoard embedded />
+      </section>
     </div>
   );
 }

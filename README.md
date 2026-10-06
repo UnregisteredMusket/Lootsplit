@@ -24,6 +24,10 @@ Player Home links to the full Character Sheet, Inventory, Campaign/chat and exis
 
 **Deployment requirement:** Migration `0010_account_shortcuts.sql` is additive and was applied to production on October 6, 2026. New installations still require it; the fixed player buttons require no additional migration. No new APK or domain change is included.
 
+## Unified DM home
+
+Campaign control combines the DM Desk and campaign overview. The top keeps status, party readouts and customizable shortcuts, followed by one set of feature links. Expand Campaign treasury, Activity & balances, Play sessions, or Campaign tools for totals, transactions, session controls, backups and campaign management. On desktop, Activity & balances retains the full review queue and transaction table. Old `?view=overview` DM links open the same screen; feature screens return to Desk. Player Home is unchanged.
+
 ## Continue a campaign on another device
 
 Sign in to the same account, then choose the saved campaign in **My account → My campaigns → Resume**. New shared rooms created while signed in are saved there automatically; a failed account save has a retry that keeps the existing room. **Start a room** creates a separate campaign copy. Copies can have the same name but do not share portraits, loot or later progress. The account page marks the room open on this device and warns before opening an older same-name entry. Existing rooms can still be added with **Save current membership**.

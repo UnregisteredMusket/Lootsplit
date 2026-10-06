@@ -259,8 +259,10 @@ try {
           await capture(`${seat}-${width}-${name}`);
           const bounds = await page.locator(".concept-main").boundingBox();
           assert.ok(bounds.x + bounds.width >= width - 1, `${name} main fills the monitor`);
-          if (name === "home" && seat === "dm")
+          if (name === "home" && seat === "dm") {
+            await page.getByRole("button", { name: /^Activity & balances/ }).click();
             await page.getByRole("heading", { name: "Recent activity", exact: true }).waitFor();
+          }
           if (name === "home" && seat === "player") {
             const a = await page.locator(".play-surface").boundingBox(),
               b = await page.locator(".sheet-edit-fields").boundingBox();
