@@ -1,3 +1,4 @@
+import { deploymentOrigins } from "../src/lib/deployment/origins.mjs";
 import { execFileSync } from "node:child_process";
 import { existsSync, readdirSync, readFileSync } from "node:fs";
 import { requestJson } from "./recovery-http.mjs";
@@ -23,7 +24,7 @@ try {
   const [branch, runs, live] = await Promise.all([
     requestJson(`https://api.github.com/repos/${repo}/branches/main`, { headers }),
     requestJson(`https://api.github.com/repos/${repo}/actions/runs?per_page=20`, { headers }),
-    requestJson("https://lootsplit.oliverstorie2017.workers.dev/assets/release-identity.json", {
+    requestJson(`${deploymentOrigins.website}/assets/release-identity.json`, {
       cache: "no-store",
     }),
   ]);

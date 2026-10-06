@@ -684,6 +684,7 @@ export async function saveShop(shop: Shop): Promise<void> {
   const db = await quireDb();
   await atomic(["shops", "meta"], async (tx) => {
     const before = await request<Shop | undefined>(tx.objectStore("shops").get(shop.id));
+    if (before?.schedule && before.closed !== shop.closed) delete shop.schedule;
     tx.objectStore("shops").put(normalizeShop(shop));
     await audit(
       tx,
@@ -2013,36 +2014,37 @@ async function audit(
 export async function executeFinanceCommand(input: CommandInput): Promise<void> {
   if (!(
     input.kind.startsWith("finance-") ||
+    input.kind === "shop-schedule" || input.kind === "property-plan" ||
     input.kind.startsWith("downtime-") ||
     input.kind === "session"
   ))
     throw Error("Not a finance command.");
-  await atomic(["purses", "holdings", "ledger", "meta"], async (tx) => {
-    const [purses, holdings, ledger, meta] = await Promise.all([
+  const market = input.kind === "shop-schedule" || input.kind === "downtime-plan" || input.kind === "session";
+  const stores: Parameters<typeof atomic>[0] = ["purses", "holdings", "ledger", "meta"];
+  if (market) stores.push("shops", "stock");
+  await atomic(stores, async (tx) => {
+    const source: CloudTable = market ? await readEconomyTransaction(tx, input.kind === "session") : await Promise.all([
       request<Purse[]>(tx.objectStore("purses").getAll()),
       request<Holding[]>(tx.objectStore("holdings").getAll()),
       request<LedgerLine[]>(tx.objectStore("ledger").getAll()),
-      request<{ id: string; value?: unknown }[]>(tx.objectStore("meta").getAll()),
-    ]);
+      readCampaignMetadata(tx, false),
+    ]).then(([purses, holdings, ledger, metadata]) => ({ purses, holdings, ledger, shops: [], stock: [], ...metadata }));
     const seat = getSeat();
-    const next = applyCommand(
-      {
-        purses,
-        holdings,
-        ledger,
-        shops: [],
-        stock: [],
-        listings: [],
-        sheets: [],
-        notes: [],
-        loans: readLoans(meta.find((x) => x.id === "loans")),
-        journal: readJournal(meta.find((x) => x.id === "journal")?.value),
-      },
+    const next = applyCommand(source,
       { id: "local", token: "", name: "Local", role: seat.role, purseIds: seat.purseIds },
       { ...input, id: crypto.randomUUID() },
     );
+    const priorShops = new Map(source.shops.map((s) => [s.id, JSON.stringify(s)]));
+    const priorStock = new Map(source.stock.map((s) => [s.id, s.quantity]));
+    for (const shop of next.shops) if (priorShops.get(shop.id) !== JSON.stringify(shop)) tx.objectStore("shops").put(shop);
+    for (const line of next.stock) if (priorStock.get(line.id) !== line.quantity) tx.objectStore("stock").put(line);
     for (const p of next.purses) tx.objectStore("purses").put(p);
+    if (input.kind === "session") {
+      tx.objectStore("ledger").clear();
+      tx.objectStore("meta").put({ id: "chat", notes: next.notes });
+    }
     for (const l of next.ledger) tx.objectStore("ledger").put(l);
     tx.objectStore("meta").put({ id: "journal", value: next.journal });
   });
+  if (input.kind === "session") await refreshChat();
 }

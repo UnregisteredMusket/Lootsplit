@@ -1,6 +1,6 @@
 import {getCloudTable, getServerCloudTable, subscribeCloudTable} from "@/lib/quire/cloud-client";
 import { useState, useSyncExternalStore } from "react";
-import { API_ORIGIN } from "@/lib/mobile/origin";
+import { invitationUrl } from "@/lib/quire/invitation-url";
 import { toast } from "sonner";
 import { useEconomy } from "@/lib/quire/economy-context";
 import { characterControl } from "@/lib/quire/types";
@@ -16,12 +16,8 @@ export function TableShare() {
     const current = getCloudTable();
     if (!current.joined || current.role !== "dm") throw Error("Start a session before inviting players.");
     if (!current.lastSync) throw Error("Wait for the current session to finish loading before copying its invitation.");
-    const origin = import.meta.env.VITE_MOBILE === "true" ? API_ORIGIN : window.location.origin;
-    const url = new URL("/share", origin);
-    url.searchParams.set("join", current.code);
-    url.searchParams.set("session", current.sessionId);
-    url.searchParams.set("character", id);
-    await copyText(url.href);
+    const url = invitationUrl({ origin: window.location.origin, native: import.meta.env.VITE_MOBILE === "true", code: current.code, session: current.sessionId, character: id });
+    await copyText(url);
     toast.success("Current session invitation copied.");
   }
   return <div><p>Player invitations work only during the current session. Manage each player's permissions in Players & permissions. Offline play is available only to the campaign's DM.</p>

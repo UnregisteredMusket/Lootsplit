@@ -1,3 +1,4 @@
+import { shopScheduleSchema } from "./shop-schedule.ts";
 import {
   characterPermissionSchema,
   canEditCharacterField,
@@ -32,6 +33,8 @@ const id = z.string().min(1).max(150),
   qty = amount.min(1).max(100000);
 const base = { id };
 export const commandSchema = z.discriminatedUnion("kind", [
+  z.object({ ...base, kind: z.literal("shop-schedule"), shopId: id, schedule: shopScheduleSchema.nullable() }),
+  z.object({ ...base, kind: z.literal("property-plan"), holdingId: id, income: amount, upkeep: amount, periodDays: z.number().int().min(1).max(3650), active: z.boolean() }),
   z.object({
     ...base,
     kind: z.literal("downtime-preference"),
@@ -257,7 +260,33 @@ export function applyCommand(input: CloudTable, seat: CloudSeat, raw: Command): 
       throw Error("Cancel the pending downtime before changing finance agreements.");
     return f;
   };
-  if (cmd.kind === "finance-loan") {
+  if (cmd.kind === "shop-schedule") {
+    const f = editableFinance();
+    const shop = t.shops.find((s) => s.id === cmd.shopId);
+    if (!shop) throw Error("Shop no longer exists.");
+    if (cmd.schedule) {
+      shop.schedule = { ...cmd.schedule, lastRestockDay: f.day };
+      shop.closed = !shop.schedule.openDays.includes(f.day % shop.schedule.cycleDays);
+    } else delete shop.schedule;
+    event(`Shop schedule ${cmd.schedule ? "updated" : "disabled"}: ${shop.name}`);
+  } else if (cmd.kind === "property-plan") {
+    const f = editableFinance();
+    const holding = t.holdings.find((h) => h.id === cmd.holdingId && h.kind === "property" && h.quantity > 0);
+    if (!holding) throw Error("Choose an owned campaign property.");
+    own(holding.purseId);
+    for (const kind of ["income", "expense"] as const) {
+      const copper = kind === "income" ? cmd.income : cmd.upkeep;
+      const existing = f.rules.filter((r) => r.holdingId === holding.id && r.kind === kind);
+      if (existing.length > 1) throw Error("This property has multiple schedules of the same type. Review them in Recurring revenue & expenses before using a property plan.");
+      const prior = existing[0];
+      if (prior && prior.purseId !== holding.purseId) throw Error("Settle the former owner's property agreements before transferring this plan.");
+      if (prior?.carryDays && prior.periodDays !== cmd.periodDays) throw Error("Finish the current property period before changing its length.");
+      if (!prior && !copper) continue;
+      const next = { id: prior?.id || `${cmd.id}-${kind}`, propertyManaged: true, name: `${holding.name.slice(0,80)}: ${kind === "income" ? "revenue" : "upkeep"}`, purseId: holding.purseId, kind, copper: copper || prior!.copper, periodDays: cmd.periodDays, holdingId: holding.id, active: cmd.active && copper > 0, carryDays: prior?.carryDays || 0, arrears: prior?.arrears || 0 };
+      if (prior) Object.assign(prior, next); else f.rules.push(next);
+    }
+    event(`Property plan updated: ${holding.name}`, "management", holding.purseId);
+  } else if (cmd.kind === "finance-loan") {
     const f = editableFinance();
     own(cmd.terms.purseId);
     if (cmd.terms.lenderId === cmd.terms.purseId)

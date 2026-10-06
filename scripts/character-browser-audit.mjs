@@ -108,7 +108,14 @@ try {
   await page.getByLabel("Assign campaign", { exact: true }).selectOption(code);
   await page.getByLabel("Assign campaign character", { exact: true }).selectOption("hero");
   await page.getByRole("button", { name: "Save campaign assignment", exact: true }).click();
-  await page.getByText(/Character assigned\./).waitFor();
+  await page.getByText(/Import submitted for DM review/).waitFor();
+  await openApplication(dm.page, origin + "/characters");
+  await dm.page.getByText("Mira Ashfall · awaiting approval", { exact: true }).click();
+  await dm.page.getByRole("button", { name: "Approve Mira Ashfall", exact: true }).click();
+  await dm.page.getByText("No pending character imports.", { exact: true }).waitFor();
+  await reloadApplication(page);
+  await page.getByRole("heading", { name: "Mira Ashfall", exact: true }).waitFor();
+  await page.getByRole("button", { name: "Edit sheet", exact: true }).click();
   await page.getByRole("button", { name: "Abilities & skills", exact: true }).click();
   await page.getByLabel("DEX", { exact: true }).fill("16");
   await page.getByLabel("Stealth proficiency", { exact: true }).selectOption("2");

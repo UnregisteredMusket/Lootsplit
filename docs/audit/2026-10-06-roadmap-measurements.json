@@ -1,0 +1,13 @@
+{
+  "environment": "Node22.23.3/Linux x64/Chromium133; isolated Vite; eight account scenarios; two workers",
+  "accountCheck": {
+    "scenario": "accounts",
+    "startedAt": "2026-10-06T03:46:10.502Z",
+    "status": "passed",
+    "commit": "7efd5947ac4c22ef5a351762d583921814f9219d",
+    "dirty": false,
+    "finishedAt": "2026-10-06T03:47:33.713Z"
+  },
+  "totalMs": 83211.0,
+  "notes": "No runtime performance improvement claim. This is verification duration including setup; builds/quick tests ran concurrently. Expanded finance/import tests have changed workload and are not compared to older narrower suites."
+}

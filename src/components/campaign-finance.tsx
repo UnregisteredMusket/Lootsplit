@@ -18,7 +18,7 @@ const defaults: Terms = {
 };
 export function CampaignFinance() {
   const anchorRef = useDisclosureAnchor("campaign-finance");
-  const { journal, purses, holdings, loans: requests, command } = useEconomy();
+  const { journal, purses, holdings, shops, loans: requests, command } = useEconomy();
   const seat = useSeat();
   const f = readFinance(journal.finance),
     pending = f.downtime.find((d) => d.status === "pending");
@@ -160,7 +160,8 @@ export function CampaignFinance() {
                 </p>
               </div>
             ))}
-            {!pending.quote.lines.length && (
+            {pending.quote.market?.map((m) => <p key={m.shopId}>{shops.find((s) => s.id === m.shopId)?.name || "Shop"}: {m.closed ? "closed" : "open"} after downtime · {m.stock.filter((s) => s.after > s.before).length} stock lines topped up.</p>)}
+            {!pending.quote.lines.length && !pending.quote.market?.length && (
               <p>No active financial agreements; approval advances only in-game time.</p>
             )}
             {pending.quote.balances

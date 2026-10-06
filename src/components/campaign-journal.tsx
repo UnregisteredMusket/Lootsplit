@@ -1,3 +1,4 @@
+import { CampaignOperations } from "./campaign-operations";
 import { downloadJson } from "@/lib/quire/table";
 import { JournalNotes } from "./journal-notes";
 import { useDisclosureAnchor } from "@/lib/help/use-disclosure-anchor";
@@ -260,6 +261,7 @@ export function CampaignJournal() {
           </div>
         ))}
       </Fold>
+      <CampaignOperations />
       <CampaignFinance />
       <details ref={reviewRef} id="review-inbox" className="review-inbox">
         <summary>

@@ -302,3 +302,60 @@ test("account deletion cannot orphan an outstanding loan in local or shared play
   await assert.rejects(removePurse("a"), /Settle this account/);
   assert.equal((await economySnapshot()).purses.length, 2);
 });
+
+test("property plans and shop schedules settle atomically with approved downtime and preserve stock", () => {
+  let t = fixture();
+  t.holdings[0].kind = "property";
+  t.shops = [{ id: "shop", name: "Shop", keeper: "", place: "", notes: "", sellRate: 1, buyRate: 0.5, wealth: "modest", category: "mixed", priceScale: 1 }];
+  t.stock = [0, 20, null].map((quantity, i) => ({ id: `stock${i}`, shopId: "shop", name: "Goods", copper: 1, baseCopper: 1, rarity: "common", quantity, notes: "" }));
+  const schedule = { cycleDays: 7, openDays: [0,1,2,3,4], restockEveryDays: 3, restockQuantity: 5, lastRestockDay: 0 };
+  assert.throws(() => applyCommand(t, player, { id: "unauthorized", kind: "shop-schedule", shopId: "shop", schedule }), /DM/);
+  assert.throws(() => applyCommand(t, player, { id: "unauthorized", kind: "property-plan", holdingId: "inn", income: 100, upkeep: 20, periodDays: 1, active: true }), /DM/);
+  t = act(t, { kind: "shop-schedule", shopId: "shop", schedule });
+  t = act(t, { kind: "property-plan", holdingId: "inn", income: 100, upkeep: 20, periodDays: 1, active: true });
+  assert.equal(t.journal!.finance!.rules.length, 2);
+  const plan = act(t, { kind: "downtime-plan", days: 5, name: "Property week" });
+  assert.equal(plan.stock[0].quantity, 0);
+  assert.equal(toCopper(plan.purses[0].coins), 1000);
+  const downtimeId = plan.journal!.finance!.downtime.at(-1)!.id;
+  const changed = structuredClone(plan); changed.stock[0].quantity = 1;
+  assert.throws(() => act(changed, { kind: "session", name: "Return", end: false, downtimeId }), /changed after this preview/);
+  const applied = act(plan, { kind: "session", name: "Return", end: false, downtimeId });
+  assert.equal(toCopper(applied.purses[0].coins), 1400);
+  assert.equal(applied.shops[0].closed, true);
+  assert.deepEqual(applied.stock.map((s) => s.quantity), [5,20,null]);
+  assert.equal(applied.shops[0].schedule!.lastRestockDay, 3);
+  assert.throws(() => act(applied, { kind: "buy", stockId: "stock0", purseId: "a", quantity: 1 }), /closed/);
+  assert.throws(() => act(applied, { kind: "session", name: "Again", end: false, downtimeId }), /already been decided/);
+  assert.deepEqual(readCloudTable(applied)?.shops, applied.shops);
+  const next = settle(applied, 2);
+  assert.equal(next.shops[0].closed, false);
+  assert.equal(next.shops[0].schedule!.lastRestockDay, 6);
+  assert.equal(toCopper(next.purses[0].coins), 1560);
+});
+
+test("atomic local session closure archives complete records and clears only active logs", async () => {
+  let t = fixture();
+  t.notes = [{ id: "note", at: 1, from: "dm", to: "party", purseId: "a", text: "Preserve the chronicle" }];
+  t.handouts = [];
+  t = act(t, { kind: "session", name: "Archive me", end: false });
+  t.ledger = [{ id: "old-ledger", at: 2, purseId: "a", shopId: null, summary: "History", copper: 10 }];
+  await applyCloudTable(t);
+  await executeFinanceCommand({ kind: "session", name: "Archive me", end: true });
+  const saved = await economySnapshot();
+  const record = JSON.parse(saved.journal!.reports!.at(-1)!.snapshot);
+  assert.deepEqual(record.notes, t.notes);
+  assert.deepEqual(record.ledger, t.ledger);
+  assert.deepEqual(record.holdings, t.holdings);
+  assert.deepEqual(saved.notes, []);
+  assert.deepEqual(saved.ledger, []);
+});
+
+test("property plans reuse linked recurring rules instead of duplicating income", () => {
+  let t = fixture(); t.holdings[0].kind = "property";
+  t = act(t, { kind: "finance-rule", rule: { id: "legacy-property", name: "Rent", purseId: "a", kind: "income", copper: 100, periodDays: 7, holdingId: "inn", active: true } });
+  t = act(t, { kind: "property-plan", holdingId: "inn", income: 200, upkeep: 0, periodDays: 7, active: true });
+  assert.equal(t.journal!.finance!.rules.length, 1);
+  assert.equal(t.journal!.finance!.rules[0].id, "legacy-property");
+  assert.equal(toCopper(settle(t, 7).purses[0].coins), 1200);
+});

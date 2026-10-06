@@ -1,3 +1,4 @@
+import { shopScheduleSchema } from "./shop-schedule.ts";
 import { characterPermissionsSchema } from "../characters/permissions.mjs";
 import { z } from "zod";
 import { sheetSchema, inventoryFields } from "../characters/model.mjs";
@@ -34,6 +35,7 @@ export const holdingSchema = z.object({
 });
 
 const shop = z.object({
+  schedule: shopScheduleSchema.optional(),
   acceptedCategories: z.array(z.string().max(80)).max(20).optional(),
   acceptAnyCategory: z.boolean().optional(),
   id,

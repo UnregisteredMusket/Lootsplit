@@ -87,3 +87,13 @@ Sources: [Playwright assertions](https://playwright.dev/docs/test-assertions), [
 ## Account-owned campaign acceptance
 
 The `ownership` scenario must cover anonymous entry restrictions, explicit legacy DM-save claim, authenticated room creation, guest join and reload without persistent campaign storage, End session revocation, and expired links after reopen. Account DM resume must retain all campaign data across devices. Never close a hosted session from tab unload or sign-out. Verify authenticated player membership resume with the current invitation; do not restore access from an ended session's token. New player data belongs in memory; pending guest actions must not be written to localStorage or IndexedDB. Existing device saves require explicit migration/claim and must never be silently deleted. Use real account endpoints for synthetic DM test fixtures, never a production auth bypass.
+
+## Roadmap feature maintenance
+
+Character imports require migration `0009_character_imports.sql`. Test approval authorization, pending submission without campaign changes, denial, stale source/target/session, financial preservation and repeated/lost responses. Run `scripts/character-play.test.mjs` and the character browser audit; do not bypass approval in fixtures.
+
+Shop calendars and property plans use the existing command/finance engine. Exercise desktop/mobile finance audits and `finance.test.ts`, including atomic local session archives, shared command permissions, stale previews, stock top-up and backup preservation. Market time is campaign days; no wall-clock polling or new scheduler. Keep the generic recurring rule editor available.
+
+For address changes run `npm run migration:check` and `scripts/domain-readiness.test.mjs`, then the complete preservation suite. Read `docs/plans/DOMAIN-READINESS.md`. An API-only two-origin test does not replace the real two-host browser/legacy-APK cutover rehearsal. Never change DNS or retire old endpoints from a preparation-only task. Economy/tax presets in `docs/plans/ECONOMY-MODES-AND-TAXES.md` require owner decisions before activation.
+
+Product screenshots are real UI captures from disposable local data (`scripts/capture-product-screenshots.mjs`), not screenshots of real user campaigns. Inspect images before placing them in `public/product/`; do not include account credentials or private campaign records. Keep them lazy-loaded and identify synthetic data in captions.

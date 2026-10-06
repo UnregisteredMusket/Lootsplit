@@ -1,3 +1,4 @@
+import { accountRequestOrigin } from "../src/lib/deployment/origins.mjs";
 import { ownerTestMode } from "./test-mode.mjs";
 import { campaignRecords } from "./campaign-records.mjs";
 import { publicAnalytics, ownerAnalytics } from "./game-analytics.mjs";
@@ -134,9 +135,12 @@ async function roomSeat(db, code, token) {
 export async function handleAccounts(request, env) {
   const path = new URL(request.url).pathname;
   if (!path.startsWith("/api/account/")) return null;
+  let authOrigin;
+  try { authOrigin = accountRequestOrigin(env, request.url); }
+  catch { return json({ error: "Account request host is not approved." }, 403); }
   const origin = request.headers.get("origin");
   const native = nativeOrigins.includes(origin);
-  const allowed = !origin || origin === env.ACCOUNT_ORIGIN || native;
+  const allowed = !origin || origin === authOrigin || native;
   if (!allowed) return json({ error: "Origin not allowed." }, 403);
   const cors = (response) => {
     const headers = new Headers(response.headers);
@@ -152,7 +156,7 @@ export async function handleAccounts(request, env) {
   };
   try {
     if (request.method === "OPTIONS") return cors(new Response(null, { status: 204 }));
-    const auth = accountAuth(env);
+    const auth = accountAuth({ ...env, ACCOUNT_ORIGIN: authOrigin });
     if (!["GET", "POST"].includes(request.method)) fail("Method not allowed.", 405);
     if (request.method === "POST") {
       if (!origin) fail("An origin is required.", 403);

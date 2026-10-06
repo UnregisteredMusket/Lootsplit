@@ -232,3 +232,15 @@ DMs sign in and own their hosted campaigns. Open sessions survive closed tabs; e
 - Campaign snapshots, full device backups and financial readouts read related balances, items and metadata in one readonly transaction. Existing schemas, private books, recovery metadata, sorting and permissions remain intact.
 - Local shop/market purchases calculate Charisma pricing inside the transaction that updates funds, stock, inventory and ledger; legacy sheets and party funds retain their existing behavior.
 - Account encounter listing uses a bounded membership/room join plus one projected encounter query, retaining current DM seat/token checks and unchanged mutation authorization. No UI reformatting or Android signing change.
+
+## Roadmap priorities — implementation branch, October 6, 2026
+
+- Signed-in player character imports are queued for DM review. Player Room UI exposes saved-sheet/assigned-character selection and request status; character editor assignment uses the same server workflow. Approve/deny is DM-only, session/seat/source/target changes are checked, and campaign currency/inventory remain authoritative. Approval receipts prevent duplicate application. Existing assigned profiles remain usable.
+- DM property management configures revenue/upkeep together as existing campaign recurring finance rules. No separate property wallet, scheduler or balance. Partial periods/arrears persist and source ownership is checked. This is periodic revenue/upkeep simulation, not tenants, construction, random events or a real-world clock.
+- DM shop calendars repeat over 1–30 in-game days with optional finite-stock top-up intervals. All changes settle with approved downtime; previews reject stale market changes. Manual availability overrides disable the schedule. No hourly calendar or background polling.
+- Offline session transitions now use the same atomic transaction as downtime and preserve complete archived session records, including private chat and inventory, before clearing active logs.
+- Homepage screenshot tour and browser/Android comparison retain the website theme and application layout. Screenshots contain synthetic characters and default shop data, with local reproducible capture tooling.
+- Shared public origin roles, exact account-host validation, approved legacy host support, shared invitation URLs, migration configuration checks and read-only device-readiness guidance prepare a future domain. DNS/TLS activation and a real two-host/physical-APK rehearsal are still pending.
+- Local/region/realm tax and four economy preset definitions are documented proposals only; current gameplay rules and saved campaigns are unchanged by those proposals.
+
+Release status must be taken from the latest recovery checkpoint/PR, not this implementation inventory.

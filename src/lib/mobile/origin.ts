@@ -1,5 +1,6 @@
+import { deploymentOrigins } from "../deployment/origins.mjs";
 /** Public Cloudflare Worker. Not a secret. */
-export const API_ORIGIN = "https://lootsplit.oliverstorie2017.workers.dev";
+export const API_ORIGIN = deploymentOrigins.nativeApi;
 
 /** WebView origins that may call the Worker. Same-origin browser traffic is separate. */
 export const APP_ORIGINS = ["https://localhost", "http://localhost", "capacitor://localhost"] as const;

@@ -1,3 +1,4 @@
+import { scheduledMarket } from "./shop-schedule.ts";
 import { z } from "zod";
 import type { CloudTable } from "./cloud.ts";
 import { toCopper, fromCopper, spendCoins } from "./money.ts";
@@ -23,6 +24,7 @@ const debtSchema = termsSchema.extend({
   paid: money,
 });
 export const ruleSchema = z.object({
+  propertyManaged: z.boolean().optional(),
   id,
   name: z.string().trim().min(1).max(100),
   purseId: id,
@@ -49,6 +51,7 @@ const lineSchema = z.object({
   balance: money,
 });
 const quoteSchema = z.object({
+  market: z.array(z.object({ shopId: id, before: z.string(), closed: z.boolean(), lastRestockDay: z.number().int().nonnegative(), stock: z.array(z.object({ id, before: money, after: money })) })).optional(),
   loans: z.array(debtSchema),
   rules: z.array(scheduleSchema),
   lines: z.array(lineSchema),
@@ -131,7 +134,7 @@ function safe(n: number) {
   return n;
 }
 export function previewDowntime(
-  table: Pick<CloudTable, "purses" | "holdings">,
+  table: Pick<CloudTable, "purses" | "holdings"> & Partial<Pick<CloudTable, "shops" | "stock">>,
   raw: Finance,
   days: number,
 ) {
@@ -151,6 +154,10 @@ export function previewDowntime(
     x.carryDays = (x.carryDays + days) % x.periodDays;
     return n;
   };
+  for (const r of f.rules.filter((r) => r.active && r.holdingId)) {
+    if (!table.holdings.some((h) => h.id === r.holdingId && h.purseId === r.purseId && h.quantity > 0))
+      throw Error(`Inventory source for “${r.name}” is missing or belongs to another account. Update or pause this schedule.`);
+  }
   // Settlement order is intentional: income, loans in creation order, then expenses.
   for (const r of f.rules.filter((r) => r.active && r.kind === "income")) {
     balance(r.purseId);
@@ -242,7 +249,9 @@ export function previewDowntime(
       balance: r.arrears,
     });
   }
+  const market = scheduledMarket(table.shops || [], table.stock || [], f.day + days);
   return quoteSchema.parse({
+    ...(market.length ? { market } : {}),
     loans: f.loans,
     rules: f.rules,
     lines,
@@ -314,6 +323,12 @@ export function applyDowntime(
         at,
         true,
       );
+  }
+  for (const market of quote.market || []) {
+    const shop = table.shops.find((s) => s.id === market.shopId)!;
+    shop.closed = market.closed;
+    shop.schedule!.lastRestockDay = market.lastRestockDay;
+    for (const line of market.stock) table.stock.find((s) => s.id === line.id)!.quantity = line.after;
   }
   f.loans = quote.loans;
   f.rules = quote.rules;

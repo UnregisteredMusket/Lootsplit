@@ -1,3 +1,27 @@
+# Roadmap priorities — publication authorized, 2026-10-06 UTC
+
+- User explicitly approved publication to UnregisteredMusket/Lootsplit, full GitHub checks, additive production migration0009, and gated merge/deployment. The earlier automatic approval block below is historical and resolved by this permission.
+- Reconciled remote main and live at `e437ab517429ba48ecf76e0b7a7885eefadd886c`; local verified checkpoint `57d8f957db6b46d745f117a9dd177f95f96c4fa6`. No remote branch, PR, migration or release occurred before this checkpoint.
+- Next: publish branch, require complete exact-head PR checks, inspect/apply additive migration0009 once, merge through gates, verify main checks and immutable deployment/live audit. Preserve migration history and existing campaign records. Domain activation, proposed tax values and APK publication remain outside this authorization.
+
+# Roadmap priorities — publication blocked, verified local checkpoint
+
+- Implementation commits: `7efd5947ac4c22ef5a351762d583921814f9219d` and `e1310f7e1055a3b3b3165943fc29845a040fdabc` on `feature/roadmap-priorities`. See `docs/audit/2026-10-06-roadmap-priorities.md` and the updated README/manual.
+- **Automatic approval review rejected the GitHub push**: user authorized implementation, but explicit publication permission is required; prior recovery instructions were cited. No branch/PR publication, production D1 migration, merge or deployment occurred. Do not bypass via connector/API or retry until the user approves publication to UnregisteredMusket/Lootsplit. Main/live remains the reconciled baseline below.
+- Final local checks:504 passed/four existing skips, clean types, 0 lint errors/34 warnings; web/mobile builds; character, expanded finance, website, encrypted-backup and governance desktop/mobile browser checks passed. All8 development account scenarios passed (83.211s with setup), all8 built standby account scenarios passed (37.5s runner). Immutable artifacts verified. Local Cloudflare emulator could not launch due environment uv_interface_addresses; full packaged-Worker CI is still mandatory.
+- Migration0009 was tested only in disposable local databases. Apply it separately to production only after publication permission and ready PR checks; preflight intentionally blocks deployment while it is missing. Preserve migration history, auth data and existing campaigns.
+- Tax/economy proposals are inactive pending owner decisions. Domain preparation is not DNS activation; actual two-host browser/old-APK cutover rehearsal remains required. No new APK publication.
+- Next after permission: reconcile remote main/PR/live again, publish this branch, run full exact-head CI, review/apply additive migration, gated merge/main/deploy/live verification. Do not repeat completed Android1.4.0 publication or treat these local artifacts as a released update.
+
+# Roadmap priorities checkpoint — 2026-10-06 UTC
+
+- User authorized work on five priorities: character-import approval, security/domain preparation, homepage/platform explanation, property/shop scheduling, and defining taxes/economy presets. No UI redesign, domain purchase/DNS cutover or APK publication.
+- Baseline main/live `e437ab517429ba48ecf76e0b7a7885eefadd886c`; verification37405125361 and deployment37405446606 succeeded. Work branch `feature/roadmap-priorities`.
+- Implemented pending DM imports (migration0009), shared finance property/shop plans, secure explicit origin preparation/readiness guide, homepage synthetic screenshots/platform comparison. Tax/preset numbers are proposals in docs/plans, not activated.
+- Local Node22.23.3/Chromium133 character audit passed including approval; expanded desktop/mobile finance and website audits passed. Initial quick suite passed500 tests/four existing skips with no type/lint errors; later additions require final fresh verification. External template script fetch failures are separately recorded, not app runtime errors.
+- Source-isolated browser work is in `/tmp/lootsplit-roadmap-verify`; runtime must bind loopback in this environment and launch server/browser children within one shell invocation. Production and real campaigns were not used for fixtures.
+- Next: final quick/build/account/preservation checks; inspect PR/main before publication; separately apply the reviewed additive D1 migration only when required release checks are ready. No migration, PR, merge or deployment has occurred at this checkpoint. Preserve permanent APK signing identity and all gates.
+
 # Development workflow improvement — 2026-10-06 UTC
 
 - User authorized development/test improvements with no application behavior/setup changes and requested current README/manual. Branch `chore/development-workflow`, based on released main `9a67fd6f3530942f6449eb72a0638563f3ecd2df` (PR46, verification37402387007, deployed/live-audited37402773863). Prior integration release is complete; older blocked/publication checkpoints below are historical.

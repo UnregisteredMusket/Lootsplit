@@ -1,3 +1,4 @@
+import { deploymentOrigins } from "../src/lib/deployment/origins.mjs";
 import assert from "node:assert/strict";
 import { mkdirSync, readFileSync, writeFileSync } from "node:fs";
 import { verifyArtifact } from "./release-artifact.mjs";
@@ -40,9 +41,10 @@ if (process.argv[1]?.endsWith("/production-preflight.mjs")) {
   assert.equal(bindings.find(b => b.name === "DB")?.id ?? bindings.find(b => b.name === "DB")?.database_id, "0a200e96-ae2e-47b5-9869-c1f4d316148f");
   for (const [name, type] of [["ACCOUNT_SECRET", "secret_text"], ["ASSETS", "assets"], ["CF_VERSION_METADATA", "version_metadata"], ["ROOM_ENTRY_LIMIT", "ratelimit"]])
     assert.equal(bindings.find(b => b.name === name)?.type, type, `Missing existing ${name} binding`);
-  const known = new Set(["DB", "ACCOUNT_SECRET", "ASSETS", "CF_VERSION_METADATA", "ROOM_ENTRY_LIMIT", "ACCOUNT_ORIGIN"]);
+  const known = new Set(["DB", "ACCOUNT_SECRET", "ASSETS", "CF_VERSION_METADATA", "ROOM_ENTRY_LIMIT", "ACCOUNT_ORIGIN", "ACCOUNT_LEGACY_ORIGINS"]);
   assert.ok(bindings.every(b => known.has(b.name) || ["plain_text", "secret_text"].includes(b.type)), "New bindings require a reviewed release config update");
-  assert.equal(bindings.find(b => b.name === "ACCOUNT_ORIGIN")?.text, "https://lootsplit.oliverstorie2017.workers.dev");
+  assert.equal(bindings.find(b => b.name === "ACCOUNT_ORIGIN")?.text, deploymentOrigins.website);
+  assert.deepEqual((bindings.find(b => b.name === "ACCOUNT_LEGACY_ORIGINS")?.text || "").split(",").map(s => s.trim()).filter(Boolean).sort(), deploymentOrigins.legacy.filter(s => s !== deploymentOrigins.website).sort(), "Review approved legacy account origins before deployment.");
   const rows = await cfRequest("d1/database/0a200e96-ae2e-47b5-9869-c1f4d316148f/query", { sql: "SELECT name FROM d1_migrations ORDER BY name" });
   assertMigrations(Object.keys(manifest.files).filter(n => n.startsWith("migrations/")).map(n => n.slice(11)), rows[0].results.map(r => r.name));
   const deployments = await cfRequest("workers/scripts/lootsplit/deployments");

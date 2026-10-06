@@ -427,7 +427,8 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
         }
         if (
           input.kind.startsWith("finance-") ||
-          input.kind.startsWith("downtime-")
+    input.kind === "shop-schedule" || input.kind === "property-plan" ||
+          input.kind.startsWith("downtime-") || input.kind === "session"
         ) {
           await executeFinanceCommand(input);
           await reload();

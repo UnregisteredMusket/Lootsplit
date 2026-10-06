@@ -11,6 +11,18 @@ For Live or Turn-based play, the DM must sign in. **Share join link** and each p
 At startup, choose an account campaign to load its server save. Existing device-only DM campaigns require an explicit **Claim this device’s existing DM campaign** after sign-in; claiming preserves the save. Offline edits stay in the owner's device copy until explicitly backed up or shared online. Do not overwrite a newer account campaign with an older device copy. Multiple campaigns remain separate.
 
 
+## Character imports, campaign operations and domain preparation
+
+Signed-in players can open **Campaign → Room → Import an account character** after joining, select a saved sheet and their assigned character, and submit it for review. **Characters → DM character & roll controls → Character import requests** lets the DM inspect and approve or deny it. Submission changes no campaign stats. Approval preserves campaign money/items, rechecks current access/session and rejects a changed sheet; refresh or resubmit after denial. Existing assigned profiles remain supported. Importing from the character editor also uses DM approval for players.
+
+DMs can open **Settings & Management → Economy → Shop schedules & properties**, or the same section on the campaign overview. Shop calendars use campaign days (day 0 starts each repeating cycle); approved downtime advances time. Restocking tops finite stock up to the configured quantity, preserving surplus and unlimited stock. Manual shop Open/Close disables its schedule. Saving a schedule starts its next restocking interval from the current campaign day.
+
+Add an owned property in **Funds & inventory**, then configure its revenue/upkeep in **Shop schedules & property management**. The amounts apply to the whole holding per period. These are ordinary campaign finance schedules: preview them with loans and other expenses, then explicitly approve downtime when starting the next session. Partial periods and unpaid upkeep persist; changing a period with carried days is refused. Pause/update agreements before selling/transferring their source. A property plan reuses its existing linked recurring schedules. Multiple linked schedules of the same type require review in the recurring schedule editor before using the combined plan. Unrelated schedules remain unchanged.
+
+The homepage includes real screenshots with synthetic data and a browser/Android comparison. Web and APK release schedules remain separate; this work does not publish a new APK.
+
+**Settings → Prepare for a future website address change** shows sync/private-document considerations and guides use of existing backups. No domain migration is active. See [domain preparation and activation gates](docs/plans/DOMAIN-READINESS.md) and run `npm run migration:check` when editing addresses. [Economy modes and tax rules](docs/plans/ECONOMY-MODES-AND-TAXES.md) are proposals awaiting approval, not active gameplay settings.
+
 ## Start here for every coding session
 
 Read [AGENTS.project.md](AGENTS.project.md), then the [Coding session manual](docs/CODING-MANUAL.md). After a timeout or interruption, also read [Recovery](docs/RECOVERY.md) and reconcile the repository, running jobs and live release before repeating an action.

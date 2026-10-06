@@ -100,6 +100,7 @@ export function ManagementPanel({
           content: <RollModeSetting />,
           links: [
             ["Encounter desk & generator", "/encounters"],
+            ["Review character imports", "/characters#dm-roll-controls"],
             ["Character rolls & manual-roll policy", "/characters#dm-roll-controls"],
             ["Turn management", "/share"],
           ],
@@ -108,6 +109,7 @@ export function ManagementPanel({
           name: "Economy",
           icon: "Treasury",
           links: [
+            ["Shop schedules & properties", "/?view=overview#campaign-operations"],
             ["Currency, price modifiers & shop defaults", "/settings#economy"],
             ["Shops & stock", "/market"],
             ["Requests & approvals", "/?view=overview#review"],

@@ -53,7 +53,7 @@ try {
           id: "inn",
           purseId: "finance-party",
           name: "Campaign inn",
-          kind: "item",
+          kind: "property",
           quantity: 1,
           unitCopper: 10000,
           notes: "Keep this inventory unchanged",
@@ -161,6 +161,36 @@ try {
     await reloadApplication(page);
     await finance.locator(":scope > summary").click();
     await finance.getByText(/Outstanding loans 8 gp · In-game day 7/).waitFor();
+    const operations = page.locator("#campaign-operations");
+    await operations.locator(":scope > summary").click();
+    await operations.getByText("Campaign inn · Unmanaged", { exact: true }).click();
+    await operations.getByLabel("Property revenue (cp)", { exact: true }).fill("200");
+    await operations.getByLabel("Property upkeep (cp)", { exact: true }).fill("40");
+    assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1));
+    await operations.screenshot({ path: `${output}/property-form-${width}.png` });
+    await operations.getByRole("button", { name: "Save Campaign inn plan", exact: true }).click();
+    await operations.getByText("Campaign inn · Managed", { exact: true }).waitFor();
+    const shop = operations.locator("details").filter({ hasText: "Hearth & Nail" }).first();
+    await shop.locator(":scope > summary").click();
+    await shop.getByLabel("Restock every in-game days (0 disables)", { exact: true }).fill("7");
+    await shop.getByLabel("Restock each finite item to at least", { exact: true }).fill("8");
+    await shop.getByRole("button", { name: "Save Hearth & Nail schedule", exact: true }).click();
+    await operations.getByText(/Hearth & Nail · Scheduled/).waitFor();
+    await finance.locator("summary").filter({ hasText: "Set downtime & review calculations" }).click();
+    await page.getByRole("button", { name: "Preview downtime", exact: true }).click();
+    await finance.getByText(/stock lines topped up/).waitFor();
+    await page.getByRole("button", { name: /Session · Return to town/ }).click();
+    await page.getByLabel("Session name", { exact: true }).fill("Property return");
+    await page.getByRole("checkbox", { name: /I approve the/ }).check();
+    await page.getByRole("button", { name: "Approve downtime & start session", exact: true }).click();
+    await finance.getByText(/In-game day 14/).waitFor();
+    await reloadApplication(page);
+    await operations.locator(":scope > summary").click();
+    await operations.getByText(/Campaign day 14/).waitFor();
+    await operations.getByText(/Hearth & Nail · Scheduled/).waitFor();
+    await operations.getByText("Campaign inn · Managed", { exact: true }).waitFor();
+    assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1));
+    await operations.screenshot({ path: `${output}/operations-${width}.png` });
     await context.close();
   }
   assert.deepEqual(errors, []);

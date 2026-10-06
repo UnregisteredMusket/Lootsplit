@@ -1,3 +1,4 @@
+import { deploymentOrigins } from "../src/lib/deployment/origins.mjs";
 import assert from "node:assert/strict";
 import { createCipheriv, createDecipheriv, createHash, randomBytes } from "node:crypto";
 import { gzipSync, gunzipSync } from "node:zlib";
@@ -9,7 +10,7 @@ import { migrationIdentity } from "./standby-artifact.mjs";
 let recoveryStage = "configuration";
 class SafeBackupError extends Error {}
 const magic = Buffer.from("LOOTSPLIT-BACKUP-1\n");
-export const primaryOrigin = "https://lootsplit.oliverstorie2017.workers.dev";
+export const primaryOrigin = deploymentOrigins.website;
 export const productionDatabase = "0a200e96-ae2e-47b5-9869-c1f4d316148f";
 const hash = (value) => createHash("sha256").update(value).digest("hex");
 function keyBytes(key) { assert.match(key || "", /^[a-fA-F0-9]{64}$/, "Use a 32-byte hexadecimal backup key"); return Buffer.from(key, "hex"); }
