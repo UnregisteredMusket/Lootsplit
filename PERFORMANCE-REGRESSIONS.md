@@ -92,6 +92,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-05T23:59:30Z | step: Packaged Worker / interface / Run actions/download-artifact@v4 | 2s → 3s | +1s | +50% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37233687309/job/111528724093) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37391401183/job/112037311517) |
 | 2026-10-05T23:56:54.000Z | workflow: Verify preserved functionality | 266s → 338s | +72s | +27.07% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37300924028) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37390831478) |
 | 2026-10-05T23:52:41Z | step: Packaged Worker / interface / Run actions/setup-node@v4 | 6s → 8s | +2s | +33.33% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37263207826/job/111614761214) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37390831478/job/112035588481) |
 | 2026-10-05T23:44:13Z | step: verify / Run actions/checkout@v4 | 1s → 2s | +1s | +100% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37233687309/job/111529121545) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37389751532/job/112033097198) |
