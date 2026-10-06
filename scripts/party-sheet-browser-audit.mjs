@@ -191,11 +191,13 @@ try {
   await card.getByText("7 / 115 HP", { exact: false }).waitFor();
   assert.equal((await state(dm.page)).holdings.find((h) => h.purseId === id).equipped, false);
   await visit(player.page, "/");
+  await player.page.getByRole("heading", { name: "Home", exact: true }).waitFor();
+  await player.page.getByRole("link", { name: "Open Character Sheet →", exact: true }).click();
   await player.page
     .getByRole("region", { name: "Interactive characters" })
     .getByRole("heading", { name: "Unified sentinel", exact: true })
     .waitFor();
-  // Guest local mode retains full character sheets and device dice without registration.
+  // The helper provisions a disposable signed-in local DM; preserve full sheets and device dice.
   const guest = await browser.newContext({ viewport: { width: 390, height: 844 } });
   const gp = await guest.newPage();
   gp.on("pageerror", (e) => errors.push(e.message));
@@ -220,7 +222,7 @@ try {
   await dm.page.screenshot({ path: output + "/party-desktop.png", fullPage: true });
   assert.deepEqual(errors, []);
   console.log(
-    "PASS: natural character creation, direct party HP, both-way inventory and funds, backup identity, legacy migration without grants, shared player permissions and metadata, guest sheets/dice, mobile and desktop.",
+    "PASS: natural character creation, direct party HP, both-way inventory and funds, backup identity, legacy migration without grants, shared player permissions and metadata, local DM sheets/dice, player Home-to-sheet navigation, mobile and desktop.",
   );
 } catch (e) {
   for (const page of pages)

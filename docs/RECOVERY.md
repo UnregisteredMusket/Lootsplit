@@ -7,6 +7,8 @@
 - PR49 was confirmed merged/released: PR37411859467, main37412269946, website37412626230, standby37412626382, backup37412269948 succeeded. Performance history latest347 observations, pendingempty, recorder37412824045 success. Do not repeat migration0009 or the completed release.
 - Local runtime: Node22 under `/tmp/lootsplit-tools/node_modules/node/bin`, Chromium `/tmp/lootsplit-chromium/chromium`. Disposable source `/tmp/lootsplit-roadmap-verify`. Server and browser must run inside one shell invocation (loopback namespaces differ). Direct recovery GitHub HTTP403; read-only connector reconciliation worked. Cloudflare emulator previously blocked by environment `uv_interface_addresses`; do not weaken packaged-Worker CI.
 
+- PR50 initial exact-head run37423624096 passed builds, seven other independent groups including packaged Worker/standby, but dev-party-sheet expected the old directly embedded player sheet. Follow-up clicks the new Home → Open Character Sheet link and preserves the existing interactive-sheet assertions. Migration0010 is still unapplied; no merge/deployment. Focused party-sheet browser validation passed with all original money, inventory, ownership, migration and sheet assertions. Next: fresh exact-head CI.
+
 # Roadmap priorities — publication authorized, 2026-10-06 UTC
 
 - User explicitly approved publication to UnregisteredMusket/Lootsplit, full GitHub checks, additive production migration0009, and gated merge/deployment. The earlier automatic approval block below is historical and resolved by this permission.
