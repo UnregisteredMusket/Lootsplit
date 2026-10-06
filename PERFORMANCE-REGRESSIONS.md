@@ -60,6 +60,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Packaged Worker / interface / Run npm ci | open | 2 | 11s → 15s | +4s | +36.36% |
 | Development / gameplay / Run actions/upload-artifact@v4 | open | 2 | 1s → 3s | +2s | +200% |
 | Development / accounts / Run actions/upload-artifact@v4 | open | 2 | 1s → 3s | +2s | +200% |
+| verify | open | 2 | 5s → 40s | +35s | +700% |
 | deploy / Check current main, existing bindings and applied migrations; deploy without rebuild | open | 2 | 9s → 15s | +6s | +66.67% |
 | Development / governance / dev-campaign-governance | open | 2 | 27s → 57s | +30s | +111.11% |
 | Packaged Worker / accounts | open | 4 | 85s → 166s | +81s | +95.29% |
@@ -95,6 +96,8 @@ Open trends require investigation. Resolved trends retain their history; each ve
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-06T02:09:36Z | job: verify | 6s → 40s | +34s | +566.67% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37254074683/job/111588083728) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37402387007/job/112073249290) |
+| 2026-10-06T02:08:18Z | step: Development / accounts / dev-bug | 4s → 5s | +1s | +25% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37233687309/job/111528483533) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37402387007/job/112072228613) |
 | 2026-10-06T02:03:06Z | step: Packaged Worker / interface / worker-game-analytics | 4s → 6s | +2s | +50% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37280342384/job/111667149206) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37402023907/job/112071458399) |
 | 2026-10-06T02:01:12Z | step: Code checks and immutable builds / unit-tests | 11s → 13s | +2s | +18.18% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37235490768/job/111533630184) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37402023907/job/112071117196) |
 | 2026-10-06T00:19:25Z | step: Development / governance / Run actions/upload-artifact@v4 | 2s → 3s | +1s | +50% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37235752710/job/111534384084) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37393097454/job/112042560491) |
