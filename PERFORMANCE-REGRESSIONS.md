@@ -21,6 +21,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Code checks and immutable builds / lint | open | 2 | 5s → 9s | +4s | +80% |
 | Development / accounts / Run npx playwright install --with-deps chromium | open | 4 | 21s → 372s | +351s | +1671.43% |
 | Development / gameplay / Start disposable development server | open | 2 | 4s → 8s | +4s | +100% |
+| Development / desktop / Start disposable development server | open | 2 | 6s → 9s | +3s | +50% |
 | Code checks and immutable builds / mobile-build | open | 2 | 3s → 6s | +3s | +100% |
 | Development / gameplay / dev-bug-data-integrity | open | 3 | 4s → 7s | +3s | +75% |
 | Code checks and immutable builds | open | 3 | 48s → 96s | +48s | +100% |
@@ -80,7 +81,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | verify | open | 2 | 5s → 40s | +35s | +700% |
 | deploy / Check current main, existing bindings and applied migrations; deploy without rebuild | open | 3 | 9s → 28s | +19s | +211.11% |
 | Packaged Worker / interface / Set up job | open | 2 | 1s → 3s | +2s | +200% |
-| Development / governance / dev-campaign-governance | open | 4 | 27s → 83s | +56s | +207.41% |
+| Development / governance / dev-campaign-governance | open | 5 | 27s → 105s | +78s | +288.89% |
 | Development / desktop / dev-game-analytics | open | 2 | 5s → 7s | +2s | +40% |
 | Development / desktop / Run actions/upload-artifact@v4 | open | 2 | 3s → 8s | +5s | +166.67% |
 | Packaged Worker / accounts | open | 5 | 85s → 202s | +117s | +137.65% |
@@ -113,7 +114,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Code checks and immutable builds / Run actions/checkout@v4 | open | 2 | 1s → 3s | +2s | +200% |
 | Development / desktop / Run npx playwright install --with-deps chromium | open | 3 | 25s → 372s | +347s | +1388% |
 | Packaged standby / Run actions/checkout@v4 | open | 2 | 1s → 3s | +2s | +200% |
-| Development / governance | open | 2 | 160s → 213s | +53s | +33.13% |
+| Development / governance | open | 3 | 160s → 257s | +97s | +60.63% |
 | Development / gameplay / dev-finance | open | 3 | 17s → 35s | +18s | +105.88% |
 | Code checks and immutable builds / unit-tests | open | 2 | 11s → 15s | +4s | +36.36% |
 | Packaged Worker / interface / Run npx playwright install --with-deps chromium | open | 2 | 21s → 57s | +36s | +171.43% |
@@ -123,7 +124,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Packaged standby / Run actions/download-artifact@v4 | open | 2 | 2s → 6s | +4s | +200% |
 | Packaged standby | open | 2 | 78s → 137s | +59s | +75.64% |
 | Development / accounts | open | 3 | 152s → 393s | +241s | +158.55% |
-| Packaged Worker / interface / Run npx playwright install --with-deps chromium | open | 3 | 22s → 44s | +22s | +100% |
+| Packaged Worker / interface / Run npx playwright install --with-deps chromium | open | 4 | 22s → 292s | +270s | +1227.27% |
 | Packaged Worker / interface / worker-theme | open | 2 | 13s → 35s | +22s | +169.23% |
 | Packaged Worker / interface / worker-game-analytics | open | 3 | 3s → 8s | +5s | +166.67% |
 | Development / gameplay / Set up job | open | 2 | 1s → 3s | +2s | +200% |
@@ -147,7 +148,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Packaged Worker / interface / worker-loot | open | 3 | 4s → 7s | +3s | +75% |
 | Development / governance / Run npx playwright install --with-deps chromium | open | 2 | 23s → 39s | +16s | +69.57% |
 | Development / gameplay / dev-library-navigation | resolved | 2 | 12s → 43s | +31s | +258.33% |
-| Packaged Worker / interface | open | 2 | 126s → 218s | +92s | +73.02% |
+| Packaged Worker / interface | open | 3 | 126s → 408s | +282s | +223.81% |
 | Packaged Worker / interface | open | 2 | 123s → 196s | +73s | +59.35% |
 | verify / Development / gameplay / Run actions/setup-node@v4 | open | 2 | 2s → 5s | +3s | +150% |
 | verify / Development / gameplay | open | 2 | 88s → 191s | +103s | +117.05% |
@@ -168,11 +169,18 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | verify / Development / governance / Run actions/setup-node@v4 | open | 2 | 3s → 14s | +11s | +366.67% |
 | verify / Development / governance / Run npm ci | open | 2 | 10s → 19s | +9s | +90% |
 | release-apk / Run actions/setup-node@v4 | open | 2 | 5s → 7s | +2s | +40% |
+| Development / governance / dev-backup | open | 2 | 7s → 12s | +5s | +71.43% |
 
 ## Recorded slowdowns
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-07T17:15:49Z | job: Packaged Worker / interface | 218s → 408s | +190s | +87.16% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37428667085/job/112154529426) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37656638053/job/112913872287) |
+| 2026-10-07T17:14:09Z | step: Packaged Worker / interface / Run npx playwright install --with-deps chromium | 44s → 292s | +248s | +563.64% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37438052113/job/112185142356) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37656638053/job/112913872287) |
+| 2026-10-07T17:08:44Z | step: Development / desktop / Start disposable development server | 7s → 9s | +2s | +28.57% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37235490768/job/111533630459) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37656638053/job/112913241611) |
+| 2026-10-07T16:54:18Z | job: Development / governance | 213s → 257s | +44s | +20.66% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37389052554/job/112029497710) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37655099675/job/112908163987) |
+| 2026-10-07T16:54:15Z | step: Development / governance / dev-backup | 9s → 12s | +3s | +33.33% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37638440371/job/112850725915) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37655099675/job/112908163987) |
+| 2026-10-07T16:52:36Z | step: Development / governance / dev-campaign-governance | 83s → 105s | +22s | +26.51% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37638440371/job/112850725915) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37655099675/job/112908163987) |
 | 2026-10-07T16:50:08Z | step: report / Set up job | 1s → 2s | +1s | +100% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37236129044/job/111535473202) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37655125684/job/112908192845) |
 | 2026-10-07T15:07:13Z | job: Code checks and immutable builds | 82s → 96s | +14s | +17.07% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37269258333/job/111632648929) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37642148171/job/112863642710) |
 | 2026-10-07T14:46:37.000Z | workflow: Verify preserved functionality | 403s → 466s | +63s | +15.63% | failure | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37438052113) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37638440371) |
