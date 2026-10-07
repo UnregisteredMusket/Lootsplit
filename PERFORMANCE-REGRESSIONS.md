@@ -146,11 +146,15 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Development / gameplay | open | 2 | 145s → 282s | +137s | +94.48% |
 | Packaged Worker / interface / worker-library-navigation | resolved | 2 | 13s → 37s | +24s | +184.62% |
 | Development / gameplay / dev-control-panel | open | 2 | 14s → 24s | +10s | +71.43% |
+| Packaged Worker / interface / worker-library-navigation | open | 2 | 9s → 15s | +6s | +66.67% |
+| Packaged Worker / interface / worker-shop-stock | open | 2 | 7s → 17s | +10s | +142.86% |
 
 ## Recorded slowdowns
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-07T07:12:19Z | step: Packaged Worker / interface / worker-library-navigation | 11s → 15s | +4s | +36.36% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37452559678/job/112232862548) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37585553287/job/112675091320) |
+| 2026-10-07T07:11:30Z | step: Packaged Worker / interface / worker-shop-stock | 10s → 17s | +7s | +70% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37572857798/job/112635440281) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37585553287/job/112675091320) |
 | 2026-10-07T05:11:24Z | step: Packaged Worker / interface / worker-shop-stock | 9s → 14s | +5s | +55.56% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37564176497/job/112608372872) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37574857899/job/112641703415) |
 | 2026-10-07T04:55:48.000Z | workflow: Android signed release APK | 238s → 425s | +187s | +78.57% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37391400899) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37573239210) |
 | 2026-10-07T04:52:19Z | job: verify / Packaged Worker / interface | 130s → 155s | +25s | +19.23% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37391400899/job/112037297078) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37573239210/job/112636602667) |
