@@ -104,7 +104,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Packaged standby / Run actions/download-artifact@v4 | open | 2 | 2s → 4s | +2s | +100% |
 | Development / accounts / dev-account | open | 4 | 59s → 158s | +99s | +167.8% |
 | Packaged Worker / interface / worker-theme | open | 4 | 11s → 25s | +14s | +127.27% |
-| Packaged Worker / accounts / worker-account | open | 5 | 25s → 75s | +50s | +200% |
+| Packaged Worker / accounts / worker-account | open | 6 | 25s → 109s | +84s | +336% |
 | deploy / Run actions/upload-artifact@v4 | open | 2 | 1s → 3s | +2s | +200% |
 | Development / accounts / Start disposable development server | open | 2 | 6s → 9s | +3s | +50% |
 | Development / accounts / Run actions/upload-artifact@v4 | open | 2 | 1s → 3s | +2s | +200% |
@@ -173,6 +173,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-07T09:38:45Z | step: Packaged Worker / accounts / worker-account | 75s → 109s | +34s | +45.33% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37304872866/job/111746559276) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37601583790/job/112727426159) |
 | 2026-10-07T09:31:54Z | step: backup / Run actions/upload-artifact@v4 | 1s → 2s | +1s | +100% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37290872931/job/111700688668) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37601195506/job/112725702458) |
 | 2026-10-07T09:31:50Z | step: backup / Run npm ci --ignore-scripts | 7s → 14s | +7s | +100% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37290872931/job/111700688668) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37601195506/job/112725702458) |
 | 2026-10-07T09:31:36Z | step: backup / Run actions/setup-node@v4 | 3s → 4s | +1s | +33.33% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37290872931/job/111700688668) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37601195506/job/112725702458) |
