@@ -114,7 +114,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Development / governance | open | 2 | 160s → 213s | +53s | +33.13% |
 | Development / gameplay / dev-finance | open | 2 | 17s → 28s | +11s | +64.71% |
 | Packaged Worker / interface / Run npx playwright install --with-deps chromium | open | 2 | 21s → 57s | +36s | +171.43% |
-| Packaged Worker / accounts | open | 3 | 94s → 160s | +66s | +70.21% |
+| Packaged Worker / accounts | open | 4 | 94s → 185s | +91s | +96.81% |
 | Development / accounts | open | 3 | 152s → 732s | +580s | +381.58% |
 | production release asset readiness | open | 2 | 2.465s → 27.818s | +25.353s | +1028.52% |
 | Packaged standby / Run actions/download-artifact@v4 | open | 2 | 2s → 6s | +4s | +200% |
@@ -123,7 +123,9 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Packaged Worker / interface / Run npx playwright install --with-deps chromium | open | 3 | 22s → 44s | +22s | +100% |
 | Packaged Worker / interface / worker-theme | open | 2 | 13s → 35s | +22s | +169.23% |
 | Packaged Worker / interface / worker-game-analytics | open | 3 | 3s → 8s | +5s | +166.67% |
+| Development / gameplay / Set up job | open | 2 | 1s → 3s | +2s | +200% |
 | Code checks and immutable builds | open | 2 | 71s → 97s | +26s | +36.62% |
+| Packaged Worker / accounts / Run npm ci | open | 2 | 13s → 19s | +6s | +46.15% |
 | report | open | 2 | 7s → 12s | +5s | +71.43% |
 | Report workflow failure | open | 2 | 7s → 12s | +5s | +71.43% |
 | Packaged standby / Run npx playwright install --with-deps chromium | open | 2 | 21s → 38s | +17s | +80.95% |
@@ -162,6 +164,9 @@ Open trends require investigation. Resolved trends retain their history; each ve
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-07T07:47:59Z | job: Packaged Worker / accounts | 160s → 185s | +25s | +15.63% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37425891304/job/112145766306) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37589088145/job/112686485475) |
+| 2026-10-07T07:45:24Z | step: Packaged Worker / accounts / Run npm ci | 15s → 19s | +4s | +26.67% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37280755805/job/111668498836) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37589088145/job/112686485475) |
+| 2026-10-07T07:43:32Z | step: Development / gameplay / Set up job | 2s → 3s | +1s | +50% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37280755805/job/111668038189) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37589088145/job/112686006538) |
 | 2026-10-07T07:36:00.000Z | workflow: Android signed release APK | 425s → 496s | +71s | +16.71% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37573239210) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37587450064) |
 | 2026-10-07T07:35:53Z | step: release-apk / Upload signed APK only | 2s → 3s | +1s | +50% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37391400899/job/112039018014) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37587450064/job/112682285306) |
 | 2026-10-07T07:32:24Z | step: release-apk / Run actions/setup-node@v4 | 5s → 6s | +1s | +20% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37391400899/job/112039018014) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37587450064/job/112682285306) |
