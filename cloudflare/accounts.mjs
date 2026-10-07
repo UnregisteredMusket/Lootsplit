@@ -17,11 +17,14 @@ import {
   touchMember,
   profileOf,
   saveProfile,
+  saveAuthProfile,
+  displayName,
   directory,
   moderation,
   memberDetail,
 } from "./members.mjs";
 import { campaignAction, resumeCampaignMembership } from "./account-campaigns.mjs";
+import { restoreDeletedCampaign, campaignRecoveryRecords } from "./campaign-recovery.mjs";
 import {
   siteRole,
   publicAnnouncement,
@@ -33,6 +36,7 @@ import {
 import { betterAuth } from "better-auth";
 import { bearer } from "better-auth/plugins";
 import { hashPassword } from "better-auth/crypto";
+import { APIError } from "better-auth/api";
 
 const nativeOrigins = ["https://localhost", "http://localhost", "capacitor://localhost"];
 const json = (data, status = 200) =>
@@ -75,6 +79,27 @@ export function accountAuth(env) {
     rateLimit: { enabled: true, storage: "database", window: 60, max: 40 },
     plugins: [bearer({ requireSignature: true })],
     databaseHooks: {
+      user: {
+        create: {
+          before: async (user) => {
+            try {
+              return { data: { ...user, name: displayName(user.name) } };
+            } catch (error) {
+              throw new APIError("BAD_REQUEST", { message: error.message });
+            }
+          },
+        },
+        update: {
+          before: async (user) => {
+            if (user.name === undefined) return { data: user };
+            try {
+              return { data: { ...user, name: displayName(user.name) } };
+            } catch (error) {
+              throw new APIError("BAD_REQUEST", { message: error.message });
+            }
+          },
+        },
+      },
       session: {
         create: {
           before: async (session) => {
@@ -137,8 +162,11 @@ export async function handleAccounts(request, env) {
   const path = new URL(request.url).pathname;
   if (!path.startsWith("/api/account/")) return null;
   let authOrigin;
-  try { authOrigin = accountRequestOrigin(env, request.url); }
-  catch { return json({ error: "Account request host is not approved." }, 403); }
+  try {
+    authOrigin = accountRequestOrigin(env, request.url);
+  } catch {
+    return json({ error: "Account request host is not approved." }, 403);
+  }
   const origin = request.headers.get("origin");
   const native = nativeOrigins.includes(origin);
   const allowed = !origin || origin === authOrigin || native;
@@ -168,6 +196,12 @@ export async function handleAccounts(request, env) {
     if (path.startsWith("/api/account/auth/")) {
       if (request.method === "POST") {
         const body = await readBody(request, 16_000);
+        if (path === "/api/account/auth/update-user") {
+          const session = await auth.api.getSession({ headers: request.headers });
+          if (!session) fail("Sign in to edit your profile.", 401);
+          await assertActive(env.DB, session.user.id);
+          return cors(json(await saveAuthProfile(env.DB, session.user.id, body)));
+        }
         request = new Request(request.url, {
           method: request.method,
           headers: request.headers,
@@ -228,7 +262,19 @@ export async function handleAccounts(request, env) {
     const userId = session.user.id;
     await assertActive(db, userId);
     await touchMember(db, userId);
-    if (path === "/api/account/shortcuts" && ["GET","POST"].includes(request.method)) return cors(json(await accountShortcuts(db,userId,request.method,request.method === "GET" ? {role:new URL(request.url).searchParams.get("role")} : body)));
+    if (path === "/api/account/shortcuts" && ["GET", "POST"].includes(request.method))
+      return cors(
+        json(
+          await accountShortcuts(
+            db,
+            userId,
+            request.method,
+            request.method === "GET"
+              ? { role: new URL(request.url).searchParams.get("role") }
+              : body,
+          ),
+        ),
+      );
     if (
       (path === "/api/account/encounters" && request.method === "GET") ||
       (path.startsWith("/api/account/encounters/") && request.method === "POST")
@@ -256,7 +302,7 @@ export async function handleAccounts(request, env) {
     if (path === "/api/account/reports/detail" && request.method === "POST")
       return cors(json(await bugReportDetail(db, userId, body.id)));
     if (path === "/api/account/reports/update" && request.method === "POST")
-      return cors(json(await updateBugReport(db, userId, body)));
+      return cors(json(await updateBugReport(db, userId, body, session.session.id)));
     if (path === "/api/account/monitor" && request.method === "GET")
       return cors(json(await serverMonitor(env, userId)));
     if (path === "/api/account/profile" && request.method === "POST")
@@ -273,31 +319,37 @@ export async function handleAccounts(request, env) {
         Date.now() - new Date(session.session.createdAt).getTime() > 600000
       )
         fail("Sign out and sign in again before changing staff roles.", 403);
-      return cors(json(await moderation(db, userId, body)));
+      return cors(json(await moderation(db, userId, body, session.session.id)));
     }
     if (path === "/api/account/campaign" && request.method === "POST")
-      return cors(json(await campaignAction(db, userId, body)));
+      return cors(json(await campaignAction(db, userId, body, session.session)));
+    if (path === "/api/account/restore-backup" && request.method === "POST")
+      return cors(json(await restoreDeletedCampaign(db, userId, body, session.session)));
+    if (path === "/api/account/recovery-records" && request.method === "POST")
+      return cors(json(await campaignRecoveryRecords(db, userId, body)));
     if (path === "/api/account/owner/donations" && request.method === "POST")
-      return cors(json(await saveDonations(db, userId, body)));
+      return cors(json(await saveDonations(db, userId, body, session.session.id)));
     if (path === "/api/account/owner/analytics" && request.method === "GET")
       return cors(json(await ownerAnalytics(db, userId)));
     if (path === "/api/account/owner" && request.method === "GET")
       return cors(json(await ownerOverview(db, userId)));
     if (path === "/api/account/owner/announcement" && request.method === "POST")
-      return cors(json(await saveAnnouncement(db, userId, body)));
-    if (path === "/api/account/owner/test-mode" && request.method === "POST") return cors(json(await ownerTestMode(db,userId,body)));
-    if (path === "/api/account/records" && request.method === "GET") return cors(json(await campaignRecords(db, userId)));
+      return cors(json(await saveAnnouncement(db, userId, body, session.session.id)));
+    if (path === "/api/account/owner/test-mode" && request.method === "POST")
+      return cors(json(await ownerTestMode(db, userId, body, session.session.id)));
+    if (path === "/api/account/records" && request.method === "GET")
+      return cors(json(await campaignRecords(db, userId)));
     if (path === "/api/account/library" && request.method === "GET") {
       const [members, backups, characters, recovery] = await Promise.all([
         db
           .prepare(
-            "SELECT m.code,m.seat_id,m.name,m.archived,m.updated_at,r.body AS room_body,r.revision AS room_revision,m.token FROM library_members m LEFT JOIN campaign_rooms r ON r.code=m.code WHERE m.user_id=? ORDER BY m.updated_at DESC",
+            "SELECT m.code,m.seat_id,m.name,m.archived,m.updated_at,r.body AS room_body,r.revision AS room_revision,m.token,EXISTS(SELECT 1 FROM campaign_recoveries c WHERE c.user_id=m.user_id AND c.code=m.code) AS has_recovery FROM library_members m LEFT JOIN campaign_rooms r ON r.code=m.code WHERE m.user_id=? ORDER BY m.updated_at DESC",
           )
           .bind(userId)
           .all(),
         db
           .prepare(
-            "SELECT id, name, created_at FROM library_backups WHERE user_id=? ORDER BY created_at DESC",
+            "SELECT b.id,b.name,b.created_at,EXISTS(SELECT 1 FROM campaign_deletion_backups d WHERE d.backup_id=b.id AND d.user_id=b.user_id) AS shared_recovery FROM library_backups b WHERE b.user_id=? ORDER BY b.created_at DESC",
           )
           .bind(userId)
           .all(),
@@ -357,7 +409,11 @@ export async function handleAccounts(request, env) {
       const code = text(body.code, 16).toUpperCase(),
         token = text(body.token, 128);
       const { room, seat } = await roomSeat(db, code, token);
-      if ((room.ownerId && seat.role === "dm" && room.ownerId !== userId) || (seat.userId && seat.userId !== userId)) fail("This seat belongs to another account.", 409);
+      if (
+        (room.ownerId && seat.role === "dm" && room.ownerId !== userId) ||
+        (seat.userId && seat.userId !== userId)
+      )
+        fail("This seat belongs to another account.", 409);
       const owner = await db
         .prepare("SELECT user_id FROM library_members WHERE code=? AND seat_id=?")
         .bind(code, seat.id)
@@ -367,18 +423,36 @@ export async function handleAccounts(request, env) {
       seat.userId = userId;
       if (seat.role === "dm") room.ownerId = userId;
       const updated = await db.batch([
-        db.prepare("UPDATE campaign_rooms SET body=? WHERE code=? AND body=?").bind(JSON.stringify(room), code, prior),
-        db.prepare("INSERT INTO library_members (user_id,code,seat_id,token,name,archived,updated_at) SELECT ?,?,?,?,?,0,? WHERE EXISTS (SELECT 1 FROM campaign_rooms WHERE code=? AND body=?) ON CONFLICT(user_id,code) DO UPDATE SET seat_id=excluded.seat_id,token=excluded.token,name=excluded.name,archived=0,updated_at=excluded.updated_at").bind(userId, code, seat.id, token, text(body.name), Date.now(), code, JSON.stringify(room))
+        db
+          .prepare("UPDATE campaign_rooms SET body=? WHERE code=? AND body=?")
+          .bind(JSON.stringify(room), code, prior),
+        db
+          .prepare(
+            "INSERT INTO library_members (user_id,code,seat_id,token,name,archived,updated_at) SELECT ?,?,?,?,?,0,? WHERE EXISTS (SELECT 1 FROM campaign_rooms WHERE code=? AND body=?) ON CONFLICT(user_id,code) DO UPDATE SET seat_id=excluded.seat_id,token=excluded.token,name=excluded.name,archived=0,updated_at=excluded.updated_at",
+          )
+          .bind(
+            userId,
+            code,
+            seat.id,
+            token,
+            text(body.name),
+            Date.now(),
+            code,
+            JSON.stringify(room),
+          ),
       ]);
-      if (!updated[0].meta.changes) fail("The campaign changed. Retry saving this membership.", 409);
+      if (!updated[0].meta.changes)
+        fail("The campaign changed. Retry saving this membership.", 409);
       return cors(json({ ok: true }));
     }
     if (path === "/api/account/resume" && request.method === "POST") {
       return cors(
-        json(await resumeCampaignMembership(db, userId, {
-          ...body,
-          code: text(body.code, 16).toUpperCase(),
-        })),
+        json(
+          await resumeCampaignMembership(db, userId, {
+            ...body,
+            code: text(body.code, 16).toUpperCase(),
+          }),
+        ),
       );
     }
     if (path === "/api/account/archive" && request.method === "POST") {

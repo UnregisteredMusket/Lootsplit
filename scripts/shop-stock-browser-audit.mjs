@@ -83,7 +83,7 @@ try {
         r.onerror = () => reject(r.error);
       });
       await new Promise((resolve, reject) => {
-        const tx = db.transaction(["catalog", "purses"], "readwrite");
+        const tx = db.transaction(["catalog", "purses", "holdings"], "readwrite");
         for (let i = 0; i < 80; i++)
           tx.objectStore("catalog").put({
             id: `audit-${i}`,
@@ -100,6 +100,12 @@ try {
           name: "Audit shared funds",
           kind: "party",
           coins: { cp: 0, sp: 0, ep: 0, gp: 10000, pp: 0 },
+        });
+        // A same-name personal lot must survive buying differently valued stock.
+        tx.objectStore("holdings").put({
+          id: "audit-personal-lot", purseId: "audit-buyer", name: "Audit good 000",
+          kind: "item", quantity: 100, unitCopper: 1,
+          notes: "Existing personal equipment", equipped: true,
         });
         tx.oncomplete = resolve;
         tx.onerror = () => reject(tx.error);
@@ -151,6 +157,16 @@ try {
       1000000 - beforePrice,
     );
     assert.equal((await readRows(page, "ledger")).filter((row) => row.shopId === shopId).length, 1);
+    const lots = (await readRows(page, "holdings")).filter(
+      (row) => row.purseId === "audit-buyer" && row.name === "Audit good 000",
+    );
+    assert.equal(lots.length, 2, "Purchasing must retain separate same-name lots");
+    const personal = lots.find((row) => row.id === "audit-personal-lot");
+    assert.equal(personal.quantity, 100);
+    assert.equal(personal.unitCopper, 1);
+    assert.equal(personal.notes, "Existing personal equipment");
+    assert.equal(personal.equipped, true);
+    assert.equal(lots.find((row) => row.id !== personal.id).quantity, 1);
     await page.getByRole("tab", { name: "Edit", exact: true }).click();
     const row = inventory.locator("li").first();
     await row.getByLabel("Price", { exact: true }).fill("17 cp");

@@ -5,8 +5,13 @@ import { accountScenarios } from "../account-scenarios.mjs";
 
 export { expect };
 export const test = base.extend({
-  devices: async ({ context, page, browser }, runFixture, testInfo) => {
+  devices: async ({ context, page, browser, baseURL }, runFixture, testInfo) => {
     const contexts = [context];
+    const localOnly = (route) =>
+      new URL(route.request().url()).origin === new URL(baseURL).origin
+        ? route.continue()
+        : route.abort("blockedbyclient");
+    await context.route("**/*", localOnly);
     // Each synthetic device is a separate local client, including its rate-limit
     // identity. Faster independent tests must not share one localhost quota.
     const address = 40 + accountScenarios.indexOf(testInfo.title) * 4;
@@ -22,6 +27,7 @@ export const test = base.extend({
         viewport: { width, height: 900 },
         extraHTTPHeaders: { "cf-connecting-ip": `192.0.2.${address + contexts.length}` },
       });
+      await other.route("**/*", localOnly);
       contexts.push(other);
       other.on("page", watch);
       return { context: other, page: await other.newPage() };

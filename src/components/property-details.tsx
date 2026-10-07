@@ -1,4 +1,5 @@
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
+import { getCloudTable, getServerCloudTable, subscribeCloudTable } from "@/lib/quire/cloud-client";
 import { useEconomy } from "@/lib/quire/economy-context";
 import { useSeat } from "@/lib/quire/seat";
 import { useDraftGuard } from "@/lib/quire/use-draft-guard";
@@ -30,6 +31,9 @@ export function PropertyDetails() {
 }
 function PropertyEditor({ holding: h }: { holding: Holding }) {
   const { command } = useEconomy();
+  const seat = useSeat();
+  const room = useSyncExternalStore(subscribeCloudTable, getCloudTable, getServerCloudTable);
+  const viewOnly = room.joined && room.viewOnly && seat.role === "player";
   const [draft, setDraft] = useState({ name: h.name, notes: h.notes }),
     [before, setBefore] = useState(draft),
     [busy, setBusy] = useState(false),
@@ -41,7 +45,7 @@ function PropertyEditor({ holding: h }: { holding: Holding }) {
       className="journal-entry grid gap-3"
       onSubmit={async (e) => {
         e.preventDefault();
-        if (busy) return;
+        if (busy || viewOnly) return;
         setBusy(true);
         setError("");
         try {
@@ -55,6 +59,11 @@ function PropertyEditor({ holding: h }: { holding: Holding }) {
       }}
     >
       <h2>{h.name}</h2>
+      {viewOnly && (
+        <p role="status">
+          This room is view-only until the DM resumes play. Your draft is kept in this view.
+        </p>
+      )}
       <p>
         Quantity {h.quantity} · Value each {formatCopper(h.unitCopper)}
       </p>
@@ -64,6 +73,7 @@ function PropertyEditor({ holding: h }: { holding: Holding }) {
           required
           maxLength={160}
           value={draft.name}
+          disabled={viewOnly}
           onChange={(e) => setDraft({ ...draft, name: e.target.value })}
         />
       </label>
@@ -72,11 +82,12 @@ function PropertyEditor({ holding: h }: { holding: Holding }) {
         <textarea
           maxLength={4000}
           value={draft.notes}
+          disabled={viewOnly}
           onChange={(e) => setDraft({ ...draft, notes: e.target.value })}
         />
       </label>
       {error && <p role="alert">{error}</p>}
-      <Button type="submit" disabled={busy || !dirty}>
+      <Button type="submit" disabled={busy || !dirty || viewOnly}>
         Save property details
       </Button>
       <Button

@@ -7,6 +7,7 @@ import {
   getCloudTable,
   hasPendingChanges,
   prepareAccountMembership,
+  resumeAccountMembership,
 } from "../quire/cloud-client";
 import {
   readQuireFile,
@@ -16,7 +17,8 @@ import {
   savePurse,
   type QuireFile,
 } from "../quire/economy";
-import { accountRequest, type CharacterProfile } from "./client";
+import { accountRequest, type AccountMembership, type CharacterProfile } from "./client";
+import { accountRestoreRequest, acknowledgeAccountRestore } from "./restore-request";
 export async function saveAccountBackup() {
   if (getSeat().role !== "dm")
     throw new Error(
@@ -60,6 +62,17 @@ export async function restoreAccountBackup(id: string, name: string) {
   await ensureEconomy();
   await restore(file);
   reloadCampaignContext();
+}
+export async function restoreSharedAccountBackup(id: string) {
+  if (getCloudTable().joined || hasPendingChanges() || getSeat().role !== "dm")
+    throw new Error(
+      "Open a local DM campaign before restoring shared records. Your current campaign will be kept.",
+    );
+  const userId = sessionStorage.getItem("lootsplit.verified-account") || "";
+  const requestKey = accountRestoreRequest(userId, id);
+  const membership = await accountRequest<AccountMembership>("restore-backup", { id, requestKey });
+  await resumeAccountMembership(membership);
+  acknowledgeAccountRestore(userId, id, requestKey);
 }
 export async function addAccountCharacter(profile: CharacterProfile) {
   if (getCloudTable().joined || getSeat().role !== "dm")

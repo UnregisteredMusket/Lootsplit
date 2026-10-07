@@ -1,7 +1,7 @@
 import { readRoom, createRoom, updateRoom } from "./room-store.server.ts";
 import {
   claimSeat,
-  readCloudTable,
+  readCloudTableForImport,
   setRoomLive,
   skipTurn,
   type CloudRoom,
@@ -140,9 +140,10 @@ export async function openRoom(input: {
   name: string;
   table: CloudTable;
   userId?: string;
-}): Promise<{ code: string; token: string; seatId: string; revision: number }> {
-  const table = readCloudTable(input.table);
-  if (!table || table.purses.length === 0) throw new Error("The table has no characters to share.");
+}): Promise<{ code: string; token: string; seatId: string; revision: number; userId?: string }> {
+  const table = readCloudTableForImport(input.table);
+  if (!table) throw new Error("This campaign has invalid saved data. Keep a recovery export and repair unreadable archives before sharing a new room.");
+  if (table.purses.length === 0) throw new Error("The table has no characters to share.");
   const code = await freshCode();
   const seat: CloudSeat = {
     id: crypto.randomUUID(),
@@ -163,7 +164,7 @@ export async function openRoom(input: {
     table,
     seen: { gifts: [], sales: [] },
   });
-  return { code, token: seat.token, seatId: seat.id, revision: 1 };
+  return { code, token: seat.token, seatId: seat.id, revision: 1, userId: seat.userId };
 }
 
 export async function previewRoom(
@@ -192,12 +193,13 @@ export async function joinRoom(input: { code: string; purseId: string; name: str
   revision: number;
   purseIds: string[];
   shopIds: string[];
+  userId?: string;
 }> {
   const room = await must(input.code);
   if (room.testMode) throw Error("Test rooms are private to the owner.");
   requireInvitationSession(room, input.sessionId);
   const existing = input.userId && room.seats.find(s => s.userId === input.userId && s.role === "player");
-  if (existing) return { token: existing.token, seatId: existing.id, revision: room.revision, purseIds: existing.purseIds, shopIds: room.table.shops.map(s => s.id) };
+  if (existing) return { token: existing.token, seatId: existing.id, revision: room.revision, purseIds: existing.purseIds, shopIds: room.table.shops.map(s => s.id), userId: existing.userId };
   const blocked = input.userId && room.blockedUsers?.[input.userId];
   if (blocked === "banned") throw Error("You are banned from this campaign.");
   const restriction = room.departed?.find(s => s.purseIds.includes(input.purseId) && (s.status === "kicked" || s.status === "banned"));
@@ -219,6 +221,7 @@ export async function joinRoom(input: { code: string; purseId: string; name: str
     revision: next.revision,
     purseIds: claimed.seat.purseIds,
     shopIds: claimed.room.table.shops.map((shop) => shop.id),
+    userId: claimed.seat.userId,
   };
 }
 
@@ -294,6 +297,7 @@ export async function passTurn(input: { code: string; token: string }): Promise<
 }
 
 export type RoomView = {
+  userId?: string;
   viewOnly?: boolean;
   sessionId?: string;
   code: string;
@@ -328,13 +332,25 @@ async function must(code: string): Promise<CloudRoom> {
   const room = await readRoom(code.trim().toUpperCase());
   if (!room) throw new Error("No table uses that code.");
   if (room.closed) throw new Error("This room is closed.");
-  return room;
+  // Older clients may have staged a delayed copy of a committed action. Such a
+  // receipt is never pending work and must not block session/turn transitions.
+  const acknowledged = new Set(room.commands ?? []);
+  return {
+    ...room,
+    drafts: Object.fromEntries(
+      Object.entries(room.drafts ?? {}).map(([seatId, commands]) => [
+        seatId,
+        commands.filter((command) => !acknowledged.has(seatId + ":" + command.id)),
+      ]),
+    ),
+  };
 }
 
 function view(room: CloudRoom, seat: CloudSeat): RoomView {
   const current = room.seats[room.turn];
   const journal = projectRecord({ ...room.table, journal: room.table.journal }, seat).journal;
   return {
+    userId: seat.userId,
     code: room.code,
     sessionId: room.sessionId,
     revision: room.revision,
@@ -417,6 +433,7 @@ export async function submitCommands(input: {
   stage?: boolean;
 }): Promise<RoomView> {
   const { commandSchema, applyCommand } = await import("./commands.ts");
+  const { commandIdentity, canonicalJson, sameCommand } = await import("./command-identity.ts");
   if (JSON.stringify(input).length > 2_000_000)
     throw new Error("The pending batch is too large. Submit smaller changes.");
   if (
@@ -427,6 +444,20 @@ export async function submitCommands(input: {
   )
     throw new Error("Invalid command batch (maximum 100 actions).");
   const commands = input.commands.map((c) => commandSchema.parse(c));
+  const digest = async (value: string) => {
+    const bytes = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
+    return Array.from(new Uint8Array(bytes), byte => byte.toString(16).padStart(2, "0")).join("");
+  };
+  const hashes = new Map<string, string>();
+  for (const command of commands) {
+    const hash = "v2:" + await digest(commandIdentity(command));
+    if (hashes.has(command.id) && hashes.get(command.id) !== hash)
+      throw Error(
+        "An action ID contains conflicting changes. Export your pending actions before retrying.",
+      );
+    hashes.set(command.id, hash);
+  }
+  const batchHash = "v2:" + await digest(canonicalJson(commands));
   for (let attempt = 0; attempt < 5; attempt++) {
     const room = await must(input.code),
       seat = room.seats.find((s) => s.token === input.token);
@@ -435,26 +466,66 @@ export async function submitCommands(input: {
     if (room.viewOnly && seat.role === "player")
       throw Error("The session has ended. This room is view-only until the DM resumes play.");
     const key = seat.id + ":" + input.batchId;
-    if (room.batches?.includes(key)) return view(room, seat);
+    for (const command of commands) {
+      const previous = room.commandHashes?.[seat.id + ":" + command.id];
+      // Unversioned receipts retain their original validated JSON algorithm;
+      // only new receipts use canonical semantics and an explicit version.
+      if (previous && previous !== hashes.get(command.id) &&
+          (previous.startsWith("v2:") || previous !== await digest(JSON.stringify(command))))
+        throw Error(
+          "An action ID contains conflicting changes. Export your pending actions before retrying.",
+        );
+      const staged = room.drafts?.[seat.id]?.find((c) => c.id === command.id);
+      if (staged && !sameCommand(staged, command))
+        throw Error(
+          "Another device saved different changes for this action. Export your pending actions before retrying.",
+        );
+    }
+    if (room.batches?.includes(key)) {
+      const previous = room.batchHashes?.[key];
+      if ((previous && previous !== batchHash &&
+           (previous.startsWith("v2:") || previous !== await digest(JSON.stringify(commands)))) ||
+          commands.some(c => !(room.commands ?? []).includes(seat.id + ":" + c.id)))
+        throw Error("This batch ID was already used for different actions. Export your pending actions before retrying.");
+      return view(room, seat);
+    }
     const messagesOnly = commands.length > 0 && commands.every((c) => c.kind === "message");
     if (!room.viewOnly && !messagesOnly && !room.live && room.seats[room.turn]?.id !== seat.id)
       throw new Error("It is not your turn. Your pending actions have been preserved.");
-    let table = room.table;
     const seen = new Set(room.commands ?? []);
-    for (const command of commands) {
+    const drafts = { ...(room.drafts ?? {}) };
+    if (input.stage) {
+      const pending = [...(drafts[seat.id] ?? [])];
+      const known = new Set(pending.map((c) => c.id));
+      for (const command of commands)
+        if (!seen.has(seat.id + ":" + command.id) && !known.has(command.id)) {
+          pending.push(command);
+          known.add(command.id);
+        }
+      if (pending.length > 100)
+        throw Error(
+          "Another device has pending actions. Submit or resolve the saved turn before adding more.",
+        );
+      drafts[seat.id] = pending;
+    }
+    let table = room.table;
+    const commandHashes = { ...(room.commandHashes ?? {}) };
+    // Validate the entire merged draft against the authoritative table. Two
+    // individually valid device queues may overspend when combined.
+    for (const command of input.stage ? drafts[seat.id]! : commands) {
       const key = seat.id + ":" + command.id;
       if (seen.has(key)) continue;
       table = applyCommand(table, seat, command);
       seen.add(key);
+      if (!input.stage) commandHashes[key] = hashes.get(command.id)!;
     }
     for (const report of table.journal?.reports || [])
-      if (!room.table.journal?.reports?.some(r => r.id === report.id)) report.seatIds = room.seats.map(s => s.id);
-    const drafts = { ...(room.drafts ?? {}) };
-    if (input.stage) {
-      drafts[seat.id] = commands;
-    } else if (!messagesOnly) {
-      delete drafts[seat.id];
-    }
+      if (!room.table.journal?.reports?.some((r) => r.id === report.id))
+        report.seatIds = room.seats.map((s) => s.id);
+    if (!input.stage)
+      drafts[seat.id] = (drafts[seat.id] ?? []).filter((c) => !seen.has(seat.id + ":" + c.id));
+    if (!input.stage && input.endTurn && drafts[seat.id]?.length)
+      throw Error("Another device has saved unfinished actions. Refresh and submit the complete turn, or export and resolve those actions before ending it.");
     const next: CloudRoom = {
       ...room,
       table: input.stage ? room.table : table,
@@ -465,7 +536,9 @@ export async function submitCommands(input: {
       drafts,
       revision: room.revision + 1,
       commands: input.stage ? room.commands : [...seen],
+      commandHashes: input.stage ? room.commandHashes : commandHashes,
       batches: input.stage ? room.batches : [...(room.batches ?? []), key],
+      batchHashes: input.stage ? room.batchHashes : { ...(room.batchHashes ?? {}), [key]: batchHash },
       turn:
         !input.stage && input.endTurn && !room.live
           ? (room.turn + 1) % room.seats.length
@@ -525,10 +598,13 @@ export async function manageRoom(input: {
     const current = room.seats[room.turn]?.id;
     const db = database();
     const member = db ? await db.prepare("SELECT user_id FROM library_members WHERE code=? AND seat_id=? AND token=?").bind(room.code, target.id, target.token).first<{user_id:string}>() : null;
+    // Forget removes a library listing, not the canonical account identity of
+    // an assigned seat. Keep campaign restrictions attached to that identity.
+    const userId = target.userId || member?.user_id;
     const finalStatus = input.action === "release" ? "dismissed" : input.action === "leave" ? "left" : input.action === "kick" ? "kicked" : "banned";
-    next.departed = [...(next.departed || []).filter(s => s.id !== target.id), { ...target, status: finalStatus as "left" | "dismissed" | "kicked" | "banned", userId: member?.user_id }];
-    if (member && (input.action === "kick" || input.action === "ban"))
-      (next.blockedUsers ??= {})[member.user_id] = input.action === "ban" ? "banned" : "kicked";
+    next.departed = [...(next.departed || []).filter(s => s.id !== target.id), { ...target, status: finalStatus as "left" | "dismissed" | "kicked" | "banned", userId }];
+    if (userId && (input.action === "kick" || input.action === "ban"))
+      (next.blockedUsers ??= {})[userId] = input.action === "ban" ? "banned" : "kicked";
     const { applyCommand } = await import("./commands.ts");
     for (const p of next.table.purses.filter(p => target.purseIds.includes(p.id) && p.editingAllowed))
       next.table = applyCommand(next.table, caller.role === "dm" ? caller : room.seats.find(s => s.role === "dm")!, { id: crypto.randomUUID(), kind: "character-editing", purseId:p.id, allowed:false });

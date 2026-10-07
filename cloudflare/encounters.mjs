@@ -34,6 +34,10 @@ export async function dmMembership(db, user, code) {
     );
   return { room, raw: row.body, revision: row.revision, seat, m };
 }
+function requireOpenCampaign(d) {
+  if (!d.personal && d.room.closed)
+    fail("This campaign is closed. Reopen it before changing encounters or rolling.", 403);
+}
 async function detail(db, user, id) {
   const row = await db
     .prepare("SELECT * FROM dm_encounters WHERE id=? AND user_id=?")
@@ -95,7 +99,7 @@ export async function handleEncounters(db, user, path, body = {}) {
       const seat = room.seats.find((s) => s.id === m.seat_id && s.token === m.token);
       if (seat?.role !== "dm") continue;
       campaigns.push({
-        code: m.code, name: m.name,
+        code: m.code, name: m.name, closed: room.closed === true,
         purses: room.table.purses.map((p) => ({ id: p.id, name: p.name, kind: p.kind })),
       });
     }
@@ -123,6 +127,7 @@ export async function handleEncounters(db, user, path, body = {}) {
       d = await dmMembership(db, user, code),
       id = text(body.id);
     if (!/^[a-zA-Z0-9-]{16,80}$/.test(id)) fail("Invalid encounter creation key.");
+    requireOpenCampaign(d);
     const encounter = parse(encounterSchema, body.encounter || blankEncounter());
     const prior = await db
       .prepare("SELECT id,user_id,code FROM dm_encounters WHERE id=?")
@@ -191,6 +196,7 @@ export async function handleEncounters(db, user, path, body = {}) {
       .first();
     return {
       ...view(d.row),
+      readOnly: d.room.closed === true,
       purses: d.room.table.purses.map((p) => ({ id: p.id, name: p.name, kind: p.kind })),
       award: award ? JSON.parse(award.body) : null,
     };
@@ -210,6 +216,16 @@ export async function handleEncounters(db, user, path, body = {}) {
         .map((r) => ({ ...JSON.parse(r.body), seq: r.seq, at: r.created_at })),
       more: rows.results.length > 50,
     };
+  }
+  requireOpenCampaign(d);
+  // A committed receipt belongs to its original request, even after another device saves/concludes.
+  // Current membership and lifecycle still take precedence over receipt recovery.
+  if (path === "encounters/roll") {
+    const key = text(body.requestKey, 80);
+    if (!/^[a-zA-Z0-9-]{16,80}$/.test(key)) fail("Invalid roll key.");
+    const prior = await db.prepare("SELECT body FROM dm_encounter_rolls WHERE encounter_id=? AND request_key=?")
+      .bind(d.row.id, key).first();
+    if (prior) return JSON.parse(prior.body);
   }
   if (path === "encounters/award") {
     if (d.personal)
@@ -251,11 +267,6 @@ export async function handleEncounters(db, user, path, body = {}) {
   if (path === "encounters/roll") {
     const key = text(body.requestKey, 80);
     if (!/^[a-zA-Z0-9-]{16,80}$/.test(key)) fail("Invalid roll key.");
-    const prior = await db
-      .prepare("SELECT body FROM dm_encounter_rolls WHERE encounter_id=? AND request_key=?")
-      .bind(d.row.id, key)
-      .first();
-    if (prior) return JSON.parse(prior.body);
     if (d.row.status === "review") fail("The encounter is concluded.", 409);
     const manual = body.manual === true;
     let result;

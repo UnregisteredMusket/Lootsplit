@@ -16,7 +16,7 @@ export function readHandouts(value: unknown): Handout[] {
       if (!item || typeof item !== "object") return null;
       const row = item as Partial<Handout>;
       if (typeof row.id !== "string" || typeof row.title !== "string" || typeof row.text !== "string") return null;
-      return { id: row.id, title: row.title.slice(0, 160), text: row.text.slice(0, 8000) };
+      return { id: row.id, title: row.title, text: row.text };
     })
     .filter((item): item is Handout => item !== null);
 }
@@ -44,7 +44,7 @@ export async function toggleHandout(articleId: string): Promise<boolean> {
   const on = current.some((item) => item.id === articleId);
   const next = on
     ? current.filter((item) => item.id !== articleId)
-    : [...current, { id: article.id, title: article.title, text: article.text.slice(0, 8000) }];
+    : [...current, { id: article.id, title: article.title, text: article.text }];
   await saveHandouts(next);
   return !on;
 }

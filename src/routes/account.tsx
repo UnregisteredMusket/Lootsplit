@@ -35,6 +35,7 @@ import {
   addAccountCharacter,
   linkCurrentCampaign,
   restoreAccountBackup,
+  restoreSharedAccountBackup,
   saveAccountBackup,
 } from "@/lib/account/transfers";
 import {
@@ -499,6 +500,20 @@ function Account() {
                           </p>
                         )}
                         <div className="portal-actions">
+                          {!!m.has_recovery && (
+                            <button
+                              className="portal-button secondary"
+                              disabled={busy}
+                              onClick={action(async () => {
+                                const records = await accountRequest("recovery-records", {
+                                  code: m.code,
+                                });
+                                await downloadJson(`Lootsplit-recovery-${m.code}.json`, records);
+                              })}
+                            >
+                              Download recovery records
+                            </button>
+                          )}
                           <button
                             className="portal-button secondary"
                             disabled={busy}
@@ -542,7 +557,7 @@ function Account() {
                                   revision: m.room_revision,
                                 });
                                 if (cloud.joined && cloud.code === m.code)
-                                  await clearAccountRoom();
+                                  await clearAccountRoom(true);
                                 await reload();
                                 setNotice(
                                   "Shared campaign deleted. Its saved state is in Cloud backups.",
@@ -664,6 +679,11 @@ function Account() {
                   campaign. PDFs and extracted reference content stay
                   device-local; protected saves use the existing encrypted
                   device tools.
+                  Deletion copies also offer shared recovery, including encounter
+                  and roll history. Restored rooms start with only you as DM and
+                  remain view-only until you resume play. Historical import
+                  proposals and account links are kept in recovery records;
+                  invite players again for new assignments.
                 </p>
                 <div className="portal-backup-list">
                   {library.backups.map((b) => (
@@ -673,6 +693,22 @@ function Account() {
                         <p>{new Date(b.created_at).toLocaleString()}</p>
                       </div>
                       <div className="portal-actions">
+                        {!!b.shared_recovery && (
+                          <button
+                            className="portal-button secondary"
+                            disabled={busy}
+                            onClick={action(async () => {
+                              if (
+                                window.confirm(
+                                  "Restore all shared records into a new view-only room? Your current campaign and backup will be kept. Players need new invitations.",
+                                )
+                              )
+                                await restoreSharedAccountBackup(b.id);
+                            })}
+                          >
+                            Restore shared records
+                          </button>
+                        )}
                         <button
                           className="portal-button secondary"
                           disabled={busy}

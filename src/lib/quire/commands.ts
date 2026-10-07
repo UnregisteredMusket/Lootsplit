@@ -1,4 +1,5 @@
 import { shopScheduleSchema } from "./shop-schedule.ts";
+import { canonicalJson } from "./canonical-json.ts";
 import {
   characterPermissionSchema,
   canEditCharacterField,
@@ -766,7 +767,7 @@ export function applyCommand(input: CloudTable, seat: CloudSeat, raw: Command): 
   return t;
 }
 export function same(a: unknown, b: unknown): boolean {
-  return JSON.stringify(a) === JSON.stringify(b);
+  return canonicalJson(a) === canonicalJson(b);
 }
 export function tablePatch(before: CloudTable, after: CloudTable): CommandInput {
   const changes: Extract<Command, { kind: "patch" }>["changes"] = [];

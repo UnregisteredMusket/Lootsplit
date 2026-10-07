@@ -3,7 +3,7 @@ import { assertMerchantSale, isService, stockCategory } from "./merchant.ts";
 import { applyCommand, type CommandInput } from "./commands.ts";
 import { loanFromRequest, readFinance, assertFinanceAccountRemovable } from "./finance.ts";
 import { readLocalEncounters } from "../encounters/local.ts";
-import { readJournal, type Journal } from "./journal.ts";
+import { readJournal, readValidatedJournal, type Journal } from "./journal.ts";
 import { blankSheet } from "../characters/model.mjs";
 import {
   statsOnly,
@@ -14,7 +14,7 @@ import {
 } from "../characters/campaign-sheet.mjs";
 import { getCloudWatch } from "./cloud-turn.ts";
 import { verifyReportBase, type ReportBase } from "./local-report.ts";
-import { coinsSchema, validateEconomyRows } from "./validation.ts";
+import { coinsSchema, validateEconomyRows, validateBackupRows, validateBackupReferences } from "./validation.ts";
 import { CATALOG_REVISION, PREVIOUS_LIST, starterCatalog } from "./catalog-seed.ts";
 import { quireDb, activeDatabaseName } from "./db.ts";
 import { guessRarity } from "./extract.ts";
@@ -57,7 +57,6 @@ import {
   readListings,
   readLoans,
   saveListings,
-  saveLoans,
   type Listing,
   type LoanAsk,
   type LoanStatus,
@@ -958,41 +957,35 @@ export async function buyFromShop(input: {
     const cost = unit * quantity;
     const coins = spendCoins(purse.coins, cost);
     if (!coins) throw new Error("Insufficient funds.");
-    const holdings = await request<Holding[]>(
-      tx.objectStore("holdings").index("purseId").getAll(purse.id),
-    );
-    const existing = holdings.find(
-      (holding) =>
-        holding.name.toLowerCase() === stock.name.toLowerCase() && holding.kind === "item",
-    );
+    // Each purchase is a separate lot. A matching name does not identify the
+    // same valuation, notes, equipment or provenance as previously owned goods.
+    const holding: Holding | null = isService(stock)
+      ? null
+      : {
+          id: crypto.randomUUID(),
+          purseId: purse.id,
+          name: stock.name,
+          category: stockCategory(stock, shop),
+          kind: "item",
+          quantity,
+          unitCopper: stock.copper,
+          notes: stock.notes,
+        };
     tx.objectStore("purses").put({ ...purse, coins });
-    if (!isService(stock))
-      tx.objectStore("holdings").put(
-        existing
-          ? {
-              ...existing,
-              category: stockCategory(stock, shop),
-              quantity: existing.quantity + quantity,
-              unitCopper: stock.copper,
-            }
-          : {
-              id: crypto.randomUUID(),
-              purseId: purse.id,
-              name: stock.name,
-              category: stockCategory(stock, shop),
-              kind: "item",
-              quantity,
-              unitCopper: stock.copper,
-              notes: stock.notes,
-            },
-      );
+    if (holding) tx.objectStore("holdings").put(holding);
     if (stock.quantity !== null)
-      tx.objectStore("stock").put({ ...stock, quantity: stock.quantity - quantity });
+      tx.objectStore("stock").put({
+        ...stock,
+        quantity: stock.quantity - quantity,
+      });
     const percent = score === null ? 0 : charismaOffPercent(score);
     const summary =
       `Bought ${quantity} ${stock.name} from ${shop.name}` +
       (percent ? `, Charisma ${score}, ${percent}% off` : "");
-    tx.objectStore("ledger").put(logLine(purse.id, shop.id, summary, -cost, "purchase"));
+    tx.objectStore("ledger").put({
+      ...logLine(purse.id, shop.id, summary, -cost, "purchase"),
+      purchase: { stockId: stock.id, quantity, holding },
+    });
   });
 }
 
@@ -1027,6 +1020,16 @@ export async function sellToShop(input: {
 }
 
 function gain(coins: Coins, copper: number): Coins {
+  const total = toCopper(coins) + copper;
+  if (
+    !coinsSchema.safeParse(coins).success ||
+    !Number.isSafeInteger(copper) ||
+    copper < 0 ||
+    !Number.isSafeInteger(total)
+  )
+    throw new Error(
+      "That coin balance cannot be represented exactly in whole copper. Export the original save before repairing it.",
+    );
   const paid = fromCopper(Math.max(0, copper));
   return tidy({
     cp: coins.cp + paid.cp,
@@ -1251,35 +1254,53 @@ export async function askLoan(input: {
   purseId: string;
   copper: number;
   note: string;
+  requestId?: string;
 }): Promise<void> {
   const copper = Math.round(input.copper);
   const note = input.note.trim();
-  if (!Number.isFinite(copper) || copper <= 0) throw new Error("Enter how much to borrow.");
+  if (getCloudWatch().joined && !getCloudWatch().mine) throw new Error("It is not your turn.");
+  if (!Number.isSafeInteger(copper) || copper <= 0)
+    throw new Error("Enter how much to borrow in whole copper.");
   if (!note) throw new Error("Write what the loan is for.");
-  const db = await quireDb();
-  const purse = await request<Purse | undefined>(
-    db.transaction("purses").objectStore("purses").get(input.purseId),
-  );
-  if (!purse) throw new Error("This account no longer exists.");
-  const loans = await loadLoans();
-  loans.push({
-    id: crypto.randomUUID(),
-    at: Date.now(),
-    purseId: purse.id,
-    purseName: purse.name,
-    copper,
-    note,
-    status: "pending",
-  });
-  await saveLoans(loans);
-  await postNotes([
-    {
-      from: "player",
-      to: "dm",
+  const id = input.requestId || crypto.randomUUID();
+  await atomic(["purses", "meta"], async (tx) => {
+    const purse = await request<Purse | undefined>(tx.objectStore("purses").get(input.purseId));
+    if (!purse) throw new Error("This account no longer exists.");
+    const loans = readLoans(await request(tx.objectStore("meta").get("loans")));
+    const prior = loans.find((loan) => loan.id === id);
+    if (prior) {
+      if (prior.purseId !== purse.id || prior.copper !== copper || prior.note !== note)
+        throw new Error("That loan request ID already identifies a different request.");
+      return;
+    }
+    const at = Date.now();
+    loans.push({
+      id,
+      at,
       purseId: purse.id,
-      text: `${purse.name} asked for a loan of ${formatCopper(copper)}. ${note}`,
-    },
-  ]);
+      purseName: purse.name,
+      copper,
+      note,
+      status: "pending",
+    });
+    const notes = readNotes(await request(tx.objectStore("meta").get("chat")));
+    tx.objectStore("meta").put({ id: "loans", loans });
+    tx.objectStore("meta").put({
+      id: "chat",
+      notes: readNotes([
+        ...notes,
+        {
+          id: `${id}-request-note`,
+          at,
+          from: "player",
+          to: "dm",
+          purseId: purse.id,
+          text: `${purse.name} asked for a loan of ${formatCopper(copper)}. ${note}`,
+        },
+      ]),
+    });
+  });
+  await refreshChat();
 }
 
 export async function decideLoan(id: string, status: LoanStatus): Promise<void> {
@@ -1292,7 +1313,10 @@ export async function decideLoan(id: string, status: LoanStatus): Promise<void> 
     if (status === "approved") {
       const purse = await request<Purse | undefined>(tx.objectStore("purses").get(loan.purseId));
       if (!purse) throw new Error("This account no longer exists.");
-      tx.objectStore("purses").put({ ...purse, coins: gain(purse.coins, loan.copper) });
+      tx.objectStore("purses").put({
+        ...purse,
+        coins: gain(purse.coins, loan.copper),
+      });
       const row = await request<{ value: unknown } | undefined>(
         tx.objectStore("meta").get("journal"),
       );
@@ -1314,17 +1338,24 @@ export async function decideLoan(id: string, status: LoanStatus): Promise<void> 
       id: "loans",
       loans: loans.map((item) => (item.id === id ? { ...item, status } : item)),
     });
+    const notes = readNotes(await request(tx.objectStore("meta").get("chat")));
+    tx.objectStore("meta").put({
+      id: "chat",
+      notes: readNotes([
+        ...notes,
+        {
+          id: `${loan.id}-decision-note`,
+          at: Date.now(),
+          from: "dm",
+          to: "dm",
+          purseId: loan.purseId,
+          text: `Loan of ${formatCopper(loan.copper)} ${status}.`,
+        },
+      ]),
+    });
     return loan;
   });
-  if (decided)
-    await postNotes([
-      {
-        from: "dm",
-        to: "dm",
-        purseId: decided.purseId,
-        text: `Loan of ${formatCopper(decided.copper)} ${status}.`,
-      },
-    ]);
+  if (decided) await refreshChat();
 }
 
 export async function importCharacterSheet(purseId: string, file: File): Promise<string[]> {
@@ -1398,95 +1429,166 @@ export async function updateCharacterSheet(
 }
 
 export async function voidLedgerLine(id: string): Promise<void> {
-  const db = await quireDb();
-  const lines = await request<LedgerLine[]>(
-    db.transaction("ledger").objectStore("ledger").getAll(),
-  );
-  const line = lines.find((item) => item.id === id);
-  if (!line) throw new Error("That line is not in this browser on this device.");
-  if (/^(Finance:|Sold |Gave |Approved a loan |Bought .* from the market)/.test(line.summary))
-    throw new Error(
-      "This trade cannot be reversed safely from the ledger. Record a compensating payment or transfer and correct the holding instead.",
-    );
-  if (line.summary.startsWith("Voided")) throw new Error("That line is already a void.");
-  if (lines.some((item) => item.summary.includes(`(void:${line.id})`)))
-    throw new Error("That line was already voided.");
-  const purse = await request<Purse | undefined>(
-    db.transaction("purses").objectStore("purses").get(line.purseId),
-  );
-  if (!purse) throw new Error("This account no longer exists.");
-  const coins =
-    line.copper < 0 ? gain(purse.coins, -line.copper) : spendCoins(purse.coins, line.copper);
-  if (!coins) throw new Error("That account cannot cover reversing this line.");
-  const bought = /^Bought (\d+) (.+?) from /.exec(line.summary);
-  const holdings = await request<Holding[]>(
-    db.transaction("holdings").objectStore("holdings").index("purseId").getAll(purse.id),
-  );
-  const stock = line.shopId
-    ? await request<StockLine[]>(
-        db.transaction("stock").objectStore("stock").index("shopId").getAll(line.shopId),
+  if (getSeat().role === "player") throw new Error("Only the DM can reverse a ledger line.");
+  await atomic(["purses", "holdings", "shops", "stock", "ledger"], async (tx) => {
+    const lines = await request<LedgerLine[]>(tx.objectStore("ledger").getAll());
+    const line = lines.find((item) => item.id === id);
+    if (!line) throw new Error("That line is not in this browser on this device.");
+    if (line.reversalOf || line.summary.startsWith("Voided"))
+      throw new Error("That line is already a void.");
+    // Legacy copies identify reversals in their summary; new copies also retain
+    // an explicit source ID. Check both while holding the write transaction.
+    if (lines.some((item) => item.reversalOf === id || item.summary.includes(`(void:${id})`)))
+      return;
+    if (
+      line.transactionType === "transfer" ||
+      line.transactionType === "loan" ||
+      /^(Finance:|Sold |Gave |Transfer (sent|received)|Approved a loan |Bought .* from the market)/.test(
+        line.summary,
       )
-    : [];
-  if (
-    bought &&
-    !holdings.some(
-      (item) =>
-        item.name.toLowerCase() === bought[2].toLowerCase() &&
-        item.kind === "item" &&
-        item.quantity >= Number(bought[1]),
     )
-  )
-    throw new Error(
-      "The purchased items are no longer in this account. Return them before reversing the purchase.",
-    );
-  const tx = db.transaction(["purses", "holdings", "stock", "ledger"], "readwrite");
-  const done = finish(tx);
-  tx.objectStore("purses").put({ ...purse, coins });
-  if (bought) {
-    const quantity = Number(bought[1]);
-    const name = bought[2].toLowerCase();
-    const holding = holdings.find(
-      (item) => item.name.toLowerCase() === name && item.kind === "item",
-    );
+      throw new Error(
+        "This trade cannot be reversed safely from the ledger. Record a compensating payment or transfer and correct the holding instead.",
+      );
+    const purse = await request<Purse | undefined>(tx.objectStore("purses").get(line.purseId));
+    if (!purse) throw new Error("This account no longer exists.");
+    const bought = /^Bought (\d+) (.+?) from /.exec(line.summary);
+    let holding: Holding | undefined;
+    let shelf: StockLine | undefined;
+    const quantity = line.purchase?.quantity ?? (bought ? Number(bought[1]) : 0);
+    if (line.purchase || bought) {
+      if (!Number.isSafeInteger(quantity) || quantity < 1 || !line.shopId)
+        throw new Error(
+          "This purchase receipt is incomplete. Correct the assets with a compensating transaction.",
+        );
+      if (bought && Number(bought[1]) !== quantity)
+        throw new Error(
+          "This purchase receipt has conflicting quantities. Correct the assets with a compensating transaction.",
+        );
+      if (line.purchase) {
+        shelf = await request<StockLine | undefined>(
+          tx.objectStore("stock").get(line.purchase.stockId),
+        );
+        if (line.purchase.holding) {
+          holding = await request<Holding | undefined>(
+            tx.objectStore("holdings").get(line.purchase.holding.id),
+          );
+          const original = line.purchase.holding;
+          const keys = new Set([
+            ...Object.keys(holding ?? {}),
+            ...Object.keys(original),
+          ] as (keyof Holding)[]);
+          if (
+            !holding ||
+            holding.purseId !== purse.id ||
+            holding.kind !== "item" ||
+            holding.quantity !== quantity ||
+            [...keys].some((key) => holding![key] !== original[key])
+          )
+            throw new Error(
+              "The purchased items have changed or left this account. Correct the assets with a compensating transaction.",
+            );
+        } else if (!shelf || !isService(shelf))
+          throw new Error(
+            "This purchase is missing its item receipt. Correct the assets with a compensating transaction.",
+          );
+      } else {
+        const name = bought![2].toLowerCase();
+        const holdings = await request<Holding[]>(
+          tx.objectStore("holdings").index("purseId").getAll(purse.id),
+        );
+        const stock = await request<StockLine[]>(
+          tx.objectStore("stock").index("shopId").getAll(line.shopId),
+        );
+        const candidates = holdings.filter(
+          (item) => item.name.toLowerCase() === name && item.kind === "item",
+        );
+        const shelves = stock.filter((item) => item.name.toLowerCase() === name);
+        if (candidates.length !== 1 || shelves.length !== 1)
+          throw new Error(
+            "This older purchase has ambiguous item or stock records. Record a compensating payment and correct the exact holding instead.",
+          );
+        holding = candidates[0];
+        shelf = shelves[0];
+        const shop = await request<Shop | undefined>(tx.objectStore("shops").get(line.shopId));
+        // A sold purchase can leave only an older same-name lot. Without a
+        // source ID, all recorded valuation and item metadata must still agree.
+        if (
+          !shop ||
+          holding.unitCopper !== shelf.copper ||
+          holding.notes !== shelf.notes ||
+          (holding.category && holding.category !== stockCategory(shelf, normalizeShop(shop)))
+        )
+          throw new Error(
+            "This older purchase no longer matches the remaining item and stock records. Record a compensating payment and correct the exact holding instead.",
+          );
+        if (holding.quantity < quantity)
+          throw new Error(
+            "The purchased items are no longer in this account. Return them before reversing the purchase.",
+          );
+      }
+      if (
+        !shelf ||
+        shelf.shopId !== line.shopId ||
+        (bought && shelf.name.toLowerCase() !== bought[2].toLowerCase())
+      )
+        throw new Error(
+          "The original shop stock is missing or changed. Correct the assets with a compensating transaction.",
+        );
+      if (shelf.quantity !== null && !Number.isSafeInteger(shelf.quantity + quantity))
+        throw new Error("The returned stock quantity would be too large.");
+    }
+    const coins =
+      line.copper < 0 ? gain(purse.coins, -line.copper) : spendCoins(purse.coins, line.copper);
+    if (!coins) throw new Error("That account cannot cover reversing this line.");
+    tx.objectStore("purses").put({ ...purse, coins });
     if (holding) {
       const left = holding.quantity - quantity;
       if (left > 0) tx.objectStore("holdings").put({ ...holding, quantity: left });
       else tx.objectStore("holdings").delete(holding.id);
     }
-    const shelf = stock.find((item) => item.name.toLowerCase() === name);
     if (shelf && shelf.quantity !== null)
-      tx.objectStore("stock").put({ ...shelf, quantity: shelf.quantity + quantity });
-  }
-  tx.objectStore("ledger").put(
-    logLine(
-      purse.id,
-      line.shopId,
-      `Voided ${line.summary} (void:${line.id})`,
-      -line.copper,
-      line.transactionType === "transfer" ? "transfer" : "void",
-    ),
-  );
-  await done;
+      tx.objectStore("stock").put({
+        ...shelf,
+        quantity: shelf.quantity + quantity,
+      });
+    tx.objectStore("ledger").put({
+      ...logLine(
+        purse.id,
+        line.shopId,
+        `Voided ${line.summary} (void:${id})`,
+        -line.copper,
+        "void",
+      ),
+      reversalOf: id,
+    });
+  });
 }
 
 export async function setCoins(purseId: string, coins: Coins, summary?: string): Promise<void> {
   if (!coinsSchema.safeParse(coins).success)
-    throw new Error("Coin balances must be nonnegative whole numbers.");
-  const db = await quireDb();
-  const purse = await request<Purse | undefined>(
-    db.transaction("purses").objectStore("purses").get(purseId),
-  );
-  if (!purse) throw new Error("This account no longer exists.");
-  const next = tidy(coins);
-  const delta = toCopper(next) - toCopper(purse.coins);
-  const tx = db.transaction(["purses", "ledger"], "readwrite");
-  const done = finish(tx);
-  tx.objectStore("purses").put({ ...purse, coins: next });
-  if (delta !== 0)
-    tx.objectStore("ledger").put(
-      logLine(purse.id, null, summary?.trim() || `Adjusted coin in ${purse.name}`, delta),
+    throw new Error(
+      "Coin balances must be nonnegative whole numbers with an exactly representable total. Export oversized original saves before repairing them.",
     );
-  await done;
+  const next = tidy(coins);
+  await atomic(["purses", "ledger"], async (tx) => {
+    const purse = await request<Purse | undefined>(tx.objectStore("purses").get(purseId));
+    if (!purse) throw new Error("This account no longer exists.");
+    if (!coinsSchema.safeParse(purse.coins).success)
+      throw new Error(
+        "The previous coin balance cannot be represented exactly. Export the original save before repairing it.",
+      );
+    const delta = toCopper(next) - toCopper(purse.coins);
+    if (!Number.isSafeInteger(delta))
+      throw new Error(
+        "The previous coin balance cannot be represented exactly. Export the original save before repairing it.",
+      );
+    tx.objectStore("purses").put({ ...purse, coins: next });
+    if (delta !== 0)
+      tx.objectStore("ledger").put(
+        logLine(purse.id, null, summary?.trim() || `Adjusted coin in ${purse.name}`, delta),
+      );
+  });
 }
 
 export async function postCopper(purseId: string, copper: number, summary: string): Promise<void> {
@@ -1496,6 +1598,10 @@ export async function postCopper(purseId: string, copper: number, summary: strin
   await atomic(["purses", "ledger"], async (tx) => {
     const purse = await request<Purse | undefined>(tx.objectStore("purses").get(purseId));
     if (!purse) throw new Error("This account no longer exists.");
+    if (!coinsSchema.safeParse(purse.coins).success)
+      throw new Error(
+        "The previous coin balance cannot be represented exactly. Export the original save before repairing it.",
+      );
     const nextTotal = toCopper(purse.coins) + copper;
     if (!Number.isSafeInteger(nextTotal) || nextTotal < 0) throw new Error("Insufficient funds.");
     tx.objectStore("purses").put({
@@ -1507,6 +1613,9 @@ export async function postCopper(purseId: string, copper: number, summary: strin
 }
 
 export type QuireFile = {
+  /** Supplemental account recovery history is preserved even in a device-only copy. */
+  campaignRecovery?: unknown;
+  recoveryDiagnostics?: string[];
   localEncounters?: ReturnType<typeof readLocalEncounters>;
   journal?: Journal;
   gifts?: import("./gift.ts").PlayerGift[];
@@ -1566,6 +1675,8 @@ export async function snapshot(): Promise<QuireFile> {
   const baseRow = request<{ value: ReportBase } | undefined>(
     tx.objectStore("meta").get("shareBase"),
   );
+  const diagnosticsRow = request<{ value: string[] } | undefined>(tx.objectStore("meta").get("recoveryDiagnostics"));
+  const recoveryRow = request<{ value: unknown } | undefined>(tx.objectStore("meta").get("campaignRecovery"));
   const encountersRow = request<{ rows: unknown } | undefined>(
     tx.objectStore("meta").get("localEncounters"),
   );
@@ -1577,6 +1688,8 @@ export async function snapshot(): Promise<QuireFile> {
   const seatLock = readSeatLock(await lockRow);
   const file: QuireFile = {
     kind: "quire",
+    campaignRecovery: (await recoveryRow)?.value,
+    recoveryDiagnostics: (await diagnosticsRow)?.value,
     localEncounters: readLocalEncounters((await encountersRow)?.rows),
     shareBase: (await baseRow)?.value,
     version: 2,
@@ -1836,15 +1949,33 @@ export function readQuireFile(value: unknown): QuireFile {
     if (!Array.isArray(file[key])) throw new Error("That file is missing part of the ledger.");
   }
   validateEconomyRows(file as QuireFile);
-  readJournal(file.journal);
+  validateBackupRows(file as unknown as Record<string, unknown>);
+  const journal = readValidatedJournal(file.journal);
   readLocalEncounters(file.localEncounters);
-  return file as QuireFile;
+  const metadata = { listings: readListings(file.listings), loans: readLoans(file.loans),
+    sheets: readSheets(file.sheets), notes: readNotes(file.notes), handouts: readHandouts(file.handouts),
+    gifts: readGifts(file.gifts), sales: readSales(file.sales) };
+  for (const [key, rows] of Object.entries(metadata)) {
+    const source = file[key as keyof typeof metadata];
+    if (source !== undefined && (!Array.isArray(source) || source.length !== rows.length))
+      throw Error(`The ${key} contain invalid or duplicate data. The current campaign was not changed.`);
+  }
+  const diagnostics = validateBackupReferences({ ...(file as QuireFile), ...metadata, journal });
+  // A clone error must occur before the destructive transaction, including non-JSON callers.
+  structuredClone(file);
+  return { ...file, recoveryDiagnostics: diagnostics } as QuireFile;
 }
 
 export async function restore(file: QuireFile): Promise<void> {
   if (getCloudWatch().joined)
     throw new Error("Return to Local Mode before importing or restoring campaign data.");
-  readQuireFile(file);
+  file = structuredClone(readQuireFile(file));
+  // Compute all readers/normalizers before opening the replacement transaction.
+  const prepared = { encounters: readLocalEncounters(file.localEncounters), shops: file.shops.map(normalizeShop),
+    stock: file.stock.map(normalizeStock), gifts: readGifts(file.gifts), sales: readSales(file.sales),
+    listings: readListings(file.listings), loans: readLoans(file.loans), sheets: readSheets(file.sheets),
+    notes: readNotes(file.notes), handouts: readHandouts(file.handouts), journal: readJournal(file.journal),
+    lock: readSeatLock(file.seatLock), settings: file.settings ? clampRealm(file.settings) : undefined };
   const db = await quireDb();
   const stores = [
     "books",
@@ -1860,46 +1991,55 @@ export async function restore(file: QuireFile): Promise<void> {
   ] as const;
   const tx = db.transaction([...stores], "readwrite");
   const done = finish(tx);
-  for (const store of stores) tx.objectStore(store).clear();
-  tx.objectStore("meta").put({
-    id: "localEncounters",
-    rows: readLocalEncounters(file.localEncounters),
-  });
-  for (const purse of file.purses) tx.objectStore("purses").put(purse);
-  for (const holding of file.holdings) tx.objectStore("holdings").put(holding);
-  for (const shop of file.shops) tx.objectStore("shops").put(normalizeShop(shop));
-  for (const line of file.stock) tx.objectStore("stock").put(normalizeStock(line));
-  for (const entry of file.ledger) tx.objectStore("ledger").put(entry);
-  for (const book of file.books) tx.objectStore("books").put(book);
-  for (const article of file.articles) tx.objectStore("articles").put(article);
-  if (Array.isArray(file.catalog)) {
-    tx.objectStore("catalog").clear();
-    for (const item of file.catalog) tx.objectStore("catalog").put(item);
-    tx.objectStore("meta").put({ id: "catalogRevision", n: CATALOG_REVISION });
+  try {
+    for (const store of stores) tx.objectStore(store).clear();
+    tx.objectStore("meta").put({
+      id: "localEncounters",
+      rows: prepared.encounters,
+    });
+    for (const purse of file.purses) tx.objectStore("purses").put(purse);
+    for (const holding of file.holdings) tx.objectStore("holdings").put(holding);
+    for (const shop of prepared.shops) tx.objectStore("shops").put(shop);
+    for (const line of prepared.stock) tx.objectStore("stock").put(line);
+    for (const entry of file.ledger) tx.objectStore("ledger").put(entry);
+    for (const book of file.books) tx.objectStore("books").put(book);
+    for (const article of file.articles) tx.objectStore("articles").put(article);
+    if (Array.isArray(file.catalog)) {
+      tx.objectStore("catalog").clear();
+      for (const item of file.catalog) tx.objectStore("catalog").put(item);
+      tx.objectStore("meta").put({ id: "catalogRevision", n: CATALOG_REVISION });
+    }
+    if (Array.isArray(file.lexicon)) {
+      tx.objectStore("lexicon").clear();
+      for (const lexeme of file.lexicon) tx.objectStore("lexicon").put(lexeme);
+    }
+    tx.objectStore("meta").put({ id: "gifts", gifts: prepared.gifts });
+    tx.objectStore("meta").put({ id: "sales", sales: prepared.sales });
+    if (file.shareBase) tx.objectStore("meta").put({ id: "shareBase", value: file.shareBase });
+    if (file.settings) tx.objectStore("meta").put({ id: "settings", ...prepared.settings });
+    if (Array.isArray(file.listings))
+      tx.objectStore("meta").put({ id: "listings", listings: prepared.listings });
+    if (Array.isArray(file.loans))
+      tx.objectStore("meta").put({ id: "loans", loans: prepared.loans });
+    if (Array.isArray(file.sheets))
+      tx.objectStore("meta").put({ id: "sheets", sheets: prepared.sheets });
+    tx.objectStore("meta").put({ id: "chat", notes: prepared.notes });
+    tx.objectStore("meta").put({ id: "handouts", handouts: prepared.handouts });
+    tx.objectStore("meta").put({ id: "journal", value: prepared.journal });
+    const lock = prepared.lock;
+    if (lock) tx.objectStore("meta").put({ id: "seatLock", ...lock });
+    else tx.objectStore("meta").delete("seatLock");
+    tx.objectStore("meta").put({ id: "seeded" });
+    tx.objectStore("meta").put({ id: "catalogSeeded" });
+    if (file.campaignRecovery !== undefined)
+      tx.objectStore("meta").put({ id: "campaignRecovery", value: file.campaignRecovery });
+    tx.objectStore("meta").put({ id: "recoveryDiagnostics", value: file.recoveryDiagnostics ?? [] });
+    await done;
+  } catch (error) {
+    try { tx.abort(); } catch { /* It may already have aborted. */ }
+    await done.catch(() => undefined);
+    throw error;
   }
-  if (Array.isArray(file.lexicon)) {
-    tx.objectStore("lexicon").clear();
-    for (const lexeme of file.lexicon) tx.objectStore("lexicon").put(lexeme);
-  }
-  tx.objectStore("meta").put({ id: "gifts", gifts: readGifts(file.gifts) });
-  tx.objectStore("meta").put({ id: "sales", sales: readSales(file.sales) });
-  if (file.shareBase) tx.objectStore("meta").put({ id: "shareBase", value: file.shareBase });
-  if (file.settings) tx.objectStore("meta").put({ id: "settings", ...clampRealm(file.settings) });
-  if (Array.isArray(file.listings))
-    tx.objectStore("meta").put({ id: "listings", listings: readListings(file.listings) });
-  if (Array.isArray(file.loans))
-    tx.objectStore("meta").put({ id: "loans", loans: readLoans(file.loans) });
-  if (Array.isArray(file.sheets))
-    tx.objectStore("meta").put({ id: "sheets", sheets: readSheets(file.sheets) });
-  tx.objectStore("meta").put({ id: "chat", notes: readNotes(file.notes) });
-  tx.objectStore("meta").put({ id: "handouts", handouts: readHandouts(file.handouts) });
-  tx.objectStore("meta").put({ id: "journal", value: readJournal(file.journal) });
-  const lock = readSeatLock(file.seatLock);
-  if (lock) tx.objectStore("meta").put({ id: "seatLock", ...lock });
-  else tx.objectStore("meta").delete("seatLock");
-  tx.objectStore("meta").put({ id: "seeded" });
-  tx.objectStore("meta").put({ id: "catalogSeeded" });
-  await done;
 }
 
 export function blankPurse(kind: Purse["kind"]): Purse {
@@ -2034,6 +2174,45 @@ async function audit(
     ...(change ? { change } : {}),
   });
   store.put({ id: "journal", value: journal });
+}
+
+/** Execute a local command against the latest campaign under one write lock. */
+export async function executeLocalCommand(input: CommandInput): Promise<void> {
+  let changedChat = false;
+  await atomic([...ECONOMY], async (tx) => {
+    const source = await readEconomyTransaction(tx);
+    const seat = getSeat();
+    const next = applyCommand(
+      source,
+      {
+        id: "local",
+        token: "",
+        name: "Local",
+        role: seat.role,
+        purseIds: seat.purseIds,
+      },
+      { ...input, id: crypto.randomUUID() },
+    );
+    for (const store of ["purses", "holdings", "shops", "stock", "ledger"] as const) {
+      const prior = new Map(source[store].map((row) => [row.id, JSON.stringify(row)]));
+      const retained = new Set(next[store].map((row) => row.id));
+      for (const row of next[store]) {
+        if (prior.get(row.id) !== JSON.stringify(row)) tx.objectStore(store).put(row);
+      }
+      for (const id of prior.keys()) if (!retained.has(id)) tx.objectStore(store).delete(id);
+    }
+    const meta = tx.objectStore("meta");
+    if (JSON.stringify(source.realm) !== JSON.stringify(next.realm))
+      meta.put({ id: "settings", ...clampRealm(next.realm) });
+    for (const id of ["listings", "loans", "sheets", "handouts"] as const) {
+      if (JSON.stringify(source[id]) !== JSON.stringify(next[id])) meta.put({ id, [id]: next[id] });
+    }
+    if (JSON.stringify(source.journal) !== JSON.stringify(next.journal))
+      meta.put({ id: "journal", value: next.journal });
+    changedChat = JSON.stringify(source.notes) !== JSON.stringify(next.notes);
+    if (changedChat) meta.put({ id: "chat", notes: next.notes });
+  });
+  if (changedChat) await refreshChat();
 }
 
 /** Read, calculate and commit campaign finances under one IndexedDB write lock. */

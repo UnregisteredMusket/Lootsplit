@@ -32,7 +32,7 @@ type Encounter = z.infer<typeof encounterSchema>;
 type Combatant = z.infer<typeof combatantSchema>;
 type Filters = z.infer<typeof generatorSchema>;
 type Purse = { id: string; name: string; kind: string };
-type Campaign = { code: string; name: string; purses: Purse[] };
+type Campaign = { code: string; name: string; purses: Purse[]; closed?: boolean };
 type Summary = {
   id: string;
   code: string;
@@ -41,6 +41,7 @@ type Summary = {
   updated_at: number;
 };
 type Detail = {
+  readOnly?: boolean;
   id: string;
   code: string;
   body: Encounter;
@@ -242,14 +243,14 @@ function EncounterLibrary({ allowDevice }: { allowDevice: boolean }) {
               >
                 {library.campaigns.map((c) => (
                   <option key={c.code} value={c.code}>
-                    {c.name}
+                    {c.name}{c.closed ? " · closed" : ""}
                     {!["device", "personal"].includes(c.code) ? ` · ${c.code}` : ""}
                   </option>
                 ))}
               </select>
             </label>
             <button
-              disabled={busy || !library.campaigns.some((c) => c.code === code)}
+              disabled={busy || !library.campaigns.some((c) => c.code === code && !c.closed)}
               onClick={() => void create()}
             >
               <FantasyIcon ui="Encounters" size={22} /> New encounter
@@ -259,7 +260,7 @@ function EncounterLibrary({ allowDevice }: { allowDevice: boolean }) {
               <input
                 type="file"
                 accept=".json,application/json"
-                disabled={busy || !library.campaigns.some((c) => c.code === code)}
+                disabled={busy || !library.campaigns.some((c) => c.code === code && !c.closed)}
                 onChange={async (e) => {
                   const file = e.target.files?.[0];
                   e.target.value = "";
@@ -352,7 +353,7 @@ function EncounterLibrary({ allowDevice }: { allowDevice: boolean }) {
                   the DM.
                 </p>
                 <button
-                  disabled={busy || !library.campaigns.some((c) => c.code === code)}
+                  disabled={busy || !library.campaigns.some((c) => c.code === code && !c.closed)}
                   onClick={() => void create()}
                 >
                   Build an encounter
@@ -587,7 +588,7 @@ function EncounterEditor({
         {error ? <p role="alert">{error}</p> : <p>Loading encounter…</p>}
       </div>
     );
-  const readOnly = detail.status === "awarded",
+  const readOnly = detail.status === "awarded" || detail.readOnly === true,
     review = detail.status === "review",
     locked = readOnly || busy || querying;
   const stats = estimate(draft);
@@ -693,7 +694,8 @@ function EncounterEditor({
             {notice}
           </p>
         )}
-        {readOnly && (
+        {detail.readOnly && <p className="encounter-notice">This campaign is closed. Reopen it in My account before changing encounters or rolling. You can still read its history or export a draft for preparation.</p>}
+        {detail.status === "awarded" && (
           <p className="encounter-notice">
             Awarded {detail.award ? new Date(detail.award.at).toLocaleString() : ""}. Receipt:{" "}
             {detail.award?.receiptId}. This encounter is locked against a second award.

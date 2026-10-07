@@ -134,6 +134,8 @@ export type RealmSettings = {
 
 export type LedgerLine = {
   transactionType?: "transfer" | "purchase" | "sale" | "loan" | "payment" | "adjustment" | "void";
+  reversalOf?: string;
+  purchase?: { stockId: string; quantity: number; holding: Holding | null };
   id: string;
   at: number;
   purseId: string;

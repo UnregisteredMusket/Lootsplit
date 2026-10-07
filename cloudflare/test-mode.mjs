@@ -1,9 +1,9 @@
-import { roleOf } from "./members.mjs";
+import { roleOf, staffCommitGuard } from "./members.mjs";
 import { blankSheet } from "../src/lib/characters/model.mjs";
 const fail = (m, status = 400) => {
   throw Object.assign(Error(m), { status });
 };
-export async function ownerTestMode(db, user, body) {
+export async function ownerTestMode(db, user, body, sessionId) {
   if ((await roleOf(db, user)) !== "owner")
     fail("Test mode is available only to the site owner.", 403);
   if (body.action === "create") {
@@ -98,16 +98,19 @@ export async function ownerTestMode(db, user, body) {
       table,
       seen: { gifts: [], sales: [] },
     };
-    await db.batch([
+    const guard = await staffCommitGuard(db, user, sessionId, ["owner"]);
+    const results = await db.batch([
       db
-        .prepare("INSERT INTO campaign_rooms(code,revision,body) VALUES (?,1,?)")
-        .bind(code, JSON.stringify(room)),
+        .prepare(`INSERT INTO campaign_rooms(code,revision,body) SELECT ?,1,? WHERE ${guard.sql}`)
+        .bind(code, JSON.stringify(room), ...guard.binds),
       db
         .prepare(
-          "INSERT INTO library_members(user_id,code,seat_id,token,name,archived,updated_at) VALUES (?,?,?,?,?,0,?)",
+          "INSERT INTO library_members(user_id,code,seat_id,token,name,archived,updated_at) SELECT ?,?,?,?,?,0,? WHERE EXISTS(SELECT 1 FROM campaign_rooms WHERE code=? AND body=?)",
         )
-        .bind(user, code, seatId, token, "Test mode", Date.now()),
+        .bind(user, code, seatId, token, "Test mode", Date.now(), code, JSON.stringify(room)),
     ]);
+    if (!results[0].meta.changes)
+      fail("Owner access changed. Sign in again before creating a Test room.", 409);
     return { userId: user, code, token, seatId, role: "dm", purseIds: [], name: "Test mode" };
   }
   if (body.action !== "reset") fail("Invalid Test mode action.");
@@ -139,10 +142,13 @@ export async function ownerTestMode(db, user, body) {
   room.invitations = {};
   room.blockedUsers = {};
   const next = JSON.stringify(room);
+  const guard = await staffCommitGuard(db, user, sessionId, ["owner"]);
   const results = await db.batch([
     db
-      .prepare("UPDATE campaign_rooms SET body=?,revision=? WHERE code=? AND body=?")
-      .bind(next, room.revision, room.code, row.body),
+      .prepare(
+        `UPDATE campaign_rooms SET body=?,revision=? WHERE code=? AND body=? AND ${guard.sql}`,
+      )
+      .bind(next, room.revision, room.code, row.body, ...guard.binds),
     db
       .prepare(
         "DELETE FROM play_rolls WHERE code=? AND EXISTS(SELECT 1 FROM campaign_rooms WHERE code=? AND body=?)",

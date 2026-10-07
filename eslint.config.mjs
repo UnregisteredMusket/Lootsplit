@@ -10,6 +10,7 @@ export default tseslint.config(
   {
     ignores: [
       "dist/**",
+      "test-results/**", // Generated browser reports and traces, not application source.
       ".output/**",
       ".wrangler/**",
       ".vercel/**",

@@ -2,9 +2,14 @@ import { shopScheduleSchema } from "./shop-schedule.ts";
 import { characterPermissionsSchema } from "../characters/permissions.mjs";
 import { z } from "zod";
 import { sheetSchema, inventoryFields } from "../characters/model.mjs";
+import { toCopper } from "./money.ts";
 const id = z.string().min(1);
 const amount = z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER);
-export const coinsSchema = z.object({ cp: amount, sp: amount, ep: amount, gp: amount, pp: amount });
+export const coinsSchema = z
+  .object({ cp: amount, sp: amount, ep: amount, gp: amount, pp: amount })
+  .refine((coins) => Number.isSafeInteger(toCopper(coins)), {
+    message: "The combined coin balance must be exactly representable in whole copper. Export the original save before repairing an oversized balance.",
+  });
 export const artworkSchema = z
   .string()
   .max(500000)
@@ -59,6 +64,8 @@ const stock = z.object({
   notes: z.string(),
 });
 const ledger = z.object({
+  reversalOf: id.optional(),
+  purchase: z.object({ stockId: id, quantity: amount.positive(), holding: holdingSchema.nullable() }).optional(),
   transactionType: z
     .enum(["transfer", "purchase", "sale", "loan", "payment", "adjustment", "void"])
     .optional(),
@@ -87,4 +94,64 @@ export function validateEconomyRows(value: {
     if (new Set(ids).size !== ids.length)
       throw new Error(`The ${key} contain duplicate IDs. The current campaign was not changed.`);
   }
+}
+
+
+/** Validate every durable store before a replacement transaction is opened. */
+export function validateBackupRows(value: Record<string, unknown>): void {
+  const book = z.object({ id, title: z.string(), fileName: z.string(), pageCount: amount,
+    articleCount: amount, importedAt: z.number().finite() });
+  const article = z.object({ id, bookId: id, title: z.string(), text: z.string(),
+    pageStart: amount, pageEnd: amount, favorite: z.boolean().optional() });
+  const catalog = z.object({ id, name: z.string(), category: z.string(), rarity: z.string(),
+    baseCopper: amount, notes: z.string(), origin: z.string(), service: z.boolean().optional() });
+  const lexicon = z.object({ id, name: z.string(), kind: z.enum(["person", "place", "shop", "continent", "country", "region"]),
+    bookId: z.string(), notes: z.string() });
+  for (const [key, schema] of Object.entries({ books: book, articles: article, catalog, lexicon })) {
+    if (value[key] === undefined && (key === "catalog" || key === "lexicon")) continue;
+    if (!z.array(schema).safeParse(value[key]).success)
+      throw Error(`The ${key} contain invalid or missing data. The current campaign was not changed.`);
+    const ids = (value[key] as { id: string }[]).map(row => row.id);
+    if (new Set(ids).size !== ids.length)
+      throw Error(`The ${key} contain duplicate IDs. The current campaign was not changed.`);
+  }
+}
+
+/** Live assets need owners; historical ledger and settled agreements may retain deleted IDs. */
+export function validateBackupReferences(value: {
+  purses: { id: string }[]; holdings: { id: string; purseId: string }[];
+  shops: { id: string }[]; stock: { shopId: string }[];
+  books: { id: string }[]; articles: { bookId: string }[];
+  sheets?: { purseId: string }[]; loans?: { purseId: string; status: string }[];
+  journal?: { requests?: { purseId: string; status: string }[]; finance?: {
+    loans: { purseId: string; lenderId: string; principal: number; interest: number }[];
+    rules: { purseId: string; holdingId: string; active: boolean; arrears: number }[];
+  } };
+}): string[] {
+  const diagnostics: string[] = [];
+  const purses = new Set(value.purses.map(row => row.id)), shops = new Set(value.shops.map(row => row.id)),
+    books = new Set(value.books.map(row => row.id)), holdings = new Set(value.holdings.map(row => row.id));
+  const requireReference = (valid: boolean, label: string) => {
+    if (!valid) throw Error(`The backup has a missing ${label} reference. The current campaign was not changed.`);
+  };
+  for (const row of value.holdings) requireReference(purses.has(row.purseId), "holding owner");
+  for (const row of value.stock) requireReference(shops.has(row.shopId), "stock shop");
+  for (const row of value.articles) requireReference(books.has(row.bookId), "article book");
+  // removePurse deliberately keeps imported sheets and request history. They are not live assets.
+  for (const row of value.sheets || []) if (!purses.has(row.purseId))
+    diagnostics.push(`Retained imported character history for removed account ${row.purseId}.`);
+  for (const row of [...(value.loans || []), ...(value.journal?.requests || [])])
+    if (!purses.has(row.purseId))
+      diagnostics.push(`Retained financial request history for removed account ${row.purseId}.`);
+  for (const row of value.journal?.finance?.loans || []) if (row.principal + row.interest > 0) {
+    requireReference(purses.has(row.purseId), "borrower");
+    if (row.lenderId) requireReference(purses.has(row.lenderId), "lender");
+  }
+  for (const row of value.journal?.finance?.rules || []) if (row.active || row.arrears > 0) {
+    requireReference(purses.has(row.purseId), "finance account");
+    // A transferred property can deliberately leave an agreement paused for review.
+    if (row.active && row.holdingId && !holdings.has(row.holdingId))
+      diagnostics.push(`Retained finance agreement for missing inventory source ${row.holdingId}. Update or pause it before settlement.`);
+  }
+  return diagnostics;
 }

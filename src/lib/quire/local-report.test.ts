@@ -14,6 +14,8 @@ const pc = (id: string) => ({
 const initial = () => ({
   ...emptyCloudTable(),
   purses: [pc("A"), pc("B")],
+  shops: [{ id: "shop", name: "Fixture shop", keeper: "", place: "", notes: "", sellRate: 1,
+    buyRate: 0.5, wealth: "modest" as const, category: "general" as const, priceScale: 1 }],
   stock: [
     {
       id: "last",

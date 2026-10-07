@@ -19,6 +19,7 @@ import { readRoom } from "../src/lib/quire/room-store.server.ts";
 import { handleCharacterPlay } from "../cloudflare/character-play.mjs";
 import { campaignRecords } from "../cloudflare/campaign-records.mjs";
 import { ownerTestMode } from "../cloudflare/test-mode.mjs";
+import { accountAuth, handleAccounts } from "../cloudflare/accounts.mjs";
 import { siteGameAnalytics } from "../cloudflare/game-analytics.mjs";
 const dm = { id: "dm", token: "dm", name: "DM", role: "dm", purseIds: [] };
 const player = { id: "p", token: "p", name: "Player", role: "player", purseIds: ["hero"] };
@@ -399,12 +400,45 @@ test("owner Test mode rejects other accounts, excludes analytics, and resets onl
       ownerTestMode(db, "player", { action: "create" }),
       (e) => e.status === 403,
     );
-    const m = await ownerTestMode(db, "owner", {
-      action: "create",
-      characters: 2,
-      gold: 20,
-      hp: 15,
-    });
+    const origin = "http://localhost:8080";
+    const env = {
+      DB: db,
+      ACCOUNT_ORIGIN: origin,
+      ACCOUNT_SECRET: "synthetic-governance-owner-secret-123456789012345",
+    };
+    const signed = await handleAccounts(
+      new Request(origin + "/api/account/auth/sign-up/email", {
+        method: "POST",
+        headers: { origin, "content-type": "application/json", "cf-connecting-ip": "192.0.2.123" },
+        body: JSON.stringify({
+          email: "test-mode-owner@example.com",
+          name: "Owner",
+          password: "synthetic-owner-password-only",
+        }),
+      }),
+      env,
+    );
+    assert.equal(signed.status, 200);
+    const cookie = signed.headers
+      .getSetCookie()
+      .map((s) => s.split(";")[0])
+      .join("; ");
+    const session = await accountAuth(env).api.getSession({ headers: new Headers({ cookie }) });
+    await db
+      .prepare("INSERT INTO site_roles VALUES (?,?,?)")
+      .bind(session.user.id, "owner", Date.now())
+      .run();
+    const m = await ownerTestMode(
+      db,
+      session.user.id,
+      {
+        action: "create",
+        characters: 2,
+        gold: 20,
+        hp: 15,
+      },
+      session.session.id,
+    );
     let room = JSON.parse(
       (await db.prepare("SELECT body FROM campaign_rooms WHERE code=?").bind(m.code).first()).body,
     );
@@ -426,7 +460,12 @@ test("owner Test mode rejects other accounts, excludes analytics, and resets onl
       .run();
     assert.equal((await siteGameAnalytics(db)).sharedCampaigns, 0);
     assert.equal((await siteGameAnalytics(db)).metrics.spentCopper, 0);
-    await ownerTestMode(db, "owner", { action: "reset", code: m.code, revision: room.revision });
+    await ownerTestMode(
+      db,
+      session.user.id,
+      { action: "reset", code: m.code, revision: room.revision },
+      session.session.id,
+    );
     room = JSON.parse(
       (await db.prepare("SELECT body FROM campaign_rooms WHERE code=?").bind(m.code).first()).body,
     );

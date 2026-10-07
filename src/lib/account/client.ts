@@ -47,7 +47,12 @@ async function accountRequestCore<T>(
   if (native() && nextToken) localStorage.setItem(TOKEN, nextToken);
   if (path === "auth/sign-out") localStorage.removeItem(TOKEN);
   if (body !== undefined && path.startsWith("auth/")) { identityRead = undefined; announceSheetChange(); }
-  if (response.ok && ["auth/sign-in/email", "auth/sign-up/email", "auth/sign-out"].includes(path)) window.dispatchEvent(new Event("lootsplit-account-changed"));
+  if (response.ok && ["auth/sign-in/email", "auth/sign-up/email", "auth/sign-out"].includes(path)) {
+    // Old account identity must not authorize device recovery while the gate is
+    // checking the newly authenticated account (or after sign-out).
+    sessionStorage.removeItem("lootsplit.verified-account");
+    window.dispatchEvent(new Event("lootsplit-account-changed"));
+  }
   return result as T;
 }
 export type AccountLibrary = {
@@ -63,8 +68,9 @@ export type AccountLibrary = {
     name: string;
     archived: number;
     updated_at: number;
+    has_recovery?: number;
   }[];
-  backups: { id: string; name: string; created_at: number }[];
+  backups: { id: string; name: string; created_at: number; shared_recovery?: number }[];
   characters: CharacterProfile[];
   hasRecoveryKey: boolean;
 };

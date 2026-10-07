@@ -5,12 +5,12 @@ import { downloadJson } from "@/lib/quire/table";
 
 import { useDisclosureAnchor } from "@/lib/help/use-disclosure-anchor";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { toast } from "sonner";
 import { useEconomy } from "@/lib/quire/economy-context";
 import { useSeat } from "@/lib/quire/seat";
 import type { Journal } from "@/lib/quire/journal";
-import { sessionSummary } from "@/lib/quire/journal";
+import { sessionSummary, readArchivedSnapshot } from "@/lib/quire/journal";
 import { formatCopper } from "@/lib/quire/money";
 import { Button, Fold, Modal } from "./ui";
 function RecordedChange({ change }: { change: NonNullable<Journal["events"][number]["change"]> }) {
@@ -33,6 +33,21 @@ function RecordedChange({ change }: { change: NonNullable<Journal["events"][numb
       </dl>
     </details>
   );
+}
+function ArchivedReportDownload({ report }: { report: NonNullable<Journal["reports"]>[number] }) {
+  const result = useMemo(() => {
+    if (report.error) return { error: report.error };
+    try { return { snapshot: readArchivedSnapshot(report.snapshot) }; }
+    catch { return { error: "This archived report cannot be read. Keep its original backup for recovery." }; }
+  }, [report.snapshot, report.error]);
+  return <div className="journal-entry">
+    <strong>{report.name}</strong>
+    {result.error && <p role="alert">{result.error}</p>}
+    <Button variant="secondary" disabled={!!result.error}
+      onClick={() => void downloadJson("lootsplit-session-" + report.id + ".json", result.snapshot)}>
+      Download session report
+    </Button>
+  </div>;
 }
 export function CampaignJournal({ section = "overview", reviewOnly = false }: { section?: "overview" | "sessions" | "bank" | "reports"; reviewOnly?: boolean }) {
   const navigate=useNavigate();
@@ -253,19 +268,7 @@ export function CampaignJournal({ section = "overview", reviewOnly = false }: { 
           ))}
       </Fold>
       <Fold title="Archived session reports" hint="Recorded before active logs are cleared.">
-        {(journal.reports || []).map((r) => (
-          <div key={r.id} className="journal-entry">
-            <strong>{r.name}</strong>
-            <Button
-              variant="secondary"
-              onClick={() =>
-                void downloadJson("lootsplit-session-" + r.id + ".json", JSON.parse(r.snapshot))
-              }
-            >
-              Download session report
-            </Button>
-          </div>
-        ))}
+        {(journal.reports || []).map((r) => <ArchivedReportDownload key={r.id} report={r} />)}
       </Fold>
       </>}
       {section === "bank" && <details open ref={reviewRef} id="review-inbox" className="review-inbox">

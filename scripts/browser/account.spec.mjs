@@ -1,4 +1,6 @@
 import assert from "node:assert/strict";
+import { blankEncounter } from "../../src/lib/encounters/model.mjs";
+import { readFile } from "node:fs/promises";
 import {
   test,
   expect,
@@ -1153,4 +1155,55 @@ test("ownership", async ({ devices, baseURL: origin }, testInfo) => {
   await secondPlayer.reload();
   await continueIntoApp(secondPlayer);
   await expect(secondPlayer.locator(".room-code")).toHaveText(code);
+});
+
+test("shared-recovery", async ({ devices, baseURL: origin }, testInfo) => {
+  const { page } = devices;
+  await signedInDevices(devices, origin);
+  await prepareDmFixture(page, origin);
+  const [member] = await createAndSaveRoom(page, origin);
+  const encounter = blankEncounter();
+  encounter.name = "Complete shared recovery";
+  encounter.notes = "Encounter notes survive deletion and shared recovery.";
+  const encounterId = crypto.randomUUID();
+  await accountPost(page.context(), origin, "encounters/create", { id: encounterId, code: member.code, encounter });
+  await accountPost(page.context(), origin, "encounters/roll", { id: encounterId, revision: 0, formula: "1d20", manual: true, total: 12, requestKey: crypto.randomUUID() });
+  await page.setViewportSize({ width: 390, height: 900 });
+  page.once("dialog", dialog => dialog.accept(member.code));
+  await page.getByRole("button", { name: "Delete shared campaign", exact: true }).click();
+  await expect(page.getByRole("status").filter({ hasText: "Shared campaign deleted" })).toBeVisible();
+  const restore = page.getByRole("button", { name: "Restore shared records", exact: true });
+  await expect(restore).toBeVisible();
+  page.once("dialog", dialog => dialog.accept());
+  await restore.click();
+  await page.waitForURL(url => url.pathname === "/");
+  await expect(page.getByText("Campaign control", { exact: true })).toBeVisible();
+  await expect(page.locator(".loot-opening")).toHaveCount(0);
+  const libraryResponse = await page.context().request.get(origin + "/api/account/library");
+  expect(libraryResponse.ok()).toBeTruthy();
+  const library = await libraryResponse.json();
+  const restored = library.members.find(m => m.has_recovery);
+  assert.ok(restored);
+  assert.notEqual(restored.code, member.code);
+  assert.equal(library.backups.length, 1, "The complete private backup stays available after restoration");
+  await visitPage(page, origin, "/encounters");
+  await page.getByLabel("Save in", { exact: true }).selectOption(restored.code);
+  await page.getByRole("button", { name: /Complete shared recovery/ }).click();
+  await expect(page.getByRole("heading", { name: "Complete shared recovery", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Builder & generator", exact: true }).click();
+  await expect(page.getByLabel(/Scene & DM notes/)).toHaveValue(encounter.notes);
+  await page.getByRole("button", { name: "Roll history", exact: true }).click();
+  await expect(page.locator(".encounter-rolls")).toContainText("12");
+  await page.screenshot({ path: testInfo.outputPath("shared-recovery-mobile.png"), fullPage: true });
+  await visitPage(page, origin, "/account");
+  await page.setViewportSize({ width: 1280, height: 900 });
+  const downloaded = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Download recovery records", exact: true }).click();
+  const download = await downloaded;
+  const records = JSON.parse(await readFile(await download.path(), "utf8"));
+  assert.equal(records.records.sourceCode, member.code);
+  assert.equal(records.records.encounters[0].body.notes, encounter.notes);
+  assert.equal(records.records.encounterRolls[0].body.total, 12);
+  await page.screenshot({ path: testInfo.outputPath("shared-recovery-desktop.png"), fullPage: true });
+  assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1));
 });

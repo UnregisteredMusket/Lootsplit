@@ -9,6 +9,7 @@ export const accountScenarios = [
   "campaign-choice",
   "invitations",
   "ownership",
+  "shared-recovery",
 ];
 
 export function selectAccountScenario(args, ci = process.env.CI) {

@@ -1,4 +1,5 @@
 import { useEffect } from "react";
+import { useBlocker } from "@tanstack/react-router";
 
 const CONTEXT_CHANGE = "lootsplit:before-context-change";
 export function allowContextChange() {
@@ -7,39 +8,30 @@ export function allowContextChange() {
 
 /** Keep character/encounter drafts safe when using the shared navigation. */
 export function useDraftGuard(dirty: boolean, subject: string) {
+  // Router history covers Link, programmatic navigation, and native Back/Forward.
+  // A document click listener misses history changes and can prompt twice for Link.
+  useBlocker({
+    disabled: !dirty,
+    enableBeforeUnload: dirty,
+    shouldBlockFn: ({ current, next }) => {
+      // Hash-only scrolling and links to this same view do not discard its draft.
+      if (
+        current.pathname === next.pathname &&
+        JSON.stringify(current.search) === JSON.stringify(next.search)
+      )
+        return false;
+      return !window.confirm(`Discard unsaved ${subject} changes and leave this view?`);
+    },
+  });
   useEffect(() => {
     if (!dirty) return;
     const confirm = () => window.confirm(`Discard unsaved ${subject} changes and leave this view?`);
-    const unload = (e: BeforeUnloadEvent) => {
-      e.preventDefault();
-      e.returnValue = "";
-    };
     const context = (e: Event) => {
       if (!confirm()) e.preventDefault();
     };
-    const navigate = (e: MouseEvent) => {
-      const target = e.target as Element | null;
-      const link = target?.closest<HTMLAnchorElement>("a[href]");
-      if (!link) return;
-      const destination = new URL(link.href, location.href);
-      if (
-        destination.pathname === location.pathname &&
-        destination.search === location.search &&
-        destination.hash
-      )
-        return;
-      if (!confirm()) {
-        e.preventDefault();
-        e.stopPropagation();
-      }
-    };
-    window.addEventListener("beforeunload", unload);
     window.addEventListener(CONTEXT_CHANGE, context);
-    document.addEventListener("click", navigate, true);
     return () => {
-      window.removeEventListener("beforeunload", unload);
       window.removeEventListener(CONTEXT_CHANGE, context);
-      document.removeEventListener("click", navigate, true);
     };
   }, [dirty, subject]);
 }

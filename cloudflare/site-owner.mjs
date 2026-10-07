@@ -2,7 +2,7 @@ const reject = (message, status = 400) => {
   throw Object.assign(new Error(message), { status });
 };
 export { roleOf as siteRole } from "./members.mjs";
-import { roleOf as siteRole } from "./members.mjs";
+import { roleOf as siteRole, staffCommitGuard } from "./members.mjs";
 export async function publicAnnouncement(db) {
   const row = await db
     .prepare("SELECT title, message FROM site_settings WHERE id=1 AND published=1")
@@ -28,7 +28,7 @@ export async function ownerOverview(db, userId) {
     .first();
   return { stats, settings };
 }
-export async function saveAnnouncement(db, userId, body) {
+export async function saveAnnouncement(db, userId, body, sessionId) {
   if ((await siteRole(db, userId)) !== "owner") reject("Owner access is required.", 403);
   if (
     typeof body.title !== "string" ||
@@ -46,12 +46,13 @@ export async function saveAnnouncement(db, userId, body) {
     );
   const id = crypto.randomUUID(),
     now = Date.now();
+  const guard = await staffCommitGuard(db, userId, sessionId, ["owner"]);
   const results = await db.batch([
     db
       .prepare(
-        "UPDATE site_settings SET title=?, message=?, published=?, revision=revision+1, update_id=?, updated_by=?, updated_at=? WHERE id=1 AND revision=?",
+        `UPDATE site_settings SET title=?, message=?, published=?, revision=revision+1, update_id=?, updated_by=?, updated_at=? WHERE id=1 AND revision=? AND ${guard.sql}`,
       )
-      .bind(title, message, body.published ? 1 : 0, id, userId, now, body.revision),
+      .bind(title, message, body.published ? 1 : 0, id, userId, now, body.revision, ...guard.binds),
     db
       .prepare(
         "INSERT INTO site_audit (id,actor_id,action,created_at,revision) SELECT update_id,updated_by,?,updated_at,revision FROM site_settings WHERE id=1 AND update_id=?",
@@ -70,7 +71,7 @@ export async function publicDonations(db) {
   const row = await db.prepare("SELECT donation_url FROM site_settings WHERE id=1").first();
   return { donationUrl: row?.donation_url || null };
 }
-export async function saveDonations(db, userId, body) {
+export async function saveDonations(db, userId, body, sessionId) {
   if ((await siteRole(db, userId)) !== "owner") reject("Owner access is required.", 403);
   if (
     typeof body.donationUrl !== "string" ||
@@ -93,12 +94,13 @@ export async function saveDonations(db, userId, body) {
   }
   const id = crypto.randomUUID(),
     now = Date.now();
+  const guard = await staffCommitGuard(db, userId, sessionId, ["owner"]);
   const result = await db.batch([
     db
       .prepare(
-        "UPDATE site_settings SET donation_url=?, donation_revision=donation_revision+1, donation_update_id=? WHERE id=1 AND donation_revision=?",
+        `UPDATE site_settings SET donation_url=?, donation_revision=donation_revision+1, donation_update_id=? WHERE id=1 AND donation_revision=? AND ${guard.sql}`,
       )
-      .bind(donationUrl, id, body.revision),
+      .bind(donationUrl, id, body.revision, ...guard.binds),
     db
       .prepare(
         "INSERT INTO site_audit (id,actor_id,action,created_at,revision) SELECT donation_update_id,?,'donations.update',?,donation_revision FROM site_settings WHERE id=1 AND donation_update_id=?",
