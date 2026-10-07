@@ -149,6 +149,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Development / gameplay / dev-library-navigation | resolved | 2 | 12s → 43s | +31s | +258.33% |
 | Packaged Worker / interface | open | 2 | 126s → 218s | +92s | +73.02% |
 | Packaged Worker / interface | open | 2 | 123s → 196s | +73s | +59.35% |
+| verify / Development / gameplay / Run actions/setup-node@v4 | open | 2 | 2s → 5s | +3s | +150% |
 | verify / Development / gameplay | open | 2 | 88s → 191s | +103s | +117.05% |
 | Development / gameplay | open | 2 | 145s → 282s | +137s | +94.48% |
 | Packaged Worker / interface / worker-library-navigation | resolved | 2 | 13s → 37s | +24s | +184.62% |
@@ -158,15 +159,35 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Packaged Worker / interface / worker-shop-stock | open | 2 | 7s → 17s | +10s | +142.86% |
 | verify / Development / accounts / Run npm ci | open | 2 | 11s → 17s | +6s | +54.55% |
 | verify / Development / governance / Start disposable development server | open | 2 | 3s → 7s | +4s | +133.33% |
+| verify / Development / accounts / Start disposable development server | open | 2 | 4s → 8s | +4s | +100% |
 | verify / Development / gameplay / dev-local-encounter | open | 2 | 4s → 7s | +3s | +75% |
 | verify / Development / gameplay / dev-finance | open | 2 | 14s → 27s | +13s | +92.86% |
 | verify / Development / accounts / dev-character | open | 2 | 11s → 16s | +5s | +45.45% |
+| verify / Packaged Worker / interface / worker-loot | open | 2 | 4s → 6s | +2s | +50% |
 | Android signed release APK | open | 2 | 238s → 496s | +258s | +108.4% |
+| verify / Development / governance / Run actions/setup-node@v4 | open | 2 | 3s → 14s | +11s | +366.67% |
+| verify / Development / governance / Run npm ci | open | 2 | 10s → 19s | +9s | +90% |
+| release-apk / Run actions/setup-node@v4 | open | 2 | 5s → 7s | +2s | +40% |
 
 ## Recorded slowdowns
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-07T09:24:17Z | step: release-apk / Run npm run typecheck | 12s → 14s | +2s | +16.67% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37391400899/job/112039018014) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37599705908/job/112722522266) |
+| 2026-10-07T09:23:50Z | step: release-apk / Run npm ci | 14s → 17s | +3s | +21.43% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37391400899/job/112039018014) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37599705908/job/112722522266) |
+| 2026-10-07T09:23:20Z | step: release-apk / Run actions/setup-node@v4 | 6s → 7s | +1s | +16.67% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37587450064/job/112682285306) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37599705908/job/112722522266) |
+| 2026-10-07T09:23:13Z | step: release-apk / Run actions/checkout@v4 | 1s → 2s | +1s | +100% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37391400899/job/112039018014) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37599705908/job/112722522266) |
+| 2026-10-07T09:23:11Z | step: release-apk / Set up job | 2s → 3s | +1s | +50% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37391400899/job/112039018014) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37599705908/job/112722522266) |
+| 2026-10-07T09:23:01Z | step: verify / verify / Run actions/checkout@v4 | 1s → 2s | +1s | +100% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37391400899/job/112038129460) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37599705908/job/112722461595) |
+| 2026-10-07T09:22:02Z | step: verify / Packaged Worker / interface / worker-loot | 5s → 6s | +1s | +20% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37573239210/job/112636602667) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37599705908/job/112721314893) |
+| 2026-10-07T09:19:51Z | step: verify / Development / governance / Run npx playwright install --with-deps chromium | 26s → 41s | +15s | +57.69% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37391400899/job/112037078505) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37599705908/job/112720798178) |
+| 2026-10-07T09:19:28Z | step: verify / Development / gameplay / Start disposable development server | 6s → 7s | +1s | +16.67% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37391400899/job/112037078470) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37599705908/job/112720798441) |
+| 2026-10-07T09:19:24Z | step: verify / Development / accounts / Start disposable development server | 6s → 8s | +2s | +33.33% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37573239210/job/112636351726) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37599705908/job/112720798458) |
+| 2026-10-07T09:19:22Z | step: verify / Development / desktop / Run npx playwright install --with-deps chromium | 22s → 27s | +5s | +22.73% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37391400899/job/112037078569) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37599705908/job/112720798575) |
+| 2026-10-07T09:19:10Z | step: verify / Development / governance / Run npm ci | 16s → 19s | +3s | +18.75% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37587450064/job/112680783447) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37599705908/job/112720798178) |
+| 2026-10-07T09:18:51Z | step: verify / Development / governance / Run actions/setup-node@v4 | 4s → 14s | +10s | +250% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37587450064/job/112680783447) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37599705908/job/112720798178) |
+| 2026-10-07T09:18:42Z | step: verify / Development / gameplay / Run actions/setup-node@v4 | 4s → 5s | +1s | +25% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37391400899/job/112038371624) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37599705908/job/112720798441) |
+| 2026-10-07T09:18:33.000Z | queue: Android signed release APK / initial queue | 3s → 4s | +1s | +33.33% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37391400899) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37599705908) |
 | 2026-10-07T09:15:25Z | step: Development / desktop / dev-game-analytics | 6s → 7s | +1s | +16.67% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37263207826/job/111614535461) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37599091203/job/112718786898) |
 | 2026-10-07T09:11:00Z | step: Code checks and immutable builds / unit-tests | 13s → 15s | +2s | +15.38% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37270098428/job/111635070872) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37598751222/job/112717652197) |
 | 2026-10-07T08:43:50Z | step: Packaged standby / Run actions/setup-node@v4 | 7s → 9s | +2s | +28.57% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37253238957/job/111585184591) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37595520953/job/112707628568) |
