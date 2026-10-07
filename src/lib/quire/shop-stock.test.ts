@@ -77,6 +77,10 @@ test("bulk stock imports preserve existing goods, deduplicate competing imports,
   assert.equal(after.ledger.length, 0);
   const backup = readQuireFile(JSON.parse(JSON.stringify(await snapshot())));
   assert.deepEqual(backup.stock, after.stock);
+  const synced = applyCommand(table, { id: "dm", token: "d", name: "DM", role: "dm", purseIds: [] }, {
+    id: "bulk-sync", kind: "patch", changes: after.stock.filter(row => row.id !== existing.id).map(row => ({ store: "stock" as const, id: row.id, before: null, after: row })),
+  });
+  assert.deepEqual(synced.stock.slice().sort((a,b) => a.id.localeCompare(b.id)), after.stock.slice().sort((a,b) => a.id.localeCompare(b.id)));
 
   setSeat({ ...DM_SEAT, role: "player", purseIds: [] });
   try {

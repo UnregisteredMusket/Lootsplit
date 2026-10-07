@@ -181,6 +181,11 @@ try {
       .fill("Night in the common room");
     await picker.getByRole("button", { name: "Select all 1 matching item", exact: true }).click();
     await picker.getByText("2 item types selected", { exact: true }).waitFor();
+    await picker.getByLabel("Catalog stock quantity", { exact: true }).fill("1.5");
+    await picker.getByRole("button", { name: "Add 2 selected items", exact: true }).click();
+    await picker.getByRole("alert").getByText(/whole quantity/).waitFor();
+    await picker.getByText("2 item types selected", { exact: true }).waitFor();
+    assert.equal((await readRows(page, "stock")).filter(row => row.shopId === shopId).length, expected);
     await picker.getByLabel("Catalog stock quantity", { exact: true }).fill("7");
     await picker.getByRole("button", { name: "Add 2 selected items", exact: true }).click();
     rows = await waitStock(

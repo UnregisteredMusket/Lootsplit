@@ -4,6 +4,8 @@ Branch feature/shop-stock-controls starts from confirmed main/live8a7b5e379077a1
 
 Previous PR56 was merged; main verification37525444442 passed. Website37527030805 uploaded Worker30bd08c0-4ab1-4a39-9d11-56b62577134c, then its first live audit failed on four edge-rollout asset404s. Read-only follow-up against its original immutable artifact verified all81 JS/CSS files, matching main identity and desktop/mobile/title/public/account-gate checks. PR56 contains final evidence; do not repeat its deployment, completed migrations or prior APK publication.
 
+Implementation published as50e757396db88e32d2104409f7a1ab8e76336e3c with exact local tree8aa89d956f6f813fc6e89d3d75bedb945555b307. Do not create another branch or repeat completed local audits. Follow-up adds a persistent first successful shop-audit measurement and additional invalid-input/shared-DM assertions before opening the exact-head PR.
+
 # DM review clarity — 2026-10-06 UTC
 
 Baseline main/live8a8e28c3afda624abd33c7e43a602fe061891ae5, completed PR55/release. Branch fix/dm-review-local-play removes duplicate DM multiplayer entries and the DM inbox composer; all financial actions remain in Bank/player views. Clarifies current offline dependencies and records the offline pass-phone design, not a new offline turn engine. Quick508 pass/four skips, clean types/lint, web/mobile builds and control-panel26.138s/finance25.633s passed locally with Node22.23.3/Chromium133. See docs/audit/2026-10-06-dm-review-clarity.md. Existing gated website publication authorization applies. No migration or signed APK update. Inspect exact PR/main/deployment/live state before claiming release or retrying writes.
