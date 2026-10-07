@@ -17,12 +17,18 @@ import {
 import { setCloudWatch } from "./cloud-turn.ts";
 import { applyCloudTable, economySnapshot, snapshot } from "./economy.ts";
 import { getSeat, setSeat, downloadJson } from "./table.ts";
-import { applyCommand, tablePatch, type Command, type CommandInput } from "./commands.ts";
+import {
+  applyCommand,
+  tablePatch,
+  type Command,
+  type CommandInput,
+} from "./commands.ts";
 import type { RoomView } from "./cloud.server.ts";
 import { rememberIncoming } from "./chat.ts";
 
 import { isEphemeralCampaign, setEphemeralCampaign } from "./guest-storage.ts";
 import { closeQuireDb } from "./db.ts";
+import { reconcileAccountResume } from "./account-resume.ts";
 let playerSession: Session | null = null;
 const PLAYER_TICKET = "lootsplit.player.reconnect.v1";
 type Session = {
@@ -66,7 +72,10 @@ let polling = false;
 let pollGeneration = 0;
 let pollFailures = 0;
 let chain: Promise<unknown> = Promise.resolve();
-export async function requestCampaignRoll(body: { purseId: string; [key: string]: unknown }) {
+export async function requestCampaignRoll(body: {
+  purseId: string;
+  [key: string]: unknown;
+}) {
   const s = requireSession();
   if (
     !body.policy &&
@@ -75,7 +84,9 @@ export async function requestCampaignRoll(body: { purseId: string; [key: string]
   )
     throw Error("Submit your pending character changes before rolling.");
   const { rollCampaignCharacter } = await import("./cloud-api");
-  return rollCampaignCharacter({ data: { ...body, code: s.code, token: s.token } });
+  return rollCampaignCharacter({
+    data: { ...body, code: s.code, token: s.token },
+  });
 }
 let sessionKey = "";
 const key = () =>
@@ -85,16 +96,31 @@ function session(): Session | null {
   try {
     if (isEphemeralCampaign()) {
       if (!playerSession) {
-        const ticket = JSON.parse(sessionStorage.getItem(PLAYER_TICKET) || "null");
-        if (ticket?.token && ticket?.code && ticket.role === "player") playerSession = { ...ticket, revision: 0, pending: [], batchId: crypto.randomUUID() };
+        const ticket = JSON.parse(
+          sessionStorage.getItem(PLAYER_TICKET) || "null",
+        );
+        if (ticket?.token && ticket?.code && ticket.role === "player")
+          playerSession = {
+            ...ticket,
+            revision: 0,
+            pending: [],
+            batchId: crypto.randomUUID(),
+          };
       }
       return playerSession;
     }
     let saved = JSON.parse(localStorage.getItem(key()) || "null");
     if (!saved && typeof sessionStorage !== "undefined") {
-      const old = JSON.parse(sessionStorage.getItem("quire.cloud.v1") || "null");
+      const old = JSON.parse(
+        sessionStorage.getItem("quire.cloud.v1") || "null",
+      );
       if (old?.token && old?.code) {
-        saved = { ...old, pending: [], batchId: crypto.randomUUID(), revision: 0 };
+        saved = {
+          ...old,
+          pending: [],
+          batchId: crypto.randomUUID(),
+          revision: 0,
+        };
         localStorage.setItem(key(), JSON.stringify(saved));
         sessionStorage.removeItem("quire.cloud.v1");
       }
@@ -114,7 +140,16 @@ function session(): Session | null {
 function remember(s: Session) {
   if (s.role === "player") {
     playerSession = s;
-    sessionStorage.setItem(PLAYER_TICKET, JSON.stringify({ code: s.code, token: s.token, seatId: s.seatId, role: s.role, purseIds: s.purseIds }));
+    sessionStorage.setItem(
+      PLAYER_TICKET,
+      JSON.stringify({
+        code: s.code,
+        token: s.token,
+        seatId: s.seatId,
+        role: s.role,
+        purseIds: s.purseIds,
+      }),
+    );
     return;
   }
   localStorage.setItem(key(), JSON.stringify(s));
@@ -127,11 +162,17 @@ function requireSession() {
 function serial<T>(fn: () => Promise<T>): Promise<T> {
   const locked = async (): Promise<T> =>
     typeof navigator !== "undefined" && navigator.locks
-      ? navigator.locks.request(key() + ".write", { ifAvailable: true }, (lock) => {
-          if (!lock)
-            throw new Error("Another Lootsplit tab is synchronizing. Try again in a moment.");
-          return fn();
-        })
+      ? navigator.locks.request(
+          key() + ".write",
+          { ifAvailable: true },
+          (lock) => {
+            if (!lock)
+              throw new Error(
+                "Another Lootsplit tab is synchronizing. Try again in a moment.",
+              );
+            return fn();
+          },
+        )
       : fn();
   const next = chain.then(locked, locked);
   chain = next.catch(() => undefined);
@@ -142,7 +183,11 @@ function publish(next: Partial<typeof view>, dataChanged = true) {
   view = { ...view, ...next };
   if (previous.joined && view.joined) {
     if (previous.live !== view.live)
-      notify("Mode changed", view.live ? "Live Mode" : "Turn-based Mode", "mode");
+      notify(
+        "Mode changed",
+        view.live ? "Live Mode" : "Turn-based Mode",
+        "mode",
+      );
     if (!previous.mine && view.mine && !view.live)
       notify("Your turn", "You can make transactions now.", "turn");
     if (previous.seats.length < view.seats.length)
@@ -175,10 +220,14 @@ function fail(error: unknown) {
   return message;
 }
 function warnUnsentPlayerActions(event: BeforeUnloadEvent) {
-  if (isEphemeralCampaign() && session()?.pending.length) { event.preventDefault(); event.returnValue = ""; }
+  if (isEphemeralCampaign() && session()?.pending.length) {
+    event.preventDefault();
+    event.returnValue = "";
+  }
 }
 function stopPolling() {
-  if (typeof window !== "undefined") window.removeEventListener("beforeunload", warnUnsentPlayerActions);
+  if (typeof window !== "undefined")
+    window.removeEventListener("beforeunload", warnUnsentPlayerActions);
   polling = false;
   pollGeneration++;
   pollFailures = 0;
@@ -257,7 +306,12 @@ async function accept(remote: RoomView, committed = false) {
   // treat an empty/incomplete local copy as already synchronized.
   remember(s);
   if (s.role === "player")
-    setSeat({ ...getSeat(), role: "player", purseIds: remote.purseIds, shopIds: remote.shopIds });
+    setSeat({
+      ...getSeat(),
+      role: "player",
+      purseIds: remote.purseIds,
+      shopIds: remote.shopIds,
+    });
   publish(
     {
       joined: true,
@@ -273,7 +327,11 @@ async function accept(remote: RoomView, committed = false) {
       seatId: remote.seatId,
       revision: remote.revision,
       pending: s.pending.length,
-      status: s.pending.length ? (view.error ? "attention" : "pending") : "synced",
+      status: s.pending.length
+        ? view.error
+          ? "attention"
+          : "pending"
+        : "synced",
       error: s.pending.length ? view.error : "",
       lastSync: Date.now(),
     },
@@ -286,13 +344,31 @@ async function refresh() {
   if (!s) return;
   const campaignKey = key();
   let remote: RoomView;
-  try { remote = await pullCloudTable({ data: { code: s.code, token: s.token } }); } catch (error) {
+  try {
+    remote = await pullCloudTable({ data: { code: s.code, token: s.token } });
+  } catch (error) {
     if (key() !== campaignKey || session()?.token !== s.token) return;
     const message = error instanceof Error ? error.message : "";
-    if (/^(This room is closed\.|No table uses that code\.|This browser is not seated at that table\.|This campaign seat belongs to a restricted account\.)$/.test(message)) {
-      if (s.pending.length && !isEphemeralCampaign()) localStorage.setItem(`lootsplit.revoked-recovery:${s.code}`, JSON.stringify({code:s.code,commands:s.pending,exportedAt:Date.now()}));
+    if (
+      /^(This room is closed\.|No table uses that code\.|This browser is not seated at that table\.|This campaign seat belongs to a restricted account\.)$/.test(
+        message,
+      )
+    ) {
+      if (s.pending.length && !isEphemeralCampaign())
+        localStorage.setItem(
+          `lootsplit.revoked-recovery:${s.code}`,
+          JSON.stringify({
+            code: s.code,
+            commands: s.pending,
+            exportedAt: Date.now(),
+          }),
+        );
       await detachTable(s.role === "player");
-      notify("Campaign access ended", "Your seat was released. Authorized session reports remain in My account.", "mode");
+      notify(
+        "Campaign access ended",
+        "Your seat was released. Authorized session reports remain in My account.",
+        "mode",
+      );
       return;
     }
     throw error;
@@ -318,18 +394,36 @@ export function captureDeviceBackup() {
   });
 }
 export async function openTable(name: string) {
-  const opened = await openCloudTable({ data: { name, table: await economySnapshot() } });
-  remember({ ...opened, role: "dm", purseIds: [], pending: [], batchId: crypto.randomUUID() });
+  const opened = await openCloudTable({
+    data: { name, table: await economySnapshot() },
+  });
+  remember({
+    ...opened,
+    role: "dm",
+    purseIds: [],
+    pending: [],
+    batchId: crypto.randomUUID(),
+  });
   await refresh();
 }
 export async function lookupTable(code: string, sessionId?: string) {
   const [room, generation] = code.trim().split(".");
-  return previewCloudTable({ data: { code: room!.toUpperCase(), sessionId: sessionId || generation } });
+  return previewCloudTable({
+    data: { code: room!.toUpperCase(), sessionId: sessionId || generation },
+  });
 }
-export async function joinTable(code: string, purseId: string, name: string, invitation?: string, sessionId?: string) {
+export async function joinTable(
+  code: string,
+  purseId: string,
+  name: string,
+  invitation?: string,
+  sessionId?: string,
+) {
   return serial(async () => {
     if (hasPendingChanges())
-      throw new Error("Resolve pending changes before joining another campaign.");
+      throw new Error(
+        "Resolve pending changes before joining another campaign.",
+      );
     if (!isEphemeralCampaign() && !(await loadSeatLock())?.protectSaves) {
       await rememberSave({
         name: `Before joining room ${code.trim().toUpperCase()}`,
@@ -339,7 +433,13 @@ export async function joinTable(code: string, purseId: string, name: string, inv
     }
     const [room, generation] = code.trim().split(".");
     const joined = await joinCloudTable({
-      data: { code: room!.toUpperCase(), purseId, name, invitation, sessionId: sessionId || generation },
+      data: {
+        code: room!.toUpperCase(),
+        purseId,
+        name,
+        invitation,
+        sessionId: sessionId || generation,
+      },
     });
     setEphemeralCampaign(true);
     closeQuireDb();
@@ -359,7 +459,13 @@ async function flush(endTurn = false) {
   publish({ status: "saving", error: "" });
   try {
     const remote = await submitCloudCommands({
-      data: { code: s.code, token: s.token, batchId: s.batchId, commands: s.pending, endTurn },
+      data: {
+        code: s.code,
+        token: s.token,
+        batchId: s.batchId,
+        commands: s.pending,
+        endTurn,
+      },
     });
     await accept(remote, true);
   } catch (error) {
@@ -372,7 +478,13 @@ async function stage() {
   if (!s.pending.length) return;
   try {
     const remote = await submitCloudCommands({
-      data: { code: s.code, token: s.token, batchId: s.batchId, commands: s.pending, stage: true },
+      data: {
+        code: s.code,
+        token: s.token,
+        batchId: s.batchId,
+        commands: s.pending,
+        stage: true,
+      },
     });
     await accept(remote);
   } catch (error) {
@@ -392,6 +504,8 @@ export function exportPending() {
   const s = requireSession();
   return downloadJson(`lootsplit-pending-${s.code}.json`, {
     code: s.code,
+    seatId: s.seatId,
+    batchId: s.batchId,
     commands: s.pending,
     exportedAt: Date.now(),
   });
@@ -400,7 +514,12 @@ export function discardPending() {
   return serial(async () => {
     const s = requireSession();
     const remote = await manageCloudRoom({
-      data: { code: s.code, token: s.token, action: "discard", seatId: s.seatId },
+      data: {
+        code: s.code,
+        token: s.token,
+        action: "discard",
+        seatId: s.seatId,
+      },
     });
     await accept(remote, true);
   });
@@ -408,13 +527,20 @@ export function discardPending() {
 export async function queueCommand(input: CommandInput) {
   return serial(async () => {
     const s = requireSession();
-    if (input.kind !== "message" && !view.mine) throw new Error(`It is ${view.who}'s turn.`);
-    if (s.pending.length >= 100) throw new Error("Submit your pending actions before adding more.");
+    if (input.kind !== "message" && !view.mine)
+      throw new Error(`It is ${view.who}'s turn.`);
+    if (s.pending.length >= 100)
+      throw new Error("Submit your pending actions before adding more.");
     const command = { ...input, id: crypto.randomUUID() } as Command;
     if (input.kind === "message") {
       // Chat is independent of transaction turns; retain a failed message in the editor.
       const remote = await submitCloudCommands({
-        data: { code: s.code, token: s.token, batchId: command.id, commands: [command] },
+        data: {
+          code: s.code,
+          token: s.token,
+          batchId: command.id,
+          commands: [command],
+        },
       });
       await accept(remote);
       return;
@@ -450,7 +576,8 @@ export function runSharedMutation(work: () => Promise<unknown>) {
         "Only the DM can directly edit funds and inventory in shared modes. Use Buy, Sell, Give, or Request loan.",
       );
     if (!view.mine) throw new Error(`It is ${view.who}'s turn.`);
-    if (s.pending.length >= 100) throw new Error("Submit your pending actions first.");
+    if (s.pending.length >= 100)
+      throw new Error("Submit your pending actions first.");
     if (!s.pending.length) await refresh();
     const before = await economySnapshot();
     let after;
@@ -479,7 +606,9 @@ export function runSharedMutation(work: () => Promise<unknown>) {
 export function chooseTableMode(mode: "local" | "turns" | "live") {
   return serial(async () => {
     if (hasPendingChanges())
-      throw new Error("Submit or export and discard pending actions before changing modes.");
+      throw new Error(
+        "Submit or export and discard pending actions before changing modes.",
+      );
     if (mode === "local") {
       const s = session();
       if (s) {
@@ -492,7 +621,9 @@ export function chooseTableMode(mode: "local" | "turns" | "live") {
     if (view.live !== (mode === "live")) {
       const s = requireSession();
       await accept(
-        await setCloudPace({ data: { code: s.code, token: s.token, live: mode === "live" } }),
+        await setCloudPace({
+          data: { code: s.code, token: s.token, live: mode === "live" },
+        }),
       );
     }
   });
@@ -500,40 +631,60 @@ export function chooseTableMode(mode: "local" | "turns" | "live") {
 export function skipTableTurn() {
   return serial(async () => {
     const s = requireSession();
-    await accept(await skipCloudTurn({ data: { code: s.code, token: s.token } }));
+    await accept(
+      await skipCloudTurn({ data: { code: s.code, token: s.token } }),
+    );
   });
 }
 export function manageParticipant(
-  action: "release" | "kick" | "ban" | "invite" | "permission" | "start" | "discard",
+  action:
+    "release" | "kick" | "ban" | "invite" | "permission" | "start" | "discard",
   seatId: string,
   allowParty?: boolean,
 ) {
   return serial(async () => {
     const s = requireSession();
     await accept(
-      await manageCloudRoom({ data: { code: s.code, token: s.token, action, seatId, allowParty } }),
+      await manageCloudRoom({
+        data: { code: s.code, token: s.token, action, seatId, allowParty },
+      }),
     );
   });
 }
 export function releasePlayerSeat() {
-  if (view.joined) throw new Error("Leave the shared campaign before changing roles.");
+  if (view.joined)
+    throw new Error("Leave the shared campaign before changing roles.");
 }
 async function detachTable(clearPlayerCopy: boolean) {
   if (clearPlayerCopy) {
     await applyCloudTable(emptyCloudTable());
-    setSeat({ role: "player", purseIds: [], shopIds: [], openedAt: Date.now() });
+    setSeat({
+      role: "player",
+      purseIds: [],
+      shopIds: [],
+      openedAt: Date.now(),
+    });
   }
-  if (isEphemeralCampaign()) { playerSession = null; sessionStorage.removeItem(PLAYER_TICKET); }
-  else if (typeof localStorage !== "undefined") localStorage.removeItem(key());
+  if (isEphemeralCampaign()) {
+    playerSession = null;
+    sessionStorage.removeItem(PLAYER_TICKET);
+  } else if (typeof localStorage !== "undefined")
+    localStorage.removeItem(key());
   stopPolling();
   publish({ ...initialView });
 }
 export async function leaveTable() {
   if (hasPendingChanges())
-    throw new Error("Export and resolve your pending actions before disconnecting.");
+    throw new Error(
+      "Export and resolve your pending actions before disconnecting.",
+    );
   const s = session();
-  if (s?.role === "dm") throw Error("The DM must end the session before leaving.");
-  if (s) await manageCloudRoom({data:{code:s.code,token:s.token,action:"leave",seatId:s.seatId}});
+  if (s?.role === "dm")
+    throw Error("The DM must end the session before leaving.");
+  if (s)
+    await manageCloudRoom({
+      data: { code: s.code, token: s.token, action: "leave", seatId: s.seatId },
+    });
   await detachTable(true);
 }
 export async function disconnectClosedRoom() {
@@ -568,7 +719,12 @@ export function resumeTable() {
 }
 
 export function pendingActions() {
-  return session()?.pending.map((command) => ({ id: command.id, kind: command.kind })) ?? [];
+  return (
+    session()?.pending.map((command) => ({
+      id: command.id,
+      kind: command.kind,
+    })) ?? []
+  );
 }
 export async function importPending(file: File) {
   if (file.size > 2_000_000) throw new Error("Recovery file is too large.");
@@ -577,10 +733,20 @@ export async function importPending(file: File) {
   return serial(async () => {
     const s = requireSession();
     if (raw.code !== s.code || !Array.isArray(raw.commands))
-      throw new Error("This recovery file belongs to a different campaign code.");
+      throw new Error(
+        "This recovery file belongs to a different campaign code.",
+      );
     if (raw.commands.length + s.pending.length > 100)
-      throw new Error("Submit the current pending actions before importing more.");
-    const incoming = raw.commands.map((c: unknown) => commandSchema.parse(c)) as Command[];
+      throw new Error(
+        "Submit the current pending actions before importing more.",
+      );
+    const incoming = raw.commands.map((c: unknown) =>
+      commandSchema.parse(c),
+    ) as Command[];
+    if (raw.seatId && raw.seatId !== s.seatId)
+      throw new Error(
+        "These device changes belong to a different seat. Review them with the DM instead of replaying them here.",
+      );
     const known = new Set(s.pending.map((c) => c.id));
     s.pending.push(...incoming.filter((c) => !known.has(c.id)));
     remember(s);
@@ -591,11 +757,18 @@ export async function importPending(file: File) {
 }
 
 /** A stable message id makes manual retries safe after an ambiguous network failure. */
-export function sendRoomMessage(command: Extract<Command, { kind: "message" }>) {
+export function sendRoomMessage(
+  command: Extract<Command, { kind: "message" }>,
+) {
   return serial(async () => {
     const s = requireSession();
     const remote = await submitCloudCommands({
-      data: { code: s.code, token: s.token, batchId: command.id, commands: [command] },
+      data: {
+        code: s.code,
+        token: s.token,
+        batchId: command.id,
+        commands: [command],
+      },
     });
     await accept(remote);
   });
@@ -629,42 +802,113 @@ export async function resumeAccountMembership(
   member: import("../account/client").AccountMembership,
 ) {
   return serial(async () => {
-    if (hasPendingChanges())
-      throw new Error("Submit or resolve your pending actions before switching campaigns.");
-    const remote = await pullCloudTable({ data: { code: member.code, token: member.token } });
+    const current = session();
+    if (sessionStorage.getItem("lootsplit.verified-account") !== member.userId)
+      throw new Error("Sign in to the account that owns this saved campaign.");
+    if (
+      current?.pending.length &&
+      (current.code !== member.code ||
+        current.seatId !== member.seatId ||
+        current.token !== member.token)
+    )
+      throw new Error(
+        "Submit or resolve your pending actions before switching campaigns.",
+      );
+    const remote = await pullCloudTable({
+      data: { code: member.code, token: member.token },
+    });
     const role = remote.seats.find((s) => s.id === remote.seatId)?.role;
-    if (!role || (role === "player" && !remote.purseIds.length) || remote.seatId !== member.seatId)
-      throw new Error("This membership has changed. Refresh your account library.");
+    if (
+      !role ||
+      (role === "player" && !remote.purseIds.length) ||
+      remote.seatId !== member.seatId
+    )
+      throw new Error(
+        "This membership has changed. Refresh your account library.",
+      );
     const { selectAccountCampaign } = await import("./campaigns");
     const id = `account-${member.userId}-${member.code}`;
     const targetKey = `quire.cloud.v2.${id}`;
-    const existing = JSON.parse(localStorage.getItem(targetKey) || "null") as Session | null;
-    if (existing?.pending?.length)
+    const existing = JSON.parse(
+      localStorage.getItem(targetKey) || "null",
+    ) as Session | null;
+    const cached = current?.pending.length
+      ? current
+      : role === "player"
+        ? current
+        : existing;
+    const reconciled = reconcileAccountResume(
+      cached,
+      remote,
+      { token: member.token, role },
+      crypto.randomUUID(),
+    );
+    if (role === "player" && reconciled.needsRecovery)
       throw new Error(
-        "This device has an unfinished turn for that campaign. Reopen its existing device campaign and resolve it before resuming.",
+        "Your unsynced player changes are still in this session. Export them in Multiplayer before changing seats.",
       );
+    const recoveryCandidates =
+      role === "dm"
+        ? [
+            ...(cached?.pending.length && reconciled.needsRecovery
+              ? [cached]
+              : []),
+            ...(existing?.pending.length &&
+            cached !== existing &&
+            key() !== targetKey
+              ? [existing]
+              : []),
+          ]
+        : [];
+    for (const recovery of recoveryCandidates) {
+      // Keep an immutable recovery record before replacing the active cache.
+      // Includes the original batch and seat IDs, but never an authentication token.
+      const recoveryKey = `quire.account-recovery.v1.${id}.${recovery.batchId}.${crypto.randomUUID()}`;
+      if (!localStorage.getItem(recoveryKey))
+        localStorage.setItem(
+          recoveryKey,
+          JSON.stringify({
+            userId: member.userId,
+            code: recovery.code,
+            seatId: recovery.seatId,
+            batchId: recovery.batchId,
+            commands: recovery.pending,
+            exportedAt: Date.now(),
+            separateSeat: true,
+          }),
+        );
+    }
+    if (reconciled.needsRecovery) {
+      // Open the authoritative seat with its own draft. Old work stays exportable.
+      reconciled.pending = JSON.parse(remote.draft) as Command[];
+      reconciled.batchId = crypto.randomUUID();
+      reconciled.revision = reconciled.pending.length ? -1 : 0;
+    }
     stopPolling();
     setEphemeralCampaign(role === "player");
     closeQuireDb();
-    if (role === "dm") selectAccountCampaign(id, member.name, {
-      role,
-      purseIds: remote.purseIds,
-      shopIds: remote.shopIds,
-      openedAt: Date.now(),
-    });
+    if (role === "dm")
+      selectAccountCampaign(id, member.name, {
+        role,
+        purseIds: remote.purseIds,
+        shopIds: remote.shopIds,
+        openedAt: Date.now(),
+      });
     remember({
       code: member.code,
       token: member.token,
       seatId: remote.seatId,
       role,
       purseIds: remote.purseIds,
-      revision: 0,
-      pending: [],
-      batchId: crypto.randomUUID(),
+      revision: reconciled.revision,
+      pending: reconciled.pending,
+      batchId: reconciled.batchId,
     });
     if (role === "dm") localStorage.setItem(`quire.owner.${id}`, member.userId);
     reloadCampaignContext();
   });
 }
 
-export async function clearAccountRoom(preserveDmCopy = false) { await detachTable(!(preserveDmCopy && session()?.role === "dm")); }
+export async function clearAccountRoom(preserveDmCopy = false) {
+  await detachTable(!(preserveDmCopy && session()?.role === "dm"));
+}

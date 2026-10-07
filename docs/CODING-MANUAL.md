@@ -21,7 +21,7 @@ Account scenario mapping:
 | ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
 | `layout`    | Public/account pages at mobile and desktop widths, real navigation between pages                                                                      |
 | `library`   | UI signup and recovery-key display, character profile, backup/restore, second-device sign-in, linking and resuming a shared membership                |
-| `dm-resume` | Two devices and two saved rooms; end, reopen as verified DM, resume each from either device, correct room/role, no title replay, mobile/desktop cards |
+| `dm-resume` | Two devices and two saved rooms; end, reopen as verified DM, resume each from either device, correct room/role, no title replay, mobile/desktop cards; stale acknowledged queues from account/startup selectors, unsynced recovery export/retry, changed-seat archive |
 | `recovery`  | UI recovery-key password reset and revocation of another signed-in device                                                                             |
 | `portrait-resume` | Both portrait upload controls, Party cards and decoded images on two devices, server readout, desktop DM resume/reopen, failed-upload recovery and turn preservation |
 | `campaign-choice` | Automatic membership linking, explicit separate-room creation, retry of failed linking without creating another room, duplicate-name warning and deliberate older-room resume |
@@ -107,3 +107,4 @@ Feature navigation is presentation over the existing economy/session services. K
 Account shortcut API/storage requires additive migration0010. Preserve user/role isolation, revision conflicts and readonly DM offline fallback; never store guest campaign data in preference caches. Repayment and property-description commands require server ownership checks, and property edits must preserve financial fields under concurrent changes. Finance projections expose only assigned loans/rules, never another character’s debt or downtime quotes.
 
 Related checks: accounts/finance/room-store regressions; finance, control-panel, library-navigation, character and campaign-governance browser audits. Governance exercises real player repayment/property edits and fixed player buttons; control-panel coverage retains DM account shortcut persistence. Preserve complete release gates, migration review and separate Android signing/publication requirements. Foreclosure or special acquisition rules require a separate gameplay decision.
+
