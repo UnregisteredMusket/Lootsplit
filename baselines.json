@@ -868,19 +868,19 @@
   },
   "[\".github/workflows/verify.yml\",\"pull_request\",\"pull-request\",\"step\",\"Packaged standby / Run actions/setup-node@v4\",\"ubuntu-latest\",1]": {
     "schema": 1,
-    "id": "37253238957:1:f9a9da4886f1170ca95544ca64e1126da5e5737e46be83b4d468996d06c49b3f",
+    "id": "37595520953:1:f9a9da4886f1170ca95544ca64e1126da5e5737e46be83b4d468996d06c49b3f",
     "scope": "[\".github/workflows/verify.yml\",\"pull_request\",\"pull-request\",\"step\",\"Packaged standby / Run actions/setup-node@v4\",\"ubuntu-latest\",1]",
     "kind": "step",
     "name": "Packaged standby / Run actions/setup-node@v4",
     "environment": "ubuntu-latest",
-    "commit": "7e3178e902b1394b43a9e1ec4ae02a0e44b6e85a",
-    "runId": 37253238957,
+    "commit": "d3293b9147861e8f4150fda5b9d940398498348c",
+    "runId": 37595520953,
     "attempt": 1,
-    "url": "https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37253238957/job/111585184591",
+    "url": "https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37595520953/job/112707628568",
     "outcome": "success",
-    "startedAt": "2026-10-05T01:55:18Z",
-    "finishedAt": "2026-10-05T01:55:25Z",
-    "durationMs": 7000,
+    "startedAt": "2026-10-07T08:43:41Z",
+    "finishedAt": "2026-10-07T08:43:50Z",
+    "durationMs": 9000,
     "trendId": "37233368939:1:f9a9da4886f1170ca95544ca64e1126da5e5737e46be83b4d468996d06c49b3f"
   },
   "[\".github/workflows/verify.yml\",\"pull_request\",\"pull-request\",\"step\",\"Development / gameplay / dev-bug-data-integrity\",\"ubuntu-latest\",1]": {
@@ -10141,5 +10141,22 @@
     "finishedAt": "2026-10-07T08:11:25Z",
     "durationMs": 93000,
     "trendId": "37591937446:1:ccbd485622b252e1f34609ab94fdf905094ea8815a405e044c4fcc35f338ae68"
+  },
+  "[\".github/workflows/verify.yml\",\"pull_request\",\"pull-request\",\"step\",\"Packaged Worker / accounts / Summarize measured verification stages\",\"ubuntu-latest\",1]": {
+    "schema": 1,
+    "id": "37595520953:1:78c0e6ea67cc17f9974da78c0b64593134843b23a310f3d57dae47590de7795d",
+    "scope": "[\".github/workflows/verify.yml\",\"pull_request\",\"pull-request\",\"step\",\"Packaged Worker / accounts / Summarize measured verification stages\",\"ubuntu-latest\",1]",
+    "kind": "step",
+    "name": "Packaged Worker / accounts / Summarize measured verification stages",
+    "environment": "ubuntu-latest",
+    "commit": "d3293b9147861e8f4150fda5b9d940398498348c",
+    "runId": 37595520953,
+    "attempt": 1,
+    "url": "https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37595520953/job/112707628634",
+    "outcome": "success",
+    "startedAt": "2026-10-07T08:46:10Z",
+    "finishedAt": "2026-10-07T08:46:11Z",
+    "durationMs": 1000,
+    "trendId": "37595520953:1:78c0e6ea67cc17f9974da78c0b64593134843b23a310f3d57dae47590de7795d"
   }
 }
