@@ -1,5 +1,27 @@
 [
   {
+    "version": "1.5.0",
+    "date": "2026-10-07",
+    "summary": "Larger DM shops, unified campaign control, and dedicated player finance and property services.",
+    "features": [
+      "DMs can create suggested, chosen-count or all-matching shop assortments, including mixed markets, with independently selected stock quantities.",
+      "Existing shops support bulk catalog selection, fixed or unlimited quantities, stock summaries, search, filters and paginated shelves.",
+      "Player Home provides six fixed service buttons for Character Sheet, Bank, My Finances, Properties, Journal and Party chat.",
+      "Includes DM-reviewed character imports, campaign-day shop schedules and restocking, and property income and upkeep plans."
+    ],
+    "improvements": [
+      "DM Desk and campaign overview share one Campaign control screen with five swipeable information panels, grouped tools and visible Multiplayer settings.",
+      "Dedicated Bank, finance, property, downtime and report screens separate player services from DM approvals and administration.",
+      "Bulk additions preserve existing custom prices and stock; pagination preserves complete saved inventories and PDF exports.",
+      "Brings the bundled Android client up to date with the verified website while retaining the package, permanent certificate, existing saves and supported play modes."
+    ],
+    "fixes": [
+      "Removes small automatic assortment limits that excluded eligible catalog items from shops.",
+      "Saved DM shortcut destinations wait for account preferences instead of exposing incorrect defaults while loading.",
+      "The DM Review Inbox no longer includes a misplaced payment-request composer, and duplicate multiplayer entries are removed from the DM overview."
+    ]
+  },
+  {
     "version": "1.4.0",
     "date": "2026-10-05",
     "summary": "Account-owned campaigns, safer shared sessions, refreshed themes and optional fantasy sounds.",
