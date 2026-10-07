@@ -54,6 +54,7 @@ const initialView = {
   seats: [] as RoomView["seats"],
   departed: [] as NonNullable<RoomView["departed"]>,
   testMode: false,
+  viewOnly: false,
   revision: 0,
   seatId: "",
   pending: 0,
@@ -74,8 +75,7 @@ let pollFailures = 0;
 let chain: Promise<unknown> = Promise.resolve();
 export async function requestCampaignRoll(body: {
   purseId: string;
-  [key: string]: unknown;
-}) {
+  [key: string]: unknown }) {
   const s = requireSession();
   if (
     !body.policy &&
@@ -324,14 +324,14 @@ async function accept(remote: RoomView, committed = false) {
       seats: remote.seats,
       departed: remote.departed || [],
       testMode: remote.testMode === true,
+      viewOnly: remote.viewOnly === true,
       seatId: remote.seatId,
       revision: remote.revision,
       pending: s.pending.length,
       status: s.pending.length
-        ? view.error
+        ? (view.error
           ? "attention"
-          : "pending"
-        : "synced",
+          : "pending") : "synced",
       error: s.pending.length ? view.error : "",
       lastSync: Date.now(),
     },
@@ -527,6 +527,8 @@ export function discardPending() {
 export async function queueCommand(input: CommandInput) {
   return serial(async () => {
     const s = requireSession();
+    if (view.viewOnly && s.role === "player")
+      throw Error("The session has ended. This room is view-only until the DM resumes play.");
     if (input.kind !== "message" && !view.mine)
       throw new Error(`It is ${view.who}'s turn.`);
     if (s.pending.length >= 100)
@@ -618,7 +620,7 @@ export function chooseTableMode(mode: "local" | "turns" | "live") {
       return;
     }
     if (!session()) await openTable("Dungeon master");
-    if (view.live !== (mode === "live")) {
+    if (view.viewOnly || view.live !== (mode === "live")) {
       const s = requireSession();
       await accept(
         await setCloudPace({
@@ -626,6 +628,24 @@ export function chooseTableMode(mode: "local" | "turns" | "live") {
         }),
       );
     }
+  });
+}
+export function endSessionKeepOnline() {
+  return serial(async () => {
+    if (hasPendingChanges()) throw Error("Resolve pending actions before ending the session.");
+    const s = requireSession();
+    await closeCloudTable({ data: { code: s.code, token: s.token, keepOnline: true } });
+    await refresh();
+  });
+}
+export function leaveViewableRoom() {
+  return serial(async () => {
+    const s = requireSession();
+    if (s.role !== "dm" || !view.viewOnly || hasPendingChanges())
+      throw Error("End the session and resolve pending actions before leaving the room online.");
+    await refresh();
+    if (!view.viewOnly) throw Error("The session has resumed. End it before leaving.");
+    await detachTable(false);
   });
 }
 export function skipTableTurn() {

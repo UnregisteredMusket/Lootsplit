@@ -4,7 +4,7 @@ import assert from "node:assert/strict";
 import { mkdir } from "node:fs/promises";
 import { localAccountDb } from "./account-dev-db.mjs";
 import { blankSheet } from "../src/lib/characters/model.mjs";
-import { openApplication } from "./title-screen-navigation.mjs";
+import { openApplication, reloadApplication, continueIntoApp } from "./title-screen-navigation.mjs";
 const origin = process.env.AUDIT_ORIGIN || "http://127.0.0.1:8080";
 if (!/^http:\/\/(localhost|127\.0\.0\.1):/.test(origin))
   throw Error("Governance audit requires a disposable local server.");
@@ -193,7 +193,7 @@ try {
   await player.page.setViewportSize({width:390,height:844});
   await visit(player.page,"/");
   await player.page.getByRole("heading",{name:"Home",exact:true}).waitFor();
-  await player.page.evaluate(()=>window.featureDocumentMarker="same-document");
+  await player.page.evaluate(()=> (window.featureDocumentMarker="same-document"));
   await player.page.locator('.shortcut-grid a[href^="/features/bank?"]').click();
   await player.page.getByLabel("Repayment in copper",{exact:true}).fill("25");
   await player.page.getByRole("button",{name:"Make repayment",exact:true}).click();
@@ -402,6 +402,56 @@ try {
     0,
   );
   await player.page.getByRole("dialog").getByRole("button", { name: "Close", exact: true }).click();
+  console.log("Governance audit: keep ended room viewable, leave as DM and resume");
+  await visit(host.page, "/share");
+  await host.page
+    .getByRole("button", { name: "End session & keep room online", exact: true })
+    .click();
+  await host.page
+    .getByRole("alertdialog")
+    .getByRole("button", { name: "End session & keep online", exact: true })
+    .click();
+  await expect(
+    host.page.getByRole("button", { name: "Leave room online", exact: true }),
+  ).toBeVisible();
+  await expect(
+    player.page.getByRole("status").filter({ hasText: "Room remains online for viewing" }),
+  ).toBeVisible();
+  await reloadApplication(player.page);
+  await expect(
+    player.page.getByRole("status").filter({ hasText: "Room remains online for viewing" }),
+  ).toBeVisible();
+  assert.equal((await state(player.page)).purses.find((p) => p.id === "hero").sheet.maxHp, 25);
+  const blocked = await player.page.evaluate(async () => {
+    try {
+      await (
+        await import("/src/lib/quire/cloud-client.ts")
+      ).queueCommand({ kind: "message", to: "party", purseId: "", text: "After session" });
+      return "allowed";
+    } catch (e) {
+      return e.message;
+    }
+  });
+  assert.match(blocked, /view-only/);
+  await host.page.setViewportSize({ width: 390, height: 844 });
+  await host.page.screenshot({ path: output + "/viewable-room-mobile.png", fullPage: true });
+  await host.page.getByRole("button", { name: "Leave room online", exact: true }).click();
+  await expect(host.page.getByRole("button", { name: "Start a room", exact: true })).toBeVisible();
+  await expect(
+    player.page.getByRole("status").filter({ hasText: "Room remains online for viewing" }),
+  ).toBeVisible();
+  await openApplication(host.page, origin + "/account");
+  await host.page
+    .getByRole("button", { name: /^Resume/ })
+    .first()
+    .click();
+  await host.page.locator(".role-chip:enabled").waitFor();
+  await visit(host.page, "/share");
+  await host.page.getByRole("button", { name: "Resume play", exact: true }).click();
+  await expect(
+    player.page.getByRole("status").filter({ hasText: "Room remains online for viewing" }),
+  ).toHaveCount(0);
+  await host.page.setViewportSize({ width: 1360, height: 1000 });
   console.log("Governance audit: leave room and retain authorized reports");
   await player.page.getByRole("button", { name: "Leave room", exact: true }).click();
   await player.page
@@ -413,7 +463,7 @@ try {
   assert.equal((await state(player.page)).purses.length, 0);
   const records = await player.context.request.get(origin + "/api/account/records");
   assert.equal(records.status(), 200);
-  assert.equal((await records.json()).reports.length, 1);
+  assert.equal((await records.json()).reports.length, 2);
   // Test controls belong inside the bottom of the actual gear menu on mobile.
   await host.page.setViewportSize({ width: 390, height: 844 });
   const menuUrl = host.page.url();

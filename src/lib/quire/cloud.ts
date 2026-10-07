@@ -51,6 +51,7 @@ export type CloudRoom = {
   commands?: string[];
   batches?: string[];
   closed?: boolean;
+  viewOnly?: boolean;
   testMode?: boolean;
   testTemplate?: CloudTable;
   departed?: Array<CloudSeat & { status: "left" | "dismissed" | "kicked" | "banned"; userId?: string }>;

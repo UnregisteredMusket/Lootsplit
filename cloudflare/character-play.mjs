@@ -149,6 +149,8 @@ export async function handleCharacterPlay(db, user, path, body, url, approval = 
       const existing = await character(db, user, id, true);
       if (existing.campaign_code) {
         const { room, seat, raw } = await membership(db, user, existing.campaign_code);
+        if (room.viewOnly && seat.role === "player")
+          fail("The session has ended. This room is view-only until the DM resumes play.", 403);
         const p = room.table.purses.find((p) => p.id === existing.purse_id);
         if (!p || (seat.role !== "dm" && !seat.purseIds.includes(p.id)))
           fail("Your seat no longer controls this character.", 403);
@@ -262,6 +264,8 @@ export async function handleCharacterPlay(db, user, path, body, url, approval = 
     if (code) {
       target = previous?.room.code === code ? previous : await membership(db, user, code);
       const { room, seat } = target;
+      if (room.viewOnly && seat.role === "player")
+        fail("The session has ended. This room is view-only until the DM resumes play.", 403);
       const p = room.table.purses.find((p) => p.id === purse);
       if (seat.role === "player" && !approval) {
         const key = text(body.requestKey, 100);
@@ -446,6 +450,8 @@ export async function handleCharacterPlay(db, user, path, body, url, approval = 
     let member = null;
     if (r.campaign_code) {
       member = await membership(db, user, r.campaign_code);
+      if (member.room.viewOnly && member.seat.role === "player")
+        fail("The session has ended. This room is view-only until the DM resumes play.", 403);
       if (member.seat.role !== "dm" && !member.seat.purseIds.includes(r.purse_id))
         fail("Your seat no longer controls this character.", 403);
     }

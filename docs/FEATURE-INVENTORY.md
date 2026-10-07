@@ -263,3 +263,9 @@ Release status must be taken from the latest recovery checkpoint/PR, not this im
 
 
 - Account campaign resume reconciles acknowledged device commands and restores server drafts; genuine pending changes remain recoverable in Multiplayer. Changed-seat/conflicting device work remains in account-scoped exportable recovery copies, with no automatic replay under another seat.
+
+## Between-session online access (2026-10-07)
+
+- DM Multiplayer offers End session & keep room online. Session records are archived once; seats, current invitations and account memberships remain available. Player gameplay, edits, messages and rolls are view-only until the DM resumes play. Existing privacy projections and kick/ban/release protections apply.
+- DM can Leave room online after ending play, then resume the saved room from My account. Resume play restores the chosen Live/Turn-based mode; starting a named session also resumes play. The existing End session option still closes the room and revokes player access.
+- Legacy room bodies default to ordinary active play; no schema migration or Android signing changes.

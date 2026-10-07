@@ -361,3 +361,61 @@ test("new request metadata remains private and approved payments synchronize onc
   assert.equal(reconnect.table.journal?.requests[0]?.status, "approved");
   await closeRoom(dm);
 });
+
+test("ending a session can retain view-only player access until DM resume or closure", async () => {
+  const { dm, a } = await setup();
+  const player = { code: dm.code, token: a.token };
+  await assert.rejects(closeRoom({ ...player, keepOnline: true }), /Only the dungeon master/);
+  await closeRoom({ ...dm, keepOnline: true });
+  const paused = await roomState(player);
+  assert.equal(paused.viewOnly, true);
+  assert.equal(paused.mine, false);
+  assert.equal(paused.table.purses.find((p) => p.id === "A")?.coins.gp, 10);
+  const reports = paused.table.journal?.reports?.length;
+  await closeRoom({ ...dm, keepOnline: true });
+  assert.equal((await roomState(player)).table.journal?.reports?.length, reports);
+  await assert.rejects(
+    submitCommands({ ...player, batchId: crypto.randomUUID(), commands: [buy()] }),
+    /view-only/,
+  );
+  await assert.rejects(
+    submitCommands({
+      ...player,
+      batchId: crypto.randomUUID(),
+      commands: [
+        { id: crypto.randomUUID(), kind: "message", to: "party", purseId: "", text: "After play" },
+      ],
+    }),
+    /view-only/,
+  );
+  await choosePace({ ...dm, live: true });
+  assert.equal((await roomState(player)).viewOnly, false);
+  assert.equal((await roomState(player)).revision, paused.revision + 1);
+  await submitCommands({ ...player, batchId: crypto.randomUUID(), commands: [buy()] });
+  await closeRoom({ ...dm, keepOnline: true });
+  await closeRoom(dm);
+  await assert.rejects(roomState(player), /closed/);
+});
+test("pending turns prevent a view-only transition without losing actions", async () => {
+  const { dm, a } = await setup(false);
+  await submitCommands({ ...dm, batchId: crypto.randomUUID(), commands: [], endTurn: true });
+  await submitCommands({
+    code: dm.code,
+    token: a.token,
+    batchId: crypto.randomUUID(),
+    commands: [buy()],
+    stage: true,
+  });
+  await assert.rejects(closeRoom({ ...dm, keepOnline: true }), /pending/);
+  assert.equal((await roomState(dm)).viewOnly, false);
+});
+
+test("DM can start a named session from a paused turn-based player turn", async () => {
+  const { dm, a } = await setup(false);
+  await submitCommands({ ...dm, batchId: crypto.randomUUID(), commands: [], endTurn: true });
+  await closeRoom({ ...dm, keepOnline: true });
+  await submitCommands({ ...dm, batchId: crypto.randomUUID(), commands: [{ id: crypto.randomUUID(), kind: "session", name: "Next session", end: false }] });
+  const resumed = await roomState({ code: dm.code, token: a.token });
+  assert.equal(resumed.viewOnly, false);
+  assert.equal(resumed.mine, true);
+});

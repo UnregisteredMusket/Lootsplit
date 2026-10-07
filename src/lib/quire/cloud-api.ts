@@ -94,7 +94,7 @@ export const setCloudPace = createServerFn({ method: "POST" })
   });
 
 export const closeCloudTable = createServerFn({ method: "POST" })
-  .validator((input: { code: string; token: string }) => input)
+  .validator((input: { code: string; token: string; keepOnline?: boolean }) => input)
   .handler(async ({ data }) => {
     const { guardMemberSeat } = await import("./member-access.server.ts");
     await guardMemberSeat(data);

@@ -231,6 +231,13 @@ test("account characters enforce ownership, campaign assignments, DM policy, sta
           .body,
       ),
     );
+    room.viewOnly = true;
+    await db.prepare("UPDATE campaign_rooms SET body=? WHERE code=?").bind(JSON.stringify(room), "PLAYTEST").run();
+    assert.equal((await call("player", "/detail", { id })).body.name, "Test hero");
+    assert.equal((await call("player", "/log", { id })).rolls.length, 1);
+    await assert.rejects(call("player", "/save", { id, sheet, revision: d.revision }), /view-only/);
+    await assert.rejects(call("player", "/roll", { ...solo, revision: d.revision, requestKey: crypto.randomUUID() }), /view-only/);
+    room.viewOnly = false;
     room.seats = room.seats.filter((s) => s.role === "dm");
     await db
       .prepare("UPDATE campaign_rooms SET body=? WHERE code=?")
