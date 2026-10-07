@@ -30,6 +30,8 @@ export async function characterRoll(input: {
   if (!seat || !p || (seat.role !== "dm" && !seat.purseIds.includes(p.id)))
     throw Error("You do not control this character.");
   if (input.policy) return { manualAllowed: await manualCharacterRolls(room.code) };
+  if (room.viewOnly && seat.role === "player" && !input.log)
+    throw Error("The session has ended. This room is view-only until the DM resumes play.");
   const db = database();
   if (db) {
     if (input.log) {
@@ -183,7 +185,8 @@ export async function previewRoom(
   };
 }
 
-export async function joinRoom(input: { code: string; purseId: string; name: string; invitation?: string; userId?: string; sessionId?: string }): Promise<{
+export async function joinRoom(input: { code: string; purseId: string; name: string; invitation?: string; userId?: string; sessionId?: string;
+}): Promise<{
   token: string;
   seatId: string;
   revision: number;
@@ -246,26 +249,32 @@ export async function choosePace(input: {
   const room = await must(input.code);
   if (Object.values(room.drafts ?? {}).some((c) => c.length))
     throw new Error("Submit or discard all pending turns before changing modes.");
-  const next = setRoomLive(room, input.token, input.live);
+  const paced = setRoomLive(room, input.token, input.live);
+  const next = { ...paced, viewOnly: false,
+    revision: room.viewOnly && paced.revision === room.revision ? room.revision + 1 : paced.revision };
   await updateRoom(next, room.revision);
   const seat = next.seats.find((item) => item.token === input.token);
   if (!seat) throw new Error("This browser is not seated at that table.");
   return view(next, seat);
 }
 
-export async function closeRoom(input: { code: string; token: string }): Promise<void> {
+export async function closeRoom(input: { code: string; token: string; keepOnline?: boolean }): Promise<void> {
   const room = await must(input.code);
   const seat = room.seats.find((item) => item.token === input.token);
   if (!seat || seat.role !== "dm")
     throw new Error("Only the dungeon master can return to Local Mode.");
   if (Object.values(room.drafts ?? {}).some((c) => c.length))
     throw new Error("Submit or discard pending turns before closing the campaign.");
+  const keepOnline = input.keepOnline === true;
+  if (room.viewOnly && keepOnline) return;
   const next = structuredClone(room);
-  const active = next.table.journal?.sessions.find(s => !s.endedAt);
-  if (active) { active.endedAt = Date.now(); active.endLedgerIds = next.table.ledger.map(l => l.id); }
-  archiveSession(next.table, active?.id || crypto.randomUUID(), active?.name || "Room closed");
-  for (const report of next.table.journal?.reports || []) if (!report.seatIds) report.seatIds = room.seats.map(s => s.id);
-  next.closed = true;
+  const active = next.table.journal?.sessions.find((s) => !s.endedAt);
+  if (active) { active.endedAt = Date.now(); active.endLedgerIds = next.table.ledger.map((l) => l.id); }
+  if (!room.viewOnly || active)
+    archiveSession(next.table, active?.id || crypto.randomUUID(), active?.name || (keepOnline ? "Session ended" : "Room closed"));
+  for (const report of next.table.journal?.reports || []) if (!report.seatIds) report.seatIds = room.seats.map((s) => s.id);
+  next.closed = !keepOnline;
+  next.viewOnly = keepOnline;
   next.revision++;
   for (const p of next.table.purses) { p.editingAllowed = false; delete p.editBaseline; }
   await updateRoom(next, room.revision);
@@ -285,6 +294,7 @@ export async function passTurn(input: { code: string; token: string }): Promise<
 }
 
 export type RoomView = {
+  viewOnly?: boolean;
   sessionId?: string;
   code: string;
   revision: number;
@@ -329,7 +339,8 @@ function view(room: CloudRoom, seat: CloudSeat): RoomView {
     sessionId: room.sessionId,
     revision: room.revision,
     turn: room.turn,
-    mine: room.live || current?.id === seat.id,
+    viewOnly: room.viewOnly === true,
+    mine: room.viewOnly ? seat.role === "dm" : room.live || current?.id === seat.id,
     who: room.live ? "everyone" : (current?.name ?? "Someone"),
     live: room.live === true,
     testMode: room.testMode === true,
@@ -421,10 +432,12 @@ export async function submitCommands(input: {
       seat = room.seats.find((s) => s.token === input.token);
     if (!seat)
       throw new Error("This session is no longer assigned. Ask the DM to release your character.");
+    if (room.viewOnly && seat.role === "player")
+      throw Error("The session has ended. This room is view-only until the DM resumes play.");
     const key = seat.id + ":" + input.batchId;
     if (room.batches?.includes(key)) return view(room, seat);
     const messagesOnly = commands.length > 0 && commands.every((c) => c.kind === "message");
-    if (!messagesOnly && !room.live && room.seats[room.turn]?.id !== seat.id)
+    if (!room.viewOnly && !messagesOnly && !room.live && room.seats[room.turn]?.id !== seat.id)
       throw new Error("It is not your turn. Your pending actions have been preserved.");
     let table = room.table;
     const seen = new Set(room.commands ?? []);
@@ -445,6 +458,10 @@ export async function submitCommands(input: {
     const next: CloudRoom = {
       ...room,
       table: input.stage ? room.table : table,
+      viewOnly:
+        !input.stage && seat.role === "dm" && commands.some((c) => c.kind === "session" && !c.end)
+          ? false
+          : room.viewOnly,
       drafts,
       revision: room.revision + 1,
       commands: input.stage ? room.commands : [...seen],

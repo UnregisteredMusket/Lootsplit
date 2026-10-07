@@ -18,6 +18,8 @@ import {
   subscribeCloudTable,
   manageParticipant,
   leaveTable,
+  endSessionKeepOnline,
+  leaveViewableRoom,
 } from "@/lib/quire/cloud-client";
 import { useSeat } from "@/lib/quire/seat";
 import { copyText } from "@/lib/quire/table";
@@ -60,6 +62,7 @@ export function CloudTable() {
   const [nextMode, setNextMode] = useState<Mode | null>(null);
   const [release, setRelease] = useState<string | null>(null);
   const [leaving, setLeaving] = useState(false);
+  const [keepOnline, setKeepOnline] = useState(false);
   const host = cloud.joined && cloud.role === "dm";
   // Restored credentials arrive before the authoritative session mode/invitation.
   const unavailable = busy || !online || (cloud.joined && cloud.lastSync === 0);
@@ -197,6 +200,32 @@ export function CloudTable() {
 
   return (
     <div className="multiplayer-hub" aria-busy={busy}>
+      {cloud.joined && cloud.viewOnly && (
+        <div role="status" className="mb-4 rounded-xl border border-border p-4">
+          <p>Session ended · Room remains online for viewing sheets and campaign information.</p>
+          {host && (
+            <div className="mt-3 flex flex-wrap gap-2">
+              <Button
+                disabled={unavailable}
+                onClick={() =>
+                  run(() => chooseTableMode(cloud.live ? "live" : "turns"), "Play resumed.")
+                }
+              >
+                Resume play
+              </Button>
+              <Button
+                variant="secondary"
+                disabled={unavailable}
+                onClick={() =>
+                  run(() => leaveViewableRoom(), "Room left online. Resume it from My account.")
+                }
+              >
+                Leave room online
+              </Button>
+            </div>
+          )}
+        </div>
+      )}
       {invitation && cloud.joined && invitation === cloud.code ? (
         <div className="mb-4 rounded-xl border border-border p-4" role="status">
           <p>You are already connected to room {cloud.code}.</p>
@@ -305,7 +334,10 @@ export function CloudTable() {
                 Resume a saved campaign
               </Link>
               {checkingAccount && <p role="status">Checking your saved campaigns…</p>}
-              {!checkingAccount && !hostAccount && <p>Create an account or sign in to proceed as a Dungeon Master in your own campaign. <Link to="/account">Sign in</Link></p>}
+              {!checkingAccount && !hostAccount && (
+                <p>Create an account or sign in to proceed as a Dungeon Master in your own campaign.{" "}
+                  <Link to="/account">Sign in</Link></p>
+              )}
               {savedRooms.length > 0 && (
                 <div className="mt-3 rounded-xl border border-lead/30 p-3">
                   <h3>You already have saved campaigns</h3>
@@ -556,7 +588,9 @@ export function CloudTable() {
             </button>
           </div>
           <p className="mt-3 text-center text-sm text-muted">
-            {cloud.live
+            {cloud.viewOnly
+              ? "Session ended. Players can view their sheets and campaign information."
+              : cloud.live
               ? "Everyone can make changes."
               : cloud.mine
                 ? "Your turn. Submit your changes when you’re done."
@@ -620,11 +654,17 @@ export function CloudTable() {
               <p className="mb-3 text-sm text-muted">
                 Manage who can spend party funds or release a character so someone can join again.
               </p>
-              {cloud.departed.map(item => <div key={item.id} className="border-b py-3">
+              {cloud.departed.map((item) => (
+                <div key={item.id} className="border-b py-3">
                 <p>{item.name} · {item.status}</p>
-                {item.status === "kicked" && <Button disabled={unavailable} variant="secondary" onClick={() => run(() => manageParticipant("invite", item.id))}>Create fresh invitation</Button>}
-                {item.invitation && <Button variant="secondary" onClick={() => { const url = new URL("/share", location.origin); url.searchParams.set("join", cloud.code); url.searchParams.set("session", cloud.sessionId); url.searchParams.set("invitation", item.invitation!); void navigator.clipboard.writeText(url.href).then(() => toast.success("Fresh invitation copied"), () => window.prompt("Copy fresh invitation", url.href)); }}>Copy fresh invitation</Button>}
-              </div>)}
+                {item.status === "kicked" && (
+                    <Button disabled={unavailable} variant="secondary" onClick={() => run(() => manageParticipant("invite", item.id))}>Create fresh invitation</Button>
+                  )}
+                {item.invitation && (
+                    <Button variant="secondary" onClick={() => { const url = new URL("/share", location.origin); url.searchParams.set("join", cloud.code); url.searchParams.set("session", cloud.sessionId); url.searchParams.set("invitation", item.invitation!); void navigator.clipboard.writeText(url.href).then(() => toast.success("Fresh invitation copied"), () => window.prompt("Copy fresh invitation", url.href)); }}>Copy fresh invitation</Button>
+                  )}
+              </div>
+              ))}
               {cloud.seats.map((item) => (
                 <div key={item.id} className="border-b border-border py-3 last:border-0">
                   <p className="font-medium">{item.name || "Dungeon master"}</p>
@@ -667,6 +707,15 @@ export function CloudTable() {
               ))}
             </Fold>
           ) : null}
+          {host && !cloud.viewOnly && (
+            <Button
+              className="mt-5 w-full"
+              disabled={unavailable}
+              onClick={() => setKeepOnline(true)}
+            >
+              End session & keep room online
+            </Button>
+          )}
           <Button
             className="mt-5 w-full text-negative"
             variant="ghost"
@@ -679,11 +728,22 @@ export function CloudTable() {
         </>
       )}
       <Confirm
+        open={keepOnline}
+        onOpenChange={setKeepOnline}
+        title="End session and keep room online?"
+        body="Archive this session and keep player sheets and campaign information available to view. Player changes and rolls pause until you resume play. Resolve pending turns first. You can then leave the room online and return from My account."
+        confirmLabel="End session & keep online"
+        onConfirm={() => {
+          setKeepOnline(false);
+          run(() => endSessionKeepOnline(), "Session ended. Room remains online.");
+        }}
+      />
+      <Confirm
         open={nextMode !== null}
         onOpenChange={(open) => {
           if (!open) setNextMode(null);
         }}
-        title={nextMode === "local" ? "End this session?" : "Change session mode?"}
+        title={nextMode === "local" ? "Close this room?" : "Change session mode?"}
         body={
           nextMode === "local"
             ? "This archives the session and closes the room for everyone. Player access is cleared; authorized reports remain in My account. Pending changes must be resolved first."
