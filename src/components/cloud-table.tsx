@@ -60,6 +60,7 @@ export function CloudTable() {
   const [nextMode, setNextMode] = useState<Mode | null>(null);
   const [release, setRelease] = useState<string | null>(null);
   const [leaving, setLeaving] = useState(false);
+  const [keepViewable, setKeepViewable] = useState(false);
   const host = cloud.joined && cloud.role === "dm";
   // Restored credentials arrive before the authoritative session mode/invitation.
   const unavailable = busy || !online || (cloud.joined && cloud.lastSync === 0);
@@ -193,7 +194,7 @@ export function CloudTable() {
           ? "Saving changes…"
           : cloud.pending
             ? `${cloud.pending} pending action${cloud.pending === 1 ? "" : "s"}`
-            : "Connected · All changes saved";
+            : cloud.readOnly ? "Session ended · View only" : "Connected · All changes saved";
 
   return (
     <div className="multiplayer-hub" aria-busy={busy}>
@@ -345,7 +346,7 @@ export function CloudTable() {
                   Create a separate room from this device’s copy
                 </label>
               )}
-              {!host && <PlayerCharacterImport key={cloud.code} code={cloud.code} />}
+              {!host && !cloud.readOnly && <PlayerCharacterImport key={cloud.code} code={cloud.code} />}
           <div className="mode-switch mt-5" role="group" aria-label="Session mode">
                 <button
                   aria-pressed={hostMode === "live"}
@@ -494,7 +495,7 @@ export function CloudTable() {
                     </select>
                   </Field>
                   <p className="text-sm text-muted">
-                    Guest campaign data stays in memory. Refreshing can reconnect during this session; ending the session revokes access. An existing DM device campaign is preserved separately.
+                    Guest campaign data stays in memory. Refreshing can reconnect during this session or while the DM keeps player viewing enabled. A full close revokes access. An existing DM device campaign is preserved separately.
                   </p>
                   <Button
                     type="submit"
@@ -518,26 +519,26 @@ export function CloudTable() {
             <p className="room-code" aria-label={`Campaign ID ${cloud.code}`}>
               {cloud.code}
             </p>
-            <p className="mb-3 text-sm text-muted">Use Copy session code or Share join link to invite players. The campaign ID alone does not grant access.</p>
+            <p className="mb-3 text-sm text-muted">{cloud.readOnly ? "Existing players can view this saved room. New joins are closed until the DM reopens play." : "Use Copy session code or Share join link to invite players. The campaign ID alone does not grant access."}</p>
             <div className="grid grid-cols-2 gap-3">
               <Button
-                disabled={unavailable}
+                disabled={unavailable || cloud.readOnly}
                 onClick={() => run(() => copyText(cloud.sessionId ? `${cloud.code}.${cloud.sessionId}` : cloud.code), "Room code copied.")}
               >
                 <Copy size={17} />
                 Copy session code
               </Button>
-              <Button variant="secondary" disabled={unavailable} onClick={() => run(invitePlayers)}>
+              <Button variant="secondary" disabled={unavailable || cloud.readOnly} onClick={() => run(invitePlayers)}>
                 <Users size={17} />
                 Share join link
               </Button>
             </div>
           </section>
-          {!host && <PlayerCharacterImport key={cloud.code} code={cloud.code} />}
+          {!host && !cloud.readOnly && <PlayerCharacterImport key={cloud.code} code={cloud.code} />}
           <div className="mode-switch mt-5" role="group" aria-label="Session mode">
             <button
               aria-pressed={cloud.live}
-              disabled={!host || unavailable}
+              disabled={!host || unavailable || cloud.readOnly}
               onClick={() => {
                 if (!cloud.live) setNextMode("live");
               }}
@@ -546,8 +547,8 @@ export function CloudTable() {
               Live
             </button>
             <button
-              aria-pressed={!cloud.live}
-              disabled={!host || unavailable}
+              aria-pressed={!cloud.live && !cloud.readOnly}
+              disabled={!host || unavailable || cloud.readOnly}
               onClick={() => {
                 if (cloud.live) setNextMode("turns");
               }}
@@ -556,14 +557,16 @@ export function CloudTable() {
             </button>
           </div>
           <p className="mt-3 text-center text-sm text-muted">
-            {cloud.live
+            {cloud.readOnly
+              ? "Session ended. Existing players can view their information; new invitations and changes are locked."
+              : cloud.live
               ? "Everyone can make changes."
               : cloud.mine
                 ? "Your turn. Submit your changes when you’re done."
                 : `Waiting for ${cloud.who}.`}
             {!host ? " The host controls the mode." : ""}
           </p>
-          {!cloud.live ? (
+          {!cloud.live && !cloud.readOnly ? (
             <div className="mt-3">
               {cloud.mine ? (
                 <Button
@@ -615,7 +618,7 @@ export function CloudTable() {
               ))}
             </ul>
           </section>
-          {host ? (
+          {host && !cloud.readOnly ? (
             <Fold title="Room settings" hint="Player permissions and turn order.">
               <p className="mb-3 text-sm text-muted">
                 Manage who can spend party funds or release a character so someone can join again.
@@ -629,7 +632,7 @@ export function CloudTable() {
                 <div key={item.id} className="border-b border-border py-3 last:border-0">
                   <p className="font-medium">{item.name || "Dungeon master"}</p>
                   <div className="mt-2 flex flex-wrap gap-2">
-                    {!cloud.live ? (
+                    {!cloud.live && !cloud.readOnly ? (
                       <Button
                         variant="secondary"
                         disabled={unavailable}
@@ -667,6 +670,13 @@ export function CloudTable() {
               ))}
             </Fold>
           ) : null}
+          {host && !cloud.readOnly && (
+            <Button className="mt-5 w-full" variant="secondary"
+              disabled={unavailable || cloud.pending > 0}
+              onClick={() => setKeepViewable(true)}>
+              End session and keep room viewable
+            </Button>
+          )}
           <Button
             className="mt-5 w-full text-negative"
             variant="ghost"
@@ -678,6 +688,20 @@ export function CloudTable() {
           </Button>
         </>
       )}
+      <Confirm
+        open={keepViewable}
+        onOpenChange={setKeepViewable}
+        title="End play and keep player viewing?"
+        body="The saved session is archived and gameplay stops. Existing players can still view their assigned sheets and permitted information online, but cannot make changes or invite anyone new. You will leave this room. Resume it or close player viewing from My account. Players need fresh invitations after you reopen play."
+        confirmLabel="End session and keep room viewable"
+        onConfirm={() => {
+          setKeepViewable(false);
+          run(async () => {
+            await chooseTableMode("local", true);
+            await router.navigate({ to: "/account" });
+          }, "Session ended. Player viewing stays online; you have left the room.");
+        }}
+      />
       <Confirm
         open={nextMode !== null}
         onOpenChange={(open) => {

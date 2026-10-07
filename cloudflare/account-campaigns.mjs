@@ -1,3 +1,5 @@
+import { isRoomViewOnly } from "../src/lib/quire/room-access.ts";
+
 const fail = (message, status = 400) => {
   throw Object.assign(new Error(message), { status });
 };
@@ -15,10 +17,10 @@ export async function resumeCampaignMembership(db, userId, body) {
   const room = row ? JSON.parse(row.body) : null;
   // Ownership is the saved account membership plus the current server seat, never a client role.
   const seat = room?.seats.find((s) => s.id === member.seat_id && s.token === member.token);
-  if (!seat || (room.closed && seat.role !== "dm"))
+  if (!seat || (room.closed && seat.role !== "dm" && !isRoomViewOnly(room)))
     fail("This campaign membership is no longer available. Ask the DM for a new invitation.", 403);
   let reopened = false;
-  if (room.closed) {
+  if (room.closed && seat.role === "dm") {
     if (body.reopen !== true)
       fail("This session has ended. Use Reopen as DM in My campaigns to continue it.", 409);
     if (body.revision !== row.revision)
@@ -27,6 +29,7 @@ export async function resumeCampaignMembership(db, userId, body) {
       fail("This campaign has pending turns. Resolve them before reopening it.", 409);
     const next = structuredClone(room);
     next.closed = false;
+    next.viewOnly = false;
     next.ownerId = userId;
     next.sessionId = crypto.randomUUID();
     next.invitations = {};
@@ -64,7 +67,7 @@ export async function resumeCampaignMembership(db, userId, body) {
 }
 
 export async function campaignAction(db, userId, body) {
-  if (typeof body.code !== "string" || !["rename", "delete"].includes(body.action))
+  if (typeof body.code !== "string" || !["rename", "delete", "close-viewing"].includes(body.action))
     fail("Invalid campaign action.");
   const member = await db
     .prepare("SELECT * FROM library_members WHERE user_id=? AND code=?")
@@ -78,6 +81,20 @@ export async function campaignAction(db, userId, body) {
       .prepare("UPDATE library_members SET name=?,updated_at=? WHERE user_id=? AND code=?")
       .bind(body.name.trim(), Date.now(), userId, body.code)
       .run();
+    return { ok: true };
+  }
+  if (body.action === "close-viewing") {
+    const row = await db.prepare("SELECT body,revision FROM campaign_rooms WHERE code=?")
+      .bind(body.code).first();
+    const room = row ? JSON.parse(row.body) : null;
+    const seat = room?.seats.find((s) => s.id === member.seat_id && s.token === member.token);
+    if (seat?.role !== "dm") fail("Only the linked DM can close player viewing.", 403);
+    if (!isRoomViewOnly(room) || body.revision !== row.revision)
+      fail("The campaign changed. Refresh My campaigns before closing player viewing.", 409);
+    const next = { ...room, viewOnly: false, revision: row.revision + 1 };
+    const result = await db.prepare("UPDATE campaign_rooms SET body=?,revision=? WHERE code=? AND revision=?")
+      .bind(JSON.stringify(next), next.revision, body.code, row.revision).run();
+    if (result.meta.changes !== 1) fail("The campaign changed. Refresh before closing player viewing.", 409);
     return { ok: true };
   }
   if (body.confirm !== body.code) fail("Type the campaign code to confirm deletion.");

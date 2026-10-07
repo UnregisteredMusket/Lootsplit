@@ -1,3 +1,5 @@
+import { VIEW_ONLY_MESSAGE } from "./room-access.ts";
+import { announceSheetChange } from "./party-sheet-links.ts";
 import { emptyCloudTable } from "./cloud.ts";
 import { reloadCampaignContext } from "./navigation-launch.ts";
 import { rememberSave } from "./saves.ts";
@@ -47,6 +49,7 @@ const initialView = {
   joined: false,
   mine: true,
   live: false,
+  readOnly: false,
   who: "",
   code: "",
   sessionId: "",
@@ -77,6 +80,7 @@ export async function requestCampaignRoll(body: {
   [key: string]: unknown;
 }) {
   const s = requireSession();
+  if (!body.policy && !body.log) requireWritable();
   if (
     !body.policy &&
     !body.log &&
@@ -159,6 +163,9 @@ function requireSession() {
   if (!s) throw new Error("Join a campaign first.");
   return s;
 }
+function requireWritable() {
+  if (view.readOnly) throw new Error(VIEW_ONLY_MESSAGE);
+}
 function serial<T>(fn: () => Promise<T>): Promise<T> {
   const locked = async (): Promise<T> =>
     typeof navigator !== "undefined" && navigator.locks
@@ -185,7 +192,7 @@ function publish(next: Partial<typeof view>, dataChanged = true) {
     if (previous.live !== view.live)
       notify(
         "Mode changed",
-        view.live ? "Live Mode" : "Turn-based Mode",
+        view.readOnly ? "Session ended · View only" : view.live ? "Live Mode" : "Turn-based Mode",
         "mode",
       );
     if (!previous.mine && view.mine && !view.live)
@@ -194,10 +201,11 @@ function publish(next: Partial<typeof view>, dataChanged = true) {
       notify("Player joined", "A participant joined the campaign.", "joined");
   }
   setCloudWatch(
-    { joined: view.joined, mine: view.mine, live: view.live, who: view.who },
+    { joined: view.joined, mine: view.mine, live: view.live, who: view.who, readOnly: view.readOnly },
     dataChanged,
   );
   for (const fn of listeners) fn();
+  if (previous.readOnly !== view.readOnly) announceSheetChange();
 }
 export function getCloudTable() {
   return view;
@@ -278,9 +286,13 @@ async function accept(remote: RoomView, committed = false) {
   if (changed && !s.pending.length) s.batchId = crypto.randomUUID();
   s.revision = remote.revision;
   s.purseIds = remote.purseIds;
-  if (!s.pending.length && (changed || committed)) {
+  if (remote.readOnly && (changed || committed || !view.readOnly)) {
+    // Show saved server state, never uncommitted optimistic edits. The queue
+    // remains untouched and exportable for a later DM-assisted recovery.
     await applyCloudTable(remote.table);
-  } else if (changed) {
+  } else if (!s.pending.length && (changed || committed)) {
+    await applyCloudTable(remote.table);
+  } else if (changed && !remote.readOnly) {
     try {
       let preview = remote.table;
       for (const cmd of s.pending)
@@ -317,6 +329,7 @@ async function accept(remote: RoomView, committed = false) {
       joined: true,
       mine: remote.mine,
       live: remote.live,
+      readOnly: remote.readOnly === true,
       who: remote.who,
       code: remote.code,
       sessionId: remote.sessionId || "",
@@ -455,6 +468,7 @@ export async function joinTable(
   });
 }
 async function flush(endTurn = false) {
+  requireWritable();
   const s = requireSession();
   publish({ status: "saving", error: "" });
   try {
@@ -474,6 +488,7 @@ async function flush(endTurn = false) {
   }
 }
 async function stage() {
+  requireWritable();
   const s = requireSession();
   if (!s.pending.length) return;
   try {
@@ -512,7 +527,8 @@ export function exportPending() {
 }
 export function discardPending() {
   return serial(async () => {
-    const s = requireSession();
+    requireWritable();
+  const s = requireSession();
     const remote = await manageCloudRoom({
       data: {
         code: s.code,
@@ -526,7 +542,8 @@ export function discardPending() {
 }
 export async function queueCommand(input: CommandInput) {
   return serial(async () => {
-    const s = requireSession();
+    requireWritable();
+  const s = requireSession();
     if (input.kind !== "message" && !view.mine)
       throw new Error(`It is ${view.who}'s turn.`);
     if (s.pending.length >= 100)
@@ -546,6 +563,7 @@ export async function queueCommand(input: CommandInput) {
       return;
     }
     if (!s.pending.length) await refresh();
+    requireWritable();
     const current = requireSession(),
       before = await economySnapshot();
     const after = applyCommand(
@@ -570,7 +588,8 @@ export async function queueCommand(input: CommandInput) {
 }
 export function runSharedMutation(work: () => Promise<unknown>) {
   return serial(async () => {
-    const s = requireSession();
+    requireWritable();
+  const s = requireSession();
     if (s.role !== "dm")
       throw new Error(
         "Only the DM can directly edit funds and inventory in shared modes. Use Buy, Sell, Give, or Request loan.",
@@ -579,6 +598,7 @@ export function runSharedMutation(work: () => Promise<unknown>) {
     if (s.pending.length >= 100)
       throw new Error("Submit your pending actions first.");
     if (!s.pending.length) await refresh();
+    requireWritable();
     const before = await economySnapshot();
     let after;
     try {
@@ -603,7 +623,7 @@ export function runSharedMutation(work: () => Promise<unknown>) {
     else await stage();
   });
 }
-export function chooseTableMode(mode: "local" | "turns" | "live") {
+export function chooseTableMode(mode: "local" | "turns" | "live", keepViewable = false) {
   return serial(async () => {
     if (hasPendingChanges())
       throw new Error(
@@ -612,11 +632,13 @@ export function chooseTableMode(mode: "local" | "turns" | "live") {
     if (mode === "local") {
       const s = session();
       if (s) {
-        await closeCloudTable({ data: { code: s.code, token: s.token } });
+        await closeCloudTable({ data: { code: s.code, token: s.token, ...(keepViewable ? { keepViewable: true } : {}) } });
+        if (keepViewable) await refresh();
         await detachTable(false);
       }
       return;
     }
+    requireWritable();
     if (!session()) await openTable("Dungeon master");
     if (view.live !== (mode === "live")) {
       const s = requireSession();
@@ -630,7 +652,8 @@ export function chooseTableMode(mode: "local" | "turns" | "live") {
 }
 export function skipTableTurn() {
   return serial(async () => {
-    const s = requireSession();
+    requireWritable();
+  const s = requireSession();
     await accept(
       await skipCloudTurn({ data: { code: s.code, token: s.token } }),
     );
@@ -643,7 +666,8 @@ export function manageParticipant(
   allowParty?: boolean,
 ) {
   return serial(async () => {
-    const s = requireSession();
+    requireWritable();
+  const s = requireSession();
     await accept(
       await manageCloudRoom({
         data: { code: s.code, token: s.token, action, seatId, allowParty },
@@ -731,7 +755,8 @@ export async function importPending(file: File) {
   const raw = JSON.parse(await file.text());
   const { commandSchema } = await import("./commands.ts");
   return serial(async () => {
-    const s = requireSession();
+    requireWritable();
+  const s = requireSession();
     if (raw.code !== s.code || !Array.isArray(raw.commands))
       throw new Error(
         "This recovery file belongs to a different campaign code.",
@@ -761,7 +786,8 @@ export function sendRoomMessage(
   command: Extract<Command, { kind: "message" }>,
 ) {
   return serial(async () => {
-    const s = requireSession();
+    requireWritable();
+  const s = requireSession();
     const remote = await submitCloudCommands({
       data: {
         code: s.code,

@@ -57,6 +57,7 @@ export type AccountLibrary = {
   members: {
     role: "dm" | "player" | null;
     closed: boolean;
+    viewOnly?: boolean;
     room_revision: number | null;
     code: string;
     seat_id: string;

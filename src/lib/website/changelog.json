@@ -1,5 +1,21 @@
 [
   {
+    "version": "1.6.0",
+    "date": "2026-10-07",
+    "summary": "Keep ended campaign rooms online for read-only player access while the Dungeon Master is away.",
+    "features": [
+      "Dungeon Masters can end a session and keep the room viewable for existing players, then leave the room.",
+      "Existing account players can return to their assigned sheets and permitted campaign information from My campaigns or the startup chooser.",
+      "The Dungeon Master can close player viewing or reopen play from My account."
+    ],
+    "improvements": [
+      "Ended rooms clearly distinguish view-only access from Live or Turn-based play; sheet edits, financial actions, chat submissions and campaign rolls are locked.",
+      "Unsent device actions remain recoverable without being replayed or displayed as saved campaign changes.",
+      "The original End session option still revokes player access completely. Reopening play requires fresh invitations, and prior saves and reports remain available."
+    ],
+    "fixes": ["None in this release."]
+  },
+  {
     "version": "1.5.1",
     "date": "2026-10-07",
     "summary": "Safer account campaign reopening and recovery of unsynced device changes.",

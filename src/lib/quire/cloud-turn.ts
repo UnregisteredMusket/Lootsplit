@@ -1,4 +1,4 @@
-export type CloudWatch = { joined: boolean; mine: boolean; live: boolean; who: string };
+export type CloudWatch = { joined: boolean; mine: boolean; live: boolean; who: string; readOnly?: boolean };
 
 let watch: CloudWatch = { joined: false, mine: true, live: false, who: "" };
 const listeners = new Set<() => void>();
@@ -14,7 +14,8 @@ export function setCloudWatch(next: CloudWatch, dataChanged = true) {
     next.joined === watch.joined &&
     next.mine === watch.mine &&
     next.live === watch.live &&
-    next.who === watch.who
+    next.who === watch.who &&
+    next.readOnly === watch.readOnly
   )
     return;
   watch = next;

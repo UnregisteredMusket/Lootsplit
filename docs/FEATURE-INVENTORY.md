@@ -263,3 +263,12 @@ Release status must be taken from the latest recovery checkpoint/PR, not this im
 
 
 - Account campaign resume reconciles acknowledged device commands and restores server drafts; genuine pending changes remain recoverable in Multiplayer. Changed-seat/conflicting device work remains in account-scoped exportable recovery copies, with no automatic replay under another seat.
+
+## Optional post-session viewing
+
+
+In **Multiplayer**, the DM can choose **End session and keep room viewable**. After confirmation, the session is archived, gameplay stops and the DM leaves the room. Existing players can keep viewing their assigned sheets, inventory and permitted information; archived activity remains in session reports. All campaign mutations, chat submissions, new rolls and new joins are refused by the server. A visible **Session ended · View only** status distinguishes this from a running session.
+
+Signed-in players return through **My account → My campaigns → View campaign**, including on another signed-in device. A startup chooser also exposes their retained viewing memberships. Guests can continue or reload their existing tab while its reconnect ticket remains; closing the tab does not give them a permanent account save. Guest campaign data remains in memory. Unsynced actions remain exportable for recovery, but cannot be submitted into an ended session.
+
+The DM can use **My account → My campaigns → Close player viewing** to revoke viewing without deleting the campaign, or **Reopen as DM** to restart play with fresh player invitations. The original **End session** button still closes player access completely. Existing ended rooms are not automatically made viewable. Merely closing the DM's browser while play is running still does not end a session.

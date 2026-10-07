@@ -33,7 +33,9 @@ export function SyncStatus({ compact = false }: { compact?: boolean }) {
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
         <span>
-          {state.live
+          {state.readOnly
+            ? "Session ended · View only"
+            : state.live
             ? "Live"
             : state.mine
               ? "Your turn"
@@ -44,13 +46,14 @@ export function SyncStatus({ compact = false }: { compact?: boolean }) {
             : state.status === "attention"
               ? "Needs attention"
               : state.pending
-                ? `${state.pending} ${state.live ? "unsynced Live change" : "unfinished turn action"}${state.pending === 1 ? "" : "s"}`
+                ? `${state.pending} ${state.readOnly ? "preserved unsynced change" : state.live ? "unsynced Live change" : "unfinished turn action"}${state.pending === 1 ? "" : "s"}`
                 : "Synced"}
         </span>
         <Link to="/share" className="underline">
           Multiplayer
         </Link>
       </div>
+      {state.readOnly && <p className="mt-2">You can view your assigned sheets and permitted campaign information. Changes are locked until the DM reopens play.</p>}
       {!compact ? (
         <>
           <details className="mt-2">
@@ -73,6 +76,7 @@ export function SyncStatus({ compact = false }: { compact?: boolean }) {
               <input
                 className="sr-only"
                 type="file"
+                disabled={state.readOnly}
                 accept="application/json,.json"
                 onChange={(event) => {
                   const file = event.target.files?.[0];
@@ -87,16 +91,16 @@ export function SyncStatus({ compact = false }: { compact?: boolean }) {
           ) : null}
           {state.pending || state.error ? (
             <div className="mt-2 flex flex-wrap gap-2">
-              <Button variant="secondary" onClick={() => act(retryPending)}>
+              <Button variant="secondary" disabled={state.readOnly} onClick={() => act(retryPending)}>
                 Retry
               </Button>
               <Button variant="ghost" onClick={() => act(exportPending)}>
                 Export pending actions
               </Button>
-              <Button variant="ghost" onClick={() => setDiscard(true)}>
+              <Button variant="ghost" disabled={state.readOnly} onClick={() => setDiscard(true)}>
                 Discard pending actions
               </Button>
-              {state.error ? (
+              {state.error || (state.readOnly && state.pending) ? (
                 <Button variant="ghost" onClick={() => setDisconnect(true)}>
                   Disconnect with recovery copy
                 </Button>

@@ -433,7 +433,7 @@ function Account() {
                   </div>
                   <button
                     className="portal-button secondary"
-                    disabled={busy || !cloud.joined}
+                    disabled={busy || !cloud.joined || cloud.readOnly}
                     onClick={action(async () => {
                       await linkCurrentCampaign();
                       await reload();
@@ -450,7 +450,7 @@ function Account() {
                 <p className="portal-subtle">
                   Open or join a shared campaign in the app, then save its
                   membership here. DMs can resume or reopen their saved shared
-                  sessions on any signed-in device. Players need an active seat
+                  sessions on any signed-in device. Players need an active seat or retained view-only access
                   from their DM. Linking does not upload a local-only campaign.
                 </p>
                 <DeviceRecovery userId={library.user.id} />
@@ -491,6 +491,7 @@ function Account() {
                             portraits, loot and progress.
                           </p>
                         )}
+                        {m.viewOnly && <p className="portal-message">Session ended · Player viewing available. Sheets and permitted information are read-only.</p>}
                         {m.role === "dm" && (
                           <p className="portal-subtle">
                             {m.closed
@@ -499,6 +500,18 @@ function Account() {
                           </p>
                         )}
                         <div className="portal-actions">
+                          {m.role === "dm" && m.viewOnly && (
+                            <button className="portal-button secondary" disabled={busy}
+                              onClick={action(async () => {
+                                if (!window.confirm("Close player viewing? Existing players will lose access to this ended room. Your campaign and authorized reports are kept.")) return;
+                                await accountRequest("campaign", { action: "close-viewing", code: m.code, revision: m.room_revision });
+                                if (cloud.joined && cloud.code === m.code) await clearAccountRoom(true);
+                                await reload();
+                                setNotice("Player viewing closed. Your campaign remains saved to your account.");
+                              })}>
+                              Close player viewing
+                            </button>
+                          )}
                           <button
                             className="portal-button secondary"
                             disabled={busy}
@@ -600,9 +613,7 @@ function Account() {
                               await resumeAccountMembership(member);
                             })}
                           >
-                            {m.closed && m.role === "dm"
-                              ? "Reopen as DM"
-                              : "Resume"}{" "}
+                            {m.closed && m.role === "dm" ? "Reopen as DM" : m.viewOnly ? "View campaign" : "Resume"}{" "}
                             <ArrowRight size={16} />
                           </button>
                           <button

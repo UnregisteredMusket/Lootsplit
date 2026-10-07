@@ -40,5 +40,7 @@
   "node scripts/recovery-step.mjs worker-website 180 node scripts/website-browser-audit.mjs",
   "node scripts/recovery-step.mjs worker-library-navigation 180 node scripts/library-navigation-browser-audit.mjs",
   "node scripts/recovery-step.mjs worker-loot 180 node scripts/loot-browser-audit.mjs",
-  "node scripts/recovery-step.mjs built-live-check 240 node scripts/live-release-audit.mjs"
+  "node scripts/recovery-step.mjs built-live-check 240 node scripts/live-release-audit.mjs",
+  "node scripts/recovery-step.mjs dev-room-viewing 180 node scripts/room-viewing-browser-audit.mjs",
+  "node scripts/recovery-step.mjs worker-room-viewing 180 node scripts/room-viewing-browser-audit.mjs"
 ]

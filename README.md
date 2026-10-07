@@ -45,6 +45,14 @@ For Live or Turn-based play, the DM must sign in. **Share join link** and each p
 At startup, choose an account campaign to load its server save. Existing device-only DM campaigns require an explicit **Claim this device’s existing DM campaign** after sign-in; claiming preserves the save. Offline edits stay in the owner's device copy until explicitly backed up or shared online. Do not overwrite a newer account campaign with an older device copy. Multiple campaigns remain separate.
 
 
+## End play without closing player viewing
+
+In **Multiplayer**, the DM can choose **End session and keep room viewable**. After confirmation, the session is archived, gameplay stops and the DM leaves the room. Existing players can keep viewing their assigned sheets, inventory and permitted information; archived activity remains in session reports. All campaign mutations, chat submissions, new rolls and new joins are refused by the server. A visible **Session ended · View only** status distinguishes this from a running session.
+
+Signed-in players return through **My account → My campaigns → View campaign**, including on another signed-in device. A startup chooser also exposes their retained viewing memberships. Guests can continue or reload their existing tab while its reconnect ticket remains; closing the tab does not give them a permanent account save. Guest campaign data remains in memory. Unsynced actions remain exportable for recovery, but cannot be submitted into an ended session.
+
+The DM can use **My account → My campaigns → Close player viewing** to revoke viewing without deleting the campaign, or **Reopen as DM** to restart play with fresh player invitations. The original **End session** button still closes player access completely. Existing ended rooms are not automatically made viewable. Merely closing the DM's browser while play is running still does not end a session.
+
 ## Character imports, campaign operations and domain preparation
 
 Signed-in players can open **Campaign → Room → Import an account character** after joining, select a saved sheet and their assigned character, and submit it for review. **Characters → DM character & roll controls → Character import requests** lets the DM inspect and approve or deny it. Submission changes no campaign stats. Approval preserves campaign money/items, rechecks current access/session and rejects a changed sheet; refresh or resubmit after denial. Existing assigned profiles remain supported. Importing from the character editor also uses DM approval for players.

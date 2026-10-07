@@ -123,7 +123,7 @@ export function CampaignGate({ children }: { children: ReactNode }) {
     try {
       const result = await accountRequest<AccountMembership>("resume", {
         code: member.code,
-        ...(member.closed
+        ...(member.closed && member.role === "dm"
           ? { reopen: true, revision: member.room_revision }
           : {}),
       });
@@ -203,18 +203,18 @@ export function CampaignGate({ children }: { children: ReactNode }) {
       ) : (
         <>
           <p>
-            Your account owns your campaigns. Choose one to load its saved data.
+            Choose an owned campaign or a room your DM has kept available for viewing.
           </p>
           <DeviceRecovery userId={library.user.id} />
           {library.members
-            .filter((m) => m.role === "dm" && !m.archived)
+            .filter((m) => !m.archived && (m.role === "dm" || (m.role === "player" && m.viewOnly)))
             .map((m) => (
               <section className="ledger-card" key={m.code}>
                 <h2>{m.name}</h2>
                 <p>Campaign ID {m.code}</p>
-                <p>{m.closed ? "Session ended" : "Session open"}</p>
+                <p>{m.viewOnly ? "Session ended · Player viewing available" : m.closed ? "Session ended" : "Session open"}</p>
                 <Button disabled={busy} onClick={() => void resume(m)}>
-                  {m.closed ? "Reopen as DM" : "Resume"}
+                  {m.closed && m.role === "dm" ? "Reopen as DM" : m.viewOnly ? "View campaign" : "Resume"}
                 </Button>
               </section>
             ))}

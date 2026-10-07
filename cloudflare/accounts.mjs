@@ -1,3 +1,4 @@
+import { isRoomViewOnly } from "../src/lib/quire/room-access.ts";
 import { accountShortcuts } from "./account-shortcuts.mjs";
 import { accountRequestOrigin } from "../src/lib/deployment/origins.mjs";
 import { ownerTestMode } from "./test-mode.mjs";
@@ -331,8 +332,9 @@ export async function handleAccounts(request, env) {
             const seat = room?.seats.find((s) => s.id === m.seat_id && s.token === token);
             return {
               ...m,
-              role: seat && (!room.closed || seat.role === "dm") ? seat.role : null,
+              role: seat && (!room.closed || isRoomViewOnly(room) || seat.role === "dm") ? seat.role : null,
               closed: room?.closed === true,
+              viewOnly: isRoomViewOnly(room),
             };
           }),
           backups: backups.results,

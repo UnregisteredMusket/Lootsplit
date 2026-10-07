@@ -8,8 +8,8 @@ import { resolve, join, dirname } from "node:path";
 import { accountScenarios } from "./account-scenarios.mjs";
 
 const scenario = process.argv[2];
-if (process.argv.length !== 3 || !["accounts", ...accountScenarios].includes(scenario))
-  throw new Error(`Usage: npm run verify:focus -- ${["accounts", ...accountScenarios].join("|")}`);
+if (process.argv.length !== 3 || !["accounts", "room-viewing", ...accountScenarios].includes(scenario))
+  throw new Error(`Usage: npm run verify:focus -- ${["accounts", "room-viewing", ...accountScenarios].join("|")}`);
 if (process.env.CI)
   throw new Error("Focused checks are local diagnostics, never a CI release gate.");
 const required = readFileSync(".nvmrc", "utf8").trim();
@@ -118,7 +118,7 @@ try {
     await new Promise((done) => setTimeout(done, 250));
   }
   console.log(`Focused ${scenario}: disposable server ready; diagnostics: ${output}`);
-  const args = [
+  const args = scenario === "room-viewing" ? ["scripts/room-viewing-browser-audit.mjs"] : [
     "scripts/account-browser-audit.mjs",
     ...(scenario === "accounts" ? [] : ["--scenario", scenario]),
   ];

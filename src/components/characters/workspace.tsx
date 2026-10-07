@@ -72,6 +72,7 @@ type Detail = Row & {
   campaign: null | {
     code: string;
     role: string;
+    readOnly?: boolean;
     editingAllowed?: boolean;
     permissions?: Purse["permissions"];
     manualAllowed: boolean;
@@ -629,7 +630,8 @@ function CharacterEditor({
   }
   if (!sheet || !detail)
     return <p role={error ? "alert" : "status"}>{error || "Loading character…"}</p>;
-  const canPlay = detail.editable && !detail.assignmentError;
+  const viewOnly = detail.campaign?.readOnly || (!!livePurse && liveRoom.readOnly);
+  const canPlay = !viewOnly && detail.editable && !detail.assignmentError;
   const canEdit = (field: string) =>
     canPlay &&
     (!detail.campaign ||
@@ -661,7 +663,7 @@ function CharacterEditor({
       kind={kind}
       rollKey={key}
       detail={detail}
-      disabled={dirty || busy || !!detail.assignmentError}
+      disabled={viewOnly || dirty || busy || !!detail.assignmentError}
       onRoll={() => setRollRefresh((n) => n + 1)}
     />
   );
@@ -716,6 +718,7 @@ function CharacterEditor({
   };
   return (
     <article className="play-sheet">
+      {viewOnly && <p role="status" className="portal-message">Session ended · This character is view-only. Sheet changes and campaign rolls are locked.</p>}
       <div className="character-title">
         <img src={sheet.portrait || "/art/portrait-default.webp"} alt="Character portrait" />
         <div>
@@ -1933,7 +1936,7 @@ function CharacterEditor({
           <h3>Dice tray</h3>
           <DiceTray
             detail={detail}
-            disabled={dirty || busy || !!detail.assignmentError}
+            disabled={viewOnly || dirty || busy || !!detail.assignmentError}
             onRoll={() => setRollRefresh((n) => n + 1)}
           />
         </section>

@@ -109,3 +109,9 @@ Account shortcut API/storage requires additive migration0010. Preserve user/role
 
 Related checks: accounts/finance/room-store regressions; finance, control-panel, library-navigation, character and campaign-governance browser audits. Governance exercises real player repayment/property edits and fixed player buttons; control-panel coverage retains DM account shortcut persistence. Preserve complete release gates, migration review and separate Android signing/publication requirements. Foreclosure or special acquisition rules require a separate gameplay decision.
 
+
+## Post-session viewing maintenance
+
+`closed:true, viewOnly:true` is the explicit DM-selected ended-but-readable room state. Legacy closed rooms remain inaccessible to players. Reads must explicitly opt in; commands, sheet/account assignments, approvals, rolls, mode/turn changes and new joins must fail closed. Keep seat filtering, account ownership/moderation and CAS revisions. Self-leave and authenticated DM viewing revocation are the only permitted ended-room access changes. Reopen play rotates invitations and retires former player seats. Never rearchive on a repeated keep-viewable close or on viewing revocation.
+
+`npm run verify:focus -- room-viewing` uses disposable source/data and a separate complete browser scenario; the existing nine account scenarios and timeouts are unchanged. Both dev-room-viewing and worker-room-viewing are required gates. Run scripts/room-viewing.test.mjs and src/lib/quire/room-viewing-client.test.ts, preserve original End session revocation checks and account-resume queue protections. An ended view shows authoritative server data while retaining unsent device command/batch IDs for export. Guest campaign content stays in memory; a reconnect ticket is not a persistent account save. No production campaign fixtures.

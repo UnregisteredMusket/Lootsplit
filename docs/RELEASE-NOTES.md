@@ -1,3 +1,31 @@
+# Lootsplit 1.6.0 candidate
+
+Android version code 9. This candidate retains package `com.unregisteredmusket.lootsplit` and the permanent signing certificate.
+
+## Added features
+
+- Dungeon Masters can end a session and keep the room viewable for existing players, then leave the room.
+- Existing account players can return to their assigned sheets and permitted campaign information from My campaigns or the startup chooser.
+- The Dungeon Master can close player viewing or reopen play from My account.
+
+## Improvements
+
+- Ended rooms clearly distinguish view-only access from Live or Turn-based play; sheet edits, financial actions, chat submissions and campaign rolls are locked.
+- Unsent device actions remain recoverable without being replayed or displayed as saved campaign changes.
+- The original End session option still revokes player access completely. Reopening play requires fresh invitations, and prior saves and reports remain available.
+
+## Bug fixes
+
+- None in this release.
+
+## Candidate verification
+
+Full exact-head PR/main preservation checks and the signed Android workflow are required. Website download metadata advances only after APK verification. The public download remains 1.5.1 until the new signed APK and checksum exist. Physical-device installation, file-picker and force-close checks are not represented as automated verification.
+
+Guest information remains in memory, with a tab-scoped reconnect ticket. A guest who closes that tab must wait for a new active-session invitation; account players can return while viewing remains enabled. No database migration, domain change or signing-key change is included.
+
+---
+
 # Lootsplit 1.5.1 candidate
 
 Android version code 8. This candidate retains package `com.unregisteredmusket.lootsplit` and the existing permanent signing certificate for in-place updates. The public download remains 1.5.0 until the new signed APK and checksum exist.

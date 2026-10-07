@@ -1,9 +1,9 @@
 import type { IconEntry } from "@/lib/icons/resolve";
 import { FantasyIcon } from "@/components/fantasy-icon";
-import { useState } from "react";
+import { useState, useSyncExternalStore } from "react";
 import { toast } from "sonner";
 import { useEconomy } from "@/lib/quire/economy-context";
-import { getCloudTable, hasPendingChanges } from "@/lib/quire/cloud-client";
+import { getCloudTable, getServerCloudTable, subscribeCloudTable, hasPendingChanges } from "@/lib/quire/cloud-client";
 import type { Holding, Purse } from "@/lib/quire/types";
 import { formatCopper } from "@/lib/quire/money";
 export function LedgerArt({
@@ -39,14 +39,15 @@ export function LedgerArt({
 }
 export function PortraitPicker({ purse }: { purse: Purse }) {
   const { command } = useEconomy();
+  const { readOnly } = useSyncExternalStore(subscribeCloudTable, getCloudTable, getServerCloudTable);
   const [busy, setBusy] = useState(false);
   return (
     <div className="portrait-picker">
       <LedgerArt kind="portrait" src={purse.portrait} />
-      <label className="quick-action">
+      <label className="quick-action" aria-disabled={readOnly || busy}>
         {busy ? "Saving…" : "Choose portrait"}
         <input
-          disabled={busy}
+          disabled={busy || readOnly}
           type="file"
           accept="image/png,image/jpeg,image/webp"
           className="sr-only"
@@ -102,6 +103,7 @@ export function PortraitPicker({ purse }: { purse: Purse }) {
       <button
         type="button"
         className="min-h-11 text-sm text-muted"
+        disabled={busy || readOnly}
         onClick={() =>
           void command({
             kind: "portrait",

@@ -1,3 +1,4 @@
+import { isRoomViewOnly, VIEW_ONLY_MESSAGE } from "../src/lib/quire/room-access.ts";
 import { hydrateCampaignCharacters, campaignBody } from "./campaign-characters.mjs";
 import { statsOnly, editCharacter } from "../src/lib/characters/campaign-sheet.mjs";
 import { sheetSchema, rollSpec, parseDice, throwDice } from "../src/lib/characters/model.mjs";
@@ -8,7 +9,7 @@ const text = (v, max = 100) => {
   if (typeof v !== "string" || v.length > max) fail("Invalid character request.");
   return v;
 };
-async function membership(db, user, code) {
+async function membership(db, user, code, allowViewOnly = false) {
   const m = await db
     .prepare("SELECT * FROM library_members WHERE user_id=? AND code=?")
     .bind(user, code)
@@ -16,15 +17,17 @@ async function membership(db, user, code) {
   const row = await db.prepare("SELECT body FROM campaign_rooms WHERE code=?").bind(code).first();
   const room = row ? JSON.parse(row.body) : null;
   const seat = room?.seats.find((s) => s.id === m?.seat_id && s.token === m?.token);
-  if (!seat || room.closed) fail("Save an active campaign membership in My account first.", 403);
+  if (!seat) fail("Save an active campaign membership in My account first.", 403);
+  if (room.closed && !(allowViewOnly && isRoomViewOnly(room)))
+    fail(isRoomViewOnly(room) ? VIEW_ONLY_MESSAGE : "Save an active campaign membership in My account first.", 403);
   await hydrateCampaignCharacters(db, room);
   return { room, seat, raw: JSON.stringify(room) };
 }
-async function character(db, user, id, own = false) {
+async function character(db, user, id, own = false, allowViewOnly = false) {
   if (typeof id === "string" && id.startsWith("campaign:")) {
     const [, code, ...parts] = id.split(":"),
       purseId = parts.join(":");
-    const { room, seat } = await membership(db, user, text(code, 16));
+    const { room, seat } = await membership(db, user, text(code, 16), allowViewOnly);
     const p = room.table.purses.find((p) => p.id === purseId && p.kind === "character");
     if (!p || (seat.role !== "dm" && !seat.purseIds.includes(p.id)))
       fail("Character not found.", 404);
@@ -43,7 +46,7 @@ async function character(db, user, id, own = false) {
   const row = await db.prepare("SELECT * FROM play_characters WHERE id=?").bind(text(id)).first();
   if (!row) fail("Character not found.", 404);
   if (row.campaign_code) {
-    const { room, seat } = await membership(db, user, row.campaign_code);
+    const { room, seat } = await membership(db, user, row.campaign_code, allowViewOnly);
     if (
       !room.table.purses.some((p) => p.id === row.purse_id) ||
       (seat.role !== "dm" && !seat.purseIds.includes(row.purse_id))
@@ -52,7 +55,7 @@ async function character(db, user, id, own = false) {
   }
   if (row.user_id !== user) {
     if (own || !row.campaign_code) fail("Character not found.", 404);
-    const { seat } = await membership(db, user, row.campaign_code);
+    const { seat } = await membership(db, user, row.campaign_code, allowViewOnly);
     if (seat.role !== "dm") fail("Character not found.", 404);
   }
   return row;
@@ -64,7 +67,7 @@ async function policy(db, code) {
 }
 export async function handleCharacterPlay(db, user, path, body, url, approval = null) {
   if (path === "sheets/imports") {
-    const { seat } = await membership(db, user, text(body.code, 16));
+    const { seat } = await membership(db, user, text(body.code, 16), true);
     const rows = await db.prepare(seat.role === "dm"
       ? "SELECT id,character_id,purse_id,body,status,created_at FROM character_imports WHERE code=? ORDER BY (status='pending') DESC,created_at DESC LIMIT 100"
       : "SELECT id,character_id,purse_id,body,status,created_at FROM character_imports WHERE code=? AND user_id=? ORDER BY created_at DESC LIMIT 100")
@@ -103,11 +106,12 @@ export async function handleCharacterPlay(db, user, path, body, url, approval = 
     const campaigns = [];
     for (const m of ms.results) {
       try {
-        const { room, seat } = await membership(db, user, m.code);
+        const { room, seat } = await membership(db, user, m.code, true);
         campaigns.push({
           code: m.code,
           name: m.name,
           role: seat.role,
+          readOnly: isRoomViewOnly(room),
           purses: room.table.purses
             .filter(
               (p) => p.kind === "character" && (seat.role === "dm" || seat.purseIds.includes(p.id)),
@@ -123,7 +127,7 @@ export async function handleCharacterPlay(db, user, path, body, url, approval = 
       let body = JSON.parse(r.body);
       if (r.campaign_code) {
         try {
-          const { room, seat } = await membership(db, user, r.campaign_code);
+          const { room, seat } = await membership(db, user, r.campaign_code, true);
           if (seat.role !== "dm" && !seat.purseIds.includes(r.purse_id)) continue;
           if (!room.table.purses.some((p) => p.id === r.purse_id)) continue;
           body = campaignBody(room, r.purse_id);
@@ -195,13 +199,13 @@ export async function handleCharacterPlay(db, user, path, body, url, approval = 
     return { id };
   }
   if (path === "sheets/detail") {
-    const r = await character(db, user, body.id);
+    const r = await character(db, user, body.id, false, true);
     let campaign = null,
       assignmentError = "",
       projected = JSON.parse(r.body),
       revision = r.revision;
     if (r.campaign_code) {
-      const { room, seat } = await membership(db, user, r.campaign_code);
+      const { room, seat } = await membership(db, user, r.campaign_code, true);
       const p = room.table.purses.find((p) => p.id === r.purse_id);
       if (!p || (seat.role !== "dm" && !seat.purseIds.includes(p.id)))
         fail("This character is no longer assigned to your campaign seat.", 403);
@@ -210,7 +214,8 @@ export async function handleCharacterPlay(db, user, path, body, url, approval = 
       campaign = {
         code: r.campaign_code,
         role: seat.role,
-        editingAllowed: seat.role === "dm" || p.editingAllowed === true,
+        readOnly: isRoomViewOnly(room),
+        editingAllowed: !room.closed && (seat.role === "dm" || p.editingAllowed === true),
         permissions: p.permissions || {},
         manualAllowed: await policy(db, r.campaign_code),
         coins: p.coins,
@@ -223,7 +228,7 @@ export async function handleCharacterPlay(db, user, path, body, url, approval = 
       body: projected,
       revision,
       assignmentRevision: r.revision,
-      editable: r.user_id === user,
+      editable: r.user_id === user && !campaign?.readOnly,
       campaign,
       assignmentError,
     };
@@ -391,7 +396,7 @@ export async function handleCharacterPlay(db, user, path, body, url, approval = 
   }
   if (path === "sheets/campaign") {
     const code = text(body.code, 16);
-    const { room, seat } = await membership(db, user, code);
+    const { room, seat } = await membership(db, user, code, true);
     if (seat.role !== "dm") fail("Only the campaign DM can review the roster.", 403);
     return {
       characters: room.table.purses
@@ -424,8 +429,8 @@ export async function handleCharacterPlay(db, user, path, body, url, approval = 
   if (path === "sheets/log") {
     const code = text(body.code || "", 16),
       id = text(body.id || "");
-    if (code) await membership(db, user, code);
-    else await character(db, user, id, true);
+    if (code) await membership(db, user, code, true);
+    else await character(db, user, id, true, true);
     const before = body.before === undefined ? Number.MAX_SAFE_INTEGER : body.before;
     if (!Number.isSafeInteger(before) || before < 1) fail("Invalid log page.");
     const rows = await db

@@ -115,6 +115,9 @@ jobs:
       - name: dev-release
         if: matrix.group == 'governance'
         run: node scripts/recovery-step.mjs dev-release 240 node scripts/release-browser-audit.mjs
+      - name: dev-room-viewing
+        if: matrix.group == 'governance'
+        run: node scripts/recovery-step.mjs dev-room-viewing 180 node scripts/room-viewing-browser-audit.mjs
       - name: dev-backup
         if: matrix.group == 'governance'
         env:
@@ -251,6 +254,11 @@ jobs:
         env:
           AUDIT_ORIGIN: http://127.0.0.1:8082
         run: node scripts/recovery-step.mjs worker-shop-stock 180 node scripts/shop-stock-browser-audit.mjs
+      - name: worker-room-viewing
+        if: matrix.group == 'interface'
+        env:
+          ACCOUNT_AUDIT_ORIGIN: http://127.0.0.1:8082
+        run: node scripts/recovery-step.mjs worker-room-viewing 180 node scripts/room-viewing-browser-audit.mjs
       - name: worker-sound
         if: matrix.group == 'interface'
         env:

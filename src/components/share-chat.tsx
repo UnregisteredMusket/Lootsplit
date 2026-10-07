@@ -249,7 +249,7 @@ function LiveChat() {
                     <p className="mt-1 text-xs text-muted">
                       {item.error || "Retry when you are connected."}
                     </p>
-                    <Button variant="secondary" className="mt-2" onClick={() => void deliver(item)}>
+                    <Button variant="secondary" className="mt-2" disabled={room.readOnly} onClick={() => void deliver(item)}>
                       <RotateCcw size={14} />
                       Retry
                     </Button>
@@ -272,6 +272,7 @@ function LiveChat() {
         </label>
         <TextArea
           id="chat-message"
+          disabled={room.readOnly}
           rows={2}
           className="min-h-20 resize-none"
           maxLength={500}
@@ -286,8 +287,8 @@ function LiveChat() {
           }}
         />
         <div className="mt-2 flex items-center justify-between gap-3">
-          <span className="text-xs text-muted">{text.length}/500 · Send during any turn</span>
-          <Button type="submit" disabled={!text.trim() || isSending}>
+          <span className="text-xs text-muted">{room.readOnly ? "Session ended · Chat history is view-only" : `${text.length}/500 · Send during any turn`}</span>
+          <Button type="submit" disabled={room.readOnly || !text.trim() || isSending}>
             <Send size={16} />
             {isSending ? "Sending…" : "Send"}
           </Button>

@@ -1,3 +1,4 @@
+import { isRoomViewOnly, VIEW_ONLY_MESSAGE } from "./room-access.ts";
 import { readRoom, createRoom, updateRoom } from "./room-store.server.ts";
 import {
   claimSeat,
@@ -24,7 +25,7 @@ export async function characterRoll(input: {
   before?: number;
   [key: string]: unknown;
 }) {
-  const room = await must(input.code);
+  const room = await must(input.code, input.log === true || input.policy === true);
   const seat = room.seats.find((s) => s.token === input.token);
   const p = room.table.purses.find((p) => p.id === input.purseId && p.kind === "character");
   if (!seat || !p || (seat.role !== "dm" && !seat.purseIds.includes(p.id)))
@@ -220,7 +221,7 @@ export async function joinRoom(input: { code: string; purseId: string; name: str
 }
 
 export async function roomState(input: { code: string; token: string }): Promise<RoomView> {
-  const room = await must(input.code);
+  const room = await must(input.code, true);
   const seat = room.seats.find((item) => item.token === input.token);
   if (!seat) throw new Error("This browser is not seated at that table.");
   return view(room, seat);
@@ -253,19 +254,32 @@ export async function choosePace(input: {
   return view(next, seat);
 }
 
-export async function closeRoom(input: { code: string; token: string }): Promise<void> {
-  const room = await must(input.code);
+export async function closeRoom(input: {
+  code: string;
+  token: string;
+  keepViewable?: boolean;
+}): Promise<void> {
+  if (input.keepViewable !== undefined && typeof input.keepViewable !== "boolean")
+    throw new Error("Choose whether players can keep viewing the room.");
+  const room = await must(input.code, true);
   const seat = room.seats.find((item) => item.token === input.token);
   if (!seat || seat.role !== "dm")
-    throw new Error("Only the dungeon master can return to Local Mode.");
+    throw new Error("Only the dungeon master can end the session.");
   if (Object.values(room.drafts ?? {}).some((c) => c.length))
     throw new Error("Submit or discard pending turns before closing the campaign.");
+  // A lost close response must not duplicate a session report. A later full
+  // close revokes viewing without archiving the already-ended session again.
+  if (isRoomViewOnly(room) && input.keepViewable === true) return;
   const next = structuredClone(room);
-  const active = next.table.journal?.sessions.find(s => !s.endedAt);
-  if (active) { active.endedAt = Date.now(); active.endLedgerIds = next.table.ledger.map(l => l.id); }
-  archiveSession(next.table, active?.id || crypto.randomUUID(), active?.name || "Room closed");
-  for (const report of next.table.journal?.reports || []) if (!report.seatIds) report.seatIds = room.seats.map(s => s.id);
+  if (!room.closed) {
+    const active = next.table.journal?.sessions.find(s => !s.endedAt);
+    if (active) { active.endedAt = Date.now(); active.endLedgerIds = next.table.ledger.map(l => l.id); }
+    archiveSession(next.table, active?.id || crypto.randomUUID(), active?.name || "Room closed");
+    for (const report of next.table.journal?.reports || [])
+      if (!report.seatIds) report.seatIds = room.seats.map(s => s.id);
+  }
   next.closed = true;
+  next.viewOnly = input.keepViewable === true;
   next.revision++;
   for (const p of next.table.purses) { p.editingAllowed = false; delete p.editBaseline; }
   await updateRoom(next, room.revision);
@@ -285,6 +299,7 @@ export async function passTurn(input: { code: string; token: string }): Promise<
 }
 
 export type RoomView = {
+  readOnly?: boolean;
   sessionId?: string;
   code: string;
   revision: number;
@@ -314,10 +329,11 @@ function requireInvitationSession(room: CloudRoom, sessionId?: string) {
     throw Error("This invitation has expired. Ask the DM for the current session link.");
 }
 
-async function must(code: string): Promise<CloudRoom> {
+async function must(code: string, allowViewOnly = false): Promise<CloudRoom> {
   const room = await readRoom(code.trim().toUpperCase());
   if (!room) throw new Error("No table uses that code.");
-  if (room.closed) throw new Error("This room is closed.");
+  if (room.closed && !(allowViewOnly && isRoomViewOnly(room)))
+    throw new Error(isRoomViewOnly(room) ? VIEW_ONLY_MESSAGE : "This room is closed.");
   return room;
 }
 
@@ -329,9 +345,10 @@ function view(room: CloudRoom, seat: CloudSeat): RoomView {
     sessionId: room.sessionId,
     revision: room.revision,
     turn: room.turn,
-    mine: room.live || current?.id === seat.id,
-    who: room.live ? "everyone" : (current?.name ?? "Someone"),
-    live: room.live === true,
+    readOnly: isRoomViewOnly(room),
+    mine: !room.closed && (room.live || current?.id === seat.id),
+    who: isRoomViewOnly(room) ? "the next session" : room.live ? "everyone" : (current?.name ?? "Someone"),
+    live: !room.closed && room.live === true,
     testMode: room.testMode === true,
     departed: seat.role === "dm" ? room.departed?.map(s => ({ id: s.id, name: s.name, status: s.status, invitation: s.purseIds.map(id => room.invitations?.[id]).find(Boolean) })) : undefined,
     seatId: seat.id,
@@ -485,7 +502,7 @@ export async function manageRoom(input: {
   seatId: string;
   allowParty?: boolean;
 }): Promise<RoomView> {
-  const room = await must(input.code),
+  const room = await must(input.code, input.action === "leave"),
     caller = room.seats.find((s) => s.token === input.token);
   if (!caller) throw new Error("Session not found.");
   if (input.action !== "discard" && input.action !== "leave" && caller.role !== "dm")
