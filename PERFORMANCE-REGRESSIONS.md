@@ -94,9 +94,10 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Development / gameplay / dev-encounter | open | 4 | 11s → 32s | +21s | +190.91% |
 | publish / Verify and publish the audited bytes without rebuilding | open | 2 | 5s → 10s | +5s | +100% |
 | deploy / Install locked deploy and verification tools (no application build) | open | 2 | 13s → 19s | +6s | +46.15% |
+| deploy / Run npx playwright install --with-deps chromium | open | 2 | 23s → 126s | +103s | +447.83% |
 | deploy / Verify deployed identity and read-only desktop/mobile website behavior | open | 3 | 44s → 81s | +37s | +84.09% |
-| Deploy verified website | open | 2 | 98s → 156s | +58s | +59.18% |
-| deploy | open | 2 | 98s → 156s | +58s | +59.18% |
+| Deploy verified website | open | 3 | 98s → 245s | +147s | +150% |
+| deploy | open | 3 | 98s → 245s | +147s | +150% |
 | Code checks and immutable builds / Run actions/upload-artifact@v4 | open | 3 | 2s → 5s | +3s | +150% |
 | Packaged Worker / accounts / Run actions/setup-node@v4 | open | 3 | 3s → 7s | +4s | +133.33% |
 | Packaged standby / Run npm ci | open | 2 | 12s → 18s | +6s | +50% |
@@ -178,6 +179,9 @@ Open trends require investigation. Resolved trends retain their history; each ve
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-07T17:53:19Z | job: deploy | 156s → 245s | +89s | +57.05% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37488564832/job/112354942283) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37661998263/job/112931601048) |
+| 2026-10-07T17:53:19.000Z | workflow: Deploy verified website | 156s → 245s | +89s | +57.05% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37488564832) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37661998263) |
+| 2026-10-07T17:51:50Z | step: deploy / Run npx playwright install --with-deps chromium | 30s → 126s | +96s | +320% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37263801298/job/111616279155) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37661998263/job/112931601048) |
 | 2026-10-07T17:48:51Z | job: Development / governance | 221s → 282s | +61s | +27.6% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37303426479/job/111741324343) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37661353259/job/112929395891) |
 | 2026-10-07T17:48:48Z | step: Development / governance / dev-backup | 7s → 13s | +6s | +85.71% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37235752710/job/111534384084) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37661353259/job/112929395891) |
 | 2026-10-07T17:47:54Z | step: Packaged Worker / interface / worker-library-navigation | 14s → 18s | +4s | +28.57% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37235752710/job/111534622155) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37661353259/job/112930144013) |
