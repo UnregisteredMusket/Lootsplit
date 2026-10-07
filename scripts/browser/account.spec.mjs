@@ -290,6 +290,9 @@ test("dm-resume", async ({ devices, baseURL: origin }, testInfo) => {
 });
 
 test("resume-queue", async ({ devices, baseURL: origin }, testInfo) => {
+  // This profile must exercise the real startup selector. The shared gameplay
+  // navigation helper otherwise claims its local DM campaign automatically.
+  devices.page.guestAccessAudit = true;
   const { other: device } = await signedInDevices(devices, origin);
   const visit = (p, path) => visitPage(p, origin, path);
   const firstCode = (await createAndSaveRoom(device, origin))[0].code;
