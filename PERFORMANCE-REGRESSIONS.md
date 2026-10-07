@@ -151,6 +151,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-07T05:11:24Z | step: Packaged Worker / interface / worker-shop-stock | 9s → 14s | +5s | +55.56% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37564176497/job/112608372872) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37574857899/job/112641703415) |
 | 2026-10-07T04:55:48.000Z | workflow: Android signed release APK | 238s → 425s | +187s | +78.57% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37391400899) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37573239210) |
 | 2026-10-07T04:52:19Z | job: verify / Packaged Worker / interface | 130s → 155s | +25s | +19.23% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37391400899/job/112037297078) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37573239210/job/112636602667) |
 | 2026-10-07T04:52:06Z | step: verify / Packaged standby / Run actions/upload-artifact@v4 | 2s → 3s | +1s | +50% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37391400899/job/112037296971) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37573239210/job/112636602730) |

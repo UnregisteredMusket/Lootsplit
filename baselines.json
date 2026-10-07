@@ -9736,19 +9736,19 @@
   },
   "[\".github/workflows/verify.yml\",\"push\",\"main\",\"step\",\"Packaged Worker / interface / worker-shop-stock\",\"ubuntu-latest\",1]": {
     "schema": 1,
-    "id": "37564176497:1:7ca6a6dcdb53a05d359bc020b03a7e529b05faee13242a4e85cd0da6aab23be3",
+    "id": "37574857899:1:7ca6a6dcdb53a05d359bc020b03a7e529b05faee13242a4e85cd0da6aab23be3",
     "scope": "[\".github/workflows/verify.yml\",\"push\",\"main\",\"step\",\"Packaged Worker / interface / worker-shop-stock\",\"ubuntu-latest\",1]",
     "kind": "step",
     "name": "Packaged Worker / interface / worker-shop-stock",
     "environment": "ubuntu-latest",
-    "commit": "3a9a4c8a1ae76aa8e7970a17a89230d56a750214",
-    "runId": 37564176497,
+    "commit": "114c93579e8a3b56431aeb2a980bb389d8b64c1d",
+    "runId": 37574857899,
     "attempt": 1,
-    "url": "https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37564176497/job/112608372872",
+    "url": "https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37574857899/job/112641703415",
     "outcome": "success",
-    "startedAt": "2026-10-07T02:56:39Z",
-    "finishedAt": "2026-10-07T02:56:48Z",
-    "durationMs": 9000,
+    "startedAt": "2026-10-07T05:11:10Z",
+    "finishedAt": "2026-10-07T05:11:24Z",
+    "durationMs": 14000,
     "trendId": "37564176497:1:7ca6a6dcdb53a05d359bc020b03a7e529b05faee13242a4e85cd0da6aab23be3"
   },
   "[\".github/workflows/verify.yml\",\"push\",\"main\",\"step\",\"Development / accounts / Complete job\",\"ubuntu-latest\",1]": {
@@ -9903,5 +9903,22 @@
     "finishedAt": "2026-10-07T04:55:47Z",
     "durationMs": 1000,
     "trendId": "37573239210:1:fe84ad60638fa19f8eac4084116e122ffaf26d589707706eb6bb2ed5521f85d2"
+  },
+  "[\".github/workflows/verify.yml\",\"push\",\"main\",\"step\",\"Packaged Worker / accounts / Summarize measured verification stages\",\"ubuntu-latest\",1]": {
+    "schema": 1,
+    "id": "37574857899:1:4159c02ee4bae3131ccf91a1280beacee625a0a72591db88c26a99c07385aefd",
+    "scope": "[\".github/workflows/verify.yml\",\"push\",\"main\",\"step\",\"Packaged Worker / accounts / Summarize measured verification stages\",\"ubuntu-latest\",1]",
+    "kind": "step",
+    "name": "Packaged Worker / accounts / Summarize measured verification stages",
+    "environment": "ubuntu-latest",
+    "commit": "114c93579e8a3b56431aeb2a980bb389d8b64c1d",
+    "runId": 37574857899,
+    "attempt": 1,
+    "url": "https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37574857899/job/112641703449",
+    "outcome": "success",
+    "startedAt": "2026-10-07T05:12:08Z",
+    "finishedAt": "2026-10-07T05:12:09Z",
+    "durationMs": 1000,
+    "trendId": "37574857899:1:4159c02ee4bae3131ccf91a1280beacee625a0a72591db88c26a99c07385aefd"
   }
 }
