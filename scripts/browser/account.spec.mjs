@@ -352,41 +352,41 @@ test("resume-queue", async ({ devices, baseURL: origin }, testInfo) => {
     ["account", 1360],
     ["startup", 390],
   ]) {
-    await visit(device, "/account");
-    await device.evaluate(
-      ({ key, queued, entry }) => {
+    const target = entry === "startup" ? devices.page : device;
+    await visit(target, "/account");
+    await target.evaluate(
+      ({ key, queued }) => {
         localStorage.setItem(key, JSON.stringify(queued));
-        if (entry === "startup")
-          localStorage.setItem("quire.campaign.v1", "audit-unowned-gate");
+        localStorage.setItem("quire.guide.offer.v3", "seen");
       },
-      { key: original.key, queued, entry },
+      { key: original.key, queued },
     );
-    await device.setViewportSize({ width, height: 900 });
+    await target.setViewportSize({ width, height: 900 });
     if (entry === "account") await resumeSaved();
     else {
-      await visit(device, "/");
-      await device
+      await visit(target, "/");
+      await target
         .getByRole("heading", { name: "Choose your campaign" })
         .waitFor();
-      await device
+      await target
         .locator("section.ledger-card")
         .filter({ hasText: firstCode })
         .getByRole("button", { name: "Resume", exact: true })
         .click();
       await expect(
-        device.getByText("Campaign control", { exact: true }),
+        target.getByText("Campaign control", { exact: true }),
       ).toBeVisible();
     }
     await expect
       .poll(() =>
-        device.evaluate(
+        target.evaluate(
           (key) => JSON.parse(localStorage.getItem(key)).pending.length,
           original.key,
         ),
       )
       .toBe(0);
-    expect(await device.locator(".loot-opening").count()).toBe(0);
-    await device.screenshot({
+    expect(await target.locator(".loot-opening").count()).toBe(0);
+    await target.screenshot({
       path: testInfo.outputPath(`dm-stale-queue-${entry}-${width}.png`),
       fullPage: true,
     });

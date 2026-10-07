@@ -1,3 +1,29 @@
+# Lootsplit 1.5.1 candidate
+
+Android version code 8. This candidate retains package `com.unregisteredmusket.lootsplit` and the existing permanent signing certificate for in-place updates. The public download remains 1.5.0 until the new signed APK and checksum exist.
+
+## Added features
+
+- Account-scoped device recovery copies can be exported when older queued changes belong to another seat or conflict with the saved campaign.
+
+## Improvements
+
+- Sync recovery distinguishes unsynced Live changes from unfinished turn actions.
+- The startup campaign selector shows campaign IDs so separate saves with the same name can be identified.
+- Pending device work remains exportable from account/startup screens even before a campaign opens successfully.
+
+## Bug fixes
+
+- Account campaign resume reconciles server acknowledgements before classifying device queues, removing the false unfinished-turn blocker for already accepted Live actions.
+- Genuine unsynced actions and server-saved turn drafts remain accessible in Multiplayer recovery, with command and retry IDs preserved.
+- Changed-seat device actions are kept separately and are never automatically replayed with another seat's permissions.
+
+## Candidate verification
+
+The unchanged complete preservation suite validates unit tests, type checking, lint, shared web/mobile builds, development desktop/mobile flows, packaged Worker and standby behavior. Signed publication requires the permanent certificate check. Website live commit/asset audits and the verified APK/checksum download follow publication; a merge alone does not prove release success. Production campaigns are never used as destructive fixtures.
+
+---
+
 # Lootsplit 1.5.0 candidate
 
 Android version code 7. This candidate retains package `com.unregisteredmusket.lootsplit` and the existing permanent signing certificate for in-place updates of permanently signed installations.
@@ -102,12 +128,15 @@ Every future Android release must include a website changelog with added feature
 - Adds release test gates, permanent-certificate verification and APK checksums.
 
 ## Install
+
 Download Lootsplit-1.3.1.apk. It updates the permanently signed 1.3.0 app in place. Export a backup before updating. Old debug-signed copies require a one-time backup, uninstall, reinstall and restore; never uninstall before verifying the exported backup.
 
 ## Preservation and verification
+
 Local device copies are not external backups. Use Save file and keep the file outside app storage. Importing a backup into the backup list lets you check it without replacing your campaign. Real-device file-picker, force-close recovery and background-delivery behavior still require device validation; automated tests do not substitute for that.
 
 ## Published and verified — 2026-10-02
+
 [Download Android 1.3.1](https://github.com/UnregisteredMusket/Lootsplit/releases/download/android-v1.3.1/Lootsplit-1.3.1.apk) · [Checksums](https://github.com/UnregisteredMusket/Lootsplit/releases/download/android-v1.3.1/SHA256SUMS.txt) · [Live web app](https://lootsplit.oliverstorie2017.workers.dev)
 
 Signed release run 36976200449 passed all gates from main commit `549b96f`: 351 passing tests, four legacy-document skips, typecheck, both builds, browser recovery/responsive checks, Android compilation and permanent-certificate verification. The downloaded APK independently confirms version 1.3.1, code 4 and the permanent certificate. Its SHA-256 is `afd1cbeb9a377c10e77a839a161c8f670dfe2acecb703c0846003d4a4db6e088`, matching the published checksum and GitHub asset digest. Cloudflare successfully deployed the same source; the live UI displays 1.3.1. See AUDIT-IMPROVEMENTS.md for release evidence, rollback references and the outstanding device checks.
