@@ -1,6 +1,10 @@
 import { test as base, expect } from "playwright/test";
 import { randomUUID } from "node:crypto";
-import { openApplication } from "../title-screen-navigation.mjs";
+import {
+  navigateApplication,
+  openApplication,
+  prepareDmFixture,
+} from "../title-screen-navigation.mjs";
 import { accountScenarios, externalAuditRequests } from "../account-scenarios.mjs";
 
 export { expect };
@@ -55,6 +59,99 @@ export async function visit(page, origin, path) {
   await page.waitForFunction(() => document.fonts.status === "loaded");
 }
 
+// Only the long DM/portrait scenarios opt in. Storage-interruption and explicit
+// reload checks keep using visit(), as do the other account scenarios.
+export async function navigateAccountScenario(page, origin, path) {
+  const target = new URL(path, origin);
+  const current = new URL(page.url());
+  if (
+    current.origin !== origin ||
+    (current.pathname === "/account" && target.pathname === "/account")
+  ) {
+    // A library already open on device two needs a real refresh after device
+    // one saves another membership. A same-route link would retain stale cards.
+    await visit(page, origin, path);
+    return;
+  }
+  if (target.pathname !== "/account") await prepareDmFixture(page, origin);
+  const marker = randomUUID();
+  await page.evaluate((value) => (window.accountNavigationAudit = value), marker);
+  if (target.pathname !== "/account") {
+    const openApp = page.getByRole("link", { name: "Open app", exact: true });
+    if (await openApp.isVisible()) {
+      await openApp.click();
+      await page.waitForURL((url) => url.pathname === "/");
+    }
+    if (new URL(page.url()).pathname === "/") await waitForDmCampaign(page);
+  }
+  if (["/party", "/characters"].includes(target.pathname)) {
+    if (new URL(page.url()).pathname !== "/party") {
+      await page
+        .locator('nav[aria-label="Sections"]:visible')
+        .getByRole("link", { name: "Party", exact: true })
+        .click();
+      await page.waitForURL((url) => url.pathname === "/party");
+    }
+    const section =
+      target.pathname === "/characters"
+        ? "characters"
+        : target.searchParams.get("section");
+    if (section) {
+      const tab = page.getByRole("tab", {
+        name: section === "funds" ? "Funds & inventory" : "Characters",
+        exact: true,
+      });
+      await tab.click();
+      await expect(tab).toHaveAttribute("aria-selected", "true");
+    }
+  }
+  if (new URL(page.url()).pathname !== target.pathname) {
+    const links = page.locator("a[href]");
+    let direct = false;
+    for (let i = 0; i < (await links.count()); i++) {
+      const link = links.nth(i);
+      if (!(await link.isVisible())) continue;
+      const url = new URL(await link.getAttribute("href"), page.url());
+      if (
+        url.origin === origin &&
+        url.pathname === target.pathname &&
+        url.search === target.search
+      ) {
+        direct = true;
+        break;
+      }
+    }
+    if (direct) {
+      // The shared helper cannot fall back to a document load: a matching
+      // visible router link was established above, and the marker checks it.
+      await navigateApplication(page, target.href);
+    } else if (["/account", "/share"].includes(target.pathname)) {
+      await page.getByRole("button", { name: "Select campaign", exact: true }).click();
+      const campaigns = page.getByRole("dialog", { name: "Campaigns", exact: true });
+      await campaigns
+        .getByRole("link", {
+          name:
+            target.pathname === "/account"
+              ? "Saved account campaigns →"
+              : "Room, invitations & connections →",
+          exact: true,
+        })
+        .click();
+      await page.waitForURL((url) => url.pathname === target.pathname);
+      if (await campaigns.isVisible()) await page.keyboard.press("Escape");
+    } else {
+      throw new Error(`No visible account-scenario navigation to ${path}`);
+    }
+  }
+  await expect(page.locator("main")).toBeVisible();
+  await expect(page.locator(".loot-opening"), "Internal navigation must not replay startup").toHaveCount(0);
+  expect(await page.evaluate(() => window.accountNavigationAudit), "Internal navigation must retain the document").toBe(marker);
+  if (target.pathname === "/account") {
+    await expect(page.getByRole("button", { name: "Sign out", exact: true })).toBeVisible();
+  }
+  await page.waitForFunction(() => document.fonts.status === "loaded");
+}
+
 export async function waitForDmCampaign(page) {
   // The legitimate first-use guide appears after a short animation delay. Wait
   // for the resumed desk, then answer the actual offer before querying roles
@@ -99,8 +196,8 @@ export async function signedInDevices(devices, origin) {
   return { ...user, other: other.page };
 }
 
-export async function createAndSaveRoom(page, origin) {
-  await visit(page, origin, "/share");
+export async function createAndSaveRoom(page, origin, visitFn = visit) {
+  await visitFn(page, origin, "/share");
   const skip = page.getByRole("button", { name: "Not now", exact: true });
   if (await skip.isVisible()) await skip.click();
   await page.getByRole("button", { name: "Start a room", exact: true }).click();
@@ -117,7 +214,7 @@ export async function createAndSaveRoom(page, origin) {
   if (await error.isVisible()) throw new Error(`Room creation: ${await error.innerText()}`);
   await expect(ready).toBeVisible();
   await expect(page.locator('.multiplayer-hub[aria-busy="false"]')).toBeVisible();
-  await visit(page, origin, "/account");
+  await visitFn(page, origin, "/account");
   await page.getByRole("button", { name: "Save current membership", exact: true }).click();
   await expect(
     page.getByRole("status").filter({ hasText: "This membership is saved" }),
@@ -127,8 +224,8 @@ export async function createAndSaveRoom(page, origin) {
   return (await library.json()).members;
 }
 
-export async function endSession(page, origin) {
-  await visit(page, origin, "/share");
+export async function endSession(page, origin, visitFn = visit) {
+  await visitFn(page, origin, "/share");
   await expect(
     page.getByRole("status").filter({ hasText: "Connected · All changes saved" }),
   ).toBeVisible();

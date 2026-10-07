@@ -5,6 +5,7 @@ import {
   test,
   expect,
   visit as visitPage,
+  navigateAccountScenario,
   credentials,
   signedInDevices,
   accountPost,
@@ -189,9 +190,9 @@ test("library", async ({ devices, baseURL: origin }, testInfo) => {
 
 test("dm-resume", async ({ devices, baseURL: origin }, testInfo) => {
   const { page } = devices;
-  const visit = (p, path) => visitPage(p, origin, path);
+  const visit = (p, path) => navigateAccountScenario(p, origin, path);
   const { other } = await signedInDevices(devices, origin);
-  const firstCode = (await createAndSaveRoom(other, origin))[0].code;
+  const firstCode = (await createAndSaveRoom(other, origin, navigateAccountScenario))[0].code;
   await visit(page, "/account");
   // Simulate navigation/storage interruption during the first account campaign
   // hydration. Its durable revision must remain old so a reload repairs the copy.
@@ -226,18 +227,19 @@ test("dm-resume", async ({ devices, baseURL: origin }, testInfo) => {
   await page.evaluate(() =>
     sessionStorage.setItem("audit-allow-hydration", "yes"),
   );
-  await visit(page, "/share");
+  // Deliberately reload after the interrupted IndexedDB hydration above.
+  await visitPage(page, origin, "/share");
   await expect(
     page.getByRole("button", {
       name: "Dungeon master. Change role.",
       exact: true,
     }),
   ).toBeVisible();
-  await endSession(page, origin);
-  const saved = await createAndSaveRoom(page, origin);
+  await endSession(page, origin, navigateAccountScenario);
+  const saved = await createAndSaveRoom(page, origin, navigateAccountScenario);
   assert.equal(saved.length, 2);
   const secondCode = saved.find((m) => m.code !== firstCode).code;
-  await endSession(page, origin);
+  await endSession(page, origin, navigateAccountScenario);
   for (const [p, width] of [
     [page, 390],
     [other, 1360],
@@ -490,8 +492,9 @@ test("portrait-resume", async ({ devices, baseURL: origin }) => {
   let portrait = await card.locator(".portrait-picker img").getAttribute("src");
   expect(portrait).toMatch(/^data:image/);
   const sheetPath = `/characters?id=${encodeURIComponent(`party:${id.slice(6)}`)}`;
-  async function expectPartyPortrait(page, expected) {
-    await visitPage(page, origin, "/party?section=characters");
+  async function expectPartyPortrait(page, expected, reload = false) {
+    const navigate = reload ? visitPage : navigateAccountScenario;
+    await navigate(page, origin, "/party?section=characters");
     const profile = page.locator("article.party-profile").filter({
       has: page
         .getByRole("link", { name: "Open sheet", exact: true })
@@ -503,10 +506,11 @@ test("portrait-resume", async ({ devices, baseURL: origin }) => {
       .poll(() => image.evaluate((img) => img.naturalWidth))
       .toBeGreaterThan(0);
   }
-  await expectPartyPortrait(phone, portrait);
-  const [member] = await createAndSaveRoom(phone, origin);
+  // A fresh document proves the first device-local portrait persisted in IDB.
+  await expectPartyPortrait(phone, portrait, true);
+  const [member] = await createAndSaveRoom(phone, origin, navigateAccountScenario);
 
-  await visitPage(desktop, origin, "/account");
+  await navigateAccountScenario(desktop, origin, "/account");
   await desktop.getByRole("button", { name: "Resume", exact: true }).click();
   await desktop.waitForURL((url) => url.pathname === "/");
   await continueIntoApp(desktop);
@@ -514,7 +518,7 @@ test("portrait-resume", async ({ devices, baseURL: origin }) => {
 
   // The full character sheet has a separate upload/save path. Verify its saved
   // portrait in the actual Party cards on both devices and the server readout.
-  await visitPage(phone, origin, sheetPath);
+  await navigateAccountScenario(phone, origin, sheetPath);
   await phone.getByRole("button", { name: "Edit sheet", exact: true }).click();
   await phone
     .getByRole("button", { name: "Character details", exact: true })
@@ -542,7 +546,7 @@ test("portrait-resume", async ({ devices, baseURL: origin }) => {
   );
   expect(sheetSaved.body.portrait).toBe(portrait);
   await expectPartyPortrait(desktop, portrait);
-  await visitPage(desktop, origin, "/party?section=funds");
+  await navigateAccountScenario(desktop, origin, "/party?section=funds");
   const restored = desktop.locator(`#${id}`);
   await restored.locator(":scope > summary").click();
   await expect(restored.locator(".portrait-picker img")).toHaveAttribute(
@@ -559,7 +563,7 @@ test("portrait-resume", async ({ devices, baseURL: origin }) => {
 
   // A phone can render its optimistic local portrait even when the upload fails.
   // Account linking must not promise another device can see those pending edits.
-  await visitPage(phone, origin, "/party?section=funds");
+  await navigateAccountScenario(phone, origin, "/party?section=funds");
   await phone.locator(`#${id} > summary`).click();
   const replacement = await phone.evaluate(() => {
     const c = document.createElement("canvas");
@@ -601,6 +605,7 @@ test("portrait-resume", async ({ devices, baseURL: origin }) => {
     portrait,
   );
   portrait = pendingPortrait;
+  // The failed upload must retain its pending command across a document reload.
   await visitPage(phone, origin, "/account");
   await phone
     .getByRole("button", { name: "Save current membership", exact: true })
@@ -623,14 +628,14 @@ test("portrait-resume", async ({ devices, baseURL: origin }) => {
     "src",
     portrait,
   );
-  await endSession(desktop, origin);
-  await visitPage(desktop, origin, "/account");
+  await endSession(desktop, origin, navigateAccountScenario);
+  await navigateAccountScenario(desktop, origin, "/account");
   await desktop
     .getByRole("button", { name: "Reopen as DM", exact: true })
     .click();
   await desktop.waitForURL((url) => url.pathname === "/");
   await continueIntoApp(desktop);
-  await visitPage(desktop, origin, "/party?section=funds");
+  await navigateAccountScenario(desktop, origin, "/party?section=funds");
   await desktop.locator(`#${id} > summary`).click();
   await expect(desktop.locator(`#${id} .portrait-picker img`)).toHaveAttribute(
     "src",
@@ -639,7 +644,7 @@ test("portrait-resume", async ({ devices, baseURL: origin }) => {
   expect(member.role).toBe("dm");
 
   // Saving account membership must not silently commit or end a turn.
-  await visitPage(desktop, origin, "/share");
+  await navigateAccountScenario(desktop, origin, "/share");
   await expect(
     desktop.getByRole("button", { name: "Live", exact: true }),
   ).toHaveAttribute("aria-pressed", "true");
@@ -653,7 +658,7 @@ test("portrait-resume", async ({ devices, baseURL: origin }) => {
   await expect(
     desktop.getByRole("button", { name: "Turn-based", exact: true }),
   ).toHaveAttribute("aria-pressed", "true");
-  await visitPage(desktop, origin, "/party?section=funds");
+  await navigateAccountScenario(desktop, origin, "/party?section=funds");
   await desktop.locator(`#${id} > summary`).click();
   await desktop
     .locator(`#${id} .portrait-picker input[type=file]`)
@@ -670,7 +675,7 @@ test("portrait-resume", async ({ devices, baseURL: origin }) => {
       },
     ),
   ).toBeVisible();
-  await visitPage(desktop, origin, "/account");
+  await navigateAccountScenario(desktop, origin, "/account");
   await desktop
     .getByRole("button", { name: "Save current membership", exact: true })
     .click();
