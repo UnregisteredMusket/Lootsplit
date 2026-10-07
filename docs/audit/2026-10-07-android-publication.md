@@ -1,0 +1,21 @@
+# Android 1.5.0 publication follow-up — October 7, 2026
+
+## Verified signed release
+
+The user authorized completing Android publication before investigating a separately reported account-save resume warning. PR58 is merged as `120d1a31899e0fee77fcbc4745f459a6dd362330`, tree `05cf4c08205e672d2756026403bc58ddffed3115`. PR verification37572857798 and independent main verification37573238905 passed every preservation group. Signed workflow37573239210, release job112637294808, passed its full reused verification and version/build/signing/publication checks. Do not repeat the signed workflow or overwrite the release.
+
+GitHub release405392289 / `android-v1.5.0` is published at 2026-10-07T04:55:46Z. APK asset617616885 is 21,821,334 bytes, SHA256 `47d4e9cb9cf95137f0a97438a2c361d5b34257a70c3c4bb8d662ffc4a2aca499`. Signed artifact11460993984 was downloaded through the GitHub connector, auto-mounted, and its ZIP SHA256 `ce870ee25f1cdee6731fa6d6c17d931d620176887e4b1e30c6e559810ce69360` independently verified. The extracted APK matches the published APK asset digest and size. Independent binary XML inspection confirms package `com.unregisteredmusket.lootsplit`, version1.5.0, code7. APK v2 RSA/SHA256 signature and protected content digest verify against permanent certificate `baca95a880d14d0d8c422c397decd4c9bf0e7f710a3fd6a5be1e47abd3f730a0`; all three sounds remain bundled. The same inspector also verified the prior1.4.0 artifact and rejected a deliberately corrupted temporary copy, which was deleted.
+
+The expected checksum-file line has 86 bytes and SHA256 `7115964c6baab4672b7d20fbd333f6fa0baad4eaf51660c9929ac8596124f58d`, matching published checksum asset617616886. The connector's direct checksum-download request returned404, so this is a digest comparison, not a claim that the text asset was downloaded. No secret values or signing keys were retrieved.
+
+## Website completion and preservation
+
+Advance only the public download metadata to the inspected1.5.0/code7 artifact; the previously merged versioned changelog becomes visible through the existing release filter. Keep all older entries and APKs. No gameplay, account/save behavior, native package/signing identity, dependencies, migrations, domain or parked offline feature changes.
+
+The prior website audit checked the button and displayed hash but did not download its target. Add a bounded read-only remote audit of the existing fixed APK proxy: one GET, no redirects, correct status/type/filename/digest header, capped streamed bytes and SHA256 verification. It saves `test-results/website/android-download.json`. Every existing desktop/mobile browser assertion remains. Local disposable browser fixtures do not fetch external APKs; six isolated Node22.16.0 tests exercise successful transport, unavailable proxy, stale/incorrect headers, tampering, truncation/oversize and request failure without retries. All six passed locally; test-runner elapsed115.906788ms, a new operation with no comparable previous reference. The original website-audit and Android-document Git blob hashes were checked before applying additive changes. Node syntax checks passed. Full local browser/build checks remain blocked by the documented repository-network/dependency environment; complete CI is mandatory.
+
+## Recovery
+
+At this checkpoint the APK is published and independently inspected, but the website metadata follow-up is not yet deployed. Require complete exact-head PR/main checks, successful immutable deployment and live desktop/mobile/download-byte reports. Reconcile current refs/runs before another action. Final deployment/run IDs and performance-history review belong in this PR or a later checkpoint; these pending notes must not be treated as completed live verification. Never rerun a production upload simply to repeat its read-only audit.
+
+Once Android publication is complete, investigate the separately reported account-campaign unfinished-turn warning with disposable fixtures. Do not clear pending work, merge different campaigns, expose private campaign names/screenshots, or assume that a saved membership proves a device-local copy was uploaded. This APK does not claim to fix that report. Physical-device installation, file-picker and force-close checks remain unperformed here.

@@ -1,7 +1,8 @@
 import { openApplication, continueIntoApp } from "./title-screen-navigation.mjs";
 import { chromium } from "playwright";
 import assert from "node:assert/strict";
-import { mkdir } from "node:fs/promises";
+import { mkdir, writeFile } from "node:fs/promises";
+import { verifyAndroidDownload } from "./android-download-audit.mjs";
 import { readFileSync } from "node:fs";
 const release = JSON.parse(readFileSync("src/lib/website/release.json", "utf8"));
 const origin = process.env.AUDIT_ORIGIN || "http://127.0.0.1:8080";
@@ -99,6 +100,12 @@ try {
     await context.close();
   }
   assert.deepEqual(failures, []);
+  // Local fixtures keep their existing route checks; remote live audits also hash the APK bytes.
+  if (!["localhost", "127.0.0.1", "[::1]"].includes(new URL(origin).hostname)) {
+    const downloadReport = await verifyAndroidDownload(origin, release);
+    await writeFile(`${output}/android-download.json`, JSON.stringify(downloadReport, null, 2));
+    console.log(`PASS live Android ${release.version}: ${downloadReport.sha256}`);
+  }
   console.log(
     JSON.stringify({ ok: true, widths: [1280, 390], pages: 7, externalFailures }, null, 2),
   );
