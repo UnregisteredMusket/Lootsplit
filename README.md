@@ -28,6 +28,14 @@ Player Home links to the full Character Sheet, Inventory, Campaign/chat and exis
 
 Campaign control combines the DM Desk and campaign overview. Connection state, encounter status, pending reviews and Multiplayer settings stay visible. Swipe or use named selectors/arrows for Session, Party, Funds, Activity and Rolls; desktop shows several panels together. Session & records and Economy & properties group the feature links. Expand Campaign treasury, Activity & balances, Play sessions, or Campaign tools for totals, transactions, session controls, backups and campaign management. On desktop, Activity & balances retains the full review queue and transaction table. Old `?view=overview` DM links open the same screen; feature screens return to Desk. Player Home is unchanged.
 
+## DM shop inventory controls
+
+In **Market → Create a shop**, choose a suggested assortment, a number of item types, or every matching catalog item. Category and rarity filters still apply; **Mixed market** includes all categories. Set quantities independently to suggested units, a fixed amount, or unlimited; services remain unlimited. The preview shows every selected item across pages and saves the entire assortment.
+
+For existing shops, open **Edit → Add from catalog**, search/filter, select individual items or every matching item, and set their quantity. New stock uses the shop’s current wealth/economic pricing; existing custom prices, quantities and items remain intact. Duplicate names are skipped. Custom Add item, stock editing, rates, schedules, restock, trading and complete PDF export remain available. Inventory readouts show item types, finite units, unlimited lines and sold-out lines; search/filter/pages do not truncate saved stock.
+
+The separate offline pass-phone plan remains parked; this shop update does not authorize or implement it. Web/mobile compatibility is checked separately from signed APK publication.
+
 ## Continue a campaign on another device
 
 Sign in to the same account, then choose the saved campaign in **My account → My campaigns → Resume**. New shared rooms created while signed in are saved there automatically; a failed account save has a retry that keeps the existing room. **Start a room** creates a separate campaign copy. Copies can have the same name but do not share portraits, loot or later progress. The account page marks the room open on this device and warns before opening an older same-name entry. Existing rooms can still be added with **Save current membership**.

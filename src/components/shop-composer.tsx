@@ -11,6 +11,7 @@ import { nameFromLexicon, randomPerson, randomPlace, randomShopTitle, rngFrom } 
 import type { ShopCategory, Wealth } from "@/lib/quire/types";
 import { Button, Select, Slider, TextInput } from "@/components/ui";
 import { cn } from "@/lib/cn";
+import { StockPages } from "./shop-stock-manager";
 
 export function ShopComposer() {
   const navigate = useNavigate();
@@ -26,6 +27,11 @@ export function ShopComposer() {
   const [flags, setFlags] = useState<RarityFlags>({ common: true, uncommon: true, rare: false, magic: false });
   const [priceScale, setPriceScale] = useState(1);
   const [depth, setDepth] = useState(1);
+  const [selection, setSelection] = useState<"suggested" | "count" | "all">("suggested");
+  const [itemCount, setItemCount] = useState(50);
+  const [quantityMode, setQuantityMode] = useState<"suggested" | "fixed" | "unlimited">("suggested");
+  const [quantity, setQuantity] = useState(10);
+  const [previewPage, setPreviewPage] = useState(0);
   const [sellRate, setSellRate] = useState(1);
   const [buyRate, setBuyRate] = useState(suggestedBuyRate("modest"));
   const [buyTouched, setBuyTouched] = useState(false);
@@ -53,8 +59,12 @@ export function ShopComposer() {
 
   const lines = useMemo(() => {
     const rng = rngFrom(shelfSeed);
-    return composeShelf(catalog, { category, wealth, flags, priceScale, depth, realm }, rng);
-  }, [catalog, category, wealth, flags, priceScale, depth, realm, shelfSeed]);
+    return composeShelf(catalog, { category, wealth, flags, priceScale, depth, realm, selection, itemCount,
+      ...(quantityMode === "suggested" ? {} : { quantity: quantityMode === "unlimited" ? null : quantity }),
+    }, rng);
+  }, [catalog, category, wealth, flags, priceScale, depth, realm, shelfSeed, selection, itemCount, quantityMode, quantity]);
+  const available = catalog.filter(item => flags[item.rarity] && (category === "mixed" || item.category === category)).length;
+  const currentPreviewPage = Math.min(previewPage, Math.max(0, Math.ceil(lines.length / 25) - 1));
 
   const people = lexicon.filter((row) => row.kind === "person");
   const places = lexicon.filter((row) => row.kind === "place" || row.kind === "region" || row.kind === "country" || row.kind === "continent");
@@ -157,7 +167,27 @@ export function ShopComposer() {
           </div>
         </fieldset>
         <Slider label="Base price multiplier" min={0.5} max={2.5} step={0.05} value={priceScale} onChange={setPriceScale} display={`${Math.round(priceScale * 100)}%`} />
-        <Slider label="Stock level" min={0.4} max={1.6} step={0.1} value={depth} onChange={setDepth} display={depth < 0.7 ? "Low" : depth > 1.2 ? "High" : "Standard"} />
+        <label className="text-sm font-medium">Item variety
+          <Select aria-label="Item variety" className="mt-1" value={selection} onChange={event => setSelection(event.target.value as typeof selection)}>
+            <option value="suggested">Suggested assortment</option>
+            <option value="count">Choose number of item types</option>
+            <option value="all">Every matching catalog item</option>
+          </Select>
+        </label>
+        {selection === "count" ? <label className="text-sm">Number of item types
+          <TextInput type="number" min="1" step="1" aria-label="Number of item types" value={itemCount} onChange={event => setItemCount(Math.max(1, Math.min(10000, Math.floor(Number(event.target.value) || 1))))} />
+        </label> : null}
+        <p className="text-sm text-muted">{lines.length} item types selected from {available} matching catalog items. Choose Mixed market to include every shop category.</p>
+        <label className="text-sm font-medium">Stock quantities
+          <Select aria-label="Stock quantities" className="mt-1" value={quantityMode} onChange={event => setQuantityMode(event.target.value as typeof quantityMode)}>
+            <option value="suggested">Suggested units per item</option><option value="fixed">Set units per item</option><option value="unlimited">Unlimited stock</option>
+          </Select>
+        </label>
+        {quantityMode === "suggested" ? <Slider label="Suggested quantity level" min={0.4} max={1.6} step={0.1} value={depth} onChange={setDepth} display={depth < 0.7 ? "Low" : depth > 1.2 ? "High" : "Standard"} /> : null}
+        {quantityMode === "fixed" ? <label className="text-sm">Units per item
+          <TextInput type="number" min="0" step="1" aria-label="Units per item" value={quantity} onChange={event => setQuantity(Math.max(0, Math.min(100000, Math.floor(Number(event.target.value) || 0))))} />
+          <span className="mt-1 block text-muted">Services remain unlimited.</span>
+        </label> : null}
         <Slider label="Sells at" min={0.5} max={2} step={0.05} value={sellRate} onChange={setSellRate} display={`${Math.round(sellRate * 100)}%`} />
         <Slider
           label="Buys at"
@@ -197,7 +227,7 @@ export function ShopComposer() {
       <h3 ref={shelfRef} className="mt-6 font-display text-xl tracking-tight">Stock · {lines.length}</h3>
       {lines.length === 0 ? <p className="mt-2 text-sm text-muted">No items match. Check the catalog, or turn a rarity on.</p> : null}
       <ul className="mt-2 divide-y divide-border border-y border-border">
-        {lines.map((line) => (
+        {lines.slice(currentPreviewPage * 25, (currentPreviewPage + 1) * 25).map((line) => (
           <li key={`${line.name}-${line.rarity}`} className="flex items-baseline justify-between gap-3 py-2">
             <span className="min-w-0">
               <span className="block truncate">{line.name}</span>
@@ -215,6 +245,7 @@ export function ShopComposer() {
           </li>
         ))}
       </ul>
+      <StockPages page={currentPreviewPage} count={lines.length} onChange={setPreviewPage} label="Stock preview pages" />
       <Button className="mt-4" disabled={busy || lines.length === 0} onClick={() => void open()}>
         Open this shop
       </Button>

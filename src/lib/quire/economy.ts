@@ -734,6 +734,32 @@ export async function saveStock(line: StockLine): Promise<void> {
   });
 }
 
+/** Add a catalog selection atomically; existing prices and quantities stay intact. */
+export async function addShelfStock(shopId: string, rows: ShelfDraft[]): Promise<number> {
+  if (getSeat().role !== "dm") throw new Error("Only the DM can manage shop stock.");
+  const prepared = rows.map(row => ({ ...row, id: crypto.randomUUID(), shopId, name: row.name.trim() }));
+  validateEconomyRows({ purses: [], holdings: [], shops: [], stock: prepared, ledger: [] });
+  if (prepared.some(row => !row.name || !Number.isSafeInteger(row.baseCopper) || row.baseCopper < 0))
+    throw new Error("Choose catalog items with valid names and prices.");
+  return atomic(["shops", "stock", "meta"], async tx => {
+    const shop = await request<Shop | undefined>(tx.objectStore("shops").get(shopId));
+    if (!shop) throw new Error("This shop no longer exists.");
+    const store = tx.objectStore("stock");
+    const current = await request<StockLine[]>(store.index("shopId").getAll(shopId));
+    const names = new Set(current.map(row => row.name.trim().toLowerCase()));
+    let added = 0;
+    for (const row of prepared) {
+      const key = row.name.toLowerCase();
+      if (names.has(key)) continue;
+      names.add(key);
+      store.put(row);
+      added++;
+    }
+    if (added) await audit(tx, `Added ${added} catalog items to ${shop.name}; existing stock preserved`, "management");
+    return added;
+  });
+}
+
 export async function saveHolding(holding: Holding): Promise<void> {
   if (
     !Number.isSafeInteger(holding.quantity) ||

@@ -20,6 +20,7 @@ import {
   addCatalogRows,
   addLexemeRows,
   addPricedStock,
+  addShelfStock,
   blankPurse,
   blankShop,
   buyFromShop,
@@ -124,6 +125,7 @@ type EconomyApi = {
     quantity: number | null,
   ) => Promise<void>;
   deleteStock: (id: string) => Promise<void>;
+  addCatalogStock: (shopId: string, rows: ShelfDraft[]) => Promise<number>;
   stockFromPrices: (
     shopId: string,
     rows: Array<{ name: string; copper: number; notes: string }>,
@@ -502,6 +504,12 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
           dmOnly();
           await removeStock(id);
         }),
+      addCatalogStock: async (shopId, rows) => {
+        dmOnly();
+        const added = await mutation(() => addShelfStock(shopId, rows));
+        await reload();
+        return added;
+      },
       stockFromPrices: async (shopId, rows) => {
         dmOnly();
         const added = await mutation(() => addPricedStock(shopId, rows));

@@ -129,7 +129,8 @@ export const HELP_GROUPS: HelpGroup[] = [
         title: "Shop generation and economy settings",
         audience: "DM",
         paragraphs: [
-          "Create shops from the catalog and choose category, wealth, stock level and buy/sell prices. Shuffle generates another name, keeper, location and stock. Closed shops cannot trade. Restocking adds to finite quantities without replacing your custom entries or changing unlimited stock.",
+          "Create shops from the catalog and choose category, wealth and buy/sell prices. Item variety can use a suggested assortment, a chosen number of item types, or every matching catalog item. Set quantities separately: suggested, fixed units per item, or unlimited. Services remain unlimited. Shuffle generates another name, keeper, location and stock.",
+          "In a shop, choose Edit → Add from catalog to select exact items or every filtered match. Existing prices and quantities are preserved and duplicate names are skipped. Custom items remain available through Add item. Inventory totals, search, rarity and stock filters, and pages help manage large shelves; paging does not remove stock or limit PDF exports. Closed shops cannot trade. Restocking adds to finite quantities without replacing your custom entries or changing unlimited stock.",
           "Price modifiers include season, shortages, war, plague, roads, scarcity and inflation. Review the price preview. Enable automatic repricing or choose Reprice open shops now to apply changes to open shops. New-shop defaults affect future shops; changing defaults is not a replacement for editing existing stock.",
         ],
         links: [

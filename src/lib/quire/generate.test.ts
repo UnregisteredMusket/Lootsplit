@@ -7,6 +7,35 @@ import { extractLexemes, goodsFromText } from "./extract.ts";
 import { inventItemName, randomPerson, rngFrom } from "./names.ts";
 import { DEFAULT_REALM, scalePrice } from "./scale.ts";
 
+test("DM-selected assortment stocks every matching catalog item without rarity caps", () => {
+  const catalog = Array.from({ length: 80 }, (_, i) => ({
+    id: `bulk-${i}`, name: `Bulk item ${i}`, category: "general" as const,
+    rarity: "common" as const, baseCopper: 10, notes: "", origin: "hand" as const, service: false,
+  }));
+  const lines = composeShelf(catalog, {
+    category: "general", wealth: "modest", flags: { common: true, uncommon: false, rare: false, magic: false },
+    priceScale: 1, depth: 0.4, realm: DEFAULT_REALM, selection: "all", quantity: 25,
+  }, rngFrom(1));
+  assert.equal(lines.length, 80);
+  assert.ok(lines.every(line => line.quantity === 25));
+});
+
+test("DM item count is independent of units per item and respects available catalog", () => {
+  const catalog = starterCatalog();
+  const input = {
+    category: "mixed" as const, wealth: "modest" as const,
+    flags: { common: true, uncommon: true, rare: true, magic: true },
+    priceScale: 1, depth: 1, realm: DEFAULT_REALM, selection: "count" as const, itemCount: 40,
+  };
+  const low = composeShelf(catalog, { ...input, quantity: 1 }, rngFrom(2));
+  const high = composeShelf(catalog, { ...input, quantity: 100 }, rngFrom(2));
+  assert.equal(low.length, 40);
+  assert.deepEqual(low.map(x => x.name), high.map(x => x.name));
+  const all = composeShelf(catalog, { ...input, itemCount: 500 }, rngFrom(2));
+  assert.equal(all.length, catalog.length);
+  assert.ok(high.filter(x => x.service).every(x => x.quantity === null));
+});
+
 test("scales prices by wealth and pushes rare goods when scarcity rises", () => {
   const calm = { ...DEFAULT_REALM };
   const modest = scalePrice(100, { wealth: "modest", rarity: "common", priceScale: 1, category: "general", realm: calm });

@@ -21,6 +21,7 @@ import { downloadShopPdf } from "@/lib/quire/shop-pdf";
 import type { Holding, Shop, StockLine, Wealth } from "@/lib/quire/types";
 import { Shell } from "@/components/shell";
 import { RemoveButton } from "@/components/quire-ui";
+import { CatalogStockPicker, ShopStockList } from "@/components/shop-stock-manager";
 import { Button, Confirm, Segmented, Select, Slider, TextInput } from "@/components/ui";
 
 export const Route = createFileRoute("/shop/$shopId")({
@@ -212,8 +213,8 @@ function ShopPage() {
         <CharismaNote purseId={purseId} />
       </label>
       <TurnLock />
-      <ul className="mt-4 divide-y divide-border border-y border-border">
-        {lines.map((line) => (
+      {viewing === "edit" ? <CatalogStockPicker key={shop.id} shop={shop} /> : null}
+      <ShopStockList key={shop.id} lines={lines} renderRow={(line) => (
           <StockRow
             key={line.id}
             line={line}
@@ -223,9 +224,7 @@ function ShopPage() {
             charisma={charismaScore(economy.sheets.find((sheet) => sheet.purseId === purseId))}
             locked={!!shop.closed || (viewing === "counter" && turnIsLocked())}
           />
-        ))}
-      </ul>
-      {lines.length === 0 ? <p className="mt-4 text-muted">This shop has no items.</p> : null}
+        )} />
       {viewing === "edit" ? <AddGood shopId={shop.id} /> : <SellBox shopId={shop.id} />}
       {viewing === "edit" ? (
         <button
