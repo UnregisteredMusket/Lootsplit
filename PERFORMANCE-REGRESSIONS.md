@@ -38,6 +38,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Development / governance / Run npm ci | open | 2 | 7s → 17s | +10s | +142.86% |
 | Development / governance / Run npx playwright install --with-deps chromium | open | 2 | 17s → 42s | +25s | +147.06% |
 | Development / governance / Start disposable development server | open | 2 | 4s → 8s | +4s | +100% |
+| Code checks and immutable builds / Run actions/upload-artifact@v4 | open | 2 | 2s → 4s | +2s | +100% |
 | Packaged Worker / interface / Run actions/setup-node@v4 | open | 3 | 3s → 7s | +4s | +133.33% |
 | Packaged Worker / accounts / Run actions/setup-node@v4 | open | 2 | 2s → 8s | +6s | +300% |
 | Development / governance / dev-campaign-governance | open | 4 | 18s → 69s | +51s | +283.33% |
@@ -72,7 +73,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Development / desktop / Run actions/setup-node@v4 | open | 3 | 2s → 9s | +7s | +350% |
 | Development / accounts / Run npm ci | open | 2 | 11s → 16s | +5s | +45.45% |
 | Packaged standby / Run actions/setup-node@v4 | open | 5 | 2s → 11s | +9s | +450% |
-| Packaged Worker / interface / Run npm ci | open | 2 | 11s → 15s | +4s | +36.36% |
+| Packaged Worker / interface / Run npm ci | open | 3 | 11s → 18s | +7s | +63.64% |
 | Development / gameplay / Run actions/upload-artifact@v4 | open | 2 | 1s → 3s | +2s | +200% |
 | Development / accounts / Run actions/upload-artifact@v4 | open | 2 | 1s → 3s | +2s | +200% |
 | verify | open | 2 | 5s → 40s | +35s | +700% |
@@ -148,12 +149,16 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Packaged Worker / interface / worker-library-navigation | resolved | 2 | 13s → 37s | +24s | +184.62% |
 | Development / gameplay / dev-control-panel | open | 2 | 14s → 24s | +10s | +71.43% |
 | Packaged Worker / interface / worker-library-navigation | open | 2 | 9s → 15s | +6s | +66.67% |
+| Development / gameplay / Run npm ci | open | 2 | 13s → 19s | +6s | +46.15% |
 | Packaged Worker / interface / worker-shop-stock | open | 2 | 7s → 17s | +10s | +142.86% |
 
 ## Recorded slowdowns
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-07T07:29:41Z | step: Packaged Worker / interface / Run npm ci | 15s → 18s | +3s | +20% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37263545529/job/111615780393) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37587449746/job/112681274035) |
+| 2026-10-07T07:29:06Z | step: Code checks and immutable builds / Run actions/upload-artifact@v4 | 3s → 4s | +1s | +33.33% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37235752710/job/111534383925) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37587449746/job/112680781363) |
+| 2026-10-07T07:28:12Z | step: Development / gameplay / Run npm ci | 15s → 19s | +4s | +26.67% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37453107393/job/112234113513) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37587449746/job/112680781630) |
 | 2026-10-07T07:15:21Z | step: Development / accounts / Start disposable development server | 7s → 9s | +2s | +28.57% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37269150846/job/111632229785) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37586104784/job/112676477470) |
 | 2026-10-07T07:14:51Z | step: Code checks and immutable builds / Run npm ci | 16s → 20s | +4s | +25% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37487168511/job/112350106248) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37586104784/job/112676477440) |
 | 2026-10-07T07:12:19Z | step: Packaged Worker / interface / worker-library-navigation | 11s → 15s | +4s | +36.36% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37452559678/job/112232862548) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37585553287/job/112675091320) |
