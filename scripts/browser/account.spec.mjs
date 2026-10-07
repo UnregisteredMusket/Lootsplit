@@ -92,7 +92,7 @@ test("library", async ({ devices, baseURL: origin }, testInfo) => {
   assert.equal(key.length, 64);
   await page.getByRole("button", { name: "I have saved it" }).click();
   await prepareDmFixture(page, origin);
-  await visit(page, "/account");
+  await navigateAccountScenario(page, origin, "/account");
   console.log("Account audit: character and backup");
   await page
     .getByLabel("Character name", { exact: true })
@@ -136,7 +136,7 @@ test("library", async ({ devices, baseURL: origin }, testInfo) => {
     fullPage: true,
   });
   await prepareDmFixture(other, origin);
-  await visit(other, "/account");
+  await navigateAccountScenario(other, origin, "/account");
   console.log("Account audit: restore into new campaign");
   other.on("dialog", (d) => d.accept());
   await other
@@ -152,9 +152,9 @@ test("library", async ({ devices, baseURL: origin }, testInfo) => {
       () => JSON.parse(localStorage.getItem("quire.campaigns.v1")).length >= 2,
     ),
   );
-  await visit(other, "/account");
+  await navigateAccountScenario(other, origin, "/account");
   console.log("Account audit: shared membership resumes on another device");
-  await visit(other, "/share");
+  await navigateAccountScenario(other, origin, "/share");
   const skip = other.getByRole("button", { name: "Not now", exact: true });
   if (await skip.isVisible()) await skip.click();
   await other
@@ -164,7 +164,7 @@ test("library", async ({ devices, baseURL: origin }, testInfo) => {
   await other
     .getByRole("button", { name: "Share join link", exact: true })
     .waitFor();
-  await visit(other, "/account");
+  await navigateAccountScenario(other, origin, "/account");
   await other
     .getByRole("button", { name: "Save current membership", exact: true })
     .click();
@@ -298,7 +298,7 @@ test("resume-queue", async ({ devices, baseURL: origin }, testInfo) => {
   devices.page.guestAccessAudit = true;
   const { other: device } = await signedInDevices(devices, origin);
   const visit = (p, path) => visitPage(p, origin, path);
-  const firstCode = (await createAndSaveRoom(device, origin))[0].code;
+  const firstCode = (await createAndSaveRoom(device, origin, navigateAccountScenario))[0].code;
   async function resumeSaved() {
     // Every caller has deliberately loaded the library, including the reloads
     // after injecting stored queues. Do not add another unrelated document load.
@@ -317,7 +317,7 @@ test("resume-queue", async ({ devices, baseURL: origin }, testInfo) => {
   await resumeSaved();
   // A lost Live response must remain recoverable, then an acknowledged stale
   // queue must open from both account cards and the startup selector.
-  await visit(device, "/account");
+  await navigateAccountScenario(device, origin, "/account");
   const original = await device.evaluate(() => {
     const key = `quire.cloud.v2.${localStorage.getItem("quire.campaign.v1")}`;
     return { key, session: JSON.parse(localStorage.getItem(key)) };
@@ -332,7 +332,7 @@ test("resume-queue", async ({ devices, baseURL: origin }, testInfo) => {
     { key: original.key, queued },
   );
   await resumeSaved();
-  await visit(device, "/share");
+  await navigateAccountScenario(device, origin, "/share");
   await device.getByRole("button", { name: /^Connection & recovery/ }).click();
   await expect(device.getByText(/1 unsynced Live change/)).toBeVisible();
   const download = device.waitForEvent("download");
@@ -1047,13 +1047,14 @@ test("ownership", async ({ devices, baseURL: origin }, testInfo) => {
   await expect(dm.getByText("Campaign control", { exact: true })).toBeVisible();
   const guide = dm.getByRole("button", { name: "Not now", exact: true });
   if (await guide.isVisible()) await guide.click();
+  // Reload after the explicit legacy claim to prove ownership and bytes persist.
   await visitPage(dm, origin, "/party");
   await expect(
     dm.getByText("Preserved legacy hero", { exact: true }).first(),
   ).toBeVisible();
-  const members = await createAndSaveRoom(dm, origin);
+  const members = await createAndSaveRoom(dm, origin, navigateAccountScenario);
   const code = members[0].code;
-  await visitPage(dm, origin, "/share");
+  await navigateAccountScenario(dm, origin, "/share");
   await dm.evaluate(() =>
     Object.defineProperty(navigator, "share", {
       configurable: true,
@@ -1092,14 +1093,14 @@ test("ownership", async ({ devices, baseURL: origin }, testInfo) => {
     path: testInfo.outputPath("guest-memory-mobile.png"),
     fullPage: true,
   });
-  await endSession(dm, origin);
+  await endSession(dm, origin, navigateAccountScenario);
   await expect(guest.locator(".room-code")).toBeHidden();
   expect(
     await guest.evaluate(() =>
       sessionStorage.getItem("lootsplit.player.reconnect.v1"),
     ),
   ).toBeNull();
-  await visitPage(dm, origin, "/account");
+  await navigateAccountScenario(dm, origin, "/account");
   await dm.getByRole("button", { name: "Reopen as DM", exact: true }).click();
   await dm.waitForURL((u) => u.pathname === "/");
   await continueIntoApp(dm);
@@ -1114,7 +1115,7 @@ test("ownership", async ({ devices, baseURL: origin }, testInfo) => {
   ).toBeVisible();
   const returning = credentials();
   await accountPost(guest.context(), origin, "auth/sign-up/email", returning);
-  await visitPage(dm, origin, "/share");
+  await navigateAccountScenario(dm, origin, "/share");
   await dm.evaluate(() =>
     Object.defineProperty(navigator, "share", {
       configurable: true,
@@ -1163,7 +1164,7 @@ test("shared-recovery", async ({ devices, baseURL: origin }, testInfo) => {
   const { page } = devices;
   await signedInDevices(devices, origin);
   await prepareDmFixture(page, origin);
-  const [member] = await createAndSaveRoom(page, origin);
+  const [member] = await createAndSaveRoom(page, origin, navigateAccountScenario);
   const encounter = blankEncounter();
   encounter.name = "Complete shared recovery";
   encounter.notes = "Encounter notes survive deletion and shared recovery.";
@@ -1188,7 +1189,7 @@ test("shared-recovery", async ({ devices, baseURL: origin }, testInfo) => {
   assert.ok(restored);
   assert.notEqual(restored.code, member.code);
   assert.equal(library.backups.length, 1, "The complete private backup stays available after restoration");
-  await visitPage(page, origin, "/encounters");
+  await navigateAccountScenario(page, origin, "/encounters");
   await page.getByLabel("Save in", { exact: true }).selectOption(restored.code);
   await page.getByRole("button", { name: /Complete shared recovery/ }).click();
   await expect(page.getByRole("heading", { name: "Complete shared recovery", exact: true })).toBeVisible();
@@ -1197,7 +1198,7 @@ test("shared-recovery", async ({ devices, baseURL: origin }, testInfo) => {
   await page.getByRole("button", { name: "Roll history", exact: true }).click();
   await expect(page.locator(".encounter-rolls")).toContainText("12");
   await page.screenshot({ path: testInfo.outputPath("shared-recovery-mobile.png"), fullPage: true });
-  await visitPage(page, origin, "/account");
+  await navigateAccountScenario(page, origin, "/account");
   await page.setViewportSize({ width: 1280, height: 900 });
   const downloaded = page.waitForEvent("download");
   await page.getByRole("button", { name: "Download recovery records", exact: true }).click();

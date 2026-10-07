@@ -1,7 +1,6 @@
 import { test as base, expect } from "playwright/test";
 import { randomUUID } from "node:crypto";
 import {
-  navigateApplication,
   openApplication,
   prepareDmFixture,
 } from "../title-screen-navigation.mjs";
@@ -59,8 +58,8 @@ export async function visit(page, origin, path) {
   await page.waitForFunction(() => document.fonts.status === "loaded");
 }
 
-// Only the long DM/portrait scenarios opt in. Storage-interruption and explicit
-// reload checks keep using visit(), as do the other account scenarios.
+// Routine DM transitions explicitly opt in. Storage-interruption, guest entry,
+// account handoffs and other deliberate cold-load checks keep using visit().
 export async function navigateAccountScenario(page, origin, path) {
   const target = new URL(path, origin);
   const current = new URL(page.url());
@@ -73,7 +72,16 @@ export async function navigateAccountScenario(page, origin, path) {
     await visit(page, origin, path);
     return;
   }
-  if (target.pathname !== "/account") await prepareDmFixture(page, origin);
+  if (target.pathname !== "/account" && !page.guestAccessAudit) await prepareDmFixture(page, origin);
+  // Already-confirmed success notices have a real close control. Use it before
+  // header navigation: hovering a notice otherwise pauses its dismissal timer.
+  const successes = page.locator('[data-sonner-toast][data-type="success"]:not([data-removed="true"])');
+  let remaining = await successes.count();
+  while (remaining > 0) {
+    await successes.first().getByRole("button", { name: "Close toast", exact: true }).click();
+    await expect.poll(() => successes.count()).toBeLessThan(remaining);
+    remaining = await successes.count();
+  }
   const marker = randomUUID();
   await page.evaluate((value) => (window.accountNavigationAudit = value), marker);
   if (target.pathname !== "/account") {
@@ -82,8 +90,10 @@ export async function navigateAccountScenario(page, origin, path) {
       await openApp.click();
       await page.waitForURL((url) => url.pathname === "/");
     }
-    if (new URL(page.url()).pathname === "/") await waitForDmCampaign(page);
   }
+  // A routine return to the account library can follow the first DM claim too;
+  // answer its delayed guide before opening any campaign navigation control.
+  if (new URL(page.url()).pathname === "/") await waitForDmCampaign(page);
   if (["/party", "/characters"].includes(target.pathname)) {
     if (new URL(page.url()).pathname !== "/party") {
       await page
@@ -106,25 +116,15 @@ export async function navigateAccountScenario(page, origin, path) {
     }
   }
   if (new URL(page.url()).pathname !== target.pathname) {
-    const links = page.locator("a[href]");
-    let direct = false;
-    for (let i = 0; i < (await links.count()); i++) {
-      const link = links.nth(i);
-      if (!(await link.isVisible())) continue;
-      const url = new URL(await link.getAttribute("href"), page.url());
-      if (
-        url.origin === origin &&
-        url.pathname === target.pathname &&
-        url.search === target.search
-      ) {
-        direct = true;
-        break;
-      }
-    }
-    if (direct) {
-      // The shared helper cannot fall back to a document load: a matching
-      // visible router link was established above, and the marker checks it.
-      await navigateApplication(page, target.href);
+    // Resolve the existing visible link in one browser round trip, rather than
+    // serially querying every anchor and then scanning them again to click it.
+    const selector = await page.locator("a[href]:visible").evaluateAll((links, href) => {
+      const link = links.find((a) => new URL(a.getAttribute("href"), document.baseURI).href === href);
+      return link ? `a[href="${CSS.escape(link.getAttribute("href"))}"]:visible` : null;
+    }, target.href);
+    if (selector) {
+      await page.locator(selector).first().click();
+      await page.waitForURL((url) => url.href === target.href);
     } else if (["/account", "/share"].includes(target.pathname)) {
       await page.getByRole("button", { name: "Select campaign", exact: true }).click();
       const campaigns = page.getByRole("dialog", { name: "Campaigns", exact: true });
