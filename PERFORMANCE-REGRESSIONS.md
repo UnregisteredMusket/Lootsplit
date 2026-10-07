@@ -81,6 +81,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | deploy / Check current main, existing bindings and applied migrations; deploy without rebuild | open | 3 | 9s → 28s | +19s | +211.11% |
 | Packaged Worker / interface / Set up job | open | 2 | 1s → 3s | +2s | +200% |
 | Development / governance / dev-campaign-governance | open | 3 | 27s → 70s | +43s | +159.26% |
+| Development / desktop / dev-game-analytics | open | 2 | 5s → 7s | +2s | +40% |
 | Development / desktop / Run actions/upload-artifact@v4 | open | 2 | 3s → 8s | +5s | +166.67% |
 | Packaged Worker / accounts | open | 4 | 85s → 166s | +81s | +95.29% |
 | Development / gameplay / Run npx playwright install --with-deps chromium | open | 3 | 21s → 58s | +37s | +176.19% |
@@ -166,6 +167,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-07T09:15:25Z | step: Development / desktop / dev-game-analytics | 6s → 7s | +1s | +16.67% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37263207826/job/111614535461) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37599091203/job/112718786898) |
 | 2026-10-07T09:11:00Z | step: Code checks and immutable builds / unit-tests | 13s → 15s | +2s | +15.38% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37270098428/job/111635070872) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37598751222/job/112717652197) |
 | 2026-10-07T08:43:50Z | step: Packaged standby / Run actions/setup-node@v4 | 7s → 9s | +2s | +28.57% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37253238957/job/111585184591) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37595520953/job/112707628568) |
 | 2026-10-07T07:48:51.000Z | queue: Publish verified standby / initial queue | 5s → 39s | +34s | +680% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37412626382) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37589600174) |
