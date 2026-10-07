@@ -1,5 +1,24 @@
 [
   {
+    "version": "1.5.1",
+    "date": "2026-10-07",
+    "summary": "Reliable account campaign reopening with preserved unsynced device actions.",
+    "features": [
+      "Device-only action recovery records can be downloaded from account campaign cards or Multiplayer when an earlier seat or conflicting draft needs review."
+    ],
+    "improvements": [
+      "Both the startup chooser and My account reconcile the verified server campaign before loading a device copy.",
+      "Genuine unsynced Live actions and turn drafts remain accessible for retry or export; resuming never silently submits a turn.",
+      "Account guidance distinguishes server-saved campaigns, local-only copies and manual cloud backups."
+    ],
+    "fixes": [
+      "Already-accepted Live actions no longer trigger the false unfinished-turn warning when resuming an account campaign.",
+      "A lost reopen response refreshes the campaign list so retries do not use a stale closed-session revision.",
+      "Old guest reconnect tickets no longer override a verified DM resume, and recovery imports cannot promote actions from a different seat.",
+      "Conflicting optimistic edits retain their actions while showing the authoritative server state; acknowledged batches cannot swallow a newer draft."
+    ]
+  },
+  {
     "version": "1.5.0",
     "date": "2026-10-07",
     "summary": "Larger DM shops, unified campaign control, and dedicated player finance and property services.",

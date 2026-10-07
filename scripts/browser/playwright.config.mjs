@@ -4,7 +4,7 @@ import { localAuditOrigin } from "../account-scenarios.mjs";
 
 export default defineConfig({
   testDir: ".",
-  testMatch: "account.spec.mjs",
+  testMatch: ["account.spec.mjs", "account-resume.spec.mjs"],
   forbidOnly: true,
   retries: 0,
   // Scenarios own their accounts, rooms, browser storage and rate-limit identities.

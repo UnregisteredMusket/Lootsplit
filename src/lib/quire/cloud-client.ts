@@ -1,3 +1,4 @@
+import { planAccountResume, readResumeSession, saveResumeRecoveries } from "./account-resume.ts";
 import { emptyCloudTable } from "./cloud.ts";
 import { reloadCampaignContext } from "./navigation-launch.ts";
 import { rememberSave } from "./saves.ts";
@@ -249,6 +250,9 @@ async function accept(remote: RoomView, committed = false) {
       await applyCloudTable(preview);
     } catch (error) {
       fail(error);
+      // A conflicting optimistic edit must not leave a resumed device empty or
+      // display an older device snapshot. Keep the commands for explicit recovery.
+      await applyCloudTable(remote.table);
       await rememberIncoming(remote.table.notes);
     }
   }
@@ -578,6 +582,8 @@ export async function importPending(file: File) {
     const s = requireSession();
     if (raw.code !== s.code || !Array.isArray(raw.commands))
       throw new Error("This recovery file belongs to a different campaign code.");
+    if ((raw.seatId && raw.seatId !== s.seatId) || (raw.role && raw.role !== s.role))
+      throw new Error("This recovery copy belongs to a different seat. Review it with the DM instead of replaying it with different permissions.");
     if (raw.commands.length + s.pending.length > 100)
       throw new Error("Submit the current pending actions before importing more.");
     const incoming = raw.commands.map((c: unknown) => commandSchema.parse(c)) as Command[];
@@ -625,45 +631,66 @@ export function prepareAccountMembership() {
   });
 }
 
+/** Run before the account endpoint can reopen a room. Same-campaign DM recovery is allowed. */
+export function assertAccountResumeAllowed(code: string) {
+  const current = session();
+  if (current?.pending.length && (current.code !== code || current.role !== "dm"))
+    throw new Error("Submit or export and resolve your current unsynced actions before switching campaigns or seats.");
+}
+
 export async function resumeAccountMembership(
   member: import("../account/client").AccountMembership,
 ) {
   return serial(async () => {
-    if (hasPendingChanges())
-      throw new Error("Submit or resolve your pending actions before switching campaigns.");
-    const remote = await pullCloudTable({ data: { code: member.code, token: member.token } });
-    const role = remote.seats.find((s) => s.id === remote.seatId)?.role;
-    if (!role || (role === "player" && !remote.purseIds.length) || remote.seatId !== member.seatId)
-      throw new Error("This membership has changed. Refresh your account library.");
-    const { selectAccountCampaign } = await import("./campaigns");
+    assertAccountResumeAllowed(member.code);
+    if (sessionStorage.getItem("lootsplit.verified-account") !== member.userId)
+      throw new Error("Your account changed. Refresh My account before opening this campaign.");
+    const originalKey = key();
     const id = `account-${member.userId}-${member.code}`;
     const targetKey = `quire.cloud.v2.${id}`;
-    const existing = JSON.parse(localStorage.getItem(targetKey) || "null") as Session | null;
-    if (existing?.pending?.length)
-      throw new Error(
-        "This device has an unfinished turn for that campaign. Reopen its existing device campaign and resolve it before resuming.",
-      );
-    stopPolling();
-    setEphemeralCampaign(role === "player");
-    closeQuireDb();
-    if (role === "dm") selectAccountCampaign(id, member.name, {
-      role,
-      purseIds: remote.purseIds,
-      shopIds: remote.shopIds,
-      openedAt: Date.now(),
-    });
-    remember({
-      code: member.code,
-      token: member.token,
-      seatId: remote.seatId,
-      role,
-      purseIds: remote.purseIds,
-      revision: 0,
-      pending: [],
-      batchId: crypto.randomUUID(),
-    });
-    if (role === "dm") localStorage.setItem(`quire.owner.${id}`, member.userId);
-    reloadCampaignContext();
+    const resume = async () => {
+      const remote = await pullCloudTable({ data: { code: member.code, token: member.token } });
+      if (key() !== originalKey || sessionStorage.getItem("lootsplit.verified-account") !== member.userId)
+        throw new Error("The active campaign or account changed. Try opening the saved campaign again.");
+      const role = remote.seats.find((s) => s.id === remote.seatId)?.role;
+      if (!role || role !== member.role || remote.code !== member.code ||
+          (role === "player" && !remote.purseIds.length) || remote.seatId !== member.seatId)
+        throw new Error("This membership has changed. Refresh your account library.");
+      const current = session();
+      // Player sessions remain in memory. Never read or promote an old DM cache for a player.
+      const existing = role === "dm" ? readResumeSession(localStorage.getItem(targetKey)) : null;
+      const plan = planAccountResume({ ...member, role }, existing, current, remote);
+      if (plan.recoveries.length) saveResumeRecoveries(localStorage, member.userId, member.code, plan.recoveries);
+      const { selectAccountCampaign } = await import("./campaigns");
+      if (key() !== originalKey || sessionStorage.getItem("lootsplit.verified-account") !== member.userId)
+        throw new Error("The active campaign or account changed. Device actions have been kept.");
+      stopPolling();
+      setEphemeralCampaign(role === "player");
+      closeQuireDb();
+      if (role === "dm") {
+        // A previous guest ticket must not turn the verified DM back into a player after reload.
+        playerSession = null;
+        sessionStorage.removeItem(PLAYER_TICKET);
+        selectAccountCampaign(id, member.name, {
+          role, purseIds: remote.purseIds, shopIds: remote.shopIds, openedAt: Date.now(),
+        });
+      }
+      remember({
+        code: member.code, token: member.token, seatId: remote.seatId, role,
+        purseIds: remote.purseIds, revision: 0, pending: plan.pending, batchId: plan.batchId,
+      });
+      if (role === "dm") localStorage.setItem(`quire.owner.${id}`, member.userId);
+      // Revision zero forces fresh authoritative hydration. Pending actions are
+      // previewed locally and remain reachable through Multiplayer, never auto-submitted.
+      reloadCampaignContext();
+    };
+    // serial() already owns the active cache lock. The target may be used by another tab.
+    if (member.role === "dm" && targetKey !== originalKey && navigator.locks)
+      return navigator.locks.request(targetKey + ".write", { ifAvailable: true }, lock => {
+        if (!lock) throw new Error("Another Lootsplit tab is synchronizing this campaign. Try again in a moment.");
+        return resume();
+      });
+    return resume();
   });
 }
 

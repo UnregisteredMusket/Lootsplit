@@ -1,3 +1,4 @@
+import { AccountResumeRecovery } from "@/components/account/resume-recovery";
 import { AccountSessionRecords } from "@/components/account/session-records";
 import { blankSheet } from "@/lib/characters/model.mjs";
 import { BugReports } from "@/components/account/bug-reports";
@@ -36,6 +37,7 @@ import {
   getServerCloudTable,
   subscribeCloudTable,
   resumeAccountMembership,
+  assertAccountResumeAllowed,
   hasPendingChanges,
   clearAccountRoom,
 } from "@/lib/quire/cloud-client";
@@ -411,7 +413,10 @@ function Account() {
                 <p className="portal-subtle">
                   Open or join a shared campaign in the app, then save its membership here. DMs can
                   resume or reopen their saved shared sessions on any signed-in device. Players need
-                  an active seat from their DM. Linking does not upload a local-only campaign.
+                  an active seat from their DM. Reopening loads server-saved progress and keeps
+                  genuinely unsynced device actions for review; it never silently submits a turn.
+                  Linking does not upload a local-only campaign. To upload a manual snapshot, use
+                  Cloud backups → Save current campaign below.
                 </p>
                 <label className="portal-check">
                   <input
@@ -430,6 +435,7 @@ function Account() {
                           {m.archived ? "ARCHIVED" : "SHARED CAMPAIGN"} · {m.code}
                         </span>
                         <h3>{m.name}</h3>
+                        {m.role === "dm" && <AccountResumeRecovery code={m.code} userId={library.user.id} />}
                         {cloud.joined && cloud.code === m.code && (
                           <p className="portal-message">Open on this device</p>
                         )}
@@ -504,10 +510,7 @@ function Account() {
                             className="portal-button"
                             disabled={busy}
                             onClick={action(async () => {
-                              if (hasPendingChanges())
-                                throw new Error(
-                                  "Submit or resolve pending actions before switching campaigns.",
-                                );
+                              assertAccountResumeAllowed(m.code);
                               // Another device may have saved a newer room since this page
                               // opened. Names are a warning only, never campaign identity.
                               const fresh = await accountRequest<AccountLibrary>("library");
@@ -533,17 +536,23 @@ function Account() {
                                 )
                               )
                                 return;
-                              const member = await accountRequest<AccountMembership>("resume", {
-                                code: target.code,
-                                ...(target.closed && target.role === "dm"
-                                  ? { reopen: true, revision: target.room_revision }
-                                  : {}),
-                              });
-                              await resumeAccountMembership(member);
+                              try {
+                                const member = await accountRequest<AccountMembership>("resume", {
+                                  code: target.code,
+                                  ...(target.closed && target.role === "dm"
+                                    ? { reopen: true, revision: target.room_revision }
+                                    : {}),
+                                });
+                                await resumeAccountMembership(member);
+                              } catch (error) {
+                                // The server may have reopened before a connection failed.
+                                await reload().catch(() => undefined);
+                                throw error;
+                              }
                             })}
                           >
                             {m.closed && m.role === "dm" ? "Reopen as DM" : "Resume"}{" "}
-                            <ArrowRight size={16} />
+                            <ArrowRight size={17} />
                           </button>
                           <button
                             aria-label={`${m.archived ? "Unarchive" : "Archive"} ${m.name}`}

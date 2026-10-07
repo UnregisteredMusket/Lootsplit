@@ -1,3 +1,4 @@
+import { AccountResumeRecovery } from "@/components/account/resume-recovery";
 import { getServerCloudTable } from "@/lib/quire/cloud-client";
 import { useState, useSyncExternalStore } from "react";
 import { Link } from "@tanstack/react-router";
@@ -90,6 +91,7 @@ export function SyncStatus({ compact = false }: { compact?: boolean }) {
           ) : null}
         </>
       ) : null}
+      {!compact && state.role === "dm" && <AccountResumeRecovery code={state.code} />}
       <Confirm
         open={discard}
         onOpenChange={setDiscard}

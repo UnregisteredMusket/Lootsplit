@@ -5,6 +5,8 @@ import { setEphemeralCampaign } from "@/lib/quire/guest-storage";
 import { setSeat, DM_SEAT } from "@/lib/quire/table";
 import { closeQuireDb } from "@/lib/quire/db";
 import { resumeAccountMembership, subscribeCloudTable, getCloudTable, getServerCloudTable } from "@/lib/quire/cloud-client";
+import { AccountResumeRecovery } from "./resume-recovery";
+import { assertAccountResumeAllowed } from "@/lib/quire/cloud-client";
 import { Button } from "@/components/ui";
 
 const publicPaths = new Set(["/welcome", "/downloads", "/updates", "/help", "/resources", "/donate", "/account"]);
@@ -54,9 +56,20 @@ export function CampaignGate({ children }: { children: ReactNode }) {
   async function resume(member: AccountLibrary["members"][number]) {
     setBusy(true); setError("");
     try {
-      const result = await accountRequest<AccountMembership>("resume", { code: member.code, ...(member.closed ? { reopen: true, revision: member.room_revision } : {}) });
+      assertAccountResumeAllowed(member.code);
+      // A previous reopen may have succeeded even when its response was lost.
+      // Refresh first; never repeat a reopen against a stale revision.
+      const fresh = await accountRequest<AccountLibrary>("library");
+      setLibrary(fresh);
+      const target = fresh.members.find(m => m.code === member.code && m.role === "dm");
+      if (!target) throw Error("This saved campaign is no longer available to this account.");
+      const result = await accountRequest<AccountMembership>("resume", { code: target.code, ...(target.closed ? { reopen: true, revision: target.room_revision } : {}) });
       await resumeAccountMembership(result);
-    } catch (e) { setError(e instanceof Error ? e.message : "Unable to resume campaign."); }
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "Unable to resume campaign.");
+      // Read only: repair the chooser after an ambiguous server reopen.
+      await accountRequest<AccountLibrary>("library").then(setLibrary).catch(() => undefined);
+    }
     finally { setBusy(false); }
   }
   async function claim() {
@@ -80,8 +93,8 @@ export function CampaignGate({ children }: { children: ReactNode }) {
   return <main className="mx-auto max-w-xl space-y-4 p-6">
     <h1 className="text-3xl">{library ? "Choose your campaign" : "Welcome to Lootsplit"}</h1>
     {!library ? <><p>Create an account or sign in to proceed as a Dungeon Master in your own campaign</p><Link to="/account" className="settings-link">Create an account or sign in</Link><Link to="/share" className="settings-link">Join with a current session invitation</Link></> : <>
-      <p>Your account owns your campaigns. Choose one to load its saved data.</p>
-      {library.members.filter(m => m.role === "dm" && !m.archived).map(m => <section className="ledger-card" key={m.code}><h2>{m.name}</h2><p>{m.closed ? "Session ended" : "Session open"}</p><Button disabled={busy} onClick={() => void resume(m)}>{m.closed ? "Reopen as DM" : "Resume"}</Button></section>)}
+      <p>Your account owns your campaigns. Choose one to load its server-saved data on this device. Unsynced device actions are preserved for review.</p>
+      {library.members.filter(m => m.role === "dm" && !m.archived).map(m => <section className="ledger-card" key={m.code}><h2>{m.name}</h2><p>{m.closed ? "Session ended" : "Session open"}</p><Button disabled={busy} onClick={() => void resume(m)}>{m.closed ? "Reopen as DM" : "Resume"}</Button><AccountResumeRecovery code={m.code} userId={library.user.id} /></section>)}
       <Link to="/account" className="settings-link">My account and saved campaigns</Link>
       <Button disabled={busy} variant="secondary" onClick={() => void claim()}>Claim this device’s existing DM campaign</Button>
       <p className="text-sm">Existing device saves are preserved. Claiming enables offline DM play; start a room to save the shared campaign to your account.</p>

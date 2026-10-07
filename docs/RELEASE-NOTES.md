@@ -1,3 +1,32 @@
+# Lootsplit 1.5.1 candidate
+
+Android version code 8. This candidate retains package `com.unregisteredmusket.lootsplit` and the existing permanent signing certificate for in-place updates of permanently signed installations.
+
+## Added features
+
+- Device-only action recovery records can be downloaded from account campaign cards or Multiplayer when an earlier seat or conflicting draft needs review.
+
+## Improvements
+
+- Both the startup chooser and My account reconcile the verified server campaign before loading a device copy.
+- Genuine unsynced Live actions and turn drafts remain accessible for retry or export; resuming never silently submits a turn.
+- Account guidance distinguishes server-saved campaigns, local-only copies and manual cloud backups.
+
+## Bug fixes
+
+- Already-accepted Live actions no longer trigger the false unfinished-turn warning when resuming an account campaign.
+- A lost reopen response refreshes the campaign list so retries do not use a stale closed-session revision.
+- Old guest reconnect tickets no longer override a verified DM resume, and recovery imports cannot promote actions from a different seat.
+- Conflicting optimistic edits retain their actions while showing the authoritative server state; acknowledged batches cannot swallow a newer draft.
+
+## Candidate verification
+
+Full exact-head PR/main preservation checks, the signed Android workflow and a verified website-download follow-up are required before declaring publication complete. The public download remains 1.5.0 until the new signed APK and checksum exist. Physical-device installation, file-picker and force-close behavior are not claimed as tested. No migration, domain change, signing-key change, new gameplay rules or parked offline pass-phone feature is included.
+
+See `docs/ACCOUNT-CAMPAIGN-RECOVERY.md` and `docs/audit/2026-10-07-account-resume.md`. Earlier release checkpoints below are retained as history; PR59's final evidence establishes the completed 1.5.0 publication.
+
+---
+
 # Lootsplit 1.5.0 candidate
 
 Android version code 7. This candidate retains package `com.unregisteredmusket.lootsplit` and the existing permanent signing certificate for in-place updates of permanently signed installations.

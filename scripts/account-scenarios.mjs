@@ -8,6 +8,8 @@ export const accountScenarios = [
   "campaign-choice",
   "invitations",
   "ownership",
+  "resume-recovery",
+  "resume-conflicts",
 ];
 
 export function selectAccountScenario(args, ci = process.env.CI) {
