@@ -42,7 +42,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Code checks and immutable builds / Run actions/upload-artifact@v4 | open | 2 | 2s → 4s | +2s | +100% |
 | Packaged Worker / interface / Run actions/setup-node@v4 | open | 3 | 3s → 7s | +4s | +133.33% |
 | Packaged Worker / accounts / Run actions/setup-node@v4 | open | 2 | 2s → 8s | +6s | +300% |
-| Development / governance / dev-campaign-governance | open | 4 | 18s → 69s | +51s | +283.33% |
+| Development / governance / dev-campaign-governance | open | 5 | 18s → 114s | +96s | +533.33% |
 | Packaged standby / Run npm ci | open | 3 | 10s → 18s | +8s | +80% |
 | Development / governance / dev-theme | open | 2 | 13s → 24s | +11s | +84.62% |
 | Packaged Worker / accounts / Run actions/download-artifact@v4 | open | 3 | 1s → 10s | +9s | +900% |
@@ -50,8 +50,10 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Packaged Worker / interface / worker-help | open | 2 | 6s → 9s | +3s | +50% |
 | Packaged standby / standby-audit | open | 3 | 20s → 76s | +56s | +280% |
 | Packaged standby | open | 3 | 62s → 126s | +64s | +103.23% |
+| Development / governance / dev-backup | open | 2 | 6s → 13s | +7s | +116.67% |
 | Development / governance / Run actions/upload-artifact@v4 | open | 2 | 1s → 3s | +2s | +200% |
-| Development / governance | open | 2 | 110s → 221s | +111s | +100.91% |
+| Development / governance | open | 3 | 110s → 282s | +172s | +156.36% |
+| Packaged Worker / interface / worker-library-navigation | open | 2 | 9s → 18s | +9s | +100% |
 | Packaged Worker / accounts / Run actions/upload-artifact@v4 | open | 2 | 1s → 3s | +2s | +200% |
 | Publish verified standby / initial queue | open | 3 | 3s → 39s | +36s | +1200% |
 | publish / Run actions/download-artifact@v4 | open | 2 | 1s → 3s | +2s | +200% |
@@ -72,7 +74,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Development / gameplay / Run actions/checkout@v4 | open | 2 | 1s → 3s | +2s | +200% |
 | Development / gameplay / Run actions/setup-node@v4 | open | 3 | 2s → 7s | +5s | +250% |
 | Development / accounts / Run actions/setup-node@v4 | open | 2 | 3s → 7s | +4s | +133.33% |
-| Development / desktop / Run actions/setup-node@v4 | open | 3 | 2s → 9s | +7s | +350% |
+| Development / desktop / Run actions/setup-node@v4 | open | 4 | 2s → 30s | +28s | +1400% |
 | Development / accounts / Run npm ci | open | 2 | 11s → 16s | +5s | +45.45% |
 | Packaged standby / Run actions/setup-node@v4 | open | 5 | 2s → 11s | +9s | +450% |
 | Packaged Worker / interface / Run npm ci | open | 3 | 11s → 18s | +7s | +63.64% |
@@ -116,7 +118,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Packaged standby / Run actions/checkout@v4 | open | 2 | 1s → 3s | +2s | +200% |
 | Development / governance | open | 3 | 160s → 257s | +97s | +60.63% |
 | Development / gameplay / dev-finance | open | 3 | 17s → 35s | +18s | +105.88% |
-| Code checks and immutable builds / unit-tests | open | 2 | 11s → 15s | +4s | +36.36% |
+| Code checks and immutable builds / unit-tests | open | 3 | 11s → 23s | +12s | +109.09% |
 | Packaged Worker / interface / Run npx playwright install --with-deps chromium | open | 2 | 21s → 57s | +36s | +171.43% |
 | Packaged Worker / accounts | open | 4 | 94s → 185s | +91s | +96.81% |
 | Development / accounts | open | 3 | 152s → 732s | +580s | +381.58% |
@@ -130,6 +132,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Development / gameplay / Set up job | open | 2 | 1s → 3s | +2s | +200% |
 | Code checks and immutable builds | open | 2 | 71s → 97s | +26s | +36.62% |
 | Packaged Worker / accounts / Run npm ci | open | 2 | 13s → 19s | +6s | +46.15% |
+| Packaged Worker / interface / worker-game-analytics | open | 2 | 3s → 5s | +2s | +66.67% |
 | report | open | 2 | 7s → 12s | +5s | +71.43% |
 | Report workflow failure | open | 2 | 7s → 12s | +5s | +71.43% |
 | Packaged standby / Run npx playwright install --with-deps chromium | open | 2 | 21s → 38s | +17s | +80.95% |
@@ -175,6 +178,15 @@ Open trends require investigation. Resolved trends retain their history; each ve
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-07T17:48:51Z | job: Development / governance | 221s → 282s | +61s | +27.6% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37303426479/job/111741324343) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37661353259/job/112929395891) |
+| 2026-10-07T17:48:48Z | step: Development / governance / dev-backup | 7s → 13s | +6s | +85.71% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37235752710/job/111534384084) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37661353259/job/112929395891) |
+| 2026-10-07T17:47:54Z | step: Packaged Worker / interface / worker-library-navigation | 14s → 18s | +4s | +28.57% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37235752710/job/111534622155) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37661353259/job/112930144013) |
+| 2026-10-07T17:47:23Z | step: Packaged Worker / interface / worker-game-analytics | 4s → 5s | +1s | +25% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37280755805/job/111668498796) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37661353259/job/112930144013) |
+| 2026-10-07T17:47:05Z | step: Development / governance / dev-campaign-governance | 69s → 114s | +45s | +65.22% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37425891304/job/112145334858) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37661353259/job/112929395891) |
+| 2026-10-07T17:47:04Z | step: Development / gameplay / dev-library-navigation | 18s → 25s | +7s | +38.89% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37233687309/job/111528483514) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37661353259/job/112929395908) |
+| 2026-10-07T17:44:54Z | step: Code checks and immutable builds / unit-tests | 15s → 23s | +8s | +53.33% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37598751222/job/112717652197) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37661353259/job/112929395486) |
+| 2026-10-07T17:44:42Z | step: Development / desktop / Run actions/setup-node@v4 | 9s → 30s | +21s | +233.33% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37424826185/job/112142000092) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37661353259/job/112929396066) |
+| 2026-10-07T17:04:41.825133+00:00 | test: verify:quick | 36.854731s → 42.83853489400644s | +5.983803894006443s | +16.24% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/tree/fix/repairs) · [After](https://github.com/UnregisteredMusket/Lootsplit/pull/67) |
 | 2026-10-07T17:41:10.000Z | workflow: Verify preserved functionality | 466s → 692s | +226s | +48.5% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37638440371) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37659474866) |
 | 2026-10-07T17:40:59Z | job: Development / accounts | 393s → 681s | +288s | +73.28% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37438052113/job/112184649165) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37659474866/job/112923007437) |
 | 2026-10-07T17:29:53Z | step: Development / accounts / Run actions/setup-node@v4 | 7s → 11s | +4s | +57.14% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37302876093/job/111739542079) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37659474866/job/112923007437) |
