@@ -805,14 +805,17 @@ export async function resumeAccountMembership(
     const current = session();
     if (sessionStorage.getItem("lootsplit.verified-account") !== member.userId)
       throw new Error("Sign in to the account that owns this saved campaign.");
-    if (
-      current?.pending.length &&
-      (current.code !== member.code ||
-        current.seatId !== member.seatId ||
-        current.token !== member.token)
-    )
+    if (current?.pending.length && current.code !== member.code)
       throw new Error(
         "Submit or resolve your pending actions before switching campaigns.",
+      );
+    if (
+      current?.pending.length &&
+      current.role === "player" &&
+      (current.seatId !== member.seatId || current.token !== member.token)
+    )
+      throw new Error(
+        "Export your unsynced player changes in Multiplayer before changing seats.",
       );
     const remote = await pullCloudTable({
       data: { code: member.code, token: member.token },

@@ -287,10 +287,32 @@ test("dm-resume", async ({ devices, baseURL: origin }, testInfo) => {
   // Both saved campaigns also remain resumable after the first reopen, on either device.
   await resumeFromAccount(page, secondCode, "Resume");
   await resumeFromAccount(other, firstCode, "Resume");
+});
 
+test("resume-queue", async ({ devices, baseURL: origin }, testInfo) => {
+  const { other: device } = await signedInDevices(devices, origin);
+  const visit = (p, path) => visitPage(p, origin, path);
+  const firstCode = (await createAndSaveRoom(device, origin))[0].code;
+  async function resumeSaved() {
+    await visit(device, "/account");
+    const card = device
+      .locator("article.portal-card")
+      .filter({ hasText: firstCode });
+    await card.getByRole("button", { name: "Resume", exact: true }).click();
+    await device.waitForURL(
+      (url) => url.origin === origin && url.pathname === "/",
+    );
+    await device
+      .getByRole("button", {
+        name: "Dungeon master. Change role.",
+        exact: true,
+      })
+      .waitFor();
+    expect(await device.locator(".loot-opening").count()).toBe(0);
+  }
+  await resumeSaved();
   // A lost Live response must remain recoverable, then an acknowledged stale
   // queue must open from both account cards and the startup selector.
-  const device = other;
   await visit(device, "/account");
   const original = await device.evaluate(() => {
     const key = `quire.cloud.v2.${localStorage.getItem("quire.campaign.v1")}`;
@@ -305,8 +327,9 @@ test("dm-resume", async ({ devices, baseURL: origin }, testInfo) => {
     ({ key, queued }) => localStorage.setItem(key, JSON.stringify(queued)),
     { key: original.key, queued },
   );
-  await resumeFromAccount(device, firstCode, "Resume");
+  await resumeSaved();
   await visit(device, "/share");
+  await device.getByRole("button", { name: /^Connection & recovery/ }).click();
   await expect(device.getByText(/1 unsynced Live change/)).toBeVisible();
   const download = device.waitForEvent("download");
   await device
@@ -339,8 +362,7 @@ test("dm-resume", async ({ devices, baseURL: origin }, testInfo) => {
       { key: original.key, queued, entry },
     );
     await device.setViewportSize({ width, height: 900 });
-    if (entry === "account")
-      await resumeFromAccount(device, firstCode, "Resume");
+    if (entry === "account") await resumeSaved();
     else {
       await visit(device, "/");
       await device
@@ -385,12 +407,11 @@ test("dm-resume", async ({ devices, baseURL: origin }, testInfo) => {
           ],
         }),
       );
-      localStorage.setItem("quire.campaign.v1", "audit-unowned-gate");
     },
     { key: original.key, queued },
   );
   await visit(device, "/account");
-  await resumeFromAccount(device, firstCode, "Resume");
+  await resumeSaved();
   await visit(device, "/account");
   await expect(
     device.getByRole("heading", { name: "Device recovery copies" }),
@@ -723,12 +744,10 @@ test("campaign-choice", async ({ devices, baseURL: origin }, testInfo) => {
     .click();
   await expect.poll(() => blocked).toBe(1);
   await expect(
-    desktop
-      .getByRole("alert")
-      .filter({
-        hasText:
-          "Room saved to your account, but its display name could not be updated",
-      }),
+    desktop.getByRole("alert").filter({
+      hasText:
+        "Room saved to your account, but its display name could not be updated",
+    }),
   ).toBeVisible();
   const secondCode = await desktop.locator(".room-code").innerText();
   expect(secondCode).not.toBe(firstCode);

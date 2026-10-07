@@ -176,14 +176,13 @@ try {
     await a.page.waitForLoadState("networkidle");
   }
   const guestContext=await browser.newContext({viewport:{width:390,height:844}});
-  await guestContext.addInitScript(()=>localStorage.setItem("quire.guide.offer.v3","seen"));
+  await guestContext.addInitScript((code) => {
+    localStorage.setItem("quire.guide.offer.v3", "seen");
+    sessionStorage.setItem("lootsplit.player.reconnect.v1", JSON.stringify({ code, seatId: "guest", token: "guest-token", role: "player", purseIds: ["hero"] }));
+  }, code);
   const guestPage=await guestContext.newPage();
   guestPage.guestAccessAudit=true;
   await openApplication(guestPage,origin+"/?as=player");
-  await Promise.all([
-    guestPage.waitForNavigation({waitUntil:"domcontentloaded"}),
-    guestPage.evaluate(async code=>(await import("/src/lib/quire/cloud-client.ts")).resumeAccountMembership({userId:"",code,seatId:"guest",token:"guest-token",role:"player",purseIds:["hero"],name:"Guest feature fixture"}),code).catch(e=>{if(!e.message.includes("Execution context was destroyed"))throw e;})
-  ]);
   await guestPage.getByRole("heading",{name:"Home",exact:true}).waitFor();
   await expect(guestPage.getByRole("region",{name:"Player features",exact:true}).getByRole("link")).toHaveText(["Character Sheet", "Bank", "My Finances", "Properties", "Journal", "Party chat"]);
   await expect(guestPage.locator('.shortcut-grid a[href^="/features/bank?"]')).toBeVisible();
@@ -528,3 +527,4 @@ try {
   db.close();
   await browser.close();
 }
+

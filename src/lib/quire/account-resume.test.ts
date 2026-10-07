@@ -3,7 +3,11 @@ import assert from "node:assert/strict";
 import { reconcileAccountResume, type ResumeCache } from "./account-resume.ts";
 import type { Command } from "./commands.ts";
 
-const command = (id: string) => ({ id, kind: "patch", changes: [] }) as Command;
+const command = (id: string): Extract<Command, { kind: "patch" }> => ({
+  id,
+  kind: "patch",
+  changes: [],
+});
 const cache = (ids = ["local"]): ResumeCache => ({
   code: "TEST",
   token: "token",
@@ -109,10 +113,10 @@ test("a device revision newer than the server requires a separate recovery copy"
   );
 });
 test("conflicting versions of the same draft command require separate recovery", () => {
-  const draft = {
+  const draft: Command = {
     ...command("local"),
-    changes: [{ table: "purses" }],
-  } as Command;
+    changes: [{ store: "purses", id: "changed", before: null, after: null }],
+  };
   assert.equal(
     reconcileAccountResume(cache(), remote([], [draft]), identity, "new")
       .needsRecovery,

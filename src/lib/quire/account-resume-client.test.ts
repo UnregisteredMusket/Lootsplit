@@ -149,7 +149,10 @@ test("unrelated campaign pending work blocks switching without changing either c
   assert.equal(h.selected(), false);
 });
 test("changed cached seat is archived without replay under authenticated seat", async () => {
-  const h = harness({ cached: { ...saved, seatId: "old-seat" } });
+  const h = harness({
+    cached: { ...saved, seatId: "old-seat" },
+    current: { ...saved, seatId: "old-seat" },
+  });
   await h.resume();
   assert.deepEqual(JSON.parse(h.values.get(h.key)!).pending, []);
   const recovery = JSON.parse(
