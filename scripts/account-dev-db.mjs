@@ -18,6 +18,16 @@ export function localAccountDb(filename = ":memory:") {
   }
   function prepare(sql) {
     let params = [];
+    // Keep the actual SQLite write synchronous. A batch must not yield between
+    // BEGIN and COMMIT, allowing another request to enter the same connection.
+    const run = () => {
+      const result = sqlite.prepare(sql).run(...params);
+      return {
+        success: true,
+        results: [],
+        meta: { changes: Number(result.changes), last_row_id: Number(result.lastInsertRowid) },
+      };
+    };
     return {
       bind(...args) {
         params = args;
@@ -44,13 +54,9 @@ export function localAccountDb(filename = ":memory:") {
           .map((row) => Object.values(row));
       },
       async run() {
-        const result = sqlite.prepare(sql).run(...params);
-        return {
-          success: true,
-          results: [],
-          meta: { changes: Number(result.changes), last_row_id: Number(result.lastInsertRowid) },
-        };
+        return run();
       },
+      runSync: run,
     };
   }
   return {
@@ -60,7 +66,7 @@ export function localAccountDb(filename = ":memory:") {
       sqlite.exec("BEGIN");
       try {
         const results = [];
-        for (const statement of statements) results.push(await statement.run());
+        for (const statement of statements) results.push(statement.runSync());
         sqlite.exec("COMMIT");
         return results;
       } catch (error) {

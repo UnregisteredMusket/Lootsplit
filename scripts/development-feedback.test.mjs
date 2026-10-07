@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { accountScenarios, selectAccountScenario, localAuditOrigin } from "./account-scenarios.mjs";
+import { accountScenarios, selectAccountScenario, localAuditOrigin, externalAuditRequests } from "./account-scenarios.mjs";
 
 test("focused selection refuses unknown names and cannot narrow CI release coverage", () => {
   assert.equal(selectAccountScenario([], "true"), null);
@@ -29,6 +29,27 @@ test("destructive account audits refuse production and ambiguous target URLs", (
     "http://localhost:8080?url=remote",
   ])
     assert.throws(() => localAuditOrigin(origin));
+});
+
+test("account network isolation intercepts external origins without routing local modules", () => {
+  const external = externalAuditRequests("http://127.0.0.1:8080");
+  for (const local of [
+    "http://127.0.0.1:8080",
+    "http://127.0.0.1:8080/",
+    "http://127.0.0.1:8080/node_modules/.vite/deps/react.js?v=123",
+    "http://127.0.0.1:8080/api/account/library",
+  ]) assert.equal(external.test(local), false, local);
+  for (const other of [
+    "https://127.0.0.1:8080/",
+    "http://127.0.0.1:8081/",
+    "http://127.0.0.1:80801/",
+    "http://127.0.0.1:8080.example.com/",
+    "http://127.0.0.1.example.com:8080/",
+    "http://localhost:8080/",
+    "https://example.com/",
+  ]) assert.equal(external.test(other), true, other);
+  assert.equal(externalAuditRequests("http://localhost:8080").test("http://localhost:8080/src/router.tsx"), false);
+  assert.throws(() => externalAuditRequests("https://example.com"));
 });
 
 test("account release audit retains all independent scenarios and failure evidence", () => {

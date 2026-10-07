@@ -2,7 +2,7 @@ import type { CloudTable, CloudSeat } from "./cloud.ts";
 import { canReadNote } from "./chat-visibility.ts";
 import { characterSheet } from "../characters/campaign-sheet.mjs";
 import { readFinance } from "./finance.ts";
-import { readJournal } from "./journal.ts";
+import { readJournal, readJournalForRecords, readArchivedSnapshot } from "./journal.ts";
 
 /** All report projections happen on the server before delivery. */
 export function projectRecord(
@@ -12,7 +12,7 @@ export function projectRecord(
   const t = structuredClone(table);
   const dm = seat.role === "dm";
   t.notes = t.notes.filter((n) => canReadNote(n, seat));
-  t.journal = readJournal(t.journal);
+  t.journal = readJournalForRecords(t.journal);
   t.journal.entries = t.journal.entries?.filter(
     (e) =>
       e.visibility === "party" ||
@@ -20,7 +20,10 @@ export function projectRecord(
   );
   t.journal.reports = t.journal.reports
     ?.filter((r) => !r.seatIds || (seat.id && r.seatIds.includes(seat.id)))
-    .map((r) => ({ ...r, snapshot: JSON.stringify(projectRecord(JSON.parse(r.snapshot), seat)) }));
+    .map((r) => {
+      try { return { ...r, snapshot: JSON.stringify(projectRecord(readArchivedSnapshot(r.snapshot), seat)) }; }
+      catch { return { ...r, snapshot: JSON.stringify({ purses: [], holdings: [], shops: [], stock: [], ledger: [], notes: [], sheets: [], loans: [], listings: [] }), error: "This archived report cannot be read. Keep its original backup for recovery." }; }
+    });
   t.journal.editReports = t.journal.editReports?.filter(
     (r) => dm || seat.purseIds.includes(r.purseId),
   );

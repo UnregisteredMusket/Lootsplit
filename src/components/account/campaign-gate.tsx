@@ -18,6 +18,7 @@ import {
   subscribeCloudTable,
   getCloudTable,
   getServerCloudTable,
+  refreshRecoveryVisibility,
 } from "@/lib/quire/cloud-client";
 import { Button } from "@/components/ui";
 import { DeviceRecovery } from "./device-recovery";
@@ -84,6 +85,7 @@ export function CampaignGate({ children }: { children: ReactNode }) {
         sessionStorage.removeItem("lootsplit.verified-account");
         localStorage.removeItem("lootsplit.offline-owner");
       }
+      refreshRecoveryVisibility();
       const owned = !!(next && owner === next.user.id) || !!offlineOwner;
       setEphemeralCampaign(!!ticket || !owned);
       if (!owned || ticket)

@@ -1,6 +1,8 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { handleEncounters } from "../cloudflare/encounters.mjs";
+import { closeRoom } from "../src/lib/quire/cloud.server.ts";
+import { resumeCampaignMembership } from "../cloudflare/account-campaigns.mjs";
 import {
   blankEncounter,
   blankCombatant,
@@ -368,4 +370,51 @@ test('encounter listing uses bounded queries and preserves seat authorization ac
   const player=await handleEncounters(db,'player','encounters');
   assert.deepEqual(player.campaigns.map(c=>c.code),['personal']);
   assert.deepEqual(player.encounters,[]);
+});
+
+test("closed campaign encounters remain readable but reject every write and roll", async () => {
+  const {db,call,id,room}=await fixture();
+  try {
+    const e=blankEncounter();e.coins.gp=7;e.coinPurseId="hero";
+    await call("dm","/save",{id,revision:0,encounter:e});
+    await call("dm","/conclude",{id,revision:1});
+    globalThis.__env__={DB:db};
+    await closeRoom({code:room.code,token:"dm-token"});
+    delete globalThis.__env__;
+    assert.equal((await call("dm","/detail",{id})).status,"review");
+    assert.equal((await call("dm","/detail",{id})).readOnly,true);
+    assert.equal((await call("dm","")).campaigns.find(c=>c.code===room.code).closed,true);
+    assert.equal((await call("dm","/log",{id})).rolls.length,0);
+    for(const path of ["/save","/start","/conclude","/award","/roll"])
+      await assert.rejects(call("dm",path,{id,revision:2,encounter:e,formula:"1d20",manual:true,total:10,requestKey:crypto.randomUUID()}),error=>error.status===403);
+    await assert.rejects(call("dm","/create",{id:crypto.randomUUID(),code:room.code}),error=>error.status===403);
+    assert.equal(await db.prepare("SELECT * FROM dm_encounter_awards WHERE encounter_id=?").bind(id).first(),null);
+    assert.equal((await call("dm","/log",{id})).rolls.length,0);
+    const after=JSON.parse((await db.prepare("SELECT body FROM campaign_rooms WHERE code=?").bind(room.code).first()).body);
+    assert.equal(after.table.purses.find(p=>p.id==="hero").coins.gp,0);
+    const privateId=crypto.randomUUID();await call("dm","/create",{id:privateId,code:"personal"});
+    assert.equal((await call("dm","/roll",{id:privateId,revision:0,formula:"1d20",manual:true,total:10,requestKey:crypto.randomUUID()})).total,10);
+    assert.equal(after.closed,true);
+    await resumeCampaignMembership(db,"dm",{code:room.code,reopen:true,revision:after.revision});
+    assert.ok((await call("dm","/award",{id,revision:2})).award);
+  } finally {delete globalThis.__env__;db.close();}
+});
+
+test("lost normal and weighted roll responses recover receipts after newer saves and conclusion", async () => {
+  const {db,call,id}=await fixture();
+  try {
+    const e=blankEncounter();e.tables=[{id:"cache",name:"Cache",entries:[{weight:1,loot:blankLoot()}],selected:0}];
+    await call("dm","/save",{id,revision:0,encounter:e});
+    const normal={id,revision:1,formula:"1d20",manual:true,total:10,requestKey:crypto.randomUUID()};
+    const weighted={id,revision:1,tableId:"cache",requestKey:crypto.randomUUID()};
+    const one=await call("dm","/roll",normal),two=await call("dm","/roll",weighted);
+    e.notes="Another device";await call("dm","/save",{id,revision:1,encounter:e});
+    await call("dm","/conclude",{id,revision:2});
+    assert.deepEqual(await call("dm","/roll",normal),one);
+    assert.deepEqual(await call("dm","/roll",weighted),two);
+    await assert.rejects(call("dm","/roll",{...normal,requestKey:crypto.randomUUID()}),error=>error.status===409);
+    assert.equal((await call("dm","/log",{id})).rolls.length,2);
+    await db.prepare("UPDATE library_members SET token='revoked' WHERE user_id='dm'").run();
+    await assert.rejects(call("dm","/roll",normal),error=>error.status===403);
+  } finally {db.close();}
 });

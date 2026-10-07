@@ -1,4 +1,5 @@
 import type { Command } from "./commands.ts";
+import { sameCommand } from "./command-identity.ts";
 
 export type ResumeCache = {
   code: string;
@@ -41,7 +42,7 @@ export function reconcileAccountResume(
   const known = new Set(pending.map((c) => c.id));
   const conflict = local.some((c) =>
     pending.some(
-      (d) => d.id === c.id && JSON.stringify(d) !== JSON.stringify(c),
+      (d) => d.id === c.id && !sameCommand(d, c),
     ),
   );
   for (const command of local)

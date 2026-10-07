@@ -2,8 +2,8 @@ import { playSound } from "./sound.ts";
 import { rememberSave, listSaves } from "./saves.ts";
 import { subscribeSheetChanges, readPartySheetLinks } from "./party-sheet-links.ts";
 import { type Journal } from "./journal.ts";
-import { applyCommand, type CommandInput } from "./commands.ts";
-import { economySnapshot, economyView, applyCloudTable, executeFinanceCommand } from "./economy.ts";
+import { type CommandInput } from "./commands.ts";
+import { economyView, executeLocalCommand, executeFinanceCommand } from "./economy.ts";
 import { loadSeatLock, passwordMatches } from "./lock.ts";
 import {
   createContext,
@@ -436,13 +436,7 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
           await reload();
           return;
         }
-        const sitting = getSeat();
-        const next = applyCommand(
-          await economySnapshot(),
-          { id: "local", token: "", name: "Local", role: sitting.role, purseIds: sitting.purseIds },
-          { ...input, id: crypto.randomUUID() },
-        );
-        await applyCloudTable(next);
+        await executeLocalCommand(input);
         await reload();
       },
       ready,

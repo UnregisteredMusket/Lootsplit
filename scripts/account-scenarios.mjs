@@ -9,6 +9,7 @@ export const accountScenarios = [
   "campaign-choice",
   "invitations",
   "ownership",
+  "shared-recovery",
 ];
 
 export function selectAccountScenario(args, ci = process.env.CI) {
@@ -41,4 +42,10 @@ export function localAuditOrigin(value) {
       "Account audits require a disposable local HTTP server with an explicit port.",
     );
   return url.origin;
+}
+
+/** Intercept only requests outside this disposable server, never every Vite module. */
+export function externalAuditRequests(value) {
+  const origin = localAuditOrigin(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`^(?!${origin}(?:/|$))`);
 }

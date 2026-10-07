@@ -1,13 +1,17 @@
 import assert from "node:assert/strict";
+import { blankEncounter } from "../../src/lib/encounters/model.mjs";
+import { readFile } from "node:fs/promises";
 import {
   test,
   expect,
   visit as visitPage,
+  navigateAccountScenario,
   credentials,
   signedInDevices,
   accountPost,
   createAndSaveRoom,
   endSession,
+  waitForDmCampaign,
 } from "./account-fixtures.mjs";
 import {
   continueIntoApp,
@@ -88,7 +92,7 @@ test("library", async ({ devices, baseURL: origin }, testInfo) => {
   assert.equal(key.length, 64);
   await page.getByRole("button", { name: "I have saved it" }).click();
   await prepareDmFixture(page, origin);
-  await visit(page, "/account");
+  await navigateAccountScenario(page, origin, "/account");
   console.log("Account audit: character and backup");
   await page
     .getByLabel("Character name", { exact: true })
@@ -132,7 +136,7 @@ test("library", async ({ devices, baseURL: origin }, testInfo) => {
     fullPage: true,
   });
   await prepareDmFixture(other, origin);
-  await visit(other, "/account");
+  await navigateAccountScenario(other, origin, "/account");
   console.log("Account audit: restore into new campaign");
   other.on("dialog", (d) => d.accept());
   await other
@@ -148,9 +152,9 @@ test("library", async ({ devices, baseURL: origin }, testInfo) => {
       () => JSON.parse(localStorage.getItem("quire.campaigns.v1")).length >= 2,
     ),
   );
-  await visit(other, "/account");
+  await navigateAccountScenario(other, origin, "/account");
   console.log("Account audit: shared membership resumes on another device");
-  await visit(other, "/share");
+  await navigateAccountScenario(other, origin, "/share");
   const skip = other.getByRole("button", { name: "Not now", exact: true });
   if (await skip.isVisible()) await skip.click();
   await other
@@ -160,7 +164,7 @@ test("library", async ({ devices, baseURL: origin }, testInfo) => {
   await other
     .getByRole("button", { name: "Share join link", exact: true })
     .waitFor();
-  await visit(other, "/account");
+  await navigateAccountScenario(other, origin, "/account");
   await other
     .getByRole("button", { name: "Save current membership", exact: true })
     .click();
@@ -186,9 +190,9 @@ test("library", async ({ devices, baseURL: origin }, testInfo) => {
 
 test("dm-resume", async ({ devices, baseURL: origin }, testInfo) => {
   const { page } = devices;
-  const visit = (p, path) => visitPage(p, origin, path);
+  const visit = (p, path) => navigateAccountScenario(p, origin, path);
   const { other } = await signedInDevices(devices, origin);
-  const firstCode = (await createAndSaveRoom(other, origin))[0].code;
+  const firstCode = (await createAndSaveRoom(other, origin, navigateAccountScenario))[0].code;
   await visit(page, "/account");
   // Simulate navigation/storage interruption during the first account campaign
   // hydration. Its durable revision must remain old so a reload repairs the copy.
@@ -223,18 +227,19 @@ test("dm-resume", async ({ devices, baseURL: origin }, testInfo) => {
   await page.evaluate(() =>
     sessionStorage.setItem("audit-allow-hydration", "yes"),
   );
-  await visit(page, "/share");
+  // Deliberately reload after the interrupted IndexedDB hydration above.
+  await visitPage(page, origin, "/share");
   await expect(
     page.getByRole("button", {
       name: "Dungeon master. Change role.",
       exact: true,
     }),
   ).toBeVisible();
-  await endSession(page, origin);
-  const saved = await createAndSaveRoom(page, origin);
+  await endSession(page, origin, navigateAccountScenario);
+  const saved = await createAndSaveRoom(page, origin, navigateAccountScenario);
   assert.equal(saved.length, 2);
   const secondCode = saved.find((m) => m.code !== firstCode).code;
-  await endSession(page, origin);
+  await endSession(page, origin, navigateAccountScenario);
   for (const [p, width] of [
     [page, 390],
     [other, 1360],
@@ -257,19 +262,17 @@ test("dm-resume", async ({ devices, baseURL: origin }, testInfo) => {
     });
   }
   async function resumeFromAccount(p, code, label) {
-    await visit(p, "/account");
+    // The card-layout checks already loaded both libraries. Reuse that ready
+    // account page; later cross-room resumes still navigate here from the desk.
+    if (new URL(p.url()).pathname !== "/account") await visit(p, "/account");
+    await expect(p.getByRole("button", { name: "Sign out", exact: true })).toBeVisible();
     const card = p.locator("article.portal-card").filter({ hasText: code });
     const acceptSeparate = (dialog) => dialog.accept();
     p.on("dialog", acceptSeparate);
     await card.getByRole("button", { name: label, exact: true }).click();
     await p.waitForURL((url) => url.origin === origin && url.pathname === "/");
     p.off("dialog", acceptSeparate);
-    await p
-      .getByRole("button", {
-        name: "Dungeon master. Change role.",
-        exact: true,
-      })
-      .waitFor();
+    await waitForDmCampaign(p);
     assert.equal(
       await p.locator(".loot-opening").count(),
       0,
@@ -295,9 +298,12 @@ test("resume-queue", async ({ devices, baseURL: origin }, testInfo) => {
   devices.page.guestAccessAudit = true;
   const { other: device } = await signedInDevices(devices, origin);
   const visit = (p, path) => visitPage(p, origin, path);
-  const firstCode = (await createAndSaveRoom(device, origin))[0].code;
+  const firstCode = (await createAndSaveRoom(device, origin, navigateAccountScenario))[0].code;
   async function resumeSaved() {
-    await visit(device, "/account");
+    // Every caller has deliberately loaded the library, including the reloads
+    // after injecting stored queues. Do not add another unrelated document load.
+    expect(new URL(device.url()).pathname).toBe("/account");
+    await expect(device.getByRole("button", { name: "Sign out", exact: true })).toBeVisible();
     const card = device
       .locator("article.portal-card")
       .filter({ hasText: firstCode });
@@ -305,18 +311,13 @@ test("resume-queue", async ({ devices, baseURL: origin }, testInfo) => {
     await device.waitForURL(
       (url) => url.origin === origin && url.pathname === "/",
     );
-    await device
-      .getByRole("button", {
-        name: "Dungeon master. Change role.",
-        exact: true,
-      })
-      .waitFor();
+    await waitForDmCampaign(device);
     expect(await device.locator(".loot-opening").count()).toBe(0);
   }
   await resumeSaved();
   // A lost Live response must remain recoverable, then an acknowledged stale
   // queue must open from both account cards and the startup selector.
-  await visit(device, "/account");
+  await navigateAccountScenario(device, origin, "/account");
   const original = await device.evaluate(() => {
     const key = `quire.cloud.v2.${localStorage.getItem("quire.campaign.v1")}`;
     return { key, session: JSON.parse(localStorage.getItem(key)) };
@@ -331,7 +332,7 @@ test("resume-queue", async ({ devices, baseURL: origin }, testInfo) => {
     { key: original.key, queued },
   );
   await resumeSaved();
-  await visit(device, "/share");
+  await navigateAccountScenario(device, origin, "/share");
   await device.getByRole("button", { name: /^Connection & recovery/ }).click();
   await expect(device.getByText(/1 unsynced Live change/)).toBeVisible();
   const download = device.waitForEvent("download");
@@ -491,8 +492,9 @@ test("portrait-resume", async ({ devices, baseURL: origin }) => {
   let portrait = await card.locator(".portrait-picker img").getAttribute("src");
   expect(portrait).toMatch(/^data:image/);
   const sheetPath = `/characters?id=${encodeURIComponent(`party:${id.slice(6)}`)}`;
-  async function expectPartyPortrait(page, expected) {
-    await visitPage(page, origin, "/party?section=characters");
+  async function expectPartyPortrait(page, expected, reload = false) {
+    const navigate = reload ? visitPage : navigateAccountScenario;
+    await navigate(page, origin, "/party?section=characters");
     const profile = page.locator("article.party-profile").filter({
       has: page
         .getByRole("link", { name: "Open sheet", exact: true })
@@ -504,10 +506,11 @@ test("portrait-resume", async ({ devices, baseURL: origin }) => {
       .poll(() => image.evaluate((img) => img.naturalWidth))
       .toBeGreaterThan(0);
   }
-  await expectPartyPortrait(phone, portrait);
-  const [member] = await createAndSaveRoom(phone, origin);
+  // A fresh document proves the first device-local portrait persisted in IDB.
+  await expectPartyPortrait(phone, portrait, true);
+  const [member] = await createAndSaveRoom(phone, origin, navigateAccountScenario);
 
-  await visitPage(desktop, origin, "/account");
+  await navigateAccountScenario(desktop, origin, "/account");
   await desktop.getByRole("button", { name: "Resume", exact: true }).click();
   await desktop.waitForURL((url) => url.pathname === "/");
   await continueIntoApp(desktop);
@@ -515,7 +518,7 @@ test("portrait-resume", async ({ devices, baseURL: origin }) => {
 
   // The full character sheet has a separate upload/save path. Verify its saved
   // portrait in the actual Party cards on both devices and the server readout.
-  await visitPage(phone, origin, sheetPath);
+  await navigateAccountScenario(phone, origin, sheetPath);
   await phone.getByRole("button", { name: "Edit sheet", exact: true }).click();
   await phone
     .getByRole("button", { name: "Character details", exact: true })
@@ -543,7 +546,7 @@ test("portrait-resume", async ({ devices, baseURL: origin }) => {
   );
   expect(sheetSaved.body.portrait).toBe(portrait);
   await expectPartyPortrait(desktop, portrait);
-  await visitPage(desktop, origin, "/party?section=funds");
+  await navigateAccountScenario(desktop, origin, "/party?section=funds");
   const restored = desktop.locator(`#${id}`);
   await restored.locator(":scope > summary").click();
   await expect(restored.locator(".portrait-picker img")).toHaveAttribute(
@@ -560,7 +563,7 @@ test("portrait-resume", async ({ devices, baseURL: origin }) => {
 
   // A phone can render its optimistic local portrait even when the upload fails.
   // Account linking must not promise another device can see those pending edits.
-  await visitPage(phone, origin, "/party?section=funds");
+  await navigateAccountScenario(phone, origin, "/party?section=funds");
   await phone.locator(`#${id} > summary`).click();
   const replacement = await phone.evaluate(() => {
     const c = document.createElement("canvas");
@@ -602,6 +605,7 @@ test("portrait-resume", async ({ devices, baseURL: origin }) => {
     portrait,
   );
   portrait = pendingPortrait;
+  // The failed upload must retain its pending command across a document reload.
   await visitPage(phone, origin, "/account");
   await phone
     .getByRole("button", { name: "Save current membership", exact: true })
@@ -624,14 +628,14 @@ test("portrait-resume", async ({ devices, baseURL: origin }) => {
     "src",
     portrait,
   );
-  await endSession(desktop, origin);
-  await visitPage(desktop, origin, "/account");
+  await endSession(desktop, origin, navigateAccountScenario);
+  await navigateAccountScenario(desktop, origin, "/account");
   await desktop
     .getByRole("button", { name: "Reopen as DM", exact: true })
     .click();
   await desktop.waitForURL((url) => url.pathname === "/");
   await continueIntoApp(desktop);
-  await visitPage(desktop, origin, "/party?section=funds");
+  await navigateAccountScenario(desktop, origin, "/party?section=funds");
   await desktop.locator(`#${id} > summary`).click();
   await expect(desktop.locator(`#${id} .portrait-picker img`)).toHaveAttribute(
     "src",
@@ -640,7 +644,7 @@ test("portrait-resume", async ({ devices, baseURL: origin }) => {
   expect(member.role).toBe("dm");
 
   // Saving account membership must not silently commit or end a turn.
-  await visitPage(desktop, origin, "/share");
+  await navigateAccountScenario(desktop, origin, "/share");
   await expect(
     desktop.getByRole("button", { name: "Live", exact: true }),
   ).toHaveAttribute("aria-pressed", "true");
@@ -654,7 +658,7 @@ test("portrait-resume", async ({ devices, baseURL: origin }) => {
   await expect(
     desktop.getByRole("button", { name: "Turn-based", exact: true }),
   ).toHaveAttribute("aria-pressed", "true");
-  await visitPage(desktop, origin, "/party?section=funds");
+  await navigateAccountScenario(desktop, origin, "/party?section=funds");
   await desktop.locator(`#${id} > summary`).click();
   await desktop
     .locator(`#${id} .portrait-picker input[type=file]`)
@@ -671,7 +675,7 @@ test("portrait-resume", async ({ devices, baseURL: origin }) => {
       },
     ),
   ).toBeVisible();
-  await visitPage(desktop, origin, "/account");
+  await navigateAccountScenario(desktop, origin, "/account");
   await desktop
     .getByRole("button", { name: "Save current membership", exact: true })
     .click();
@@ -1043,13 +1047,14 @@ test("ownership", async ({ devices, baseURL: origin }, testInfo) => {
   await expect(dm.getByText("Campaign control", { exact: true })).toBeVisible();
   const guide = dm.getByRole("button", { name: "Not now", exact: true });
   if (await guide.isVisible()) await guide.click();
+  // Reload after the explicit legacy claim to prove ownership and bytes persist.
   await visitPage(dm, origin, "/party");
   await expect(
     dm.getByText("Preserved legacy hero", { exact: true }).first(),
   ).toBeVisible();
-  const members = await createAndSaveRoom(dm, origin);
+  const members = await createAndSaveRoom(dm, origin, navigateAccountScenario);
   const code = members[0].code;
-  await visitPage(dm, origin, "/share");
+  await navigateAccountScenario(dm, origin, "/share");
   await dm.evaluate(() =>
     Object.defineProperty(navigator, "share", {
       configurable: true,
@@ -1088,14 +1093,14 @@ test("ownership", async ({ devices, baseURL: origin }, testInfo) => {
     path: testInfo.outputPath("guest-memory-mobile.png"),
     fullPage: true,
   });
-  await endSession(dm, origin);
+  await endSession(dm, origin, navigateAccountScenario);
   await expect(guest.locator(".room-code")).toBeHidden();
   expect(
     await guest.evaluate(() =>
       sessionStorage.getItem("lootsplit.player.reconnect.v1"),
     ),
   ).toBeNull();
-  await visitPage(dm, origin, "/account");
+  await navigateAccountScenario(dm, origin, "/account");
   await dm.getByRole("button", { name: "Reopen as DM", exact: true }).click();
   await dm.waitForURL((u) => u.pathname === "/");
   await continueIntoApp(dm);
@@ -1110,7 +1115,7 @@ test("ownership", async ({ devices, baseURL: origin }, testInfo) => {
   ).toBeVisible();
   const returning = credentials();
   await accountPost(guest.context(), origin, "auth/sign-up/email", returning);
-  await visitPage(dm, origin, "/share");
+  await navigateAccountScenario(dm, origin, "/share");
   await dm.evaluate(() =>
     Object.defineProperty(navigator, "share", {
       configurable: true,
@@ -1153,4 +1158,55 @@ test("ownership", async ({ devices, baseURL: origin }, testInfo) => {
   await secondPlayer.reload();
   await continueIntoApp(secondPlayer);
   await expect(secondPlayer.locator(".room-code")).toHaveText(code);
+});
+
+test("shared-recovery", async ({ devices, baseURL: origin }, testInfo) => {
+  const { page } = devices;
+  await signedInDevices(devices, origin);
+  await prepareDmFixture(page, origin);
+  const [member] = await createAndSaveRoom(page, origin, navigateAccountScenario);
+  const encounter = blankEncounter();
+  encounter.name = "Complete shared recovery";
+  encounter.notes = "Encounter notes survive deletion and shared recovery.";
+  const encounterId = crypto.randomUUID();
+  await accountPost(page.context(), origin, "encounters/create", { id: encounterId, code: member.code, encounter });
+  await accountPost(page.context(), origin, "encounters/roll", { id: encounterId, revision: 0, formula: "1d20", manual: true, total: 12, requestKey: crypto.randomUUID() });
+  await page.setViewportSize({ width: 390, height: 900 });
+  page.once("dialog", dialog => dialog.accept(member.code));
+  await page.getByRole("button", { name: "Delete shared campaign", exact: true }).click();
+  await expect(page.getByRole("status").filter({ hasText: "Shared campaign deleted" })).toBeVisible();
+  const restore = page.getByRole("button", { name: "Restore shared records", exact: true });
+  await expect(restore).toBeVisible();
+  page.once("dialog", dialog => dialog.accept());
+  await restore.click();
+  await page.waitForURL(url => url.pathname === "/");
+  await expect(page.getByText("Campaign control", { exact: true })).toBeVisible();
+  await expect(page.locator(".loot-opening")).toHaveCount(0);
+  const libraryResponse = await page.context().request.get(origin + "/api/account/library");
+  expect(libraryResponse.ok()).toBeTruthy();
+  const library = await libraryResponse.json();
+  const restored = library.members.find(m => m.has_recovery);
+  assert.ok(restored);
+  assert.notEqual(restored.code, member.code);
+  assert.equal(library.backups.length, 1, "The complete private backup stays available after restoration");
+  await navigateAccountScenario(page, origin, "/encounters");
+  await page.getByLabel("Save in", { exact: true }).selectOption(restored.code);
+  await page.getByRole("button", { name: /Complete shared recovery/ }).click();
+  await expect(page.getByRole("heading", { name: "Complete shared recovery", exact: true })).toBeVisible();
+  await page.getByRole("button", { name: "Builder & generator", exact: true }).click();
+  await expect(page.getByLabel(/Scene & DM notes/)).toHaveValue(encounter.notes);
+  await page.getByRole("button", { name: "Roll history", exact: true }).click();
+  await expect(page.locator(".encounter-rolls")).toContainText("12");
+  await page.screenshot({ path: testInfo.outputPath("shared-recovery-mobile.png"), fullPage: true });
+  await navigateAccountScenario(page, origin, "/account");
+  await page.setViewportSize({ width: 1280, height: 900 });
+  const downloaded = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Download recovery records", exact: true }).click();
+  const download = await downloaded;
+  const records = JSON.parse(await readFile(await download.path(), "utf8"));
+  assert.equal(records.records.sourceCode, member.code);
+  assert.equal(records.records.encounters[0].body.notes, encounter.notes);
+  assert.equal(records.records.encounterRolls[0].body.total, 12);
+  await page.screenshot({ path: testInfo.outputPath("shared-recovery-desktop.png"), fullPage: true });
+  assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1));
 });

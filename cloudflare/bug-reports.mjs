@@ -1,4 +1,4 @@
-import { roleOf } from "./members.mjs";
+import { roleOf, staffCommitGuard } from "./members.mjs";
 const statuses = ["new", "reviewing", "planned", "fixed", "closed"];
 const areas = [
   "general",
@@ -119,7 +119,7 @@ export async function bugReportDetail(db, userId, id) {
     .all();
   return { ...row, diagnostics: JSON.parse(row.diagnostics), history: history.results };
 }
-export async function updateBugReport(db, userId, body) {
+export async function updateBugReport(db, userId, body, sessionId) {
   if (!(await staff(db, userId))) fail("Owner or administrator access is required.", 403);
   const id = text(body.id, 80, true),
     response = text(body.response, 2000);
@@ -132,12 +132,13 @@ export async function updateBugReport(db, userId, body) {
     fail("Invalid report update.");
   const marker = crypto.randomUUID(),
     now = Date.now();
+  const guard = await staffCommitGuard(db, userId, sessionId, ["owner", "admin"]);
   const result = await db.batch([
     db
       .prepare(
-        "UPDATE bug_reports SET status=?,priority=?,response=?,revision=revision+1,last_action=?,updated_at=? WHERE id=? AND revision=?",
+        `UPDATE bug_reports SET status=?,priority=?,response=?,revision=revision+1,last_action=?,updated_at=? WHERE id=? AND revision=? AND ${guard.sql}`,
       )
-      .bind(body.status, body.priority, response, marker, now, id, body.revision),
+      .bind(body.status, body.priority, response, marker, now, id, body.revision, ...guard.binds),
     db
       .prepare(
         "INSERT INTO bug_report_audit(id,report_id,actor_id,status,priority,response,created_at,revision) SELECT last_action,id,?,status,priority,response,updated_at,revision FROM bug_reports WHERE id=? AND last_action=?",

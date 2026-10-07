@@ -28,6 +28,7 @@ Account scenario mapping:
 | `campaign-choice` | Automatic membership linking, explicit separate-room creation, retry of failed linking without creating another room, duplicate-name warning and deliberate older-room resume |
 | `invitations` | Copy the real player invite in a shared room; verify its room and character, existing-session conflict, same-document navigation, explicit switching and confirmed destination |
 | `ownership` | Anonymous gate, legacy save claim, guest memory/reconnect, expired links, account-player cross-device resume, and tab closure without ending the session |
+| `shared-recovery` | Shared campaign deletion, complete private recovery, fresh DM-only view-only restoration, encounter and character history, retry after interruption |
 
 Portrait sync verification must exercise the real upload → room creation → account save → second-device resume path. Also interrupt an upload: a local preview or a saved membership is not proof the image reached the server. Preserve pending commands and their retry IDs; never repair sync by overwriting the whole room from one device.
 
@@ -108,4 +109,3 @@ Feature navigation is presentation over the existing economy/session services. K
 Account shortcut API/storage requires additive migration0010. Preserve user/role isolation, revision conflicts and readonly DM offline fallback; never store guest campaign data in preference caches. Repayment and property-description commands require server ownership checks, and property edits must preserve financial fields under concurrent changes. Finance projections expose only assigned loans/rules, never another character’s debt or downtime quotes.
 
 Related checks: accounts/finance/room-store regressions; finance, control-panel, library-navigation, character and campaign-governance browser audits. Governance exercises real player repayment/property edits and fixed player buttons; control-panel coverage retains DM account shortcut persistence. Preserve complete release gates, migration review and separate Android signing/publication requirements. Foreclosure or special acquisition rules require a separate gameplay decision.
-

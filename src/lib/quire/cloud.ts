@@ -1,4 +1,4 @@
-import { readJournal, preserveJournalMetadata, type Journal } from "./journal.ts";
+import { readJournal, readValidatedJournal, preserveJournalMetadata, type Journal } from "./journal.ts";
 import { validateEconomyRows } from "./validation.ts";
 import { clampRealm } from "./scale.ts";
 import type { RealmSettings } from "./types.ts";
@@ -49,6 +49,9 @@ export type CloudRoom = {
   table: CloudTable;
   seen: CloudSeen;
   commands?: string[];
+  /** Optional content receipts; old rooms retain their existing ID receipts. */
+  commandHashes?: Record<string, string>;
+  batchHashes?: Record<string, string>;
   batches?: string[];
   closed?: boolean;
   viewOnly?: boolean;
@@ -85,6 +88,14 @@ export function readCloudTable(value: unknown): CloudTable | null {
     notes: readNotes(table.notes),
     handouts: readHandouts(table.handouts),
   };
+}
+
+/** Import/create boundary; runtime readers preserve damaged legacy archives for recovery. */
+export function readCloudTableForImport(value: unknown): CloudTable | null {
+  const table = readCloudTable(value);
+  if (!table) return null;
+  try { table.journal = readValidatedJournal(table.journal); } catch { return null; }
+  return table;
 }
 
 export function nextTurn(turn: number, count: number): number {

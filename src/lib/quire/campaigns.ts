@@ -6,6 +6,7 @@ export type Campaign = { id: string; name: string; db: string; blank?: boolean }
 
 const REGISTRY = "quire.campaigns.v1";
 const ACTIVE = "quire.campaign.v1";
+const DELETION = "quire.deletion.v1";
 export const FIRST_CAMPAIGN: Campaign = { id: "main", name: "Party overview", db: "quire" };
 
 type CampaignState = { campaigns: Campaign[]; activeId: string };
@@ -39,11 +40,11 @@ export function subscribeCampaigns(listener: () => void) {
 export function createCampaign(name: string) {
   boot();
   playersCannotChangeCampaigns();
+  const owner = sessionStorage.getItem("lootsplit.verified-account");
+  if (!owner) throw Error("Sign in before creating a campaign.");
   const id = crypto.randomUUID();
   const campaign: Campaign = { id, name: cleanName(name), db: `quire-${id}`, blank: true };
   state = { campaigns: [...state.campaigns, campaign], activeId: state.activeId };
-  const owner = sessionStorage.getItem("lootsplit.verified-account");
-  if (!owner) throw Error("Sign in before creating a campaign.");
   localStorage.setItem(`quire.owner.${id}`, owner);
   persist();
   switchCampaign(id);
@@ -92,29 +93,28 @@ export async function deleteCampaign(id: string) {
     activeId: state.activeId === id ? remaining[0]!.id : state.activeId,
   };
   // Durable intent permits recovery if the browser closes between IDB deletion and registry commit.
-  localStorage.setItem("quire.deletion.v1", JSON.stringify({ target, next }));
+  localStorage.setItem(DELETION, JSON.stringify({ target, next }));
   deleting = true;
   try {
     await deleteQuireDatabase(target.db);
   } catch (error) {
-    localStorage.removeItem("quire.deletion.v1");
+    localStorage.removeItem(DELETION);
     deleting = false;
     throw error;
   }
-  state = next;
-  persist();
-  localStorage.removeItem("quire.deletion.v1");
-  deleting = false;
-  closeQuireDb();
-  reloadSeat();
-  publish();
+  completeDeletion(target, next);
 }
 
-function playersCannotChangeCampaigns() {
-  if (deleting)
+function assertNoDeletion() {
+  if (deleting || (typeof window !== "undefined" && window.localStorage.getItem(DELETION)))
     throw new Error(
       "A campaign deletion is still finishing. Close other Lootsplit tabs if it is waiting.",
     );
+}
+
+function playersCannotChangeCampaigns() {
+  assertNoDeletion();
+  refreshRegistry();
   if (getCloudWatch().joined) throw new Error("Return to Local Mode before changing campaigns.");
   if (getSeat().role === "player")
     throw new Error("A player link cannot create, change, or delete campaigns.");
@@ -135,23 +135,19 @@ function boot() {
   } catch {
     state = { campaigns: [FIRST_CAMPAIGN], activeId: FIRST_CAMPAIGN.id };
   }
-  const pending = window.localStorage.getItem("quire.deletion.v1");
+  const pending = window.localStorage.getItem(DELETION);
   if (pending) {
     try {
       const intent = JSON.parse(pending) as { target: Campaign; next: CampaignState };
       if (
         readCampaign(intent.target) &&
         Array.isArray(intent.next.campaigns) &&
+        intent.next.campaigns.length > 0 &&
         intent.next.campaigns.every((c) => readCampaign(c))
       ) {
+        deleting = true;
         void deleteQuireDatabase(intent.target.db)
-          .then(() => {
-            state = intent.next;
-            persist();
-            localStorage.removeItem("quire.deletion.v1");
-            reloadSeat();
-            publish();
-          })
+          .then(() => completeDeletion(intent.target, intent.next))
           .catch(() => {});
       }
     } catch {
@@ -159,6 +155,40 @@ function boot() {
     }
   }
   persist();
+}
+
+function refreshRegistry() {
+  if (typeof window === "undefined") return;
+  try {
+    const raw: unknown = JSON.parse(window.localStorage.getItem(REGISTRY) || "null");
+    if (!Array.isArray(raw)) return;
+    const campaigns = raw.map(readCampaign).filter((c): c is Campaign => c !== null);
+    if (!campaigns.length) return;
+    const active = window.localStorage.getItem(ACTIVE);
+    // Registry reconciliation must not silently switch this tab into another tab's seat.
+    const activeId = campaigns.some(c => c.id === state.activeId) ? state.activeId
+      : campaigns.some(c => c.id === active) ? active! : campaigns[0]!.id;
+    state = { campaigns, activeId };
+  } catch { /* Preserve the last readable registry. */ }
+}
+
+function completeDeletion(target: Campaign, fallback: CampaignState) {
+  // The durable intent is a recovery hint, not an authoritative replacement registry.
+  // Another tab (including an older client) may have committed newer metadata while IDB was blocked.
+  refreshRegistry();
+  const campaigns = state.campaigns.filter(c => c.id !== target.id);
+  if (!campaigns.length) campaigns.push(...fallback.campaigns.filter(c => c.id !== target.id));
+  const latestActive = localStorage.getItem(ACTIVE);
+  const activeId = campaigns.some(c => c.id === state.activeId) ? state.activeId
+    : campaigns.some(c => c.id === latestActive) ? latestActive!
+    : campaigns.some(c => c.id === fallback.activeId) ? fallback.activeId : campaigns[0]!.id;
+  state = { campaigns, activeId };
+  persist();
+  localStorage.removeItem(DELETION);
+  deleting = false;
+  closeQuireDb();
+  reloadSeat();
+  publish();
 }
 
 function persist() {
@@ -192,7 +222,8 @@ function readCampaign(value: unknown): Campaign | null {
 /** Account resume selects a separate device database; it never promotes the old player copy. */
 export function selectAccountCampaign(id: string, name: string, seat: import('./table.ts').Seat) {
   boot();
-  if (deleting) throw new Error('Wait for the campaign deletion to finish.');
+  assertNoDeletion();
+  refreshRegistry();
   if (!/^account-[a-zA-Z0-9_-]+$/.test(id)) throw new Error('Invalid account campaign.');
   const existing = state.campaigns.find(c => c.id === id);
   localStorage.setItem(`quire.seat.v1.${id}`, JSON.stringify(seat));

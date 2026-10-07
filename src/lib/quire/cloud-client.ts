@@ -19,6 +19,7 @@ import { applyCloudTable, economySnapshot, snapshot } from "./economy.ts";
 import { getSeat, setSeat, downloadJson } from "./table.ts";
 import {
   applyCommand,
+  commandSchema,
   tablePatch,
   type Command,
   type CommandInput,
@@ -29,9 +30,16 @@ import { rememberIncoming } from "./chat.ts";
 import { isEphemeralCampaign, setEphemeralCampaign } from "./guest-storage.ts";
 import { closeQuireDb } from "./db.ts";
 import { reconcileAccountResume } from "./account-resume.ts";
+import { sameCommand } from "./command-identity.ts";
+import {
+  rememberRevokedRecovery, revokedRecoverySummaries, revokedRecoveryCopy,
+  discardRevokedRecovery, hasRevokedMemoryWork, legacyRecoveryCount,
+} from "./revoked-recovery.ts";
 let playerSession: Session | null = null;
 const PLAYER_TICKET = "lootsplit.player.reconnect.v1";
 type Session = {
+  /** Account owning this seat, captured before queuing work, not on revocation. */
+  userId?: string;
   code: string;
   token: string;
   seatId: string;
@@ -61,6 +69,8 @@ const initialView = {
   status: "local" as SyncState,
   error: "",
   lastSync: 0,
+  recoveries: [] as Array<{ id: string; code: string; pending: number }>,
+  unverifiedRecoveries: 0,
 };
 let view = initialView;
 // Hydration always starts from the same local snapshot, even if room restoration
@@ -132,6 +142,10 @@ function session(): Session | null {
       !Array.isArray(saved.pending)
     )
       return null;
+    // Legacy owned DM caches inherit the saved campaign owner, never whichever
+    // account happens to sign in when a request is later rejected.
+    if (saved.role === "dm" && !saved.userId)
+      saved.userId = localStorage.getItem(`quire.owner.${localStorage.getItem("quire.campaign.v1") || "main"}`) || undefined;
     return saved;
   } catch {
     return null;
@@ -148,6 +162,7 @@ function remember(s: Session) {
         seatId: s.seatId,
         role: s.role,
         purseIds: s.purseIds,
+        userId: s.userId,
       }),
     );
     return;
@@ -180,14 +195,15 @@ function serial<T>(fn: () => Promise<T>): Promise<T> {
 }
 function publish(next: Partial<typeof view>, dataChanged = true) {
   const previous = view;
-  view = { ...view, ...next };
+  view = {
+    ...view,
+    ...next,
+    recoveries: revokedRecoverySummaries(),
+    unverifiedRecoveries: legacyRecoveryCount(),
+  };
   if (previous.joined && view.joined) {
     if (previous.live !== view.live)
-      notify(
-        "Mode changed",
-        view.live ? "Live Mode" : "Turn-based Mode",
-        "mode",
-      );
+      notify("Mode changed", view.live ? "Live Mode" : "Turn-based Mode", "mode");
     if (!previous.mine && view.mine && !view.live)
       notify("Your turn", "You can make transactions now.", "turn");
     if (previous.seats.length < view.seats.length)
@@ -200,12 +216,24 @@ function publish(next: Partial<typeof view>, dataChanged = true) {
   for (const fn of listeners) fn();
 }
 export function getCloudTable() {
+  // Owner changes can occur while no room is connected. Keep the external-store
+  // snapshot stable except when the authorized recovery list actually changes.
+  const recoveries = revokedRecoverySummaries(), unverifiedRecoveries = legacyRecoveryCount();
+  if (JSON.stringify(recoveries) !== JSON.stringify(view.recoveries) || unverifiedRecoveries !== view.unverifiedRecoveries)
+    view = { ...view, recoveries, unverifiedRecoveries };
   return view;
 }
+export function refreshRecoveryVisibility() {
+  publish({}, false);
+}
 export function subscribeCloudTable(fn: () => void) {
+  if (!listeners.size && typeof window !== "undefined")
+    window.addEventListener("lootsplit-account-changed", refreshRecoveryVisibility);
   listeners.add(fn);
   return () => {
     listeners.delete(fn);
+    if (!listeners.size && typeof window !== "undefined")
+      window.removeEventListener("lootsplit-account-changed", refreshRecoveryVisibility);
   };
 }
 export function hasPendingChanges() {
@@ -220,13 +248,13 @@ function fail(error: unknown) {
   return message;
 }
 function warnUnsentPlayerActions(event: BeforeUnloadEvent) {
-  if (isEphemeralCampaign() && session()?.pending.length) {
+  if (hasRevokedMemoryWork() || (isEphemeralCampaign() && session()?.pending.length)) {
     event.preventDefault();
     event.returnValue = "";
   }
 }
 function stopPolling() {
-  if (typeof window !== "undefined")
+  if (typeof window !== "undefined" && !hasRevokedMemoryWork())
     window.removeEventListener("beforeunload", warnUnsentPlayerActions);
   polling = false;
   pollGeneration++;
@@ -265,17 +293,36 @@ function start() {
 }
 async function accept(remote: RoomView, committed = false) {
   const s = requireSession();
+  if (remote.userId && s.userId && remote.userId !== s.userId)
+    throw Error("This seat now belongs to a different account. Export your original pending work before switching.");
+  if (remote.userId) s.userId = remote.userId;
   const acknowledged = new Set(remote.acknowledged);
+  const acknowledgedLocal = s.pending.some(c => acknowledged.has(c.id));
   s.pending = s.pending.filter((c) => !acknowledged.has(c.id));
-  if (committed) {
-    s.pending = [];
+  if (committed || acknowledgedLocal) {
+    if (committed) s.pending = [];
     s.batchId = crypto.randomUUID();
   }
-  // Restore server-saved turns after a lost local session or a page reload.
-  const draft = JSON.parse(remote.draft) as Command[];
-  if (!s.pending.length && draft.length && !committed) s.pending = draft;
+  // Unite immutable same-seat drafts from every device. Acknowledged commands
+  // never return as pending, including legacy/delayed server responses.
+  const draft = (JSON.parse(remote.draft) as Command[]).filter((c) => !acknowledged.has(c.id));
+  const known = new Map(s.pending.map((c) => [c.id, c]));
+  for (const command of draft) {
+    const local = known.get(command.id);
+    if (local && !sameCommand(local, command))
+      fail(
+        Error(
+          "Another device saved different changes for this action. Export your pending actions before resolving the conflict.",
+        ),
+      );
+    else if (!local) {
+      s.pending.push(command);
+      known.set(command.id, command);
+    }
+  }
   const changed = s.revision !== remote.revision;
   if (changed && !s.pending.length) s.batchId = crypto.randomUUID();
+  const previousRevision = s.revision;
   s.revision = remote.revision;
   s.purseIds = remote.purseIds;
   if (!s.pending.length && (changed || committed)) {
@@ -297,6 +344,7 @@ async function accept(remote: RoomView, committed = false) {
         );
       await applyCloudTable(preview);
     } catch (error) {
+      s.revision = previousRevision;
       fail(error);
       await rememberIncoming(remote.table.notes);
     }
@@ -328,10 +376,7 @@ async function accept(remote: RoomView, committed = false) {
       seatId: remote.seatId,
       revision: remote.revision,
       pending: s.pending.length,
-      status: s.pending.length
-        ? (view.error
-          ? "attention"
-          : "pending") : "synced",
+      status: s.pending.length ? (view.error ? "attention" : "pending") : "synced",
       error: s.pending.length ? view.error : "",
       lastSync: Date.now(),
     },
@@ -354,19 +399,13 @@ async function refresh() {
         message,
       )
     ) {
-      if (s.pending.length && !isEphemeralCampaign())
-        localStorage.setItem(
-          `lootsplit.revoked-recovery:${s.code}`,
-          JSON.stringify({
-            code: s.code,
-            commands: s.pending,
-            exportedAt: Date.now(),
-          }),
-        );
+      if (s.pending.length) rememberRevokedRecovery(s, isEphemeralCampaign());
       await detachTable(s.role === "player");
       notify(
         "Campaign access ended",
-        "Your seat was released. Authorized session reports remain in My account.",
+        s.pending.length
+          ? "Your seat was released. Export the unsent recovery copy before closing this document."
+          : "Your seat was released. Authorized session reports remain in My account.",
         "mode",
       );
       return;
@@ -510,6 +549,16 @@ export function exportPending() {
     exportedAt: Date.now(),
   });
 }
+export async function exportRevokedPending(id: string) {
+  const recovery = revokedRecoveryCopy(id);
+  return downloadJson(`lootsplit-pending-${recovery.code}.json`, recovery);
+}
+export async function discardRevokedPending(id: string) {
+  discardRevokedRecovery(id);
+  if (!hasRevokedMemoryWork() && !polling && typeof window !== "undefined")
+    window.removeEventListener("beforeunload", warnUnsentPlayerActions);
+  publish({});
+}
 export function discardPending() {
   return serial(async () => {
     const s = requireSession();
@@ -533,7 +582,7 @@ export async function queueCommand(input: CommandInput) {
       throw new Error(`It is ${view.who}'s turn.`);
     if (s.pending.length >= 100)
       throw new Error("Submit your pending actions before adding more.");
-    const command = { ...input, id: crypto.randomUUID() } as Command;
+    const command = commandSchema.parse({ ...input, id: crypto.randomUUID() });
     if (input.kind === "message") {
       // Chat is independent of transaction turns; retain a failed message in the editor.
       const remote = await submitCloudCommands({
@@ -593,7 +642,7 @@ export function runSharedMutation(work: () => Promise<unknown>) {
     const patch = tablePatch(before, after);
     if (patch.kind !== "patch" || !patch.changes.length) return;
     const current = requireSession();
-    current.pending.push({ ...patch, id: crypto.randomUUID() });
+    current.pending.push(commandSchema.parse({ ...patch, id: crypto.randomUUID() }));
     try {
       remember(current);
     } catch (e) {
@@ -767,7 +816,10 @@ export async function importPending(file: File) {
       throw new Error(
         "These device changes belong to a different seat. Review them with the DM instead of replaying them here.",
       );
-    const known = new Set(s.pending.map((c) => c.id));
+    const saved = new Map(s.pending.map(c => [c.id, c]));
+    if (incoming.some(c => saved.has(c.id) && !sameCommand(saved.get(c.id), c)))
+      throw Error("This recovery file contains conflicting changes for a pending action. Export both copies and resolve them with the DM.");
+    const known = new Set(saved.keys());
     s.pending.push(...incoming.filter((c) => !known.has(c.id)));
     remember(s);
     publish({ pending: s.pending.length, status: "pending", error: "" });
@@ -903,7 +955,7 @@ export async function resumeAccountMembership(
     }
     if (reconciled.needsRecovery) {
       // Open the authoritative seat with its own draft. Old work stays exportable.
-      reconciled.pending = JSON.parse(remote.draft) as Command[];
+      reconciled.pending = (JSON.parse(remote.draft) as Command[]).filter(c => !remote.acknowledged.includes(c.id));
       reconciled.batchId = crypto.randomUUID();
       reconciled.revision = reconciled.pending.length ? -1 : 0;
     }
@@ -919,6 +971,7 @@ export async function resumeAccountMembership(
       });
     remember({
       code: member.code,
+      userId: member.userId,
       token: member.token,
       seatId: remote.seatId,
       role,

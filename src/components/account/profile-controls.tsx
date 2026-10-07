@@ -1,5 +1,24 @@
 import { useState, type FormEvent } from "react";
 import { accountRequest, type MemberProfile } from "@/lib/account/client";
+import { useDraftGuard } from "@/lib/quire/use-draft-guard";
+
+function editableProfile(
+  profile:
+    | MemberProfile
+    | (Omit<MemberProfile, "share_contact" | "email_opt_in"> & {
+        share_contact: boolean;
+        email_opt_in: boolean;
+      }),
+) {
+  return {
+    name: profile.name,
+    introduction: profile.introduction,
+    portrait: profile.portrait,
+    contact_email: profile.contact_email,
+    share_contact: !!profile.share_contact,
+    email_opt_in: !!profile.email_opt_in,
+  };
+}
 export function ProfileControls({
   profile,
   onSaved,
@@ -12,6 +31,8 @@ export function ProfileControls({
     share_contact: !!profile.share_contact,
     email_opt_in: !!profile.email_opt_in,
   });
+  const [saved, setSaved] = useState(editableProfile(profile));
+  useDraftGuard(JSON.stringify(editableProfile(draft)) !== JSON.stringify(saved), "profile");
   const [busy, setBusy] = useState(false),
     [notice, setNotice] = useState(""),
     [error, setError] = useState("");
@@ -23,6 +44,7 @@ export function ProfileControls({
     try {
       const next = await accountRequest<MemberProfile>("profile", draft);
       setDraft({ ...next, share_contact: !!next.share_contact, email_opt_in: !!next.email_opt_in });
+      setSaved(editableProfile(next));
       await onSaved();
       setNotice("Profile saved.");
     } catch (e) {

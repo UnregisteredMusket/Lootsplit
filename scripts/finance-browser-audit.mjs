@@ -185,11 +185,42 @@ try {
     await operations.getByText("Campaign inn · Managed", { exact: true }).waitFor();
     assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1));
     await operations.screenshot({ path: `${output}/operations-${width}.png` });
+    // Two local tabs share IndexedDB but have independently rendered forms.
+    // Both accepted requests must survive instead of replacing an old snapshot.
+    await go("bank");
+    const other = await context.newPage();
+    other.on("pageerror", (error) => errors.push(error.message));
+    await openApplication(other, origin + "/features/bank");
+    await other.locator("#campaign-finance").waitFor();
+    const drafts = [[page, "First tab expense", "100"], [other, "Second tab expense", "200"]];
+    for (const [tab, note, amount] of drafts) {
+      await tab.getByPlaceholder("Amount in copper pieces", { exact: true }).fill(amount);
+      await tab.getByPlaceholder("What is this payment for?", { exact: true }).fill(note);
+    }
+    await Promise.all(drafts.map(([tab]) => tab.getByRole("button", { name: "Queue payment", exact: true }).click()));
+    await page.waitForFunction(async () => {
+      const active = localStorage.getItem("quire.campaign.v1");
+      const name = JSON.parse(localStorage.getItem("quire.campaigns.v1") || "[]").find((r) => r.id === active)?.db || "quire";
+      const db = await new Promise((resolve, reject) => {
+        const r = indexedDB.open(name); r.onsuccess = () => resolve(r.result); r.onerror = () => reject(r.error);
+      });
+      try {
+        const row = await new Promise((resolve, reject) => {
+          const r = db.transaction("meta").objectStore("meta").get("journal");
+          r.onsuccess = () => resolve(r.result); r.onerror = () => reject(r.error);
+        });
+        return ["First tab expense", "Second tab expense"].every((note) => row?.value?.requests?.some((r) => r.note === note && r.status === "pending"));
+      } finally { db.close(); }
+    });
+    await other.close();
+    await reloadApplication(page);
+    await page.getByText("First tab expense", { exact: true }).waitFor();
+    await page.getByText("Second tab expense", { exact: true }).waitFor();
     await context.close();
   }
   assert.deepEqual(errors, []);
   console.log(
-    "Finance UI: desktop/mobile creation, preview, consent, approval, reload, repayment and campaign isolation passed.",
+    "Finance UI: desktop/mobile creation, preview, consent, approval, reload, repayment, campaign isolation and concurrent local payment forms passed.",
   );
 } catch (error) {
   if (lastPage && !lastPage.isClosed()) {

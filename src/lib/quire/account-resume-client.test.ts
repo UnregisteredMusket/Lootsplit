@@ -6,10 +6,7 @@ import { reconcileAccountResume } from "./account-resume.ts";
 
 // Execute the actual exported client function with isolated storage/transport.
 // Browser coverage separately exercises its real UI entry points and backend.
-const source = readFileSync(
-  new URL("./cloud-client.ts", import.meta.url),
-  "utf8",
-);
+const source = readFileSync(new URL("./cloud-client.ts", import.meta.url), "utf8");
 const body = source
   .slice(
     source.indexOf("export async function resumeAccountMembership("),
@@ -118,9 +115,7 @@ test("actual resume opens a cache with acknowledged stale Live actions", async (
   assert.equal(h.reloaded(), true);
   assert.deepEqual(JSON.parse(h.values.get(h.key)!).pending, []);
   assert.equal(
-    [...h.values.keys()].some((key) =>
-      key.startsWith("quire.account-recovery"),
-    ),
+    [...h.values.keys()].some((key) => key.startsWith("quire.account-recovery")),
     false,
   );
 });
@@ -128,6 +123,11 @@ test("actual resume exposes genuine unsynced actions with original batch ID", as
   const h = harness({ cached: saved });
   await h.resume();
   const session = JSON.parse(h.values.get(h.key)!);
+  assert.equal(
+    session.userId,
+    "owner",
+    "Resume captures the authenticated membership owner before queuing work",
+  );
   assert.deepEqual(session.pending, pending);
   assert.equal(session.batchId, "original-batch");
   assert.equal(session.revision, -1);
@@ -156,9 +156,7 @@ test("changed cached seat is archived without replay under authenticated seat", 
   await h.resume();
   assert.deepEqual(JSON.parse(h.values.get(h.key)!).pending, []);
   const recovery = JSON.parse(
-    [...h.values.entries()].find(([key]) =>
-      key.startsWith("quire.account-recovery"),
-    )![1],
+    [...h.values.entries()].find(([key]) => key.startsWith("quire.account-recovery"))![1],
   );
   assert.equal(recovery.separateSeat, true);
   assert.equal(recovery.seatId, "old-seat");

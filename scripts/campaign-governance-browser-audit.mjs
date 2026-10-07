@@ -1,10 +1,10 @@
 import { chromium } from "playwright";
 import { expect } from "playwright/test";
 import assert from "node:assert/strict";
-import { mkdir } from "node:fs/promises";
+import { mkdir, readFile } from "node:fs/promises";
 import { localAccountDb } from "./account-dev-db.mjs";
 import { blankSheet } from "../src/lib/characters/model.mjs";
-import { openApplication, reloadApplication, continueIntoApp } from "./title-screen-navigation.mjs";
+import { openApplication, reloadApplication } from "./title-screen-navigation.mjs";
 const origin = process.env.AUDIT_ORIGIN || "http://127.0.0.1:8080";
 if (!/^http:\/\/(localhost|127\.0\.0\.1):/.test(origin))
   throw Error("Governance audit requires a disposable local server.");
@@ -20,11 +20,19 @@ const db = localAccountDb("data/account-dev.sqlite"),
   errors = [];
 const code = "G" + crypto.randomUUID().replaceAll("-", "").slice(0, 7).toUpperCase();
 codes.push(code);
+async function blockExternal(context) {
+  await context.route("**/*", (route) =>
+    new URL(route.request().url()).origin === origin
+      ? route.continue()
+      : route.abort("blockedbyclient"),
+  );
+}
 async function actor(name, ip) {
   const context = await browser.newContext({
     viewport: { width: 1360, height: 1000 },
     extraHTTPHeaders: { "cf-connecting-ip": ip },
   });
+  await blockExternal(context);
   await context.addInitScript(() => localStorage.setItem("quire.guide.offer.v3", "seen"));
   const r = await context.request.post(origin + "/api/account/auth/sign-up/email", {
     headers: { origin },
@@ -64,6 +72,7 @@ async function save(page) {
 try {
   // Stabilize Vite's first dependency discovery before collecting application errors.
   const warmup = await browser.newPage();
+  await blockExternal(warmup.context());
   await openApplication(warmup, origin + "/settings#appearance");
   await warmup.getByLabel("Accent color", { exact: true }).waitFor();
   await warmup.waitForLoadState("networkidle");
@@ -97,7 +106,15 @@ try {
         },
       ],
       holdings: [
-        {id:"home-inn",purseId:"hero",name:"Player inn",kind:"property",quantity:1,unitCopper:20000,notes:"A small inn"},
+        {
+          id: "home-inn",
+          purseId: "hero",
+          name: "Player inn",
+          kind: "property",
+          quantity: 1,
+          unitCopper: 20000,
+          notes: "A small inn",
+        },
         {
           id: "potion",
           purseId: "hero",
@@ -117,7 +134,42 @@ try {
       sheets: [],
       notes: [],
       journal: {
-        finance:{day:0,loans:[{id:"home-debt",name:"Bank test debt",purseId:"hero",lenderId:"",rateBps:0,periodDays:7,compound:false,payment:0,principal:100,interest:0,due:0,carryDays:0,interestRemainder:0,paid:0}],rules:[{id:"home-income",name:"Inn revenue",purseId:"hero",kind:"income",copper:20,periodDays:7,holdingId:"home-inn",active:true,carryDays:0,arrears:0}],downtime:[]},
+        finance: {
+          day: 0,
+          loans: [
+            {
+              id: "home-debt",
+              name: "Bank test debt",
+              purseId: "hero",
+              lenderId: "",
+              rateBps: 0,
+              periodDays: 7,
+              compound: false,
+              payment: 0,
+              principal: 100,
+              interest: 0,
+              due: 0,
+              carryDays: 0,
+              interestRemainder: 0,
+              paid: 0,
+            },
+          ],
+          rules: [
+            {
+              id: "home-income",
+              name: "Inn revenue",
+              purseId: "hero",
+              kind: "income",
+              copper: 20,
+              periodDays: 7,
+              holdingId: "home-inn",
+              active: true,
+              carryDays: 0,
+              arrears: 0,
+            },
+          ],
+          downtime: [],
+        },
         sessions: [
           {
             id: "audit-session",
@@ -175,53 +227,187 @@ try {
     await a.page.locator(".quire-dawn").waitFor({ state: "hidden" });
     await a.page.waitForLoadState("networkidle");
   }
-  const guestContext=await browser.newContext({viewport:{width:390,height:844}});
+  const guestContext = await browser.newContext({ viewport: { width: 390, height: 844 } });
+  await blockExternal(guestContext);
   await guestContext.addInitScript((code) => {
     localStorage.setItem("quire.guide.offer.v3", "seen");
-    sessionStorage.setItem("lootsplit.player.reconnect.v1", JSON.stringify({ code, seatId: "guest", token: "guest-token", role: "player", purseIds: ["hero"] }));
+    sessionStorage.setItem(
+      "lootsplit.player.reconnect.v1",
+      JSON.stringify({
+        code,
+        seatId: "guest",
+        token: "guest-token",
+        role: "player",
+        purseIds: ["hero"],
+      }),
+    );
   }, code);
-  const guestPage=await guestContext.newPage();
-  guestPage.guestAccessAudit=true;
-  await openApplication(guestPage,origin+"/?as=player");
-  await guestPage.getByRole("heading",{name:"Home",exact:true}).waitFor();
-  await expect(guestPage.getByRole("region",{name:"Player features",exact:true}).getByRole("link")).toHaveText(["Character Sheet", "Bank", "My Finances", "Properties", "Journal", "Party chat"]);
+  const guestPage = await guestContext.newPage();
+  guestPage.on("pageerror", (e) => errors.push(e.message));
+  guestPage.guestAccessAudit = true;
+  await openApplication(guestPage, origin + "/?as=player");
+  await guestPage.getByRole("heading", { name: "Home", exact: true }).waitFor();
+  await expect(
+    guestPage.getByRole("region", { name: "Player features", exact: true }).getByRole("link"),
+  ).toHaveText(["Character Sheet", "Bank", "My Finances", "Properties", "Journal", "Party chat"]);
   await expect(guestPage.locator('.shortcut-grid a[href^="/features/bank?"]')).toBeVisible();
-  assert.equal(await guestPage.getByRole("button",{name:"Customize",exact:true}).count(),0);
-  assert.equal(await guestPage.evaluate(()=>Object.keys(localStorage).some(k=>k.startsWith("lootsplit.account-shortcuts"))),false);
-  await guestContext.close();
-  console.log("Feature screens: player Home, bank repayment, property permissions and fixed feature buttons");
-  await player.page.setViewportSize({width:390,height:844});
-  await visit(player.page,"/");
-  await player.page.getByRole("heading",{name:"Home",exact:true}).waitFor();
-  await player.page.evaluate(()=> (window.featureDocumentMarker="same-document"));
+  assert.equal(await guestPage.getByRole("button", { name: "Customize", exact: true }).count(), 0);
+  assert.equal(
+    await guestPage.evaluate(() =>
+      Object.keys(localStorage).some((k) => k.startsWith("lootsplit.account-shortcuts")),
+    ),
+    false,
+  );
+  await guestPage
+    .getByRole("region", { name: "Player features", exact: true })
+    .getByRole("link", { name: "Party chat", exact: true })
+    .click();
+  await guestPage.locator("#chat-message").fill("Synthetic private guest message");
+  await guestContext.route("**/_serverFn/**", (route) => route.abort("failed"));
+  await guestPage.getByRole("button", { name: "Send", exact: true }).click();
+  await guestPage.getByText("Failed — not confirmed", { exact: true }).waitFor();
+  assert.equal(
+    await guestPage.evaluate(() =>
+      Object.entries(localStorage).some(
+        ([key, value]) =>
+          key.startsWith("lootsplit.chat.outbox.") ||
+          value.includes("Synthetic private guest message"),
+      ),
+    ),
+    false,
+    "Guest failed messages remain in memory",
+  );
+  await guestContext.unroute("**/_serverFn/**");
+  await guestPage.locator("#chat-message").fill("Retain this unsent guest draft");
+  await guestPage.getByLabel("Conversation", { exact: true }).selectOption("dm");
+  await guestPage.locator("#chat-message").fill("A separate private draft");
+  await guestPage.getByLabel("Conversation", { exact: true }).selectOption("party");
+  await expect(guestPage.locator("#chat-message")).toHaveValue("Retain this unsent guest draft");
+  await guestPage
+    .locator('nav[aria-label="Sections"]:visible')
+    .getByRole("link", { name: "Home", exact: true })
+    .click();
+  await guestPage
+    .getByRole("region", { name: "Player features", exact: true })
+    .getByRole("link", { name: "Party chat", exact: true })
+    .click();
+  await expect(guestPage.locator("#chat-message")).toHaveValue("Retain this unsent guest draft");
+  await expect(guestPage.getByText("Failed — not confirmed", { exact: true })).toBeVisible();
+  await guestPage.getByLabel("Conversation", { exact: true }).selectOption("dm");
+  await expect(guestPage.locator("#chat-message")).toHaveValue("A separate private draft");
+  await guestPage.screenshot({ path: output + "/guest-chat-memory-mobile.png", fullPage: true });
+  await guestPage
+    .locator('nav[aria-label="Sections"]:visible')
+    .getByRole("link", { name: "Home", exact: true })
+    .click();
+  // The warning remains installed after Chat unmounts; closing a document would
+  // lose its memory-only draft/outbox.
+  assert.equal(
+    await guestPage.evaluate(
+      () => !window.dispatchEvent(new Event("beforeunload", { cancelable: true })),
+    ),
+    true,
+  );
+  await guestPage.evaluate(() => (window.guestDraftDocument = "retained"));
+  const closingWarning = guestPage.waitForEvent("dialog");
+  // Chromium can leave the navigation waiter pending after cancelling a native
+  // reload. Bound that expected blocked operation, then verify the old document.
+  const cancelledReload = guestPage.reload({ timeout: 2000, waitUntil: "commit" }).then(
+    () => "reloaded",
+    (error) => error.message,
+  );
+  const warning = await closingWarning;
+  assert.equal(warning.type(), "beforeunload");
+  await warning.dismiss();
+  assert.match(
+    await cancelledReload,
+    /ERR_ABORTED|Timeout/,
+    "A cancelled native reload must not complete",
+  );
+  assert.equal(await guestPage.evaluate(() => window.guestDraftDocument), "retained");
+  assert.equal(await guestPage.locator(".loot-opening").count(), 0);
+  await guestPage
+    .getByRole("region", { name: "Player features", exact: true })
+    .getByRole("link", { name: "Bank", exact: true })
+    .click();
+  let blockedRepayments = 0;
+  await guestContext.route("**/_serverFn/**", (route) => {
+    if ((route.request().postData() || "").includes("bank-repay")) {
+      blockedRepayments++;
+      return route.abort("failed");
+    }
+    return route.continue();
+  });
+  await guestPage.getByLabel("Repayment in copper", { exact: true }).fill("1");
+  await guestPage.getByRole("button", { name: "Make repayment", exact: true }).click();
+  await expect.poll(() => blockedRepayments).toBe(1);
+  const pendingGuest = await guestPage.evaluate(async () =>
+    (await import("/src/lib/quire/cloud-client.ts")).pendingActions(),
+  );
+  assert.equal(pendingGuest.length, 1);
+  assert.equal(pendingGuest[0].kind, "bank-repay");
+  console.log(
+    "Feature screens: player Home, bank repayment, property permissions and fixed feature buttons",
+  );
+  await player.page.setViewportSize({ width: 390, height: 844 });
+  await visit(player.page, "/");
+  await player.page.getByRole("heading", { name: "Home", exact: true }).waitFor();
+  await player.page.evaluate(() => (window.featureDocumentMarker = "same-document"));
   await player.page.locator('.shortcut-grid a[href^="/features/bank?"]').click();
-  await player.page.getByLabel("Repayment in copper",{exact:true}).fill("25");
-  await player.page.getByRole("button",{name:"Make repayment",exact:true}).click();
-  await expect.poll(async()=> (await state(host.page)).journal.finance.loans[0].principal).toBe(75);
-  assert.equal(await player.page.getByLabel("Loan name",{exact:true}).count(),0,"Players cannot edit loan terms");
-  await player.page.getByRole("link",{name:"Return to Home",exact:true}).click();
+  await player.page.getByLabel("Repayment in copper", { exact: true }).fill("25");
+  await player.page.getByRole("button", { name: "Make repayment", exact: true }).click();
+  await expect
+    .poll(async () => (await state(host.page)).journal.finance.loans[0].principal)
+    .toBe(75);
+  assert.equal(
+    await player.page.getByLabel("Loan name", { exact: true }).count(),
+    0,
+    "Players cannot edit loan terms",
+  );
+  await player.page.getByRole("link", { name: "Return to Home", exact: true }).click();
   await player.page.locator('.shortcut-grid a[href^="/features/properties?"]').click();
-  await player.page.getByLabel("Property name",{exact:true}).fill("Renamed player inn");
-  await player.page.getByRole("button",{name:"Save property details",exact:true}).click();
-  await expect.poll(async()=> (await state(host.page)).holdings.find(h=>h.id==="home-inn").name).toBe("Renamed player inn");
-  assert.equal((await state(host.page)).holdings.find(h=>h.id==="home-inn").unitCopper,20000);
-  assert.equal(await player.page.getByLabel("Property revenue (cp)",{exact:true}).count(),0);
+  await player.page.getByLabel("Property name", { exact: true }).fill("Renamed player inn");
+  await player.page.getByRole("button", { name: "Save property details", exact: true }).click();
+  await expect
+    .poll(async () => (await state(host.page)).holdings.find((h) => h.id === "home-inn").name)
+    .toBe("Renamed player inn");
+  assert.equal(
+    (await state(host.page)).holdings.find((h) => h.id === "home-inn").unitCopper,
+    20000,
+  );
+  assert.equal(await player.page.getByLabel("Property revenue (cp)", { exact: true }).count(), 0);
   await player.page.locator(".feature-return a").click();
   await player.page.locator('.shortcut-grid a[href^="/features/finances?"]').click();
   await player.page.getByText(/Inn revenue.*2 sp every 7 days/).waitFor();
-  await player.page.screenshot({path:output+"/player-finances-mobile.png",fullPage:true});
+  await player.page.screenshot({ path: output + "/player-finances-mobile.png", fullPage: true });
   await player.page.locator(".feature-return a").click();
-  const playerFeatures = player.page.getByRole("region", {name:"Player features",exact:true});
-  await expect(playerFeatures.getByRole("link")).toHaveText(["Character Sheet", "Bank", "My Finances", "Properties", "Journal", "Party chat"]);
-  assert.equal(await player.page.getByRole("button",{name:"Customize",exact:true}).count(),0);
-  assert.equal(await player.page.locator(".feature-cards").count(),0,"No duplicate player feature cards");
-  await playerFeatures.getByRole("link",{name:"Journal",exact:true}).click();
+  const playerFeatures = player.page.getByRole("region", { name: "Player features", exact: true });
+  await expect(playerFeatures.getByRole("link")).toHaveText([
+    "Character Sheet",
+    "Bank",
+    "My Finances",
+    "Properties",
+    "Journal",
+    "Party chat",
+  ]);
+  assert.equal(
+    await player.page.getByRole("button", { name: "Customize", exact: true }).count(),
+    0,
+  );
+  assert.equal(
+    await player.page.locator(".feature-cards").count(),
+    0,
+    "No duplicate player feature cards",
+  );
+  await playerFeatures.getByRole("link", { name: "Journal", exact: true }).click();
   await player.page.locator(".feature-return a").click();
-  assert.equal(await player.page.evaluate(()=>window.featureDocumentMarker),"same-document");
-  assert.equal(await player.page.locator(".loot-opening").count(),0);
-  assert.ok(await player.page.evaluate(()=>document.documentElement.scrollWidth<=innerWidth+1));
-  await player.page.screenshot({path:output+"/player-home-mobile.png",fullPage:true});
-  await player.page.setViewportSize({width:1360,height:1000});
+  assert.equal(await player.page.evaluate(() => window.featureDocumentMarker), "same-document");
+  assert.equal(await player.page.locator(".loot-opening").count(), 0);
+  assert.ok(
+    await player.page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1),
+  );
+  await player.page.screenshot({ path: output + "/player-home-mobile.png", fullPage: true });
+  await player.page.setViewportSize({ width: 1360, height: 1000 });
   console.log("Governance audit: live account character receives loot and portrait without reload");
   await visit(player.page, `/characters?id=${encodeURIComponent(`campaign:${code}:hero`)}`);
   await player.page.getByRole("heading", { name: "Governance hero", exact: true }).waitFor();
@@ -342,7 +528,7 @@ try {
   await changes.getByText("Governance hero", { exact: false }).first().waitFor();
   await changes.locator("details > summary").click();
   await changes.getByText(/species.*Human.*Elf/).waitFor();
-  await visit(host.page,"/?view=overview");
+  await visit(host.page, "/?view=overview");
   const sessions = host.page.locator("#sessions");
   await sessions.locator(":scope > div > button").first().click();
   await sessions.getByRole("button", { name: "End session", exact: true }).click();
@@ -350,7 +536,7 @@ try {
     await host.page.waitForTimeout(250);
   assert.equal((await state(host.page)).journal.reports.length, 1);
   assert.equal((await state(host.page)).ledger.length, 0);
-  await visit(host.page,"/features/journal");
+  await visit(host.page, "/features/journal");
   await host.page.getByLabel("Journal entry title", { exact: true }).fill("The first chronicle");
   await host.page
     .getByLabel("Journal entry text", { exact: true })
@@ -362,7 +548,7 @@ try {
   await host.page.setViewportSize({ width: 390, height: 844 });
   await host.page.locator(".journal-book").screenshot({ path: output + "/journal-mobile.png" });
   await host.page.setViewportSize({ width: 1360, height: 1000 });
-  await visit(host.page,"/?view=overview");
+  await visit(host.page, "/?view=overview");
   await sessions.locator(":scope > div > button").first().click();
   await sessions.getByLabel("Session name", { exact: true }).fill("Next session");
   await sessions.getByRole("button", { name: "Start session", exact: true }).click();
@@ -403,6 +589,12 @@ try {
   );
   await player.page.getByRole("dialog").getByRole("button", { name: "Close", exact: true }).click();
   console.log("Governance audit: keep ended room viewable, leave as DM and resume");
+  await visit(player.page, "/");
+  await player.page
+    .getByRole("region", { name: "Player features", exact: true })
+    .getByRole("link", { name: "Properties", exact: true })
+    .click();
+  await player.page.getByLabel("Property name", { exact: true }).fill("Draft before session pause");
   await visit(host.page, "/share");
   await host.page
     .getByRole("button", { name: "End session & keep room online", exact: true })
@@ -415,11 +607,26 @@ try {
     host.page.getByRole("button", { name: "Leave room online", exact: true }),
   ).toBeVisible();
   await expect(
-    player.page.getByRole("status").filter({ hasText: "Room remains online for viewing" }),
+    player.page.getByRole("status").filter({ hasText: "Your draft is kept in this view" }),
   ).toBeVisible();
+  await expect(player.page.getByLabel("Property name", { exact: true })).toHaveValue(
+    "Draft before session pause",
+  );
+  await expect(player.page.getByLabel("Property name", { exact: true })).toBeDisabled();
+  await expect(
+    player.page.getByRole("button", { name: "Save property details", exact: true }),
+  ).toBeDisabled();
+  await expect(
+    player.page.getByRole("status").filter({ hasText: "Your draft is kept in this view" }),
+  ).toBeVisible();
+  await player.page.screenshot({
+    path: output + "/paused-property-draft-desktop.png",
+    fullPage: true,
+  });
+  await player.page.getByRole("button", { name: "Reload details", exact: true }).click();
   await reloadApplication(player.page);
   await expect(
-    player.page.getByRole("status").filter({ hasText: "Room remains online for viewing" }),
+    player.page.getByRole("status").filter({ hasText: "Your draft is kept in this view" }),
   ).toBeVisible();
   assert.equal((await state(player.page)).purses.find((p) => p.id === "hero").sheet.maxHp, 25);
   const blocked = await player.page.evaluate(async () => {
@@ -433,12 +640,23 @@ try {
     }
   });
   assert.match(blocked, /view-only/);
+  await player.page.getByRole("link", { name: "Return to Home", exact: true }).click();
+  await player.page
+    .getByRole("region", { name: "Player features", exact: true })
+    .getByRole("link", { name: "Party chat", exact: true })
+    .click();
+  await expect(player.page.locator("#chat-message")).toBeDisabled();
+  await expect(player.page.getByRole("button", { name: "Send", exact: true })).toBeDisabled();
+  await expect(
+    player.page.getByRole("status").filter({ hasText: "View-only until the DM resumes play" }),
+  ).toBeVisible();
+  await player.page.screenshot({ path: output + "/paused-chat-desktop.png", fullPage: true });
   await host.page.setViewportSize({ width: 390, height: 844 });
   await host.page.screenshot({ path: output + "/viewable-room-mobile.png", fullPage: true });
   await host.page.getByRole("button", { name: "Leave room online", exact: true }).click();
   await expect(host.page.getByRole("button", { name: "Start a room", exact: true })).toBeVisible();
   await expect(
-    player.page.getByRole("status").filter({ hasText: "Room remains online for viewing" }),
+    player.page.getByRole("status").filter({ hasText: "View-only until the DM resumes play" }),
   ).toBeVisible();
   await openApplication(host.page, origin + "/account");
   await host.page
@@ -449,8 +667,102 @@ try {
   await visit(host.page, "/share");
   await host.page.getByRole("button", { name: "Resume play", exact: true }).click();
   await expect(
-    player.page.getByRole("status").filter({ hasText: "Room remains online for viewing" }),
+    player.page.getByRole("status").filter({ hasText: "View-only until the DM resumes play" }),
   ).toHaveCount(0);
+  await expect(player.page.locator("#chat-message")).toBeEnabled();
+  await player.page.locator("#chat-message").fill("Play resumed");
+  await expect(player.page.getByRole("button", { name: "Send", exact: true })).toBeEnabled();
+  await player.page.locator("#chat-message").fill("Account message awaiting confirmation");
+  await player.context.route("**/_serverFn/**", (route) => route.abort("failed"));
+  await player.page.getByRole("button", { name: "Send", exact: true }).click();
+  await player.page.getByText("Failed — not confirmed", { exact: true }).waitFor();
+  const savedOutbox = await player.page.evaluate(() =>
+    Object.entries(localStorage).filter(([key]) => key.startsWith("lootsplit.chat.outbox.v2.")),
+  );
+  assert.equal(savedOutbox.length, 1);
+  assert.ok(
+    decodeURIComponent(savedOutbox[0][0]).includes(player.id),
+    "Persistent outbox is verified-account scoped",
+  );
+  const savedCommand = JSON.parse(savedOutbox[0][1])[0].command;
+  assert.equal(savedCommand.text, "Account message awaiting confirmation");
+  await player.context.unroute("**/_serverFn/**");
+  await reloadApplication(player.page);
+  await player.page.getByText("Failed — not confirmed", { exact: true }).waitFor();
+  await player.page
+    .getByRole("region", { name: "Live party chat", exact: true })
+    .getByRole("button", { name: "Retry", exact: true })
+    .click();
+  await expect(player.page.getByText("Failed — not confirmed", { exact: true })).toHaveCount(0);
+  await expect
+    .poll(async () => (await state(host.page)).notes.filter((n) => n.id === savedCommand.id).length)
+    .toBe(1);
+  // A real storage failure must leave a visible, exportable copy with the same
+  // request ID; successful persistence is not a prerequisite for guest-like
+  // memory recovery or delivery.
+  await player.page.evaluate(() => {
+    window.originalChatSetItem = Storage.prototype.setItem;
+    Storage.prototype.setItem = function (key, value) {
+      if (key.startsWith("lootsplit.chat.outbox.v2."))
+        throw new DOMException("Synthetic full storage", "QuotaExceededError");
+      return window.originalChatSetItem.call(this, key, value);
+    };
+  });
+  await player.context.route("**/_serverFn/**", (route) => route.abort("failed"));
+  await player.page.locator("#chat-message").fill("Account memory fallback message");
+  await player.page.getByRole("button", { name: "Send", exact: true }).click();
+  await player.page.getByText("Failed — not confirmed", { exact: true }).waitFor();
+  await expect(
+    player.page
+      .getByRole("status")
+      .filter({ hasText: "Could not save message recovery on this device" }),
+  ).toBeVisible();
+  const fallbackDownload = player.page.waitForEvent("download");
+  await player.page.getByRole("button", { name: "Export unsent chat", exact: true }).click();
+  const fallbackFile = output + "/account-chat-storage-failure.json";
+  await (await fallbackDownload).saveAs(fallbackFile);
+  const fallbackRecovery = JSON.parse(await readFile(fallbackFile, "utf8"));
+  assert.equal(fallbackRecovery.commands.length, 1);
+  assert.equal(fallbackRecovery.commands[0].text, "Account memory fallback message");
+  assert.equal("token" in fallbackRecovery, false);
+  await player.page.evaluate(() => {
+    Storage.prototype.setItem = window.originalChatSetItem;
+    delete window.originalChatSetItem;
+  });
+  await player.context.unroute("**/_serverFn/**");
+  await player.page
+    .getByRole("region", { name: "Live party chat", exact: true })
+    .getByRole("button", { name: "Retry", exact: true })
+    .click();
+  await expect(player.page.getByText("Failed — not confirmed", { exact: true })).toHaveCount(0);
+  await expect
+    .poll(
+      async () =>
+        (await state(host.page)).notes.filter((n) => n.id === fallbackRecovery.commands[0].id)
+          .length,
+    )
+    .toBe(1);
+  // Preserve another confirmed-account failure through departure, room closure,
+  // and a fresh document. It must remain recoverable without room credentials.
+  await player.context.route("**/_serverFn/**", (route) => route.abort("failed"));
+  await player.page.locator("#chat-message").fill("Account closed-room recovery message");
+  await player.page.getByRole("button", { name: "Send", exact: true }).click();
+  await player.page.getByText("Failed — not confirmed", { exact: true }).waitFor();
+  const closedOutbox = await player.page.evaluate(() =>
+    Object.entries(localStorage).find(
+      ([key, value]) =>
+        key.startsWith("lootsplit.chat.outbox.v2.") &&
+        value.includes("Account closed-room recovery message"),
+    ),
+  );
+  assert.ok(closedOutbox);
+  const closedCommand = JSON.parse(closedOutbox[1])[0].command;
+  await player.context.unroute("**/_serverFn/**");
+  await player.page
+    .locator('nav[aria-label="Sections"]:visible')
+    .getByRole("link", { name: "Home", exact: true })
+    .click();
+  await visit(player.page, "/share");
   await host.page.setViewportSize({ width: 1360, height: 1000 });
   console.log("Governance audit: leave room and retain authorized reports");
   await player.page.getByRole("button", { name: "Leave room", exact: true }).click();
@@ -464,6 +776,104 @@ try {
   const records = await player.context.request.get(origin + "/api/account/records");
   assert.equal(records.status(), 200);
   assert.equal((await records.json()).reports.length, 2);
+  // Close through the actual DM control after all primary campaign assertions.
+  // The guest's failed command was never staged/committed on the server.
+  await visit(host.page, "/share");
+  await host.page.getByRole("button", { name: "End session", exact: true }).click();
+  await host.page
+    .getByRole("alertdialog", { name: "Close this room?", exact: true })
+    .getByRole("button", { name: "End session", exact: true })
+    .click();
+  await guestPage.getByRole("button", { name: "Export unsent recovery", exact: true }).waitFor();
+  await guestPage.screenshot({
+    path: output + "/revoked-guest-actions-mobile.png",
+    fullPage: true,
+  });
+  assert.equal(
+    await guestPage.evaluate(() => sessionStorage.getItem("lootsplit.player.reconnect.v1")),
+    null,
+  );
+  const actionDownload = guestPage.waitForEvent("download");
+  await guestPage.getByRole("button", { name: "Export unsent recovery", exact: true }).click();
+  const actionFile = output + "/revoked-guest-action.json";
+  await (await actionDownload).saveAs(actionFile);
+  const actionRecovery = JSON.parse(await readFile(actionFile, "utf8"));
+  assert.equal(actionRecovery.commands[0].id, pendingGuest[0].id);
+  assert.equal(actionRecovery.commands[0].kind, "bank-repay");
+  assert.equal("token" in actionRecovery, false);
+  await guestPage.getByRole("button", { name: "Discard recovery copy", exact: true }).click();
+  await guestPage
+    .getByRole("alertdialog", { name: "Discard unsent recovery?", exact: true })
+    .getByRole("button", { name: "Discard", exact: true })
+    .click();
+  await expect(
+    guestPage.getByRole("button", { name: "Export unsent recovery", exact: true }),
+  ).toHaveCount(0);
+  await guestPage
+    .locator('nav[aria-label="Sections"]:visible')
+    .getByRole("link", { name: "Campaign", exact: true })
+    .click();
+  await guestPage.getByRole("tab", { name: "Chat", exact: true }).click();
+  await guestPage.getByRole("button", { name: "Export chat recovery", exact: true }).waitFor();
+  await guestPage.screenshot({ path: output + "/revoked-guest-chat-mobile.png", fullPage: true });
+  const chatDownload = guestPage.waitForEvent("download");
+  await guestPage.getByRole("button", { name: "Export chat recovery", exact: true }).click();
+  const chatFile = output + "/revoked-guest-chat.json";
+  await (await chatDownload).saveAs(chatFile);
+  const chatRecovery = JSON.parse(await readFile(chatFile, "utf8"));
+  assert.equal(chatRecovery.commands[0].text, "Synthetic private guest message");
+  assert.equal(chatRecovery.drafts.party, "Retain this unsent guest draft");
+  assert.equal(chatRecovery.drafts.dm, "A separate private draft");
+  assert.equal("token" in chatRecovery, false);
+  assert.equal(
+    await guestPage.evaluate(() =>
+      Object.values(localStorage).some(
+        (v) =>
+          v.includes("Synthetic private guest message") ||
+          v.includes("Retain this unsent guest draft") ||
+          v.includes("A separate private draft"),
+      ),
+    ),
+    false,
+  );
+  await guestPage.getByRole("button", { name: "Discard chat recovery", exact: true }).click();
+  await guestPage
+    .getByRole("alertdialog", { name: "Discard unsent chat recovery?", exact: true })
+    .getByRole("button", { name: "Discard", exact: true })
+    .click();
+  await expect(
+    guestPage.getByRole("region", { name: "Unsent chat recovery", exact: true }),
+  ).toHaveCount(0);
+  await guestContext.close();
+  await reloadApplication(player.page);
+  await player.page.getByRole("tab", { name: "Chat", exact: true }).click();
+  await player.page.getByRole("button", { name: "Export chat recovery", exact: true }).waitFor();
+  const closedDownload = player.page.waitForEvent("download");
+  await player.page.getByRole("button", { name: "Export chat recovery", exact: true }).click();
+  const closedFile = output + "/account-chat-closed-room.json";
+  await (await closedDownload).saveAs(closedFile);
+  const closedRecovery = JSON.parse(await readFile(closedFile, "utf8"));
+  assert.equal(closedRecovery.commands[0].id, closedCommand.id);
+  assert.equal(closedRecovery.commands[0].text, "Account closed-room recovery message");
+  assert.equal("token" in closedRecovery, false);
+  await player.page.screenshot({
+    path: output + "/account-chat-closed-room-mobile.png",
+    fullPage: true,
+  });
+  await player.page.getByRole("button", { name: "Discard chat recovery", exact: true }).click();
+  await player.page
+    .getByRole("alertdialog", { name: "Discard unsent chat recovery?", exact: true })
+    .getByRole("button", { name: "Discard", exact: true })
+    .click();
+  assert.equal(
+    await player.page.evaluate((key) => localStorage.getItem(key), closedOutbox[0]),
+    null,
+  );
+  await reloadApplication(player.page);
+  await player.page.getByRole("tab", { name: "Chat", exact: true }).click();
+  await expect(
+    player.page.getByRole("button", { name: "Export chat recovery", exact: true }),
+  ).toHaveCount(0);
   // Test controls belong inside the bottom of the actual gear menu on mobile.
   await host.page.setViewportSize({ width: 390, height: 844 });
   const menuUrl = host.page.url();
@@ -577,4 +987,3 @@ try {
   db.close();
   await browser.close();
 }
-

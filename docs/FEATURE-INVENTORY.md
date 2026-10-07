@@ -79,7 +79,7 @@ Not implemented or promised by this inventory: OCR, Google Drive backup integrat
 - Warnings, temporary/permanent bans, access revocation/restoration, session revocation, and profile-content moderation. Moderators can warn/clear profiles and suspend ordinary members for up to 30 days; admins manage ordinary members; the owner manages other staff.
 - Restrictions terminate account sessions and block associated room-seat credentials. They do not erase local data or remove anonymous guest support.
 - Member profiles include display name, raster profile image, introduction, optional messaging email and explicit moderator visibility choice. Email-update preferences default off and record consent; sending is not configured.
-- Account page includes existing local campaign controls plus shared-membership rename and linked-DM deletion. Shared deletion checks current revision, refuses pending turns, retains a private snapshot of DM-visible saved data, and cleans up memberships and push subscriptions.
+- Account page includes existing local campaign controls plus shared-membership rename and linked-DM deletion. Shared deletion checks current revision, refuses pending turns, retains a complete private recovery copy of DM-visible campaign and encounter/roll history, and cleans up memberships and push subscriptions. Shared recovery restores a separate DM-only view-only room with fresh credentials; historical proposals/assignments remain downloadable, and players need new invitations. Oversized or unreadable complete copies prevent deletion. Device copies remain available.
 
 ### Administrator server monitoring
 

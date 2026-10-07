@@ -10,6 +10,7 @@ export function AccountSessionRecords() {
       name: string;
       at: number;
       snapshot: unknown;
+      error?: string;
     }>
   >([]);
   const [error, setError] = useState("");
@@ -36,7 +37,9 @@ export function AccountSessionRecords() {
             {r.campaign} · {r.name}
           </strong>
           <p>{new Date(r.at).toLocaleString()}</p>
+          {r.error && <p role="alert">{r.error}</p>}
           <button
+            disabled={!!r.error}
             className="portal-button secondary"
             onClick={() => void downloadJson("lootsplit-session-" + r.id + ".json", r.snapshot)}
           >
