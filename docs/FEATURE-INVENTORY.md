@@ -15,6 +15,7 @@ No feature below may be removed, disabled, hidden or reduced without explicit us
 | Handouts and player references                                                                      | Character / Sharing                |
 | Shops, keeper/location/category/wealth, open/closed states, filters                                 | Market                             |
 | Stock editing/generation, finite/unlimited quantities, restock, custom prices                       | Shop                               |
+| DM-selected item variety/count/all matches; independent suggested/fixed/unlimited units; bulk catalog selection preserving existing stock; totals/search/rarity/stock filters and complete paginated inventory | Market / shop Edit |
 | Purchases, sales, gifts, property listings and receipts                                             | Market / Party                     |
 | Buy/sell rates, discounts, economic modifiers, previews and repricing                               | Market / Settings                  |
 | Loans, explicit payment requests and DM review                                                      | Market / review inbox              |

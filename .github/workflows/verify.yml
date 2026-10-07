@@ -161,6 +161,9 @@ jobs:
       - name: dev-finance
         if: matrix.group == 'gameplay'
         run: node scripts/recovery-step.mjs dev-finance 240 node scripts/finance-browser-audit.mjs
+      - name: dev-shop-stock
+        if: matrix.group == 'gameplay'
+        run: node scripts/recovery-step.mjs dev-shop-stock 240 node scripts/shop-stock-browser-audit.mjs
       - name: dev-control-panel
         if: matrix.group == 'gameplay'
         run: node scripts/recovery-step.mjs dev-control-panel 240 node scripts/control-panel-browser-audit.mjs
@@ -243,6 +246,11 @@ jobs:
         env:
           AUDIT_ORIGIN: http://127.0.0.1:8082
         run: node scripts/recovery-step.mjs worker-theme 180 node scripts/theme-browser-audit.mjs
+      - name: worker-shop-stock
+        if: matrix.group == 'interface'
+        env:
+          AUDIT_ORIGIN: http://127.0.0.1:8082
+        run: node scripts/recovery-step.mjs worker-shop-stock 180 node scripts/shop-stock-browser-audit.mjs
       - name: worker-sound
         if: matrix.group == 'interface'
         env:
