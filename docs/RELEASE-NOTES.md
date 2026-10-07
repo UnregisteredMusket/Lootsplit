@@ -1,3 +1,28 @@
+# Lootsplit 1.6.0 candidate
+
+Android version code 9. This candidate retains package `com.unregisteredmusket.lootsplit` and the permanent signing certificate.
+
+## Added features
+
+- End session & keep room online lets players retain their assigned sheets and permitted campaign information between sessions.
+- After ending play, the DM can Leave room online and return through My account.
+
+## Improvements
+
+- Player gameplay, chat, campaign-sheet changes, imports and rolls pause until the DM resumes play.
+- Resume play or starting a named session restores play. The existing End session still closes access completely.
+- Preserves current account-resume recovery, saves, privacy, guest memory-only storage and the permanent Android package/signing identity.
+
+## Bug fixes
+
+- None in this release.
+
+## Candidate verification
+
+Full PR/main preservation checks and the signed Android workflow must pass. Verify the published APK certificate, version/code and checksum before updating the website download metadata. The public download remains 1.5.1 until the new signed APK and checksum exist. Physical-device installation, file-picker and force-close behavior require separate validation.
+
+---
+
 # Lootsplit 1.5.1 candidate
 
 Android version code 8. This candidate retains package `com.unregisteredmusket.lootsplit` and the existing permanent signing certificate for in-place updates. The public download remains 1.5.0 until the new signed APK and checksum exist.

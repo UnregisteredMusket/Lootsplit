@@ -1,5 +1,21 @@
 [
   {
+    "version": "1.6.0",
+    "date": "2026-10-07",
+    "summary": "Keep rooms online for player viewing between sessions.",
+    "features": [
+      "DMs can end a session while keeping the room online so players retain their assigned sheets and permitted campaign information.",
+      "After ending play, DMs can leave the room online and return through their account."
+    ],
+    "improvements": [
+      "Player gameplay, chat, campaign-sheet changes, imports and rolls pause until the DM resumes play.",
+      "The existing End session option still closes the room and revokes player access; guest storage, privacy and current account-resume recovery are preserved."
+    ],
+    "fixes": [
+      "None in this release."
+    ]
+  },
+  {
     "version": "1.5.1",
     "date": "2026-10-07",
     "summary": "Safer account campaign reopening and recovery of unsynced device changes.",
