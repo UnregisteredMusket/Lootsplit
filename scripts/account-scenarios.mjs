@@ -43,3 +43,9 @@ export function localAuditOrigin(value) {
     );
   return url.origin;
 }
+
+/** Intercept only requests outside this disposable server, never every Vite module. */
+export function externalAuditRequests(value) {
+  const origin = localAuditOrigin(value).replace(/[.*+?^${}()|[\]\\]/g, "\\$&");
+  return new RegExp(`^(?!${origin}(?:/|$))`);
+}

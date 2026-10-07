@@ -1,17 +1,18 @@
 import { test as base, expect } from "playwright/test";
 import { randomUUID } from "node:crypto";
 import { openApplication } from "../title-screen-navigation.mjs";
-import { accountScenarios } from "../account-scenarios.mjs";
+import { accountScenarios, externalAuditRequests } from "../account-scenarios.mjs";
 
 export { expect };
 export const test = base.extend({
   devices: async ({ context, page, browser, baseURL }, runFixture, testInfo) => {
     const contexts = [context];
-    const localOnly = (route) =>
-      new URL(route.request().url()).origin === new URL(baseURL).origin
-        ? route.continue()
-        : route.abort("blockedbyclient");
-    await context.route("**/*", localOnly);
+    // A catch-all route forces every development module through a Node callback
+    // during each account context reload. Match external URLs in the browser
+    // instead, retaining the exact-origin boundary and blocking every other host.
+    const externalOnly = externalAuditRequests(baseURL);
+    const blockExternal = (route) => route.abort("blockedbyclient");
+    await context.route(externalOnly, blockExternal);
     // Each synthetic device is a separate local client, including its rate-limit
     // identity. Faster independent tests must not share one localhost quota.
     const address = 40 + accountScenarios.indexOf(testInfo.title) * 4;
@@ -27,7 +28,7 @@ export const test = base.extend({
         viewport: { width, height: 900 },
         extraHTTPHeaders: { "cf-connecting-ip": `192.0.2.${address + contexts.length}` },
       });
-      await other.route("**/*", localOnly);
+      await other.route(externalOnly, blockExternal);
       contexts.push(other);
       other.on("page", watch);
       return { context: other, page: await other.newPage() };
@@ -52,6 +53,19 @@ export async function visit(page, origin, path) {
   // Vite may replace the document after its first dependency optimization.
   // waitForFunction survives that navigation while still requiring loaded fonts.
   await page.waitForFunction(() => document.fonts.status === "loaded");
+}
+
+export async function waitForDmCampaign(page) {
+  // The legitimate first-use guide appears after a short animation delay. Wait
+  // for the resumed desk, then answer the actual offer before querying roles
+  // hidden by the modal. Do not race an immediate isVisible() check.
+  await expect(page.getByText("Campaign control", { exact: true })).toBeAttached();
+  if (await page.evaluate(() => !localStorage.getItem("quire.guide.offer.v3"))) {
+    await page.getByRole("button", { name: "Not now", exact: true }).click();
+  }
+  await expect(
+    page.getByRole("button", { name: "Dungeon master. Change role.", exact: true }),
+  ).toBeVisible();
 }
 
 export function credentials() {

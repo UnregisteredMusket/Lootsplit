@@ -10,6 +10,7 @@ import {
   accountPost,
   createAndSaveRoom,
   endSession,
+  waitForDmCampaign,
 } from "./account-fixtures.mjs";
 import {
   continueIntoApp,
@@ -259,19 +260,17 @@ test("dm-resume", async ({ devices, baseURL: origin }, testInfo) => {
     });
   }
   async function resumeFromAccount(p, code, label) {
-    await visit(p, "/account");
+    // The card-layout checks already loaded both libraries. Reuse that ready
+    // account page; later cross-room resumes still navigate here from the desk.
+    if (new URL(p.url()).pathname !== "/account") await visit(p, "/account");
+    await expect(p.getByRole("button", { name: "Sign out", exact: true })).toBeVisible();
     const card = p.locator("article.portal-card").filter({ hasText: code });
     const acceptSeparate = (dialog) => dialog.accept();
     p.on("dialog", acceptSeparate);
     await card.getByRole("button", { name: label, exact: true }).click();
     await p.waitForURL((url) => url.origin === origin && url.pathname === "/");
     p.off("dialog", acceptSeparate);
-    await p
-      .getByRole("button", {
-        name: "Dungeon master. Change role.",
-        exact: true,
-      })
-      .waitFor();
+    await waitForDmCampaign(p);
     assert.equal(
       await p.locator(".loot-opening").count(),
       0,
@@ -299,7 +298,10 @@ test("resume-queue", async ({ devices, baseURL: origin }, testInfo) => {
   const visit = (p, path) => visitPage(p, origin, path);
   const firstCode = (await createAndSaveRoom(device, origin))[0].code;
   async function resumeSaved() {
-    await visit(device, "/account");
+    // Every caller has deliberately loaded the library, including the reloads
+    // after injecting stored queues. Do not add another unrelated document load.
+    expect(new URL(device.url()).pathname).toBe("/account");
+    await expect(device.getByRole("button", { name: "Sign out", exact: true })).toBeVisible();
     const card = device
       .locator("article.portal-card")
       .filter({ hasText: firstCode });
@@ -307,12 +309,7 @@ test("resume-queue", async ({ devices, baseURL: origin }, testInfo) => {
     await device.waitForURL(
       (url) => url.origin === origin && url.pathname === "/",
     );
-    await device
-      .getByRole("button", {
-        name: "Dungeon master. Change role.",
-        exact: true,
-      })
-      .waitFor();
+    await waitForDmCampaign(device);
     expect(await device.locator(".loot-opening").count()).toBe(0);
   }
   await resumeSaved();
