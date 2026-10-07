@@ -1,5 +1,22 @@
 [
   {
+    "version": "1.5.1",
+    "date": "2026-10-07",
+    "summary": "Safer account campaign reopening and recovery of unsynced device changes.",
+    "features": [
+      "Device recovery copies can be exported when older queued changes belong to a different seat or conflict with the saved campaign."
+    ],
+    "improvements": [
+      "Live changes and unfinished turn actions are labeled separately in sync recovery.",
+      "The startup campaign selector shows campaign IDs to distinguish separate saves with the same name."
+    ],
+    "fixes": [
+      "Account campaign resume reconciles server acknowledgements before treating cached actions as unsynced, removing the false unfinished-turn blocker.",
+      "Genuine unsynced actions and server turn drafts remain reachable through Multiplayer recovery while preserving command and retry identifiers.",
+      "Older-seat device actions are preserved separately and are not replayed with another seat’s permissions."
+    ]
+  },
+  {
     "version": "1.5.0",
     "date": "2026-10-07",
     "summary": "Larger DM shops, unified campaign control, and dedicated player finance and property services.",

@@ -3,6 +3,7 @@ export const accountScenarios = [
   "layout",
   "library",
   "dm-resume",
+  "resume-queue",
   "recovery",
   "portrait-resume",
   "campaign-choice",
@@ -12,8 +13,14 @@ export const accountScenarios = [
 
 export function selectAccountScenario(args, ci = process.env.CI) {
   if (!args.length) return null;
-  if (args.length !== 2 || args[0] !== "--scenario" || !accountScenarios.includes(args[1]))
-    throw new Error(`Use --scenario ${accountScenarios.join("|")}; omit it for the full audit.`);
+  if (
+    args.length !== 2 ||
+    args[0] !== "--scenario" ||
+    !accountScenarios.includes(args[1])
+  )
+    throw new Error(
+      `Use --scenario ${accountScenarios.join("|")}; omit it for the full audit.`,
+    );
   if (ci) throw new Error("CI release audits must run every account scenario.");
   return args[1];
 }
@@ -30,6 +37,8 @@ export function localAuditOrigin(value) {
     url.search ||
     url.hash
   )
-    throw new Error("Account audits require a disposable local HTTP server with an explicit port.");
+    throw new Error(
+      "Account audits require a disposable local HTTP server with an explicit port.",
+    );
   return url.origin;
 }

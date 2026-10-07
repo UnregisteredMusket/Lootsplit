@@ -14,12 +14,18 @@ import {
 import { Button, Confirm } from "./ui";
 import { toast } from "sonner";
 export function SyncStatus({ compact = false }: { compact?: boolean }) {
-  const state = useSyncExternalStore(subscribeCloudTable, getCloudTable, getServerCloudTable);
+  const state = useSyncExternalStore(
+    subscribeCloudTable,
+    getCloudTable,
+    getServerCloudTable,
+  );
   const [discard, setDiscard] = useState(false);
   const [disconnect, setDisconnect] = useState(false);
   if (!state.joined && state.status === "local") return null;
   const act = (fn: () => Promise<unknown>) =>
-    void fn().catch((e) => toast.error(e instanceof Error ? e.message : "Action failed."));
+    void fn().catch((e) =>
+      toast.error(e instanceof Error ? e.message : "Action failed."),
+    );
   return (
     <aside
       className="mb-4 rounded-xl border border-lead/30 bg-elevated p-3 text-sm"
@@ -27,13 +33,18 @@ export function SyncStatus({ compact = false }: { compact?: boolean }) {
     >
       <div className="flex flex-wrap items-center justify-between gap-2">
         <span>
-          {state.live ? "Live" : state.mine ? "Your turn" : `Waiting for ${state.who}`} ·{" "}
+          {state.live
+            ? "Live"
+            : state.mine
+              ? "Your turn"
+              : `Waiting for ${state.who}`}{" "}
+          ·{" "}
           {state.status === "saving"
             ? "Saving…"
             : state.status === "attention"
               ? "Needs attention"
               : state.pending
-                ? `${state.pending} pending action${state.pending === 1 ? "" : "s"}`
+                ? `${state.pending} ${state.live ? "unsynced Live change" : "unfinished turn action"}${state.pending === 1 ? "" : "s"}`
                 : "Synced"}
         </span>
         <Link to="/share" className="underline">
@@ -43,7 +54,9 @@ export function SyncStatus({ compact = false }: { compact?: boolean }) {
       {!compact ? (
         <>
           <details className="mt-2">
-            <summary className="cursor-pointer">Pending actions and recovery</summary>
+            <summary className="cursor-pointer">
+              Pending actions and recovery
+            </summary>
             {pendingActions().length ? (
               <ol className="mt-2 list-inside list-decimal">
                 {pendingActions().map((action) => (
@@ -69,7 +82,9 @@ export function SyncStatus({ compact = false }: { compact?: boolean }) {
               />
             </label>
           </details>
-          {state.error ? <p className="mt-2 text-danger">{state.error}</p> : null}
+          {state.error ? (
+            <p className="mt-2 text-danger">{state.error}</p>
+          ) : null}
           {state.pending || state.error ? (
             <div className="mt-2 flex flex-wrap gap-2">
               <Button variant="secondary" onClick={() => act(retryPending)}>

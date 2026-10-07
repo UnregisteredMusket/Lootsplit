@@ -260,3 +260,6 @@ Release status must be taken from the latest recovery checkpoint/PR, not this im
 - DM Pending reviews opens Review Inbox, which exposes the current campaign’s existing payment/loan decisions alongside character-import reviews. Explicit reviews of another saved room do not show the active campaign’s financial queue. Bank retains its financial controls.
 - DM Review Inbox labels the queue Payments & loans awaiting approval and shows decisions/history without a submission form. Player Bank retains Request approval to spend coins; DM Bank retains Queue a character payment for approval. Approval debits the selected account once; this is an expense request, not an invoice sent to a player.
 - DM Desk uses its visible Multiplayer settings entry; redundant standalone and Campaign tools multiplayer links are removed from DM presentation. Player navigation remains. Shared Turn-based currently requires Internet; offline pass-phone play and reliable offline website launch are specified in docs/plans/offline-pass-phone.md and are not yet implemented.
+
+
+- Account campaign resume reconciles acknowledged device commands and restores server drafts; genuine pending changes remain recoverable in Multiplayer. Changed-seat/conflicting device work remains in account-scoped exportable recovery copies, with no automatic replay under another seat.
