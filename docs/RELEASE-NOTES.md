@@ -1,3 +1,35 @@
+# Lootsplit 1.5.0 candidate
+
+Android version code 7. This candidate retains package `com.unregisteredmusket.lootsplit` and the existing permanent signing certificate for in-place updates of permanently signed installations.
+
+## Added features
+
+- DMs can create suggested, chosen-count or all-matching shop assortments, including mixed markets, with independently selected stock quantities.
+- Existing shops support bulk catalog selection, fixed or unlimited quantities, stock summaries, search, filters and paginated shelves.
+- Player Home provides six fixed service buttons for Character Sheet, Bank, My Finances, Properties, Journal and Party chat.
+- Includes DM-reviewed character imports, campaign-day shop schedules and restocking, and property income and upkeep plans.
+
+## Improvements
+
+- DM Desk and campaign overview share one Campaign control screen with five swipeable information panels, grouped tools and visible Multiplayer settings.
+- Dedicated Bank, finance, property, downtime and report screens separate player services from DM approvals and administration.
+- Bulk additions preserve existing custom prices and stock; pagination preserves complete saved inventories and PDF exports.
+- Brings the bundled Android client up to date with the verified website while retaining the package, permanent certificate, existing saves and supported play modes.
+
+## Bug fixes
+
+- Removes small automatic assortment limits that excluded eligible catalog items from shops.
+- Saved DM shortcut destinations wait for account preferences instead of exposing incorrect defaults while loading.
+- The DM Review Inbox no longer includes a misplaced payment-request composer, and duplicate multiplayer entries are removed from the DM overview.
+
+## Candidate verification
+
+Full exact-head PR/main preservation checks and the signed Android workflow must pass before publication. Verify the APK version, package, permanent certificate and checksum, then advance the website download metadata and verify its deployed download and changelog. The public download remains 1.4.0 until the new signed APK and checksum exist. Real-device upgrade, file-picker and force-close checks remain separate from automated verification.
+
+No new gameplay rules, offline pass-phone implementation, database migration, domain activation or signing-key change is included. Previously released APKs and changelog entries remain available.
+
+---
+
 # Lootsplit 1.4.0
 
 Android version code 6. This release retains package `com.unregisteredmusket.lootsplit` and the existing permanent signing certificate for in-place updates of permanently signed installations.
