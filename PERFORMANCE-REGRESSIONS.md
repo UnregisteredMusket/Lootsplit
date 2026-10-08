@@ -140,6 +140,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Packaged Worker / accounts / worker-finance | open | 3 | 11s → 19s | +8s | +72.73% |
 | Packaged Worker / accounts / worker-finance | open | 4 | 11s → 23s | +12s | +109.09% |
 | Packaged Worker / interface / Run npm ci | open | 2 | 13s → 18s | +5s | +38.46% |
+| report / Run actions/setup-node@v4 | open | 2 | 1s → 6s | +5s | +500% |
 | Packaged Worker / accounts / Run npx playwright install --with-deps chromium | open | 3 | 23s → 684s | +661s | +2873.91% |
 | Verify preserved functionality | open | 6 | 220s → 920s | +700s | +318.18% |
 | Development / gameplay / dev-bug-edge-cases | open | 2 | 9s → 15s | +6s | +66.67% |
@@ -179,6 +180,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-08T08:03:03Z | step: report / Run actions/setup-node@v4 | 3s → 6s | +3s | +100% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37301090506/job/111733716644) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37747258693/job/113211576874) |
 | 2026-10-08T08:02:48.000Z | workflow: Verify preserved functionality | 692s → 920s | +228s | +32.95% | failure | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37659474866) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37745618424) |
 | 2026-10-08T08:02:39Z | job: Packaged Worker / accounts | 202s → 810s | +608s | +300.99% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37638440371/job/112851511436) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37745618424/job/113206836417) |
 | 2026-10-08T08:00:48Z | step: Packaged Worker / accounts / Run npx playwright install --with-deps chromium | 37s → 684s | +647s | +1748.65% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37423624096/job/112139010374) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37745618424/job/113206836417) |
