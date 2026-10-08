@@ -367,11 +367,17 @@ test("dm-resume", async ({ devices, baseURL: origin }, testInfo) => {
     });
     assert.deepEqual(active, { code, role: "dm" });
   }
-  await resumeFromAccount(other, secondCode, "Reopen as DM");
-  await resumeFromAccount(page, firstCode, "Reopen as DM");
+  // Each device reopens a different closed room. Keep both complete UI/role/
+  // startup assertions, then wait for both before the cross-room resume checks.
+  await Promise.all([
+    resumeFromAccount(other, secondCode, "Reopen as DM"),
+    resumeFromAccount(page, firstCode, "Reopen as DM"),
+  ]);
   // Both saved campaigns also remain resumable after the first reopen, on either device.
-  await resumeFromAccount(page, secondCode, "Resume");
-  await resumeFromAccount(other, firstCode, "Resume");
+  await Promise.all([
+    resumeFromAccount(page, secondCode, "Resume"),
+    resumeFromAccount(other, firstCode, "Resume"),
+  ]);
 });
 
 test("resume-queue", async ({ devices, baseURL: origin }, testInfo) => {
@@ -793,13 +799,17 @@ test("portrait-resume", async ({ devices, baseURL: origin }) => {
 test("campaign-choice", async ({ devices, baseURL: origin }, testInfo) => {
   const desktop = devices.page;
   const { other: phone } = await signedInDevices(devices, origin);
+  // These are routine transitions from the already signed-in account pages.
+  // Use real links and retain the helper's same-document/startup assertions;
+  // the ownership, layout and interrupted-hydration scenarios retain cold loads.
+  const visit = (p, path) => navigateAccountScenario(p, origin, path);
   await phone.setViewportSize({ width: 390, height: 844 });
   const members = async () => {
     const response = await desktop.context().request.get(`${origin}/api/account/library`);
     expect(response.ok()).toBeTruthy();
     return (await response.json()).members;
   };
-  await visitPage(phone, origin, "/share");
+  await visit(phone, "/share");
   await phone.getByRole("button", { name: "Start a room", exact: true }).click();
   await phone.getByRole("button", { name: "Create room", exact: true }).click();
   await phone.getByRole("button", { name: "Share join link", exact: true }).waitFor();
@@ -807,7 +817,7 @@ test("campaign-choice", async ({ devices, baseURL: origin }, testInfo) => {
   await expect.poll(async () => (await members()).length).toBe(1);
   const firstCode = (await members())[0].code;
 
-  await visitPage(desktop, origin, "/share");
+  await visit(desktop, "/share");
   await desktop.getByRole("button", { name: "Start a room", exact: true }).click();
   await expect(
     desktop.getByRole("link", { name: "Resume a saved campaign", exact: true }),
@@ -851,7 +861,7 @@ test("campaign-choice", async ({ devices, baseURL: origin }, testInfo) => {
   await expect.poll(async () => (await members()).length).toBe(2);
   await expect(desktop.locator(".room-code")).toHaveText(secondCode);
 
-  await visitPage(phone, origin, "/account");
+  await visit(phone, "/account");
   const old = phone.locator("article.portal-card").filter({ hasText: firstCode });
   await expect(
     old.getByText("Open on this device · Current campaign", { exact: true }),
@@ -867,7 +877,7 @@ test("campaign-choice", async ({ devices, baseURL: origin }, testInfo) => {
   phone.once("dialog", (dialog) => dialog.accept());
   await old.getByRole("button", { name: "Resume", exact: true }).click();
   await phone.waitForURL((url) => url.pathname === "/");
-  await visitPage(phone, origin, "/share");
+  await visit(phone, "/share");
   await expect(phone.locator(".room-code")).toHaveText(firstCode);
   expect((await members()).length).toBe(2);
 });
