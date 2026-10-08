@@ -189,8 +189,12 @@ export async function signedInDevices(devices, origin) {
   await accountPost(devices.context, origin, "auth/sign-up/email", user);
   const other = await devices.newDevice();
   await accountPost(other.context, origin, "auth/sign-in/email", user);
-  await visit(devices.page, origin, "/account");
-  await visit(other.page, origin, "/account");
+  // Both devices are already independently authenticated. Their initial read-only
+  // library loads share no ordered state, so retain both cold visits in parallel.
+  await Promise.all([
+    visit(devices.page, origin, "/account"),
+    visit(other.page, origin, "/account"),
+  ]);
   await expect(devices.page.getByRole("button", { name: "Sign out", exact: true })).toBeVisible();
   await expect(other.page.getByRole("button", { name: "Sign out", exact: true })).toBeVisible();
   return { ...user, other: other.page };

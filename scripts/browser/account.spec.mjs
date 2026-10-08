@@ -18,7 +18,6 @@ import { continueIntoApp, prepareDmFixture } from "../title-screen-navigation.mj
 test("layout", async ({ devices, baseURL: origin }, testInfo) => {
   const { page } = devices;
   const visit = (p, path) => visitPage(p, origin, path);
-  await visit(page, "/welcome");
   for (const width of [1280, 390]) {
     await page.setViewportSize({ width, height: 900 });
     for (const path of ["/welcome", "/downloads", "/help", "/updates", "/account"]) {

@@ -470,7 +470,14 @@ try {
   await page.screenshot({ path: output + "/attached-record-reader.png" });
   await openApplication(page, origin + "/?view=overview");
   const sessions = page.locator("#sessions");
-  await sessions.locator(":scope > div > button").first().click();
+  const showSessions = async () => {
+    const toggle = sessions.locator(":scope > div > button").first();
+    await expect(toggle).toBeVisible();
+    if ((await toggle.getAttribute("aria-expanded")) === "false") await toggle.click();
+    await expect(toggle).toHaveAttribute("aria-expanded", "true");
+    await expect(sessions.getByLabel("Session name", { exact: true })).toBeVisible();
+  };
+  await showSessions();
   await sessions.getByLabel("Session name", { exact: true }).fill("Preserved next session");
   await page.evaluate(() => {
     window.sessionDraftDocument = "same-document";
@@ -503,13 +510,20 @@ try {
     .getByRole("button", { name: "Preview downtime calculations", exact: true })
     .click();
   await page.waitForURL((url) => url.pathname === "/features/downtime");
+  // Router history can update while the outgoing overview still has #sessions.
+  // Wait for the actual destination before opening or approving its session form.
+  await page.getByRole("heading", { name: "Downtime", exact: true }).waitFor();
   assert.equal(await page.evaluate(() => window.sessionDraftDocument), "same-document");
   assert.equal(await page.locator(".loot-opening").count(), 0);
-  await sessions.locator(":scope > div > button").first().click();
+  await showSessions();
   await expect(sessions.getByLabel("Session name", { exact: true })).toHaveValue(
     "Preserved next session",
   );
-  await sessions.getByRole("checkbox", { name: /I approve the downtime plan/ }).check();
+  const approval = sessions.getByRole("checkbox", { name: /I approve the downtime plan/ });
+  await approval.scrollIntoViewIfNeeded();
+  await expect(approval).toBeInViewport();
+  await approval.check();
+  await expect(approval).toBeChecked();
   await sessions
     .getByRole("button", { name: "Approve downtime & start session", exact: true })
     .click();
