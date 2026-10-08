@@ -474,7 +474,6 @@ export async function openComposedShop(input: {
     category: input.category,
     priceScale: input.priceScale,
   });
-  const db = await quireDb();
   await atomic(["shops", "stock", "meta"], async tx => {
     const journal = await request<{ value?: Journal } | undefined>(tx.objectStore("meta").get("journal"));
     validateShopLocations([shop], journal?.value?.market);
