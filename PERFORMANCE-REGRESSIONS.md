@@ -24,7 +24,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Development / desktop / Start disposable development server | open | 2 | 6s → 9s | +3s | +50% |
 | Code checks and immutable builds / mobile-build | open | 2 | 3s → 6s | +3s | +100% |
 | Development / gameplay / dev-bug-data-integrity | open | 3 | 4s → 7s | +3s | +75% |
-| Code checks and immutable builds | open | 3 | 48s → 96s | +48s | +100% |
+| Code checks and immutable builds | open | 4 | 48s → 144s | +96s | +200% |
 | Development / gameplay / dev-encounter | open | 5 | 8s → 32s | +24s | +300% |
 | Packaged Worker / interface / Run actions/setup-node@v4 | open | 4 | 2s → 8s | +6s | +300% |
 | Packaged Worker / accounts / Run npm ci | open | 3 | 8s → 17s | +9s | +112.5% |
@@ -126,7 +126,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Development / accounts | open | 3 | 152s → 732s | +580s | +381.58% |
 | production release asset readiness | open | 2 | 2.465s → 27.818s | +25.353s | +1028.52% |
 | Packaged standby / Run actions/download-artifact@v4 | open | 2 | 2s → 6s | +4s | +200% |
-| Packaged standby | open | 3 | 78s → 398s | +320s | +410.26% |
+| Packaged standby | open | 4 | 78s → 523s | +445s | +570.51% |
 | Development / accounts | open | 4 | 152s → 681s | +529s | +348.03% |
 | Packaged Worker / interface / Run npx playwright install --with-deps chromium | open | 4 | 22s → 292s | +270s | +1227.27% |
 | Packaged Worker / interface / worker-theme | open | 2 | 13s → 35s | +22s | +169.23% |
@@ -146,7 +146,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | report / Run actions/setup-node@v4 | open | 3 | 1s → 12s | +11s | +1100% |
 | Packaged Worker / accounts / Run npx playwright install --with-deps chromium | open | 3 | 23s → 684s | +661s | +2873.91% |
 | Verify preserved functionality | open | 6 | 220s → 920s | +700s | +318.18% |
-| Packaged standby / Run npx playwright install --with-deps chromium | open | 2 | 25s → 312s | +287s | +1148% |
+| Packaged standby / Run npx playwright install --with-deps chromium | open | 3 | 25s → 427s | +402s | +1608% |
 | Development / gameplay / dev-bug-edge-cases | open | 2 | 9s → 15s | +6s | +66.67% |
 | Verify preserved functionality | open | 3 | 205s → 917s | +712s | +347.32% |
 | Packaged Worker / interface / worker-help | open | 2 | 6s → 25s | +19s | +316.67% |
@@ -190,6 +190,9 @@ Open trends require investigation. Resolved trends retain their history; each ve
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-08T14:57:21Z | job: Packaged standby | 398s → 523s | +125s | +31.41% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37768959416/job/113284017233) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37795169313/job/113373777882) |
+| 2026-10-08T14:56:01Z | step: Packaged standby / Run npx playwright install --with-deps chromium | 312s → 427s | +115s | +36.86% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37768959416/job/113284017233) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37795169313/job/113373777882) |
+| 2026-10-08T14:48:35Z | job: Code checks and immutable builds | 96s → 144s | +48s | +50% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37642148171/job/112863642710) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37795169313/job/113372621630) |
 | 2026-10-08T14:41:06Z | step: Development / gameplay / Run actions/upload-artifact@v4 | 3s → 4s | +1s | +33.33% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37233368939/job/111527537884) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37793810061/job/113367876815) |
 | 2026-10-08T14:29:32Z | step: Development / accounts / Run npm ci | 19s → 23s | +4s | +21.05% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37563730253/job/112606617647) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37792759670/job/113364207658) |
 | 2026-10-08T14:29:09Z | step: Development / accounts / Run actions/setup-node@v4 | 11s → 23s | +12s | +109.09% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37659474866/job/112923007437) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37792759670/job/113364207658) |
