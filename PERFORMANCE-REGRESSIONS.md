@@ -86,7 +86,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Development / governance / dev-campaign-governance | open | 5 | 27s → 105s | +78s | +288.89% |
 | Development / desktop / dev-game-analytics | open | 2 | 5s → 7s | +2s | +40% |
 | Development / desktop / Run actions/upload-artifact@v4 | open | 2 | 3s → 8s | +5s | +166.67% |
-| Packaged Worker / accounts | open | 5 | 85s → 202s | +117s | +137.65% |
+| Packaged Worker / accounts | open | 6 | 85s → 810s | +725s | +852.94% |
 | Development / gameplay / Run npx playwright install --with-deps chromium | open | 3 | 21s → 58s | +37s | +176.19% |
 | Development / accounts / Run npx playwright install --with-deps chromium | open | 2 | 22s → 523s | +501s | +2277.27% |
 | Code checks and immutable builds / Run actions/upload-artifact@v4 | open | 2 | 2s → 4s | +2s | +100% |
@@ -140,8 +140,8 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Packaged Worker / accounts / worker-finance | open | 3 | 11s → 19s | +8s | +72.73% |
 | Packaged Worker / accounts / worker-finance | open | 4 | 11s → 23s | +12s | +109.09% |
 | Packaged Worker / interface / Run npm ci | open | 2 | 13s → 18s | +5s | +38.46% |
-| Packaged Worker / accounts / Run npx playwright install --with-deps chromium | open | 2 | 23s → 37s | +14s | +60.87% |
-| Verify preserved functionality | open | 5 | 220s → 692s | +472s | +214.55% |
+| Packaged Worker / accounts / Run npx playwright install --with-deps chromium | open | 3 | 23s → 684s | +661s | +2873.91% |
+| Verify preserved functionality | open | 6 | 220s → 920s | +700s | +318.18% |
 | Development / gameplay / dev-bug-edge-cases | open | 2 | 9s → 15s | +6s | +66.67% |
 | Verify preserved functionality | open | 2 | 205s → 744s | +539s | +262.93% |
 | Packaged Worker / interface / worker-help | open | 2 | 6s → 25s | +19s | +316.67% |
@@ -179,6 +179,9 @@ Open trends require investigation. Resolved trends retain their history; each ve
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-08T08:02:48.000Z | workflow: Verify preserved functionality | 692s → 920s | +228s | +32.95% | failure | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37659474866) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37745618424) |
+| 2026-10-08T08:02:39Z | job: Packaged Worker / accounts | 202s → 810s | +608s | +300.99% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37638440371/job/112851511436) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37745618424/job/113206836417) |
+| 2026-10-08T08:00:48Z | step: Packaged Worker / accounts / Run npx playwright install --with-deps chromium | 37s → 684s | +647s | +1748.65% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37423624096/job/112139010374) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37745618424/job/113206836417) |
 | 2026-10-08T07:26:12Z | step: Packaged Worker / accounts / worker-finance | 20s → 23s | +3s | +15% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37638440371/job/112851511436) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37742900449/job/113198095145) |
 | 2026-10-08T07:25:31Z | step: Development / governance / dev-backup | 12s → 23s | +11s | +91.67% | failure | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37655099675/job/112908163987) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37742900449/job/113197526534) |
 | 2026-10-08T07:25:06Z | step: Packaged Worker / interface / worker-library-navigation | 15s → 18s | +3s | +20% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37585553287/job/112675091320) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37742900449/job/113198094929) |
