@@ -34,7 +34,7 @@ test("network-boundary", async ({ devices, baseURL: origin }) => {
           const url = `${protocol}://127.0.0.1:${port}/forbidden`;
           const failed = page.waitForEvent("requestfailed", (request) => request.url() === url);
           expect(await page.evaluate((url) => fetch(url).then(() => true, () => false), url)).toBe(false);
-          expect((await failed).failure().errorText).toMatch(/BLOCKED/);
+          expect((await failed).failure().errorText).toMatch(/^(inspector|net::ERR_BLOCKED_BY_CLIENT(?:\.Inspector)?)$/);
         }
         const account = await page.evaluate(async () => {
           const response = await fetch("/api/account/auth/get-session");
