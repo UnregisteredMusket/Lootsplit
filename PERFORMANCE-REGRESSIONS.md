@@ -149,7 +149,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Packaged Worker / interface / worker-help | open | 2 | 6s → 25s | +19s | +316.67% |
 | Development / desktop / Run npx playwright install --with-deps chromium | open | 2 | 21s → 42s | +21s | +100% |
 | Development / gameplay / dev-bug-data-integrity | open | 2 | 5s → 7s | +2s | +40% |
-| Development / gameplay / dev-finance | open | 3 | 18s → 30s | +12s | +66.67% |
+| Development / gameplay / dev-finance | open | 4 | 18s → 39s | +21s | +116.67% |
 | Packaged Worker / accounts / Run npx playwright install --with-deps chromium | open | 2 | 22s → 35s | +13s | +59.09% |
 | Packaged Worker / interface / worker-loot | open | 3 | 4s → 7s | +3s | +75% |
 | Development / accounts / dev-owner | open | 2 | 4s → 6s | +2s | +50% |
@@ -180,11 +180,14 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | backup / Run npm ci --ignore-scripts | open | 2 | 7s → 17s | +10s | +142.86% |
 | Development / governance / dev-backup | resolved | 3 | 7s → 23s | +16s | +228.57% |
 | verify:quick | open | 2 | 36.854731s → 52.084s | +15.229269s | +41.32% |
+| Development / gameplay / dev-library-navigation | open | 2 | 18s → 29s | +11s | +61.11% |
 
 ## Recorded slowdowns
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-08T11:45:20Z | step: Development / gameplay / dev-library-navigation | 25s → 29s | +4s | +16% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37661353259/job/112929395908) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37769999494/job/113292704791) |
+| 2026-10-08T11:44:04Z | step: Development / gameplay / dev-finance | 30s → 39s | +9s | +30% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37564176497/job/112608005379) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37769999494/job/113292704791) |
 | 2026-10-08T11:41:19.000Z | workflow: Verify preserved functionality | 744s → 917s | +173s | +23.25% | failure | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37525444442) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37769999494) |
 | 2026-10-08T11:41:13Z | job: Development / gameplay | 282s → 911s | +629s | +223.05% | cancelled | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37564176497/job/112608005379) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37769999494/job/113286953171) |
 | 2026-10-08T11:41:10Z | step: Development / gameplay / Run npx playwright install --with-deps chromium | 58s → 881s | +823s | +1418.97% | cancelled | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37564176497/job/112608005379) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37769999494/job/113286953171) |
