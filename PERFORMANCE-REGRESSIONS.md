@@ -10,7 +10,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 
 | Operation | State | Logged increases | Original → latest | Total added | Cumulative increase |
 | --- | --- | ---: | ---: | ---: | ---: |
-| Development / accounts / Run actions/setup-node@v4 | open | 3 | 3s → 11s | +8s | +266.67% |
+| Development / accounts / Run actions/setup-node@v4 | open | 4 | 3s → 23s | +20s | +666.67% |
 | Development / gameplay / Run actions/setup-node@v4 | open | 2 | 3s → 7s | +4s | +133.33% |
 | Development / desktop / Run actions/setup-node@v4 | open | 3 | 3s → 9s | +6s | +200% |
 | Code checks and immutable builds / Run npm ci | open | 3 | 7s → 20s | +13s | +185.71% |
@@ -82,6 +82,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Development / accounts / Run actions/upload-artifact@v4 | open | 2 | 1s → 3s | +2s | +200% |
 | verify | open | 2 | 5s → 40s | +35s | +700% |
 | deploy / Check current main, existing bindings and applied migrations; deploy without rebuild | open | 3 | 9s → 28s | +19s | +211.11% |
+| Development / accounts / Run actions/checkout@v4 | open | 2 | 1s → 5s | +4s | +400% |
 | Packaged Worker / interface / Set up job | open | 2 | 1s → 3s | +2s | +200% |
 | Development / governance / dev-campaign-governance | open | 5 | 27s → 105s | +78s | +288.89% |
 | Development / desktop / dev-game-analytics | open | 2 | 5s → 7s | +2s | +40% |
@@ -166,6 +167,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Development / gameplay / dev-control-panel | open | 3 | 14s → 29s | +15s | +107.14% |
 | Packaged Worker / interface / worker-library-navigation | open | 3 | 9s → 18s | +9s | +100% |
 | Development / gameplay / Run npm ci | open | 2 | 13s → 19s | +6s | +46.15% |
+| Development / accounts / Run npm ci | open | 2 | 14s → 23s | +9s | +64.29% |
 | Packaged Worker / interface / worker-shop-stock | open | 2 | 7s → 17s | +10s | +142.86% |
 | verify / Development / accounts / Run npm ci | open | 2 | 11s → 17s | +6s | +54.55% |
 | verify / Development / governance / Start disposable development server | open | 2 | 3s → 7s | +4s | +133.33% |
@@ -188,6 +190,9 @@ Open trends require investigation. Resolved trends retain their history; each ve
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-08T14:29:32Z | step: Development / accounts / Run npm ci | 19s → 23s | +4s | +21.05% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37563730253/job/112606617647) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37792759670/job/113364207658) |
+| 2026-10-08T14:29:09Z | step: Development / accounts / Run actions/setup-node@v4 | 11s → 23s | +12s | +109.09% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37659474866/job/112923007437) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37792759670/job/113364207658) |
+| 2026-10-08T14:28:46Z | step: Development / accounts / Run actions/checkout@v4 | 2s → 5s | +3s | +150% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37263207826/job/111614535383) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37792759670/job/113364207658) |
 | 2026-10-08T14:20:02Z | step: Packaged standby / Run actions/upload-artifact@v4 | 3s → 4s | +1s | +33.33% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37284669067/job/111681080987) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37791092715/job/113359057228) |
 | 2026-10-08T14:02:36Z | step: Packaged standby / standby-audit | 78s → 91s | +13s | +16.67% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37299751759/job/111729876507) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37788622946/job/113350513119) |
 | 2026-10-08T14:00:53Z | step: Development / gameplay / dev-finance | 35s → 41s | +6s | +17.14% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37638440371/job/112850726074) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37788622946/job/113349768282) |
