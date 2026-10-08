@@ -134,14 +134,14 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Code checks and immutable builds | open | 2 | 71s → 97s | +26s | +36.62% |
 | Packaged Worker / accounts / Run npm ci | open | 2 | 13s → 19s | +6s | +46.15% |
 | Packaged Worker / interface / worker-game-analytics | open | 2 | 3s → 5s | +2s | +66.67% |
-| report | open | 2 | 7s → 12s | +5s | +71.43% |
-| Report workflow failure | open | 2 | 7s → 12s | +5s | +71.43% |
+| report | open | 3 | 7s → 18s | +11s | +157.14% |
+| Report workflow failure | open | 3 | 7s → 18s | +11s | +157.14% |
 | Packaged standby / Run npx playwright install --with-deps chromium | open | 2 | 21s → 38s | +17s | +80.95% |
 | Packaged Worker / accounts / worker-finance | open | 4 | 11s → 24s | +13s | +118.18% |
 | Packaged Worker / accounts / worker-finance | open | 4 | 11s → 23s | +12s | +109.09% |
 | report / Save report and send configured email | open | 2 | 1s → 3s | +2s | +200% |
 | Packaged Worker / interface / Run npm ci | open | 2 | 13s → 18s | +5s | +38.46% |
-| report / Run actions/setup-node@v4 | open | 2 | 1s → 6s | +5s | +500% |
+| report / Run actions/setup-node@v4 | open | 3 | 1s → 12s | +11s | +1100% |
 | Packaged Worker / accounts / Run npx playwright install --with-deps chromium | open | 3 | 23s → 684s | +661s | +2873.91% |
 | Verify preserved functionality | open | 6 | 220s → 920s | +700s | +318.18% |
 | Packaged standby / Run npx playwright install --with-deps chromium | open | 2 | 25s → 312s | +287s | +1148% |
@@ -187,6 +187,9 @@ Open trends require investigation. Resolved trends retain their history; each ve
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-08T13:26:43.000Z | workflow: Report workflow failure | 12s → 18s | +6s | +50% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37389424072) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37784341989) |
+| 2026-10-08T13:26:43Z | job: report | 12s → 18s | +6s | +50% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37389424072/job/112030687648) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37784341989/job/113335116191) |
+| 2026-10-08T13:26:39Z | step: report / Run actions/setup-node@v4 | 6s → 12s | +6s | +100% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37747258693/job/113211576874) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37784341989/job/113335116191) |
 | 2026-10-08T13:22:14Z | step: report / Save report and send configured email | 2s → 3s | +1s | +50% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37300186442/job/111730797765) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37783783759/job/113333216246) |
 | 2026-10-08T13:20:14Z | step: Development / gameplay / dev-shop-stock | 16s → 19s | +3s | +18.75% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37563730253/job/112606617702) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37783175577/job/113331148194) |
 | 2026-10-08T13:19:09Z | step: Development / gameplay / dev-encounter | 27s → 32s | +5s | +18.52% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37269780574/job/111634124581) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37783175577/job/113331148194) |
