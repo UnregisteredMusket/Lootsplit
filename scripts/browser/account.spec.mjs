@@ -116,11 +116,17 @@ test("ownership", async ({ devices, baseURL: origin }, testInfo) => {
     fullPage: true,
   });
   await endSession(dm, origin, navigateAccountScenario);
-  await expect(guest.locator(".room-code")).toBeHidden();
-  expect(
-    await guest.evaluate(() => sessionStorage.getItem("lootsplit.player.reconnect.v1")),
-  ).toBeNull();
-  await navigateAccountScenario(dm, origin, "/account");
+  // Closing is acknowledged before either read. The DM can open its library
+  // while the guest observes revocation; both finish before the room is reopened.
+  await Promise.all([
+    (async () => {
+      await expect(guest.locator(".room-code")).toBeHidden();
+      expect(
+        await guest.evaluate(() => sessionStorage.getItem("lootsplit.player.reconnect.v1")),
+      ).toBeNull();
+    })(),
+    navigateAccountScenario(dm, origin, "/account"),
+  ]);
   await dm.getByRole("button", { name: "Reopen as DM", exact: true }).click();
   await dm.waitForURL((u) => u.pathname === "/");
   await continueIntoApp(dm);
@@ -130,17 +136,23 @@ test("ownership", async ({ devices, baseURL: origin }, testInfo) => {
     guest.locator("[data-sonner-toast]").filter({ hasText: "invitation has expired" }),
   ).toBeVisible();
   const returning = credentials();
-  await accountPost(guest.context(), origin, "auth/sign-up/email", returning);
-  await navigateAccountScenario(dm, origin, "/share");
-  await dm.evaluate(() =>
-    Object.defineProperty(navigator, "share", {
-      configurable: true,
-      value: async (data) => {
-        window.invitationForTest = data.url;
-      },
-    }),
-  );
-  await dm.getByRole("button", { name: "Share join link", exact: true }).click();
+  // The returning player's signup and the DM's fresh invitation are independent.
+  // Both must finish before the authenticated player joins the reopened room.
+  await Promise.all([
+    accountPost(guest.context(), origin, "auth/sign-up/email", returning),
+    (async () => {
+      await navigateAccountScenario(dm, origin, "/share");
+      await dm.evaluate(() =>
+        Object.defineProperty(navigator, "share", {
+          configurable: true,
+          value: async (data) => {
+            window.invitationForTest = data.url;
+          },
+        }),
+      );
+      await dm.getByRole("button", { name: "Share join link", exact: true }).click();
+    })(),
+  ]);
   const freshLink = new URL(await dm.evaluate(() => window.invitationForTest));
   await visitPage(guest, origin, freshLink.pathname + freshLink.search);
   await guest.getByRole("button", { name: "Find characters", exact: true }).click();
@@ -153,7 +165,15 @@ test("ownership", async ({ devices, baseURL: origin }, testInfo) => {
   await secondPlayer.getByRole("button", { name: "Resume", exact: true }).click();
   await secondPlayer.waitForURL((u) => u.pathname === "/");
   await continueIntoApp(secondPlayer);
-  await visitPage(secondPlayer, origin, "/share");
+  // Account resume already entered a fresh player document. Follow the actual
+  // player Home link to inspect the resumed room; retain the later cold reload.
+  await secondPlayer.evaluate(() => (window.playerResumeDocumentForAudit = "resumed"));
+  await secondPlayer
+    .getByRole("link", { name: "Campaign, messages & session status →", exact: true })
+    .click();
+  await secondPlayer.waitForURL((url) => url.pathname === "/share");
+  expect(await secondPlayer.evaluate(() => window.playerResumeDocumentForAudit)).toBe("resumed");
+  await expect(secondPlayer.locator(".loot-opening")).toHaveCount(0);
   await expect(secondPlayer.locator(".room-code")).toHaveText(code);
   expect(await secondPlayer.evaluate(async () => (await indexedDB.databases()).length)).toBe(0);
   // Closing the DM's tab is not End session; a fresh player reload still reconnects.
@@ -622,7 +642,9 @@ test("portrait-resume", async ({ devices, baseURL: origin }) => {
   const desktop = devices.page;
   const { other: phone } = await signedInDevices(devices, origin);
   await phone.setViewportSize({ width: 390, height: 844 });
-  await visitPage(phone, origin, "/party?section=funds");
+  // First editing is a routine link from My account; the following explicit
+  // cold Party visit still proves the uploaded portrait persisted in IndexedDB.
+  await navigateAccountScenario(phone, origin, "/party?section=funds");
   const card = phone.locator('details[id^="purse-"]').first();
   await card.locator(":scope > summary").click();
   const id = await card.getAttribute("id");
