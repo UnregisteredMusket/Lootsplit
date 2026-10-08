@@ -139,6 +139,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Packaged standby / Run npx playwright install --with-deps chromium | open | 2 | 21s → 38s | +17s | +80.95% |
 | Packaged Worker / accounts / worker-finance | open | 4 | 11s → 24s | +13s | +118.18% |
 | Packaged Worker / accounts / worker-finance | open | 4 | 11s → 23s | +12s | +109.09% |
+| report / Save report and send configured email | open | 2 | 1s → 3s | +2s | +200% |
 | Packaged Worker / interface / Run npm ci | open | 2 | 13s → 18s | +5s | +38.46% |
 | report / Run actions/setup-node@v4 | open | 2 | 1s → 6s | +5s | +500% |
 | Packaged Worker / accounts / Run npx playwright install --with-deps chromium | open | 3 | 23s → 684s | +661s | +2873.91% |
@@ -186,6 +187,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-08T13:22:14Z | step: report / Save report and send configured email | 2s → 3s | +1s | +50% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37300186442/job/111730797765) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37783783759/job/113333216246) |
 | 2026-10-08T13:20:14Z | step: Development / gameplay / dev-shop-stock | 16s → 19s | +3s | +18.75% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37563730253/job/112606617702) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37783175577/job/113331148194) |
 | 2026-10-08T13:19:09Z | step: Development / gameplay / dev-encounter | 27s → 32s | +5s | +18.52% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37269780574/job/111634124581) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37783175577/job/113331148194) |
 | 2026-10-08T13:18:12Z | step: Code checks and immutable builds / unit-tests | 23s → 27s | +4s | +17.39% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37638440371/job/112850725516) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37783175577/job/113331147664) |
