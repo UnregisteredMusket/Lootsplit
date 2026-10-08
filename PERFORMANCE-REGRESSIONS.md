@@ -41,7 +41,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Development / governance / Start disposable development server | open | 2 | 4s → 8s | +4s | +100% |
 | Code checks and immutable builds / Run actions/upload-artifact@v4 | open | 2 | 2s → 4s | +2s | +100% |
 | Packaged Worker / interface / Run actions/setup-node@v4 | open | 3 | 3s → 7s | +4s | +133.33% |
-| Packaged Worker / accounts / Run actions/setup-node@v4 | open | 2 | 2s → 8s | +6s | +300% |
+| Packaged Worker / accounts / Run actions/setup-node@v4 | open | 3 | 2s → 11s | +9s | +450% |
 | Development / governance / dev-campaign-governance | open | 5 | 18s → 114s | +96s | +533.33% |
 | Packaged standby / Run npm ci | open | 3 | 10s → 18s | +8s | +80% |
 | Development / governance / dev-theme | open | 2 | 13s → 24s | +11s | +84.62% |
@@ -50,7 +50,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Packaged Worker / interface / worker-help | open | 2 | 6s → 9s | +3s | +50% |
 | Packaged standby / standby-audit | open | 3 | 20s → 76s | +56s | +280% |
 | Packaged standby | open | 3 | 62s → 126s | +64s | +103.23% |
-| Development / governance / dev-backup | open | 2 | 6s → 13s | +7s | +116.67% |
+| Development / governance / dev-backup | open | 3 | 6s → 18s | +12s | +200% |
 | Development / governance / Run actions/upload-artifact@v4 | open | 2 | 1s → 3s | +2s | +200% |
 | Development / governance | open | 3 | 110s → 282s | +172s | +156.36% |
 | Packaged Worker / interface / worker-library-navigation | open | 2 | 9s → 18s | +9s | +100% |
@@ -137,7 +137,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | report | open | 2 | 7s → 12s | +5s | +71.43% |
 | Report workflow failure | open | 2 | 7s → 12s | +5s | +71.43% |
 | Packaged standby / Run npx playwright install --with-deps chromium | open | 2 | 21s → 38s | +17s | +80.95% |
-| Packaged Worker / accounts / worker-finance | open | 3 | 11s → 19s | +8s | +72.73% |
+| Packaged Worker / accounts / worker-finance | open | 4 | 11s → 24s | +13s | +118.18% |
 | Packaged Worker / accounts / worker-finance | open | 4 | 11s → 23s | +12s | +109.09% |
 | Packaged Worker / interface / Run npm ci | open | 2 | 13s → 18s | +5s | +38.46% |
 | report / Run actions/setup-node@v4 | open | 2 | 1s → 6s | +5s | +500% |
@@ -151,6 +151,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Development / gameplay / dev-finance | open | 3 | 18s → 30s | +12s | +66.67% |
 | Packaged Worker / accounts / Run npx playwright install --with-deps chromium | open | 2 | 22s → 35s | +13s | +59.09% |
 | Packaged Worker / interface / worker-loot | open | 3 | 4s → 7s | +3s | +75% |
+| Development / accounts / dev-owner | open | 2 | 4s → 6s | +2s | +50% |
 | Development / governance / Run npx playwright install --with-deps chromium | open | 2 | 23s → 39s | +16s | +69.57% |
 | Development / gameplay / dev-library-navigation | resolved | 2 | 12s → 43s | +31s | +258.33% |
 | Packaged Worker / interface | open | 3 | 126s → 408s | +282s | +223.81% |
@@ -177,11 +178,20 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | backup / Run actions/setup-node@v4 | open | 2 | 3s → 7s | +4s | +133.33% |
 | backup / Run npm ci --ignore-scripts | open | 2 | 7s → 17s | +10s | +142.86% |
 | Development / governance / dev-backup | resolved | 3 | 7s → 23s | +16s | +228.57% |
+| verify:quick | open | 2 | 36.854731s → 52.084s | +15.229269s | +41.32% |
 
 ## Recorded slowdowns
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-08T10:31:00Z | step: Packaged Worker / accounts / worker-finance | 19s → 24s | +5s | +26.32% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37453107393/job/112234598065) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37763435596/job/113265768760) |
+| 2026-10-08T10:30:17Z | step: Development / governance / dev-backup | 13s → 18s | +5s | +38.46% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37661353259/job/112929395891) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37763435596/job/113265181401) |
+| 2026-10-08T10:29:51Z | step: Development / accounts / dev-owner | 5s → 6s | +1s | +20% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37304872866/job/111746024028) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37763435596/job/113265181532) |
+| 2026-10-08T10:28:01Z | step: Packaged Worker / accounts / Run actions/setup-node@v4 | 8s → 11s | +3s | +37.5% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37425891304/job/112145766306) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37763435596/job/113265768760) |
+| 2026-10-08T08:43:27.932Z | action: immutable Worker packaging | 15.786s → 51.12s | +35.334s | +223.83% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/tree/feature/preserved-improvements) · [After](https://github.com/UnregisteredMusket/Lootsplit/pull/68) |
+| 2026-10-08T08:34:36.610Z | audit: encounter browser audit | 27.42s → 32.571s | +5.151s | +18.79% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/tree/feature/preserved-improvements) · [After](https://github.com/UnregisteredMusket/Lootsplit/pull/68) |
+| 2026-10-08T08:02:22.349772+00:00 | test: verify:quick | 42.83853489400644s → 52.084s | +9.245465105993556s | +21.58% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/pull/67) · [After](https://github.com/UnregisteredMusket/Lootsplit/pull/68) |
+| 2026-10-08T07:31:41.794Z | audit: backup browser audit | 17.843s → 54.971s | +37.128s | +208.08% | failure | resolved | [Before](https://github.com/UnregisteredMusket/Lootsplit/tree/feature/preserved-improvements) · [After](https://github.com/UnregisteredMusket/Lootsplit/pull/68) |
 | 2026-10-08T09:32:21Z | step: backup / Run npm ci --ignore-scripts | 14s → 17s | +3s | +21.43% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37601195506/job/112725702458) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37757278895/job/113244829031) |
 | 2026-10-08T09:32:04Z | step: backup / Run actions/setup-node@v4 | 4s → 7s | +3s | +75% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37601195506/job/112725702458) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37757278895/job/113244829031) |
 | 2026-10-08T08:51:07Z | step: Development / gameplay / Run npx playwright install --with-deps chromium | 41s → 102s | +61s | +148.78% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37424344225/job/112140489817) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37752367163/job/113228451042) |
@@ -793,3 +803,4 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | 2026-10-06T08:55:11.946Z | resolved | PR53 unified DM home moved the desktop Session journal link into Activity & balances. Initial run37438052113 timed out because the audit did not expand that section. Commit93df78ba082a2a84c3276d45deb7adbe5b8cf3a1 adds the real section-opening click and preserves all no-reload/title assertions. Full successful run37438630832 confirms the same operation; archive this diagnosed audit timeout, not unrelated browser-install delays. | 9s | [Evidence](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37438630832/job/112187667724) |
 | 2026-10-06T15:31:06.788Z | resolved | PR55 verification37485642730 timed out at the retired .glance-strip HP selector. Fix dd60b627bdab8b75870252494b01b418b0e84f3f selects the actual Party information panel, creates its fixture among the first four alphabetical readouts, verifies exact HP/link/meter and opens the complete party list. All later two-way funds, inventory, restore, migration, permissions and shared HP checks remain intact. Complete successful exact-head verification37487168511 confirms the corrected same operation; archive this selector timeout, not unrelated workload or infrastructure trends. | 19s | [Evidence](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37487168511/job/112350106195) |
 | 2026-10-08T08:25:35.529Z | resolved | PR #68 corrects backup fixture destination readiness and session-panel handling. The failed outgoing-screen/checkbox assumptions are replaced by waiting for the actual Downtime screen and original approval controls, with every archive, cancellation, unload, exact-byte, same-document/title assertion retained. Full exact-head CI 37748688924 passed the complete same-scope dev-backup operation in 20s versus the last recorded failed 23s; preserve all prior observations. Fix/evidence: https://github.com/UnregisteredMusket/Lootsplit/pull/68 and https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37748688924 | 20s | [Evidence](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37748688924/job/113216276396) |
+| 2026-10-08T07:46:05.295Z | resolved | Corrected backup fixture outgoing-screen race: URL history changed before incoming Downtime screen mounted, then an unconditional Fold toggle could close the actual panel. Visible destination heading, conditional opening, viewport and checked-state verification preserve all original assertions. Full disposable browser audit passed at source snapshot 4fc9c9f0e95c54db0b9957f8a7261f69bcc312d51b1e4dc45fe9362cf9215e62 with the same browser-only measurement scope; PR68 retains failed and passing evidence. No application-latency fix is claimed. | 20.466s | [Evidence](https://github.com/UnregisteredMusket/Lootsplit/pull/68) |
