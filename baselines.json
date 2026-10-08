@@ -10770,17 +10770,17 @@
   },
   "[\"local\",\"audit\",\"market locations browser audit\",\"node22.23.3/linux-x64/chromium133/disposable-vite\",\"v1-location-images-and-player-availability\"]": {
     "schema": 1,
-    "id": "local:6f396a6d-2122-4b9e-ba87-7df33918437f",
+    "id": "local:77161513-8a39-4a99-941b-c66f2d5627f8",
     "scope": "[\"local\",\"audit\",\"market locations browser audit\",\"node22.23.3/linux-x64/chromium133/disposable-vite\",\"v1-location-images-and-player-availability\"]",
     "kind": "audit",
     "name": "market locations browser audit",
     "environment": "node22.23.3/linux-x64/chromium133/disposable-vite",
-    "commit": "3dbeadf8cb448fbbe6073024b54f7dc3e1b05d35",
-    "url": "https://github.com/UnregisteredMusket/Lootsplit/pull/70",
+    "commit": "2ba947ef2424348828ffda50f3c9bdfb40dfc8dc",
+    "url": "https://github.com/UnregisteredMusket/Lootsplit/tree/feature/market-name-import",
     "outcome": "success",
-    "startedAt": "2026-10-08T13:13:46.563Z",
-    "finishedAt": "2026-10-08T13:14:22.742Z",
-    "durationMs": 36179,
+    "startedAt": "2026-10-08T16:22:49.651Z",
+    "finishedAt": "2026-10-08T16:23:43.607Z",
+    "durationMs": 53956,
     "trendId": "local:6f396a6d-2122-4b9e-ba87-7df33918437f"
   },
   "[\".github/workflows/verify.yml\",\"push\",\"main\",\"step\",\"Development / desktop / Complete job\",\"ubuntu-latest\",1]": {

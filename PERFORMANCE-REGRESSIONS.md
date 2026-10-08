@@ -193,6 +193,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-08T16:23:43.607Z | audit: market locations browser audit | 36.179s → 53.956s | +17.777s | +49.14% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/pull/70) · [After](https://github.com/UnregisteredMusket/Lootsplit/tree/feature/market-name-import) |
 | 2026-10-08T16:43:07Z | step: Packaged Worker / interface / worker-library-navigation | 18s → 22s | +4s | +22.22% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37742900449/job/113198094929) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37810301899/job/113425923981) |
 | 2026-10-08T16:42:07Z | step: Packaged Worker / interface / worker-market-locations | 33s → 45s | +12s | +36.36% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37809135233/job/113421794769) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37810301899/job/113425923981) |
 | 2026-10-08T16:39:06Z | step: Code checks and immutable builds / typecheck | 14s → 17s | +3s | +21.43% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37301858919/job/111736201122) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37810301899/job/113425118332) |
