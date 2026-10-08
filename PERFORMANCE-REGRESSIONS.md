@@ -174,12 +174,16 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | verify / Development / governance / Run actions/setup-node@v4 | open | 2 | 3s → 14s | +11s | +366.67% |
 | verify / Development / governance / Run npm ci | open | 2 | 10s → 19s | +9s | +90% |
 | release-apk / Run actions/setup-node@v4 | open | 2 | 5s → 7s | +2s | +40% |
+| backup / Run actions/setup-node@v4 | open | 2 | 3s → 7s | +4s | +133.33% |
+| backup / Run npm ci --ignore-scripts | open | 2 | 7s → 17s | +10s | +142.86% |
 | Development / governance / dev-backup | resolved | 3 | 7s → 23s | +16s | +228.57% |
 
 ## Recorded slowdowns
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-08T09:32:21Z | step: backup / Run npm ci --ignore-scripts | 14s → 17s | +3s | +21.43% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37601195506/job/112725702458) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37757278895/job/113244829031) |
+| 2026-10-08T09:32:04Z | step: backup / Run actions/setup-node@v4 | 4s → 7s | +3s | +75% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37601195506/job/112725702458) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37757278895/job/113244829031) |
 | 2026-10-08T08:51:07Z | step: Development / gameplay / Run npx playwright install --with-deps chromium | 41s → 102s | +61s | +148.78% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37424344225/job/112140489817) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37752367163/job/113228451042) |
 | 2026-10-08T08:03:03Z | step: report / Run actions/setup-node@v4 | 3s → 6s | +3s | +100% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37301090506/job/111733716644) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37747258693/job/113211576874) |
 | 2026-10-08T08:02:48.000Z | workflow: Verify preserved functionality | 692s → 920s | +228s | +32.95% | failure | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37659474866) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37745618424) |
