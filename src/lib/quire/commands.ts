@@ -1,6 +1,7 @@
 import { shopScheduleSchema } from "./shop-schedule.ts";
 import { marketLocationSchema, readMarketLocations, validateShopLocations, shopAvailableHere } from "./shop-locations.ts";
 import { canonicalJson } from "./canonical-json.ts";
+import { marketNameRowsSchema, marketNameFingerprint, previewMarketNames } from "./market-name-import.ts";
 import {
   characterPermissionSchema,
   canEditCharacterField,
@@ -36,6 +37,7 @@ const id = z.string().min(1).max(150),
   qty = amount.min(1).max(100000);
 const base = { id };
 export const commandSchema = z.discriminatedUnion("kind", [
+  z.object({ ...base, kind: z.literal("market-name-import"), before: z.string(), rows: marketNameRowsSchema }),
   z.object({ ...base, kind: z.literal("shop-location"), shopId: id,
     before: z.object({ locationId: id.nullable(), image: artworkSchema.nullable() }),
     locationId: id.nullable(), image: artworkSchema.nullable() }),
@@ -271,7 +273,17 @@ export function applyCommand(input: CloudTable, seat: CloudSeat, raw: Command): 
       throw Error("Cancel the pending downtime before changing finance agreements.");
     return f;
   };
-  if (cmd.kind === "shop-location") {
+  if (cmd.kind === "market-name-import") {
+    dm();
+    const market = readMarketLocations(journal.market);
+    if (marketNameFingerprint(market, t.shops) !== cmd.before) throw Error("Location or shop names changed elsewhere. Review a fresh import preview.");
+    const plan = previewMarketNames(market, t.shops, cmd.rows, cmd.id);
+    if (plan.locations.length || plan.shops.length) {
+      journal.market = readMarketLocations({ ...market, locations: [...market.locations, ...plan.locations] });
+      t.shops.push(...plan.shops);
+      event(`Names imported: ${plan.locations.length} locations, ${plan.shops.length} shops`);
+    }
+  } else if (cmd.kind === "shop-location") {
     dm();
     const shop = t.shops.find(shop => shop.id === cmd.shopId);
     if (!shop) throw Error("This shop no longer exists.");

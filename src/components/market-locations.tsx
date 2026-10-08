@@ -14,6 +14,7 @@ import {
 import type { Shop } from "@/lib/quire/types";
 import { Button, Fold, Select, TextInput } from "./ui";
 import { MarketImageUpload } from "./market-image-upload";
+import { MarketNameImport } from "./market-name-import";
 
 export function LocationOptions({ market }: { market: MarketLocations }) {
   return [...market.locations]
@@ -134,6 +135,7 @@ export function MarketLocationsPanel() {
             <Button variant="secondary" disabled={!!editing} onClick={() => setEditing("new")}>
               Create location
             </Button>
+            <MarketNameImport market={market} shops={shops} disabled={!!editing} />
             {editing ? (
               <LocationEditor
                 key={editing}
