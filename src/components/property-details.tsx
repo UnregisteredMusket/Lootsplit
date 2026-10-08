@@ -1,3 +1,7 @@
+import { useArchiveReaderSeat } from "@/lib/quire/use-archive-reader-seat";
+import { readArchiveResult } from "@/lib/quire/archive-reader";
+import { currentPropertyRules } from "@/lib/quire/finance-record-links";
+import { nextFinancePeriod } from "@/lib/quire/finance-presentation";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { getCloudTable, getServerCloudTable, subscribeCloudTable } from "@/lib/quire/cloud-client";
 import { useEconomy } from "@/lib/quire/economy-context";
@@ -9,7 +13,6 @@ import { Button, TextInput, TextArea } from "./ui";
 import { FeatureLink } from "./feature-navigation";
 import { PropertyFinancialPlan } from "./campaign-operations";
 import { readFinance } from "@/lib/quire/finance";
-import { readArchivedSnapshot } from "@/lib/quire/journal";
 import { mutationNotice } from "@/lib/quire/mutation-outcome";
 import { AppLink } from "./app-link";
 export function PropertyDetails({ plans = false }: { plans?: boolean }) {
@@ -21,16 +24,14 @@ export function PropertyDetails({ plans = false }: { plans?: boolean }) {
       h.quantity > 0 &&
       (seat.role === "dm" || seat.purseIds.includes(h.purseId)),
   );
-  const finance = readFinance(journal.finance);
+  const finance = readFinance(journal.finance),
+    archiveSeat = useArchiveReaderSeat(seat);
   const records = [...ledger];
   let unavailable = 0;
   for (const report of journal.reports || []) {
-    try {
-      if (report.error) throw Error(report.error);
-      records.push(...readArchivedSnapshot(report.snapshot).ledger);
-    } catch {
-      unavailable++;
-    }
+    const result = readArchiveResult(report, archiveSeat);
+    if (result.available) records.push(...result.snapshot.ledger);
+    else unavailable++;
   }
   return (
     <section id="campaign-operations">
@@ -42,7 +43,12 @@ export function PropertyDetails({ plans = false }: { plans?: boolean }) {
             record {h.id}
           </p>
           <PropertyEditor holding={h} />
-          {plans && seat.role === "dm" && <PropertyFinancialPlan holding={h} />}
+          {plans &&
+            (seat.role === "dm" ? (
+              <PropertyFinancialPlan holding={h} />
+            ) : (
+              <PropertyFinancialReadout holding={h} finance={finance} />
+            ))}
           <PropertyHistory holding={h} records={records} finance={finance} />
         </article>
       ))}
@@ -219,5 +225,37 @@ function PropertyHistory({
         </p>
       )}
     </details>
+  );
+}
+
+function PropertyFinancialReadout({
+  holding,
+  finance,
+}: {
+  holding: Holding;
+  finance: ReturnType<typeof readFinance>;
+}) {
+  const rules = currentPropertyRules(holding, finance.rules);
+  return (
+    <section className="journal-entry" aria-label={`Financial plan for ${holding.name}`}>
+      <h3>Current-owner financial plan</h3>
+      {rules.map((rule) => (
+        <p key={rule.id}>
+          {rule.kind === "income" ? "Revenue" : "Upkeep"}: {formatCopper(rule.copper)} every{" "}
+          {rule.periodDays} in-game days · {rule.active ? "Active" : "Paused"} · {rule.carryDays}{" "}
+          days carried{rule.arrears ? ` · Unpaid ${formatCopper(rule.arrears)}` : ""}.
+          {rule.active
+            ? ` Next full period at campaign day ${nextFinancePeriod(finance.day, rule.periodDays, rule.carryDays, true)}, conditional on approved in-game days.`
+            : " Pausing preserves carried days and unpaid amounts."}{" "}
+          <AppLink href={`/features/finances#rule-${encodeURIComponent(rule.id)}`}>
+            View original recurring rule
+          </AppLink>
+        </p>
+      ))}
+      {!rules.length && <p>No current-owner financial plan is recorded for this property.</p>}
+      <p className="text-sm text-muted">
+        Scheduled revenue is not available cash. The DM controls these agreements.
+      </p>
+    </section>
   );
 }

@@ -20,6 +20,7 @@ import {
 import { useEffect, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { AppLink } from "@/components/app-link";
+import { journalEntryHref } from "@/lib/quire/journal-navigation";
 import { z } from "zod";
 import { Shield } from "lucide-react";
 import { accountRequest } from "@/lib/account/client";
@@ -938,7 +939,7 @@ function EncounterEditor({
                 {summaryEntry && (
                   <p>
                     This receipt already has a journal summary. Check sync status for any pending
-                    save. <AppLink href="/features/journal">Open campaign journal</AppLink>
+                    save. <AppLink href={journalEntryHref(summaryEntry.id)}>Open campaign journal</AppLink>
                   </p>
                 )}
               </details>

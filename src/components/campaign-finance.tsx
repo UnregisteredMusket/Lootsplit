@@ -1,3 +1,4 @@
+import { loanRecordId, loanRequestRecordId } from "@/lib/quire/finance-record-links";
 import { useDraftGuard } from "@/lib/quire/use-draft-guard";
 import { mutationNotice } from "@/lib/quire/mutation-outcome";
 import { CoinAmountInput, FinanceReadiness } from "./finance-input";
@@ -296,7 +297,7 @@ export function CampaignFinance({
             outstanding
           </summary>
           {f.loans.map((l) => (
-            <div className="journal-entry" key={l.id}>
+            <div className="journal-entry" key={l.id} id={loanRecordId(l.id)}>
               <strong>
                 {l.name} · {accountName(l.purseId)}
               </strong>
@@ -309,6 +310,13 @@ export function CampaignFinance({
                 Installment {formatCopper(l.payment)} · {l.carryDays} days carried · Lender:{" "}
                 {l.lenderId ? accountName(l.lenderId) : "External / NPC lender"}
               </p>
+              {requests.some(
+                (request) => request.id === l.sourceLoanId && request.purseId === l.purseId,
+              ) && (
+                <AppLink href={`/features/bank#${loanRequestRecordId(l.sourceLoanId!)}`}>
+                  View original loan request
+                </AppLink>
+              )}
               {l.principal + l.interest > 0 ? (
                 <div className="flex flex-wrap gap-2">
                   <Button disabled={busy || !!pending} variant="secondary" onClick={() => edit(l)}>

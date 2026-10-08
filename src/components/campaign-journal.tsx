@@ -1,5 +1,5 @@
 import { useDraftGuard } from "@/lib/quire/use-draft-guard";
-import { useNavigate } from "@tanstack/react-router";
+import { useNavigate, useRouterState } from "@tanstack/react-router";
 import { FeatureCards } from "./feature-navigation";
 import { downloadJson } from "@/lib/quire/table";
 
@@ -23,6 +23,14 @@ import { CoinAmountInput, FinanceReadiness } from "./finance-input";
 import { useFinanceReadiness } from "@/lib/quire/use-finance-readiness";
 import { useArchiveReaderSeat } from "@/lib/quire/use-archive-reader-seat";
 import { mutationNotice } from "@/lib/quire/mutation-outcome";
+import { journalEntryHref, sessionChronicleEntries } from "@/lib/quire/journal-navigation";
+import { AppLink } from "./app-link";
+import { readFinance } from "@/lib/quire/finance";
+import {
+  debtForLoanRequest,
+  loanRecordId,
+  loanRequestRecordId,
+} from "@/lib/quire/finance-record-links";
 import { activeDatabaseName } from "@/lib/quire/db";
 import {
   rememberSessionName,
@@ -198,6 +206,23 @@ export function CampaignJournal({
   }
   const requests = journal.requests.filter((x) => dm || seat.purseIds.includes(x.purseId));
   const loanRequests = loans.filter((x) => dm || seat.purseIds.includes(x.purseId));
+  const hash = useRouterState({ select: (state) => state.location.hash });
+  const linkedLoanRequestId = loanRequests.find(
+    (request) => loanRequestRecordId(request.id) === hash,
+  )?.id;
+  useEffect(() => {
+    if (!linkedLoanRequestId) return;
+    setRequestSearch("");
+    setRequestStatus("all");
+    setRequestKind("all");
+    if (reviewRef.current) reviewRef.current.open = true;
+    const frame = requestAnimationFrame(() =>
+      document
+        .getElementById(loanRequestRecordId(linkedLoanRequestId))
+        ?.scrollIntoView({ block: "start" }),
+    );
+    return () => cancelAnimationFrame(frame);
+  }, [linkedLoanRequestId, hash, reviewRef]);
   const pending = loanRequests.filter((x) => x.status === "pending");
   const matchesRequest = (request: { status: string; note: string; purseId: string }) =>
     (requestStatus === "all" ||
@@ -374,6 +399,15 @@ export function CampaignJournal({
                       Read session report
                     </Button>
                   )}
+                  {sessionChronicleEntries(journal.entries || [], seat, session.id).map((entry) => (
+                    <AppLink
+                      className="settings-link"
+                      key={entry.id}
+                      href={journalEntryHref(entry.id)}
+                    >
+                      Read linked journal entry · {entry.title}
+                    </AppLink>
+                  ))}
                 </div>
               );
             })}
@@ -573,32 +607,54 @@ export function CampaignJournal({
           {dm && !pending.length && !requests.some((x) => x.status === "pending") && (
             <p role="status">No payments or loans need approval.</p>
           )}
-          {shownLoanRequests.map((x) => (
-            <div className="journal-entry" key={x.id}>
-              <strong>
-                Loan · {x.purseName} · {formatCopper(x.copper)}
-              </strong>
-              <p>{x.note}</p>
-              <small>{x.status}</small>
-              {dm && x.status === "pending" ? (
-                <div className="flex gap-2">
-                  <Button
-                    disabled={busy}
-                    onClick={() => void run(() => decideLoan(x.id, "approved"))}
-                  >
-                    Approve loan
-                  </Button>
-                  <Button
-                    disabled={busy}
-                    variant="secondary"
-                    onClick={() => void run(() => decideLoan(x.id, "denied"))}
-                  >
-                    Decline
-                  </Button>
-                </div>
-              ) : null}
-            </div>
-          ))}
+          {shownLoanRequests.map((x) => {
+            const debt = debtForLoanRequest(x, readFinance(journal.finance).loans);
+            return (
+              <div
+                className="journal-entry"
+                key={x.id}
+                id={loanRequestRecordId(x.id)}
+                style={{ scrollMarginTop: "6rem" }}
+              >
+                <strong>
+                  Loan · {x.purseName} · {formatCopper(x.copper)}
+                </strong>
+                <p>{x.note}</p>
+                <small>{x.status}</small>
+                {x.status === "approved" &&
+                  (debt ? (
+                    <AppLink
+                      className="settings-link"
+                      href={`/features/bank#${loanRecordId(debt.id)}`}
+                    >
+                      View resulting loan record
+                    </AppLink>
+                  ) : (
+                    <p className="text-sm text-muted">
+                      The original loan record link is unavailable. Your authorized Bank history
+                      remains available.
+                    </p>
+                  ))}
+                {dm && x.status === "pending" ? (
+                  <div className="flex gap-2">
+                    <Button
+                      disabled={busy}
+                      onClick={() => void run(() => decideLoan(x.id, "approved"))}
+                    >
+                      Approve loan
+                    </Button>
+                    <Button
+                      disabled={busy}
+                      variant="secondary"
+                      onClick={() => void run(() => decideLoan(x.id, "denied"))}
+                    >
+                      Decline
+                    </Button>
+                  </div>
+                ) : null}
+              </div>
+            );
+          })}
           {[...shownRequests].reverse().map((x) => (
             <div className="journal-entry" key={x.id}>
               <strong>
@@ -606,6 +662,14 @@ export function CampaignJournal({
               </strong>
               <p>{x.note}</p>
               <small>{x.status}</small>
+              {x.status === "approved" && (
+                <p className="text-sm text-muted">
+                  No original transaction link was stored for this request.{" "}
+                  <AppLink href={dm ? "/features/reports" : "/features/finances"}>
+                    Open authorized financial history
+                  </AppLink>
+                </p>
+              )}
               {dm && x.status === "pending" ? (
                 <div className="flex gap-2">
                   <Button

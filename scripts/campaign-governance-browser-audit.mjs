@@ -510,6 +510,23 @@ try {
     20000,
   );
   assert.equal(await player.page.getByLabel("Property revenue (cp)", { exact: true }).count(), 0);
+  const propertyPlan = player.page.getByRole("region", {
+    name: "Financial plan for Renamed player inn",
+    exact: true,
+  });
+  await expect(propertyPlan).toContainText("Revenue: 2 sp every 7 in-game days");
+  await expect(propertyPlan).toContainText("Scheduled revenue is not available cash");
+  await expect(propertyPlan.locator("input,select,textarea")).toHaveCount(0);
+  await player.page.locator(".feature-return a").click();
+  await player.page.locator('.shortcut-grid a[href^="/features/finances?"]').click();
+  await player.page.getByText(/Inn revenue.*2 sp every 7 days/).waitFor();
+  await player.page.getByRole("link", { name: "View linked property", exact: true }).click();
+  await expect(player.page.locator("#property-home-inn")).toBeVisible();
+  await expect(
+    player.page.getByRole("region", { name: "Financial plan for Renamed player inn", exact: true }),
+  ).toContainText("Revenue: 2 sp");
+  assert.equal(await player.page.evaluate(() => window.featureDocumentMarker), "same-document");
+  assert.equal(await player.page.locator(".loot-opening").count(), 0);
   await player.page.locator(".feature-return a").click();
   await player.page.locator('.shortcut-grid a[href^="/features/finances?"]').click();
   await player.page.getByText(/Inn revenue.*2 sp every 7 days/).waitFor();

@@ -7,7 +7,16 @@ import { useSeat } from "@/lib/quire/seat";
 import { readFinance } from "@/lib/quire/finance";
 import { formatCopper, toCopper } from "@/lib/quire/money";
 import { FeatureLink } from "./feature-navigation";
-import { Button } from "./ui";
+import { Button, Modal } from "./ui";
+import type { LedgerLine } from "@/lib/quire/types";
+import {
+  currentPurchasedHolding,
+  fundingRecordForDebt,
+  loanRecordId,
+  loanRequestRecordId,
+  holdingRecordId,
+  propertyRecordId,
+} from "@/lib/quire/finance-record-links";
 import { selectSessionLedgerRows } from "@/lib/quire/journal";
 import { readArchiveResult } from "@/lib/quire/archive-reader";
 import {
@@ -20,7 +29,7 @@ import { mutationNotice } from "@/lib/quire/mutation-outcome";
 import { CoinAmountInput, FinanceReadiness } from "./finance-input";
 import { AppLink } from "./app-link";
 export function PersonalFinances({ bank = false }: { bank?: boolean }) {
-  const { journal, purses, ledger, commandOutcome } = useEconomy(),
+  const { journal, purses, holdings, ledger, loans: loanRequests, commandOutcome } = useEconomy(),
     seat = useSeat();
   const archiveSeat = useArchiveReaderSeat(seat);
   const f = readFinance(journal.finance),
@@ -70,7 +79,7 @@ export function PersonalFinances({ bank = false }: { bank?: boolean }) {
           {f.loans
             .filter((l) => l.purseId === p.id)
             .map((l) => (
-              <article className="journal-entry" key={l.id}>
+              <article className="journal-entry" key={l.id} id={loanRecordId(l.id)}>
                 <strong>{l.name}</strong>
                 <p>
                   Principal {formatCopper(l.principal)} · Interest {formatCopper(l.interest)} ·
@@ -84,6 +93,24 @@ export function PersonalFinances({ bank = false }: { bank?: boolean }) {
                     ? ` · Next full period at campaign day ${nextFinancePeriod(f.day, l.periodDays, l.carryDays, true)}, if those in-game days are approved`
                     : ""}
                 </p>
+                {loanRequests.some(
+                  (request) => request.id === l.sourceLoanId && request.purseId === l.purseId,
+                ) && (
+                  <AppLink href={`/features/bank#${loanRequestRecordId(l.sourceLoanId!)}`}>
+                    View original loan request
+                  </AppLink>
+                )}
+                {fundingRecordForDebt(l, ledger) ? (
+                  <OriginalFinanceRecord
+                    record={fundingRecordForDebt(l, ledger)!}
+                    label="Read original funding record"
+                  />
+                ) : (
+                  <p className="text-sm text-muted">
+                    No original funding transaction link is available in these active records.
+                    Authorized archived history remains available.
+                  </p>
+                )}
                 {bank && l.principal + l.interest > 0 && (
                   <form
                     onSubmit={async (e) => {
@@ -193,13 +220,28 @@ export function PersonalFinances({ bank = false }: { bank?: boolean }) {
               {f.rules
                 .filter((r) => r.purseId === p.id)
                 .map((r) => (
-                  <p key={r.id}>
+                  <p key={r.id} id={`rule-${encodeURIComponent(r.id)}`}>
                     {r.name} · {r.kind} · {formatCopper(r.copper)} every {r.periodDays} days ·{" "}
                     {r.active ? "Active" : "Paused"} · {r.carryDays} days carried
                     {r.active
                       ? ` · Next full period at campaign day ${nextFinancePeriod(f.day, r.periodDays, r.carryDays, true)}, conditional on approved in-game days`
                       : " · Pausing keeps carried days and unpaid amounts"}
                     {r.arrears ? ` · Owed ${formatCopper(r.arrears)}` : ""}
+                    {holdings.some(
+                      (holding) =>
+                        holding.id === r.holdingId &&
+                        holding.kind === "property" &&
+                        holding.purseId === r.purseId &&
+                        holding.quantity > 0,
+                    ) && (
+                      <>
+                        {" "}
+                        ·{" "}
+                        <AppLink href={`/features/properties#${propertyRecordId(r.holdingId)}`}>
+                          View linked property
+                        </AppLink>
+                      </>
+                    )}
                   </p>
                 ))}
             </>
@@ -300,8 +342,22 @@ export function PersonalFinances({ bank = false }: { bank?: boolean }) {
                 {new Date(r.at).toLocaleString()} · {r.summary} · {formatCopper(r.copper)}
               </p>
               <small>Original record · {r.transactionType || "Legacy type not recorded"}</small>
-              {r.purchase?.holding && (
-                <AppLink href="/party?section=funds">Open purchased inventory</AppLink>
+              {(r.transactionType === "purchase" || r.purchase?.holding) && (
+                <>
+                  <OriginalFinanceRecord record={r} label="Read original purchase record" />
+                  {currentPurchasedHolding(r, holdings) ? (
+                    <AppLink
+                      href={`/party?section=funds#${holdingRecordId(currentPurchasedHolding(r, holdings)!.id)}`}
+                    >
+                      Open purchased inventory
+                    </AppLink>
+                  ) : (
+                    <p className="text-sm text-muted">
+                      An exact current inventory lot is unavailable. This original transaction
+                      remains readable; stored purchase details are shown when available.
+                    </p>
+                  )}
+                </>
               )}
             </article>
           ))}
@@ -333,5 +389,42 @@ export function PersonalFinances({ bank = false }: { bank?: boolean }) {
       )}
       <FeatureLink feature={bank ? "finances" : "bank"} />
     </section>
+  );
+}
+
+function OriginalFinanceRecord({ record, label }: { record: LedgerLine; label: string }) {
+  const [open, setOpen] = useState(false);
+  const purchased = record.purchase?.holding;
+  return (
+    <>
+      <Button variant="secondary" onClick={() => setOpen(true)}>
+        {label}
+      </Button>
+      {open && (
+        <Modal open onOpenChange={setOpen} title={label}>
+          <section aria-label="Original financial record" className="grid gap-3">
+            <p>
+              {new Date(record.at).toLocaleString()} · {record.summary} ·{" "}
+              {formatCopper(record.copper)}
+            </p>
+            <p>Original record ID: {record.id}</p>
+            {purchased && (
+              <>
+                <h3>{purchased.name}</h3>
+                <p>
+                  Original holding ID: {purchased.id} · {purchased.kind} · Quantity{" "}
+                  {record.purchase!.quantity} · Value each {formatCopper(purchased.unitCopper)}
+                </p>
+                {purchased.notes && <p className="whitespace-pre-wrap">{purchased.notes}</p>}
+                <p className="text-sm text-muted">
+                  These are the stored purchase details. Later inventory changes do not rewrite this
+                  record.
+                </p>
+              </>
+            )}
+          </section>
+        </Modal>
+      )}
+    </>
   );
 }

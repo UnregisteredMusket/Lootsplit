@@ -196,6 +196,7 @@ Validation for this change: 427 automated tests passed (four existing skips), Ty
 - Authoritative leave/dismiss/kick/ban controls revoke seats. Kicks require fresh invitations; bans block campaign/report access. Closed rooms retain authorized archives while denying character selection and edits.
 - Session reports archive financial activity, character changes and authorized messages before active logs clear; DM reports indicate player-private messages without exposing contents. Account reports survive departure according to permissions.
 - DM-private, party-shared and private-player journal entries can attach prior session reports.
+- Receipt-linked loot journal summaries use exact stored encounter/receipt/session IDs. Authorized session entries and party notes link to each other; original encounter links require a confirmed matching DM read in the current campaign. Players keep their own projected financial history. Names never establish a historical link.
 - Merchant sale categories have DM-configurable exceptions. Service purchases are recorded and cannot be resold.
 - Owner-only isolated Test mode has a settings configurator, header indicator and red DM-home reset; Test rooms are excluded from gameplay analytics.
 

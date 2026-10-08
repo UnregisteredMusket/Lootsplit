@@ -60,9 +60,47 @@ try {
         });
         tx.objectStore("meta").put({
           id: "journal",
-          value: { sessions: [], requests: [], events: [] },
+          value: {
+            sessions: [],
+            requests: [],
+            events: [],
+            finance: {
+              loans: [
+                {
+                  id: "previously-repaid-debt",
+                  sourceLoanId: "previously-approved-request",
+                  name: "Previously repaid loan",
+                  purseId: "finance-party",
+                  lenderId: "",
+                  principal: 0,
+                  interest: 0,
+                  due: 0,
+                  carryDays: 0,
+                  interestRemainder: 0,
+                  paid: 100,
+                  rateBps: 0,
+                  periodDays: 30,
+                  compound: false,
+                  payment: 0,
+                },
+              ],
+            },
+          },
         });
-        tx.objectStore("meta").put({ id: "loans", loans: [] });
+        tx.objectStore("meta").put({
+          id: "loans",
+          loans: [
+            {
+              id: "previously-approved-request",
+              at: 1,
+              purseId: "finance-party",
+              purseName: "Finance party",
+              copper: 100,
+              note: "Previously repaid loan",
+              status: "approved",
+            },
+          ],
+        });
         tx.oncomplete = resolve;
         tx.onerror = () => reject(tx.error);
       });
@@ -80,6 +118,24 @@ try {
       assert.equal(await page.locator(".loot-opening").count(), 0);
     }
     const finance = page.locator("#campaign-finance");
+    // A complete legacy request/debt relation opens the exact existing agreement,
+    // while its absent historical ledger association remains unlinked.
+    const loanRequest = page.locator("#loan-request-previously-approved-request");
+    await loanRequest
+      .getByRole("link", { name: "View resulting loan record", exact: true })
+      .click();
+    assert.equal(new URL(page.url()).hash, "#loan-previously-repaid-debt");
+    const previousDebt = page.locator("#loan-previously-repaid-debt");
+    assert.equal(await previousDebt.count(), 1);
+    await previousDebt
+      .getByText("Previously repaid loan · Finance party", { exact: true })
+      .waitFor();
+    assert.equal(await previousDebt.isVisible(), true);
+    await previousDebt
+      .getByRole("link", { name: "View original loan request", exact: true })
+      .click();
+    assert.equal(new URL(page.url()).hash, "#loan-request-previously-approved-request");
+    assert.equal(await loanRequest.isVisible(), true);
     await page.getByLabel("Loan name", { exact: true }).fill("Guild debt");
     const principal = page.getByLabel("Principal (cp)", { exact: true });
     await principal

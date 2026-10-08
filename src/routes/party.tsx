@@ -1,3 +1,4 @@
+import { holdingRecordId } from "@/lib/quire/finance-record-links";
 import { CharacterPermissions } from "@/components/character-permissions";
 import { toast } from "sonner";
 import { Open5eBrowser } from "@/components/open5e-browser";
@@ -374,7 +375,7 @@ function PartyPage() {
                   .map((holding) => {
                     const owner = economy.purses.find((purse) => purse.id === holding.purseId);
                     return (
-                      <li key={holding.id} className="py-3">
+                      <li key={holding.id} id={holdingRecordId(holding.id)} className="py-3">
                         <div className="flex items-baseline justify-between gap-3">
                           <span>
                             <span className="fantasy-reference-title">

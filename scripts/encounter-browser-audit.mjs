@@ -320,6 +320,167 @@ try {
   assert.equal(receiptNotes.length, 1);
   assert.equal(receiptNotes[0].provenance.encounterId, d.id);
   assert.equal(receiptNotes[0].provenance.sessionId, "session-explicit");
+  const noteId = receiptNotes[0].id;
+  const noteHref = `/features/journal#journal-entry-${encodeURIComponent(noteId)}`;
+  const sessionHash = "journal-session-session-explicit";
+  await p.evaluate(() => {
+    window.receiptNavigationDocument = true;
+  });
+  const noteLink = p.getByRole("link", { name: "Open campaign journal", exact: true });
+  await expect(noteLink).toHaveAttribute("href", noteHref);
+  // An existing party summary never proves that a different receipt belongs to it.
+  let mismatchedReceiptReads = 0;
+  const wrongReceipt = async (route) => {
+    if (route.request().postDataJSON()?.id !== d.id) return route.continue();
+    mismatchedReceiptReads++;
+    const response = await route.fetch();
+    const detail = await response.json();
+    await route.fulfill({
+      json: { ...detail, award: { ...detail.award, receiptId: "different-receipt" } },
+    });
+  };
+  await p.route("**/api/account/encounters/detail", wrongReceipt);
+  await noteLink.click();
+  await p.getByRole("heading", { name: "Journal", exact: true }).waitFor();
+  await expect(p.locator(".journal-reading")).toContainText(receiptNotes[0].text);
+  await expect(
+    p.getByText("The original receipt is unavailable in this campaign access.", { exact: true }),
+  ).toBeVisible();
+  assert.ok(mismatchedReceiptReads > 0);
+  await expect(
+    p.getByRole("link", { name: "Open original encounter receipt", exact: true }),
+  ).toHaveCount(0);
+  await p.unroute("**/api/account/encounters/detail", wrongReceipt);
+  await p.getByRole("button", { name: "Retry receipt access", exact: true }).click();
+  await expect(
+    p.getByRole("link", { name: "Open original encounter receipt", exact: true }),
+  ).toHaveAttribute("href", `/encounters?encounter=${encodeURIComponent(d.id)}`);
+  await p.setViewportSize({ width: 1440, height: 1000 });
+  assert.ok(await p.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+  await p.getByRole("link", { name: "Open linked recorded session", exact: true }).click();
+  await p.waitForURL((url) => url.hash === `#${sessionHash}`);
+  const sessionReader = p.getByRole("dialog", { name: "Recorded session", exact: true });
+  await expect(sessionReader).toContainText("Recorded session");
+  await expect(sessionReader).toContainText("Campaign · Received 25 gp");
+  await sessionReader.screenshot({ path: output + "/linked-session-dm.png" });
+  const exactNote = sessionReader.getByRole("link", {
+    name: `Read linked journal entry · ${receiptNotes[0].title}`,
+    exact: true,
+  });
+  await expect(exactNote).toHaveAttribute("href", noteHref);
+  await exactNote.click();
+  await expect(sessionReader).toBeHidden();
+  await p.goBack();
+  await expect(sessionReader).toBeVisible();
+  await p.goForward();
+  await expect(sessionReader).toBeHidden();
+  await expect(p.locator(".journal-reading")).toContainText(receiptNotes[0].text);
+  await p.locator(".journal-book").screenshot({ path: output + "/linked-journal-dm.png" });
+  // Hash-only record navigation retains a journal draft; leaving its screen still asks.
+  await p.getByRole("button", { name: "Write an entry", exact: true }).click();
+  await p.getByLabel("Journal entry title", { exact: true }).fill("Unsubmitted journal draft");
+  await p
+    .getByLabel("Journal entry text", { exact: true })
+    .fill("Preserve this text while reading linked records.");
+  await p.locator(".journal-contents button").filter({ hasText: receiptNotes[0].title }).click();
+  await p.getByRole("link", { name: "Open linked recorded session", exact: true }).click();
+  await sessionReader
+    .getByRole("link", {
+      name: `Read linked journal entry · ${receiptNotes[0].title}`,
+      exact: true,
+    })
+    .click();
+  await p.getByRole("button", { name: "Write an entry", exact: true }).click();
+  await expect(p.getByLabel("Journal entry title", { exact: true })).toHaveValue(
+    "Unsubmitted journal draft",
+  );
+  await expect(p.getByLabel("Journal entry text", { exact: true })).toHaveValue(
+    "Preserve this text while reading linked records.",
+  );
+  const draftWarnings = [];
+  const recordDraftWarning = (dialog) => draftWarnings.push(dialog.message());
+  p.on("dialog", recordDraftWarning);
+  // The campaign's ordinary session card also reaches this exact entry.
+  await p.getByRole("link", { name: "Return to Desk", exact: true }).click();
+  await p.getByText("Campaign control", { exact: true }).waitFor();
+  p.off("dialog", recordDraftWarning);
+  assert.ok(draftWarnings.some((message) => /Discard unsaved journal changes/.test(message)));
+  await p.getByRole("link", { name: "Open session controls →", exact: true }).click();
+  await p
+    .locator("#sessions")
+    .getByRole("link", {
+      name: `Read linked journal entry · ${receiptNotes[0].title}`,
+      exact: true,
+    })
+    .click();
+  await p.getByRole("heading", { name: "Journal", exact: true }).waitFor();
+  await expect(p.locator(".journal-reading")).toContainText(receiptNotes[0].text);
+  await p.getByRole("link", { name: "Open original encounter receipt", exact: true }).click();
+  await p.waitForURL((url) => url.searchParams.get("encounter") === d.id);
+  await p.getByText(/locked against a second award/).waitFor();
+  assert.equal(await p.evaluate(() => window.receiptNavigationDocument), true);
+  assert.equal(await p.locator(".loot-opening").count(), 0);
+  // Read the same explicit party summary through a separately resumed player context.
+  // Its authenticated cookie is synthetic; its campaign/tab storage is isolated.
+  const readerContext = await browser.newContext({
+    viewport: { width: 390, height: 844 },
+    extraHTTPHeaders: { "cf-connecting-ip": "192.0.2.223" },
+    storageState: await player.context.storageState(),
+  });
+  const reader = await readerContext.newPage();
+  reader.setDefaultTimeout(30000);
+  reader.on("pageerror", (error) => errors.push(error.message));
+  await openApplication(reader, origin + "/account");
+  await reader
+    .locator("article.portal-card")
+    .filter({ hasText: code })
+    .getByRole("button", { name: "Resume", exact: true })
+    .click();
+  await reader.waitForURL((url) => url.pathname === "/");
+  await continueIntoApp(reader);
+  await reader.getByRole("heading", { name: "Home", exact: true }).waitFor();
+  await reader.evaluate(() => {
+    window.receiptNavigationDocument = true;
+  });
+  let privateReceiptRequests = 0;
+  const observeReceipt = (request) => {
+    if (new URL(request.url()).pathname === "/api/account/encounters/detail")
+      privateReceiptRequests++;
+  };
+  reader.on("request", observeReceipt);
+  await reader.getByRole("link", { name: "Journal", exact: true }).click();
+  await reader.getByRole("heading", { name: "Journal", exact: true }).waitFor();
+  await expect(reader.locator(".journal-reading")).toContainText(receiptNotes[0].text);
+  await expect(
+    reader.getByRole("link", { name: "Open original encounter receipt", exact: true }),
+  ).toHaveCount(0);
+  await expect(
+    reader.getByRole("link", { name: "Open my authorized financial history", exact: true }),
+  ).toBeVisible();
+  for (const privateText of ["Silver signet", "Hidden gem", "Party fund", "Rimrock ghoul", "25 gp"])
+    assert.ok(!(await reader.locator(".journal-reading").innerText()).includes(privateText));
+  await reader.getByRole("link", { name: "Open linked recorded session", exact: true }).click();
+  const playerSession = reader.getByRole("dialog", { name: "Recorded session", exact: true });
+  await expect(playerSession).toContainText("Your assigned accounts · Received 0 cp");
+  await expect(playerSession).not.toContainText("25 gp");
+  assert.ok(await reader.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
+  await playerSession.screenshot({ path: output + "/linked-session-player.png" });
+  await playerSession
+    .getByRole("link", {
+      name: `Read linked journal entry · ${receiptNotes[0].title}`,
+      exact: true,
+    })
+    .click();
+  await expect(playerSession).toBeHidden();
+  await reader.locator(".journal-book").screenshot({ path: output + "/linked-journal-player.png" });
+  assert.equal(
+    privateReceiptRequests,
+    0,
+    "a player note/session reader never requests the DM receipt endpoint",
+  );
+  assert.equal(await reader.evaluate(() => window.receiptNavigationDocument), true);
+  assert.equal(await reader.locator(".loot-opening").count(), 0);
+  await readerContext.close();
   await reloadApplication(p);
   await p.getByText(/locked against a second award/).waitFor();
   await p.getByLabel("Save in", { exact: true }).selectOption(code);
