@@ -159,6 +159,62 @@ try {
     });
     await reloadApplication(dm);
     await dm.getByRole("button", { name: /^Manage regions, cities, towns and areas/ }).click();
+    await dm.getByRole("button", { name: "Import names", exact: true }).click();
+    const importDialog = dm.getByRole("dialog", { name: "Import location and shop names" });
+    const namesFile = {
+      name: "world.csv",
+      mimeType: "text/csv",
+      buffer: Buffer.from(
+        `region,city,town,area,shop\nImported Coast ${width},Imported Port ${width},,Imported Docks ${width},Imported Forge ${width}\nImported Coast ${width},,Imported Village ${width},,Imported Inn ${width}`,
+      ),
+    };
+    await importDialog.getByLabel("Import names file", { exact: true }).setInputFiles(namesFile);
+    await importDialog.getByRole("button", { name: "Review import", exact: true }).click();
+    await expect(
+      importDialog.getByText("4 new locations · 2 new shops", { exact: true }),
+    ).toBeVisible();
+    await dm.screenshot({ path: `${output}/import-preview-${width}.png` });
+    await importDialog.getByRole("button", { name: "Close", exact: true }).click();
+    await dm.getByRole("button", { name: /^Manage regions, cities, towns and areas/ }).click();
+    await dm.getByRole("button", { name: "Import names", exact: true }).click();
+    await expect(importDialog.getByLabel("Names to import", { exact: true })).toHaveValue(
+      namesFile.buffer.toString(),
+    );
+    await expect(
+      importDialog.getByText("4 new locations · 2 new shops", { exact: true }),
+    ).toBeVisible();
+    await importDialog.getByRole("button", { name: "Import 6 new entries", exact: true }).click();
+    await expect(importDialog).toHaveCount(0);
+    await dm.getByRole("button", { name: /^Manage regions, cities, towns and areas/ }).click();
+    const importedShop = (await rows(dm, "shops")).find(
+      (shop) => shop.name === `Imported Forge ${width}`,
+    );
+    assert.ok(importedShop.closed);
+    assert.equal(
+      (await rows(dm, "stock")).filter((stock) => stock.shopId === importedShop.id).length,
+      0,
+    );
+    const importedLocations = (await market(dm)).locations;
+    assert.equal(importedLocations.length, 4);
+    await dm.getByRole("button", { name: "Import names", exact: true }).click();
+    await importDialog.getByLabel("Import names file", { exact: true }).setInputFiles(namesFile);
+    await importDialog.getByRole("button", { name: "Review import", exact: true }).click();
+    await expect(
+      importDialog.getByText("0 new locations · 0 new shops", { exact: true }),
+    ).toBeVisible();
+    await expect(
+      importDialog.getByRole("button", { name: "Import 0 new entries", exact: true }),
+    ).toBeDisabled();
+    await importDialog.getByLabel("Import names file", { exact: true }).setInputFiles({
+      name: "invalid.json",
+      mimeType: "application/json",
+      buffer: Buffer.from('[{"city":"Orphan"}]'),
+    });
+    await importDialog.getByRole("button", { name: "Review import", exact: true }).click();
+    await expect(importDialog.getByRole("alert")).toContainText("choose a region");
+    assert.deepEqual((await market(dm)).locations, importedLocations);
+    await importDialog.getByRole("button", { name: "Clear import", exact: true }).click();
+    await importDialog.getByRole("button", { name: "Close", exact: true }).click();
     const region = await createLocation(dm, "region", `Coast ${width}`);
     const city = await createLocation(dm, "city", `Port ${width}`, region);
     const area = await createLocation(dm, "area", `Docks ${width}`, city);
@@ -281,6 +337,7 @@ try {
       player.getByRole("button", { name: /^Manage regions, cities, towns and areas/ }),
     ).toHaveCount(0);
     await expect(player.getByRole("button", { name: "New shop", exact: true })).toHaveCount(0);
+    await expect(player.getByRole("button", { name: "Import names", exact: true })).toHaveCount(0);
     for (const name of [`Coast ${width}`, `Port ${width}`, `Docks ${width}`])
       await decode(player.getByAltText(name, { exact: true }));
     await expect(
@@ -331,12 +388,43 @@ try {
       (await rows(dm, "stock")).find((stock) => stock.shopId === remoteShop).quantity,
       7,
     );
+    // The shared DM imports a plain shop list through the actual server command path.
+    await dm.getByRole("button", { name: /^Manage regions, cities, towns and areas/ }).click();
+    await dm.getByRole("button", { name: "Import names", exact: true }).click();
+    await importDialog.getByLabel("Imported name type", { exact: true }).selectOption("shop");
+    await importDialog.getByLabel("Import parent location", { exact: true }).selectOption(other);
+    await importDialog
+      .getByLabel("Names to import", { exact: true })
+      .fill(`Shared Imported Shop ${width}`);
+    await importDialog.getByRole("button", { name: "Review import", exact: true }).click();
+    await expect(
+      importDialog.getByText("0 new locations · 1 new shops", { exact: true }),
+    ).toBeVisible();
+    await importDialog.getByRole("button", { name: "Import 1 new entries", exact: true }).click();
+    await expect(importDialog).toHaveCount(0);
+    await expect(
+      player
+        .locator(".market-grid")
+        .getByRole("link")
+        .filter({ hasText: `Shared Imported Shop ${width}` }),
+    ).toHaveCount(1);
+    await reloadApplication(dm);
+    assert.equal(
+      (await rows(dm, "shops")).filter((shop) => shop.name === `Shared Imported Shop ${width}`)
+        .length,
+      1,
+    );
+    assert.equal(
+      (await market(dm)).locations.filter((location) => location.name === `Imported Coast ${width}`)
+        .length,
+      1,
+    );
     await player.screenshot({ path: `${output}/player-${width}.png`, fullPage: true });
     await dm.screenshot({ path: `${output}/dm-${width}.png`, fullPage: true });
   }
   assert.deepEqual(errors, []);
   console.log(
-    "PASS: desktop/mobile DM hierarchy and four image uploads, shop assignments and configuration, real player image decoding/trade, live location change, reload and memory-only guest access.",
+    "PASS: desktop/mobile reviewed CSV/plain name imports, invalid JSON/duplicate protection, closed empty shops, shared server import and reload; DM hierarchy/images, player trade, live location changes and memory-only guest access.",
   );
 } catch (error) {
   console.error(error);

@@ -14,6 +14,29 @@ import {
 } from "./push.server.ts";
 import { jwtVerify, importJWK } from "jose";
 const sql = new DatabaseSync(":memory:");
+test("DM name imports persist atomically and a lost-response retry cannot duplicate shops; players cannot import", async () => {
+  const { parseMarketNames, marketNameFingerprint } = await import("./market-name-import.ts");
+  const { readMarketLocations } = await import("./shop-locations.ts");
+  const { choosePace } = await import("./cloud.server.ts");
+  const table = { ...emptyCloudTable(), purses: [{ id: "import-hero", name: "Hero", kind: "character" as const, coins: emptyCoins() }] };
+  const host = await openRoom({ name: "Import DM", table });
+  const player = await joinRoom({ code: host.code, purseId: "import-hero", name: "Hero" });
+  await choosePace({ ...host, live: true });
+  const command = { id: "import-once", kind: "market-name-import", before: marketNameFingerprint(readMarketLocations(), []), rows: parseMarketNames("region,town,shop\nCoast,Village,Inn\nCoast,Village,Forge", "region", null) };
+  const before = await readRoom(host.code);
+  await assert.rejects(submitCommands({ code: host.code, token: player.token, batchId: "player-import", commands: [command] }), /Only the DM/);
+  assert.deepEqual(await readRoom(host.code), before);
+  await submitCommands({ ...host, batchId: "import-first", commands: [command] });
+  await submitCommands({ ...host, batchId: "import-first", commands: [command] });
+  await submitCommands({ ...host, batchId: "lost-response", commands: [command] });
+  const read = await roomState(host);
+  assert.equal(read.table.shops.length, 2);
+  assert.equal(read.table.journal!.market!.locations.length, 2);
+  assert.ok(read.table.shops.every(shop => shop.closed));
+  assert.deepEqual(read.table.purses, table.purses);
+  assert.equal(read.table.journal!.events.filter(event => event.summary.startsWith("Names imported:")).length, 1);
+  await deleteRoom(host.code, read.revision);
+});
 test("independent player room reads follow DM location changes and reject hidden-shop trades without committing", async () => {
   const { blankShop } = await import("./economy.ts");
   const { choosePace } = await import("./cloud.server.ts");

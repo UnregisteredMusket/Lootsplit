@@ -14,6 +14,7 @@ import {
 import type { Shop } from "@/lib/quire/types";
 import { Button, Fold, Select, TextInput } from "./ui";
 import { MarketImageUpload } from "./market-image-upload";
+import { MarketNameImport } from "./market-name-import";
 
 export function LocationOptions({ market }: { market: MarketLocations }) {
   return [...market.locations]
@@ -117,6 +118,7 @@ export function MarketLocationsPanel() {
         <Fold
           title="Manage regions, cities, towns and areas"
           hint={`${market.locations.length} locations · images and descriptions are player facing`}
+          actions={<MarketNameImport market={market} shops={shops} disabled={!!editing} />}
         >
           <div className="space-y-3">
             <label className="block text-sm">
