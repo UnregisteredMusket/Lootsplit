@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import { chromium } from "playwright";
-import { mkdir } from "node:fs/promises";
+import { mkdir, readFile } from "node:fs/promises";
 import { openApplication, reloadApplication } from "./title-screen-navigation.mjs";
 
 const origin = process.env.AUDIT_ORIGIN || "http://127.0.0.1:8080";
@@ -118,6 +118,8 @@ try {
       (row) => row.category === "general" && ["common", "uncommon"].includes(row.rarity),
     ).length;
     await page.getByLabel("Shop", { exact: true }).fill(`Audit Trading Hall ${width}`);
+    await page.getByLabel("New shop image", { exact: true }).setInputFiles({ name: "shop.webp", mimeType: "image/webp", buffer: await readFile("public/art/shop-default.webp") });
+    await page.getByAltText("New shop image preview", { exact: true }).waitFor();
     await page.getByLabel("Item variety", { exact: true }).selectOption("count");
     await page.getByLabel("Number of item types", { exact: true }).fill("60");
     await page.getByRole("heading", { name: "Stock · 60", exact: true }).waitFor();
@@ -129,6 +131,9 @@ try {
     await page.getByRole("button", { name: "Open this shop", exact: true }).click();
     await page.getByRole("heading", { name: `Audit Trading Hall ${width}`, exact: true }).waitFor();
     const shopId = new URL(page.url()).pathname.split("/").at(-1);
+    const createdShop = (await readRows(page, "shops")).find(shop => shop.id === shopId);
+    assert.match(createdShop.image, /^data:image\/webp;base64,/);
+    assert.equal(createdShop.locationId, undefined, "Composed unassigned shops remain campaignwide");
     let rows = await waitStock(
       page,
       (rows) => rows.filter((row) => row.shopId === shopId).length === expected,

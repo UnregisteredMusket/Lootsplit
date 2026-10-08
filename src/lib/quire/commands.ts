@@ -1,4 +1,5 @@
 import { shopScheduleSchema } from "./shop-schedule.ts";
+import { marketLocationSchema, readMarketLocations, validateShopLocations, shopAvailableHere } from "./shop-locations.ts";
 import { canonicalJson } from "./canonical-json.ts";
 import {
   characterPermissionSchema,
@@ -19,6 +20,7 @@ import { assertMerchantSale, isService, stockCategory } from "./merchant.ts";
 import { archiveSession } from "./session-records.ts";
 import { readJournal, preserveJournalMetadata, encounterLootProvenanceSchema, encounterLootEntryId } from "./journal.ts";
 import { z } from "zod";
+import { artworkSchema } from "./artwork.ts";
 import { sheetSchema } from "../characters/model.mjs";
 import {
   characterSheet,
@@ -34,6 +36,11 @@ const id = z.string().min(1).max(150),
   qty = amount.min(1).max(100000);
 const base = { id };
 export const commandSchema = z.discriminatedUnion("kind", [
+  z.object({ ...base, kind: z.literal("shop-location"), shopId: id,
+    before: z.object({ locationId: id.nullable(), image: artworkSchema.nullable() }),
+    locationId: id.nullable(), image: artworkSchema.nullable() }),
+  z.object({ ...base, kind: z.literal("market-location"), locationId: id, before: marketLocationSchema.nullable(), after: marketLocationSchema.nullable() }),
+  z.object({ ...base, kind: z.literal("party-location"), before: id.nullable(), locationId: id.nullable() }),
   z.object({ ...base, kind: z.literal("bank-repay"), loanId: id, copper: amount.min(1) }),
   z.object({ ...base, kind: z.literal("property-details"), holdingId: id, before: z.object({name:z.string(),notes:z.string()}), name: z.string().trim().min(1).max(160), notes: z.string().max(4000) }),
   z.object({ ...base, kind: z.literal("shop-schedule"), shopId: id, schedule: shopScheduleSchema.nullable() }),
@@ -264,7 +271,32 @@ export function applyCommand(input: CloudTable, seat: CloudSeat, raw: Command): 
       throw Error("Cancel the pending downtime before changing finance agreements.");
     return f;
   };
-  if (cmd.kind === "property-details") {
+  if (cmd.kind === "shop-location") {
+    dm();
+    const shop = t.shops.find(shop => shop.id === cmd.shopId);
+    if (!shop) throw Error("This shop no longer exists.");
+    if (!same({ locationId: shop.locationId ?? null, image: shop.image ?? null }, cmd.before)) throw Error("This shop's location or image changed elsewhere. Refresh before saving.");
+    if (cmd.locationId) shop.locationId = cmd.locationId; else delete shop.locationId;
+    if (cmd.image) shop.image = cmd.image; else delete shop.image;
+    event(`Shop location and image saved: ${shop.name}`);
+  } else if (cmd.kind === "market-location") {
+    dm();
+    const market = readMarketLocations(journal.market);
+    const current = market.locations.find(location => location.id === cmd.locationId) ?? null;
+    if (!same(current, cmd.before)) throw Error("This location changed elsewhere. Refresh before saving.");
+    if (cmd.after && cmd.after.id !== cmd.locationId) throw Error("Location identity cannot change.");
+    if (!cmd.after && (market.currentLocationId === cmd.locationId || market.locations.some(location => location.parentId === cmd.locationId) || t.shops.some(shop => shop.locationId === cmd.locationId)))
+      throw Error("Move the party, child locations and assigned shops before removing this location.");
+    market.locations = [...market.locations.filter(location => location.id !== cmd.locationId), ...(cmd.after ? [cmd.after] : [])];
+    journal.market = readMarketLocations(market);
+    event(cmd.after ? `Location saved: ${cmd.after.name}` : "Location removed");
+  } else if (cmd.kind === "party-location") {
+    dm();
+    const market = readMarketLocations(journal.market);
+    if (market.currentLocationId !== cmd.before) throw Error("The party moved elsewhere. Refresh before changing location.");
+    journal.market = readMarketLocations({ ...market, currentLocationId: cmd.locationId });
+    event(cmd.locationId ? `Party location: ${market.locations.find(location => location.id === cmd.locationId)?.name}` : "Party location cleared; all shops available");
+  } else if (cmd.kind === "property-details") {
     const h = t.holdings.find(h => h.id === cmd.holdingId && h.kind === "property" && h.quantity > 0);
     if (!h) throw Error("Property no longer exists.");
     own(h.purseId);
@@ -574,6 +606,7 @@ export function applyCommand(input: CloudTable, seat: CloudSeat, raw: Command): 
     const s = t.stock.find((x) => x.id === cmd.stockId),
       shop = t.shops.find((x) => x.id === s?.shopId);
     if (!s || !shop) throw new Error("Item or shop no longer exists.");
+    if (seat.role === "player" && !shopAvailableHere(shop, readMarketLocations(journal.market))) throw Error("This shop is not available at the party's current location.");
     if (shop.closed) throw new Error("This shop is closed.");
     if (s.quantity !== null && s.quantity < cmd.quantity)
       throw new Error("Not enough stock. Refresh and choose a smaller quantity.");
@@ -616,6 +649,7 @@ export function applyCommand(input: CloudTable, seat: CloudSeat, raw: Command): 
     const h = t.holdings.find((x) => x.id === cmd.holdingId),
       s = t.shops.find((x) => x.id === cmd.shopId);
     if (!h || !s) throw new Error("Item or shop no longer exists.");
+    if (seat.role === "player" && !shopAvailableHere(s, readMarketLocations(journal.market))) throw Error("This shop is not available at the party's current location.");
     if (s.closed) throw new Error("This shop is closed.");
     own(h.purseId);
     assertMerchantSale(h, s);
@@ -781,6 +815,7 @@ export function applyCommand(input: CloudTable, seat: CloudSeat, raw: Command): 
   }
   if (journal.finance) journal.finance = readFinance(journal.finance);
   validateEconomyRows(t);
+  validateShopLocations(t.shops, t.journal?.market);
   return t;
 }
 export function same(a: unknown, b: unknown): boolean {

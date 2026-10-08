@@ -199,7 +199,7 @@ export async function joinRoom(input: { code: string; purseId: string; name: str
   if (room.testMode) throw Error("Test rooms are private to the owner.");
   requireInvitationSession(room, input.sessionId);
   const existing = input.userId && room.seats.find(s => s.userId === input.userId && s.role === "player");
-  if (existing) return { token: existing.token, seatId: existing.id, revision: room.revision, purseIds: existing.purseIds, shopIds: room.table.shops.map(s => s.id), userId: existing.userId };
+  if (existing) return { token: existing.token, seatId: existing.id, revision: room.revision, purseIds: existing.purseIds, shopIds: projectRecord(room.table, existing).shops.map(s => s.id), userId: existing.userId };
   const blocked = input.userId && room.blockedUsers?.[input.userId];
   if (blocked === "banned") throw Error("You are banned from this campaign.");
   const restriction = room.departed?.find(s => s.purseIds.includes(input.purseId) && (s.status === "kicked" || s.status === "banned"));
@@ -220,7 +220,7 @@ export async function joinRoom(input: { code: string; purseId: string; name: str
     seatId: claimed.seat.id,
     revision: next.revision,
     purseIds: claimed.seat.purseIds,
-    shopIds: claimed.room.table.shops.map((shop) => shop.id),
+    shopIds: projectRecord(claimed.room.table, claimed.seat).shops.map((shop) => shop.id),
     userId: claimed.seat.userId,
   };
 }
@@ -348,7 +348,8 @@ async function must(code: string): Promise<CloudRoom> {
 
 function view(room: CloudRoom, seat: CloudSeat): RoomView {
   const current = room.seats[room.turn];
-  const journal = projectRecord({ ...room.table, journal: room.table.journal }, seat).journal;
+  const record = projectRecord({ ...room.table, journal: room.table.journal }, seat);
+  const journal = record.journal;
   return {
     userId: seat.userId,
     code: room.code,
@@ -363,7 +364,7 @@ function view(room: CloudRoom, seat: CloudSeat): RoomView {
     departed: seat.role === "dm" ? room.departed?.map(s => ({ id: s.id, name: s.name, status: s.status, invitation: s.purseIds.map(id => room.invitations?.[id]).find(Boolean) })) : undefined,
     seatId: seat.id,
     purseIds: seat.purseIds,
-    shopIds: room.table.shops.map((shop) => shop.id),
+    shopIds: record.shops.map((shop) => shop.id),
     seats: room.seats.map((item) => ({
       id: item.id,
       name: item.name,
@@ -380,6 +381,8 @@ function view(room: CloudRoom, seat: CloudSeat): RoomView {
         ? { ...room.table, journal, notes: room.table.notes.filter((note) => canReadNote(note, seat)) }
         : {
             ...room.table,
+            shops: record.shops,
+            stock: record.stock,
             purses: room.table.purses.map((p) => {
               if (seat.purseIds.includes(p.id)) return p;
               const {

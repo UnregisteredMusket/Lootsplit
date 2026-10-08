@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { marketLocationsSchema, validateShopLocations } from "./shop-locations.ts";
 import { validateEconomyRows } from "./validation.ts";
 import type { CloudTable } from "./cloud.ts";
 import { sheetSchema } from "../characters/model.mjs";
@@ -17,6 +18,7 @@ export const encounterLootProvenanceSchema = z.object({
 export type EncounterLootProvenance = z.infer<typeof encounterLootProvenanceSchema>;
 export const encounterLootEntryId = (receiptId: string) => `encounter-loot:${receiptId}`;
 const journalFields = z.object({
+  market: marketLocationsSchema.optional(),
   downtimePrompt: z
     .object({ enabled: z.boolean(), days: z.number().int().min(0).max(3650) })
     .optional(),
@@ -125,6 +127,7 @@ export function readArchivedSnapshot(snapshot: string): CloudTable {
     const t = table as CloudTable;
     validateEconomyRows(t);
     const journal = journalFields.parse(t.journal ?? {});
+    validateShopLocations(t.shops, journal.market);
     for (const key of ["notes", "sheets", "loans", "listings", "handouts"] as const)
       if (t[key] !== undefined && !Array.isArray(t[key])) throw Error("Invalid archived records.");
     if (!z.array(z.object({ id: z.string(), at: z.number().finite(), from: z.enum(["dm", "player"]),
@@ -217,6 +220,7 @@ export function preserveJournalMetadata(value: unknown, current: Journal): Journ
       ? { downtimePrompt: next.downtimePrompt ?? current.downtimePrompt }
       : {}),
     ...(next.finance ? {} : current.finance ? { finance: current.finance } : {}),
+    ...(next.market ? {} : current.market ? { market: current.market } : {}),
     ...(current.reports || next.reports
       ? {
           reports: [...reports.values()],

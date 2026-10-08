@@ -1,4 +1,6 @@
 import { useFinanceReadiness } from "@/lib/quire/use-finance-readiness";
+import { ShopLocationEditor } from "@/components/market-locations";
+import { readMarketLocations, locationLabel, shopAvailableHere } from "@/lib/quire/shop-locations";
 import { useDraftGuard } from "@/lib/quire/use-draft-guard";
 import { FinanceReadiness } from "@/components/finance-input";
 import { mutationNotice } from "@/lib/quire/mutation-outcome";
@@ -79,12 +81,16 @@ function ShopPage() {
     );
   }
 
-  if (seat.role === "player" && !seat.shopIds.includes(shop.id)) {
+  if (
+    seat.role === "player" &&
+    (!seat.shopIds.includes(shop.id) ||
+      !shopAvailableHere(shop, readMarketLocations(economy.journal.market)))
+  ) {
     return (
       <Shell>
         <h1 className="font-display text-4xl tracking-tight">Shop not included</h1>
         <p className="mt-2 text-sm text-muted">
-          This shop was not included in the link you opened.
+          This shop is not available at the party's current location.
         </p>
       </Shell>
     );
@@ -119,6 +125,16 @@ function ShopPage() {
           </Button>
         ) : null}
       </div>
+      {shop.image ? (
+        <img
+          src={shop.image}
+          alt={shop.name}
+          className="mt-3 max-h-72 w-full rounded-lg object-contain"
+        />
+      ) : null}
+      <p className="mt-2 text-sm text-muted">
+        {locationLabel(readMarketLocations(economy.journal.market), shop.locationId)}
+      </p>
       {viewing === "edit" ? (
         <div className="mt-3 flex flex-col gap-3">
           <TextInput
@@ -150,6 +166,7 @@ function ShopPage() {
             }
           />
           <ShelfTuning shop={shop} />
+          <ShopLocationEditor key={shop.id} shop={shop} />
         </div>
       ) : (
         <div className="mt-2">

@@ -1,0 +1,22 @@
+# Shop locations and shared images
+
+The Dungeon Master can create regions, cities/towns and areas, upload their player-facing images and descriptions, assign shops, and set the party's location. Players see the current path and its available shops, including parent-location and campaignwide shops. Unassigned legacy shops remain campaignwide. With no party location, every shop remains available.
+
+Locations live in optional journal metadata, so existing IndexedDB stores, shared snapshots, session archives and complete backups retain them without a schema migration. Structured shop assignments supplement the existing free-text address. Dedicated DM commands use captured baselines and reject conflicting edits; they change only location/image fields, preserving stock, merchant rates, schedules and other configuration. Removing an occupied location requires explicitly moving the party, child places and assigned shops first. Server purchases and sales reject unavailable shops before committing financial or stock changes. Player room and archive projections exclude unrelated locations, shops and stock.
+
+The file picker accepts PNG, JPEG and WebP, decodes and compresses locally while preserving aspect ratio, limits uploads to 10 MB and stored images to 100,000 characters, and retains an existing image when processing fails. Save controls wait for image processing. No generated or third-party artwork was integrated.
+
+## Verification checkpoint
+
+- Focused model, backup, shop and durable-room checks: 18 passed, including DM authorization, hierarchy/reference validation, stale-write rejection, inherited availability, atomic trade rejection, configuration preservation and independent room projections.
+- Desktop/mobile browser checks passed for hierarchy creation, four location image uploads, two shop image uploads, real guest image decoding and purchase, live movement, reload and guest memory-only storage. Conflicting edits retained the unfinished draft and newer saved assignment. The existing shop-stock audit also passed, with additional composed-shop image persistence coverage and every stock/trading assertion retained.
+- Quick verification: 725 passed/four existing skips, clean TypeScript and ESLint zero errors (31 existing warnings), 43.227s. The sandbox injects an experimental proxy warning into Node stderr; `NODE_NO_WARNINGS=1` restores the normal CLI test environment without changing assertions. The new browser checks are required in both development and packaged Worker CI, with existing deadlines and release gates preserved.
+- Web build passed. Mobile build and exact-head CI remain required before release. Local Chromium 133 is diagnostic coverage; current Playwright Chromium download is blocked here, and mandatory CI uses the current browser. No physical Android verification or new signed APK is claimed.
+
+## Performance review
+
+Initial read-only history sync returned 614 retained regression observations, zero additions and zero stale resolutions, matching the preceding PR69 review. One previously recorded interrupted GitHub run remains pending (37642398740); it is not a successful check. Historical observations and twelve resolution records remain intact; no faster sample resets a reference. The 43.227s local quick check is below the existing 52.084s logged comparable reference, with no qualifying slowdown.
+
+Existing open trends include runner/dependency installation, account/browser audits, builds and short-step timing noise. PR69's latest full main attempt took 917s versus the logged 744s reference (+173s, +23.25%); its gameplay runner spent 881s installing browser system dependencies versus 58s (+823s, +1418.97%) before cancellation. Failed-jobs-only retry then passed on unchanged code. These diagnosed setup events remain logged. Application-facing finance (30s to 39s, +30%) and library navigation (25s to 29s, +16%) remain open for comparable follow-up; prior findings remain available in PR69 and the persistent log. New location audits add workload and are measured separately. Final CI/deployment timings, recorder freshness, newly qualifying observations and outstanding trend review belong in the PR release evidence after exact-head checks complete.
+
+No production campaign mutation is used for verification. Publishing remains dependent on complete exact-head PR/main checks and the immutable website deployment with read-only desktop/mobile live verification.

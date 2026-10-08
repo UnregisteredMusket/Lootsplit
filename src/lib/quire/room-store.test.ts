@@ -14,6 +14,35 @@ import {
 } from "./push.server.ts";
 import { jwtVerify, importJWK } from "jose";
 const sql = new DatabaseSync(":memory:");
+test("independent player room reads follow DM location changes and reject hidden-shop trades without committing", async () => {
+  const { blankShop } = await import("./economy.ts");
+  const { choosePace } = await import("./cloud.server.ts");
+  const table = { ...emptyCloudTable(),
+    purses: [{ id: "location-hero", name: "Hero", kind: "character" as const, coins: { ...emptyCoins(), gp: 10 } }],
+    shops: [{ ...blankShop(), id: "east-shop", locationId: "east" }, { ...blankShop(), id: "west-shop", locationId: "west" }],
+    stock: ["east", "west"].map(side => ({ id: `${side}-stock`, shopId: `${side}-shop`, name: "Good", copper: 10, quantity: 3, baseCopper: 10, rarity: "common" as const, notes: "" })),
+    journal: { sessions: [], requests: [], events: [], market: { currentLocationId: "east", locations: ["east", "west"].map(side => ({ id: side, name: side, kind: "region" as const, parentId: null, description: "", image: "/art/shop-default.webp" })) } },
+  };
+  const host = await openRoom({ name: "DM", table });
+  const guest = await joinRoom({ code: host.code, purseId: "location-hero", name: "Player" });
+  await choosePace({ ...host, live: true });
+  assert.deepEqual(guest.shopIds, ["east-shop"]);
+  const read = await roomState({ code: host.code, token: guest.token });
+  assert.deepEqual(read.shopIds, ["east-shop"]);
+  assert.deepEqual(read.table.journal!.market!.locations.map(location => location.id), ["east"]);
+  assert.equal(read.table.journal!.market!.locations[0].image, "/art/shop-default.webp");
+  const before = await readRoom(host.code);
+  await assert.rejects(submitCommands({ code: host.code, token: guest.token, batchId: "hidden-shop", commands: [{ id: "hidden-buy", kind: "buy", stockId: "west-stock", purseId: "location-hero", quantity: 1 }] }), /not available/);
+  assert.deepEqual(await readRoom(host.code), before);
+  await assert.rejects(submitCommands({ code: host.code, token: guest.token, batchId: "move-player", commands: [{ id: "move-player", kind: "party-location", before: "east", locationId: "west" }] }), /Only the DM/);
+  await submitCommands({ ...host, batchId: "move-host", commands: [{ id: "move-host", kind: "party-location", before: "east", locationId: "west" }] });
+  const moved = await roomState({ code: host.code, token: guest.token });
+  assert.deepEqual(moved.shopIds, ["west-shop"]);
+  assert.equal(moved.table.stock[0].id, "west-stock");
+  assert.deepEqual(moved.table.purses[0].coins, table.purses[0].coins);
+  assert.equal((await roomState(host)).table.shops.length, 2);
+  await deleteRoom(host.code, moved.revision);
+});
 sql.exec(
   readFileSync(new URL("../../../drizzle/0000_mysterious_lord_tyger.sql", import.meta.url), "utf8"),
 );

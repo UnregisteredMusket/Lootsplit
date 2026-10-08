@@ -145,6 +145,8 @@ type EconomyApi = {
     rows: Array<{ name: string; copper: number; notes: string }>,
   ) => Promise<number>;
   openShelf: (input: {
+    locationId?: string;
+    image?: string;
     name: string;
     keeper: string;
     place: string;

@@ -40,8 +40,9 @@ test("each development check belongs to exactly one declared isolated group", ()
     .map((v) => v.trim());
   assert.equal(new Set(groups).size, groups.length);
   const checks = [...workflow.matchAll(/- name: (dev-[\w-]+)\n\s+if: matrix.group == '([^']+)'/g)];
-  assert.equal(checks.length, 26);
+  assert.equal(checks.length, 27);
   assert.ok(checks.some(([, name, group]) => name === "dev-shop-stock" && group === "gameplay"));
+  assert.ok(checks.some(([, name, group]) => name === "dev-market-locations" && group === "gameplay"));
   assert.ok(checks.some(([, name, group]) => name === "dev-sound" && group === "governance"));
   for (const [, name, group] of checks) assert.ok(groups.includes(group), `${name}: ${group}`);
   for (const group of groups) assert.ok(checks.some(([, , assigned]) => assigned === group));
