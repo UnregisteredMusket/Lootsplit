@@ -14,7 +14,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Development / gameplay / Run actions/setup-node@v4 | open | 2 | 3s → 7s | +4s | +133.33% |
 | Development / desktop / Run actions/setup-node@v4 | open | 3 | 3s → 9s | +6s | +200% |
 | Code checks and immutable builds / Run npm ci | open | 3 | 7s → 20s | +13s | +185.71% |
-| Development / desktop / Run npm ci | open | 2 | 11s → 16s | +5s | +45.45% |
+| Development / desktop / Run npm ci | open | 3 | 11s → 20s | +9s | +81.82% |
 | Development / gameplay / Run npm ci | open | 2 | 11s → 17s | +6s | +54.55% |
 | Code checks and immutable builds / unit-tests | open | 4 | 8s → 27s | +19s | +237.5% |
 | Code checks and immutable builds / typecheck | open | 2 | 7s → 14s | +7s | +100% |
@@ -25,7 +25,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Code checks and immutable builds / mobile-build | open | 2 | 3s → 6s | +3s | +100% |
 | Development / gameplay / dev-bug-data-integrity | open | 3 | 4s → 7s | +3s | +75% |
 | Code checks and immutable builds | open | 4 | 48s → 144s | +96s | +200% |
-| Development / gameplay / dev-encounter | open | 5 | 8s → 32s | +24s | +300% |
+| Development / gameplay / dev-encounter | open | 6 | 8s → 41s | +33s | +412.5% |
 | Packaged Worker / interface / Run actions/setup-node@v4 | open | 4 | 2s → 8s | +6s | +300% |
 | Packaged Worker / accounts / Run npm ci | open | 3 | 8s → 17s | +9s | +112.5% |
 | Packaged Worker / interface / Run actions/download-artifact@v4 | open | 2 | 1s → 3s | +2s | +200% |
@@ -191,6 +191,10 @@ Open trends require investigation. Resolved trends retain their history; each ve
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-08T16:32:43Z | step: Development / gameplay / dev-market-locations | 38s → 47s | +9s | +23.68% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37783175577/job/113331148194) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37809135233/job/113421122434) |
+| 2026-10-08T16:32:29Z | step: Packaged Worker / interface / worker-market-locations | 23s → 33s | +10s | +43.48% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37783175577/job/113331877768) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37809135233/job/113421794769) |
+| 2026-10-08T16:30:54Z | step: Development / gameplay / dev-encounter | 32s → 41s | +9s | +28.13% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37783175577/job/113331148194) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37809135233/job/113421122434) |
+| 2026-10-08T16:29:32Z | step: Development / desktop / Run npm ci | 16s → 20s | +4s | +25% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37263207826/job/111614535461) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37809135233/job/113421122332) |
 | 2026-10-08T15:04:16Z | step: deploy / Run actions/setup-node@v4 | 6s → 7s | +1s | +16.67% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37235992107/job/111535079328) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37797621168/job/113381083283) |
 | 2026-10-08T15:02:23Z | step: Packaged standby / standby-audit | 76s → 91s | +15s | +19.74% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37303426479/job/111741750534) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37796847170/job/113379277005) |
 | 2026-10-08T15:02:09Z | step: Development / gameplay / Run actions/upload-artifact@v4 | 3s → 4s | +1s | +33.33% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37267485071/job/111627248809) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37796847170/job/113378416980) |
