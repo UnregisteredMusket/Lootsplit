@@ -90,13 +90,15 @@ Use Node 22 (`nvm use`, or the included development container).
 | `npm run performance:resolve -- resolution.json` | Record a verified resolution and reset request while preserving the previous trend     |
 | `npm run recover:status`                         | Inspect saved checkpoints and remote release state                                     |
 
-Focused scenario names: `layout`, `library`, `dm-resume`, `recovery`, `portrait-resume`, `campaign-choice`, `invitations`, `ownership`; use `accounts` for all eight. Focused checks include current uncommitted source edits and exclude local databases, secrets and browser profiles. They do not deploy or replace the running development server.
+Focused scenario names: `network-boundary`, `ownership`, `layout`, `library`, `dm-resume`, `resume-queue`, `recovery`, `portrait-resume`, `campaign-choice`, `invitations`, `shared-recovery`; use `accounts` for all eleven. Focused checks include current uncommitted source edits and exclude local databases, secrets and browser profiles. They do not deploy or replace the running development server.
 
 [Development and CI details](docs/DEVELOPMENT.md) · [Feature preservation inventory](docs/FEATURE-INVENTORY.md) · [Android releases](ANDROID.md)
 
 ## Faster development without changing the application
 
 Account scenarios run on two Playwright workers with independent accounts, rooms, storage and client identities. Every scenario remains required; retries stay disabled. Focused checks still isolate their server and database, and complete PR/main checks still gate publication.
+
+For recurring aggregate timeouts, follow "Prevent repeated account-suite timeouts" in the coding manual: diagnose the worker timeline and resource-interception overhead, retain the 60s/170s limits, and verify native/fallback network isolation. Interrupted chats resume persisted checkpoints; they do not restart completed releases.
 
 The existing `.devcontainer/devcontainer.json` provides Node22 and runs the locked dependency/browser setup. Use that container where supported, or `nvm use` then `npm run dev:setup`. `dev:doctor` reports the actual Chromium version and path; a custom browser launching successfully does not prove it supports every PDF/import feature. Do not substitute an older browser for release verification.
 

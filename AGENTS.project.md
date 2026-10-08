@@ -8,6 +8,8 @@ Once the cause is fixed and a successful comparable verification confirms resolu
 
 After a timeout, network failure or interrupted task, read `docs/RECOVERY.md` first. Reconcile the working tree, GitHub runs and live release before retrying any write. Use `npm run recover:status`; checkpoint and push finished work in small commits. A chat timeout does not establish that the external operation failed. Preserve all release gates and report email configuration honestly.
 
+Keep long work active with progress updates and durable exact-state checkpoints; a continuation resumes existing work rather than restarting it. Follow the manual's "Prevent repeated account-suite timeouts" procedure. Repeated aggregate failures require diagnosis before another full run. Preserve the 60s case/170s suite/two-worker/zero-retry limits, every original scenario and the required native/fallback network-boundary check; never trade account freshness, network isolation or release gates for speed.
+
 The user requires preservation of every existing feature, UI capability, saved campaign, permission and supported platform. Do not remove, disable, hide, or replace a feature with a reduced version without the user's explicit approval. Full implementation permission is not removal permission.
 
 Use docs/FEATURE-INVENTORY.md and docs/REDESIGN.md as the preservation baseline. For every change identify affected capabilities, keep old saves and backups readable, and verify related authorization and financial behavior. Add new features to the inventory. Never test destructive actions against real user campaigns or rooms.
