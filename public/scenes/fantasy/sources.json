@@ -1,0 +1,370 @@
+{
+  "source": "https://willyee.itch.io/fantasy-visual-novel-backgrounds",
+  "author": "willYEE",
+  "license": "CC0-1.0",
+  "retrieved": "2026-10-08",
+  "archives": {
+    "day": {
+      "sha256": "7a75ba3c4b3b0c8969f3cf929ad4256e90cc76d85a486ef015801fd97d67e47a",
+      "bytes": 9472656
+    },
+    "night": {
+      "sha256": "3e3f4906aba7644020b7f9db2bec271fd5bf3771ae39f11183d2581b7f0fda62",
+      "bytes": 9393922
+    }
+  },
+  "images": [
+    {
+      "scene": "tavern",
+      "mode": "day",
+      "original": "01_tavern_day.jpg",
+      "sourceSha256": "e65dd8d5bca564fb0f305032832f2e19d6481d0dec509c7f33538021a9ff5f5b",
+      "variants": [
+        {
+          "file": "tavern-day-768.webp",
+          "width": 768,
+          "height": 432,
+          "bytes": 29966,
+          "sha256": "b6700ae71959582ee313eeaa7c47777f08523db61f6c452297671206cd8ad673"
+        },
+        {
+          "file": "tavern-day-1440.webp",
+          "width": 1440,
+          "height": 810,
+          "bytes": 74358,
+          "sha256": "069743c37962dcaab668bade0715f1c4a53a8d04e1d53db0336bc3994699a83a"
+        }
+      ]
+    },
+    {
+      "scene": "throne-room",
+      "mode": "day",
+      "original": "02_throne_room_day.jpg",
+      "sourceSha256": "0cfdfc168ddba86e9cd282d2fc53ea1b76830d3a556ceb9d77bb663d4b412d74",
+      "variants": [
+        {
+          "file": "throne-room-day-768.webp",
+          "width": 768,
+          "height": 432,
+          "bytes": 26888,
+          "sha256": "c3765060f431403782b23e5071e7fbcec9345266ef263fe884c4e4f2977bab49"
+        },
+        {
+          "file": "throne-room-day-1440.webp",
+          "width": 1440,
+          "height": 810,
+          "bytes": 68046,
+          "sha256": "03f05c6fb2fd0164fd2910417bf72d8b19a68a3236d5cdff9083976168f3b456"
+        }
+      ]
+    },
+    {
+      "scene": "village-square",
+      "mode": "day",
+      "original": "04_village_square_day.jpg",
+      "sourceSha256": "ca437f12548f4793112b11a4c4d96ba218fd2f1cd19e49f9552fbafd050ae9ff",
+      "variants": [
+        {
+          "file": "village-square-day-768.webp",
+          "width": 768,
+          "height": 432,
+          "bytes": 42208,
+          "sha256": "1804f3e331a851931882245db2f589ece92082ceb7cff3f9877b90cb3320d49f"
+        },
+        {
+          "file": "village-square-day-1440.webp",
+          "width": 1440,
+          "height": 810,
+          "bytes": 106962,
+          "sha256": "ed4983f7b4ea5e73149569c2e18a683108d2bdd26d54f017e0a03c4da794f12a"
+        }
+      ]
+    },
+    {
+      "scene": "ancient-library",
+      "mode": "day",
+      "original": "05_ancient_library_day.jpg",
+      "sourceSha256": "686e3dc1f742876251f6f8361ce172b943b6c7a574a860f3659919e72c312d3e",
+      "variants": [
+        {
+          "file": "ancient-library-day-768.webp",
+          "width": 768,
+          "height": 432,
+          "bytes": 32814,
+          "sha256": "4ebba294687f2b68facaf4772c2d09820851c5d4879572af791722edc68faea6"
+        },
+        {
+          "file": "ancient-library-day-1440.webp",
+          "width": 1440,
+          "height": 810,
+          "bytes": 82994,
+          "sha256": "e9e10fb33d66454c15e27dac54936324274ebba248258b557220649fb78cc1ce"
+        }
+      ]
+    },
+    {
+      "scene": "mage-tower-study",
+      "mode": "day",
+      "original": "06_mage_tower_study_day.jpg",
+      "sourceSha256": "5b710776798c19be5be29b1581d351c2b7e725c9ee9a3a3354021b9217a2daf2",
+      "variants": [
+        {
+          "file": "mage-tower-study-day-768.webp",
+          "width": 768,
+          "height": 432,
+          "bytes": 30458,
+          "sha256": "a506fcc7c9cc56245e55e7023d284a7f6220c82900d34e5184669281ceee7e8a"
+        },
+        {
+          "file": "mage-tower-study-day-1440.webp",
+          "width": 1440,
+          "height": 810,
+          "bytes": 77762,
+          "sha256": "53f6acd72f704619beb16cb4e5be919f05987af4e19ea10f76445ae526f9239b"
+        }
+      ]
+    },
+    {
+      "scene": "dungeon-corridor",
+      "mode": "day",
+      "original": "07_dungeon_corridor_day.jpg",
+      "sourceSha256": "6dbfff3f8dbd6be6e4e7b3275bc507bffb4955b151017032bd6d0a91511e74dd",
+      "variants": [
+        {
+          "file": "dungeon-corridor-day-768.webp",
+          "width": 768,
+          "height": 432,
+          "bytes": 34136,
+          "sha256": "80054d60c4ff2911f57a1caa01f0f49ec78b5a9a281189ac0eed7c180e8937d1"
+        },
+        {
+          "file": "dungeon-corridor-day-1440.webp",
+          "width": 1440,
+          "height": 810,
+          "bytes": 85694,
+          "sha256": "670e3083f0883d83e63d14533467b414c90cbad8ae389b1931b5589ee8f028f2"
+        }
+      ]
+    },
+    {
+      "scene": "market-street",
+      "mode": "day",
+      "original": "11_market_street_day.jpg",
+      "sourceSha256": "960f3fa28f290793b6c65d67cd4b9c1169de253345c03a20b692c76f9bcaf978",
+      "variants": [
+        {
+          "file": "market-street-day-768.webp",
+          "width": 768,
+          "height": 432,
+          "bytes": 40688,
+          "sha256": "d6d49e7f2bef26246bda1749f974743008b094ff855712b9e9033e23b3d1fe49"
+        },
+        {
+          "file": "market-street-day-1440.webp",
+          "width": 1440,
+          "height": 810,
+          "bytes": 99874,
+          "sha256": "7ed8ab5c25f467aa813ecbb03a309c0cfe4f36659274317f3eb39e4cb3337e86"
+        }
+      ]
+    },
+    {
+      "scene": "blacksmith",
+      "mode": "day",
+      "original": "14_blacksmith_day.jpg",
+      "sourceSha256": "91e25a04bdd11e9c1f0fc24a185ccafabb682d49c70c507d9e659b861cef655f",
+      "variants": [
+        {
+          "file": "blacksmith-day-768.webp",
+          "width": 768,
+          "height": 432,
+          "bytes": 28342,
+          "sha256": "557f1f53a77020d4d62ca2b687fa83aa5731df18a76ed986107ebccc89685471"
+        },
+        {
+          "file": "blacksmith-day-1440.webp",
+          "width": 1440,
+          "height": 810,
+          "bytes": 67632,
+          "sha256": "e56edf6244bb85c4f90a11a390ec492e97b1e4688b3a1143c2c1c560157ca92d"
+        }
+      ]
+    },
+    {
+      "scene": "tavern",
+      "mode": "night",
+      "original": "01_tavern_night.jpg",
+      "sourceSha256": "75e79d64631ce9a8d03695c455e5ceb01433a7007ad681eedab21bed4e58b108",
+      "variants": [
+        {
+          "file": "tavern-night-768.webp",
+          "width": 768,
+          "height": 432,
+          "bytes": 33756,
+          "sha256": "0354976594e9705cd7d5175a33407ee10bfb96fd3d3b3c9d5829dd8a21899487"
+        },
+        {
+          "file": "tavern-night-1440.webp",
+          "width": 1440,
+          "height": 810,
+          "bytes": 81336,
+          "sha256": "491af6acd59ca5d242311d1abef55d957e20bcad3c32eaa5c42b7f564d9b2467"
+        }
+      ]
+    },
+    {
+      "scene": "throne-room",
+      "mode": "night",
+      "original": "02_throne_room_night.jpg",
+      "sourceSha256": "91a2b7ea8198afd7693ee8c417ab84c82c7464937c6b5b418db7b59adb826b3c",
+      "variants": [
+        {
+          "file": "throne-room-night-768.webp",
+          "width": 768,
+          "height": 432,
+          "bytes": 27452,
+          "sha256": "9cab109b409ec39d696b1076021e2144528dc893c4a432d4b34514baf8279100"
+        },
+        {
+          "file": "throne-room-night-1440.webp",
+          "width": 1440,
+          "height": 810,
+          "bytes": 68854,
+          "sha256": "dc93278591832e75b2467340dd2afbea6641ea00f9b0b2bacdc9fb5a1354cfd5"
+        }
+      ]
+    },
+    {
+      "scene": "village-square",
+      "mode": "night",
+      "original": "04_village_square_night.jpg",
+      "sourceSha256": "36b0139b7a2336d37dd270c50abeb6a3de643aa3ca40e2cd69a8a15b21029eb8",
+      "variants": [
+        {
+          "file": "village-square-night-768.webp",
+          "width": 768,
+          "height": 432,
+          "bytes": 37974,
+          "sha256": "1dd2edc1b0b89cfb8ecc04dfdb9c27c1e1c085cae1966734c1b4f01f5c9b2932"
+        },
+        {
+          "file": "village-square-night-1440.webp",
+          "width": 1440,
+          "height": 810,
+          "bytes": 95546,
+          "sha256": "d91d620d609c8d9db8f3b6a517a24f0b878d0c21ebbc3b2e394c55c30e0f762b"
+        }
+      ]
+    },
+    {
+      "scene": "ancient-library",
+      "mode": "night",
+      "original": "05_ancient_library_night.jpg",
+      "sourceSha256": "0d4970e8d15b94c87e876d5ca98b6b688e9019f460017feb184de1e0b4e1df48",
+      "variants": [
+        {
+          "file": "ancient-library-night-768.webp",
+          "width": 768,
+          "height": 432,
+          "bytes": 36174,
+          "sha256": "3c6c7137f94feaae03861c1b4840bf5142817f1c8ec3290c476cf57ec2c03dca"
+        },
+        {
+          "file": "ancient-library-night-1440.webp",
+          "width": 1440,
+          "height": 810,
+          "bytes": 88122,
+          "sha256": "abd714f949d42bcc25ae5f17e20938f81585eca1f8930b83958820ca40745227"
+        }
+      ]
+    },
+    {
+      "scene": "mage-tower-study",
+      "mode": "night",
+      "original": "06_mage_tower_study_night.jpg",
+      "sourceSha256": "55fd3d7e78f896b27d0e5042f39d994906434d10c4925d8f0d031f2ac786e889",
+      "variants": [
+        {
+          "file": "mage-tower-study-night-768.webp",
+          "width": 768,
+          "height": 432,
+          "bytes": 29664,
+          "sha256": "1e63ab7927f27a29238814e42e03fc679d0974ce781a9a9110a9559a17f0bd79"
+        },
+        {
+          "file": "mage-tower-study-night-1440.webp",
+          "width": 1440,
+          "height": 810,
+          "bytes": 74494,
+          "sha256": "792fd8c8e2b8382ea5b48664d18bbe373482fcd4d028b6c3f561ed2970abf1e6"
+        }
+      ]
+    },
+    {
+      "scene": "dungeon-corridor",
+      "mode": "night",
+      "original": "07_dungeon_corridor_night.jpg",
+      "sourceSha256": "d7dfde2c116dda88b2e24021a7c4424a8f6cf805469bf1460c8fcfbefceb22e1",
+      "variants": [
+        {
+          "file": "dungeon-corridor-night-768.webp",
+          "width": 768,
+          "height": 432,
+          "bytes": 37674,
+          "sha256": "4fc675f34e89129af6a5f9a6b396fb0cf3ee4632cf7dc22335d55a9986abf54a"
+        },
+        {
+          "file": "dungeon-corridor-night-1440.webp",
+          "width": 1440,
+          "height": 810,
+          "bytes": 91016,
+          "sha256": "c93a470f474fb25b005bf39614f181cf2f2b2c3d4aafd2981614f9b145593782"
+        }
+      ]
+    },
+    {
+      "scene": "market-street",
+      "mode": "night",
+      "original": "11_market_street_night.jpg",
+      "sourceSha256": "1029bab0518bfb9d34b8c561d049de9a68f9a22d7dca6eff8d3a73058e6ad93b",
+      "variants": [
+        {
+          "file": "market-street-night-768.webp",
+          "width": 768,
+          "height": 432,
+          "bytes": 43332,
+          "sha256": "12c35a42ef177adad2f704aa9696d714017f7666d1919cd725fa08e21933e872"
+        },
+        {
+          "file": "market-street-night-1440.webp",
+          "width": 1440,
+          "height": 810,
+          "bytes": 108780,
+          "sha256": "55d21e3126d68d34d91d62a8b41c4e57249da5e63770cf13f0a1daaca6a3288c"
+        }
+      ]
+    },
+    {
+      "scene": "blacksmith",
+      "mode": "night",
+      "original": "14_blacksmith_night.jpg",
+      "sourceSha256": "0190b6a2e38689ae6ca28a10fb1bef4f20f7f29886f6e794e2aa8e3df4437311",
+      "variants": [
+        {
+          "file": "blacksmith-night-768.webp",
+          "width": 768,
+          "height": 432,
+          "bytes": 27100,
+          "sha256": "297a2b621a718aea2584e3ff82a411f776700f9da2ba3af670b00411203b167b"
+        },
+        {
+          "file": "blacksmith-night-1440.webp",
+          "width": 1440,
+          "height": 810,
+          "bytes": 67150,
+          "sha256": "b0274314956b18d8d8e60cb77cacf45e2881f33c1473b774bf137f60b7d1715e"
+        }
+      ]
+    }
+  ]
+}

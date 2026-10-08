@@ -322,6 +322,12 @@ export function SettingsPage({ financial = false }: { financial?: boolean } = {}
           </>}
           {!financial && <><Fold anchorId="appearance" title="Colors" hint="Fantasy light and dark themes, or your own colors.">
             <p className="mt-2 text-sm text-muted">Adventurer’s Ledger brings parchment and dark ink to light mode. Ironbound Dragon uses dark iron and antique brass. Your choice is saved on this device; custom colors are still available.</p>
+            <Switch
+              label="Show fantasy backgrounds"
+              hint="Day and night scenery in submenus for these two fantasy themes. Turn off for a simpler display."
+              checked={prefs.fantasyBackgrounds}
+              onChange={(fantasyBackgrounds) => setPrefs({ fantasyBackgrounds })}
+            />
             <div className="mt-4">
               <ChoiceGrid
                 label="Mode"
