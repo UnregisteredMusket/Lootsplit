@@ -187,6 +187,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-08T13:40:50.000Z | workflow: Verify preserved functionality | 422s → 868s | +446s | +105.69% | failure | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37389052554) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37784166101) |
 | 2026-10-08T13:36:04Z | job: Development / gameplay | 232s → 581s | +349s | +150.43% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37638440371/job/112850726074) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37784166101/job/113335097452) |
 | 2026-10-08T13:32:04Z | step: Development / gameplay / Run npx playwright install --with-deps chromium | 102s → 319s | +217s | +212.75% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37752367163/job/113228451042) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37784166101/job/113335097452) |
 | 2026-10-08T13:29:08Z | step: Packaged Worker / interface / Start disposable built Worker | 7s → 9s | +2s | +28.57% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37233368939/job/111527693168) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37784166101/job/113335892592) |
