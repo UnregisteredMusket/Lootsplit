@@ -82,7 +82,7 @@ export function ShopComposer() {
   const baseline = useRef<string | null>(null);
   if (seeded.current && baseline.current === null) baseline.current = draft;
   useDraftGuard(
-    !busy && baseline.current !== null && draft !== baseline.current,
+    !busy && (imageBusy || (baseline.current !== null && draft !== baseline.current)),
     "shop configuration",
   );
 
