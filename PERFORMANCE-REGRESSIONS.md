@@ -190,6 +190,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-08T14:41:06Z | step: Development / gameplay / Run actions/upload-artifact@v4 | 3s → 4s | +1s | +33.33% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37233368939/job/111527537884) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37793810061/job/113367876815) |
 | 2026-10-08T14:29:32Z | step: Development / accounts / Run npm ci | 19s → 23s | +4s | +21.05% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37563730253/job/112606617647) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37792759670/job/113364207658) |
 | 2026-10-08T14:29:09Z | step: Development / accounts / Run actions/setup-node@v4 | 11s → 23s | +12s | +109.09% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37659474866/job/112923007437) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37792759670/job/113364207658) |
 | 2026-10-08T14:28:46Z | step: Development / accounts / Run actions/checkout@v4 | 2s → 5s | +3s | +150% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37263207826/job/111614535383) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37792759670/job/113364207658) |
