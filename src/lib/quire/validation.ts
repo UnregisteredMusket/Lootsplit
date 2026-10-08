@@ -1,6 +1,9 @@
 import { shopScheduleSchema } from "./shop-schedule.ts";
 import { characterPermissionsSchema } from "../characters/permissions.mjs";
 import { z } from "zod";
+import { artworkSchema } from "./artwork.ts";
+import { validateShopLocations, type MarketLocations } from "./shop-locations.ts";
+export { artworkSchema } from "./artwork.ts";
 import { sheetSchema, inventoryFields } from "../characters/model.mjs";
 import { toCopper } from "./money.ts";
 const id = z.string().min(1);
@@ -10,10 +13,6 @@ export const coinsSchema = z
   .refine((coins) => Number.isSafeInteger(toCopper(coins)), {
     message: "The combined coin balance must be exactly representable in whole copper. Export the original save before repairing an oversized balance.",
   });
-export const artworkSchema = z
-  .string()
-  .max(500000)
-  .regex(/^(data:image\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+|\/art\/[a-z0-9-]+\.webp)$/);
 const purse = z.object({
   sheet: sheetSchema.optional(),
   sheetRevision: z.number().int().nonnegative().optional(),
@@ -40,6 +39,7 @@ export const holdingSchema = z.object({
 });
 
 const shop = z.object({
+  locationId: z.string().min(1).max(150).optional(),
   schedule: shopScheduleSchema.optional(),
   acceptedCategories: z.array(z.string().max(80)).max(20).optional(),
   acceptAnyCategory: z.boolean().optional(),
@@ -120,14 +120,15 @@ export function validateBackupRows(value: Record<string, unknown>): void {
 /** Live assets need owners; historical ledger and settled agreements may retain deleted IDs. */
 export function validateBackupReferences(value: {
   purses: { id: string }[]; holdings: { id: string; purseId: string }[];
-  shops: { id: string }[]; stock: { shopId: string }[];
+  shops: { id: string; locationId?: string }[]; stock: { shopId: string }[];
   books: { id: string }[]; articles: { bookId: string }[];
   sheets?: { purseId: string }[]; loans?: { purseId: string; status: string }[];
-  journal?: { requests?: { purseId: string; status: string }[]; finance?: {
+  journal?: { market?: MarketLocations; requests?: { purseId: string; status: string }[]; finance?: {
     loans: { purseId: string; lenderId: string; principal: number; interest: number }[];
     rules: { purseId: string; holdingId: string; active: boolean; arrears: number }[];
   } };
 }): string[] {
+  validateShopLocations(value.shops, value.journal?.market);
   const diagnostics: string[] = [];
   const purses = new Set(value.purses.map(row => row.id)), shops = new Set(value.shops.map(row => row.id)),
     books = new Set(value.books.map(row => row.id)), holdings = new Set(value.holdings.map(row => row.id));

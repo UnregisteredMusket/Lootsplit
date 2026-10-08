@@ -19,10 +19,17 @@ import type { ShopCategory, Wealth } from "@/lib/quire/types";
 import { Button, Select, Slider, TextInput } from "@/components/ui";
 import { cn } from "@/lib/cn";
 import { StockPages } from "./shop-stock-manager";
+import { LocationOptions } from "./market-locations";
+import { MarketImageUpload } from "./market-image-upload";
+import { readMarketLocations } from "@/lib/quire/shop-locations";
 
 export function ShopComposer() {
   const navigate = useNavigate();
-  const { catalog, lexicon, realm, openShelfOutcome } = useEconomy();
+  const { catalog, lexicon, realm, journal, openShelfOutcome } = useEconomy();
+  const market = readMarketLocations(journal.market);
+  const [locationId, setLocationId] = useState(market.currentLocationId ?? "");
+  const [image, setImage] = useState<string>();
+  const [imageBusy, setImageBusy] = useState(false);
   const { prefs, ready: prefsReady } = usePrefs();
   const dollars = useDollarText();
   const seeded = useRef(false);
@@ -54,6 +61,8 @@ export function ShopComposer() {
   const [place, setPlace] = useState("");
   const [busy, setBusy] = useState(false);
   const draft = JSON.stringify({
+    locationId,
+    image,
     name,
     keeper,
     place,
@@ -73,7 +82,7 @@ export function ShopComposer() {
   const baseline = useRef<string | null>(null);
   if (seeded.current && baseline.current === null) baseline.current = draft;
   useDraftGuard(
-    !busy && baseline.current !== null && draft !== baseline.current,
+    !busy && (imageBusy || (baseline.current !== null && draft !== baseline.current)),
     "shop configuration",
   );
 
@@ -182,6 +191,8 @@ export function ShopComposer() {
     setBusy(true);
     try {
       const result = await openShelfOutcome({
+        ...(locationId ? { locationId } : {}),
+        ...(image ? { image } : {}),
         name,
         keeper,
         place,
@@ -240,6 +251,23 @@ export function ShopComposer() {
             ))}
           </Select>
         ) : null}
+        <label className="text-sm">
+          Shop availability
+          <Select
+            aria-label="New shop availability"
+            value={locationId}
+            onChange={(event) => setLocationId(event.target.value)}
+          >
+            <option value="">Campaignwide · available everywhere</option>
+            <LocationOptions market={market} />
+          </Select>
+        </label>
+        <MarketImageUpload
+          label="New shop image"
+          value={image}
+          onChange={setImage}
+          onBusyChange={setImageBusy}
+        />
         <Choice label="Type of shop" value={category} options={SHOP_KINDS} onChange={setCategory} />
         <Choice label="Wealth" value={wealth} options={WEALTHS} onChange={chooseWealth} />
         <fieldset>
@@ -452,7 +480,11 @@ export function ShopComposer() {
         onChange={setPreviewPage}
         label="Stock preview pages"
       />
-      <Button className="mt-4" disabled={busy || lines.length === 0} onClick={() => void open()}>
+      <Button
+        className="mt-4"
+        disabled={busy || imageBusy || lines.length === 0}
+        onClick={() => void open()}
+      >
         Open this shop
       </Button>
     </section>

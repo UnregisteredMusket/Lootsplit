@@ -3,6 +3,7 @@ import { canReadNote } from "./chat-visibility.ts";
 import { characterSheet } from "../characters/campaign-sheet.mjs";
 import { readFinance } from "./finance.ts";
 import { readJournal, readJournalForRecords, readArchivedSnapshot } from "./journal.ts";
+import { readMarketLocations, publicMarketLocations, shopAvailableHere } from "./shop-locations.ts";
 
 /** Server/default projections enforce historical seats; verified local DM readers may retain their owned nested records. */
 export function projectRecord(
@@ -52,6 +53,11 @@ export function projectRecord(
     (r) => dm || seat.purseIds.includes(r.purseId),
   );
   if (!dm) {
+    const market = readMarketLocations(t.journal.market);
+    t.shops = t.shops.filter(shop => shopAvailableHere(shop, market));
+    const shops = new Set(t.shops.map(shop => shop.id));
+    t.stock = t.stock.filter(line => shops.has(line.shopId));
+    if (t.journal.market) t.journal.market = publicMarketLocations(market);
     t.ledger = t.ledger.filter((l) => seat.purseIds.includes(l.purseId));
     t.holdings = t.holdings.filter((h) => seat.purseIds.includes(h.purseId));
     t.purses = t.purses.filter((p) => seat.purseIds.includes(p.id));

@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { blankEncounter } from "../../src/lib/encounters/model.mjs";
 import { readFile } from "node:fs/promises";
+import { createServer } from "node:http";
 import {
   test,
   expect,
@@ -14,6 +15,43 @@ import {
   waitForDmCampaign,
 } from "./account-fixtures.mjs";
 import { continueIntoApp, prepareDmFixture } from "../title-screen-navigation.mjs";
+
+test("network-boundary", async ({ devices, baseURL: origin }) => {
+  let connections = 0;
+  const forbidden = createServer((_request, response) => {
+    response.writeHead(200, { "access-control-allow-origin": "*" });
+    response.end("This other origin must never be reached.");
+  });
+  forbidden.on("connection", () => connections++);
+  await new Promise((done) => forbidden.listen(0, "127.0.0.1", done));
+  const port = forbidden.address().port;
+  try {
+    const { page: other } = await devices.newDevice();
+    await Promise.all([devices.page, other].map(async (page) => {
+      await visitPage(page, origin, "/welcome");
+      const probe = async () => {
+        for (const protocol of ["http", "https"]) {
+          const url = `${protocol}://127.0.0.1:${port}/forbidden`;
+          const failed = page.waitForEvent("requestfailed", (request) => request.url() === url);
+          expect(await page.evaluate((url) => fetch(url).then(() => true, () => false), url)).toBe(false);
+          expect((await failed).failure().errorText).toMatch(/^(inspector|net::ERR_BLOCKED_BY_CLIENT(?:\.Inspector)?)$/);
+        }
+        const account = await page.evaluate(async () => {
+          const response = await fetch("/api/account/auth/get-session");
+          return { ok: response.ok, cache: response.headers.get("cache-control") };
+        });
+        expect(account).toEqual({ ok: true, cache: "no-store" });
+      };
+      await probe();
+      await page.reload();
+      await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+      await probe();
+    }));
+    expect(connections, "Blocked origins must not open a network connection").toBe(0);
+  } finally {
+    await new Promise((done) => forbidden.close(done));
+  }
+});
 
 // Run the long, independent ownership scenario first so it has the full
 // unchanged per-test and suite budgets rather than the final queue remainder.
@@ -116,11 +154,17 @@ test("ownership", async ({ devices, baseURL: origin }, testInfo) => {
     fullPage: true,
   });
   await endSession(dm, origin, navigateAccountScenario);
-  await expect(guest.locator(".room-code")).toBeHidden();
-  expect(
-    await guest.evaluate(() => sessionStorage.getItem("lootsplit.player.reconnect.v1")),
-  ).toBeNull();
-  await navigateAccountScenario(dm, origin, "/account");
+  // Closing is acknowledged before either read. The DM can open its library
+  // while the guest observes revocation; both finish before the room is reopened.
+  await Promise.all([
+    (async () => {
+      await expect(guest.locator(".room-code")).toBeHidden();
+      expect(
+        await guest.evaluate(() => sessionStorage.getItem("lootsplit.player.reconnect.v1")),
+      ).toBeNull();
+    })(),
+    navigateAccountScenario(dm, origin, "/account"),
+  ]);
   await dm.getByRole("button", { name: "Reopen as DM", exact: true }).click();
   await dm.waitForURL((u) => u.pathname === "/");
   await continueIntoApp(dm);
@@ -130,17 +174,23 @@ test("ownership", async ({ devices, baseURL: origin }, testInfo) => {
     guest.locator("[data-sonner-toast]").filter({ hasText: "invitation has expired" }),
   ).toBeVisible();
   const returning = credentials();
-  await accountPost(guest.context(), origin, "auth/sign-up/email", returning);
-  await navigateAccountScenario(dm, origin, "/share");
-  await dm.evaluate(() =>
-    Object.defineProperty(navigator, "share", {
-      configurable: true,
-      value: async (data) => {
-        window.invitationForTest = data.url;
-      },
-    }),
-  );
-  await dm.getByRole("button", { name: "Share join link", exact: true }).click();
+  // The returning player's signup and the DM's fresh invitation are independent.
+  // Both must finish before the authenticated player joins the reopened room.
+  await Promise.all([
+    accountPost(guest.context(), origin, "auth/sign-up/email", returning),
+    (async () => {
+      await navigateAccountScenario(dm, origin, "/share");
+      await dm.evaluate(() =>
+        Object.defineProperty(navigator, "share", {
+          configurable: true,
+          value: async (data) => {
+            window.invitationForTest = data.url;
+          },
+        }),
+      );
+      await dm.getByRole("button", { name: "Share join link", exact: true }).click();
+    })(),
+  ]);
   const freshLink = new URL(await dm.evaluate(() => window.invitationForTest));
   await visitPage(guest, origin, freshLink.pathname + freshLink.search);
   await guest.getByRole("button", { name: "Find characters", exact: true }).click();
@@ -153,7 +203,15 @@ test("ownership", async ({ devices, baseURL: origin }, testInfo) => {
   await secondPlayer.getByRole("button", { name: "Resume", exact: true }).click();
   await secondPlayer.waitForURL((u) => u.pathname === "/");
   await continueIntoApp(secondPlayer);
-  await visitPage(secondPlayer, origin, "/share");
+  // Account resume already entered a fresh player document. Follow the actual
+  // player Home link to inspect the resumed room; retain the later cold reload.
+  await secondPlayer.evaluate(() => (window.playerResumeDocumentForAudit = "resumed"));
+  await secondPlayer
+    .getByRole("link", { name: "Campaign, messages & session status →", exact: true })
+    .click();
+  await secondPlayer.waitForURL((url) => url.pathname === "/share");
+  expect(await secondPlayer.evaluate(() => window.playerResumeDocumentForAudit)).toBe("resumed");
+  await expect(secondPlayer.locator(".loot-opening")).toHaveCount(0);
   await expect(secondPlayer.locator(".room-code")).toHaveText(code);
   expect(await secondPlayer.evaluate(async () => (await indexedDB.databases()).length)).toBe(0);
   // Closing the DM's tab is not End session; a fresh player reload still reconnects.
@@ -367,11 +425,17 @@ test("dm-resume", async ({ devices, baseURL: origin }, testInfo) => {
     });
     assert.deepEqual(active, { code, role: "dm" });
   }
-  await resumeFromAccount(other, secondCode, "Reopen as DM");
-  await resumeFromAccount(page, firstCode, "Reopen as DM");
+  // Each device reopens a different closed room. Keep both complete UI/role/
+  // startup assertions, then wait for both before the cross-room resume checks.
+  await Promise.all([
+    resumeFromAccount(other, secondCode, "Reopen as DM"),
+    resumeFromAccount(page, firstCode, "Reopen as DM"),
+  ]);
   // Both saved campaigns also remain resumable after the first reopen, on either device.
-  await resumeFromAccount(page, secondCode, "Resume");
-  await resumeFromAccount(other, firstCode, "Resume");
+  await Promise.all([
+    resumeFromAccount(page, secondCode, "Resume"),
+    resumeFromAccount(other, firstCode, "Resume"),
+  ]);
 });
 
 test("resume-queue", async ({ devices, baseURL: origin }, testInfo) => {
@@ -616,7 +680,9 @@ test("portrait-resume", async ({ devices, baseURL: origin }) => {
   const desktop = devices.page;
   const { other: phone } = await signedInDevices(devices, origin);
   await phone.setViewportSize({ width: 390, height: 844 });
-  await visitPage(phone, origin, "/party?section=funds");
+  // First editing is a routine link from My account; the following explicit
+  // cold Party visit still proves the uploaded portrait persisted in IndexedDB.
+  await navigateAccountScenario(phone, origin, "/party?section=funds");
   const card = phone.locator('details[id^="purse-"]').first();
   await card.locator(":scope > summary").click();
   const id = await card.getAttribute("id");
@@ -793,13 +859,17 @@ test("portrait-resume", async ({ devices, baseURL: origin }) => {
 test("campaign-choice", async ({ devices, baseURL: origin }, testInfo) => {
   const desktop = devices.page;
   const { other: phone } = await signedInDevices(devices, origin);
+  // These are routine transitions from the already signed-in account pages.
+  // Use real links and retain the helper's same-document/startup assertions;
+  // the ownership, layout and interrupted-hydration scenarios retain cold loads.
+  const visit = (p, path) => navigateAccountScenario(p, origin, path);
   await phone.setViewportSize({ width: 390, height: 844 });
   const members = async () => {
     const response = await desktop.context().request.get(`${origin}/api/account/library`);
     expect(response.ok()).toBeTruthy();
     return (await response.json()).members;
   };
-  await visitPage(phone, origin, "/share");
+  await visit(phone, "/share");
   await phone.getByRole("button", { name: "Start a room", exact: true }).click();
   await phone.getByRole("button", { name: "Create room", exact: true }).click();
   await phone.getByRole("button", { name: "Share join link", exact: true }).waitFor();
@@ -807,7 +877,7 @@ test("campaign-choice", async ({ devices, baseURL: origin }, testInfo) => {
   await expect.poll(async () => (await members()).length).toBe(1);
   const firstCode = (await members())[0].code;
 
-  await visitPage(desktop, origin, "/share");
+  await visit(desktop, "/share");
   await desktop.getByRole("button", { name: "Start a room", exact: true }).click();
   await expect(
     desktop.getByRole("link", { name: "Resume a saved campaign", exact: true }),
@@ -851,7 +921,7 @@ test("campaign-choice", async ({ devices, baseURL: origin }, testInfo) => {
   await expect.poll(async () => (await members()).length).toBe(2);
   await expect(desktop.locator(".room-code")).toHaveText(secondCode);
 
-  await visitPage(phone, origin, "/account");
+  await visit(phone, "/account");
   const old = phone.locator("article.portal-card").filter({ hasText: firstCode });
   await expect(
     old.getByText("Open on this device · Current campaign", { exact: true }),
@@ -867,7 +937,7 @@ test("campaign-choice", async ({ devices, baseURL: origin }, testInfo) => {
   phone.once("dialog", (dialog) => dialog.accept());
   await old.getByRole("button", { name: "Resume", exact: true }).click();
   await phone.waitForURL((url) => url.pathname === "/");
-  await visitPage(phone, origin, "/share");
+  await visit(phone, "/share");
   await expect(phone.locator(".room-code")).toHaveText(firstCode);
   expect((await members()).length).toBe(2);
 });

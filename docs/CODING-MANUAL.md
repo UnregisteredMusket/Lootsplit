@@ -8,6 +8,7 @@ Read this at the start of every task, including a new chat, recovered workspace,
 2. Inspect `git status --short --branch`, the recent log, current remote main and the relevant PR. Preserve uncommitted work. Use an isolated branch/worktree if another task is active; do not overwrite or stop its processes.
 3. Check existing verification/deployment runs and the production release identity. A successful merge is not a successful release. An interrupted chat is not proof that a merge or deployment failed.
 4. Reuse completed authorized work. Do not automatically rerun tests, deployments, campaign actions or other mutations after an uncertain response. Identify the actual failed stage first.
+5. Keep the active task moving through verification and authorized publication. During long checks, give a meaningful progress update at least every 60 seconds and use bounded polling that yields control. Before any handoff, persist the exact branch/head/tree, PR/run IDs, last successful stage, remaining blocker and next action. A user saying "continue" resumes that checkpoint; it does not authorize restarting completed work or treating an active external job as failed.
 
 ## 2. Define the smallest useful reproduction
 
@@ -19,6 +20,7 @@ Account scenario mapping:
 
 | Scenario    | Required coverage                                                                                                                                     |
 | ----------- | ----------------------------------------------------------------------------------------------------------------------------------------------------- |
+| `network-boundary` | Primary/secondary contexts before and after reload; outside HTTP/HTTPS requests rejected with zero connections, allowed account responses remain no-store |
 | `layout`    | Public/account pages at mobile and desktop widths, real navigation between pages                                                                      |
 | `library`   | UI signup and recovery-key display, character profile, backup/restore, second-device sign-in, linking and resuming a shared membership                |
 | `dm-resume` | Two devices and two saved rooms; end, reopen as verified DM, resume each from either device, correct room/role, no title replay, mobile/desktop cards |
@@ -55,6 +57,17 @@ There is no requirement to rerun unrelated local browser suites after each keyst
 - The account suite uses Playwright Test with `forbidOnly: true`, two workers, independent parallel scenarios, no retries, failure screenshots and traces. Preserve unique scenario accounts, rooms, browser storage and synthetic client identities; never parallelize ordered actions within a scenario. Additional browser contexts are recorded by the runner too. Never turn retries into a way to make a flaky release look green.
 - Focused selection rejects unknown scenarios and is refused in CI. The unchanged account audit entry point runs every required scenario by default. Add new scenarios to the manifest and preservation mapping.
 - Traces may contain disposable passwords, keys and cookies. Use them only with synthetic local data; never post their contents to a public PR or email. Existing artifact access controls apply. Failure emails remain sanitized summaries.
+
+### Prevent repeated account-suite timeouts
+
+1. Distinguish an individual assertion/60-second case timeout from the 170-second aggregate deadline. Nine passing cases and a final unfinished case are not a complete pass. Preserve every required scenario, two workers, zero retries and both deadlines. Do not solve overruns by weakening assertions, increasing deadlines, adding workers, splitting away the aggregate limit or accepting partial green groups.
+2. After a repeated aggregate timeout on unchanged source, stop rerunning it. Read per-case durations and the worker timeline, then compare the development and immutable Worker/standby runs. Separate runner/browser installation from test execution. Identify the cause before another full submission; a local pass alone does not explain a recurring CI overrun. If CI trace access is blocked, record the access gap and use readable job logs plus disposable local diagnostics; do not repeatedly download through the same rejected route.
+3. Ordinary account/edit/resume transitions must click actual router links and assert the document remains and startup stays absent. Preserve deliberate new documents for ownership migration, interrupted hydration, pending-queue/portrait persistence, guest reconnect, sign-in and cold layout checks. Only independent device setup/read operations may overlap; keep completion barriers before reopening, switching, writing or asserting dependent state.
+4. Keep browser network isolation in `scripts/browser/account-fixtures.mjs`. Playwright `context.route`/`page.route` enables protocol interception and disables HTTP caching even with an external-only regex; never assume a narrow abort handler avoids development-module overhead. Prefer the existing native Chromium ordered URLPattern restriction for the exact disposable HTTP/HMR origins, including empty credentials. Older diagnostic Chromium uses the original safe abort-route fallback. Retain explicit page routes for deliberate failure injection. Do not disable the network boundary or make account responses cacheable to improve timings.
+5. The required `network-boundary` scenario must prove both contexts and policy persistence across real reloads: outside HTTP/HTTPS probes never open a socket, same-origin account reads succeed and return no-store. Accept only the known protocol blocking reasons (`inspector`, or `net::ERR_BLOCKED_BY_CLIENT` with its optional `.Inspector` suffix), not ordinary DNS/TLS/connection failures. After changing isolation, run the full focused account suite and current-browser CI against development, Worker and standby; a pass on the older fallback does not verify the native path.
+6. Freeze a locally verified functional checkpoint before full CI. Reconcile current runs before making another head change; batch necessary documentation/performance follow-ups together. Preserve failed evidence, run IDs and measured outcomes. Resolve a diagnosed slowdown only after a successful complete comparable run, using the performance procedure below; a faster failed run is not a resolution. Fresh exact-head release gates and the read-only live audit remain mandatory.
+
+The October 8 shop-location investigation in `docs/audit/2026-10-08-shop-locations.md` records the repeated aggregate failures, protocol-overhead diagnosis and native/fallback error-label correction. Consult its final PR70 evidence before repeating those experiments.
 
 ## 5. Inspect performance before optimizing
 

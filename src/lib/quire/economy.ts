@@ -2,6 +2,7 @@ import { captureDeviceMutationScope, assertDeviceMutationScope } from "./mutatio
 import { isEphemeralCampaign } from "./guest-storage.ts";
 import { assertMerchantSale, isService, stockCategory } from "./merchant.ts";
 import { applyCommand, type CommandInput } from "./commands.ts";
+import { validateShopLocations } from "./shop-locations.ts";
 import { loanFromRequest, readFinance, assertFinanceAccountRemovable } from "./finance.ts";
 import { readLocalEncounters } from "../encounters/local.ts";
 import { readJournal, readValidatedJournal, type Journal } from "./journal.ts";
@@ -446,6 +447,8 @@ export async function inventGoods(input: {
 }
 
 export async function openComposedShop(input: {
+  locationId?: string;
+  image?: string;
   name: string;
   keeper: string;
   place: string;
@@ -458,6 +461,8 @@ export async function openComposedShop(input: {
   lines: ShelfDraft[];
 }): Promise<string> {
   const shop = normalizeShop({
+    ...(input.locationId ? { locationId: input.locationId } : {}),
+    ...(input.image ? { image: input.image } : {}),
     id: crypto.randomUUID(),
     name: input.name.trim() || "New shop",
     keeper: input.keeper.trim(),
@@ -469,11 +474,12 @@ export async function openComposedShop(input: {
     category: input.category,
     priceScale: input.priceScale,
   });
-  const db = await quireDb();
-  const tx = db.transaction(["shops", "stock"], "readwrite");
-  const done = finish(tx);
-  tx.objectStore("shops").put(shop);
-  for (const line of input.lines) {
+  await atomic(["shops", "stock", "meta"], async tx => {
+    const journal = await request<{ value?: Journal } | undefined>(tx.objectStore("meta").get("journal"));
+    validateShopLocations([shop], journal?.value?.market);
+    validateEconomyRows({ purses: [], holdings: [], shops: [shop], stock: [], ledger: [] });
+    tx.objectStore("shops").put(shop);
+    for (const line of input.lines) {
     const stock: StockLine = {
       id: crypto.randomUUID(),
       shopId: shop.id,
@@ -487,8 +493,8 @@ export async function openComposedShop(input: {
       rarity: line.rarity,
     };
     tx.objectStore("stock").put(stock);
-  }
-  await done;
+    }
+  });
   return shop.id;
 }
 
@@ -685,7 +691,10 @@ export async function saveShop(shop: Shop): Promise<void> {
   const db = await quireDb();
   await atomic(["shops", "meta"], async (tx) => {
     const before = await request<Shop | undefined>(tx.objectStore("shops").get(shop.id));
+    const journal = await request<{ value?: Journal } | undefined>(tx.objectStore("meta").get("journal"));
+    validateShopLocations([shop], journal?.value?.market);
     if (before?.schedule && before.closed !== shop.closed) delete shop.schedule;
+    validateEconomyRows({ purses: [], holdings: [], shops: [normalizeShop(shop)], stock: [], ledger: [] });
     tx.objectStore("shops").put(normalizeShop(shop));
     await audit(
       tx,

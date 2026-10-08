@@ -70,6 +70,7 @@ export type ItemCategory =
 export type ShopCategory = ItemCategory | "mixed";
 
 export type Shop = {
+  locationId?: string;
   schedule?: import("./shop-schedule.ts").ShopSchedule;
   acceptedCategories?: string[];
   acceptAnyCategory?: boolean;

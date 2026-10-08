@@ -63,6 +63,8 @@ export type CloudRoom = {
   drafts?: Record<string, import("./commands.ts").Command[]>;
 };
 
+import { validateShopLocations } from "./shop-locations.ts";
+
 export function emptyCloudTable(): CloudTable {
   return { purses: [], holdings: [], shops: [], stock: [], ledger: [], listings: [], loans: [], sheets: [], notes: [] };
 }
@@ -73,7 +75,7 @@ export function readCloudTable(value: unknown): CloudTable | null {
   if (!Array.isArray(table.purses) || !Array.isArray(table.holdings) || !Array.isArray(table.shops) || !Array.isArray(table.stock) || !Array.isArray(table.ledger)) {
     return null;
   }
-  try { validateEconomyRows(table as CloudTable); readJournal(table.journal); } catch { return null; }
+  try { validateEconomyRows(table as CloudTable); validateShopLocations(table.shops, readJournal(table.journal).market); } catch { return null; }
   return {
     journal: readJournal(table.journal),
     realm: table.realm ? clampRealm(table.realm) : undefined,
@@ -181,7 +183,7 @@ export function endDmTurn(room: CloudRoom, token: string, table: CloudTable, bas
   const seat = room.live ? seated(room, token) : requireTurn(room, token);
   if (seat.role !== "dm") throw new Error("Only the dungeon master can publish the whole table.");
   expectRevision(room, baseRevision);
-  if (room.table.journal?.finance && !table.journal?.finance)
+  if ((room.table.journal?.finance && !table.journal?.finance) || (room.table.journal?.market && !table.journal?.market))
     table = { ...table, journal: preserveJournalMetadata(table.journal, room.table.journal) };
   if (room.live) return { ...room, table, revision: room.revision + 1 };
   return advance({ ...room, table });

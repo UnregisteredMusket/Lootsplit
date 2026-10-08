@@ -1,4 +1,6 @@
 import { LedgerArt } from "@/components/ledger-art";
+import { MarketLocationsPanel, LocationOptions } from "@/components/market-locations";
+import { readMarketLocations, shopAvailableHere, locationLabel } from "@/lib/quire/shop-locations";
 import { PriceHistory } from "@/components/campaign-journal";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { MapPin, Search, ChevronRight } from "lucide-react";
@@ -29,7 +31,11 @@ export const Route = createFileRoute("/market")({
 function MarketPage() {
   const { book } = Route.useSearch();
   const navigate = useNavigate();
-  const { ready, shops, stock, realm, createShop, updateShop, commandOutcome } = useEconomy();
+  const { ready, shops, stock, realm, journal, createShop, updateShop, commandOutcome } =
+    useEconomy();
+  const market = readMarketLocations(journal.market);
+  const [assignedLocation, setAssignedLocation] = useState("");
+  const [availableOnly, setAvailableOnly] = useState(false);
   const { prefs } = usePrefs();
   const seat = useSeat();
   const [location, setLocation] = useState("");
@@ -45,9 +51,19 @@ function MarketPage() {
     addedUnits = Number(restockQuantity);
   const [stocked, setStocked] = useState<"all" | "open" | "empty">("all");
   const shown =
-    seat.role === "player" ? shops.filter((shop) => seat.shopIds.includes(shop.id)) : shops;
+    seat.role === "player"
+      ? shops.filter((shop) => seat.shopIds.includes(shop.id) && shopAvailableHere(shop, market))
+      : shops;
   const needle = query.trim().toLowerCase();
   const filtered = shown.filter((shop) => {
+    if (
+      assignedLocation &&
+      (assignedLocation === "campaignwide"
+        ? !!shop.locationId
+        : shop.locationId !== assignedLocation)
+    )
+      return false;
+    if (availableOnly && !shopAvailableHere(shop, market)) return false;
     if (location && shop.place !== location) return false;
     if (category && shop.category !== category) return false;
     if (stocked === "open" && shop.closed) return false;
@@ -56,7 +72,14 @@ function MarketPage() {
     const names = stock
       .filter((line) => line.shopId === shop.id)
       .map((line) => line.name.toLowerCase());
-    return [shop.name, shop.keeper, shop.place, shop.category, ...names]
+    return [
+      shop.name,
+      shop.keeper,
+      shop.place,
+      locationLabel(market, shop.locationId),
+      shop.category,
+      ...names,
+    ]
       .join(" ")
       .toLowerCase()
       .includes(needle);
@@ -92,6 +115,7 @@ function MarketPage() {
                 sellRate: prefs.defaultSell,
                 buyRate: prefs.defaultBuy,
                 priceScale: prefs.defaultScale,
+                ...(market.currentLocationId ? { locationId: market.currentLocationId } : {}),
               }).then((id) => navigate({ to: "/shop/$shopId", params: { shopId: id } }));
             }}
           >
@@ -99,6 +123,7 @@ function MarketPage() {
           </Button>
         ) : null}
       </div>
+      {ready ? <MarketLocationsPanel /> : null}
       <label className="relative mt-5 block">
         <Search className="absolute left-4 top-3.5 size-5 text-faint" aria-hidden="true" />
         <span className="sr-only">Search the market</span>
@@ -159,6 +184,28 @@ function MarketPage() {
           ))}
         </select>
       </div>
+      {seat.role === "dm" && market.locations.length ? (
+        <div className="mt-3 space-y-2">
+          <select
+            aria-label="Shop assigned location"
+            className="ledger-search w-full"
+            value={assignedLocation}
+            onChange={(event) => setAssignedLocation(event.target.value)}
+          >
+            <option value="">All assigned locations</option>
+            <option value="campaignwide">Campaignwide shops</option>
+            <LocationOptions market={market} />
+          </select>
+          <label className="flex min-h-11 items-center gap-2 text-sm">
+            <input
+              type="checkbox"
+              checked={availableOnly}
+              onChange={(event) => setAvailableOnly(event.target.checked)}
+            />
+            Available at the party's location
+          </label>
+        </div>
+      ) : null}
       {!ready ? <p className="mt-6 text-muted">Opening the market…</p> : null}
       {ready && filtered.length === 0 ? (
         <div className="mt-4">
@@ -203,6 +250,11 @@ function MarketPage() {
                     <span className="mt-2 flex items-center gap-1 text-sm text-faint">
                       <MapPin className="size-3" />
                       {shop.place}
+                    </span>
+                  ) : null}
+                  {shop.locationId ? (
+                    <span className="mt-1 block text-sm text-faint">
+                      {locationLabel(market, shop.locationId)}
                     </span>
                   ) : null}
                 </span>

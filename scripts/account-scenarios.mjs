@@ -1,5 +1,6 @@
 // Keep this list and the named Playwright tests in sync. CI always runs all of them.
 export const accountScenarios = [
+  "network-boundary",
   "ownership",
   "layout",
   "library",
