@@ -4,15 +4,31 @@ import { openApplication, prepareDmFixture } from "../title-screen-navigation.mj
 import { accountScenarios, externalAuditRequests } from "../account-scenarios.mjs";
 
 export { expect };
+async function isolatePage(context, page, origin) {
+  // Playwright routing turns off HTTP caching and intercepts every request at
+  // the protocol layer, even with an external-only regex. Current Chromium can
+  // enforce the same boundary natively without relaying every Vite module.
+  const cdp = await context.newCDPSession(page);
+  await cdp.send("Network.enable");
+  const exact = origin.replace("://", "://:@");
+  try {
+    await cdp.send("Network.setBlockedURLs", {
+      urlPatterns: [
+        { urlPattern: `${exact}/*`, block: false },
+        { urlPattern: `${exact.replace(/^http:/, "ws:")}/*`, block: false },
+        { urlPattern: "*://*:*/*", block: true },
+      ],
+    });
+  } catch (error) {
+    if (!/Invalid parameters|wasn't found|not supported/.test(error.message)) throw error;
+    // Older diagnostic Chromium keeps the original exact-origin abort route.
+    await context.route(externalAuditRequests(origin), (route) => route.abort("blockedbyclient"));
+  }
+}
 export const test = base.extend({
   devices: async ({ context, page, browser, baseURL }, runFixture, testInfo) => {
     const contexts = [context];
-    // A catch-all route forces every development module through a Node callback
-    // during each account context reload. Match external URLs in the browser
-    // instead, retaining the exact-origin boundary and blocking every other host.
-    const externalOnly = externalAuditRequests(baseURL);
-    const blockExternal = (route) => route.abort("blockedbyclient");
-    await context.route(externalOnly, blockExternal);
+    await isolatePage(context, page, baseURL);
     // Each synthetic device is a separate local client, including its rate-limit
     // identity. Faster independent tests must not share one localhost quota.
     const address = 40 + accountScenarios.indexOf(testInfo.title) * 4;
@@ -28,10 +44,11 @@ export const test = base.extend({
         viewport: { width, height: 900 },
         extraHTTPHeaders: { "cf-connecting-ip": `192.0.2.${address + contexts.length}` },
       });
-      await other.route(externalOnly, blockExternal);
       contexts.push(other);
       other.on("page", watch);
-      return { context: other, page: await other.newPage() };
+      const otherPage = await other.newPage();
+      await isolatePage(other, otherPage, baseURL);
+      return { context: other, page: otherPage };
     };
     try {
       await runFixture({ context, page, newDevice });

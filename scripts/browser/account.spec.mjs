@@ -1,6 +1,7 @@
 import assert from "node:assert/strict";
 import { blankEncounter } from "../../src/lib/encounters/model.mjs";
 import { readFile } from "node:fs/promises";
+import { createServer } from "node:http";
 import {
   test,
   expect,
@@ -14,6 +15,43 @@ import {
   waitForDmCampaign,
 } from "./account-fixtures.mjs";
 import { continueIntoApp, prepareDmFixture } from "../title-screen-navigation.mjs";
+
+test("network-boundary", async ({ devices, baseURL: origin }) => {
+  let connections = 0;
+  const forbidden = createServer((_request, response) => {
+    response.writeHead(200, { "access-control-allow-origin": "*" });
+    response.end("This other origin must never be reached.");
+  });
+  forbidden.on("connection", () => connections++);
+  await new Promise((done) => forbidden.listen(0, "127.0.0.1", done));
+  const port = forbidden.address().port;
+  try {
+    const { page: other } = await devices.newDevice();
+    await Promise.all([devices.page, other].map(async (page) => {
+      await visitPage(page, origin, "/welcome");
+      const probe = async () => {
+        for (const protocol of ["http", "https"]) {
+          const url = `${protocol}://127.0.0.1:${port}/forbidden`;
+          const failed = page.waitForEvent("requestfailed", (request) => request.url() === url);
+          expect(await page.evaluate((url) => fetch(url).then(() => true, () => false), url)).toBe(false);
+          expect((await failed).failure().errorText).toMatch(/BLOCKED/);
+        }
+        const account = await page.evaluate(async () => {
+          const response = await fetch("/api/account/auth/get-session");
+          return { ok: response.ok, cache: response.headers.get("cache-control") };
+        });
+        expect(account).toEqual({ ok: true, cache: "no-store" });
+      };
+      await probe();
+      await page.reload();
+      await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+      await probe();
+    }));
+    expect(connections, "Blocked origins must not open a network connection").toBe(0);
+  } finally {
+    await new Promise((done) => forbidden.close(done));
+  }
+});
 
 // Run the long, independent ownership scenario first so it has the full
 // unchanged per-test and suite budgets rather than the final queue remainder.
