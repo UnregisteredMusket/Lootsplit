@@ -6,6 +6,7 @@ import { applyTheme, DEFAULT_ACCENT, DEFAULT_GROUND, type Appearance } from "./t
 import type { Wealth } from "./types.ts";
 
 export type AppPrefs = {
+  fantasyBackgrounds: boolean;
   soundEnabled: boolean;
   soundVolume: number;
   rollMode: "manual" | "virtual";
@@ -31,6 +32,7 @@ export type AppPrefs = {
 };
 
 export const DEFAULT_PREFS: AppPrefs = {
+  fantasyBackgrounds: true,
   soundEnabled: false,
   soundVolume: 0.35,
   rollMode: "virtual",
@@ -75,6 +77,7 @@ function hexColor(value: unknown, fallback: string): string {
 export function normalizePrefs(input: Partial<AppPrefs> | null | undefined): AppPrefs {
   const wealth = WEALTHS.includes(input?.defaultWealth as Wealth) ? (input?.defaultWealth as Wealth) : DEFAULT_PREFS.defaultWealth;
   return {
+    fantasyBackgrounds: flag(input?.fantasyBackgrounds, true),
     soundEnabled: flag(input?.soundEnabled, false),
     soundVolume: num(input?.soundVolume, 0, 1, 0.35),
     rollMode: input?.rollMode === "manual" ? "manual" : "virtual",

@@ -1,0 +1,12 @@
+Fantasy Visual Novel Backgrounds — 48 Painted Scenes, Day & Night
+Author: willYEE
+Source: https://willyee.itch.io/fantasy-visual-novel-backgrounds
+License: CC0 1.0 Universal (see LICENSE.txt)
+
+Lootsplit uses eight selected day/night scene pairs, resized from 1920x1080 JPEGs
+to 768x432 and 1440x810 WebP, quality 77. Artwork is bundled locally for web
+and Android; no third-party image request is required. See sources.json for original
+filenames, archive hashes, adaptations and per-file integrity hashes.
+
+The original creator discloses AI generation with Krea 2, then Real-ESRGAN
+upscaling. Their unmodified pack documentation is SOURCE-README.md.

@@ -1,4 +1,5 @@
 import { FeatureCards } from "./feature-navigation";
+import { SubmenuBackdrop } from "./submenu-backdrop";
 import { AppLink } from "@/components/app-link";
 import { FantasyIcon } from "@/components/fantasy-icon";
 import { allowContextChange } from "@/lib/quire/use-draft-guard";
@@ -237,15 +238,17 @@ export function Shell({
             ) : null}
           </header>
           <OfflineNote />
-          <main
-            className={cn(
-              "concept-main mx-auto w-full px-4 pt-6 pb-28 lg:px-8 lg:pt-8 lg:pb-12",
-              width === "prose" ? "max-w-3xl" : "max-w-6xl",
-            )}
-          >
-            {pathname !== "/share" ? <SyncStatus compact /> : null}
-            {children}
-          </main>
+          <SubmenuBackdrop pathname={pathname}>
+            <main
+              className={cn(
+                "concept-main mx-auto w-full px-4 pt-6 pb-28 lg:px-8 lg:pt-8 lg:pb-12",
+                width === "prose" ? "max-w-3xl" : "max-w-6xl",
+              )}
+            >
+              {pathname !== "/share" ? <SyncStatus compact /> : null}
+              {children}
+            </main>
+          </SubmenuBackdrop>
         </div>
       </div>
       <ManagementPanel
