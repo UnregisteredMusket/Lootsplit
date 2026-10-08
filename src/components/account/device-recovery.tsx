@@ -59,6 +59,10 @@ export function DeviceRecovery({ userId }: { userId: string }) {
       ? null
       : sessionStorage.getItem("lootsplit.verified-account");
   const [error, setError] = useState("");
+  const [checking, setChecking] = useState(false);
+  const [verification, setVerification] = useState<ReturnType<
+    typeof authorizeLegacyRecovery
+  > | null>(null);
   const [discard, setDiscard] = useState<string | null>(null);
   const [copies, setCopies] = useState<
     Array<{ key: string; code: string; count: number; archived: boolean; preview: RecoveryPreview }>
@@ -113,15 +117,19 @@ export function DeviceRecovery({ userId }: { userId: string }) {
   if (verified !== userId) return null;
   if (!copies.length && !recovery.recoveries.length && !recovery.unverifiedRecoveries) return null;
   async function verifyOlder() {
+    setChecking(true);
     setError("");
+    setVerification(null);
     try {
       const library = await accountRequest<AccountLibrary>("library");
       if (library.user.id !== userId)
         throw Error("Sign in to the account that owns these campaigns.");
-      authorizeLegacyRecovery(userId, library.members);
+      setVerification(authorizeLegacyRecovery(userId, library.members));
       refreshRecoveryVisibility();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Ownership could not be checked.");
+    } finally {
+      setChecking(false);
     }
   }
   return (
@@ -135,6 +143,18 @@ export function DeviceRecovery({ userId }: { userId: string }) {
         save and are never replayed under a new seat. Guest work is memory-only; export it to a file
         before closing this tab if you need a recovery copy.
       </p>
+      {verification ? (
+        <p role="status">
+          Ownership checked. {verification.verified} recovery cop
+          {verification.verified === 1 ? "y is" : "ies are"} available to export.
+          {verification.remaining
+            ? ` ${verification.remaining} older cop${verification.remaining === 1 ? "y could" : "ies could"} not be matched to this account's saved DM campaigns. They remain private and unchanged. Sign in to the account that originally hosted those rooms to check again.`
+            : ""}
+          {!verification.durable
+            ? " Verification could not be saved on this device. Export the verified work before closing this tab; the original copy is preserved."
+            : ""}
+        </p>
+      ) : null}
       {copies.map((copy) => (
         <div key={copy.key}>
           <p>
@@ -195,11 +215,13 @@ export function DeviceRecovery({ userId }: { userId: string }) {
         <div>
           <p>
             {recovery.unverifiedRecoveries} older recovery copies are preserved. Their contents
-            remain hidden until this account's saved DM memberships verify ownership. Unverified
-            copies remain unchanged for device recovery.
+            {recovery.legacyRecoveryChecked
+              ? " could not be matched to this account's saved DM campaigns and remain private."
+              : " remain hidden until this account's saved DM memberships verify ownership."}{" "}
+            Unverified copies remain unchanged for device recovery.
           </p>
-          <Button variant="secondary" onClick={() => void verifyOlder()}>
-            Verify older recovery copies
+          <Button variant="secondary" disabled={checking} onClick={() => void verifyOlder()}>
+            {checking ? "Checking ownership…" : "Verify older recovery copies"}
           </Button>
         </div>
       ) : null}

@@ -40,6 +40,7 @@ import {
   discardRevokedRecovery,
   hasRevokedMemoryWork,
   legacyRecoveryCount,
+  legacyRecoveryChecked,
 } from "./revoked-recovery.ts";
 let playerSession: Session | null = null;
 const PLAYER_TICKET = "lootsplit.player.reconnect.v1";
@@ -78,6 +79,7 @@ const initialView = {
   lastSync: 0,
   recoveries: [] as Array<{ id: string; code: string; pending: number }>,
   unverifiedRecoveries: 0,
+  legacyRecoveryChecked: false,
 };
 let view = initialView;
 // Hydration always starts from the same local snapshot, even if room restoration
@@ -245,6 +247,7 @@ function publish(next: Partial<typeof view>, dataChanged = true) {
     ...next,
     recoveries: revokedRecoverySummaries(),
     unverifiedRecoveries: legacyRecoveryCount(),
+    legacyRecoveryChecked: legacyRecoveryChecked(),
   };
   if (previous.joined && view.joined) {
     if (previous.live !== view.live)
@@ -264,12 +267,14 @@ export function getCloudTable() {
   // Owner changes can occur while no room is connected. Keep the external-store
   // snapshot stable except when the authorized recovery list actually changes.
   const recoveries = revokedRecoverySummaries(),
-    unverifiedRecoveries = legacyRecoveryCount();
+    unverifiedRecoveries = legacyRecoveryCount(),
+    checked = legacyRecoveryChecked();
   if (
     JSON.stringify(recoveries) !== JSON.stringify(view.recoveries) ||
-    unverifiedRecoveries !== view.unverifiedRecoveries
+    unverifiedRecoveries !== view.unverifiedRecoveries ||
+    checked !== view.legacyRecoveryChecked
   )
-    view = { ...view, recoveries, unverifiedRecoveries };
+    view = { ...view, recoveries, unverifiedRecoveries, legacyRecoveryChecked: checked };
   return view;
 }
 export function refreshRecoveryVisibility() {

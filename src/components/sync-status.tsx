@@ -62,10 +62,17 @@ export function SyncStatus({ compact = false }: { compact?: boolean }) {
         <p>
           {state.unverifiedRecoveries} older recovery cop
           {state.unverifiedRecoveries === 1 ? "y is" : "ies are"} preserved on this device.{" "}
+          {state.legacyRecoveryChecked
+            ? "Ownership could not be confirmed with this account. "
+            : ""}
           <Link to="/account" className="underline">
-            Verify ownership in My account
+            {state.legacyRecoveryChecked
+              ? "Review device recovery copies in My account"
+              : "Verify ownership in My account"}
           </Link>{" "}
-          to recover authorized work.
+          {state.legacyRecoveryChecked
+            ? "The copies remain private and unchanged."
+            : "to recover authorized work."}
         </p>
       ) : null}
       {state.joined ? (
