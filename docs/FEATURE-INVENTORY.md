@@ -267,6 +267,7 @@ Release status must be taken from the latest recovery checkpoint/PR, not this im
 
 
 - Account campaign resume reconciles acknowledged device commands and restores server drafts; genuine pending changes remain recoverable in Multiplayer. Changed-seat/conflicting device work remains in account-scoped exportable recovery copies, with no automatic replay under another seat.
+- Legacy device recovery ownership checks report matched and unmatched counts. Verified, token-free copies survive reload for the verified owning account; original bytes and unmatched copies remain preserved. The desk shows the last account-scoped unmatched result with a review link instead of repeating the verification instruction.
 
 ## Between-session online access (2026-10-07)
 

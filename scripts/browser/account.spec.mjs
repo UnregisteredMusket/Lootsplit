@@ -507,6 +507,92 @@ test("resume-queue", async ({ devices, baseURL: origin }, testInfo) => {
   expect(recovery.seatId).toBe("audit-old-seat");
   expect(recovery.commands[0].id).toBe("audit-old-seat-action");
   expect(recovery.token).toBeUndefined();
+
+  // Verify the actual account action and its desk notice, including a cold
+  // reload. Only the exact saved DM room authorizes the old work.
+  const legacySubmissions = [];
+  device.on("request", (request) => {
+    if (request.postData()?.includes("audit-legacy-action")) legacySubmissions.push(request.url());
+  });
+  const legacy = {
+    ownedKey: `lootsplit.revoked-recovery:${firstCode}:audit`,
+    privateKey: "lootsplit.revoked-recovery:UNSAVED:audit",
+    raw: JSON.stringify({
+      code: firstCode,
+      seatId: "legacy-seat",
+      batchId: "legacy-batch",
+      commands: [{ id: "audit-legacy-action", kind: "patch", changes: [] }],
+      exportedAt: 1,
+      token: "legacy-secret-must-stay-private",
+    }),
+  };
+  await device.evaluate(({ ownedKey, privateKey, raw }) => {
+    localStorage.setItem(ownedKey, raw);
+    localStorage.setItem(privateKey, JSON.stringify({ code: "UNSAVED", commands: [] }));
+  }, legacy);
+  await visit(device, "/account");
+  const deviceRecovery = device.getByRole("region", { name: "Device recovery copies" });
+  await deviceRecovery
+    .getByRole("button", { name: "Verify older recovery copies", exact: true })
+    .click();
+  await expect(deviceRecovery.getByRole("status")).toContainText(
+    "Ownership checked. 1 recovery copy is available to export.",
+  );
+  await expect(deviceRecovery.getByRole("status")).toContainText(
+    "1 older copy could not be matched",
+  );
+  await visit(device, "/account");
+  const verifiedCopy = deviceRecovery
+    .getByText(`${firstCode}: 1 unsent device actions`, { exact: true })
+    .locator("..");
+  await expect(verifiedCopy).toBeVisible();
+  const verifiedDownload = device.waitForEvent("download");
+  await verifiedCopy
+    .getByRole("button", { name: "Export device recovery copy", exact: true })
+    .click();
+  const verifiedExport = JSON.parse(await readFile(await (await verifiedDownload).path(), "utf8"));
+  expect(verifiedExport.commands[0].id).toBe("audit-legacy-action");
+  expect(verifiedExport.seatId).toBe("legacy-seat");
+  expect(verifiedExport.batchId).toBe("legacy-batch");
+  expect(verifiedExport.token).toBeUndefined();
+  expect(await device.evaluate(({ ownedKey }) => localStorage.getItem(ownedKey), legacy)).toBe(
+    legacy.raw,
+  );
+  expect(await device.evaluate(({ privateKey }) => localStorage.getItem(privateKey), legacy)).toBe(
+    JSON.stringify({ code: "UNSAVED", commands: [] }),
+  );
+  await navigateAccountScenario(device, origin, "/");
+  const review = device.getByRole("link", {
+    name: "Review device recovery copies in My account",
+    exact: true,
+  });
+  await expect(review).toBeVisible();
+  await expect(
+    device.getByRole("link", { name: "Verify ownership in My account", exact: true }),
+  ).toHaveCount(0);
+  await device.setViewportSize({ width: 390, height: 844 });
+  await device.screenshot({
+    path: testInfo.outputPath("legacy-recovery-checked-phone.png"),
+    fullPage: true,
+  });
+  await device.evaluate(() => {
+    window.recoveryDocumentForAudit = "same-document";
+  });
+  await review.click();
+  await expect(deviceRecovery).toBeVisible();
+  expect(await device.evaluate(() => window.recoveryDocumentForAudit)).toBe("same-document");
+  expect(await device.locator(".loot-opening").count()).toBe(0);
+  await expect(verifiedCopy).toBeVisible();
+  await device.screenshot({
+    path: testInfo.outputPath("legacy-recovery-account-phone.png"),
+    fullPage: true,
+  });
+  await device.setViewportSize({ width: 1360, height: 900 });
+  await device.screenshot({
+    path: testInfo.outputPath("legacy-recovery-account-desktop.png"),
+    fullPage: true,
+  });
+  expect(legacySubmissions).toEqual([]);
 });
 
 test("recovery", async ({ devices, baseURL: origin }) => {
