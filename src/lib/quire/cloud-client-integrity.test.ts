@@ -2,7 +2,7 @@ import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { stripTypeScriptTypes } from "node:module";
-import { applyCommand, commandSchema, type Command } from "./commands.ts";
+import { applyCommand, commandSchema, tablePatch, type Command } from "./commands.ts";
 import { sameCommand } from "./command-identity.ts";
 import { emptyCloudTable, type CloudTable } from "./cloud.ts";
 import { fromCopper, toCopper } from "./money.ts";
@@ -151,7 +151,12 @@ test("a conflicting same-ID draft remains recoverable and is never silently repl
   assert.equal((h.session.pending[0] as Extract<Command, { kind: "give" }>).copper, 100);
 });
 test("actual acceptance keeps id-last client portrait pending without conflicting with its Zod server echo", async () => {
-  const client: Command = { kind: "portrait", purseId: "hero", portrait: "data:image/png;base64,QUFB", id: "photo" };
+  const client: Command = {
+    kind: "portrait",
+    purseId: "hero",
+    portrait: "data:image/png;base64,QUFB",
+    id: "photo",
+  };
   const h = acceptance([client], [], [commandSchema.parse(client)]);
   h.remote.table.purses[0]!.editingAllowed = true;
   await h.accept(h.remote);
@@ -502,4 +507,435 @@ test("actual account authentication clears old recovery identity before announci
     await request(path, {});
     assert.equal(changed, true);
   }
+});
+
+// Execute the real queue/flush/stage/accept functions while replacing only
+// storage, network, and IndexedDB boundaries. JSON session reads reproduce a
+// returning DM's persisted cache rather than sharing an in-memory object.
+function outcomeHarness({ live = true, lostResponse = false, hydrationFailure = false } = {}) {
+  let serialized = JSON.stringify({
+    code: "TEST",
+    token: seat.token,
+    seatId: "dm",
+    role: "dm",
+    purseIds: [],
+    pending: [],
+    revision: 1,
+    sessionId: "original-generation",
+    batchId: "outcome-batch",
+  });
+  let local = table(),
+    authoritative = table(),
+    submissions = 0,
+    revision = 1;
+  let error = "",
+    hydrationAttempts = 0;
+  let deviceScope = {
+    campaignId: "main",
+    databaseName: "quire",
+    accountId: "synthetic-owner",
+    ephemeral: false,
+  };
+  let duringRefresh: (() => void | Promise<void>) | undefined;
+  let duringSnapshot: (() => void | Promise<void>) | undefined;
+  const view = {
+    mine: true,
+    who: "Synthetic DM",
+    live,
+    viewOnly: false,
+    seats: [{ ...seat, id: "dm", role: "dm" }],
+    error: "",
+  };
+  const session = () => JSON.parse(serialized);
+  const remember = (s: unknown) => {
+    serialized = JSON.stringify(s);
+  };
+  let chain: Promise<unknown> = Promise.resolve();
+  const serial = <T>(fn: () => Promise<T>) => {
+    const result = chain.then(fn);
+    chain = result.catch(() => undefined);
+    return result;
+  };
+  const applyCloudTable = async (next: CloudTable) => {
+    hydrationAttempts++;
+    if (hydrationFailure && hydrationAttempts === 1)
+      throw Error("Synthetic hydration interruption");
+    local = structuredClone(next);
+  };
+  const submitCloudCommands = async ({
+    data,
+  }: {
+    data: { commands: Command[]; stage?: boolean };
+  }) => {
+    submissions++;
+    if (!data.stage) {
+      for (const command of data.commands)
+        authoritative = applyCommand(authoritative, { ...seat, id: "dm", role: "dm" }, command);
+      revision++;
+    }
+    if (lostResponse) throw Error("Synthetic lost response");
+    return {
+      code: session().code,
+      sessionId: session().sessionId,
+      seatId: "dm",
+      revision,
+      table: authoritative,
+      seats: view.seats,
+      purseIds: [],
+      shopIds: [],
+      acknowledged: data.stage ? [] : data.commands.map((c) => c.id),
+      draft: JSON.stringify(data.stage ? data.commands : []),
+      mine: true,
+      live,
+      who: "Synthetic DM",
+    };
+  };
+  const body = [
+    source.slice(
+      source.indexOf("export type MutationScope"),
+      source.indexOf("function requireSession()"),
+    ),
+    source.slice(
+      source.indexOf("async function accept("),
+      source.indexOf("async function refresh()"),
+    ),
+    source.slice(
+      source.indexOf("async function flush("),
+      source.indexOf("export function endTableTurn()"),
+    ),
+    source.slice(
+      source.indexOf("export async function queueCommand("),
+      source.indexOf("export function chooseTableMode("),
+    ),
+  ]
+    .join("\n")
+    .replaceAll("export async function", "async function")
+    .replaceAll("export function", "function");
+  const functions = new Function(
+    "captureDeviceMutationScope",
+    "session",
+    "requireSession",
+    "remember",
+    "view",
+    "serial",
+    "refresh",
+    "economySnapshot",
+    "applyCloudTable",
+    "submitCloudCommands",
+    "applyCommand",
+    "commandSchema",
+    "tablePatch",
+    "fail",
+    "publish",
+    "rememberIncoming",
+    "getSeat",
+    "setSeat",
+    "start",
+    "sameCommand",
+    stripTypeScriptTypes(body) +
+      "; return {queueCommand, runSharedMutation, captureMutationScope};",
+  )(
+    () => Object.freeze({ ...deviceScope }),
+    session,
+    session,
+    remember,
+    view,
+    serial,
+    async () => {
+      await duringRefresh?.();
+    },
+    async () => {
+      await duringSnapshot?.();
+      return structuredClone(local);
+    },
+    applyCloudTable,
+    submitCloudCommands,
+    applyCommand,
+    commandSchema,
+    tablePatch,
+    (e: Error) => {
+      error = e.message;
+      view.error = error;
+    },
+    (patch: object) => Object.assign(view, patch),
+    async () => {},
+    () => ({}),
+    () => {},
+    () => {},
+    sameCommand,
+  );
+  return {
+    ...functions,
+    session,
+    submissions: () => submissions,
+    error: () => error,
+    local: () => local,
+    authoritative: () => authoritative,
+    edit: () => {
+      local.purses[0]!.coins = fromCopper(1200);
+    },
+    serial,
+    onRefresh: (work: () => void | Promise<void>) => {
+      duringRefresh = work;
+    },
+    onSnapshot: (work: () => void | Promise<void>) => {
+      duringSnapshot = work;
+    },
+    retarget: (
+      change: Partial<typeof deviceScope> & {
+        code?: string;
+        seatId?: string;
+        token?: string;
+        sessionId?: string;
+      },
+    ) => {
+      const { code, seatId, token, sessionId, ...device } = change;
+      deviceScope = { ...deviceScope, ...device };
+      const s = session();
+      if (code !== undefined) s.code = code;
+      if (seatId !== undefined) s.seatId = seatId;
+      if (token !== undefined) s.token = token;
+      if (sessionId !== undefined) s.sessionId = sessionId;
+      remember(s);
+    },
+  };
+}
+test("real Live DM queue reports committed from the updated JSON cache and applies once", async () => {
+  const h = outcomeHarness();
+  assert.deepEqual(
+    await h.queueCommand({
+      kind: "give",
+      fromId: "hero",
+      toId: "other",
+      copper: 100,
+      holdingId: null,
+      quantity: 0,
+    }),
+    { status: "committed" },
+  );
+  assert.equal(h.session().pending.length, 0);
+  assert.equal(h.submissions(), 1);
+  assert.equal(toCopper(h.local().purses[1]!.coins), 100);
+  assert.equal(h.authoritative().ledger.length, 2);
+});
+test("real Turn-based stage reports pending without claiming the preview was committed", async () => {
+  const h = outcomeHarness({ live: false });
+  assert.deepEqual(
+    await h.queueCommand({
+      kind: "give",
+      fromId: "hero",
+      toId: "other",
+      copper: 100,
+      holdingId: null,
+      quantity: 0,
+    }),
+    { status: "pending" },
+  );
+  assert.equal(h.session().pending.length, 1);
+  assert.equal(h.submissions(), 1);
+  assert.equal(toCopper(h.local().purses[1]!.coins), 100);
+  assert.equal(toCopper(h.authoritative().purses[1]!.coins), 0);
+});
+test("real lost stage and flush responses preserve their exact accepted command as pending", async () => {
+  for (const live of [false, true]) {
+    const h = outcomeHarness({ live, lostResponse: true });
+    assert.deepEqual(
+      await h.queueCommand({
+        kind: "give",
+        fromId: "hero",
+        toId: "other",
+        copper: 100,
+        holdingId: null,
+        quantity: 0,
+      }),
+      { status: "pending" },
+    );
+    assert.equal(h.session().pending.length, 1);
+    assert.equal(h.session().pending[0].copper, 100);
+    assert.match(h.error(), /lost response/);
+    assert.equal(h.submissions(), 1);
+  }
+});
+test("real hydration interruption after retention reports recoverable pending without submitting again", async () => {
+  const h = outcomeHarness({ hydrationFailure: true });
+  assert.deepEqual(
+    await h.queueCommand({
+      kind: "give",
+      fromId: "hero",
+      toId: "other",
+      copper: 100,
+      holdingId: null,
+      quantity: 0,
+    }),
+    { status: "pending" },
+  );
+  assert.equal(h.session().pending.length, 1);
+  assert.equal(h.submissions(), 0);
+  assert.match(h.error(), /hydration interruption/);
+  assert.equal(toCopper(h.local().purses[1]!.coins), 0);
+});
+test("real serialized valid and invalid commands never mistake another command for acceptance", async () => {
+  const h = outcomeHarness({ live: false });
+  const valid = h.queueCommand({
+    kind: "give",
+    fromId: "hero",
+    toId: "other",
+    copper: 100,
+    holdingId: null,
+    quantity: 0,
+  });
+  const invalid = h.queueCommand({
+    kind: "give",
+    fromId: "hero",
+    toId: "other",
+    copper: 2000,
+    holdingId: null,
+    quantity: 0,
+  });
+  assert.deepEqual(await valid, { status: "pending" });
+  await assert.rejects(invalid, /Insufficient funds/);
+  assert.equal(h.session().pending.length, 1);
+  assert.equal(h.session().pending[0].copper, 100);
+  assert.equal(h.submissions(), 1);
+});
+test("real DM shared mutations use their own patch receipt for committed versus staged status", async () => {
+  for (const live of [false, true]) {
+    const h = outcomeHarness({ live });
+    assert.deepEqual(await h.runSharedMutation(async () => h.edit()), {
+      status: live ? "committed" : "pending",
+    });
+    assert.equal(h.session().pending.length, live ? 0 : 1);
+    assert.equal(
+      toCopper(h.local().purses.find((p: { id: string }) => p.id === "hero")!.coins),
+      1200,
+    );
+    assert.equal(
+      toCopper(h.authoritative().purses.find((p: { id: string }) => p.id === "hero")!.coins),
+      live ? 1200 : 1000,
+    );
+  }
+});
+
+test("real queued action rejects after an earlier resumed campaign changes its execution target", async () => {
+  const h = outcomeHarness();
+  let release!: () => void;
+  const prior = h.serial(async () => {
+    await new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    h.retarget({
+      campaignId: "other",
+      databaseName: "quire-other",
+      code: "NEXT",
+      seatId: "new-seat",
+      token: "new-private-token",
+      sessionId: "new-generation",
+    });
+  });
+  await Promise.resolve();
+  const action = h.queueCommand({
+    kind: "give",
+    fromId: "hero",
+    toId: "other",
+    copper: 100,
+    holdingId: null,
+    quantity: 0,
+  });
+  release();
+  await prior;
+  await assert.rejects(action, /campaign or seat changed/);
+  assert.equal(h.submissions(), 0);
+  assert.equal(h.session().pending.length, 0);
+  assert.equal(toCopper(h.local().purses[1]!.coins), 0);
+});
+test("real queue rechecks authoritative storage, account and credentials after refresh and snapshot", async () => {
+  for (const phase of ["refresh", "snapshot"] as const) {
+    for (const changed of [
+      { databaseName: "quire-mapped-elsewhere" },
+      { accountId: "another-owner" },
+      { token: "revoked-private-token" },
+      { sessionId: "reopened-generation" },
+    ]) {
+      const h = outcomeHarness();
+      const change = () => h.retarget(changed);
+      if (phase === "refresh") h.onRefresh(change);
+      else h.onSnapshot(change);
+      await assert.rejects(
+        h.queueCommand({
+          kind: "give",
+          fromId: "hero",
+          toId: "other",
+          copper: 100,
+          holdingId: null,
+          quantity: 0,
+        }),
+        /changed before this action/,
+      );
+      assert.equal(h.submissions(), 0);
+      assert.equal(h.session().pending.length, 0);
+      assert.equal(toCopper(h.local().purses[1]!.coins), 0);
+    }
+  }
+});
+test("real explicit reviewed scope rejects an older target even when invocation is already in the new room", async () => {
+  const h = outcomeHarness();
+  const reviewed = h.captureMutationScope();
+  assert.equal("token" in reviewed, false);
+  h.retarget({ code: "NEXT", sessionId: "new-generation" });
+  await assert.rejects(
+    h.queueCommand(
+      { kind: "give", fromId: "hero", toId: "other", copper: 100, holdingId: null, quantity: 0 },
+      reviewed,
+    ),
+    /campaign or seat changed/,
+  );
+  assert.equal(h.submissions(), 0);
+  assert.equal(h.session().pending.length, 0);
+});
+
+test("real legacy cache with unknown invitation generation learns it without rejecting the first same-seat action", async () => {
+  const h = outcomeHarness();
+  h.retarget({ sessionId: "" });
+  h.onRefresh(() => h.retarget({ sessionId: "learned-generation" }));
+  assert.deepEqual(
+    await h.queueCommand({
+      kind: "give",
+      fromId: "hero",
+      toId: "other",
+      copper: 100,
+      holdingId: null,
+      quantity: 0,
+    }),
+    { status: "committed" },
+  );
+  assert.equal(h.submissions(), 1);
+  assert.equal(h.session().pending.length, 0);
+  assert.equal(toCopper(h.local().purses[1]!.coins), 100);
+});
+
+test("real shared mutation rejects a queued target switch before invoking its work", async () => {
+  const h = outcomeHarness();
+  let release!: () => void,
+    worked = false;
+  const prior = h.serial(async () => {
+    await new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    h.retarget({ databaseName: "quire-other", code: "NEXT", token: "next-private-token" });
+  });
+  await Promise.resolve();
+  const action = h.runSharedMutation(async () => {
+    worked = true;
+    h.edit();
+  });
+  release();
+  await prior;
+  await assert.rejects(action, /campaign or seat changed/);
+  assert.equal(worked, false);
+  assert.equal(h.submissions(), 0);
+  assert.equal(h.session().pending.length, 0);
+  assert.equal(
+    toCopper(h.local().purses.find((p: { id: string }) => p.id === "hero")!.coins),
+    1000,
+  );
 });

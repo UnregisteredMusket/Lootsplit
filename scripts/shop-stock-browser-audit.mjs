@@ -167,7 +167,16 @@ try {
     assert.equal(personal.notes, "Existing personal equipment");
     assert.equal(personal.equipped, true);
     assert.equal(lots.find((row) => row.id !== personal.id).quantity, 1);
-    await page.getByRole("tab", { name: "Edit", exact: true }).click();
+    const editMode = page.getByRole("button", { name: "Edit", exact: true });
+    await editMode.click();
+    assert.equal(await editMode.getAttribute("aria-pressed"), "true");
+    await editMode.press("Home");
+    const tradeMode = page.getByRole("group", { name: "Shop mode", exact: true }).getByRole("button", { name: "Counter", exact: true });
+    assert.equal(await tradeMode.getAttribute("aria-pressed"), "true");
+    assert.equal(await tradeMode.evaluate((element) => element === document.activeElement), true);
+    await tradeMode.press("End");
+    assert.equal(await editMode.getAttribute("aria-pressed"), "true");
+    assert.equal(await editMode.evaluate((element) => element === document.activeElement), true);
     const row = inventory.locator("li").first();
     await row.getByLabel("Price", { exact: true }).fill("17 cp");
     await row.getByLabel("Price", { exact: true }).press("Tab");
@@ -186,10 +195,11 @@ try {
       .getByRole("navigation", { name: "Shop inventory pages" })
       .getByText(`26–50 of ${expected}`)
       .waitFor();
-    await page.locator("summary").filter({ hasText: "Add from catalog" }).click();
+    assert.equal(await page.locator("summary:visible").filter({ hasText: "Add from catalog" }).count(), 1, "Repeated shop mode changes preserve one catalog picker");
+    await page.locator("summary:visible").filter({ hasText: "Add from catalog" }).click();
     const picker = page
-      .locator("details")
-      .filter({ has: page.locator("summary").filter({ hasText: "Add from catalog" }) });
+      .locator("details:visible")
+      .filter({ has: page.locator("summary:visible").filter({ hasText: "Add from catalog" }) });
     await picker.getByLabel("Search catalog for stock", { exact: true }).fill("Spyglass");
     await picker.getByRole("checkbox", { name: "Stock Spyglass", exact: true }).check();
     await picker
@@ -239,6 +249,27 @@ try {
     assert.equal(restored.length, expected + 2);
     assert.equal(restored.find((row) => row.name === "Audit good 000").copper, 17);
     assert.equal(restored.find((row) => row.name === "Spyglass").quantity, 7);
+    await page.getByRole("button",{name:"Edit",exact:true}).click();
+    await page.getByLabel("New item",{exact:true}).fill("Retained invalid stock draft");
+    await page.getByLabel("New price",{exact:true}).fill("2 gp");
+    await page.getByLabel("New quantity",{exact:true}).fill("1.5");
+    await page.getByRole("button",{name:"Add item",exact:true}).click();
+    await page.getByRole("alert").filter({hasText:"whole quantity"}).waitFor();
+    assert.equal(await page.getByLabel("New item",{exact:true}).inputValue(),"Retained invalid stock draft");
+    assert.equal((await readRows(page,"stock")).filter(row=>row.shopId===shopId).length,expected+2);
+    await page.getByLabel("New quantity",{exact:true}).fill("2");
+    await page.getByRole("button",{name:"Add item",exact:true}).click();
+    await waitStock(page,rows=>rows.some(row=>row.shopId===shopId&&row.name==="Retained invalid stock draft"&&row.quantity===2));
+    // The database commit precedes the provider reload and outer form reset.
+    // Its own notice marks that continuation; the provider toast does not.
+    const addForm = page.locator("form").filter({
+      has: page.getByLabel("New item", { exact: true }),
+    });
+    await addForm.getByRole("status").filter({ hasText: /^Item added\.$/ }).waitFor();
+    assert.equal(await page.getByLabel("New item",{exact:true}).inputValue(),"");
+    assert.equal(await addForm.getByLabel("New price", { exact: true }).inputValue(), "");
+    assert.equal(await addForm.getByLabel("New quantity", { exact: true }).inputValue(), "");
+    assert.equal(await addForm.getByRole("button", { name: "Add item", exact: true }).isEnabled(), true);
     await page.getByRole("link", { name: "Market", exact: true }).first().click();
     await page.getByRole("button", { name: /^Create a shop/ }).click();
     await page.getByRole("heading", { name: "Create a shop", exact: true }).waitFor();

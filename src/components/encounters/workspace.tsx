@@ -10,14 +10,31 @@ import { FantasyIcon } from "@/components/fantasy-icon";
 import { useDraftGuard } from "@/lib/quire/use-draft-guard";
 import { useDesktop } from "@/lib/quire/use-desktop";
 import { HpBar } from "@/components/control-panel/readouts";
-import { getCloudTable } from "@/lib/quire/cloud-client";
+import {
+  assertMutationScope,
+  captureMutationScope,
+  getCloudTable,
+  getServerCloudTable,
+  subscribeCloudTable,
+} from "@/lib/quire/cloud-client";
 import { useEffect, useRef, useState } from "react";
 import { Link } from "@tanstack/react-router";
+import { AppLink } from "@/components/app-link";
+import { journalEntryHref } from "@/lib/quire/journal-navigation";
 import { z } from "zod";
 import { Shield } from "lucide-react";
 import { accountRequest } from "@/lib/account/client";
 import { useEconomy } from "@/lib/quire/economy-context";
-import { downloadJson } from "@/lib/quire/table";
+import { downloadJson, getSeat } from "@/lib/quire/table";
+import { formatCoins } from "@/lib/quire/money";
+import {
+  confirmedLootSummary,
+  currentPartyMembers,
+  encounterReadiness,
+  recipientAwardPreview,
+  reviewedPartyPlan,
+} from "@/lib/encounters/presentation";
+import "./encounter-improvements.css";
 import {
   blankEncounter,
   blankCombatant,
@@ -158,7 +175,11 @@ function EncounterLibrary({ allowDevice }: { allowDevice: boolean }) {
             "",
         );
         const params = new URLSearchParams(location.search);
-        if (params.has("resume") || params.has("review")) {
+        const linked = data.encounters.find((x) => x.id === params.get("encounter"));
+        if (linked) {
+          setCode(linked.code);
+          setSelected((v) => v || linked.id);
+        } else if (params.has("resume") || params.has("review")) {
           const eligible = data.encounters.filter(
             (x) =>
               x.code === (selectedCode.current || (getCloudTable().joined ? current : "device")) &&
@@ -243,7 +264,8 @@ function EncounterLibrary({ allowDevice }: { allowDevice: boolean }) {
               >
                 {library.campaigns.map((c) => (
                   <option key={c.code} value={c.code}>
-                    {c.name}{c.closed ? " · closed" : ""}
+                    {c.name}
+                    {c.closed ? " · closed" : ""}
                     {!["device", "personal"].includes(c.code) ? ` · ${c.code}` : ""}
                   </option>
                 ))}
@@ -375,6 +397,9 @@ function EncounterEditor({
   onDirty: (v: boolean) => void;
   onSaved: () => void;
 }) {
+  const seat = useSeat();
+  const cloud = useSyncExternalStore(subscribeCloudTable, getCloudTable, getServerCloudTable);
+  const loadedCampaignId = useRef(getCampaigns().activeId);
   const { prefs, setPrefs } = usePrefs();
   const manual = prefs.rollMode === "manual";
   const setManual = (value: boolean) => setPrefs({ rollMode: value ? "manual" : "virtual" });
@@ -403,12 +428,23 @@ function EncounterEditor({
     [rollLabel, setRollLabel] = useState("Encounter roll"),
     [formula, setFormula] = useState("1d20"),
     [total, setTotal] = useState(""),
-    [lootSearch, setLootSearch] = useState("");
+    [lootSearch, setLootSearch] = useState(""),
+    [showPartyReview, setShowPartyReview] = useState(false),
+    [selectedMembers, setSelectedMembers] = useState<string[]>([]),
+    [planningLevel, setPlanningLevel] = useState(1),
+    [summarySessionId, setSummarySessionId] = useState("");
   const pendingRoll = useRef<{
     path: string;
     body: Record<string, unknown>;
   } | null>(null);
-  const { catalog, reload: reloadEconomy } = useEconomy();
+  const {
+    catalog,
+    purses,
+    journal,
+    ready: economyReady,
+    commandOutcome,
+    reload: reloadEconomy,
+  } = useEconomy();
   useEffect(() => {
     const c = new AbortController();
     encounterRequest<Detail>("encounters/detail", { id }, c.signal)
@@ -422,6 +458,9 @@ function EncounterEditor({
           difficulty: d.body.difficulty,
         });
         setDirty(false);
+        setShowPartyReview(false);
+        setSelectedMembers([]);
+        setSummarySessionId("");
         onDirty(false);
         setError("");
       })
@@ -474,6 +513,83 @@ function EncounterEditor({
           : path === "conclude"
             ? "Encounter concluded. Review recipients and loot before transferring."
             : "Encounter saved.",
+      );
+    } catch (e) {
+      setError(message(e));
+    } finally {
+      setBusy(false);
+    }
+  }
+  async function publishAwardSummary() {
+    if (!detail) return;
+    const initial = confirmedLootSummary(detail);
+    if (!initial) return;
+    const activeCampaignId = loadedCampaignId.current;
+    const sourceCode = detail.code;
+    const contextMatches = () => {
+      const current = getCloudTable();
+      return (
+        getCampaigns().activeId === activeCampaignId &&
+        getSeat().role === "dm" &&
+        (sourceCode === "device"
+          ? !current.joined
+          : current.joined && current.role === "dm" && current.code === sourceCode)
+      );
+    };
+    setBusy(true);
+    setError("");
+    setNotice("");
+    try {
+      const mutationScope = captureMutationScope();
+      if (!contextMatches())
+        throw new Error(
+          "Resume this encounter’s campaign before adding its summary to the journal.",
+        );
+      // A failed/lost award reply never authorizes publication. Read its stored receipt again.
+      const confirmed = await encounterRequest<Detail>("encounters/detail", { id });
+      const summary = confirmedLootSummary(confirmed);
+      if (
+        !summary ||
+        confirmed.id !== detail.id ||
+        confirmed.code !== sourceCode ||
+        summary.receiptId !== initial.receiptId
+      )
+        throw new Error(
+          "The award could not be confirmed. Reload the encounter before publishing a summary.",
+        );
+      if (confirmed.readOnly)
+        throw new Error("Reopen this campaign before adding its summary to the journal.");
+      if (!contextMatches())
+        throw new Error(
+          "The active campaign changed. Resume the encounter’s campaign and try again.",
+        );
+      assertMutationScope(mutationScope);
+      if (summarySessionId && !journal.sessions.some((session) => session.id === summarySessionId))
+        throw new Error("Choose an existing session, or leave the summary unlinked.");
+      const outcome = await commandOutcome(
+        {
+          kind: "journal-note",
+          title: summary.title,
+          text: summary.text,
+          visibility: "party",
+          purseId: "",
+          reportIds: [],
+          provenance: {
+            kind: "encounter-loot",
+            encounterId: summary.encounterId,
+            receiptId: summary.receiptId,
+            ...(summarySessionId ? { sessionId: summarySessionId } : {}),
+          },
+        },
+        mutationScope,
+      );
+      setDetail(confirmed);
+      setNotice(
+        outcome.status === "committed"
+          ? "Loot summary saved in the party journal."
+          : getCloudTable().live
+            ? "Loot summary is pending. Check or retry Multiplayer sync before repeating it."
+            : "Loot summary is pending in this campaign turn. Submit the turn to save it for party readers.",
       );
     } catch (e) {
       setError(message(e));
@@ -592,6 +708,44 @@ function EncounterEditor({
     review = detail.status === "review",
     locked = readOnly || busy || querying;
   const stats = estimate(draft);
+  const currentContext =
+    getCampaigns().activeId === loadedCampaignId.current &&
+    (detail.code === "device"
+      ? !cloud.joined
+      : cloud.joined && cloud.code === detail.code && cloud.role === "dm");
+  const currentParty = currentContext && economyReady ? currentPartyMembers(purses) : [];
+  const partyPlan = reviewedPartyPlan(currentParty, selectedMembers, planningLevel);
+  const readiness = encounterReadiness({
+    status: detail.status,
+    body: draft,
+    recipients: detail.purses,
+    dirty,
+    busy,
+    closed: detail.readOnly,
+    personal: detail.code === "personal",
+    ...(cloud.joined && cloud.code === detail.code
+      ? {
+          shared: {
+            live: cloud.live,
+            mine: cloud.mine,
+            pending: Math.max(
+              cloud.pending,
+              cloud.seats.reduce((sum, member) => sum + member.pending, 0),
+            ),
+          },
+        }
+      : {}),
+  });
+  const awardPreview = recipientAwardPreview(draft, detail.purses);
+  const lootSummary = confirmedLootSummary(detail);
+  const summaryEntry =
+    lootSummary && currentContext
+      ? journal.entries?.find(
+          (entry) =>
+            entry.provenance?.kind === "encounter-loot" &&
+            entry.provenance.receiptId === lootSummary.receiptId,
+        )
+      : undefined;
   const updateCombatant = (id: string, patch: Partial<Combatant>) =>
     change({
       ...draft,
@@ -663,7 +817,7 @@ function EncounterEditor({
           )}
           {!review && !readOnly && (
             <button
-              disabled={busy || dirty}
+              disabled={readiness.conclude.length > 0}
               onClick={() => {
                 if (
                   window.confirm(
@@ -684,6 +838,16 @@ function EncounterEditor({
             Save changes before rolling, starting, concluding or transferring loot.
           </p>
         )}
+        {!review && !readOnly && readiness.conclude.length > 0 && (
+          <div className="encounter-readiness" aria-label="Before concluding">
+            <strong>Before concluding</strong>
+            <ul>
+              {readiness.conclude.map((reason, index) => (
+                <li key={index}>{reason}</li>
+              ))}
+            </ul>
+          </div>
+        )}
         {error && (
           <p role="alert" className="character-error">
             {error}
@@ -694,12 +858,93 @@ function EncounterEditor({
             {notice}
           </p>
         )}
-        {detail.readOnly && <p className="encounter-notice">This campaign is closed. Reopen it in My account before changing encounters or rolling. You can still read its history or export a draft for preparation.</p>}
-        {detail.status === "awarded" && (
+        {detail.readOnly && (
           <p className="encounter-notice">
-            Awarded {detail.award ? new Date(detail.award.at).toLocaleString() : ""}. Receipt:{" "}
-            {detail.award?.receiptId}. This encounter is locked against a second award.
+            This campaign is closed. Reopen it in My account before changing encounters or rolling.
+            You can still read its history or export a draft for preparation.
           </p>
+        )}
+        {detail.status === "awarded" && (
+          <section className="encounter-award-receipt" aria-label="Confirmed award receipt">
+            <p className="encounter-notice">
+              Awarded {detail.award ? new Date(detail.award.at).toLocaleString() : ""}. Receipt:{" "}
+              {detail.award?.receiptId}. This encounter is locked against a second award.
+            </p>
+            {lootSummary && (
+              <div className="character-toolbar">
+                <AppLink href={`/encounters?encounter=${encodeURIComponent(detail.id)}`}>
+                  Open this confirmed award
+                </AppLink>
+                {currentContext && (
+                  <>
+                    <AppLink href="/party?section=funds">
+                      Open campaign inventories & ledger
+                    </AppLink>
+                    <AppLink href="/features/reports">Open campaign reports</AppLink>
+                  </>
+                )}
+              </div>
+            )}
+            {!currentContext && (
+              <p>
+                Resume this encounter’s campaign to view its inventories, ledger and journal
+                together.
+              </p>
+            )}
+            {lootSummary && (
+              <details className="encounter-chronicle">
+                <summary>Add a party journal summary</summary>
+                <p>
+                  This publishes only the preview below to party readers. Recipient names, item
+                  names, values and DM notes remain in their existing authorized records.
+                </p>
+                <strong>{lootSummary.title}</strong>
+                <pre>{lootSummary.text}</pre>
+                <label>
+                  Link to session (optional)
+                  <select
+                    value={summarySessionId}
+                    disabled={busy || !currentContext || detail.readOnly || !!summaryEntry}
+                    onChange={(e) => setSummarySessionId(e.target.value)}
+                  >
+                    <option value="">No session association</option>
+                    {currentContext &&
+                      journal.sessions.map((session) => (
+                        <option key={session.id} value={session.id}>
+                          {session.name} · {new Date(session.startedAt).toLocaleDateString()}
+                        </option>
+                      ))}
+                  </select>
+                </label>
+                <button
+                  disabled={
+                    busy ||
+                    !currentContext ||
+                    !economyReady ||
+                    detail.readOnly ||
+                    seat.role !== "dm" ||
+                    !!summaryEntry
+                  }
+                  onClick={() => {
+                    if (
+                      window.confirm(
+                        "Add this preview to the party journal? Party readers will be able to see it.",
+                      )
+                    )
+                      void publishAwardSummary();
+                  }}
+                >
+                  Add reviewed summary to party journal
+                </button>
+                {summaryEntry && (
+                  <p>
+                    This receipt already has a journal summary. Check sync status for any pending
+                    save. <AppLink href={journalEntryHref(summaryEntry.id)}>Open campaign journal</AppLink>
+                  </p>
+                )}
+              </details>
+            )}
+          </section>
         )}
         <nav className="encounter-tabs" aria-label="Encounter sections">
           {[
@@ -968,6 +1213,108 @@ function EncounterEditor({
                 onChange={(e) => change({ ...draft, notes: e.target.value })}
               />
             </label>
+            <section className="encounter-party-review" aria-label="Current party planning">
+              <button
+                disabled={!currentContext || !economyReady || !currentParty.length}
+                onClick={() => {
+                  setSelectedMembers(currentParty.map((member) => member.id));
+                  const levels = new Set(currentParty.map((member) => member.level));
+                  setPlanningLevel(
+                    levels.size === 1 && currentParty[0]?.level
+                      ? currentParty[0].level
+                      : draft.level,
+                  );
+                  setShowPartyReview(true);
+                }}
+              >
+                Use current party
+              </button>
+              {!currentContext && (
+                <p>
+                  {detail.code === "personal"
+                    ? "Account-only drafts use manual party size and level. Import this encounter into an active campaign to review that party."
+                    : "Resume this encounter’s campaign to review its current character levels. The manual planning fields remain available."}
+                </p>
+              )}
+              {currentContext && economyReady && !currentParty.length && (
+                <p>
+                  No campaign characters are available for this preview. Enter party size and level
+                  below.
+                </p>
+              )}
+              {showPartyReview && currentContext && (
+                <div>
+                  <h4>Review participating characters</h4>
+                  <p>
+                    Select participants, then deliberately apply a party size and common planning
+                    level. Character sheets are unchanged.
+                  </p>
+                  {currentParty.map((member) => (
+                    <label key={member.id} className="encounter-party-member">
+                      <input
+                        type="checkbox"
+                        checked={selectedMembers.includes(member.id)}
+                        onChange={(e) =>
+                          setSelectedMembers((ids) =>
+                            e.target.checked
+                              ? [...ids, member.id]
+                              : ids.filter((id) => id !== member.id),
+                          )
+                        }
+                      />
+                      <span>
+                        {member.name} ·{" "}
+                        {member.level === null ? "Level unavailable" : `Level ${member.level}`} ·{" "}
+                        {member.edition || "Edition unavailable"}
+                      </span>
+                    </label>
+                  ))}
+                  <label>
+                    Reviewed common level
+                    <input
+                      type="number"
+                      min="1"
+                      max="20"
+                      value={planningLevel}
+                      onChange={(e) => setPlanningLevel(n(e.target.value))}
+                    />
+                  </label>
+                  <p>
+                    {partyPlan.partySize} selected · common planning level {planningLevel}
+                  </p>
+                  {partyPlan.mixedLevels && (
+                    <p>
+                      Selected characters have mixed levels. Choose the common level for this
+                      advisory estimate yourself; levels are not averaged.
+                    </p>
+                  )}
+                  {partyPlan.unknownLevels && (
+                    <p>
+                      Some current levels are unavailable. Review their sheets and choose the common
+                      level manually.
+                    </p>
+                  )}
+                  {partyPlan.non2014 && (
+                    <p>
+                      Some sheets use 2024 or custom rules. The estimate remains D&D 2014 guidance.
+                    </p>
+                  )}
+                  <button
+                    disabled={!partyPlan.valid || review}
+                    onClick={() => {
+                      change({ ...draft, partySize: partyPlan.partySize, level: partyPlan.level });
+                      setShowPartyReview(false);
+                      setNotice(
+                        "Reviewed party size and common level applied to this encounter draft. Save to keep them; difficulty and generator choices remain unchanged.",
+                      );
+                    }}
+                  >
+                    Use reviewed party size & level
+                  </button>
+                  <button onClick={() => setShowPartyReview(false)}>Cancel party review</button>
+                </div>
+              )}
+            </section>
             <div className="encounter-grid">
               <label>
                 Party size
@@ -1570,8 +1917,71 @@ function EncounterEditor({
                   together. The stored receipt prevents this encounter from awarding twice,
                   including after a connection failure.
                 </p>
+                <section
+                  aria-label="Recipient award preview"
+                  className="encounter-recipient-preview"
+                >
+                  <h4>Recipient preview</h4>
+                  {awardPreview.recipients.map((recipient) => (
+                    <article key={recipient.id}>
+                      <strong>{recipient.name}</strong>
+                      {recipient.coins && <p>Coins: {formatCoins(recipient.coins)}</p>}
+                      {recipient.items.length > 0 && (
+                        <ul>
+                          {recipient.items.map((item) => (
+                            <li key={item.id}>
+                              {item.name} × {item.quantity}
+                            </li>
+                          ))}
+                        </ul>
+                      )}
+                    </article>
+                  ))}
+                  {!awardPreview.recipients.length &&
+                    !awardPreview.unresolved.length &&
+                    !awardPreview.unresolvedCoins && (
+                      <p>No coins or items are attached to this award.</p>
+                    )}
+                  {awardPreview.unresolvedCoins && (
+                    <p className="character-error">Coins need an existing recipient.</p>
+                  )}
+                  {awardPreview.unresolved.length > 0 && (
+                    <ul>
+                      {awardPreview.unresolved.map((item, index) => (
+                        <li key={item.id}>
+                          Unassigned item: {item.name} × {item.quantity}. Choose its recipient above
+                          (item {draft.loot.findIndex((row) => row.id === item.id) + 1 || index + 1}
+                          ).
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+                </section>
+                <div className="encounter-readiness" aria-label="Before transferring">
+                  {readiness.transfer.length ? (
+                    <>
+                      <strong>Before transferring</strong>
+                      <ul>
+                        {readiness.transfer.map((reason, index) => (
+                          <li key={index}>{reason}</li>
+                        ))}
+                      </ul>
+                    </>
+                  ) : (
+                    <p>
+                      Ready to transfer this saved review. Campaign permissions and recipients are
+                      checked again when you confirm.
+                    </p>
+                  )}
+                  {!currentContext && detail.code !== "personal" && detail.code !== "device" && (
+                    <p>
+                      Current campaign turn and pending actions are checked by the server; resume
+                      this room to see their live status here.
+                    </p>
+                  )}
+                </div>
                 <button
-                  disabled={busy || dirty}
+                  disabled={readiness.transfer.length > 0}
                   onClick={() => {
                     if (
                       window.confirm(

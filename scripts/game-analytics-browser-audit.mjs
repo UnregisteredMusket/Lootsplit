@@ -26,6 +26,13 @@ try {
     );
     await openApplication(page, origin + "/welcome");
     await page.getByRole("status").filter({ hasText: "gp spent" }).waitFor();
+    const explanation = page.getByText("About this total", { exact: true });
+    await explanation.focus();
+    await explanation.press("Enter");
+    await page
+      .getByText(/Recorded purchases and outgoing payments across current shared campaigns/)
+      .waitFor({ state: "visible" });
+    await page.getByText(/Snapshots are cached for up to a minute/).waitFor({ state: "visible" });
     assert.equal(
       await page.evaluate(() => document.documentElement.scrollWidth > innerWidth),
       false,

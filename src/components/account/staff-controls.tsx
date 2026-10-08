@@ -1,5 +1,15 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { accountRequest, type MemberProfile, type SiteRole } from "@/lib/account/client";
+import { useDraftGuard } from "@/lib/quire/use-draft-guard";
+import {
+  canManageMember,
+  moderationDraftChanged,
+  moderationErrorGuidance,
+  staffActionPreview,
+  type ModerationDraft,
+  type StaffAction,
+} from "@/lib/quire/staff-action-preview";
+import "./account-admin.css";
 type Member = {
   id: string;
   name: string;
@@ -24,32 +34,64 @@ export function StaffControls({ userId, role }: { userId: string; role: SiteRole
     [offset, setOffset] = useState(0);
   const [selected, setSelected] = useState<Member | null>(null),
     [detail, setDetail] = useState<Detail | null>(null);
-  const [action, setAction] = useState("warn"),
+  const [action, setAction] = useState<StaffAction>("warn"),
     [reason, setReason] = useState(""),
     [days, setDays] = useState("7"),
-    [newRole, setNewRole] = useState("member");
+    [newRole, setNewRole] = useState<ModerationDraft["newRole"]>("member");
+  const [savedDraft, setSavedDraft] = useState<ModerationDraft>({
+    action: "warn",
+    reason: "",
+    days: "7",
+    newRole: "member",
+  });
   const [error, setError] = useState(""),
     [notice, setNotice] = useState(""),
     [busy, setBusy] = useState(false);
+  const canManage = canManageMember(userId, role, selected);
+  const dirty =
+    !!selected &&
+    canManage &&
+    moderationDraftChanged({ action, reason, days, newRole }, savedDraft);
+  useDraftGuard(dirty, "moderation action and reason");
+  const preview = selected ? staffActionPreview(action, selected.name, days, newRole) : null;
+  const guidance = moderationErrorGuidance(error);
   async function load(next = offset) {
     const data = await accountRequest<List>(
       `staff/members?q=${encodeURIComponent(q)}&status=${filter}&offset=${next}`,
     );
     setList(data);
     setOffset(next);
+    // A refresh reconciles the target revision without discarding the action/reason draft.
+    setSelected((current) =>
+      current ? data.members.find((m) => m.id === current.id) || current : null,
+    );
   }
   useEffect(() => {
     void load(0).catch((e) => setError(e.message));
   }, []);
   async function inspect(m: Member) {
+    if (busy) return;
+    const sameMember = selected?.id === m.id;
+    if (
+      !sameMember &&
+      dirty &&
+      !window.confirm(
+        "Discard the unsaved moderation action and reason before managing another member?",
+      )
+    )
+      return;
     setBusy(true);
     setError("");
     setNotice("");
     setSelected(m);
     setDetail(null);
-    setAction("warn");
-    setReason("");
-    setNewRole(m.role === "owner" ? "member" : m.role);
+    if (!sameMember) {
+      const nextRole = m.role === "owner" ? "member" : m.role;
+      setAction("warn");
+      setReason("");
+      setNewRole(nextRole);
+      setSavedDraft({ action: "warn", reason: "", days, newRole: nextRole });
+    }
     try {
       setDetail(await accountRequest<Detail>("staff/member", { id: m.id }));
     } catch (e) {
@@ -60,14 +102,18 @@ export function StaffControls({ userId, role }: { userId: string; role: SiteRole
   }
   async function submit(e: FormEvent) {
     e.preventDefault();
-    if (!selected) return;
-    const description =
-      action === "role"
-        ? `Set ${selected.name}'s role to ${newRole}?`
-        : action === "ban"
-          ? `Ban ${selected.name} ${days === "permanent" ? "permanently" : `for ${days} days`}?`
-          : `Apply ${action} to ${selected.name}?`;
-    if (!window.confirm(description + " This action is recorded in the moderation log.")) return;
+    if (!selected || busy || !detail || !canManage || !preview || !reason.trim()) return;
+    const until = days === "permanent" ? null : Date.now() + Number(days) * 86400000;
+    const expiry =
+      action === "ban" && until !== null
+        ? `\nScheduled expiry: ${new Date(until).toLocaleString()}.`
+        : "";
+    if (
+      !window.confirm(
+        `${preview.summary}\n\n${preview.effects.join("\n")}${expiry}\n\nThis action and reason are recorded in the moderation log. Apply this member action?`,
+      )
+    )
+      return;
     setBusy(true);
     setError("");
     setNotice("");
@@ -78,23 +124,25 @@ export function StaffControls({ userId, role }: { userId: string; role: SiteRole
         action,
         reason,
         role: newRole,
-        until: days === "permanent" ? null : Date.now() + Number(days) * 86400000,
+        until,
       });
       setSelected(null);
       setDetail(null);
-      await load();
+      setReason("");
       setNotice("Member action saved.");
+      try {
+        await load();
+      } catch (refreshError) {
+        setError(
+          `The action was saved, but the member list could not refresh. ${refreshError instanceof Error ? refreshError.message : "Use Search / refresh members to try again."}`,
+        );
+      }
     } catch (e) {
       setError((e as Error).message);
     } finally {
       setBusy(false);
     }
   }
-  const canManage =
-    selected &&
-    selected.id !== userId &&
-    selected.role !== "owner" &&
-    (role === "owner" || selected.role === "member");
   return (
     <section className="portal-card staff-controls">
       <p className="portal-eyebrow">{role.toUpperCase()} WORKSPACE</p>
@@ -109,6 +157,7 @@ export function StaffControls({ userId, role }: { userId: string; role: SiteRole
           {error}
         </p>
       )}
+      {guidance && <p className="portal-subtle">{guidance}</p>}
       {notice && (
         <p role="status" className="portal-message">
           {notice}
@@ -230,7 +279,7 @@ export function StaffControls({ userId, role }: { userId: string; role: SiteRole
                   aria-label="Member action"
                   disabled={busy}
                   value={action}
-                  onChange={(e) => setAction(e.target.value)}
+                  onChange={(e) => setAction(e.target.value as StaffAction)}
                 >
                   <option value="warn">Issue warning</option>
                   <option value="ban">Ban account</option>
@@ -250,6 +299,7 @@ export function StaffControls({ userId, role }: { userId: string; role: SiteRole
                   Ban duration
                   <select
                     aria-label="Ban duration"
+                    disabled={busy}
                     value={days}
                     onChange={(e) => setDays(e.target.value)}
                   >
@@ -272,8 +322,9 @@ export function StaffControls({ userId, role }: { userId: string; role: SiteRole
                   Staff role
                   <select
                     aria-label="Staff role"
+                    disabled={busy}
                     value={newRole}
-                    onChange={(e) => setNewRole(e.target.value)}
+                    onChange={(e) => setNewRole(e.target.value as ModerationDraft["newRole"])}
                   >
                     <option value="member">Member (remove staff access)</option>
                     <option value="moderator">Moderator</option>
@@ -281,17 +332,49 @@ export function StaffControls({ userId, role }: { userId: string; role: SiteRole
                   </select>
                 </label>
               )}
+              {preview && (
+                <section
+                  className="staff-action-preview"
+                  aria-labelledby="staff-action-preview-title"
+                >
+                  <h4 id="staff-action-preview-title">Before you apply this action</h4>
+                  <p>
+                    <strong>{preview.summary}</strong>
+                  </p>
+                  <ul>
+                    {preview.effects.map((effect) => (
+                      <li key={effect}>{effect}</li>
+                    ))}
+                  </ul>
+                  {action === "ban" && days !== "permanent" && (
+                    <p>
+                      Approximate expiry if applied now:{" "}
+                      {new Date(Date.now() + Number(days) * 86400000).toLocaleString()}. The
+                      confirmation shows the scheduled expiry.
+                    </p>
+                  )}
+                  <p>
+                    A reason is required. The action and reason are recorded in moderation history.
+                  </p>
+                </section>
+              )}
               <label>
                 Reason
                 <textarea
                   aria-label="Moderation reason"
                   required
+                  disabled={busy}
                   maxLength={1000}
                   value={reason}
                   onChange={(e) => setReason(e.target.value)}
                 />
               </label>
-              <button className="portal-button" disabled={busy || !detail}>
+              {dirty && (
+                <p className="portal-subtle">
+                  Unsaved moderation action and reason. Refreshing members keeps this draft.
+                </p>
+              )}
+              <button className="portal-button" disabled={busy || !detail || !reason.trim()}>
                 Apply member action
               </button>
             </form>
@@ -311,7 +394,22 @@ export function StaffControls({ userId, role }: { userId: string; role: SiteRole
           ) : (
             <p>No recorded actions.</p>
           )}
-          <button className="portal-button secondary" onClick={() => setSelected(null)}>
+          <button
+            className="portal-button secondary"
+            disabled={busy}
+            onClick={() => {
+              if (
+                dirty &&
+                !window.confirm(
+                  "Discard the unsaved moderation action and reason and close member details?",
+                )
+              )
+                return;
+              setSelected(null);
+              setDetail(null);
+              setReason("");
+            }}
+          >
             Close member details
           </button>
         </section>

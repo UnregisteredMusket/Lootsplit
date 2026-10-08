@@ -1,3 +1,9 @@
+import { filterAccountCampaigns } from "@/lib/account/campaign-library";
+import { allowContextChange, useDraftGuard } from "@/lib/quire/use-draft-guard";
+import { roomLifecycleLabels } from "@/lib/quire/room-state";
+import { BackupPreview } from "@/components/account/backup-preview";
+import { accountBackupSummary, backupConfirmation } from "@/lib/account/backup-presentation";
+import "@/components/account/account-improvements.css";
 import { AccountSessionRecords } from "@/components/account/session-records";
 import { DeviceRecovery } from "@/components/account/device-recovery";
 import { blankSheet } from "@/lib/characters/model.mjs";
@@ -8,12 +14,7 @@ import { StaffControls } from "@/components/account/staff-controls";
 import { Campaigns } from "@/components/campaigns";
 import { OwnerControls } from "@/components/account/owner-controls";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import {
-  useEffect,
-  useState,
-  useSyncExternalStore,
-  type FormEvent,
-} from "react";
+import { useEffect, useState, useSyncExternalStore, type FormEvent } from "react";
 import {
   ArrowRight,
   Archive,
@@ -25,12 +26,7 @@ import {
   Trash2,
 } from "lucide-react";
 import { Website } from "@/components/website/site";
-import {
-  accountRequest,
-  type AccountLibrary,
-  type AccountMembership,
-  type CharacterProfile,
-} from "@/lib/account/client";
+import { accountRequest, type AccountLibrary, type AccountMembership } from "@/lib/account/client";
 import {
   addAccountCharacter,
   linkCurrentCampaign,
@@ -67,15 +63,24 @@ function Account() {
     [portrait, setPortrait] = useState(""),
     [editId, setEditId] = useState(""),
     [archived, setArchived] = useState(false);
+  const [campaignSearch, setCampaignSearch] = useState(""),
+    [campaignRole, setCampaignRole] = useState("all"),
+    [campaignState, setCampaignState] = useState("all");
+  const [profileBaseline, setProfileBaseline] = useState({
+    name: "",
+    description: "",
+    portrait: "",
+  });
+  const [profileSource, setProfileSource] = useState("");
+  const profileDirty =
+    !!library &&
+    JSON.stringify({ name: profileName, description, portrait }) !==
+      JSON.stringify(profileBaseline);
+  useDraftGuard(profileDirty, "character profile");
   const economy = useEconomy(),
     seat = useSeat();
-  const cloud = useSyncExternalStore(
-    subscribeCloudTable,
-    getCloudTable,
-    getServerCloudTable,
-  );
-  const reload = async () =>
-    setLibrary(await accountRequest<AccountLibrary>("library"));
+  const cloud = useSyncExternalStore(subscribeCloudTable, getCloudTable, getServerCloudTable);
+  const reload = async () => setLibrary(await accountRequest<AccountLibrary>("library"));
   useEffect(() => {
     let live = true;
     void accountRequest<{ user: unknown } | null>("auth/get-session")
@@ -118,47 +123,50 @@ function Account() {
           password,
         });
         setKey(result.key);
-        setNotice(
-          "Password changed. Save your replacement recovery key, then sign in.",
-        );
+        setNotice("Password changed. Save your replacement recovery key, then sign in.");
         setMode("signin");
         setRecoveryInput("");
         setPassword("");
         return;
       }
-      await accountRequest(
-        mode === "signup" ? "auth/sign-up/email" : "auth/sign-in/email",
-        {
-          email,
-          password,
-          ...(mode === "signup" ? { name } : {}),
-        },
-      );
+      await accountRequest(mode === "signup" ? "auth/sign-up/email" : "auth/sign-in/email", {
+        email,
+        password,
+        ...(mode === "signup" ? { name } : {}),
+      });
       setPassword("");
       await reload();
       if (mode === "signup") {
-        const result = await accountRequest<{ key: string }>(
-          "recovery-key",
-          {},
-        );
+        const result = await accountRequest<{ key: string }>("recovery-key", {});
         setKey(result.key);
         await reload();
       }
     });
   }
   async function signOut() {
+    if (!allowContextChange()) return;
     if (hasPendingChanges())
-      throw new Error(
-        "Submit or resolve your pending campaign actions before signing out.",
-      );
+      throw new Error("Submit or resolve your pending campaign actions before signing out.");
     await accountRequest("auth/sign-out", {});
     if (cloud.joined) await clearAccountRoom(true);
     for (const k of Object.keys(localStorage))
       if (k.startsWith("quire.cloud.v2.account-")) localStorage.removeItem(k);
     setLibrary(null);
+    setEditId("");
+    setProfileName("");
+    setDescription("");
+    setPortrait("");
+    setProfileBaseline({ name: "", description: "", portrait: "" });
+    setProfileSource("");
     setKey("");
     setNotice("Signed out. Your device campaign copies remain on this device.");
   }
+  const visibleMembers = filterAccountCampaigns(library?.members ?? [], {
+    search: campaignSearch,
+    role: campaignRole,
+    state: campaignState,
+    archived,
+  });
   const action = (work: () => Promise<void>) => () => void run(work);
   const remove = (kind: string, id: string) =>
     action(async () => {
@@ -179,9 +187,7 @@ function Account() {
             <div>
               <p className="portal-eyebrow">YOUR NEXT ADVENTURE STARTS HERE</p>
               <h1>
-                {library
-                  ? `${library.user.name}’s library`
-                  : "Welcome to your next chapter."}
+                {library ? `${library.user.name}’s library` : "Welcome to your next chapter."}
               </h1>
               <p className="portal-lead">
                 {library
@@ -190,11 +196,7 @@ function Account() {
               </p>
             </div>
             {library && (
-              <button
-                disabled={busy}
-                onClick={action(signOut)}
-                className="portal-button secondary"
-              >
+              <button disabled={busy} onClick={action(signOut)} className="portal-button secondary">
                 <LogOut size={16} /> Sign out
               </button>
             )}
@@ -209,76 +211,13 @@ function Account() {
               {notice}
             </p>
           )}
-          {!loading && (
-            <BugReports
-              key={library?.user.id ?? "guest"}
-              userId={library?.user.id}
-              role={library?.user.role}
-            />
-          )}
-          {(library?.user.role === "owner" ||
-            library?.user.role === "admin") && <ServerMonitor />}
-          {library?.user.role === "owner" && <OwnerControls />}
-          {library && (
-            <>
-              {library.notices.map((n, i) => (
-                <p key={i} className="portal-message" role="status">
-                  Staff warning ({new Date(n.created_at).toLocaleDateString()}):{" "}
-                  {n.reason}
-                </p>
-              ))}
-              <section className="portal-card">
-                <h2>Interactive character sheets</h2>
-                <p>
-                  Create a full character, assign a campaign, track HP and
-                  spells, and roll with your party.
-                </p>
-                <Link to="/characters" className="portal-button">
-                  Open character sheets & rolls
-                </Link>
-              </section>
-              {
-                <section className="portal-card">
-                  <h2>DM encounters</h2>
-                  <p>
-                    Build private encounters in your account and export them to
-                    the app. You can also build directly in your account-owned
-                    campaign, including offline.
-                  </p>
-                  <Link
-                    to="/encounters"
-                    search={{ storage: "personal" } as never}
-                    className="portal-button"
-                  >
-                    Open DM encounters
-                  </Link>
-                </section>
-              }
-              <AccountSessionRecords />
-              <ProfileControls profile={library.profile} onSaved={reload} />
-              {library.user.role !== "member" && (
-                <StaffControls
-                  userId={library.user.id}
-                  role={library.user.role}
-                />
-              )}
-              <section className="portal-card">
-                <h2>Campaigns on this device</h2>
-                <p>
-                  These campaigns are stored on this device, separately from
-                  your shared memberships and cloud backups.
-                </p>
-                <Campaigns />
-              </section>
-            </>
-          )}
           {key && (
             <section className="portal-key" aria-label="Recovery key">
               <ShieldCheck />
               <h2>Keep this recovery key somewhere safe</h2>
               <p>
-                This key can reset your password. It replaces any previous key.
-                Email reset is not enabled; save this key outside Lootsplit.
+                This key can reset your password. It replaces any previous key. Email reset is not
+                enabled; save this key outside Lootsplit.
               </p>
               <code>{key}</code>
               <div className="portal-actions">
@@ -293,14 +232,391 @@ function Account() {
                 >
                   Save recovery key
                 </button>
-                <button
-                  className="portal-button secondary"
-                  onClick={() => setKey("")}
-                >
+                <button className="portal-button secondary" onClick={() => setKey("")}>
                   I have saved it
                 </button>
               </div>
             </section>
+          )}
+          {library && (
+            <nav className="account-section-index" aria-label="Account sections">
+              <a href="#account-campaigns">Campaigns</a>
+              <a href="#account-characters">Characters</a>
+              <a href="#account-encounters">Encounters</a>
+              <a href="#account-reports">Reports</a>
+              <a href="#account-backups">Backups</a>
+              <a href="#account-profile">Profile</a>
+              <a href="#account-support">Support</a>
+              <a href="#account-recovery">Account recovery</a>
+              {library.user.role !== "member" && (
+                <a
+                  href={
+                    library.user.role === "moderator"
+                      ? "#account-member-management"
+                      : "#account-administration"
+                  }
+                >
+                  Administration
+                </a>
+              )}
+            </nav>
+          )}
+          {library && (
+            <>
+              <section id="account-campaigns" className="portal-account-section">
+                <div className="portal-section-title">
+                  <div>
+                    <p className="portal-eyebrow">PICK UP WHERE YOU LEFT OFF</p>
+                    <h2>My campaigns</h2>
+                  </div>
+                  <button
+                    className="portal-button secondary"
+                    disabled={busy || !cloud.joined}
+                    onClick={action(async () => {
+                      await linkCurrentCampaign();
+                      await reload();
+                      setNotice(
+                        hasPendingChanges()
+                          ? "This membership is saved. Your turn still has pending changes; submit it in Multiplayer to share those changes."
+                          : "This membership is saved. You can resume it on another signed-in device.",
+                      );
+                    })}
+                  >
+                    <Plus size={16} /> Save current membership
+                  </button>
+                </div>
+                <p className="portal-subtle">
+                  Signed-in room creation and joining save memberships automatically. Save current
+                  membership refreshes or retries that link. DMs can resume or reopen saved rooms on
+                  another signed-in device; players need their current assigned seat. This does not
+                  upload a local-only campaign.
+                </p>
+                {economy.ready && (
+                  <p className="portal-message">
+                    {cloud.joined ? `Current room · ${cloud.code}` : "Current device campaign"}{" "}
+                    <Link to="/" search={{ view: "home" }} className="portal-button secondary">
+                      Continue on this device
+                    </Link>
+                  </p>
+                )}
+                <p className="portal-actions">
+                  <a href="#account-device-campaigns">Campaigns on this device</a>
+                  <a href="#account-backups">Cloud backup versions</a>
+                </p>
+                <DeviceRecovery userId={library.user.id} />
+                <div className="account-campaign-filters">
+                  <label>
+                    Search campaigns
+                    <input
+                      value={campaignSearch}
+                      onChange={(e) => setCampaignSearch(e.target.value)}
+                      placeholder="Name or campaign ID"
+                    />
+                  </label>
+                  <label>
+                    Campaign role
+                    <select value={campaignRole} onChange={(e) => setCampaignRole(e.target.value)}>
+                      <option value="all">All roles</option>
+                      <option value="dm">DM</option>
+                      <option value="player">Player</option>
+                      <option value="unavailable">Seat unavailable</option>
+                    </select>
+                  </label>
+                  <label>
+                    Room state
+                    <select
+                      value={campaignState}
+                      onChange={(e) => setCampaignState(e.target.value)}
+                    >
+                      <option value="all">All room states</option>
+                      <option value="active">Playing</option>
+                      <option value="viewing">View-only</option>
+                      <option value="closed">Closed</option>
+                    </select>
+                  </label>
+                  <button
+                    className="portal-button secondary"
+                    onClick={() => {
+                      setCampaignSearch("");
+                      setCampaignRole("all");
+                      setCampaignState("all");
+                      setArchived(false);
+                    }}
+                  >
+                    Clear campaign filters
+                  </button>
+                </div>
+                <label className="portal-check">
+                  <input
+                    type="checkbox"
+                    checked={archived}
+                    onChange={(e) => setArchived(e.target.checked)}
+                  />{" "}
+                  Show archived campaigns
+                </label>
+                <div className="portal-library-grid">
+                  {visibleMembers.map((m) => (
+                    <article className="portal-card" key={m.code}>
+                      <span className="portal-eyebrow">
+                        {m.archived ? "ARCHIVED" : "SHARED CAMPAIGN"} · {m.code}
+                      </span>
+                      <h3>{m.name}</h3>
+                      <p className="account-room-state">
+                        {roomLifecycleLabels(m).mode} · {roomLifecycleLabels(m).play}
+                      </p>
+                      {!m.role && (
+                        <p className="portal-subtle">
+                          Your former seat is unavailable. Ask the DM for a current invitation;
+                          archived records retain their original permissions.
+                        </p>
+                      )}
+                      {cloud.joined && cloud.code === m.code && (
+                        <p className="portal-message">Open on this device · Current campaign</p>
+                      )}
+                      <p className="portal-subtle">
+                        Last opened or saved {new Date(m.updated_at).toLocaleString()}
+                      </p>
+                      {library.members.some(
+                        (other) =>
+                          !other.archived &&
+                          other.code !== m.code &&
+                          other.name.trim().toLowerCase() === m.name.trim().toLowerCase(),
+                      ) && (
+                        <p className="portal-subtle">
+                          Other rooms share this name. Each room has separate portraits, loot and
+                          progress.
+                        </p>
+                      )}
+                      {m.role === "dm" && (
+                        <p className="portal-subtle">
+                          {m.closed
+                            ? "You are the DM. This room is closed. Reopen its saved shared state to continue; players will need new invitations."
+                            : "You are the DM of this campaign."}
+                        </p>
+                      )}
+                      <div className="portal-actions">
+                        {!!m.has_recovery && (
+                          <button
+                            className="portal-button secondary"
+                            disabled={busy}
+                            onClick={action(async () => {
+                              const records = await accountRequest("recovery-records", {
+                                code: m.code,
+                              });
+                              await downloadJson(`Lootsplit-recovery-${m.code}.json`, records);
+                            })}
+                          >
+                            Download recovery records
+                          </button>
+                        )}
+                        <button
+                          className="portal-button secondary"
+                          disabled={busy}
+                          onClick={action(async () => {
+                            const name = window.prompt("Campaign name in your library", m.name);
+                            if (!name) return;
+                            await accountRequest("campaign", {
+                              action: "rename",
+                              code: m.code,
+                              name,
+                            });
+                            await reload();
+                          })}
+                        >
+                          Rename
+                        </button>
+                        {m.role === "dm" && (
+                          <button
+                            className="portal-button secondary"
+                            disabled={busy}
+                            onClick={action(async () => {
+                              if (cloud.joined && cloud.code === m.code && hasPendingChanges())
+                                throw new Error(
+                                  "Submit or export pending changes before deleting this campaign.",
+                                );
+                              const confirm = window.prompt(
+                                `Delete shared campaign ${m.name} for everyone? A private cloud backup of its saved state will be kept. Device copies remain. Type ${m.code} to confirm.`,
+                              );
+                              if (confirm !== m.code) return;
+                              await accountRequest("campaign", {
+                                action: "delete",
+                                code: m.code,
+                                confirm,
+                                revision: m.room_revision,
+                              });
+                              if (cloud.joined && cloud.code === m.code)
+                                await clearAccountRoom(true);
+                              await reload();
+                              setNotice(
+                                "Shared campaign deleted. Its saved state is in Cloud backups.",
+                              );
+                            })}
+                          >
+                            Delete shared campaign
+                          </button>
+                        )}
+                        <button
+                          className="portal-button"
+                          disabled={busy || !m.role || (m.closed && m.role !== "dm")}
+                          onClick={action(async () => {
+                            if (!allowContextChange()) return;
+                            // Another device may have saved a newer room since this page
+                            // opened. Names are a warning only, never campaign identity.
+                            const fresh = await accountRequest<AccountLibrary>("library");
+                            setLibrary(fresh);
+                            const target = fresh.members.find((member) => member.code === m.code);
+                            if (!target)
+                              throw new Error(
+                                "This saved campaign is no longer available. Refresh My campaigns.",
+                              );
+                            const newer = fresh.members.find(
+                              (other) =>
+                                !other.archived &&
+                                other.role &&
+                                other.code !== target.code &&
+                                other.name.trim().toLowerCase() ===
+                                  target.name.trim().toLowerCase() &&
+                                other.updated_at > target.updated_at,
+                            );
+                            if (
+                              newer &&
+                              !window.confirm(
+                                `Another campaign named “${target.name}” was opened or saved more recently (${newer.code}). These are separate rooms; portraits, loot and progress do not sync between them. Continue opening this older entry (${target.code})?`,
+                              )
+                            )
+                              return;
+                            const member = await accountRequest<AccountMembership>("resume", {
+                              code: target.code,
+                              ...(target.closed && target.role === "dm"
+                                ? {
+                                    reopen: true,
+                                    revision: target.room_revision,
+                                  }
+                                : {}),
+                            });
+                            await resumeAccountMembership(member);
+                          })}
+                        >
+                          {!m.role
+                            ? "Seat unavailable"
+                            : m.closed && m.role === "dm"
+                              ? "Reopen as DM"
+                              : m.viewOnly
+                                ? "Open for viewing"
+                                : "Resume"}{" "}
+                          <ArrowRight size={16} />
+                        </button>
+                        <button
+                          aria-label={`${m.archived ? "Unarchive" : "Archive"} ${m.name}`}
+                          className="portal-icon-button"
+                          disabled={busy}
+                          onClick={action(async () => {
+                            await accountRequest("archive", {
+                              code: m.code,
+                              archived: !m.archived,
+                            });
+                            await reload();
+                          })}
+                        >
+                          <Archive size={18} />
+                        </button>
+                        <button
+                          aria-label={`Forget ${m.name}`}
+                          className="portal-icon-button"
+                          disabled={busy}
+                          onClick={remove("membership", m.code)}
+                        >
+                          <Trash2 size={18} />
+                        </button>
+                      </div>
+                    </article>
+                  ))}
+                </div>
+                {!!library.members.length && (
+                  <p className="portal-subtle">
+                    {visibleMembers.length} of {library.members.length} memberships shown. Filters
+                    do not remove campaigns or recovery copies.
+                  </p>
+                )}
+                {!library.members.length && (
+                  <div className="portal-empty">
+                    No saved memberships yet. <Link to="/share">Open campaign sharing →</Link>
+                  </div>
+                )}
+              </section>
+            </>
+          )}
+          {!loading && (
+            <section id="account-support">
+              <BugReports
+                key={library?.user.id ?? "guest"}
+                userId={library?.user.id}
+                role={library?.user.role}
+              />
+            </section>
+          )}
+          <div id="account-administration">
+            {(library?.user.role === "owner" || library?.user.role === "admin") && (
+              <ServerMonitor />
+            )}
+            {library?.user.role === "owner" && <OwnerControls />}
+            {library && library.user.role !== "member" && (
+              <div id="account-member-management">
+                <StaffControls userId={library.user.id} role={library.user.role} />
+              </div>
+            )}
+          </div>
+          {library && (
+            <>
+              {library.notices.map((n, i) => (
+                <p key={i} className="portal-message" role="status">
+                  Staff warning ({new Date(n.created_at).toLocaleDateString()}): {n.reason}
+                </p>
+              ))}
+              <section className="portal-card" id="account-characters">
+                <h2>Interactive character sheets</h2>
+                <p>
+                  Create a full character, assign a campaign, track HP and spells, and roll with
+                  your party.
+                </p>
+                <Link to="/characters" className="portal-button">
+                  Open character sheets & rolls
+                </Link>
+                <p>
+                  <a href="#account-reusable-profiles">Reusable names, portraits & notes</a>
+                </p>
+              </section>
+              {
+                <section className="portal-card" id="account-encounters">
+                  <h2>DM encounters</h2>
+                  <p>
+                    Build private encounters in your account and export them to the app. You can
+                    also build directly in your account-owned campaign, including offline.
+                  </p>
+                  <Link
+                    to="/encounters"
+                    search={{ storage: "personal" } as never}
+                    className="portal-button"
+                  >
+                    Open DM encounters
+                  </Link>
+                </section>
+              }
+              <div id="account-reports">
+                <AccountSessionRecords />
+              </div>
+              <div id="account-profile">
+                <ProfileControls profile={library.profile} onSaved={reload} />
+              </div>
+              <section className="portal-card" id="account-device-campaigns">
+                <h2>Campaigns on this device</h2>
+                <p>
+                  These campaigns are stored on this device, separately from your shared memberships
+                  and cloud backups.
+                </p>
+                <Campaigns />
+              </section>
+            </>
           )}
           {loading ? (
             <p role="status">Opening your library…</p>
@@ -370,17 +686,15 @@ function Account() {
                       type="password"
                       minLength={mode === "signin" ? 1 : 12}
                       maxLength={128}
-                      autoComplete={
-                        mode === "signin" ? "current-password" : "new-password"
-                      }
+                      autoComplete={mode === "signin" ? "current-password" : "new-password"}
                       value={password}
                       onChange={(e) => setPassword(e.target.value)}
                     />
                   </label>
                   {mode !== "signin" && (
                     <p className="portal-subtle">
-                      Use at least 12 characters. A password manager can save
-                      your password and recovery key.
+                      Use at least 12 characters. A password manager can save your password and
+                      recovery key.
                     </p>
                   )}
                   <button className="portal-button" disabled={busy}>
@@ -396,9 +710,7 @@ function Account() {
                 </form>
                 <button
                   className="portal-text-button"
-                  onClick={() =>
-                    setMode(mode === "recover" ? "signin" : "recover")
-                  }
+                  onClick={() => setMode(mode === "recover" ? "signin" : "recover")}
                 >
                   {mode === "recover"
                     ? "Back to sign in"
@@ -413,247 +725,19 @@ function Account() {
                   Less getting set up.
                 </h2>
                 <p>
-                  Save your place in shared campaigns. Keep private cloud
-                  backups. Reuse character profiles without carrying money
-                  between worlds.
+                  Save your place in shared campaigns. Keep private cloud backups. Reuse character
+                  profiles without carrying money between worlds.
                 </p>
                 <p>
-                  Signing in does not upload any campaign automatically. Your
-                  PDFs stay on your device.
+                  Signing in does not upload any campaign automatically. Your PDFs stay on your
+                  device.
                 </p>
                 <Link to="/share">Join a session as guest →</Link>
               </aside>
             </div>
           ) : (
             <>
-              <section className="portal-account-section">
-                <div className="portal-section-title">
-                  <div>
-                    <p className="portal-eyebrow">PICK UP WHERE YOU LEFT OFF</p>
-                    <h2>My campaigns</h2>
-                  </div>
-                  <button
-                    className="portal-button secondary"
-                    disabled={busy || !cloud.joined}
-                    onClick={action(async () => {
-                      await linkCurrentCampaign();
-                      await reload();
-                      setNotice(
-                        hasPendingChanges()
-                          ? "This membership is saved. Your turn still has pending changes; submit it in Multiplayer to share those changes."
-                          : "This membership is saved. You can resume it on another signed-in device.",
-                      );
-                    })}
-                  >
-                    <Plus size={16} /> Save current membership
-                  </button>
-                </div>
-                <p className="portal-subtle">
-                  Open or join a shared campaign in the app, then save its
-                  membership here. DMs can resume or reopen their saved shared
-                  sessions on any signed-in device. Players need an active seat
-                  from their DM. Linking does not upload a local-only campaign.
-                </p>
-                <DeviceRecovery userId={library.user.id} />
-                <label className="portal-check">
-                  <input
-                    type="checkbox"
-                    checked={archived}
-                    onChange={(e) => setArchived(e.target.checked)}
-                  />{" "}
-                  Show archived campaigns
-                </label>
-                <div className="portal-library-grid">
-                  {library.members
-                    .filter((m) => archived || !m.archived)
-                    .map((m) => (
-                      <article className="portal-card" key={m.code}>
-                        <span className="portal-eyebrow">
-                          {m.archived ? "ARCHIVED" : "SHARED CAMPAIGN"} ·{" "}
-                          {m.code}
-                        </span>
-                        <h3>{m.name}</h3>
-                        {cloud.joined && cloud.code === m.code && (
-                          <p className="portal-message">Open on this device</p>
-                        )}
-                        <p className="portal-subtle">
-                          Last opened or saved{" "}
-                          {new Date(m.updated_at).toLocaleString()}
-                        </p>
-                        {library.members.some(
-                          (other) =>
-                            !other.archived &&
-                            other.code !== m.code &&
-                            other.name.trim().toLowerCase() ===
-                              m.name.trim().toLowerCase(),
-                        ) && (
-                          <p className="portal-subtle">
-                            Other rooms share this name. Each room has separate
-                            portraits, loot and progress.
-                          </p>
-                        )}
-                        {m.role === "dm" && (
-                          <p className="portal-subtle">
-                            {m.closed
-                              ? "You are the DM. This session has ended. Reopen its saved shared state to continue; players will need to rejoin."
-                              : "You are the DM of this campaign."}
-                          </p>
-                        )}
-                        <div className="portal-actions">
-                          {!!m.has_recovery && (
-                            <button
-                              className="portal-button secondary"
-                              disabled={busy}
-                              onClick={action(async () => {
-                                const records = await accountRequest("recovery-records", {
-                                  code: m.code,
-                                });
-                                await downloadJson(`Lootsplit-recovery-${m.code}.json`, records);
-                              })}
-                            >
-                              Download recovery records
-                            </button>
-                          )}
-                          <button
-                            className="portal-button secondary"
-                            disabled={busy}
-                            onClick={action(async () => {
-                              const name = window.prompt(
-                                "Campaign name in your library",
-                                m.name,
-                              );
-                              if (!name) return;
-                              await accountRequest("campaign", {
-                                action: "rename",
-                                code: m.code,
-                                name,
-                              });
-                              await reload();
-                            })}
-                          >
-                            Rename
-                          </button>
-                          {m.role === "dm" && (
-                            <button
-                              className="portal-button secondary"
-                              disabled={busy}
-                              onClick={action(async () => {
-                                if (
-                                  cloud.joined &&
-                                  cloud.code === m.code &&
-                                  hasPendingChanges()
-                                )
-                                  throw new Error(
-                                    "Submit or export pending changes before deleting this campaign.",
-                                  );
-                                const confirm = window.prompt(
-                                  `Delete shared campaign ${m.name} for everyone? A private cloud backup of its saved state will be kept. Device copies remain. Type ${m.code} to confirm.`,
-                                );
-                                if (confirm !== m.code) return;
-                                await accountRequest("campaign", {
-                                  action: "delete",
-                                  code: m.code,
-                                  confirm,
-                                  revision: m.room_revision,
-                                });
-                                if (cloud.joined && cloud.code === m.code)
-                                  await clearAccountRoom(true);
-                                await reload();
-                                setNotice(
-                                  "Shared campaign deleted. Its saved state is in Cloud backups.",
-                                );
-                              })}
-                            >
-                              Delete shared campaign
-                            </button>
-                          )}
-                          <button
-                            className="portal-button"
-                            disabled={busy}
-                            onClick={action(async () => {
-                              // Another device may have saved a newer room since this page
-                              // opened. Names are a warning only, never campaign identity.
-                              const fresh =
-                                await accountRequest<AccountLibrary>("library");
-                              setLibrary(fresh);
-                              const target = fresh.members.find(
-                                (member) => member.code === m.code,
-                              );
-                              if (!target)
-                                throw new Error(
-                                  "This saved campaign is no longer available. Refresh My campaigns.",
-                                );
-                              const newer = fresh.members.find(
-                                (other) =>
-                                  !other.archived &&
-                                  other.role &&
-                                  other.code !== target.code &&
-                                  other.name.trim().toLowerCase() ===
-                                    target.name.trim().toLowerCase() &&
-                                  other.updated_at > target.updated_at,
-                              );
-                              if (
-                                newer &&
-                                !window.confirm(
-                                  `Another campaign named “${target.name}” was opened or saved more recently (${newer.code}). These are separate rooms; portraits, loot and progress do not sync between them. Continue opening this older entry (${target.code})?`,
-                                )
-                              )
-                                return;
-                              const member =
-                                await accountRequest<AccountMembership>(
-                                  "resume",
-                                  {
-                                    code: target.code,
-                                    ...(target.closed && target.role === "dm"
-                                      ? {
-                                          reopen: true,
-                                          revision: target.room_revision,
-                                        }
-                                      : {}),
-                                  },
-                                );
-                              await resumeAccountMembership(member);
-                            })}
-                          >
-                            {m.closed && m.role === "dm"
-                              ? "Reopen as DM"
-                              : "Resume"}{" "}
-                            <ArrowRight size={16} />
-                          </button>
-                          <button
-                            aria-label={`${m.archived ? "Unarchive" : "Archive"} ${m.name}`}
-                            className="portal-icon-button"
-                            disabled={busy}
-                            onClick={action(async () => {
-                              await accountRequest("archive", {
-                                code: m.code,
-                                archived: !m.archived,
-                              });
-                              await reload();
-                            })}
-                          >
-                            <Archive size={18} />
-                          </button>
-                          <button
-                            aria-label={`Forget ${m.name}`}
-                            className="portal-icon-button"
-                            disabled={busy}
-                            onClick={remove("membership", m.code)}
-                          >
-                            <Trash2 size={18} />
-                          </button>
-                        </div>
-                      </article>
-                    ))}
-                </div>
-                {!library.members.length && (
-                  <div className="portal-empty">
-                    No saved memberships yet.{" "}
-                    <Link to="/share">Open campaign sharing →</Link>
-                  </div>
-                )}
-              </section>
-              <section className="portal-account-section">
+              <section id="account-backups" className="portal-account-section">
                 <div className="portal-section-title">
                   <div>
                     <p className="portal-eyebrow">SAVE A MOMENT IN THE STORY</p>
@@ -665,25 +749,20 @@ function Account() {
                     onClick={action(async () => {
                       await saveAccountBackup();
                       await reload();
-                      setNotice(
-                        "A new private cloud backup is saved. Earlier backups were kept.",
-                      );
+                      setNotice("A new private cloud backup is saved. Earlier backups were kept.");
                     })}
                   >
                     <Plus size={16} /> Save current campaign
                   </button>
                 </div>
                 <p className="portal-subtle">
-                  Manual recovery copies, separate from live campaigns. Each
-                  save keeps a new version. Restoring creates a new device
-                  campaign. PDFs and extracted reference content stay
-                  device-local; protected saves use the existing encrypted
-                  device tools.
-                  Deletion copies also offer shared recovery, including encounter
-                  and roll history. Restored rooms start with only you as DM and
-                  remain view-only until you resume play. Historical import
-                  proposals and account links are kept in recovery records;
-                  invite players again for new assignments.
+                  Manual recovery copies, separate from live campaigns. Each save keeps a new
+                  version. Restoring creates a new device campaign. PDFs and extracted reference
+                  content stay device-local; protected saves use the existing encrypted device
+                  tools. Deletion copies also offer shared recovery, including encounter and roll
+                  history. Restored rooms start with only you as DM and remain view-only until you
+                  resume play. Historical import proposals and account links are kept in recovery
+                  records; invite players again for new assignments.
                 </p>
                 <div className="portal-backup-list">
                   {library.backups.map((b) => (
@@ -693,14 +772,20 @@ function Account() {
                         <p>{new Date(b.created_at).toLocaleString()}</p>
                       </div>
                       <div className="portal-actions">
+                        <BackupPreview id={b.id} shared={!!b.shared_recovery} />
                         {!!b.shared_recovery && (
                           <button
                             className="portal-button secondary"
                             disabled={busy}
                             onClick={action(async () => {
+                              if (!allowContextChange()) return;
+                              const { payload } = await accountRequest<{ payload: unknown }>(
+                                "read-backup",
+                                { id: b.id },
+                              );
                               if (
                                 window.confirm(
-                                  "Restore all shared records into a new view-only room? Your current campaign and backup will be kept. Players need new invitations.",
+                                  backupConfirmation(accountBackupSummary(payload), true),
                                 )
                               )
                                 await restoreSharedAccountBackup(b.id);
@@ -713,9 +798,14 @@ function Account() {
                           className="portal-button secondary"
                           disabled={busy}
                           onClick={action(async () => {
+                            if (!allowContextChange()) return;
+                            const { payload } = await accountRequest<{ payload: unknown }>(
+                              "read-backup",
+                              { id: b.id },
+                            );
                             if (
                               window.confirm(
-                                "Restore into a new device campaign? Your current campaign will remain.",
+                                backupConfirmation(accountBackupSummary(payload), false),
                               )
                             )
                               await restoreAccountBackup(b.id, b.name);
@@ -733,10 +823,7 @@ function Account() {
                             }>("read-backup", {
                               id: b.id,
                             });
-                            await downloadJson(
-                              `Lootsplit-cloud-${b.id}.json`,
-                              r.payload,
-                            );
+                            await downloadJson(`Lootsplit-cloud-${b.id}.json`, r.payload);
                           })}
                         >
                           <Download size={18} />
@@ -755,29 +842,21 @@ function Account() {
                 </div>
                 {!library.backups.length && (
                   <div className="portal-empty">
-                    No cloud backups yet. Local saves are still available in the
-                    app’s settings.
+                    No cloud backups yet. Local saves are still available in the app’s settings.
                   </div>
                 )}
               </section>
-              <section className="portal-account-section">
+              <section id="account-reusable-profiles" className="portal-account-section">
                 <p className="portal-eyebrow">FAMILIAR FACES, NEW ADVENTURES</p>
                 <h2>My characters</h2>
                 <p className="portal-subtle">
-                  Reusable names, portraits and notes. Adding a profile creates
-                  a new character with no money or inventory, in your current
-                  local DM campaign.
+                  Reusable names, portraits and notes. Adding a profile creates a new character with
+                  no money or inventory, in your current local DM campaign.
                 </p>
                 <div className="portal-library-grid">
                   {library.characters.map((c) => (
                     <article className="portal-card" key={c.id}>
-                      {c.portrait && (
-                        <img
-                          className="portal-portrait"
-                          src={c.portrait}
-                          alt=""
-                        />
-                      )}
+                      {c.portrait && <img className="portal-portrait" src={c.portrait} alt="" />}
                       <h3>{c.name}</h3>
                       <p>{c.description}</p>
                       <div className="portal-actions">
@@ -816,6 +895,19 @@ function Account() {
                         <button
                           className="portal-text-button"
                           onClick={() => {
+                            if (
+                              profileDirty &&
+                              !window.confirm(
+                                "Discard unsaved profile changes and edit another character?",
+                              )
+                            )
+                              return;
+                            setProfileBaseline({
+                              name: c.name,
+                              description: c.description,
+                              portrait: c.portrait,
+                            });
+                            setProfileSource("");
                             setEditId(c.id);
                             setProfileName(c.name);
                             setDescription(c.description);
@@ -847,6 +939,8 @@ function Account() {
                         description,
                         portrait,
                       });
+                      setProfileBaseline({ name: "", description: "", portrait: "" });
+                      setProfileSource("");
                       setEditId("");
                       setProfileName("");
                       setDescription("");
@@ -855,20 +949,23 @@ function Account() {
                     });
                   }}
                 >
-                  <h3>
-                    {editId
-                      ? "Edit character profile"
-                      : "Save a character profile"}
-                  </h3>
+                  <h3>{editId ? "Edit character profile" : "Save a character profile"}</h3>
                   {!editId && (
                     <label>
                       Start from a current character (optional)
                       <select
-                        defaultValue=""
+                        value={profileSource}
                         onChange={(e) => {
-                          const p = economy.purses.find(
-                            (p) => p.id === e.target.value,
-                          );
+                          const p = economy.purses.find((p) => p.id === e.target.value);
+                          if (
+                            p &&
+                            profileDirty &&
+                            !window.confirm(
+                              "Discard unsaved profile changes and start from another character?",
+                            )
+                          )
+                            return;
+                          setProfileSource(e.target.value);
                           if (p) {
                             setProfileName(p.name);
                             setPortrait(p.portrait || "");
@@ -876,15 +973,12 @@ function Account() {
                           }
                         }}
                       >
-                        <option value="">
-                          Choose a character or enter one below
-                        </option>
+                        <option value="">Choose a character or enter one below</option>
                         {economy.purses
                           .filter(
                             (p) =>
                               p.kind === "character" &&
-                              (seat.role === "dm" ||
-                                seat.purseIds.includes(p.id)),
+                              (seat.role === "dm" || seat.purseIds.includes(p.id)),
                           )
                           .map((p) => (
                             <option key={p.id} value={p.id}>
@@ -920,20 +1014,14 @@ function Account() {
                         const f = e.target.files?.[0];
                         if (!f) return;
                         void run(async () => {
-                          if (f.size > 350000)
-                            throw new Error("Choose a portrait below 350 KB.");
-                          const data = await new Promise<string>(
-                            (resolve, reject) => {
-                              const reader = new FileReader();
-                              reader.onload = () =>
-                                resolve(String(reader.result));
-                              reader.onerror = () =>
-                                reject(
-                                  new Error("Could not read the portrait."),
-                                );
-                              reader.readAsDataURL(f);
-                            },
-                          );
+                          if (f.size > 350000) throw new Error("Choose a portrait below 350 KB.");
+                          const data = await new Promise<string>((resolve, reject) => {
+                            const reader = new FileReader();
+                            reader.onload = () => resolve(String(reader.result));
+                            reader.onerror = () =>
+                              reject(new Error("Could not read the portrait."));
+                            reader.readAsDataURL(f);
+                          });
                           setPortrait(data);
                         });
                       }}
@@ -941,11 +1029,7 @@ function Account() {
                   </label>
                   {portrait && (
                     <div className="portal-actions">
-                      <img
-                        className="portal-portrait"
-                        src={portrait}
-                        alt="Selected portrait"
-                      />
+                      <img className="portal-portrait" src={portrait} alt="Selected portrait" />
                       <button type="button" onClick={() => setPortrait("")}>
                         Remove portrait
                       </button>
@@ -960,6 +1044,13 @@ function Account() {
                         type="button"
                         className="portal-button secondary"
                         onClick={() => {
+                          if (
+                            profileDirty &&
+                            !window.confirm("Discard unsaved character profile changes?")
+                          )
+                            return;
+                          setProfileBaseline({ name: "", description: "", portrait: "" });
+                          setProfileSource("");
                           setEditId("");
                           setProfileName("");
                           setDescription("");
@@ -972,7 +1063,7 @@ function Account() {
                   </div>
                 </form>
               </section>
-              <section className="portal-callout">
+              <section id="account-recovery" className="portal-callout">
                 <div>
                   <ShieldCheck />
                   <h2>Account recovery</h2>
@@ -980,13 +1071,11 @@ function Account() {
                     {library.hasRecoveryKey
                       ? "A recovery key is set. Keep it outside the app."
                       : "Save a recovery key now so you can recover a forgotten password."}{" "}
-                    Generating another invalidates the old key. Email reset is
-                    not enabled.
+                    Generating another invalidates the old key. Email reset is not enabled.
                   </p>
                   <p className="portal-subtle">
-                    Signed in as {library.user.email}. Signing out keeps device
-                    copies, while removing account-resumed connections from this
-                    device.
+                    Signed in as {library.user.email}. Signing out keeps device copies, while
+                    removing account-resumed connections from this device.
                   </p>
                 </div>
                 <button
@@ -1000,18 +1089,13 @@ function Account() {
                       )
                     )
                       return;
-                    const r = await accountRequest<{ key: string }>(
-                      "recovery-key",
-                      {},
-                    );
+                    const r = await accountRequest<{ key: string }>("recovery-key", {});
                     setKey(r.key);
                     await reload();
                     window.scrollTo({ top: 0, behavior: "smooth" });
                   })}
                 >
-                  {library.hasRecoveryKey
-                    ? "Replace recovery key"
-                    : "Create recovery key"}
+                  {library.hasRecoveryKey ? "Replace recovery key" : "Create recovery key"}
                 </button>
               </section>
             </>

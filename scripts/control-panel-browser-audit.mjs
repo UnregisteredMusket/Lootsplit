@@ -20,7 +20,10 @@ try {
   await context.addInitScript(() => localStorage.setItem("quire.guide.offer.v3", "seen"));
   const page = await context.newPage();
   page.setDefaultTimeout(20000);
-  page.on("response", response => { if (response.status() >= 400) console.error(`HTTP ${response.status()} ${new URL(response.url()).pathname}`); });
+  page.on("response", (response) => {
+    if (response.status() >= 400)
+      console.error(`HTTP ${response.status()} ${new URL(response.url()).pathname}`);
+  });
   page.on("pageerror", (e) => errors.push(e.message));
   async function visit(path) {
     await navigateApplication(page, origin + path);
@@ -51,91 +54,206 @@ try {
     "Library",
   ]);
   assert.equal(await page.locator(".shortcut-button").count(), 0, "Main Desk has no shortcut grid");
-  await expect(page.getByRole("link", {name:"Multiplayer settings",exact:true})).toHaveCount(1);
-  await expect(page.getByRole("link", {name:/Multiplayer · Room, chat & connection status/})).toHaveCount(0);
-  await expect(page.getByRole("link", {name:"Open Multiplayer — host or join a room",exact:true})).toHaveCount(0);
-  const information = page.getByRole("region", {name:"Campaign information",exact:true});
+  await expect(page.getByRole("link", { name: "Multiplayer settings", exact: true })).toHaveCount(
+    1,
+  );
+  await expect(
+    page.getByRole("link", { name: /Multiplayer · Room, chat & connection status/ }),
+  ).toHaveCount(0);
+  await expect(
+    page.getByRole("link", { name: "Open Multiplayer — host or join a room", exact: true }),
+  ).toHaveCount(0);
+  const information = page.getByRole("region", { name: "Campaign information", exact: true });
   await expect(information).toBeVisible();
   assert.equal(await page.locator(".information-panel").count(), 5);
-  await page.locator('.information-selectors').getByRole("button", {name:"Funds",exact:true}).click();
-  await expect(page.locator('.information-selectors').getByRole("button", {name:"Funds",exact:true})).toHaveAttribute("aria-pressed", "true");
-  await page.getByRole("button", {name:"Next information panel",exact:true}).click();
-  await expect(page.locator('.information-selectors').getByRole("button", {name:"Activity",exact:true})).toHaveAttribute("aria-pressed", "true");
-  await page.locator('.information-selectors').getByRole("button", {name:"Session",exact:true}).click();
-  await expect(page.locator('.information-selectors').getByRole("button", {name:"Session",exact:true})).toHaveAttribute("aria-pressed", "true");
+  await page
+    .locator(".information-selectors")
+    .getByRole("button", { name: "Funds", exact: true })
+    .click();
+  await expect(
+    page.locator(".information-selectors").getByRole("button", { name: "Funds", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await page.getByRole("button", { name: "Next information panel", exact: true }).click();
+  await expect(
+    page.locator(".information-selectors").getByRole("button", { name: "Activity", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await page
+    .locator(".information-selectors")
+    .getByRole("button", { name: "Session", exact: true })
+    .click();
+  await expect(
+    page.locator(".information-selectors").getByRole("button", { name: "Session", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  // Wait for the selected panel to finish scrolling before issuing a new native input.
+  await expect
+    .poll(() =>
+      page
+        .getByRole("region", { name: "Session information", exact: true })
+        .evaluate((element) =>
+          Math.abs(
+            element.getBoundingClientRect().left -
+              element.parentElement.getBoundingClientRect().left,
+          ),
+        ),
+    )
+    .toBeLessThan(2);
   // Native horizontal input must work too, independent of the jump controls.
-  const stripBounds = await page.locator('.information-strip').boundingBox();
-  await page.mouse.move(stripBounds.x + stripBounds.width / 2, stripBounds.y + 30);
+  const stripBounds = await page.locator(".information-strip").boundingBox();
+  const inputPoint = {
+    x: stripBounds.x + stripBounds.width / 2,
+    y: stripBounds.y + stripBounds.height / 2,
+  };
+  assert.equal(
+    await page
+      .locator(".information-strip")
+      .evaluate(
+        (element, point) => element.contains(document.elementFromPoint(point.x, point.y)),
+        inputPoint,
+      ),
+    true,
+    "Native wheel targets the strip rather than the sticky header",
+  );
+  await page.mouse.move(inputPoint.x, inputPoint.y);
   await page.mouse.wheel(stripBounds.width, 0);
-  await expect(page.locator('.information-selectors').getByRole("button", {name:"Party",exact:true})).toHaveAttribute("aria-pressed", "true");
-  await page.locator('.information-selectors').getByRole("button", {name:"Session",exact:true}).click();
-  await expect(page.locator('.information-selectors').getByRole("button", {name:"Session",exact:true})).toHaveAttribute("aria-pressed", "true");
-  await page.evaluate(() => { window.multiplayerNavigationMarker = "same-document"; });
-  await page.getByRole("link", {name:"Multiplayer settings",exact:true}).click();
-  await expect(page.getByRole("tab", {name:"Room",exact:true})).toHaveAttribute("aria-selected", "true");
+  await expect(
+    page.locator(".information-selectors").getByRole("button", { name: "Party", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await page
+    .locator(".information-selectors")
+    .getByRole("button", { name: "Session", exact: true })
+    .click();
+  await expect(
+    page.locator(".information-selectors").getByRole("button", { name: "Session", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await page.evaluate(() => {
+    window.multiplayerNavigationMarker = "same-document";
+  });
+  await page.getByRole("link", { name: "Multiplayer settings", exact: true }).click();
+  await expect(page.getByRole("tab", { name: "Room", exact: true })).toHaveAttribute(
+    "aria-selected",
+    "true",
+  );
   assert.equal(await page.evaluate(() => window.multiplayerNavigationMarker), "same-document");
   assert.equal(await page.locator(".loot-opening").count(), 0);
-  await nav.getByRole("link", {name:"Desk",exact:true}).click();
+  const multiplayerTabs = page.getByRole("tablist", { name: "Multiplayer sections", exact: true });
+  const roomTab = multiplayerTabs.getByRole("tab", { name: "Room", exact: true });
+  await roomTab.focus();
+  await roomTab.press("ArrowRight");
+  const chatTab = multiplayerTabs.getByRole("tab", { name: /^Chat/ });
+  await expect(chatTab).toBeFocused();
+  await expect(chatTab).toHaveAttribute("aria-selected", "true");
+  await expect(roomTab).toHaveAttribute("tabindex", "-1");
+  await expect(page.getByRole("tabpanel", { name: /^Chat/ })).toBeVisible();
+  await chatTab.press("End");
+  const alertsTab = multiplayerTabs.getByRole("tab", { name: "Alerts", exact: true });
+  await expect(alertsTab).toBeFocused();
+  await expect(page.getByRole("tabpanel", { name: "Alerts", exact: true })).toBeVisible();
+  await alertsTab.press("ArrowLeft");
+  const rollsTab = multiplayerTabs.getByRole("tab", { name: "Rolls", exact: true });
+  await expect(rollsTab).toBeFocused();
+  await expect(page.getByRole("tabpanel", { name: "Rolls", exact: true })).toContainText(
+    "Join an online campaign to see shared rolls.",
+  );
+  await rollsTab.press("Home");
+  await expect(roomTab).toBeFocused();
+  await expect(roomTab).toHaveAttribute("tabindex", "0");
+  await expect(page.getByRole("tabpanel", { name: "Room", exact: true })).toBeVisible();
+  await expect(page.locator(".campaign-rolls")).toHaveCount(0);
+  assert.equal(
+    await roomTab.getAttribute("aria-controls"),
+    await page.getByRole("tabpanel", { name: "Room", exact: true }).getAttribute("id"),
+  );
+  await nav.getByRole("link", { name: "Desk", exact: true }).click();
+  await page.getByRole("button", { name: /^Campaign tools/ }).click();
+  await expect(page.getByRole("link", { name: "Multiplayer", exact: true })).toHaveCount(0);
+  await expect(page.getByRole("link", { name: "Multiplayer settings", exact: true })).toHaveCount(
+    1,
+  );
   await capture("dm-desk");
-  await page.evaluate(() => { window.reviewNavigationMarker = "same-document"; });
+  await page.evaluate(() => {
+    window.reviewNavigationMarker = "same-document";
+  });
   await page.locator(".readout").filter({ hasText: "Pending reviews" }).click();
   await expect(page.getByRole("heading", { name: "Review Inbox", exact: true })).toBeVisible();
   await expect(page.locator("#review-inbox")).toBeVisible();
-  await expect(page.locator("#review-inbox summary")).toContainText("Payments & loans awaiting approval");
-  await expect(page.getByText("No payments or loans need approval.", {exact:true})).toBeVisible();
-  await expect(page.getByLabel("Payment account", {exact:true})).toHaveCount(0);
-  await expect(page.getByRole("button", {name:"Submit request",exact:true})).toHaveCount(0);
+  await expect(page.locator("#review-inbox summary")).toContainText(
+    "Payments & loans awaiting approval",
+  );
+  await expect(
+    page.getByText("No payments or loans need approval.", { exact: true }),
+  ).toBeVisible();
+  await expect(page.getByLabel("Payment account", { exact: true })).toHaveCount(0);
+  await expect(page.getByRole("button", { name: "Submit request", exact: true })).toHaveCount(0);
   assert.equal(await page.evaluate(() => window.reviewNavigationMarker), "same-document");
   assert.equal(await page.locator(".loot-opening").count(), 0);
   await page.getByRole("link", { name: "Return to Desk", exact: true }).click();
   // Both historical entry URLs now expose one DM home without duplicate sections.
-  await page.evaluate(() => { window.unifiedHomeMarker = "same-document"; });
+  await page.evaluate(() => {
+    window.unifiedHomeMarker = "same-document";
+  });
   await page.locator(".session-readout").click();
-  await expect(page.locator("#sessions").getByLabel("Session name", {exact:true})).toBeVisible();
+  await expect(page.locator("#sessions").getByLabel("Session name", { exact: true })).toBeVisible();
   assert.equal(await page.locator(".loot-opening").count(), 0);
   assert.equal(await page.evaluate(() => window.unifiedHomeMarker), "same-document");
   await visit("/?view=overview"); // Explicitly open the historical URL; no separate overview link remains.
-  await page.evaluate(() => { window.unifiedHomeMarker = "same-document"; });
-  await expect(page.getByRole("heading", {name:"Campaign control",exact:true})).toHaveCount(1);
+  await page.evaluate(() => {
+    window.unifiedHomeMarker = "same-document";
+  });
+  await expect(page.getByRole("heading", { name: "Campaign control", exact: true })).toHaveCount(1);
   await expect(page.locator(".feature-cards")).toHaveCount(1);
   await expect(page.locator(".desk-shortcuts")).toHaveCount(0);
   assert.equal(await page.locator(".desk-overview").count(), 0);
-  await page.getByRole("button", {name:/^Campaign treasury/}).click();
-  await expect(page.getByRole("link", {name:"Add loot",exact:true})).toBeVisible();
-  await page.getByRole("link", {name:"Review requests",exact:true}).click();
-  await expect(page.getByRole("heading", {name:"Bank",exact:true})).toBeVisible();
-  await expect(page.getByRole("heading", {name:"Queue a character payment for approval",exact:true})).toBeVisible();
-  await page.getByRole("link", {name:"Return to Desk",exact:true}).click();
-  await page.getByRole("button", {name:/^Activity & balances/}).click();
-  await expect(page.getByRole("heading", {name:"Recent activity",exact:true})).toHaveCount(1);
-  await page.getByRole("button", {name:/^Campaign tools/}).click();
-  await expect(page.getByRole("button", {name:"Download copy",exact:true})).toBeVisible();
-  await expect(page.getByText("Restore a copy", {exact:true})).toBeVisible();
+  await page.getByRole("button", { name: /^Campaign treasury/ }).click();
+  await expect(page.getByRole("link", { name: "Add loot", exact: true })).toBeVisible();
+  await page.getByRole("link", { name: "Review requests", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Bank", exact: true })).toBeVisible();
+  await expect(
+    page.getByRole("heading", { name: "Queue a character payment for approval", exact: true }),
+  ).toBeVisible();
+  await page.getByRole("link", { name: "Return to Desk", exact: true }).click();
+  await page.getByRole("button", { name: /^Activity & balances/ }).click();
+  await expect(page.getByRole("heading", { name: "Recent activity", exact: true })).toHaveCount(1);
+  await page.getByRole("button", { name: /^Campaign tools/ }).click();
+  await expect(page.getByRole("button", { name: "Download copy", exact: true })).toBeVisible();
+  await expect(page.getByText("Restore a copy", { exact: true })).toBeVisible();
   assert.equal(await page.evaluate(() => window.unifiedHomeMarker), "same-document");
   assert.equal(await page.locator(".loot-opening").count(), 0);
   await capture("unified-dm-home");
   await visit("/");
 
   await page.getByRole("button", { name: "Settings & Management", exact: true }).click();
-  await page.getByRole("dialog").getByRole("button", {name:"Dashboard",exact:true}).click();
-  await page.getByRole("link", {name:"Saved shortcut settings →",exact:true}).click();
+  await page.getByRole("dialog").getByRole("button", { name: "Dashboard", exact: true }).click();
+  await page.getByRole("link", { name: "Saved shortcut settings →", exact: true }).click();
   await page.getByLabel("Button 1", { exact: true }).selectOption("chat");
   await page.getByLabel("Label", { exact: true }).first().fill("Party messages");
   await page.getByRole("button", { name: "Move button 1 down", exact: true }).click();
   await page.getByRole("button", { name: "Save shortcuts", exact: true }).click();
-  await page.getByRole("dialog", { name: "Customize shortcuts", exact: true }).waitFor({ state: "hidden" }); // Closes only after the account write succeeds.
+  await page
+    .getByRole("dialog", { name: "Customize shortcuts", exact: true })
+    .waitFor({ state: "hidden" }); // Closes only after the account write succeeds.
   let releasePreferences;
-  const preferencesReady = new Promise(resolve => { releasePreferences = resolve; });
-  await page.route("**/api/account/shortcuts?role=dm", async route => {
+  const preferencesReady = new Promise((resolve) => {
+    releasePreferences = resolve;
+  });
+  await page.route("**/api/account/shortcuts?role=dm", async (route) => {
     const response = await route.fetch();
     await preferencesReady;
     await route.fulfill({ response });
   });
   await reloadApplication(page); // Explicit reload verifies persisted shortcut edits.
-  await expect(page.getByRole("status").filter({ hasText: "Loading your account shortcuts" })).toBeVisible();
-  assert.equal(await page.locator(".shortcut-button").count(), 0, "Default destinations cannot be clicked while saved preferences load");
+  await expect(
+    page.getByRole("status").filter({ hasText: "Loading your account shortcuts" }),
+  ).toBeVisible();
+  assert.equal(
+    await page.locator(".shortcut-button").count(),
+    0,
+    "Default destinations cannot be clicked while saved preferences load",
+  );
   releasePreferences();
-  await page.getByRole("dialog", {name:"Customize shortcuts",exact:true}).getByRole("button",{name:"Close",exact:true}).click();
+  await page
+    .getByRole("dialog", { name: "Customize shortcuts", exact: true })
+    .getByRole("button", { name: "Close", exact: true })
+    .click();
   await expect(page.locator(".shortcut-button").nth(1)).toHaveText("Party messages");
   await page.unroute("**/api/account/shortcuts?role=dm");
   assert.equal(await page.locator(".shortcut-button").nth(1).getAttribute("href"), "/share?chat=1");
@@ -171,6 +289,26 @@ try {
     ["dm-library", "/library"],
   ]) {
     await visit(path);
+    if (path === "/party") {
+      const partyTabs = page.getByRole("tablist", { name: "Party sections", exact: true });
+      const characterTab = partyTabs.getByRole("tab", { name: "Characters", exact: true });
+      const fundsTab = partyTabs.getByRole("tab", { name: "Funds & inventory", exact: true });
+      await characterTab.focus();
+      await characterTab.press("End");
+      await expect(fundsTab).toBeFocused();
+      await expect(fundsTab).toHaveAttribute("aria-selected", "true");
+      await expect(
+        page.getByRole("tabpanel", { name: "Funds & inventory", exact: true }),
+      ).toBeVisible();
+      await expect(page.locator("#party-panel-characters")).toBeHidden();
+      await fundsTab.press("Home");
+      await expect(characterTab).toBeFocused();
+      await expect(page.getByRole("tabpanel", { name: "Characters", exact: true })).toBeVisible();
+      await expect(page.locator("#party-panel-funds")).toBeHidden();
+      assert.equal(await characterTab.getAttribute("aria-controls"), "party-panel-characters");
+      await expect(partyTabs.getByRole("link")).toHaveCount(0);
+      await expect(page.getByRole("link", { name: "Ledger", exact: true })).toBeVisible();
+    }
     await capture(name);
   }
   // Exercise player presentation using a disposable local seat; server permissions
@@ -197,15 +335,19 @@ try {
     "Library",
   ]);
   await capture("player-character");
-  await nav.getByRole("link", {name:"Home",exact:true}).click();
-  await page.getByRole("link", {name:"Bank",exact:true}).click();
-  await expect(page.getByRole("heading", {name:"Request approval to spend coins",exact:true})).toBeVisible();
-  const paymentPurse = await page.getByLabel("Payment account", {exact:true}).inputValue();
+  await nav.getByRole("link", { name: "Home", exact: true }).click();
+  await page.getByRole("link", { name: "Bank", exact: true }).click();
+  await expect(
+    page.getByRole("heading", { name: "Request approval to spend coins", exact: true }),
+  ).toBeVisible();
+  const paymentPurse = await page.getByLabel("Payment account", { exact: true }).inputValue();
   assert.ok(paymentPurse, "Player request is assigned to their character");
-  await page.getByLabel("Payment amount in copper", {exact:true}).fill("1");
-  await page.getByLabel("Payment description", {exact:true}).fill("Review audit inn bill");
-  await page.getByRole("button", {name:"Submit request",exact:true}).click();
-  await expect(page.locator("#review-inbox .journal-entry").filter({hasText:"Review audit inn bill"})).toContainText("pending");
+  await page.getByLabel("Payment amount in copper", { exact: true }).fill("1");
+  await page.getByLabel("Payment description", { exact: true }).fill("Review audit inn bill");
+  await page.getByRole("button", { name: "Submit request", exact: true }).click();
+  await expect(
+    page.locator("#review-inbox .journal-entry").filter({ hasText: "Review audit inn bill" }),
+  ).toContainText("pending");
   await visit("/characters");
   await page.getByRole("button", { name: "Settings & Management", exact: true }).click();
   await dialog.getByRole("button", { name: "Character", exact: true }).waitFor();
@@ -253,19 +395,92 @@ try {
     t.setSeat({ ...t.getSeat(), role: "dm" });
   });
   await visit("/");
-  await page.locator(".readout").filter({hasText:"Pending reviews"}).click();
-  const paymentRequest = page.locator("#review-inbox .journal-entry").filter({hasText:"Review audit inn bill"});
-  await expect(paymentRequest.getByRole("button", {name:"Approve payment",exact:true})).toBeVisible();
-  await paymentRequest.getByRole("button", {name:"Decline",exact:true}).click();
+  await page.locator(".readout").filter({ hasText: "Pending reviews" }).click();
+  const paymentRequest = page
+    .locator("#review-inbox .journal-entry")
+    .filter({ hasText: "Review audit inn bill" });
+  await expect(
+    paymentRequest.getByRole("button", { name: "Approve payment", exact: true }),
+  ).toBeVisible();
+  await paymentRequest.getByRole("button", { name: "Decline", exact: true }).click();
   await expect(paymentRequest).toContainText("denied");
-  await expect(page.getByLabel("Payment account", {exact:true})).toHaveCount(0);
-  await page.getByRole("link", {name:"Return to Desk",exact:true}).click();
-  await page.locator(".information-selectors").getByRole("button",{name:"Rolls",exact:true}).click();
-  await expect(page.locator(".information-selectors").getByRole("button",{name:"Rolls",exact:true})).toHaveAttribute("aria-pressed","true");
-  await expect(page.getByRole("button",{name:"Next information panel",exact:true})).toBeDisabled();
-  await page.locator(".information-selectors").getByRole("button",{name:"Session",exact:true}).click();
-  await expect(page.locator(".information-selectors").getByRole("button",{name:"Session",exact:true})).toHaveAttribute("aria-pressed","true");
+  await expect(page.getByLabel("Payment account", { exact: true })).toHaveCount(0);
+  await page.getByRole("link", { name: "Return to Desk", exact: true }).click();
+  await page
+    .locator(".information-selectors")
+    .getByRole("button", { name: "Rolls", exact: true })
+    .click();
+  await expect(
+    page.locator(".information-selectors").getByRole("button", { name: "Rolls", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await expect(
+    page.getByRole("button", { name: "Next information panel", exact: true }),
+  ).toBeDisabled();
+  await page
+    .locator(".information-selectors")
+    .getByRole("button", { name: "Session", exact: true })
+    .click();
+  await expect(
+    page.locator(".information-selectors").getByRole("button", { name: "Session", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
   await capture("dm-desktop");
+  const historyCount = await page.evaluate(async () => {
+    const economy = await import("/src/lib/quire/economy.ts");
+    const purse = (await economy.listPurses()).find((p) => p.kind === "character");
+    for (let i = 0; i < 12; i++)
+      await economy.postCopper(purse.id, 1, `History preference ${i + 1}`);
+    return (await economy.listLedger()).length;
+  });
+  // Direct fixture writes need hydration; the following setting changes still use real controls.
+  await reloadApplication(page);
+  async function changeHistoryRows(key) {
+    await page.locator(".settings-trigger").click();
+    const preferences = page.getByRole("dialog");
+    await preferences
+      .getByRole("button", { name: "Appearance & notifications", exact: true })
+      .click();
+    await preferences
+      .getByRole("link", { name: "Custom colors & display preferences", exact: true })
+      .click();
+    await page.getByText("Display", { exact: true }).click();
+    const rows = page.getByRole("slider", { name: /Recent transactions in Home activity/ });
+    await rows.focus();
+    await rows.press(key);
+    await nav.getByRole("link", { name: "Desk", exact: true }).click();
+    await page.getByRole("button", { name: /^Activity & balances/ }).click();
+    await page.screenshot({
+      path: `${output}/history-preference-${key.toLowerCase()}.png`,
+      fullPage: true,
+    });
+    console.log(
+      "History preference state",
+      await page.evaluate(async () => ({
+        path: location.pathname,
+        width: innerWidth,
+        role: (await import("/src/lib/quire/table.ts")).getSeat().role,
+        ledger: (await (await import("/src/lib/quire/economy.ts")).economySnapshot()).ledger.length,
+        panels: [...document.querySelectorAll(".loot-fold > div > button")]
+          .filter((button) => button.textContent.includes("Activity & balances"))
+          .map((button) => ({
+            expanded: button.getAttribute("aria-expanded"),
+            text: button.textContent,
+          })),
+        desktopRows: document.querySelectorAll(".desktop-ledger tbody tr").length,
+        mobileRows: document.querySelectorAll(".activity-row").length,
+      })),
+    );
+  }
+  await changeHistoryRows("Home");
+  await expect(page.locator(".desktop-ledger tbody tr")).toHaveCount(4);
+  await expect(
+    page.getByRole("heading", { name: "Financial requests", exact: true }),
+  ).toBeVisible();
+  await page.setViewportSize({ width: 390, height: 844 });
+  await expect(page.locator(".activity-row")).toHaveCount(4);
+  await changeHistoryRows("End");
+  await expect(page.locator(".activity-row")).toHaveCount(Math.min(historyCount, 24));
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await expect(page.locator(".desktop-ledger tbody tr")).toHaveCount(Math.min(historyCount, 24));
   await page.setViewportSize({ width: 320, height: 740 });
   await visit("/");
   await capture("dm-small");

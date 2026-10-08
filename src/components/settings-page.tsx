@@ -414,7 +414,7 @@ export function SettingsPage({ financial = false }: { financial?: boolean } = {}
                 display={READ_LABELS[Math.round(prefs.readScale)] ?? "Standard"}
               />
               <Slider
-                label="Recent transactions shown on Home"
+                label="Recent transactions in Home activity"
                 min={4}
                 max={24}
                 step={1}

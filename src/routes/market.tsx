@@ -1,8 +1,7 @@
 import { LedgerArt } from "@/components/ledger-art";
 import { PriceHistory } from "@/components/campaign-journal";
-import { toast } from "sonner";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
-import { Store, MapPin, Search, ChevronRight } from "lucide-react";
+import { MapPin, Search, ChevronRight } from "lucide-react";
 import { useMemo, useState } from "react";
 import { useEconomy } from "@/lib/quire/economy-context";
 import { CATEGORIES } from "@/lib/quire/labels";
@@ -14,7 +13,10 @@ import { PriceHarvest } from "@/components/price-harvest";
 import { ShopComposer } from "@/components/shop-composer";
 import { MarketBoard } from "@/components/market-board";
 import { EmptyState } from "@/components/terminal";
-import { Button, Fold } from "@/components/ui";
+import { mutationNotice } from "@/lib/quire/mutation-outcome";
+import { useDraftGuard } from "@/lib/quire/use-draft-guard";
+import { AppLink } from "@/components/app-link";
+import { Button, Fold, Modal } from "@/components/ui";
 import type { ShopCategory } from "@/lib/quire/types";
 
 export const Route = createFileRoute("/market")({
@@ -27,12 +29,20 @@ export const Route = createFileRoute("/market")({
 function MarketPage() {
   const { book } = Route.useSearch();
   const navigate = useNavigate();
-  const { ready, shops, stock, realm, createShop, updateShop, command } = useEconomy();
+  const { ready, shops, stock, realm, createShop, updateShop, commandOutcome } = useEconomy();
   const { prefs } = usePrefs();
   const seat = useSeat();
   const [location, setLocation] = useState("");
   const [category, setCategory] = useState("");
   const [query, setQuery] = useState("");
+  const [restockId, setRestockId] = useState(""),
+    [restockQuantity, setRestockQuantity] = useState("5"),
+    [restockBusy, setRestockBusy] = useState(false),
+    [restockError, setRestockError] = useState(""),
+    [restockNotice, setRestockNotice] = useState("");
+  useDraftGuard(!!restockId && restockQuantity !== "5", "manual restock");
+  const restockShop = shops.find((s) => s.id === restockId),
+    addedUnits = Number(restockQuantity);
   const [stocked, setStocked] = useState<"all" | "open" | "empty">("all");
   const shown =
     seat.role === "player" ? shops.filter((shop) => seat.shopIds.includes(shop.id)) : shops;
@@ -206,23 +216,26 @@ function MarketPage() {
                   <button
                     className="quick-action"
                     onClick={() => {
-                      const value = window.prompt(
-                        "Add how many units to each finite stock line? Existing prices, custom stock and unlimited quantities are preserved.",
-                        "5",
-                      );
-                      if (value !== null)
-                        void command({
-                          kind: "restock",
-                          shopId: shop.id,
-                          quantity: Number(value),
-                        }).catch((e) => toast.error(e.message));
+                      setRestockId(shop.id);
+                      setRestockQuantity("5");
+                      setRestockError("");
+                      setRestockNotice("");
                     }}
                   >
                     Restock
                   </button>
                   <button
                     className="quick-action"
-                    onClick={() => void updateShop({ ...shop, closed: !shop.closed })}
+                    onClick={() => {
+                      if (
+                        shop.schedule &&
+                        !window.confirm(
+                          "Manually changing availability disables this shop’s schedule. Continue?",
+                        )
+                      )
+                        return;
+                      void updateShop({ ...shop, closed: !shop.closed });
+                    }}
                   >
                     {shop.closed ? "Open" : "Close"}
                   </button>
@@ -255,6 +268,77 @@ function MarketPage() {
           <ShopComposer />
         </Fold>
       ) : null}
+      {restockNotice && <p role="status">{restockNotice}</p>}
+      <Modal
+        open={!!restockId}
+        title={`Restock ${restockShop?.name || "shop"}`}
+        onOpenChange={(open) => {
+          if (!open) {
+            if (restockQuantity !== "5" && !window.confirm("Discard unsaved restock amount?"))
+              return;
+            setRestockId("");
+          }
+        }}
+      >
+        <p>
+          Manual restock adds units to every finite stock line. Existing prices, custom stock,
+          surplus and unlimited stock are preserved. Scheduled restock separately tops up to a
+          target.
+        </p>
+        <label>
+          Add units to each finite stock line
+          <input
+            type="number"
+            min="1"
+            max="100000"
+            step="1"
+            required
+            value={restockQuantity}
+            onChange={(e) => setRestockQuantity(e.target.value)}
+          />
+        </label>
+        <details open>
+          <summary>Manual add-units preview</summary>
+          {stock
+            .filter((s) => s.shopId === restockId)
+            .map((s) => (
+              <p key={s.id}>
+                {s.name}:{" "}
+                {s.quantity === null
+                  ? "Unlimited; unchanged"
+                  : `${s.quantity} → ${s.quantity + (Number.isSafeInteger(addedUnits) && addedUnits >= 1 ? addedUnits : 0)}`}
+              </p>
+            ))}
+        </details>
+        {restockError && <p role="alert">{restockError}</p>}
+        <Button
+          disabled={
+            restockBusy || !restockShop || !Number.isSafeInteger(addedUnits) || addedUnits < 1
+          }
+          onClick={async () => {
+            setRestockBusy(true);
+            setRestockError("");
+            try {
+              const result = await commandOutcome({
+                kind: "restock",
+                shopId: restockId,
+                quantity: addedUnits,
+              });
+              setRestockNotice(mutationNotice(result, "Manual restock recorded."));
+              setRestockId("");
+            } catch (e) {
+              setRestockError(
+                e instanceof Error ? e.message : "Restock failed. Your amount is retained.",
+              );
+            } finally {
+              setRestockBusy(false);
+            }
+          }}
+        >
+          Add units & restock
+        </Button>
+        <AppLink href="/features/shops">Review scheduled top-up settings</AppLink>
+      </Modal>
       <PriceHistory />
       <MarketBoard />
       {seat.role === "dm" ? <PriceHarvest bookId={book} /> : null}

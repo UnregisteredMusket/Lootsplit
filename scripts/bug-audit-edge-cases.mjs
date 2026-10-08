@@ -119,7 +119,7 @@ try {
     actual: r,
   });
   await p.getByRole("button", { name: "Play sheet", exact: true }).click();
-  await p.getByRole("button", { name: "Skills", exact: true }).click();
+  await p.getByRole("tab", { name: "Skills", exact: true }).click();
   await p.screenshot({ path: output + "/legacy-sheet.png", fullPage: true });
   await p.context().close();
   const q = await fresh();

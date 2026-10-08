@@ -1,5 +1,6 @@
 import { openApplication, reloadApplication } from "./title-screen-navigation.mjs";
 import { chromium } from "playwright";
+import { expect } from "playwright/test";
 import assert from "node:assert/strict";
 import { mkdir } from "node:fs/promises";
 import { localAccountDb } from "./account-dev-db.mjs";
@@ -75,7 +76,21 @@ try {
     if (option)
       await owner.page.getByLabel(option.label, { exact: true }).selectOption(option.value);
     await owner.page.getByLabel("Moderation reason", { exact: true }).fill(reason);
-    owner.page.once("dialog", (d) => d.accept());
+    await expect(owner.page.locator(".staff-action-preview")).toContainText(
+      "Before you apply this action",
+    );
+    const expected = {
+      warn: "Issue a warning",
+      ban: "All account sessions end",
+      restore: "Closed rooms and dismissed character assignments",
+      role: "Campaign DM/player assignments are separate",
+    }[kind];
+    await expect(owner.page.locator(".staff-action-preview")).toContainText(expected);
+    owner.page.once("dialog", async (d) => {
+      assert.match(d.message(), /recorded in the moderation log/);
+      assert.ok(d.message().includes(expected));
+      await d.accept();
+    });
     await owner.page.getByRole("button", { name: "Apply member action" }).click();
     await owner.page.getByText("Member action saved.", { exact: true }).waitFor();
   }

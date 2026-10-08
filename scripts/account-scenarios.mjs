@@ -1,5 +1,6 @@
 // Keep this list and the named Playwright tests in sync. CI always runs all of them.
 export const accountScenarios = [
+  "ownership",
   "layout",
   "library",
   "dm-resume",
@@ -8,20 +9,13 @@ export const accountScenarios = [
   "portrait-resume",
   "campaign-choice",
   "invitations",
-  "ownership",
   "shared-recovery",
 ];
 
 export function selectAccountScenario(args, ci = process.env.CI) {
   if (!args.length) return null;
-  if (
-    args.length !== 2 ||
-    args[0] !== "--scenario" ||
-    !accountScenarios.includes(args[1])
-  )
-    throw new Error(
-      `Use --scenario ${accountScenarios.join("|")}; omit it for the full audit.`,
-    );
+  if (args.length !== 2 || args[0] !== "--scenario" || !accountScenarios.includes(args[1]))
+    throw new Error(`Use --scenario ${accountScenarios.join("|")}; omit it for the full audit.`);
   if (ci) throw new Error("CI release audits must run every account scenario.");
   return args[1];
 }
@@ -38,9 +32,7 @@ export function localAuditOrigin(value) {
     url.search ||
     url.hash
   )
-    throw new Error(
-      "Account audits require a disposable local HTTP server with an explicit port.",
-    );
+    throw new Error("Account audits require a disposable local HTTP server with an explicit port.");
   return url.origin;
 }
 

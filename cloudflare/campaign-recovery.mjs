@@ -281,6 +281,20 @@ export async function restoreDeletedCampaign(db, userId, body, actor) {
   const receiptIds = new Map(
     recovery.encounterAwards.map((a) => [a.receipt_id, crypto.randomUUID()]),
   );
+  const sourceAwards = new Map(recovery.encounterAwards.map((a) => [a.encounter_id, a]));
+  // Only active references to an exact restored award move with its rotated IDs.
+  // Historical archive strings, note identity/text and unmatched references stay intact.
+  for (const entry of table.journal?.entries || []) {
+    const provenance = entry.provenance;
+    if (provenance?.kind !== "encounter-loot") continue;
+    const sourceAward = sourceAwards.get(provenance.encounterId);
+    if (sourceAward?.receipt_id !== provenance.receiptId) continue;
+    entry.provenance = {
+      ...provenance,
+      encounterId: encounterIds.get(sourceAward.encounter_id),
+      receiptId: receiptIds.get(sourceAward.receipt_id),
+    };
+  }
   const committed = "EXISTS(SELECT 1 FROM campaign_recoveries WHERE id=? AND user_id=?)";
   const statements = [
     db

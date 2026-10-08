@@ -15,8 +15,12 @@ import {
 } from "@/lib/quire/cloud-client";
 import { Button, Confirm } from "./ui";
 import { toast } from "sonner";
+import { roomStatusLabels } from "@/lib/quire/room-state";
+import { getOnline, subscribeOnline } from "@/lib/mobile/online";
 export function SyncStatus({ compact = false }: { compact?: boolean }) {
   const state = useSyncExternalStore(subscribeCloudTable, getCloudTable, getServerCloudTable);
+  const online = useSyncExternalStore(subscribeOnline, getOnline, () => true);
+  const labels = roomStatusLabels(state, { online });
   const [discard, setDiscard] = useState(false);
   const [disconnect, setDisconnect] = useState(false);
   const [discardRecovery, setDiscardRecovery] = useState<string | null>(null);
@@ -66,15 +70,10 @@ export function SyncStatus({ compact = false }: { compact?: boolean }) {
       ) : null}
       {state.joined ? (
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <span>
-            {state.live ? "Live" : state.mine ? "Your turn" : `Waiting for ${state.who}`} ·{" "}
-            {state.status === "saving"
-              ? "Saving…"
-              : state.status === "attention"
-                ? "Needs attention"
-                : state.pending
-                  ? `${state.pending} ${state.live ? "unsynced Live change" : "unfinished turn action"}${state.pending === 1 ? "" : "s"}`
-                  : "Synced"}
+          <span role="status">
+            {[labels.mode, labels.room, labels.play, labels.turn, labels.save]
+              .filter(Boolean)
+              .join(" · ")}
           </span>
           <Link to="/share" className="underline">
             Multiplayer

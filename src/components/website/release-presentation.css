@@ -1,0 +1,54 @@
+.ls-about dl {
+  display: grid;
+  gap: 18px;
+  margin: 0 0 20px;
+}
+.ls-about dt {
+  color: #f3ecdc;
+  font-weight: 600;
+}
+.ls-about dd {
+  margin: 4px 0 0;
+  overflow-wrap: anywhere;
+}
+.ls-about button {
+  min-height: 44px;
+  padding: 8px 12px;
+  color: inherit;
+  text-decoration: underline;
+}
+.ls-spending-total {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  max-width: 360px;
+  color: #c4c9c9;
+  font-size: 14px;
+}
+.ls-spending-total > svg {
+  margin-top: 3px;
+  flex-shrink: 0;
+}
+.ls-spending-total small {
+  display: block;
+  font-size: 0.8em;
+}
+.ls-spending-total details {
+  margin-top: 5px;
+}
+.ls-spending-total summary {
+  cursor: pointer;
+  min-height: 44px;
+  display: list-item;
+  align-content: center;
+  color: #e0cc9f;
+}
+.ls-spending-total p {
+  margin: 8px 0;
+}
+.ls-spending-total summary:focus-visible,
+.ls-about summary:focus-visible,
+.ls-about button:focus-visible {
+  outline: 2px solid #dfbb78;
+  outline-offset: 3px;
+}

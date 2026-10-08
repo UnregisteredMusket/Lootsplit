@@ -17,7 +17,7 @@ import {
 } from "./finance.ts";
 import { assertMerchantSale, isService, stockCategory } from "./merchant.ts";
 import { archiveSession } from "./session-records.ts";
-import { readJournal, preserveJournalMetadata } from "./journal.ts";
+import { readJournal, preserveJournalMetadata, encounterLootProvenanceSchema, encounterLootEntryId } from "./journal.ts";
 import { z } from "zod";
 import { sheetSchema } from "../characters/model.mjs";
 import {
@@ -75,6 +75,7 @@ export const commandSchema = z.discriminatedUnion("kind", [
     visibility: z.enum(["dm", "party", "player"]),
     purseId: z.string(),
     reportIds: z.array(id).default([]),
+    provenance: encounterLootProvenanceSchema.optional(),
   }),
   z.object({ ...base, kind: z.literal("character-editing"), purseId: id, allowed: z.boolean() }),
   z.object({
@@ -428,14 +429,30 @@ export function applyCommand(input: CloudTable, seat: CloudSeat, raw: Command): 
     d.status = "cancelled";
     event("Cancelled pending downtime; no funds moved");
   } else if (cmd.kind === "journal-note") {
-    if (cmd.visibility === "dm") dm();
+    if (cmd.provenance || cmd.visibility === "dm") dm();
     if (seat.role !== "dm" || cmd.visibility === "player") {
       const p = own(cmd.purseId);
       if (p.kind !== "character") throw Error("Choose your character.");
     }
     if (cmd.reportIds.some((id) => !journal.reports?.some((r) => r.id === id)))
       throw Error("Session report not found.");
-    (journal.entries ??= []).push({ ...cmd, at, authorId: seat.id });
+    if (cmd.provenance) {
+      dm();
+      if (cmd.visibility !== "party" || cmd.purseId || cmd.reportIds.length)
+        throw Error("A loot summary must be a party journal entry without private attachments.");
+      if (cmd.provenance.sessionId && !journal.sessions.some(session => session.id === cmd.provenance!.sessionId))
+        throw Error("Choose an existing campaign session for this loot summary.");
+      const existing = journal.entries?.find(entry => entry.provenance?.receiptId === cmd.provenance!.receiptId);
+      if (existing) {
+        if (existing.provenance?.encounterId !== cmd.provenance.encounterId)
+          throw Error("This award receipt already belongs to another encounter summary.");
+        return t;
+      }
+      const entryId = encounterLootEntryId(cmd.provenance.receiptId);
+      if (journal.entries?.some(entry => entry.id === entryId))
+        throw Error("This journal entry identity already exists.");
+      (journal.entries ??= []).push({ ...cmd, id: entryId, at, authorId: seat.id });
+    } else (journal.entries ??= []).push({ ...cmd, at, authorId: seat.id });
   } else if (cmd.kind === "character-permission") {
     dm();
     const p = own(cmd.purseId);

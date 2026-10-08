@@ -3,6 +3,16 @@ import { useEffect, useState, useSyncExternalStore } from "react";
 import { toast } from "sonner";
 import { useSeat } from "@/lib/quire/seat";
 import { PasswordGate } from "@/components/password-gate";
+import {
+  DeviceBackupPreview,
+  type DeviceBackupOperation,
+} from "@/components/device-backup-preview";
+import {
+  accountBackupSummary,
+  assertBackupPreviewContext,
+  type AccountBackupSummary,
+} from "@/lib/account/backup-presentation";
+import { useDraftGuard } from "@/lib/quire/use-draft-guard";
 import { Button, Confirm, Fold, TextInput } from "@/components/ui";
 import { getCampaigns, serverCampaigns, subscribeCampaigns } from "@/lib/quire/campaigns";
 import { readQuireFile, type QuireFile } from "@/lib/quire/economy";
@@ -30,8 +40,18 @@ import {
 type Ask =
   | { kind: "save"; download?: boolean }
   | { kind: "load"; save: LocalSave }
+  | { kind: "preview"; save: LocalSave }
   | { kind: "export"; save: LocalSave }
   | { kind: "import"; name: string; value: unknown };
+
+type ReviewedBackup = {
+  operation: DeviceBackupOperation;
+  name: string;
+  campaignName: string;
+  encrypted: boolean;
+  summary: AccountBackupSummary;
+  commit: () => Promise<void>;
+};
 
 export function SaveFolder() {
   const { restoreFile } = useEconomy();
@@ -45,12 +65,19 @@ export function SaveFolder() {
   );
   const campaign = campaigns.find((row) => row.id === activeId) ?? campaigns[0];
   const [name, setName] = useState("");
-  const [restoreChoice, setRestoreChoice] = useState<Ask | null>(null);
+  const [reviewed, setReviewed] = useState<ReviewedBackup | null>(null);
   const [saves, setSaves] = useState<LocalSave[]>([]);
   const [lock, setLock] = useState<SeatLock | null>(null);
   const [busy, setBusy] = useState(false);
   const [removing, setRemoving] = useState<LocalSave | null>(null);
   const [ask, setAsk] = useState<Ask | null>(null);
+  useDraftGuard(!!name || !!reviewed || !!ask, "device backup");
+
+  useEffect(() => {
+    setAsk(null);
+    setReviewed(null);
+    setName("");
+  }, [activeId]);
 
   useEffect(() => {
     if (!campaign) return;
@@ -109,8 +136,58 @@ export function SaveFolder() {
     return rememberSave({ name: payloadName, campaignId: campaign.id, file: payload });
   }
 
+  async function reviewBackup(
+    next: Extract<Ask, { kind: "load" | "import" | "preview" }>,
+    password: string | null,
+    gate: SeatLock | null,
+    backupPassword?: string,
+  ) {
+    const campaignId = campaign.id;
+    await requirePassword(gate, password);
+    const source = next.kind === "import" ? next.value : next.save.file;
+    const file = await plainFrom(source, backupPassword ?? password);
+    const summary = accountBackupSummary(file);
+    const payloadName = next.kind === "import" ? next.name : next.save.name;
+    // Import encryption is prepared in memory so no password needs to be retained in its preview.
+    const importPayload =
+      next.kind === "import" && gate?.protectSaves && password
+        ? await lockFile(file, password, gate.salt)
+        : file;
+    const currentGate = await loadSeatLock();
+    assertBackupPreviewContext(
+      { campaignId, gate },
+      { campaignId: getCampaigns().activeId, gate: currentGate },
+    );
+    setReviewed({
+      operation: next.kind,
+      name: payloadName,
+      campaignName: campaign.name,
+      encrypted: isLockedFile(source),
+      summary,
+      commit: async () => {
+        const latestGate = await loadSeatLock();
+        assertBackupPreviewContext(
+          { campaignId, gate },
+          { campaignId: getCampaigns().activeId, gate: latestGate },
+        );
+        if (next.kind === "import") {
+          await rememberSave({ name: payloadName, campaignId, file: importPayload });
+          toast.success("Backup imported.");
+        } else if (next.kind === "load") {
+          const selected = new File(
+            [JSON.stringify(file)],
+            saveDownloadName(next.save.name, next.save.savedAt),
+            { type: "application/json" },
+          );
+          await restoreFile(selected, password ?? undefined);
+          await reload();
+        }
+      },
+    });
+  }
+
   async function finish(
-    next: Ask,
+    next: Extract<Ask, { kind: "save" | "export" }>,
     password: string | null,
     gate: SeatLock | null,
     backupPassword?: string,
@@ -136,27 +213,7 @@ export function SaveFolder() {
       );
       return;
     }
-    if (next.kind === "import") {
-      await storePayload(
-        gate,
-        next.name,
-        await plainFrom(next.value, backupPassword ?? password),
-        password,
-      );
-      toast.success("Backup imported.");
-      return;
-    }
     const plain = await plainFrom(next.save.file, backupPassword ?? password);
-    if (next.kind === "load") {
-      const file = new File(
-        [JSON.stringify(plain)],
-        saveDownloadName(next.save.name, next.save.savedAt),
-        { type: "application/json" },
-      );
-      await restoreFile(file, password ?? undefined);
-      await reload();
-      return;
-    }
     const download =
       gate?.protectSaves && password ? await lockFile(plain, password, gate.salt) : plain;
     const saved = await downloadJson(saveDownloadName(next.save.name, next.save.savedAt), download);
@@ -167,14 +224,11 @@ export function SaveFolder() {
     else toast.info("Export cancelled. Your device backup is still available.");
   }
 
-  function start(next: Ask, confirmed = false) {
-    if (next.kind === "load" && !confirmed) {
-      setRestoreChoice(next);
-      return;
-    }
+  function start(next: Ask) {
+    if (busy || ask || reviewed) return;
     setBusy(true);
     void (async () => {
-      if (next.kind === "load" || next.kind === "export") {
+      if (next.kind === "load" || next.kind === "export" || next.kind === "preview") {
         const saveId = next.save.id;
         const current = (await listSaves(seat.role === "dm" ? undefined : campaign.id)).find(
           (row) => row.id === saveId,
@@ -185,7 +239,7 @@ export function SaveFolder() {
       const gate = await loadSeatLock();
       setLock(gate);
       const secret =
-        next.kind === "load" || next.kind === "export"
+        next.kind === "load" || next.kind === "export" || next.kind === "preview"
           ? next.save.file
           : next.kind === "import"
             ? next.value
@@ -194,8 +248,12 @@ export function SaveFolder() {
         setAsk(next);
         return;
       }
-      await finish(next, null, gate);
-      await refresh();
+      if (next.kind === "load" || next.kind === "import" || next.kind === "preview") {
+        await reviewBackup(next, null, gate);
+      } else {
+        await finish(next, null, gate);
+        await refresh();
+      }
     })()
       .catch((error) =>
         toast.error(error instanceof Error ? error.message : "That save could not be used."),
@@ -205,20 +263,37 @@ export function SaveFolder() {
 
   return (
     <Fold title="Device backups" hint="Save on this device or download a backup file." defaultOpen>
-      <Confirm
-        open={restoreChoice !== null}
-        onOpenChange={(open) => {
-          if (!open) setRestoreChoice(null);
-        }}
-        title="Replace the current campaign?"
-        body="Loading this backup replaces the current campaign. Export a backup first if you need to keep your latest changes."
-        confirmLabel="Load backup"
-        onConfirm={() => {
-          const choice = restoreChoice;
-          setRestoreChoice(null);
-          if (choice) start(choice, true);
-        }}
-      />
+      {reviewed && (
+        <DeviceBackupPreview
+          open
+          operation={reviewed.operation}
+          name={reviewed.name}
+          campaignName={reviewed.campaignName}
+          encrypted={reviewed.encrypted}
+          summary={reviewed.summary}
+          busy={busy}
+          onOpenChange={(open) => {
+            if (!open && !busy) setReviewed(null);
+          }}
+          onConfirm={() => {
+            const current = reviewed;
+            if (busy) return;
+            setBusy(true);
+            void current
+              .commit()
+              .then(() => refresh())
+              .catch((error) =>
+                toast.error(
+                  error instanceof Error ? error.message : "That backup could not be applied.",
+                ),
+              )
+              .finally(() => {
+                setBusy(false);
+                setReviewed(null);
+              });
+          }}
+        />
+      )}
       <p className="text-sm text-muted">
         Save stores a named backup on this device. Export downloads it. Import adds a backup file to
         this list. Load replaces the current campaign with the selected backup. Download backup
@@ -280,7 +355,7 @@ export function SaveFolder() {
               onChange={(event) => {
                 const next = event.target.files?.[0];
                 event.target.value = "";
-                if (!next || busy) return;
+                if (!next || busy || ask || reviewed) return;
                 setBusy(true);
                 void next
                   .text()
@@ -292,12 +367,11 @@ export function SaveFolder() {
                       setAsk({ kind: "import", name: nameFromImport(next.name), value });
                       return;
                     }
-                    await finish(
+                    await reviewBackup(
                       { kind: "import", name: nameFromImport(next.name), value },
                       null,
                       gate,
                     );
-                    await refresh();
                   })
                   .catch((error) =>
                     toast.error(
@@ -333,12 +407,23 @@ export function SaveFolder() {
             <div className="mt-2 flex flex-wrap gap-2">
               <Button
                 variant="secondary"
+                disabled={busy}
+                onClick={() => start({ kind: "preview", save })}
+              >
+                Preview contents
+              </Button>
+              <Button
+                variant="secondary"
                 disabled={busy || shared.joined || seat.role === "player"}
                 onClick={() => start({ kind: "load", save })}
               >
                 Load
               </Button>
-              <Button variant="secondary" onClick={() => start({ kind: "export", save })}>
+              <Button
+                variant="secondary"
+                disabled={busy}
+                onClick={() => start({ kind: "export", save })}
+              >
                 Export
               </Button>
               <Button variant="ghost" onClick={() => setRemoving(save)}>
@@ -356,16 +441,18 @@ export function SaveFolder() {
         title={
           ask?.kind === "load"
             ? "Load this save?"
-            : ask?.kind === "export"
-              ? "Export this save?"
-              : ask?.kind === "import"
-                ? "Import this file?"
-                : "Save this campaign?"
+            : ask?.kind === "preview"
+              ? "Preview this save?"
+              : ask?.kind === "export"
+                ? "Export this save?"
+                : ask?.kind === "import"
+                  ? "Import this file?"
+                  : "Save this campaign?"
         }
         showBackupPassword={
           ask?.kind === "import"
             ? isLockedFile(ask.value)
-            : ask?.kind === "load" || ask?.kind === "export"
+            : ask?.kind === "load" || ask?.kind === "export" || ask?.kind === "preview"
               ? isLockedFile(ask.save.file)
               : false
         }
@@ -373,8 +460,13 @@ export function SaveFolder() {
         onSubmit={async (password, backupPassword) => {
           const next = ask;
           if (!next) return;
-          await finish(next, password, await loadSeatLock(), backupPassword);
-          await refresh();
+          const gate = await loadSeatLock();
+          if (next.kind === "load" || next.kind === "import" || next.kind === "preview") {
+            await reviewBackup(next, password, gate, backupPassword);
+          } else {
+            await finish(next, password, gate, backupPassword);
+            await refresh();
+          }
         }}
       />
       <Confirm

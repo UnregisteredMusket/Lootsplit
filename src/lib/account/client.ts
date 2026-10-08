@@ -62,6 +62,9 @@ export type AccountLibrary = {
   members: {
     role: "dm" | "player" | null;
     closed: boolean;
+    /** Derived room metadata; absent on older servers/clients. */
+    viewOnly?: boolean;
+    live?: boolean;
     room_revision: number | null;
     code: string;
     seat_id: string;

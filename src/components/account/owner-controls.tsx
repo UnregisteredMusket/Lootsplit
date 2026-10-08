@@ -1,5 +1,7 @@
 import { useEffect, useState, type FormEvent } from "react";
 import { accountRequest } from "@/lib/account/client";
+import { useDraftGuard } from "@/lib/quire/use-draft-guard";
+import { OwnerAnalytics } from "./owner-analytics";
 
 type OwnerData = {
   stats: {
@@ -27,6 +29,12 @@ export function OwnerControls() {
   const [error, setError] = useState("");
   const [notice, setNotice] = useState("");
   const [busy, setBusy] = useState(false);
+  const dirty =
+    !!data &&
+    (title !== data.settings.title ||
+      message !== data.settings.message ||
+      donationUrl !== data.settings.donation_url);
+  useDraftGuard(dirty, "owner announcement or donation link");
   async function load() {
     const next = await accountRequest<OwnerData>("owner");
     setData(next);
@@ -75,6 +83,9 @@ export function OwnerControls() {
           updated_at: Date.now(),
         },
       });
+      // Match the server's normalized fields so a successful save is no longer dirty.
+      setTitle(title.trim());
+      setMessage(message.trim());
       setNotice(
         published
           ? "Announcement published on the homepage."
@@ -144,6 +155,13 @@ export function OwnerControls() {
         className="portal-button secondary"
         disabled={busy}
         onClick={() => {
+          if (
+            dirty &&
+            !window.confirm(
+              "Discard unsaved owner announcement or donation link changes and reload the owner panel?",
+            )
+          )
+            return;
           setError("");
           setBusy(true);
           void load()
@@ -171,6 +189,7 @@ export function OwnerControls() {
               </div>
             ))}
           </dl>
+          <OwnerAnalytics />
           <form onSubmit={saveDonation} className="owner-form">
             <h3>Donations</h3>
             <p>

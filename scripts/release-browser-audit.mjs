@@ -100,7 +100,7 @@ try {
   assert.ok((await invitation.innerText()).includes("TEST1234"));
   await invitation.getByRole("button", { name: "Stay in this room", exact: true }).click();
   assert.equal(new URL(player.url()).searchParams.has("join"), false);
-  await player.getByRole("status").filter({ hasText: "Connected · All changes saved" }).waitFor();
+  await player.getByRole("status").filter({ hasText: /Room online.*Play active.*Saved to room/ }).waitFor();
   console.log("Audit: interrupt purchase and restore queue");
   // Interrupt only API transport so the app and saved queue can reload normally.
   let interruptCommands = true;

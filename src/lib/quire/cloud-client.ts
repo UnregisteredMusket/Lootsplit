@@ -1,3 +1,5 @@
+import type { EconomyMutationOutcome } from "./mutation-outcome.ts";
+import { captureDeviceMutationScope, type DeviceMutationScope } from "./mutation-scope.ts";
 import { emptyCloudTable } from "./cloud.ts";
 import { reloadCampaignContext } from "./navigation-launch.ts";
 import { rememberSave } from "./saves.ts";
@@ -32,8 +34,12 @@ import { closeQuireDb } from "./db.ts";
 import { reconcileAccountResume } from "./account-resume.ts";
 import { sameCommand } from "./command-identity.ts";
 import {
-  rememberRevokedRecovery, revokedRecoverySummaries, revokedRecoveryCopy,
-  discardRevokedRecovery, hasRevokedMemoryWork, legacyRecoveryCount,
+  rememberRevokedRecovery,
+  revokedRecoverySummaries,
+  revokedRecoveryCopy,
+  discardRevokedRecovery,
+  hasRevokedMemoryWork,
+  legacyRecoveryCount,
 } from "./revoked-recovery.ts";
 let playerSession: Session | null = null;
 const PLAYER_TICKET = "lootsplit.player.reconnect.v1";
@@ -41,6 +47,7 @@ type Session = {
   /** Account owning this seat, captured before queuing work, not on revocation. */
   userId?: string;
   code: string;
+  sessionId?: string;
   token: string;
   seatId: string;
   role: "dm" | "player";
@@ -83,9 +90,7 @@ let polling = false;
 let pollGeneration = 0;
 let pollFailures = 0;
 let chain: Promise<unknown> = Promise.resolve();
-export async function requestCampaignRoll(body: {
-  purseId: string;
-  [key: string]: unknown }) {
+export async function requestCampaignRoll(body: { purseId: string; [key: string]: unknown }) {
   const s = requireSession();
   if (
     !body.policy &&
@@ -106,9 +111,7 @@ function session(): Session | null {
   try {
     if (isEphemeralCampaign()) {
       if (!playerSession) {
-        const ticket = JSON.parse(
-          sessionStorage.getItem(PLAYER_TICKET) || "null",
-        );
+        const ticket = JSON.parse(sessionStorage.getItem(PLAYER_TICKET) || "null");
         if (ticket?.token && ticket?.code && ticket.role === "player")
           playerSession = {
             ...ticket,
@@ -121,9 +124,7 @@ function session(): Session | null {
     }
     let saved = JSON.parse(localStorage.getItem(key()) || "null");
     if (!saved && typeof sessionStorage !== "undefined") {
-      const old = JSON.parse(
-        sessionStorage.getItem("quire.cloud.v1") || "null",
-      );
+      const old = JSON.parse(sessionStorage.getItem("quire.cloud.v1") || "null");
       if (old?.token && old?.code) {
         saved = {
           ...old,
@@ -145,7 +146,10 @@ function session(): Session | null {
     // Legacy owned DM caches inherit the saved campaign owner, never whichever
     // account happens to sign in when a request is later rejected.
     if (saved.role === "dm" && !saved.userId)
-      saved.userId = localStorage.getItem(`quire.owner.${localStorage.getItem("quire.campaign.v1") || "main"}`) || undefined;
+      saved.userId =
+        localStorage.getItem(
+          `quire.owner.${localStorage.getItem("quire.campaign.v1") || "main"}`,
+        ) || undefined;
     return saved;
   } catch {
     return null;
@@ -158,6 +162,7 @@ function remember(s: Session) {
       PLAYER_TICKET,
       JSON.stringify({
         code: s.code,
+        sessionId: s.sessionId,
         token: s.token,
         seatId: s.seatId,
         role: s.role,
@@ -169,6 +174,52 @@ function remember(s: Session) {
   }
   localStorage.setItem(key(), JSON.stringify(s));
 }
+export type MutationScope = DeviceMutationScope &
+  Readonly<{ code: string; seatId: string; sessionId: string }>;
+export type ExpectedMutationScope = Pick<MutationScope, "campaignId" | "code"> &
+  Partial<Omit<MutationScope, "campaignId" | "code">>;
+// Credential identity remains internal and is never placed in requests or diagnostics.
+const mutationCredentials = new WeakMap<object, string | undefined>();
+export function captureMutationScope(): MutationScope {
+  const current = session();
+  const scope = Object.freeze({
+    ...captureDeviceMutationScope(),
+    code: current?.code || "device",
+    seatId: current?.seatId || "",
+    sessionId: current?.sessionId || "",
+  });
+  mutationCredentials.set(scope, current?.token);
+  return scope;
+}
+export function assertMutationScope(expected: ExpectedMutationScope): void {
+  const actual = captureMutationScope();
+  for (const key of [
+    "campaignId",
+    "databaseName",
+    "accountId",
+    "ephemeral",
+    "code",
+    "seatId",
+    "sessionId",
+  ] as const) {
+    if (
+      expected[key] !== undefined &&
+      !(key === "sessionId" && expected[key] === "") &&
+      actual[key] !== expected[key]
+    )
+      throw Error(
+        "The campaign or seat changed before this action could finish. Your draft is retained; reopen its original campaign before trying again.",
+      );
+  }
+  if (
+    mutationCredentials.has(expected) &&
+    mutationCredentials.get(actual) !== mutationCredentials.get(expected)
+  )
+    throw Error(
+      "The campaign session changed before this action could finish. Your draft is retained; review the current session before trying again.",
+    );
+}
+
 function requireSession() {
   const s = session();
   if (!s) throw new Error("Join a campaign first.");
@@ -177,17 +228,11 @@ function requireSession() {
 function serial<T>(fn: () => Promise<T>): Promise<T> {
   const locked = async (): Promise<T> =>
     typeof navigator !== "undefined" && navigator.locks
-      ? navigator.locks.request(
-          key() + ".write",
-          { ifAvailable: true },
-          (lock) => {
-            if (!lock)
-              throw new Error(
-                "Another Lootsplit tab is synchronizing. Try again in a moment.",
-              );
-            return fn();
-          },
-        )
+      ? navigator.locks.request(key() + ".write", { ifAvailable: true }, (lock) => {
+          if (!lock)
+            throw new Error("Another Lootsplit tab is synchronizing. Try again in a moment.");
+          return fn();
+        })
       : fn();
   const next = chain.then(locked, locked);
   chain = next.catch(() => undefined);
@@ -218,8 +263,12 @@ function publish(next: Partial<typeof view>, dataChanged = true) {
 export function getCloudTable() {
   // Owner changes can occur while no room is connected. Keep the external-store
   // snapshot stable except when the authorized recovery list actually changes.
-  const recoveries = revokedRecoverySummaries(), unverifiedRecoveries = legacyRecoveryCount();
-  if (JSON.stringify(recoveries) !== JSON.stringify(view.recoveries) || unverifiedRecoveries !== view.unverifiedRecoveries)
+  const recoveries = revokedRecoverySummaries(),
+    unverifiedRecoveries = legacyRecoveryCount();
+  if (
+    JSON.stringify(recoveries) !== JSON.stringify(view.recoveries) ||
+    unverifiedRecoveries !== view.unverifiedRecoveries
+  )
     view = { ...view, recoveries, unverifiedRecoveries };
   return view;
 }
@@ -294,10 +343,13 @@ function start() {
 async function accept(remote: RoomView, committed = false) {
   const s = requireSession();
   if (remote.userId && s.userId && remote.userId !== s.userId)
-    throw Error("This seat now belongs to a different account. Export your original pending work before switching.");
+    throw Error(
+      "This seat now belongs to a different account. Export your original pending work before switching.",
+    );
   if (remote.userId) s.userId = remote.userId;
+  s.sessionId = remote.sessionId;
   const acknowledged = new Set(remote.acknowledged);
-  const acknowledgedLocal = s.pending.some(c => acknowledged.has(c.id));
+  const acknowledgedLocal = s.pending.some((c) => acknowledged.has(c.id));
   s.pending = s.pending.filter((c) => !acknowledged.has(c.id));
   if (committed || acknowledgedLocal) {
     if (committed) s.pending = [];
@@ -460,9 +512,7 @@ export async function joinTable(
 ) {
   return serial(async () => {
     if (hasPendingChanges())
-      throw new Error(
-        "Resolve pending changes before joining another campaign.",
-      );
+      throw new Error("Resolve pending changes before joining another campaign.");
     if (!isEphemeralCampaign() && !(await loadSeatLock())?.protectSaves) {
       await rememberSave({
         name: `Before joining room ${code.trim().toUpperCase()}`,
@@ -573,15 +623,22 @@ export function discardPending() {
     await accept(remote, true);
   });
 }
-export async function queueCommand(input: CommandInput) {
+export async function queueCommand(
+  input: CommandInput,
+  expected?: ExpectedMutationScope,
+): Promise<EconomyMutationOutcome> {
+  const invoked = captureMutationScope();
+  const guard = () => {
+    assertMutationScope(invoked);
+    if (expected) assertMutationScope(expected);
+  };
   return serial(async () => {
+    guard();
     const s = requireSession();
     if (view.viewOnly && s.role === "player")
       throw Error("The session has ended. This room is view-only until the DM resumes play.");
-    if (input.kind !== "message" && !view.mine)
-      throw new Error(`It is ${view.who}'s turn.`);
-    if (s.pending.length >= 100)
-      throw new Error("Submit your pending actions before adding more.");
+    if (input.kind !== "message" && !view.mine) throw new Error(`It is ${view.who}'s turn.`);
+    if (s.pending.length >= 100) throw new Error("Submit your pending actions before adding more.");
     const command = commandSchema.parse({ ...input, id: crypto.randomUUID() });
     if (input.kind === "message") {
       // Chat is independent of transaction turns; retain a failed message in the editor.
@@ -594,11 +651,13 @@ export async function queueCommand(input: CommandInput) {
         },
       });
       await accept(remote);
-      return;
+      return { status: "committed" };
     }
     if (!s.pending.length) await refresh();
+    guard();
     const current = requireSession(),
       before = await economySnapshot();
+    guard();
     const after = applyCommand(
       before,
       {
@@ -612,54 +671,91 @@ export async function queueCommand(input: CommandInput) {
     );
     current.pending.push(command);
     remember(current);
-    await applyCloudTable(after);
     publish({ pending: current.pending.length, status: "pending", error: "" });
+    try {
+      await applyCloudTable(after, guard);
+      guard();
+    } catch (error) {
+      // This exact command is already retained for recovery. A failed local
+      // hydration must not invite the form to repeat the accepted action.
+      fail(error);
+      return { status: "pending" };
+    }
     if (view.live) {
       await flush().catch(() => undefined);
     } else await stage();
+    const latest = session();
+    return {
+      status: (latest?.code === current.code && latest.seatId === current.seatId
+        ? latest.pending
+        : current.pending
+      ).some((c) => c.id === command.id)
+        ? "pending"
+        : "committed",
+    };
   });
 }
-export function runSharedMutation(work: () => Promise<unknown>) {
+export function runSharedMutation(
+  work: () => Promise<unknown>,
+  expected?: ExpectedMutationScope,
+): Promise<EconomyMutationOutcome> {
+  const invoked = captureMutationScope();
+  const guard = () => {
+    assertMutationScope(invoked);
+    if (expected) assertMutationScope(expected);
+  };
   return serial(async () => {
+    guard();
     const s = requireSession();
     if (s.role !== "dm")
       throw new Error(
         "Only the DM can directly edit funds and inventory in shared modes. Use Buy, Sell, Give, or Request loan.",
       );
     if (!view.mine) throw new Error(`It is ${view.who}'s turn.`);
-    if (s.pending.length >= 100)
-      throw new Error("Submit your pending actions first.");
+    if (s.pending.length >= 100) throw new Error("Submit your pending actions first.");
     if (!s.pending.length) await refresh();
+    guard();
     const before = await economySnapshot();
+    guard();
     let after;
     try {
       await work();
+      guard();
       after = await economySnapshot();
+      guard();
     } catch (e) {
-      await applyCloudTable(before);
+      await applyCloudTable(before, guard);
       throw e;
     }
     const patch = tablePatch(before, after);
-    if (patch.kind !== "patch" || !patch.changes.length) return;
+    if (patch.kind !== "patch" || !patch.changes.length) return { status: "committed" };
     const current = requireSession();
-    current.pending.push(commandSchema.parse({ ...patch, id: crypto.randomUUID() }));
+    const command = commandSchema.parse({ ...patch, id: crypto.randomUUID() });
+    current.pending.push(command);
     try {
       remember(current);
     } catch (e) {
-      await applyCloudTable(before);
+      await applyCloudTable(before, guard);
       throw e;
     }
     publish({ pending: current.pending.length, status: "pending", error: "" });
     if (view.live) await flush().catch(() => undefined);
     else await stage();
+    const latest = session();
+    return {
+      status: (latest?.code === current.code && latest.seatId === current.seatId
+        ? latest.pending
+        : current.pending
+      ).some((c) => c.id === command.id)
+        ? "pending"
+        : "committed",
+    };
   });
 }
 export function chooseTableMode(mode: "local" | "turns" | "live") {
   return serial(async () => {
     if (hasPendingChanges())
-      throw new Error(
-        "Submit or export and discard pending actions before changing modes.",
-      );
+      throw new Error("Submit or export and discard pending actions before changing modes.");
     if (mode === "local") {
       const s = session();
       if (s) {
@@ -700,14 +796,11 @@ export function leaveViewableRoom() {
 export function skipTableTurn() {
   return serial(async () => {
     const s = requireSession();
-    await accept(
-      await skipCloudTurn({ data: { code: s.code, token: s.token } }),
-    );
+    await accept(await skipCloudTurn({ data: { code: s.code, token: s.token } }));
   });
 }
 export function manageParticipant(
-  action:
-    "release" | "kick" | "ban" | "invite" | "permission" | "start" | "discard",
+  action: "release" | "kick" | "ban" | "invite" | "permission" | "start" | "discard",
   seatId: string,
   allowParty?: boolean,
 ) {
@@ -721,8 +814,7 @@ export function manageParticipant(
   });
 }
 export function releasePlayerSeat() {
-  if (view.joined)
-    throw new Error("Leave the shared campaign before changing roles.");
+  if (view.joined) throw new Error("Leave the shared campaign before changing roles.");
 }
 async function detachTable(clearPlayerCopy: boolean) {
   if (clearPlayerCopy) {
@@ -737,19 +829,15 @@ async function detachTable(clearPlayerCopy: boolean) {
   if (isEphemeralCampaign()) {
     playerSession = null;
     sessionStorage.removeItem(PLAYER_TICKET);
-  } else if (typeof localStorage !== "undefined")
-    localStorage.removeItem(key());
+  } else if (typeof localStorage !== "undefined") localStorage.removeItem(key());
   stopPolling();
   publish({ ...initialView });
 }
 export async function leaveTable() {
   if (hasPendingChanges())
-    throw new Error(
-      "Export and resolve your pending actions before disconnecting.",
-    );
+    throw new Error("Export and resolve your pending actions before disconnecting.");
   const s = session();
-  if (s?.role === "dm")
-    throw Error("The DM must end the session before leaving.");
+  if (s?.role === "dm") throw Error("The DM must end the session before leaving.");
   if (s)
     await manageCloudRoom({
       data: { code: s.code, token: s.token, action: "leave", seatId: s.seatId },
@@ -802,23 +890,19 @@ export async function importPending(file: File) {
   return serial(async () => {
     const s = requireSession();
     if (raw.code !== s.code || !Array.isArray(raw.commands))
-      throw new Error(
-        "This recovery file belongs to a different campaign code.",
-      );
+      throw new Error("This recovery file belongs to a different campaign code.");
     if (raw.commands.length + s.pending.length > 100)
-      throw new Error(
-        "Submit the current pending actions before importing more.",
-      );
-    const incoming = raw.commands.map((c: unknown) =>
-      commandSchema.parse(c),
-    ) as Command[];
+      throw new Error("Submit the current pending actions before importing more.");
+    const incoming = raw.commands.map((c: unknown) => commandSchema.parse(c)) as Command[];
     if (raw.seatId && raw.seatId !== s.seatId)
       throw new Error(
         "These device changes belong to a different seat. Review them with the DM instead of replaying them here.",
       );
-    const saved = new Map(s.pending.map(c => [c.id, c]));
-    if (incoming.some(c => saved.has(c.id) && !sameCommand(saved.get(c.id), c)))
-      throw Error("This recovery file contains conflicting changes for a pending action. Export both copies and resolve them with the DM.");
+    const saved = new Map(s.pending.map((c) => [c.id, c]));
+    if (incoming.some((c) => saved.has(c.id) && !sameCommand(saved.get(c.id), c)))
+      throw Error(
+        "This recovery file contains conflicting changes for a pending action. Export both copies and resolve them with the DM.",
+      );
     const known = new Set(saved.keys());
     s.pending.push(...incoming.filter((c) => !known.has(c.id)));
     remember(s);
@@ -829,9 +913,7 @@ export async function importPending(file: File) {
 }
 
 /** A stable message id makes manual retries safe after an ambiguous network failure. */
-export function sendRoomMessage(
-  command: Extract<Command, { kind: "message" }>,
-) {
+export function sendRoomMessage(command: Extract<Command, { kind: "message" }>) {
   return serial(async () => {
     const s = requireSession();
     const remote = await submitCloudCommands({
@@ -878,40 +960,24 @@ export async function resumeAccountMembership(
     if (sessionStorage.getItem("lootsplit.verified-account") !== member.userId)
       throw new Error("Sign in to the account that owns this saved campaign.");
     if (current?.pending.length && current.code !== member.code)
-      throw new Error(
-        "Submit or resolve your pending actions before switching campaigns.",
-      );
+      throw new Error("Submit or resolve your pending actions before switching campaigns.");
     if (
       current?.pending.length &&
       current.role === "player" &&
       (current.seatId !== member.seatId || current.token !== member.token)
     )
-      throw new Error(
-        "Export your unsynced player changes in Multiplayer before changing seats.",
-      );
+      throw new Error("Export your unsynced player changes in Multiplayer before changing seats.");
     const remote = await pullCloudTable({
       data: { code: member.code, token: member.token },
     });
     const role = remote.seats.find((s) => s.id === remote.seatId)?.role;
-    if (
-      !role ||
-      (role === "player" && !remote.purseIds.length) ||
-      remote.seatId !== member.seatId
-    )
-      throw new Error(
-        "This membership has changed. Refresh your account library.",
-      );
+    if (!role || (role === "player" && !remote.purseIds.length) || remote.seatId !== member.seatId)
+      throw new Error("This membership has changed. Refresh your account library.");
     const { selectAccountCampaign } = await import("./campaigns");
     const id = `account-${member.userId}-${member.code}`;
     const targetKey = `quire.cloud.v2.${id}`;
-    const existing = JSON.parse(
-      localStorage.getItem(targetKey) || "null",
-    ) as Session | null;
-    const cached = current?.pending.length
-      ? current
-      : role === "player"
-        ? current
-        : existing;
+    const existing = JSON.parse(localStorage.getItem(targetKey) || "null") as Session | null;
+    const cached = current?.pending.length ? current : role === "player" ? current : existing;
     const reconciled = reconcileAccountResume(
       cached,
       remote,
@@ -925,12 +991,8 @@ export async function resumeAccountMembership(
     const recoveryCandidates =
       role === "dm"
         ? [
-            ...(cached?.pending.length && reconciled.needsRecovery
-              ? [cached]
-              : []),
-            ...(existing?.pending.length &&
-            cached !== existing &&
-            key() !== targetKey
+            ...(cached?.pending.length && reconciled.needsRecovery ? [cached] : []),
+            ...(existing?.pending.length && cached !== existing && key() !== targetKey
               ? [existing]
               : []),
           ]
@@ -955,7 +1017,9 @@ export async function resumeAccountMembership(
     }
     if (reconciled.needsRecovery) {
       // Open the authoritative seat with its own draft. Old work stays exportable.
-      reconciled.pending = (JSON.parse(remote.draft) as Command[]).filter(c => !remote.acknowledged.includes(c.id));
+      reconciled.pending = (JSON.parse(remote.draft) as Command[]).filter(
+        (c) => !remote.acknowledged.includes(c.id),
+      );
       reconciled.batchId = crypto.randomUUID();
       reconciled.revision = reconciled.pending.length ? -1 : 0;
     }

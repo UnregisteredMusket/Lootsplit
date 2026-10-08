@@ -1,0 +1,42 @@
+.encounter-party-review,
+.encounter-award-receipt,
+.encounter-recipient-preview,
+.encounter-readiness {
+  overflow-wrap: anywhere;
+  margin-block: 1rem;
+}
+.encounter-party-review {
+  border: 1px solid var(--color-border);
+  border-radius: 0.75rem;
+  padding: 0.75rem;
+}
+.encounter-party-review .encounter-party-member {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-block: 0.5rem;
+}
+.encounter-party-member input {
+  width: auto;
+  flex: 0 0 auto;
+}
+.encounter-readiness ul,
+.encounter-recipient-preview ul {
+  list-style: disc;
+  padding-left: 1.5rem;
+}
+.encounter-recipient-preview article {
+  border-top: 1px solid var(--color-border);
+  padding-block: 0.5rem;
+}
+.encounter-chronicle pre {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  font: inherit;
+  padding: 0.75rem;
+  background: var(--color-elevated);
+  border-radius: 0.5rem;
+}
+.encounter-award-receipt .character-toolbar a {
+  text-decoration: underline;
+}

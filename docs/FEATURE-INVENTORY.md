@@ -2,6 +2,8 @@
 
 No feature below may be removed, disabled, hidden or reduced without explicit user approval. Locations are entry points, not permission grants. Server authorization remains authoritative.
 
+The October 8 preservation improvements extend the existing entry points with accurate room/play/save status, guarded drafts, campaign-first account navigation, complete financial previews, property/calendar explanations, archive and handout readers, import comparisons, reachable character save controls, encounter conveniences and owner/staff explanations. See [implementation mapping](audit/2026-10-08-feature-improvements.md). These are additive presentation and workflow changes; original actions, complete records, manual options, themes, opening animation and permissions remain available. Website source and signed Android release identity are reported separately.
+
 | Capability                                                                                          | Entry point                        |
 | --------------------------------------------------------------------------------------------------- | ---------------------------------- |
 | Campaign create/rename/switch/export/delete, current/last handling and recovery                     | Campaign controls                  |
@@ -163,6 +165,7 @@ Not implemented or promised by this inventory: OCR, Google Drive backup integrat
 - DM sets 1–3650 downtime days and reviews a stored preview. Explicit approval while starting a session applies coins, debt changes, ledger entries, in-game time and a receipt together. A changed preview is rejected; repeat approvals cannot settle twice. Cancelling changes no balances or elapsed days.
 - Settlement order: all revenue, loans in creation order, then expenses. Interest is calculated per full period on remaining principal (plus unpaid interest when compounding), before its scheduled installment; sub-copper interest carries forward. Repayments cover interest first, never exceed debt, and never overdraw purses. Arrears remain visible; pausing stops accrual and settlement attempts without forgiving them.
 - Financial state is stored in the campaign journal, included in device backups and shared-room persistence, with player projections limited to their assigned characters’ loans and recurring rules; private downtime quotes and other characters’ agreements stay excluded. Account-owned character profiles are never modified. Old saves remain readable. Finance ledger entries cannot be independently voided, preventing disagreement with the debt record.
+- Loan request/debt and command-created inventory links use stored IDs; original funding/purchase readers retain authorized history and label missing historical associations. Player property cards show their existing projected current-owner recurring plans without economic edit controls.
 - Local approvals run under one IndexedDB write transaction; shared actions retain authoritative role, turn, revision, and retry checks. Session summaries include the approved downtime and exclude internal lender transfers from received/spent totals.
 
 Validation for this change: 427 automated tests passed (four existing skips), TypeScript passed, lint passed with existing warnings, Cloudflare and mobile builds passed. Desktop (1440px) and mobile (390px) browser audits passed on development and built production output, including campaign isolation, reload persistence, loan funding/repayment, inventory-linked revenue, recurring expenses, preview and explicit next-session approval. Screenshots inspected; no horizontal overflow or uncaught page errors. The user authorized GitHub publication and website deployment on October 3, 2026. No Android APK has been released for this change.
@@ -194,6 +197,7 @@ Validation for this change: 427 automated tests passed (four existing skips), Ty
 - Authoritative leave/dismiss/kick/ban controls revoke seats. Kicks require fresh invitations; bans block campaign/report access. Closed rooms retain authorized archives while denying character selection and edits.
 - Session reports archive financial activity, character changes and authorized messages before active logs clear; DM reports indicate player-private messages without exposing contents. Account reports survive departure according to permissions.
 - DM-private, party-shared and private-player journal entries can attach prior session reports.
+- Receipt-linked loot journal summaries use exact stored encounter/receipt/session IDs. Authorized session entries and party notes link to each other; original encounter links require a confirmed matching DM read in the current campaign. Players keep their own projected financial history. Names never establish a historical link. Fresh shared recovery remaps only exact active encounter/receipt pairs; archived original IDs and note text remain intact.
 - Merchant sale categories have DM-configurable exceptions. Service purchases are recorded and cannot be resold.
 - Owner-only isolated Test mode has a settings configurator, header indicator and red DM-home reset; Test rooms are excluded from gameplay analytics.
 
@@ -221,7 +225,7 @@ Validation for this change: 427 automated tests passed (four existing skips), Ty
 
 ## Authorized account-owned campaign model (2026-10-05)
 
-DMs sign in and own their hosted campaigns. Open sessions survive closed tabs; explicit End session preserves the server campaign and revokes players. Reopening rotates invitations. Signed-in players get account memberships automatically. Guests keep campaign contents only in document memory, with a session-scoped reconnect credential; a new session requires joining/assignment again. DM offline play remains available for owned device copies, with explicit legacy-save claiming and existing backups preserved. Offline player copies are intentionally retired; legacy DM report imports remain for recovery. Multiple campaigns remain independent.
+DMs sign in and own their hosted campaigns. Open sessions survive closed tabs; explicit Close room & revoke access preserves the server campaign and revokes players. Reopening rotates invitations. Signed-in players get account memberships automatically. Guests keep campaign contents only in document memory, with a session-scoped reconnect credential; a new session requires joining/assignment again. DM offline play remains available for owned device copies, with explicit legacy-save claiming and existing backups preserved. Offline player copies are intentionally retired; legacy DM report imports remain for recovery. Multiple campaigns remain independent.
 
 ## Optional CC0 sound effects
 
@@ -266,6 +270,6 @@ Release status must be taken from the latest recovery checkpoint/PR, not this im
 
 ## Between-session online access (2026-10-07)
 
-- DM Multiplayer offers End session & keep room online. Session records are archived once; seats, current invitations and account memberships remain available. Player gameplay, edits, messages and rolls are view-only until the DM resumes play. Existing privacy projections and kick/ban/release protections apply.
-- DM can Leave room online after ending play, then resume the saved room from My account. Resume play restores the chosen Live/Turn-based mode; starting a named session also resumes play. The existing End session option still closes the room and revokes player access.
+- DM Multiplayer offers End play & keep room online. Session records are archived once; seats, current invitations and account memberships remain available. Player gameplay, edits, messages and rolls are view-only until the DM resumes play. Existing privacy projections and kick/ban/release protections apply.
+- DM can Leave room online after ending play, then resume the saved room from My account. Resume play restores the chosen Live/Turn-based mode; starting a named session also resumes play. Close room & revoke access closes the room and revokes player access. End recorded session remains a separate named-record action.
 - Legacy room bodies default to ordinary active play; no schema migration or Android signing changes.

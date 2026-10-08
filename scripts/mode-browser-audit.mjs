@@ -59,7 +59,7 @@ try {
   results.push("Turn backup refuses unsubmitted draft");
   await openApplication(player, origin + "/share");
   await player.getByRole("button", { name: "Submit changes and end turn", exact: true }).click();
-  await player.getByText(/Waiting for Dungeon master · Synced/).waitFor();
+  await player.getByText(/Play active · Waiting for Dungeon master · Saved to room/).waitFor();
   results.push("Player purchase submitted and turn returned to DM");
   await openApplication(player, origin + "/settings");
   let downloading = player.waitForEvent("download");
@@ -74,11 +74,11 @@ try {
   await openApplication(player, origin + "/share");
   await dm.getByRole("button", { name: "Live Mode", exact: true }).click();
   await dm.getByRole("button", { name: "Change mode", exact: true }).click();
-  await player.getByText("Live · Synced", { exact: true }).waitFor();
+  await player.getByText("Live · Room online · Play active · Saved to room", { exact: true }).waitFor();
   await openApplication(player, origin + "/market");
   await player.getByRole("link").filter({ hasText: "Hearth" }).first().click();
   await player.getByRole("button", { name: /^Buy / }).first().click();
-  await player.getByText("Live · Synced", { exact: true }).waitFor();
+  await player.getByText("Live · Room online · Play active · Saved to room", { exact: true }).waitFor();
   results.push("Live purchase accepted and synchronized");
   await openApplication(dm, origin + "/settings");
   downloading = dm.waitForEvent("download");

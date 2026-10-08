@@ -20,6 +20,8 @@ import { HomeBoard } from "../home-board";
 import { useSheetReadouts, HpBar } from "./readouts";
 import { InformationStrip } from "./information-strip";
 import type { Purse } from "@/lib/quire/types";
+import { roomStatusLabels } from "@/lib/quire/room-state";
+import { getOnline, subscribeOnline } from "@/lib/mobile/online";
 type Roll = NonNullable<Purse["rolls"]>[number];
 
 export function DmDesk() {
@@ -34,6 +36,8 @@ function DmDeskContents() {
   const campaigns = useSyncExternalStore(subscribeCampaigns, getCampaigns, serverCampaigns),
     room = useSyncExternalStore(subscribeCloudTable, getCloudTable, getServerCloudTable);
   const search = useRouterState({ select: (s) => s.location.searchStr });
+  const online = useSyncExternalStore(subscribeOnline, getOnline, () => true);
+  const status = roomStatusLabels(room, { online, ready });
   const savedShortcuts = new URLSearchParams(search).get("customize") === "1";
   const [encounter, setEncounter] = useState<{
       name: string;
@@ -140,18 +144,9 @@ function DmDeskContents() {
         <div className="desk-connection-row">
           <p className="desk-status">
             <span className={room.status === "attention" ? "status-attention" : "status-dot"} />
-            {room.joined ? (room.live ? "Live" : "Turn-based") : "Local"} ·{" "}
-            {room.joined
-              ? room.status === "synced"
-                ? "Saved"
-                : room.status === "attention"
-                  ? "Needs attention"
-                  : room.pending
-                    ? "Changes pending"
-                    : "Connecting"
-              : ready
-                ? "Saved on device"
-                : "Opening campaign"}
+            {[status.mode, status.room, status.play, status.turn, status.save]
+              .filter(Boolean)
+              .join(" · ")}
           </p>
           <AppLink href="/share?tab=room" className="multiplayer-settings">
             <Users size={18} />
@@ -223,6 +218,9 @@ function DmDeskContents() {
             content: (
               <>
                 <h2>Party at a glance</h2>
+                <small>
+                  Showing {Math.min(4, party.length)} of {party.length} characters
+                </small>
                 <div className="information-party">
                   {party.slice(0, 4).map((p) => {
                     const live = profiles.find((x) => x.purse_id === p.id),
@@ -317,6 +315,9 @@ function DmDeskContents() {
             content: (
               <>
                 <h2>Activity log</h2>
+                <small>
+                  Latest {recent.length} of {ledger.length + journal.events.length} recorded events
+                </small>
                 <ol className="information-log">
                   {recent.map((line) => (
                     <li key={`${line.type}-${line.id}`}>

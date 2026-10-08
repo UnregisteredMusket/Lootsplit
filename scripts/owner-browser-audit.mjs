@@ -1,5 +1,6 @@
 import { openApplication, reloadApplication } from "./title-screen-navigation.mjs";
 import { chromium } from "playwright";
+import { expect } from "playwright/test";
 import assert from "node:assert/strict";
 import { mkdir } from "node:fs/promises";
 import { localAccountDb } from "./account-dev-db.mjs";
@@ -32,6 +33,24 @@ try {
   await DB.prepare("INSERT INTO site_roles VALUES (?,'owner',?)").bind(id, Date.now()).run();
   await openApplication(page, origin + "/account");
   await page.getByRole("heading", { name: "Owner controls", exact: true }).waitFor();
+  await page.route("**/api/account/owner/analytics", (route) =>
+    route.fulfill({
+      status: 503,
+      contentType: "application/json",
+      body: JSON.stringify({ error: "Disposable analytics outage" }),
+    }),
+  );
+  await page.getByRole("button", { name: "Open game analytics", exact: true }).click();
+  await expect(page.locator(".owner-analytics").getByRole("alert")).toContainText("unavailable");
+  await expect(page.locator(".owner-analytics-group dd")).toHaveCount(0);
+  await page.unroute("**/api/account/owner/analytics");
+  await page.getByRole("button", { name: "Refresh game analytics", exact: true }).click();
+  await expect(page.locator(".owner-analytics-group dd")).toHaveCount(19);
+  await expect(page.locator(".owner-analytics").getByRole("alert")).toHaveCount(0);
+  await page.getByText("What these totals include", { exact: true }).click();
+  await expect(page.getByText(/Only accepted shared-campaign records are counted/)).toBeVisible();
+  await page.getByRole("button", { name: "Close game analytics", exact: true }).click();
+  await expect(page.locator(".owner-analytics-group dd")).toHaveCount(0);
   await page.getByLabel("Donation page URL").fill("https://example.com/support");
   await page.getByRole("button", { name: "Save donation link", exact: true }).click();
   await page.getByText("Donation link is live on the Donate page.", { exact: true }).waitFor();
@@ -69,6 +88,9 @@ try {
   await reloadApplication(page);
   await page.getByRole("heading", { name: "Audit Owner’s library", exact: true }).waitFor();
   assert.equal(await page.getByRole("heading", { name: "Owner controls", exact: true }).count(), 0);
+  await expect(page.getByRole("button", { name: "Open game analytics", exact: true })).toHaveCount(
+    0,
+  );
   assert.deepEqual(errors, []);
   console.log("Owner browser audit passed");
 } catch (error) {

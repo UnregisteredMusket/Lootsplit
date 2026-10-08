@@ -69,7 +69,7 @@ try {
   await edit(dm.page);
   await dm.page.getByLabel("Maximum HP", { exact: true }).fill("115");
   await dm.page.getByLabel("Current HP", { exact: true }).fill("10");
-  await dm.page.getByRole("button", { name: "Character details", exact: true }).click();
+  await dm.page.getByRole("tab", { name: "Character details", exact: true }).click();
   await dm.page.getByLabel("Character name", { exact: true }).fill(characterName);
   await save(dm.page);
   let t = await state(dm.page),
@@ -77,7 +77,7 @@ try {
   assert.ok(p?.sheet);
   const id = p.id,
     href = `/characters?id=${encodeURIComponent(`party:${id}`)}`;
-  await dm.page.getByRole("button", { name: "Inventory & currency", exact: true }).click();
+  await dm.page.getByRole("tab", { name: "Inventory & currency", exact: true }).click();
   await dm.page.getByLabel("GP", { exact: true }).fill("17");
   await dm.page.getByRole("button", { name: "Add equipment", exact: true }).click();
   await dm.page.getByLabel("Item 1 name", { exact: true }).fill("Sentinel sword");
@@ -103,7 +103,7 @@ try {
   await funds.getByText(/23 gp/).first().waitFor();
   await funds.getByRole("link", { name: "Open character sheet", exact: true }).click();
   await edit(dm.page);
-  await dm.page.getByRole("button", { name: "Inventory & currency", exact: true }).click();
+  await dm.page.getByRole("tab", { name: "Inventory & currency", exact: true }).click();
   assert.equal(await dm.page.getByLabel("GP", { exact: true }).inputValue(), "23");
   assert.equal(
     await dm.page.getByLabel("Sentinel sword quantity", { exact: true }).inputValue(),
@@ -187,7 +187,7 @@ try {
   await edit(player.page);
   await player.page.getByLabel("Current HP", { exact: true }).fill("7");
   await save(player.page);
-  await player.page.getByRole("button", { name: "Inventory & currency", exact: true }).click();
+  await player.page.getByRole("tab", { name: "Inventory & currency", exact: true }).click();
   assert.equal(
     await player.page.getByLabel("Sentinel sword quantity", { exact: true }).isEnabled(),
     true,

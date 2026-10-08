@@ -3,12 +3,14 @@ import { useEconomy } from "@/lib/quire/economy-context";
 import { formatCopper } from "@/lib/quire/money";
 import { sessionSummary } from "@/lib/quire/journal";
 import { useDesktop } from "@/lib/quire/use-desktop";
+import { usePrefs } from "@/lib/quire/prefs";
 
 export function DesktopDeskPanels() {
   const desktop = useDesktop();
+  const { prefs } = usePrefs();
   const { ready, purses, ledger, journal, loans, shops, holdings } = useEconomy();
   if (!desktop || !ready) return null;
-  const recent = [...ledger].sort((a, b) => b.at - a.at).slice(0, 8);
+  const recent = [...ledger].sort((a, b) => b.at - a.at).slice(0, prefs.ledgerRows);
   const requests = [
     ...journal.requests
       .filter((r) => r.status === "pending")
@@ -83,8 +85,8 @@ export function DesktopDeskPanels() {
       </section>
       <section className="desktop-desk-card" aria-labelledby="desktop-review-heading">
         <div className="panel-heading">
-          <h2 id="desktop-review-heading">Review queue</h2>
-          <AppLink href="/features/bank">Open review →</AppLink>
+          <h2 id="desktop-review-heading">Financial requests</h2>
+          <AppLink href="/features/bank">Open Bank →</AppLink>
         </div>
         <p className="desktop-panel-note">
           {requests.length} pending {requests.length === 1 ? "request" : "requests"}

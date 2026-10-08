@@ -1,0 +1,90 @@
+.ls-account .account-section-index {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.65rem;
+  margin: 1.25rem 0;
+}
+.ls-account .account-section-index a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  padding: 0.55rem 0.9rem;
+  border: 1px solid #859087;
+  border-radius: 0.75rem;
+  text-decoration: none;
+}
+.ls-account .account-section-index a:hover {
+  background: #203349;
+}
+.ls-account [id^="account-"] {
+  scroll-margin-top: 1.25rem;
+}
+.ls-account .account-campaign-filters {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
+  align-items: end;
+  gap: 0.8rem;
+  margin: 1rem 0;
+}
+.ls-account .account-campaign-filters label {
+  display: grid;
+  gap: 0.4rem;
+}
+.ls-account .account-campaign-filters input,
+.ls-account .account-campaign-filters select {
+  width: 100%;
+  min-height: 44px;
+  border: 1px solid #859087;
+  border-radius: 0.6rem;
+  padding: 0.65rem;
+  background: #0d1724;
+  color: var(--portal-ink);
+}
+.ls-account .account-backup-preview {
+  width: 100%;
+}
+.ls-account .account-backup-preview > div {
+  margin: 0.8rem 0;
+  padding: 1rem;
+  border: 1px solid #859087;
+  border-radius: 0.75rem;
+}
+.ls-account .account-backup-counts {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+  gap: 0.65rem;
+}
+.ls-account .account-backup-counts > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 1rem;
+  padding: 0.4rem 0;
+}
+.ls-account .account-backup-counts dd {
+  margin: 0;
+  font-weight: 700;
+}
+.ls-account .account-room-state {
+  font-size: 0.9rem;
+}
+.account-report-filters {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.7rem;
+  align-items: end;
+  margin: 1rem 0;
+}
+.account-report-filters label {
+  display: grid;
+  gap: 0.35rem;
+  flex: 1 1 150px;
+}
+.account-report-filters input,
+.account-report-filters select {
+  min-height: 44px;
+  padding: 0.6rem;
+  background: #0d1724;
+  color: var(--portal-ink);
+  border: 1px solid #859087;
+  border-radius: 0.5rem;
+}

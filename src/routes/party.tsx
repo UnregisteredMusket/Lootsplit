@@ -1,3 +1,4 @@
+import { holdingRecordId } from "@/lib/quire/finance-record-links";
 import { CharacterPermissions } from "@/components/character-permissions";
 import { toast } from "sonner";
 import { Open5eBrowser } from "@/components/open5e-browser";
@@ -85,20 +86,56 @@ function PartyPage() {
         </Button>
       </div>
       {seat.role === "dm" && (
-        <div className="mode-switch party-sections" role="tablist" aria-label="Party sections">
-          {[
-            ["characters", "Characters"],
-            ["funds", "Funds & inventory"],
-          ].map(([k, label]) => (
-            <button role="tab" aria-selected={section === k} key={k} onClick={() => setSection(k!)}>
-              {label}
-            </button>
-          ))}
-          <AppLink href={seat.role === "dm" ? "/features/reports" : "/features/finances"}>Ledger</AppLink>
+        <div className="flex flex-wrap items-center gap-3">
+          <div className="mode-switch party-sections" role="tablist" aria-label="Party sections">
+            {[
+              ["characters", "Characters"],
+              ["funds", "Funds & inventory"],
+            ].map(([k, label]) => (
+              <button
+                type="button"
+                id={`party-tab-${k}`}
+                role="tab"
+                aria-selected={section === k}
+                aria-controls={`party-panel-${k}`}
+                tabIndex={section === k ? 0 : -1}
+                key={k}
+                onClick={() => setSection(k!)}
+                onKeyDown={(event) => {
+                  const next =
+                    event.key === "Home"
+                      ? "characters"
+                      : event.key === "End"
+                        ? "funds"
+                        : ["ArrowRight", "ArrowLeft"].includes(event.key)
+                          ? k === "characters"
+                            ? "funds"
+                            : "characters"
+                          : undefined;
+                  if (!next) return;
+                  event.preventDefault();
+                  setSection(next);
+                  document.getElementById(`party-tab-${next}`)?.focus();
+                }}
+              >
+                {label}
+              </button>
+            ))}
+          </div>
+          <AppLink href={seat.role === "dm" ? "/features/reports" : "/features/finances"}>
+            Ledger
+          </AppLink>
         </div>
       )}
-      {seat.role === "dm" && section === "characters" && (
-        <div className="party-profile-list">
+      {seat.role === "dm" && (
+        <div
+          className="party-profile-list"
+          id="party-panel-characters"
+          role="tabpanel"
+          aria-labelledby="party-tab-characters"
+          hidden={section !== "characters"}
+          tabIndex={0}
+        >
           {visible
             .filter((p) => p.kind === "character")
             .map((p) => {
@@ -205,7 +242,13 @@ function PartyPage() {
           </button>
         </div>
       )}
-      <div hidden={seat.role === "dm" && section !== "funds"}>
+      <div
+        id="party-panel-funds"
+        role={seat.role === "dm" ? "tabpanel" : undefined}
+        aria-labelledby={seat.role === "dm" ? "party-tab-funds" : undefined}
+        hidden={seat.role === "dm" && section !== "funds"}
+        tabIndex={seat.role === "dm" ? 0 : undefined}
+      >
         {!economy.ready ? <p className="mt-6 text-muted">Loading…</p> : null}
         {economy.ready ? (
           <>
@@ -332,7 +375,7 @@ function PartyPage() {
                   .map((holding) => {
                     const owner = economy.purses.find((purse) => purse.id === holding.purseId);
                     return (
-                      <li key={holding.id} className="py-3">
+                      <li key={holding.id} id={holdingRecordId(holding.id)} className="py-3">
                         <div className="flex items-baseline justify-between gap-3">
                           <span>
                             <span className="fantasy-reference-title">

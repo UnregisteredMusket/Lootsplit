@@ -2,7 +2,12 @@ import { accountRequest } from "../account/client";
 import { characterSheet } from "./campaign-sheet.mjs";
 import { economySnapshot, saveCampaignCharacter } from "../quire/economy";
 import { getSeat } from "../quire/table";
-import { getCloudTable, queueCommand } from "../quire/cloud-client";
+import {
+  getCloudTable,
+  queueCommand,
+  captureMutationScope,
+  assertMutationScope,
+} from "../quire/cloud-client";
 import { announceSheetChange } from "../quire/party-sheet-links";
 import type { PlaySheet } from "./model.mjs";
 
@@ -11,14 +16,17 @@ export async function characterRequest<T>(
   payload?: any,
   signal?: AbortSignal,
 ): Promise<T> {
+  const scope = path === "sheets/save" ? captureMutationScope() : undefined;
+  const joinedAtStart = getCloudTable().joined;
   if (
     !payload?.id ||
     (path === "sheets/assign" && !payload.id.startsWith("party:")) ||
     (getCloudTable().joined && !payload.id.startsWith("party:"))
   )
     return accountRequest<T>(path, payload, signal);
-  const table = await economySnapshot(),
-    seat = getSeat();
+  const table = await economySnapshot();
+  if (scope) assertMutationScope(scope);
+  const seat = getSeat();
   const linked = table.purses.find((p) => p.profileId === payload.id);
   if (!payload.id.startsWith("party:") && !linked) return accountRequest<T>(path, payload, signal);
   const purseId = linked?.id || payload.id.slice(6);
@@ -69,10 +77,14 @@ export async function characterRequest<T>(
       before: payload.before as PlaySheet,
       sheet: payload.sheet as PlaySheet,
     };
-    if (getCloudTable().joined) await queueCommand({ kind: "character", ...input });
-    else await saveCampaignCharacter(input);
+    let outcome: { status: "committed" | "pending" } = { status: "committed" };
+    if (joinedAtStart) outcome = await queueCommand({ kind: "character", ...input }, scope);
+    else
+      await saveCampaignCharacter(input, () => {
+        if (scope) assertMutationScope(scope);
+      });
     announceSheetChange();
-    return { id: payload.id } as T;
+    return { id: payload.id, ...outcome } as T;
   }
   if (path === "sheets/roll" || path === "sheets/log") {
     const { campaignRollRequest } = await import("../quire/character-roll-client");

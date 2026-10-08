@@ -28,6 +28,7 @@ import { cn } from "@/lib/cn";
 import { loadSeatLock } from "@/lib/quire/lock";
 import { getOnline, subscribeOnline } from "@/lib/mobile/online";
 import { watchCrashes } from "@/lib/quire/reports";
+import { isEphemeralCampaign } from "@/lib/quire/guest-storage";
 
 type Dest =
   | "/encounters"
@@ -417,8 +418,10 @@ export function Shell({
     if (online) return null;
     return (
       <p className="border-b border-lead/30 bg-elevated px-4 py-2 text-sm text-muted" role="status">
-        Offline. This device keeps its local campaign. A shared change is not saved until the server
-        accepts it.
+        {isEphemeralCampaign()
+          ? "Offline. Your player campaign stays in this document; export unsent work before closing it."
+          : "Offline. This device keeps its owned local campaign."}{" "}
+        A shared change is not saved until the server accepts it.
       </p>
     );
   }

@@ -1,3 +1,4 @@
+import { captureDeviceMutationScope, assertDeviceMutationScope } from "./mutation-scope.ts";
 import { quireDb } from "./db.ts";
 import { getCloudWatch, pushCloudChange } from "./cloud-turn.ts";
 import { alertNotes } from "./notify.ts";
@@ -35,13 +36,23 @@ export function mergeNoteLists(current: ChatNote[], incoming: ChatNote[]): ChatN
   return readNotes([...current, ...incoming]);
 }
 
-export async function loadNotes(): Promise<ChatNote[]> {
+export async function loadNotes(assertScope?: () => void): Promise<ChatNote[]> {
+  const invoked = captureDeviceMutationScope();
+  const guard = () => {
+    assertDeviceMutationScope(invoked);
+    assertScope?.();
+  };
+  guard();
   const db = await quireDb();
+  guard();
   const row = await request<unknown>(db.transaction("meta").objectStore("meta").get(KEY));
+  guard();
   return readNotes(row);
 }
 
-export async function postNotes(drafts: Array<{ from: "dm" | "player"; to?: "dm" | "party"; purseId: string; text: string }>): Promise<void> {
+export async function postNotes(
+  drafts: Array<{ from: "dm" | "player"; to?: "dm" | "party"; purseId: string; text: string }>,
+): Promise<void> {
   const gate = getCloudWatch();
   if (gate.joined && !gate.mine) throw new Error("It is not your turn.");
   const at = Date.now();
@@ -62,14 +73,17 @@ export async function postNotes(drafts: Array<{ from: "dm" | "player"; to?: "dm"
   pushCloudChange();
 }
 
-export async function replaceNotes(incoming: ChatNote[]): Promise<void> {
-  await writeNotes(readNotes(incoming));
+export async function replaceNotes(incoming: ChatNote[], assertScope?: () => void): Promise<void> {
+  await writeNotes(readNotes(incoming), assertScope);
 }
 
 export async function rememberIncoming(incoming: ChatNote[]): Promise<void> {
   if (incoming.length === 0) return;
-  const next = mergeNoteLists(await loadNotes(), incoming);
-  await writeNotes(next);
+  const invoked = captureDeviceMutationScope();
+  const guard = () => assertDeviceMutationScope(invoked);
+  const next = mergeNoteLists(await loadNotes(guard), incoming);
+  guard();
+  await writeNotes(next, guard);
 }
 
 export function getChatSnapshot(): ChatNote[] {
@@ -85,17 +99,33 @@ export function subscribeChat(listener: () => void) {
   return () => listeners.delete(listener);
 }
 
-export async function refreshChat(): Promise<void> {
+export async function refreshChat(assertScope?: () => void): Promise<void> {
+  const invoked = captureDeviceMutationScope();
+  const guard = () => {
+    assertDeviceMutationScope(invoked);
+    assertScope?.();
+  };
+  const next = await loadNotes(guard).catch(() => EMPTY);
   try {
-    notes = await loadNotes();
-  } catch {
-    notes = EMPTY;
+    guard();
+  } catch (error) {
+    // A late read belongs to the former context. Keep the current chat intact.
+    if (assertScope) throw error;
+    return;
   }
+  notes = next;
   publish();
 }
 
-async function writeNotes(next: ChatNote[]): Promise<void> {
+async function writeNotes(next: ChatNote[], assertScope?: () => void): Promise<void> {
+  const invoked = captureDeviceMutationScope();
+  const guard = () => {
+    assertDeviceMutationScope(invoked);
+    assertScope?.();
+  };
+  guard();
   const db = await quireDb();
+  guard();
   const tx = db.transaction("meta", "readwrite");
   tx.objectStore("meta").put({ id: KEY, notes: next });
   await new Promise<void>((resolve, reject) => {
@@ -103,6 +133,7 @@ async function writeNotes(next: ChatNote[]): Promise<void> {
     tx.onerror = () => reject(tx.error ?? new Error("Could not save the message."));
     tx.onabort = () => reject(tx.error ?? new Error("Could not save the message."));
   });
+  guard();
   notes = next;
   publish();
   alertNotes(next);
@@ -130,7 +161,15 @@ function normalizeNote(value: unknown): ChatNote | null {
   if (!text || !id || (note.from !== "dm" && note.from !== "player")) return null;
   if (to === "dm" && !purseId) return null;
   if (to === "party" && note.from === "player" && !purseId) return null;
-  return { id, purseId, text, from: note.from, to, ...(to === "player" ? { recipientId } : {}), at: Number.isFinite(note.at) ? Number(note.at) : 0 };
+  return {
+    id,
+    purseId,
+    text,
+    from: note.from,
+    to,
+    ...(to === "player" ? { recipientId } : {}),
+    at: Number.isFinite(note.at) ? Number(note.at) : 0,
+  };
 }
 
 function request<T>(req: IDBRequest<T>): Promise<T> {
