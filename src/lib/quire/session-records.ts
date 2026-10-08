@@ -4,13 +4,15 @@ import { characterSheet } from "../characters/campaign-sheet.mjs";
 import { readFinance } from "./finance.ts";
 import { readJournal, readJournalForRecords, readArchivedSnapshot } from "./journal.ts";
 
-/** All report projections happen on the server before delivery. */
+/** Server/default projections enforce historical seats; verified local DM readers may retain their owned nested records. */
 export function projectRecord(
   table: CloudTable,
   seat: Pick<CloudSeat, "role" | "purseIds"> & { id?: string },
+  options: { ownedDevice?: boolean } = {},
 ): CloudTable {
   const t = structuredClone(table);
   const dm = seat.role === "dm";
+  const ownedDevice = options.ownedDevice === true && dm;
   t.notes = t.notes.filter((n) => canReadNote(n, seat));
   t.journal = readJournalForRecords(t.journal);
   t.journal.entries = t.journal.entries?.filter(
@@ -19,10 +21,32 @@ export function projectRecord(
       (dm ? e.visibility === "dm" : e.visibility === "player" && seat.purseIds.includes(e.purseId)),
   );
   t.journal.reports = t.journal.reports
-    ?.filter((r) => !r.seatIds || (seat.id && r.seatIds.includes(seat.id)))
+    ?.filter((r) => ownedDevice || !r.seatIds || (seat.id && r.seatIds.includes(seat.id)))
     .map((r) => {
-      try { return { ...r, snapshot: JSON.stringify(projectRecord(readArchivedSnapshot(r.snapshot), seat)) }; }
-      catch { return { ...r, snapshot: JSON.stringify({ purses: [], holdings: [], shops: [], stock: [], ledger: [], notes: [], sheets: [], loans: [], listings: [] }), error: "This archived report cannot be read. Keep its original backup for recovery." }; }
+      try {
+        return {
+          ...r,
+          snapshot: JSON.stringify(
+            projectRecord(readArchivedSnapshot(r.snapshot), seat, { ownedDevice }),
+          ),
+        };
+      } catch {
+        return {
+          ...r,
+          snapshot: JSON.stringify({
+            purses: [],
+            holdings: [],
+            shops: [],
+            stock: [],
+            ledger: [],
+            notes: [],
+            sheets: [],
+            loans: [],
+            listings: [],
+          }),
+          error: "This archived report cannot be read. Keep its original backup for recovery.",
+        };
+      }
     });
   t.journal.editReports = t.journal.editReports?.filter(
     (r) => dm || seat.purseIds.includes(r.purseId),
@@ -33,7 +57,12 @@ export function projectRecord(
     t.purses = t.purses.filter((p) => seat.purseIds.includes(p.id));
     if (t.journal.finance) {
       const f = readFinance(t.journal.finance);
-      t.journal.finance = { day: f.day, loans: f.loans.filter(l => seat.purseIds.includes(l.purseId)), rules: f.rules.filter(r => seat.purseIds.includes(r.purseId)), downtime: [] };
+      t.journal.finance = {
+        day: f.day,
+        loans: f.loans.filter((l) => seat.purseIds.includes(l.purseId)),
+        rules: f.rules.filter((r) => seat.purseIds.includes(r.purseId)),
+        downtime: [],
+      };
     }
     t.journal.requests = t.journal.requests.filter((r) => seat.purseIds.includes(r.purseId));
     t.journal.events = t.journal.events

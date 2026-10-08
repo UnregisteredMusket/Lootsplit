@@ -10,7 +10,46 @@ import {
   discardRevokedPending,
   refreshRecoveryVisibility,
 } from "@/lib/quire/cloud-client";
-import { authorizeLegacyRecovery } from "@/lib/quire/revoked-recovery";
+import { authorizeLegacyRecovery, revokedRecoveryCopy } from "@/lib/quire/revoked-recovery";
+import { pendingCommandDescription } from "@/lib/account/backup-presentation";
+
+type RecoveryPreview = { seat: string; capturedAt: number | null; commands: string[] };
+function recoveryPreview(value: {
+  seatId?: unknown;
+  exportedAt?: unknown;
+  commands: unknown[];
+}): RecoveryPreview {
+  return {
+    seat: typeof value.seatId === "string" && value.seatId ? value.seatId : "Unknown original seat",
+    capturedAt:
+      typeof value.exportedAt === "number" &&
+      Number.isFinite(value.exportedAt) &&
+      value.exportedAt >= 0
+        ? value.exportedAt
+        : null,
+    commands: value.commands.map(pendingCommandDescription),
+  };
+}
+function RecoveryDetails({ preview }: { preview: RecoveryPreview }) {
+  return (
+    <details>
+      <summary>Review original action scope · {preview.commands.length} actions</summary>
+      <p>
+        Original seat: {preview.seat}. Captured:{" "}
+        {preview.capturedAt === null ? "Unknown" : new Date(preview.capturedAt).toLocaleString()}.
+      </p>
+      <p>
+        Actions belong to this room and original seat. This preview does not send or replay them.
+        Message and journal text remain in the recovery export.
+      </p>
+      <ol>
+        {preview.commands.map((command, index) => (
+          <li key={index}>{command}</li>
+        ))}
+      </ol>
+    </details>
+  );
+}
 
 /** Account-scoped old-seat work is retained without replaying it in a new seat. */
 export function DeviceRecovery({ userId }: { userId: string }) {
@@ -22,7 +61,7 @@ export function DeviceRecovery({ userId }: { userId: string }) {
   const [error, setError] = useState("");
   const [discard, setDiscard] = useState<string | null>(null);
   const [copies, setCopies] = useState<
-    Array<{ key: string; code: string; count: number; archived: boolean }>
+    Array<{ key: string; code: string; count: number; archived: boolean; preview: RecoveryPreview }>
   >([]);
   useEffect(() => {
     if (verified !== userId) {
@@ -49,6 +88,7 @@ export function DeviceRecovery({ userId }: { userId: string }) {
             code: value.code,
             count: value.commands.length,
             archived: true,
+            preview: recoveryPreview(value),
           });
         else if (
           pending &&
@@ -61,6 +101,7 @@ export function DeviceRecovery({ userId }: { userId: string }) {
             code: value.code,
             count: value.pending.length,
             archived: false,
+            preview: recoveryPreview({ ...value, commands: value.pending }),
           });
       } catch {
         /* An unreadable recovery record is preserved. */
@@ -88,8 +129,11 @@ export function DeviceRecovery({ userId }: { userId: string }) {
       <h2>Device recovery copies</h2>
       <p>
         Export device work here even if opening a campaign needs attention. Open the campaign to
-        reconcile pending changes in Multiplayer. Archived copies from older seats or conflicting
-        revisions remain separate from the server save.
+        reconcile pending changes in Multiplayer. Retry sends pending actions in Live mode or saves
+        an unfinished online turn in Turn-based mode; Submit turn remains a separate action.
+        Archived copies from older seats or conflicting revisions remain separate from the server
+        save and are never replayed under a new seat. Guest work is memory-only; export it to a file
+        before closing this tab if you need a recovery copy.
       </p>
       {copies.map((copy) => (
         <div key={copy.key}>
@@ -97,6 +141,7 @@ export function DeviceRecovery({ userId }: { userId: string }) {
             {copy.code}: {copy.count}{" "}
             {copy.archived ? "archived device actions" : "device actions awaiting reconciliation"}
           </p>
+          <RecoveryDetails preview={copy.preview} />
           <Button
             variant="secondary"
             onClick={() => {
@@ -120,22 +165,32 @@ export function DeviceRecovery({ userId }: { userId: string }) {
           </Button>
         </div>
       ))}
-      {revoked.map((copy) => (
-        <div key={copy.id}>
-          <p>
-            {copy.code}: {copy.pending} unsent device actions
-          </p>
-          <Button
-            variant="secondary"
-            onClick={() => void exportRevokedPending(copy.id).catch((e) => setError(e.message))}
-          >
-            Export device recovery copy
-          </Button>
-          <Button variant="ghost" onClick={() => setDiscard(copy.id)}>
-            Discard recovery copy
-          </Button>
-        </div>
-      ))}
+      {revoked.map((copy) => {
+        let preview: RecoveryPreview | null = null;
+        try {
+          // The recovery API checks the verified owner before exposing token-free fields.
+          preview = recoveryPreview(revokedRecoveryCopy(copy.id));
+        } catch {
+          /* Keep export/verification controls available without exposing contents. */
+        }
+        return (
+          <div key={copy.id}>
+            <p>
+              {copy.code}: {copy.pending} unsent device actions
+            </p>
+            {preview && <RecoveryDetails preview={preview} />}
+            <Button
+              variant="secondary"
+              onClick={() => void exportRevokedPending(copy.id).catch((e) => setError(e.message))}
+            >
+              Export device recovery copy
+            </Button>
+            <Button variant="ghost" onClick={() => setDiscard(copy.id)}>
+              Discard recovery copy
+            </Button>
+          </div>
+        );
+      })}
       {recovery.unverifiedRecoveries ? (
         <div>
           <p>

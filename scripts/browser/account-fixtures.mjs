@@ -227,12 +227,12 @@ export async function createAndSaveRoom(page, origin, visitFn = visit) {
 export async function endSession(page, origin, visitFn = visit) {
   await visitFn(page, origin, "/share");
   await expect(
-    page.getByRole("status").filter({ hasText: "Connected · All changes saved" }),
+    page.getByRole("status").filter({ hasText: /Room online.*Play active.*Saved to room/ }),
   ).toBeVisible();
-  await page.getByRole("button", { name: "End session", exact: true }).click();
+  await page.getByRole("button", { name: "Close room & revoke access", exact: true }).click();
   await page
     .getByRole("alertdialog")
-    .getByRole("button", { name: "End session", exact: true })
+    .getByRole("button", { name: "Close room & revoke access", exact: true })
     .click();
   await expect(page.getByRole("button", { name: "Start a room", exact: true })).toBeVisible();
   await expect(page.locator('.multiplayer-hub[aria-busy="false"]')).toBeVisible();

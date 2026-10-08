@@ -30,6 +30,8 @@ import { Button, TextInput, Confirm, Field, Fold } from "@/components/ui";
 
 import { rememberSave } from "@/lib/quire/saves";
 import { loadSeatLock } from "@/lib/quire/lock";
+import { roomStatusLabels } from "@/lib/quire/room-state";
+import { isEphemeralCampaign } from "@/lib/quire/guest-storage";
 
 type Mode = "local" | "turns" | "live";
 
@@ -186,23 +188,15 @@ export function CloudTable() {
     }
   }
 
-  const status = !online
-    ? "Offline · reconnect to play together"
-    : !cloud.joined
-      ? "Local campaign · only on this device"
-      : cloud.error
-        ? "Connection needs attention"
-        : cloud.status === "saving"
-          ? "Saving changes…"
-          : cloud.pending
-            ? `${cloud.pending} pending action${cloud.pending === 1 ? "" : "s"}`
-            : "Connected · All changes saved";
+  const labels = roomStatusLabels(cloud, { online, ephemeral: isEphemeralCampaign() });
+  const status = [labels.mode, labels.room, labels.play, labels.turn, labels.save].filter(Boolean).join(" · ");
 
   return (
     <div className="multiplayer-hub" aria-busy={busy}>
       {cloud.joined && cloud.viewOnly && (
         <div role="status" className="mb-4 rounded-xl border border-border p-4">
           <p>Session ended · Room remains online for viewing sheets and campaign information.</p>
+          {host && <p className="mt-2 text-sm text-muted">DM preparation remains available. Resume play when players should act again.</p>}
           {host && (
             <div className="mt-3 flex flex-wrap gap-2">
               <Button
@@ -526,7 +520,7 @@ export function CloudTable() {
                     </select>
                   </Field>
                   <p className="text-sm text-muted">
-                    Guest campaign data stays in memory. Refreshing can reconnect during this session; ending the session revokes access. An existing DM device campaign is preserved separately.
+                    Guest campaign data stays in memory. Refreshing can reconnect while the room stays open. Ending play can leave viewing access; closing the room revokes access. An existing DM device campaign is preserved separately.
                   </p>
                   <Button
                     type="submit"
@@ -599,13 +593,14 @@ export function CloudTable() {
           </p>
           {!cloud.live ? (
             <div className="mt-3">
+              {host && cloud.viewOnly && <p className="mb-2 text-sm text-muted">Existing turn controls still advance turns during DM preparation; they do not resume player play.</p>}
               {cloud.mine ? (
                 <Button
                   className="w-full"
                   disabled={unavailable}
                   onClick={() => run(() => endTableTurn(), "Turn ended.")}
                 >
-                  Submit changes & end turn
+                  {cloud.viewOnly ? "Submit preparation & end turn" : "Submit changes & end turn"}
                 </Button>
               ) : host ? (
                 <Button
@@ -614,7 +609,7 @@ export function CloudTable() {
                   disabled={unavailable}
                   onClick={() => run(() => skipTableTurn(), "Turn skipped.")}
                 >
-                  Skip this turn
+                  {cloud.viewOnly ? "Skip turn during preparation" : "Skip this turn"}
                 </Button>
               ) : null}
             </div>
@@ -713,7 +708,7 @@ export function CloudTable() {
               disabled={unavailable}
               onClick={() => setKeepOnline(true)}
             >
-              End session & keep room online
+              End play & keep room online
             </Button>
           )}
           <Button
@@ -723,16 +718,16 @@ export function CloudTable() {
             onClick={() => (host ? setNextMode("local") : setLeaving(true))}
           >
             <DoorOpen size={17} />
-            {host ? "End session" : "Leave room"}
+            {host ? "Close room & revoke access" : "Leave room"}
           </Button>
         </>
       )}
       <Confirm
         open={keepOnline}
         onOpenChange={setKeepOnline}
-        title="End session and keep room online?"
+        title="End play and keep room online?"
         body="Archive this session and keep player sheets and campaign information available to view. Player changes and rolls pause until you resume play. Resolve pending turns first. You can then leave the room online and return from My account."
-        confirmLabel="End session & keep online"
+        confirmLabel="End play & keep room online"
         onConfirm={() => {
           setKeepOnline(false);
           run(() => endSessionKeepOnline(), "Session ended. Room remains online.");
@@ -743,13 +738,15 @@ export function CloudTable() {
         onOpenChange={(open) => {
           if (!open) setNextMode(null);
         }}
-        title={nextMode === "local" ? "Close this room?" : "Change session mode?"}
+        title={nextMode === "local" ? "Close room and revoke player access?" : cloud.viewOnly ? "Resume play in the selected mode?" : "Change session mode?"}
         body={
           nextMode === "local"
             ? "This archives the session and closes the room for everyone. Player access is cleared; authorized reports remain in My account. Pending changes must be resolved first."
-            : "Players must submit or discard pending changes before the mode can change."
+            : cloud.viewOnly
+              ? "This resumes player gameplay in the selected mode. Existing sheets, records and room memberships remain."
+              : "Players must submit or discard pending changes before the mode can change."
         }
-        confirmLabel={nextMode === "local" ? "End session" : "Change mode"}
+        confirmLabel={nextMode === "local" ? "Close room & revoke access" : cloud.viewOnly ? "Resume play" : "Change mode"}
         onConfirm={() => {
           const mode = nextMode;
           setNextMode(null);

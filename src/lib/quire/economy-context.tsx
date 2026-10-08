@@ -1,3 +1,13 @@
+import {
+  captureMutationScope,
+  assertMutationScope,
+  type ExpectedMutationScope,
+} from "./cloud-client.ts";
+import {
+  acceptedMutation,
+  mutationNotice,
+  type EconomyMutationOutcome,
+} from "./mutation-outcome.ts";
 import { playSound } from "./sound.ts";
 import { rememberSave, listSaves } from "./saves.ts";
 import { subscribeSheetChanges, readPartySheetLinks } from "./party-sheet-links.ts";
@@ -103,6 +113,10 @@ import type {
 type EconomyApi = {
   journal: Journal;
   command: (input: CommandInput) => Promise<void>;
+  commandOutcome: (
+    input: CommandInput,
+    expected?: import("./cloud-client.ts").ExpectedMutationScope,
+  ) => Promise<EconomyMutationOutcome>;
   ready: boolean;
   purses: Purse[];
   holdings: Holding[];
@@ -123,7 +137,7 @@ type EconomyApi = {
     name: string,
     copper: number,
     quantity: number | null,
-  ) => Promise<void>;
+  ) => Promise<EconomyMutationOutcome>;
   deleteStock: (id: string) => Promise<void>;
   addCatalogStock: (shopId: string, rows: ShelfDraft[]) => Promise<number>;
   stockFromPrices: (
@@ -142,6 +156,9 @@ type EconomyApi = {
     priceScale: number;
     lines: ShelfDraft[];
   }) => Promise<string>;
+  openShelfOutcome: (
+    input: Parameters<EconomyApi["openShelf"]>[0],
+  ) => Promise<{ id: string } & EconomyMutationOutcome>;
   createPurse: (kind: Purse["kind"]) => Promise<void>;
   updatePurse: (purse: Purse) => Promise<void>;
   deletePurse: (id: string) => Promise<void>;
@@ -155,8 +172,8 @@ type EconomyApi = {
     metadata?: Pick<Holding, "notes" | "category">,
   ) => Promise<void>;
   deleteHolding: (id: string) => Promise<void>;
-  buy: (stockId: string, purseId: string, quantity: number) => Promise<void>;
-  sell: (holdingId: string, shopId: string, quantity: number) => Promise<void>;
+  buy: (stockId: string, purseId: string, quantity: number) => Promise<EconomyMutationOutcome>;
+  sell: (holdingId: string, shopId: string, quantity: number) => Promise<EconomyMutationOutcome>;
   setPurseCoins: (purseId: string, coins: Coins) => Promise<void>;
   post: (purseId: string, copper: number, summary: string) => Promise<void>;
   give: (input: {
@@ -174,10 +191,14 @@ type EconomyApi = {
     copper: number;
     quantity: number | null;
     notes: string;
-  }) => Promise<void>;
+  }) => Promise<EconomyMutationOutcome>;
   removeListing: (id: string) => Promise<void>;
-  buyListing: (listingId: string, purseId: string, quantity: number) => Promise<void>;
-  askLoan: (purseId: string, copper: number, note: string) => Promise<void>;
+  buyListing: (
+    listingId: string,
+    purseId: string,
+    quantity: number,
+  ) => Promise<EconomyMutationOutcome>;
+  askLoan: (purseId: string, copper: number, note: string) => Promise<EconomyMutationOutcome>;
   decideLoan: (id: string, status: LoanStatus) => Promise<void>;
   sheets: CharacterSheet[];
   importSheet: (purseId: string, file: File) => Promise<void>;
@@ -241,10 +262,18 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
       }
     }
     const {
-      purses: nextPurses, holdings: nextHoldings, shops: nextShops,
-      stock: nextStock, ledger: nextLedger, catalog: nextCatalog,
-      lexicon: nextLexicon, realm: nextRealm, listings: nextListings,
-      loans: nextLoans, sheets: nextSheets, journal: nextJournal,
+      purses: nextPurses,
+      holdings: nextHoldings,
+      shops: nextShops,
+      stock: nextStock,
+      ledger: nextLedger,
+      catalog: nextCatalog,
+      lexicon: nextLexicon,
+      realm: nextRealm,
+      listings: nextListings,
+      loans: nextLoans,
+      sheets: nextSheets,
+      journal: nextJournal,
     } = await economyView();
     if (
       sequence !== reloadSequence.current ||
@@ -375,7 +404,18 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
         if (gate.joined) await runSharedMutation(work);
         else await work();
         await reload();
-        if (ok && !hasPendingChanges() && ["Purchase recorded.", "Sale recorded.", "Coin updated.", "Ledger updated.", "Transfer recorded and added to party messages."].includes(ok)) void playSound("coins");
+        if (
+          ok &&
+          !hasPendingChanges() &&
+          [
+            "Purchase recorded.",
+            "Sale recorded.",
+            "Coin updated.",
+            "Ledger updated.",
+            "Transfer recorded and added to party messages.",
+          ].includes(ok)
+        )
+          void playSound("coins");
         if (ok)
           toast.success(
             gate.joined && hasPendingChanges() ? "Action saved as pending. Check sync status." : ok,
@@ -406,10 +446,81 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
       try {
         await queueCommand(command);
         await reload();
-        if (!hasPendingChanges() && ["buy", "sell", "listing", "give"].includes(command.kind)) void playSound("coins");
+        if (!hasPendingChanges() && ["buy", "sell", "listing", "give"].includes(command.kind))
+          void playSound("coins");
       } catch (error) {
         fault(error, "Action failed. Check sync status.");
       }
+    };
+    const refreshAccepted = async () => {
+      await reload().catch(() =>
+        toast.error(
+          "Action accepted, but this view could not refresh. Check sync before repeating it.",
+        ),
+      );
+    };
+    const accept = async (
+      work: (assertScope: () => void) => Promise<unknown>,
+      ok?: string,
+    ): Promise<EconomyMutationOutcome> => {
+      const invoked = captureMutationScope();
+      const guard = () => assertMutationScope(invoked);
+      guard();
+      const gate = getCloudWatch();
+      if (gate.joined && !gate.mine) throw new Error(`It is ${gate.who}'s turn.`);
+      const outcome =
+        invoked.code !== "device"
+          ? await runSharedMutation(() => work(guard), invoked)
+          : await acceptedMutation(
+              () => work(guard),
+              () => false,
+            );
+      await refreshAccepted();
+      if (
+        outcome.status === "committed" &&
+        ok &&
+        ["Purchase recorded.", "Sale recorded."].includes(ok)
+      )
+        void playSound("coins");
+      if (ok) toast.success(mutationNotice(outcome, ok));
+      return outcome;
+    };
+    const acceptCommand = async (
+      input: CommandInput,
+      expected?: ExpectedMutationScope,
+    ): Promise<EconomyMutationOutcome> => {
+      const invoked = captureMutationScope();
+      const guard = () => {
+        assertMutationScope(invoked);
+        if (expected) assertMutationScope(expected);
+      };
+      guard();
+      const outcome =
+        invoked.code !== "device"
+          ? await queueCommand(input, expected || invoked)
+          : await acceptedMutation(
+              async () => {
+                guard();
+                if (
+                  input.kind.startsWith("finance-") ||
+                  [
+                    "shop-schedule",
+                    "property-plan",
+                    "property-details",
+                    "bank-repay",
+                    "session",
+                  ].includes(input.kind) ||
+                  input.kind.startsWith("downtime-")
+                )
+                  await executeFinanceCommand(input, guard);
+                else await executeLocalCommand(input, guard);
+              },
+              () => false,
+            );
+      await refreshAccepted();
+      if (outcome.status === "committed" && ["buy", "sell", "listing"].includes(input.kind))
+        void playSound("coins");
+      return outcome;
     };
     const mutation = async <T,>(work: () => Promise<T>): Promise<T> => {
       if (!getCloudWatch().joined) return work();
@@ -421,6 +532,7 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
     };
     return {
       journal,
+      commandOutcome: acceptCommand,
       command: async (input) => {
         if (getCloudWatch().joined) {
           await queueCommand(input);
@@ -429,8 +541,12 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
         }
         if (
           input.kind.startsWith("finance-") ||
-    input.kind === "shop-schedule" || input.kind === "property-plan" || input.kind === "property-details" || input.kind === "bank-repay" ||
-          input.kind.startsWith("downtime-") || input.kind === "session"
+          input.kind === "shop-schedule" ||
+          input.kind === "property-plan" ||
+          input.kind === "property-details" ||
+          input.kind === "bank-repay" ||
+          input.kind.startsWith("downtime-") ||
+          input.kind === "session"
         ) {
           await executeFinanceCommand(input);
           await reload();
@@ -480,18 +596,21 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
           await saveStock(line);
         }),
       addStock: (shopId, name, copper, quantity) =>
-        run(async () => {
+        accept(async (guard) => {
           dmOnly();
-          await saveStock({
-            id: crypto.randomUUID(),
-            shopId,
-            name,
-            copper,
-            quantity,
-            notes: "",
-            baseCopper: copper,
-            rarity: "common",
-          });
+          await saveStock(
+            {
+              id: crypto.randomUUID(),
+              shopId,
+              name,
+              copper,
+              quantity,
+              notes: "",
+              baseCopper: copper,
+              rarity: "common",
+            },
+            guard,
+          );
         }, "Item added."),
       deleteStock: (id) =>
         run(async () => {
@@ -516,6 +635,14 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
         await reload();
         return id;
       },
+      openShelfOutcome: async (input) => {
+        dmOnly();
+        let id = "";
+        const result = await accept(async () => {
+          id = await openComposedShop(input);
+        });
+        return { id, ...result };
+      },
       createPurse: (kind) =>
         run(async () => {
           dmOnly();
@@ -537,19 +664,23 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
           await saveHolding(holding);
         }),
       addHolding: (purseId, name, kind, quantity, unitCopper, metadata) =>
-        run(async () => {
-          dmOnly();
-          await saveHolding({
-            id: crypto.randomUUID(),
-            purseId,
-            name,
-            kind,
-            quantity,
-            unitCopper,
-            notes: metadata?.notes ?? "",
-            ...(metadata?.category ? { category: metadata.category } : {}),
-          });
-        }, "Holding added.", true),
+        run(
+          async () => {
+            dmOnly();
+            await saveHolding({
+              id: crypto.randomUUID(),
+              purseId,
+              name,
+              kind,
+              quantity,
+              unitCopper,
+              notes: metadata?.notes ?? "",
+              ...(metadata?.category ? { category: metadata.category } : {}),
+            });
+          },
+          "Holding added.",
+          true,
+        ),
       deleteHolding: (id) =>
         run(async () => {
           dmOnly();
@@ -557,8 +688,8 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
         }),
       buy: (stockId, purseId, quantity) =>
         getCloudWatch().joined
-          ? shared({ kind: "buy", stockId, purseId, quantity })
-          : run(async () => {
+          ? acceptCommand({ kind: "buy", stockId, purseId, quantity })
+          : accept(async () => {
               ownPurse(purseId);
               const line = stock.find((item) => item.id === stockId);
               if (line) ownShop(line.shopId);
@@ -566,8 +697,8 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
             }, "Purchase recorded."),
       sell: (holdingId, shopId, quantity) =>
         getCloudWatch().joined
-          ? shared({ kind: "sell", holdingId, shopId, quantity })
-          : run(async () => {
+          ? acceptCommand({ kind: "sell", holdingId, shopId, quantity })
+          : accept(async () => {
               ownShop(shopId);
               const holding = holdings.find((item) => item.id === holdingId);
               if (holding) ownPurse(holding.purseId);
@@ -591,9 +722,9 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
               await giveToPlayer(input);
             }, "Transfer recorded and added to party messages."),
       addListing: (input) =>
-        run(async () => {
+        accept(async (guard) => {
           dmOnly();
-          await addListing(input);
+          await addListing(input, guard);
         }, "Listing posted."),
       removeListing: (id) =>
         run(async () => {
@@ -602,17 +733,17 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
         }, "Listing removed."),
       buyListing: (listingId, purseId, quantity) =>
         getCloudWatch().joined
-          ? shared({ kind: "listing", listingId, purseId, quantity })
-          : run(async () => {
+          ? acceptCommand({ kind: "listing", listingId, purseId, quantity })
+          : accept(async () => {
               ownPurse(purseId);
               await buyListing({ listingId, purseId, quantity });
             }, "Purchase recorded."),
       askLoan: (purseId, copper, note) =>
         getCloudWatch().joined
-          ? shared({ kind: "loan", purseId, copper, note })
-          : run(async () => {
+          ? acceptCommand({ kind: "loan", purseId, copper, note })
+          : accept(async (guard) => {
               ownPurse(purseId);
-              await askLoan({ purseId, copper, note });
+              await askLoan({ purseId, copper, note }, guard);
             }, "Loan requested."),
       decideLoan: (id, status) =>
         getCloudWatch().joined

@@ -1,3 +1,5 @@
+import { CharacterTabs } from "./workspace-tabs";
+import "./character-improvements.css";
 import { FeatureLink } from "../feature-navigation";
 import { ImportCharacterSheet } from "./import-sheet";
 import { canEditCharacterField, characterPermissions } from "@/lib/characters/permissions.mjs";
@@ -6,7 +8,7 @@ import { FantasyIcon } from "@/components/fantasy-icon";
 import { useDraftGuard } from "@/lib/quire/use-draft-guard";
 import { Heart, Shield, Footprints } from "lucide-react";
 import { HpBar } from "@/components/control-panel/readouts";
-import { useEffect, useRef, useState, useSyncExternalStore, type FormEvent } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore, useId, type FormEvent } from "react";
 import { getCampaigns, serverCampaigns, subscribeCampaigns } from "@/lib/quire/campaigns";
 import { getCloudTable, getServerCloudTable, subscribeCloudTable } from "@/lib/quire/cloud-client";
 import { useEconomy } from "@/lib/quire/economy-context";
@@ -425,6 +427,22 @@ function CharacterEditor({
   deviceCampaign?: DeviceCampaign;
 }) {
   const currentSeat = useSeat();
+  const playPrefix = useId(), editPrefix = useId();
+  const playTabs = { tabId: (key: string) => `${playPrefix}-tab-${key}`, panelId: `${playPrefix}-panel` };
+  const editTabs = { tabId: (key: string) => `${editPrefix}-tab-${key}`, panelId: `${editPrefix}-panel` };
+  const [headerHeight, setHeaderHeight] = useState(80);
+  useEffect(() => {
+    const header = document.querySelector(".loot-shell header");
+    if (!header) {
+      setHeaderHeight(0);
+      return;
+    }
+    const measure = () => setHeaderHeight(header.getBoundingClientRect().height);
+    measure();
+    const observer = new ResizeObserver(measure);
+    observer.observe(header);
+    return () => observer.disconnect();
+  }, []);
   const campaignEconomy = useEconomy();
   const activeCampaignId = useSyncExternalStore(
     subscribeCampaigns,
@@ -533,10 +551,10 @@ function CharacterEditor({
     setBusy(true);
     setError("");
     try {
-      if (id.startsWith("party:") && loadedCampaign.current !== activeCampaignId)
+      if (id.startsWith("party:") && loadedCampaign.current !== getCampaigns().activeId)
         throw Error("Reopen the character in the current campaign before saving.");
       const parsed = sheetSchema.parse(sheet);
-      await accountRequest("sheets/save", {
+      const outcome = await accountRequest<{ status?: "committed" | "pending" }>("sheets/save", {
         id,
         sheet: parsed,
         revision: detail.revision,
@@ -544,7 +562,7 @@ function CharacterEditor({
       });
       const saved = await accountRequest<Detail>("sheets/detail", { id });
       setNotice(
-        getCloudTable().pending
+        outcome.status === "pending"
           ? "Character changes saved in your pending turn. Submit the turn to share them."
           : id.startsWith("party:")
             ? "Character saved to this campaign."
@@ -606,7 +624,9 @@ function CharacterEditor({
       });
       importKey.current = crypto.randomUUID();
       if (result.pending) {
-        setNotice("Import submitted for DM review. Campaign stats, money and items remain unchanged until approval.");
+        setNotice(
+          "Import submitted for DM review. Campaign stats, money and items remain unchanged until approval.",
+        );
         return;
       }
       if (deviceCampaign) {
@@ -772,7 +792,7 @@ function CharacterEditor({
           consumption remain available.
         </p>
       )}
-      <div className="character-savebar">
+      <div className="character-savebar" style={{ top: headerHeight + 8 }}>
         <strong role="status">
           {dirty
             ? "Unsaved changes — save before rolling"
@@ -857,89 +877,95 @@ function CharacterEditor({
             </button>
           </div>
           {sheet.conditions && <p className="condition-pill">{sheet.conditions}</p>}
-          <div className="sheet-tabs" aria-label="Play sections">
-            {[
+          <CharacterTabs
+            options={[
               ["actions", "Actions"],
               ["spells", "Spells"],
               ["skills", "Skills"],
-              ["details", "Details"],
-            ].map(([key, label]) => (
-              <button
-                key={key}
-                aria-pressed={playTab === key}
-                onClick={() => {
-                  if (key === "details") {
-                    setPlayView(false);
-                    setTab("details");
-                  } else setPlayTab(key!);
-                }}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
-          {playTab === "actions" && (
-            <div className="play-actions">
-              {rollButton(
-                `Initiative ${signed(bonusFor("dex", 0, sheet.initiative))}`,
-                "initiative",
-              )}
-              {sheet.attacks.map((a, i) => (
-                <div key={i} className="play-action-row">
-                  <FantasyIcon entry={{ ...a, kind: "items" }} size={36} />
-                  <div>
-                    <h3>{a.name}</h3>
-                    <p>
-                      {signed(a.bonus)} to hit · {a.damage}
-                    </p>
-                    {a.notes && <small>{a.notes}</small>}
-                    <div className="play-action-rolls">
-                      {rollButton(`Roll ${a.name} attack`, "attack", String(i))}
-                      {rollButton(`Roll ${a.name} damage`, "damage", String(i))}
+            ]}
+            value={playTab}
+            onChange={setPlayTab}
+            label="Play sections"
+            ids={playTabs}
+          />
+          <button
+            type="button"
+            onClick={() => {
+              setPlayView(false);
+              setTab("details");
+            }}
+          >
+            Details
+          </button>
+          <div
+            role="tabpanel"
+            id={playTabs.panelId}
+            aria-labelledby={playTabs.tabId(playTab)}
+            tabIndex={0}
+          >
+            {playTab === "actions" && (
+              <div className="play-actions">
+                {rollButton(
+                  `Initiative ${signed(bonusFor("dex", 0, sheet.initiative))}`,
+                  "initiative",
+                )}
+                {sheet.attacks.map((a, i) => (
+                  <div key={i} className="play-action-row">
+                    <FantasyIcon entry={{ ...a, kind: "items" }} size={36} />
+                    <div>
+                      <h3>{a.name}</h3>
+                      <p>
+                        {signed(a.bonus)} to hit · {a.damage}
+                      </p>
+                      {a.notes && <small>{a.notes}</small>}
+                      <div className="play-action-rolls">
+                        {rollButton(`Roll ${a.name} attack`, "attack", String(i))}
+                        {rollButton(`Roll ${a.name} damage`, "damage", String(i))}
+                      </div>
                     </div>
                   </div>
-                </div>
-              ))}
-              {!sheet.attacks.length && <p>Add your attacks in Edit sheet → Combat.</p>}
-            </div>
-          )}
-          {playTab === "spells" && (
-            <div>
-              {sheet.spells.map((spell, i) => (
-                <div className="play-action-row" key={i}>
-                  <FantasyIcon entry={{ ...spell, kind: "spells" }} size={36} />
-                  <div>
-                    <h3>{spell.name}</h3>
-                    <p>
-                      Level {spell.level} · {spell.prepared ? "Prepared" : "Not prepared"}
-                    </p>
-                    <details>
-                      <summary>Spell description</summary>
-                      <p>{spell.description}</p>
-                    </details>
-                    {spell.formula && rollButton(`Roll ${spell.name}`, "spell", String(i))}
+                ))}
+                {!sheet.attacks.length && <p>Add your attacks in Edit sheet → Combat.</p>}
+              </div>
+            )}
+            {playTab === "spells" && (
+              <div>
+                {sheet.spells.map((spell, i) => (
+                  <div className="play-action-row" key={i}>
+                    <FantasyIcon entry={{ ...spell, kind: "spells" }} size={36} />
+                    <div>
+                      <h3>{spell.name}</h3>
+                      <p>
+                        Level {spell.level} · {spell.prepared ? "Prepared" : "Not prepared"}
+                      </p>
+                      <details>
+                        <summary>Spell description</summary>
+                        <p>{spell.description}</p>
+                      </details>
+                      {spell.formula && rollButton(`Roll ${spell.name}`, "spell", String(i))}
+                    </div>
                   </div>
-                </div>
-              ))}
-              {!sheet.spells.length && <p>Add or import spells in Edit sheet → Spells.</p>}
-            </div>
-          )}
-          {playTab === "skills" && (
-            <div className="play-skills">
-              {Object.entries(skills).map(([name, ability]) => {
-                const rank = sheet.skills[name] || { rank: 0, extra: 0 };
-                return (
-                  <div key={name}>
-                    {rollButton(
-                      `${name} ${signed(bonusFor(ability as Ability, rank.rank, rank.extra))}`,
-                      "skill",
-                      name,
-                    )}
-                  </div>
-                );
-              })}
-            </div>
-          )}
+                ))}
+                {!sheet.spells.length && <p>Add or import spells in Edit sheet → Spells.</p>}
+              </div>
+            )}
+            {playTab === "skills" && (
+              <div className="play-skills">
+                {Object.entries(skills).map(([name, ability]) => {
+                  const rank = sheet.skills[name] || { rank: 0, extra: 0 };
+                  return (
+                    <div key={name}>
+                      {rollButton(
+                        `${name} ${signed(bonusFor(ability as Ability, rank.rank, rank.extra))}`,
+                        "skill",
+                        name,
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            )}
+          </div>
           <div className="panel-heading mt-5">
             <h3>Resources</h3>
             <button
@@ -992,768 +1018,851 @@ function CharacterEditor({
       )}
       <fieldset disabled={busy} className="sheet-edit-fields">
         <div hidden={playView}>
-          <nav className="sheet-tabs" aria-label="Character sheet sections">
-            {[
+          <CharacterTabs
+            options={[
               ["combat", "Combat"],
               ["abilities", "Abilities & skills"],
               ["spells", "Spells"],
               ["gear", "Inventory & currency"],
               ["details", "Character details"],
-            ].map(([key, label]) => (
-              <button key={key} aria-pressed={tab === key} onClick={() => setTab(key)}>
-                {label}
-              </button>
-            ))}
-          </nav>
-          <div className="sheet-vitals">
-            <strong>AC {sheet.ac}</strong>
-            <strong>
-              HP {sheet.hp} / {sheet.maxHp}
-              {sheet.tempHp ? ` (+${sheet.tempHp} temp)` : ""}
-            </strong>
-            <strong>Speed {sheet.speed}</strong>
-            <strong>Proficiency {signed(sheet.proficiency)}</strong>
-          </div>
-          {tab === "combat" && (
-            <>
-              <div className="sheet-grid">
-                <section className="sheet-card">
-                  <h3>Health & defense</h3>
-                  <div className="field-grid">
-                    {(["hp", "maxHp", "tempHp", "ac"] as const).map((k, i) => (
-                      <Num
-                        key={k}
-                        label={["Current HP", "Maximum HP", "Temporary HP", "Armor class"][i]}
-                        value={sheet[k]}
-                        disabled={k === "hp" || k === "tempHp" ? !canPlay : !canEdit(k)}
-                        onChange={(v) => set(k, v)}
-                      />
-                    ))}
-                  </div>
-                  <HealthActions sheet={sheet} change={setSheet} disabled={!canPlay} />
-                  <Text
-                    label="Conditions"
-                    value={sheet.conditions}
-                    disabled={!canPlay}
-                    onChange={(v) => set("conditions", v)}
-                  />
-                  <div className="field-grid">
-                    <Num
-                      label="Death save successes"
-                      value={sheet.deathSuccesses}
-                      max={3}
-                      disabled={!canPlay}
-                      onChange={(v) => set("deathSuccesses", v)}
-                    />
-                    <Num
-                      label="Death save failures"
-                      value={sheet.deathFailures}
-                      max={3}
-                      disabled={!canPlay}
-                      onChange={(v) => set("deathFailures", v)}
-                    />
-                  </div>
-                  {rollButton("Roll death saving throw", "death")}
-                  <p>
-                    Record the outcome in the counters above; rolls do not apply death-save rules
-                    automatically.
-                  </p>
-                  <Check
-                    label="Inspiration"
-                    value={sheet.inspiration}
-                    disabled={!canPlay}
-                    onChange={(v) => set("inspiration", v)}
-                  />
-                </section>
-                <section className="sheet-card">
-                  <h3>Initiative & attacks</h3>
-                  {rollButton(
-                    `Initiative ${signed(bonusFor("dex", 0, sheet.initiative))}`,
-                    "initiative",
-                  )}
-                  <Num
-                    label="Initiative extra bonus"
-                    value={sheet.initiative}
-                    min={-100}
-                    disabled={!canEdit("initiative")}
-                    onChange={(v) => set("initiative", v)}
-                  />
-                  {sheet.attacks.map((a, i) => (
-                    <div className="sheet-row" key={i}>
-                      <Text
-                        label={`Attack ${i + 1} name`}
-                        value={a.name}
-                        disabled={!canEdit("attacks")}
-                        onChange={(v) =>
-                          set(
-                            "attacks",
-                            sheet.attacks.map((r, j) => (j === i ? { ...r, name: v } : r)),
-                          )
-                        }
-                      />
-                      <div className="field-grid">
+            ]}
+            value={tab}
+            onChange={setTab}
+            label="Character sheet sections"
+            ids={editTabs}
+          />
+          <div
+            role="tabpanel"
+            id={editTabs.panelId}
+            aria-labelledby={editTabs.tabId(tab)}
+            tabIndex={0}
+          >
+            <div className="sheet-vitals">
+              <strong>AC {sheet.ac}</strong>
+              <strong>
+                HP {sheet.hp} / {sheet.maxHp}
+                {sheet.tempHp ? ` (+${sheet.tempHp} temp)` : ""}
+              </strong>
+              <strong>Speed {sheet.speed}</strong>
+              <strong>Proficiency {signed(sheet.proficiency)}</strong>
+            </div>
+            {tab === "combat" && (
+              <>
+                <div className="sheet-grid">
+                  <section className="sheet-card">
+                    <h3>Health & defense</h3>
+                    <div className="field-grid">
+                      {(["hp", "maxHp", "tempHp", "ac"] as const).map((k, i) => (
                         <Num
-                          label={`${a.name} attack bonus`}
-                          value={a.bonus}
-                          min={-100}
-                          disabled={!canEdit("attacks")}
-                          onChange={(v) =>
-                            set(
-                              "attacks",
-                              sheet.attacks.map((r, j) => (j === i ? { ...r, bonus: v } : r)),
-                            )
-                          }
+                          key={k}
+                          label={["Current HP", "Maximum HP", "Temporary HP", "Armor class"][i]}
+                          value={sheet[k]}
+                          disabled={k === "hp" || k === "tempHp" ? !canPlay : !canEdit(k)}
+                          onChange={(v) => set(k, v)}
                         />
-                        <Text
-                          label={`${a.name} damage dice`}
-                          value={a.damage}
-                          disabled={!canEdit("attacks")}
-                          onChange={(v) =>
-                            set(
-                              "attacks",
-                              sheet.attacks.map((r, j) => (j === i ? { ...r, damage: v } : r)),
-                            )
-                          }
-                        />
-                      </div>
-                      <Text
-                        label={`${a.name} notes`}
-                        value={a.notes}
-                        disabled={!canEdit("attacks")}
-                        onChange={(v) =>
-                          set(
-                            "attacks",
-                            sheet.attacks.map((r, j) => (j === i ? { ...r, notes: v } : r)),
-                          )
-                        }
+                      ))}
+                    </div>
+                    <HealthActions sheet={sheet} change={setSheet} disabled={!canPlay} />
+                    <Text
+                      label="Conditions"
+                      value={sheet.conditions}
+                      disabled={!canPlay}
+                      onChange={(v) => set("conditions", v)}
+                    />
+                    <div className="field-grid">
+                      <Num
+                        label="Death save successes"
+                        value={sheet.deathSuccesses}
+                        max={3}
+                        disabled={!canPlay}
+                        onChange={(v) => set("deathSuccesses", v)}
                       />
-                      <div className="character-toolbar">
-                        {rollButton(`Roll ${a.name} attack`, "attack", String(i))}
-                        {rollButton(`Roll ${a.name} damage`, "damage", String(i))}
-                        {canEdit("attacks") && (
-                          <button
-                            onClick={() =>
+                      <Num
+                        label="Death save failures"
+                        value={sheet.deathFailures}
+                        max={3}
+                        disabled={!canPlay}
+                        onChange={(v) => set("deathFailures", v)}
+                      />
+                    </div>
+                    {rollButton("Roll death saving throw", "death")}
+                    <p>
+                      Record the outcome in the counters above; rolls do not apply death-save rules
+                      automatically.
+                    </p>
+                    <Check
+                      label="Inspiration"
+                      value={sheet.inspiration}
+                      disabled={!canPlay}
+                      onChange={(v) => set("inspiration", v)}
+                    />
+                  </section>
+                  <section className="sheet-card">
+                    <h3>Initiative & attacks</h3>
+                    {rollButton(
+                      `Initiative ${signed(bonusFor("dex", 0, sheet.initiative))}`,
+                      "initiative",
+                    )}
+                    <Num
+                      label="Initiative extra bonus"
+                      value={sheet.initiative}
+                      min={-100}
+                      disabled={!canEdit("initiative")}
+                      onChange={(v) => set("initiative", v)}
+                    />
+                    {sheet.attacks.map((a, i) => (
+                      <div className="sheet-row" key={i}>
+                        <Text
+                          label={`Attack ${i + 1} name`}
+                          value={a.name}
+                          disabled={!canEdit("attacks")}
+                          onChange={(v) =>
+                            set(
+                              "attacks",
+                              sheet.attacks.map((r, j) => (j === i ? { ...r, name: v } : r)),
+                            )
+                          }
+                        />
+                        <div className="field-grid">
+                          <Num
+                            label={`${a.name} attack bonus`}
+                            value={a.bonus}
+                            min={-100}
+                            disabled={!canEdit("attacks")}
+                            onChange={(v) =>
                               set(
                                 "attacks",
-                                sheet.attacks.filter((_, j) => j !== i),
+                                sheet.attacks.map((r, j) => (j === i ? { ...r, bonus: v } : r)),
                               )
                             }
-                          >
-                            Remove attack
-                          </button>
-                        )}
+                          />
+                          <Text
+                            label={`${a.name} damage dice`}
+                            value={a.damage}
+                            disabled={!canEdit("attacks")}
+                            onChange={(v) =>
+                              set(
+                                "attacks",
+                                sheet.attacks.map((r, j) => (j === i ? { ...r, damage: v } : r)),
+                              )
+                            }
+                          />
+                        </div>
+                        <Text
+                          label={`${a.name} notes`}
+                          value={a.notes}
+                          disabled={!canEdit("attacks")}
+                          onChange={(v) =>
+                            set(
+                              "attacks",
+                              sheet.attacks.map((r, j) => (j === i ? { ...r, notes: v } : r)),
+                            )
+                          }
+                        />
+                        <div className="character-toolbar">
+                          {rollButton(`Roll ${a.name} attack`, "attack", String(i))}
+                          {rollButton(`Roll ${a.name} damage`, "damage", String(i))}
+                          {canEdit("attacks") && (
+                            <button
+                              onClick={() =>
+                                set(
+                                  "attacks",
+                                  sheet.attacks.filter((_, j) => j !== i),
+                                )
+                              }
+                            >
+                              Remove attack
+                            </button>
+                          )}
+                        </div>
                       </div>
+                    ))}
+                    {canEdit("attacks") && (
+                      <button
+                        onClick={() =>
+                          set("attacks", [
+                            ...sheet.attacks,
+                            {
+                              name: "New attack",
+                              bonus: 0,
+                              damage: "1d6",
+                              notes: "",
+                            },
+                          ])
+                        }
+                      >
+                        Add attack
+                      </button>
+                    )}
+                  </section>
+                </div>
+                <section className="sheet-card">
+                  <h3>Limited-use resources</h3>
+                  <Text
+                    label="Hit dice"
+                    value={sheet.hitDice}
+                    disabled={!canEdit("hitDice")}
+                    onChange={(v) => set("hitDice", v)}
+                  />
+                  {sheet.resources.map((r, i) => (
+                    <div className="resource-row" key={i}>
+                      <Text
+                        label={`Resource ${i + 1} name`}
+                        value={r.name}
+                        disabled={!canEdit("resources")}
+                        onChange={(v) =>
+                          set(
+                            "resources",
+                            sheet.resources.map((x, j) => (j === i ? { ...x, name: v } : x)),
+                          )
+                        }
+                      />
+                      <Num
+                        label={`${r.name} remaining`}
+                        value={r.current}
+                        disabled={!canPlay}
+                        onChange={(v) =>
+                          set(
+                            "resources",
+                            sheet.resources.map((x, j) => (j === i ? { ...x, current: v } : x)),
+                          )
+                        }
+                      />
+                      <Num
+                        label={`${r.name} maximum`}
+                        value={r.max}
+                        disabled={!canEdit("resources")}
+                        onChange={(v) =>
+                          set(
+                            "resources",
+                            sheet.resources.map((x, j) => (j === i ? { ...x, max: v } : x)),
+                          )
+                        }
+                      />
+                      <label>
+                        Recovery
+                        <select
+                          aria-label={`${r.name} recovery`}
+                          disabled={!canEdit("resources")}
+                          value={r.recovery}
+                          onChange={(e) =>
+                            set(
+                              "resources",
+                              sheet.resources.map((x, j) =>
+                                j === i
+                                  ? {
+                                      ...x,
+                                      recovery: e.target.value as "short" | "long" | "manual",
+                                    }
+                                  : x,
+                              ),
+                            )
+                          }
+                        >
+                          {["short", "long", "manual"].map((v) => (
+                            <option key={v}>{v}</option>
+                          ))}
+                        </select>
+                      </label>
+                      <button
+                        disabled={!canPlay || r.current === 0}
+                        onClick={() =>
+                          set(
+                            "resources",
+                            sheet.resources.map((x, j) =>
+                              j === i ? { ...x, current: x.current - 1 } : x,
+                            ),
+                          )
+                        }
+                      >
+                        Use {r.name}
+                      </button>
+                      {canEdit("resources") && (
+                        <button
+                          onClick={() =>
+                            set(
+                              "resources",
+                              sheet.resources.filter((_, j) => j !== i),
+                            )
+                          }
+                        >
+                          Remove resource
+                        </button>
+                      )}
                     </div>
                   ))}
-                  {canEdit("attacks") && (
+                  {canEdit("resources") && (
+                    <>
+                      <button
+                        onClick={() =>
+                          set("resources", [
+                            ...sheet.resources,
+                            {
+                              name: "New resource",
+                              current: 1,
+                              max: 1,
+                              recovery: "long",
+                            },
+                          ])
+                        }
+                      >
+                        Add resource
+                      </button>
+                      <div className="character-toolbar">
+                        <button
+                          onClick={() =>
+                            set(
+                              "resources",
+                              sheet.resources.map((r) =>
+                                r.recovery === "short" ? { ...r, current: r.max } : r,
+                              ),
+                            )
+                          }
+                        >
+                          Restore short-rest resources
+                        </button>
+                        <button
+                          onClick={() => {
+                            if (
+                              window.confirm(
+                                "Restore HP, spell slots, and short/long-rest resources?",
+                              )
+                            )
+                              setSheet({
+                                ...sheet,
+                                hp: sheet.maxHp,
+                                deathSuccesses: 0,
+                                deathFailures: 0,
+                                slots: sheet.slots.map((s) => ({
+                                  ...s,
+                                  used: 0,
+                                })),
+                                resources: sheet.resources.map((r) =>
+                                  r.recovery !== "manual" ? { ...r, current: r.max } : r,
+                                ),
+                              });
+                          }}
+                        >
+                          Long rest
+                        </button>
+                      </div>
+                      <p>
+                        Hit dice, conditions and custom rules are managed manually. Save after
+                        resting.
+                      </p>
+                    </>
+                  )}
+                </section>
+              </>
+            )}
+            {tab === "abilities" && (
+              <>
+                <div className="ability-grid">
+                  {(abilities as Ability[]).map((a) => (
+                    <section className="sheet-card" key={a}>
+                      <Num
+                        label={a.toUpperCase()}
+                        value={sheet.scores[a]}
+                        min={1}
+                        max={30}
+                        disabled={!canEdit("scores")}
+                        onChange={(v) => set("scores", { ...sheet.scores, [a]: v })}
+                      />
+                      {rollButton(
+                        `Roll ${a.toUpperCase()} ${signed(modifier(sheet.scores[a]))}`,
+                        "ability",
+                        a,
+                      )}
+                    </section>
+                  ))}
+                </div>
+                <div className="sheet-grid">
+                  <section className="sheet-card">
+                    <h3>Saving throws</h3>
+                    {(abilities as Ability[]).map((a) => trained(a.toUpperCase(), "saves", a))}
+                  </section>
+                  <section className="sheet-card">
+                    <h3>Skills</h3>
+                    <p>Training adds proficiency; the final field is an extra bonus.</p>
+                    {Object.entries(skills).map(([name, a]) =>
+                      trained(name, "skills", a as Ability),
+                    )}
+                    <p>
+                      Passive Perception:{" "}
+                      {10 +
+                        bonusFor(
+                          "wis",
+                          sheet.skills.Perception?.rank,
+                          sheet.skills.Perception?.extra,
+                        )}
+                    </p>
+                  </section>
+                </div>
+              </>
+            )}
+            {tab === "spells" && (
+              <section className="sheet-card">
+                <h3>Spellcasting</h3>
+                <label>
+                  Spellcasting ability
+                  <select
+                    aria-label="Spellcasting ability"
+                    disabled={!canEdit("spellAbility")}
+                    value={sheet.spellAbility}
+                    onChange={(e) => set("spellAbility", e.target.value as Ability)}
+                  >
+                    {abilities.map((a) => (
+                      <option key={a}>{a}</option>
+                    ))}
+                  </select>
+                </label>
+                <p>Spell save DC: {8 + bonusFor(sheet.spellAbility, 1, sheet.spellDcExtra)}</p>
+                {rollButton(
+                  `Spell attack ${signed(bonusFor(sheet.spellAbility, 1, sheet.spellAttackExtra))}`,
+                  "spellAttack",
+                )}
+                <div className="field-grid">
+                  <Num
+                    label="Spell attack extra bonus"
+                    value={sheet.spellAttackExtra}
+                    min={-100}
+                    disabled={!canEdit("spellAttackExtra")}
+                    onChange={(v) => set("spellAttackExtra", v)}
+                  />
+                  <Num
+                    label="Spell DC extra bonus"
+                    value={sheet.spellDcExtra}
+                    min={-100}
+                    disabled={!canEdit("spellDcExtra")}
+                    onChange={(v) => set("spellDcExtra", v)}
+                  />
+                </div>
+                <h4>Spell slots</h4>
+                {sheet.slots.map((slot, i) => (
+                  <div className="resource-row" key={slot.level}>
+                    <strong>Level {slot.level}</strong>
+                    <Num
+                      label={`Level ${slot.level} slots maximum`}
+                      value={slot.max}
+                      max={99}
+                      disabled={!canEdit("slots")}
+                      onChange={(v) =>
+                        set(
+                          "slots",
+                          sheet.slots.map((x, j) => (j === i ? { ...x, max: v } : x)),
+                        )
+                      }
+                    />
+                    <Num
+                      label={`Level ${slot.level} slots used`}
+                      value={slot.used}
+                      max={99}
+                      disabled={!canPlay}
+                      onChange={(v) =>
+                        set(
+                          "slots",
+                          sheet.slots.map((x, j) => (j === i ? { ...x, used: v } : x)),
+                        )
+                      }
+                    />
+                    <button
+                      disabled={!canPlay || slot.used >= slot.max}
+                      onClick={() =>
+                        set(
+                          "slots",
+                          sheet.slots.map((x, j) => (j === i ? { ...x, used: x.used + 1 } : x)),
+                        )
+                      }
+                    >
+                      Use level {slot.level} slot
+                    </button>
+                  </div>
+                ))}
+                {canEdit("slots") && sheet.slots.length < 9 && (
+                  <button
+                    onClick={() => {
+                      const level = [1, 2, 3, 4, 5, 6, 7, 8, 9].find(
+                        (l) => !sheet.slots.some((s) => s.level === l),
+                      )!;
+                      set("slots", [...sheet.slots, { level, max: 0, used: 0 }]);
+                    }}
+                  >
+                    Add spell slot level
+                  </button>
+                )}
+                <p>
+                  Spend slots explicitly, including for upcasting. Spell rolls do not spend slots or
+                  apply effects automatically.
+                </p>
+                {sheet.spells.map((s, i) => (
+                  <details key={i} className="sheet-row">
+                    <summary>
+                      <FantasyIcon entry={{ ...s, kind: "spells" }} className="fantasy-inline" />
+                      {s.name} · {s.level === 0 ? "Cantrip" : `Level ${s.level}`}{" "}
+                      {s.prepared ? "· Prepared" : ""}
+                    </summary>
+                    <Text
+                      label={`Spell ${i + 1} name`}
+                      value={s.name}
+                      disabled={!canEdit("spells")}
+                      onChange={(v) =>
+                        set(
+                          "spells",
+                          sheet.spells.map((x, j) => (j === i ? { ...x, name: v } : x)),
+                        )
+                      }
+                    />
+                    <Num
+                      label={`${s.name} level`}
+                      value={s.level}
+                      max={9}
+                      disabled={!canEdit("spells")}
+                      onChange={(v) =>
+                        set(
+                          "spells",
+                          sheet.spells.map((x, j) => (j === i ? { ...x, level: v } : x)),
+                        )
+                      }
+                    />
+                    <Check
+                      label={`Prepare ${s.name}`}
+                      value={s.prepared}
+                      disabled={!canEdit("spells")}
+                      onChange={(v) =>
+                        set(
+                          "spells",
+                          sheet.spells.map((x, j) => (j === i ? { ...x, prepared: v } : x)),
+                        )
+                      }
+                    />
+                    <Text
+                      label={`${s.name} roll formula`}
+                      value={s.formula}
+                      disabled={!canEdit("spells")}
+                      onChange={(v) =>
+                        set(
+                          "spells",
+                          sheet.spells.map((x, j) => (j === i ? { ...x, formula: v } : x)),
+                        )
+                      }
+                    />
+                    <Text
+                      multiline
+                      label={`${s.name} description`}
+                      value={s.description}
+                      disabled={!canEdit("spells")}
+                      onChange={(v) =>
+                        set(
+                          "spells",
+                          sheet.spells.map((x, j) => (j === i ? { ...x, description: v } : x)),
+                        )
+                      }
+                    />
+                    <p className="character-source">{s.source}</p>
+                    {s.formula && rollButton(`Roll ${s.name}`, "spell", String(i))}
+                    {canEdit("spells") && (
+                      <button
+                        onClick={() =>
+                          set(
+                            "spells",
+                            sheet.spells.filter((_, j) => j !== i),
+                          )
+                        }
+                      >
+                        Remove spell
+                      </button>
+                    )}
+                  </details>
+                ))}
+                {canEdit("spells") && (
+                  <>
                     <button
                       onClick={() =>
-                        set("attacks", [
-                          ...sheet.attacks,
+                        set("spells", [
+                          ...sheet.spells,
                           {
-                            name: "New attack",
-                            bonus: 0,
-                            damage: "1d6",
-                            notes: "",
+                            name: "New spell",
+                            level: 0,
+                            prepared: false,
+                            description: "",
+                            formula: "",
+                            source: "Custom content",
                           },
                         ])
                       }
                     >
-                      Add attack
+                      Add custom spell
                     </button>
-                  )}
-                </section>
-              </div>
+                    <ReferenceSearch
+                      onAdd={(entry) => {
+                        const level = Number(
+                          entry.facts.find((f) => f.startsWith("Spell level:"))?.split(":")[1] || 0,
+                        );
+                        set("spells", [
+                          ...sheet.spells,
+                          {
+                            name: entry.name,
+                            level,
+                            prepared: false,
+                            description: [...entry.facts, entry.description].join("\n\n"),
+                            formula: "",
+                            source: entry.attribution + "\n" + entry.url,
+                          },
+                        ]);
+                      }}
+                    />
+                  </>
+                )}
+              </section>
+            )}
+            {tab === "gear" && (
               <section className="sheet-card">
-                <h3>Limited-use resources</h3>
-                <Text
-                  label="Hit dice"
-                  value={sheet.hitDice}
-                  disabled={!canEdit("hitDice")}
-                  onChange={(v) => set("hitDice", v)}
-                />
-                {sheet.resources.map((r, i) => (
-                  <div className="resource-row" key={i}>
+                <h3>Inventory & currency</h3>
+                {campaignLedger ? (
+                  <>
+                    <p>
+                      {devicePurse ? "Device campaign ledger." : "Live campaign ledger."} Use Party
+                      or Market to move money and items.
+                    </p>
+                    <div className="sheet-vitals">
+                      {Object.entries(campaignLedger.coins).map(([k, v]) => (
+                        <strong key={k}>
+                          {v} {k}
+                        </strong>
+                      ))}
+                    </div>
+                    <ul>
+                      {campaignLedger.holdings.map((h) => (
+                        <li key={h.id}>
+                          <FantasyIcon entry={h} size={28} className="fantasy-inline" />
+                          {h.name} × {h.quantity}
+                        </li>
+                      ))}
+                    </ul>
+                    <Link to="/party" search={{ action: "", section: "funds" }}>
+                      Open party inventory
+                    </Link>
+                    <p>
+                      {devicePurse
+                        ? "This device campaign keeps its existing balances and inventory; linking a sheet does not transfer anything."
+                        : "Funds & inventory and this sheet share the same items and balances. Live changes appear automatically when no edits are pending."}
+                    </p>
+                  </>
+                ) : null}
+                {(!campaignLedger || canManageCurrency) && (
+                  <>
+                    <p>Character currency. Campaign changes update Funds & inventory when saved.</p>
+                    <div className="field-grid">
+                      {(Object.keys(sheet.coins) as (keyof Sheet["coins"])[]).map((k) => (
+                        <Num
+                          key={k}
+                          label={k.toUpperCase()}
+                          value={sheet.coins[k]}
+                          disabled={!canManageCurrency}
+                          onChange={(v) => set("coins", { ...sheet.coins, [k]: v })}
+                        />
+                      ))}
+                    </div>
+                  </>
+                )}
+                <h4>Equipment & loadout</h4>
+                <p>
+                  Campaign equipment is the same inventory shown in Funds & inventory. Players can
+                  equip or consume existing gear; adding and editing items requires the DM’s
+                  inventory permission.
+                </p>
+                {sheet.equipment.map((item, i) => (
+                  <div className="sheet-row" key={i}>
+                    <FantasyIcon entry={item} size={36} />
                     <Text
-                      label={`Resource ${i + 1} name`}
-                      value={r.name}
-                      disabled={!canEdit("resources")}
+                      label={`Item ${i + 1} name`}
+                      value={item.name}
+                      disabled={!canManageInventory}
                       onChange={(v) =>
                         set(
-                          "resources",
-                          sheet.resources.map((x, j) => (j === i ? { ...x, name: v } : x)),
+                          "equipment",
+                          sheet.equipment.map((x, j) => (j === i ? { ...x, name: v } : x)),
                         )
                       }
                     />
-                    <Num
-                      label={`${r.name} remaining`}
-                      value={r.current}
-                      disabled={!canPlay}
-                      onChange={(v) =>
-                        set(
-                          "resources",
-                          sheet.resources.map((x, j) => (j === i ? { ...x, current: v } : x)),
-                        )
-                      }
-                    />
-                    <Num
-                      label={`${r.name} maximum`}
-                      value={r.max}
-                      disabled={!canEdit("resources")}
-                      onChange={(v) =>
-                        set(
-                          "resources",
-                          sheet.resources.map((x, j) => (j === i ? { ...x, max: v } : x)),
-                        )
-                      }
-                    />
-                    <label>
-                      Recovery
-                      <select
-                        aria-label={`${r.name} recovery`}
-                        disabled={!canEdit("resources")}
-                        value={r.recovery}
-                        onChange={(e) =>
+                    <div className="field-grid">
+                      <Num
+                        label={`${item.name} quantity`}
+                        value={item.quantity}
+                        disabled={!canPlay}
+                        onChange={(v) =>
                           set(
-                            "resources",
-                            sheet.resources.map((x, j) =>
+                            "equipment",
+                            sheet.equipment.map((x, j) =>
                               j === i
                                 ? {
                                     ...x,
-                                    recovery: e.target.value as "short" | "long" | "manual",
+                                    quantity: canManageInventory ? v : Math.min(x.quantity, v),
                                   }
                                 : x,
                             ),
                           )
                         }
-                      >
-                        {["short", "long", "manual"].map((v) => (
-                          <option key={v}>{v}</option>
-                        ))}
-                      </select>
-                    </label>
-                    <button
-                      disabled={!canPlay || r.current === 0}
-                      onClick={() =>
-                        set(
-                          "resources",
-                          sheet.resources.map((x, j) =>
-                            j === i ? { ...x, current: x.current - 1 } : x,
-                          ),
-                        )
-                      }
-                    >
-                      Use {r.name}
-                    </button>
-                    {canEdit("resources") && (
-                      <button
-                        onClick={() =>
-                          set(
-                            "resources",
-                            sheet.resources.filter((_, j) => j !== i),
-                          )
-                        }
-                      >
-                        Remove resource
-                      </button>
-                    )}
-                  </div>
-                ))}
-                {canEdit("resources") && (
-                  <>
-                    <button
-                      onClick={() =>
-                        set("resources", [
-                          ...sheet.resources,
-                          {
-                            name: "New resource",
-                            current: 1,
-                            max: 1,
-                            recovery: "long",
-                          },
-                        ])
-                      }
-                    >
-                      Add resource
-                    </button>
-                    <div className="character-toolbar">
-                      <button
-                        onClick={() =>
-                          set(
-                            "resources",
-                            sheet.resources.map((r) =>
-                              r.recovery === "short" ? { ...r, current: r.max } : r,
-                            ),
-                          )
-                        }
-                      >
-                        Restore short-rest resources
-                      </button>
-                      <button
-                        onClick={() => {
-                          if (
-                            window.confirm(
-                              "Restore HP, spell slots, and short/long-rest resources?",
-                            )
-                          )
-                            setSheet({
-                              ...sheet,
-                              hp: sheet.maxHp,
-                              deathSuccesses: 0,
-                              deathFailures: 0,
-                              slots: sheet.slots.map((s) => ({
-                                ...s,
-                                used: 0,
-                              })),
-                              resources: sheet.resources.map((r) =>
-                                r.recovery !== "manual" ? { ...r, current: r.max } : r,
-                              ),
-                            });
-                        }}
-                      >
-                        Long rest
-                      </button>
-                    </div>
-                    <p>
-                      Hit dice, conditions and custom rules are managed manually. Save after
-                      resting.
-                    </p>
-                  </>
-                )}
-              </section>
-            </>
-          )}
-          {tab === "abilities" && (
-            <>
-              <div className="ability-grid">
-                {(abilities as Ability[]).map((a) => (
-                  <section className="sheet-card" key={a}>
-                    <Num
-                      label={a.toUpperCase()}
-                      value={sheet.scores[a]}
-                      min={1}
-                      max={30}
-                      disabled={!canEdit("scores")}
-                      onChange={(v) => set("scores", { ...sheet.scores, [a]: v })}
-                    />
-                    {rollButton(
-                      `Roll ${a.toUpperCase()} ${signed(modifier(sheet.scores[a]))}`,
-                      "ability",
-                      a,
-                    )}
-                  </section>
-                ))}
-              </div>
-              <div className="sheet-grid">
-                <section className="sheet-card">
-                  <h3>Saving throws</h3>
-                  {(abilities as Ability[]).map((a) => trained(a.toUpperCase(), "saves", a))}
-                </section>
-                <section className="sheet-card">
-                  <h3>Skills</h3>
-                  <p>Training adds proficiency; the final field is an extra bonus.</p>
-                  {Object.entries(skills).map(([name, a]) => trained(name, "skills", a as Ability))}
-                  <p>
-                    Passive Perception:{" "}
-                    {10 +
-                      bonusFor(
-                        "wis",
-                        sheet.skills.Perception?.rank,
-                        sheet.skills.Perception?.extra,
-                      )}
-                  </p>
-                </section>
-              </div>
-            </>
-          )}
-          {tab === "spells" && (
-            <section className="sheet-card">
-              <h3>Spellcasting</h3>
-              <label>
-                Spellcasting ability
-                <select
-                  aria-label="Spellcasting ability"
-                  disabled={!canEdit("spellAbility")}
-                  value={sheet.spellAbility}
-                  onChange={(e) => set("spellAbility", e.target.value as Ability)}
-                >
-                  {abilities.map((a) => (
-                    <option key={a}>{a}</option>
-                  ))}
-                </select>
-              </label>
-              <p>Spell save DC: {8 + bonusFor(sheet.spellAbility, 1, sheet.spellDcExtra)}</p>
-              {rollButton(
-                `Spell attack ${signed(bonusFor(sheet.spellAbility, 1, sheet.spellAttackExtra))}`,
-                "spellAttack",
-              )}
-              <div className="field-grid">
-                <Num
-                  label="Spell attack extra bonus"
-                  value={sheet.spellAttackExtra}
-                  min={-100}
-                  disabled={!canEdit("spellAttackExtra")}
-                  onChange={(v) => set("spellAttackExtra", v)}
-                />
-                <Num
-                  label="Spell DC extra bonus"
-                  value={sheet.spellDcExtra}
-                  min={-100}
-                  disabled={!canEdit("spellDcExtra")}
-                  onChange={(v) => set("spellDcExtra", v)}
-                />
-              </div>
-              <h4>Spell slots</h4>
-              {sheet.slots.map((slot, i) => (
-                <div className="resource-row" key={slot.level}>
-                  <strong>Level {slot.level}</strong>
-                  <Num
-                    label={`Level ${slot.level} slots maximum`}
-                    value={slot.max}
-                    max={99}
-                    disabled={!canEdit("slots")}
-                    onChange={(v) =>
-                      set(
-                        "slots",
-                        sheet.slots.map((x, j) => (j === i ? { ...x, max: v } : x)),
-                      )
-                    }
-                  />
-                  <Num
-                    label={`Level ${slot.level} slots used`}
-                    value={slot.used}
-                    max={99}
-                    disabled={!canPlay}
-                    onChange={(v) =>
-                      set(
-                        "slots",
-                        sheet.slots.map((x, j) => (j === i ? { ...x, used: v } : x)),
-                      )
-                    }
-                  />
-                  <button
-                    disabled={!canPlay || slot.used >= slot.max}
-                    onClick={() =>
-                      set(
-                        "slots",
-                        sheet.slots.map((x, j) => (j === i ? { ...x, used: x.used + 1 } : x)),
-                      )
-                    }
-                  >
-                    Use level {slot.level} slot
-                  </button>
-                </div>
-              ))}
-              {canEdit("slots") && sheet.slots.length < 9 && (
-                <button
-                  onClick={() => {
-                    const level = [1, 2, 3, 4, 5, 6, 7, 8, 9].find(
-                      (l) => !sheet.slots.some((s) => s.level === l),
-                    )!;
-                    set("slots", [...sheet.slots, { level, max: 0, used: 0 }]);
-                  }}
-                >
-                  Add spell slot level
-                </button>
-              )}
-              <p>
-                Spend slots explicitly, including for upcasting. Spell rolls do not spend slots or
-                apply effects automatically.
-              </p>
-              {sheet.spells.map((s, i) => (
-                <details key={i} className="sheet-row">
-                  <summary>
-                    <FantasyIcon entry={{ ...s, kind: "spells" }} className="fantasy-inline" />
-                    {s.name} · {s.level === 0 ? "Cantrip" : `Level ${s.level}`}{" "}
-                    {s.prepared ? "· Prepared" : ""}
-                  </summary>
-                  <Text
-                    label={`Spell ${i + 1} name`}
-                    value={s.name}
-                    disabled={!canEdit("spells")}
-                    onChange={(v) =>
-                      set(
-                        "spells",
-                        sheet.spells.map((x, j) => (j === i ? { ...x, name: v } : x)),
-                      )
-                    }
-                  />
-                  <Num
-                    label={`${s.name} level`}
-                    value={s.level}
-                    max={9}
-                    disabled={!canEdit("spells")}
-                    onChange={(v) =>
-                      set(
-                        "spells",
-                        sheet.spells.map((x, j) => (j === i ? { ...x, level: v } : x)),
-                      )
-                    }
-                  />
-                  <Check
-                    label={`Prepare ${s.name}`}
-                    value={s.prepared}
-                    disabled={!canEdit("spells")}
-                    onChange={(v) =>
-                      set(
-                        "spells",
-                        sheet.spells.map((x, j) => (j === i ? { ...x, prepared: v } : x)),
-                      )
-                    }
-                  />
-                  <Text
-                    label={`${s.name} roll formula`}
-                    value={s.formula}
-                    disabled={!canEdit("spells")}
-                    onChange={(v) =>
-                      set(
-                        "spells",
-                        sheet.spells.map((x, j) => (j === i ? { ...x, formula: v } : x)),
-                      )
-                    }
-                  />
-                  <Text
-                    multiline
-                    label={`${s.name} description`}
-                    value={s.description}
-                    disabled={!canEdit("spells")}
-                    onChange={(v) =>
-                      set(
-                        "spells",
-                        sheet.spells.map((x, j) => (j === i ? { ...x, description: v } : x)),
-                      )
-                    }
-                  />
-                  <p className="character-source">{s.source}</p>
-                  {s.formula && rollButton(`Roll ${s.name}`, "spell", String(i))}
-                  {canEdit("spells") && (
-                    <button
-                      onClick={() =>
-                        set(
-                          "spells",
-                          sheet.spells.filter((_, j) => j !== i),
-                        )
-                      }
-                    >
-                      Remove spell
-                    </button>
-                  )}
-                </details>
-              ))}
-              {canEdit("spells") && (
-                <>
-                  <button
-                    onClick={() =>
-                      set("spells", [
-                        ...sheet.spells,
-                        {
-                          name: "New spell",
-                          level: 0,
-                          prepared: false,
-                          description: "",
-                          formula: "",
-                          source: "Custom content",
-                        },
-                      ])
-                    }
-                  >
-                    Add custom spell
-                  </button>
-                  <ReferenceSearch
-                    onAdd={(entry) => {
-                      const level = Number(
-                        entry.facts.find((f) => f.startsWith("Spell level:"))?.split(":")[1] || 0,
-                      );
-                      set("spells", [
-                        ...sheet.spells,
-                        {
-                          name: entry.name,
-                          level,
-                          prepared: false,
-                          description: [...entry.facts, entry.description].join("\n\n"),
-                          formula: "",
-                          source: entry.attribution + "\n" + entry.url,
-                        },
-                      ]);
-                    }}
-                  />
-                </>
-              )}
-            </section>
-          )}
-          {tab === "gear" && (
-            <section className="sheet-card">
-              <h3>Inventory & currency</h3>
-              {campaignLedger ? (
-                <>
-                  <p>
-                    {devicePurse ? "Device campaign ledger." : "Live campaign ledger."} Use Party or
-                    Market to move money and items.
-                  </p>
-                  <div className="sheet-vitals">
-                    {Object.entries(campaignLedger.coins).map(([k, v]) => (
-                      <strong key={k}>
-                        {v} {k}
-                      </strong>
-                    ))}
-                  </div>
-                  <ul>
-                    {campaignLedger.holdings.map((h) => (
-                      <li key={h.id}>
-                        <FantasyIcon entry={h} size={28} className="fantasy-inline" />
-                        {h.name} × {h.quantity}
-                      </li>
-                    ))}
-                  </ul>
-                  <Link to="/party" search={{ action: "", section: "funds" }}>
-                    Open party inventory
-                  </Link>
-                  <p>
-                    {devicePurse
-                      ? "This device campaign keeps its existing balances and inventory; linking a sheet does not transfer anything."
-                      : "Funds & inventory and this sheet share the same items and balances. Live changes appear automatically when no edits are pending."}
-                  </p>
-                </>
-              ) : null}
-              {(!campaignLedger || canManageCurrency) && (
-                <>
-                  <p>Character currency. Campaign changes update Funds & inventory when saved.</p>
-                  <div className="field-grid">
-                    {(Object.keys(sheet.coins) as (keyof Sheet["coins"])[]).map((k) => (
-                      <Num
-                        key={k}
-                        label={k.toUpperCase()}
-                        value={sheet.coins[k]}
-                        disabled={!canManageCurrency}
-                        onChange={(v) => set("coins", { ...sheet.coins, [k]: v })}
                       />
-                    ))}
-                  </div>
-                </>
-              )}
-              <h4>Equipment & loadout</h4>
-              <p>
-                Campaign equipment is the same inventory shown in Funds & inventory. Players can
-                equip or consume existing gear; adding and editing items requires the DM’s inventory
-                permission.
-              </p>
-              {sheet.equipment.map((item, i) => (
-                <div className="sheet-row" key={i}>
-                  <FantasyIcon entry={item} size={36} />
-                  <Text
-                    label={`Item ${i + 1} name`}
-                    value={item.name}
-                    disabled={!canManageInventory}
-                    onChange={(v) =>
-                      set(
-                        "equipment",
-                        sheet.equipment.map((x, j) => (j === i ? { ...x, name: v } : x)),
-                      )
-                    }
-                  />
-                  <div className="field-grid">
-                    <Num
-                      label={`${item.name} quantity`}
-                      value={item.quantity}
+                      <Num
+                        label={`${item.name} unit weight`}
+                        value={item.weight}
+                        step="any"
+                        disabled={!canEdit("equipment")}
+                        onChange={(v) =>
+                          set(
+                            "equipment",
+                            sheet.equipment.map((x, j) => (j === i ? { ...x, weight: v } : x)),
+                          )
+                        }
+                      />
+                    </div>
+                    <Check
+                      label={`Equip ${item.name}`}
+                      value={item.equipped}
                       disabled={!canPlay}
                       onChange={(v) =>
                         set(
                           "equipment",
-                          sheet.equipment.map((x, j) =>
-                            j === i
-                              ? { ...x, quantity: canManageInventory ? v : Math.min(x.quantity, v) }
-                              : x,
-                          ),
+                          sheet.equipment.map((x, j) => (j === i ? { ...x, equipped: v } : x)),
                         )
                       }
                     />
-                    <Num
-                      label={`${item.name} unit weight`}
-                      value={item.weight}
-                      step="any"
+                    <Text
+                      label={`${item.name} notes`}
+                      value={item.notes}
                       disabled={!canEdit("equipment")}
                       onChange={(v) =>
                         set(
                           "equipment",
-                          sheet.equipment.map((x, j) => (j === i ? { ...x, weight: v } : x)),
+                          sheet.equipment.map((x, j) => (j === i ? { ...x, notes: v } : x)),
                         )
                       }
                     />
+                    {canManageInventory && (
+                      <button
+                        onClick={() =>
+                          set(
+                            "equipment",
+                            sheet.equipment.filter((_, j) => j !== i),
+                          )
+                        }
+                      >
+                        Remove item
+                      </button>
+                    )}
                   </div>
-                  <Check
-                    label={`Equip ${item.name}`}
-                    value={item.equipped}
-                    disabled={!canPlay}
-                    onChange={(v) =>
-                      set(
-                        "equipment",
-                        sheet.equipment.map((x, j) => (j === i ? { ...x, equipped: v } : x)),
-                      )
+                ))}
+                <p>
+                  Loadout weight:{" "}
+                  {sheet.equipment.reduce((n, i) => n + i.quantity * i.weight, 0).toLocaleString()}
+                </p>
+                {canManageInventory && (
+                  <button
+                    onClick={() =>
+                      set("equipment", [
+                        ...sheet.equipment,
+                        {
+                          name: "New item",
+                          quantity: 1,
+                          weight: 0,
+                          equipped: false,
+                          notes: "",
+                        },
+                      ])
                     }
-                  />
-                  <Text
-                    label={`${item.name} notes`}
-                    value={item.notes}
-                    disabled={!canEdit("equipment")}
-                    onChange={(v) =>
-                      set(
-                        "equipment",
-                        sheet.equipment.map((x, j) => (j === i ? { ...x, notes: v } : x)),
-                      )
-                    }
-                  />
-                  {canManageInventory && (
-                    <button
-                      onClick={() =>
-                        set(
-                          "equipment",
-                          sheet.equipment.filter((_, j) => j !== i),
-                        )
+                  >
+                    Add equipment
+                  </button>
+                )}
+              </section>
+            )}
+            {tab === "details" && (
+              <section className="sheet-card">
+                <h3>Character details</h3>
+                <div className="field-grid">
+                  {(["name", "species", "classes", "background", "speed"] as const).map((k) => (
+                    <Text
+                      key={k}
+                      label={
+                        {
+                          name: "Character name",
+                          species: "Species",
+                          classes: "Classes / subclasses",
+                          background: "Background",
+                          speed: "Speed",
+                        }[k]
                       }
+                      value={sheet[k]}
+                      disabled={!canEdit(k)}
+                      onChange={(v) => set(k, v)}
+                    />
+                  ))}
+                  <Num
+                    label="Character level"
+                    value={sheet.level}
+                    min={1}
+                    max={20}
+                    disabled={!canEdit("level")}
+                    onChange={(v) => set("level", v)}
+                  />
+                  <Num
+                    label="Proficiency bonus"
+                    value={sheet.proficiency}
+                    max={20}
+                    disabled={!canEdit("proficiency")}
+                    onChange={(v) => set("proficiency", v)}
+                  />
+                  <label>
+                    Rules edition
+                    <select
+                      aria-label="Rules edition"
+                      disabled={!canEdit("edition")}
+                      value={sheet.edition}
+                      onChange={(e) => set("edition", e.target.value as Sheet["edition"])}
                     >
-                      Remove item
-                    </button>
-                  )}
+                      {["2014", "2024", "custom"].map((v) => (
+                        <option key={v}>{v}</option>
+                      ))}
+                    </select>
+                  </label>
                 </div>
-              ))}
-              <p>
-                Loadout weight:{" "}
-                {sheet.equipment.reduce((n, i) => n + i.quantity * i.weight, 0).toLocaleString()}
-              </p>
-              {canManageInventory && (
-                <button
-                  onClick={() =>
-                    set("equipment", [
-                      ...sheet.equipment,
-                      {
-                        name: "New item",
-                        quantity: 1,
-                        weight: 0,
-                        equipped: false,
-                        notes: "",
-                      },
-                    ])
-                  }
-                >
-                  Add equipment
-                </button>
-              )}
-            </section>
-          )}
-          {tab === "details" && (
-            <section className="sheet-card">
-              <h3>Character details</h3>
-              <div className="field-grid">
-                {(["name", "species", "classes", "background", "speed"] as const).map((k) => (
+                <p>
+                  Stats and class features are editable. Level changes do not automatically change
+                  proficiency, HP, spells or features.
+                </p>
+                {canEdit("portrait") && (
+                  <label>
+                    Portrait
+                    <input
+                      aria-label="Character portrait"
+                      type="file"
+                      accept="image/png,image/jpeg,image/webp"
+                      onChange={async (e) => {
+                        const f = e.target.files?.[0];
+                        e.target.value = "";
+                        if (!f) return;
+                        if (f.size > 350000) {
+                          setError("Choose a portrait smaller than 350 KB.");
+                          return;
+                        }
+                        const reader = new FileReader();
+                        reader.onload = () => set("portrait", String(reader.result));
+                        reader.readAsDataURL(f);
+                      }}
+                    />
+                  </label>
+                )}
+                {(["description", "features", "notes", "source"] as const).map((k) => (
                   <Text
+                    multiline
                     key={k}
                     label={
                       {
-                        name: "Character name",
-                        species: "Species",
-                        classes: "Classes / subclasses",
-                        background: "Background",
-                        speed: "Speed",
+                        description: "Personality & background",
+                        features: "Features, traits & custom content",
+                        notes: "Character notes",
+                        source: "Source credits",
                       }[k]
                     }
                     value={sheet[k]}
@@ -1761,173 +1870,103 @@ function CharacterEditor({
                     onChange={(v) => set(k, v)}
                   />
                 ))}
-                <Num
-                  label="Character level"
-                  value={sheet.level}
-                  min={1}
-                  max={20}
-                  disabled={!canEdit("level")}
-                  onChange={(v) => set("level", v)}
-                />
-                <Num
-                  label="Proficiency bonus"
-                  value={sheet.proficiency}
-                  max={20}
-                  disabled={!canEdit("proficiency")}
-                  onChange={(v) => set("proficiency", v)}
-                />
-                <label>
-                  Rules edition
-                  <select
-                    aria-label="Rules edition"
-                    disabled={!canEdit("edition")}
-                    value={sheet.edition}
-                    onChange={(e) => set("edition", e.target.value as Sheet["edition"])}
-                  >
-                    {["2014", "2024", "custom"].map((v) => (
-                      <option key={v}>{v}</option>
-                    ))}
-                  </select>
-                </label>
-              </div>
-              <p>
-                Stats and class features are editable. Level changes do not automatically change
-                proficiency, HP, spells or features.
-              </p>
-              {canEdit("portrait") && (
-                <label>
-                  Portrait
-                  <input
-                    aria-label="Character portrait"
-                    type="file"
-                    accept="image/png,image/jpeg,image/webp"
-                    onChange={async (e) => {
-                      const f = e.target.files?.[0];
-                      e.target.value = "";
-                      if (!f) return;
-                      if (f.size > 350000) {
-                        setError("Choose a portrait smaller than 350 KB.");
-                        return;
-                      }
-                      const reader = new FileReader();
-                      reader.onload = () => set("portrait", String(reader.result));
-                      reader.readAsDataURL(f);
-                    }}
-                  />
-                </label>
-              )}
-              {(["description", "features", "notes", "source"] as const).map((k) => (
-                <Text
-                  multiline
-                  key={k}
-                  label={
-                    {
-                      description: "Personality & background",
-                      features: "Features, traits & custom content",
-                      notes: "Character notes",
-                      source: "Source credits",
-                    }[k]
-                  }
-                  value={sheet[k]}
-                  disabled={!canEdit(k)}
-                  onChange={(v) => set(k, v)}
-                />
-              ))}
-              {editable && !id.startsWith("party:") && !id.startsWith("campaign:") && (
-                <>
-                  <h4>Campaign assignment</h4>
-                  {!detail.campaign && currentSeat.role === "dm" && (
-                    <button
-                      disabled={dirty || busy}
-                      onClick={async () => {
-                        setBusy(true);
-                        setError("");
-                        try {
-                          const work = async () => {
-                            const target = await createCampaignCharacter(sheet);
-                            await bindCampaignProfile(target, id, sheet);
-                          };
-                          if (getCloudTable().joined) await runSharedMutation(work);
-                          else await work();
-                          announceSheetChange();
-                          setReload((n) => n + 1);
-                          changed();
-                          setNotice(
-                            "Character added to the current campaign with its funds and inventory.",
-                          );
-                        } catch (e) {
-                          setError(errorText(e));
-                        } finally {
-                          setBusy(false);
-                        }
-                      }}
-                    >
-                      Add to current campaign
-                    </button>
-                  )}
-                  <p>
-                    A character belongs to one campaign at a time. The campaign DM can view the
-                    assigned sheet; its rolls are visible to campaign members. Save changes before
-                    assigning. Player imports require DM approval; campaign money and items are preserved.
-                  </p>
-                  <label>
-                    Campaign
-                    <select
-                      aria-label="Assign campaign"
-                      value={code}
-                      onChange={(e) => {
-                        setCode(e.target.value);
-                        setPurse("");
-                      }}
-                    >
-                      <option value="">Standalone character</option>
-                      {!!deviceCampaign?.purses.length && (
-                        <option value={deviceCampaign.code}>
-                          {deviceCampaign.name} · this device
-                        </option>
-                      )}
-                      {campaigns.map((c) => (
-                        <option key={c.code} value={c.code}>
-                          {c.name} · {c.code}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  {code && (
-                    <label>
-                      Campaign character
-                      <select
-                        aria-label="Assign campaign character"
-                        value={purse}
-                        onChange={(e) => setPurse(e.target.value)}
+                {editable && !id.startsWith("party:") && !id.startsWith("campaign:") && (
+                  <>
+                    <h4>Campaign assignment</h4>
+                    {!detail.campaign && currentSeat.role === "dm" && (
+                      <button
+                        disabled={dirty || busy}
+                        onClick={async () => {
+                          setBusy(true);
+                          setError("");
+                          try {
+                            const work = async () => {
+                              const target = await createCampaignCharacter(sheet);
+                              await bindCampaignProfile(target, id, sheet);
+                            };
+                            if (getCloudTable().joined) await runSharedMutation(work);
+                            else await work();
+                            announceSheetChange();
+                            setReload((n) => n + 1);
+                            changed();
+                            setNotice(
+                              "Character added to the current campaign with its funds and inventory.",
+                            );
+                          } catch (e) {
+                            setError(errorText(e));
+                          } finally {
+                            setBusy(false);
+                          }
+                        }}
                       >
-                        <option value="">Choose controlled character</option>
-                        {(deviceCampaign?.code === code
-                          ? deviceCampaign.purses
-                          : campaigns.find((c) => c.code === code)?.purses
-                        )?.map((p) => (
-                          <option key={p.id} value={p.id}>
-                            {p.name}
+                        Add to current campaign
+                      </button>
+                    )}
+                    <p>
+                      A character belongs to one campaign at a time. The campaign DM can view the
+                      assigned sheet; its rolls are visible to campaign members. Save changes before
+                      assigning. Player imports require DM approval; campaign money and items are
+                      preserved.
+                    </p>
+                    <label>
+                      Campaign
+                      <select
+                        aria-label="Assign campaign"
+                        value={code}
+                        onChange={(e) => {
+                          setCode(e.target.value);
+                          setPurse("");
+                        }}
+                      >
+                        <option value="">Standalone character</option>
+                        {!!deviceCampaign?.purses.length && (
+                          <option value={deviceCampaign.code}>
+                            {deviceCampaign.name} · this device
+                          </option>
+                        )}
+                        {campaigns.map((c) => (
+                          <option key={c.code} value={c.code}>
+                            {c.name} · {c.code}
                           </option>
                         ))}
                       </select>
                     </label>
-                  )}
-                  <button
-                    disabled={busy || dirty || (!!code && !purse)}
-                    onClick={() => void assign()}
-                  >
-                    Save campaign assignment
-                  </button>
-                  <p>
-                    {deviceCampaign?.code === code
-                      ? "This link is saved for this account and campaign on this device. Your account sheet stays private; online campaign membership and roll sharing are unchanged."
-                      : "Missing a campaign? Save its membership from My account first."}
-                  </p>
-                </>
-              )}
-            </section>
-          )}
+                    {code && (
+                      <label>
+                        Campaign character
+                        <select
+                          aria-label="Assign campaign character"
+                          value={purse}
+                          onChange={(e) => setPurse(e.target.value)}
+                        >
+                          <option value="">Choose controlled character</option>
+                          {(deviceCampaign?.code === code
+                            ? deviceCampaign.purses
+                            : campaigns.find((c) => c.code === code)?.purses
+                          )?.map((p) => (
+                            <option key={p.id} value={p.id}>
+                              {p.name}
+                            </option>
+                          ))}
+                        </select>
+                      </label>
+                    )}
+                    <button
+                      disabled={busy || dirty || (!!code && !purse)}
+                      onClick={() => void assign()}
+                    >
+                      Save campaign assignment
+                    </button>
+                    <p>
+                      {deviceCampaign?.code === code
+                        ? "This link is saved for this account and campaign on this device. Your account sheet stays private; online campaign membership and roll sharing are unchanged."
+                        : "Missing a campaign? Save its membership from My account first."}
+                    </p>
+                  </>
+                )}
+              </section>
+            )}
+          </div>
         </div>
         <section className="sheet-card" id="dice">
           <h3>Dice tray</h3>
@@ -2456,7 +2495,9 @@ function DmCampaigns({ campaigns }: { campaigns: Campaign[] }) {
               changed={() => setReload((n) => n + 1)}
             />
           )}
-          <FeatureLink feature="review" campaignCode={code}>Review character imports</FeatureLink>
+          <FeatureLink feature="review" campaignCode={code}>
+            Review character imports
+          </FeatureLink>
           <RollLog key={code} code={code} />
         </>
       )}
@@ -2515,4 +2556,3 @@ function ReferenceSearch({ onAdd }: { onAdd: (e: OpenEntry) => void }) {
     </details>
   );
 }
-

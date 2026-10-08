@@ -2,6 +2,8 @@
 
 No feature below may be removed, disabled, hidden or reduced without explicit user approval. Locations are entry points, not permission grants. Server authorization remains authoritative.
 
+The October 8 preservation improvements extend the existing entry points with accurate room/play/save status, guarded drafts, campaign-first account navigation, complete financial previews, property/calendar explanations, archive and handout readers, import comparisons, reachable character save controls, encounter conveniences and owner/staff explanations. See [implementation mapping](audit/2026-10-08-feature-improvements.md). These are additive presentation and workflow changes; original actions, complete records, manual options, themes, opening animation and permissions remain available. Website source and signed Android release identity are reported separately.
+
 | Capability                                                                                          | Entry point                        |
 | --------------------------------------------------------------------------------------------------- | ---------------------------------- |
 | Campaign create/rename/switch/export/delete, current/last handling and recovery                     | Campaign controls                  |
@@ -221,7 +223,7 @@ Validation for this change: 427 automated tests passed (four existing skips), Ty
 
 ## Authorized account-owned campaign model (2026-10-05)
 
-DMs sign in and own their hosted campaigns. Open sessions survive closed tabs; explicit End session preserves the server campaign and revokes players. Reopening rotates invitations. Signed-in players get account memberships automatically. Guests keep campaign contents only in document memory, with a session-scoped reconnect credential; a new session requires joining/assignment again. DM offline play remains available for owned device copies, with explicit legacy-save claiming and existing backups preserved. Offline player copies are intentionally retired; legacy DM report imports remain for recovery. Multiple campaigns remain independent.
+DMs sign in and own their hosted campaigns. Open sessions survive closed tabs; explicit Close room & revoke access preserves the server campaign and revokes players. Reopening rotates invitations. Signed-in players get account memberships automatically. Guests keep campaign contents only in document memory, with a session-scoped reconnect credential; a new session requires joining/assignment again. DM offline play remains available for owned device copies, with explicit legacy-save claiming and existing backups preserved. Offline player copies are intentionally retired; legacy DM report imports remain for recovery. Multiple campaigns remain independent.
 
 ## Optional CC0 sound effects
 
@@ -266,6 +268,6 @@ Release status must be taken from the latest recovery checkpoint/PR, not this im
 
 ## Between-session online access (2026-10-07)
 
-- DM Multiplayer offers End session & keep room online. Session records are archived once; seats, current invitations and account memberships remain available. Player gameplay, edits, messages and rolls are view-only until the DM resumes play. Existing privacy projections and kick/ban/release protections apply.
-- DM can Leave room online after ending play, then resume the saved room from My account. Resume play restores the chosen Live/Turn-based mode; starting a named session also resumes play. The existing End session option still closes the room and revokes player access.
+- DM Multiplayer offers End play & keep room online. Session records are archived once; seats, current invitations and account memberships remain available. Player gameplay, edits, messages and rolls are view-only until the DM resumes play. Existing privacy projections and kick/ban/release protections apply.
+- DM can Leave room online after ending play, then resume the saved room from My account. Resume play restores the chosen Live/Turn-based mode; starting a named session also resumes play. Close room & revoke access closes the room and revokes player access. End recorded session remains a separate named-record action.
 - Legacy room bodies default to ordinary active play; no schema migration or Android signing changes.

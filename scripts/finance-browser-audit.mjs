@@ -69,20 +69,47 @@ try {
       db.close();
     });
     await reloadApplication(page);
-    async function go(feature){
-      await page.locator('nav[aria-label="Sections"]:visible').getByRole("link",{name:"Desk",exact:true}).click();
-      if (["financial","bank","shops","properties"].includes(feature)) await page.getByRole("button",{name:/^Economy & properties/}).click();
-      await page.locator('.feature-cards').locator(`a[href^="/features/${feature}?"]`).click();
-      assert.equal(await page.locator(".loot-opening").count(),0);
+    async function go(feature) {
+      await page
+        .locator('nav[aria-label="Sections"]:visible')
+        .getByRole("link", { name: "Desk", exact: true })
+        .click();
+      if (["financial", "bank", "shops", "properties"].includes(feature))
+        await page.getByRole("button", { name: /^Economy & properties/ }).click();
+      await page.locator(".feature-cards").locator(`a[href^="/features/${feature}?"]`).click();
+      assert.equal(await page.locator(".loot-opening").count(), 0);
     }
     const finance = page.locator("#campaign-finance");
     await page.getByLabel("Loan name", { exact: true }).fill("Guild debt");
-    await page.getByLabel("Principal (cp)", { exact: true }).fill("1000");
+    const principal = page.getByLabel("Principal (cp)", { exact: true });
+    await principal
+      .locator("..")
+      .locator("..")
+      .getByRole("button", { name: "Enter gold, silver or other coins", exact: true })
+      .click();
+    const coinPrincipal = page.getByLabel("Principal (cp) with coin denominations", {
+      exact: true,
+    });
+    await coinPrincipal.fill("10 g");
+    assert.equal(await coinPrincipal.inputValue(), "10 g");
+    assert.equal(await principal.inputValue(), "");
+    await coinPrincipal.fill("10 gp");
+    assert.equal(await principal.inputValue(), "1000");
+    await principal.fill("1100");
+    assert.equal(
+      await page.getByLabel("Principal (cp) with coin denominations", { exact: true }).inputValue(),
+      "",
+    );
+    await page.getByLabel("Principal (cp) with coin denominations", { exact: true }).fill("10 gp");
     await page.getByLabel("Interest per period (%)", { exact: true }).fill("10");
     await page.getByLabel("Period (in-game days)", { exact: true }).fill("7");
     await page.getByLabel("Scheduled repayment per period (cp)", { exact: true }).fill("200");
     await page.getByRole("button", { name: "Approve & fund loan", exact: true }).click();
     await finance.getByText("Guild debt · Finance party", { exact: true }).waitFor();
+    assert.equal(
+      await page.getByLabel("Principal (cp) with coin denominations", { exact: true }).inputValue(),
+      "",
+    );
     await go("financial");
     await page.getByLabel("Schedule name", { exact: true }).fill("Inn revenue");
     await page.getByLabel("Amount per period (cp)", { exact: true }).fill("100");
@@ -103,6 +130,16 @@ try {
       .click();
     await page.getByRole("button", { name: "Preview downtime", exact: true }).click();
     await finance.getByText(/Finance party: 20 gp → 18 gp, 5 sp/).waitFor();
+    await finance.getByText(/Preview only: 7 in-game days/).waitFor();
+    assert.equal(
+      await finance
+        .getByRole("link", {
+          name: "Approve downtime & start session in Play sessions",
+          exact: true,
+        })
+        .getAttribute("href"),
+      "/#sessions",
+    );
     await finance.scrollIntoViewIfNeeded();
     assert.ok(
       await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1),
@@ -143,7 +180,10 @@ try {
       });
       localStorage.setItem("quire.campaigns.v1", JSON.stringify(rows));
       // This synthetic second campaign belongs to the already authenticated fixture DM.
-      localStorage.setItem("quire.owner.finance-isolation", localStorage.getItem(`quire.owner.${active || "main"}`));
+      localStorage.setItem(
+        "quire.owner.finance-isolation",
+        localStorage.getItem(`quire.owner.${active || "main"}`),
+      );
       localStorage.setItem("quire.campaign.v1", "finance-isolation");
       return active;
     });
@@ -164,18 +204,29 @@ try {
     await go("shops");
     const shop = operations.locator("details").filter({ hasText: "Hearth & Nail" }).first();
     await shop.locator(":scope > summary").click();
+    assert.equal(
+      await shop.getByRole("checkbox", { name: "Day 1", exact: true }).isChecked(),
+      true,
+    );
+    await shop.getByRole("checkbox", { name: "Day 6", exact: true }).check();
+    await shop.getByRole("checkbox", { name: "Day 6", exact: true }).uncheck();
     await shop.getByLabel("Restock every in-game days (0 disables)", { exact: true }).fill("7");
     await shop.getByLabel("Restock each finite item to at least", { exact: true }).fill("8");
     await shop.getByRole("button", { name: "Save Hearth & Nail schedule", exact: true }).click();
     await operations.getByText(/Hearth & Nail · Scheduled/).waitFor();
     await go("downtime");
-    await finance.locator("summary").filter({ hasText: "Set downtime & review calculations" }).click();
+    await finance
+      .locator("summary")
+      .filter({ hasText: "Set downtime & review calculations" })
+      .click();
     await page.getByRole("button", { name: "Preview downtime", exact: true }).click();
     await finance.getByText(/stock lines topped up/).waitFor();
     await page.getByRole("button", { name: /Session · Return to town/ }).click();
     await page.getByLabel("Session name", { exact: true }).fill("Property return");
     await page.getByRole("checkbox", { name: /I approve the/ }).check();
-    await page.getByRole("button", { name: "Approve downtime & start session", exact: true }).click();
+    await page
+      .getByRole("button", { name: "Approve downtime & start session", exact: true })
+      .click();
     await finance.getByText(/In-game day 14/).waitFor();
     await reloadApplication(page);
     await go("shops");
@@ -192,25 +243,41 @@ try {
     other.on("pageerror", (error) => errors.push(error.message));
     await openApplication(other, origin + "/features/bank");
     await other.locator("#campaign-finance").waitFor();
-    const drafts = [[page, "First tab expense", "100"], [other, "Second tab expense", "200"]];
+    const drafts = [
+      [page, "First tab expense", "100"],
+      [other, "Second tab expense", "200"],
+    ];
     for (const [tab, note, amount] of drafts) {
-      await tab.getByPlaceholder("Amount in copper pieces", { exact: true }).fill(amount);
+      await tab.getByLabel("Payment amount in copper", { exact: true }).fill(amount);
       await tab.getByPlaceholder("What is this payment for?", { exact: true }).fill(note);
     }
-    await Promise.all(drafts.map(([tab]) => tab.getByRole("button", { name: "Queue payment", exact: true }).click()));
+    await Promise.all(
+      drafts.map(([tab]) =>
+        tab.getByRole("button", { name: "Queue payment", exact: true }).click(),
+      ),
+    );
     await page.waitForFunction(async () => {
       const active = localStorage.getItem("quire.campaign.v1");
-      const name = JSON.parse(localStorage.getItem("quire.campaigns.v1") || "[]").find((r) => r.id === active)?.db || "quire";
+      const name =
+        JSON.parse(localStorage.getItem("quire.campaigns.v1") || "[]").find((r) => r.id === active)
+          ?.db || "quire";
       const db = await new Promise((resolve, reject) => {
-        const r = indexedDB.open(name); r.onsuccess = () => resolve(r.result); r.onerror = () => reject(r.error);
+        const r = indexedDB.open(name);
+        r.onsuccess = () => resolve(r.result);
+        r.onerror = () => reject(r.error);
       });
       try {
         const row = await new Promise((resolve, reject) => {
           const r = db.transaction("meta").objectStore("meta").get("journal");
-          r.onsuccess = () => resolve(r.result); r.onerror = () => reject(r.error);
+          r.onsuccess = () => resolve(r.result);
+          r.onerror = () => reject(r.error);
         });
-        return ["First tab expense", "Second tab expense"].every((note) => row?.value?.requests?.some((r) => r.note === note && r.status === "pending"));
-      } finally { db.close(); }
+        return ["First tab expense", "Second tab expense"].every((note) =>
+          row?.value?.requests?.some((r) => r.note === note && r.status === "pending"),
+        );
+      } finally {
+        db.close();
+      }
     });
     await other.close();
     await reloadApplication(page);

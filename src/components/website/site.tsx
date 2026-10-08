@@ -3,6 +3,8 @@ import { HelpContent } from "../help-content";
 import { APP_DESCRIPTION } from "@/lib/help/content";
 import { GoldSpentCounter } from "./gold-counter";
 import { SiteAnnouncement } from "./announcement";
+import { AboutLootsplit } from "./about";
+import { WebReleaseHistory } from "./web-history";
 import { Link, useRouterState } from "@tanstack/react-router";
 import {
   ArrowDownToLine,
@@ -68,7 +70,10 @@ export function Website({ children }: { children: ReactNode }) {
           Open app <ArrowRight size={16} />
         </AppLink>
       </header>
-      <main id="main">{children}</main>
+      <main id="main">
+        {children}
+        <AboutLootsplit />
+      </main>
       <footer className="ls-footer ls-wrap">
         <div>
           <Link className="ls-brand" to="/welcome">
@@ -349,6 +354,15 @@ export function UpdatesPage() {
         <h1>Changelog</h1>
         <p className="ls-intro">
           New releases, practical improvements, and what changed at the table.
+        </p>
+        <p className="ls-small-copy">
+          <a href="#web-backend">Web & backend</a> · <a href="#android-releases">Android releases</a>
+        </p>
+        <WebReleaseHistory />
+        <h2 id="android-releases">Android releases</h2>
+        <p className="ls-copy">
+          These notes describe the separately published APKs. All earlier release notes and
+          downloads remain available.
         </p>
         {publishedChangelog.map((entry) => (
           <article className="ls-release" key={entry.version} id={`android-${entry.version}`}>

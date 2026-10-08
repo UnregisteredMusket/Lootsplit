@@ -11,9 +11,10 @@ import { TurnLine } from "@/components/turn-line";
 import { useEconomy } from "@/lib/quire/economy-context";
 import { loadHandouts, type Handout } from "@/lib/quire/handouts";
 import { formatCoins, formatCopper, toCopper } from "@/lib/quire/money";
-import { Fold } from "@/components/ui";
+import { Button, Fold, Modal } from "@/components/ui";
 import { useSeat } from "@/lib/quire/seat";
 import { allowContextChange } from "@/lib/quire/use-draft-guard";
+import { activeDatabaseName } from "@/lib/quire/db";
 
 export function HomeSheet() {
   const { ready, purses, holdings, sheets } = useEconomy();
@@ -26,13 +27,48 @@ export function HomeSheet() {
   const purse = mine.find((item) => item.id === picked) ?? mine[0];
   const sheet = purse ? sheets.find((item) => item.purseId === purse.id) : undefined;
   const carried = purse ? holdings.filter((holding) => holding.purseId === purse.id) : [];
-  const [handouts, setHandouts] = useState<Handout[]>([]);
+  const handoutScope = `${activeDatabaseName()}|${cloud.code}|${seat.role}|${seat.purseIds.join(",")}`;
+  const [handoutState, setHandoutState] = useState<{
+    scope: string;
+    rows: Handout[];
+    status: "loading" | "ready" | "error";
+  }>({ scope: "", rows: [], status: "loading" });
+  const [handoutRetry, setHandoutRetry] = useState(0);
+  const [handoutSearch, setHandoutSearch] = useState("");
+  const [inlineHandouts, setInlineHandouts] = useState(false);
+  const [pickedHandout, setPickedHandout] = useState("");
+  const handouts = handoutState.scope === handoutScope ? handoutState.rows : [];
+  const handoutStatus = handoutState.scope === handoutScope ? handoutState.status : "loading";
+  const shownHandouts = handouts.filter(
+    (handout) =>
+      !handoutSearch.trim() ||
+      `${handout.title} ${handout.text}`.toLowerCase().includes(handoutSearch.trim().toLowerCase()),
+  );
+  const openedHandout = handouts.find((handout) => handout.id === pickedHandout);
 
   useEffect(() => {
+    let cancelled = false;
+    setHandoutState((previous) => ({
+      scope: handoutScope,
+      rows: previous.scope === handoutScope && ready ? previous.rows : [],
+      status: "loading",
+    }));
+    if (!ready) return;
     void loadHandouts()
-      .then(setHandouts)
-      .catch(() => setHandouts([]));
-  }, [ready, cloud.revision]);
+      .then((rows) => {
+        if (!cancelled) setHandoutState({ scope: handoutScope, rows, status: "ready" });
+      })
+      .catch(() => {
+        if (!cancelled) setHandoutState({ scope: handoutScope, rows: [], status: "error" });
+      });
+    return () => {
+      cancelled = true;
+    };
+  }, [ready, cloud.revision, handoutScope, handoutRetry]);
+  useEffect(() => {
+    setPickedHandout("");
+    setHandoutSearch("");
+  }, [handoutScope]);
 
   if (!ready) return <p className="mt-6 text-muted">Loading…</p>;
   if (!purse) {
@@ -152,19 +188,82 @@ export function HomeSheet() {
         )}
         <CharacterSheetPanel purseId={purse.id} face={false} />
       </Fold>
-      {handouts.length > 0 ? (
-        <section className="mt-6 border-t border-paper-line pt-4">
-          <h2 className="font-display text-2xl tracking-tight">Handouts</h2>
-          <ul className="mt-2 flex flex-col gap-3">
-            {handouts.map((handout) => (
-              <li key={handout.id}>
-                <p className="text-sm font-medium">{handout.title}</p>
-                <p className="mt-1 whitespace-pre-wrap text-sm text-muted">{handout.text}</p>
-              </li>
-            ))}
-          </ul>
-        </section>
-      ) : null}
+      <section aria-label="Campaign handouts" className="mt-6 border-t border-paper-line pt-4">
+        <h2 className="font-display text-2xl tracking-tight">Handouts</h2>
+        {handoutStatus === "loading" && <p role="status">Loading campaign handouts…</p>}
+        {handoutStatus === "error" && (
+          <div>
+            <p role="alert">
+              Campaign handouts could not be loaded. This does not mean there are no handouts.
+            </p>
+            <Button variant="secondary" onClick={() => setHandoutRetry((value) => value + 1)}>
+              Retry handouts
+            </Button>
+          </div>
+        )}
+        {handoutStatus === "ready" && !handouts.length && (
+          <p>No handouts have been shared with this campaign.</p>
+        )}
+        {handouts.length > 0 && (
+          <>
+            <p className="text-sm text-muted">
+              Shared campaign text. Private original PDFs remain on the DM’s device.
+            </p>
+            <input
+              className="ledger-search w-full mt-2"
+              aria-label="Search campaign handouts"
+              placeholder="Find a handout title or text"
+              value={handoutSearch}
+              onChange={(event) => setHandoutSearch(event.target.value)}
+            />
+            <Button
+              variant="secondary"
+              aria-pressed={inlineHandouts}
+              onClick={() => setInlineHandouts((value) => !value)}
+            >
+              {inlineHandouts ? "Show handout index" : "Read all handouts inline"}
+            </Button>
+            <p className="text-sm text-muted">
+              {shownHandouts.length} of {handouts.length} handouts
+            </p>
+            <ul className="mt-2 flex flex-col gap-3">
+              {shownHandouts.map((handout) => (
+                <li key={handout.id}>
+                  <p className="text-sm font-medium">{handout.title}</p>
+                  {inlineHandouts ? (
+                    <p className="mt-1 whitespace-pre-wrap break-words text-sm text-muted">
+                      {handout.text}
+                    </p>
+                  ) : (
+                    <Button variant="secondary" onClick={() => setPickedHandout(handout.id)}>
+                      Read full handout · {handout.title}
+                    </Button>
+                  )}
+                </li>
+              ))}
+            </ul>
+            {!shownHandouts.length && (
+              <p>No handouts match. Clear the search to see every shared handout.</p>
+            )}
+          </>
+        )}
+        {openedHandout && (
+          <Modal
+            open
+            title={openedHandout.title}
+            onOpenChange={(open) => {
+              if (!open) setPickedHandout("");
+            }}
+          >
+            <section aria-label="Full campaign handout">
+              <p className="whitespace-pre-wrap break-words">{openedHandout.text}</p>
+              <Button className="mt-4" onClick={() => setPickedHandout("")}>
+                Return to character sheet
+              </Button>
+            </section>
+          </Modal>
+        )}
+      </section>
       <Guide />
     </article>
   );

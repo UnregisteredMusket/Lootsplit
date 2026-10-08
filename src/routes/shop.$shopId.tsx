@@ -1,3 +1,9 @@
+import { useFinanceReadiness } from "@/lib/quire/use-finance-readiness";
+import { useDraftGuard } from "@/lib/quire/use-draft-guard";
+import { FinanceReadiness } from "@/components/finance-input";
+import { mutationNotice } from "@/lib/quire/mutation-outcome";
+import { assertMerchantSale } from "@/lib/quire/merchant";
+import { AppLink } from "@/components/app-link";
 import { FantasyIcon } from "@/components/fantasy-icon";
 import { getServerCloudTable } from "@/lib/quire/cloud-client";
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
@@ -98,7 +104,16 @@ function ShopPage() {
         {seat.role === "dm" ? (
           <Button
             variant="secondary"
-            onClick={() => void economy.updateShop({ ...shop, closed: !shop.closed })}
+            onClick={() => {
+              if (
+                shop.schedule &&
+                !window.confirm(
+                  "Manually changing availability disables this shop’s schedule. Continue?",
+                )
+              )
+                return;
+              void economy.updateShop({ ...shop, closed: !shop.closed });
+            }}
           >
             {shop.closed ? "Open shop" : "Close shop"}
           </Button>
@@ -213,8 +228,11 @@ function ShopPage() {
         <CharismaNote purseId={purseId} />
       </label>
       <TurnLock />
-      {viewing === "edit" ? <CatalogStockPicker key={shop.id} shop={shop} /> : null}
-      <ShopStockList key={shop.id} lines={lines} renderRow={(line) => (
+      {viewing === "edit" ? <CatalogStockPicker key={`catalog-${shop.id}`} shop={shop} /> : null}
+      <ShopStockList
+        key={`stock-${shop.id}`}
+        lines={lines}
+        renderRow={(line) => (
           <StockRow
             key={line.id}
             line={line}
@@ -224,7 +242,8 @@ function ShopPage() {
             charisma={charismaScore(economy.sheets.find((sheet) => sheet.purseId === purseId))}
             locked={!!shop.closed || (viewing === "counter" && turnIsLocked())}
           />
-        )} />
+        )}
+      />
       {viewing === "edit" ? <AddGood shopId={shop.id} /> : <SellBox shopId={shop.id} />}
       {viewing === "edit" ? (
         <button
@@ -280,11 +299,30 @@ function ShelfTuning({ shop }: { shop: Shop }) {
         ))}
       </Select>
       <label className="flex min-h-11 items-center gap-2">
-        <input type="checkbox" checked={shop.acceptAnyCategory === true} onChange={e => void updateShop({...shop,acceptAnyCategory:e.target.checked})} />
+        <input
+          type="checkbox"
+          checked={shop.acceptAnyCategory === true}
+          onChange={(e) => void updateShop({ ...shop, acceptAnyCategory: e.target.checked })}
+        />
         DM exception: buy all item categories
       </label>
-      <fieldset><legend className="text-sm">Additional categories this merchant buys</legend>
-        {SHOP_KINDS.filter(o => o.value !== "mixed").map(o => <label key={o.value} className="mr-3 inline-flex min-h-11 items-center gap-2"><input type="checkbox" checked={(shop.acceptedCategories || [shop.category]).includes(o.value)} onChange={e => { const categories = new Set(shop.acceptedCategories || [shop.category]); if (e.target.checked) categories.add(o.value); else categories.delete(o.value); void updateShop({...shop,acceptedCategories:[...categories]}); }} />{o.label}</label>)}
+      <fieldset>
+        <legend className="text-sm">Additional categories this merchant buys</legend>
+        {SHOP_KINDS.filter((o) => o.value !== "mixed").map((o) => (
+          <label key={o.value} className="mr-3 inline-flex min-h-11 items-center gap-2">
+            <input
+              type="checkbox"
+              checked={(shop.acceptedCategories || [shop.category]).includes(o.value)}
+              onChange={(e) => {
+                const categories = new Set(shop.acceptedCategories || [shop.category]);
+                if (e.target.checked) categories.add(o.value);
+                else categories.delete(o.value);
+                void updateShop({ ...shop, acceptedCategories: [...categories] });
+              }}
+            />
+            {o.label}
+          </label>
+        ))}
       </fieldset>
       <div className="grid grid-cols-2 gap-2">
         {WEALTHS.map((option) => (
@@ -353,6 +391,12 @@ function turnIsLocked() {
 
 function TurnLock() {
   const table = useSyncExternalStore(subscribeCloudTable, getCloudTable, getServerCloudTable);
+  if (table.joined && table.viewOnly)
+    return (
+      <p className="mt-3 text-sm text-muted">
+        Between sessions · players view only. Buying waits until the DM resumes play.
+      </p>
+    );
   if (!table.joined || table.live || table.mine) return null;
   return <p className="mt-3 text-sm text-muted">It is {table.who}'s turn. Buying waits.</p>;
 }
@@ -394,10 +438,17 @@ function StockRow({
   charisma: number | null;
   locked?: boolean;
 }) {
-  const { buy, updateStock, deleteStock } = useEconomy();
+  const { buy, updateStock, deleteStock, purses } = useEconomy();
   const dollars = useDollarText();
   const [qty, setQty] = useState("1");
-  const asked = Math.max(1, Math.floor(Number(qty) || 1));
+  const asked = Number(qty);
+  const [busy, setBusy] = useState(false),
+    [error, setError] = useState(""),
+    [notice, setNotice] = useState("");
+  const { locked: readinessLocked } = useFinanceReadiness();
+  const available = toCopper(
+    purses.find((p) => p.id === purseId)?.coins || { cp: 0, sp: 0, ep: 0, gp: 0, pp: 0 },
+  );
   const asking = Math.round(line.copper * sellRate);
   const percent = charisma === null ? 0 : charismaOffPercent(charisma);
   const unit = priceAfterCharisma(asking, charisma);
@@ -427,11 +478,43 @@ function StockRow({
           className="h-11 w-16 rounded-sm border border-border bg-subtle px-2 text-center text-base text-fg"
         />
         <Button
-          disabled={locked || !purseId || (line.quantity !== null && line.quantity < 1)}
-          onClick={() => void buy(line.id, purseId, asked)}
+          disabled={
+            busy ||
+            readinessLocked ||
+            locked ||
+            !purseId ||
+            !Number.isSafeInteger(asked) ||
+            asked < 1 ||
+            price > available ||
+            (line.quantity !== null && asked > line.quantity)
+          }
+          onClick={async () => {
+            setBusy(true);
+            setError("");
+            setNotice("");
+            try {
+              const outcome = await buy(line.id, purseId, asked);
+              setNotice(mutationNotice(outcome, "Purchase recorded."));
+            } catch (e) {
+              setError(e instanceof Error ? e.message : "Purchase failed.");
+            } finally {
+              setBusy(false);
+            }
+          }}
         >
           Buy {formatCopper(price)}
         </Button>
+        <p className="w-full text-sm">
+          {Number.isSafeInteger(asked) && asked > 0
+            ? `${asked} × ${formatCopper(unit)} = ${formatCopper(price)}. Available ${formatCopper(available)}; afterward ${formatCopper(available - price)}.`
+            : "Choose a whole quantity of at least one."}
+        </p>
+        {error && <p role="alert">{error}</p>}
+        {notice && (
+          <p role="status">
+            {notice} <AppLink href="/party?section=funds">Open inventory & ledger</AppLink>
+          </p>
+        )}
       </li>
     );
   }
@@ -484,19 +567,37 @@ function AddGood({ shopId }: { shopId: string }) {
   const [name, setName] = useState("");
   const [price, setPrice] = useState("");
   const [qty, setQty] = useState("");
-
+  const [busy, setBusy] = useState(false),
+    [error, setError] = useState(""),
+    [notice, setNotice] = useState("");
+  useDraftGuard(!!name || !!price || !!qty, "shop item");
   return (
     <form
       className="mt-4 flex flex-col gap-2"
-      onSubmit={(event) => {
+      onSubmit={async (event) => {
         event.preventDefault();
+        if (busy) return;
         const copper = parsePrice(price);
         if (!name.trim() || copper === null) return;
-        const quantity = qty.trim() === "" ? null : Math.max(0, Math.floor(Number(qty)));
-        void addStock(shopId, name.trim(), copper, quantity);
-        setName("");
-        setPrice("");
-        setQty("");
+        const quantity = qty.trim() === "" ? null : Number(qty);
+        if (quantity !== null && (!Number.isSafeInteger(quantity) || quantity < 0)) {
+          setError("Choose a whole quantity of zero or more, or leave blank for unlimited.");
+          return;
+        }
+        setBusy(true);
+        setError("");
+        setNotice("");
+        try {
+          const result = await addStock(shopId, name.trim(), copper, quantity);
+          setNotice(mutationNotice(result, "Item added."));
+          setName("");
+          setPrice("");
+          setQty("");
+        } catch (e) {
+          setError(e instanceof Error ? e.message : "Item save failed. Your draft is retained.");
+        } finally {
+          setBusy(false);
+        }
       }}
     >
       <TextInput
@@ -519,7 +620,9 @@ function AddGood({ shopId }: { shopId: string }) {
           aria-label="New quantity"
         />
       </div>
-      <Button type="submit" variant="secondary">
+      {error && <p role="alert">{error}</p>}
+      {notice && <p role="status">{notice}</p>}
+      <Button type="submit" variant="secondary" disabled={busy}>
         Add item
       </Button>
     </form>
@@ -537,7 +640,23 @@ function SellBox({ shopId }: { shopId: string }) {
       : holdings;
   const [holdingId, setHoldingId] = useState(mine[0]?.id ?? "");
   const [qty, setQty] = useState("1");
-  const holding = mine.find((item) => item.id === holdingId);
+  const holding = mine.find((item) => item.id === holdingId),
+    shop = shops.find((s) => s.id === shopId);
+  const [busy, setBusy] = useState(false),
+    [error, setError] = useState(""),
+    [notice, setNotice] = useState("");
+  const { locked } = useFinanceReadiness();
+  let eligibility = "";
+  if (holding && shop) {
+    try {
+      assertMerchantSale(holding, shop);
+    } catch (e) {
+      eligibility = e instanceof Error ? e.message : "This sale is unavailable.";
+    }
+  }
+  const asked = Number(qty),
+    payout =
+      holding && shop ? Math.max(0, Math.round(holding.unitCopper * shop.buyRate)) * asked : 0;
 
   useEffect(() => {
     if (!mine.some((item) => item.id === holdingId) && mine[0]) setHoldingId(mine[0].id);
@@ -549,13 +668,40 @@ function SellBox({ shopId }: { shopId: string }) {
   return (
     <form
       className="mt-6 flex flex-col gap-2"
-      onSubmit={(event) => {
+      onSubmit={async (event) => {
         event.preventDefault();
-        if (!holding || closed || turnLocked) return;
-        void sell(holding.id, shopId, Math.max(1, Math.floor(Number(qty) || 1)));
+        if (!holding || closed || turnLocked || locked || busy || eligibility) return;
+        setBusy(true);
+        setError("");
+        setNotice("");
+        try {
+          const result = await sell(holding.id, shopId, asked);
+          setNotice(mutationNotice(result, "Sale recorded."));
+        } catch (e) {
+          setError(e instanceof Error ? e.message : "Sale failed.");
+        } finally {
+          setBusy(false);
+        }
       }}
     >
       <p className="text-sm text-muted">Sell to this shop</p>
+      <FinanceReadiness />
+      {holding && shop && (
+        <p>
+          Lot value each {formatCopper(holding.unitCopper)} · merchant rate{" "}
+          {Math.round(shop.buyRate * 100)}%.{" "}
+          {Number.isSafeInteger(asked) && asked > 0
+            ? `Preview payout ${formatCopper(payout)}; quantity remaining ${holding.quantity - asked}.`
+            : "Choose a whole quantity of at least one."}
+        </p>
+      )}
+      {eligibility && <p role="status">{eligibility}</p>}
+      {error && <p role="alert">{error}</p>}
+      {notice && (
+        <p role="status">
+          {notice} <AppLink href="/party?section=funds">Open original inventory & ledger</AppLink>
+        </p>
+      )}
       <select
         value={holdingId}
         onChange={(event) => setHoldingId(event.target.value)}
@@ -574,7 +720,20 @@ function SellBox({ shopId }: { shopId: string }) {
           aria-label="Quantity to sell"
           className="w-24"
         />
-        <Button type="submit" variant="secondary" disabled={closed || turnLocked}>
+        <Button
+          type="submit"
+          variant="secondary"
+          disabled={
+            closed ||
+            turnLocked ||
+            locked ||
+            busy ||
+            !!eligibility ||
+            !Number.isSafeInteger(asked) ||
+            asked < 1 ||
+            asked > (holding?.quantity || 0)
+          }
+        >
           Sell
         </Button>
       </div>

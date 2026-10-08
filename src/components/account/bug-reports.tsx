@@ -1,5 +1,8 @@
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { accountRequest } from "@/lib/account/client";
+import { Capacitor } from "@capacitor/core";
+import { clientKind } from "@/lib/website/client-presentation";
+import { useDraftGuard } from "@/lib/quire/use-draft-guard";
 import { APP_VERSION } from "@/lib/quire/version";
 
 const statuses = ["new", "reviewing", "planned", "fixed", "closed"];
@@ -46,13 +49,20 @@ export function BugReports({ userId, role }: { userId?: string; role?: string })
     [error, setError] = useState(""),
     [receipt, setReceipt] = useState(""),
     [refresh, setRefresh] = useState(0);
+  const [savedOptions, setSavedOptions] = useState({ area: "general", include: false });
+  useDraftGuard(
+    !!(title || description || steps || expected) ||
+      area !== savedOptions.area ||
+      include !== savedOptions.include,
+    "bug report",
+  );
   const retry = useRef({ signature: "", key: "" });
   const [diagnostics] = useState(() =>
     typeof window === "undefined"
       ? {}
       : {
           appVersion: APP_VERSION,
-          platform: /android/i.test(navigator.userAgent) ? "android" : "web",
+          platform: clientKind(Capacitor.isNativePlatform(), Capacitor.getPlatform()),
           browser: navigator.userAgent.slice(0, 350),
           viewport: `${window.innerWidth} × ${window.innerHeight}`,
         },
@@ -80,6 +90,7 @@ export function BugReports({ userId, role }: { userId?: string; role?: string })
         requestKey: retry.current.key,
       });
       setReceipt(result.id);
+      setSavedOptions({ area, include });
       setTitle("");
       setDescription("");
       setSteps("");
@@ -215,6 +226,13 @@ function ReportInbox({ admin, refresh }: { admin: boolean; refresh: number }) {
     [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
     [selected, setSelected] = useState<string | null>(null);
+  const [detailDirty, setDetailDirty] = useState(false);
+  function chooseReport(id: string | null) {
+    if (id === selected) return;
+    if (detailDirty && !window.confirm("Discard unsaved administrator response changes?")) return;
+    setDetailDirty(false);
+    setSelected(id);
+  }
   useEffect(() => {
     const controller = new AbortController();
     setBusy(true);
@@ -248,6 +266,14 @@ function ReportInbox({ admin, refresh }: { admin: boolean; refresh: number }) {
               aria-label="Report inbox"
               value={scope}
               onChange={(e) => {
+                if (
+                  detailDirty &&
+                  !window.confirm(
+                    "Discard unsaved administrator response changes and switch inbox?",
+                  )
+                )
+                  return;
+                setDetailDirty(false);
                 setScope(e.target.value);
                 setOffset(0);
                 setSelected(null);
@@ -295,7 +321,7 @@ function ReportInbox({ admin, refresh }: { admin: boolean; refresh: number }) {
       <ul className="bug-list">
         {reports.map((r) => (
           <li key={r.id}>
-            <button onClick={() => setSelected(r.id)}>
+            <button onClick={() => chooseReport(r.id)}>
               <strong>{r.title}</strong>
               <span>
                 {r.status} · {r.priority} · {new Date(r.created_at).toLocaleDateString()}
@@ -325,7 +351,8 @@ function ReportInbox({ admin, refresh }: { admin: boolean; refresh: number }) {
           key={selected}
           id={selected}
           admin={admin}
-          close={() => setSelected(null)}
+          close={() => chooseReport(null)}
+          onDirtyChange={setDetailDirty}
           saved={() => setReload((n) => n + 1)}
         />
       )}
@@ -337,11 +364,13 @@ function ReportDetail({
   admin,
   close,
   saved,
+  onDirtyChange,
 }: {
   id: string;
   admin: boolean;
   close: () => void;
   saved: () => void;
+  onDirtyChange: (dirty: boolean) => void;
 }) {
   const [data, setData] = useState<Detail | null>(null),
     [status, setStatus] = useState("new"),
@@ -351,6 +380,15 @@ function ReportDetail({
     [busy, setBusy] = useState(false),
     [reload, setReload] = useState(0),
     [notice, setNotice] = useState("");
+  const dirty = !!(
+    admin &&
+    data &&
+    (status !== data.status || priority !== data.priority || response !== data.response)
+  );
+  useDraftGuard(dirty, "administrator response");
+  useEffect(() => {
+    onDirtyChange(dirty);
+  }, [dirty, onDirtyChange]);
   useEffect(() => {
     const controller = new AbortController();
     setData(null);
@@ -399,7 +437,14 @@ function ReportDetail({
         <button
           className="portal-button secondary"
           disabled={busy}
-          onClick={() => setReload((n) => n + 1)}
+          onClick={() => {
+            if (
+              dirty &&
+              !window.confirm("Discard unsaved response changes and reload this report?")
+            )
+              return;
+            setReload((n) => n + 1);
+          }}
         >
           Reload report
         </button>

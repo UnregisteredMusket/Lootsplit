@@ -2,7 +2,7 @@ import { AppLink } from "@/components/app-link";
 import { getServerCloudTable } from "@/lib/quire/cloud-client";
 import { useSyncExternalStore } from "react";
 import { getCloudTable, subscribeCloudTable } from "@/lib/quire/cloud-client";
-import { useEffect, useState } from "react";
+import { useEffect, useId, useState } from "react";
 import { Link, createFileRoute, useRouterState } from "@tanstack/react-router";
 import { CloudTable } from "@/components/cloud-table";
 import { Notices } from "@/components/notices";
@@ -20,6 +20,7 @@ export const Route = createFileRoute("/share")({ component: SharePage });
 function SharePage() {
   const [openChat, setOpenChat] = useState(false);
   const [tab, setTab] = useState("room");
+  const tabsId = useId();
   const locationSearch = useRouterState({ select: (s) => s.location.searchStr });
   useEffect(() => {
     const params = new URLSearchParams(locationSearch);
@@ -51,19 +52,52 @@ function SharePage() {
         ].map(([key, label]) => (
           <button
             key={key}
+            type="button"
+            id={`${tabsId}-${key}-tab`}
             role="tab"
             aria-selected={tab === key}
-            aria-pressed={tab === key}
+            aria-controls={`${tabsId}-${key}-panel`}
+            tabIndex={tab === key ? 0 : -1}
             onClick={() => setTab(key!)}
+            onKeyDown={(event) => {
+              const keys = ["room", "chat", "rolls", "notifications"];
+              const current = keys.indexOf(key!);
+              const next =
+                event.key === "ArrowRight"
+                  ? (current + 1) % keys.length
+                  : event.key === "ArrowLeft"
+                    ? (current + keys.length - 1) % keys.length
+                    : event.key === "Home"
+                      ? 0
+                      : event.key === "End"
+                        ? keys.length - 1
+                        : -1;
+              if (next < 0) return;
+              event.preventDefault();
+              setTab(keys[next]!);
+              event.currentTarget.parentElement
+                ?.querySelectorAll<HTMLButtonElement>('[role="tab"]')
+                [next]?.focus();
+            }}
           >
             {label}
           </button>
         ))}
       </div>
-      <div hidden={tab !== "room"}>
+      <div
+        id={`${tabsId}-room-panel`}
+        role="tabpanel"
+        aria-labelledby={`${tabsId}-room-tab`}
+        hidden={tab !== "room"}
+      >
         <CloudTable />
       </div>
-      <div hidden={tab !== "chat"}>
+      <div
+        id={`${tabsId}-chat-panel`}
+        role="tabpanel"
+        aria-labelledby={`${tabsId}-chat-tab`}
+        hidden={tab !== "chat"}
+      >
         <Fold
           key={String(openChat)}
           defaultOpen={true}
@@ -73,19 +107,31 @@ function SharePage() {
           <ShareChat />
         </Fold>
       </div>
-      {tab === "rolls" && (
-        <div className="character-play campaign-rolls">
-          {room.joined ? (
-            <RollLog code={room.code} />
-          ) : (
-            <p className="sheet-card">
-              Join an online campaign to see shared rolls.{" "}
-              <AppLink href="/characters#dice">Your private dice and roll history →</AppLink>
-            </p>
-          )}
-        </div>
-      )}
-      <div hidden={tab !== "notifications"}>
+      <div
+        id={`${tabsId}-rolls-panel`}
+        role="tabpanel"
+        aria-labelledby={`${tabsId}-rolls-tab`}
+        hidden={tab !== "rolls"}
+      >
+        {tab === "rolls" && (
+          <div className="character-play campaign-rolls">
+            {room.joined ? (
+              <RollLog code={room.code} />
+            ) : (
+              <p className="sheet-card">
+                Join an online campaign to see shared rolls.{" "}
+                <AppLink href="/characters#dice">Your private dice and roll history →</AppLink>
+              </p>
+            )}
+          </div>
+        )}
+      </div>
+      <div
+        id={`${tabsId}-notifications-panel`}
+        role="tabpanel"
+        aria-labelledby={`${tabsId}-notifications-tab`}
+        hidden={tab !== "notifications"}
+      >
         <Fold defaultOpen title="Notifications" hint="Turn reminders, messages, and room changes.">
           <Notices />
         </Fold>

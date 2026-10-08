@@ -7,6 +7,15 @@ import { quireDb, request } from "./db.ts";
 import type { LedgerLine } from "./types.ts";
 const id = z.string().min(1).max(150),
   at = z.number().int().nonnegative();
+/** Optional receipt identity; it carries no recipient, financial or enemy data. */
+export const encounterLootProvenanceSchema = z.object({
+  kind: z.literal("encounter-loot"),
+  encounterId: id,
+  receiptId: z.string().min(1).max(120),
+  sessionId: id.optional(),
+}).strict();
+export type EncounterLootProvenance = z.infer<typeof encounterLootProvenanceSchema>;
+export const encounterLootEntryId = (receiptId: string) => `encounter-loot:${receiptId}`;
 const journalFields = z.object({
   downtimePrompt: z
     .object({ enabled: z.boolean(), days: z.number().int().min(0).max(3650) })
@@ -35,6 +44,7 @@ const journalFields = z.object({
         title: z.string().max(100),
         text: z.string().max(12000),
         reportIds: z.array(id).default([]),
+        provenance: encounterLootProvenanceSchema.optional(),
       }),
     )
     .optional(),
@@ -149,25 +159,31 @@ export async function loadJournal(): Promise<Journal> {
   );
   return readJournal(row?.value);
 }
-export function sessionSummary(
+export function selectSessionLedgerRows(
   ledger: LedgerLine[],
   session: Journal["sessions"][number],
   purseIds?: string[],
 ) {
   const startIds = session.startLedgerIds ? new Set(session.startLedgerIds) : null;
   const endIds = session.endLedgerIds ? new Set(session.endLedgerIds) : null;
-  const rows = ledger.filter(
+  return ledger.filter(
     (x) =>
       (startIds ? !startIds.has(x.id) : x.at >= session.startedAt) &&
       (endIds ? endIds.has(x.id) : !session.endedAt || x.at < session.endedAt) &&
       (!purseIds || purseIds.includes(x.purseId)),
   );
-  // An account movement is not campaign income. Legacy transfers are identified by their recorded summaries.
-  const external = rows.filter((x) =>
-    x.transactionType
-      ? x.transactionType !== "transfer"
-      : !/^(Transfer (sent|received)$|Gave )/.test(x.summary),
-  );
+}
+// An account movement is not campaign income. Legacy transfers use their recorded summaries.
+export function isExternalLedgerLine(row: LedgerLine): boolean {
+  return row.transactionType ? row.transactionType !== "transfer" : !/^(Transfer (sent|received)$|Gave )/.test(row.summary);
+}
+export function sessionSummary(
+  ledger: LedgerLine[],
+  session: Journal["sessions"][number],
+  purseIds?: string[],
+) {
+  const rows = selectSessionLedgerRows(ledger, session, purseIds);
+  const external = rows.filter(isExternalLedgerLine);
   return {
     net: rows.reduce((n, x) => n + x.copper, 0),
     received: external.reduce((n, x) => n + Math.max(0, x.copper), 0),
@@ -188,6 +204,13 @@ export function preserveJournalMetadata(value: unknown, current: Journal): Journ
     }
   }
   const changes = new Map(current.events.map((event) => [event.id, event.change]));
+  const entries = new Map((current.entries || []).map(entry => [entry.id, entry]));
+  for (const entry of next.entries || []) {
+    const provenance = entries.get(entry.id)?.provenance ?? entry.provenance;
+    // Older clients do not know this optional field. Keep a confirmed record's
+    // stable association when they write the same entry back without it.
+    entries.set(entry.id, provenance ? { ...entry, provenance } : entry);
+  }
   return readJournal({
     ...next,
     ...((next.downtimePrompt ?? current.downtimePrompt)
@@ -201,11 +224,7 @@ export function preserveJournalMetadata(value: unknown, current: Journal): Journ
       : {}),
     ...(current.entries || next.entries
       ? {
-          entries: [
-            ...new Map(
-              [...(current.entries || []), ...(next.entries || [])].map((e) => [e.id, e]),
-            ).values(),
-          ],
+          entries: [...entries.values()],
         }
       : {}),
     ...(current.editReports || next.editReports

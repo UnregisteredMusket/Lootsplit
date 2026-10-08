@@ -1,3 +1,4 @@
+import { captureDeviceMutationScope, assertDeviceMutationScope } from "./mutation-scope.ts";
 import assert from "node:assert/strict";
 import test from "node:test";
 import "fake-indexeddb/auto";
@@ -10,6 +11,9 @@ import {
   decideLoan,
   economySnapshot,
   executeLocalCommand,
+  executeFinanceCommand,
+  addListing,
+  saveStock,
   giveToPlayer,
   postCopper,
   sellToShop,
@@ -426,4 +430,130 @@ test("coin validation rejects aggregate overflow but preserves exactly represent
     (await snapshot()).purses.find((p) => p.id === "a"),
     old,
   );
+});
+
+test("local command scope rejection after the atomic read leaves every saved record unchanged", async () => {
+  await applyCloudTable(fixture());
+  const before = await economySnapshot();
+  let checks = 0;
+  await assert.rejects(
+    executeLocalCommand(
+      { kind: "payment-request", purseId: "a", copper: 100, note: "Reviewed original campaign" },
+      () => {
+        if (++checks === 2) throw Error("Synthetic campaign changed during source read");
+      },
+    ),
+    /campaign changed during source read/,
+  );
+  assert.equal(checks, 2);
+  assert.deepEqual(await economySnapshot(), before);
+});
+test("finance command scope rejection after the atomic read retains its original schedule and balances", async () => {
+  await applyCloudTable(fixture());
+  const before = await economySnapshot();
+  let checks = 0;
+  await assert.rejects(
+    executeFinanceCommand(
+      {
+        kind: "shop-schedule",
+        shopId: "s",
+        schedule: {
+          cycleDays: 7,
+          openDays: [0, 1],
+          restockEveryDays: 7,
+          restockQuantity: 5,
+          lastRestockDay: 0,
+        },
+      },
+      () => {
+        if (++checks === 2) throw Error("Synthetic campaign changed during source read");
+      },
+    ),
+    /campaign changed during source read/,
+  );
+  assert.equal(checks, 2);
+  assert.deepEqual(await economySnapshot(), before);
+});
+
+test("listing, stock and loan forms reject a campaign/account switch during their own source reads", async () => {
+  const prior = {
+    window: globalThis.window,
+    localStorage: globalThis.localStorage,
+    sessionStorage: globalThis.sessionStorage,
+  };
+  const values = new Map([
+    ["quire.campaign.v1", "scope-original"],
+    [
+      "quire.campaigns.v1",
+      JSON.stringify([
+        { id: "scope-original", db: "quire-form-original" },
+        { id: "scope-other", db: "quire-form-other" },
+      ]),
+    ],
+  ]);
+  const tickets = new Map([["lootsplit.verified-account", "scope-owner"]]);
+  const storage = {
+    getItem: (key: string) => values.get(key) ?? null,
+    setItem: (key: string, value: string) => values.set(key, value),
+  };
+  Object.assign(globalThis, {
+    localStorage: storage,
+    sessionStorage: { getItem: (key: string) => tickets.get(key) ?? null },
+    window: { localStorage: storage },
+  });
+  try {
+    const actions = [
+      (guard: () => void) =>
+        addListing(
+          { name: "Retained listing", kind: "item", copper: 100, quantity: 1, notes: "" },
+          guard,
+        ),
+      (guard: () => void) =>
+        saveStock(
+          {
+            id: "new-stock",
+            shopId: "s",
+            name: "Retained stock",
+            copper: 100,
+            baseCopper: 100,
+            rarity: "common",
+            quantity: 2,
+            notes: "",
+          },
+          guard,
+        ),
+      (guard: () => void) => askLoan({ purseId: "a", copper: 100, note: "Retained loan" }, guard),
+    ];
+    for (const action of actions) {
+      values.set("quire.campaign.v1", "scope-original");
+      tickets.set("lootsplit.verified-account", "scope-owner");
+      await applyCloudTable(fixture());
+      const beforeOriginal = await economySnapshot();
+      values.set("quire.campaign.v1", "scope-other");
+      const other = fixture();
+      other.purses[0]!.coins = fromCopper(2020);
+      await applyCloudTable(other);
+      const beforeOther = await economySnapshot();
+      values.set("quire.campaign.v1", "scope-original");
+      const expected = captureDeviceMutationScope();
+      let checks = 0;
+      await assert.rejects(
+        action(() => {
+          if (++checks === 2) {
+            values.set("quire.campaign.v1", "scope-other");
+            tickets.set("lootsplit.verified-account", "different-owner");
+          }
+          assertDeviceMutationScope(expected);
+        }),
+        /campaign or account changed/,
+      );
+      assert.equal(checks, 2);
+      assert.deepEqual(await economySnapshot(), beforeOther);
+      values.set("quire.campaign.v1", "scope-original");
+      tickets.set("lootsplit.verified-account", "scope-owner");
+      assert.deepEqual(await economySnapshot(), beforeOriginal);
+    }
+  } finally {
+    Object.assign(globalThis, prior);
+  }
 });

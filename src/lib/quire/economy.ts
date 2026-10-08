@@ -1,3 +1,4 @@
+import { captureDeviceMutationScope, assertDeviceMutationScope } from "./mutation-scope.ts";
 import { isEphemeralCampaign } from "./guest-storage.ts";
 import { assertMerchantSale, isService, stockCategory } from "./merchant.ts";
 import { applyCommand, type CommandInput } from "./commands.ts";
@@ -589,7 +590,7 @@ export async function saveCampaignCharacter(input: {
   purseId: string;
   before: import("../characters/model.mjs").PlaySheet;
   sheet: import("../characters/model.mjs").PlaySheet;
-}) {
+}, assertCurrentScope?: () => void) {
   return atomic(["purses", "holdings", "ledger", "meta"], async (tx) => {
     const purses = await request<Purse[]>(tx.objectStore("purses").getAll());
     const holdings = await request<Holding[]>(tx.objectStore("holdings").getAll());
@@ -597,6 +598,7 @@ export async function saveCampaignCharacter(input: {
       tx.objectStore("meta").get("sheets"),
     );
     const table = { purses, holdings, ledger: [] as LedgerLine[], sheets: legacy?.sheets || [] };
+    assertCurrentScope?.();
     editCharacter(table, getSeat(), input, crypto.randomUUID());
     validateEconomyRows({ ...table, shops: [], stock: [] });
     const p = table.purses.find((p) => p.id === input.purseId)!;
@@ -712,10 +714,21 @@ export async function saveShop(shop: Shop): Promise<void> {
   });
 }
 
-export async function saveStock(line: StockLine): Promise<void> {
-  const db = await quireDb();
+export async function saveStock(
+  line: StockLine,
+  assertScope?: () => void,
+): Promise<void> {
+  const invoked = captureDeviceMutationScope();
+  const guard = () => {
+    assertDeviceMutationScope(invoked);
+    assertScope?.();
+  };
+  guard();
   await atomic(["stock", "meta"], async (tx) => {
-    const before = await request<StockLine | undefined>(tx.objectStore("stock").get(line.id));
+    const before = await request<StockLine | undefined>(
+      tx.objectStore("stock").get(line.id),
+    );
+    guard();
     tx.objectStore("stock").put(line);
     if (before && before.copper !== line.copper)
       await audit(
@@ -1157,28 +1170,46 @@ export async function giveToPlayer(input: {
   await postNotes([{ from: "player", to: "party", purseId: from.id, text: giftSummary(gift) }]);
 }
 
-export async function addListing(input: {
-  name: string;
-  kind: Listing["kind"];
-  copper: number;
-  quantity: number | null;
-  notes: string;
-}): Promise<void> {
+export async function addListing(
+  input: {
+    name: string;
+    kind: Listing["kind"];
+    copper: number;
+    quantity: number | null;
+    notes: string;
+  },
+  assertScope?: () => void,
+): Promise<void> {
+  const invoked = captureDeviceMutationScope();
+  const guard = () => {
+    assertDeviceMutationScope(invoked);
+    assertScope?.();
+  };
+  guard();
   const name = input.name.trim();
   const copper = Math.round(input.copper);
   if (!name) throw new Error("Name the listing.");
   if (!Number.isFinite(copper) || copper < 0) throw new Error("Enter a price.");
-  if (getSeat().role === "player") throw new Error("Only the DM can edit the market.");
-  const listings = await loadListings();
-  listings.push({
-    id: crypto.randomUUID(),
-    name,
-    kind: input.kind,
-    copper,
-    quantity: input.quantity === null ? null : Math.max(0, Math.floor(input.quantity)),
-    notes: input.notes.trim(),
+  if (getSeat().role === "player")
+    throw new Error("Only the DM can edit the market.");
+  await atomic(["meta"], async (tx) => {
+    const listings = readListings(
+      await request(tx.objectStore("meta").get("listings")),
+    );
+    guard();
+    listings.push({
+      id: crypto.randomUUID(),
+      name,
+      kind: input.kind,
+      copper,
+      quantity:
+        input.quantity === null
+          ? null
+          : Math.max(0, Math.floor(input.quantity)),
+      notes: input.notes.trim(),
+    });
+    tx.objectStore("meta").put({ id: "listings", listings });
   });
-  await saveListings(listings);
 }
 
 export async function removeListing(id: string): Promise<void> {
@@ -1250,27 +1281,45 @@ export async function buyListing(input: {
   });
 }
 
-export async function askLoan(input: {
-  purseId: string;
-  copper: number;
-  note: string;
-  requestId?: string;
-}): Promise<void> {
+export async function askLoan(
+  input: {
+    purseId: string;
+    copper: number;
+    note: string;
+    requestId?: string;
+  },
+  assertScope?: () => void,
+): Promise<void> {
+  const invoked = captureDeviceMutationScope();
+  const guard = () => {
+    assertDeviceMutationScope(invoked);
+    assertScope?.();
+  };
+  guard();
   const copper = Math.round(input.copper);
   const note = input.note.trim();
-  if (getCloudWatch().joined && !getCloudWatch().mine) throw new Error("It is not your turn.");
+  if (getCloudWatch().joined && !getCloudWatch().mine)
+    throw new Error("It is not your turn.");
   if (!Number.isSafeInteger(copper) || copper <= 0)
     throw new Error("Enter how much to borrow in whole copper.");
   if (!note) throw new Error("Write what the loan is for.");
   const id = input.requestId || crypto.randomUUID();
   await atomic(["purses", "meta"], async (tx) => {
-    const purse = await request<Purse | undefined>(tx.objectStore("purses").get(input.purseId));
+    const purse = await request<Purse | undefined>(
+      tx.objectStore("purses").get(input.purseId),
+    );
     if (!purse) throw new Error("This account no longer exists.");
     const loans = readLoans(await request(tx.objectStore("meta").get("loans")));
     const prior = loans.find((loan) => loan.id === id);
     if (prior) {
-      if (prior.purseId !== purse.id || prior.copper !== copper || prior.note !== note)
-        throw new Error("That loan request ID already identifies a different request.");
+      if (
+        prior.purseId !== purse.id ||
+        prior.copper !== copper ||
+        prior.note !== note
+      )
+        throw new Error(
+          "That loan request ID already identifies a different request.",
+        );
       return;
     }
     const at = Date.now();
@@ -1284,6 +1333,7 @@ export async function askLoan(input: {
       status: "pending",
     });
     const notes = readNotes(await request(tx.objectStore("meta").get("chat")));
+    guard();
     tx.objectStore("meta").put({ id: "loans", loans });
     tx.objectStore("meta").put({
       id: "chat",
@@ -2127,32 +2177,50 @@ export async function economyView() {
   };
 }
 
-export async function applyCloudTable(table: CloudTable): Promise<void> {
+export async function applyCloudTable(
+  table: CloudTable,
+  assertScope?: () => void,
+): Promise<void> {
   const next = readCloudTable(table);
   if (!next) throw new Error("That table could not be read.");
+  assertScope?.();
   const db = await quireDb();
+  assertScope?.();
   const tx = db.transaction(
     ["purses", "holdings", "shops", "stock", "ledger", "meta"],
     "readwrite",
   );
   const done = finish(tx);
   tx.objectStore("meta").put({ id: "seeded" });
-  for (const store of ["purses", "holdings", "shops", "stock", "ledger"] as const)
+  for (const store of [
+    "purses",
+    "holdings",
+    "shops",
+    "stock",
+    "ledger",
+  ] as const)
     tx.objectStore(store).clear();
   for (const purse of next.purses) tx.objectStore("purses").put(purse);
   for (const holding of next.holdings) tx.objectStore("holdings").put(holding);
-  for (const shop of next.shops) tx.objectStore("shops").put(normalizeShop(shop));
-  for (const line of next.stock) tx.objectStore("stock").put(normalizeStock(line));
+  for (const shop of next.shops)
+    tx.objectStore("shops").put(normalizeShop(shop));
+  for (const line of next.stock)
+    tx.objectStore("stock").put(normalizeStock(line));
   for (const entry of next.ledger) tx.objectStore("ledger").put(entry);
-  if (next.realm) tx.objectStore("meta").put({ id: "settings", ...clampRealm(next.realm) });
+  if (next.realm)
+    tx.objectStore("meta").put({ id: "settings", ...clampRealm(next.realm) });
   tx.objectStore("meta").put({ id: "listings", listings: next.listings });
   tx.objectStore("meta").put({ id: "loans", loans: next.loans });
   tx.objectStore("meta").put({ id: "sheets", sheets: next.sheets });
   tx.objectStore("meta").put({ id: "handouts", handouts: next.handouts ?? [] });
-  tx.objectStore("meta").put({ id: "journal", value: readJournal(next.journal) });
+  tx.objectStore("meta").put({
+    id: "journal",
+    value: readJournal(next.journal),
+  });
   await done;
-  await replaceNotes(next.notes);
-  await refreshChat();
+  assertScope?.();
+  await replaceNotes(next.notes, assertScope);
+  await refreshChat(assertScope);
 }
 
 async function audit(
@@ -2177,10 +2245,20 @@ async function audit(
 }
 
 /** Execute a local command against the latest campaign under one write lock. */
-export async function executeLocalCommand(input: CommandInput): Promise<void> {
+export async function executeLocalCommand(
+  input: CommandInput,
+  assertScope?: () => void,
+): Promise<void> {
+  const invoked = captureDeviceMutationScope();
+  const guard = () => {
+    assertDeviceMutationScope(invoked);
+    assertScope?.();
+  };
+  guard();
   let changedChat = false;
   await atomic([...ECONOMY], async (tx) => {
     const source = await readEconomyTransaction(tx);
+    guard();
     const seat = getSeat();
     const next = applyCommand(
       source,
@@ -2193,19 +2271,30 @@ export async function executeLocalCommand(input: CommandInput): Promise<void> {
       },
       { ...input, id: crypto.randomUUID() },
     );
-    for (const store of ["purses", "holdings", "shops", "stock", "ledger"] as const) {
-      const prior = new Map(source[store].map((row) => [row.id, JSON.stringify(row)]));
+    for (const store of [
+      "purses",
+      "holdings",
+      "shops",
+      "stock",
+      "ledger",
+    ] as const) {
+      const prior = new Map(
+        source[store].map((row) => [row.id, JSON.stringify(row)]),
+      );
       const retained = new Set(next[store].map((row) => row.id));
       for (const row of next[store]) {
-        if (prior.get(row.id) !== JSON.stringify(row)) tx.objectStore(store).put(row);
+        if (prior.get(row.id) !== JSON.stringify(row))
+          tx.objectStore(store).put(row);
       }
-      for (const id of prior.keys()) if (!retained.has(id)) tx.objectStore(store).delete(id);
+      for (const id of prior.keys())
+        if (!retained.has(id)) tx.objectStore(store).delete(id);
     }
     const meta = tx.objectStore("meta");
     if (JSON.stringify(source.realm) !== JSON.stringify(next.realm))
       meta.put({ id: "settings", ...clampRealm(next.realm) });
     for (const id of ["listings", "loans", "sheets", "handouts"] as const) {
-      if (JSON.stringify(source[id]) !== JSON.stringify(next[id])) meta.put({ id, [id]: next[id] });
+      if (JSON.stringify(source[id]) !== JSON.stringify(next[id]))
+        meta.put({ id, [id]: next[id] });
     }
     if (JSON.stringify(source.journal) !== JSON.stringify(next.journal))
       meta.put({ id: "journal", value: next.journal });
@@ -2216,35 +2305,79 @@ export async function executeLocalCommand(input: CommandInput): Promise<void> {
 }
 
 /** Read, calculate and commit campaign finances under one IndexedDB write lock. */
-export async function executeFinanceCommand(input: CommandInput): Promise<void> {
+export async function executeFinanceCommand(
+  input: CommandInput,
+  assertScope?: () => void,
+): Promise<void> {
+  const invoked = captureDeviceMutationScope();
+  const guard = () => {
+    assertDeviceMutationScope(invoked);
+    assertScope?.();
+  };
+  guard();
   if (!(
     input.kind.startsWith("finance-") ||
-    input.kind === "shop-schedule" || input.kind === "property-plan" || input.kind === "property-details" || input.kind === "bank-repay" ||
+    input.kind === "shop-schedule" ||
+    input.kind === "property-plan" ||
+    input.kind === "property-details" ||
+    input.kind === "bank-repay" ||
     input.kind.startsWith("downtime-") ||
     input.kind === "session"
   ))
     throw Error("Not a finance command.");
-  const market = input.kind === "shop-schedule" || input.kind === "downtime-plan" || input.kind === "session";
-  const stores: Parameters<typeof atomic>[0] = ["purses", "holdings", "ledger", "meta"];
+  const market =
+    input.kind === "shop-schedule" ||
+    input.kind === "downtime-plan" ||
+    input.kind === "session";
+  const stores: Parameters<typeof atomic>[0] = [
+    "purses",
+    "holdings",
+    "ledger",
+    "meta",
+  ];
   if (market) stores.push("shops", "stock");
   await atomic(stores, async (tx) => {
-    const source: CloudTable = market ? await readEconomyTransaction(tx, input.kind === "session") : await Promise.all([
-      request<Purse[]>(tx.objectStore("purses").getAll()),
-      request<Holding[]>(tx.objectStore("holdings").getAll()),
-      request<LedgerLine[]>(tx.objectStore("ledger").getAll()),
-      readCampaignMetadata(tx, false),
-    ]).then(([purses, holdings, ledger, metadata]) => ({ purses, holdings, ledger, shops: [], stock: [], ...metadata }));
+    const source: CloudTable = market
+      ? await readEconomyTransaction(tx, input.kind === "session")
+      : await Promise.all([
+          request<Purse[]>(tx.objectStore("purses").getAll()),
+          request<Holding[]>(tx.objectStore("holdings").getAll()),
+          request<LedgerLine[]>(tx.objectStore("ledger").getAll()),
+          readCampaignMetadata(tx, false),
+        ]).then(([purses, holdings, ledger, metadata]) => ({
+          purses,
+          holdings,
+          ledger,
+          shops: [],
+          stock: [],
+          ...metadata,
+        }));
+    guard();
     const seat = getSeat();
-    const next = applyCommand(source,
-      { id: "local", token: "", name: "Local", role: seat.role, purseIds: seat.purseIds },
+    const next = applyCommand(
+      source,
+      {
+        id: "local",
+        token: "",
+        name: "Local",
+        role: seat.role,
+        purseIds: seat.purseIds,
+      },
       { ...input, id: crypto.randomUUID() },
     );
-    const priorShops = new Map(source.shops.map((s) => [s.id, JSON.stringify(s)]));
+    const priorShops = new Map(
+      source.shops.map((s) => [s.id, JSON.stringify(s)]),
+    );
     const priorStock = new Map(source.stock.map((s) => [s.id, s.quantity]));
-    for (const shop of next.shops) if (priorShops.get(shop.id) !== JSON.stringify(shop)) tx.objectStore("shops").put(shop);
-    for (const line of next.stock) if (priorStock.get(line.id) !== line.quantity) tx.objectStore("stock").put(line);
+    for (const shop of next.shops)
+      if (priorShops.get(shop.id) !== JSON.stringify(shop))
+        tx.objectStore("shops").put(shop);
+    for (const line of next.stock)
+      if (priorStock.get(line.id) !== line.quantity)
+        tx.objectStore("stock").put(line);
     for (const p of next.purses) tx.objectStore("purses").put(p);
-    if (input.kind === "property-details") for (const h of next.holdings) tx.objectStore("holdings").put(h);
+    if (input.kind === "property-details")
+      for (const h of next.holdings) tx.objectStore("holdings").put(h);
     if (input.kind === "session") {
       tx.objectStore("ledger").clear();
       tx.objectStore("meta").put({ id: "chat", notes: next.notes });

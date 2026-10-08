@@ -205,16 +205,34 @@ export function Segmented<T extends string>({
   label: string;
 }) {
   return (
-    <div className="flex rounded-md bg-subtle p-1" role="tablist" aria-label={label}>
-      {options.map((option) => {
+    <div className="flex rounded-md bg-subtle p-1" role="group" aria-label={label}>
+      {options.map((option, index) => {
         const selected = value === option.value;
         return (
           <button
             key={option.value}
             type="button"
-            role="tab"
-            aria-selected={selected}
+            aria-pressed={selected}
             onClick={() => onChange(option.value)}
+            onKeyDown={(event) => {
+              const last = options.length - 1;
+              const next =
+                event.key === "Home"
+                  ? 0
+                  : event.key === "End"
+                    ? last
+                    : event.key === "ArrowRight" || event.key === "ArrowDown"
+                      ? (index + 1) % options.length
+                      : event.key === "ArrowLeft" || event.key === "ArrowUp"
+                        ? (index + last) % options.length
+                        : undefined;
+              if (next === undefined) return;
+              event.preventDefault();
+              onChange(options[next]!.value);
+              (
+                event.currentTarget.parentElement?.children[next] as HTMLButtonElement | undefined
+              )?.focus();
+            }}
             className={cn(
               "min-h-11 flex-1 rounded-sm px-3 text-sm font-medium motion-colors",
               selected ? "bg-fg text-bg" : "text-muted hover:text-fg",

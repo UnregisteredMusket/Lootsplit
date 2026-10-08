@@ -22,6 +22,7 @@ import {
 } from "@/lib/quire/cloud-client";
 import { Button } from "@/components/ui";
 import { DeviceRecovery } from "./device-recovery";
+import { roomLifecycleLabels } from "@/lib/quire/room-state";
 
 const publicPaths = new Set([
   "/welcome",
@@ -214,9 +215,9 @@ export function CampaignGate({ children }: { children: ReactNode }) {
               <section className="ledger-card" key={m.code}>
                 <h2>{m.name}</h2>
                 <p>Campaign ID {m.code}</p>
-                <p>{m.closed ? "Session ended" : "Session open"}</p>
+                <p>{Object.values(roomLifecycleLabels(m)).join(" · ")}</p>
                 <Button disabled={busy} onClick={() => void resume(m)}>
-                  {m.closed ? "Reopen as DM" : "Resume"}
+                  {m.closed ? "Reopen as DM" : m.viewOnly ? "Open for viewing" : "Resume"}
                 </Button>
               </section>
             ))}

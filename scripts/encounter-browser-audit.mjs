@@ -1,11 +1,13 @@
+import { finishAuditLiveness } from "./audit-liveness.mjs";
 import { scanFixture, scannedPdf } from "./ocr-browser-fixtures.mjs";
 import { characterPdf, characterPdfFields } from "./character-pdf-fixtures.mjs";
 import { expect } from "playwright/test";
-import { openApplication, reloadApplication } from "./title-screen-navigation.mjs";
+import { continueIntoApp, openApplication, reloadApplication } from "./title-screen-navigation.mjs";
 import { chromium } from "playwright";
 import assert from "node:assert/strict";
 import { mkdir } from "node:fs/promises";
 import { generateEncounter } from "../src/lib/encounters/model.mjs";
+import { blankSheet } from "../src/lib/characters/model.mjs";
 import { localAccountDb } from "./account-dev-db.mjs";
 const origin = process.env.ENCOUNTER_ORIGIN || process.env.AUDIT_ORIGIN || "http://127.0.0.1:8080";
 const output = process.env.ENCOUNTER_SCREENSHOTS || "test-results/encounters";
@@ -72,6 +74,14 @@ try {
           name: "Hero",
           kind: "character",
           coins: { cp: 0, sp: 0, ep: 0, gp: 0, pp: 0 },
+          sheet: { ...blankSheet(), name: "Hero", level: 3 },
+        },
+        {
+          id: "scout",
+          name: "Scout",
+          kind: "character",
+          coins: { cp: 0, sp: 0, ep: 0, gp: 0, pp: 0 },
+          sheet: { ...blankSheet(), name: "Scout", level: 5, edition: "custom" },
         },
       ],
       holdings: [],
@@ -82,6 +92,11 @@ try {
       sheets: [],
       loans: [],
       listings: [],
+      journal: {
+        sessions: [{ id: "session-explicit", name: "Recorded session", startedAt: Date.now() }],
+        requests: [],
+        events: [],
+      },
     },
     drafts: {},
     seen: { gifts: [], sales: [] },
@@ -131,6 +146,17 @@ try {
       });
     });
   }
+  // Resume the real saved membership through the account controls before reviewing
+  // current-party data or writing a receipt-linked journal note.
+  await openApplication(p, origin + "/account");
+  await p
+    .locator("article.portal-card")
+    .filter({ hasText: code })
+    .getByRole("button", { name: "Resume", exact: true })
+    .click();
+  await p.waitForURL((url) => url.pathname === "/");
+  await continueIntoApp(p);
+  await p.getByText("Campaign control", { exact: true }).waitFor();
   await openApplication(p, origin + "/encounters");
   await p.getByLabel("Save in", { exact: true }).selectOption(code);
   await p.getByRole("button", { name: "New encounter", exact: true }).click();
@@ -157,6 +183,21 @@ try {
   await p.getByText(/Encounter roll: 18/).waitFor();
   assert.ok((await p.locator(".encounter-rolls").innerText()).includes("Manual"));
   await p.getByRole("button", { name: "Builder & generator", exact: true }).click();
+  await p.getByRole("button", { name: "Use current party", exact: true }).click();
+  const partyReview = p.getByRole("region", { name: "Current party planning", exact: true });
+  await expect(partyReview).toContainText("Hero · Level 3 · 2014");
+  await expect(partyReview).toContainText("Scout · Level 5 · custom");
+  await expect(partyReview).toContainText("mixed levels");
+  await partyReview.getByRole("checkbox", { name: /Scout/ }).uncheck();
+  await partyReview.getByLabel("Reviewed common level", { exact: true }).fill("4");
+  await partyReview
+    .getByRole("button", { name: "Use reviewed party size & level", exact: true })
+    .click();
+  await expect(p.getByLabel("Party size", { exact: true })).toHaveValue("1");
+  await expect(p.getByLabel("Party level", { exact: true })).toHaveValue("4");
+  await expect(p.getByRole("combobox", { name: "Desired difficulty", exact: true })).toHaveValue(
+    "medium",
+  );
   const scan = await scanFixture(p, [
     "Goblin",
     "Small humanoid, neutral evil",
@@ -195,14 +236,31 @@ try {
   await p.getByRole("button", { name: "Assign all to party inventory", exact: true }).click();
   await p.getByRole("button", { name: "Attach loot table", exact: true }).click();
   await p.getByLabel("Result name", { exact: true }).fill("Hidden gem");
+  await p.getByRole("button", { name: "Save encounter", exact: true }).click();
+  await p.getByText("Encounter saved.", { exact: true }).waitFor();
+  await expect(
+    p.getByRole("button", { name: "Conclude & review loot", exact: true }),
+  ).toBeDisabled();
+  await expect(p.getByLabel("Before concluding", { exact: true })).toContainText(
+    "Choose or roll a result for Loot table",
+  );
   await p.getByLabel(/^Selected result/).selectOption("0");
   await p.getByRole("button", { name: "Save encounter", exact: true }).click();
   await p.getByText("Encounter saved.", { exact: true }).waitFor();
   await p.getByRole("button", { name: "Conclude & review loot", exact: true }).click();
   await p.getByRole("button", { name: "Transfer loot once", exact: true }).waitFor();
+  await expect(p.getByRole("button", { name: "Transfer loot once", exact: true })).toBeDisabled();
+  await expect(
+    p.getByRole("region", { name: "Recipient award preview", exact: true }),
+  ).toContainText("Unassigned item: Hidden gem");
   await p.getByRole("button", { name: "Assign all to party inventory", exact: true }).click();
   await p.getByRole("button", { name: "Save encounter", exact: true }).click();
   await p.getByText("Encounter saved.", { exact: true }).waitFor();
+  const recipientPreview = p.getByRole("region", { name: "Recipient award preview", exact: true });
+  await expect(recipientPreview).toContainText("Party fund");
+  await expect(recipientPreview).toContainText("Coins: 25 gp");
+  await expect(recipientPreview).toContainText("Silver signet × 1");
+  await expect(recipientPreview).toContainText("Hidden gem × 1");
   assert.ok(await p.evaluate(() => document.documentElement.scrollWidth <= innerWidth));
   await p.screenshot({
     path: output + "/mobile-loot-review.png",
@@ -222,14 +280,48 @@ try {
   });
   await p.getByRole("button", { name: "Transfer loot once", exact: true }).click();
   await p.getByRole("alert").waitFor();
+  assert.equal(
+    await p.getByText("Add a party journal summary", { exact: true }).count(),
+    0,
+    "lost response does not claim a confirmed award",
+  );
   await p.getByRole("button", { name: "Transfer loot once", exact: true }).click();
   await p.getByText(/locked against a second award/).waitFor();
+  await p.getByText("Add a party journal summary", { exact: true }).click();
+  const chronicle = p.locator(".encounter-chronicle");
+  await expect(chronicle.locator("pre")).toContainText("Items awarded: 2 across 2 item entries");
+  for (const privateText of ["Silver signet", "Hidden gem", "Party fund", "Rimrock ghoul", "25 gp"])
+    assert.ok(!(await chronicle.locator("pre").innerText()).includes(privateText));
+  await expect(
+    chronicle.getByRole("combobox", { name: "Link to session (optional)", exact: true }),
+  ).toHaveValue("");
+  await chronicle
+    .getByRole("combobox", { name: "Link to session (optional)", exact: true })
+    .selectOption("session-explicit");
+  await chronicle
+    .getByRole("button", { name: "Add reviewed summary to party journal", exact: true })
+    .click();
+  await p.getByText("Loot summary saved in the party journal.", { exact: true }).waitFor();
+  await expect(
+    chronicle.getByRole("button", { name: "Add reviewed summary to party journal", exact: true }),
+  ).toBeDisabled();
+  // Click the stable receipt destination without reloading/replaying the opening.
+  await p.getByRole("link", { name: "Open this confirmed award", exact: true }).click();
+  await p.waitForURL((url) => url.searchParams.get("encounter") === d.id);
+  assert.equal(await p.locator(".loot-opening").count(), 0);
   const updated = JSON.parse(
     (await db.prepare("SELECT body FROM campaign_rooms WHERE code=?").bind(code).first()).body,
   );
   assert.equal(updated.table.holdings.length, 2);
   assert.equal(updated.table.purses[0].coins.gp, 35);
+  const receiptNotes = updated.table.journal.entries.filter(
+    (entry) => entry.provenance?.kind === "encounter-loot",
+  );
+  assert.equal(receiptNotes.length, 1);
+  assert.equal(receiptNotes[0].provenance.encounterId, d.id);
+  assert.equal(receiptNotes[0].provenance.sessionId, "session-explicit");
   await reloadApplication(p);
+  await p.getByText(/locked against a second award/).waitFor();
   await p.getByLabel("Save in", { exact: true }).selectOption(code);
   await p.getByRole("button", { name: /Ambush on the northern road/ }).click();
   await p.getByText(/locked against a second award/).waitFor();
@@ -321,7 +413,9 @@ try {
     .getByRole("button", { name: "Use reviewed character", exact: true })
     .click();
   await expect(characterReview).toBeHidden();
-  await expect(player.page.getByRole("heading", { name: "Scan Hero", exact: true, level: 2 })).toBeVisible();
+  await expect(
+    player.page.getByRole("heading", { name: "Scan Hero", exact: true, level: 2 }),
+  ).toBeVisible();
   await player.page.getByRole("button", { name: "Edit sheet", exact: true }).click();
   await expect(player.page.getByLabel("Maximum HP", { exact: true })).toHaveValue("53");
   // Both normal form indexes and orphaned filled page widgets must work through the real picker.
@@ -376,22 +470,26 @@ try {
     }
   throw error;
 } finally {
-  await browser.close();
-  await db
-    .prepare(
-      "DELETE FROM dm_encounter_rolls WHERE encounter_id IN (SELECT id FROM dm_encounters WHERE code=?)",
-    )
-    .bind(code)
-    .run();
-  await db
-    .prepare(
-      "DELETE FROM dm_encounter_awards WHERE encounter_id IN (SELECT id FROM dm_encounters WHERE code=?)",
-    )
-    .bind(code)
-    .run();
-  await db.prepare("DELETE FROM dm_encounters WHERE code=?").bind(code).run();
-  await db.prepare("DELETE FROM library_members WHERE code=?").bind(code).run();
-  await db.prepare("DELETE FROM campaign_rooms WHERE code=?").bind(code).run();
-  for (const id of users) await db.prepare("DELETE FROM user WHERE id=?").bind(id).run();
-  db.close();
+  try {
+    await browser.close();
+    await db
+      .prepare(
+        "DELETE FROM dm_encounter_rolls WHERE encounter_id IN (SELECT id FROM dm_encounters WHERE code=?)",
+      )
+      .bind(code)
+      .run();
+    await db
+      .prepare(
+        "DELETE FROM dm_encounter_awards WHERE encounter_id IN (SELECT id FROM dm_encounters WHERE code=?)",
+      )
+      .bind(code)
+      .run();
+    await db.prepare("DELETE FROM dm_encounters WHERE code=?").bind(code).run();
+    await db.prepare("DELETE FROM library_members WHERE code=?").bind(code).run();
+    await db.prepare("DELETE FROM campaign_rooms WHERE code=?").bind(code).run();
+    for (const id of users) await db.prepare("DELETE FROM user WHERE id=?").bind(id).run();
+    db.close();
+  } finally {
+    finishAuditLiveness();
+  }
 }

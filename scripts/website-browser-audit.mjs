@@ -62,13 +62,29 @@ try {
         assert.match(theme.headingFont, /Cormorant Garamond/);
       }
       if (path === "updates") {
-        const latest = page.locator(".ls-release").first();
+        await page.getByRole("heading", { name: "Web & backend", exact: true }).waitFor();
+        await page.getByRole("heading", { name: "Android releases", exact: true }).waitFor();
+        const latest = page
+          .locator(".ls-release")
+          .filter({
+            has: page.getByRole("heading", { name: `Version ${release.version}`, exact: true }),
+          });
         await latest
           .getByRole("heading", { name: `Version ${release.version}`, exact: true })
           .waitFor();
         for (const category of ["Added features", "Improvements", "Bug fixes"])
           await latest.getByRole("heading", { name: category, exact: true }).waitFor();
         assert.equal(await latest.locator("ul").count(), 3);
+      }
+      if (path === "welcome") {
+        await page.getByText("About this app & releases", { exact: true }).click();
+        await page.getByText(/Browser · Client release label/).waitFor();
+        const identityText = await page.locator(".ls-about").innerText();
+        assert.ok(
+          identityText.includes(`Version ${release.version} · version code ${release.versionCode}`),
+        );
+        assert.equal(identityText.includes("Installed app version"), false);
+        await page.getByRole("link", { name: "Web & backend history", exact: true }).waitFor();
       }
       assert.equal(
         await page.evaluate(() => document.documentElement.scrollWidth > innerWidth),
@@ -93,7 +109,12 @@ try {
     assert.match(page.url(), /\/help#android$/);
     await page.getByRole("link", { name: "Open app", exact: true }).click();
     await continueIntoApp(page);
-    await page.getByText("Create an account or sign in to proceed as a Dungeon Master in your own campaign", { exact: true }).waitFor();
+    await page
+      .getByText(
+        "Create an account or sign in to proceed as a Dungeon Master in your own campaign",
+        { exact: true },
+      )
+      .waitFor();
     await page.getByRole("link", { name: "Create an account or sign in", exact: true }).waitFor();
     assert.equal(await page.evaluate(async () => (await indexedDB.databases()).length), 0);
     assert.equal(new URL(page.url()).pathname, "/");

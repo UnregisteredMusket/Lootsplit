@@ -152,6 +152,12 @@ test("account characters enforce ownership, campaign assignments, DM policy, sta
     const importRequest = (await call("dm", "/imports", { code: "PLAYTEST" })).requests.find((r) => r.id === requestKey);
     assert.equal(importRequest.id, requestKey);
     assert.equal(importRequest.seat_token, undefined);
+    const campaignTarget = await call("dm", "/detail", { id: `campaign:PLAYTEST:${importRequest.purse_id}` });
+    assert.equal(campaignTarget.body.name, "Hero", "Review reads the authorized campaign target, not the submitted account source");
+    assert.equal(importRequest.target_revision, campaignTarget.revision);
+    assert.equal(importRequest.source_revision, assignment.revision);
+    assert.equal(importRequest.body.name, sheet.name);
+
     await assert.rejects(call("player", "/review-import", { id: requestKey, decision: "approved" }), (e) => e.status === 403);
     // A concurrent financial change is retained by approval.
     room.table.purses[0].coins.gp = 9;

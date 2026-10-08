@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import { mkdir, readFile } from "node:fs/promises";
 import { localAccountDb } from "./account-dev-db.mjs";
 import { blankSheet } from "../src/lib/characters/model.mjs";
+import { formatCopper, toCopper } from "../src/lib/quire/money.ts";
 import { openApplication, reloadApplication } from "./title-screen-navigation.mjs";
 const origin = process.env.AUDIT_ORIGIN || "http://127.0.0.1:8080";
 if (!/^http:\/\/(localhost|127\.0\.0\.1):/.test(origin))
@@ -19,6 +20,8 @@ const db = localAccountDb("data/account-dev.sqlite"),
   codes = [],
   errors = [];
 const code = "G" + crypto.randomUUID().replaceAll("-", "").slice(0, 7).toUpperCase();
+const handoutText =
+  "The map follows the old road beyond the gate.\n".repeat(250) + "Full handout final marker.";
 codes.push(code);
 async function blockExternal(context) {
   await context.route("**/*", (route) =>
@@ -130,9 +133,31 @@ try {
       stock: [],
       ledger: [],
       listings: [],
-      loans: [],
+      loans: [
+        {
+          id: "own-decided-application",
+          at: 1,
+          purseId: "hero",
+          purseName: "Governance hero",
+          copper: 20,
+          note: "Original declined application",
+          status: "denied",
+        },
+        {
+          id: "other-decided-application",
+          at: 1,
+          purseId: "other-character",
+          purseName: "Other character",
+          copper: 30,
+          note: "Another character's declined application",
+          status: "denied",
+        },
+      ],
       sheets: [],
       notes: [],
+      handouts: [
+        { id: "governance-handout", title: "The complete campaign map", text: handoutText },
+      ],
       journal: {
         finance: {
           day: 0,
@@ -341,6 +366,8 @@ try {
   await guestPage.getByLabel("Repayment in copper", { exact: true }).fill("1");
   await guestPage.getByRole("button", { name: "Make repayment", exact: true }).click();
   await expect.poll(() => blockedRepayments).toBe(1);
+  await expect(guestPage.getByText(/Action accepted as pending/)).toBeVisible();
+  await expect(guestPage.getByLabel("Repayment in copper", { exact: true })).toHaveValue("");
   const pendingGuest = await guestPage.evaluate(async () =>
     (await import("/src/lib/quire/cloud-client.ts")).pendingActions(),
   );
@@ -352,8 +379,115 @@ try {
   await player.page.setViewportSize({ width: 390, height: 844 });
   await visit(player.page, "/");
   await player.page.getByRole("heading", { name: "Home", exact: true }).waitFor();
+  // Hold a local storage fault through background refreshes until Retry is tested.
+  // A one-shot fault can be consumed by a concurrent campaign snapshot read.
+  await player.page.evaluate(async () => {
+    const db = await (await import("/src/lib/quire/db.ts")).quireDb();
+    const prototype = Object.getPrototypeOf(db.transaction("meta").objectStore("meta"));
+    const get = prototype.get;
+    window.handoutReadFailures = 0;
+    window.restoreHandoutReads = () => {
+      prototype.get = get;
+    };
+    prototype.get = function (key) {
+      if (
+        this.name === "meta" &&
+        key === "handouts" &&
+        new Error().stack?.includes("loadHandouts")
+      ) {
+        window.handoutReadFailures++;
+        throw Error("Synthetic handout read failure");
+      }
+      return get.call(this, key);
+    };
+  });
+  await player.page
+    .getByRole("region", { name: "Player features", exact: true })
+    .getByRole("link", { name: "Character Sheet", exact: true })
+    .click();
+  const handouts = player.page.getByRole("region", { name: "Campaign handouts", exact: true });
+  await expect(handouts.getByRole("alert")).toContainText("could not be loaded");
+  assert.ok(
+    await player.page.evaluate(() => window.handoutReadFailures > 0),
+    "The storage fault must reach the actual handout reader",
+  );
+  await expect(handouts).not.toContainText("No handouts have been shared");
+  await player.page.evaluate(() => window.restoreHandoutReads());
+  await handouts.getByRole("button", { name: "Retry handouts", exact: true }).click();
+  await expect(
+    handouts.getByRole("button", {
+      name: "Read full handout · The complete campaign map",
+      exact: true,
+    }),
+  ).toBeVisible();
+  await expect(handouts).not.toContainText("Full handout final marker.");
+  await handouts.getByLabel("Search campaign handouts", { exact: true }).fill("final marker");
+  await expect(handouts).toContainText("1 of 1 handouts");
+  await handouts
+    .getByRole("button", { name: "Read full handout · The complete campaign map", exact: true })
+    .click();
+  const handoutReader = player.page.getByRole("dialog", {
+    name: "The complete campaign map",
+    exact: true,
+  });
+  assert.equal(
+    await handoutReader
+      .getByRole("region", { name: "Full campaign handout", exact: true })
+      .locator("p")
+      .innerText(),
+    handoutText,
+  );
+  await handoutReader
+    .getByRole("button", { name: "Return to character sheet", exact: true })
+    .click();
+  await expect(handouts.getByLabel("Search campaign handouts", { exact: true })).toHaveValue(
+    "final marker",
+  );
+  await handouts.getByRole("button", { name: "Read all handouts inline", exact: true }).click();
+  await expect(handouts).toContainText("Full handout final marker.");
+  await handouts.getByRole("button", { name: "Show handout index", exact: true }).click();
+  await handouts
+    .getByLabel("Search campaign handouts", { exact: true })
+    .fill("does not occur in the map");
+  await expect(handouts).toContainText("No handouts match.");
+  await handouts.getByLabel("Search campaign handouts", { exact: true }).clear();
+  await player.page
+    .locator('nav[aria-label="Sections"]:visible')
+    .getByRole("link", { name: "Home", exact: true })
+    .click();
   await player.page.evaluate(() => (window.featureDocumentMarker = "same-document"));
   await player.page.locator('.shortcut-grid a[href^="/features/bank?"]').click();
+  const ownDecision = player.page.getByText("Original declined application", { exact: true });
+  await expect(ownDecision).toBeVisible();
+  await expect(
+    player.page.getByText("Another character's declined application", { exact: true }),
+  ).toHaveCount(0);
+  await player.page.getByLabel("Financial request status", { exact: true }).selectOption("pending");
+  await expect(ownDecision).toHaveCount(0);
+  await player.page.getByLabel("Financial request status", { exact: true }).selectOption("decided");
+  await player.page.getByLabel("Financial request type", { exact: true }).selectOption("loans");
+  await player.page
+    .getByLabel("Search financial requests", { exact: true })
+    .fill("Original declined");
+  await expect(ownDecision).toBeVisible();
+  await player.page.getByRole("button", { name: "Clear request filters", exact: true }).click();
+  await expect(player.page.getByLabel("Search financial requests", { exact: true })).toHaveValue(
+    "",
+  );
+  await player.page.getByLabel("Loan amount", { exact: true }).fill("0 gp");
+  await player.page
+    .getByLabel("Loan reason", { exact: true })
+    .fill("Keep this invalid application for correction");
+  await player.page.getByRole("button", { name: "Request loan", exact: true }).click();
+  await expect(
+    player.page.getByRole("alert").filter({ hasText: "Enter a positive coin amount" }),
+  ).toBeVisible();
+  await expect(player.page.getByLabel("Loan amount", { exact: true })).toHaveValue("0 gp");
+  await expect(player.page.getByLabel("Loan reason", { exact: true })).toHaveValue(
+    "Keep this invalid application for correction",
+  );
+  await player.page.getByLabel("Loan amount", { exact: true }).fill("");
+  await player.page.getByLabel("Loan reason", { exact: true }).fill("");
   await player.page.getByLabel("Repayment in copper", { exact: true }).fill("25");
   await player.page.getByRole("button", { name: "Make repayment", exact: true }).click();
   await expect
@@ -412,7 +546,7 @@ try {
   await visit(player.page, `/characters?id=${encodeURIComponent(`campaign:${code}:hero`)}`);
   await player.page.getByRole("heading", { name: "Governance hero", exact: true }).waitFor();
   await player.page.getByRole("button", { name: "Edit sheet", exact: true }).click();
-  await player.page.getByRole("button", { name: "Inventory & currency", exact: true }).click();
+  await player.page.getByRole("tab", { name: "Inventory & currency", exact: true }).click();
   await visit(host.page, "/party");
   await host.page
     .getByRole("button", { name: "Add characters, party funds & loot", exact: true })
@@ -475,14 +609,14 @@ try {
   await visit(player.page, "/characters?id=party%3Ahero");
   await player.page.getByRole("heading", { name: "Governance hero", exact: true }).waitFor();
   await player.page.getByRole("button", { name: "Edit sheet", exact: true }).click();
-  await player.page.getByRole("button", { name: "Character details", exact: true }).click();
+  await player.page.getByRole("tab", { name: "Character details", exact: true }).click();
   const species = player.page.getByLabel("Species", { exact: true });
   assert.equal(await species.isEnabled(), false);
-  await player.page.getByRole("button", { name: "Combat", exact: true }).click();
+  await player.page.getByRole("tab", { name: "Combat", exact: true }).click();
   assert.equal(await player.page.getByLabel("Maximum HP", { exact: true }).isEnabled(), false);
   await player.page.getByLabel("Current HP", { exact: true }).fill("17");
   await save(player.page);
-  await player.page.getByRole("button", { name: "Inventory & currency", exact: true }).click();
+  await player.page.getByRole("tab", { name: "Inventory & currency", exact: true }).click();
   await player.page.getByLabel("Equip Potion", { exact: true }).check();
   await player.page.getByLabel("Potion quantity", { exact: true }).fill("1");
   await save(player.page);
@@ -490,7 +624,7 @@ try {
   await visit(host.page, "/party");
   console.log("Governance audit: open/close editing and verify change report");
   await host.page.getByLabel("Allow character editing", { exact: true }).click();
-  await player.page.getByRole("button", { name: "Character details", exact: true }).click();
+  await player.page.getByRole("tab", { name: "Character details", exact: true }).click();
   await enabled(species, true);
   await species.fill("Elf");
   await save(player.page);
@@ -506,7 +640,7 @@ try {
   const maxPermission = permissionsMenu.getByLabel("Governance hero: Maximum HP", { exact: true });
   await maxPermission.click();
   await expect(maxPermission).toBeChecked();
-  await player.page.getByRole("button", { name: "Combat", exact: true }).click();
+  await player.page.getByRole("tab", { name: "Combat", exact: true }).click();
   await enabled(player.page.getByLabel("Maximum HP", { exact: true }), true);
   assert.equal(await player.page.getByLabel("Armor class", { exact: true }).isEnabled(), false);
   await player.page.getByLabel("Maximum HP", { exact: true }).fill("25");
@@ -531,7 +665,7 @@ try {
   await visit(host.page, "/?view=overview");
   const sessions = host.page.locator("#sessions");
   await sessions.locator(":scope > div > button").first().click();
-  await sessions.getByRole("button", { name: "End session", exact: true }).click();
+  await sessions.getByRole("button", { name: "End recorded session", exact: true }).click();
   for (let n = 0; n < 80 && !((await state(host.page)).journal.reports || []).length; n++)
     await host.page.waitForTimeout(250);
   assert.equal((await state(host.page)).journal.reports.length, 1);
@@ -596,15 +730,18 @@ try {
     .click();
   await player.page.getByLabel("Property name", { exact: true }).fill("Draft before session pause");
   await visit(host.page, "/share");
-  await host.page
-    .getByRole("button", { name: "End session & keep room online", exact: true })
-    .click();
+  await host.page.getByRole("button", { name: "End play & keep room online", exact: true }).click();
   await host.page
     .getByRole("alertdialog")
-    .getByRole("button", { name: "End session & keep online", exact: true })
+    .getByRole("button", { name: "End play & keep room online", exact: true })
     .click();
   await expect(
     host.page.getByRole("button", { name: "Leave room online", exact: true }),
+  ).toBeVisible();
+  await expect(
+    host.page.getByRole("status").filter({
+      hasText: /Live · Room online · Between sessions · players view only · Saved to room/,
+    }),
   ).toBeVisible();
   await expect(
     player.page.getByRole("status").filter({ hasText: "Your draft is kept in this view" }),
@@ -641,6 +778,17 @@ try {
   });
   assert.match(blocked, /view-only/);
   await player.page.getByRole("link", { name: "Return to Home", exact: true }).click();
+  await expect(
+    player.page.getByRole("status").filter({
+      hasText: /Live · Room online · Between sessions · players view only · Saved to room/,
+    }),
+  ).toBeVisible();
+  const pausedHero = (await state(player.page)).purses.find((p) => p.id === "hero");
+  await expect(
+    player.page.getByText(`HP 17/25 · AC 10 · ${formatCopper(toCopper(pausedHero.coins))}`, {
+      exact: true,
+    }),
+  ).toBeVisible();
   await player.page
     .getByRole("region", { name: "Player features", exact: true })
     .getByRole("link", { name: "Party chat", exact: true })
@@ -659,10 +807,7 @@ try {
     player.page.getByRole("status").filter({ hasText: "View-only until the DM resumes play" }),
   ).toBeVisible();
   await openApplication(host.page, origin + "/account");
-  await host.page
-    .getByRole("button", { name: /^Resume/ })
-    .first()
-    .click();
+  await host.page.getByRole("button", { name: "Open for viewing", exact: true }).first().click();
   await host.page.locator(".role-chip:enabled").waitFor();
   await visit(host.page, "/share");
   await host.page.getByRole("button", { name: "Resume play", exact: true }).click();
@@ -779,10 +924,10 @@ try {
   // Close through the actual DM control after all primary campaign assertions.
   // The guest's failed command was never staged/committed on the server.
   await visit(host.page, "/share");
-  await host.page.getByRole("button", { name: "End session", exact: true }).click();
+  await host.page.getByRole("button", { name: "Close room & revoke access", exact: true }).click();
   await host.page
-    .getByRole("alertdialog", { name: "Close this room?", exact: true })
-    .getByRole("button", { name: "End session", exact: true })
+    .getByRole("alertdialog", { name: "Close room and revoke player access?", exact: true })
+    .getByRole("button", { name: "Close room & revoke access", exact: true })
     .click();
   await guestPage.getByRole("button", { name: "Export unsent recovery", exact: true }).waitFor();
   await guestPage.screenshot({

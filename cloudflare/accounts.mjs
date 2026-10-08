@@ -385,6 +385,8 @@ export async function handleAccounts(request, env) {
               ...m,
               role: seat && (!room.closed || seat.role === "dm") ? seat.role : null,
               closed: room?.closed === true,
+              viewOnly: room?.viewOnly === true,
+              ...(room ? { live: room.live === true } : {}),
             };
           }),
           backups: backups.results,

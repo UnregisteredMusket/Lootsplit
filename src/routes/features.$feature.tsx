@@ -84,8 +84,7 @@ function FeaturePage() {
             )}
             {feature === "properties" && (
               <>
-                <PropertyDetails />
-                {dm && <CampaignOperations section="properties" />}
+                <PropertyDetails plans />
               </>
             )}
             {feature === "shops" && (

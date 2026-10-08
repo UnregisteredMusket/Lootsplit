@@ -1,9 +1,10 @@
+import { finishAuditLiveness } from "./audit-liveness.mjs";
 import { openApplication, reloadApplication } from "./title-screen-navigation.mjs";
 import { chromium } from "playwright";
 import assert from "node:assert/strict";
 import { mkdir } from "node:fs/promises";
 import { localAccountDb } from "./account-dev-db.mjs";
-const origin = "http://127.0.0.1:8080",
+const origin = process.env.AUDIT_ORIGIN || "http://127.0.0.1:8080",
   output = process.env.CHARACTER_SCREENSHOTS || "test-results/characters";
 await mkdir(output, { recursive: true });
 const browser = await chromium.launch({
@@ -98,7 +99,16 @@ try {
   await page.getByRole("heading", { name: "New adventurer", exact: true }).waitFor();
   await page.locator(".quire-dawn").waitFor({ state: "hidden" });
   await page.getByRole("button", { name: "Edit sheet", exact: true }).click();
-  await page.getByRole("button", { name: "Character details", exact: true }).click();
+  await page.getByRole("tab", { name: "Character details", exact: true }).click();
+  const detailsTab = page.getByRole("tab", { name: "Character details", exact: true });
+  await detailsTab.press("Home");
+  assert.equal(await page.getByRole("tab", { name: "Combat", exact: true }).getAttribute("aria-selected"), "true");
+  await page.getByRole("tab", { name: "Combat", exact: true }).press("ArrowLeft");
+  assert.equal(await detailsTab.getAttribute("aria-selected"), "true");
+  assert.equal(await detailsTab.evaluate(el => el === document.activeElement), true);
+  const panelId = await detailsTab.getAttribute("aria-controls");
+  assert.equal(await page.locator(`[id="${panelId}"]`).getAttribute("aria-labelledby"), await detailsTab.getAttribute("id"));
+
   await page.getByLabel("Character name", { exact: true }).fill("Mira Ashfall");
   await page.getByLabel("Species", { exact: true }).fill("Elf");
   await page.getByLabel("Classes / subclasses", { exact: true }).fill("Ranger");
@@ -111,14 +121,21 @@ try {
   await page.getByText(/Import submitted for DM review/).waitFor();
   await openApplication(dm.page, origin + "/characters");
   await dm.page.getByRole("link",{name:"Review character imports →",exact:true}).click();
-  await dm.page.getByText("Mira Ashfall · awaiting approval", { exact: true }).click();
+  await dm.page.getByText(/Import Mira Ashfall into .+ · awaiting approval/).click();
+  const comparison = dm.page.getByRole("region", { name: "Changes proposed for Campaign hero", exact: true });
+  const nameChange = comparison.getByRole("row").filter({ has: dm.page.getByRole("rowheader", { name: "Name", exact: true }) });
+  assert.deepEqual(await nameChange.getByRole("cell").allTextContents(), ["Campaign hero", "Mira Ashfall"]);
+  assert.equal(await comparison.getByRole("rowheader", { name: /Coins|Equipment/ }).count(), 0);
+  await dm.page.getByText("Full submitted sheet", { exact: true }).click();
+  await dm.page.getByText("Full submitted sheet", { exact: true }).click();
+
   await dm.page.getByRole("button", { name: "Approve Mira Ashfall", exact: true }).click();
   await dm.page.getByText("No pending character imports.", { exact: true }).waitFor();
   await dm.page.locator(".feature-return a").click();
   await reloadApplication(page);
   await page.getByRole("heading", { name: "Mira Ashfall", exact: true }).waitFor();
   await page.getByRole("button", { name: "Edit sheet", exact: true }).click();
-  await page.getByRole("button", { name: "Abilities & skills", exact: true }).click();
+  await page.getByRole("tab", { name: "Abilities & skills", exact: true }).click();
   await page.getByLabel("DEX", { exact: true }).fill("16");
   await page.getByLabel("Stealth proficiency", { exact: true }).selectOption("2");
   await page.getByRole("button", { name: "Save character", exact: true }).click();
@@ -144,7 +161,7 @@ try {
   assert.equal(JSON.parse(saved.body).modifier, 3);
   assert.equal(JSON.parse(saved.body).dice.length, 2);
   assert.equal(await page.getByLabel("Enter a manual total", { exact: true }).isEnabled(), false);
-  await page.getByRole("button", { name: "Combat", exact: true }).click();
+  await page.getByRole("tab", { name: "Combat", exact: true }).click();
   await page.getByLabel("Temporary HP", { exact: true }).fill("3");
   await page.getByLabel("Damage / healing amount", { exact: true }).fill("5");
   await page.getByRole("button", { name: "Apply damage", exact: true }).click();
@@ -160,7 +177,7 @@ try {
   await page.getByRole("button", { name: "Save character", exact: true }).click();
   await page.getByText("Saved character", { exact: true }).waitFor();
   await page.screenshot({ path: output + "/desktop.png" });
-  await page.getByRole("button", { name: "Spells", exact: true }).click();
+  await page.getByRole("tab", { name: "Spells", exact: true }).click();
   await page.getByRole("button", { name: "Add custom spell", exact: true }).click();
   await page.getByText("New spell · Cantrip", { exact: false }).click();
   await page.getByLabel("Spell 1 name", { exact: true }).fill("Spark");
@@ -171,7 +188,7 @@ try {
   await page.getByRole("button", { name: "Use level 1 slot", exact: true }).click();
   await page.getByRole("button", { name: "Save character", exact: true }).click();
   await page.getByText("Saved character", { exact: true }).waitFor();
-  await page.getByRole("button", { name: "Inventory & currency", exact: true }).click();
+  await page.getByRole("tab", { name: "Inventory & currency", exact: true }).click();
   await page.getByText("Campaign sword × 1", { exact: true }).waitFor();
   await page.getByText("17 gp", { exact: true }).waitFor();
   await openApplication(dm.page, origin + "/characters");
@@ -183,7 +200,7 @@ try {
   await page.getByRole("button", { name: "Record manual roll", exact: true }).click();
   await page.getByText(/Custom roll: 18 · Manual result/).waitFor();
   assert.equal(await page.evaluate(() => JSON.parse(localStorage.getItem("quire.prefs.v1")).rollMode), "manual");
-  await page.getByRole("button", { name: "Abilities & skills", exact: true }).click();
+  await page.getByRole("tab", { name: "Abilities & skills", exact: true }).click();
   const physical = page.getByLabel("Roll DEX +3 manual total", { exact: true });
   await physical.fill("19");
   await page.locator(".quick-roll").filter({ has: physical }).getByRole("button", { name: "Record DEX +3", exact: true }).click();
@@ -195,16 +212,28 @@ try {
   await dm.page.getByRole("button", { name: "Edit sheet", exact: true }).last().click();
   assert.equal(await dm.page.getByLabel("Current HP", { exact: true }).last().isEnabled(), false);
   await page.setViewportSize({ width: 390, height: 844 });
-  await page.getByRole("button", { name: "Combat", exact: true }).click();
+  await page.getByRole("tab", { name: "Combat", exact: true }).click();
+  await page.getByRole("button", { name: "Add resource", exact: true }).scrollIntoViewIfNeeded();
+  await page.getByRole("button", { name: "Add resource", exact: true }).click();
+  const mobileSave = page.getByRole("button", { name: "Save character", exact: true });
+  assert.equal(await mobileSave.count(), 1);
+  assert.equal(await mobileSave.evaluate(el => {
+    const rect = el.getBoundingClientRect(), header = document.querySelector(".loot-shell header")?.getBoundingClientRect();
+    return rect.top >= (header?.bottom || 0) && rect.bottom < innerHeight && el.contains(document.elementFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2));
+  }), true, "Explicit save remains unobscured after an action near the bottom of the mobile editor");
+  assert.equal(await page.getByRole("button", { name: "Export sheet / draft", exact: true }).evaluate(el => el.getBoundingClientRect().bottom < innerHeight), true);
+  await mobileSave.click();
+  await page.getByText("Saved character", { exact: true }).waitFor();
+
   assert.equal(
     await page.evaluate(() => document.documentElement.scrollWidth > innerWidth + 1),
     false,
   );
   await page.getByRole("button", { name: "Play sheet", exact: true }).click();
   await page.locator(".play-action-row").filter({ hasText: "Longbow" }).waitFor();
-  await page.getByRole("button", { name: "Spells", exact: true }).click();
+  await page.getByRole("tab", { name: "Spells", exact: true }).click();
   await page.locator(".play-action-row").filter({ hasText: "Spark" }).waitFor();
-  await page.getByRole("button", { name: "Actions", exact: true }).click();
+  await page.getByRole("tab", { name: "Actions", exact: true }).click();
   await page.locator(".character-title").scrollIntoViewIfNeeded();
   await page.screenshot({ path: output + "/mobile.png" });
   await reloadApplication(page);
@@ -228,16 +257,23 @@ try {
   await page.getByRole("heading", { name: "Character sheets", exact: true }).waitFor();
   assert.deepEqual(errors, []);
   console.log(
-    "PASS: account character creation, editing/reload, campaign inventory, derived/advantage rolls, lost-response deduplication, HP, attacks, spells/slots, resources, DM manual policy and log, readonly DM roster, player home and mobile layout.",
+    "PASS: account character creation, editing/reload, campaign inventory, derived/advantage rolls, lost-response deduplication, HP, attacks, spells/slots, resources, DM manual policy and log, readonly DM roster, correct target import comparison/financial exclusions, keyboard tab navigation, sticky explicit mobile Save/export, player home and mobile layout.",
   );
+} catch (error) {
+  console.error("FAIL: character browser audit", error);
+  throw error;
 } finally {
-  await db
-    .prepare("DELETE FROM play_rolls WHERE code=? OR user_id IN (?,?)")
-    .bind(code, ...ids)
-    .run();
-  for (const id of ids) await db.prepare("DELETE FROM user WHERE id=?").bind(id).run();
-  await db.prepare("DELETE FROM play_policies WHERE code=?").bind(code).run();
-  await db.prepare("DELETE FROM campaign_rooms WHERE code=?").bind(code).run();
-  db.close();
-  await browser.close();
+  try {
+    await db
+      .prepare("DELETE FROM play_rolls WHERE code=? OR user_id IN (?,?)")
+      .bind(code, ...ids)
+      .run();
+    for (const id of ids) await db.prepare("DELETE FROM user WHERE id=?").bind(id).run();
+    await db.prepare("DELETE FROM play_policies WHERE code=?").bind(code).run();
+    await db.prepare("DELETE FROM campaign_rooms WHERE code=?").bind(code).run();
+    db.close();
+    await browser.close();
+  } finally {
+    finishAuditLiveness();
+  }
 }

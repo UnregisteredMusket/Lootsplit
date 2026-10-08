@@ -77,8 +77,8 @@ export async function handleCharacterPlay(db, user, path, body, url, approval = 
     const rows = await db
       .prepare(
         seat.role === "dm"
-          ? "SELECT id,character_id,purse_id,body,status,created_at FROM character_imports WHERE code=? ORDER BY (status='pending') DESC,created_at DESC LIMIT 100"
-          : "SELECT id,character_id,purse_id,body,status,created_at FROM character_imports WHERE code=? AND user_id=? ORDER BY created_at DESC LIMIT 100",
+          ? "SELECT id,character_id,purse_id,source_revision,target_revision,body,status,created_at FROM character_imports WHERE code=? ORDER BY (status='pending') DESC,created_at DESC LIMIT 100"
+          : "SELECT id,character_id,purse_id,source_revision,target_revision,body,status,created_at FROM character_imports WHERE code=? AND user_id=? ORDER BY created_at DESC LIMIT 100",
       )
       .bind(...(seat.role === "dm" ? [body.code] : [body.code, user]))
       .all();

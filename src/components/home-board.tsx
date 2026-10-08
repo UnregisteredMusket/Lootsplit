@@ -89,10 +89,10 @@ export function HomeBoard({ embedded = false }: { embedded?: boolean }) {
         treasury.map((p) => p.id),
       ).net
     : today.reduce((sum, line) => sum + line.copper, 0);
-  const recent = [...ledger]
+  const activity = [...ledger]
     .filter((line) => mine.some((purse) => purse.id === line.purseId))
-    .sort((a, b) => b.at - a.at)
-    .slice(0, 5);
+    .sort((a, b) => b.at - a.at);
+  const recent = activity.slice(0, prefs.ledgerRows);
   const messages = [...notes].sort((a, b) => b.at - a.at).slice(0, 2);
 
   return (
@@ -258,8 +258,13 @@ export function HomeBoard({ embedded = false }: { embedded?: boolean }) {
                 <section className="min-w-0">
                   <div className="section-heading">
                     <h2>Recent activity</h2>
-                    <span className="text-sm text-faint">Latest transactions</span>
+                    <AppLink href="/features/reports" className="text-sm text-lead">
+                      Full ledger →
+                    </AppLink>
                   </div>
+                  <p className="text-sm text-faint">
+                    Latest {recent.length} of {activity.length} transactions
+                  </p>
                   {recent.length === 0 ? (
                     <EmptyState
                       title="No transactions yet"
@@ -389,12 +394,14 @@ export function HomeBoard({ embedded = false }: { embedded?: boolean }) {
           >
             Settings
           </Link>
-          <Link
-            to="/share"
-            className="inline-flex min-h-11 items-center rounded-xl border border-lead/40 px-3"
-          >
-            Multiplayer
-          </Link>
+          {seat.role === "player" && (
+            <Link
+              to="/share"
+              className="inline-flex min-h-11 items-center rounded-xl border border-lead/40 px-3"
+            >
+              Multiplayer
+            </Link>
+          )}
           {seat.role === "dm" ? (
             <Button
               variant="secondary"
