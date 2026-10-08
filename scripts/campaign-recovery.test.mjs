@@ -219,29 +219,50 @@ for (const kind of ["sqlite", "libsql"]) {
       assert.equal(deleted.status, 200, JSON.stringify(deleted.data));
       const backupId = deleted.data.backupId;
       const row = await DB.prepare("SELECT body FROM library_backups WHERE id=?")
-        .bind(backupId).first();
+        .bind(backupId)
+        .first();
       for (const error of ["Unreadable original archive", ""]) {
         const payload = JSON.parse(row.body);
         payload.journal = {
-          reports: [{
-            id: "diagnostic-only", name: "Damaged historical record", at: 1,
-            snapshot: JSON.stringify(emptyCloudTable()), error,
-          }],
+          reports: [
+            {
+              id: "diagnostic-only",
+              name: "Damaged historical record",
+              at: 1,
+              snapshot: JSON.stringify(emptyCloudTable()),
+              error,
+            },
+          ],
         };
         const original = JSON.stringify(payload);
         await DB.prepare("UPDATE library_backups SET body=? WHERE id=?")
-          .bind(original, backupId).run();
-        const restored = await call("restore-backup", {
-          id: backupId, requestKey: crypto.randomUUID(),
-        }, dm.cookie);
+          .bind(original, backupId)
+          .run();
+        const restored = await call(
+          "restore-backup",
+          {
+            id: backupId,
+            requestKey: crypto.randomUUID(),
+          },
+          dm.cookie,
+        );
         assert.equal(restored.status, 409, JSON.stringify(restored.data));
         assert.equal((await DB.prepare("SELECT COUNT(*) AS n FROM campaign_rooms").first()).n, 0);
-        assert.equal((await DB.prepare("SELECT COUNT(*) AS n FROM campaign_recoveries").first()).n, 0);
+        assert.equal(
+          (await DB.prepare("SELECT COUNT(*) AS n FROM campaign_recoveries").first()).n,
+          0,
+        );
         assert.equal((await DB.prepare("SELECT COUNT(*) AS n FROM library_members").first()).n, 0);
-        assert.equal((await DB.prepare("SELECT body FROM library_backups WHERE id=?")
-          .bind(backupId).first()).body, original);
-        assert.ok(await DB.prepare("SELECT backup_id FROM campaign_deletion_backups WHERE backup_id=?")
-          .bind(backupId).first());
+        assert.equal(
+          (await DB.prepare("SELECT body FROM library_backups WHERE id=?").bind(backupId).first())
+            .body,
+          original,
+        );
+        assert.ok(
+          await DB.prepare("SELECT backup_id FROM campaign_deletion_backups WHERE backup_id=?")
+            .bind(backupId)
+            .first(),
+        );
       }
     } finally {
       await DB.close();
@@ -450,6 +471,104 @@ for (const kind of ["sqlite", "libsql"]) {
         (await call("encounters/award", { id: encounterId, revision: 2 }, dm.cookie)).status,
         200,
       );
+      const sourceAward = await DB.prepare(
+        "SELECT receipt_id FROM dm_encounter_awards WHERE encounter_id=?",
+      )
+        .bind(encounterId)
+        .first();
+      // A second real receipt makes the mismatched reference use two known IDs.
+      // Mapping encounter and receipt independently would forge their association.
+      const otherEncounterId = crypto.randomUUID();
+      assert.equal(
+        (await call("encounters/create", { id: otherEncounterId, code }, dm.cookie)).status,
+        200,
+      );
+      assert.equal(
+        (await call("encounters/conclude", { id: otherEncounterId, revision: 0 }, dm.cookie))
+          .status,
+        200,
+      );
+      assert.equal(
+        (await call("encounters/award", { id: otherEncounterId, revision: 1 }, dm.cookie)).status,
+        200,
+      );
+      const otherAward = await DB.prepare(
+        "SELECT receipt_id FROM dm_encounter_awards WHERE encounter_id=?",
+      )
+        .bind(otherEncounterId)
+        .first();
+      const sourceRoom = JSON.parse(
+        (await DB.prepare("SELECT body FROM campaign_rooms WHERE code=?").bind(code).first()).body,
+      );
+      const note = {
+        id: `encounter-loot:${sourceAward.receipt_id}`,
+        at: 1,
+        authorId: "dm-seat",
+        purseId: "",
+        visibility: "party",
+        title: "Reviewed original award",
+        text: `Historical receipt text: ${sourceAward.receipt_id}`,
+        reportIds: [],
+        provenance: {
+          kind: "encounter-loot",
+          encounterId,
+          receiptId: sourceAward.receipt_id,
+          sessionId: "chronicle-session",
+        },
+      };
+      const sourceEntries = [
+        note,
+        {
+          ...note,
+          id: "second-confirmed",
+          provenance: {
+            ...note.provenance,
+            encounterId: otherEncounterId,
+            receiptId: otherAward.receipt_id,
+          },
+        },
+        {
+          ...note,
+          id: "mismatched-known-pair",
+          provenance: { ...note.provenance, receiptId: otherAward.receipt_id },
+        },
+        {
+          ...note,
+          id: "dangling-history",
+          provenance: {
+            ...note.provenance,
+            encounterId: "absent-encounter",
+            receiptId: "absent-receipt",
+          },
+        },
+        { ...note, id: "ordinary-unlinked", provenance: undefined },
+      ];
+      const sourceSessions = [{ id: "chronicle-session", name: "Original session", startedAt: 1 }];
+      const archived = emptyCloudTable();
+      archived.journal = {
+        sessions: sourceSessions,
+        requests: [],
+        events: [],
+        entries: sourceEntries,
+      };
+      const sourceArchiveBytes = JSON.stringify(archived, null, 3);
+      sourceRoom.table.journal = {
+        ...sourceRoom.table.journal,
+        sessions: sourceSessions,
+        entries: sourceEntries,
+        reports: [
+          {
+            id: "original-archive",
+            name: "Immutable session history",
+            at: 1,
+            seatIds: ["dm-seat"],
+            snapshot: sourceArchiveBytes,
+          },
+        ],
+      };
+      await DB.prepare("UPDATE campaign_rooms SET body=? WHERE code=?")
+        .bind(JSON.stringify(sourceRoom), code)
+        .run();
       const savedRoll = await DB.prepare("SELECT body FROM dm_encounter_rolls WHERE encounter_id=?")
         .bind(encounterId)
         .first();
@@ -524,10 +643,20 @@ for (const kind of ["sqlite", "libsql"]) {
       assert.equal(deleted.status, 200, JSON.stringify(deleted.data));
       assert.equal((await call("campaign", deletion, dm.cookie)).status, 404);
       const backupId = deleted.data.backupId;
+      const originalBackupBytes = (
+        await DB.prepare("SELECT body FROM library_backups WHERE id=?").bind(backupId).first()
+      ).body;
       assert.equal((await call("read-backup", { id: backupId }, player.cookie)).status, 404);
       const payload = (await call("read-backup", { id: backupId }, dm.cookie)).data.payload;
-      assert.equal(payload.campaignRecovery.encounters.length, 1);
-      assert.equal(payload.campaignRecovery.encounterAwards.length, 1);
+      assert.equal(payload.campaignRecovery.encounters.length, 2);
+      assert.equal(payload.campaignRecovery.encounterAwards.length, 2);
+      // Deletion retains its existing privacy projection. Restoration must not
+      // rewrite the resulting authoritative backup's historical archive bytes.
+      const originalArchiveBytes = payload.journal.reports[0].snapshot;
+      assert.deepEqual(
+        JSON.parse(originalArchiveBytes).journal.entries,
+        JSON.parse(sourceArchiveBytes).journal.entries,
+      );
       assert.equal(
         payload.campaignRecovery.encounterRolls.length,
         81,
@@ -595,13 +724,58 @@ for (const kind of ["sqlite", "libsql"]) {
       assert.deepEqual(next.table.holdings, before.table.holdings);
       assert.deepEqual(next.table.ledger, before.table.ledger);
       assert.equal(next.table.purses[0].profileId, undefined);
+      const restoredNote = next.table.journal.entries.find((entry) => entry.id === note.id);
+      assert.ok(restoredNote);
+      assert.notEqual(restoredNote.provenance.encounterId, encounterId);
+      assert.notEqual(restoredNote.provenance.receiptId, sourceAward.receipt_id);
+      assert.deepEqual(
+        { ...restoredNote, provenance: note.provenance },
+        note,
+        "Only the active note's source pair changes; identity, text, visibility and session remain intact",
+      );
+      assert.deepEqual(next.table.journal.sessions, sourceSessions);
+      assert.equal(
+        next.table.journal.reports[0].snapshot,
+        originalArchiveBytes,
+        "Archived JSON remains byte-for-byte historical, including old provenance",
+      );
+      for (const id of ["mismatched-known-pair", "dangling-history", "ordinary-unlinked"])
+        assert.deepEqual(
+          next.table.journal.entries.find((entry) => entry.id === id),
+          payload.journal.entries.find((entry) => entry.id === id),
+          `${id}: no new association is inferred`,
+        );
+      assert.equal(
+        (await DB.prepare("SELECT body FROM library_backups WHERE id=?").bind(backupId).first())
+          .body,
+        originalBackupBytes,
+        "The private source backup stays byte-for-byte intact after retry",
+      );
       const encounters = (await call("encounters", undefined, dm.cookie)).data.encounters;
-      const saved = encounters.find((e) => e.code === resumed.code);
+      const saved = encounters.find(
+        (e) => e.code === resumed.code && e.id === restoredNote.provenance.encounterId,
+      );
       assert.ok(saved);
       assert.notEqual(saved.id, encounterId);
       const detail = (await call("encounters/detail", { id: saved.id }, dm.cookie)).data;
       assert.equal(detail.body.notes, encounter.notes);
       assert.equal(detail.status, "awarded");
+      assert.equal(
+        detail.award.receiptId,
+        restoredNote.provenance.receiptId,
+        "The restored active note resolves to the actual restored award receipt",
+      );
+      const secondNote = next.table.journal.entries.find(
+        (entry) => entry.id === "second-confirmed",
+      );
+      const secondDetail = await call(
+        "encounters/detail",
+        { id: secondNote.provenance.encounterId },
+        dm.cookie,
+      );
+      assert.equal(secondDetail.status, 200);
+      assert.equal(secondDetail.data.award.receiptId, secondNote.provenance.receiptId);
+      assert.notEqual(secondNote.provenance.receiptId, restoredNote.provenance.receiptId);
       const duplicate = await call(
         "encounters/award",
         { id: saved.id, revision: detail.revision },
@@ -679,6 +853,16 @@ for (const kind of ["sqlite", "libsql"]) {
         final.table.purses[0].coins,
         next.table.purses[0].coins,
         "Restored award receipts cannot award wealth twice",
+      );
+      assert.deepEqual(
+        final.table.journal,
+        next.table.journal,
+        "Duplicate award requests cannot replace the remapped chronicle or immutable archives",
+      );
+      assert.equal(
+        (await DB.prepare("SELECT body FROM library_backups WHERE id=?").bind(backupId).first())
+          .body,
+        originalBackupBytes,
       );
     } finally {
       await DB.close();

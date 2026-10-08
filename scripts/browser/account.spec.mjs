@@ -15,24 +15,176 @@ import {
 } from "./account-fixtures.mjs";
 import { continueIntoApp, prepareDmFixture } from "../title-screen-navigation.mjs";
 
+// Run the long, independent ownership scenario first so it has the full
+// unchanged per-test and suite budgets rather than the final queue remainder.
+test("ownership", async ({ devices, baseURL: origin }, testInfo) => {
+  const dm = devices.page;
+  dm.guestAccessAudit = true;
+  await visitPage(dm, origin, "/");
+  await expect(
+    dm.getByText(
+      "Create an account or sign in to proceed as a Dungeon Master in your own campaign",
+      { exact: true },
+    ),
+  ).toBeVisible();
+  expect(await dm.evaluate(async () => (await indexedDB.databases()).length)).toBe(0);
+  // A pre-account device save must survive the migration gate unchanged.
+  await dm.evaluate(async () => {
+    const db = await new Promise((resolve, reject) => {
+      const open = indexedDB.open("quire", 3);
+      open.onupgradeneeded = () => {
+        for (const name of [
+          "books",
+          "articles",
+          "purses",
+          "holdings",
+          "shops",
+          "stock",
+          "ledger",
+          "meta",
+          "catalog",
+          "lexicon",
+        ]) {
+          const store = open.result.createObjectStore(name, { keyPath: "id" });
+          if (name === "articles") store.createIndex("bookId", "bookId");
+          if (name === "holdings") store.createIndex("purseId", "purseId");
+          if (name === "stock") store.createIndex("shopId", "shopId");
+        }
+      };
+      open.onsuccess = () => resolve(open.result);
+      open.onerror = () => reject(open.error);
+    });
+    await new Promise((resolve, reject) => {
+      const tx = db.transaction(["purses", "meta"], "readwrite");
+      tx.objectStore("purses").put({
+        id: "legacy-hero",
+        name: "Preserved legacy hero",
+        kind: "character",
+        control: "player",
+        coins: { cp: 3, sp: 2, ep: 0, gp: 37, pp: 0 },
+      });
+      tx.objectStore("meta").put({ id: "seeded" });
+      tx.oncomplete = resolve;
+      tx.onerror = () => reject(tx.error);
+    });
+    db.close();
+  });
+  const owner = credentials();
+  await accountPost(devices.context, origin, "auth/sign-up/email", owner);
+  await visitPage(dm, origin, "/");
+  await dm
+    .getByRole("button", {
+      name: "Claim this device’s existing DM campaign",
+      exact: true,
+    })
+    .click();
+  await expect(dm.getByText("Campaign control", { exact: true })).toBeVisible();
+  const guide = dm.getByRole("button", { name: "Not now", exact: true });
+  if (await guide.isVisible()) await guide.click();
+  // Reload after the explicit legacy claim to prove ownership and bytes persist.
+  await visitPage(dm, origin, "/party");
+  await expect(dm.getByText("Preserved legacy hero", { exact: true }).first()).toBeVisible();
+  const members = await createAndSaveRoom(dm, origin, navigateAccountScenario);
+  const code = members[0].code;
+  await navigateAccountScenario(dm, origin, "/share");
+  await dm.evaluate(() =>
+    Object.defineProperty(navigator, "share", {
+      configurable: true,
+      value: async (data) => {
+        window.invitationForTest = data.url;
+      },
+    }),
+  );
+  await dm.getByRole("button", { name: "Share join link", exact: true }).click();
+  const link = await dm.evaluate(() => window.invitationForTest);
+  expect(new URL(link).searchParams.get("session")).toBeTruthy();
+  const { page: guest } = await devices.newDevice(390);
+  await visitPage(guest, origin, new URL(link).pathname + new URL(link).search);
+  await guest.getByRole("button", { name: "Find characters", exact: true }).click();
+  await guest.getByPlaceholder("What should the party call you?").fill("Guest adventurer");
+  await guest.getByRole("button", { name: "Join room", exact: true }).click();
+  await expect(guest.locator(".room-code")).toHaveText(code);
+  expect(await guest.evaluate(async () => (await indexedDB.databases()).length)).toBe(0);
+  expect(
+    await guest.evaluate(() => Object.keys(localStorage).some((k) => k.startsWith("quire.cloud"))),
+  ).toBe(false);
+  await guest.reload();
+  await continueIntoApp(guest);
+  await expect(guest.locator(".room-code")).toHaveText(code);
+  await guest.screenshot({
+    path: testInfo.outputPath("guest-memory-mobile.png"),
+    fullPage: true,
+  });
+  await endSession(dm, origin, navigateAccountScenario);
+  await expect(guest.locator(".room-code")).toBeHidden();
+  expect(
+    await guest.evaluate(() => sessionStorage.getItem("lootsplit.player.reconnect.v1")),
+  ).toBeNull();
+  await navigateAccountScenario(dm, origin, "/account");
+  await dm.getByRole("button", { name: "Reopen as DM", exact: true }).click();
+  await dm.waitForURL((u) => u.pathname === "/");
+  await continueIntoApp(dm);
+  await visitPage(guest, origin, new URL(link).pathname + new URL(link).search);
+  await guest.getByRole("button", { name: "Find characters", exact: true }).click();
+  await expect(
+    guest.locator("[data-sonner-toast]").filter({ hasText: "invitation has expired" }),
+  ).toBeVisible();
+  const returning = credentials();
+  await accountPost(guest.context(), origin, "auth/sign-up/email", returning);
+  await navigateAccountScenario(dm, origin, "/share");
+  await dm.evaluate(() =>
+    Object.defineProperty(navigator, "share", {
+      configurable: true,
+      value: async (data) => {
+        window.invitationForTest = data.url;
+      },
+    }),
+  );
+  await dm.getByRole("button", { name: "Share join link", exact: true }).click();
+  const freshLink = new URL(await dm.evaluate(() => window.invitationForTest));
+  await visitPage(guest, origin, freshLink.pathname + freshLink.search);
+  await guest.getByRole("button", { name: "Find characters", exact: true }).click();
+  await guest.getByPlaceholder("What should the party call you?").fill("Returning player");
+  await guest.getByRole("button", { name: "Join room", exact: true }).click();
+  await expect(guest.locator(".room-code")).toHaveText(code);
+  const { page: secondPlayer, context: playerContext } = await devices.newDevice();
+  await accountPost(playerContext, origin, "auth/sign-in/email", returning);
+  await visitPage(secondPlayer, origin, "/account");
+  await secondPlayer.getByRole("button", { name: "Resume", exact: true }).click();
+  await secondPlayer.waitForURL((u) => u.pathname === "/");
+  await continueIntoApp(secondPlayer);
+  await visitPage(secondPlayer, origin, "/share");
+  await expect(secondPlayer.locator(".room-code")).toHaveText(code);
+  expect(await secondPlayer.evaluate(async () => (await indexedDB.databases()).length)).toBe(0);
+  // Closing the DM's tab is not End session; a fresh player reload still reconnects.
+  await dm.close();
+  await secondPlayer.reload();
+  await continueIntoApp(secondPlayer);
+  await expect(secondPlayer.locator(".room-code")).toHaveText(code);
+});
+
 test("layout", async ({ devices, baseURL: origin }, testInfo) => {
   const { page } = devices;
+  const { page: desktop } = await devices.newDevice(1280);
   const visit = (p, path) => visitPage(p, origin, path);
-  for (const width of [1280, 390]) {
-    await page.setViewportSize({ width, height: 900 });
+  const inspectLayout = async (device, width) => {
+    await device.setViewportSize({ width, height: 900 });
     for (const path of ["/welcome", "/downloads", "/help", "/updates", "/account"]) {
-      await visit(page, path);
-      assert.ok((await page.locator("body").innerText()).length > 200);
+      await visit(device, path);
+      assert.ok((await device.locator("body").innerText()).length > 200);
       assert.ok(
-        await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1),
+        await device.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1),
         `Overflow ${path} ${width}`,
       );
-      await page.screenshot({
+      await device.screenshot({
         path: testInfo.outputPath(`website-${path.slice(1)}-${width}.png`),
         fullPage: true,
       });
     }
-  }
+  };
+  // Independent public-page scans retain every cold-load/layout assertion. The
+  // phone still performs the original actual-link transitions after both finish.
+  await Promise.all([inspectLayout(desktop, 1280), inspectLayout(page, 390)]);
   // Exercise client-side route transitions as well as direct navigation. Providers
   // must stay mounted while the router renders the previous page during a lazy load.
   await page.getByRole("link", { name: "Downloads", exact: true }).first().click();
@@ -773,152 +925,6 @@ test("invitations", async ({ devices, baseURL: origin }, testInfo) => {
     player.getByRole("status").filter({ hasText: /Room online.*Play active.*Saved to room/ }),
   ).toBeVisible();
   await expect.poll(() => new URL(player.url()).searchParams.has("join")).toBe(false);
-});
-
-test("ownership", async ({ devices, baseURL: origin }, testInfo) => {
-  const dm = devices.page;
-  dm.guestAccessAudit = true;
-  await visitPage(dm, origin, "/");
-  await expect(
-    dm.getByText(
-      "Create an account or sign in to proceed as a Dungeon Master in your own campaign",
-      { exact: true },
-    ),
-  ).toBeVisible();
-  expect(await dm.evaluate(async () => (await indexedDB.databases()).length)).toBe(0);
-  // A pre-account device save must survive the migration gate unchanged.
-  await dm.evaluate(async () => {
-    const db = await new Promise((resolve, reject) => {
-      const open = indexedDB.open("quire", 3);
-      open.onupgradeneeded = () => {
-        for (const name of [
-          "books",
-          "articles",
-          "purses",
-          "holdings",
-          "shops",
-          "stock",
-          "ledger",
-          "meta",
-          "catalog",
-          "lexicon",
-        ]) {
-          const store = open.result.createObjectStore(name, { keyPath: "id" });
-          if (name === "articles") store.createIndex("bookId", "bookId");
-          if (name === "holdings") store.createIndex("purseId", "purseId");
-          if (name === "stock") store.createIndex("shopId", "shopId");
-        }
-      };
-      open.onsuccess = () => resolve(open.result);
-      open.onerror = () => reject(open.error);
-    });
-    await new Promise((resolve, reject) => {
-      const tx = db.transaction(["purses", "meta"], "readwrite");
-      tx.objectStore("purses").put({
-        id: "legacy-hero",
-        name: "Preserved legacy hero",
-        kind: "character",
-        control: "player",
-        coins: { cp: 3, sp: 2, ep: 0, gp: 37, pp: 0 },
-      });
-      tx.objectStore("meta").put({ id: "seeded" });
-      tx.oncomplete = resolve;
-      tx.onerror = () => reject(tx.error);
-    });
-    db.close();
-  });
-  const owner = credentials();
-  await accountPost(devices.context, origin, "auth/sign-up/email", owner);
-  await visitPage(dm, origin, "/");
-  await dm
-    .getByRole("button", {
-      name: "Claim this device’s existing DM campaign",
-      exact: true,
-    })
-    .click();
-  await expect(dm.getByText("Campaign control", { exact: true })).toBeVisible();
-  const guide = dm.getByRole("button", { name: "Not now", exact: true });
-  if (await guide.isVisible()) await guide.click();
-  // Reload after the explicit legacy claim to prove ownership and bytes persist.
-  await visitPage(dm, origin, "/party");
-  await expect(dm.getByText("Preserved legacy hero", { exact: true }).first()).toBeVisible();
-  const members = await createAndSaveRoom(dm, origin, navigateAccountScenario);
-  const code = members[0].code;
-  await navigateAccountScenario(dm, origin, "/share");
-  await dm.evaluate(() =>
-    Object.defineProperty(navigator, "share", {
-      configurable: true,
-      value: async (data) => {
-        window.invitationForTest = data.url;
-      },
-    }),
-  );
-  await dm.getByRole("button", { name: "Share join link", exact: true }).click();
-  const link = await dm.evaluate(() => window.invitationForTest);
-  expect(new URL(link).searchParams.get("session")).toBeTruthy();
-  const { page: guest } = await devices.newDevice(390);
-  await visitPage(guest, origin, new URL(link).pathname + new URL(link).search);
-  await guest.getByRole("button", { name: "Find characters", exact: true }).click();
-  await guest.getByPlaceholder("What should the party call you?").fill("Guest adventurer");
-  await guest.getByRole("button", { name: "Join room", exact: true }).click();
-  await expect(guest.locator(".room-code")).toHaveText(code);
-  expect(await guest.evaluate(async () => (await indexedDB.databases()).length)).toBe(0);
-  expect(
-    await guest.evaluate(() => Object.keys(localStorage).some((k) => k.startsWith("quire.cloud"))),
-  ).toBe(false);
-  await guest.reload();
-  await continueIntoApp(guest);
-  await expect(guest.locator(".room-code")).toHaveText(code);
-  await guest.screenshot({
-    path: testInfo.outputPath("guest-memory-mobile.png"),
-    fullPage: true,
-  });
-  await endSession(dm, origin, navigateAccountScenario);
-  await expect(guest.locator(".room-code")).toBeHidden();
-  expect(
-    await guest.evaluate(() => sessionStorage.getItem("lootsplit.player.reconnect.v1")),
-  ).toBeNull();
-  await navigateAccountScenario(dm, origin, "/account");
-  await dm.getByRole("button", { name: "Reopen as DM", exact: true }).click();
-  await dm.waitForURL((u) => u.pathname === "/");
-  await continueIntoApp(dm);
-  await visitPage(guest, origin, new URL(link).pathname + new URL(link).search);
-  await guest.getByRole("button", { name: "Find characters", exact: true }).click();
-  await expect(
-    guest.locator("[data-sonner-toast]").filter({ hasText: "invitation has expired" }),
-  ).toBeVisible();
-  const returning = credentials();
-  await accountPost(guest.context(), origin, "auth/sign-up/email", returning);
-  await navigateAccountScenario(dm, origin, "/share");
-  await dm.evaluate(() =>
-    Object.defineProperty(navigator, "share", {
-      configurable: true,
-      value: async (data) => {
-        window.invitationForTest = data.url;
-      },
-    }),
-  );
-  await dm.getByRole("button", { name: "Share join link", exact: true }).click();
-  const freshLink = new URL(await dm.evaluate(() => window.invitationForTest));
-  await visitPage(guest, origin, freshLink.pathname + freshLink.search);
-  await guest.getByRole("button", { name: "Find characters", exact: true }).click();
-  await guest.getByPlaceholder("What should the party call you?").fill("Returning player");
-  await guest.getByRole("button", { name: "Join room", exact: true }).click();
-  await expect(guest.locator(".room-code")).toHaveText(code);
-  const { page: secondPlayer, context: playerContext } = await devices.newDevice();
-  await accountPost(playerContext, origin, "auth/sign-in/email", returning);
-  await visitPage(secondPlayer, origin, "/account");
-  await secondPlayer.getByRole("button", { name: "Resume", exact: true }).click();
-  await secondPlayer.waitForURL((u) => u.pathname === "/");
-  await continueIntoApp(secondPlayer);
-  await visitPage(secondPlayer, origin, "/share");
-  await expect(secondPlayer.locator(".room-code")).toHaveText(code);
-  expect(await secondPlayer.evaluate(async () => (await indexedDB.databases()).length)).toBe(0);
-  // Closing the DM's tab is not End session; a fresh player reload still reconnects.
-  await dm.close();
-  await secondPlayer.reload();
-  await continueIntoApp(secondPlayer);
-  await expect(secondPlayer.locator(".room-code")).toHaveText(code);
 });
 
 test("shared-recovery", async ({ devices, baseURL: origin }, testInfo) => {
