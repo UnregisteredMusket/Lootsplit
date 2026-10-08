@@ -260,7 +260,16 @@ try {
     await page.getByLabel("New quantity",{exact:true}).fill("2");
     await page.getByRole("button",{name:"Add item",exact:true}).click();
     await waitStock(page,rows=>rows.some(row=>row.shopId===shopId&&row.name==="Retained invalid stock draft"&&row.quantity===2));
+    // The database commit precedes the provider reload and outer form reset.
+    // Its own notice marks that continuation; the provider toast does not.
+    const addForm = page.locator("form").filter({
+      has: page.getByLabel("New item", { exact: true }),
+    });
+    await addForm.getByRole("status").filter({ hasText: /^Item added\.$/ }).waitFor();
     assert.equal(await page.getByLabel("New item",{exact:true}).inputValue(),"");
+    assert.equal(await addForm.getByLabel("New price", { exact: true }).inputValue(), "");
+    assert.equal(await addForm.getByLabel("New quantity", { exact: true }).inputValue(), "");
+    assert.equal(await addForm.getByRole("button", { name: "Add item", exact: true }).isEnabled(), true);
     await page.getByRole("link", { name: "Market", exact: true }).first().click();
     await page.getByRole("button", { name: /^Create a shop/ }).click();
     await page.getByRole("heading", { name: "Create a shop", exact: true }).waitFor();
