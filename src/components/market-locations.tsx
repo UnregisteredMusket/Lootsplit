@@ -118,6 +118,7 @@ export function MarketLocationsPanel() {
         <Fold
           title="Manage regions, cities, towns and areas"
           hint={`${market.locations.length} locations · images and descriptions are player facing`}
+          actions={<MarketNameImport market={market} shops={shops} disabled={!!editing} />}
         >
           <div className="space-y-3">
             <label className="block text-sm">
@@ -135,7 +136,6 @@ export function MarketLocationsPanel() {
             <Button variant="secondary" disabled={!!editing} onClick={() => setEditing("new")}>
               Create location
             </Button>
-            <MarketNameImport market={market} shops={shops} disabled={!!editing} />
             {editing ? (
               <LocationEditor
                 key={editing}

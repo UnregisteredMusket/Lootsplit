@@ -174,8 +174,18 @@ try {
       importDialog.getByText("4 new locations · 2 new shops", { exact: true }),
     ).toBeVisible();
     await dm.screenshot({ path: `${output}/import-preview-${width}.png` });
+    await importDialog.getByRole("button", { name: "Close", exact: true }).click();
+    await dm.getByRole("button", { name: /^Manage regions, cities, towns and areas/ }).click();
+    await dm.getByRole("button", { name: "Import names", exact: true }).click();
+    await expect(importDialog.getByLabel("Names to import", { exact: true })).toHaveValue(
+      namesFile.buffer.toString(),
+    );
+    await expect(
+      importDialog.getByText("4 new locations · 2 new shops", { exact: true }),
+    ).toBeVisible();
     await importDialog.getByRole("button", { name: "Import 6 new entries", exact: true }).click();
     await expect(importDialog).toHaveCount(0);
+    await dm.getByRole("button", { name: /^Manage regions, cities, towns and areas/ }).click();
     const importedShop = (await rows(dm, "shops")).find(
       (shop) => shop.name === `Imported Forge ${width}`,
     );
@@ -195,13 +205,11 @@ try {
     await expect(
       importDialog.getByRole("button", { name: "Import 0 new entries", exact: true }),
     ).toBeDisabled();
-    await importDialog
-      .getByLabel("Import names file", { exact: true })
-      .setInputFiles({
-        name: "invalid.json",
-        mimeType: "application/json",
-        buffer: Buffer.from('[{"city":"Orphan"}]'),
-      });
+    await importDialog.getByLabel("Import names file", { exact: true }).setInputFiles({
+      name: "invalid.json",
+      mimeType: "application/json",
+      buffer: Buffer.from('[{"city":"Orphan"}]'),
+    });
     await importDialog.getByRole("button", { name: "Review import", exact: true }).click();
     await expect(importDialog.getByRole("alert")).toContainText("choose a region");
     assert.deepEqual((await market(dm)).locations, importedLocations);
