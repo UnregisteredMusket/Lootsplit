@@ -67,7 +67,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Packaged Worker / accounts / Run actions/download-artifact@v4 | open | 3 | 1s → 4s | +3s | +300% |
 | Packaged Worker / accounts / Run actions/upload-artifact@v4 | open | 2 | 1s → 3s | +2s | +200% |
 | Packaged Worker / interface / worker-loot | open | 2 | 4s → 6s | +2s | +50% |
-| Development / gameplay / Run npx playwright install --with-deps chromium | open | 2 | 25s → 41s | +16s | +64% |
+| Development / gameplay / Run npx playwright install --with-deps chromium | open | 3 | 25s → 102s | +77s | +308% |
 | Code checks and immutable builds / Run actions/upload-artifact@v4 | open | 2 | 2s → 4s | +2s | +100% |
 | Packaged Worker / accounts / worker-account | resolved | 6 | 22s → 95s | +73s | +331.82% |
 | Development / gameplay | open | 3 | 141s → 232s | +91s | +64.54% |
@@ -180,6 +180,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-08T08:51:07Z | step: Development / gameplay / Run npx playwright install --with-deps chromium | 41s → 102s | +61s | +148.78% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37424344225/job/112140489817) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37752367163/job/113228451042) |
 | 2026-10-08T08:03:03Z | step: report / Run actions/setup-node@v4 | 3s → 6s | +3s | +100% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37301090506/job/111733716644) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37747258693/job/113211576874) |
 | 2026-10-08T08:02:48.000Z | workflow: Verify preserved functionality | 692s → 920s | +228s | +32.95% | failure | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37659474866) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37745618424) |
 | 2026-10-08T08:02:39Z | job: Packaged Worker / accounts | 202s → 810s | +608s | +300.99% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37638440371/job/112851511436) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37745618424/job/113206836417) |
