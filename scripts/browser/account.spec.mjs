@@ -171,22 +171,26 @@ test("dm-resume", async ({ devices, baseURL: origin }, testInfo) => {
   assert.equal(saved.length, 2);
   const secondCode = saved.find((m) => m.code !== firstCode).code;
   await endSession(page, origin, navigateAccountScenario);
-  for (const [p, width] of [
-    [page, 390],
-    [other, 1360],
-  ]) {
-    await p.setViewportSize({ width, height: 900 });
-    await visit(p, "/account");
-    await p.getByRole("button", { name: "Reopen as DM", exact: true }).nth(1).waitFor();
-    assert.equal(
-      await p.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1),
-      true,
-    );
-    await p.screenshot({
-      path: testInfo.outputPath(`dm-resume-closed-${width}.png`),
-      fullPage: true,
-    });
-  }
+  // Both rooms are closed before these independent device layout checks. Finish
+  // both ready libraries/screenshots before any subsequent reopen changes them.
+  await Promise.all(
+    [
+      [page, 390],
+      [other, 1360],
+    ].map(async ([p, width]) => {
+      await p.setViewportSize({ width, height: 900 });
+      await visit(p, "/account");
+      await p.getByRole("button", { name: "Reopen as DM", exact: true }).nth(1).waitFor();
+      assert.equal(
+        await p.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1),
+        true,
+      );
+      await p.screenshot({
+        path: testInfo.outputPath(`dm-resume-closed-${width}.png`),
+        fullPage: true,
+      });
+    }),
+  );
   async function resumeFromAccount(p, code, label) {
     // The card-layout checks already loaded both libraries. Reuse that ready
     // account page; later cross-room resumes still navigate here from the desk.
@@ -276,48 +280,53 @@ test("resume-queue", async ({ devices, baseURL: origin }, testInfo) => {
       .filter({ hasText: /Room online.*Play active.*Saved to room/ }),
   ).toBeVisible();
 
-  for (const [entry, width] of [
-    ["account", 1360],
-    ["startup", 390],
-  ]) {
-    const target = entry === "startup" ? devices.page : device;
-    await visit(target, "/account");
-    await target.evaluate(
-      ({ key, queued }) => {
-        localStorage.setItem(key, JSON.stringify(queued));
-        localStorage.setItem("quire.guide.offer.v3", "seen");
-      },
-      { key: original.key, queued },
-    );
-    await target.setViewportSize({ width, height: 900 });
-    if (entry === "account") await resumeSaved();
-    else {
-      await visit(target, "/");
-      await target.getByRole("heading", { name: "Choose your campaign" }).waitFor();
-      await target
-        .locator("section.ledger-card")
-        .filter({ hasText: firstCode })
-        .getByRole("button", { name: "Resume", exact: true })
-        .click();
-      await expect(target.getByText("Campaign control", { exact: true })).toBeVisible();
-    }
-    await expect
-      .poll(() =>
-        target.evaluate(
-          (key) => JSON.parse(localStorage.getItem(key)).pending.length,
-          original.key,
-        ),
-      )
-      .toBe(0);
-    expect(await target.locator(".loot-opening").count()).toBe(0);
-    await target.screenshot({
-      path: testInfo.outputPath(`dm-stale-queue-${entry}-${width}.png`),
-      fullPage: true,
-    });
-  }
+  // Retry above has already acknowledged this no-op batch. Each entry proof
+  // now owns a different device cache and only reads the same server receipt.
+  // Complete both independently before testing the changed-seat archive below.
+  await Promise.all(
+    [
+      ["account", 1360],
+      ["startup", 390],
+    ].map(async ([entry, width]) => {
+      const target = entry === "startup" ? devices.page : device;
+      await visit(target, "/account");
+      await target.evaluate(
+        ({ key, queued }) => {
+          localStorage.setItem(key, JSON.stringify(queued));
+          localStorage.setItem("quire.guide.offer.v3", "seen");
+        },
+        { key: original.key, queued },
+      );
+      await target.setViewportSize({ width, height: 900 });
+      if (entry === "account") await resumeSaved();
+      else {
+        await visit(target, "/");
+        await target.getByRole("heading", { name: "Choose your campaign" }).waitFor();
+        await target
+          .locator("section.ledger-card")
+          .filter({ hasText: firstCode })
+          .getByRole("button", { name: "Resume", exact: true })
+          .click();
+        await expect(target.getByText("Campaign control", { exact: true })).toBeVisible();
+      }
+      await expect
+        .poll(() =>
+          target.evaluate(
+            (key) => JSON.parse(localStorage.getItem(key)).pending.length,
+            original.key,
+          ),
+        )
+        .toBe(0);
+      expect(await target.locator(".loot-opening").count()).toBe(0);
+      await target.screenshot({
+        path: testInfo.outputPath(`dm-stale-queue-${entry}-${width}.png`),
+        fullPage: true,
+      });
+    }),
+  );
 
   // Changed-seat work is exported separately; never submitted as the new seat.
-  await visit(device, "/account");
+  await navigateAccountScenario(device, origin, "/account");
   await device.evaluate(
     ({ key, queued }) => {
       localStorage.setItem(
@@ -334,7 +343,7 @@ test("resume-queue", async ({ devices, baseURL: origin }, testInfo) => {
   );
   await visit(device, "/account");
   await resumeSaved();
-  await visit(device, "/account");
+  await navigateAccountScenario(device, origin, "/account");
   await expect(device.getByRole("heading", { name: "Device recovery copies" })).toBeVisible();
   const recoveryDownload = device.waitForEvent("download");
   await device.getByRole("button", { name: "Export device recovery copy" }).click();
@@ -427,12 +436,19 @@ test("portrait-resume", async ({ devices, baseURL: origin }) => {
   await phone.getByRole("button", { name: "Save character", exact: true }).click();
   await expect(phone.getByRole("button", { name: "Save character", exact: true })).toBeDisabled();
   portrait = `data:image/png;base64,${picture}`;
-  await expectPartyPortrait(phone, portrait);
-  const sheetSaved = await accountPost(desktop.context(), origin, "sheets/detail", {
-    id: `campaign:${member.code}:${id.slice(6)}`,
-  });
-  expect(sheetSaved.body.portrait).toBe(portrait);
-  await expectPartyPortrait(desktop, portrait);
+  // Save is complete before either device reads it. Preserve the server check
+  // and both actual Party card/decoded-image assertions without serializing
+  // unrelated read-only navigation on the phone and desktop.
+  await Promise.all([
+    expectPartyPortrait(phone, portrait),
+    (async () => {
+      const sheetSaved = await accountPost(desktop.context(), origin, "sheets/detail", {
+        id: `campaign:${member.code}:${id.slice(6)}`,
+      });
+      expect(sheetSaved.body.portrait).toBe(portrait);
+      await expectPartyPortrait(desktop, portrait);
+    })(),
+  ]);
   await navigateAccountScenario(desktop, origin, "/party?section=funds");
   const restored = desktop.locator(`#${id}`);
   await restored.locator(":scope > summary").click();
@@ -634,7 +650,13 @@ test("invitations", async ({ devices, baseURL: origin }, testInfo) => {
     return page.locator(".room-code").innerText();
   }
   const dm = devices.page;
-  const target = await host(dm);
+  const { page: otherDm } = await devices.newDevice();
+  const { page: player } = await devices.newDevice(390);
+  // These unrelated campaigns/devices do not interact until invitation testing.
+  // Keep every initial cold visit and control assertion, without serializing
+  // their account provisioning and room preparation.
+  const [target, previous] = await Promise.all([host(dm), host(otherDm), openGuest(player)]);
+  expect(previous).not.toBe(target);
   await dm.evaluate(() =>
     Object.defineProperty(navigator, "share", {
       configurable: true,
@@ -671,11 +693,6 @@ test("invitations", async ({ devices, baseURL: origin }, testInfo) => {
     dm.getByRole("button", { name: "Copy offline snapshot link", exact: true }),
   ).toHaveCount(0);
   await expect(dm.getByRole("button", { name: "Download file", exact: true })).toHaveCount(0);
-  const { page: otherDm } = await devices.newDevice();
-  const previous = await host(otherDm);
-  expect(previous).not.toBe(target);
-  const { page: player } = await devices.newDevice(390);
-  await openGuest(player);
   await otherDm.evaluate(() =>
     Object.defineProperty(navigator, "share", {
       configurable: true,

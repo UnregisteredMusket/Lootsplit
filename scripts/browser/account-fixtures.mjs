@@ -1,9 +1,6 @@
 import { test as base, expect } from "playwright/test";
 import { randomUUID } from "node:crypto";
-import {
-  openApplication,
-  prepareDmFixture,
-} from "../title-screen-navigation.mjs";
+import { openApplication, prepareDmFixture } from "../title-screen-navigation.mjs";
 import { accountScenarios, externalAuditRequests } from "../account-scenarios.mjs";
 
 export { expect };
@@ -72,10 +69,13 @@ export async function navigateAccountScenario(page, origin, path) {
     await visit(page, origin, path);
     return;
   }
-  if (target.pathname !== "/account" && !page.guestAccessAudit) await prepareDmFixture(page, origin);
+  if (target.pathname !== "/account" && !page.guestAccessAudit)
+    await prepareDmFixture(page, origin);
   // Already-confirmed success notices have a real close control. Use it before
   // header navigation: hovering a notice otherwise pauses its dismissal timer.
-  const successes = page.locator('[data-sonner-toast][data-type="success"]:not([data-removed="true"])');
+  const successes = page.locator(
+    '[data-sonner-toast][data-type="success"]:not([data-removed="true"])',
+  );
   let remaining = await successes.count();
   while (remaining > 0) {
     await successes.first().getByRole("button", { name: "Close toast", exact: true }).click();
@@ -103,9 +103,7 @@ export async function navigateAccountScenario(page, origin, path) {
       await page.waitForURL((url) => url.pathname === "/party");
     }
     const section =
-      target.pathname === "/characters"
-        ? "characters"
-        : target.searchParams.get("section");
+      target.pathname === "/characters" ? "characters" : target.searchParams.get("section");
     if (section) {
       const tab = page.getByRole("tab", {
         name: section === "funds" ? "Funds & inventory" : "Characters",
@@ -119,7 +117,9 @@ export async function navigateAccountScenario(page, origin, path) {
     // Resolve the existing visible link in one browser round trip, rather than
     // serially querying every anchor and then scanning them again to click it.
     const selector = await page.locator("a[href]:visible").evaluateAll((links, href) => {
-      const link = links.find((a) => new URL(a.getAttribute("href"), document.baseURI).href === href);
+      const link = links.find(
+        (a) => new URL(a.getAttribute("href"), document.baseURI).href === href,
+      );
       return link ? `a[href="${CSS.escape(link.getAttribute("href"))}"]:visible` : null;
     }, target.href);
     if (selector) {
@@ -144,8 +144,14 @@ export async function navigateAccountScenario(page, origin, path) {
     }
   }
   await expect(page.locator("main")).toBeVisible();
-  await expect(page.locator(".loot-opening"), "Internal navigation must not replay startup").toHaveCount(0);
-  expect(await page.evaluate(() => window.accountNavigationAudit), "Internal navigation must retain the document").toBe(marker);
+  await expect(
+    page.locator(".loot-opening"),
+    "Internal navigation must not replay startup",
+  ).toHaveCount(0);
+  expect(
+    await page.evaluate(() => window.accountNavigationAudit),
+    "Internal navigation must retain the document",
+  ).toBe(marker);
   if (target.pathname === "/account") {
     await expect(page.getByRole("button", { name: "Sign out", exact: true })).toBeVisible();
   }
@@ -188,12 +194,15 @@ export async function signedInDevices(devices, origin) {
   const user = credentials();
   await accountPost(devices.context, origin, "auth/sign-up/email", user);
   const other = await devices.newDevice();
-  await accountPost(other.context, origin, "auth/sign-in/email", user);
-  // Both devices are already independently authenticated. Their initial read-only
-  // library loads share no ordered state, so retain both cold visits in parallel.
+  // Signup must precede sign-in, and each device must authenticate before its
+  // library opens. Device one's read-only load need not wait for device two's
+  // independent sign-in; retain both cold documents and readiness assertions.
   await Promise.all([
     visit(devices.page, origin, "/account"),
-    visit(other.page, origin, "/account"),
+    (async () => {
+      await accountPost(other.context, origin, "auth/sign-in/email", user);
+      await visit(other.page, origin, "/account");
+    })(),
   ]);
   await expect(devices.page.getByRole("button", { name: "Sign out", exact: true })).toBeVisible();
   await expect(other.page.getByRole("button", { name: "Sign out", exact: true })).toBeVisible();
