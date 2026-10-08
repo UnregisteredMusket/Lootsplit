@@ -2089,6 +2089,13 @@ input,select,textarea { max-width: 100%; }
   .concept-shell .submenu-workspace[data-submenu-scene] .concept-main { width: calc(100% - 1rem); }
   .submenu-scenery img { object-position: center 35%; }
 }
+@media (min-width: 1024px) {
+  .concept-shell .submenu-workspace[data-submenu-scene] .concept-main {
+    width: 100%;
+    border-inline: 0;
+    border-radius: 0;
+  }
+}
 @media print {
   .submenu-workspace[data-submenu-scene] { display: contents; }
   .submenu-scenery { display: none; }
