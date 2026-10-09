@@ -170,6 +170,9 @@ jobs:
       - name: dev-properties
         if: matrix.group == 'gameplay'
         run: node scripts/recovery-step.mjs dev-properties 240 node scripts/property-browser-audit.mjs
+      - name: dev-property-operations
+        if: matrix.group == 'gameplay'
+        run: node scripts/recovery-step.mjs dev-property-operations 240 node scripts/property-operations-browser-audit.mjs
       - name: dev-control-panel
         if: matrix.group == 'gameplay'
         run: node scripts/recovery-step.mjs dev-control-panel 240 node scripts/control-panel-browser-audit.mjs
@@ -267,6 +270,11 @@ jobs:
         env:
           AUDIT_ORIGIN: http://127.0.0.1:8082
         run: node scripts/recovery-step.mjs worker-properties 180 node scripts/property-browser-audit.mjs
+      - name: worker-property-operations
+        if: matrix.group == 'interface'
+        env:
+          AUDIT_ORIGIN: http://127.0.0.1:8082
+        run: node scripts/recovery-step.mjs worker-property-operations 180 node scripts/property-operations-browser-audit.mjs
       - name: worker-sound
         if: matrix.group == 'interface'
         env:

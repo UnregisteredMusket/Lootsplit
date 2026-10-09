@@ -18,6 +18,7 @@ import { JournalNotes } from "@/components/journal-notes";
 import { LoanAskForm } from "@/components/market-board";
 import { PersonalFinances } from "@/components/personal-finances";
 import { PropertyDetails } from "@/components/property-details";
+import { PropertyOperationReviews } from "@/components/property-operations";
 import { PropertyMarketplace } from "@/components/property-marketplace";
 import { CharacterImportReviews } from "@/components/character-import-reviews";
 import { getCloudTable, getServerCloudTable, subscribeCloudTable } from "@/lib/quire/cloud-client";
@@ -75,6 +76,7 @@ function FeaturePage() {
               (dm ? <CampaignJournal section="reports" /> : <PersonalFinances />)}
             {feature === "downtime" && (
               <>
+                <AppLink className="settings-link" href="/features/properties">Property Management →</AppLink>
                 <CampaignFinance section="downtime" />
                 <CampaignJournal section="sessions" />
               </>
@@ -112,6 +114,7 @@ function FeaturePage() {
             )}
             {feature === "review" && (
               <>
+                <PropertyOperationReviews />
                 {(!code || code === room.code) && <CampaignJournal section="bank" reviewOnly />}
                 {code || room.joined ? (
                   <CharacterImportReviews code={code || room.code} />

@@ -1,0 +1,88 @@
+.estate-operations {
+  min-width: 0;
+  margin-block: 1rem;
+}
+.estate-operations h3,
+.estate-operations h4 {
+  overflow-wrap: anywhere;
+}
+.estate-form {
+  margin-block: 0.75rem;
+  min-width: 0;
+}
+.estate-form fieldset {
+  min-width: 0;
+  border: 1px solid var(--color-border);
+  border-radius: 0.5rem;
+  padding: 1rem;
+}
+.estate-form legend {
+  font-weight: 600;
+  padding-inline: 0.25rem;
+}
+.estate-fields {
+  display: grid;
+  gap: 0.85rem;
+  margin-bottom: 1rem;
+}
+.estate-fields > * {
+  min-width: 0;
+}
+.estate-fields input,
+.estate-fields select,
+.estate-fields textarea {
+  max-width: 100%;
+}
+.estate-tick {
+  display: flex;
+  align-items: center;
+  gap: 0.65rem;
+  min-height: 2.75rem;
+}
+.estate-tick input {
+  flex: 0 0 auto;
+  width: 1.15rem;
+  height: 1.15rem;
+  accent-color: var(--color-lead);
+}
+.estate-record,
+.estate-records > li {
+  margin-block: 0.75rem;
+  padding: 1rem;
+  border: 1px solid var(--color-border);
+  border-radius: 0.5rem;
+  overflow-wrap: anywhere;
+}
+.estate-records {
+  list-style: none;
+  padding: 0;
+}
+.estate-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.estate-actions .estate-form {
+  flex: 1 1 9rem;
+}
+.estate-actions .estate-form fieldset {
+  padding: 0.5rem;
+}
+.estate-actions .estate-form legend,
+.estate-actions .estate-fields {
+  display: none;
+}
+.estate-import-error {
+  white-space: pre-wrap;
+  overflow-wrap: anywhere;
+  max-height: 15rem;
+  overflow: auto;
+}
+@media (min-width: 48rem) {
+  .estate-fields {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .estate-wide {
+    grid-column: 1 / -1;
+  }
+}

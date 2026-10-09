@@ -5,6 +5,8 @@ import { readFinance } from "./finance.ts";
 import { readJournal, readJournalForRecords, readArchivedSnapshot } from "./journal.ts";
 import { readMarketLocations, publicMarketLocations, shopAvailableHere } from "./shop-locations.ts";
 import { propertyAvailableHere } from "./property.ts";
+import { canAccessEstate } from "./estate.ts";
+import { readEstate } from "./estate-schema.ts";
 
 /** Server/default projections enforce historical seats; verified local DM readers may retain their owned nested records. */
 export function projectRecord(
@@ -54,15 +56,108 @@ export function projectRecord(
     (r) => dm || seat.purseIds.includes(r.purseId),
   );
   if (!dm) {
+    const estate = readEstate(t.journal.propertyOperations);
+    const visibleSites = new Set(
+      estate.sites
+        .filter((site) => canAccessEstate(t, estate, site.propertyId, seat))
+        .map((site) => site.propertyId),
+    );
+    const sharedOwners = new Set(
+      t.holdings.filter((h) => visibleSites.has(h.id)).map((h) => h.purseId),
+    );
+    if (t.journal.propertyOperations) {
+      estate.sites = estate.sites.filter((s) => visibleSites.has(s.propertyId));
+      for (const field of [
+        "jobs",
+        "staff",
+        "rentals",
+        "letters",
+        "shipments",
+        "standingOrders",
+        "suppliers",
+        "withdrawals",
+      ] as const)
+        (estate[field] as { propertyId: string }[]) = estate[field].filter((r) =>
+          visibleSites.has(r.propertyId),
+        );
+      t.journal.propertyOperations = estate;
+    }
     const market = readMarketLocations(t.journal.market);
-    t.shops = t.shops.filter(shop => shopAvailableHere(shop, market));
-    t.listings = t.listings.filter(listing => propertyAvailableHere(listing, market) && listing.quantity !== 0 && listing.status !== "withdrawn");
-    const shops = new Set(t.shops.map(shop => shop.id));
-    t.stock = t.stock.filter(line => shops.has(line.shopId));
-    if (t.journal.market) t.journal.market = publicMarketLocations(market, t.holdings.filter(h => seat.purseIds.includes(h.purseId)).flatMap(h => h.locationId ? [h.locationId] : []));
+    t.shops = t.shops.filter((shop) => shopAvailableHere(shop, market));
+    t.listings = t.listings.filter(
+      (listing) =>
+        propertyAvailableHere(listing, market) &&
+        listing.quantity !== 0 &&
+        listing.status !== "withdrawn",
+    );
+    const shops = new Set(t.shops.map((shop) => shop.id));
+    t.stock = t.stock.filter((line) => shops.has(line.shopId));
+    if (t.journal.market)
+      t.journal.market = publicMarketLocations(
+        market,
+        t.holdings
+          .filter((h) => seat.purseIds.includes(h.purseId) || visibleSites.has(h.id))
+          .flatMap((h) => (h.locationId ? [h.locationId] : [])),
+      );
     t.ledger = t.ledger.filter((l) => seat.purseIds.includes(l.purseId));
-    t.holdings = t.holdings.filter((h) => seat.purseIds.includes(h.purseId));
-    t.purses = t.purses.filter((p) => seat.purseIds.includes(p.id));
+    t.holdings = t.holdings.filter(
+      (h) =>
+        seat.purseIds.includes(h.purseId) ||
+        visibleSites.has(h.id) ||
+        (h.custody && visibleSites.has(h.custody.propertyId)),
+    );
+    if (t.journal.propertyOperations) {
+      const keys = new Set([
+        ...estate.sites.flatMap((site) => [site.templateKey, ...site.completedTemplates]),
+        ...t.listings.flatMap((listing) =>
+          [listing.estateTemplateKey, ...(listing.estateAttachments ?? [])].filter(Boolean),
+        ),
+        ...estate.jobs.flatMap((job) =>
+          job.recipe.resultTemplateKey ? [job.recipe.resultTemplateKey] : [],
+        ),
+      ]);
+      // Include referenced building templates, but never another private property's unrelated custom configuration.
+      let changed = true;
+      while (changed) {
+        changed = false;
+        for (const template of estate.templates.filter((template) => keys.has(template.key)))
+          for (const recipe of template.recipes ?? [])
+            if (recipe.resultTemplateKey && !keys.has(recipe.resultTemplateKey)) {
+              keys.add(recipe.resultTemplateKey);
+              changed = true;
+            }
+      }
+      estate.templates = estate.templates.filter((template) => keys.has(template.key));
+      const recipes = [
+        ...estate.templates.flatMap((template) => template.recipes ?? []),
+        ...estate.jobs.map((job) => job.recipe),
+      ];
+      const materials = new Set([
+        ...t.holdings.map((holding) => holding.materialKey),
+        ...estate.suppliers.map((supplier) => supplier.materialKey),
+        ...recipes.flatMap((recipe) =>
+          [...recipe.materials, ...(recipe.stages ?? []).flatMap((stage) => stage.materials)].map(
+            (use) => use.materialKey,
+          ),
+        ),
+        ...recipes.map((recipe) => recipe.output?.materialKey),
+      ]);
+      estate.materials = estate.materials.filter((material) => materials.has(material.key));
+    }
+    const publicNames = new Set([
+      ...sharedOwners,
+      ...t.holdings.map((h) => h.purseId),
+      ...estate.jobs.flatMap((j) => [j.purseId, ...j.assignments.map((a) => a.purseId)]),
+      ...estate.letters.map((l) => l.senderId),
+      ...estate.withdrawals.map((r) => r.purseId),
+    ]);
+    t.purses = t.purses
+      .filter((p) => seat.purseIds.includes(p.id) || publicNames.has(p.id))
+      .map((p) =>
+        seat.purseIds.includes(p.id)
+          ? p
+          : { id: p.id, name: p.name, kind: p.kind, coins: { cp: 0, sp: 0, ep: 0, gp: 0, pp: 0 } },
+      );
     if (t.journal.finance) {
       const f = readFinance(t.journal.finance);
       t.journal.finance = {
@@ -74,7 +169,12 @@ export function projectRecord(
     }
     t.journal.requests = t.journal.requests.filter((r) => seat.purseIds.includes(r.purseId));
     t.journal.events = t.journal.events
-      .filter((e) => !e.purseId || seat.purseIds.includes(e.purseId))
+      .filter(
+        (e) =>
+          !e.purseId ||
+          seat.purseIds.includes(e.purseId) ||
+          (e.propertyId && visibleSites.has(e.propertyId)),
+      )
       .map(({ change, ...e }) => e);
     t.loans = t.loans.filter((l) => seat.purseIds.includes(l.purseId));
     t.sheets = t.sheets.filter((s) => seat.purseIds.includes(s.purseId));

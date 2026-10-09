@@ -1,6 +1,6 @@
-# Lootsplit property operations proposal
+# Lootsplit approved property operations design
 
-Planning and documentation only - October 9, 2026. No gameplay changes are implemented or released by this proposal. The import contract below is a draft for the future property importer; the current app cannot import these files.
+Approved for implementation on October 9, 2026. The `feature/property-operations` branch implements this design; production remains on the previously verified release until the full release gates pass. See `docs/PROPERTY-OPERATIONS.md` for current workflows.
 
 ## Confirmed direction
 

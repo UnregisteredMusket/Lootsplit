@@ -769,16 +769,17 @@ function PropertyListingEditor({
     ),
     [status, setStatus] = useState<Listing["status"]>(listing?.status ?? "available"),
     [locationId, setLocationId] = useState(listing?.locationId ?? market.currentLocationId ?? ""),
+    [estateTemplateKey, setEstateTemplateKey] = useState(listing?.estateTemplateKey ?? ""),
     [draft, setDraft] = useState(propertyDraft(listing?.property)),
     [busy, setBusy] = useState(false),
     [imageBusy, setImageBusy] = useState(false),
     [error, setError] = useState("");
   const { locked, reason } = useFinanceReadiness();
   const [initial, setInitial] = useState(
-    JSON.stringify({ name, notes, price, quantity, status, locationId, draft }),
+    JSON.stringify({ name, notes, price, quantity, status, locationId, estateTemplateKey, draft }),
   );
   const dirty =
-    initial !== JSON.stringify({ name, notes, price, quantity, status, locationId, draft });
+    initial !== JSON.stringify({ name, notes, price, quantity, status, locationId, estateTemplateKey, draft });
   useDraftGuard(dirty, "property listing");
   useEffect(() => {
     onState({ dirty, busy: busy || imageBusy });
@@ -813,6 +814,8 @@ function PropertyListingEditor({
             status,
             ...(locationId ? { locationId } : {}),
             property: readPropertyDraft(draft),
+            ...(estateTemplateKey ? { estateTemplateKey } : {}),
+            ...(before?.estateAttachments ? { estateAttachments: before.estateAttachments } : {}),
           });
       const result = await commandOutcome({ kind: "listing-edit", listingId: id, before, after });
       onSaved(
@@ -890,6 +893,7 @@ function PropertyListingEditor({
           onChange={(event) => setNotes(event.target.value)}
         />
       </Field>
+      <Field label="Property operations template"><Select value={estateTemplateKey} onChange={e => setEstateTemplateKey(e.target.value)}><option value="">No operations template</option>{journal.propertyOperations?.templates.map(t => <option key={t.key} value={t.key}>{t.name}</option>)}</Select></Field>
       <PropertyProfileFields
         draft={draft}
         onChange={setDraft}
@@ -936,6 +940,7 @@ function PropertyListingEditor({
                   quantity: current.quantity === null ? "" : String(current.quantity),
                   status: current.status ?? "available",
                   locationId: current.locationId ?? "",
+                  estateTemplateKey: current.estateTemplateKey ?? "",
                   draft: propertyDraft(current.property),
                 };
                 setBefore(current);
@@ -945,6 +950,7 @@ function PropertyListingEditor({
                 setQuantity(next.quantity);
                 setStatus(next.status);
                 setLocationId(next.locationId);
+                setEstateTemplateKey(next.estateTemplateKey);
                 setDraft(next.draft);
                 setInitial(JSON.stringify(next));
                 setError("");

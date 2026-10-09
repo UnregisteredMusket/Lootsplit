@@ -37,6 +37,9 @@ export function characterControl(purse: Purse): "player" | "npc" | null {
 }
 
 export type Holding = {
+  custody?: import("./estate-schema.ts").zCustody;
+  materialKey?: string;
+  reservedFor?: string;
   deed?: import("./property-deed.ts").PropertyDeed;
   locationId?: string;
   property?: import("./property.ts").PropertyProfile;

@@ -18,6 +18,9 @@ import { AppLink } from "./app-link";
 import { PropertyFacts, OwnedPropertyProfile } from "./property-profile";
 import { LedgerArt } from "./ledger-art";
 import { locationLabel, readMarketLocations } from "@/lib/quire/shop-locations";
+import { EstateWorkshop, PropertyOperations } from "./property-operations";
+import { canAccessEstate } from "@/lib/quire/estate";
+import { readEstate } from "@/lib/quire/estate-schema";
 export function PropertyDetails({ plans = false }: { plans?: boolean }) {
   const { holdings, purses, journal, ledger } = useEconomy(),
     seat = useSeat();
@@ -25,7 +28,7 @@ export function PropertyDetails({ plans = false }: { plans?: boolean }) {
     (h) =>
       h.kind === "property" &&
       h.quantity > 0 &&
-      (seat.role === "dm" || seat.purseIds.includes(h.purseId)),
+      (seat.role === "dm" || seat.purseIds.includes(h.purseId) || canAccessEstate({ holdings, purses }, readEstate(journal.propertyOperations), h.id, seat)),
   );
   const finance = readFinance(journal.finance),
     archiveSeat = useArchiveReaderSeat(seat);
@@ -40,6 +43,7 @@ export function PropertyDetails({ plans = false }: { plans?: boolean }) {
     <section id="campaign-operations">
       <h2 id="owned-properties">Owned properties</h2>
       <p>Edit descriptive details. Ownership, value, revenue and upkeep remain under DM control.</p>
+      <EstateWorkshop />
       {rows.map((h) => (
         <article className="journal-entry" key={h.id} id={`property-${encodeURIComponent(h.id)}`}>
           <div className="owned-property-heading"><LedgerArt kind="property" src={h.image} entry={h} /><div><h3>{h.name}</h3><p>{locationLabel(readMarketLocations(journal.market), h.locationId)}</p><PropertyFacts profile={h.property} /></div></div>
@@ -47,16 +51,17 @@ export function PropertyDetails({ plans = false }: { plans?: boolean }) {
             Owner: {purses.find((p) => p.id === h.purseId)?.name || "Missing account"} · Property
             record {h.id}
           </p>
-          <PropertyEditor holding={h} />
+          {(seat.role === "dm" || seat.purseIds.includes(h.purseId)) && <PropertyEditor holding={h} />}
           {seat.role === "dm" && <OwnedPropertyProfile holding={h} />}
           {h.deed && <p className="text-sm">Deed held by {h.deed.ownerName}. <AppLink href="/party?section=funds&action=give">Transfer to another character</AppLink> · <AppLink href="/market">Sell through an eligible shop</AppLink></p>}
           {plans &&
             (seat.role === "dm" ? (
-              <PropertyFinancialPlan holding={h} />
+              finance.rules.some(r => r.holdingId === h.id && r.estateOperation) ? <p>Reviewed tenancy and staff schedules are managed in this property's operating sections below. <AppLink href="/features/financial">View all financial schedules</AppLink></p> : <PropertyFinancialPlan holding={h} />
             ) : (
               <PropertyFinancialReadout holding={h} finance={finance} />
             ))}
           <PropertyHistory holding={h} records={records} finance={finance} />
+          <PropertyOperations holding={h} />
         </article>
       ))}
       {!rows.length && (

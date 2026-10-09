@@ -1,4 +1,6 @@
 import { scheduledMarket } from "./shop-schedule.ts";
+import { estateQuoteSchema } from "./estate-schema.ts";
+import { estateRuleEligible, previewEstate } from "./estate.ts";
 import { z } from "zod";
 import type { CloudTable } from "./cloud.ts";
 import { toCopper, fromCopper, spendCoins } from "./money.ts";
@@ -24,6 +26,7 @@ const debtSchema = termsSchema.extend({
   paid: money,
 });
 export const ruleSchema = z.object({
+  estateOperation: z.enum(["rent", "wage", "upkeep"]).optional(),
   propertyManaged: z.boolean().optional(),
   id,
   name: z.string().trim().min(1).max(100),
@@ -51,7 +54,18 @@ const lineSchema = z.object({
   balance: money,
 });
 const quoteSchema = z.object({
-  market: z.array(z.object({ shopId: id, before: z.string(), closed: z.boolean(), lastRestockDay: z.number().int().nonnegative(), stock: z.array(z.object({ id, before: money, after: money })) })).optional(),
+  propertyOperations: estateQuoteSchema.optional(),
+  market: z
+    .array(
+      z.object({
+        shopId: id,
+        before: z.string(),
+        closed: z.boolean(),
+        lastRestockDay: z.number().int().nonnegative(),
+        stock: z.array(z.object({ id, before: money, after: money })),
+      }),
+    )
+    .optional(),
   loans: z.array(debtSchema),
   rules: z.array(scheduleSchema),
   lines: z.array(lineSchema),
@@ -134,12 +148,19 @@ function safe(n: number) {
   return n;
 }
 export function previewDowntime(
-  table: Pick<CloudTable, "purses" | "holdings"> & Partial<Pick<CloudTable, "shops" | "stock">>,
+  table: Pick<CloudTable, "purses" | "holdings"> &
+    Partial<Pick<CloudTable, "shops" | "stock" | "journal" | "sheets">>,
   raw: Finance,
   days: number,
 ) {
   z.number().int().min(1).max(3650).parse(days);
   const f = readFinance(raw);
+  for (const r of f.rules)
+    if (
+      r.estateOperation === "rent" &&
+      !estateRuleEligible({ ...table, shops: table.shops ?? [], stock: table.stock ?? [] }, r)
+    )
+      r.active = false;
   const balances = new Map(table.purses.map((p) => [p.id, safe(toCopper(p.coins))]));
   const lines: z.infer<typeof lineSchema>[] = [];
   const balance = (id: string) => {
@@ -155,8 +176,12 @@ export function previewDowntime(
     return n;
   };
   for (const r of f.rules.filter((r) => r.active && r.holdingId)) {
-    if (!table.holdings.some((h) => h.id === r.holdingId && h.purseId === r.purseId && h.quantity > 0))
-      throw Error(`Inventory source for “${r.name}” is missing or belongs to another account. Update or pause this schedule.`);
+    if (
+      !table.holdings.some((h) => h.id === r.holdingId && h.purseId === r.purseId && h.quantity > 0)
+    )
+      throw Error(
+        `Inventory source for “${r.name}” is missing or belongs to another account. Update or pause this schedule.`,
+      );
   }
   // Settlement order is intentional: income, loans in creation order, then expenses.
   for (const r of f.rules.filter((r) => r.active && r.kind === "income")) {
@@ -250,10 +275,30 @@ export function previewDowntime(
     });
   }
   const market = scheduledMarket(table.shops || [], table.stock || [], f.day + days);
+  for (const r of f.rules)
+    if (r.estateOperation === "rent") r.active = raw.rules.find((x) => x.id === r.id)!.active;
+  const operations = table.journal?.propertyOperations
+    ? previewEstate(
+        {
+          ...table,
+          journal: { ...table.journal, finance: f },
+          shops: table.shops ?? [],
+          stock: table.stock ?? [],
+          sheets: table.sheets ?? [],
+          listings: [],
+          loans: [],
+          notes: [],
+          ledger: [],
+        },
+        days,
+        balances,
+      )
+    : undefined;
   return quoteSchema.parse({
+    ...(operations ? { propertyOperations: operations } : {}),
     ...(market.length ? { market } : {}),
     loans: f.loans,
-    rules: f.rules,
+    rules: operations?.rules ?? f.rules,
     lines,
     balances: [...balances]
       .sort(([a], [b]) => a.localeCompare(b))
@@ -324,14 +369,50 @@ export function applyDowntime(
         true,
       );
   }
+  const stockBefore = new Map(table.stock.map((line) => [line.id, line.quantity]));
   for (const market of quote.market || []) {
     const shop = table.shops.find((s) => s.id === market.shopId)!;
     shop.closed = market.closed;
     shop.schedule!.lastRestockDay = market.lastRestockDay;
-    for (const line of market.stock) table.stock.find((s) => s.id === line.id)!.quantity = line.after;
+    for (const line of market.stock)
+      table.stock.find((s) => s.id === line.id)!.quantity = line.after;
   }
   f.loans = quote.loans;
   f.rules = quote.rules;
+  if (quote.propertyOperations) {
+    const operations = quote.propertyOperations;
+    for (const move of operations.movements) {
+      financeMove(table, move.purseId, -move.copper, `${d.id}-${move.id}`, move.summary, at);
+      const line = table.ledger[table.ledger.length - 1];
+      if (move.copper && move.shopId) {
+        line.shopId = move.shopId;
+        line.transactionType = "purchase";
+      }
+    }
+    table.holdings = operations.holdings as CloudTable["holdings"];
+    for (const after of operations.stock) {
+      const line = table.stock.find((s) => s.id === after.id),
+        before = stockBefore.get(after.id);
+      if (
+        line &&
+        before !== null &&
+        before !== undefined &&
+        after.quantity !== null &&
+        line.quantity !== null
+      )
+        line.quantity += after.quantity - before;
+    }
+    table.journal!.propertyOperations = operations.state;
+    for (const [i, notice] of operations.notices.entries())
+      table.journal!.events.push({
+        id: `${d.id}-property-${i}`,
+        at,
+        kind: "management",
+        propertyId: notice.propertyId,
+        purseId: table.holdings.find((h) => h.id === notice.propertyId)?.purseId,
+        summary: notice.summary.slice(0, 500),
+      });
+  }
   f.day += d.days;
   d.status = "applied";
   d.appliedAt = at;

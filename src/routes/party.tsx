@@ -843,7 +843,7 @@ function GiveToPlayer({ purses }: { purses: Purse[] }) {
       : getCloudTable().joined
         ? everyone.filter(purse => purse.id !== fromId && purse.kind === "character" && characterControl(purse) === "player").map(purse => ({ id: purse.id, name: purse.name }))
         : roster.filter(person => person.id !== fromId);
-  const mine = holdings.filter((holding) => holding.purseId === fromId);
+  const mine = holdings.filter((holding) => holding.purseId === fromId && !holding.custody && !holding.reservedFor);
 
   useEffect(() => {
     if (!purses.some((purse) => purse.id === fromId)) setFromId(purses[0]?.id ?? "");

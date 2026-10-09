@@ -260,9 +260,36 @@ export function CampaignFinance({
                       ))}
                   </details>
                 ))}
-                {!pending.quote.lines.length && !pending.quote.market?.length && (
-                  <p>No active financial agreements; approval advances only in-game time.</p>
+                {pending.quote.propertyOperations && (
+                  <details open>
+                    <summary>Property work, deliveries & manager orders</summary>
+                    {pending.quote.propertyOperations.state.jobs
+                      .filter((j) => ["active", "blocked", "completed"].includes(j.status))
+                      .map((j) => (
+                        <p key={j.id}>
+                          {j.name}: {j.status} · {j.message} · labor paid{" "}
+                          {formatCopper(j.paidCopper)}
+                        </p>
+                      ))}
+                    {pending.quote.propertyOperations.movements.map((m) => (
+                      <p key={m.id}>
+                        {m.summary}: {formatCopper(m.copper)}
+                      </p>
+                    ))}
+                    {pending.quote.propertyOperations.notices.map((notice, i) => (
+                      <p key={i}>{notice.summary}</p>
+                    ))}
+                    <p>
+                      These property results are applied together with the approved campaign days.
+                      Review blocked results before starting the next session.
+                    </p>
+                  </details>
                 )}
+                {!pending.quote.lines.length &&
+                  !pending.quote.market?.length &&
+                  !pending.quote.propertyOperations && (
+                    <p>No active financial agreements; approval advances only in-game time.</p>
+                  )}
                 {pending.quote.balances
                   .filter((b) => b.before !== b.after)
                   .map((b) => (

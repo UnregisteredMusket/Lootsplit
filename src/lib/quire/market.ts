@@ -2,6 +2,8 @@ import { quireDb } from "./db.ts";
 import { listingSchema, type PropertyProfile } from "./property.ts";
 
 export type Listing = {
+  estateTemplateKey?: string;
+  estateAttachments?: string[];
   id: string;
   name: string;
   kind: "item" | "property";

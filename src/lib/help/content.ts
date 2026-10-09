@@ -167,6 +167,17 @@ export const HELP_GROUPS: HelpGroup[] = [
         ],
       },
       {
+        id: "property-operations",
+        title: "Store, build and manage properties",
+        paragraphs: [
+          "Property Management keeps the existing estate register, inventory deeds and shop location hierarchy. The DM estate workshop provides building presets, material definitions, work recipes, city post offices and reviewed JSON imports. Import owner aliases map to existing campaign purses; owned configurations start inactive without goods, staff, money movement or invented deeds.",
+          "Use a property's expandable sections for storage, work, staff, rentals, deliveries and letters. The party must be at its location to move goods. Stored, reserved and travelling lots stay out of carried character equipment. Deposits keep their owner unless explicitly donated for shared work; permitted withdrawal assigns the retrieved lot to the selected character.",
+          "Players propose work and hires for DM review. Approved projects reserve materials, share character downtime or pay contractors and attach completed buildings to the original parcel. Managers need delegated duties, paid contracts and spending limits. Rental income, upkeep and wages use existing finance schedules; vacancy, missing staff and arrears can block new operation benefits.",
+          "Send a property letter while at an open city post office. Postage is paid once; campaign-day delivery rechecks the manager, ownership, reviewed instruction and budget. Letters do not allow remote item withdrawal. Review property effects in the existing downtime preview and explicitly approve at the next session. Active obligations must be resolved before ordinary sale/Give, or the DM records a handover retaining contents and history.",
+        ],
+        links: [["Property Management", "/features/properties"], ["Property proposals", "/features/review"], ["Approved downtime", "/features/downtime"]],
+      },
+      {
         id: "analytics",
         title: "What the website gold counter includes",
         paragraphs: [

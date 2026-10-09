@@ -7,6 +7,7 @@ import { useEconomy } from "@/lib/quire/economy-context";
 import { getCloudTable, hasPendingChanges } from "@/lib/quire/cloud-client";
 import type { Holding, Purse } from "@/lib/quire/types";
 import { formatCopper } from "@/lib/quire/money";
+import { AppLink } from "./app-link";
 export function LedgerArt({
   src,
   kind,
@@ -172,6 +173,8 @@ export function InventoryList({ holdings }: { holdings: Holding[] }) {
                 {classify(x)} · ×{x.quantity}
               </small>
               {x.notes ? <small className="line-clamp-2">{x.notes}</small> : null}
+              {x.custody && <small>{x.custody.kind === "transit" ? "Delivery in transit" : "Stored at property"} · <AppLink href={`/features/properties#property-${encodeURIComponent(x.custody.propertyId)}`}>View property</AppLink></small>}
+              {x.reservedFor && <small>Reserved for approved property work</small>}
             </span>
             <span className="text-lead tabular-nums">
               {formatCopper(x.quantity * x.unitCopper)}

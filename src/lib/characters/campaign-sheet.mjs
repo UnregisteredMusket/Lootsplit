@@ -93,7 +93,7 @@ export function characterSheet(purse, holdings = [], legacy) {
     portrait: purse.portrait || purse.sheet?.portrait || "",
     coins: { ...purse.coins },
     equipment: holdings
-      .filter((h) => h.purseId === purse.id)
+      .filter((h) => h.purseId === purse.id && !h.custody && !h.reservedFor)
       .sort((a, b) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0))
       .map((h) => ({
         id: h.id,
@@ -326,7 +326,7 @@ export function editCharacter(table, seat, input, receipt, at = Date.now()) {
   }
   if (itemChange) {
     const ids = new Set();
-    const owned = table.holdings.filter((h) => h.purseId === p.id);
+    const owned = table.holdings.filter((h) => h.purseId === p.id && !h.custody && !h.reservedFor);
     const updated = next.equipment.map((item, i) => {
       const old = item.id ? owned.find((h) => h.id === item.id) : undefined;
       if (item.id && !old) throw Error("Unknown inventory item. Reload the sheet.");
@@ -342,7 +342,7 @@ export function editCharacter(table, seat, input, receipt, at = Date.now()) {
         unitCopper: item.unitCopper || 0,
       };
     });
-    table.holdings = [...table.holdings.filter((h) => h.purseId !== p.id), ...updated];
+    table.holdings = [...table.holdings.filter((h) => h.purseId !== p.id || h.custody || h.reservedFor), ...updated];
   }
   p.sheetRevision = (p.sheetRevision || 0) + 1;
   if (grant)
