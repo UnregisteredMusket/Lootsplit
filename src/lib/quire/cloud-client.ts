@@ -374,6 +374,7 @@ async function accept(remote: RoomView, committed = false) {
       );
     else if (!local) {
       s.pending.push(command);
+      s.batchId = crypto.randomUUID();
       known.set(command.id, command);
     }
   }
@@ -590,8 +591,25 @@ export function endTableTurn() {
 }
 export function retryPending() {
   return serial(async () => {
-    if (view.live) await flush();
-    else await stage();
+    await refresh();
+    if (!requireSession().pending.length) return;
+    if (!view.live) return stage();
+    try {
+      await flush();
+    } catch (error) {
+      if (
+        !(error instanceof Error) ||
+        !error.message.startsWith("This batch ID was already used for different actions.")
+      )
+        throw error;
+      // Older clients could persist a changed queue under a committed receipt.
+      // Only this explicit batch collision permits one fresh receipt. Keep the
+      // immutable action IDs so already committed transfers cannot run twice.
+      const s = requireSession();
+      s.batchId = crypto.randomUUID();
+      remember(s);
+      await flush();
+    }
   });
 }
 export function exportPending() {
@@ -675,6 +693,7 @@ export async function queueCommand(
       command,
     );
     current.pending.push(command);
+    current.batchId = crypto.randomUUID();
     remember(current);
     publish({ pending: current.pending.length, status: "pending", error: "" });
     try {
@@ -737,6 +756,7 @@ export function runSharedMutation(
     const current = requireSession();
     const command = commandSchema.parse({ ...patch, id: crypto.randomUUID() });
     current.pending.push(command);
+    current.batchId = crypto.randomUUID();
     try {
       remember(current);
     } catch (e) {
@@ -909,7 +929,9 @@ export async function importPending(file: File) {
         "This recovery file contains conflicting changes for a pending action. Export both copies and resolve them with the DM.",
       );
     const known = new Set(saved.keys());
-    s.pending.push(...incoming.filter((c) => !known.has(c.id)));
+    const additions = incoming.filter((c) => !known.has(c.id));
+    s.pending.push(...additions);
+    if (additions.length) s.batchId = crypto.randomUUID();
     remember(s);
     publish({ pending: s.pending.length, status: "pending", error: "" });
     if (view.live) await flush();

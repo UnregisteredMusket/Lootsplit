@@ -23,7 +23,8 @@ Account scenario mapping:
 | `network-boundary` | Primary/secondary contexts before and after reload; outside HTTP/HTTPS requests rejected with zero connections, allowed account responses remain no-store |
 | `layout`    | Public/account pages at mobile and desktop widths, real navigation between pages                                                                      |
 | `library`   | UI signup and recovery-key display, character profile, backup/restore, second-device sign-in, linking and resuming a shared membership                |
-| `dm-resume` | Two devices and two saved rooms; end, reopen as verified DM, resume each from either device, correct room/role, no title replay, mobile/desktop cards |
+| `dm-resume` | HTML response recovery without replacing device data; two devices and two saved rooms; end, reopen as verified DM, resume each from either device, correct room/role, no title replay, mobile/desktop cards |
+| `resume-partial` | Partial acknowledgements on two devices; fresh batch receipts, remaining action IDs, real Retry and saved-room status |
 | `resume-queue` | Account/startup desktop/mobile clicks, unsynced export/retry, stale acknowledged Live queues, changed-seat recovery archive |
 | `recovery`  | UI recovery-key password reset and revocation of another signed-in device                                                                             |
 | `portrait-resume` | Both portrait upload controls, Party cards and decoded images on two devices, server readout, desktop DM resume/reopen, failed-upload recovery and turn preservation |

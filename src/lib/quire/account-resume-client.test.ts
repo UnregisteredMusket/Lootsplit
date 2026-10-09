@@ -141,6 +141,21 @@ test("current same-campaign pending queue does not prematurely block resume", as
   await h.resume();
   assert.equal(h.reloaded(), true);
 });
+test("actual resume rotates a partly acknowledged batch while retaining the unsent command", async () => {
+  const h = harness({
+    cached: { ...saved, pending: [...pending, { id: "unsent", kind: "patch", changes: [] }] },
+    acknowledged: ["action"],
+  });
+  await h.resume();
+  const session = JSON.parse(h.values.get(h.key)!);
+  assert.deepEqual(
+    session.pending.map((c: { id: string }) => c.id),
+    ["unsent"],
+  );
+  assert.notEqual(session.batchId, "original-batch");
+  assert.equal(h.selected(), true);
+  assert.equal(h.reloaded(), true);
+});
 test("unrelated campaign pending work blocks switching without changing either cache", async () => {
   const h = harness({ cached: saved, current: { ...saved, code: "OTHER" } });
   const before = h.values.get(h.key);

@@ -202,9 +202,18 @@ function Account() {
             )}
           </div>
           {error && (
-            <p className="portal-message error" role="alert">
-              {error}
-            </p>
+            <div className="portal-message error" role="alert">
+              <p>{error}</p>
+              {library && (
+                <button
+                  className="portal-button secondary"
+                  disabled={busy}
+                  onClick={action(reload)}
+                >
+                  Refresh campaign list
+                </button>
+              )}
+            </div>
           )}
           {notice && (
             <p className="portal-message" role="status">

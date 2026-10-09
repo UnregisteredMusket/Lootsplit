@@ -6,6 +6,7 @@ import { applyCommand, commandSchema, tablePatch, type Command } from "./command
 import { sameCommand } from "./command-identity.ts";
 import { emptyCloudTable, type CloudTable } from "./cloud.ts";
 import { fromCopper, toCopper } from "./money.ts";
+import { readAccountResponse } from "../account/response.ts";
 
 const source = readFileSync(new URL("./cloud-client.ts", import.meta.url), "utf8");
 const give = (id: string, copper: number): Command => ({
@@ -117,7 +118,7 @@ test("actual acceptance unites another device's draft with this device's unsent 
   await h.accept(h.remote);
   assert.deepEqual(new Set(h.session.pending.map((c) => c.id)), new Set([a.id, b.id]));
   assert.equal(toCopper(h.displayed()!.purses[1]!.coins), 300);
-  assert.equal(h.session.batchId, "original-batch");
+  assert.notEqual(h.session.batchId, "original-batch", "The merged payload needs its own receipt");
 });
 test("actual commit acceptance restores only the other device's unsubmitted draft", async () => {
   const a = give("committed", 100),
@@ -477,6 +478,7 @@ test("actual account authentication clears old recovery identity before announci
     "announceSheetChange",
     "API_ORIGIN",
     "TOKEN",
+    "readAccountResponse",
     "let identityRead; " + stripTypeScriptTypes(body) + ";return accountRequestCore;",
   );
   for (const path of ["auth/sign-in/email", "auth/sign-up/email", "auth/sign-out"]) {
@@ -503,6 +505,7 @@ test("actual account authentication clears old recovery identity before announci
       () => {},
       "",
       "token",
+      readAccountResponse,
     );
     await request(path, {});
     assert.equal(changed, true);
@@ -530,6 +533,8 @@ function outcomeHarness({ live = true, lostResponse = false, hydrationFailure = 
     revision = 1;
   let error = "",
     hydrationAttempts = 0;
+  const accepted = new Map<string, Command>();
+  const batches = new Map<string, Command[]>();
   let deviceScope = {
     campaignId: "main",
     databaseName: "quire",
@@ -565,12 +570,27 @@ function outcomeHarness({ live = true, lostResponse = false, hydrationFailure = 
   const submitCloudCommands = async ({
     data,
   }: {
-    data: { commands: Command[]; stage?: boolean };
+    data: { commands: Command[]; stage?: boolean; batchId: string };
   }) => {
     submissions++;
     if (!data.stage) {
-      for (const command of data.commands)
+      const previous = batches.get(data.batchId);
+      if (
+        previous &&
+        (previous.length !== data.commands.length ||
+          previous.some((c, i) => !sameCommand(c, data.commands[i])))
+      )
+        throw Error("This batch ID was already used for different actions.");
+      for (const command of data.commands) {
+        if (accepted.has(command.id)) {
+          if (!sameCommand(accepted.get(command.id), command))
+            throw Error("Changed action content");
+          continue;
+        }
         authoritative = applyCommand(authoritative, { ...seat, id: "dm", role: "dm" }, command);
+        accepted.set(command.id, structuredClone(command));
+      }
+      batches.set(data.batchId, structuredClone(data.commands));
       revision++;
     }
     if (lostResponse) throw Error("Synthetic lost response");
@@ -601,7 +621,7 @@ function outcomeHarness({ live = true, lostResponse = false, hydrationFailure = 
     ),
     source.slice(
       source.indexOf("async function flush("),
-      source.indexOf("export function endTableTurn()"),
+      source.indexOf("export function exportPending()"),
     ),
     source.slice(
       source.indexOf("export async function queueCommand("),
@@ -633,7 +653,7 @@ function outcomeHarness({ live = true, lostResponse = false, hydrationFailure = 
     "start",
     "sameCommand",
     stripTypeScriptTypes(body) +
-      "; return {queueCommand, runSharedMutation, captureMutationScope};",
+      "; return {queueCommand, runSharedMutation, captureMutationScope, retryPending};",
   )(
     () => Object.freeze({ ...deviceScope }),
     session,
@@ -671,6 +691,11 @@ function outcomeHarness({ live = true, lostResponse = false, hydrationFailure = 
     error: () => error,
     local: () => local,
     authoritative: () => authoritative,
+    replacePending: (pending: Command[]) => {
+      const s = session();
+      s.pending = pending;
+      remember(s);
+    },
     edit: () => {
       local.purses[0]!.coins = fromCopper(1200);
     },
@@ -755,6 +780,66 @@ test("real lost stage and flush responses preserve their exact accepted command 
     assert.match(h.error(), /lost response/);
     assert.equal(h.submissions(), 1);
   }
+});
+test("changed Live payloads use fresh receipts while unchanged retries preserve identity and wealth", async () => {
+  const h = outcomeHarness({ lostResponse: true });
+  const give = {
+    kind: "give" as const,
+    fromId: "hero",
+    toId: "other",
+    copper: 100,
+    holdingId: null,
+    quantity: 0,
+  };
+  await h.queueCommand(give);
+  const first = h.session();
+  await assert.rejects(h.retryPending(), /lost response/);
+  assert.equal(h.session().batchId, first.batchId);
+  assert.deepEqual(h.session().pending, first.pending);
+  assert.equal(toCopper(h.authoritative().purses[1]!.coins), 100);
+  await h.queueCommand(give);
+  const next = h.session();
+  assert.notEqual(next.batchId, first.batchId);
+  assert.equal(next.pending[0].id, first.pending[0].id);
+  assert.equal(next.pending.length, 2);
+  assert.match(h.error(), /lost response/);
+  assert.equal(toCopper(h.authoritative().purses[1]!.coins), 200);
+  assert.equal(h.authoritative().ledger.length, 4);
+});
+test("manual Retry stops after the read acknowledges every action", async () => {
+  const h = outcomeHarness({ lostResponse: true });
+  await h.queueCommand({
+    kind: "give",
+    fromId: "hero",
+    toId: "other",
+    copper: 100,
+    holdingId: null,
+    quantity: 0,
+  });
+  h.onRefresh(() => h.replacePending([]));
+  await h.retryPending();
+  assert.equal(h.submissions(), 1, "No empty mutation after acknowledgement");
+  assert.equal(toCopper(h.authoritative().purses[1]!.coins), 100);
+});
+test("manual Retry repairs a legacy mismatched batch once without replaying committed wealth", async () => {
+  const h = outcomeHarness({ lostResponse: true });
+  await h.queueCommand({
+    kind: "give",
+    fromId: "hero",
+    toId: "other",
+    copper: 100,
+    holdingId: null,
+    quantity: 0,
+  });
+  const original = h.session();
+  const remaining = { ...original.pending[0], id: "legacy-unsent" };
+  h.replacePending([remaining]);
+  await assert.rejects(h.retryPending(), /lost response/);
+  assert.notEqual(h.session().batchId, original.batchId);
+  assert.deepEqual(h.session().pending, [remaining]);
+  assert.equal(h.submissions(), 3, "One colliding attempt, then one repaired attempt");
+  assert.equal(toCopper(h.authoritative().purses[1]!.coins), 200);
+  assert.equal(h.authoritative().ledger.length, 4);
 });
 test("real hydration interruption after retention reports recoverable pending without submitting again", async () => {
   const h = outcomeHarness({ hydrationFailure: true });

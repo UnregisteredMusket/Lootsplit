@@ -1,3 +1,11 @@
+# Pending actions / account resume correction — 2026-10-09 UTC
+
+Branch `fix/pending-room-resume` starts from released main `c4e0a844ca0d832828a3c520751bd1e0a88f1e7b`. Confirmed partial-acknowledgement and changed-payload receipt bugs are fixed while preserving command IDs, recovery data and financial idempotency. Manual Retry rereads acknowledgements and repairs only an explicit legacy batch collision once. Account HTML/malformed responses now stop before local state changes and provide a campaign-list refresh; the originating gateway incident has not been reproduced. See `docs/audit/2026-10-09-pending-room-resume.md` and `/workspace/scratch/69452c190f3d/pending-room-checkpoint.json` for current verification state. No private campaign reads, data resets, migration, APK or global market implementation.
+
+Next: complete the twelve-scenario disposable account audit and final source checks, checkpoint the exact tree, publish a reviewable PR, require all nine exact-head PR groups and independent main verification, then gated website/standby deployment and read-only live verification. Preserve every prior scenario and 60s/170s/two-worker/zero-retry limits. Reconcile actual run/PR/live state before any interrupted write retry.
+
+The prior map fix is COMPLETE: PR79 head `0d8502510802ca8b6e1d0c5fa9b38669cd052c8a`, main `c4e0a844ca0d832828a3c520751bd1e0a88f1e7b`, tree `4c734fb7c4bfb5c57cc7ef0c9158a911921133c9`. All nine PR/main groups passed (37937913571 / 37938922697); website37939833337 and standby37939833033 passed. Worker `ae2d0b97-950a-445a-904d-b564073a1928`, exact live identity,99 matching JS/CSS hashes and read-only desktop/mobile account protection passed. Do not redo that release or migration0012. Android remains1.6.0/code9.
+
 # Map save correction — 2026-10-09 UTC
 
 The user reported that a map could not be saved. The upload/OCR captured-draft race was reproduced: uploading first and typing a name during processing erased the name on completion. Functional state updates now retain current details; Save waits for processing and explains missing images. Existing location/anchor, size, privacy, permission, retry and preservation behavior remains. No new migration, APK or global-market implementation is included.

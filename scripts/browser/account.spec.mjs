@@ -27,26 +27,39 @@ test("network-boundary", async ({ devices, baseURL: origin }) => {
   const port = forbidden.address().port;
   try {
     const { page: other } = await devices.newDevice();
-    await Promise.all([devices.page, other].map(async (page) => {
-      await visitPage(page, origin, "/welcome");
-      const probe = async () => {
-        for (const protocol of ["http", "https"]) {
-          const url = `${protocol}://127.0.0.1:${port}/forbidden`;
-          const failed = page.waitForEvent("requestfailed", (request) => request.url() === url);
-          expect(await page.evaluate((url) => fetch(url).then(() => true, () => false), url)).toBe(false);
-          expect((await failed).failure().errorText).toMatch(/^(inspector|net::ERR_BLOCKED_BY_CLIENT(?:\.Inspector)?)$/);
-        }
-        const account = await page.evaluate(async () => {
-          const response = await fetch("/api/account/auth/get-session");
-          return { ok: response.ok, cache: response.headers.get("cache-control") };
-        });
-        expect(account).toEqual({ ok: true, cache: "no-store" });
-      };
-      await probe();
-      await page.reload();
-      await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
-      await probe();
-    }));
+    await Promise.all(
+      [devices.page, other].map(async (page) => {
+        await visitPage(page, origin, "/welcome");
+        const probe = async () => {
+          for (const protocol of ["http", "https"]) {
+            const url = `${protocol}://127.0.0.1:${port}/forbidden`;
+            const failed = page.waitForEvent("requestfailed", (request) => request.url() === url);
+            expect(
+              await page.evaluate(
+                (url) =>
+                  fetch(url).then(
+                    () => true,
+                    () => false,
+                  ),
+                url,
+              ),
+            ).toBe(false);
+            expect((await failed).failure().errorText).toMatch(
+              /^(inspector|net::ERR_BLOCKED_BY_CLIENT(?:\.Inspector)?)$/,
+            );
+          }
+          const account = await page.evaluate(async () => {
+            const response = await fetch("/api/account/auth/get-session");
+            return { ok: response.ok, cache: response.headers.get("cache-control") };
+          });
+          expect(account).toEqual({ ok: true, cache: "no-store" });
+        };
+        await probe();
+        await page.reload();
+        await expect(page.getByRole("heading", { level: 1 })).toBeVisible();
+        await probe();
+      }),
+    );
     expect(connections, "Blocked origins must not open a network connection").toBe(0);
   } finally {
     await new Promise((done) => forbidden.close(done));
@@ -340,6 +353,36 @@ test("dm-resume", async ({ devices, baseURL: origin }, testInfo) => {
   const { other } = await signedInDevices(devices, origin);
   const firstCode = (await createAndSaveRoom(other, origin, navigateAccountScenario))[0].code;
   await visit(page, "/account");
+  const beforeTransportError = await page.evaluate(() =>
+    Object.fromEntries(Object.entries(localStorage).filter(([k]) => k.startsWith("quire."))),
+  );
+  // A successful server operation may lose its JSON response to a gateway.
+  // Recovery rereads the library; it must never clear or replay this queue.
+  const loseAccountResponse = async (route) => {
+    await route.fetch();
+    await route.fulfill({
+      status: 502,
+      contentType: "text/html",
+      body: "<!DOCTYPE html><h1>Gateway error</h1>",
+    });
+  };
+  await page.route("**/api/account/resume", loseAccountResponse);
+  await page
+    .locator("article.portal-card")
+    .filter({ hasText: firstCode })
+    .getByRole("button", { name: "Resume", exact: true })
+    .click();
+  await expect(page.getByRole("alert").filter({ hasText: /unreadable response/ })).toBeVisible();
+  expect(
+    await page.evaluate(() =>
+      Object.fromEntries(Object.entries(localStorage).filter(([k]) => k.startsWith("quire."))),
+    ),
+  ).toEqual(beforeTransportError);
+  await page.unroute("**/api/account/resume", loseAccountResponse);
+  await page.getByRole("button", { name: "Refresh campaign list", exact: true }).click();
+  await expect(page.getByRole("button", { name: "Resume", exact: true })).toBeEnabled();
+  await expect(page.getByRole("alert").filter({ hasText: /unreadable response/ })).toHaveCount(0);
+
   // Simulate navigation/storage interruption during the first account campaign
   // hydration. Its durable revision must remain old so a reload repairs the copy.
   await page.addInitScript(() => {
@@ -658,6 +701,7 @@ test("resume-queue", async ({ devices, baseURL: origin }, testInfo) => {
   });
   expect(legacySubmissions).toEqual([]);
 });
+
 
 test("recovery", async ({ devices, baseURL: origin }) => {
   const { context, page } = devices;
@@ -1157,4 +1201,123 @@ test("shared-recovery", async ({ devices, baseURL: origin }, testInfo) => {
     fullPage: true,
   });
   assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1));
+});
+
+test("resume-partial", async ({ devices, baseURL: origin }, testInfo) => {
+  // This profile must exercise the real startup selector. The shared gameplay
+  // navigation helper otherwise claims its local DM campaign automatically.
+  devices.page.guestAccessAudit = true;
+  const { other: device } = await signedInDevices(devices, origin);
+  const firstCode = (await createAndSaveRoom(device, origin, navigateAccountScenario))[0].code;
+  async function resumeSaved() {
+    // Every caller has deliberately loaded the library, including the reloads
+    // after injecting stored queues. Do not add another unrelated document load.
+    expect(new URL(device.url()).pathname).toBe("/account");
+    await expect(device.getByRole("button", { name: "Sign out", exact: true })).toBeVisible();
+    const card = device.locator("article.portal-card").filter({ hasText: firstCode });
+    await card.getByRole("button", { name: "Resume", exact: true }).click();
+    await device.waitForURL((url) => url.origin === origin && url.pathname === "/");
+    await waitForDmCampaign(device);
+    expect(await device.locator(".loot-opening").count()).toBe(0);
+  }
+  await resumeSaved();
+  // A lost Live response must remain recoverable, then an acknowledged stale
+  // queue must open from both account cards and the startup selector.
+  await navigateAccountScenario(device, origin, "/account");
+  const original = await device.evaluate(() => {
+    const key = `quire.cloud.v2.${localStorage.getItem("quire.campaign.v1")}`;
+    return { key, session: JSON.parse(localStorage.getItem(key)) };
+  });
+  const queued = {
+    ...original.session,
+    pending: [{ id: "audit-resume-noop", kind: "patch", changes: [] }],
+    batchId: "audit-original-batch",
+  };
+  await device.evaluate(({ key, queued }) => localStorage.setItem(key, JSON.stringify(queued)), {
+    key: original.key,
+    queued,
+  });
+  await resumeSaved();
+  await navigateAccountScenario(device, origin, "/share");
+  await device.getByRole("button", { name: /^Connection & recovery/ }).click();
+  await expect(
+    device
+      .getByRole("tabpanel", { name: "Room", exact: true })
+      .getByRole("status")
+      .filter({ hasText: /1 unsynced change/ }),
+  ).toBeVisible();
+  const download = device.waitForEvent("download");
+  await device.getByRole("button", { name: "Export pending actions", exact: true }).click();
+  const exported = JSON.parse(
+    await (await import("node:fs/promises")).readFile(await (await download).path(), "utf8"),
+  );
+  expect(exported.commands[0].id).toBe("audit-resume-noop");
+  await device.getByRole("button", { name: "Retry", exact: true }).click();
+  await expect(
+    device
+      .getByRole("tabpanel", { name: "Room", exact: true })
+      .getByRole("status")
+      .filter({ hasText: /Room online.*Play active.*Saved to room/ }),
+  ).toBeVisible();
+
+  // Partly acknowledged queues must retry with a new receipt on both devices.
+  // The command IDs survive; the server applies the new action only once.
+  let openedPartial = 0,
+    releasePartial;
+  const bothPartialOpened = new Promise((resolve) => {
+    releasePartial = resolve;
+  });
+  await Promise.all(
+    [
+      [device, 1360],
+      [devices.page, 390],
+    ].map(async ([target, width]) => {
+      await target.setViewportSize({ width, height: 900 });
+      await navigateAccountScenario(target, origin, "/account");
+      const partial = {
+        ...queued,
+        pending: [...queued.pending, { id: "audit-remaining-noop", kind: "patch", changes: [] }],
+      };
+      await target.evaluate(
+        ({ key, partial }) => localStorage.setItem(key, JSON.stringify(partial)),
+        { key: original.key, partial },
+      );
+      await target
+        .locator("article.portal-card")
+        .filter({ hasText: firstCode })
+        .getByRole("button", { name: "Resume", exact: true })
+        .click();
+      await target.waitForURL((url) => url.pathname === "/");
+      await waitForDmCampaign(target);
+      const resumed = await target.evaluate(
+        (key) => JSON.parse(localStorage.getItem(key)),
+        original.key,
+      );
+      expect(resumed.pending.map((c) => c.id)).toEqual(["audit-remaining-noop"]);
+      expect(resumed.batchId).not.toBe(queued.batchId);
+      await navigateAccountScenario(target, origin, "/share");
+      await target.getByRole("button", { name: /^Connection & recovery/ }).click();
+      if (++openedPartial === 2) releasePartial();
+      await bothPartialOpened;
+      await target.getByRole("button", { name: "Retry", exact: true }).click();
+      await expect
+        .poll(() =>
+          target.evaluate(
+            (key) => JSON.parse(localStorage.getItem(key)).pending.length,
+            original.key,
+          ),
+        )
+        .toBe(0);
+      await expect(
+        target
+          .getByRole("tabpanel", { name: "Room", exact: true })
+          .getByRole("status")
+          .filter({ hasText: /Room online.*Play active.*Saved to room/ }),
+      ).toBeVisible();
+      await target.screenshot({
+        path: testInfo.outputPath(`dm-partial-queue-${width}.png`),
+        fullPage: true,
+      });
+    }),
+  );
 });
