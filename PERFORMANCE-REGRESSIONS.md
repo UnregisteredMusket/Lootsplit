@@ -58,7 +58,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Packaged Worker / interface / worker-library-navigation | open | 2 | 9s → 18s | +9s | +100% |
 | Packaged Worker / accounts / Run actions/upload-artifact@v4 | open | 2 | 1s → 3s | +2s | +200% |
 | Publish verified standby / initial queue | open | 3 | 3s → 39s | +36s | +1200% |
-| publish / Run actions/download-artifact@v4 | open | 2 | 1s → 3s | +2s | +200% |
+| publish / Run actions/download-artifact@v4 | open | 3 | 1s → 4s | +3s | +300% |
 | Publish verified standby | open | 2 | 10s → 18s | +8s | +80% |
 | publish | open | 2 | 10s → 18s | +8s | +80% |
 | Deploy verified website / initial queue | open | 2 | 4s → 6780s | +6776s | +169400% |
@@ -204,6 +204,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-09T05:43:58Z | step: publish / Run actions/download-artifact@v4 | 3s → 4s | +1s | +33.33% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37267750778/job/111628032772) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37889960741/job/113688418789) |
 | 2026-10-09T05:42:13Z | step: Development / governance / dev-sound | 21s → 35s | +14s | +66.67% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37884489066/job/113671305297) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37889515368/job/113687018218) |
 | 2026-10-09T05:41:57Z | step: Packaged Worker / interface / worker-sound | 14s → 18s | +4s | +28.57% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37884489066/job/113671686029) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37889515368/job/113687447648) |
 | 2026-10-09T05:29:53.899Z | test: Cloudflare web build | 11.681s → 16.544s | +4.863s | +41.63% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/tree/feature/menu-audio) · [After](https://github.com/UnregisteredMusket/Lootsplit/pull/74) |
