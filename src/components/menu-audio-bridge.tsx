@@ -45,16 +45,23 @@ export function MenuAudioBridge() {
       menuAudio.dispose();
     };
     const identity = () => localAudioLibrary.clearMemory();
+    const restore = () => {
+      const current = localAudioLibrary.getSnapshot();
+      if (localAudioAllowed() && !current.library && !current.loading)
+        void localAudioLibrary.load();
+    };
     window.addEventListener("pointerdown", gesture);
     window.addEventListener("keydown", gesture);
     document.addEventListener("visibilitychange", visibility);
     window.addEventListener("pagehide", leave);
+    window.addEventListener("pageshow", restore);
     window.addEventListener("lootsplit-account-changed", identity);
     return () => {
       window.removeEventListener("pointerdown", gesture);
       window.removeEventListener("keydown", gesture);
       document.removeEventListener("visibilitychange", visibility);
       window.removeEventListener("pagehide", leave);
+      window.removeEventListener("pageshow", restore);
       window.removeEventListener("lootsplit-account-changed", identity);
       menuAudio.dispose();
       localAudioLibrary.clearMemory();

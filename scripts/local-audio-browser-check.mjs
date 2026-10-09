@@ -252,6 +252,19 @@ export async function checkLocalAudio(page, context, width) {
     await page.screenshot({ path: "test-results/sound/local-playlists-320.png", fullPage: true });
   }
   assert.equal(new URL(page.url()).origin, origin);
+  await page.evaluate(() =>
+    window.dispatchEvent(new PageTransitionEvent("pagehide", { persisted: true })),
+  );
+  await page.evaluate(() =>
+    window.dispatchEvent(new PageTransitionEvent("pageshow", { persisted: true })),
+  );
+  await expect(
+    panel.getByRole("button", { name: "Road music 0 tracks", exact: true }),
+  ).toBeVisible();
+  await panel.getByRole("button", { name: "Exploration 2 tracks", exact: true }).click();
+  await player.getByRole("button", { name: "Play playlist", exact: true }).click();
+  await expect(player.getByText("NOW PLAYING · playing", { exact: true })).toBeVisible();
+  await player.getByRole("button", { name: "Stop", exact: true }).click();
   if (width === 390) {
     const anonymous = await context.browser().newContext();
     try {
