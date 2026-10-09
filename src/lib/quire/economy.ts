@@ -1,4 +1,5 @@
 import { shopVisible, shopAsking, validateWorld } from "./world.ts";
+import { randomTradeRoll, recordShopTrade, validateTradeEconomy } from "./trade-economy.ts";
 import { captureDeviceMutationScope, assertDeviceMutationScope } from "./mutation-scope.ts";
 import { isEphemeralCampaign } from "./guest-storage.ts";
 import { assertMerchantSale, isService, stockCategory } from "./merchant.ts";
@@ -897,6 +898,7 @@ export async function removePurse(id: string): Promise<void> {
     );
     const journal = readJournal(row?.value);
     assertFinanceAccountRemovable(journal.finance, id);
+    if (journal.tradeEconomy?.exchanges.some(e => e.purseId === id)) throw Error("An exchange treasury must remain with its recorded exchange. Close the exchange instead of removing its account.");
     if (journal.world?.npcs.some(npc => npc.controllerPurseId === id)) throw Error("Unassign this character as an NPC controller before removing its account.");
     const holdings = await request<Holding[]>(
       tx.objectStore("holdings").index("purseId").getAll(id),
@@ -1024,6 +1026,9 @@ export async function buyFromShop(input: {
           quantity,
           unitCopper: stock.copper,
           notes: stock.notes,
+          ...(stock.commodityId ? { commodityId: stock.commodityId,
+            weight: journal.tradeEconomy?.commodities.find(c => c.id === stock.commodityId)?.weight,
+            ...(journal.tradeEconomy?.commodities.find(c => c.id === stock.commodityId)?.materialKey ? { materialKey: journal.tradeEconomy!.commodities.find(c => c.id === stock.commodityId)!.materialKey } : {}) } : {}),
         };
     tx.objectStore("purses").put({ ...purse, coins });
     if (holding) tx.objectStore("holdings").put(holding);
@@ -1036,10 +1041,15 @@ export async function buyFromShop(input: {
     const summary =
       `Bought ${quantity} ${stock.name} from ${shop.name}` +
       (percent ? `, Charisma ${score}, ${percent}% off` : "");
+    const entry = logLine(purse.id, shop.id, summary, -cost, "purchase");
     tx.objectStore("ledger").put({
-      ...logLine(purse.id, shop.id, summary, -cost, "purchase"),
+      ...entry,
       purchase: { stockId: stock.id, quantity, holding },
     });
+    if (stock.tradeExchangeId) {
+      recordShopTrade({ ...emptyCloudTable(), journal, stock: [stock] }, { id: entry.id, at: entry.at, stockId: stock.id, purseId: purse.id, direction: "buy", quantity, copper: cost });
+      tx.objectStore("meta").put({ id: "journal", value: journal });
+    }
   });
 }
 
@@ -1051,7 +1061,7 @@ export async function sellToShop(input: {
   const quantity = Math.floor(input.quantity);
   if (!Number.isSafeInteger(quantity) || quantity < 1)
     throw new Error("Choose a valid quantity of at least one.");
-  await atomic(["purses", "holdings", "shops", "ledger", "meta"], async (tx) => {
+  await atomic(["purses", "holdings", "shops", "stock", "ledger", "meta"], async (tx) => {
     const holding = await request<Holding | undefined>(
       tx.objectStore("holdings").get(input.holdingId),
     );
@@ -1071,9 +1081,16 @@ export async function sellToShop(input: {
     tx.objectStore("purses").put({ ...purse, coins: gain(purse.coins, paid) });
     if (holding.quantity === quantity) tx.objectStore("holdings").delete(holding.id);
     else tx.objectStore("holdings").put({ ...holding, quantity: holding.quantity - quantity });
-    tx.objectStore("ledger").put(
-      logLine(purse.id, shop.id, `Sold ${quantity} ${holding.name} to ${shop.name}`, paid, "sale"),
-    );
+    const entry = logLine(purse.id, shop.id, `Sold ${quantity} ${holding.name} to ${shop.name}`, paid, "sale");
+    tx.objectStore("ledger").put(entry);
+    if (holding.commodityId) {
+      const lines = await request<StockLine[]>(tx.objectStore("stock").index("shopId").getAll(shop.id));
+      const linked = lines.find(s => s.commodityId === holding.commodityId && s.tradeExchangeId);
+      if (linked) {
+        recordShopTrade({ ...emptyCloudTable(), journal, stock: [linked] }, { id: entry.id, at: entry.at, stockId: linked.id, purseId: purse.id, direction: "sell", quantity, copper: paid });
+        tx.objectStore("meta").put({ id: "journal", value: journal });
+      }
+    }
   });
 }
 
@@ -2090,6 +2107,7 @@ export function readQuireFile(value: unknown): QuireFile {
   const diagnostics = validateBackupReferences({ ...(file as QuireFile), ...metadata, journal });
   validateEstate({ ...(file as QuireFile), journal });
   validateWorld({ ...(file as QuireFile), ...metadata, journal });
+  validateTradeEconomy({ ...(file as QuireFile), journal });
   // A clone error must occur before the destructive transaction, including non-JSON callers.
   structuredClone(file);
   return { ...file, recoveryDiagnostics: diagnostics } as QuireFile;
@@ -2349,6 +2367,7 @@ export async function executeLocalCommand(
         purseIds: seat.purseIds,
       },
       { ...input, id: crypto.randomUUID() },
+      { source: "local", random: randomTradeRoll },
     );
     for (const store of [
       "purses",
@@ -2407,6 +2426,7 @@ export async function executeFinanceCommand(
   const market =
     input.kind === "shop-schedule" ||
     input.kind === "downtime-plan" ||
+    input.kind === "downtime-apply" ||
     input.kind === "session";
   const stores: Parameters<typeof atomic>[0] = [
     "purses",
@@ -2417,7 +2437,7 @@ export async function executeFinanceCommand(
   if (market) stores.push("shops", "stock");
   await atomic(stores, async (tx) => {
     const source: CloudTable = market
-      ? await readEconomyTransaction(tx, input.kind === "session")
+      ? await readEconomyTransaction(tx, input.kind === "session" || input.kind === "downtime-apply")
       : await Promise.all([
           request<Purse[]>(tx.objectStore("purses").getAll()),
           request<Holding[]>(tx.objectStore("holdings").getAll()),
@@ -2443,6 +2463,7 @@ export async function executeFinanceCommand(
         purseIds: seat.purseIds,
       },
       { ...input, id: crypto.randomUUID() },
+      { source: "local", random: randomTradeRoll },
     );
     const priorShops = new Map(
       source.shops.map((s) => [s.id, JSON.stringify(s)]),
@@ -2455,17 +2476,19 @@ export async function executeFinanceCommand(
       if (priorStock.get(line.id) !== line.quantity)
         tx.objectStore("stock").put(line);
     for (const p of next.purses) tx.objectStore("purses").put(p);
-    if (input.kind === "property-details" || input.kind === "session") {
+    if (input.kind === "property-details" || input.kind === "session" || input.kind === "downtime-apply") {
       const kept = new Set(next.holdings.map(h => h.id));
       for (const h of source.holdings) if (!kept.has(h.id)) tx.objectStore("holdings").delete(h.id);
       for (const h of next.holdings) tx.objectStore("holdings").put(h);
     }
-    if (input.kind === "session") {
+    if (input.kind === "session" || input.kind === "downtime-apply") {
       tx.objectStore("ledger").clear();
       tx.objectStore("meta").put({ id: "chat", notes: next.notes });
     }
     for (const l of next.ledger) tx.objectStore("ledger").put(l);
+    if (JSON.stringify(source.realm) !== JSON.stringify(next.realm))
+      tx.objectStore("meta").put({ id: "settings", ...clampRealm(next.realm) });
     tx.objectStore("meta").put({ id: "journal", value: next.journal });
   });
-  if (input.kind === "session") await refreshChat();
+  if (input.kind === "session" || input.kind === "downtime-apply") await refreshChat();
 }

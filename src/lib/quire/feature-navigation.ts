@@ -1,4 +1,5 @@
 export const featureScreens = {
+  economy: { title: "Trade Exchanges", dm: false },
   npcs: { title: "People & NPCs", dm: false },
   trading: { title: "Trading & Barter", dm: false },
   time: { title: "Session Time", dm: true },
@@ -26,7 +27,7 @@ export function safeReturn(value: unknown): string {
   const url = new URL(value, "https://lootsplit.invalid");
   if (url.origin !== "https://lootsplit.invalid") return "/?view=home";
   if (
-    !/^\/(?:party|maps|market|share|settings|characters|library|shop\/[^/]+|features\/(?:bank|finances|downtime|financial|properties|reports|review|journal|shops|music|npcs|trading|time))?$/.test(
+    !/^\/(?:party|maps|market|share|settings|characters|library|shop\/[^/]+|features\/(?:economy|bank|finances|downtime|financial|properties|reports|review|journal|shops|music|npcs|trading|time))?$/.test(
       url.pathname,
     )
   )

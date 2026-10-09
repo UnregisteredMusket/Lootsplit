@@ -1,6 +1,8 @@
 import { scheduledMarket } from "./shop-schedule.ts";
 import { estateQuoteSchema } from "./estate-schema.ts";
 import { estateRuleEligible, previewEstate } from "./estate.ts";
+import { tradeSeasonQuoteSchema } from "./trade-economy-schema.ts";
+import { applyTradeSeason, previewTradeSeason } from "./trade-economy.ts";
 import { z } from "zod";
 import type { CloudTable } from "./cloud.ts";
 import { toCopper, fromCopper, spendCoins } from "./money.ts";
@@ -54,6 +56,7 @@ const lineSchema = z.object({
   balance: money,
 });
 export const quoteSchema = z.object({
+  tradeSeason: tradeSeasonQuoteSchema.optional(),
   propertyOperations: estateQuoteSchema.optional(),
   market: z
     .array(
@@ -150,10 +153,11 @@ function safe(n: number) {
 }
 export function previewDowntime(
   table: Pick<CloudTable, "purses" | "holdings"> &
-    Partial<Pick<CloudTable, "shops" | "stock" | "journal" | "sheets">>,
+    Partial<Pick<CloudTable, "shops" | "stock" | "journal" | "sheets" | "realm">>,
   raw: Finance,
   days: number,
   estateTime?: import("./estate.ts").EstateTime,
+  seasonReceiptId?: string,
 ) {
   z.number().int().min(1).max(3650).parse(days);
   const f = readFinance(raw);
@@ -298,6 +302,9 @@ export function previewDowntime(
       )
     : undefined;
   return quoteSchema.parse({
+    ...(seasonReceiptId && table.journal?.tradeEconomy?.settings.enabled ? { tradeSeason: previewTradeSeason({
+      ...table, journal: { ...table.journal, tradeEconomy: operations?.tradeEconomy ?? table.journal.tradeEconomy },
+    }, seasonReceiptId) } : {}),
     ...(operations ? { propertyOperations: operations } : {}),
     ...(market.length ? { market } : {}),
     loans: f.loans,
@@ -345,7 +352,7 @@ export function applyDowntime(
   const f = table.journal!.finance!;
   const d = f.downtime.find((d) => d.id === downtimeId);
   if (!d || d.status !== "pending") throw Error("Downtime is missing or has already been decided.");
-  const quote = previewDowntime(table, f, d.days);
+  const quote = previewDowntime(table, f, d.days, undefined, d.quote.tradeSeason?.id);
   if (JSON.stringify(quote) !== JSON.stringify(d.quote))
     throw Error(
       "Campaign finances changed after this preview. Recalculate downtime before approving.",
@@ -397,9 +404,10 @@ export function applyFinanceQuote(table: CloudTable, quote: z.infer<typeof quote
     for (const move of operations.movements) {
       financeMove(table, move.purseId, -move.copper, `${receipt.id}-${move.id}`, move.summary, at);
       const line = table.ledger[table.ledger.length - 1];
-      if (move.copper && move.shopId) {
-        line.shopId = move.shopId;
-        line.transactionType = "purchase";
+      if (move.copper) {
+        if (move.shopId) line.shopId = move.shopId;
+        if (move.transactionType) line.transactionType = move.transactionType;
+        else if (move.shopId) line.transactionType = "purchase";
       }
     }
     table.holdings = operations.holdings as CloudTable["holdings"];
@@ -416,6 +424,7 @@ export function applyFinanceQuote(table: CloudTable, quote: z.infer<typeof quote
         line.quantity += after.quantity - before;
     }
     table.journal!.propertyOperations = operations.state;
+    if (operations.tradeEconomy) table.journal!.tradeEconomy = operations.tradeEconomy;
     for (const [i, notice] of operations.notices.entries())
       table.journal!.events.push({
         id: `${receipt.id}-property-${i}`,
@@ -426,6 +435,9 @@ export function applyFinanceQuote(table: CloudTable, quote: z.infer<typeof quote
         summary: notice.summary.slice(0, 500),
       });
   }
+  if (quote.tradeSeason) applyTradeSeason(table, quote.tradeSeason, at, f.day + (f.downtime.find(d => d.id === receipt.id)?.days ?? 0),
+    "downtime", `Approved downtime: ${receipt.name}`);
+  for (const trade of table.journal!.tradeEconomy?.receipts ?? []) if (trade.at === 0) trade.at = at;
 }
 
 export function assertFinanceAccountRemovable(value: unknown, purseId: string) {

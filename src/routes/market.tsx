@@ -127,6 +127,7 @@ function MarketPage() {
       </div>
       {ready ? <MarketLocationsPanel /> : null}
       <BlackMarketToggle />
+      <AppLink className="settings-link" href="/features/economy?from=%2Fmarket">Trade Exchanges · regional goods & seasonal market →</AppLink>
       {seat.role === "dm" && <AppLink className="settings-link" href="/features/time">Session Time →</AppLink>}
       <div className="world-toolbar"><AppLink className="settings-link" href="/features/npcs">People & NPCs →</AppLink><AppLink className="settings-link" href="/features/trading">Trading & Barter →</AppLink><AppLink className="settings-link" href="/maps">Campaign maps →</AppLink></div>
       <AppLink className="settings-link mt-4" href="/features/properties?from=%2Fmarket">Property listings · deeds & dwellings →</AppLink>

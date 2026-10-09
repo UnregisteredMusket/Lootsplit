@@ -39,6 +39,7 @@ export function characterControl(purse: Purse): "player" | "npc" | null {
 }
 
 export type Holding = {
+  commodityId?: string;
   custody?: import("./estate-schema.ts").zCustody;
   materialKey?: string;
   reservedFor?: string;
@@ -99,6 +100,8 @@ export type Shop = {
 };
 
 export type StockLine = {
+  commodityId?: string;
+  tradeExchangeId?: string;
   service?: boolean;
   category?: string;
   id: string;

@@ -101,7 +101,10 @@ export function validateWorld(t: CloudTable, projected = false) {
     )
       throw Error("Choose an existing player character to act as this NPC.");
   }
-  if (!projected && t.purses.some((p) => p.nonParty && !w.npcs.some((n) => n.id === p.id)))
+  // Exchange treasuries are canonical non-party accounts configured by the
+  // regional exchange, rather than people players can independently barter with.
+  if (!projected && t.purses.some((p) => p.nonParty && !w.npcs.some((n) => n.id === p.id) &&
+    !t.journal?.tradeEconomy?.exchanges.some(e => e.purseId === p.id)))
     throw Error("A non-party NPC is missing its configuration.");
   for (const trade of w.trades) {
     if (

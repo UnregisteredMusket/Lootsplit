@@ -1,4 +1,6 @@
 import { readWorld } from "./world-schema.ts";
+import { exchangeHere } from "./trade-economy.ts";
+import { readTradeEconomy } from "./trade-economy-schema.ts";
 import { npcAvailableHere, npcController, shopVisible } from "./world.ts";
 import type { CloudTable, CloudSeat } from "./cloud.ts";
 import { canReadNote } from "./chat-visibility.ts";
@@ -96,6 +98,15 @@ export function projectRecord(
       t.journal.propertyOperations = estate;
     }
     const market = readMarketLocations(t.journal.market);
+    if (t.journal.tradeEconomy) {
+      const economy = t.journal.tradeEconomy;
+      economy.settings = { ...readTradeEconomy().settings, enabled: economy.settings.enabled, mode: economy.settings.mode };
+      economy.exchanges = economy.exchanges.filter(e => economy.settings.enabled && e.visible && exchangeHere(t, e));
+      economy.receipts = economy.receipts.filter(r => seat.purseIds.includes(r.purseId));
+      economy.draws = [];
+      economy.history = [];
+      delete economy.pendingSeason;
+    }
     t.shops = t.shops.filter((shop) => shopVisible(shop, t));
     t.listings = t.listings.filter(
       (listing) =>
@@ -113,7 +124,8 @@ export function projectRecord(
           .flatMap((h) => (h.locationId ? [h.locationId] : [])).concat(
             world.maps.flatMap(m=>[...(m.locationId?[m.locationId]:[]),...m.anchors.map(a=>a.locationId)]),
             world.npcs.map(n=>n.locationId), t.shops.flatMap(s=>s.locationId?[s.locationId]:[]),
-            t.listings.flatMap(l=>l.locationId?[l.locationId]:[])),
+            t.listings.flatMap(l=>l.locationId?[l.locationId]:[]),
+            t.journal.tradeEconomy?.exchanges.flatMap(e=>e.locationId?[e.locationId]:[]) ?? []),
       );
     t.ledger = t.ledger.filter((l) => seat.purseIds.includes(l.purseId));
     t.holdings = t.holdings.filter(
@@ -157,10 +169,20 @@ export function projectRecord(
           ),
         ),
         ...recipes.map((recipe) => recipe.output?.materialKey),
+        ...(t.journal.tradeEconomy?.commodities.map(c => c.materialKey) ?? []),
       ]);
       estate.materials = estate.materials.filter((material) => materials.has(material.key));
     }
+    if (t.journal.tradeEconomy) {
+      const economy = t.journal.tradeEconomy;
+      const goods = new Set([...economy.exchanges.flatMap(e => e.offers.map(o => o.commodityId)),
+        ...t.holdings.map(h => h.commodityId), ...t.stock.map(s => s.commodityId), ...economy.receipts.map(r => r.commodityId)]);
+      economy.commodities = economy.commodities.filter(c => goods.has(c.id));
+      // A linked shop outside the visible exchange still retains its commodity identity, without disclosing that exchange.
+      for (const line of t.stock) if (!economy.exchanges.some(e => e.id === line.tradeExchangeId)) { delete line.tradeExchangeId; delete line.commodityId; }
+    }
     const publicNames = new Set([
+      ...(t.journal.tradeEconomy?.exchanges.map(e => e.purseId) ?? []),
       ...world.conversations.map(c=>c.purseId),
       ...world.npcs.map(n=>n.id),
       ...world.trades.flatMap(o=>[o.left.purseId,o.right.purseId]),
@@ -190,9 +212,9 @@ export function projectRecord(
     t.journal.requests = t.journal.requests.filter((r) => seat.purseIds.includes(r.purseId));
     t.journal.events = t.journal.events
       .filter((e) =>
-        e.propertyId
+        !e.dmOnly && (e.propertyId
           ? visibleSites.has(e.propertyId) || (!!e.purseId && seat.purseIds.includes(e.purseId))
-          : !e.purseId || seat.purseIds.includes(e.purseId),
+          : !e.purseId || seat.purseIds.includes(e.purseId)),
       )
       .map(({ change, ...e }) => e);
     t.loans = t.loans.filter((l) => seat.purseIds.includes(l.purseId));

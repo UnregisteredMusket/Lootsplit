@@ -66,6 +66,7 @@ export type CloudRoom = {
 import { validateShopLocations } from "./shop-locations.ts";
 import { validatePropertyLocations } from "./property.ts";
 import { validateEstate } from "./estate.ts";
+import { validateTradeEconomy } from "./trade-economy.ts";
 import { validateWorld } from "./world.ts";
 
 export function emptyCloudTable(): CloudTable {
@@ -82,6 +83,7 @@ export function readCloudTable(value: unknown): CloudTable | null {
     validateShopLocations(table.shops, market);
     validatePropertyLocations(readListings(table.listings), table.holdings, market);
     validateEstate(table as CloudTable, true);
+    validateTradeEconomy(table as CloudTable);
     validateWorld(table as CloudTable, true);
   } catch { return null; }
   return {

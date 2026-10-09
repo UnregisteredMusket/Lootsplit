@@ -2378,3 +2378,13 @@ input,select,textarea { max-width: 100%; }
 .map-entity { margin-top:24px; }
 
 .map-party { margin-top:-24px; }
+
+.trade-economy-panel { display:grid; gap:1rem; min-width:0; }
+.trade-offer-grid { display:grid; grid-template-columns:repeat(auto-fit,minmax(min(100%,280px),1fr)); gap:1rem; min-width:0; }
+.trade-offer, .trade-season-review, .trade-economy-panel fieldset { min-width:0; }
+.trade-economy-panel input:not([type="checkbox"]), .trade-economy-panel select,
+.trade-economy-panel textarea { width:100%; max-width:100%; min-width:0; }
+.trade-economy-panel textarea { min-height:6rem; }
+.trade-economy-panel p, .trade-season-review p { overflow-wrap:anywhere; }
+.trade-json { max-width:100%; max-height:20rem; overflow:auto; font-size:.8rem; white-space:pre-wrap; overflow-wrap:anywhere; }
+.trade-economy-panel summary { cursor:pointer; padding:.6rem 0; }

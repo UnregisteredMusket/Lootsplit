@@ -1,4 +1,5 @@
 import { shopVisible, shopAsking } from "./vendors.ts";
+import { exchangeQuoteKey, executeExchange } from "./trade-economy.ts";
 import type { CloudTable, CloudSeat } from "./cloud.ts";
 import type { Holding } from "./types.ts";
 import { canonicalJson } from "./canonical-json.ts";
@@ -1075,6 +1076,7 @@ export function previewEstate(t: CloudTable, days: number, balances: Map<string,
     })),
     market: t.journal.market,
     sheets: t.sheets,
+    ...(t.journal.tradeEconomy ? { tradeEconomy: t.journal.tradeEconomy } : {}),
   });
   const working = structuredClone(t),
     s = readEstate(working.journal!.propertyOperations),
@@ -1116,6 +1118,7 @@ export function previewEstate(t: CloudTable, days: number, balances: Map<string,
         rent: "rent",
         staff: "staff",
         supply: "supplies",
+        market: "supplies",
       } as const
     )[order.kind];
     if (!manager.duties.includes(duty)) throw Error("The manager is not authorized for this duty.");
@@ -1124,6 +1127,42 @@ export function previewEstate(t: CloudTable, days: number, balances: Map<string,
         Math.floor((day - manager.budgetStartDay) / manager.budgetPeriodDays) *
         manager.budgetPeriodDays;
       manager.budgetSpentCopper = 0;
+    }
+    if (order.kind === "market") {
+      const economy = working.journal!.tradeEconomy;
+      const exchange = economy?.exchanges.find(e => e.id === order.exchangeId);
+      const commodity = economy?.commodities.find(c => c.id === order.commodityId);
+      const offer = exchange?.offers.find(o => o.commodityId === order.commodityId);
+      if (!economy || !exchange || !commodity || !offer) throw Error("This manager order's reviewed exchange or commodity is missing.");
+      const unitCopper = order.direction === "buy" ? offer.askCopper : offer.bidCopper;
+      if (order.direction === "buy" ? unitCopper > order.limitCopper : unitCopper < order.limitCopper)
+        throw Error("The seasonal price is outside the owner's authorized limit.");
+      const cost = order.direction === "buy" ? unitCopper * order.quantity : 0;
+      if (cost > budget || manager.budgetSpentCopper + cost > manager.budgetCopper)
+        throw Error("The market order exceeds its authorized spending budget.");
+      const lots = working.holdings.filter(x => x.purseId === ownerId && x.commodityId === commodity.id &&
+        x.custody?.kind === "property" && x.custody.propertyId === propertyId && !x.reservedFor);
+      if (order.direction === "sell" && lots.reduce((n, x) => n + x.quantity, 0) < order.quantity)
+        throw Error("The property has insufficient unreserved commodity goods.");
+      // Each order is atomic, including multi-lot sales. A blocked letter cannot partly spend or sell.
+      const trial = structuredClone(working);
+      const actor: CloudSeat = { id: "property-manager", token: "", name: manager.name, role: "dm", purseIds: [ownerId] };
+      let remaining = order.quantity;
+      const trades = order.direction === "buy" ? [{ id: undefined, quantity: remaining }] : lots;
+      for (const [index, lot] of trades.entries()) {
+        if (!remaining) break;
+        const quantity = Math.min(remaining, lot.quantity);
+        executeExchange(trial, actor, { id: `${receipt}-trade-${index}`, exchangeId: exchange.id, commodityId: commodity.id,
+          purseId: ownerId, direction: order.direction, quantity, before: exchangeQuoteKey(economy, exchange, commodity),
+          propertyId, ...(lot.id ? { holdingId: lot.id } : {}) }, 0, { locationId: h.locationId ?? null });
+        remaining -= quantity;
+      }
+      working.purses = trial.purses;
+      working.holdings = trial.holdings;
+      working.ledger = trial.ledger;
+      working.journal!.tradeEconomy = trial.journal!.tradeEconomy;
+      manager.budgetSpentCopper += cost;
+      return `${order.direction === "buy" ? "Bought" : "Sold"} ${order.quantity} ${commodity.unit} of ${commodity.name} at ${unitCopper} cp per unit.`;
     }
     if (order.kind === "supply") {
       if (
@@ -1328,6 +1367,8 @@ export function previewEstate(t: CloudTable, days: number, balances: Map<string,
             const out = job.recipe.output;
             working.holdings.push({
               ...out,
+              ...(out.materialKey && working.journal!.tradeEconomy?.commodities.find(c => c.materialKey === out.materialKey)
+                ? { commodityId: working.journal!.tradeEconomy!.commodities.find(c => c.materialKey === out.materialKey)!.id } : {}),
               id: `${job.id}-output`,
               purseId: job.purseId,
               kind: "item",
@@ -1444,10 +1485,12 @@ export function previewEstate(t: CloudTable, days: number, balances: Map<string,
     copper: -l.copper,
     summary: l.summary,
     ...(l.shopId ? { shopId: l.shopId } : {}),
+    ...(l.transactionType && ["purchase", "sale", "transfer", "payment"].includes(l.transactionType) ? { transactionType: l.transactionType as "purchase" | "sale" | "transfer" | "payment" } : {}),
   }));
   for (const p of working.purses) balances.set(p.id, toCopper(p.coins));
   validateEstate(working);
   return {
+    ...(working.journal!.tradeEconomy ? { tradeEconomy: working.journal!.tradeEconomy } : {}),
     before,
     state: readEstate(s),
     holdings: working.holdings,

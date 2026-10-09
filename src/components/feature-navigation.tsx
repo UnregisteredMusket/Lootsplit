@@ -56,7 +56,7 @@ export function FeatureCards({
         </Fold>
         <Fold title="Economy & properties" hint="Bank, shops, property and financial rules.">
           <div className="dm-tool-links">
-            {(["bank", "shops", "properties", "npcs", "trading", "financial"] as Feature[]).map((id) => (
+            {(["bank", "shops", "economy", "properties", "npcs", "trading", "financial"] as Feature[]).map((id) => (
               <FeatureLink key={id} feature={id}>
                 {featureScreens[id].title}
               </FeatureLink>
@@ -94,7 +94,7 @@ export function FeatureCards({
                                 ? "Financial requests & character imports"
                                 : id === "music"
                                   ? "Device playlists, playback & audio credits"
-                                  : "Shop availability & restocking"}
+                                  : id === "economy" ? "Regional trade goods & seasonal supply and demand" : "Shop availability & restocking"}
               </p>
             </>
           )}

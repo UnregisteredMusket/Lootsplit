@@ -3,6 +3,8 @@ import { worldSchema } from "./world-schema.ts";
 import { validateWorld } from "./world.ts";
 import { estateSchema } from "./estate-schema.ts";
 import { validateEstate } from "./estate.ts";
+import { tradeEconomySchema } from "./trade-economy-schema.ts";
+import { validateTradeEconomy } from "./trade-economy.ts";
 import { marketLocationsSchema, validateShopLocations } from "./shop-locations.ts";
 import { validateEconomyRows } from "./validation.ts";
 import { validatePropertyLocations, listingSchema } from "./property.ts";
@@ -23,6 +25,7 @@ export const encounterLootProvenanceSchema = z.object({
 export type EncounterLootProvenance = z.infer<typeof encounterLootProvenanceSchema>;
 export const encounterLootEntryId = (receiptId: string) => `encounter-loot:${receiptId}`;
 const journalFields = z.object({
+  tradeEconomy: tradeEconomySchema.optional(),
   world: worldSchema.optional(),
   propertyOperations: estateSchema.optional(),
   market: marketLocationsSchema.optional(),
@@ -93,6 +96,7 @@ const journalFields = z.object({
         at,
         summary: z.string().max(500),
         kind: z.enum(["management", "prices", "request", "session"]),
+        dmOnly: z.boolean().optional(),
         purseId: id.optional(),
         propertyId: id.optional(),
         change: z
@@ -139,6 +143,7 @@ export function readArchivedSnapshot(snapshot: string): CloudTable {
     for (const listing of t.listings ?? []) listingSchema.parse(listing);
     validatePropertyLocations(t.listings ?? [], t.holdings, journal.market);
     validateEstate({ ...t, journal }, true);
+    validateTradeEconomy({ ...t, journal });
     validateWorld({ ...t, journal }, true);
     for (const key of ["notes", "sheets", "loans", "listings", "handouts"] as const)
       if (t[key] !== undefined && !Array.isArray(t[key])) throw Error("Invalid archived records.");
@@ -219,6 +224,7 @@ export function preserveJournalMetadata(value: unknown, current: Journal): Journ
     }
   }
   const changes = new Map(current.events.map((event) => [event.id, event.change]));
+  const privateEvents = new Set(current.events.filter(e => e.dmOnly).map(e => e.id));
   const entries = new Map((current.entries || []).map(entry => [entry.id, entry]));
   for (const entry of next.entries || []) {
     const provenance = entries.get(entry.id)?.provenance ?? entry.provenance;
@@ -236,6 +242,7 @@ export function preserveJournalMetadata(value: unknown, current: Journal): Journ
     ...(next.world ? {} : current.world ? { world: current.world } : {}),
     ...(next.market ? {} : current.market ? { market: current.market } : {}),
     ...(next.propertyOperations ? {} : current.propertyOperations ? { propertyOperations: current.propertyOperations } : {}),
+    ...(current.tradeEconomy ? { tradeEconomy: current.tradeEconomy } : {}),
     ...(current.reports || next.reports
       ? {
           reports: [...reports.values()],
@@ -257,7 +264,7 @@ export function preserveJournalMetadata(value: unknown, current: Journal): Journ
       : {}),
     events: next.events.map((event) => {
       const change = event.change ?? changes.get(event.id);
-      return change ? { ...event, change } : event;
+      return { ...event, ...(change ? { change } : {}), ...(privateEvents.has(event.id) ? { dmOnly: true } : {}) };
     }),
   });
 }

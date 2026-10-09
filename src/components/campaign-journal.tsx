@@ -448,7 +448,7 @@ export function CampaignJournal({
                     await command({ kind: "downtime-preference", days: 0 });
                     await saveSession();
                   } else {
-                    await command({ kind: "downtime-plan", name: "Before " + name, days });
+                    await command({ kind: "downtime-plan", name: "Before " + name, days, advanceSeason: !!journal.tradeEconomy?.settings.enabled });
                   }
                   setDowntimeOpen(false);
                   if (days > 0) {

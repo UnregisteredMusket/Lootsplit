@@ -4,6 +4,8 @@ import { DatabaseSync } from "node:sqlite";
 import { readFileSync } from "node:fs";
 import { createRoom, readRoom, updateRoom, deleteRoom } from "./room-store.server.ts";
 import { emptyCloudTable } from "./cloud.ts";
+import { tradeFixture } from "./test-fixtures/trade-economy.ts";
+import { exchangeQuoteKey, tradeSeasonFingerprint } from "./trade-economy.ts";
 import { openRoom, joinRoom, roomState, previewRoom, submitCommands } from "./cloud.server.ts";
 import { emptyCoins } from "./money.ts";
 import {
@@ -14,6 +16,31 @@ import {
 } from "./push.server.ts";
 import { jwtVerify, importJWK } from "jose";
 const sql = new DatabaseSync(":memory:");
+test("separate shared campaign exchanges persist authoritative seasonal rolls, trades and one-time settlement across retries", async () => {
+  const { choosePace } = await import("./cloud.server.ts");
+  const host=await openRoom({name:"Economy DM",table:tradeFixture()}),other=await openRoom({name:"Separate economy",table:tradeFixture()});
+  const joined=await joinRoom({code:host.code,purseId:"a",name:"Arden"});await choosePace({...host,live:true});
+  const auth={code:host.code,token:joined.token},initial=(await roomState(auth)).table,e=initial.journal!.tradeEconomy!;
+  const command={id:"economy-buy",kind:"trade-buy",exchangeId:"harbor",commodityId:"timber",purseId:"a",quantity:10,before:exchangeQuoteKey(e,e.exchanges[0],e.commodities[0])};
+  await submitCommands({...auth,batchId:"economy-buy-first",commands:[command]});
+  await submitCommands({...auth,batchId:"economy-buy-lost-response",commands:[command]});
+  const bought=(await roomState(host)).table;assert.equal(bought.journal!.tradeEconomy!.receipts.length,1);assert.equal(bought.holdings.find(h=>h.commodityId)!.quantity,10);
+  assert.equal((await roomState(other)).table.journal!.tradeEconomy!.receipts.length,0);
+  await assert.rejects(submitCommands({...auth,batchId:"player-mode",commands:[{id:"player-mode",kind:"trade-settings",before:e.settings,settings:{...e.settings,mode:"classic"},reason:"No permission"}]}),/Only the DM/);
+  const plan={id:"server-season",kind:"trade-season-plan",before:tradeSeasonFingerprint(bought)};
+  await assert.rejects(submitCommands({...host,batchId:"staged-roll",commands:[plan],stage:true}),/directly/);
+  await submitCommands({...host,batchId:"server-plan",commands:[plan]});
+  const prepared=(await roomState(host)).table.journal!.tradeEconomy!;assert.ok(prepared.draws.every(d=>d.source==="server"));assert.equal(prepared.draws.length,5);
+  await submitCommands({...host,batchId:"server-plan-lost",commands:[plan]});assert.deepEqual((await roomState(host)).table.journal!.tradeEconomy!.draws,prepared.draws);
+  const playerView=(await roomState(auth)).table.journal!.tradeEconomy!;assert.deepEqual(playerView.draws,[]);assert.equal(playerView.pendingSeason,undefined);
+  await submitCommands({...host,batchId:"cancel-server-preview",commands:[{id:"cancel-server-preview",kind:"trade-season-cancel",previewId:plan.id}]});
+  await submitCommands({...host,batchId:"end-season-downtime",commands:[{id:"end-season-downtime",kind:"downtime-plan",name:"Session end",days:7,advanceSeason:true}]});
+  const downtime=(await roomState(host)).table.journal!.finance!.downtime.at(-1)!;assert.deepEqual(downtime.quote.tradeSeason!.draws,prepared.draws);
+  const settle={id:"settle-economy",kind:"downtime-apply",downtimeId:downtime.id,endSession:false};
+  await submitCommands({...host,batchId:"settle-first",commands:[settle]});await submitCommands({...host,batchId:"settle-lost",commands:[settle]});
+  const final=(await roomState(host)).table;assert.equal(final.journal!.tradeEconomy!.epoch,1);assert.equal(final.journal!.tradeEconomy!.history.length,1);assert.equal(final.journal!.finance!.day,7);
+  assert.equal((await roomState(other)).table.journal!.tradeEconomy!.epoch,0);
+});
 test("property purchases and deed transfers persist once across lost responses and independent player reads", async () => {
   const { choosePace } = await import("./cloud.server.ts");
   const { blankShop } = await import("./economy.ts");

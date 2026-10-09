@@ -1460,7 +1460,9 @@ function OrderFields({
       (s) => s.propertyId === h.id && ["active", "paused"].includes(s.status),
     );
   const initial = (kind: EstateOrder["kind"]): EstateOrder =>
-    kind === "message"
+    kind === "market"
+      ? { kind, exchangeId: t.journal.tradeEconomy?.exchanges[0]?.id ?? "", commodityId: t.journal.tradeEconomy?.commodities[0]?.id ?? "", direction: "buy", quantity: 1, limitCopper: 0 }
+      : kind === "message"
       ? { kind, text: "" }
       : kind === "report"
         ? { kind }
@@ -1491,6 +1493,7 @@ function OrderFields({
           <option value="rent">Manage approved tenancy</option>
           <option value="staff">Manage approved staff contract</option>
           <option value="supply">Order reviewed material supplies</option>
+          {t.journal.tradeEconomy?.settings.enabled && <option value="market">Trade stored commodities at a local exchange</option>}
         </Select>
       </Field>
       {value.kind === "message" && (
@@ -1576,6 +1579,22 @@ function OrderFields({
           />
         </>
       )}
+      {value.kind === "market" && <>
+        <Field label="Property exchange"><Select value={value.exchangeId} onChange={e=>set({...value,exchangeId:e.target.value})}>
+          <option value="">Choose an exchange</option>
+          {t.journal.tradeEconomy?.exchanges.map(e=><option key={e.id} value={e.id}>{e.name}</option>)}
+        </Select></Field>
+        <Field label="Trade commodity"><Select value={value.commodityId} onChange={e=>set({...value,commodityId:e.target.value})}>
+          <option value="">Choose a commodity</option>
+          {t.journal.tradeEconomy?.commodities.map(c=><option key={c.id} value={c.id}>{c.name} · {c.unit}</option>)}
+        </Select></Field>
+        <Field label="Manager trade direction"><Select value={value.direction} onChange={e=>set({...value,direction:e.target.value as "buy"|"sell"})}>
+          <option value="buy">Buy into property storage</option><option value="sell">Sell stored goods</option>
+        </Select></Field>
+        <NumberField label="Commodity quantity" value={value.quantity} min={1} max={100000} set={quantity=>set({...value,quantity})}/>
+        <NumberField label={value.direction==="buy"?"Maximum purchase price per unit (cp)":"Minimum sale price per unit (cp)"} value={value.limitCopper} min={0} max={1e12} set={limitCopper=>set({...value,limitCopper})}/>
+        <p>The exchange must serve this property's location. The supplies duty, staff wages, manager budget, treasury, stock and storage are rechecked at execution. Sales use the owner's stored, unreserved goods.</p>
+      </>}
     </>
   );
 }

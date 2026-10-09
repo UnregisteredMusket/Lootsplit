@@ -106,6 +106,10 @@ The `ownership` scenario must cover anonymous entry restrictions, explicit legac
 
 ## Roadmap feature maintenance
 
+### Seasonal campaign trade economies
+
+Read `docs/TRADE-ECONOMY.md` and `docs/plans/SEASONAL-TRADE-ECONOMY.md`. Economy state is optional campaign journal data; never share exchange balances, seasonal draws or feedback across campaigns. Reuse canonical inventory/purses, location hierarchy, property manager budgets/postal orders and the atomic stored downtime approval. Price quotes stay fixed for the season; current transactions feed the next automatic proposal. Rolls are authoritative and retained across cancellation/retry, including server CAS retries. Classic preserves exact DM values and every mode supports recorded overrides. Within-session clock advances never settle seasons. Preserve older saves, immutable archives, recovery drafts, all existing release gates and the independent packaged Worker checks. Run `trade-economy.test.ts`, shared `room-store.test.ts`, and the complete desktop/mobile trade-economy audit in both environments.
+
 ### Property operations and reviewed imports
 
 The user approved the October 9 property expansion after reviewing the catalogue and import contract. Read `docs/plans/PROPERTY-OPERATIONS.md`, `docs/PROPERTY-OPERATIONS.md`, `docs/examples/property-operations.sample.json` and its companion schema. The property importer is separate from the existing location/shop name importer and performs its own reviewed atomic command.
