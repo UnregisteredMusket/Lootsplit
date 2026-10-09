@@ -104,7 +104,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Deploy verified website | open | 3 | 98s → 245s | +147s | +150% |
 | deploy | open | 3 | 98s → 245s | +147s | +150% |
 | Code checks and immutable builds / Run actions/upload-artifact@v4 | open | 3 | 2s → 5s | +3s | +150% |
-| Packaged Worker / accounts / Run actions/setup-node@v4 | open | 3 | 3s → 7s | +4s | +133.33% |
+| Packaged Worker / accounts / Run actions/setup-node@v4 | open | 4 | 3s → 9s | +6s | +200% |
 | Packaged standby / Run npm ci | open | 2 | 12s → 18s | +6s | +50% |
 | Development / accounts / dev-account | resolved | 4 | 57s → 156s | +99s | +173.68% |
 | Packaged Worker / interface / worker-help | resolved | 2 | 6s → 22s | +16s | +266.67% |
@@ -201,6 +201,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-09T05:33:34Z | step: Packaged Worker / accounts / Run actions/setup-node@v4 | 7s → 9s | +2s | +28.57% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37300754865/job/111733075958) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37889040350/job/113685808971) |
 | 2026-10-09T05:29:14Z | step: Packaged Worker / interface / worker-sound | 13s → 23s | +10s | +76.92% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37883947170/job/113669934308) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37888429597/job/113684082922) |
 | 2026-10-09T05:28:46Z | step: Development / governance / dev-sound | 21s → 34s | +13s | +61.9% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37883947170/job/113669641661) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37888429597/job/113683616303) |
 | 2026-10-09T05:26:47Z | step: Packaged Worker / interface / Run actions/setup-node@v4 | 8s → 15s | +7s | +87.5% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37390831478/job/112035588481) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37888429597/job/113684082922) |
