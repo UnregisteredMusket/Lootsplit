@@ -9,12 +9,14 @@ export function CommandForm({
   submit,
   label,
   dirty = false,
+  submitDisabled = false,
   onDone,
 }: {
   children?: ReactNode;
   submit: () => CommandInput | Promise<CommandInput>;
   label: string;
   dirty?: boolean;
+  submitDisabled?: boolean;
   onDone?: () => void;
 }) {
   const { commandOutcome } = useEconomy(),
@@ -24,7 +26,7 @@ export function CommandForm({
   useDraftGuard(dirty, label);
   async function save(e: FormEvent) {
     e.preventDefault();
-    if (busy) return;
+    if (busy || submitDisabled) return;
     setBusy(true);
     setError("");
     setNotice("");
@@ -42,7 +44,9 @@ export function CommandForm({
     <form className="world-form" onSubmit={save}>
       <fieldset disabled={busy}>
         {children}
-        <Button type="submit">{busy ? "Saving…" : label}</Button>
+        <Button type="submit" disabled={submitDisabled}>
+          {busy ? "Saving…" : label}
+        </Button>
       </fieldset>
       {error && <p role="alert">{error}</p>}
       {notice && <p role="status">{notice}</p>}
