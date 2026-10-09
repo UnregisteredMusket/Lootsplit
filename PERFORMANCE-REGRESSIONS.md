@@ -173,6 +173,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Development / gameplay | open | 3 | 145s → 911s | +766s | +528.28% |
 | Packaged Worker / interface / worker-sound | open | 4 | 6s → 25s | +19s | +316.67% |
 | Packaged Worker / interface / worker-library-navigation | resolved | 2 | 13s → 37s | +24s | +184.62% |
+| mobile client build | open | 2 | 4.224s → 9.632s | +5.408s | +128.03% |
 | Development / gameplay / dev-control-panel | open | 3 | 14s → 29s | +15s | +107.14% |
 | Packaged Worker / interface / worker-library-navigation | open | 4 | 9s → 22s | +13s | +144.44% |
 | Development / gameplay / Run npm ci | open | 2 | 13s → 19s | +6s | +46.15% |
@@ -206,6 +207,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-09T09:41:21.344Z | test: mobile client build | 5.464s → 9.632s | +4.168s | +76.28% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/tree/fix/player-home-buttons) · [After](https://github.com/UnregisteredMusket/Lootsplit/tree/feature/property-operations) |
 | 2026-10-09T09:49:54Z | step: Code checks and immutable builds / lint | 9s → 11s | +2s | +22.22% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37563730253/job/112606617494) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37913636690/job/113764459944) |
 | 2026-10-09T07:26:43Z | job: Packaged Worker / interface | 196s → 273s | +77s | +39.29% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37439896490/job/112191368666) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37898476002/job/113715653210) |
 | 2026-10-09T07:25:24Z | step: Packaged Worker / interface / worker-sound | 18s → 25s | +7s | +38.89% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37889515368/job/113687447648) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37898476002/job/113715653210) |
