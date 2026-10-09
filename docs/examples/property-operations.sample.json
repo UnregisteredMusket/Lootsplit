@@ -1,0 +1,123 @@
+{
+  "format": "lootsplit.property-operations",
+  "schemaVersion": 1,
+  "status": "draft",
+  "currency": "copper",
+  "timeUnit": "campaign-day",
+  "locations": [
+    {"key": "eastmarch", "kind": "region", "name": "Eastmarch", "parentKey": null},
+    {"key": "brackenport", "kind": "city", "name": "Brackenport", "parentKey": "eastmarch"},
+    {"key": "dock-ward", "kind": "area", "name": "Dock Ward", "parentKey": "brackenport"}
+  ],
+  "ownerBindings": [
+    {"key": "party-treasury", "kind": "party", "label": "Map to the campaign's party treasury"}
+  ],
+  "materials": [
+    {"key": "timber", "name": "Building timber", "unit": "bundle"},
+    {"key": "stone", "name": "Dressed stone", "unit": "crate"},
+    {"key": "iron", "name": "Iron fittings", "unit": "crate"}
+  ],
+  "templates": [
+    {
+      "key": "warehouse",
+      "name": "Party warehouse",
+      "propertyType": "other",
+      "capabilities": ["storage"],
+      "storage": {"defaultAccess": "party-members", "capacityWeight": null},
+      "staff": [
+        {"role": "porter", "minimum": 0, "wageCopper": 200, "periodDays": 1, "purpose": "operation"},
+        {"role": "manager", "minimum": 1, "wageCopper": 50, "periodDays": 1, "purpose": "automation"}
+      ]
+    },
+    {
+      "key": "house",
+      "name": "Small house",
+      "propertyType": "residence",
+      "capabilities": ["storage", "rental"],
+      "storage": {"defaultAccess": "owner", "capacityWeight": null},
+      "rental": {"incomeCopper": 5000, "upkeepCopper": 1000, "periodDays": 30},
+      "staff": [
+        {"role": "caretaker", "minimum": 0, "wageCopper": 100, "periodDays": 1, "purpose": "operation"},
+        {"role": "manager", "minimum": 1, "wageCopper": 50, "periodDays": 1, "purpose": "automation"}
+      ]
+    },
+    {
+      "key": "land",
+      "name": "Building plot",
+      "propertyType": "land",
+      "capabilities": ["construction-site"],
+      "recipes": [
+        {
+          "key": "build-house",
+          "name": "Build a small house",
+          "resultTemplateKey": "house",
+          "laborDays": 60,
+          "laborCostCopper": 30000,
+          "materials": [
+            {"materialKey": "timber", "quantity": 40},
+            {"materialKey": "stone", "quantity": 20},
+            {"materialKey": "iron", "quantity": 5}
+          ]
+        }
+      ]
+    },
+    {
+      "key": "forge",
+      "name": "Working forge",
+      "propertyType": "workshop",
+      "capabilities": ["storage", "crafting"],
+      "storage": {"defaultAccess": "owner", "capacityWeight": null},
+      "staff": [
+        {"role": "smith", "minimum": 1, "wageCopper": 300, "periodDays": 1, "purpose": "operation"},
+        {"role": "manager", "minimum": 1, "wageCopper": 50, "periodDays": 1, "purpose": "automation"}
+      ]
+    }
+  ],
+  "properties": [
+    {
+      "key": "party-warehouse",
+      "name": "Harbor Storehouse",
+      "recordKind": "holding",
+      "templateKey": "warehouse",
+      "locationKey": "dock-ward",
+      "condition": "maintained",
+      "ownerKey": "party-treasury",
+      "valueCopper": 120000,
+      "notes": "Fictional DM-created owned holding. Empty storage; no purchased goods, staff contracts or payment receipt."
+    },
+    {
+      "key": "small-house",
+      "name": "Lantern House",
+      "recordKind": "listing",
+      "templateKey": "house",
+      "locationKey": "brackenport",
+      "condition": "ready",
+      "priceCopper": 80000,
+      "status": "available",
+      "notes": "Fictional sale listing. Rental and staffing defaults stay inactive until reviewed after acquisition."
+    },
+    {
+      "key": "building-plot",
+      "name": "Mason's Plot",
+      "recordKind": "listing",
+      "templateKey": "land",
+      "locationKey": "brackenport",
+      "condition": "ready",
+      "priceCopper": 25000,
+      "status": "available",
+      "notes": "Fictional vacant site. The recipe defines future work; no house is already built."
+    },
+    {
+      "key": "dock-forge",
+      "name": "Dock Ward Forge",
+      "recordKind": "listing",
+      "templateKey": "forge",
+      "locationKey": "dock-ward",
+      "condition": "repairs",
+      "priceCopper": 180000,
+      "status": "available",
+      "notes": "Fictional business requiring repairs and a hired smith before automated production."
+    }
+  ],
+  "postalDefaults": {"feeCopper": 100, "deliveryDays": 2}
+}
