@@ -196,11 +196,16 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Development / gameplay / dev-library-navigation | open | 2 | 18s → 29s | +11s | +61.11% |
 | Packaged Worker / interface / worker-market-locations | open | 2 | 23s → 45s | +22s | +95.65% |
 | Development / governance / dev-sound | open | 2 | 8s → 34s | +26s | +325% |
+| Cloudflare web build | open | 2 | 8.956s → 16.544s | +7.588s | +84.73% |
+| mobile web build | open | 2 | 6.259s → 12.496s | +6.237s | +99.65% |
 
 ## Recorded slowdowns
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-09T05:29:53.899Z | test: Cloudflare web build | 11.681s → 16.544s | +4.863s | +41.63% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/tree/feature/menu-audio) · [After](https://github.com/UnregisteredMusket/Lootsplit/pull/74) |
+| 2026-10-09T05:20:30.067Z | test: mobile web build | 10.377s → 12.496s | +2.119s | +20.42% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/tree/feature/menu-audio) · [After](https://github.com/UnregisteredMusket/Lootsplit/tree/feature/local-playlists) |
+| 2026-10-09T05:08:12.034Z | audit: sound browser audit | 44.51s → 56.377s | +11.867s | +26.66% | failure | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/tree/feature/menu-audio) · [After](https://github.com/UnregisteredMusket/Lootsplit/tree/feature/local-playlists) |
 | 2026-10-09T05:33:34Z | step: Packaged Worker / accounts / Run actions/setup-node@v4 | 7s → 9s | +2s | +28.57% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37300754865/job/111733075958) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37889040350/job/113685808971) |
 | 2026-10-09T05:29:14Z | step: Packaged Worker / interface / worker-sound | 13s → 23s | +10s | +76.92% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37883947170/job/113669934308) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37888429597/job/113684082922) |
 | 2026-10-09T05:28:46Z | step: Development / governance / dev-sound | 21s → 34s | +13s | +61.9% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37883947170/job/113669641661) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37888429597/job/113683616303) |
