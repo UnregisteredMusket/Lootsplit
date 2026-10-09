@@ -146,7 +146,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Packaged standby / Run npx playwright install --with-deps chromium | open | 2 | 21s → 38s | +17s | +80.95% |
 | Packaged Worker / accounts / worker-finance | open | 4 | 11s → 24s | +13s | +118.18% |
 | Development / governance / dev-theme | open | 2 | 20s → 44s | +24s | +120% |
-| Packaged Worker / accounts / worker-finance | open | 4 | 11s → 23s | +12s | +109.09% |
+| Packaged Worker / accounts / worker-finance | open | 5 | 11s → 29s | +18s | +163.64% |
 | report / Save report and send configured email | open | 2 | 1s → 3s | +2s | +200% |
 | Packaged Worker / interface / Run npm ci | open | 2 | 13s → 18s | +5s | +38.46% |
 | report / Run actions/setup-node@v4 | open | 3 | 1s → 12s | +11s | +1100% |
@@ -204,6 +204,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-09T07:17:16Z | step: Packaged Worker / accounts / worker-finance | 23s → 29s | +6s | +26.09% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37742900449/job/113198095145) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37897679114/job/113713200932) |
 | 2026-10-09T05:43:58Z | step: publish / Run actions/download-artifact@v4 | 3s → 4s | +1s | +33.33% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37267750778/job/111628032772) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37889960741/job/113688418789) |
 | 2026-10-09T05:42:13Z | step: Development / governance / dev-sound | 21s → 35s | +14s | +66.67% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37884489066/job/113671305297) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37889515368/job/113687018218) |
 | 2026-10-09T05:41:57Z | step: Packaged Worker / interface / worker-sound | 14s → 18s | +4s | +28.57% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37884489066/job/113671686029) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37889515368/job/113687447648) |
