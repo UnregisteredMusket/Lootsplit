@@ -10659,17 +10659,17 @@
   },
   "[\"local\",\"test\",\"Cloudflare web build\",\"node22.23.3/linux-x64/work-mode/warm/concurrent-quick-browser\",\"v1\"]": {
     "schema": 1,
-    "id": "local:4f895954-75c9-43eb-9761-c2683af11f78",
+    "id": "local:65e17668-db54-495b-987e-1761fe664522",
     "scope": "[\"local\",\"test\",\"Cloudflare web build\",\"node22.23.3/linux-x64/work-mode/warm/concurrent-quick-browser\",\"v1\"]",
     "kind": "test",
     "name": "Cloudflare web build",
     "environment": "node22.23.3/linux-x64/work-mode/warm/concurrent-quick-browser",
-    "commit": "7ac3ec73e27266da8799516283f270e7b3b67d3e",
-    "url": "https://github.com/UnregisteredMusket/Lootsplit/tree/feature/preserved-improvements",
+    "commit": "893851ed9c51bdc3a809afe7088b78b4d50365ae",
+    "url": "https://github.com/UnregisteredMusket/Lootsplit/tree/feature/menu-audio",
     "outcome": "success",
-    "startedAt": "2026-10-08T07:13:07.699Z",
-    "finishedAt": "2026-10-08T07:13:16.655Z",
-    "durationMs": 8956,
+    "startedAt": "2026-10-09T04:19:00.883Z",
+    "finishedAt": "2026-10-09T04:19:12.564Z",
+    "durationMs": 11681,
     "trendId": "local:4f895954-75c9-43eb-9761-c2683af11f78"
   },
   "[\"local\",\"action\",\"immutable Worker packaging\",\"node22.23.3/linux-x64/work-mode/warm/concurrent-quick-browser\",\"v1\"]": {
@@ -10689,17 +10689,17 @@
   },
   "[\"local\",\"test\",\"mobile web build\",\"node22.23.3/linux-x64/work-mode/warm/concurrent-quick-browser\",\"v1\"]": {
     "schema": 1,
-    "id": "local:a329cf5a-e472-4301-9434-221658a2ce84",
+    "id": "local:8ccc021d-1ed0-4b2b-b66f-543e9c41b1a4",
     "scope": "[\"local\",\"test\",\"mobile web build\",\"node22.23.3/linux-x64/work-mode/warm/concurrent-quick-browser\",\"v1\"]",
     "kind": "test",
     "name": "mobile web build",
     "environment": "node22.23.3/linux-x64/work-mode/warm/concurrent-quick-browser",
-    "commit": "7ac3ec73e27266da8799516283f270e7b3b67d3e",
-    "url": "https://github.com/UnregisteredMusket/Lootsplit/tree/feature/preserved-improvements",
+    "commit": "893851ed9c51bdc3a809afe7088b78b4d50365ae",
+    "url": "https://github.com/UnregisteredMusket/Lootsplit/tree/feature/menu-audio",
     "outcome": "success",
-    "startedAt": "2026-10-08T07:13:32.804Z",
-    "finishedAt": "2026-10-08T07:13:39.063Z",
-    "durationMs": 6259,
+    "startedAt": "2026-10-09T04:19:12.671Z",
+    "finishedAt": "2026-10-09T04:19:23.048Z",
+    "durationMs": 10377,
     "trendId": "local:a329cf5a-e472-4301-9434-221658a2ce84"
   },
   "[\"local\",\"audit\",\"encounter browser audit\",\"node22.23.3/linux-x64/chromium133/disposable-vite\",\"v3-exact-chronicle-navigation-and-drafts\"]": {
@@ -10880,5 +10880,20 @@
     "finishedAt": "2026-10-08T19:08:14.735Z",
     "durationMs": 52182,
     "trendId": "local:1705db26-8e2b-4041-bf16-34add91d76d9"
+  },
+  "[\"local\",\"audit\",\"sound browser audit\",\"node22.23.3/linux-x64/chromium133/disposable-vite/mobile390-desktop1280\",\"v1-effects-and-scene-loops\"]": {
+    "schema": 1,
+    "id": "local:da63514c-32f3-4f1a-8f38-0cdbc9980f85",
+    "scope": "[\"local\",\"audit\",\"sound browser audit\",\"node22.23.3/linux-x64/chromium133/disposable-vite/mobile390-desktop1280\",\"v1-effects-and-scene-loops\"]",
+    "kind": "audit",
+    "name": "sound browser audit",
+    "environment": "node22.23.3/linux-x64/chromium133/disposable-vite/mobile390-desktop1280",
+    "commit": "893851ed9c51bdc3a809afe7088b78b4d50365ae",
+    "url": "https://github.com/UnregisteredMusket/Lootsplit/tree/feature/menu-audio",
+    "outcome": "failure",
+    "startedAt": "2026-10-09T04:16:04.285Z",
+    "finishedAt": "2026-10-09T04:16:48.795Z",
+    "durationMs": 44510,
+    "trendId": "local:da63514c-32f3-4f1a-8f38-0cdbc9980f85"
   }
 }

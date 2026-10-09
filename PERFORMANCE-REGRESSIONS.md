@@ -197,6 +197,8 @@ Open trends require investigation. Resolved trends retain their history; each ve
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-09T04:19:23.048Z | test: mobile web build | 6.259s → 10.377s | +4.118s | +65.79% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/tree/feature/preserved-improvements) · [After](https://github.com/UnregisteredMusket/Lootsplit/tree/feature/menu-audio) |
+| 2026-10-09T04:19:12.564Z | test: Cloudflare web build | 8.956s → 11.681s | +2.725s | +30.43% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/tree/feature/preserved-improvements) · [After](https://github.com/UnregisteredMusket/Lootsplit/tree/feature/menu-audio) |
 | 2026-10-09T04:32:22Z | job: Development / governance | 257s → 302s | +45s | +17.51% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37655099675/job/112908163987) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37883947170/job/113669641661) |
 | 2026-10-09T04:31:55Z | step: Development / accounts / dev-party-sheet | 19s → 22s | +3s | +15.79% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37487168511/job/112350106195) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37883947170/job/113669641542) |
 | 2026-10-09T04:31:02Z | step: Development / accounts / dev-owner | 5s → 6s | +1s | +20% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37235490768/job/111533630375) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37883947170/job/113669641542) |
