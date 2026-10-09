@@ -2,6 +2,7 @@
 export const accountScenarios = [
   "network-boundary",
   "ownership",
+  "resume-partial",
   "layout",
   "library",
   "dm-resume",
@@ -11,7 +12,6 @@ export const accountScenarios = [
   "campaign-choice",
   "invitations",
   "shared-recovery",
-  "resume-partial",
 ];
 
 export function selectAccountScenario(args, ci = process.env.CI) {

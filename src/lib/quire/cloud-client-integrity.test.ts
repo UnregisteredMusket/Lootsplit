@@ -573,14 +573,14 @@ function outcomeHarness({ live = true, lostResponse = false, hydrationFailure = 
     data: { commands: Command[]; stage?: boolean; batchId: string };
   }) => {
     submissions++;
+    const previous = batches.get(data.batchId);
+    if (
+      previous &&
+      (previous.length !== data.commands.length ||
+        previous.some((c, i) => !sameCommand(c, data.commands[i])))
+    )
+      throw Error("This batch ID was already used for different actions.");
     if (!data.stage) {
-      const previous = batches.get(data.batchId);
-      if (
-        previous &&
-        (previous.length !== data.commands.length ||
-          previous.some((c, i) => !sameCommand(c, data.commands[i])))
-      )
-        throw Error("This batch ID was already used for different actions.");
       for (const command of data.commands) {
         if (accepted.has(command.id)) {
           if (!sameCommand(accepted.get(command.id), command))
@@ -606,7 +606,7 @@ function outcomeHarness({ live = true, lostResponse = false, hydrationFailure = 
       acknowledged: data.stage ? [] : data.commands.map((c) => c.id),
       draft: JSON.stringify(data.stage ? data.commands : []),
       mine: true,
-      live,
+      live: view.live,
       who: "Synthetic DM",
     };
   };
@@ -691,6 +691,13 @@ function outcomeHarness({ live = true, lostResponse = false, hydrationFailure = 
     error: () => error,
     local: () => local,
     authoritative: () => authoritative,
+    setLive: (live: boolean) => {
+      view.live = live;
+    },
+    markError: () => {
+      view.error = "Previous failed upload";
+    },
+    visibleError: () => view.error,
     replacePending: (pending: Command[]) => {
       const s = session();
       s.pending = pending;
@@ -840,6 +847,48 @@ test("manual Retry repairs a legacy mismatched batch once without replaying comm
   assert.equal(h.submissions(), 3, "One colliding attempt, then one repaired attempt");
   assert.equal(toCopper(h.authoritative().purses[1]!.coins), 200);
   assert.equal(h.authoritative().ledger.length, 4);
+});
+test("manual turn-based Retry repairs a legacy Live receipt without committing the staged transfer", async () => {
+  const h = outcomeHarness({ lostResponse: true });
+  await h.queueCommand({
+    kind: "give",
+    fromId: "hero",
+    toId: "other",
+    copper: 100,
+    holdingId: null,
+    quantity: 0,
+  });
+  const original = h.session();
+  const remaining = { ...original.pending[0], id: "legacy-unsent-turn" };
+  h.replacePending([remaining]);
+  h.setLive(false);
+  await assert.rejects(h.retryPending(), /lost response/);
+  assert.notEqual(h.session().batchId, original.batchId);
+  assert.deepEqual(h.session().pending, [remaining]);
+  assert.equal(h.submissions(), 3);
+  assert.equal(
+    toCopper(h.authoritative().purses[1]!.coins),
+    100,
+    "Staging cannot commit or duplicate money",
+  );
+});
+test("successful turn-based Retry clears old attention while keeping the uncommitted command", async () => {
+  const h = outcomeHarness({ live: false });
+  await h.queueCommand({
+    kind: "give",
+    fromId: "hero",
+    toId: "other",
+    copper: 100,
+    holdingId: null,
+    quantity: 0,
+  });
+  const before = h.session();
+  h.markError();
+  await h.retryPending();
+  assert.equal(h.visibleError(), "");
+  assert.equal(h.session().batchId, before.batchId);
+  assert.deepEqual(h.session().pending, before.pending);
+  assert.equal(toCopper(h.authoritative().purses[1]!.coins), 0);
 });
 test("real hydration interruption after retention reports recoverable pending without submitting again", async () => {
   const h = outcomeHarness({ hydrationFailure: true });

@@ -568,7 +568,7 @@ async function flush(endTurn = false) {
     throw error;
   }
 }
-async function stage() {
+async function stage(rethrow = false) {
   const s = requireSession();
   if (!s.pending.length) return;
   try {
@@ -584,6 +584,7 @@ async function stage() {
     await accept(remote);
   } catch (error) {
     fail(error);
+    if (rethrow) throw error;
   }
 }
 export function endTableTurn() {
@@ -593,9 +594,10 @@ export function retryPending() {
   return serial(async () => {
     await refresh();
     if (!requireSession().pending.length) return;
-    if (!view.live) return stage();
+    publish({ status: "saving", error: "" });
+    const submit = () => view.live ? flush() : stage(true);
     try {
-      await flush();
+      await submit();
     } catch (error) {
       if (
         !(error instanceof Error) ||
@@ -608,7 +610,7 @@ export function retryPending() {
       const s = requireSession();
       s.batchId = crypto.randomUUID();
       remember(s);
-      await flush();
+      await submit();
     }
   });
 }
