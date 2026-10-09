@@ -101,6 +101,7 @@ export function CampaignMaps() {
         <label>
           Map
           <select
+            aria-label="Map"
             value={map?.id ?? ""}
             onChange={(e) => {
               setSelected(e.target.value);

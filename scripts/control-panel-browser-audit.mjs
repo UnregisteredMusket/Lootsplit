@@ -277,12 +277,10 @@ try {
   await capture("dm-settings");
   await page.keyboard.press("Escape");
   await dialog.waitFor({ state: "hidden" });
-  assert.equal(
-    await page
-      .getByRole("button", { name: "Settings & Management", exact: true })
-      .evaluate((e) => e === document.activeElement),
-    true,
-  );
+  // Radix restores focus in its deferred unmount autofocus event.
+  await expect(
+    page.getByRole("button", { name: "Settings & Management", exact: true }),
+  ).toBeFocused();
   for (const [name, path] of [
     ["dm-encounters", "/encounters"],
     ["dm-party", "/party"],
