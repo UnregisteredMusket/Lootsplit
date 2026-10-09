@@ -11125,5 +11125,22 @@
     "finishedAt": "2026-10-09T11:31:28Z",
     "durationMs": 16000,
     "trendId": "37923694654:1:f8b8ed52727894fe83dac10d06e5cb343b0aa17c2d7c508b8a0a37cb9d56be7b"
+  },
+  "[\".github/workflows/verify.yml\",\"pull_request\",\"pull-request\",\"step\",\"Packaged Worker / interface / worker-world-features\",\"ubuntu-latest\",1]": {
+    "schema": 1,
+    "id": "37924806456:1:be951da5c31d6e4b59d3563d40501bc6d2a47595fedc8857995b5ef285de3b9d",
+    "scope": "[\".github/workflows/verify.yml\",\"pull_request\",\"pull-request\",\"step\",\"Packaged Worker / interface / worker-world-features\",\"ubuntu-latest\",1]",
+    "kind": "step",
+    "name": "Packaged Worker / interface / worker-world-features",
+    "environment": "ubuntu-latest",
+    "commit": "67ae5db380d0f4c0325bb72eda3aa652e578a21a",
+    "runId": 37924806456,
+    "attempt": 1,
+    "url": "https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37924806456/job/113801685465",
+    "outcome": "success",
+    "startedAt": "2026-10-09T11:41:59Z",
+    "finishedAt": "2026-10-09T11:42:13Z",
+    "durationMs": 14000,
+    "trendId": "37924806456:1:be951da5c31d6e4b59d3563d40501bc6d2a47595fedc8857995b5ef285de3b9d"
   }
 }
