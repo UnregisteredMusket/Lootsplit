@@ -328,7 +328,11 @@ export function CampaignMaps() {
       ) : (
         <p>No maps shared yet. The DM can import regional, city and area maps.</p>
       )}
-      {dm && <Fold title="Manage campaign locations"><MarketLocationsPanel /></Fold>}
+      {dm && (
+        <Fold title="Manage campaign locations">
+          <MarketLocationsPanel />
+        </Fold>
+      )}
       {editing !== undefined && dm && (
         <MapEditor
           key={editing?.id ?? "new"}
@@ -370,8 +374,12 @@ function MapEditor({
       <CommandForm
         label="Save map"
         dirty
+        submitDisabled={busy}
         submit={() => {
           if (busy) throw Error("Wait for the image to finish processing.");
+          if (!draft.image)
+            throw Error("Choose a map image before saving. Your draft is retained.");
+          if (!draft.name.trim()) throw Error("Enter a map name before saving.");
           return { kind: "map-save", mapId: draft.id, before: map ?? null, map: draft };
         }}
         onDone={close}
@@ -382,7 +390,10 @@ function MapEditor({
             required
             maxLength={160}
             value={draft.name}
-            onChange={(e) => setDraft({ ...draft, name: e.target.value })}
+            onChange={(e) => {
+              const name = e.target.value;
+              setDraft((current) => ({ ...current, name }));
+            }}
           />
         </label>
         <label>
@@ -390,7 +401,10 @@ function MapEditor({
           <select
             aria-label="Map location"
             value={draft.locationId ?? ""}
-            onChange={(e) => setDraft({ ...draft, locationId: e.target.value || null })}
+            onChange={(e) => {
+              const locationId = e.target.value || null;
+              setDraft((current) => ({ ...current, locationId }));
+            }}
           >
             <option value="">World / campaign map</option>
             <LocationOptions market={market} />
@@ -400,7 +414,10 @@ function MapEditor({
           <input
             type="checkbox"
             checked={draft.visible}
-            onChange={(e) => setDraft({ ...draft, visible: e.target.checked })}
+            onChange={(e) => {
+              const visible = e.target.checked;
+              setDraft((current) => ({ ...current, visible }));
+            }}
           />
           Share this map image with players
         </label>
@@ -416,9 +433,13 @@ function MapEditor({
               if (!file) return;
               setBusy(true);
               setError("");
+              setProgress("Preparing map image… You can fill in the map details while you wait.");
               try {
-                setDraft({ ...draft, image: await prepareMapImage(file), anchors: [] });
+                const image = await prepareMapImage(file);
+                setDraft((current) => ({ ...current, image, anchors: [] }));
+                setProgress("Map image ready. Review the details, then save the map.");
               } catch (e) {
+                setProgress("");
                 setError(e instanceof Error ? e.message : "Map import failed.");
               } finally {
                 setBusy(false);
@@ -438,6 +459,7 @@ function MapEditor({
               onClick={async () => {
                 setBusy(true);
                 setError("");
+                setProgress("Reading location labels… You can continue editing the map details.");
                 try {
                   const result = await recognizeMap(draft.image, setProgress);
                   const matches = recognizedAnchors(
@@ -446,19 +468,20 @@ function MapEditor({
                     result.height,
                     table,
                   );
-                  setDraft({
-                    ...draft,
+                  setDraft((current) => ({
+                    ...current,
                     anchors: [
-                      ...draft.anchors,
+                      ...current.anchors,
                       ...matches.filter(
-                        (a) => !draft.anchors.some((b) => a.locationId === b.locationId),
+                        (a) => !current.anchors.some((b) => a.locationId === b.locationId),
                       ),
                     ],
-                  });
+                  }));
                   setProgress(
                     `${matches.length} unique location labels matched. Review their positions before saving; ambiguous or unreadable labels can be linked manually.`,
                   );
                 } catch (e) {
+                  setProgress("");
                   setError(
                     e instanceof Error ? e.message : "Recognition failed. Link locations manually.",
                   );
@@ -478,7 +501,12 @@ function MapEditor({
               {Math.round(a.y * 100)}%
             </span>
             <Button
-              onClick={() => setDraft({ ...draft, anchors: draft.anchors.filter((b) => b !== a) })}
+              onClick={() =>
+                setDraft((current) => ({
+                  ...current,
+                  anchors: current.anchors.filter((b) => b !== a),
+                }))
+              }
             >
               Remove anchor
             </Button>

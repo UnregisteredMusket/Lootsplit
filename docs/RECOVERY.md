@@ -1,3 +1,11 @@
+# Map save correction — 2026-10-09 UTC
+
+The user reported that a map could not be saved. The upload/OCR captured-draft race was reproduced: uploading first and typing a name during processing erased the name on completion. Functional state updates now retain current details; Save waits for processing and explains missing images. Existing location/anchor, size, privacy, permission, retry and preservation behavior remains. No new migration, APK or global-market implementation is included.
+
+Branch `fix/map-import-save` is based on the completed live release `8f4cef550427868673f5911a013c6e15a13b854a`. Functional checkpoint `f1e7dbbc2aca5d32e1bc0ed8d29ac782c3e3e630` passed the offline desktop/mobile reproduction. Expanded checkpoint `ad92d8f4434515393e4382e82584361602f783c3`, tree `22f477c0f8cb241691bf4b329a2df27bcb62c0e2`, passed every earlier world browser scenario plus real shared map creation/edit/reload at both widths in 66.441 seconds. Quick 798 tests/794 passes/four existing skips, clean types, lint zero errors/30 existing warnings, web and mobile builds passed. Local Chromium133 is diagnostic; locked current-browser full CI is required.
+
+Next: publish the batched audit/performance evidence; require all nine fresh PR groups, independently verify merged main, then gated immutable website/standby publication and read-only production checks. Reconcile the actual PR, run and release identities from the PR and `/workspace/scratch/69452c190f3d/map-save-checkpoint.json` before retrying any write. See `docs/audit/2026-10-09-map-save.md`. Earlier world-feature release is already complete: PR78/main verification37927498722, website37928213093 attempt2, standby37928213087, Worker `c8cb7081-381f-4df8-a1fa-b8e20eb90fea`. Migration0012 is already applied; do not redo that release or migration.
+
 # Maps, NPCs, trading, black market and session time — 2026-10-09 UTC
 
 Active authorized implementation: `/workspace/scratch/69452c190f3d/lootsplit`, branch `feature/maps-npcs-trading-time`, based on released main `c2bb41e4dd8a3af1e294c11bea4faa4f64d8a1e6`. User requested all five features and publication authorization persists. The prior property expansion is released (PR77), despite older pending text below. No new signed APK is requested.
