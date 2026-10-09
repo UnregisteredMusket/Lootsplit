@@ -110,7 +110,20 @@ try {
     await expect(menus.getByLabel("Menu music volume", { exact: true })).toHaveValue("17");
     await expect(menus.getByLabel("Ambient sound volume", { exact: true })).toHaveValue("12");
     await page.waitForFunction(() => window.__loops.size === 2);
+    await page
+      .locator('nav[aria-label="Sections"]:visible')
+      .getByRole("link", { name: "Desk", exact: true })
+      .click();
+    await page.waitForFunction(() => window.__loops.size === 0);
+    await page.reload();
+    await page.getByRole("button", { name: "Lootsplit. Click to continue", exact: true }).click();
+    assert.equal(await page.evaluate(() => window.__loopStarts), 0);
     await page.evaluate(() => (window.soundNavigationMarker = "same-document"));
+    await page
+      .locator('nav[aria-label="Sections"]:visible')
+      .getByRole("link", { name: "Market", exact: true })
+      .click();
+    await page.waitForFunction(() => window.__loops.size === 2);
     for (const name of ["Market", "Encounters", "Party", "Library"]) {
       await page
         .locator('nav[aria-label="Sections"]:visible')

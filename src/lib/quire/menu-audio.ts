@@ -52,6 +52,7 @@ type AudioEnvironment = {
 export class MenuAudioController {
   private context?: AudioContext;
   private unlocked = false;
+  private wanted = false;
   private buffers = new Map<string, Promise<AudioBuffer>>();
   private layers: Layer[] = [
     { volume: 0, version: 0, pending: false },
@@ -63,6 +64,10 @@ export class MenuAudioController {
   }
 
   configure(options: MenuAudioOptions) {
+    // A first navigation from Home can unlock the forthcoming scene in the same gesture.
+    this.wanted =
+      (options.musicEnabled && options.musicVolume > 0) ||
+      (options.ambienceEnabled && options.ambienceVolume > 0);
     const files = sceneAudio(options.scene, options.appearance);
     const values = [
       [options.musicEnabled ? files.music : undefined, options.musicVolume],
@@ -85,7 +90,7 @@ export class MenuAudioController {
   /** Only invoke from a real user gesture; loading/configuration never opens audio. */
   async unlock(enabling = false): Promise<boolean> {
     if (!this.environment.visible()) return false;
-    if (!enabling && !this.layers.some((layer) => layer.file && layer.volume > 0)) return false;
+    if (!enabling && !this.wanted) return false;
     try {
       this.context ??= this.environment.open();
       if (!this.context) return false;

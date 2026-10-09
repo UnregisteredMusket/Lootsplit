@@ -130,6 +130,18 @@ test("scene and volume updates reuse loops; independent mute and hiding stop imm
   assert.equal(f.context.state, "closed");
 });
 
+test("saved-on audio unlocks during the first navigation from a silent Home menu", async () => {
+  const f = fixture();
+  f.controller.configure({ ...options, scene: undefined });
+  assert.equal(await f.controller.unlock(), true);
+  assert.equal(f.requests.length, 0);
+  f.controller.configure(options);
+  f.resolve();
+  await settle();
+  assert.equal(f.sources.length, 2);
+  f.controller.dispose();
+});
+
 test("late downloads cannot play after a route change, mute, hidden tab or disposal", async () => {
   for (const cancel of [
     (f) => f.controller.configure({ ...options, scene: undefined }),
