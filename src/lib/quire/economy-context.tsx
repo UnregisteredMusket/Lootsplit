@@ -698,7 +698,7 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
               await buyFromShop({ stockId, purseId, quantity });
             }, "Purchase recorded."),
       sell: (holdingId, shopId, quantity) =>
-        getCloudWatch().joined
+        getCloudWatch().joined || holdings.some(h => h.id === holdingId && (h.custody || h.reservedFor || journal.propertyOperations?.sites.some(s => s.propertyId === h.id)))
           ? acceptCommand({ kind: "sell", holdingId, shopId, quantity })
           : accept(async () => {
               ownShop(shopId);
@@ -719,7 +719,7 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
       give: (input) =>
         getCloudWatch().joined
           ? shared({ kind: "give", ...input })
-          : run(async () => {
+          : holdings.some(h => h.id === input.holdingId && (h.custody || h.reservedFor || journal.propertyOperations?.sites.some(s => s.propertyId === h.id))) ? acceptCommand({ kind: "give", ...input }).then(() => {}) : run(async () => {
               ownPurse(input.fromId);
               await giveToPlayer(input);
             }, "Transfer recorded and added to party messages."),
@@ -734,7 +734,7 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
           await removeListing(id);
         }, "Listing removed."),
       buyListing: (listingId, purseId, quantity) =>
-        getCloudWatch().joined
+        getCloudWatch().joined || listings.some(l => l.id === listingId && l.estateTemplateKey)
           ? acceptCommand({ kind: "listing", listingId, purseId, quantity })
           : accept(async () => {
               ownPurse(purseId);

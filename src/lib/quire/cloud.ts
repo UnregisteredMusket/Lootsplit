@@ -65,6 +65,7 @@ export type CloudRoom = {
 
 import { validateShopLocations } from "./shop-locations.ts";
 import { validatePropertyLocations } from "./property.ts";
+import { validateEstate } from "./estate.ts";
 
 export function emptyCloudTable(): CloudTable {
   return { purses: [], holdings: [], shops: [], stock: [], ledger: [], listings: [], loans: [], sheets: [], notes: [] };
@@ -79,6 +80,7 @@ export function readCloudTable(value: unknown): CloudTable | null {
   try { validateEconomyRows(table as CloudTable); const market = readJournal(table.journal).market;
     validateShopLocations(table.shops, market);
     validatePropertyLocations(readListings(table.listings), table.holdings, market);
+    validateEstate(table as CloudTable, true);
   } catch { return null; }
   return {
     journal: readJournal(table.journal),
@@ -111,6 +113,10 @@ export function nextTurn(turn: number, count: number): number {
 
 export function applyBillToTable(table: CloudTable, bill: BillFile, seen: CloudSeen): { table: CloudTable; seen: CloudSeen } {
   const purseIds = new Set(bill.purseIds);
+  for (const h of table.holdings.filter(h => purseIds.has(h.purseId) && (h.custody || h.reservedFor || table.journal?.propertyOperations?.sites.some(s => s.propertyId === h.id)))) {
+    const incoming = bill.holdings.find(x => x.id === h.id);
+    if (JSON.stringify(incoming) !== JSON.stringify(h)) throw Error("This report changes property storage or an operating holding. Use the current Property controls and shared commands so its contents and agreements remain intact.");
+  }
   const purses = table.purses.map((purse) => {
     const next = bill.purses.find((item) => item.id === purse.id);
     return next && purseIds.has(purse.id) ? next : { ...purse, coins: { ...purse.coins } };

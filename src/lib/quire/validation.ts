@@ -8,6 +8,7 @@ import { sheetSchema, inventoryFields } from "../characters/model.mjs";
 import { toCopper } from "./money.ts";
 import { propertyFields, validatePropertyLocations, type PropertyRecord } from "./property.ts";
 import { propertyDeedSchema } from "./property-deed.ts";
+import { custodySchema, estateKey } from "./estate-schema.ts";
 const id = z.string().min(1);
 const amount = z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER);
 export const coinsSchema = z
@@ -31,6 +32,9 @@ const purse = z.object({
   control: z.enum(["player", "npc"]).optional(),
 });
 export const holdingSchema = z.object({
+  custody: custodySchema.optional(),
+  materialKey: estateKey.optional(),
+  reservedFor: z.string().min(1).max(150).optional(),
   ...inventoryFields,
   ...propertyFields,
   deed: propertyDeedSchema.optional(),

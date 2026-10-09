@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { estateSchema } from "./estate-schema.ts";
+import { validateEstate } from "./estate.ts";
 import { marketLocationsSchema, validateShopLocations } from "./shop-locations.ts";
 import { validateEconomyRows } from "./validation.ts";
 import { validatePropertyLocations, listingSchema } from "./property.ts";
@@ -19,6 +21,7 @@ export const encounterLootProvenanceSchema = z.object({
 export type EncounterLootProvenance = z.infer<typeof encounterLootProvenanceSchema>;
 export const encounterLootEntryId = (receiptId: string) => `encounter-loot:${receiptId}`;
 const journalFields = z.object({
+  propertyOperations: estateSchema.optional(),
   market: marketLocationsSchema.optional(),
   downtimePrompt: z
     .object({ enabled: z.boolean(), days: z.number().int().min(0).max(3650) })
@@ -88,6 +91,7 @@ const journalFields = z.object({
         summary: z.string().max(500),
         kind: z.enum(["management", "prices", "request", "session"]),
         purseId: id.optional(),
+        propertyId: id.optional(),
         change: z
           .object({
             entity: z.enum(["stock", "realm", "shop", "holding", "account"]),
@@ -131,6 +135,7 @@ export function readArchivedSnapshot(snapshot: string): CloudTable {
     validateShopLocations(t.shops, journal.market);
     for (const listing of t.listings ?? []) listingSchema.parse(listing);
     validatePropertyLocations(t.listings ?? [], t.holdings, journal.market);
+    validateEstate({ ...t, journal }, true);
     for (const key of ["notes", "sheets", "loans", "listings", "handouts"] as const)
       if (t[key] !== undefined && !Array.isArray(t[key])) throw Error("Invalid archived records.");
     if (!z.array(z.object({ id: z.string(), at: z.number().finite(), from: z.enum(["dm", "player"]),
@@ -224,6 +229,7 @@ export function preserveJournalMetadata(value: unknown, current: Journal): Journ
       : {}),
     ...(next.finance ? {} : current.finance ? { finance: current.finance } : {}),
     ...(next.market ? {} : current.market ? { market: current.market } : {}),
+    ...(next.propertyOperations ? {} : current.propertyOperations ? { propertyOperations: current.propertyOperations } : {}),
     ...(current.reports || next.reports
       ? {
           reports: [...reports.values()],

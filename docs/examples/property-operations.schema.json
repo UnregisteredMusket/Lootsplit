@@ -1,0 +1,582 @@
+{
+  "$schema": "http://json-schema.org/draft-07/schema#",
+  "type": "object",
+  "properties": {
+    "format": {
+      "type": "string",
+      "const": "lootsplit.property-operations"
+    },
+    "schemaVersion": {
+      "type": "number",
+      "const": 1
+    },
+    "status": {
+      "type": "string",
+      "const": "draft"
+    },
+    "currency": {
+      "type": "string",
+      "const": "copper"
+    },
+    "timeUnit": {
+      "type": "string",
+      "const": "campaign-day"
+    },
+    "locations": {
+      "maxItems": 500,
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9._-]{0,79}$"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "region",
+              "city",
+              "town",
+              "area"
+            ]
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "parentKey": {
+            "anyOf": [
+              {
+                "type": "string",
+                "pattern": "^[a-z0-9][a-z0-9._-]{0,79}$"
+              },
+              {
+                "type": "null"
+              }
+            ]
+          }
+        },
+        "required": [
+          "key",
+          "kind",
+          "name",
+          "parentKey"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "ownerBindings": {
+      "maxItems": 500,
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9._-]{0,79}$"
+          },
+          "kind": {
+            "type": "string",
+            "enum": [
+              "party",
+              "character"
+            ]
+          },
+          "label": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          }
+        },
+        "required": [
+          "key",
+          "kind",
+          "label"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "materials": {
+      "maxItems": 500,
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9._-]{0,79}$"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "unit": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          }
+        },
+        "required": [
+          "key",
+          "name",
+          "unit"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "templates": {
+      "maxItems": 500,
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9._-]{0,79}$"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "propertyType": {
+            "type": "string",
+            "enum": [
+              "residence",
+              "inn",
+              "keep",
+              "tower",
+              "homestead",
+              "workshop",
+              "land",
+              "other"
+            ]
+          },
+          "capabilities": {
+            "maxItems": 16,
+            "type": "array",
+            "items": {
+              "type": "string",
+              "enum": [
+                "storage",
+                "rental",
+                "construction-site",
+                "trade",
+                "crafting",
+                "lodging",
+                "farming",
+                "extraction",
+                "stabling",
+                "postal",
+                "research",
+                "training",
+                "healing",
+                "administration",
+                "defense",
+                "transport"
+              ]
+            }
+          },
+          "storage": {
+            "type": "object",
+            "properties": {
+              "defaultAccess": {
+                "type": "string",
+                "enum": [
+                  "party-members",
+                  "owner"
+                ]
+              },
+              "capacityWeight": {
+                "anyOf": [
+                  {
+                    "type": "number",
+                    "minimum": 0,
+                    "maximum": 1000000000000
+                  },
+                  {
+                    "type": "null"
+                  }
+                ]
+              }
+            },
+            "required": [
+              "defaultAccess",
+              "capacityWeight"
+            ],
+            "additionalProperties": false
+          },
+          "rental": {
+            "type": "object",
+            "properties": {
+              "incomeCopper": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 1000000000000
+              },
+              "upkeepCopper": {
+                "type": "integer",
+                "minimum": 0,
+                "maximum": 1000000000000
+              },
+              "periodDays": {
+                "type": "integer",
+                "minimum": 1,
+                "maximum": 3650
+              }
+            },
+            "required": [
+              "incomeCopper",
+              "upkeepCopper",
+              "periodDays"
+            ],
+            "additionalProperties": false
+          },
+          "staff": {
+            "maxItems": 30,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "role": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 160
+                },
+                "minimum": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 1000
+                },
+                "wageCopper": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 1000000000000
+                },
+                "periodDays": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 3650
+                },
+                "purpose": {
+                  "type": "string",
+                  "enum": [
+                    "operation",
+                    "automation"
+                  ]
+                }
+              },
+              "required": [
+                "role",
+                "minimum",
+                "wageCopper",
+                "periodDays",
+                "purpose"
+              ],
+              "additionalProperties": false
+            }
+          },
+          "recipes": {
+            "maxItems": 100,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "key": {
+                  "type": "string",
+                  "pattern": "^[a-z0-9][a-z0-9._-]{0,79}$"
+                },
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 160
+                },
+                "resultTemplateKey": {
+                  "type": "string",
+                  "pattern": "^[a-z0-9][a-z0-9._-]{0,79}$"
+                },
+                "resultCondition": {
+                  "type": "string",
+                  "enum": [
+                    "ready",
+                    "maintained",
+                    "repairs",
+                    "ruin"
+                  ]
+                },
+                "laborDays": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 1000000000
+                },
+                "laborCostCopper": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 1000000000000
+                },
+                "materials": {
+                  "maxItems": 100,
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "materialKey": {
+                        "type": "string",
+                        "pattern": "^[a-z0-9][a-z0-9._-]{0,79}$"
+                      },
+                      "quantity": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 1000000000
+                      }
+                    },
+                    "required": [
+                      "materialKey",
+                      "quantity"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "stages": {
+                  "minItems": 1,
+                  "maxItems": 20,
+                  "type": "array",
+                  "items": {
+                    "type": "object",
+                    "properties": {
+                      "name": {
+                        "type": "string",
+                        "minLength": 1,
+                        "maxLength": 160
+                      },
+                      "laborDays": {
+                        "type": "integer",
+                        "minimum": 1,
+                        "maximum": 1000000000
+                      },
+                      "laborCostCopper": {
+                        "type": "integer",
+                        "minimum": 0,
+                        "maximum": 1000000000000
+                      },
+                      "materials": {
+                        "maxItems": 100,
+                        "type": "array",
+                        "items": {
+                          "type": "object",
+                          "properties": {
+                            "materialKey": {
+                              "type": "string",
+                              "pattern": "^[a-z0-9][a-z0-9._-]{0,79}$"
+                            },
+                            "quantity": {
+                              "type": "integer",
+                              "minimum": 1,
+                              "maximum": 1000000000
+                            }
+                          },
+                          "required": [
+                            "materialKey",
+                            "quantity"
+                          ],
+                          "additionalProperties": false
+                        }
+                      },
+                      "requirement": {
+                        "default": "",
+                        "type": "string",
+                        "maxLength": 1000
+                      }
+                    },
+                    "required": [
+                      "name",
+                      "laborDays",
+                      "laborCostCopper",
+                      "materials"
+                    ],
+                    "additionalProperties": false
+                  }
+                },
+                "requirement": {
+                  "type": "string",
+                  "maxLength": 1000
+                },
+                "output": {
+                  "type": "object",
+                  "properties": {
+                    "name": {
+                      "type": "string",
+                      "minLength": 1,
+                      "maxLength": 160
+                    },
+                    "quantity": {
+                      "type": "integer",
+                      "minimum": 1,
+                      "maximum": 1000000000
+                    },
+                    "unitCopper": {
+                      "type": "integer",
+                      "minimum": 0,
+                      "maximum": 1000000000000
+                    },
+                    "weight": {
+                      "type": "number",
+                      "minimum": 0,
+                      "maximum": 9999
+                    },
+                    "materialKey": {
+                      "type": "string",
+                      "pattern": "^[a-z0-9][a-z0-9._-]{0,79}$"
+                    }
+                  },
+                  "required": [
+                    "name",
+                    "quantity",
+                    "unitCopper",
+                    "weight"
+                  ],
+                  "additionalProperties": false
+                }
+              },
+              "required": [
+                "key",
+                "name",
+                "laborDays",
+                "laborCostCopper",
+                "materials"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "key",
+          "name",
+          "propertyType",
+          "capabilities"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "properties": {
+      "maxItems": 500,
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "key": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9._-]{0,79}$"
+          },
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "recordKind": {
+            "type": "string",
+            "enum": [
+              "listing",
+              "holding"
+            ]
+          },
+          "templateKey": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9._-]{0,79}$"
+          },
+          "locationKey": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9._-]{0,79}$"
+          },
+          "condition": {
+            "type": "string",
+            "enum": [
+              "ready",
+              "maintained",
+              "repairs",
+              "ruin"
+            ]
+          },
+          "notes": {
+            "type": "string",
+            "maxLength": 4000
+          },
+          "parentPropertyKey": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9._-]{0,79}$"
+          },
+          "priceCopper": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1000000000000
+          },
+          "status": {
+            "type": "string",
+            "enum": [
+              "available",
+              "reserved",
+              "withdrawn"
+            ]
+          },
+          "ownerKey": {
+            "type": "string",
+            "pattern": "^[a-z0-9][a-z0-9._-]{0,79}$"
+          },
+          "valueCopper": {
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1000000000000
+          }
+        },
+        "required": [
+          "key",
+          "name",
+          "recordKind",
+          "templateKey",
+          "locationKey",
+          "condition",
+          "notes"
+        ],
+        "additionalProperties": false
+      }
+    },
+    "postalDefaults": {
+      "type": "object",
+      "properties": {
+        "feeCopper": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 1000000000000
+        },
+        "deliveryDays": {
+          "type": "integer",
+          "minimum": 0,
+          "maximum": 3650
+        }
+      },
+      "required": [
+        "feeCopper",
+        "deliveryDays"
+      ],
+      "additionalProperties": false
+    }
+  },
+  "required": [
+    "format",
+    "schemaVersion",
+    "status",
+    "currency",
+    "timeUnit",
+    "locations",
+    "ownerBindings",
+    "materials",
+    "templates",
+    "properties"
+  ],
+  "additionalProperties": false,
+  "title": "Lootsplit property operations import v1",
+  "description": "Strict structural format. The application additionally checks keys, references, hierarchy, ownership mappings and campaign revisions."
+}

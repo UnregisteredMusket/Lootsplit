@@ -19,6 +19,7 @@ import {
   legacyCharacter,
 } from "../characters/campaign-sheet.mjs";
 import { getCloudWatch } from "./cloud-turn.ts";
+import { assertCarried, assertEstateDisposable, removeEstateSite, validateEstate } from "./estate.ts";
 import { verifyReportBase, type ReportBase } from "./local-report.ts";
 import { coinsSchema, validateEconomyRows, validateBackupRows, validateBackupReferences } from "./validation.ts";
 import { CATALOG_REVISION, PREVIOUS_LIST, starterCatalog } from "./catalog-seed.ts";
@@ -43,7 +44,7 @@ import {
   rememberIncoming,
   replaceNotes,
 } from "./chat.ts";
-import { readCloudTable, applyBillToTable, type CloudTable } from "./cloud.ts";
+import { readCloudTable, applyBillToTable, emptyCloudTable, type CloudTable } from "./cloud.ts";
 import { readHandouts, type Handout } from "./handouts.ts";
 import { APP_VERSION } from "./version.ts";
 import {
@@ -794,7 +795,15 @@ export async function saveHolding(holding: Holding): Promise<void> {
   )
     throw new Error("Enter a valid quantity and value.");
   const db = await quireDb();
-  await atomic(["holdings", "meta"], async (tx) => {
+  await atomic(["holdings", "meta", "purses"], async (tx) => {
+    const old = await request<Holding | undefined>(tx.objectStore("holdings").get(holding.id));
+    if (old?.custody || old?.reservedFor) {
+      if (old.purseId !== holding.purseId || old.quantity !== holding.quantity || old.kind !== holding.kind || old.reservedFor !== holding.reservedFor || JSON.stringify(old.custody) !== JSON.stringify(holding.custody) || holding.equipped) throw Error("Move stored goods or release project reservations through Property management before changing their inventory identity.");
+    }
+    const journal = readJournal((await request<{ value?: unknown } | undefined>(tx.objectStore("meta").get("journal")))?.value);
+    const rows = await request<Holding[]>(tx.objectStore("holdings").getAll());
+    if (old?.kind === "property" && (old.purseId !== holding.purseId || holding.kind !== "property")) assertEstateDisposable({ holdings: rows, purses: [], shops: [], stock: [], journal }, old.id);
+    validateEstate({ holdings: [...rows.filter(h => h.id !== holding.id), holding], purses: await request<Purse[]>(tx.objectStore("purses").getAll()), shops: [], stock: [], journal });
     tx.objectStore("holdings").put(holding);
     await audit(
       tx,
@@ -866,6 +875,15 @@ export async function removeHolding(id: string): Promise<void> {
   const db = await quireDb();
   await atomic(["holdings", "meta"], async (tx) => {
     const old = await request<Holding | undefined>(tx.objectStore("holdings").get(id));
+    const journal = readJournal((await request<{ value?: unknown } | undefined>(tx.objectStore("meta").get("journal")))?.value);
+    if (old) {
+      assertCarried(old);
+      if (old.kind === "property") {
+        const table = { ...emptyCloudTable(), journal, holdings: await request<Holding[]>(tx.objectStore("holdings").getAll()) };
+        assertEstateDisposable(table, id); removeEstateSite(table, id);
+        tx.objectStore("meta").put({ id: "journal", value: table.journal });
+      }
+    }
     tx.objectStore("holdings").delete(id);
     if (old) await audit(tx, `Removed holding: ${old.name}`, "management", old.purseId);
   });
@@ -876,10 +894,16 @@ export async function removePurse(id: string): Promise<void> {
     const row = await request<{ value: unknown } | undefined>(
       tx.objectStore("meta").get("journal"),
     );
-    assertFinanceAccountRemovable(readJournal(row?.value).finance, id);
+    const journal = readJournal(row?.value);
+    assertFinanceAccountRemovable(journal.finance, id);
     const holdings = await request<Holding[]>(
       tx.objectStore("holdings").index("purseId").getAll(id),
     );
+    const all = await request<Holding[]>(tx.objectStore("holdings").getAll());
+    for (const h of holdings) { assertCarried(h); if (h.kind === "property") assertEstateDisposable({ holdings: all, purses: [], shops: [], stock: [], journal }, h.id); }
+    if (journal.propertyOperations?.jobs.some(j => ["active", "paused", "blocked", "draft"].includes(j.status) && (j.purseId === id || j.assignments.some(a => a.purseId === id)))) throw Error("Resolve this character's property projects before removing its account.");
+    for (const h of holdings.filter(h => h.kind === "property")) removeEstateSite({ ...emptyCloudTable(), journal }, h.id);
+    tx.objectStore("meta").put({ id: "journal", value: journal });
     tx.objectStore("purses").delete(id);
     for (const holding of holdings) tx.objectStore("holdings").delete(holding.id);
     await audit(tx, "Removed account and its holdings", "management", id);
@@ -1029,6 +1053,7 @@ export async function sellToShop(input: {
     );
     const shop = await request<Shop | undefined>(tx.objectStore("shops").get(input.shopId));
     if (!holding || !shop) throw new Error("That sale cannot be made.");
+    assertCarried(holding);
     if (shop.closed) throw new Error("This shop is closed.");
     assertMerchantSale(holding, shop);
     if (holding.quantity < quantity) throw new Error("You do not have that many.");
@@ -1140,6 +1165,11 @@ export async function giveToPlayer(input: {
     )
       throw new Error("You do not have that many.");
     if (holdingRow && moved) {
+      assertCarried(holdingRow);
+      if (holdingRow.kind === "property") {
+        const journal = readJournal((await request<{ value?: unknown } | undefined>(tx.objectStore("meta").get("journal")))?.value);
+        if (journal.propertyOperations?.sites.some(s => s.propertyId === holdingRow.id)) throw Error("Transfer this property through its operational handover or the authoritative Give command.");
+      }
       gift.holding = moved = itemForGift(holdingRow, moved.quantity);
       if (holdingRow.deed) moved.deed = transferPropertyDeed(holdingRow.deed, { id: gift.toId, name: to?.name || toName }, gift.id, gift.at);
     }
@@ -1241,6 +1271,11 @@ export async function buyListing(input: {
   const quantity = Math.floor(input.quantity);
   if (!Number.isSafeInteger(quantity) || quantity < 1)
     throw new Error("Choose a valid quantity of at least one.");
+  const currentListing = (await economySnapshot()).listings.find((l) => l.id === input.listingId);
+  if (currentListing?.estateTemplateKey) {
+    await executeLocalCommand({ kind: "listing", ...input, quantity });
+    return;
+  }
   await atomic(["purses", "holdings", "ledger", "meta"], async (tx) => {
     const listings = readListings(await request(tx.objectStore("meta").get("listings")));
     const listing = listings.find((item) => item.id === input.listingId);
@@ -2046,6 +2081,7 @@ export function readQuireFile(value: unknown): QuireFile {
       throw Error(`The ${key} contain invalid or duplicate data. The current campaign was not changed.`);
   }
   const diagnostics = validateBackupReferences({ ...(file as QuireFile), ...metadata, journal });
+  validateEstate({ ...(file as QuireFile), journal });
   // A clone error must occur before the destructive transaction, including non-JSON callers.
   structuredClone(file);
   return { ...file, recoveryDiagnostics: diagnostics } as QuireFile;
@@ -2411,8 +2447,11 @@ export async function executeFinanceCommand(
       if (priorStock.get(line.id) !== line.quantity)
         tx.objectStore("stock").put(line);
     for (const p of next.purses) tx.objectStore("purses").put(p);
-    if (input.kind === "property-details")
+    if (input.kind === "property-details" || input.kind === "session") {
+      const kept = new Set(next.holdings.map(h => h.id));
+      for (const h of source.holdings) if (!kept.has(h.id)) tx.objectStore("holdings").delete(h.id);
       for (const h of next.holdings) tx.objectStore("holdings").put(h);
+    }
     if (input.kind === "session") {
       tx.objectStore("ledger").clear();
       tx.objectStore("meta").put({ id: "chat", notes: next.notes });

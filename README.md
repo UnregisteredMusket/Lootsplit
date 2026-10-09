@@ -103,3 +103,5 @@ For recurring aggregate timeouts, follow "Prevent repeated account-suite timeout
 The existing `.devcontainer/devcontainer.json` provides Node22 and runs the locked dependency/browser setup. Use that container where supported, or `nvm use` then `npm run dev:setup`. `dev:doctor` reports the actual Chromium version and path; a custom browser launching successfully does not prove it supports every PDF/import feature. Do not substitute an older browser for release verification.
 
 After a failed focused run, use its printed diagnostics path: `npm run verify:report -- test-results/focused/TIMESTAMP-accounts/html`. Read the failing action, network activity and trace before rerunning. CI account reports are in `test-results/account/html` inside the existing audit artifacts. Reports contain disposable test credentials; keep them in the existing restricted diagnostic artifacts.
+
+Property storage, projects, staff, rentals, delivery and postal management are documented in [Property operations](docs/PROPERTY-OPERATIONS.md), with a [sample import](docs/examples/property-operations.sample.json) and [strict schema](docs/examples/property-operations.schema.json).
