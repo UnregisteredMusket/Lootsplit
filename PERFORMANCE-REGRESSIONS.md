@@ -45,12 +45,13 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Packaged Worker / accounts / Run actions/setup-node@v4 | open | 3 | 2s → 11s | +9s | +450% |
 | Development / governance / dev-campaign-governance | open | 5 | 18s → 114s | +96s | +533.33% |
 | Packaged standby / Run npm ci | open | 3 | 10s → 18s | +8s | +80% |
-| Development / governance / dev-theme | open | 3 | 13s → 33s | +20s | +153.85% |
+| Development / governance / dev-theme | open | 4 | 13s → 45s | +32s | +246.15% |
 | Packaged Worker / accounts / Run actions/download-artifact@v4 | open | 3 | 1s → 10s | +9s | +900% |
 | Development / governance / dev-help | open | 3 | 6s → 15s | +9s | +150% |
 | Packaged Worker / interface / worker-help | open | 2 | 6s → 9s | +3s | +50% |
 | Packaged standby / standby-audit | open | 4 | 20s → 91s | +71s | +355% |
 | Packaged standby | open | 4 | 62s → 157s | +95s | +153.23% |
+| Development / governance / dev-release | open | 2 | 31s → 44s | +13s | +41.94% |
 | Development / governance / dev-backup | open | 3 | 6s → 18s | +12s | +200% |
 | Development / governance / Run actions/upload-artifact@v4 | open | 2 | 1s → 3s | +2s | +200% |
 | Development / governance | open | 3 | 110s → 282s | +172s | +156.36% |
@@ -153,6 +154,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Verify preserved functionality | open | 6 | 220s → 920s | +700s | +318.18% |
 | Packaged standby / Run npx playwright install --with-deps chromium | open | 3 | 25s → 427s | +402s | +1608% |
 | Development / gameplay / dev-bug-edge-cases | open | 2 | 9s → 15s | +6s | +66.67% |
+| Development / accounts / dev-character | open | 2 | 12s → 17s | +5s | +41.67% |
 | Verify preserved functionality | open | 3 | 205s → 917s | +712s | +347.32% |
 | Packaged Worker / interface / worker-help | open | 2 | 6s → 25s | +19s | +316.67% |
 | Development / desktop / Run npx playwright install --with-deps chromium | open | 2 | 21s → 42s | +21s | +100% |
@@ -169,6 +171,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | verify / Development / gameplay / Run actions/setup-node@v4 | open | 2 | 2s → 5s | +3s | +150% |
 | verify / Development / gameplay | open | 2 | 88s → 191s | +103s | +117.05% |
 | Development / gameplay | open | 3 | 145s → 911s | +766s | +528.28% |
+| Packaged Worker / interface / worker-sound | open | 2 | 6s → 14s | +8s | +133.33% |
 | Packaged Worker / interface / worker-library-navigation | resolved | 2 | 13s → 37s | +24s | +184.62% |
 | Development / gameplay / dev-control-panel | open | 3 | 14s → 29s | +15s | +107.14% |
 | Packaged Worker / interface / worker-library-navigation | open | 4 | 9s → 22s | +13s | +144.44% |
@@ -197,6 +200,12 @@ Open trends require investigation. Resolved trends retain their history; each ve
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-09T04:39:38Z | step: verify / Require every preservation group to pass | 2s → 3s | +1s | +50% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37270098428/job/111635910668) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37884489066/job/113672597631) |
+| 2026-10-09T04:39:07Z | step: Development / governance / dev-release | 38s → 44s | +6s | +15.79% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37235752710/job/111534384084) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37884489066/job/113671305297) |
+| 2026-10-09T04:38:09Z | step: Development / accounts / dev-character | 14s → 17s | +3s | +21.43% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37303426479/job/111741324413) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37884489066/job/113671305538) |
+| 2026-10-09T04:38:09Z | step: Development / governance / dev-sound | 8s → 21s | +13s | +162.5% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37389751532/job/112031761465) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37884489066/job/113671305297) |
+| 2026-10-09T04:38:04Z | step: Packaged Worker / interface / worker-sound | 8s → 14s | +6s | +75% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37412269946/job/112103497361) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37884489066/job/113671686029) |
+| 2026-10-09T04:37:48Z | step: Development / governance / dev-theme | 33s → 45s | +12s | +36.36% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37831342775/job/113497170452) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37884489066/job/113671305297) |
 | 2026-10-09T04:19:23.048Z | test: mobile web build | 6.259s → 10.377s | +4.118s | +65.79% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/tree/feature/preserved-improvements) · [After](https://github.com/UnregisteredMusket/Lootsplit/tree/feature/menu-audio) |
 | 2026-10-09T04:19:12.564Z | test: Cloudflare web build | 8.956s → 11.681s | +2.725s | +30.43% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/tree/feature/preserved-improvements) · [After](https://github.com/UnregisteredMusket/Lootsplit/tree/feature/menu-audio) |
 | 2026-10-09T04:32:22Z | job: Development / governance | 257s → 302s | +45s | +17.51% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37655099675/job/112908163987) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37883947170/job/113669641661) |
