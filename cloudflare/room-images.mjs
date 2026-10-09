@@ -4,7 +4,38 @@ const reference = /\/art\/room-image-[a-f0-9]{64}\.webp/g;
 /** @param {unknown} value */
 export async function encodeRoomImages(value) {
   let body = JSON.stringify(value);
-  const images = [...new Set(body.match(raster) || [])];
+  // Existing sheet/profile and recovery SQL reads raw room portraits directly.
+  // Extract map images only; keep every image also used outside maps inline.
+  const maps = new Set(),
+    inline = new Set();
+  /** @param {unknown} node */
+  function scan(node, map = false, world = false) {
+    if (typeof node === "string") {
+      for (const image of node.match(raster) || []) inline.add(image);
+    } else if (Array.isArray(node)) {
+      node.forEach((value) => scan(value));
+    } else if (node && typeof node === "object") {
+      for (const [key, value] of Object.entries(node)) {
+        if (map && key === "image" && typeof value === "string") {
+          if (value.match(raster)?.some((image) => image === value)) maps.add(value);
+        } else if (world && key === "maps" && Array.isArray(value)) {
+          value.forEach((value) => scan(value, true));
+        } else if (key === "world") {
+          scan(value, false, true);
+        } else if ("kind" in node && node.kind === "map-save" && ["map", "before"].includes(key)) {
+          scan(value, true);
+        } else if (key === "snapshot" && typeof value === "string") {
+          try {
+            scan(JSON.parse(value));
+          } catch {
+            scan(value);
+          }
+        } else scan(value);
+      }
+    }
+  }
+  scan(value);
+  const images = [...maps].filter((image) => !inline.has(image));
   const assets = await Promise.all(
     images.map(async (image) => {
       if (image.length > 500000)

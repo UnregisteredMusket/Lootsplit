@@ -1,5 +1,4 @@
-import { encodeRoomImages } from "../../../cloudflare/room-images.mjs";
-import { readRoom, createRoom, updateRoom } from "./room-store.server.ts";
+import { readRoom, createRoom, updateRoom, roomStorageBody } from "./room-store.server.ts";
 import {
   claimSeat,
   readCloudTableForImport,
@@ -90,7 +89,7 @@ export async function characterRoll(input: {
         JSON.stringify(roll),
         Date.now(),
         room.code,
-        (await encodeRoomImages(room)).body,
+        roomStorageBody(room),
         input.manual ? 1 : 0,
         room.code,
       )

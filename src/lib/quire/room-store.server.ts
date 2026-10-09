@@ -25,6 +25,11 @@ export function database(): Database | undefined {
   }
   return undefined;
 }
+const STORED_BODY = Symbol("authoritative-room-body");
+/** Internal, per-read SQL guard; never serialized or returned as campaign data. */
+export function roomStorageBody(room: CloudRoom): string {
+  return (room as CloudRoom & { [STORED_BODY]?: string })[STORED_BODY] ?? JSON.stringify(room);
+}
 const FILE = path.join(process.cwd(), "data", "cloud-rooms.json");
 let localWrites: Promise<unknown> = Promise.resolve();
 function localWrite<T>(work: () => Promise<T>): Promise<T> {
@@ -100,8 +105,12 @@ export async function readRoom(code: string): Promise<CloudRoom | null> {
     if (!row) return null;
     const { hydrateCampaignCharacters } =
       await import("../../../cloudflare/campaign-characters.mjs");
-    const room = await hydrateCampaignCharacters(db, JSON.parse(row.body) as CloudRoom);
-    return hydrateRoomImages(db, room.code, room);
+    const parsed = JSON.parse(row.body) as CloudRoom, revision = parsed.revision;
+    const room = await hydrateCampaignCharacters(db, parsed);
+    const stored = room.revision === revision ? row.body : JSON.stringify(room);
+    const hydrated = await hydrateRoomImages(db, room.code, room);
+    Object.defineProperty(hydrated, STORED_BODY, { value: stored });
+    return hydrated;
   }
   return (await localRooms()).find((room) => room.code === code) ?? null;
 }
