@@ -261,7 +261,7 @@ export function applyWorldCommand(t: CloudTable, seat: CloudSeat, cmd: WorldComm
     if (cmd.map && cmd.map.id !== cmd.mapId) throw Error("Map identity cannot change.");
     w.maps = w.maps.filter((m) => m.id !== cmd.mapId);
     if (cmd.map) w.maps.push(cmd.map);
-    event(cmd.map ? `Map saved: ${cmd.map.name}` : "Map removed");
+    event(cmd.map ? "Campaign map saved" : "Campaign map removed");
   } else if (cmd.kind === "map-marker") {
     dm();
     const map = w.maps.find((m) => m.id === cmd.mapId);

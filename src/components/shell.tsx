@@ -159,7 +159,7 @@ export function Shell({
             Lootsplit
           </Link>
           <p className="rail-caption">Your campaign companion</p>
-          <nav className="mt-8 flex flex-1 flex-col gap-2" aria-label="Sections">
+          <nav className="mt-8 flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto overscroll-contain" aria-label="Sections">
             {navLinks("rail")}
           </nav>
           <div className="rounded-xl border border-lead/20 p-4 text-sm text-muted">
@@ -396,7 +396,6 @@ export function Shell({
         ];
     return (
       <>
-        {layout === "rail" && <FeatureCards desktop />}
         {links.map((link) => (
           <NavLink
             key={link.label}
@@ -409,6 +408,7 @@ export function Shell({
             badge={link.to === "/share" ? unreadCount : 0}
           />
         ))}
+        {layout === "rail" && <FeatureCards desktop />}
         {layout === "rail" && (
           <button className="rail-settings" onClick={() => setManagement(true)}>
             <FantasyIcon ui="Settings" size={20} />

@@ -168,6 +168,11 @@ test("maps preserve coordinates and DM-only marker privacy in live and archived 
   const archived = projectRecord(t, hero).journal!.reports![0];
   assert.ok(!archived.snapshot.includes("Secret lair"));
   assert.ok(readArchivedSnapshot(archived.snapshot));
+  const hiddenMap = { ...map, id: "hidden-map", name: "Secret expedition atlas", visible: false };
+  const privateTable = command(t, {kind:"map-save", mapId:hiddenMap.id, before:null, map:hiddenMap});
+  assert.ok(!JSON.stringify(projectRecord(privateTable, hero)).includes(hiddenMap.name));
+  archiveSession(privateTable, "private-map-archive", "Private map archive");
+  assert.ok(!JSON.stringify(projectRecord(privateTable, hero)).includes(hiddenMap.name));
 });
 test("map edits and marker changes require fresh exact state; locations referenced by maps cannot disappear", () => {
   const t = command(fixture(), { kind: "map-save", mapId: map.id, before: null, map });
