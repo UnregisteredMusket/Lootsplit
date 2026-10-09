@@ -209,12 +209,15 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Development / governance / dev-sound | open | 2 | 8s → 35s | +27s | +337.5% |
 | property-browser-audit | open | 2 | 32.709s → 99.355s | +66.646s | +203.75% |
 | world features browser audit | open | 2 | 34.352s → 53.675s | +19.323s | +56.25% |
-| Packaged Worker / interface / worker-world-features | open | 2 | 14s → 25s | +11s | +78.57% |
+| Packaged Worker / interface / worker-world-features | open | 3 | 14s → 37s | +23s | +164.29% |
 
 ## Recorded slowdowns
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-09T15:20:49Z | step: Packaged Worker / interface / worker-world-features | 25s → 37s | +12s | +48% | failure | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37946907180/job/113876212075) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37950235670/job/113887581798) |
+| 2026-10-09T15:20:12Z | step: Packaged Worker / interface / worker-property-operations | 22s → 26s | +4s | +18.18% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37914033060/job/113766764406) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37950235670/job/113887581798) |
+| 2026-10-09T15:18:02Z | step: Packaged Worker / interface / worker-theme | 37s → 43s | +6s | +16.22% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37924806456/job/113801685465) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37950235670/job/113887581798) |
 | 2026-10-09T14:53:47Z | step: Packaged Worker / interface / worker-world-features | 19s → 25s | +6s | +31.58% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37937913571/job/113845339813) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37946907180/job/113876212075) |
 | 2026-10-09T14:49:52Z | step: Code checks and immutable builds / mobile-build | 6s → 7s | +1s | +16.67% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37269258333/job/111632648929) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37946907180/job/113875425253) |
 | 2026-10-09T13:50:32Z | job: Packaged Worker / interface | 273s → 320s | +47s | +17.22% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37898476002/job/113715653210) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37938922697/job/113848543618) |
