@@ -1,3 +1,4 @@
+import { shopVisible, shopAsking, validateWorld } from "./world.ts";
 import { captureDeviceMutationScope, assertDeviceMutationScope } from "./mutation-scope.ts";
 import { isEphemeralCampaign } from "./guest-storage.ts";
 import { assertMerchantSale, isService, stockCategory } from "./merchant.ts";
@@ -896,6 +897,7 @@ export async function removePurse(id: string): Promise<void> {
     );
     const journal = readJournal(row?.value);
     assertFinanceAccountRemovable(journal.finance, id);
+    if (journal.world?.npcs.some(npc => npc.controllerPurseId === id)) throw Error("Unassign this character as an NPC controller before removing its account.");
     const holdings = await request<Holding[]>(
       tx.objectStore("holdings").index("purseId").getAll(id),
     );
@@ -999,11 +1001,13 @@ export async function buyFromShop(input: {
     const shop = await request<Shop | undefined>(tx.objectStore("shops").get(stock.shopId));
     const purse = await request<Purse | undefined>(tx.objectStore("purses").get(input.purseId));
     if (!shop || !purse) throw new Error("Choose an account and a shop.");
+    const journal = readJournal((await request<{value:unknown}|undefined>(tx.objectStore("meta").get("journal")))?.value);
+    if ((shop.blackMarket && !journal.world?.blackMarketActive) || (getSeat().role === "player" && !shopVisible(shop, {journal}))) throw Error("This vendor is not available at the current location.");
     if (shop.closed) throw new Error("This shop is closed.");
     if (stock.quantity !== null && stock.quantity < quantity)
       throw new Error("The shop does not have that many.");
     const score = await charismaOf(purse, tx);
-    const unit = priceAfterCharisma(Math.round(stock.copper * shop.sellRate), score);
+    const unit = priceAfterCharisma(shopAsking(shop, stock.copper), score);
     const cost = unit * quantity;
     const coins = spendCoins(purse.coins, cost);
     if (!coins) throw new Error("Insufficient funds.");
@@ -1047,13 +1051,16 @@ export async function sellToShop(input: {
   const quantity = Math.floor(input.quantity);
   if (!Number.isSafeInteger(quantity) || quantity < 1)
     throw new Error("Choose a valid quantity of at least one.");
-  await atomic(["purses", "holdings", "shops", "ledger"], async (tx) => {
+  await atomic(["purses", "holdings", "shops", "ledger", "meta"], async (tx) => {
     const holding = await request<Holding | undefined>(
       tx.objectStore("holdings").get(input.holdingId),
     );
     const shop = await request<Shop | undefined>(tx.objectStore("shops").get(input.shopId));
     if (!holding || !shop) throw new Error("That sale cannot be made.");
     assertCarried(holding);
+    const journal = readJournal((await request<{value:unknown}|undefined>(tx.objectStore("meta").get("journal")))?.value);
+    if ((shop.blackMarket && !journal.world?.blackMarketActive) || (getSeat().role === "player" && !shopVisible(shop, {journal}))) throw Error("This vendor is not available at the current location.");
+    if (holding.kind === "property") assertEstateDisposable({purses:[],holdings:await request<Holding[]>(tx.objectStore("holdings").getAll()),shops:[],stock:[],journal}, holding.id);
     if (shop.closed) throw new Error("This shop is closed.");
     assertMerchantSale(holding, shop);
     if (holding.quantity < quantity) throw new Error("You do not have that many.");
@@ -2082,6 +2089,7 @@ export function readQuireFile(value: unknown): QuireFile {
   }
   const diagnostics = validateBackupReferences({ ...(file as QuireFile), ...metadata, journal });
   validateEstate({ ...(file as QuireFile), journal });
+  validateWorld({ ...(file as QuireFile), ...metadata, journal });
   // A clone error must occur before the destructive transaction, including non-JSON callers.
   structuredClone(file);
   return { ...file, recoveryDiagnostics: diagnostics } as QuireFile;

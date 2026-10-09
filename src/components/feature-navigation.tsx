@@ -47,7 +47,7 @@ export function FeatureCards({
         <FeatureLink feature="music">Music & Ambience</FeatureLink>
         <Fold title="Sessions & records" hint="Journal, reports, downtime and reviews." defaultOpen>
           <div className="dm-tool-links">
-            {(["journal", "reports", "downtime", "review"] as Feature[]).map((id) => (
+            {(["journal", "reports", "downtime", "time", "review"] as Feature[]).map((id) => (
               <FeatureLink key={id} feature={id}>
                 {id === "reports" ? "Reports" : featureScreens[id].title}
               </FeatureLink>
@@ -56,7 +56,7 @@ export function FeatureCards({
         </Fold>
         <Fold title="Economy & properties" hint="Bank, shops, property and financial rules.">
           <div className="dm-tool-links">
-            {(["bank", "shops", "properties", "financial"] as Feature[]).map((id) => (
+            {(["bank", "shops", "properties", "npcs", "trading", "financial"] as Feature[]).map((id) => (
               <FeatureLink key={id} feature={id}>
                 {featureScreens[id].title}
               </FeatureLink>
@@ -76,7 +76,7 @@ export function FeatureCards({
             <>
               <h2>{x.title}</h2>
               <p className="text-sm text-muted">
-                {id === "bank"
+                {id === "npcs" ? "Location encounters & NPC conversations" : id === "trading" ? "Reviewed offers & property deeds" : id === "time" ? "Advance the session clock & award rests" : id === "bank"
                   ? `${loans.filter((l) => l.status === "pending").length + journal.requests.filter((r) => r.status === "pending").length} pending financial requests`
                   : id === "properties"
                     ? `${holdings.filter((h) => h.kind === "property" && h.quantity > 0 && (dm || seat.purseIds.includes(h.purseId))).length} owned properties`

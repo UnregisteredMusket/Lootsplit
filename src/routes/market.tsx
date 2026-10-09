@@ -1,3 +1,5 @@
+import { BlackMarketToggle } from "@/components/black-market";
+import { shopVisible } from "@/lib/quire/world";
 import { LedgerArt } from "@/components/ledger-art";
 import { MarketLocationsPanel, LocationOptions } from "@/components/market-locations";
 import { readMarketLocations, shopAvailableHere, locationLabel } from "@/lib/quire/shop-locations";
@@ -52,7 +54,7 @@ function MarketPage() {
   const [stocked, setStocked] = useState<"all" | "open" | "empty">("all");
   const shown =
     seat.role === "player"
-      ? shops.filter((shop) => seat.shopIds.includes(shop.id) && shopAvailableHere(shop, market))
+      ? shops.filter((shop) => seat.shopIds.includes(shop.id) && shopVisible(shop, {journal}))
       : shops;
   const needle = query.trim().toLowerCase();
   const filtered = shown.filter((shop) => {
@@ -124,6 +126,9 @@ function MarketPage() {
         ) : null}
       </div>
       {ready ? <MarketLocationsPanel /> : null}
+      <BlackMarketToggle />
+      {seat.role === "dm" && <AppLink className="settings-link" href="/features/time">Session Time →</AppLink>}
+      <div className="world-toolbar"><AppLink className="settings-link" href="/features/npcs">People & NPCs →</AppLink><AppLink className="settings-link" href="/features/trading">Trading & Barter →</AppLink><AppLink className="settings-link" href="/maps">Campaign maps →</AppLink></div>
       <AppLink className="settings-link mt-4" href="/features/properties?from=%2Fmarket">Property listings · deeds & dwellings →</AppLink>
       <label className="relative mt-5 block">
         <Search className="absolute left-4 top-3.5 size-5 text-faint" aria-hidden="true" />
@@ -244,7 +249,7 @@ function MarketPage() {
                     {shop.name}
                   </span>
                   <span className="text-sm text-muted">
-                    {shop.closed ? "Closed" : "Open"} · {labelKind(shop.category)} · {lines.length}{" "}
+                    {shop.blackMarket ? "Black market · " : ""}{shop.closed ? "Closed" : "Open"} · {labelKind(shop.category)} · {lines.length}{" "}
                     stock lines · {tier}
                   </span>
                   {shop.place ? (

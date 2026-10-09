@@ -2347,3 +2347,34 @@ input,select,textarea { max-width: 100%; }
 .local-audio-mini small { display:block; color:var(--color-muted); }
 .local-audio-mini button { font-size:.8rem; }
 @media(min-width:800px) { .local-audio-layout { grid-template-columns:minmax(200px, 1fr) minmax(0, 2fr); } .local-audio-fields, .local-audio-mixer { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+
+/* Campaign cartography and location services retain the parchment/ledger controls. */
+.world-toolbar { display:flex; flex-wrap:wrap; gap:.65rem; align-items:center; margin:1rem 0; }
+.world-toolbar label { display:grid; gap:.3rem; flex:1; min-width:150px; }
+.world-form { min-width:0; margin:.6rem 0; }
+.world-form fieldset { min-width:0; display:grid; gap:.65rem; border:0; padding:0; }
+.world-form label { display:grid; gap:.35rem; min-width:0; }
+.world-form label:has(input[type=checkbox]) { display:flex; align-items:center; gap:.5rem; min-height:44px; }
+.world-form input:not([type=checkbox]), .world-form textarea, .world-form select, .world-toolbar select { width:100%; min-width:0; min-height:44px; padding:.6rem; border:1px solid var(--color-border); border-radius:4px; background:var(--color-elevated); color:var(--color-fg); font:inherit; font-size:16px; }
+.world-row { display:flex; flex-wrap:wrap; align-items:center; justify-content:space-between; gap:.6rem; padding:.7rem 0; border-bottom:1px solid var(--color-border); overflow-wrap:anywhere; }
+.world-row > span { flex:1; min-width:160px; }
+.world-row p { margin:.4rem 0; }
+.map-preview { width:100%; max-height:350px; object-fit:contain; }
+.map-viewport { position:relative; height:min(65vh,600px); min-height:300px; overflow:hidden; touch-action:none; user-select:none; cursor:grab; border:3px double var(--color-lead); border-radius:8px; background:color-mix(in srgb,var(--color-bg) 90%,var(--color-lead)); }
+.map-viewport:active { cursor:grabbing; }
+.map-viewport.placing { cursor:crosshair; }
+.map-viewport:focus-visible { outline:3px solid var(--color-lead); outline-offset:3px; }
+.map-layer { position:absolute; transform-origin:0 0; }
+.map-layer > img { width:100%; height:100%; pointer-events:none; }
+.map-anchor,.map-pin { position:absolute; transform:translate(-50%,-50%); font-size:20px; color:var(--color-lead); text-shadow:0 0 2px var(--color-bg); }
+.map-pin { display:flex; align-items:center; gap:3px; white-space:nowrap; background:var(--color-elevated); border:1px solid var(--color-lead); border-radius:4px; padding:2px 5px; font-size:16px; }
+.map-pin span { font-size:11px; }
+.map-party { color:var(--color-positive); z-index:2; }
+.world-register { margin:1.2rem 0; }
+.world-columns { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:1rem; }
+.world-card { min-width:0; border:1px solid var(--color-border); border-radius:8px; padding:1rem; margin:1rem 0; }
+.world-message { padding:.6rem; border-left:2px solid var(--color-lead); margin:.5rem 0; }
+@media(max-width:600px) { .world-columns { grid-template-columns:1fr; } .map-viewport { height:50vh; } .loot-nav-tab { font-size:.7rem; } }
+.map-entity { margin-top:24px; }
+
+.map-party { margin-top:-24px; }

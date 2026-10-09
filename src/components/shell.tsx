@@ -32,6 +32,7 @@ import { watchCrashes } from "@/lib/quire/reports";
 import { isEphemeralCampaign } from "@/lib/quire/guest-storage";
 
 type Dest =
+  | "/maps"
   | "/encounters"
   | "/characters"
   | "/library"
@@ -158,7 +159,7 @@ export function Shell({
             Lootsplit
           </Link>
           <p className="rail-caption">Your campaign companion</p>
-          <nav className="mt-8 flex flex-1 flex-col gap-2" aria-label="Sections">
+          <nav className="mt-8 flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto overscroll-contain" aria-label="Sections">
             {navLinks("rail")}
           </nav>
           <div className="rounded-xl border border-lead/20 p-4 text-sm text-muted">
@@ -268,7 +269,7 @@ export function Shell({
         className="fixed inset-x-0 bottom-0 z-20 border-t border-lead/40 bg-bg/92 pb-[env(safe-area-inset-bottom)] backdrop-blur-sm lg:hidden"
         aria-label="Sections"
       >
-        <div className="mx-auto grid max-w-3xl grid-cols-5">{navLinks("tab")}</div>
+        <div className="mx-auto grid max-w-3xl grid-cols-6">{navLinks("tab")}</div>
       </nav>
       <BillReceipt />
       <SeatSwitch open={switching} onOpenChange={setSwitching} seat={seat} />
@@ -357,6 +358,7 @@ export function Shell({
             search: { book: "" },
           },
           { to: "/library", label: "Library", icon: "Library", active: library },
+          { to: "/maps", label: "Maps", icon: "Maps", active: pathname === "/maps" },
         ]
       : [
           {
@@ -390,10 +392,10 @@ export function Shell({
             search: { book: "" },
           },
           { to: "/library", label: "Library", icon: "Library", active: library },
+          { to: "/maps", label: "Maps", icon: "Maps", active: pathname === "/maps" },
         ];
     return (
       <>
-        {layout === "rail" && <FeatureCards desktop />}
         {links.map((link) => (
           <NavLink
             key={link.label}
@@ -406,6 +408,7 @@ export function Shell({
             badge={link.to === "/share" ? unreadCount : 0}
           />
         ))}
+        {layout === "rail" && <FeatureCards desktop />}
         {layout === "rail" && (
           <button className="rail-settings" onClick={() => setManagement(true)}>
             <FantasyIcon ui="Settings" size={20} />

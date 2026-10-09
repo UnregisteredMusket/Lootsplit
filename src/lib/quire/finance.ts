@@ -53,7 +53,7 @@ const lineSchema = z.object({
   unpaid: money,
   balance: money,
 });
-const quoteSchema = z.object({
+export const quoteSchema = z.object({
   propertyOperations: estateQuoteSchema.optional(),
   market: z
     .array(
@@ -74,6 +74,7 @@ const quoteSchema = z.object({
 export const financeSchema = z
   .object({
     day: z.number().int().nonnegative().max(1e9).default(0),
+    minuteOfDay: z.number().int().min(0).max(1439).optional(),
     loans: z.array(debtSchema).max(1000).default([]),
     rules: z.array(scheduleSchema).max(1000).default([]),
     downtime: z
@@ -152,6 +153,7 @@ export function previewDowntime(
     Partial<Pick<CloudTable, "shops" | "stock" | "journal" | "sheets">>,
   raw: Finance,
   days: number,
+  estateTime?: import("./estate.ts").EstateTime,
 ) {
   z.number().int().min(1).max(3650).parse(days);
   const f = readFinance(raw);
@@ -292,6 +294,7 @@ export function previewDowntime(
         },
         days,
         balances,
+        estateTime,
       )
     : undefined;
   return quoteSchema.parse({
@@ -347,14 +350,24 @@ export function applyDowntime(
     throw Error(
       "Campaign finances changed after this preview. Recalculate downtime before approving.",
     );
+  applyFinanceQuote(table, quote, { id: d.id, name: d.name }, at);
+  f.day += d.days;
+  d.status = "applied";
+  d.appliedAt = at;
+  d.sessionId = sessionId;
+}
+
+/** Shared atomic settlement for approved downtime and within-session clock advances. */
+export function applyFinanceQuote(table: CloudTable, quote: z.infer<typeof quoteSchema>, receipt: {id:string;name:string}, at:number) {
+  const f = table.journal!.finance!;
   for (const l of quote.lines) {
     const debt = quote.loans.find((x) => x.id === l.id);
     financeMove(
       table,
       l.purseId,
       l.kind === "income" ? l.paid : -l.paid,
-      `${d.id}-${l.id}`,
-      `${d.name}: ${l.name}`,
+      `${receipt.id}-${l.id}`,
+      `${receipt.name}: ${l.name}`,
       at,
       !!debt?.lenderId,
     );
@@ -363,8 +376,8 @@ export function applyDowntime(
         table,
         debt.lenderId,
         l.paid,
-        `${d.id}-${l.id}-lender`,
-        `${d.name}: ${l.name} repayment`,
+        `${receipt.id}-${l.id}-lender`,
+        `${receipt.name}: ${l.name} repayment`,
         at,
         true,
       );
@@ -382,7 +395,7 @@ export function applyDowntime(
   if (quote.propertyOperations) {
     const operations = quote.propertyOperations;
     for (const move of operations.movements) {
-      financeMove(table, move.purseId, -move.copper, `${d.id}-${move.id}`, move.summary, at);
+      financeMove(table, move.purseId, -move.copper, `${receipt.id}-${move.id}`, move.summary, at);
       const line = table.ledger[table.ledger.length - 1];
       if (move.copper && move.shopId) {
         line.shopId = move.shopId;
@@ -405,7 +418,7 @@ export function applyDowntime(
     table.journal!.propertyOperations = operations.state;
     for (const [i, notice] of operations.notices.entries())
       table.journal!.events.push({
-        id: `${d.id}-property-${i}`,
+        id: `${receipt.id}-property-${i}`,
         at,
         kind: "management",
         propertyId: notice.propertyId,
@@ -413,10 +426,6 @@ export function applyDowntime(
         summary: notice.summary.slice(0, 500),
       });
   }
-  f.day += d.days;
-  d.status = "applied";
-  d.appliedAt = at;
-  d.sessionId = sessionId;
 }
 
 export function assertFinanceAccountRemovable(value: unknown, purseId: string) {

@@ -105,3 +105,5 @@ The existing `.devcontainer/devcontainer.json` provides Node22 and runs the lock
 After a failed focused run, use its printed diagnostics path: `npm run verify:report -- test-results/focused/TIMESTAMP-accounts/html`. Read the failing action, network activity and trace before rerunning. CI account reports are in `test-results/account/html` inside the existing audit artifacts. Reports contain disposable test credentials; keep them in the existing restricted diagnostic artifacts.
 
 Property storage, projects, staff, rentals, delivery and postal management are documented in [Property operations](docs/PROPERTY-OPERATIONS.md), with a [sample import](docs/examples/property-operations.sample.json) and [strict schema](docs/examples/property-operations.schema.json).
+
+Maps, location NPCs, bilateral barter, black-market vendors and session time: [field guide](docs/WORLD-FEATURES.md), [NPC import example](docs/examples/location-npcs.sample.json). Local focused UI check: `CHROMIUM_EXECUTABLE_PATH=/path/to/chromium node scripts/world-local-check.mjs`; complete release verification remains required.

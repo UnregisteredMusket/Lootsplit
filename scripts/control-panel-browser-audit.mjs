@@ -52,6 +52,7 @@ try {
     "Party",
     "Market",
     "Library",
+    "Maps",
   ]);
   assert.equal(await page.locator(".shortcut-button").count(), 0, "Main Desk has no shortcut grid");
   await expect(page.getByRole("link", { name: "Multiplayer settings", exact: true })).toHaveCount(
@@ -333,6 +334,7 @@ try {
     "Campaign",
     "Market",
     "Library",
+    "Maps",
   ]);
   await capture("player-character");
   await nav.getByRole("link", { name: "Home", exact: true }).click();

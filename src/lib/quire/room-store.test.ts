@@ -111,8 +111,12 @@ sql.exec(
     "utf8",
   ),
 );
+sql.exec(readFileSync(new URL("../../../cloudflare/migrations/0012_campaign_room_images.sql",import.meta.url),"utf8"));
 (globalThis as any).__env__ = {
   DB: {
+    async batch(statements: {run:()=>Promise<unknown>}[]) {
+      sql.exec("BEGIN");try { const results=[];for(const statement of statements)results.push(await statement.run());sql.exec("COMMIT");return results; } catch(error) { sql.exec("ROLLBACK");throw error; }
+    },
     prepare(query: string) {
       let values: any[] = [];
       return {
@@ -462,4 +466,64 @@ test("players receive only their own finance agreements in persisted room projec
   assert.equal(projected.loans.length,1);
   assert.equal(projected.loans[0].principal,500);
   assert.deepEqual(projected.downtime,[]);
+});
+
+test("maps, NPC barter, vendor toggles and session time remain authoritative and retry-safe across independent seats",async()=>{
+  const {choosePace}=await import("./cloud.server.ts"),{readJournal}=await import("./journal.ts"),{canonicalJson}=await import("./canonical-json.ts"),{sessionTimeFingerprint}=await import("./session-time.ts");
+  const table={...emptyCloudTable(),purses:["world-a","world-b"].map(id=>({id,name:id,kind:"character" as const,coins:{...emptyCoins(),gp:100}})),holdings:[{id:"world-lot",name:"Sword",kind:"item" as const,purseId:"world-a",quantity:2,unitCopper:500,notes:""}],journal:readJournal({market:{currentLocationId:"world-city",locations:[{id:"world-region",name:"Realm",kind:"region",parentId:null,description:""},{id:"world-city",name:"City",kind:"city",parentId:"world-region",description:""}]},sessions:[{id:"world-session",name:"Travel",startedAt:1}]})};
+  const host=await openRoom({name:"World DM",table}),a=await joinRoom({code:host.code,purseId:"world-a",name:"A"}),b=await joinRoom({code:host.code,purseId:"world-b",name:"B"});await choosePace({...host,live:true});const aAuth={code:host.code,token:a.token},bAuth={code:host.code,token:b.token};
+  const map={id:"world-map",name:"City map",image:"data:image/png;base64,AAAA",locationId:"world-city",visible:true,anchors:[{locationId:"world-city",x:.5,y:.5}],markers:[]};
+  await assert.rejects(submitCommands({...aAuth,batchId:"forged-map",commands:[{id:"forged-map",kind:"map-save",mapId:map.id,before:null,map}]}),/Only the DM/);
+  const save={id:"world-map-save",kind:"map-save",mapId:map.id,before:null,map};await submitCommands({...host,batchId:"map-save",commands:[save]});await submitCommands({...host,batchId:"map-lost-response",commands:[save]});assert.equal((await roomState(aAuth)).table.journal!.world!.maps.length,1);
+  const marker={id:"world-marker",label:"Live landmark",description:"Public",visibility:"party",x:.2,y:.3};await submitCommands({...host,batchId:"marker-add",commands:[{id:"world-marker-add",kind:"map-marker",mapId:map.id,markerId:marker.id,before:null,marker}]});assert.equal((await roomState(bAuth)).table.journal!.world!.maps[0].markers[0].label,"Live landmark");await submitCommands({...host,batchId:"marker-remove",commands:[{id:"world-marker-remove",kind:"map-marker",mapId:map.id,markerId:marker.id,before:marker,marker:null}]});assert.equal((await roomState(aAuth)).table.journal!.world!.maps[0].markers.length,0);
+  const create={id:"world-npc-create",kind:"npc-create",npc:{id:"world-npc",name:"Broker",description:"Near",locationId:"world-city",visible:true,barterAllowed:true,controllerPurseId:null},copper:500,inventory:[{name:"Gem",quantity:1,unitCopper:500,notes:""}]};await submitCommands({...host,batchId:"npc-create",commands:[create]});await submitCommands({...host,batchId:"npc-retry",commands:[create]});assert.equal((await roomState(aAuth)).table.journal!.world!.npcs.length,1);
+  const offer={id:"world-offer",kind:"trade-offer",tradeId:"world-trade",revision:null,actorId:"world-a",left:{purseId:"world-a",copper:100,items:[{holdingId:"world-lot",quantity:1,before:canonicalJson(table.holdings[0])}]},right:{purseId:"world-b",copper:0,items:[]},note:"Sword"};await submitCommands({...aAuth,batchId:"offer",commands:[offer]});const decision={id:"world-accept",kind:"trade-decision",tradeId:"world-trade",revision:0,actorId:"world-b",decision:"accepted"};await assert.rejects(submitCommands({...aAuth,batchId:"forged-accept",commands:[decision]}),/participant/);await submitCommands({...bAuth,batchId:"accept",commands:[decision]});await submitCommands({...bAuth,batchId:"accept-retry",commands:[decision]});assert.equal((await roomState(bAuth)).table.holdings.find(h=>h.name==="Sword")!.quantity,1);assert.equal((await roomState(host)).table.ledger.filter(l=>l.summary.startsWith("Barter")).length,2);
+  const before=(await roomState(host)).table,time={id:"world-time",kind:"session-time",before:sessionTimeFingerprint(before),hours:24,rest:"none",purseIds:[],allowDowntime:false,note:"Travel"};await submitCommands({...host,batchId:"time",commands:[time]});await submitCommands({...host,batchId:"time-retry",commands:[time]});const final=await roomState(host);assert.equal(final.table.journal!.finance!.day,1);assert.equal(final.table.journal!.world!.timeHistory.length,1);await deleteRoom(host.code,final.revision);
+});
+
+
+test("multiple large maps persist outside the D1 room row and hydrate exact archive bytes with campaign isolation",async()=>{
+  const {readJournal}=await import("./journal.ts"),{hydrateRoomImages}=await import("../../../cloudflare/room-images.mjs"),{database}=await import("./room-store.server.ts");
+  const maps=Array.from({length:6},(_,i)=>({id:`large-${i}`,name:`Map ${i}`,image:"data:image/png;base64,"+String.fromCharCode(65+i).repeat(480000),locationId:null,visible:true,anchors:[],markers:[]}));
+  const table={...emptyCloudTable(),purses:[{id:"map-hero",name:"Hero",kind:"character" as const,coins:emptyCoins()}],journal:readJournal({world:{maps}})};
+  const snapshot=JSON.stringify(table,null,2);table.journal.reports=[{id:"map-report",name:"Original bytes",at:1,snapshot}];
+  const host=await openRoom({name:"Maps DM",table});const raw=sql.prepare("SELECT body FROM campaign_rooms WHERE code=?").get(host.code) as {body:string};assert.ok(raw.body.length<10000);assert.ok(!raw.body.includes(maps[0].image));assert.equal(sql.prepare("SELECT count(*) AS n FROM campaign_room_images WHERE code=?").get(host.code)!.n,6);
+  const hydrated=await readRoom(host.code);assert.deepEqual(hydrated!.table.journal!.world!.maps,maps);assert.equal(hydrated!.table.journal!.reports![0].snapshot,snapshot);
+  await updateRoom({...hydrated!,revision:hydrated!.revision+1},hydrated!.revision);assert.equal(sql.prepare("SELECT count(*) AS n FROM campaign_room_images WHERE code=?").get(host.code)!.n,6);
+  await assert.rejects(hydrateRoomImages(database()!,"another-campaign",JSON.parse(raw.body)),/missing/);
+  const direct = JSON.parse((sql.prepare("SELECT body FROM campaign_rooms WHERE code=?").get(host.code) as {body:string}).body);
+  direct.table.purses[0].portrait=maps[0].image;
+  const directBody=JSON.stringify(direct);
+  sql.prepare("UPDATE campaign_rooms SET body=? WHERE code=?").run(directBody,host.code);
+  const latest=await readRoom(host.code),stale=structuredClone(latest!);
+  const {roomStorageBody}=await import("./room-store.server.ts"),{encodeRoomImages}=await import("../../../cloudflare/room-images.mjs");
+  assert.equal(latest!.table.purses[0].portrait,maps[0].image);
+  assert.equal(roomStorageBody(latest!),directBody);
+  assert.notEqual((await encodeRoomImages(latest!)).body,directBody);
+  assert.ok(!Object.keys(latest!).some(key=>key.includes("stored")));stale.revision++;stale.table.journal!.world!.maps[0].image="data:image/png;base64,"+"Z".repeat(480000);
+  await assert.rejects(updateRoom(stale,latest!.revision-1),/changed/);assert.equal(sql.prepare("SELECT count(*) AS n FROM campaign_room_images WHERE code=?").get(host.code)!.n,6);
+  assert.deepEqual((await readRoom(host.code))!.table.journal!.world!.maps,maps);await deleteRoom(host.code,latest!.revision);
+});
+
+test("map storage leaves raw character portraits and non-map inventory recovery bytes intact", async () => {
+  const {encodeRoomImages} = await import("../../../cloudflare/room-images.mjs");
+  const portrait = "data:image/webp;base64," + "P".repeat(12000);
+  const mapImage = "data:image/webp;base64," + "M".repeat(12000);
+  const table = emptyCloudTable();
+  table.journal=(await import("./journal.ts")).readJournal(undefined);
+  table.purses=[{id:"portrait-holder",name:"Portrait holder",kind:"character",coins:{cp:0,sp:0,ep:0,gp:0,pp:0},portrait}];
+  table.holdings=[{id:"illustrated-item",purseId:"portrait-holder",name:"Illustrated item",kind:"item",quantity:1,unitCopper:1,notes:"",image:portrait}];
+  const makeMap=(id:string,image:string)=>({id,name:id,image,locationId:null,visible:true,anchors:[],markers:[]});
+  table.journal!.world={maps:[makeMap("map",mapImage),makeMap("portrait-map",portrait)],npcs:[],trades:[],conversations:[],blackMarketActive:false,timeHistory:[]};
+  const snapshot = JSON.stringify(table,null,2);
+  table.journal!.reports=[{id:"portrait-report",name:"Portrait record",at:1,snapshot}];
+  const encoded=await encodeRoomImages({table,drafts:{dm:[{kind:"map-save",map:makeMap("queued",mapImage),before:null}]}});
+  assert.equal(encoded.assets.length,1);
+  const raw=JSON.parse(encoded.body);
+  assert.equal(raw.table.purses[0].portrait,portrait);
+  assert.equal(raw.table.holdings[0].image,portrait);
+  assert.ok(raw.table.journal.reports[0].snapshot.includes(portrait));
+  assert.equal(raw.table.journal.world.maps[1].image,portrait);
+  assert.equal(raw.drafts.dm[0].map.image,encoded.assets[0].reference);
+  assert.equal(encoded.body.split(encoded.assets[0].reference).join(encoded.assets[0].image),JSON.stringify({table,drafts:{dm:[{kind:"map-save",map:makeMap("queued",mapImage),before:null}]}}));
 });

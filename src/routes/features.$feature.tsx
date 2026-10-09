@@ -1,3 +1,6 @@
+import { LocationNpcs } from "@/components/location-npcs";
+import { CampaignTrading } from "@/components/campaign-trading";
+import { SessionTime } from "@/components/session-time";
 import { getCampaigns, serverCampaigns, subscribeCampaigns } from "@/lib/quire/campaigns";
 import { CampaignReports } from "@/components/campaign-reports";
 import { createFileRoute } from "@tanstack/react-router";
@@ -52,6 +55,9 @@ function FeaturePage() {
           <p>This screen is available to the campaign DM.</p>
         ) : (
           <>
+            {feature === "npcs" && <LocationNpcs />}
+            {feature === "trading" && <CampaignTrading />}
+            {feature === "time" && <SessionTime />}
             {feature === "music" && <LocalAudioPanel />}
             {feature === "bank" && (
               <>

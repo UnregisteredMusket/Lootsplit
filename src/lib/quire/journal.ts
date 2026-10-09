@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { worldSchema } from "./world-schema.ts";
+import { validateWorld } from "./world.ts";
 import { estateSchema } from "./estate-schema.ts";
 import { validateEstate } from "./estate.ts";
 import { marketLocationsSchema, validateShopLocations } from "./shop-locations.ts";
@@ -21,6 +23,7 @@ export const encounterLootProvenanceSchema = z.object({
 export type EncounterLootProvenance = z.infer<typeof encounterLootProvenanceSchema>;
 export const encounterLootEntryId = (receiptId: string) => `encounter-loot:${receiptId}`;
 const journalFields = z.object({
+  world: worldSchema.optional(),
   propertyOperations: estateSchema.optional(),
   market: marketLocationsSchema.optional(),
   downtimePrompt: z
@@ -136,6 +139,7 @@ export function readArchivedSnapshot(snapshot: string): CloudTable {
     for (const listing of t.listings ?? []) listingSchema.parse(listing);
     validatePropertyLocations(t.listings ?? [], t.holdings, journal.market);
     validateEstate({ ...t, journal }, true);
+    validateWorld({ ...t, journal }, true);
     for (const key of ["notes", "sheets", "loans", "listings", "handouts"] as const)
       if (t[key] !== undefined && !Array.isArray(t[key])) throw Error("Invalid archived records.");
     if (!z.array(z.object({ id: z.string(), at: z.number().finite(), from: z.enum(["dm", "player"]),
@@ -227,7 +231,9 @@ export function preserveJournalMetadata(value: unknown, current: Journal): Journ
     ...((next.downtimePrompt ?? current.downtimePrompt)
       ? { downtimePrompt: next.downtimePrompt ?? current.downtimePrompt }
       : {}),
+    ...(next.finance && next.finance.minuteOfDay===undefined && current.finance?.minuteOfDay!==undefined ? {finance:{...next.finance,minuteOfDay:current.finance.minuteOfDay}} : {}),
     ...(next.finance ? {} : current.finance ? { finance: current.finance } : {}),
+    ...(next.world ? {} : current.world ? { world: current.world } : {}),
     ...(next.market ? {} : current.market ? { market: current.market } : {}),
     ...(next.propertyOperations ? {} : current.propertyOperations ? { propertyOperations: current.propertyOperations } : {}),
     ...(current.reports || next.reports

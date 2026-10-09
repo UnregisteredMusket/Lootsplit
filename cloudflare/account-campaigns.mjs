@@ -1,3 +1,4 @@
+import { hydrateRoomImages } from "./room-images.mjs";
 import {
   deletionRecoverySql,
   deletionRecoveryArgs,
@@ -107,7 +108,7 @@ export async function campaignAction(db, userId, body, actor) {
     fail("The campaign changed. Refresh your library before deleting it.", 409);
   let projected;
   try {
-    projected = projectRecord(room.table, seat);
+    projected = projectRecord(await hydrateRoomImages(db, room.code, room.table), seat);
   } catch {
     fail(
       "An archived record cannot be safely backed up. Your campaign was not deleted. Export your records for recovery first.",

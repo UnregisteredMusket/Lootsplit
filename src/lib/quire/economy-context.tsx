@@ -348,7 +348,7 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
       !ready ||
       getCloudWatch().joined ||
       getSeat().role !== "dm" ||
-      !purses.some((p) => p.kind === "character" && !p.sheet)
+      !purses.some((p) => p.kind === "character" && !p.nonParty && !p.sheet)
     )
       return;
     void import("../account/client")
