@@ -77,7 +77,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Development / gameplay | open | 4 | 141s → 581s | +440s | +312.06% |
 | Development / gameplay / Run actions/checkout@v4 | open | 2 | 1s → 3s | +2s | +200% |
 | Development / gameplay / Run actions/setup-node@v4 | open | 3 | 2s → 7s | +5s | +250% |
-| Development / accounts / Run actions/setup-node@v4 | open | 2 | 3s → 7s | +4s | +133.33% |
+| Development / accounts / Run actions/setup-node@v4 | open | 3 | 3s → 9s | +6s | +200% |
 | Development / desktop / Run actions/setup-node@v4 | open | 4 | 2s → 30s | +28s | +1400% |
 | Development / accounts / Run npm ci | open | 3 | 11s → 19s | +8s | +72.73% |
 | Packaged standby / Run actions/setup-node@v4 | open | 5 | 2s → 11s | +9s | +450% |
@@ -96,7 +96,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Development / accounts / Run npx playwright install --with-deps chromium | open | 2 | 22s → 523s | +501s | +2277.27% |
 | Code checks and immutable builds / Run actions/upload-artifact@v4 | open | 2 | 2s → 4s | +2s | +100% |
 | Packaged standby / Run actions/checkout@v4 | open | 2 | 1s → 23s | +22s | +2200% |
-| Development / gameplay / dev-encounter | open | 4 | 11s → 32s | +21s | +190.91% |
+| Development / gameplay / dev-encounter | open | 5 | 11s → 37s | +26s | +236.36% |
 | publish / Verify and publish the audited bytes without rebuilding | open | 2 | 5s → 10s | +5s | +100% |
 | deploy / Install locked deploy and verification tools (no application build) | open | 2 | 13s → 19s | +6s | +46.15% |
 | deploy / Run npx playwright install --with-deps chromium | open | 2 | 23s → 126s | +103s | +447.83% |
@@ -167,11 +167,11 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Development / gameplay / dev-library-navigation | resolved | 2 | 12s → 43s | +31s | +258.33% |
 | Packaged Worker / interface / worker-sound | open | 3 | 7s → 23s | +16s | +228.57% |
 | Packaged Worker / interface | open | 3 | 126s → 408s | +282s | +223.81% |
-| Packaged Worker / interface | open | 2 | 123s → 196s | +73s | +59.35% |
+| Packaged Worker / interface | open | 3 | 123s → 273s | +150s | +121.95% |
 | verify / Development / gameplay / Run actions/setup-node@v4 | open | 2 | 2s → 5s | +3s | +150% |
 | verify / Development / gameplay | open | 2 | 88s → 191s | +103s | +117.05% |
 | Development / gameplay | open | 3 | 145s → 911s | +766s | +528.28% |
-| Packaged Worker / interface / worker-sound | open | 3 | 6s → 18s | +12s | +200% |
+| Packaged Worker / interface / worker-sound | open | 4 | 6s → 25s | +19s | +316.67% |
 | Packaged Worker / interface / worker-library-navigation | resolved | 2 | 13s → 37s | +24s | +184.62% |
 | Development / gameplay / dev-control-panel | open | 3 | 14s → 29s | +15s | +107.14% |
 | Packaged Worker / interface / worker-library-navigation | open | 4 | 9s → 22s | +13s | +144.44% |
@@ -195,15 +195,26 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | verify:quick | open | 2 | 36.854731s → 52.084s | +15.229269s | +41.32% |
 | Development / gameplay / dev-library-navigation | open | 2 | 18s → 29s | +11s | +61.11% |
 | Packaged Worker / interface / worker-market-locations | open | 2 | 23s → 45s | +22s | +95.65% |
+| market locations browser audit | open | 2 | 36.179s → 65.756s | +29.577s | +81.75% |
 | Development / governance / dev-sound | open | 2 | 8s → 34s | +26s | +325% |
 | Cloudflare web build | open | 2 | 8.956s → 16.544s | +7.588s | +84.73% |
 | mobile web build | open | 2 | 6.259s → 12.496s | +6.237s | +99.65% |
 | Development / governance / dev-sound | open | 2 | 8s → 35s | +27s | +337.5% |
+| property-browser-audit | open | 2 | 32.709s → 99.355s | +66.646s | +203.75% |
 
 ## Recorded slowdowns
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-09T07:26:43Z | job: Packaged Worker / interface | 196s → 273s | +77s | +39.29% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37439896490/job/112191368666) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37898476002/job/113715653210) |
+| 2026-10-09T07:25:24Z | step: Packaged Worker / interface / worker-sound | 18s → 25s | +7s | +38.89% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37889515368/job/113687447648) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37898476002/job/113715653210) |
+| 2026-10-09T07:23:22Z | step: Development / gameplay / dev-encounter | 32s → 37s | +5s | +15.63% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37429247281/job/112155971212) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37898476002/job/113715225431) |
+| 2026-10-09T07:20:58Z | step: Development / accounts / Run actions/setup-node@v4 | 7s → 9s | +2s | +28.57% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37270098428/job/111635070946) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37898476002/job/113715225553) |
+| 2026-10-09T06:52:30.996Z | audit: campaign-governance browser audit | 97.237s → 133.772s | +36.535s | +37.57% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/tree/feature/preserved-improvements) · [After](https://github.com/UnregisteredMusket/Lootsplit/tree/feature/property-marketplace) |
+| 2026-10-09T06:48:37.009Z | audit: market locations browser audit | 53.956s → 65.756s | +11.8s | +21.87% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/tree/feature/market-name-import) · [After](https://github.com/UnregisteredMusket/Lootsplit/tree/feature/property-marketplace) |
+| 2026-10-09T06:47:31.187Z | audit: finance browser audit | 39.362s → 80.746s | +41.384s | +105.14% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/tree/feature/preserved-improvements) · [After](https://github.com/UnregisteredMusket/Lootsplit/tree/feature/property-marketplace) |
+| 2026-10-09T06:38:05.533Z | audit: property-browser-audit | 67.592s → 99.355s | +31.763s | +46.99% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/tree/feature/property-marketplace) · [After](https://github.com/UnregisteredMusket/Lootsplit/tree/feature/property-marketplace) |
+| 2026-10-09T06:35:22.707Z | audit: property-browser-audit | 32.709s → 67.592s | +34.883s | +106.65% | failure | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/tree/feature/property-marketplace) · [After](https://github.com/UnregisteredMusket/Lootsplit/tree/feature/property-marketplace) |
 | 2026-10-09T07:17:16Z | step: Packaged Worker / accounts / worker-finance | 23s → 29s | +6s | +26.09% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37742900449/job/113198095145) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37897679114/job/113713200932) |
 | 2026-10-09T05:43:58Z | step: publish / Run actions/download-artifact@v4 | 3s → 4s | +1s | +33.33% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37267750778/job/111628032772) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37889960741/job/113688418789) |
 | 2026-10-09T05:42:13Z | step: Development / governance / dev-sound | 21s → 35s | +14s | +66.67% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37884489066/job/113671305297) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37889515368/job/113687018218) |
