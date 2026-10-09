@@ -9,6 +9,10 @@ export type AppPrefs = {
   fantasyBackgrounds: boolean;
   soundEnabled: boolean;
   soundVolume: number;
+  musicEnabled: boolean;
+  musicVolume: number;
+  ambienceEnabled: boolean;
+  ambienceVolume: number;
   rollMode: "manual" | "virtual";
   showDollars: boolean;
   confirmRemoves: boolean;
@@ -35,6 +39,10 @@ export const DEFAULT_PREFS: AppPrefs = {
   fantasyBackgrounds: true,
   soundEnabled: false,
   soundVolume: 0.35,
+  musicEnabled: false,
+  musicVolume: 0.2,
+  ambienceEnabled: false,
+  ambienceVolume: 0.15,
   rollMode: "virtual",
   showDollars: true,
   confirmRemoves: false,
@@ -80,6 +88,10 @@ export function normalizePrefs(input: Partial<AppPrefs> | null | undefined): App
     fantasyBackgrounds: flag(input?.fantasyBackgrounds, true),
     soundEnabled: flag(input?.soundEnabled, false),
     soundVolume: num(input?.soundVolume, 0, 1, 0.35),
+    musicEnabled: flag(input?.musicEnabled, false),
+    musicVolume: num(input?.musicVolume, 0, 1, 0.2),
+    ambienceEnabled: flag(input?.ambienceEnabled, false),
+    ambienceVolume: num(input?.ambienceVolume, 0, 1, 0.15),
     rollMode: input?.rollMode === "manual" ? "manual" : "virtual",
     showDollars: flag(input?.showDollars, DEFAULT_PREFS.showDollars),
     confirmRemoves: flag(input?.confirmRemoves, DEFAULT_PREFS.confirmRemoves),

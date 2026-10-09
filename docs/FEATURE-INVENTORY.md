@@ -230,6 +230,9 @@ DMs sign in and own their hosted campaigns. Open sessions survive closed tabs; e
 
 ## Optional CC0 sound effects
 
+- Optional menu music and ambience accompany the eight scene mappings, independently of the visual scenery switch/custom palette. Three musical tracks and four ambient loops are bundled locally with complete CC0/CC BY 4.0 credits, licenses and hashes. Outdoor ambience follows day/night appearance; music/ambience have separate default-off toggles and volumes in existing Settings → Sound effects and management appearance controls. Preferences are device-local and additive to existing saves.
+- User interaction unlocks audio. Each layer loops without restarting on volume changes or routes sharing a track. Two sources and a three-buffer cache bound playback resources. Muting, leaving scene menus, hiding the document or unloading stops playback; obsolete downloads cannot start. No campaign command, history replay, synchronization or remote streaming participates. Missing/blocked audio remains optional; an explicit Start / resume control retries playback.
+
 - Device-local, default-off sound preference, volume and three previews in DM/player Settings and the management panel. No campaign audio preference is synchronized.
 - Coins accompany successful local financial actions and confirmed shared trades; pending or failed actions do not announce success. Encounter loot awards and journal/page navigation have distinct cues.
 - No startup/history playback, background-tab playback or remote audio dependency; missing/blocked playback cannot block gameplay. Sources and CC0 credits ship with three small WAV files.

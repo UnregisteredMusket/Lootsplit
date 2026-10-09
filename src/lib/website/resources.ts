@@ -1,6 +1,22 @@
 /** Add every new third-party content/data resource here when integrating it. */
 export const resources = [
   {
+    name: "Free scene music and ambience",
+    description: "Menu music: Soft Strings and Flutes and Dark and Mysterious from Fantasy Music and Drum Loops Pack by North Fantasy Music (CC BY 4.0), and Town Theme RPG by cynicmusic (CC0; cynicmusic.com pixelsphere.org). Ambience: Fireplace Sound loop by PagDev, water_flowing from 30 CC0 SFX loops by rubberduck, Crickets Ambient Noise by Ted Kerr (Wolfgang_), and Loopable Dungeon Ambience by JaggedStone (all CC0). Full tracks are converted to local 44.1 kHz MP3, with stereo music, mono ambience and short edge fades. Optional device-only controls; no remote streaming.",
+    links: [
+      { label: "North Fantasy Music pack", url: "https://opengameart.org/content/fantasy-music-and-drum-loops-pack" },
+      { label: "Town Theme RPG", url: "https://opengameart.org/content/town-theme-rpg" },
+      { label: "30 CC0 SFX loops", url: "https://opengameart.org/content/30-cc0-sfx-loops" },
+      { label: "Fireplace Sound loop", url: "https://opengameart.org/content/fireplace-sound-loop" },
+      { label: "Crickets Ambient Noise", url: "https://opengameart.org/content/crickets-ambient-noise-loopable" },
+      { label: "Loopable Dungeon Ambience", url: "https://opengameart.org/content/loopable-dungeon-ambience" },
+      { label: "Credits and adaptations", url: "/audio/scenes/CREDITS.txt" },
+      { label: "Source file provenance", url: "/audio/scenes/sources.json" },
+      { label: "CC BY 4.0 license", url: "/audio/scenes/LICENSE-CC-BY-4.0.txt" },
+      { label: "CC0 license", url: "/audio/scenes/LICENSE-CC0.txt" },
+    ],
+  },
+  {
     name: "CC0 fantasy backgrounds — willYEE",
     description: "Eight day/night scene pairs from Fantasy Visual Novel Backgrounds — 48 Painted Scenes, Day & Night, dedicated to the public domain under CC0 1.0. Selected images are resized to responsive WebP and bundled locally for web and Android submenu scenery. The creator discloses AI generation with Krea 2 and Real-ESRGAN upscaling. Scenery is optional; campaign and shop uploads remain separate.",
     links: [
