@@ -12,6 +12,16 @@ let state = EMPTY,
   storage: AudioLibraryStorage | undefined,
   generation = 0;
 const listeners = new Set<() => void>();
+export function localAudioAllowed() {
+  if (typeof window === "undefined" || getSeat().role !== "dm") return false;
+  try {
+    const account = sessionStorage.getItem("lootsplit.verified-account");
+    const campaign = localStorage.getItem("quire.campaign.v1") || "main";
+    return !!account && localStorage.getItem(`quire.owner.${campaign}`) === account;
+  } catch {
+    return false;
+  }
+}
 function notify(next: LibraryState) {
   state = next;
   for (const listener of listeners) listener();
@@ -19,7 +29,7 @@ function notify(next: LibraryState) {
 function deviceStorage() {
   if (typeof indexedDB === "undefined")
     throw Error("Local audio storage is unavailable on this device.");
-  return (storage ??= new AudioLibraryStorage(indexedDB, () => getSeat().role === "dm"));
+  return (storage ??= new AudioLibraryStorage(indexedDB, localAudioAllowed));
 }
 export const localAudioPlayer = new LocalAudioPlayer({
   open: () => {
@@ -39,7 +49,7 @@ export const localAudioPlayer = new LocalAudioPlayer({
       active,
       ambience ? MENU_AUDIO_FILES[ambience as keyof typeof MENU_AUDIO_FILES] : undefined,
     ),
-  allowed: () => typeof window !== "undefined" && getSeat().role === "dm",
+  allowed: localAudioAllowed,
   visible: () => typeof document !== "undefined" && !document.hidden,
 });
 export const localAudioLibrary = {

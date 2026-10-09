@@ -4,7 +4,7 @@ import { usePrefs } from "@/lib/quire/prefs";
 import { submenuScene } from "@/lib/quire/submenu-scenes";
 import { menuAudio } from "@/lib/quire/menu-audio";
 import { useSeat, useSeatKnown } from "@/lib/quire/seat";
-import { localAudioLibrary, localAudioPlayer } from "@/lib/quire/local-audio";
+import { localAudioAllowed, localAudioLibrary, localAudioPlayer } from "@/lib/quire/local-audio";
 import { LocalAudioMini } from "./local-audio-mini";
 
 /** Own audio for the running document, above route-specific shells. */
@@ -20,10 +20,11 @@ export function MenuAudioBridge() {
     localAudioLibrary.getServerSnapshot,
   );
   useEffect(() => {
-    if (known && seat.role === "dm") void localAudioLibrary.load();
-    else localAudioLibrary.clearMemory();
-    return () => localAudioLibrary.clearMemory();
-  }, [known, seat.role]);
+    if (known && seat.role === "dm" && localAudioAllowed()) {
+      const current = localAudioLibrary.getSnapshot();
+      if (!current.library && !current.loading) void localAudioLibrary.load();
+    } else localAudioLibrary.clearMemory();
+  }, [known, seat.role, pathname]);
   useEffect(() => {
     if (local.library && known && seat.role === "dm")
       localAudioPlayer.configure(local.library, scene || "");
@@ -43,15 +44,18 @@ export function MenuAudioBridge() {
       localAudioLibrary.clearMemory();
       menuAudio.dispose();
     };
+    const identity = () => localAudioLibrary.clearMemory();
     window.addEventListener("pointerdown", gesture);
     window.addEventListener("keydown", gesture);
     document.addEventListener("visibilitychange", visibility);
     window.addEventListener("pagehide", leave);
+    window.addEventListener("lootsplit-account-changed", identity);
     return () => {
       window.removeEventListener("pointerdown", gesture);
       window.removeEventListener("keydown", gesture);
       document.removeEventListener("visibilitychange", visibility);
       window.removeEventListener("pagehide", leave);
+      window.removeEventListener("lootsplit-account-changed", identity);
       menuAudio.dispose();
       localAudioLibrary.clearMemory();
     };

@@ -276,11 +276,12 @@ export function LocalAudioPanel() {
                 max={100}
                 value={Math.round(library.volume * 100)}
                 disabled={busy}
-                onChange={(e) =>
+                onChange={(e) => {
+                  const value = Number(e.target.value) / 100;
                   void change((lib) => {
-                    lib.volume = Number(e.target.value) / 100;
-                  })
-                }
+                    lib.volume = value;
+                  });
+                }}
               />
             </label>
             <label>
@@ -308,13 +309,15 @@ export function LocalAudioPanel() {
             <label>
               Ambience while playlist is active
               <select
+                aria-label="Ambience while playlist is active"
                 value={library.ambience}
                 disabled={busy}
-                onChange={(e) =>
+                onChange={(e) => {
+                  const value = e.target.value as LocalAudioLibrary["ambience"];
                   void change((lib) => {
-                    lib.ambience = e.target.value as LocalAudioLibrary["ambience"];
-                  })
-                }
+                    lib.ambience = value;
+                  });
+                }}
               >
                 <option value="scene">Follow menu scene</option>
                 <option value="fire">Fireplace</option>
@@ -331,11 +334,12 @@ export function LocalAudioPanel() {
                   type="checkbox"
                   checked={library[key]}
                   disabled={busy}
-                  onChange={(e) =>
+                  onChange={(e) => {
+                    const checked = e.target.checked;
                     void change((lib) => {
-                      lib[key] = e.target.checked;
-                    })
-                  }
+                      lib[key] = checked;
+                    });
+                  }}
                 />
                 {key === "repeat" ? "Loop playlist" : "Shuffle"}
               </label>
@@ -375,10 +379,12 @@ export function LocalAudioPanel() {
                               const tracks = lib.playlists.find(
                                 (x) => x.id === playlist.id,
                               )!.tracks;
-                              [tracks[index - 1], tracks[index]] = [
-                                tracks[index],
-                                tracks[index - 1],
-                              ];
+                              const position = tracks.indexOf(id);
+                              if (position > 0)
+                                [tracks[position - 1], tracks[position]] = [
+                                  tracks[position],
+                                  tracks[position - 1],
+                                ];
                             })
                           }
                         >
@@ -392,10 +398,12 @@ export function LocalAudioPanel() {
                               const tracks = lib.playlists.find(
                                 (x) => x.id === playlist.id,
                               )!.tracks;
-                              [tracks[index + 1], tracks[index]] = [
-                                tracks[index],
-                                tracks[index + 1],
-                              ];
+                              const position = tracks.indexOf(id);
+                              if (position >= 0 && position < tracks.length - 1)
+                                [tracks[position + 1], tracks[position]] = [
+                                  tracks[position],
+                                  tracks[position + 1],
+                                ];
                             })
                           }
                         >
@@ -536,6 +544,7 @@ export function LocalAudioPanel() {
                 <label>
                   License
                   <select
+                    aria-label="License"
                     value={metadata.license}
                     onChange={(e) =>
                       setMetadata({ ...metadata, license: e.target.value as AudioLicense })
@@ -595,11 +604,12 @@ export function LocalAudioPanel() {
             type="checkbox"
             checked={library.followScenes}
             disabled={busy}
-            onChange={(e) =>
+            onChange={(e) => {
+              const checked = e.target.checked;
               void change((lib) => {
-                lib.followScenes = e.target.checked;
-              })
-            }
+                lib.followScenes = checked;
+              });
+            }}
           />{" "}
           Follow assigned scene playlists
         </label>
@@ -608,14 +618,16 @@ export function LocalAudioPanel() {
             <label key={scene}>
               {label}
               <select
+                aria-label={label}
                 value={library.assignments[scene as AudioScene] || ""}
                 disabled={busy}
-                onChange={(e) =>
+                onChange={(e) => {
+                  const value = e.target.value;
                   void change((lib) => {
-                    if (e.target.value) lib.assignments[scene as AudioScene] = e.target.value;
+                    if (value) lib.assignments[scene as AudioScene] = value;
                     else delete lib.assignments[scene as AudioScene];
-                  })
-                }
+                  });
+                }}
               >
                 <option value="">Keep current playlist</option>
                 {library.playlists.map((x) => (

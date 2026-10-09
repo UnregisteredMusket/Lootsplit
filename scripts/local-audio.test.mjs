@@ -273,6 +273,12 @@ test("pause, resume, backgrounding, end-of-playlist, shuffle and scene following
   f.resolve(5);
   await settle();
   assert.equal(f.player.getSnapshot().trackId, "study");
+  f.output.onended();
+  assert.equal(
+    f.player.getSnapshot().status,
+    "stopped",
+    "Shuffle obeys the loop toggle after every track has played",
+  );
   f.player.dispose();
   assert.equal(f.output.src, "");
   assert.equal(f.ownership.at(-1)[0], false);

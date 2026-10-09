@@ -36,6 +36,7 @@ export class LocalAudioPlayer {
   private version = 0;
   private source?: string;
   private scene?: string;
+  private visited = new Set<string>();
   private readonly environment: Environment;
   constructor(environment: Environment) {
     this.environment = environment;
@@ -100,7 +101,7 @@ export class LocalAudioPlayer {
     if (this.source) this.environment.revoke(this.source);
     this.source = undefined;
   }
-  async play(playlistId: string, trackId?: string) {
+  async play(playlistId: string, trackId?: string, continuing = false) {
     if (!this.environment.allowed() || !this.environment.visible() || !this.library) {
       this.stop();
       return;
@@ -132,6 +133,8 @@ export class LocalAudioPlayer {
       }
       return;
     }
+    if (!continuing) this.visited.clear();
+    this.visited.add(id!);
     this.clear();
     const version = this.version;
     this.set({ playlistId, trackId: id, status: "loading", error: "" });
@@ -194,7 +197,16 @@ export class LocalAudioPlayer {
       this.stop();
       return;
     }
-    const candidates = playlist.tracks.filter((id) => id !== this.state.trackId);
+    let candidates = playlist.tracks.filter((id) => !this.visited.has(id));
+    if (this.library?.shuffle && !candidates.length) {
+      if (ended && !this.library.repeat) {
+        this.stop();
+        return;
+      }
+      this.visited.clear();
+      if (this.state.trackId) this.visited.add(this.state.trackId);
+      candidates = playlist.tracks.filter((id) => id !== this.state.trackId);
+    }
     const id =
       this.library?.shuffle && candidates.length
         ? candidates[
@@ -204,9 +216,10 @@ export class LocalAudioPlayer {
             )
           ]
         : playlist.tracks[(index + 1) % playlist.tracks.length];
-    void this.play(playlist.id, id);
+    void this.play(playlist.id, id, true);
   }
   stop(error = "") {
+    this.visited.clear();
     this.clear();
     this.own(false);
     this.set({ ...STOPPED, error });

@@ -8,7 +8,38 @@ export async function checkLocalAudio(page, context, width) {
     .locator('nav[aria-label="Sections"]:visible')
     .getByRole("link", { name: "Desk", exact: true })
     .click();
-  await page.getByRole("link", { name: "Music & Ambience →", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Campaign control", exact: true })).toBeVisible();
+  await page.evaluate(() => {
+    if (!window.__loops) {
+      window.__loops = new Set();
+      const start = AudioBufferSourceNode.prototype.start,
+        stop = AudioBufferSourceNode.prototype.stop;
+      AudioBufferSourceNode.prototype.start = function (...args) {
+        if (this.loop) window.__loops.add(this);
+        return start.apply(this, args);
+      };
+      AudioBufferSourceNode.prototype.stop = function (...args) {
+        window.__loops.delete(this);
+        return stop.apply(this, args);
+      };
+    }
+  });
+  const management = page.getByRole("dialog", { name: "Settings & Management", exact: true });
+  if (!(await management.isVisible())) await page.locator(".settings-trigger").click();
+  const appearance = management.getByRole("button", {
+    name: "Appearance & notifications",
+    exact: true,
+  });
+  if ((await appearance.getAttribute("aria-expanded")) !== "true") await appearance.click();
+  const menus = management.getByRole("group", { name: "Menu music and ambience", exact: true });
+  await menus.getByLabel("Enable menu music").check();
+  await menus.getByLabel("Ambient sound volume", { exact: true }).fill("12");
+  await menus.getByLabel("Enable ambient sound").check();
+  await page.keyboard.press("Escape");
+  await page
+    .locator(".dm-tool-groups")
+    .getByRole("link", { name: "Music & Ambience →", exact: true })
+    .click();
   const panel = page.locator(".local-audio-panel"),
     player = page.getByRole("region", { name: "Playlist player", exact: true });
   await expect(page.getByRole("heading", { name: "Music & Ambience", exact: true })).toBeVisible();
@@ -25,6 +56,31 @@ export async function checkLocalAudio(page, context, width) {
       return play.apply(this, args);
     };
   });
+  await player
+    .getByLabel("Ambience while playlist is active", { exact: true })
+    .selectOption("fire");
+  await expect(panel.getByRole("status")).toHaveText("Saved on this device.");
+  await player.getByRole("button", { name: "Play playlist", exact: true }).click();
+  await expect(player.getByText("NOW PLAYING · playing", { exact: true })).toBeVisible();
+  await page.waitForFunction(() => window.__loops.size === 1);
+  await page
+    .locator('nav[aria-label="Sections"]:visible')
+    .getByRole("link", { name: "Market", exact: true })
+    .click();
+  await page.waitForFunction(() => window.__loops.size === 1);
+  await page
+    .getByRole("complementary", { name: "Active local playlist" })
+    .getByRole("button", { name: "Stop", exact: true })
+    .click();
+  await page.waitForFunction(() => window.__loops.size === 2);
+  await page
+    .locator('nav[aria-label="Sections"]:visible')
+    .getByRole("link", { name: "Desk", exact: true })
+    .click();
+  await page
+    .locator(".dm-tool-groups")
+    .getByRole("link", { name: "Music & Ambience →", exact: true })
+    .click();
   await player.getByRole("button", { name: "Play playlist", exact: true }).click();
   await expect(player.getByText("NOW PLAYING · playing", { exact: true })).toBeVisible();
   await page.waitForFunction(
@@ -133,13 +189,16 @@ export async function checkLocalAudio(page, context, width) {
     .getByRole("button", { name: "Remove Town Theme RPG from playlist", exact: true })
     .click();
   await expect(player.locator(".local-audio-tracks li")).toHaveCount(1);
-  await panel.getByLabel("Loop playlist", { exact: true }).uncheck();
+  await panel.getByLabel("Loop playlist", { exact: true }).click();
+  await expect(panel.getByLabel("Loop playlist", { exact: true })).not.toBeChecked();
   await expect(panel.getByRole("status")).toHaveText("Saved on this device.");
-  await panel.getByLabel("Shuffle", { exact: true }).check();
+  await panel.getByLabel("Shuffle", { exact: true }).click();
+  await expect(panel.getByLabel("Shuffle", { exact: true })).toBeChecked();
   await expect(panel.getByRole("status")).toHaveText("Saved on this device.");
   await panel.getByLabel("Dungeon / encounters", { exact: true }).selectOption("combat");
   await expect(panel.getByRole("status")).toHaveText("Saved on this device.");
-  await panel.getByLabel("Follow assigned scene playlists", { exact: true }).check();
+  await panel.getByLabel("Follow assigned scene playlists", { exact: true }).click();
+  await expect(panel.getByLabel("Follow assigned scene playlists", { exact: true })).toBeChecked();
   await expect(panel.getByRole("status")).toHaveText("Saved on this device.");
   await player.getByRole("button", { name: "Play playlist", exact: true }).click();
   await expect(player.getByText("NOW PLAYING · playing", { exact: true })).toBeVisible();
@@ -193,4 +252,42 @@ export async function checkLocalAudio(page, context, width) {
     await page.screenshot({ path: "test-results/sound/local-playlists-320.png", fullPage: true });
   }
   assert.equal(new URL(page.url()).origin, origin);
+  if (width === 390) {
+    const anonymous = await context.browser().newContext();
+    try {
+      const guest = await anonymous.newPage();
+      await guest.goto(origin + "/features/music");
+      const title = guest.getByRole("button", {
+        name: "Lootsplit. Click to continue",
+        exact: true,
+      });
+      await title.waitFor({ state: "visible" });
+      await title.click();
+      await expect(
+        guest.getByText(
+          "Create an account or sign in to proceed as a Dungeon Master in your own campaign",
+        ),
+      ).toBeVisible();
+      assert.equal(await guest.locator(".local-audio-panel").count(), 0);
+      assert.equal(
+        await guest.evaluate(async () =>
+          (await indexedDB.databases()).some((x) => x.name === "lootsplit.local-audio.v1"),
+        ),
+        false,
+      );
+      await guest.goto(origin + "/resources");
+      await expect(
+        guest.getByRole("heading", { name: /Resources/, exact: false }).first(),
+      ).toBeVisible();
+      assert.equal(
+        await guest.evaluate(async () =>
+          (await indexedDB.databases()).some((x) => x.name === "lootsplit.local-audio.v1"),
+        ),
+        false,
+        "Anonymous public pages never open DM audio storage",
+      );
+    } finally {
+      await anonymous.close();
+    }
+  }
 }
