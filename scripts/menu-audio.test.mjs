@@ -199,3 +199,27 @@ test("day/night uses shared scene mapping and every bundled file matches credite
     assert.match(track.source, /^https:\/\/opengameart.org\/content\//);
   }
 });
+
+test("local playlists suppress only automatic music, hold ambience and restore original menu layers", async () => {
+  const f = fixture();
+  f.controller.configure(options);
+  await f.controller.unlock();
+  f.resolve();
+  await settle();
+  assert.equal(f.sources.length, 2);
+  f.controller.setLocalPlayback(true, "/audio/scenes/water.mp3");
+  assert.equal(f.sources[0].stopped, 1);
+  assert.equal(f.sources[1].stopped, 1);
+  f.resolve();
+  await settle();
+  assert.equal(f.sources.length, 3);
+  f.controller.configure({ ...options, scene: "ancient-library" });
+  assert.equal(f.sources.length, 3);
+  assert.equal(f.sources[2].stopped, 0);
+  f.controller.setLocalPlayback(false);
+  f.resolve();
+  await settle();
+  assert.equal(f.sources[2].stopped, 1);
+  assert.equal(f.sources.length, 5);
+  f.controller.dispose();
+});

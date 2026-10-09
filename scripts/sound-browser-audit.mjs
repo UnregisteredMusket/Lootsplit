@@ -2,6 +2,7 @@ import { chromium, expect } from "playwright/test";
 import assert from "node:assert/strict";
 import { mkdir } from "node:fs/promises";
 import { openApplication, reloadApplication } from "./title-screen-navigation.mjs";
+import { checkLocalAudio } from "./local-audio-browser-check.mjs";
 const origin = process.env.AUDIT_ORIGIN || "http://127.0.0.1:8080";
 if (!["127.0.0.1", "localhost"].includes(new URL(origin).hostname))
   throw Error("Disposable local server required");
@@ -216,6 +217,7 @@ try {
       await page.evaluate(() => document.documentElement.scrollWidth > innerWidth),
       false,
     );
+    await checkLocalAudio(page, context, width);
     assert.deepEqual(errors, []);
     await context.close();
   }
