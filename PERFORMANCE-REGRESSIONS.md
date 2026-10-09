@@ -171,7 +171,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | verify / Development / gameplay / Run actions/setup-node@v4 | open | 2 | 2s → 5s | +3s | +150% |
 | verify / Development / gameplay | open | 2 | 88s → 191s | +103s | +117.05% |
 | Development / gameplay | open | 3 | 145s → 911s | +766s | +528.28% |
-| Packaged Worker / interface / worker-sound | open | 2 | 6s → 14s | +8s | +133.33% |
+| Packaged Worker / interface / worker-sound | open | 3 | 6s → 18s | +12s | +200% |
 | Packaged Worker / interface / worker-library-navigation | resolved | 2 | 13s → 37s | +24s | +184.62% |
 | Development / gameplay / dev-control-panel | open | 3 | 14s → 29s | +15s | +107.14% |
 | Packaged Worker / interface / worker-library-navigation | open | 4 | 9s → 22s | +13s | +144.44% |
@@ -198,11 +198,14 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Development / governance / dev-sound | open | 2 | 8s → 34s | +26s | +325% |
 | Cloudflare web build | open | 2 | 8.956s → 16.544s | +7.588s | +84.73% |
 | mobile web build | open | 2 | 6.259s → 12.496s | +6.237s | +99.65% |
+| Development / governance / dev-sound | open | 2 | 8s → 35s | +27s | +337.5% |
 
 ## Recorded slowdowns
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-09T05:42:13Z | step: Development / governance / dev-sound | 21s → 35s | +14s | +66.67% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37884489066/job/113671305297) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37889515368/job/113687018218) |
+| 2026-10-09T05:41:57Z | step: Packaged Worker / interface / worker-sound | 14s → 18s | +4s | +28.57% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37884489066/job/113671686029) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37889515368/job/113687447648) |
 | 2026-10-09T05:29:53.899Z | test: Cloudflare web build | 11.681s → 16.544s | +4.863s | +41.63% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/tree/feature/menu-audio) · [After](https://github.com/UnregisteredMusket/Lootsplit/pull/74) |
 | 2026-10-09T05:20:30.067Z | test: mobile web build | 10.377s → 12.496s | +2.119s | +20.42% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/tree/feature/menu-audio) · [After](https://github.com/UnregisteredMusket/Lootsplit/tree/feature/local-playlists) |
 | 2026-10-09T05:08:12.034Z | audit: sound browser audit | 44.51s → 56.377s | +11.867s | +26.66% | failure | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/tree/feature/menu-audio) · [After](https://github.com/UnregisteredMusket/Lootsplit/tree/feature/local-playlists) |
