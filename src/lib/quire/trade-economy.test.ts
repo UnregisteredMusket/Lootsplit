@@ -465,7 +465,7 @@ test("player projections hide private exchanges, rolls, other trades and pending
 });
 
 test("Session Time and property production reuse existing days and units without automatic seasonal settlement", () => {
-  let t = act(tradeFixture(), { kind: "session", name: "Working day", end: false });
+  const t = act(tradeFixture(), { kind: "session", name: "Working day", end: false });
   const clock = act(t, {
     kind: "session-time",
     before: sessionTimeFingerprint(t),
