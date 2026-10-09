@@ -50,6 +50,9 @@ type AudioEnvironment = {
 
 /** Two independent layers, bounded decoded cache, and cancellation of obsolete downloads. */
 export class MenuAudioController {
+  private options?: MenuAudioOptions;
+  private localPlayback = false;
+  private localAmbience?: string;
   private context?: AudioContext;
   private unlocked = false;
   private wanted = false;
@@ -64,14 +67,22 @@ export class MenuAudioController {
   }
 
   configure(options: MenuAudioOptions) {
+    this.options = options;
     // A first navigation from Home can unlock the forthcoming scene in the same gesture.
     this.wanted =
       (options.musicEnabled && options.musicVolume > 0) ||
       (options.ambienceEnabled && options.ambienceVolume > 0);
     const files = sceneAudio(options.scene, options.appearance);
     const values = [
-      [options.musicEnabled ? files.music : undefined, options.musicVolume],
-      [options.ambienceEnabled ? files.ambience : undefined, options.ambienceVolume],
+      [options.musicEnabled && !this.localPlayback ? files.music : undefined, options.musicVolume],
+      [
+        options.ambienceEnabled
+          ? this.localPlayback && this.localAmbience
+            ? this.localAmbience
+            : files.ambience
+          : undefined,
+        options.ambienceVolume,
+      ],
     ] as const;
     values.forEach(([file, volume], index) => {
       const layer = this.layers[index];
@@ -85,6 +96,13 @@ export class MenuAudioController {
       }
     });
     this.refresh();
+  }
+
+  /** A custom playlist owns music until Stop; ambient audio keeps its independent controls. */
+  setLocalPlayback(active: boolean, ambience?: string) {
+    this.localPlayback = active;
+    this.localAmbience = ambience;
+    if (this.options) this.configure(this.options);
   }
 
   /** Only invoke from a real user gesture; loading/configuration never opens audio. */

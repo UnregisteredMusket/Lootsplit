@@ -8,6 +8,7 @@ export const featureScreens = {
   review: { title: "Review Inbox", dm: true },
   journal: { title: "Journal", dm: false },
   shops: { title: "Shop Management", dm: true },
+  music: { title: "Music & Ambience", dm: true },
 };
 export type Feature = keyof typeof featureScreens;
 export function safeReturn(value: unknown): string {
@@ -22,7 +23,7 @@ export function safeReturn(value: unknown): string {
   const url = new URL(value, "https://lootsplit.invalid");
   if (url.origin !== "https://lootsplit.invalid") return "/?view=home";
   if (
-    !/^\/(?:party|market|share|settings|characters|library|shop\/[^/]+|features\/(?:bank|finances|downtime|financial|properties|reports|review|journal|shops))?$/.test(
+    !/^\/(?:party|market|share|settings|characters|library|shop\/[^/]+|features\/(?:bank|finances|downtime|financial|properties|reports|review|journal|shops|music))?$/.test(
       url.pathname,
     )
   )
@@ -36,13 +37,15 @@ export function screenName(href: string, dm: boolean) {
   if (url.pathname.startsWith("/features/") && featureScreens[feature])
     return featureScreens[feature].title;
   if (url.pathname === "/")
-    return dm ? "Desk" : url.searchParams.get("view") === "overview"
-      ? "Campaign overview"
-      : url.searchParams.get("view") === "sheet"
-        ? "Character"
-        : dm
-          ? "Desk"
-          : "Home";
+    return dm
+      ? "Desk"
+      : url.searchParams.get("view") === "overview"
+        ? "Campaign overview"
+        : url.searchParams.get("view") === "sheet"
+          ? "Character"
+          : dm
+            ? "Desk"
+            : "Home";
   return (
     (
       {

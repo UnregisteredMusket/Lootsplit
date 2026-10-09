@@ -21,6 +21,7 @@ import { PropertyDetails } from "@/components/property-details";
 import { CharacterImportReviews } from "@/components/character-import-reviews";
 import { getCloudTable, getServerCloudTable, subscribeCloudTable } from "@/lib/quire/cloud-client";
 import { SettingsPage } from "@/components/settings-page";
+import { LocalAudioPanel } from "@/components/local-audio-panel";
 export const Route = createFileRoute("/features/$feature")({
   validateSearch: (s: Record<string, unknown>) => ({
     from: safeReturn(s.from),
@@ -49,6 +50,7 @@ function FeaturePage() {
           <p>This screen is available to the campaign DM.</p>
         ) : (
           <>
+            {feature === "music" && <LocalAudioPanel />}
             {feature === "bank" && (
               <>
                 <p>
