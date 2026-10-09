@@ -114,15 +114,15 @@ function DmDeskContents() {
     }
     return () => c.abort();
   }, [contextKey, room.revision, room.joined, room.code, refresh]);
-  const party = purses.filter((p) => p.kind === "character"),
+  const party = purses.filter((p) => p.kind === "character" && !p.nonParty),
     session = journal.sessions.find((x) => !x.endedAt),
     fund = purses.filter((p) => p.kind === "party").reduce((sum, p) => sum + toCopper(p.coins), 0),
     pending =
       journal.requests.filter((x) => x.status === "pending").length +
       loans.filter((x) => x.status === "pending").length,
     totals = session ? sessionSummary(ledger, session) : null,
-    allCoins = purses.reduce((sum, p) => sum + toCopper(p.coins), 0),
-    goods = holdings.reduce((sum, h) => sum + h.unitCopper * h.quantity, 0),
+    allCoins = purses.filter(p=>!p.nonParty).reduce((sum, p) => sum + toCopper(p.coins), 0),
+    goods = holdings.filter(h=>!purses.some(p=>p.id===h.purseId&&p.nonParty)).reduce((sum, h) => sum + h.unitCopper * h.quantity, 0),
     rolls = (room.joined ? sharedRolls : purses.flatMap((p) => p.rolls || []))
       .slice()
       .sort((a, b) => b.at - a.at)

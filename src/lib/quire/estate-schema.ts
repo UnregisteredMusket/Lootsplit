@@ -127,6 +127,8 @@ export const jobSchema = z
     status: z.enum(["draft", "active", "paused", "blocked", "completed", "cancelled", "denied"]),
     stage: z.number().int().min(0).max(20),
     progress: z.number().int().min(0).max(1e11),
+    characterWorkRemainder: z.number().int().min(0).max(1439).optional(),
+    paidWorkRemainder: z.number().int().min(0).max(1439).optional(),
     paidProgress: z.number().int().min(0).max(1e11).default(0),
     paidCopper: money,
     assignments: z

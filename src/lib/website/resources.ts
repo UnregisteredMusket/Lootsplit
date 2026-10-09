@@ -1,5 +1,6 @@
 /** Add every new third-party content/data resource here when integrating it. */
 export const resources = [
+  { name: "Campaign map text recognition", description: "Map labels use the existing locally bundled Tesseract.js 7 engine (Apache-2.0) and English trained data. Lootsplit's reviewed anchors, markers, fantasy controls and deed/barter integration are original. Cloudflare's official D1 limits and transaction documentation informed campaign-private deduplicated image storage; no third-party maps or artwork are supplied.", links: [{label:"Tesseract.js source and license",url:"https://github.com/naptha/tesseract.js"},{label:"English trained data",url:"https://github.com/tesseract-ocr/tessdata"},{label:"D1 limits",url:"https://developers.cloudflare.com/d1/platform/limits/"},{label:"D1 atomic batches",url:"https://developers.cloudflare.com/d1/worker-api/d1-database/#batch"}] },
   {
     name: "Property marketplace design references",
     description: "First-party Zillow and Redfin product guidance informed location-first search, asking-price filters, image listings and side-by-side comparison. Lootsplit's fantasy interface and deed template are original; no listings, logos, photographs or proprietary app assets are copied.",

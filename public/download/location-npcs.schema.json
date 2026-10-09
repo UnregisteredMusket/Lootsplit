@@ -1,0 +1,132 @@
+{
+  "$schema": "https://json-schema.org/draft/2020-12/schema",
+  "type": "object",
+  "properties": {
+    "format": {
+      "type": "string",
+      "const": "lootsplit.npcs"
+    },
+    "schemaVersion": {
+      "type": "number",
+      "const": 1
+    },
+    "npcs": {
+      "minItems": 1,
+      "maxItems": 100,
+      "type": "array",
+      "items": {
+        "type": "object",
+        "properties": {
+          "name": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 160
+          },
+          "description": {
+            "type": "string",
+            "maxLength": 4000
+          },
+          "locationId": {
+            "type": "string",
+            "minLength": 1,
+            "maxLength": 150
+          },
+          "visible": {
+            "default": true,
+            "type": "boolean"
+          },
+          "barterAllowed": {
+            "default": false,
+            "type": "boolean"
+          },
+          "controllerPurseId": {
+            "default": null,
+            "anyOf": [
+              {
+                "type": "string",
+                "minLength": 1,
+                "maxLength": 150
+              },
+              {
+                "type": "null"
+              }
+            ]
+          },
+          "portrait": {
+            "type": "string",
+            "maxLength": 500000,
+            "pattern": "^(data:image\\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+|\\/art\\/[a-z0-9-]+\\.webp)$"
+          },
+          "copper": {
+            "default": 0,
+            "type": "integer",
+            "minimum": 0,
+            "maximum": 1000000000000
+          },
+          "inventory": {
+            "default": [],
+            "maxItems": 500,
+            "type": "array",
+            "items": {
+              "type": "object",
+              "properties": {
+                "name": {
+                  "type": "string",
+                  "minLength": 1,
+                  "maxLength": 160
+                },
+                "quantity": {
+                  "type": "integer",
+                  "minimum": 1,
+                  "maximum": 100000
+                },
+                "unitCopper": {
+                  "type": "integer",
+                  "minimum": 0,
+                  "maximum": 1000000000000
+                },
+                "notes": {
+                  "type": "string",
+                  "maxLength": 4000
+                },
+                "category": {
+                  "type": "string",
+                  "maxLength": 80
+                },
+                "image": {
+                  "type": "string",
+                  "maxLength": 500000,
+                  "pattern": "^(data:image\\/(png|jpeg|webp);base64,[A-Za-z0-9+/=]+|\\/art\\/[a-z0-9-]+\\.webp)$"
+                }
+              },
+              "required": [
+                "name",
+                "quantity",
+                "unitCopper",
+                "notes"
+              ],
+              "additionalProperties": false
+            }
+          }
+        },
+        "required": [
+          "name",
+          "description",
+          "locationId",
+          "visible",
+          "barterAllowed",
+          "controllerPurseId",
+          "copper",
+          "inventory"
+        ],
+        "additionalProperties": false
+      }
+    }
+  },
+  "required": [
+    "format",
+    "schemaVersion",
+    "npcs"
+  ],
+  "additionalProperties": false
+}

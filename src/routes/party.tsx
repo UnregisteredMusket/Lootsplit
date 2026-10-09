@@ -60,7 +60,7 @@ function PartyPage() {
   const visible =
     seat.role === "player"
       ? economy.purses.filter((purse) => seat.purseIds.includes(purse.id))
-      : economy.purses;
+      : economy.purses.filter(p=>!p.nonParty);
   const coin = visible.reduce((sum, purse) => sum + toCopper(purse.coins), 0);
   const goods = economy.holdings
     .filter((holding) => visible.some((purse) => purse.id === holding.purseId))

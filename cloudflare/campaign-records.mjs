@@ -1,3 +1,4 @@
+import { hydrateRoomImages } from "./room-images.mjs";
 import { readArchivedSnapshot } from "../src/lib/quire/journal.ts";
 import { projectRecord } from "../src/lib/quire/session-records.ts";
 export async function campaignRecords(db, user) {
@@ -9,7 +10,7 @@ export async function campaignRecords(db, user) {
     .all();
   const reports = [];
   for (const m of members.results) {
-    const room = JSON.parse(m.body);
+    const room = await hydrateRoomImages(db,m.code,JSON.parse(m.body));
     if (room.blockedUsers?.[user] === "banned") continue;
     const seat = [...room.seats, ...(room.departed || [])].find(
       (s) => s.id === m.seat_id && s.token === m.token,

@@ -16,7 +16,7 @@ export type SheetReadout = {
 export function useSheetReadouts() {
   const economy = useEconomy();
   return economy.purses
-    .filter((p) => p.kind === "character")
+    .filter((p) => p.kind === "character" && !p.nonParty)
     .map((p) => ({
       id: `party:${p.id}`,
       purse_id: p.id,

@@ -1,7 +1,8 @@
+import { shopVisible, shopAsking } from "./vendors.ts";
 import type { CloudTable, CloudSeat } from "./cloud.ts";
 import type { Holding } from "./types.ts";
 import { canonicalJson } from "./canonical-json.ts";
-import { locationPath, readMarketLocations, shopAvailableHere } from "./shop-locations.ts";
+import { locationPath, readMarketLocations } from "./shop-locations.ts";
 import { toCopper, fromCopper, spendCoins, priceAfterCharisma } from "./money.ts";
 import { charismaScore } from "./sheet.ts";
 import { isService } from "./merchant.ts";
@@ -172,7 +173,7 @@ export function validateEstate(t: Table, projected = false) {
       throw Error("A property template is missing.");
     if (
       !projected &&
-      site.accessPurseIds.some((id) => !t.purses.some((p) => p.id === id && p.kind === "character"))
+      site.accessPurseIds.some((id) => !t.purses.some((p) => p.id === id && p.kind === "character" && !p.nonParty))
     )
       throw Error("A property permission refers to a missing character.");
   }
@@ -211,7 +212,7 @@ export function validateEstate(t: Table, projected = false) {
       !t.purses.some((p) => p.id === j.purseId) ||
       (!projected &&
         j.assignments.some(
-          (a) => !t.purses.some((p) => p.id === a.purseId && p.kind === "character"),
+          (a) => !t.purses.some((p) => p.id === a.purseId && p.kind === "character" && !p.nonParty),
         ))
     )
       throw Error("A project has missing property, payer or worker records.");
@@ -429,7 +430,7 @@ function delivery(
     )
   )
     throw Error("The destination needs active storage or a construction staging site.");
-  if (!line || !shop || shop.closed || isService(line))
+  if (!line || !shop || shop.closed || (shop.blackMarket && !t.journal?.world?.blackMarketActive) || isService(line))
     throw Error("Choose stocked physical goods from an open shop.");
   if (!s.materials.some((m) => m.key === args.materialKey))
     throw Error("Choose a DM-reviewed material definition.");
@@ -448,7 +449,7 @@ function delivery(
     payer.kind === "party"
       ? null
       : (payer.sheet?.scores.cha ?? charismaScore(t.sheets.find((x) => x.purseId === payer.id)));
-  const unitCopper = priceAfterCharisma(line.copper, cha),
+  const unitCopper = priceAfterCharisma(shop.blackMarket ? shopAsking(shop,line.copper) : line.copper, cha),
     cost = unitCopper * args.quantity + args.deliveryCopper;
   const approvedSupplier = s.suppliers.find(
     (x) =>
@@ -900,7 +901,7 @@ export function applyEstateCommand(t: CloudTable, seat: CloudSeat, cmd: EstateCo
         shop &&
         !shop.closed &&
         !!shop.locationId &&
-        shopAvailableHere(shop, market) &&
+        shopVisible(shop, t) &&
         !!settlement &&
         (settlement.kind === "city" || o.allowTown)
       );
@@ -1058,7 +1059,8 @@ export function applyEstateCommand(t: CloudTable, seat: CloudSeat, cmd: EstateCo
 }
 
 /** Pure simulation. Every output is included in the existing DM downtime quote. */
-export function previewEstate(t: CloudTable, days: number, balances: Map<string, number>) {
+export type EstateTime = { minutes: number; allowCharacterWork: boolean; receiptId: string };
+export function previewEstate(t: CloudTable, days: number, balances: Map<string, number>, time?: EstateTime) {
   if (!t.journal?.propertyOperations) return undefined;
   const before = canonicalJson({
     estate: t.journal.propertyOperations,
@@ -1145,7 +1147,9 @@ export function previewEstate(t: CloudTable, days: number, balances: Map<string,
           ? null
           : (payer.sheet?.scores.cha ??
             charismaScore(working.sheets.find((x) => x.purseId === payer.id)));
-      const cost = priceAfterCharisma(line.copper, cha) * order.quantity + order.deliveryCopper;
+      const vendor = working.shops.find(shop=>shop.id===line.shopId);
+      if(!vendor)throw Error("The selected supply vendor is missing.");
+      const cost = priceAfterCharisma(vendor.blackMarket ? shopAsking(vendor,line.copper) : line.copper, cha) * order.quantity + order.deliveryCopper;
       if (cost > budget || manager.budgetSpentCopper + cost > manager.budgetCopper)
         throw Error("The order exceeds its authorized spending budget.");
       delivery(working, s, { ...order, propertyId, purseId: ownerId }, receipt, 0);
@@ -1188,8 +1192,8 @@ export function previewEstate(t: CloudTable, days: number, balances: Map<string,
       .reduce((n, x) => n + x.quantity, 0);
     return `${h.name}: ${stored} stored items; ${s.jobs.filter((j) => j.propertyId === h.id && ["active", "blocked"].includes(j.status)).length} ongoing projects; ${s.staff.filter((c) => c.propertyId === h.id && c.status === "active").length} active staff.`;
   };
-  for (let offset = 1; offset <= days; offset++) {
-    const day = start + offset;
+  for (let offset = 1; offset <= Math.max(days, time ? 1 : 0); offset++) {
+    const day = start + Math.min(offset, days);
     working.journal!.finance!.day = day;
     for (const job of s.jobs.filter((j) => ["active", "blocked"].includes(j.status))) {
       const site = s.sites.find((x) => x.propertyId === job.propertyId)!;
@@ -1209,7 +1213,7 @@ export function previewEstate(t: CloudTable, days: number, balances: Map<string,
         job.message = "DM approval of tools, skills or checks is required.";
         continue;
       }
-      if (!reserve(working, s, job, `${job.id}-day-${day}`)) {
+      if (!reserve(working, s, job, `${job.id}-day-${day}${time ? "-" + time.receiptId : ""}`)) {
         job.status = "blocked";
         continue;
       }
@@ -1233,10 +1237,12 @@ export function previewEstate(t: CloudTable, days: number, balances: Map<string,
       }
       const stage = jobStages(job)[job.stage],
         required = stage.laborDays * 100;
-      const characterWork = physicallyHere(working, property(working, job.propertyId))
-        ? job.assignments.reduce((n, a) => n + a.share, 0)
-        : 0;
-      const labor = Math.min(required - job.progress, characterWork + job.paidWorkers * 100);
+      const dailyCharacterWork = physicallyHere(working, property(working, job.propertyId)) && (!time || time.allowCharacterWork)
+        ? job.assignments.reduce((n, a) => n + a.share, 0) : 0;
+      const charUnits = time ? dailyCharacterWork * time.minutes + (job.characterWorkRemainder ?? 0) : dailyCharacterWork * 1440;
+      const paidUnits = time ? job.paidWorkers * 100 * time.minutes + (job.paidWorkRemainder ?? 0) : job.paidWorkers * 100 * 1440;
+      const characterWork = Math.floor(charUnits / 1440), paidLabor = Math.floor(paidUnits / 1440);
+      const labor = Math.min(required - job.progress, characterWork + paidLabor);
       const paidWork = Math.max(0, labor - characterWork),
         cost =
           Math.floor(((job.paidProgress + paidWork) * stage.laborCostCopper) / required) -
@@ -1254,6 +1260,10 @@ export function previewEstate(t: CloudTable, days: number, balances: Map<string,
           continue;
         }
       }
+      if (!labor && (dailyCharacterWork || job.paidWorkers) && time) {
+        job.characterWorkRemainder = charUnits % 1440; job.paidWorkRemainder = paidUnits % 1440;
+        job.status = "active"; job.message = "Partial labor recorded; work continues at the next approved time advance."; continue;
+      }
       if (!labor && job.progress !== required) {
         job.status = "blocked";
         job.message = "Assign workers at this location or hire contractors.";
@@ -1264,7 +1274,7 @@ export function previewEstate(t: CloudTable, days: number, balances: Map<string,
           working,
           job.purseId,
           cost,
-          `${job.id}-labor-${day}`,
+          `${job.id}-labor-${day}${time ? "-" + time.receiptId : ""}`,
           `Property work: ${job.name} (${stage.name}), day ${day}`,
           0,
         );
@@ -1274,6 +1284,7 @@ export function previewEstate(t: CloudTable, days: number, balances: Map<string,
         continue;
       }
       if (supervisor) supervisor.budgetSpentCopper += cost;
+      if (time) { job.characterWorkRemainder = charUnits % 1440; job.paidWorkRemainder = paidUnits % 1440; }
       job.progress += labor;
       job.paidProgress += paidWork;
       job.paidCopper += cost;
@@ -1299,7 +1310,7 @@ export function previewEstate(t: CloudTable, days: number, balances: Map<string,
         working.holdings = working.holdings.filter((h) => h.reservedFor !== job.id);
         if (job.stage + 1 < jobStages(job).length) {
           job.stage++;
-          job.progress = 0;
+          job.progress = 0; delete job.characterWorkRemainder; delete job.paidWorkRemainder;
           job.paidProgress = 0;
           job.message = `Ready for ${jobStages(job)[job.stage].name}.`;
         } else {
@@ -1335,6 +1346,7 @@ export function previewEstate(t: CloudTable, days: number, balances: Map<string,
         }
       }
     }
+    if (offset > days) continue; // Calendar deliveries/orders run once at each crossed campaign day.
     for (const shipment of s.shipments.filter(
       (x) => x.status === "in-transit" && x.dueDay <= day,
     )) {

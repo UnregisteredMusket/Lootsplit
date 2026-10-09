@@ -32,6 +32,7 @@ import { watchCrashes } from "@/lib/quire/reports";
 import { isEphemeralCampaign } from "@/lib/quire/guest-storage";
 
 type Dest =
+  | "/maps"
   | "/encounters"
   | "/characters"
   | "/library"
@@ -268,7 +269,7 @@ export function Shell({
         className="fixed inset-x-0 bottom-0 z-20 border-t border-lead/40 bg-bg/92 pb-[env(safe-area-inset-bottom)] backdrop-blur-sm lg:hidden"
         aria-label="Sections"
       >
-        <div className="mx-auto grid max-w-3xl grid-cols-5">{navLinks("tab")}</div>
+        <div className="mx-auto grid max-w-3xl grid-cols-6">{navLinks("tab")}</div>
       </nav>
       <BillReceipt />
       <SeatSwitch open={switching} onOpenChange={setSwitching} seat={seat} />
@@ -357,6 +358,7 @@ export function Shell({
             search: { book: "" },
           },
           { to: "/library", label: "Library", icon: "Library", active: library },
+          { to: "/maps", label: "Maps", icon: "Maps", active: pathname === "/maps" },
         ]
       : [
           {
@@ -390,6 +392,7 @@ export function Shell({
             search: { book: "" },
           },
           { to: "/library", label: "Library", icon: "Library", active: library },
+          { to: "/maps", label: "Maps", icon: "Maps", active: pathname === "/maps" },
         ];
     return (
       <>

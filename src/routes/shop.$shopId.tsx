@@ -1,6 +1,8 @@
+import { BlackMarketVendor } from "@/components/black-market";
+import { shopVisible } from "@/lib/quire/world";
 import { useFinanceReadiness } from "@/lib/quire/use-finance-readiness";
 import { ShopLocationEditor } from "@/components/market-locations";
-import { readMarketLocations, locationLabel, shopAvailableHere } from "@/lib/quire/shop-locations";
+import { readMarketLocations, locationLabel } from "@/lib/quire/shop-locations";
 import { useDraftGuard } from "@/lib/quire/use-draft-guard";
 import { FinanceReadiness } from "@/components/finance-input";
 import { mutationNotice } from "@/lib/quire/mutation-outcome";
@@ -84,7 +86,7 @@ function ShopPage() {
   if (
     seat.role === "player" &&
     (!seat.shopIds.includes(shop.id) ||
-      !shopAvailableHere(shop, readMarketLocations(economy.journal.market)))
+      !shopVisible(shop, {journal:economy.journal}))
   ) {
     return (
       <Shell>
@@ -100,6 +102,7 @@ function ShopPage() {
 
   return (
     <Shell>
+      {seat.role === "dm" && <BlackMarketVendor key={shop.id} shop={shop}/>}
       <Link to="/market" search={{ book: "" }} className="text-sm text-muted">
         Market
       </Link>
@@ -255,7 +258,7 @@ function ShopPage() {
             line={line}
             mode={viewing}
             purseId={purseId}
-            sellRate={shop.sellRate}
+            sellRate={shop.sellRate * (shop.blackMarket ? shop.blackMarketPremium ?? 1.5 : 1)}
             charisma={charismaScore(economy.sheets.find((sheet) => sheet.purseId === purseId))}
             locked={!!shop.closed || (viewing === "counter" && turnIsLocked())}
           />

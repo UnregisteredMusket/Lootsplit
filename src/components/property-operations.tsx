@@ -731,7 +731,7 @@ function Projects({
           </p>
         )}
         {t.purses
-          .filter((p) => p.kind === "character" && (dm || seat.purseIds.includes(p.id)))
+          .filter((p) => p.kind === "character" && !p.nonParty && (dm || seat.purseIds.includes(p.id)))
           .map((p) => (
             <NumberField
               key={p.id}

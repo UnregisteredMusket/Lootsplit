@@ -1,3 +1,4 @@
+import { encodeRoomImages, hydrateRoomImages, roomImageStatements } from "../../../cloudflare/room-images.mjs";
 import { mkdir, open, readFile, rename, unlink } from "node:fs/promises";
 import path from "node:path";
 import type { CloudRoom } from "./cloud.ts";
@@ -99,17 +100,19 @@ export async function readRoom(code: string): Promise<CloudRoom | null> {
     if (!row) return null;
     const { hydrateCampaignCharacters } =
       await import("../../../cloudflare/campaign-characters.mjs");
-    return hydrateCampaignCharacters(db, JSON.parse(row.body) as CloudRoom);
+    const room = await hydrateCampaignCharacters(db, JSON.parse(row.body) as CloudRoom);
+    return hydrateRoomImages(db, room.code, room);
   }
   return (await localRooms()).find((room) => room.code === code) ?? null;
 }
 export async function createRoom(room: CloudRoom): Promise<void> {
   const db = database();
   if (db) {
+    const encoded = await encodeRoomImages(room);
     const insert = db
       .prepare("INSERT INTO campaign_rooms (code, revision, body) VALUES (?, ?, ?)")
-      .bind(room.code, room.revision, JSON.stringify(room));
-    const members = accountSeats(db, room);
+      .bind(room.code, room.revision, encoded.body);
+    const members = [...await roomImageStatements(db, room, encoded), ...accountSeats(db, room, encoded.body)];
     if (members.length) await db.batch([insert, ...members]);
     else await insert.run();
     return;
@@ -124,10 +127,11 @@ export async function createRoom(room: CloudRoom): Promise<void> {
 export async function updateRoom(room: CloudRoom, baseRevision: number): Promise<void> {
   const db = database();
   if (db) {
+    const encoded = await encodeRoomImages(room);
     const update = db
       .prepare("UPDATE campaign_rooms SET revision = ?, body = ? WHERE code = ? AND revision = ?")
-      .bind(room.revision, JSON.stringify(room), room.code, baseRevision);
-    const members = accountSeats(db, room);
+      .bind(room.revision, encoded.body, room.code, baseRevision);
+    const members = [...await roomImageStatements(db, room, encoded), ...accountSeats(db, room, encoded.body)];
     const result = members.length ? (await db.batch([update, ...members]))[0]! : await update.run();
     if (!result.meta.changes)
       throw new Error("The table changed. Refresh before sending your turn.");
@@ -159,7 +163,7 @@ export async function deleteRoom(code: string, baseRevision: number): Promise<vo
   });
 }
 
-function accountSeats(db: Database, room: CloudRoom): Statement[] {
+function accountSeats(db: Database, room: CloudRoom, body: string): Statement[] {
   return room.seats
     .filter((s) => s.userId)
     .map((s) =>
@@ -175,7 +179,7 @@ function accountSeats(db: Database, room: CloudRoom): Statement[] {
           "Campaign",
           Date.now(),
           room.code,
-          JSON.stringify(room),
+          body,
         ),
     );
 }

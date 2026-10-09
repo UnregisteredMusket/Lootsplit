@@ -1,0 +1,29 @@
+{
+  "format": "lootsplit.npcs",
+  "schemaVersion": 1,
+  "npcs": [
+    {
+      "name": "Mara Quayside",
+      "description": "A dock broker who trades expedition supplies and keeps discreet city contacts.",
+      "locationId": "REPLACE_WITH_EXISTING_CITY_OR_AREA_ID",
+      "visible": true,
+      "barterAllowed": true,
+      "controllerPurseId": null,
+      "copper": 15000,
+      "inventory": [
+        { "name": "Silk rope", "quantity": 4, "unitCopper": 1000, "notes": "Fictional example; DM sets price and details.", "category": "general" },
+        { "name": "Moonstone", "quantity": 1, "unitCopper": 5000, "notes": "Available for a reviewed barter.", "category": "jewels" }
+      ]
+    },
+    {
+      "name": "Archivist Elara",
+      "description": "Offers local lore. The DM supplies all responses.",
+      "locationId": "REPLACE_WITH_EXISTING_CITY_OR_AREA_ID",
+      "visible": true,
+      "barterAllowed": false,
+      "controllerPurseId": null,
+      "copper": 0,
+      "inventory": []
+    }
+  ]
+}

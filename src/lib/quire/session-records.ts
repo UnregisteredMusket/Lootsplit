@@ -1,9 +1,11 @@
+import { readWorld } from "./world-schema.ts";
+import { npcAvailableHere, npcController, shopVisible } from "./world.ts";
 import type { CloudTable, CloudSeat } from "./cloud.ts";
 import { canReadNote } from "./chat-visibility.ts";
 import { characterSheet } from "../characters/campaign-sheet.mjs";
 import { readFinance } from "./finance.ts";
 import { readJournal, readJournalForRecords, readArchivedSnapshot } from "./journal.ts";
-import { readMarketLocations, publicMarketLocations, shopAvailableHere } from "./shop-locations.ts";
+import { readMarketLocations, publicMarketLocations } from "./shop-locations.ts";
 import { propertyAvailableHere } from "./property.ts";
 import { canAccessEstate } from "./estate.ts";
 import { readEstate } from "./estate-schema.ts";
@@ -12,7 +14,7 @@ import { readEstate } from "./estate-schema.ts";
 export function projectRecord(
   table: CloudTable,
   seat: Pick<CloudSeat, "role" | "purseIds"> & { id?: string },
-  options: { ownedDevice?: boolean } = {},
+  options: { ownedDevice?: boolean; directory?: boolean } = {},
 ): CloudTable {
   const t = structuredClone(table);
   const dm = seat.role === "dm";
@@ -56,6 +58,17 @@ export function projectRecord(
     (r) => dm || seat.purseIds.includes(r.purseId),
   );
   if (!dm) {
+    const world = readWorld(t.journal.world);
+    world.maps = world.maps.filter(map => map.visible).map(map => ({...map, markers:map.markers.filter(marker=>marker.visibility === "party")}));
+    const readableNpcs = new Set(world.npcs.filter(npc=>npcAvailableHere(npc,t)).map(npc=>npc.id));
+    const controlledNpcs = new Set(world.npcs.filter(npc=>npcController(npc,seat)).map(npc=>npc.id));
+    world.conversations = world.conversations.filter(c=>(seat.purseIds.includes(c.purseId) || controlledNpcs.has(c.npcId)) && readableNpcs.has(c.npcId));
+    world.trades = world.trades.filter(o=>[o.left.purseId,o.right.purseId].some(id=>seat.purseIds.includes(id)||controlledNpcs.has(id)));
+    world.timeHistory = world.timeHistory.map(r=>({...r,purseIds:r.purseIds.filter(id=>seat.purseIds.includes(id))}));
+    world.npcs = world.npcs.filter(npc=>readableNpcs.has(npc.id));
+    if(options.directory)world.partyCharacters=t.purses.filter(p=>!p.nonParty && p.kind==="character" && p.control!=="npc").map(p=>({id:p.id,name:p.name}));
+    else delete world.partyCharacters;
+    if(t.journal.world || options.directory)t.journal.world=world;
     const estate = readEstate(t.journal.propertyOperations);
     const visibleSites = new Set(
       estate.sites
@@ -83,7 +96,7 @@ export function projectRecord(
       t.journal.propertyOperations = estate;
     }
     const market = readMarketLocations(t.journal.market);
-    t.shops = t.shops.filter((shop) => shopAvailableHere(shop, market));
+    t.shops = t.shops.filter((shop) => shopVisible(shop, t));
     t.listings = t.listings.filter(
       (listing) =>
         propertyAvailableHere(listing, market) &&
@@ -97,12 +110,15 @@ export function projectRecord(
         market,
         t.holdings
           .filter((h) => seat.purseIds.includes(h.purseId) || visibleSites.has(h.id))
-          .flatMap((h) => (h.locationId ? [h.locationId] : [])),
+          .flatMap((h) => (h.locationId ? [h.locationId] : [])).concat(
+            world.maps.flatMap(m=>[...(m.locationId?[m.locationId]:[]),...m.anchors.map(a=>a.locationId)]),
+            world.npcs.map(n=>n.locationId), t.shops.flatMap(s=>s.locationId?[s.locationId]:[]),
+            t.listings.flatMap(l=>l.locationId?[l.locationId]:[])),
       );
     t.ledger = t.ledger.filter((l) => seat.purseIds.includes(l.purseId));
     t.holdings = t.holdings.filter(
       (h) =>
-        seat.purseIds.includes(h.purseId) ||
+        seat.purseIds.includes(h.purseId) || (readableNpcs.has(h.purseId) && !h.custody && !h.reservedFor) ||
         visibleSites.has(h.id) ||
         (h.custody && visibleSites.has(h.custody.propertyId)),
     );
@@ -145,6 +161,9 @@ export function projectRecord(
       estate.materials = estate.materials.filter((material) => materials.has(material.key));
     }
     const publicNames = new Set([
+      ...world.conversations.map(c=>c.purseId),
+      ...world.npcs.map(n=>n.id),
+      ...world.trades.flatMap(o=>[o.left.purseId,o.right.purseId]),
       ...sharedOwners,
       ...t.holdings.map((h) => h.purseId),
       ...estate.jobs.flatMap((j) => [j.purseId, ...j.assignments.map((a) => a.purseId)]),
@@ -156,12 +175,13 @@ export function projectRecord(
       .map((p) =>
         seat.purseIds.includes(p.id)
           ? p
-          : { id: p.id, name: p.name, kind: p.kind, coins: { cp: 0, sp: 0, ep: 0, gp: 0, pp: 0 } },
+          : { id: p.id, name: p.name, kind: p.kind, ...(p.nonParty?{nonParty:true,control:"npc" as const}:{}), coins: { cp: 0, sp: 0, ep: 0, gp: 0, pp: 0 } },
       );
     if (t.journal.finance) {
       const f = readFinance(t.journal.finance);
       t.journal.finance = {
         day: f.day,
+        ...(f.minuteOfDay!==undefined?{minuteOfDay:f.minuteOfDay}:{}),
         loans: f.loans.filter((l) => seat.purseIds.includes(l.purseId)),
         rules: f.rules.filter((r) => seat.purseIds.includes(r.purseId)),
         downtime: [],

@@ -1,8 +1,10 @@
+import { worldCommands, type WorldCommand } from "./world-schema.ts";
+import { applyWorldCommand, validateWorld, shopVisible, shopAsking } from "./world.ts";
 import { shopScheduleSchema } from "./shop-schedule.ts";
 import { estateCommands } from "./estate-schema.ts";
 import { estateImportCommand, estateImportFingerprint, previewEstateImport } from "./estate-import.ts";
 import { applyEstateCommand, assertCarried, assertEstateDisposable, initializeEstatePurchase, removeEstateSite, validateEstate } from "./estate.ts";
-import { marketLocationSchema, readMarketLocations, validateShopLocations, shopAvailableHere } from "./shop-locations.ts";
+import { marketLocationSchema, readMarketLocations, validateShopLocations } from "./shop-locations.ts";
 import { canonicalJson } from "./canonical-json.ts";
 import { marketNameRowsSchema, marketNameFingerprint, previewMarketNames } from "./market-name-import.ts";
 import {
@@ -43,6 +45,7 @@ const id = z.string().min(1).max(150),
   qty = amount.min(1).max(100000);
 const base = { id };
 export const commandSchema = z.discriminatedUnion("kind", [
+  ...worldCommands,
   ...estateCommands,
   estateImportCommand,
   z.object({ ...base, kind: z.literal("listing-edit"), listingId: id, before: listingSchema.nullable(), after: listingSchema.nullable() }),
@@ -285,7 +288,9 @@ export function applyCommand(input: CloudTable, seat: CloudSeat, raw: Command): 
       throw Error("Cancel the pending downtime before changing finance agreements.");
     return f;
   };
-  if (cmd.kind === "estate-import") {
+  if (worldCommands.some(schema => schema.shape.kind.value === cmd.kind)) {
+    applyWorldCommand(t, seat, cmd as WorldCommand, at);
+  } else if (cmd.kind === "estate-import") {
     dm();
     if (finance().downtime.some(d => d.status === "pending")) throw Error("Cancel pending downtime before importing properties.");
     if (estateImportFingerprint(t) !== cmd.before) throw Error("The campaign changed. Review a fresh property import preview.");
@@ -336,7 +341,7 @@ export function applyCommand(input: CloudTable, seat: CloudSeat, raw: Command): 
     const current = market.locations.find(location => location.id === cmd.locationId) ?? null;
     if (!same(current, cmd.before)) throw Error("This location changed elsewhere. Refresh before saving.");
     if (cmd.after && cmd.after.id !== cmd.locationId) throw Error("Location identity cannot change.");
-    if (!cmd.after && (market.currentLocationId === cmd.locationId || market.locations.some(location => location.parentId === cmd.locationId) || t.shops.some(shop => shop.locationId === cmd.locationId) || [...t.listings, ...t.holdings].some(property => property.locationId === cmd.locationId)))
+    if (!cmd.after && (market.currentLocationId === cmd.locationId || market.locations.some(location => location.parentId === cmd.locationId) || t.shops.some(shop => shop.locationId === cmd.locationId) || journal.world?.npcs.some(n => n.locationId === cmd.locationId) || journal.world?.maps.some(m => m.locationId === cmd.locationId || m.anchors.some(a => a.locationId === cmd.locationId)) || [...t.listings, ...t.holdings].some(property => property.locationId === cmd.locationId)))
       throw Error("Move the party, child locations, assigned shops and properties before removing this location.");
     market.locations = [...market.locations.filter(location => location.id !== cmd.locationId), ...(cmd.after ? [cmd.after] : [])];
     journal.market = readMarketLocations(market);
@@ -659,12 +664,13 @@ export function applyCommand(input: CloudTable, seat: CloudSeat, raw: Command): 
     const s = t.stock.find((x) => x.id === cmd.stockId),
       shop = t.shops.find((x) => x.id === s?.shopId);
     if (!s || !shop) throw new Error("Item or shop no longer exists.");
-    if (seat.role === "player" && !shopAvailableHere(shop, readMarketLocations(journal.market))) throw Error("This shop is not available at the party's current location.");
+    if (seat.role === "player" && !shopVisible(shop, t)) throw Error("This shop is not available at the party's current location.");
+    if (shop.blackMarket && !journal.world?.blackMarketActive) throw Error("This black-market vendor is hidden.");
     if (shop.closed) throw new Error("This shop is closed.");
     if (s.quantity !== null && s.quantity < cmd.quantity)
       throw new Error("Not enough stock. Refresh and choose a smaller quantity.");
     const cost =
-      priceAfterCharisma(Math.round(s.copper * shop.sellRate), score(cmd.purseId)) * cmd.quantity;
+      priceAfterCharisma(shopAsking(shop, s.copper), score(cmd.purseId)) * cmd.quantity;
     coins(cmd.purseId, -cost);
     if (s.quantity !== null) s.quantity -= cmd.quantity;
     if (!isService(s))
@@ -719,7 +725,8 @@ export function applyCommand(input: CloudTable, seat: CloudSeat, raw: Command): 
     const h = t.holdings.find((x) => x.id === cmd.holdingId),
       s = t.shops.find((x) => x.id === cmd.shopId);
     if (!h || !s) throw new Error("Item or shop no longer exists.");
-    if (seat.role === "player" && !shopAvailableHere(s, readMarketLocations(journal.market))) throw Error("This shop is not available at the party's current location.");
+    if (seat.role === "player" && !shopVisible(s, t)) throw Error("This shop is not available at the party's current location.");
+    if (s.blackMarket && !journal.world?.blackMarketActive) throw Error("This black-market vendor is hidden.");
     if (s.closed) throw new Error("This shop is closed.");
     own(h.purseId);
     assertCarried(h);
@@ -899,6 +906,7 @@ export function applyCommand(input: CloudTable, seat: CloudSeat, raw: Command): 
   for (const listing of t.listings) listingSchema.parse(listing);
   validatePropertyLocations(t.listings, t.holdings, t.journal?.market);
   validateEstate(t);
+  validateWorld(t);
   return t;
 }
 export function same(a: unknown, b: unknown): boolean {

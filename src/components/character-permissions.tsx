@@ -56,7 +56,7 @@ export function PlayerPermissions() {
   return (
     <div className="grid gap-3">
       {purses
-        .filter((p) => p.kind === "character")
+        .filter((p) => p.kind === "character" && !p.nonParty)
         .map((p) => (
           <CharacterPermissions key={p.id} purse={p} />
         ))}

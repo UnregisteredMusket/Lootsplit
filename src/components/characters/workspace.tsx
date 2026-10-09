@@ -140,7 +140,7 @@ export function CharacterWorkspace({
     [reload, setReload] = useState(0),
     [creating, setCreating] = useState(false);
   const campaignRows: Row[] = economy.purses
-    .filter((p) => p.kind === "character" && (seat.role === "dm" || seat.purseIds.includes(p.id)))
+    .filter((p) => p.kind === "character" && !p.nonParty && (seat.role === "dm" || seat.purseIds.includes(p.id)))
     .map((p) => ({
       id: `party:${p.id}`,
       body: characterSheet(
@@ -284,7 +284,7 @@ export function CharacterWorkspace({
           name: registry.campaigns.find((c) => c.id === registry.activeId)?.name || "Campaign",
           ownerId: data.userId,
           purses: economy.purses.filter(
-            (p) => p.kind === "character" && (seat.role === "dm" || seat.purseIds.includes(p.id)),
+            (p) => p.kind === "character" && !p.nonParty && (seat.role === "dm" || seat.purseIds.includes(p.id)),
           ),
           holdings: economy.holdings,
         }

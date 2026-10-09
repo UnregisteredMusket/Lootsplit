@@ -7,6 +7,8 @@ export type Coins = {
 };
 
 export type Purse = {
+  /** Canonical account for a location NPC, excluded from party membership. */
+  nonParty?: boolean;
   sheet?: import("../characters/model.mjs").PlaySheet;
   sheetRevision?: number;
   editingAllowed?: boolean;
@@ -76,6 +78,8 @@ export type ItemCategory =
 export type ShopCategory = ItemCategory | "mixed";
 
 export type Shop = {
+  blackMarket?: boolean;
+  blackMarketPremium?: number;
   locationId?: string;
   schedule?: import("./shop-schedule.ts").ShopSchedule;
   acceptedCategories?: string[];

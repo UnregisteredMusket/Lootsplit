@@ -17,6 +17,7 @@ export const coinsSchema = z
     message: "The combined coin balance must be exactly representable in whole copper. Export the original save before repairing an oversized balance.",
   });
 const purse = z.object({
+  nonParty: z.boolean().optional(),
   sheet: sheetSchema.optional(),
   sheetRevision: z.number().int().nonnegative().optional(),
   editingAllowed: z.boolean().optional(),
@@ -47,6 +48,8 @@ export const holdingSchema = z.object({
 });
 
 const shop = z.object({
+  blackMarket: z.boolean().optional(),
+  blackMarketPremium: z.number().min(1.01).max(100).optional(),
   locationId: z.string().min(1).max(150).optional(),
   schedule: shopScheduleSchema.optional(),
   acceptedCategories: z.array(z.string().max(80)).max(20).optional(),

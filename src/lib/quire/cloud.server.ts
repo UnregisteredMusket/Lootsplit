@@ -1,3 +1,4 @@
+import { encodeRoomImages } from "../../../cloudflare/room-images.mjs";
 import { readRoom, createRoom, updateRoom } from "./room-store.server.ts";
 import {
   claimSeat,
@@ -89,7 +90,7 @@ export async function characterRoll(input: {
         JSON.stringify(roll),
         Date.now(),
         room.code,
-        JSON.stringify(room),
+        (await encodeRoomImages(room)).body,
         input.manual ? 1 : 0,
         room.code,
       )
@@ -348,7 +349,7 @@ async function must(code: string): Promise<CloudRoom> {
 
 function view(room: CloudRoom, seat: CloudSeat): RoomView {
   const current = room.seats[room.turn];
-  const record = projectRecord({ ...room.table, journal: room.table.journal }, seat);
+  const record = projectRecord({ ...room.table, journal: room.table.journal }, seat, { directory: true });
   const journal = record.journal;
   return {
     userId: seat.userId,
