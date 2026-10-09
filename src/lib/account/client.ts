@@ -1,5 +1,6 @@
 import { API_ORIGIN } from "../mobile/origin";
 import { announceSheetChange } from "../quire/party-sheet-links";
+import { readAccountResponse } from "./response";
 const native = () => import.meta.env.VITE_MOBILE === "true";
 const TOKEN = "lootsplit.account.token.v1";
 // Coalesce the startup gate and account controls' identity reads. This is UI
@@ -9,7 +10,10 @@ export function accountRequest<T>(path: string, body?: unknown, signal?: AbortSi
   if (body !== undefined && path.startsWith("auth/")) identityRead = undefined;
   if (path === "auth/get-session" && body === undefined && !signal) {
     if (identityRead && identityRead.until > Date.now()) return identityRead.result as Promise<T>;
-    const result = accountRequestCore<T>(path).catch(e => { identityRead = undefined; throw e; });
+    const result = accountRequestCore<T>(path).catch((e) => {
+      identityRead = undefined;
+      throw e;
+    });
     identityRead = { until: Date.now() + 2500, result };
     return result;
   }
@@ -21,6 +25,7 @@ async function accountRequestCore<T>(
   signal?: AbortSignal,
 ): Promise<T> {
   const headers = new Headers();
+  headers.set("accept", "application/json");
   if (body !== undefined) headers.set("content-type", "application/json");
   const token = native() ? localStorage.getItem(TOKEN) : null;
   if (token) headers.set("authorization", `Bearer ${token}`);
@@ -29,24 +34,30 @@ async function accountRequestCore<T>(
     headers,
     signal,
     credentials: native() ? "omit" : "same-origin",
+    cache: "no-store",
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
   });
-  const result = await response.json();
+  const result = await readAccountResponse<{
+    error?: string | { message?: string };
+    message?: string;
+  } | null>(response);
   if (path === "activity" && response.status === 401)
     localStorage.removeItem("lootsplit.account.active");
   if (response.ok && path === "library") localStorage.setItem("lootsplit.account.active", "yes");
   if (path === "auth/sign-out" && response.ok) localStorage.removeItem("lootsplit.account.active");
   if (!response.ok)
     throw new Error(
-      result.error?.message ||
-        result.error ||
-        result.message ||
+      (typeof result?.error === "object" ? result.error?.message : result?.error) ||
+        result?.message ||
         "The account service is unavailable. Try again when online.",
     );
   const nextToken = response.headers.get("set-auth-token");
   if (native() && nextToken) localStorage.setItem(TOKEN, nextToken);
   if (path === "auth/sign-out") localStorage.removeItem(TOKEN);
-  if (body !== undefined && path.startsWith("auth/")) { identityRead = undefined; announceSheetChange(); }
+  if (body !== undefined && path.startsWith("auth/")) {
+    identityRead = undefined;
+    announceSheetChange();
+  }
   if (response.ok && ["auth/sign-in/email", "auth/sign-up/email", "auth/sign-out"].includes(path)) {
     // Old account identity must not authorize device recovery while the gate is
     // checking the newly authenticated account (or after sign-out).

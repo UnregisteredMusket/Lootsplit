@@ -2,6 +2,7 @@
 export const accountScenarios = [
   "network-boundary",
   "ownership",
+  "resume-partial",
   "layout",
   "library",
   "dm-resume",

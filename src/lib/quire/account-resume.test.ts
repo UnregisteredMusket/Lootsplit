@@ -36,12 +36,7 @@ test("fresh profile opens the server campaign without a device queue", () => {
 });
 test("already-acknowledged Live actions cannot block account resume", () => {
   const cached = cache(["accepted"]);
-  const result = reconcileAccountResume(
-    cached,
-    remote(["accepted"]),
-    identity,
-    "new",
-  );
+  const result = reconcileAccountResume(cached, remote(["accepted"]), identity, "new");
   assert.equal(result.pending.length, 0);
   assert.equal(result.needsRecovery, false);
   assert.equal(
@@ -59,6 +54,21 @@ test("lost-response actions retain command and batch identity", () => {
   assert.equal(result.batchId, "original-batch");
   assert.equal(result.revision, -1);
 });
+test("a partially acknowledged queue gets a fresh batch without losing unsent actions", () => {
+  const cached = cache(["accepted", "unsent"]);
+  const result = reconcileAccountResume(cached, remote(["accepted"]), identity, "new");
+  assert.deepEqual(
+    result.pending.map((c) => c.id),
+    ["unsent"],
+  );
+  assert.equal(result.batchId, "new", "The old batch receipt describes different commands");
+  assert.equal(result.revision, -1);
+  assert.deepEqual(
+    cached.pending.map((c) => c.id),
+    ["accepted", "unsent"],
+  );
+  assert.equal(cached.batchId, "original-batch");
+});
 test("genuine turn restores server draft and unsubmitted local additions", () => {
   const result = reconcileAccountResume(
     cache(["staged", "unsent"]),
@@ -73,15 +83,23 @@ test("genuine turn restores server draft and unsubmitted local additions", () =>
   assert.equal(result.batchId, "original-batch");
 });
 test("a second device restores a genuine server draft", () => {
-  const result = reconcileAccountResume(
-    null,
-    remote([], [command("staged")]),
-    identity,
-    "new",
-  );
+  const result = reconcileAccountResume(null, remote([], [command("staged")]), identity, "new");
   assert.deepEqual(
     result.pending.map((c) => c.id),
     ["staged"],
+  );
+});
+test("additional server drafts get a fresh receipt while unchanged commands keep their IDs", () => {
+  const result = reconcileAccountResume(
+    cache(),
+    remote([], [command("other-device")]),
+    identity,
+    "new",
+  );
+  assert.equal(result.batchId, "new");
+  assert.deepEqual(
+    result.pending.map((c) => c.id),
+    ["other-device", "local"],
   );
 });
 for (const change of [
@@ -91,24 +109,14 @@ for (const change of [
   { role: "player" as const },
 ]) {
   test(`changed identity ${JSON.stringify(change)} never replays cached work`, () => {
-    const result = reconcileAccountResume(
-      { ...cache(), ...change },
-      remote(),
-      identity,
-      "new",
-    );
+    const result = reconcileAccountResume({ ...cache(), ...change }, remote(), identity, "new");
     assert.equal(result.pending.length, 0);
     assert.equal(result.needsRecovery, true);
   });
 }
 test("a device revision newer than the server requires a separate recovery copy", () => {
   assert.equal(
-    reconcileAccountResume(
-      { ...cache(), revision: 9 },
-      remote(),
-      identity,
-      "new",
-    ).needsRecovery,
+    reconcileAccountResume({ ...cache(), revision: 9 }, remote(), identity, "new").needsRecovery,
     true,
   );
 });
@@ -118,8 +126,7 @@ test("conflicting versions of the same draft command require separate recovery",
     changes: [{ store: "purses", id: "changed", before: null, after: null }],
   };
   assert.equal(
-    reconcileAccountResume(cache(), remote([], [draft]), identity, "new")
-      .needsRecovery,
+    reconcileAccountResume(cache(), remote([], [draft]), identity, "new").needsRecovery,
     true,
   );
 });

@@ -34,17 +34,11 @@ export function reconcileAccountResume(
     cached.token === identity.token &&
     cached.role === identity.role;
   const acknowledged = new Set(remote.acknowledged);
-  const local = sameSeat
-    ? cached!.pending.filter((c) => !acknowledged.has(c.id))
-    : [];
+  const local = sameSeat ? cached!.pending.filter((c) => !acknowledged.has(c.id)) : [];
   // Server drafts and local unsent additions both survive a cross-device resume.
   const pending = [...draft.filter((c) => !acknowledged.has(c.id))];
   const known = new Set(pending.map((c) => c.id));
-  const conflict = local.some((c) =>
-    pending.some(
-      (d) => d.id === c.id && !sameCommand(d, c),
-    ),
-  );
+  const conflict = local.some((c) => pending.some((d) => d.id === c.id && !sameCommand(d, c)));
   for (const command of local)
     if (!known.has(command.id)) {
       pending.push(command);
@@ -52,12 +46,19 @@ export function reconcileAccountResume(
     }
   return {
     pending,
-    batchId: local.length ? cached!.batchId : freshBatchId,
+    // A receipt identifies the whole ordered payload. Keep it only for an
+    // unchanged retry; individual command IDs still prevent double execution.
+    batchId:
+      sameSeat &&
+      pending.length > 0 &&
+      pending.length === cached!.pending.length &&
+      pending.every((c, i) => sameCommand(c, cached!.pending[i]))
+        ? cached!.batchId
+        : freshBatchId,
     // Force a read/rebase after selecting the device database, including conflicts.
     revision: pending.length ? -1 : 0,
     // A changed seat must never replay the previous seat's queued work.
     needsRecovery:
-      !!cached?.pending.length &&
-      (!sameSeat || cached.revision > remote.revision || conflict),
+      !!cached?.pending.length && (!sameSeat || cached.revision > remote.revision || conflict),
   };
 }
