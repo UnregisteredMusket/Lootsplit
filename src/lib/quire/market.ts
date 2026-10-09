@@ -1,4 +1,5 @@
 import { quireDb } from "./db.ts";
+import { listingSchema, type PropertyProfile } from "./property.ts";
 
 export type Listing = {
   id: string;
@@ -7,6 +8,9 @@ export type Listing = {
   copper: number;
   quantity: number | null;
   notes: string;
+  locationId?: string;
+  property?: PropertyProfile;
+  status?: "available" | "reserved" | "withdrawn";
 };
 
 export type LoanStatus = "pending" | "approved" | "denied";
@@ -124,7 +128,10 @@ function normalizeListing(value: unknown): Listing | null {
   if (!id || !name || (listing.kind !== "item" && listing.kind !== "property") || !Number.isFinite(copper) || copper < 0) return null;
   const quantity = listing.quantity === null || listing.quantity === undefined ? null : Math.max(0, Math.floor(Number(listing.quantity)));
   if (quantity !== null && !Number.isFinite(quantity)) return null;
-  return { id, name, kind: listing.kind, copper, quantity, notes: typeof listing.notes === "string" ? listing.notes.trim() : "" };
+  return listingSchema.parse({ id, name, kind: listing.kind, copper, quantity, notes: typeof listing.notes === "string" ? listing.notes.trim() : "",
+    ...(listing.locationId !== undefined ? { locationId: listing.locationId } : {}),
+    ...(listing.property !== undefined ? { property: listing.property } : {}),
+    ...(listing.status !== undefined ? { status: listing.status } : {}) });
 }
 
 function normalizeLoan(value: unknown): LoanAsk | null {

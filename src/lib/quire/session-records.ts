@@ -4,6 +4,7 @@ import { characterSheet } from "../characters/campaign-sheet.mjs";
 import { readFinance } from "./finance.ts";
 import { readJournal, readJournalForRecords, readArchivedSnapshot } from "./journal.ts";
 import { readMarketLocations, publicMarketLocations, shopAvailableHere } from "./shop-locations.ts";
+import { propertyAvailableHere } from "./property.ts";
 
 /** Server/default projections enforce historical seats; verified local DM readers may retain their owned nested records. */
 export function projectRecord(
@@ -55,9 +56,10 @@ export function projectRecord(
   if (!dm) {
     const market = readMarketLocations(t.journal.market);
     t.shops = t.shops.filter(shop => shopAvailableHere(shop, market));
+    t.listings = t.listings.filter(listing => propertyAvailableHere(listing, market) && listing.quantity !== 0 && listing.status !== "withdrawn");
     const shops = new Set(t.shops.map(shop => shop.id));
     t.stock = t.stock.filter(line => shops.has(line.shopId));
-    if (t.journal.market) t.journal.market = publicMarketLocations(market);
+    if (t.journal.market) t.journal.market = publicMarketLocations(market, t.holdings.filter(h => seat.purseIds.includes(h.purseId)).flatMap(h => h.locationId ? [h.locationId] : []));
     t.ledger = t.ledger.filter((l) => seat.purseIds.includes(l.purseId));
     t.holdings = t.holdings.filter((h) => seat.purseIds.includes(h.purseId));
     t.purses = t.purses.filter((p) => seat.purseIds.includes(p.id));

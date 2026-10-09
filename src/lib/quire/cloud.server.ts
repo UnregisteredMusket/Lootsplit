@@ -383,6 +383,8 @@ function view(room: CloudRoom, seat: CloudSeat): RoomView {
             ...room.table,
             shops: record.shops,
             stock: record.stock,
+            listings: record.listings,
+            holdings: record.holdings,
             purses: room.table.purses.map((p) => {
               if (seat.purseIds.includes(p.id)) return p;
               const {

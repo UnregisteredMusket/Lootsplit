@@ -65,7 +65,7 @@ function Listings() {
               {listing.quantity === null ? "Unlimited" : `${listing.quantity} left`}
             </p>
             {listing.notes ? <p className="mt-1 text-sm text-muted">{listing.notes}</p> : null}
-            {seat.role === "dm" ? (
+            {listing.kind === "property" ? <AppLink className="settings-link" href="/features/properties?from=%2Fmarket">View property listing & purchase</AppLink> : seat.role === "dm" ? (
               <Button
                 className="mt-2"
                 variant="ghost"

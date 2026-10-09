@@ -840,7 +840,9 @@ function GiveToPlayer({ purses }: { purses: Purse[] }) {
       ? everyone
           .filter((purse) => purse.id !== fromId)
           .map((purse) => ({ id: purse.id, name: purse.name }))
-      : roster;
+      : getCloudTable().joined
+        ? everyone.filter(purse => purse.id !== fromId && purse.kind === "character" && characterControl(purse) === "player").map(purse => ({ id: purse.id, name: purse.name }))
+        : roster.filter(person => person.id !== fromId);
   const mine = holdings.filter((holding) => holding.purseId === fromId);
 
   useEffect(() => {
@@ -873,10 +875,10 @@ function GiveToPlayer({ purses }: { purses: Purse[] }) {
   }
 
   return (
-    <section className="mt-10">
+    <section className="mt-10" id="give-holding">
       <h2 className="font-display text-2xl tracking-tight">Give to a player</h2>
       <p className="mt-1 text-sm text-muted">
-        Coins, items, or property move to another player. The party chat shows it, and the dungeon
+        Coins, items, or property deeds move to another character. A property and its deed transfer together. The party chat shows it, and the dungeon
         master's activity report lists it.
       </p>
       {recipients.length === 0 ? (

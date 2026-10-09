@@ -32,11 +32,18 @@ import type { CloudTable, CloudSeat } from "./cloud.ts";
 import { fromCopper, toCopper, spendCoins, priceAfterCharisma } from "./money.ts";
 import { charismaScore, readSheets } from "./sheet.ts";
 import { validateEconomyRows } from "./validation.ts";
+import { listingSchema, propertyProfileSchema, propertyAvailableHere, validatePropertyLocations } from "./property.ts";
+import { transferPropertyDeed } from "./property-deed.ts";
+import { locationLabel } from "./shop-locations.ts";
 const id = z.string().min(1).max(150),
   amount = z.number().int().nonnegative().max(1e12),
   qty = amount.min(1).max(100000);
 const base = { id };
 export const commandSchema = z.discriminatedUnion("kind", [
+  z.object({ ...base, kind: z.literal("listing-edit"), listingId: id, before: listingSchema.nullable(), after: listingSchema.nullable() }),
+  z.object({ ...base, kind: z.literal("property-profile"), holdingId: id,
+    before: z.object({ locationId: id.nullable(), property: propertyProfileSchema.nullable() }),
+    locationId: id.nullable(), property: propertyProfileSchema.nullable() }),
   z.object({ ...base, kind: z.literal("market-name-import"), before: z.string(), rows: marketNameRowsSchema }),
   z.object({ ...base, kind: z.literal("shop-location"), shopId: id,
     before: z.object({ locationId: id.nullable(), image: artworkSchema.nullable() }),
@@ -126,7 +133,7 @@ export const commandSchema = z.discriminatedUnion("kind", [
   }),
   z.object({ ...base, kind: z.literal("buy"), stockId: id, purseId: id, quantity: qty }),
   z.object({ ...base, kind: z.literal("sell"), holdingId: id, shopId: id, quantity: qty }),
-  z.object({ ...base, kind: z.literal("listing"), listingId: id, purseId: id, quantity: qty }),
+  z.object({ ...base, kind: z.literal("listing"), listingId: id, purseId: id, quantity: qty, before: listingSchema.optional() }),
   z.object({
     ...base,
     kind: z.literal("give"),
@@ -273,7 +280,24 @@ export function applyCommand(input: CloudTable, seat: CloudSeat, raw: Command): 
       throw Error("Cancel the pending downtime before changing finance agreements.");
     return f;
   };
-  if (cmd.kind === "market-name-import") {
+  if (cmd.kind === "listing-edit") {
+    dm();
+    const current = t.listings.find(listing => listing.id === cmd.listingId) ?? null;
+    if (!same(current, cmd.before)) throw Error("This listing changed elsewhere. Reload before saving; your draft is retained.");
+    if (cmd.after && (cmd.after.id !== cmd.listingId || (current && current.kind !== cmd.after.kind)))
+      throw Error("Listing identity and kind cannot change.");
+    t.listings = [...t.listings.filter(listing => listing.id !== cmd.listingId), ...(cmd.after ? [cmd.after] : [])];
+    event(cmd.after ? `Listing saved: ${cmd.after.name}` : `Listing removed: ${current?.name || cmd.listingId}`);
+  } else if (cmd.kind === "property-profile") {
+    dm();
+    const h = t.holdings.find(h => h.id === cmd.holdingId && h.kind === "property" && h.quantity > 0);
+    if (!h) throw Error("Property no longer exists.");
+    if (!same({ locationId: h.locationId ?? null, property: h.property ?? null }, cmd.before))
+      throw Error("Property location or features changed elsewhere. Reload before saving.");
+    if (cmd.locationId) h.locationId = cmd.locationId; else delete h.locationId;
+    if (cmd.property) h.property = cmd.property; else delete h.property;
+    event(`Property location and features saved: ${h.name}`, "management", h.purseId);
+  } else if (cmd.kind === "market-name-import") {
     dm();
     const market = readMarketLocations(journal.market);
     if (marketNameFingerprint(market, t.shops) !== cmd.before) throw Error("Location or shop names changed elsewhere. Review a fresh import preview.");
@@ -297,8 +321,8 @@ export function applyCommand(input: CloudTable, seat: CloudSeat, raw: Command): 
     const current = market.locations.find(location => location.id === cmd.locationId) ?? null;
     if (!same(current, cmd.before)) throw Error("This location changed elsewhere. Refresh before saving.");
     if (cmd.after && cmd.after.id !== cmd.locationId) throw Error("Location identity cannot change.");
-    if (!cmd.after && (market.currentLocationId === cmd.locationId || market.locations.some(location => location.parentId === cmd.locationId) || t.shops.some(shop => shop.locationId === cmd.locationId)))
-      throw Error("Move the party, child locations and assigned shops before removing this location.");
+    if (!cmd.after && (market.currentLocationId === cmd.locationId || market.locations.some(location => location.parentId === cmd.locationId) || t.shops.some(shop => shop.locationId === cmd.locationId) || [...t.listings, ...t.holdings].some(property => property.locationId === cmd.locationId)))
+      throw Error("Move the party, child locations, assigned shops and properties before removing this location.");
     market.locations = [...market.locations.filter(location => location.id !== cmd.locationId), ...(cmd.after ? [cmd.after] : [])];
     journal.market = readMarketLocations(market);
     event(cmd.after ? `Location saved: ${cmd.after.name}` : "Location removed");
@@ -642,12 +666,16 @@ export function applyCommand(input: CloudTable, seat: CloudSeat, raw: Command): 
     own(cmd.purseId);
     const l = t.listings.find((x) => x.id === cmd.listingId);
     if (!l) throw new Error("Listing no longer exists.");
+    if (cmd.before && !same(l, cmd.before)) throw Error("This listing changed. Review its current price and details before buying.");
+    if (l.kind === "property" && l.status && l.status !== "available") throw Error("This property is not currently for sale.");
+    if (seat.role === "player" && !propertyAvailableHere(l, readMarketLocations(journal.market)))
+      throw Error("This property is not available at the party's current location.");
     if (l.quantity !== null && l.quantity < cmd.quantity)
       throw new Error("Not enough listing stock.");
     const cost = priceAfterCharisma(l.copper, score(cmd.purseId)) * cmd.quantity;
     coins(cmd.purseId, -cost);
     if (l.quantity !== null) l.quantity -= cmd.quantity;
-    t.holdings.push({
+    const holding: import("./types.ts").Holding = {
       id: cmd.id + "-item",
       purseId: cmd.purseId,
       name: l.name,
@@ -655,8 +683,20 @@ export function applyCommand(input: CloudTable, seat: CloudSeat, raw: Command): 
       quantity: cmd.quantity,
       unitCopper: l.copper,
       notes: l.notes,
-    });
+      ...(l.locationId ? { locationId: l.locationId } : {}),
+      ...(l.property ? { property: structuredClone(l.property), ...(l.property.images?.[0] ? { image: l.property.images[0] } : {}) } : {}),
+      ...(l.kind === "property" ? { deed: {
+        id: cmd.id + "-deed", transactionId: cmd.id, listingId: l.id, propertyName: l.name,
+        location: locationLabel(readMarketLocations(journal.market), l.locationId),
+        buyerId: cmd.purseId, buyerName: t.purses.find(p => p.id === cmd.purseId)!.name,
+        ownerId: cmd.purseId, ownerName: t.purses.find(p => p.id === cmd.purseId)!.name,
+        purchasedAt: at, campaignDay: readFinance(journal.finance).day, unitCopper: cost / cmd.quantity,
+        totalCopper: cost, purchasedQuantity: cmd.quantity,
+      } } : {}),
+    };
+    t.holdings.push(holding);
     log(cmd.purseId, `Bought ${cmd.quantity} ${l.name} from the market`, -cost);
+    t.ledger[t.ledger.length - 1].listingPurchase = { listingId: l.id, quantity: cmd.quantity, holding: structuredClone(holding) };
   } else if (cmd.kind === "sell") {
     const h = t.holdings.find((x) => x.id === cmd.holdingId),
       s = t.shops.find((x) => x.id === cmd.shopId);
@@ -683,7 +723,8 @@ export function applyCommand(input: CloudTable, seat: CloudSeat, raw: Command): 
       if (!h || cmd.quantity < 1 || h.quantity < cmd.quantity)
         throw new Error("Not enough items to transfer.");
       h.quantity -= cmd.quantity;
-      t.holdings.push({ ...h, id: cmd.id + "-item", purseId: cmd.toId, quantity: cmd.quantity });
+      t.holdings.push({ ...h, id: cmd.id + "-item", purseId: cmd.toId, quantity: cmd.quantity,
+        ...(h.deed ? { deed: transferPropertyDeed(h.deed, t.purses.find(p => p.id === cmd.toId)!, cmd.id, at) } : {}) });
       t.holdings = t.holdings.filter((x) => x.quantity > 0);
     }
     log(cmd.fromId, "Transfer sent", -cmd.copper);
@@ -828,6 +869,8 @@ export function applyCommand(input: CloudTable, seat: CloudSeat, raw: Command): 
   if (journal.finance) journal.finance = readFinance(journal.finance);
   validateEconomyRows(t);
   validateShopLocations(t.shops, t.journal?.market);
+  for (const listing of t.listings) listingSchema.parse(listing);
+  validatePropertyLocations(t.listings, t.holdings, t.journal?.market);
   return t;
 }
 export function same(a: unknown, b: unknown): boolean {

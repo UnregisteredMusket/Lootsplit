@@ -3,6 +3,10 @@ import { isEphemeralCampaign } from "./guest-storage.ts";
 import { assertMerchantSale, isService, stockCategory } from "./merchant.ts";
 import { applyCommand, type CommandInput } from "./commands.ts";
 import { validateShopLocations } from "./shop-locations.ts";
+import { propertyAvailableHere } from "./property.ts";
+import { readMarketLocations } from "./shop-locations.ts";
+import { locationLabel } from "./shop-locations.ts";
+import { transferPropertyDeed } from "./property-deed.ts";
 import { loanFromRequest, readFinance, assertFinanceAccountRemovable } from "./finance.ts";
 import { readLocalEncounters } from "../encounters/local.ts";
 import { readJournal, readValidatedJournal, type Journal } from "./journal.ts";
@@ -1135,7 +1139,10 @@ export async function giveToPlayer(input: {
       (!holdingRow || holdingRow.purseId !== from.id || holdingRow.quantity < moved.quantity)
     )
       throw new Error("You do not have that many.");
-    if (holdingRow && moved) gift.holding = moved = itemForGift(holdingRow, moved.quantity);
+    if (holdingRow && moved) {
+      gift.holding = moved = itemForGift(holdingRow, moved.quantity);
+      if (holdingRow.deed) moved.deed = transferPropertyDeed(holdingRow.deed, { id: gift.toId, name: to?.name || toName }, gift.id, gift.at);
+    }
     const pendingRow =
       sitting.role === "player" ? await request(tx.objectStore("meta").get("gifts")) : null;
     const pending =
@@ -1238,6 +1245,13 @@ export async function buyListing(input: {
     const listings = readListings(await request(tx.objectStore("meta").get("listings")));
     const listing = listings.find((item) => item.id === input.listingId);
     if (!listing) throw new Error("That listing is gone.");
+    if (listing.status && listing.status !== "available") throw Error("This property is not currently for sale.");
+    if (getSeat().role === "player") {
+      if (!getSeat().purseIds.includes(input.purseId)) throw Error("That character is not yours at this table.");
+      const journal = readJournal((await request<{ value?: unknown } | undefined>(tx.objectStore("meta").get("journal")))?.value);
+      if (!propertyAvailableHere(listing, readMarketLocations(journal.market)))
+        throw Error("This property is not available at the party's current location.");
+    }
     if (listing.quantity !== null && listing.quantity < quantity)
       throw new Error("There are not that many.");
     const purse = await request<Purse | undefined>(tx.objectStore("purses").get(input.purseId));
@@ -1251,7 +1265,9 @@ export async function buyListing(input: {
         ? readSales(await request(tx.objectStore("meta").get("sales")))
         : null;
     tx.objectStore("purses").put({ ...purse, coins });
-    tx.objectStore("holdings").put({
+    const receiptId = crypto.randomUUID(), purchasedAt = Date.now();
+    const journal = readJournal((await request<{ value?: unknown } | undefined>(tx.objectStore("meta").get("journal")))?.value);
+    const holding: Holding = {
       id: crypto.randomUUID(),
       purseId: purse.id,
       name: listing.name,
@@ -1259,7 +1275,16 @@ export async function buyListing(input: {
       quantity,
       unitCopper: listing.copper,
       notes: listing.notes,
-    });
+      ...(listing.locationId ? { locationId: listing.locationId } : {}),
+      ...(listing.property ? { property: structuredClone(listing.property), ...(listing.property.images?.[0] ? { image: listing.property.images[0] } : {}) } : {}),
+      ...(listing.kind === "property" ? { deed: {
+        id: receiptId + "-deed", transactionId: receiptId, listingId: listing.id, propertyName: listing.name,
+        location: locationLabel(readMarketLocations(journal.market), listing.locationId), buyerId: purse.id, buyerName: purse.name,
+        ownerId: purse.id, ownerName: purse.name, purchasedAt, campaignDay: readFinance(journal.finance).day,
+        unitCopper: cost / quantity, totalCopper: cost, purchasedQuantity: quantity,
+      } } : {}),
+    };
+    tx.objectStore("holdings").put(holding);
     tx.objectStore("meta").put({
       id: "listings",
       listings: listings.map((item) =>
@@ -1286,7 +1311,8 @@ export async function buyListing(input: {
     const summary =
       `Bought ${quantity} ${listing.name} from the market` +
       (percent ? `, Charisma ${score}, ${percent}% off` : "");
-    tx.objectStore("ledger").put(logLine(purse.id, null, summary, -cost, "purchase"));
+    tx.objectStore("ledger").put({ ...logLine(purse.id, null, summary, -cost, "purchase"), id: receiptId, at: purchasedAt,
+      listingPurchase: { listingId: listing.id, quantity, holding: structuredClone(holding) } });
   });
 }
 

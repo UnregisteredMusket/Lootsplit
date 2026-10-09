@@ -6,6 +6,8 @@ import { validateShopLocations, type MarketLocations } from "./shop-locations.ts
 export { artworkSchema } from "./artwork.ts";
 import { sheetSchema, inventoryFields } from "../characters/model.mjs";
 import { toCopper } from "./money.ts";
+import { propertyFields, validatePropertyLocations, type PropertyRecord } from "./property.ts";
+import { propertyDeedSchema } from "./property-deed.ts";
 const id = z.string().min(1);
 const amount = z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER);
 export const coinsSchema = z
@@ -30,6 +32,8 @@ const purse = z.object({
 });
 export const holdingSchema = z.object({
   ...inventoryFields,
+  ...propertyFields,
+  deed: propertyDeedSchema.optional(),
   service: z.boolean().optional(),
   purseId: id,
   image: artworkSchema.optional(),
@@ -66,6 +70,7 @@ const stock = z.object({
 const ledger = z.object({
   reversalOf: id.optional(),
   purchase: z.object({ stockId: id, quantity: amount.positive(), holding: holdingSchema.nullable() }).optional(),
+  listingPurchase: z.object({ listingId: id, quantity: amount.positive(), holding: holdingSchema }).optional(),
   transactionType: z
     .enum(["transfer", "purchase", "sale", "loan", "payment", "adjustment", "void"])
     .optional(),
@@ -93,6 +98,8 @@ export function validateEconomyRows(value: {
     const ids = (rows as { id: string }[]).map((row) => row.id);
     if (new Set(ids).size !== ids.length)
       throw new Error(`The ${key} contain duplicate IDs. The current campaign was not changed.`);
+    if (key === "holdings" && (rows as import("./types.ts").Holding[]).some(holding => holding.deed && (holding.kind !== "property" || holding.deed.ownerId !== holding.purseId)))
+      throw Error("A deed must belong to its property owner. The current campaign was not changed.");
   }
 }
 
@@ -119,7 +126,8 @@ export function validateBackupRows(value: Record<string, unknown>): void {
 
 /** Live assets need owners; historical ledger and settled agreements may retain deleted IDs. */
 export function validateBackupReferences(value: {
-  purses: { id: string }[]; holdings: { id: string; purseId: string }[];
+  purses: { id: string }[]; holdings: ({ id: string; purseId: string } & PropertyRecord)[];
+  listings?: PropertyRecord[];
   shops: { id: string; locationId?: string }[]; stock: { shopId: string }[];
   books: { id: string }[]; articles: { bookId: string }[];
   sheets?: { purseId: string }[]; loans?: { purseId: string; status: string }[];
@@ -129,6 +137,7 @@ export function validateBackupReferences(value: {
   } };
 }): string[] {
   validateShopLocations(value.shops, value.journal?.market);
+  validatePropertyLocations(value.listings ?? [], value.holdings, value.journal?.market);
   const diagnostics: string[] = [];
   const purses = new Set(value.purses.map(row => row.id)), shops = new Set(value.shops.map(row => row.id)),
     books = new Set(value.books.map(row => row.id)), holdings = new Set(value.holdings.map(row => row.id));

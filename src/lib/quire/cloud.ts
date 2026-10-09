@@ -64,6 +64,7 @@ export type CloudRoom = {
 };
 
 import { validateShopLocations } from "./shop-locations.ts";
+import { validatePropertyLocations } from "./property.ts";
 
 export function emptyCloudTable(): CloudTable {
   return { purses: [], holdings: [], shops: [], stock: [], ledger: [], listings: [], loans: [], sheets: [], notes: [] };
@@ -75,7 +76,10 @@ export function readCloudTable(value: unknown): CloudTable | null {
   if (!Array.isArray(table.purses) || !Array.isArray(table.holdings) || !Array.isArray(table.shops) || !Array.isArray(table.stock) || !Array.isArray(table.ledger)) {
     return null;
   }
-  try { validateEconomyRows(table as CloudTable); validateShopLocations(table.shops, readJournal(table.journal).market); } catch { return null; }
+  try { validateEconomyRows(table as CloudTable); const market = readJournal(table.journal).market;
+    validateShopLocations(table.shops, market);
+    validatePropertyLocations(readListings(table.listings), table.holdings, market);
+  } catch { return null; }
   return {
     journal: readJournal(table.journal),
     realm: table.realm ? clampRealm(table.realm) : undefined,
