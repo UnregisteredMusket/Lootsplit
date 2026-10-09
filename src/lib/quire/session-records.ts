@@ -169,11 +169,10 @@ export function projectRecord(
     }
     t.journal.requests = t.journal.requests.filter((r) => seat.purseIds.includes(r.purseId));
     t.journal.events = t.journal.events
-      .filter(
-        (e) =>
-          !e.purseId ||
-          seat.purseIds.includes(e.purseId) ||
-          (e.propertyId && visibleSites.has(e.propertyId)),
+      .filter((e) =>
+        e.propertyId
+          ? visibleSites.has(e.propertyId) || (!!e.purseId && seat.purseIds.includes(e.purseId))
+          : !e.purseId || seat.purseIds.includes(e.purseId),
       )
       .map(({ change, ...e }) => e);
     t.loans = t.loans.filter((l) => seat.purseIds.includes(l.purseId));

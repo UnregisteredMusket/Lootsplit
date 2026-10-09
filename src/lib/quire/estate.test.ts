@@ -644,8 +644,29 @@ test("rental income uses existing schedules and occupancy gates without altering
   );
 });
 test("shared projections expose authorized stash records and redact unrelated character finances", () => {
-  const t = stored(),
-    view = projectRecord(t, hero);
+  const t = stored();
+  t.journal!.events.push({
+    id: "private-operation",
+    at: 1,
+    kind: "request",
+    propertyId: "unrelated-property",
+    summary: "Private owner's withdrawal request",
+  });
+  t.journal!.events.push({
+    id: "public-event",
+    at: 1,
+    kind: "management",
+    summary: "Campaign announcement",
+  });
+  const view = projectRecord(t, hero);
+  assert.equal(
+    view.journal!.events.some((e) => e.id === "private-operation"),
+    false,
+  );
+  assert.equal(
+    view.journal!.events.some((e) => e.id === "public-event"),
+    true,
+  );
   assert.equal(
     view.holdings.some((h) => h.id === "warehouse"),
     true,
@@ -661,6 +682,10 @@ test("shared projections expose authorized stash records and redact unrelated ch
   );
   const unauthorized = projectRecord(t, { ...hero, purseIds: [] });
   assert.equal(unauthorized.holdings.length, 0);
+  assert.equal(
+    unauthorized.journal!.events.some((e) => e.propertyId),
+    false,
+  );
   archiveSession(t, "archive", "Session");
   const parsed = readArchivedSnapshot(t.journal!.reports![0].snapshot);
   assert.equal(parsed.holdings.filter((h) => h.custody).length, 1);

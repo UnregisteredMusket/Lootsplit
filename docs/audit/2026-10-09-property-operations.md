@@ -32,6 +32,10 @@ The warm mobile build reference was 5.464s; the new complete build took 9.632s, 
 
 Recent release-main observations remain open: encounter step 32→37s (+5s/+15.63%), packaged sound 18→25s (+7s/+38.89%) and packaged interface job 196→273s (+77s/+39.29%). The full verification workflow did not produce a new qualifying slowdown in that observation window; jobs overlap, so their durations are not summed. Repeated infrastructure/workload trends include browser installation 21→372s over four increases (+351s/+1671.43%) and code-checks job 48→144s over four increases (+96s/+200%). These require runner/cache/workload analysis; they are not silently attributed to this feature or closed. The new full CI must retain every qualifying workflow/job/step observation and report fresh release timings separately.
 
+## Final privacy correction
+
+Final review found that the legacy public-event fallback (`no purseId`) also admitted new property-scoped events. Projection now checks property access first when an event has `propertyId`, preserving ordinary campaign announcements and authorized shared-storage history. The regression covers an unrelated private withdrawal and an unassigned viewer. All 337 application tests pass after the correction; fresh full CI is required for this source change. Initial PR run37913636690 is superseded, not a completed release pass.
+
 ## Release checkpoint
 
 This audit records completed local implementation and verification. Full exact-tree PR verification, independent main verification, deployment/standby and the read-only live asset/desktop/mobile audit remain required before claiming this update is live. The release's final immutable identities, run links and results will be recorded in the implementation PR and exact-state recovery checkpoint.
