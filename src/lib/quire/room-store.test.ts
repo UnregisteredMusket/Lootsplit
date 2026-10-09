@@ -14,6 +14,42 @@ import {
 } from "./push.server.ts";
 import { jwtVerify, importJWK } from "jose";
 const sql = new DatabaseSync(":memory:");
+test("property purchases and deed transfers persist once across lost responses and independent player reads", async () => {
+  const { choosePace } = await import("./cloud.server.ts");
+  const { blankShop } = await import("./economy.ts");
+  const table = { ...emptyCloudTable(), purses: ["buyer", "recipient"].map(id => ({ id, name: id, kind: "character" as const, coins: { ...emptyCoins(), gp: id === "buyer" ? 100 : 0 } })),
+    shops: [{ ...blankShop(), id: "broker", category: "mixed" as const, buyRate: 0.5 }],
+    journal: { sessions: [], requests: [], events: [], market: { currentLocationId: "coast", locations: ["coast", "desert"].map(id => ({ id, name: id, kind: "region" as const, parentId: null, description: "" })) } },
+    listings: [{ id: "mill", name: "Mill", kind: "property" as const, copper: 5000, quantity: 1, notes: "", locationId: "coast", property: { type: "workshop" as const, features: ["Waterwheel"] } },
+      { id: "remote", name: "Remote keep", kind: "property" as const, copper: 2000, quantity: 1, notes: "", locationId: "desert" }] };
+  const host = await openRoom({ name: "DM", table }), buyer = await joinRoom({ code: host.code, purseId: "buyer", name: "Buyer" }), recipient = await joinRoom({ code: host.code, purseId: "recipient", name: "Recipient" });
+  await choosePace({ ...host, live: true });
+  const buyerAuth = { code: host.code, token: buyer.token }, recipientAuth = { code: host.code, token: recipient.token };
+  assert.deepEqual((await roomState(buyerAuth)).table.listings.map(l => l.id), ["mill"]);
+  const purchase = { id: "deed-purchase", kind: "listing", listingId: "mill", purseId: "buyer", quantity: 1, before: table.listings[0] };
+  await submitCommands({ ...buyerAuth, batchId: "deed-buy", commands: [purchase] });
+  await submitCommands({ ...buyerAuth, batchId: "deed-buy", commands: [purchase] });
+  await submitCommands({ ...buyerAuth, batchId: "buy-response-lost", commands: [purchase] });
+  const bought = (await roomState(buyerAuth)).table;
+  assert.equal(bought.holdings.length, 1); assert.equal(bought.ledger.length, 1); assert.equal(bought.holdings[0].deed!.totalCopper, 5000);
+  assert.equal((await roomState(recipientAuth)).table.holdings.length, 0);
+  const transfer = { id: "deed-transfer", kind: "give", fromId: "buyer", toId: "recipient", copper: 0, holdingId: bought.holdings[0].id, quantity: 1 };
+  await submitCommands({ ...buyerAuth, batchId: "transfer-first", commands: [transfer] });
+  await submitCommands({ ...buyerAuth, batchId: "transfer-response-lost", commands: [transfer] });
+  assert.equal((await roomState(buyerAuth)).table.holdings.length, 0);
+  const received = (await roomState(recipientAuth)).table.holdings[0];
+  assert.equal(received.deed!.ownerName, "recipient"); assert.equal(received.deed!.buyerName, "buyer");
+  await submitCommands({ ...host, batchId: "travel", commands: [{ id: "travel", kind: "party-location", before: "coast", locationId: "desert" }] });
+  const traveled = await roomState(recipientAuth);
+  assert.equal(traveled.table.holdings[0].locationId, "coast");
+  assert.deepEqual(traveled.table.journal!.market!.locations.map(l => l.id), ["coast", "desert"]);
+  await submitCommands({ ...recipientAuth, batchId: "sell-deed", commands: [{ id: "sell-deed", kind: "sell", holdingId: received.id, shopId: "broker", quantity: 1 }] });
+  assert.equal((await roomState(recipientAuth)).table.holdings.length, 0);
+  const final = await roomState(host);
+  assert.equal(final.table.ledger.filter(l => l.listingPurchase).length, 1);
+  assert.equal(final.table.listings.find(l => l.id === "mill")!.quantity, 0);
+  await deleteRoom(host.code, final.revision);
+});
 test("DM name imports persist atomically and a lost-response retry cannot duplicate shops; players cannot import", async () => {
   const { parseMarketNames, marketNameFingerprint } = await import("./market-name-import.ts");
   const { readMarketLocations } = await import("./shop-locations.ts");

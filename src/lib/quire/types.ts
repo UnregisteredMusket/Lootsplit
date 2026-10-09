@@ -37,6 +37,9 @@ export function characterControl(purse: Purse): "player" | "npc" | null {
 }
 
 export type Holding = {
+  deed?: import("./property-deed.ts").PropertyDeed;
+  locationId?: string;
+  property?: import("./property.ts").PropertyProfile;
   service?: boolean;
   weight?: number;
   equipped?: boolean;
@@ -137,6 +140,7 @@ export type LedgerLine = {
   transactionType?: "transfer" | "purchase" | "sale" | "loan" | "payment" | "adjustment" | "void";
   reversalOf?: string;
   purchase?: { stockId: string; quantity: number; holding: Holding | null };
+  listingPurchase?: { listingId: string; quantity: number; holding: Holding };
   id: string;
   at: number;
   purseId: string;

@@ -74,10 +74,11 @@ test("packaged Worker checks all belong to one required isolated group", () => {
       /- name: (worker-[\w-]+|Verify title screen on the built artifact)\n\s+if: matrix.group == '([^']+)'/g,
     ),
   ];
-  assert.equal(assignments.length, 13);
+  assert.equal(assignments.length, 14);
+  assert.ok(assignments.some(([, name, group]) => name === "worker-properties" && group === "interface"));
   assert.ok(assignments.some(([, name, group]) => name === "worker-shop-stock" && group === "interface"));
   assert.ok(assignments.some(([, name, group]) => name === "worker-market-locations" && group === "interface"));
-  assert.equal(new Set(assignments.map((m) => m[1])).size, 13);
+  assert.equal(new Set(assignments.map((m) => m[1])).size, 14);
   assert.ok(assignments.some(([, name, group]) => name === "worker-sound" && group === "interface"));
   for (const [, , group] of assignments) assert.ok(["accounts", "interface"].includes(group));
   assert.match(workflow, /group: \[accounts, interface\]/);

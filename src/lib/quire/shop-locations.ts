@@ -85,11 +85,12 @@ export function validateShopLocations(
     throw Error("A shop refers to a missing location. The current campaign was not changed.");
 }
 /** Public places follow the party's path; unrelated places stay with the DM. */
-export function publicMarketLocations(market: MarketLocations): MarketLocations {
+export function publicMarketLocations(market: MarketLocations, ownedLocationIds: string[] = []): MarketLocations {
+  const visible = new Set([market.currentLocationId, ...ownedLocationIds].flatMap(id => locationPath(market, id).map(location => location.id)));
   return {
     currentLocationId: market.currentLocationId,
     locations: market.currentLocationId
-      ? locationPath(market, market.currentLocationId)
+      ? market.locations.filter(location => visible.has(location.id))
       : market.locations,
   };
 }

@@ -1,6 +1,16 @@
 /** Add every new third-party content/data resource here when integrating it. */
 export const resources = [
   {
+    name: "Property marketplace design references",
+    description: "First-party Zillow and Redfin product guidance informed location-first search, asking-price filters, image listings and side-by-side comparison. Lootsplit's fantasy interface and deed template are original; no listings, logos, photographs or proprietary app assets are copied.",
+    links: [
+      { label: "Zillow saved searches and homes", url: "https://zillow.zendesk.com/hc/en-us/articles/213395508-Saved-Searches-and-Saved-Homes" },
+      { label: "Zillow advanced search", url: "https://www.zillow.com/learn/zillow-advanced-search/" },
+      { label: "Redfin home search", url: "https://support.redfin.com/hc/en-us/articles/360001432632-Searching-for-Homes" },
+      { label: "Redfin favorites and lists", url: "https://support.redfin.com/hc/en-us/articles/12559140934939-Favorites-Favorite-Lists" },
+    ],
+  },
+  {
     name: "Free scene music and ambience",
     description: "Menu music: Soft Strings and Flutes and Dark and Mysterious from Fantasy Music and Drum Loops Pack by North Fantasy Music (CC BY 4.0), and Town Theme RPG by cynicmusic (CC0; cynicmusic.com pixelsphere.org). Ambience: Fireplace Sound loop by PagDev, water_flowing from 30 CC0 SFX loops by rubberduck, Crickets Ambient Noise by Ted Kerr (Wolfgang_), and Loopable Dungeon Ambience by JaggedStone (all CC0). Full tracks are converted to local 44.1 kHz MP3, with stereo music, mono ambience and short edge fades. Optional device-only controls; no remote streaming.",
     links: [

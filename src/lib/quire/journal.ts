@@ -1,6 +1,7 @@
 import { z } from "zod";
 import { marketLocationsSchema, validateShopLocations } from "./shop-locations.ts";
 import { validateEconomyRows } from "./validation.ts";
+import { validatePropertyLocations, listingSchema } from "./property.ts";
 import type { CloudTable } from "./cloud.ts";
 import { sheetSchema } from "../characters/model.mjs";
 import { financeSchema } from "./finance.ts";
@@ -128,6 +129,8 @@ export function readArchivedSnapshot(snapshot: string): CloudTable {
     validateEconomyRows(t);
     const journal = journalFields.parse(t.journal ?? {});
     validateShopLocations(t.shops, journal.market);
+    for (const listing of t.listings ?? []) listingSchema.parse(listing);
+    validatePropertyLocations(t.listings ?? [], t.holdings, journal.market);
     for (const key of ["notes", "sheets", "loans", "listings", "handouts"] as const)
       if (t[key] !== undefined && !Array.isArray(t[key])) throw Error("Invalid archived records.");
     if (!z.array(z.object({ id: z.string(), at: z.number().finite(), from: z.enum(["dm", "player"]),

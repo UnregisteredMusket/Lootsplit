@@ -4,6 +4,9 @@ import { holdingSchema } from "./validation.ts";
 import type { Holding } from "./types.ts";
 
 export type GiftHolding = {
+  deed?: Holding["deed"];
+  locationId?: string;
+  property?: Holding["property"];
   name: string;
   kind: "item" | "property";
   quantity: number;

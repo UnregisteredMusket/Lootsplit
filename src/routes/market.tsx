@@ -124,6 +124,7 @@ function MarketPage() {
         ) : null}
       </div>
       {ready ? <MarketLocationsPanel /> : null}
+      <AppLink className="settings-link mt-4" href="/features/properties?from=%2Fmarket">Property listings · deeds & dwellings →</AppLink>
       <label className="relative mt-5 block">
         <Search className="absolute left-4 top-3.5 size-5 text-faint" aria-hidden="true" />
         <span className="sr-only">Search the market</span>

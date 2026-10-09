@@ -1,5 +1,6 @@
 import type { IconEntry } from "@/lib/icons/resolve";
 import { FantasyIcon } from "@/components/fantasy-icon";
+import { PropertyDeedArt } from "./property-deed";
 import { useState } from "react";
 import { toast } from "sonner";
 import { useEconomy } from "@/lib/quire/economy-context";
@@ -13,11 +14,13 @@ export function LedgerArt({
   entry,
 }: {
   src?: string;
-  entry?: IconEntry;
+  entry?: IconEntry & { deed?: Holding["deed"]; quantity?: number };
   kind: "portrait" | "shop" | "item" | "property";
   className?: string;
 }) {
   const [failedSrc, setFailedSrc] = useState<string>();
+  if (kind === "property" && entry?.deed)
+    return <PropertyDeedArt deed={entry.deed} quantity={entry.quantity} className={className} />;
   if (kind === "item" && (!src || src === "/art/item-default.webp" || failedSrc === src))
     return <FantasyIcon entry={entry} size={56} className={`ledger-art ${className}`} />;
   return (

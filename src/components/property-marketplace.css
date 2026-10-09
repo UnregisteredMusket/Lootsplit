@@ -1,0 +1,403 @@
+.property-marketplace {
+  margin-block: 1.5rem 2.5rem;
+  min-width: 0;
+}
+.property-register {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 1.25rem;
+  padding: clamp(1rem, 3vw, 2rem);
+  border: 1px solid var(--color-lead);
+  outline: 1px solid var(--color-border);
+  outline-offset: -7px;
+  background: var(--color-subtle);
+}
+.property-register h2 {
+  margin: 0.15rem 0 0.4rem;
+  font-family: var(--font-display);
+  font-size: clamp(2.2rem, 5vw, 3.7rem);
+  line-height: 1;
+}
+.property-register > div:nth-child(2) {
+  flex: 1;
+  min-width: min(100%, 14rem);
+}
+.property-register-seal {
+  display: grid;
+  place-items: center;
+  width: 4.5rem;
+  height: 4.5rem;
+  border: 1px solid var(--color-lead);
+  border-radius: 50%;
+  color: var(--color-lead);
+}
+.property-register-seal svg {
+  width: 2.25rem;
+  height: 2.25rem;
+}
+.property-eyebrow {
+  font-size: 0.75rem;
+  letter-spacing: 0.13em;
+  text-transform: uppercase;
+  color: var(--color-lead);
+}
+.property-register > .property-actions {
+  max-width: 15rem;
+}
+.property-actions {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+}
+.property-actions a {
+  min-height: 2.75rem;
+  display: inline-flex;
+  align-items: center;
+  text-decoration: underline;
+  text-underline-offset: 3px;
+}
+.property-search-panel {
+  margin-top: 1rem;
+  border: 1px solid var(--color-border);
+  padding: 1rem;
+  background: var(--color-subtle);
+}
+.property-search {
+  display: flex;
+  align-items: center;
+  gap: 0.6rem;
+  margin-bottom: 1rem;
+}
+.property-search svg {
+  flex-shrink: 0;
+  width: 1.2rem;
+  color: var(--color-lead);
+}
+.property-filter-grid {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+.property-filter-grid select,
+.property-form-grid select,
+.property-profile-fields select {
+  min-width: 0;
+  max-width: 100%;
+}
+.property-search-panel > details {
+  margin-top: 0.75rem;
+}
+.property-marketplace summary,
+.property-profile-editor summary {
+  min-height: 2.75rem;
+  padding-block: 0.7rem;
+  cursor: pointer;
+}
+.property-filter-checks {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.75rem 1.5rem;
+  align-items: center;
+}
+.property-filter-checks label {
+  display: flex;
+  align-items: center;
+  min-height: 2.75rem;
+  gap: 0.5rem;
+}
+.property-filter-checks input {
+  accent-color: var(--color-lead);
+  width: 1rem;
+  height: 1rem;
+}
+.property-results {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+  padding-block: 0.5rem;
+}
+.property-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(min(100%, 18rem), 1fr));
+  gap: 1rem;
+}
+.property-card {
+  min-width: 0;
+  border: 1px solid var(--color-lead);
+  background: var(--color-elevated);
+  box-shadow: 0 3px 9px #0001;
+  overflow: hidden;
+}
+.property-card-art {
+  position: relative;
+}
+.property-image {
+  width: 100%;
+  aspect-ratio: 16 / 9;
+  overflow: hidden;
+  background: var(--color-subtle);
+}
+.property-image img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+.property-image-placeholder {
+  display: flex;
+  flex-direction: column;
+  justify-content: flex-end;
+  align-items: flex-end;
+  padding: 1rem;
+  gap: 0.4rem;
+  background:
+    linear-gradient(0deg, #182023b8, #18202300 80%),
+    url("/scenes/fantasy/village-square-day-768.webp") center / cover;
+  color: #fff4d7;
+}
+.property-image-placeholder svg {
+  display: none;
+}
+.property-image-placeholder span {
+  font-size: 0.7rem;
+}
+.property-status {
+  position: absolute;
+  top: 0.7rem;
+  left: 0.7rem;
+  padding: 0.3rem 0.65rem;
+  background: #efe1bd;
+  color: #513626;
+  font-size: 0.8rem;
+  border: 1px solid #947342;
+}
+.property-card-copy {
+  padding: 1rem;
+}
+.property-card h3 {
+  font-family: var(--font-display);
+  font-size: 1.8rem;
+  line-height: 1.15;
+  margin-block: 0.2rem 0.6rem;
+  overflow-wrap: anywhere;
+}
+.property-location {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.35rem;
+  color: var(--color-muted);
+  font-size: 0.9rem;
+  margin-block: 0.6rem;
+  overflow-wrap: anywhere;
+}
+.property-location svg {
+  flex-shrink: 0;
+  width: 1rem;
+  height: 1.25rem;
+}
+.property-asking {
+  font-family: var(--font-display);
+  font-size: 1.8rem;
+  margin-block: 0.7rem;
+}
+.property-asking small {
+  display: block;
+  font-family: var(--font-sans);
+  font-size: 0.75rem;
+  color: var(--color-muted);
+}
+.property-facts {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.3rem 0.6rem;
+  font-size: 0.85rem;
+  color: var(--color-muted);
+  margin-block: 0.6rem;
+}
+.property-facts span:not(:last-child)::after {
+  content: " ·";
+}
+.property-tags {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.35rem;
+  margin-block: 0.6rem;
+}
+.property-tags li {
+  padding: 0.15rem 0.45rem;
+  background: var(--color-subtle);
+  border: 1px solid var(--color-border);
+  font-size: 0.8rem;
+  overflow-wrap: anywhere;
+}
+.property-excerpt {
+  margin-block: 0.65rem;
+  display: -webkit-box;
+  -webkit-line-clamp: 2;
+  -webkit-box-orient: vertical;
+  overflow: hidden;
+}
+.property-empty {
+  display: grid;
+  justify-items: center;
+  gap: 0.6rem;
+  padding: 2rem 1rem;
+  border: 1px dashed var(--color-lead);
+  text-align: center;
+}
+.property-empty h3 {
+  font-family: var(--font-display);
+  font-size: 1.8rem;
+}
+.property-empty svg {
+  width: 2.5rem;
+  height: 2.5rem;
+  color: var(--color-lead);
+}
+.property-comparison {
+  padding: 1rem;
+  margin-bottom: 1rem;
+  border: 1px solid var(--color-border);
+  background: var(--color-subtle);
+}
+.property-comparison h3,
+.property-purchase h3 {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  font-family: var(--font-display);
+  font-size: 1.6rem;
+}
+.property-comparison-scroll {
+  overflow-x: auto;
+  max-width: 100%;
+}
+.property-comparison table {
+  border-collapse: collapse;
+  min-width: 100%;
+  text-align: left;
+  font-size: 0.9rem;
+}
+.property-comparison td,
+.property-comparison th {
+  min-width: 8rem;
+  max-width: 16rem;
+  padding: 0.65rem;
+  border-bottom: 1px solid var(--color-border);
+  overflow-wrap: anywhere;
+  vertical-align: top;
+}
+.property-comparison th {
+  font-weight: 600;
+}
+.property-listing-editor,
+.property-profile-fields,
+.property-viewing {
+  display: grid;
+  gap: 1rem;
+  min-width: 0;
+}
+.property-form-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 0.75rem;
+}
+.property-profile-fields legend {
+  margin-bottom: 0.75rem;
+}
+.property-image-editor > div {
+  border-top: 1px solid var(--color-border);
+  padding-block: 0.75rem;
+}
+.property-purchase {
+  display: grid;
+  gap: 0.75rem;
+  padding: 1rem;
+  border: 1px solid var(--color-lead);
+  background: var(--color-subtle);
+}
+.property-price-summary > div {
+  display: flex;
+  justify-content: space-between;
+  flex-wrap: wrap;
+  gap: 0.3rem;
+  padding-block: 0.3rem;
+  border-bottom: 1px solid var(--color-border);
+}
+.property-price-summary dd {
+  font-weight: 600;
+}
+.property-profile-editor {
+  margin-block: 1rem;
+}
+.owned-property-heading {
+  display: flex;
+  gap: 1rem;
+  flex-wrap: wrap;
+  align-items: flex-start;
+}
+.owned-property-heading > div {
+  flex: 1;
+  min-width: 10rem;
+}
+.property-deed-thumbnail {
+  display: block;
+  flex-shrink: 0;
+  width: 3.5rem;
+  min-height: 3.5rem;
+  padding: 0;
+  background: none;
+  cursor: pointer;
+}
+.property-deed-thumbnail img.ledger-art {
+  width: 3.5rem;
+  height: 4.5rem;
+  border-radius: 0;
+  object-fit: contain;
+  background: none;
+}
+.property-deed-preview {
+  width: min(100%, 34rem);
+  height: auto;
+  margin: 0 auto;
+}
+.property-deed-details {
+  display: grid;
+  gap: 1rem;
+}
+.property-deed-details .property-actions {
+  justify-content: center;
+}
+:root[data-appearance="dark"] .property-image-placeholder {
+  background-image:
+    linear-gradient(0deg, #182023b8, #18202300 80%),
+    url("/scenes/fantasy/village-square-night-768.webp");
+}
+@media (max-width: 900px) {
+  .property-filter-grid {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media (max-width: 480px) {
+  .property-register-seal {
+    width: 3rem;
+    height: 3rem;
+  }
+  .property-register {
+    gap: 0.75rem;
+  }
+  .property-register > .property-actions {
+    max-width: none;
+    width: 100%;
+  }
+  .property-filter-grid,
+  .property-form-grid {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .property-card-copy {
+    padding: 0.85rem;
+  }
+}

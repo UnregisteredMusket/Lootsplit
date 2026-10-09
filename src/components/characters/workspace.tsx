@@ -5,6 +5,12 @@ import { ImportCharacterSheet } from "./import-sheet";
 import { canEditCharacterField, characterPermissions } from "@/lib/characters/permissions.mjs";
 import { usePrefs } from "@/lib/quire/prefs";
 import { FantasyIcon } from "@/components/fantasy-icon";
+import { LedgerArt } from "@/components/ledger-art";
+
+function CampaignInventoryArt({ item, holdings }: { item: { id?: string; name: string; kind?: string }; holdings: Holding[] }) {
+  const holding = holdings.find(holding => holding.id === item.id);
+  return holding?.deed ? <LedgerArt kind="property" entry={holding} /> : <FantasyIcon entry={item} size={36} />;
+}
 import { useDraftGuard } from "@/lib/quire/use-draft-guard";
 import { Heart, Shield, Footprints } from "lucide-react";
 import { HpBar } from "@/components/control-panel/readouts";
@@ -78,7 +84,7 @@ type Detail = Row & {
     permissions?: Purse["permissions"];
     manualAllowed: boolean;
     coins: Sheet["coins"];
-    holdings: { id: string; name: string; quantity: number }[];
+    holdings: Holding[];
   };
 };
 type Roll = {
@@ -1634,7 +1640,7 @@ function CharacterEditor({
                     <ul>
                       {campaignLedger.holdings.map((h) => (
                         <li key={h.id}>
-                          <FantasyIcon entry={h} size={28} className="fantasy-inline" />
+                          {h.deed ? <LedgerArt kind="property" entry={h} /> : <FantasyIcon entry={h} size={28} className="fantasy-inline" />}
                           {h.name} × {h.quantity}
                         </li>
                       ))}
@@ -1673,7 +1679,7 @@ function CharacterEditor({
                 </p>
                 {sheet.equipment.map((item, i) => (
                   <div className="sheet-row" key={i}>
-                    <FantasyIcon entry={item} size={36} />
+                    <CampaignInventoryArt item={item} holdings={campaignLedger?.holdings ?? []} />
                     <Text
                       label={`Item ${i + 1} name`}
                       value={item.name}

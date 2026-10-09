@@ -18,6 +18,7 @@ import { JournalNotes } from "@/components/journal-notes";
 import { LoanAskForm } from "@/components/market-board";
 import { PersonalFinances } from "@/components/personal-finances";
 import { PropertyDetails } from "@/components/property-details";
+import { PropertyMarketplace } from "@/components/property-marketplace";
 import { CharacterImportReviews } from "@/components/character-import-reviews";
 import { getCloudTable, getServerCloudTable, subscribeCloudTable } from "@/lib/quire/cloud-client";
 import { SettingsPage } from "@/components/settings-page";
@@ -86,6 +87,7 @@ function FeaturePage() {
             )}
             {feature === "properties" && (
               <>
+                <PropertyMarketplace />
                 <PropertyDetails plans />
               </>
             )}
