@@ -1,11 +1,10 @@
 import { LocationNpcs } from "@/components/location-npcs";
-import { TradeEconomyPanel } from "@/components/trade-economy";
 import { CampaignTrading } from "@/components/campaign-trading";
 import { SessionTime } from "@/components/session-time";
 import { getCampaigns, serverCampaigns, subscribeCampaigns } from "@/lib/quire/campaigns";
 import { CampaignReports } from "@/components/campaign-reports";
 import { createFileRoute } from "@tanstack/react-router";
-import { useSyncExternalStore } from "react";
+import { lazy, Suspense, useSyncExternalStore } from "react";
 import { Shell } from "@/components/shell";
 import { AppLink } from "@/components/app-link";
 import {
@@ -28,6 +27,11 @@ import { CharacterImportReviews } from "@/components/character-import-reviews";
 import { getCloudTable, getServerCloudTable, subscribeCloudTable } from "@/lib/quire/cloud-client";
 import { SettingsPage } from "@/components/settings-page";
 import { LocalAudioPanel } from "@/components/local-audio-panel";
+// Load exchange editors only for this screen. Downtime shares the small review
+// without pulling every market editor into startup.
+const TradeEconomyPanel = lazy(() =>
+  import("@/components/trade-economy").then((m) => ({ default: m.TradeEconomyPanel })),
+);
 export const Route = createFileRoute("/features/$feature")({
   validateSearch: (s: Record<string, unknown>) => ({
     from: safeReturn(s.from),
@@ -57,7 +61,11 @@ function FeaturePage() {
         ) : (
           <>
             {feature === "npcs" && <LocationNpcs />}
-            {feature === "economy" && <TradeEconomyPanel />}
+            {feature === "economy" && (
+              <Suspense fallback={<p role="status">Loading trade exchanges…</p>}>
+                <TradeEconomyPanel />
+              </Suspense>
+            )}
             {feature === "trading" && <CampaignTrading />}
             {feature === "time" && <SessionTime />}
             {feature === "music" && <LocalAudioPanel />}
@@ -84,7 +92,9 @@ function FeaturePage() {
               (dm ? <CampaignJournal section="reports" /> : <PersonalFinances />)}
             {feature === "downtime" && (
               <>
-                <AppLink className="settings-link" href="/features/properties">Property Management →</AppLink>
+                <AppLink className="settings-link" href="/features/properties">
+                  Property Management →
+                </AppLink>
                 <CampaignFinance section="downtime" />
                 <CampaignJournal section="sessions" />
               </>
@@ -97,7 +107,12 @@ function FeaturePage() {
             )}
             {feature === "properties" && (
               <>
-                <AppLink className="settings-link" href="/features/economy?from=%2Ffeatures%2Fproperties">Trade Exchanges · stored goods & seasonal prices →</AppLink>
+                <AppLink
+                  className="settings-link"
+                  href="/features/economy?from=%2Ffeatures%2Fproperties"
+                >
+                  Trade Exchanges · stored goods & seasonal prices →
+                </AppLink>
                 <PropertyMarketplace />
                 <PropertyDetails plans />
               </>

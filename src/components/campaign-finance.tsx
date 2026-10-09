@@ -1,5 +1,5 @@
 import { loanRecordId, loanRequestRecordId } from "@/lib/quire/finance-record-links";
-import { TradeSeasonReview } from "./trade-economy";
+import { TradeSeasonReview } from "./trade-season-review";
 import { useDraftGuard } from "@/lib/quire/use-draft-guard";
 import { mutationNotice } from "@/lib/quire/mutation-outcome";
 import { CoinAmountInput, FinanceReadiness } from "./finance-input";
@@ -40,7 +40,9 @@ export function CampaignFinance({
   const [principal, setPrincipal] = useState(1000),
     [days, setDays] = useState(pending?.days ?? 7),
     [name, setName] = useState(pending?.name ?? "Between sessions");
-  const [advanceSeason, setAdvanceSeason] = useState(pending ? !!pending.quote.tradeSeason : !!journal.tradeEconomy?.settings.enabled);
+  const [advanceSeason, setAdvanceSeason] = useState(
+    pending ? !!pending.quote.tradeSeason : !!journal.tradeEconomy?.settings.enabled,
+  );
   const [seasonBefore, setSeasonBefore] = useState(advanceSeason);
   const [loanEntryRevision, setLoanEntryRevision] = useState(0),
     [ruleEntryRevision, setRuleEntryRevision] = useState(0);
@@ -71,7 +73,8 @@ export function CampaignFinance({
       ruleDirty ||
       Object.values(repay).some(Boolean) ||
       name !== downtimeBefore.name ||
-      days !== downtimeBefore.days || advanceSeason !== seasonBefore,
+      days !== downtimeBefore.days ||
+      advanceSeason !== seasonBefore,
     "campaign finance",
   );
   if (seat.role !== "dm") return null;
@@ -159,7 +162,8 @@ export function CampaignFinance({
               onSubmit={(e) => {
                 e.preventDefault();
                 void run({ kind: "downtime-plan", name, days, advanceSeason }, () => {
-                  setDowntimeBefore({ name, days }); setSeasonBefore(advanceSeason);
+                  setDowntimeBefore({ name, days });
+                  setSeasonBefore(advanceSeason);
                 });
               }}
             >
@@ -185,10 +189,16 @@ export function CampaignFinance({
                   onChange={(e) => setDays(Number(e.target.value))}
                 />
               </label>
-              {journal.tradeEconomy?.settings.enabled && <label className="flex min-h-11 items-center gap-2">
-                <input type="checkbox" checked={advanceSeason} onChange={e=>setAdvanceSeason(e.target.checked)} />
-                Settle one new market season with this downtime
-              </label>}
+              {journal.tradeEconomy?.settings.enabled && (
+                <label className="flex min-h-11 items-center gap-2">
+                  <input
+                    type="checkbox"
+                    checked={advanceSeason}
+                    onChange={(e) => setAdvanceSeason(e.target.checked)}
+                  />
+                  Settle one new market season with this downtime
+                </label>
+              )}
               <Button disabled={busy} type="submit">
                 {pending ? "Recalculate downtime" : "Preview downtime"}
               </Button>
@@ -197,7 +207,9 @@ export function CampaignFinance({
               Only complete periods accrue; unused days carry forward. Income settles first, loan
               installments next in creation order, then expenses. Payments never overdraw a purse.
               Interest is charged per completed period before its installment; repayments pay
-              interest first. Fractional copper interest carries forward. Approve after review at the end of this recorded session, now, or when starting the next session. Session Time advances the clock without settling a season.
+              interest first. Fractional copper interest carries forward. Approve after review at
+              the end of this recorded session, now, or when starting the next session. Session Time
+              advances the clock without settling a season.
             </p>
             {pending && (
               <div className="journal-entry">
@@ -291,10 +303,13 @@ export function CampaignFinance({
                     </p>
                   </details>
                 )}
-                {pending.quote.tradeSeason && <TradeSeasonReview quote={pending.quote.tradeSeason}/>}
+                {pending.quote.tradeSeason && (
+                  <TradeSeasonReview quote={pending.quote.tradeSeason} />
+                )}
                 {!pending.quote.lines.length &&
                   !pending.quote.market?.length &&
-                  !pending.quote.propertyOperations && !pending.quote.tradeSeason && (
+                  !pending.quote.propertyOperations &&
+                  !pending.quote.tradeSeason && (
                     <p>No active financial agreements; approval advances only in-game time.</p>
                   )}
                 {pending.quote.balances
@@ -309,8 +324,9 @@ export function CampaignFinance({
                   <AppLink href="#sessions">
                     Approve downtime & start session in Play sessions
                   </AppLink>
-                  . Or approve below at this session's end. Changed funds, agreements, goods or stock require a fresh preview; your description and
-                  days remain available for recalculation.
+                  . Or approve below at this session's end. Changed funds, agreements, goods or
+                  stock require a fresh preview; your description and days remain available for
+                  recalculation.
                 </p>
                 <Button
                   variant="secondary"
@@ -319,8 +335,24 @@ export function CampaignFinance({
                 >
                   Cancel downtime
                 </Button>
-                <Button disabled={busy} onClick={()=>void run({kind:"downtime-apply",downtimeId:pending.id,endSession:false})}>Approve downtime now</Button>
-                {journal.sessions.some(s=>!s.endedAt) && <Button disabled={busy} onClick={()=>void run({kind:"downtime-apply",downtimeId:pending.id,endSession:true})}>Approve downtime & end recorded session</Button>}
+                <Button
+                  disabled={busy}
+                  onClick={() =>
+                    void run({ kind: "downtime-apply", downtimeId: pending.id, endSession: false })
+                  }
+                >
+                  Approve downtime now
+                </Button>
+                {journal.sessions.some((s) => !s.endedAt) && (
+                  <Button
+                    disabled={busy}
+                    onClick={() =>
+                      void run({ kind: "downtime-apply", downtimeId: pending.id, endSession: true })
+                    }
+                  >
+                    Approve downtime & end recorded session
+                  </Button>
+                )}
               </div>
             )}
           </details>

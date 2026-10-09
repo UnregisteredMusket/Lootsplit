@@ -175,6 +175,14 @@ try {
       .getByRole("button", { name: "Live", exact: true });
     await expect(live).toHaveAttribute("aria-pressed", "true");
     await navigateApplication(page, origin + "/features/economy");
+    // Mobile may open a fresh document when no visible link reaches this screen.
+    // Await authoritative room hydration before opening controls: changing room
+    // identity deliberately resets the feature screen's drafts.
+    await expect(
+      page
+        .getByRole("status")
+        .filter({ hasText: "Live · Room online · Play active · Saved to room" }),
+    ).toBeVisible();
     await page.getByText("Manual season control & DM overrides", { exact: true }).click();
     await page.getByRole("button", { name: "Prepare manual season", exact: true }).click();
     await expect(
