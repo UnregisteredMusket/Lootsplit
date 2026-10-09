@@ -449,6 +449,10 @@ export async function submitCommands(input: {
   )
     throw new Error("Invalid command batch (maximum 100 actions).");
   const commands = input.commands.map((c) => commandSchema.parse(c));
+  const seasonalPlan = (c: (typeof commands)[number]) => c.kind === "trade-season-plan" || (c.kind === "downtime-plan" && c.advanceSeason);
+  if (input.stage && commands.some(seasonalPlan)) throw Error("Seasonal previews must be prepared directly by the DM authority.");
+  const { randomTradeRoll } = await import("./trade-economy.ts");
+  const seasonalRolls = new Map<string, number>();
   const digest = async (value: string) => {
     const bytes = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
     return Array.from(new Uint8Array(bytes), byte => byte.toString(16).padStart(2, "0")).join("");
@@ -520,7 +524,11 @@ export async function submitCommands(input: {
     for (const command of input.stage ? drafts[seat.id]! : commands) {
       const key = seat.id + ":" + command.id;
       if (seen.has(key)) continue;
-      table = applyCommand(table, seat, command);
+      table = applyCommand(table, seat, command, { source: "server", random: draw => {
+        const key = command.id + ":" + draw;
+        if (!seasonalRolls.has(key)) seasonalRolls.set(key, randomTradeRoll());
+        return seasonalRolls.get(key)!;
+      } });
       seen.add(key);
       if (!input.stage) commandHashes[key] = hashes.get(command.id)!;
     }

@@ -33,6 +33,7 @@ const purse = z.object({
   control: z.enum(["player", "npc"]).optional(),
 });
 export const holdingSchema = z.object({
+  commodityId: estateKey.optional(),
   custody: custodySchema.optional(),
   materialKey: estateKey.optional(),
   reservedFor: z.string().min(1).max(150).optional(),
@@ -65,6 +66,8 @@ const shop = z.object({
   buyRate: z.number().finite().nonnegative(),
 });
 const stock = z.object({
+  commodityId: estateKey.optional(),
+  tradeExchangeId: z.string().min(1).max(150).optional(),
   service: z.boolean().optional(),
   category: z.string().max(80).optional(),
   id,

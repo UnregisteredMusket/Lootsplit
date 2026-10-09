@@ -665,7 +665,9 @@ export async function queueCommand(
     if (input.kind !== "message" && !view.mine) throw new Error(`It is ${view.who}'s turn.`);
     if (s.pending.length >= 100) throw new Error("Submit your pending actions before adding more.");
     const command = commandSchema.parse({ ...input, id: crypto.randomUUID() });
-    if (input.kind === "message") {
+    const seasonalPlan = input.kind === "trade-season-plan" || (input.kind === "downtime-plan" && input.advanceSeason);
+    if (seasonalPlan && s.pending.length) throw Error("Submit or resolve pending actions before preparing authoritative seasonal rolls.");
+    if (input.kind === "message" || seasonalPlan) {
       // Chat is independent of transaction turns; retain a failed message in the editor.
       const remote = await submitCloudCommands({
         data: {

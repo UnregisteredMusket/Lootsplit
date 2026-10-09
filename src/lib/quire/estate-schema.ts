@@ -1,8 +1,10 @@
 import { z } from "zod";
 import type { Holding, StockLine } from "./types.ts";
+import { goodsKey } from "./goods-key.ts";
+import { tradeEconomySchema } from "./trade-economy-schema.ts";
 
 const id = z.string().min(1).max(150);
-export const estateKey = z.string().regex(/^[a-z0-9][a-z0-9._-]{0,79}$/);
+export const estateKey = goodsKey;
 const name = z.string().trim().min(1).max(160);
 const money = z.number().int().min(0).max(1e12);
 const quantity = z.number().int().min(1).max(1e9);
@@ -177,6 +179,9 @@ export const rentalSchema = z
   })
   .strict();
 export const orderSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("market"), exchangeId: id, commodityId: estateKey,
+    direction: z.enum(["buy", "sell"]), quantity: quantity.max(100000),
+    limitCopper: money }).strict(),
   z.object({ kind: z.literal("message"), text: z.string().min(1).max(2000) }).strict(),
   z.object({ kind: z.literal("report") }).strict(),
   z.object({ kind: z.literal("project"), jobId: id, active: z.boolean() }).strict(),
@@ -309,6 +314,7 @@ export const custodySchema = z
   .strict();
 export type zCustody = z.infer<typeof custodySchema>;
 export const estateQuoteSchema = z.object({
+  tradeEconomy: tradeEconomySchema.optional(),
   before: z.string(),
   state: estateSchema,
   holdings: z.array(
@@ -332,11 +338,12 @@ export const estateQuoteSchema = z.object({
   ),
   movements: z.array(
     z.object({
-      id,
+      id: z.string().min(1).max(300),
       purseId: id,
-      copper: money,
+      copper: z.number().int().min(-1e12).max(1e12),
       summary: z.string().max(500),
       shopId: id.optional(),
+      transactionType: z.enum(["purchase", "sale", "transfer", "payment"]).optional(),
     }),
   ),
   notices: z.array(z.object({ propertyId: id, summary: z.string().max(1000) })),

@@ -1,4 +1,5 @@
 import { LocationNpcs } from "@/components/location-npcs";
+import { TradeEconomyPanel } from "@/components/trade-economy";
 import { CampaignTrading } from "@/components/campaign-trading";
 import { SessionTime } from "@/components/session-time";
 import { getCampaigns, serverCampaigns, subscribeCampaigns } from "@/lib/quire/campaigns";
@@ -56,6 +57,7 @@ function FeaturePage() {
         ) : (
           <>
             {feature === "npcs" && <LocationNpcs />}
+            {feature === "economy" && <TradeEconomyPanel />}
             {feature === "trading" && <CampaignTrading />}
             {feature === "time" && <SessionTime />}
             {feature === "music" && <LocalAudioPanel />}
@@ -95,6 +97,7 @@ function FeaturePage() {
             )}
             {feature === "properties" && (
               <>
+                <AppLink className="settings-link" href="/features/economy?from=%2Ffeatures%2Fproperties">Trade Exchanges · stored goods & seasonal prices →</AppLink>
                 <PropertyMarketplace />
                 <PropertyDetails plans />
               </>

@@ -1,4 +1,6 @@
 import { worldCommands, type WorldCommand } from "./world-schema.ts";
+import { tradeCommands, type TradeCommand, type TradeExecution } from "./trade-economy-schema.ts";
+import { applyTradeCommand, prepareTradeSeason, recordShopTrade, validateTradeEconomy } from "./trade-economy.ts";
 import { applyWorldCommand, validateWorld, shopVisible, shopAsking } from "./world.ts";
 import { shopScheduleSchema } from "./shop-schedule.ts";
 import { estateCommands } from "./estate-schema.ts";
@@ -45,6 +47,7 @@ const id = z.string().min(1).max(150),
   qty = amount.min(1).max(100000);
 const base = { id };
 export const commandSchema = z.discriminatedUnion("kind", [
+  ...tradeCommands,
   ...worldCommands,
   ...estateCommands,
   estateImportCommand,
@@ -87,10 +90,12 @@ export const commandSchema = z.discriminatedUnion("kind", [
   z.object({
     ...base,
     kind: z.literal("downtime-plan"),
+    advanceSeason: z.boolean().optional(),
     name: z.string().trim().min(1).max(100),
     days: z.number().int().min(1).max(3650),
   }),
   z.object({ ...base, kind: z.literal("downtime-cancel"), downtimeId: id }),
+  z.object({ ...base, kind: z.literal("downtime-apply"), downtimeId: id, endSession: z.boolean() }),
   z.object({
     ...base,
     kind: z.literal("journal-note"),
@@ -211,7 +216,7 @@ export type CommandInput = Command extends infer C
     ? Omit<C, "id">
     : never
   : never;
-export function applyCommand(input: CloudTable, seat: CloudSeat, raw: Command): CloudTable {
+export function applyCommand(input: CloudTable, seat: CloudSeat, raw: Command, execution: TradeExecution = {}): CloudTable {
   const cmd = commandSchema.parse(raw);
   const t = structuredClone(input);
   const at = Date.now();
@@ -288,7 +293,9 @@ export function applyCommand(input: CloudTable, seat: CloudSeat, raw: Command): 
       throw Error("Cancel the pending downtime before changing finance agreements.");
     return f;
   };
-  if (worldCommands.some(schema => schema.shape.kind.value === cmd.kind)) {
+  if (tradeCommands.some(schema => schema.shape.kind.value === cmd.kind)) {
+    applyTradeCommand(t, seat, cmd as TradeCommand, at, execution);
+  } else if (worldCommands.some(schema => schema.shape.kind.value === cmd.kind)) {
     applyWorldCommand(t, seat, cmd as WorldCommand, at);
   } else if (cmd.kind === "estate-import") {
     dm();
@@ -499,7 +506,11 @@ export function applyCommand(input: CloudTable, seat: CloudSeat, raw: Command): 
   } else if (cmd.kind === "downtime-plan") {
     dm();
     const f = finance();
-    const quote = previewDowntime(t, f, cmd.days);
+    if (cmd.advanceSeason) {
+      if (journal.tradeEconomy?.pendingSeason) throw Error("Cancel the manual seasonal preview before preparing seasonal downtime.");
+      if (journal.tradeEconomy?.settings.enabled) prepareTradeSeason(t, execution);
+    }
+    const quote = previewDowntime(t, f, cmd.days, undefined, cmd.advanceSeason ? cmd.id : undefined);
     journal.downtimePrompt = { enabled: true, days: cmd.days };
     for (const d of f.downtime) if (d.status === "pending") d.status = "cancelled";
     f.downtime.push({
@@ -518,6 +529,17 @@ export function applyCommand(input: CloudTable, seat: CloudSeat, raw: Command): 
     if (!d || d.status !== "pending") throw Error("This downtime is already decided.");
     d.status = "cancelled";
     event("Cancelled pending downtime; no funds moved");
+  } else if (cmd.kind === "downtime-apply") {
+    dm();
+    const active = journal.sessions.find(s => !s.endedAt);
+    if (cmd.endSession && !active) throw Error("There is no recorded session to end.");
+    applyDowntime(t, cmd.downtimeId, active?.id ?? cmd.id, at);
+    event("Applied approved downtime and seasonal settlement once", "session");
+    if (cmd.endSession && active) {
+      active.endedAt = at;
+      active.endLedgerIds = t.ledger.map(l => l.id);
+      archiveSession(t, active.id, active.name, at);
+    }
   } else if (cmd.kind === "journal-note") {
     if (cmd.provenance || cmd.visibility === "dm") dm();
     if (seat.role !== "dm" || cmd.visibility === "player") {
@@ -683,8 +705,12 @@ export function applyCommand(input: CloudTable, seat: CloudSeat, raw: Command): 
         quantity: cmd.quantity,
         unitCopper: s.copper,
         notes: s.notes,
+        ...(s.commodityId ? { commodityId: s.commodityId,
+          weight: journal.tradeEconomy?.commodities.find(c => c.id === s.commodityId)?.weight,
+          ...((journal.tradeEconomy?.commodities.find(c => c.id === s.commodityId)?.materialKey) ? { materialKey: journal.tradeEconomy!.commodities.find(c => c.id === s.commodityId)!.materialKey } : {}) } : {}),
       });
     log(cmd.purseId, `Bought ${cmd.quantity} ${s.name} from ${shop.name}`, -cost, shop.id);
+    recordShopTrade(t, { id: cmd.id, at, stockId: s.id, purseId: cmd.purseId, direction: "buy", quantity: cmd.quantity, copper: cost });
   } else if (cmd.kind === "listing") {
     own(cmd.purseId);
     const l = t.listings.find((x) => x.id === cmd.listingId);
@@ -738,6 +764,8 @@ export function applyCommand(input: CloudTable, seat: CloudSeat, raw: Command): 
     h.quantity -= cmd.quantity;
     t.holdings = t.holdings.filter((x) => x.quantity > 0);
     log(h.purseId, `Sold ${cmd.quantity} ${h.name} to ${s.name}`, paid, s.id);
+    const linked = t.stock.find(line => line.shopId === s.id && line.commodityId === h.commodityId && h.commodityId);
+    if (linked) recordShopTrade(t, { id: cmd.id, at, stockId: linked.id, purseId: h.purseId, direction: "sell", quantity: cmd.quantity, copper: paid });
     if (h.kind === "property" && h.quantity === 0) removeEstateSite(t, h.id);
   } else if (cmd.kind === "give") {
     own(cmd.fromId);
@@ -831,6 +859,8 @@ export function applyCommand(input: CloudTable, seat: CloudSeat, raw: Command): 
         assertFinanceAccountRemovable(t.journal?.finance, change.id);
       if (change.store === "journal") {
         const currentJournal = readJournal(t.journal);
+        if (!currentJournal.tradeEconomy && readJournal(change.after).tradeEconomy)
+          throw Error("Configure a new trade economy with reviewed economy commands; seasonal rolls require DM authority.");
         if (!same(currentJournal, preserveJournalMetadata(change.before, currentJournal)))
           throw new Error("Activity changed elsewhere. Refresh and retry.");
         t.journal = preserveJournalMetadata(change.after, currentJournal);
@@ -906,6 +936,7 @@ export function applyCommand(input: CloudTable, seat: CloudSeat, raw: Command): 
   for (const listing of t.listings) listingSchema.parse(listing);
   validatePropertyLocations(t.listings, t.holdings, t.journal?.market);
   validateEstate(t);
+  validateTradeEconomy(t);
   validateWorld(t);
   return t;
 }

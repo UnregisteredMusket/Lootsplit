@@ -44,6 +44,8 @@ A delivery records one purchased inventory lot in transit, depletes actual stock
 
 ## Send property letters
 
+Trade Exchanges add a structured **Trade stored commodities at a local exchange** instruction to existing letters and manager standing orders. Choose the stable commodity/unit, quantity and maximum buy/minimum sell price. The supplies duty, staff/wages, budget, owner's purse, property location, exchange stock/cash and storage capacity are checked on execution. Sales use the owner's unreserved stored goods; letters do not grant remote inventory access. See [TRADE-ECONOMY.md](TRADE-ECONOMY.md). Reviewed import material keys and units remain the link between recipes, produced goods and trade commodities; the property importer itself never creates commodity inventory or market funds.
+
 The DM designates an existing city shop as a post office and sets postage and delivery days. A town exception is configurable. Players physically present in the city can send a letter or a structured report, project, tenancy, staff or supply instruction to an active property manager. Postage is charged once on dispatch.
 
 Letters record origin, destination, sender, contact, send/due days, spending authorization and receipt. Delivery rechecks ownership, authority, manager wages, reviewed agreements, supplier terms, stock and funds. Blocked instructions keep an explanation; cancelling does not refund postage. Free text is correspondence and does not execute arbitrary actions. Letters do not allow remote withdrawal, equipping or instant transfer of goods. These are in-game letters, not real email.

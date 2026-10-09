@@ -20,6 +20,7 @@ export function submenuScene(pathname: string): string | undefined {
     "/features/journal": "ancient-library",
     "/features/downtime": "tavern",
     "/features/properties": "village-square",
+    "/features/economy": "market-street",
     "/features/shops": "market-street",
   };
   return scenes[pathname];

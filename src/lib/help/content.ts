@@ -139,8 +139,10 @@ export const HELP_GROUPS: HelpGroup[] = [
           "Create shops from the catalog and choose category, wealth and buy/sell prices. Item variety can use a suggested assortment, a chosen number of item types, or every matching catalog item. Set quantities separately: suggested, fixed units per item, or unlimited. Services remain unlimited. Shuffle generates another name, keeper, location and stock.",
           "In a shop, choose Edit → Add from catalog to select exact items or every filtered match. Existing prices and quantities are preserved and duplicate names are skipped. Custom items remain available through Add item. Inventory totals, search, rarity and stock filters, and pages help manage large shelves; paging does not remove stock or limit PDF exports. Closed shops cannot trade. Restocking adds to finite quantities without replacing your custom entries or changing unlimited stock.",
           "Price modifiers include season, shortages, war, plague, roads, scarcity and inflation. Review the price preview. Enable automatic repricing or choose Reprice open shops now to apply changes to open shops. New-shop defaults affect future shops; changing defaults is not a replacement for editing existing stock.",
+          "Market → Trade Exchanges adds separate campaign economies. The DM defines regional quotes, stable commodity units, stock and treasury funds. Classic retains DM values; Automatic proposes the next season from stored d100 rolls, existing economic settings and recorded trades. Prices stay fixed during the season. Review and approve one seasonal transition with end-of-session Downtime, or use Manual season control for a recorded override without advancing days. Session Time does not settle seasons. Property managers and letters can trade stored goods with price limits and existing budget/location rules.",
         ],
         links: [
+          ["Trade Exchanges", "/features/economy"],
           ["Price modifiers", "/settings#economy"],
           ["Shops & stock", "/market"],
           ["Catalog", "/catalog?pane=goods"],

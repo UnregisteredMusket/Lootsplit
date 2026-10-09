@@ -1,0 +1,29 @@
+# Campaign trade economies
+
+Open **Market → Trade Exchanges**. Each campaign owns its definitions, regional exchanges, stock, treasuries, seasonal rolls and history. Loading an older save does not enable trading or change its money. The existing shop and property location hierarchy controls where players may trade; a city exchange also serves its child areas. A cleared party location does not grant access to a located exchange.
+
+The DM enables the economy and creates commodities with a stable key, physical unit, category, base price and weight. Names do not identify interchangeable goods. A reviewed property-material link must use that material's existing unit. Production using that material can then generate commodity inventory; purchased bundles remain available to existing construction recipes and reservations. Use **Link existing inventory & shop activity** to review older lots explicitly. Traded unit/material identity stays fixed; create another commodity for a different unit.
+
+Create regional exchanges with finite stock, seasonal target stock, capacity, supply/demand indices and bid/ask prices. Each exchange uses a separate canonical non-party treasury. Opening funds default to zero; the DM may explicitly fund it with an audited reason. No season automatically replenishes treasury money. Purchases and sales transfer actual copper between the character/party account and that treasury. Shop activity links preserve existing shop prices and quantities while recording next-season feedback.
+
+## Classic and Automatic modes
+
+Classic Mode keeps the DM's exact prices, stock and indices when the season advances. Automatic Mode prepares new supply/demand and stock with recorded d100 rolls, existing realm conditions, seasonal category pressure and that season's net purchases/sales. Buying increases next-season demand; selling has the opposite effect. Bid/ask prices remain fixed during a season until an explicit DM change. Existing realm price pressure is applied once, with editable minimum/maximum bounds. Each offer can lock prices, stock or indices independently.
+
+Volatility, transaction influence, hardship chance/types, price bounds and buyback share are DM settings. Winter adds 10 hardship chance points; war and plague each add 5 per level, capped at 100. Default hardship types are shortage and roads; war/plague change automatically only when the DM enables them. Existing conditions remain until adjusted. These defaults are fictional game settings, not official D&D rules or prices.
+
+The shared room server creates and stores rolls for the next season. Local DM play uses local cryptographic randomness. Recalculating, cancelling, reloading or retrying a preview retains that upcoming season's draws. Clients cannot supply dice results. Every approval checks the current authoritative state and records the proposal, applied results, reason and source. Receipts and original rolls remain in backups and session archives.
+
+## End-of-session settlement
+
+Open **Downtime**, choose the campaign days and keep **Settle one new market season with this downtime** selected. Review finances, property work, manager transactions and the seasonal proposal together. Approve downtime now, approve it and end the recorded session, or retain the existing approve-and-start-next-session workflow. Approval advances exactly one market season, regardless of downtime days. Changed funds, goods, staff, exchange settings or prices require recalculation. Pending/shared turn actions still follow the room's existing submission rules.
+
+**Session Time** advances the campaign clock and approved within-session actions without settling a market season. **Manual season control & DM overrides** separately previews and approves any calendar season without advancing campaign days. Cancel pending downtime before manual settlement. The DM can override the proposed exchange values and realm conditions using the displayed JSON, retain individual offer locks, or change definitions/settings and prepare a fresh preview. Identity and treasury changes use the exchange workshop. Closing a room remains separate from ending a recorded session.
+
+## Property stores, managers and letters
+
+Purchases can enter accessible local property storage directly, subject to active storage and weight capacity. Sales use the character's own identified commodity lots. Stored goods require the property's location and access permission; reserved/transit goods cannot be sold. A player must follow withdrawal approval before selling from a restricted store. Physical custody, item ownership and original construction material references remain separate.
+
+Under a property's **Letters & manager orders**, choose **Trade stored commodities at a local exchange**. Select the exchange, commodity, buy/sell direction, quantity and maximum buy/minimum sell price per unit. Use existing standing-order periods or send an instruction from an authorized post office. The manager needs the supplies duty, active employment, satisfied staff/wage requirements and an adequate budget. Orders use the property owner's actual purse and property location. The exchange must serve that location. Purchases enter storage; sales use the owner's unreserved stored lots, with finite treasury and capacity checks. Blocked orders report a reason and do not partly spend or sell. Postage is still paid once under existing postal terms; letters grant no remote carried-item access.
+
+Property definitions continue to use the strict reviewed importer and sample in [PROPERTY-OPERATIONS.md](PROPERTY-OPERATIONS.md). Existing material keys/units connect those imported recipes to commodities; imports do not grant inventory, activate the economy, mint funds or fabricate seasonal history. Commodity/exchange configuration is reviewed in the workshop. Preserve full campaign backups when moving campaigns between devices.

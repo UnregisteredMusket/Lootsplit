@@ -12,5 +12,6 @@ export function useWorldTable() {
     sheets: e.sheets,
     notes: [],
     journal: e.journal,
+    realm: e.realm,
   };
 }
