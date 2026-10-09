@@ -16,6 +16,7 @@ import { PreviewHostBridge } from "@/components/preview-host-bridge";
 import { LibraryProvider } from "@/lib/quire/library";
 import { EconomyProvider } from "@/lib/quire/economy-context";
 import { PrefsProvider } from "@/lib/quire/prefs";
+import { MenuAudioBridge } from "@/components/menu-audio-bridge";
 import { installMobileApi } from "@/lib/mobile/boot";
 import appCss from "../styles.css?url";
 
@@ -64,6 +65,7 @@ export const Route = createRootRoute({
             <AuthProvider>
               <CampaignGate><LibraryProvider>
                 <PrefsProvider>
+                  <MenuAudioBridge />
                   <EconomyProvider>
                     <AppNotifications />
                     <Outlet />

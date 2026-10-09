@@ -1,0 +1,106 @@
+{
+  "checkedAt": "2026-10-09",
+  "tracks": [
+    {
+      "file": "town.mp3",
+      "author": "cynicmusic",
+      "title": "Town Theme RPG",
+      "source": "https://opengameart.org/content/town-theme-rpg",
+      "license": "CC0-1.0",
+      "originalFile": "TownTheme.mp3",
+      "originalSha256": "2657861d5107d4a3c01ef81cb6a4d61ddd5e7a054b6da57e658373d79d0c3466",
+      "sha256": "062b3a64d129864c974b413c62ccc619b26373c1ebc3071ffb577e805f7c08b3",
+      "bytes": 1170226,
+      "durationSeconds": 97.48898,
+      "adaptation": "Full-length MP3, 44.1 kHz stereo 96 kbps, metadata removed, 60 ms edge fades."
+    },
+    {
+      "file": "study.mp3",
+      "author": "North Fantasy Music",
+      "title": "Fantasy Music and Drum Loops Pack",
+      "source": "https://opengameart.org/content/fantasy-music-and-drum-loops-pack",
+      "license": "CC-BY-4.0",
+      "originalFile": "fantasyambience/FantasyAmbience/Soft_Strings_and_Flutes.wav",
+      "originalSha256": "ef65c3222f8d384d0d4124a8ca9c73961e86c08ada68d070aa27472884f03146",
+      "sha256": "17782f98539be77f48dd71a06814db7672892915503896ac292660e7a8207c2b",
+      "bytes": 708799,
+      "durationSeconds": 59.0,
+      "adaptation": "Full-length MP3, 44.1 kHz stereo 96 kbps, metadata removed, 60 ms edge fades."
+    },
+    {
+      "file": "mystery.mp3",
+      "author": "North Fantasy Music",
+      "title": "Fantasy Music and Drum Loops Pack",
+      "source": "https://opengameart.org/content/fantasy-music-and-drum-loops-pack",
+      "license": "CC-BY-4.0",
+      "originalFile": "fantasyambience/FantasyAmbience/Dark_and_Mysterious.wav",
+      "originalSha256": "a337257fa0dd667b9eb80167b92349400d986b1b168162aeb8ff8164d7a344fc",
+      "sha256": "e6ca73ce119532dec5cbc2863079c534334865831c9c0751f06317076c8513ce",
+      "bytes": 864907,
+      "durationSeconds": 72.0,
+      "adaptation": "Full-length MP3, 44.1 kHz stereo 96 kbps, metadata removed, 60 ms edge fades."
+    },
+    {
+      "file": "fire.mp3",
+      "author": "PagDev",
+      "title": "Fireplace Sound loop",
+      "source": "https://opengameart.org/content/fireplace-sound-loop",
+      "license": "CC0-1.0",
+      "originalFile": "fire.wav",
+      "originalSha256": "85ca0cc60d0c037fff8b185e31ad1fcdbda6ce45eee17c3ee1318d1b8f59e330",
+      "sha256": "64858c6486522179a99c37e3007711f2deae24098bca564d252fdf3363a7cbd4",
+      "bytes": 234728,
+      "durationSeconds": 29.263537,
+      "adaptation": "Full-length MP3, 44.1 kHz mono 64 kbps, metadata removed, 60 ms edge fades."
+    },
+    {
+      "file": "water.mp3",
+      "author": "rubberduck",
+      "title": "30 CC0 SFX loops",
+      "source": "https://opengameart.org/content/30-cc0-sfx-loops",
+      "license": "CC0-1.0",
+      "originalFile": "sfx_loops/water_flowing.ogg",
+      "originalSha256": "1a431f77d61661becdc87a5b1832d47f83a12a5c0b001077e41a202e739797a7",
+      "sha256": "dd5902a2d2b15c5d780bb2f8d65a7014479402421da3dd4b5ec24e022378d286",
+      "bytes": 15717,
+      "durationSeconds": 1.883208,
+      "adaptation": "Full-length MP3, 44.1 kHz mono 64 kbps, metadata removed, 60 ms edge fades."
+    },
+    {
+      "file": "crickets.mp3",
+      "author": "Ted Kerr (Wolfgang_)",
+      "title": "Crickets Ambient Noise - loopable",
+      "source": "https://opengameart.org/content/crickets-ambient-noise-loopable",
+      "license": "CC0-1.0",
+      "originalFile": "crickets_1.mp3",
+      "originalSha256": "5b5bd1f744087888c5623543c3ff80be9c2ce106093993e7c8a8492b0280b2c0",
+      "sha256": "7870d5ee01bbcab8e88333b963be88c6cb709a8a139c789701b74b66c1426963",
+      "bytes": 92204,
+      "durationSeconds": 11.493878,
+      "adaptation": "Full-length MP3, 44.1 kHz mono 64 kbps, metadata removed, 60 ms edge fades."
+    },
+    {
+      "file": "dungeon.mp3",
+      "author": "JaggedStone",
+      "title": "Loopable Dungeon Ambience",
+      "source": "https://opengameart.org/content/loopable-dungeon-ambience",
+      "license": "CC0-1.0",
+      "originalFile": "dungeon_ambient_1_0.ogg",
+      "originalSha256": "df491823e4877371c34dbda4e9321cd83a4a14fa7573cee0ebca1ae423b70e6e",
+      "sha256": "f674f8497262b870c6083e3807b261dac35fcb7e787a003772a0d801be164ae1",
+      "bytes": 755087,
+      "durationSeconds": 94.30975,
+      "adaptation": "Full-length MP3, 44.1 kHz mono 64 kbps, metadata removed, 60 ms edge fades."
+    }
+  ],
+  "archives": [
+    {
+      "file": "fantasyambience.zip",
+      "sha256": "135ccb7d86eddef621e174a7932ecc6547036529808bfab335231c182155101c"
+    },
+    {
+      "file": "sfx_loops.zip",
+      "sha256": "9c013474c7e56192a0d1b2840535a1e1d8b93166948d4a9f7136bb6c3d5421cd"
+    }
+  ]
+}

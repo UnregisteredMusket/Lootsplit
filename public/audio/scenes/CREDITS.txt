@@ -1,0 +1,43 @@
+Lootsplit menu music and ambience
+
+town.mp3: Town Theme RPG by cynicmusic
+Source: https://opengameart.org/content/town-theme-rpg
+License: CC0-1.0
+Changes: Full-length MP3, 44.1 kHz stereo 96 kbps, metadata removed, 60 ms edge fades.
+
+study.mp3: Fantasy Music and Drum Loops Pack by North Fantasy Music
+Source: https://opengameart.org/content/fantasy-music-and-drum-loops-pack
+License: CC-BY-4.0
+Changes: Full-length MP3, 44.1 kHz stereo 96 kbps, metadata removed, 60 ms edge fades.
+
+mystery.mp3: Fantasy Music and Drum Loops Pack by North Fantasy Music
+Source: https://opengameart.org/content/fantasy-music-and-drum-loops-pack
+License: CC-BY-4.0
+Changes: Full-length MP3, 44.1 kHz stereo 96 kbps, metadata removed, 60 ms edge fades.
+
+fire.mp3: Fireplace Sound loop by PagDev
+Source: https://opengameart.org/content/fireplace-sound-loop
+License: CC0-1.0
+Changes: Full-length MP3, 44.1 kHz mono 64 kbps, metadata removed, 60 ms edge fades.
+
+water.mp3: 30 CC0 SFX loops by rubberduck
+Source: https://opengameart.org/content/30-cc0-sfx-loops
+License: CC0-1.0
+Changes: Full-length MP3, 44.1 kHz mono 64 kbps, metadata removed, 60 ms edge fades.
+
+crickets.mp3: Crickets Ambient Noise - loopable by Ted Kerr (Wolfgang_)
+Source: https://opengameart.org/content/crickets-ambient-noise-loopable
+License: CC0-1.0
+Changes: Full-length MP3, 44.1 kHz mono 64 kbps, metadata removed, 60 ms edge fades.
+
+dungeon.mp3: Loopable Dungeon Ambience by JaggedStone
+Source: https://opengameart.org/content/loopable-dungeon-ambience
+License: CC0-1.0
+Changes: Full-length MP3, 44.1 kHz mono 64 kbps, metadata removed, 60 ms edge fades.
+
+CC0: https://creativecommons.org/publicdomain/zero/1.0/
+CC BY 4.0: https://creativecommons.org/licenses/by/4.0/
+Town Theme attribution: cynicmusic.com pixelsphere.org
+North Fantasy Music attribution: North Fantasy Music
+
+Original archives and individual file hashes are documented in sources.json.
