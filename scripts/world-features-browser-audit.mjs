@@ -2,7 +2,12 @@ import assert from "node:assert/strict";
 import { chromium } from "playwright";
 import { expect } from "playwright/test";
 import { mkdir, writeFile } from "node:fs/promises";
-import { openApplication, reloadApplication } from "./title-screen-navigation.mjs";
+import {
+  openApplication,
+  reloadApplication,
+  navigateApplication,
+} from "./title-screen-navigation.mjs";
+import { createAndSaveRoom } from "./browser/account-fixtures.mjs";
 const origin = process.env.AUDIT_ORIGIN || "http://127.0.0.1:8080";
 assert.match(
   origin,
@@ -254,6 +259,7 @@ try {
     await page.getByLabel("Map location", { exact: true }).selectOption("city");
     await page.getByLabel("Share this map image with players", { exact: true }).check();
     await page.getByRole("button", { name: "Save map", exact: true }).click();
+    await expect(page.getByRole("heading", { name: "Import a map", exact: true })).toHaveCount(0);
     await expect(page.getByRole("region", { name: "Interactive campaign map" })).toBeVisible();
     await reloadApplication(page);
     await expect(page.getByRole("region", { name: "Interactive campaign map" })).toBeVisible();
@@ -265,6 +271,7 @@ try {
     await page.getByRole("button", { name: "Edit map & anchors", exact: true }).click();
     await page.getByLabel("Map name", { exact: true }).fill("Port atlas revised");
     await page.getByRole("button", { name: "Save map", exact: true }).click();
+    await expect(page.getByRole("heading", { name: "Edit map", exact: true })).toHaveCount(0);
     await reloadApplication(page);
     const revisedMap = (await dbRead(page, "journal")).world.maps[0];
     assert.equal(revisedMap.id, savedMap.id);
@@ -417,21 +424,77 @@ try {
     assert.equal((await dbRead(page, "journal")).world.timeHistory.length, 2);
     await fits(page);
     await page.screenshot({ path: `${output}/time-${width}.png`, fullPage: true });
+    // Keep the existing offline gameplay audit, then verify real shared map writes.
+    await createAndSaveRoom(page, origin, (p, o, path) => navigateApplication(p, o + path));
+    await navigateApplication(page, origin + "/maps");
+    await page.getByRole("button", { name: "Import map", exact: true }).click();
+    await holdMapDecode(page);
+    await page.getByLabel("Map image", { exact: true }).setInputFiles({
+      name: "shared-port.png",
+      mimeType: "image/png",
+      buffer: Buffer.from(image, "base64"),
+    });
+    await page.waitForFunction(() => window.mapDecodeGate.started);
+    await page.getByLabel("Map name", { exact: true }).fill("Shared Port atlas");
+    await page.getByLabel("Map location", { exact: true }).selectOption("area");
+    await page.evaluate(() => window.mapDecodeGate.release());
+    await expect(page.getByLabel("Map name", { exact: true })).toHaveValue("Shared Port atlas");
+    await expect(page.getByRole("button", { name: "Save map", exact: true })).toBeEnabled();
+    await page.getByRole("button", { name: "Save map", exact: true }).click();
+    await expect(page.getByRole("heading", { name: "Import a map", exact: true })).toHaveCount(0);
+    await expect(
+      page
+        .getByRole("status")
+        .filter({ hasText: /Room online.*Play active.*Saved to room/ })
+        .first(),
+    ).toBeVisible();
+    await reloadApplication(page);
+    const sharedMap = (await dbRead(page, "journal")).world.maps.find(
+      (map) => map.name === "Shared Port atlas",
+    );
+    assert.ok(sharedMap, "Shared map survives reload from the server");
+    assert.equal(sharedMap.locationId, "area");
+    assert.equal(sharedMap.visible, true);
+    assert.equal(sharedMap.image, savedMap.image);
+    await page.getByLabel("Map", { exact: true }).selectOption(sharedMap.id);
+    await page.getByRole("button", { name: "Edit map & anchors", exact: true }).click();
+    await page.getByLabel("Map name", { exact: true }).fill("Shared Port atlas revised");
+    await page.getByRole("button", { name: "Save map", exact: true }).click();
+    await expect(page.getByRole("heading", { name: "Edit map", exact: true })).toHaveCount(0);
+    await expect(
+      page
+        .getByRole("status")
+        .filter({ hasText: /Room online.*Play active.*Saved to room/ })
+        .first(),
+    ).toBeVisible();
+    await reloadApplication(page);
+    const sharedRevision = (await dbRead(page, "journal")).world.maps.find(
+      (map) => map.id === sharedMap.id,
+    );
+    assert.equal(sharedRevision.name, "Shared Port atlas revised");
+    assert.equal(sharedRevision.image, sharedMap.image);
+    await expect(page.getByRole("region", { name: "Interactive campaign map" })).toBeVisible();
+    await fits(page);
+    await page.screenshot({ path: `${output}/shared-maps-${width}.png`, fullPage: true });
     await context.close();
   }
   assert.deepEqual(errors, []);
+  const finished = Date.now();
   await writeFile(
     `${output}/summary.json`,
     JSON.stringify(
       {
         status: "passed",
-        durationMs: Date.now() - started,
+        startedAt: new Date(started).toISOString(),
+        finishedAt: new Date(finished).toISOString(),
+        durationMs: finished - started,
         widths: [1280, 390],
         checks: [
           "image import and OCR",
           "details retained during image processing and OCR",
           "save waits for processing; missing-image draft retained",
           "saved maps and edits survive reload",
+          "real shared-room saves",
           "location anchors",
           "live markers",
           "wheel and pinch zoom/pan",
