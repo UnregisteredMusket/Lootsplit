@@ -18,7 +18,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Development / gameplay / Run npm ci | open | 2 | 11s → 17s | +6s | +54.55% |
 | Code checks and immutable builds / unit-tests | open | 4 | 8s → 27s | +19s | +237.5% |
 | Code checks and immutable builds / typecheck | open | 3 | 7s → 17s | +10s | +142.86% |
-| Code checks and immutable builds / lint | open | 2 | 5s → 9s | +4s | +80% |
+| Code checks and immutable builds / lint | open | 3 | 5s → 11s | +6s | +120% |
 | Development / accounts / Run npx playwright install --with-deps chromium | open | 4 | 21s → 372s | +351s | +1671.43% |
 | Development / gameplay / Start disposable development server | open | 2 | 4s → 8s | +4s | +100% |
 | Development / desktop / Start disposable development server | open | 2 | 6s → 9s | +3s | +50% |
@@ -206,6 +206,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-09T09:49:54Z | step: Code checks and immutable builds / lint | 9s → 11s | +2s | +22.22% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37563730253/job/112606617494) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37913636690/job/113764459944) |
 | 2026-10-09T07:26:43Z | job: Packaged Worker / interface | 196s → 273s | +77s | +39.29% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37439896490/job/112191368666) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37898476002/job/113715653210) |
 | 2026-10-09T07:25:24Z | step: Packaged Worker / interface / worker-sound | 18s → 25s | +7s | +38.89% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37889515368/job/113687447648) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37898476002/job/113715653210) |
 | 2026-10-09T07:23:22Z | step: Development / gameplay / dev-encounter | 32s → 37s | +5s | +15.63% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37429247281/job/112155971212) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37898476002/job/113715225431) |
