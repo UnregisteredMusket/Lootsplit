@@ -159,6 +159,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Development / accounts / dev-character | open | 2 | 12s → 17s | +5s | +41.67% |
 | Verify preserved functionality | open | 3 | 205s → 917s | +712s | +347.32% |
 | Packaged Worker / interface / worker-help | open | 2 | 6s → 25s | +19s | +316.67% |
+| Development / governance / Run actions/checkout@v4 | open | 2 | 1s → 3s | +2s | +200% |
 | Development / desktop / Run npx playwright install --with-deps chromium | open | 2 | 21s → 42s | +21s | +100% |
 | Development / gameplay / dev-bug-data-integrity | open | 2 | 5s → 7s | +2s | +40% |
 | Development / gameplay / dev-finance | open | 4 | 18s → 39s | +21s | +116.67% |
@@ -169,7 +170,8 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Development / gameplay / dev-library-navigation | resolved | 2 | 12s → 43s | +31s | +258.33% |
 | Packaged Worker / interface / worker-sound | open | 3 | 7s → 23s | +16s | +228.57% |
 | Packaged Worker / interface | open | 3 | 126s → 408s | +282s | +223.81% |
-| Packaged Worker / interface | open | 3 | 123s → 273s | +150s | +121.95% |
+| Packaged Worker / interface | open | 4 | 123s → 320s | +197s | +160.16% |
+| Packaged Worker / interface / Run actions/download-artifact@v4 | open | 2 | 2s → 4s | +2s | +100% |
 | verify / Development / gameplay / Run actions/setup-node@v4 | open | 2 | 2s → 5s | +3s | +150% |
 | verify / Development / gameplay | open | 2 | 88s → 191s | +103s | +117.05% |
 | Development / gameplay | open | 3 | 145s → 911s | +766s | +528.28% |
@@ -206,11 +208,18 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | mobile web build | open | 2 | 6.259s → 12.496s | +6.237s | +99.65% |
 | Development / governance / dev-sound | open | 2 | 8s → 35s | +27s | +337.5% |
 | property-browser-audit | open | 2 | 32.709s → 99.355s | +66.646s | +203.75% |
+| world features browser audit | open | 2 | 34.352s → 53.675s | +19.323s | +56.25% |
 
 ## Recorded slowdowns
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-09T13:50:32Z | job: Packaged Worker / interface | 273s → 320s | +47s | +17.22% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37898476002/job/113715653210) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37938922697/job/113848543618) |
+| 2026-10-09T13:49:50Z | step: Development / gameplay / dev-world-features | 17s → 39s | +22s | +129.41% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37927498722/job/113809849067) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37938922697/job/113847977630) |
+| 2026-10-09T13:48:50Z | step: Packaged Worker / interface / worker-world-features | 13s → 23s | +10s | +76.92% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37927498722/job/113810320985) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37938922697/job/113848543618) |
+| 2026-10-09T13:46:03Z | step: Packaged Worker / interface / Run actions/download-artifact@v4 | 3s → 4s | +1s | +33.33% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37391401183/job/112037311517) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37938922697/job/113848543618) |
+| 2026-10-09T13:43:55Z | step: Development / governance / Run actions/checkout@v4 | 2s → 3s | +1s | +50% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37304872866/job/111746023869) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37938922697/job/113847977493) |
+| 2026-10-09T13:22:28.287Z | audit: world features browser audit | 40.174s → 53.675s | +13.501s | +33.61% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/pull/78) · [After](https://github.com/UnregisteredMusket/Lootsplit/commit/f1e7dbbc2aca5d32e1bc0ed8d29ac782c3e3e630) |
 | 2026-10-09T13:41:12Z | step: Development / gameplay / dev-world-features | 16s → 39s | +23s | +143.75% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37923694654/job/113797482894) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37937913571/job/113844540457) |
 | 2026-10-09T13:40:16Z | step: Packaged Worker / interface / worker-world-features | 14s → 19s | +5s | +35.71% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37924806456/job/113801685465) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37937913571/job/113845339813) |
 | 2026-10-09T13:38:52Z | step: Development / governance / dev-theme | 38s → 46s | +8s | +21.05% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37924806456/job/113801079767) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37937913571/job/113844540539) |
