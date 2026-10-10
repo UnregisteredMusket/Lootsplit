@@ -17,11 +17,12 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Development / desktop / Run npm ci | open | 3 | 11s → 20s | +9s | +81.82% |
 | Development / gameplay / Run npm ci | open | 2 | 11s → 17s | +6s | +54.55% |
 | Code checks and immutable builds / unit-tests | open | 4 | 8s → 27s | +19s | +237.5% |
-| Code checks and immutable builds / typecheck | open | 3 | 7s → 17s | +10s | +142.86% |
+| Code checks and immutable builds / typecheck | open | 4 | 7s → 20s | +13s | +185.71% |
 | Code checks and immutable builds / lint | open | 3 | 5s → 11s | +6s | +120% |
 | Development / accounts / Run npx playwright install --with-deps chromium | open | 4 | 21s → 372s | +351s | +1671.43% |
 | Development / gameplay / Start disposable development server | open | 2 | 4s → 8s | +4s | +100% |
 | Development / desktop / Start disposable development server | open | 2 | 6s → 9s | +3s | +50% |
+| Code checks and immutable builds / Run node scripts/release-artifact.mjs prepare | open | 2 | 2s → 4s | +2s | +100% |
 | Code checks and immutable builds / mobile-build | open | 3 | 3s → 7s | +4s | +133.33% |
 | Development / gameplay / dev-bug-data-integrity | open | 3 | 4s → 7s | +3s | +75% |
 | Code checks and immutable builds | open | 4 | 48s → 144s | +96s | +200% |
@@ -224,6 +225,8 @@ Open trends require investigation. Resolved trends retain their history; each ve
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-10T02:46:55Z | step: Code checks and immutable builds / Run node scripts/release-artifact.mjs prepare | 3s → 4s | +1s | +33.33% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37235490768/job/111533630184) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38018106897/job/114112829425) |
+| 2026-10-10T02:46:33Z | step: Code checks and immutable builds / typecheck | 17s → 20s | +3s | +17.65% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37810301899/job/113425118332) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38018106897/job/114112829425) |
 | 2026-10-10T02:27:21Z | step: Packaged Worker / interface / worker-market-locations | 32s → 68s | +36s | +112.5% | failure | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37811118461/job/113428687791) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38016770316/job/114108904234) |
 | 2026-10-10T02:27:14Z | step: Development / gameplay / dev-market-locations | 52s → 68s | +16s | +30.77% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37811118461/job/113427906196) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38016770316/job/114108667453) |
 | 2026-10-09T18:26:49.234Z | audit: market locations browser audit | 65.756s → 110.925s | +45.169s | +68.69% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/tree/feature/property-marketplace) · [After](https://github.com/UnregisteredMusket/Lootsplit/tree/fix/location-import-response) |
