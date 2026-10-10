@@ -406,7 +406,7 @@ test("library", async ({ devices, baseURL: origin }, testInfo) => {
   const key = await page.locator(".portal-key code").innerText();
   assert.equal(key.length, 64);
   await page.getByRole("button", { name: "I have saved it" }).click();
-  await prepareDmFixture(page, origin);
+  await prepareDmFixture(page, origin, { useAccountLink: true });
   await navigateAccountScenario(page, origin, "/account");
   console.log("Account audit: character and backup");
   await page.getByLabel("Character name", { exact: true }).fill("Browser test hero");
@@ -433,7 +433,7 @@ test("library", async ({ devices, baseURL: origin }, testInfo) => {
     path: testInfo.outputPath("account-library-desktop.png"),
     fullPage: true,
   });
-  await prepareDmFixture(other, origin);
+  await prepareDmFixture(other, origin, { useAccountLink: true });
   await navigateAccountScenario(other, origin, "/account");
   console.log("Account audit: restore into new campaign");
   other.on("dialog", (d) => d.accept());
@@ -444,8 +444,8 @@ test("library", async ({ devices, baseURL: origin }, testInfo) => {
   assert.ok(
     await other.evaluate(() => JSON.parse(localStorage.getItem("quire.campaigns.v1")).length >= 2),
   );
-  await navigateAccountScenario(other, origin, "/account");
   console.log("Account audit: shared membership resumes on another device");
+  // Continue from the restored desk; no account action is needed before hosting.
   await navigateAccountScenario(other, origin, "/share");
   const skip = other.getByRole("button", { name: "Not now", exact: true });
   if (await skip.isVisible()) await skip.click();
@@ -473,9 +473,11 @@ test("library", async ({ devices, baseURL: origin }, testInfo) => {
 test("dm-resume", async ({ devices, baseURL: origin }, testInfo) => {
   const { page } = devices;
   const visit = (p, path) => navigateAccountScenario(p, origin, path);
-  const { other } = await signedInDevices(devices, origin);
+  const { other } = await signedInDevices(devices, origin, { deferPrimaryLibrary: true });
   const firstCode = (await createAndSaveRoom(other, origin, navigateAccountScenario))[0].code;
+  // This is the primary device's first cold library entry, after the room exists.
   await visit(page, "/account");
+  await expect(page.getByRole("button", { name: "Sign out", exact: true })).toBeVisible();
   const beforeTransportError = await page.evaluate(() =>
     Object.fromEntries(Object.entries(localStorage).filter(([k]) => k.startsWith("quire."))),
   );
@@ -676,7 +678,13 @@ test("resume-queue", async ({ devices, baseURL: origin }, testInfo) => {
       ["startup", 390],
     ].map(async ([entry, width]) => {
       const target = entry === "startup" ? devices.page : device;
-      await visit(target, "/account");
+      if (entry === "account") await visit(target, "/account");
+      else {
+        // This untouched device still has its signed-in cold account document.
+        // The actual cold startup below fetches the new membership after injection.
+        expect(new URL(target.url()).pathname).toBe("/account");
+        await expect(target.getByRole("button", { name: "Sign out", exact: true })).toBeVisible();
+      }
       await target.evaluate(
         ({ key, queued }) => {
           localStorage.setItem(key, JSON.stringify(queued));
@@ -849,7 +857,7 @@ test("recovery", async ({ devices, baseURL: origin }) => {
 
 test("portrait-resume", async ({ devices, baseURL: origin }) => {
   const desktop = devices.page;
-  const { other: phone } = await signedInDevices(devices, origin);
+  const { other: phone } = await signedInDevices(devices, origin, { deferPrimaryLibrary: true });
   await phone.setViewportSize({ width: 390, height: 844 });
   // First editing is a routine link from My account; the following explicit
   // cold Party visit still proves the uploaded portrait persisted in IndexedDB.
@@ -892,7 +900,9 @@ test("portrait-resume", async ({ devices, baseURL: origin }) => {
   await expectPartyPortrait(phone, portrait, true);
   const [member] = await createAndSaveRoom(phone, origin, navigateAccountScenario);
 
+  // Keep the desktop's first cold signed-in entry after the phone saves its room.
   await navigateAccountScenario(desktop, origin, "/account");
+  await expect(desktop.getByRole("button", { name: "Sign out", exact: true })).toBeVisible();
   await desktop.getByRole("button", { name: "Resume", exact: true }).click();
   await desktop.waitForURL((url) => url.pathname === "/");
   await continueIntoApp(desktop);
@@ -1117,7 +1127,7 @@ test("invitations", async ({ devices, baseURL: origin }, testInfo) => {
   async function openGuest(page) {
     // Keep the real cold startup and DM claim, then follow the actual router
     // link to invitations in the document that the claim already opened.
-    await prepareDmFixture(page, origin);
+    await prepareDmFixture(page, origin, { useAccountLink: true });
     await navigateAccountScenario(page, origin, "/share");
     const guide = page.getByRole("button", { name: "Not now", exact: true });
     if (await guide.isVisible()) await guide.click();
@@ -1263,7 +1273,7 @@ test("shared-recovery", async ({ devices, baseURL: origin }, testInfo) => {
   await accountPost(devices.context, origin, "auth/sign-up/email", credentials());
   await visitPage(page, origin, "/account");
   await expect(page.getByRole("button", { name: "Sign out", exact: true })).toBeVisible();
-  await prepareDmFixture(page, origin);
+  await prepareDmFixture(page, origin, { useAccountLink: true });
   const [member] = await createAndSaveRoom(page, origin, navigateAccountScenario);
   const encounter = blankEncounter();
   encounter.name = "Complete shared recovery";

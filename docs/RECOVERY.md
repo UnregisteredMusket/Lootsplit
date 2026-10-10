@@ -1,3 +1,11 @@
+# Market release verification continuation — October 10, 2026 UTC
+
+PR85's first run `38022072870` passed every substantive group except the development account aggregate (eleven complete scenarios, one unfinished at the preserved 170-second deadline). The market implementation and packaged market audit passed. The import/Save release below remains complete/live; do not repeat it.
+
+The isolated continuation checkout is `/workspace/scratch/208a509919d2/lootsplit-finish`, local branch `fix/market-release-verification`, based on PR85 head `31f6f8d7a8cf125175aba85208bcbdbbd8f75586`. It retains the earlier candidate fixture edits and adds actual Account → Open app link entry during signed-in fixture claims, preserving document/title assertions. Every original scenario, cold recovery/ownership check, network boundary and 60s/170s/two-worker/zero-retry bound remains. See `docs/audit/2026-10-10-market-release-verification.md` for diagnosis, local failures, verification and performance limits.
+
+The older local Chromium133 aggregate has explicit environment/timing failures; it is not a complete pass. Quick checks and focused results are retained. Require complete fresh locked-browser PR/main, packaged Worker/standby, immutable publication and exact read-only live asset/desktop/mobile verification before claiming the market complete/live. Current evolving commit/tree/run identities belong in PR85 and `test-results/recovery/market-completion.json` to avoid documentation-only head loops. User publication authorization and full task permissions persist; no migration, APK or numeric tax/difficulty activation is included.
+
 # Campaign market completion — 2026-10-10 UTC
 
 The user's full task/publication permissions persist. The market implementation is in `/workspace/scratch/695a65eb4f3f/lootsplit-market`, branch `feature/campaign-market-completion`, based on merged PR84 main `f640e6d050a535527123277b39307f83f9d4e18f`. It completes reviewed supplier identity/pricing/demand, one authoritative complete reversal command, full frozen receipt/season history and truthful private treasury presentation. Classic/Automatic seasonal behavior already exists. The separate numeric tax/difficulty proposal remains inactive; no migration or APK release is included.
