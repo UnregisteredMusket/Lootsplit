@@ -269,36 +269,39 @@ function TradeEditor({
       >
         <div className="barter-workspace">
           <section className="barter-side barter-side-left">
-            <Participant
-              table={table}
-              id={leftId}
-              showBalance={dm || canAct(leftId) || world.npcs.some((n) => n.id === leftId)}
-            />
-            <label>
-              {offer ? "First participant" : "Your offering account"}
-              <SearchSelect
-                aria-label={offer ? "First participant" : "Your offering account"}
-                required
-                value={leftId}
-                disabled={!!offer}
-                onValueChange={(selectedValue) => {
-                  setLeftId(selectedValue);
-                  setLeftItems({});
-                  setLeftCoins("0");
-                  if (selectedValue === rightId) {
-                    setRightId(accounts.find((p) => p.id !== selectedValue)?.id ?? "");
-                    setRightItems({});
-                    setRightCoins("0");
-                  }
-                }}
-              >
-                {(offer ? accounts : actors).map((p) => (
-                  <option key={p.id} value={p.id}>
-                    {p.name}
-                  </option>
-                ))}
-              </SearchSelect>
-            </label>
+            <div className="barter-profile">
+              <Participant
+                large
+                table={table}
+                id={leftId}
+                showBalance={dm || canAct(leftId) || world.npcs.some((n) => n.id === leftId)}
+              />
+              <label>
+                {offer ? "First participant" : "Your offering account"}
+                <SearchSelect
+                  aria-label={offer ? "First participant" : "Your offering account"}
+                  required
+                  value={leftId}
+                  disabled={!!offer}
+                  onValueChange={(selectedValue) => {
+                    setLeftId(selectedValue);
+                    setLeftItems({});
+                    setLeftCoins("0");
+                    if (selectedValue === rightId) {
+                      setRightId(accounts.find((p) => p.id !== selectedValue)?.id ?? "");
+                      setRightItems({});
+                      setRightCoins("0");
+                    }
+                  }}
+                >
+                  {(offer ? accounts : actors).map((p) => (
+                    <option key={p.id} value={p.id}>
+                      {p.name}
+                    </option>
+                  ))}
+                </SearchSelect>
+              </label>
+            </div>
             <ItemOfferPicker
               label="First side"
               lots={leftLots}
@@ -310,34 +313,37 @@ function TradeEditor({
             />
           </section>
           <section className="barter-side barter-side-right">
-            <Participant
-              table={table}
-              id={rightId}
-              showBalance={dm || canAct(rightId) || world.npcs.some((n) => n.id === rightId)}
-            />
-            <label>
-              Other participant
-              <SearchSelect
-                aria-label="Other participant"
-                required
-                value={rightId}
-                disabled={!!offer}
-                onValueChange={(selectedValue) => {
-                  setRightId(selectedValue);
-                  setRightItems({});
-                  setRightCoins("0");
-                }}
-              >
-                {accounts
-                  .filter((p) => p.id !== leftId)
-                  .map((p) => (
-                    <option key={p.id} value={p.id}>
-                      {p.name}
-                      {p.nonParty ? " (NPC)" : ""}
-                    </option>
-                  ))}
-              </SearchSelect>
-            </label>
+            <div className="barter-profile">
+              <Participant
+                large
+                table={table}
+                id={rightId}
+                showBalance={dm || canAct(rightId) || world.npcs.some((n) => n.id === rightId)}
+              />
+              <label>
+                Other participant
+                <SearchSelect
+                  aria-label="Other participant"
+                  required
+                  value={rightId}
+                  disabled={!!offer}
+                  onValueChange={(selectedValue) => {
+                    setRightId(selectedValue);
+                    setRightItems({});
+                    setRightCoins("0");
+                  }}
+                >
+                  {accounts
+                    .filter((p) => p.id !== leftId)
+                    .map((p) => (
+                      <option key={p.id} value={p.id}>
+                        {p.name}
+                        {p.nonParty ? " (NPC)" : ""}
+                      </option>
+                    ))}
+                </SearchSelect>
+              </label>
+            </div>
             <ItemOfferPicker
               label="Second side"
               lots={rightLots}
@@ -359,11 +365,23 @@ function TradeEditor({
           <ArrowLeftRight size={18} aria-hidden="true" />
           <p>Review both offer trays. Nothing moves until the recipient accepts.</p>
         </div>
-        <label>
+        <label className="barter-note">
           Barter note
           <textarea maxLength={1000} value={note} onChange={(e) => setNote(e.target.value)} />
         </label>
-        <p>
+        <Button
+          variant="secondary"
+          onClick={() => {
+            setLeftItems({});
+            setRightItems({});
+            setLeftCoins("0");
+            setRightCoins("0");
+            setNote("");
+          }}
+        >
+          Clear offer trays
+        </Button>
+        <p className="barter-consent">
           The other side must accept this exact offer. Submitting a counteroffer makes them the
           recipient again.
         </p>
@@ -397,7 +415,8 @@ function ItemOfferPicker({
 }) {
   const [query, setQuery] = useState(""),
     [category, setCategory] = useState("all"),
-    [limit, setLimit] = useState(24);
+    [limit, setLimit] = useState(24),
+    [focusedId, setFocusedId] = useState("");
   const categoryOf = (h: Holding) => (h.kind === "property" ? "Deeds" : h.category || "Goods");
   const categories = [...new Set(lots.map(categoryOf))].sort();
   const filtered = lots.filter(
@@ -408,6 +427,7 @@ function ItemOfferPicker({
         .includes(query.toLocaleLowerCase().trim()),
   );
   const offered = lots.filter((h) => (selected[h.id] ?? 0) > 0);
+  const focused = offered.find((h) => h.id === focusedId) ?? offered[0];
   const recordedValue =
     offered.reduce((total, h) => total + h.unitCopper * selected[h.id], 0) + (Number(copper) || 0);
   return (
@@ -454,9 +474,10 @@ function ItemOfferPicker({
               aria-pressed={(selected[h.id] ?? 0) > 0}
               aria-label={`${(selected[h.id] ?? 0) > 0 ? "Remove" : "Add"} ${h.name} ${direction === "offer" ? "to" : "from"} ${label} offer`}
               title={`${h.name} · ${h.quantity} available · ${formatCopper(h.unitCopper)} each${h.kind === "property" ? " · Property deed" : ""}`}
-              onClick={() =>
-                setSelected({ ...selected, [h.id]: (selected[h.id] ?? 0) > 0 ? 0 : 1 })
-              }
+              onClick={() => {
+                setSelected({ ...selected, [h.id]: (selected[h.id] ?? 0) > 0 ? 0 : 1 });
+                setFocusedId(h.id);
+              }}
             >
               <LotArt holding={h} />
               <span className="barter-tile-count">{h.quantity}</span>
@@ -497,48 +518,68 @@ function ItemOfferPicker({
           />
           <small>{formatCopper(Number(copper) || 0)}</small>
         </label>
-        <div className="barter-offer-lots">
+        <div className="barter-offer-slots" aria-label={`${label} offer slots`}>
           {offered.map((h) => (
-            <div key={h.id} className="barter-offered-lot">
+            <button
+              type="button"
+              key={h.id}
+              className="barter-tile"
+              aria-label={`Inspect ${h.name} in ${label} tray`}
+              aria-pressed={focused?.id === h.id}
+              title={`${h.name} · ${selected[h.id]} offered`}
+              onClick={() => setFocusedId(h.id)}
+            >
               <LotArt holding={h} />
-              <label>
-                <strong>{h.name}</strong>
-                <small>
-                  {h.kind === "property" ? "Property deed · " : ""}
-                  {h.quantity} available · {formatCopper(h.unitCopper)} each
-                </small>
-                <input
-                  aria-label={`${label}: ${h.name} quantity`}
-                  type="number"
-                  min={0}
-                  max={h.quantity}
-                  step={1}
-                  value={selected[h.id] ?? 0}
-                  onChange={(e) => setSelected({ ...selected, [h.id]: Number(e.target.value) })}
-                />
-              </label>
-              <button
-                type="button"
-                className="barter-remove"
-                aria-label={`Remove ${h.name} from ${label} tray`}
-                onClick={() => setSelected({ ...selected, [h.id]: 0 })}
-              >
-                <X size={16} aria-hidden="true" />
-              </button>
-            </div>
+              <span className="barter-tile-count">{selected[h.id]}</span>
+              <span className="barter-tile-name">{h.name}</span>
+            </button>
           ))}
-          {!offered.length && (
-            <div className="barter-empty-tray">
-              <PackageOpen size={28} aria-hidden="true" />
-              <p>Add goods from inventory</p>
-            </div>
-          )}
+          {Array.from({ length: Math.max(0, 8 - offered.length) }, (_, i) => (
+            <span key={`empty-${i}`} className="barter-empty-slot" aria-hidden="true" />
+          ))}
         </div>
+        {!offered.length && <p className="barter-hint">Add goods from inventory</p>}
         <p className="barter-tray-value">
           <span>Recorded offer value</span>
           <strong>{formatCopper(recordedValue)}</strong>
         </p>
         <p className="barter-hint">Saved item values and coins; participants agree the terms.</p>
+      </div>
+      <div className="barter-inspector" aria-label={`${label} selected item`}>
+        {focused ? (
+          <>
+            <LotArt holding={focused} />
+            <div>
+              <strong>{focused.name}</strong>
+              <small>
+                {focused.kind === "property" ? "Property deed · " : ""}
+                {focused.quantity} available · {formatCopper(focused.unitCopper)} each
+              </small>
+            </div>
+            <label>
+              Quantity
+              <input
+                aria-label={`${label}: ${focused.name} quantity`}
+                type="number"
+                min={0}
+                max={focused.quantity}
+                step={1}
+                value={selected[focused.id] ?? 0}
+                onChange={(e) => setSelected({ ...selected, [focused.id]: Number(e.target.value) })}
+              />
+            </label>
+            <button
+              type="button"
+              className="barter-remove"
+              aria-label={`Remove ${focused.name} from ${label} tray`}
+              onClick={() => setSelected({ ...selected, [focused.id]: 0 })}
+            >
+              <X size={16} aria-hidden="true" />
+            </button>
+          </>
+        ) : (
+          <p>Select an offered item to adjust its quantity.</p>
+        )}
       </div>
     </div>
   );
@@ -560,10 +601,12 @@ function Participant({
   table,
   id,
   showBalance = false,
+  large = false,
 }: {
   table: CloudTable;
   id: string;
   showBalance?: boolean;
+  large?: boolean;
 }) {
   const world = readWorld(table.journal?.world),
     purse = table.purses.find((p) => p.id === id),
@@ -571,7 +614,7 @@ function Participant({
     npc = world.npcs.find((n) => n.id === id),
     portrait = purse?.portrait || purse?.sheet?.portrait || npc?.portrait;
   return (
-    <header className="barter-participant">
+    <header className={`barter-participant${large ? " barter-participant-large" : ""}`}>
       <div className="barter-portrait">
         {portrait ? (
           <img src={portrait} alt={`${person?.name ?? "Participant"} portrait`} />

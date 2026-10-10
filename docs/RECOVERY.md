@@ -1,3 +1,7 @@
+# Active recovery: approved trading layout
+
+The owner approved the interactive market/exchange/barter preview with “That's perfect.” Branch `feature/approved-trading-layout` starts from complete/live main `ed5758b2e4d2c54da8422a0694c4a2cb5202e823` (PR91). Prior Library/NPC placement/privacy/downtime, seasonal economy, commodity boards and initial barter release are COMPLETE. Implement only the approved denser presentation and preserve every capability and gate. See `docs/audit/2026-10-10-approved-trading-layout.md`. No migration or distributed APK. Existing website publication authorization persists. Reconcile evolving exact source/PR/run/deploy identities in the new PR and `test-results/recovery/approved-trading-layout.json` before repeating a write.
+
 # Portrait barter interface — October 10, 2026 UTC
 
 Active branch `feature/portrait-barter-ui` starts from complete/live main `10e468745351090c4f47a8077dd380b16313b6dc` (PR90). Searchable Library/NPC placement/privacy/downtime and commodity boards are COMPLETE; do not repeat their merges, releases or migrations. The remaining owner request is the supplied two-sided barter reference. Implementation and preservation/performance evidence are in `docs/audit/2026-10-10-barter-ui.md`; shared web/mobile client only, no migration or distributed APK. Existing publication authorization persists.

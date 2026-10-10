@@ -257,7 +257,8 @@ export function CommodityBoard({
     [openOnly, setOpenOnly] = useState(false),
     [sort, setSort] = useState("name"),
     [selectedKey, setSelectedKey] = useState(""),
-    [visited, setVisited] = useState<string[]>([]);
+    [visited, setVisited] = useState<string[]>([]),
+    [expanded, setExpanded] = useState(false);
   const needle = query.normalize("NFKD").replace(/\p{M}/gu, "").toLocaleLowerCase().trim();
   const shown = rows
     .filter(
@@ -289,6 +290,68 @@ export function CommodityBoard({
   function select(row: CommodityQuoteRow) {
     setVisited((keys) => [...new Set([...keys, ...(selected ? [selected.key] : []), row.key])]);
     setSelectedKey(row.key);
+  }
+  function quote(row: CommodityQuoteRow) {
+    const content = (
+      <>
+        <div className="commodity-good">
+          <FantasyIcon
+            entry={{
+              name: row.commodity.name,
+              category: row.commodity.category,
+              kind: "shop",
+            }}
+            size={36}
+          />
+          <div>
+            <strong>{row.commodity.name}</strong>
+            <small>
+              {row.exchange.name} · {row.commodity.unit}
+            </small>
+            {(!row.exchange.open || !row.commodity.active) && (
+              <small>{!row.exchange.open ? "Exchange closed" : "Inactive good"}</small>
+            )}
+          </div>
+        </div>
+        <div className="commodity-price">
+          <strong>
+            <span>Ask </span>
+            {formatCopper(row.offer.askCopper)}
+          </strong>
+          <small>Bid {formatCopper(row.offer.bidCopper)}</small>
+        </div>
+        <StockBars offer={row.offer} />
+        <div className="commodity-trend">
+          <Change value={row.changePercent} />
+          {row.points.length > 1 && (
+            <svg viewBox="0 0 100 30" aria-hidden="true">
+              <PriceLines points={row.points.slice(-12)} width={100} height={30} />
+            </svg>
+          )}
+        </div>
+      </>
+    );
+    return overview ? (
+      <AppLink
+        key={row.key}
+        className="commodity-row"
+        href={`/features/economy?from=%2Fmarket&exchange=${encodeURIComponent(row.exchange.id)}&commodity=${encodeURIComponent(row.commodity.id)}`}
+        aria-label={`View ${row.commodity.name} at ${row.exchange.name}`}
+      >
+        {content}
+      </AppLink>
+    ) : (
+      <button
+        type="button"
+        key={row.key}
+        className="commodity-row"
+        aria-pressed={selected?.key === row.key}
+        aria-label={`View ${row.commodity.name} at ${row.exchange.name}`}
+        onClick={() => select(row)}
+      >
+        {content}
+      </button>
+    );
   }
   return (
     <div className={`commodity-dashboard${overview ? " commodity-overview" : ""}`}>
@@ -378,68 +441,38 @@ export function CommodityBoard({
             <span>Season change</span>
           </div>
           <div className="commodity-rows">
-            {shown.map((row) => {
-              const content = (
-                <>
-                  <div className="commodity-good">
-                    <FantasyIcon
-                      entry={{
-                        name: row.commodity.name,
-                        category: row.commodity.category,
-                        kind: "shop",
-                      }}
-                      size={36}
-                    />
-                    <div>
-                      <strong>{row.commodity.name}</strong>
-                      <small>
-                        {row.exchange.name} · {row.commodity.unit}
-                      </small>
-                      {(!row.exchange.open || !row.commodity.active) && (
-                        <small>{!row.exchange.open ? "Exchange closed" : "Inactive good"}</small>
-                      )}
-                    </div>
-                  </div>
-                  <div className="commodity-price">
-                    <strong>
-                      <span>Ask </span>
-                      {formatCopper(row.offer.askCopper)}
-                    </strong>
-                    <small>Bid {formatCopper(row.offer.bidCopper)}</small>
-                  </div>
-                  <StockBars offer={row.offer} />
-                  <div className="commodity-trend">
-                    <Change value={row.changePercent} />
-                    {row.points.length > 1 && (
-                      <svg viewBox="0 0 100 30" aria-hidden="true">
-                        <PriceLines points={row.points.slice(-12)} width={100} height={30} />
-                      </svg>
-                    )}
-                  </div>
-                </>
-              );
-              return overview ? (
-                <AppLink
-                  key={row.key}
-                  className="commodity-row"
-                  href={`/features/economy?from=%2Fmarket&exchange=${encodeURIComponent(row.exchange.id)}&commodity=${encodeURIComponent(row.commodity.id)}`}
-                  aria-label={`View ${row.commodity.name} at ${row.exchange.name}`}
-                >
-                  {content}
-                </AppLink>
-              ) : (
-                <button
-                  type="button"
-                  key={row.key}
-                  className="commodity-row"
-                  aria-pressed={selected?.key === row.key}
-                  aria-label={`View ${row.commodity.name} at ${row.exchange.name}`}
-                  onClick={() => select(row)}
-                >
-                  {content}
-                </button>
-              );
-            })}
+            {overview ? (
+              <div className="commodity-sectors">
+                {[...new Set(shown.map((r) => r.commodity.category))]
+                  .sort(
+                    (a, b) =>
+                      CATEGORIES.findIndex((c) => c.value === a) -
+                      CATEGORIES.findIndex((c) => c.value === b),
+                  )
+                  .map((sector) => (
+                    <section
+                      className="commodity-sector"
+                      key={sector}
+                      aria-label={`${labelOf(CATEGORIES, sector)} quotes`}
+                    >
+                      <h3>
+                        <FantasyIcon
+                          entry={{ kind: "shop", category: sector }}
+                          categoryOnly
+                          size={22}
+                        />
+                        {labelOf(CATEGORIES, sector)}
+                      </h3>
+                      {shown.filter((row) => row.commodity.category === sector).map(quote)}
+                    </section>
+                  ))}
+              </div>
+            ) : (
+              (expanded || needle || category || exchangeId || openOnly
+                ? shown
+                : shown.slice(0, 8)
+              ).map(quote)
+            )}
             {!shown.length && (
               <p className="commodity-no-results">
                 {rows.length
@@ -452,6 +485,13 @@ export function CommodityBoard({
               </p>
             )}
           </div>
+          {!overview && !needle && !category && !exchangeId && !openOnly && shown.length > 8 && (
+            <div className="commodity-more-quotes">
+              <button type="button" aria-expanded={expanded} onClick={() => setExpanded(!expanded)}>
+                {expanded ? "Show fewer quotes" : `Show all ${shown.length} quotes`}
+              </button>
+            </div>
+          )}
           <p className="commodity-caption">
             {dm
               ? `Ask changes compare the current quote with its recorded baseline before season ${economy.epoch}.`
@@ -502,6 +542,7 @@ export function CommodityBoard({
                     </div>
                     <Change value={row.changePercent} />
                   </div>
+                  <RecordedChart row={row} dm={dm} />
                   <div className="commodity-indices">
                     <div>
                       <span>Supply</span>
@@ -533,7 +574,6 @@ export function CommodityBoard({
                   <StockBars offer={row.offer} />
                   {row.commodity.description && <p>{row.commodity.description}</p>}
                   {row.exchange.notes && <p>{row.exchange.notes}</p>}
-                  <RecordedChart row={row} dm={dm} />
                   {renderTrade?.(row)}
                 </section>
               ))}

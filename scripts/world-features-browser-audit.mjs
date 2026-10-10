@@ -10,6 +10,21 @@ import {
   navigateApplication,
 } from "./title-screen-navigation.mjs";
 import { createAndSaveRoom } from "./browser/account-fixtures.mjs";
+import { FANTASY_LOOKS, themeVars } from "../src/lib/quire/theme.ts";
+
+async function tradingLook(page, appearance) {
+  const look = FANTASY_LOOKS[appearance];
+  await page.evaluate(
+    ({ look, vars }) => {
+      const root = document.documentElement;
+      for (const [key, value] of Object.entries(vars)) root.style.setProperty(key, value);
+      root.dataset.appearance = look.appearance;
+      root.dataset.fantasyTheme = look.id;
+      root.style.colorScheme = look.appearance;
+    },
+    { look, vars: themeVars(appearance, look.accent, look.ground) },
+  );
+}
 const origin = process.env.AUDIT_ORIGIN || "http://127.0.0.1:8080";
 assert.match(
   origin,
@@ -428,6 +443,29 @@ try {
     await chooseOption(page.getByLabel("Other participant", { exact: true }), npc.id);
     await expect(page.locator(".barter-participant").filter({ hasText: "Alwen" })).toBeVisible();
     await expect(page.locator(".barter-participant").filter({ hasText: "Mara" })).toBeVisible();
+    await expect(
+      page.getByLabel("First side offer slots", { exact: true }).locator(".barter-empty-slot"),
+    ).toHaveCount(8);
+    await expect(
+      page.getByLabel("Second side offer slots", { exact: true }).locator(".barter-empty-slot"),
+    ).toHaveCount(8);
+    if (width === 1280) {
+      const panels = await page.locator(".barter-workspace").evaluate((node) => {
+        const box = (selector) => node.querySelector(selector).getBoundingClientRect().x;
+        return [
+          box(".barter-side-left .barter-profile"),
+          box(".barter-side-left .barter-inventory"),
+          box(".barter-side-left .barter-edit-tray"),
+          box(".barter-side-right .barter-edit-tray"),
+          box(".barter-side-right .barter-inventory"),
+          box(".barter-side-right .barter-profile"),
+        ];
+      });
+      assert.ok(
+        panels.every((x, i) => i === 0 || x > panels[i - 1]),
+        "Portraits flank inventories and central offer trays",
+      );
+    }
     await page.getByRole("button", { name: /Show more first side goods/ }).click();
     await expect(
       page.getByRole("button", {
@@ -435,11 +473,29 @@ try {
         exact: true,
       }),
     ).toBeVisible();
+    const inventory = page.locator(".barter-side-left .barter-inventory-grid");
+    for (let i = 0; i < 9; i++) await inventory.getByRole("button").nth(i).click();
+    await expect(
+      page.getByLabel("First side offer slots", { exact: true }).getByRole("button"),
+    ).toHaveCount(9);
+    await expect(
+      page.getByLabel("First side offer slots", { exact: true }).locator(".barter-empty-slot"),
+    ).toHaveCount(0);
+    await page.getByLabel("First side coins (copper)", { exact: true }).fill("101");
+    await fits(page);
+    await page.getByRole("button", { name: "Clear offer trays", exact: true }).click();
+    await expect(page.getByLabel("First side coins (copper)", { exact: true })).toHaveValue("0");
+    await expect(
+      page.getByLabel("First side offer slots", { exact: true }).locator(".barter-empty-slot"),
+    ).toHaveCount(8);
     await page.getByLabel("First side inventory search", { exact: true }).fill("sword");
     await page
       .getByRole("button", { name: "Add Iron sword to First side offer", exact: true })
       .click();
     await page.getByLabel("First side: Iron sword quantity", { exact: true }).fill("1");
+    await expect(
+      page.getByLabel("First side offer slots", { exact: true }).locator(".barter-empty-slot"),
+    ).toHaveCount(7);
     await page.getByLabel("First side inventory search", { exact: true }).fill("no-matching-goods");
     await expect(page.getByText("No matching goods.", { exact: true })).toBeVisible();
     await expect(page.getByLabel("First side: Iron sword quantity", { exact: true })).toHaveValue(
@@ -460,6 +516,15 @@ try {
       "1",
     );
     await page
+      .getByRole("button", { name: "Inspect Iron sword in First side tray", exact: true })
+      .click();
+    await expect(page.getByLabel("First side: Iron sword quantity", { exact: true })).toHaveValue(
+      "1",
+    );
+    await page
+      .getByRole("button", { name: "Inspect Dock house in First side tray", exact: true })
+      .click();
+    await page
       .getByRole("button", { name: "Remove Dock house from First side tray", exact: true })
       .click();
     await expect(page.getByLabel("First side: Dock house quantity", { exact: true })).toHaveCount(
@@ -475,7 +540,7 @@ try {
     await page.getByLabel("Second side: Trade gem quantity", { exact: true }).fill("1");
     await fits(page);
     await page.screenshot({ path: `${output}/barter-dark-${width}.png`, fullPage: true });
-    await page.evaluate(() => document.documentElement.setAttribute("data-appearance", "light"));
+    await tradingLook(page, "light");
     await fits(page);
     await page.screenshot({ path: `${output}/barter-light-${width}.png`, fullPage: true });
     if (width === 390) {
@@ -484,7 +549,7 @@ try {
       await page.screenshot({ path: `${output}/barter-light-320.png`, fullPage: true });
       await page.setViewportSize({ width, height: 950 });
     }
-    await page.evaluate(() => document.documentElement.setAttribute("data-appearance", "dark"));
+    await tradingLook(page, "dark");
     await page.getByRole("button", { name: "Send barter offer", exact: true }).click();
     await page.getByRole("button", { name: "Counteroffer", exact: true }).click();
     await expect(page.getByLabel("First side: Iron sword quantity", { exact: true })).toHaveValue(
