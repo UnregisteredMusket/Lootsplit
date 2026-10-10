@@ -30,7 +30,10 @@ export const openCloudTable = createServerFn({ method: "POST" })
     const { openRoom } = await import("./cloud.server.ts");
     const { currentAccountId } = await import("./member-access.server.ts");
     const userId = await currentAccountId();
-    if (!userId) throw Error("Create an account or sign in to proceed as a Dungeon Master in your own campaign");
+    if (!userId)
+      throw Error(
+        "Create an account or sign in to proceed as a Dungeon Master in your own campaign",
+      );
     return openRoom({ ...data, userId });
   });
 
@@ -47,7 +50,15 @@ export const previewCloudTable = createServerFn({ method: "POST" })
   });
 
 export const joinCloudTable = createServerFn({ method: "POST" })
-  .validator((input: { code: string; purseId: string; name: string; invitation?: string; sessionId?: string }) => input)
+  .validator(
+    (input: {
+      code: string;
+      purseId: string;
+      name: string;
+      invitation?: string;
+      sessionId?: string;
+    }) => input,
+  )
   .handler(async ({ data }) => {
     const { guardMemberSeat } = await import("./member-access.server.ts");
     await guardMemberSeat(data);
@@ -160,4 +171,15 @@ export const updateRoomPushSubscription = createServerFn({ method: "POST" })
     await guardMemberSeat(data);
     const { setPushSubscription } = await import("./push.server.ts");
     return setPushSubscription(data);
+  });
+
+export const requestCloudMapSignals = createServerFn({ method: "POST" })
+  .validator((input: { code: string; token: string; mapId: string; ping?: unknown }) => input)
+  .handler(async ({ data }) => {
+    const { setResponseHeader } = await import("@tanstack/react-start/server");
+    setResponseHeader("Cache-Control", "no-store");
+    const { guardMemberSeat } = await import("./member-access.server.ts");
+    await guardMemberSeat(data);
+    const { mapSignals } = await import("./map-signals.server.ts");
+    return mapSignals(data);
   });

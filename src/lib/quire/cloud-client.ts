@@ -1099,3 +1099,19 @@ export async function resumeAccountMembership(
 export async function clearAccountRoom(preserveDmCopy = false) {
   await detachTable(!(preserveDmCopy && session()?.role === "dm"));
 }
+
+/** Ephemeral signals bypass financial commands/turn drafts and never enter device storage. */
+export async function requestMapSignals(
+  mapId: string,
+  ping?: import("./map-signals.ts").MapPingInput,
+) {
+  const s = requireSession(),
+    campaign = key();
+  const { requestCloudMapSignals } = await import("./cloud-api.ts");
+  const started = Date.now();
+  const result = await requestCloudMapSignals({
+    data: { code: s.code, token: s.token, mapId, ping },
+  });
+  if (key() !== campaign || session()?.token !== s.token) throw Error("The campaign changed.");
+  return { ...result, serverNow: result.serverNow + Math.max(0, Date.now() - started) };
+}

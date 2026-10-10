@@ -9,6 +9,16 @@ import { CommandForm, CommandButton } from "./world-tools";
 import { LocationOptions, MarketLocationsPanel } from "./market-locations";
 import { Button, Fold } from "./ui";
 import { AppLink } from "./app-link";
+import { Users, UserRound, Store, House, Mail, Flag, MapPin, EyeOff } from "lucide-react";
+import { MapFrame } from "./map-frame";
+import {
+  groupMapRecords,
+  mapRecordKinds,
+  pingColors,
+  type MapRecord,
+  type MapPingInput,
+} from "@/lib/quire/map-signals";
+import { useMapPings } from "@/lib/quire/use-map-pings";
 import type { CloudTable } from "@/lib/quire/cloud";
 
 export function CampaignMaps() {
@@ -131,9 +141,21 @@ export function CampaignMaps() {
             map={map}
             party={party}
             placing={!!placement}
+            stopPlacing={() => {
+              setPlacement("");
+              setPoint(undefined);
+            }}
             point={point}
             onPlace={setPoint}
-            entities={pins}
+            entities={[
+              ...pins,
+              ...map.anchors.map((a) => ({
+                id: a.locationId,
+                label: locationLabel(market, a.locationId),
+                kind: "Location",
+                point: a,
+              })),
+            ]}
           />
           <p className="text-sm text-muted">
             Drag to pan. Pinch or use the scroll wheel to zoom. Keyboard: arrows, +, − and Home.
@@ -370,159 +392,163 @@ function MapEditor({
     [error, setError] = useState("");
   const market = readMarketLocations(table.journal?.market);
   return (
-    <section className="journal-entry">
-      <h2>{map ? "Edit map" : "Import a map"}</h2>
-      <CommandForm
-        label="Save map"
-        dirty
-        submitDisabled={busy}
-        submit={() => {
-          if (busy) throw Error("Wait for the image to finish processing.");
-          if (!draft.image)
-            throw Error("Choose a map image before saving. Your draft is retained.");
-          if (!draft.name.trim()) throw Error("Enter a map name before saving.");
-          return { kind: "map-save", mapId: draft.id, before: map ?? null, map: draft };
-        }}
-        onDone={close}
-      >
-        <label>
-          Map name
-          <input
-            required
-            maxLength={160}
-            value={draft.name}
-            onChange={(e) => {
-              const name = e.target.value;
-              setDraft((current) => ({ ...current, name }));
-            }}
-          />
-        </label>
-        <label>
-          Map location
-          <select
-            aria-label="Map location"
-            value={draft.locationId ?? ""}
-            onChange={(e) => {
-              const locationId = e.target.value || null;
-              setDraft((current) => ({ ...current, locationId }));
-            }}
-          >
-            <option value="">World / campaign map</option>
-            <LocationOptions market={market} />
-          </select>
-        </label>
-        <label>
-          <input
-            type="checkbox"
-            checked={draft.visible}
-            onChange={(e) => {
-              const visible = e.target.checked;
-              setDraft((current) => ({ ...current, visible }));
-            }}
-          />
-          Share this map image with players
-        </label>
-        <label>
-          Map image
-          <input
-            type="file"
-            accept="image/png,image/jpeg,image/webp"
-            disabled={busy}
-            onChange={async (e) => {
-              const file = e.target.files?.[0];
-              e.target.value = "";
-              if (!file) return;
-              setBusy(true);
-              setError("");
-              setProgress("Preparing map image… You can fill in the map details while you wait.");
-              try {
-                const image = await prepareMapImage(file);
-                setDraft((current) => ({ ...current, image, anchors: [] }));
-                setProgress("Map image ready. Review the details, then save the map.");
-              } catch (e) {
-                setProgress("");
-                setError(e instanceof Error ? e.message : "Map import failed.");
-              } finally {
-                setBusy(false);
-              }
-            }}
-          />
-        </label>
-        <p className="text-sm text-muted">
-          PNG, JPEG or WebP up to 20 MB. Shared copy: up to 2400 pixels and 500 KB. Players see
-          everything drawn in the shared image.
-        </p>
-        {draft.image && (
-          <>
-            <img className="map-preview" src={draft.image} alt="Imported map preview" />
-            <Button
+    <MapFrame editor>
+      <section className="journal-entry">
+        <h2>{map ? "Edit map" : "Import a map"}</h2>
+        <CommandForm
+          label="Save map"
+          dirty
+          submitDisabled={busy}
+          submit={() => {
+            if (busy) throw Error("Wait for the image to finish processing.");
+            if (!draft.image)
+              throw Error("Choose a map image before saving. Your draft is retained.");
+            if (!draft.name.trim()) throw Error("Enter a map name before saving.");
+            return { kind: "map-save", mapId: draft.id, before: map ?? null, map: draft };
+          }}
+          onDone={close}
+        >
+          <label>
+            Map name
+            <input
+              required
+              maxLength={160}
+              value={draft.name}
+              onChange={(e) => {
+                const name = e.target.value;
+                setDraft((current) => ({ ...current, name }));
+              }}
+            />
+          </label>
+          <label>
+            Map location
+            <select
+              aria-label="Map location"
+              value={draft.locationId ?? ""}
+              onChange={(e) => {
+                const locationId = e.target.value || null;
+                setDraft((current) => ({ ...current, locationId }));
+              }}
+            >
+              <option value="">World / campaign map</option>
+              <LocationOptions market={market} />
+            </select>
+          </label>
+          <label>
+            <input
+              type="checkbox"
+              checked={draft.visible}
+              onChange={(e) => {
+                const visible = e.target.checked;
+                setDraft((current) => ({ ...current, visible }));
+              }}
+            />
+            Share this map image with players
+          </label>
+          <label>
+            Map image
+            <input
+              type="file"
+              accept="image/png,image/jpeg,image/webp"
               disabled={busy}
-              onClick={async () => {
+              onChange={async (e) => {
+                const file = e.target.files?.[0];
+                e.target.value = "";
+                if (!file) return;
                 setBusy(true);
                 setError("");
-                setProgress("Reading location labels… You can continue editing the map details.");
+                setProgress("Preparing map image… You can fill in the map details while you wait.");
                 try {
-                  const result = await recognizeMap(draft.image, setProgress);
-                  const matches = recognizedAnchors(
-                    result.lines,
-                    result.width,
-                    result.height,
-                    table,
-                  );
-                  setDraft((current) => ({
-                    ...current,
-                    anchors: [
-                      ...current.anchors,
-                      ...matches.filter(
-                        (a) => !current.anchors.some((b) => a.locationId === b.locationId),
-                      ),
-                    ],
-                  }));
-                  setProgress(
-                    `${matches.length} unique location labels matched. Review their positions before saving; ambiguous or unreadable labels can be linked manually.`,
-                  );
+                  const image = await prepareMapImage(file);
+                  setDraft((current) => ({ ...current, image, anchors: [] }));
+                  setProgress("Map image ready. Review the details, then save the map.");
                 } catch (e) {
                   setProgress("");
-                  setError(
-                    e instanceof Error ? e.message : "Recognition failed. Link locations manually.",
-                  );
+                  setError(e instanceof Error ? e.message : "Map import failed.");
                 } finally {
                   setBusy(false);
                 }
               }}
-            >
-              Read location labels
-            </Button>
-          </>
+            />
+          </label>
+          <p className="text-sm text-muted">
+            PNG, JPEG or WebP up to 20 MB. Shared copy: up to 2400 pixels and 500 KB. Players see
+            everything drawn in the shared image.
+          </p>
+          {draft.image && (
+            <>
+              <img className="map-preview" src={draft.image} alt="Imported map preview" />
+              <Button
+                disabled={busy}
+                onClick={async () => {
+                  setBusy(true);
+                  setError("");
+                  setProgress("Reading location labels… You can continue editing the map details.");
+                  try {
+                    const result = await recognizeMap(draft.image, setProgress);
+                    const matches = recognizedAnchors(
+                      result.lines,
+                      result.width,
+                      result.height,
+                      table,
+                    );
+                    setDraft((current) => ({
+                      ...current,
+                      anchors: [
+                        ...current.anchors,
+                        ...matches.filter(
+                          (a) => !current.anchors.some((b) => a.locationId === b.locationId),
+                        ),
+                      ],
+                    }));
+                    setProgress(
+                      `${matches.length} unique location labels matched. Review their positions before saving; ambiguous or unreadable labels can be linked manually.`,
+                    );
+                  } catch (e) {
+                    setProgress("");
+                    setError(
+                      e instanceof Error
+                        ? e.message
+                        : "Recognition failed. Link locations manually.",
+                    );
+                  } finally {
+                    setBusy(false);
+                  }
+                }}
+              >
+                Read location labels
+              </Button>
+            </>
+          )}
+          {draft.anchors.map((a) => (
+            <div className="world-row" key={a.locationId}>
+              <span>
+                {locationLabel(market, a.locationId)} · {Math.round(a.x * 100)}%,{" "}
+                {Math.round(a.y * 100)}%
+              </span>
+              <Button
+                onClick={() =>
+                  setDraft((current) => ({
+                    ...current,
+                    anchors: current.anchors.filter((b) => b !== a),
+                  }))
+                }
+              >
+                Remove anchor
+              </Button>
+            </div>
+          ))}
+          {progress && <p role="status">{progress}</p>}
+          {error && <p role="alert">{error}</p>}
+        </CommandForm>
+        <Button onClick={close}>Close editor</Button>
+        {map && (
+          <CommandButton input={{ kind: "map-save", mapId: map.id, before: map, map: null }}>
+            Remove map
+          </CommandButton>
         )}
-        {draft.anchors.map((a) => (
-          <div className="world-row" key={a.locationId}>
-            <span>
-              {locationLabel(market, a.locationId)} · {Math.round(a.x * 100)}%,{" "}
-              {Math.round(a.y * 100)}%
-            </span>
-            <Button
-              onClick={() =>
-                setDraft((current) => ({
-                  ...current,
-                  anchors: current.anchors.filter((b) => b !== a),
-                }))
-              }
-            >
-              Remove anchor
-            </Button>
-          </div>
-        ))}
-        {progress && <p role="status">{progress}</p>}
-        {error && <p role="alert">{error}</p>}
-      </CommandForm>
-      <Button onClick={close}>Close editor</Button>
-      {map && (
-        <CommandButton input={{ kind: "map-save", mapId: map.id, before: map, map: null }}>
-          Remove map
-        </CommandButton>
-      )}
-    </section>
+      </section>
+    </MapFrame>
   );
 }
 function MapViewport({
@@ -532,14 +558,43 @@ function MapViewport({
   point,
   onPlace,
   entities,
+  stopPlacing,
 }: {
   map: CampaignMap;
   party?: { x: number; y: number };
   placing: boolean;
   point?: { x: number; y: number };
   onPlace: (p: { x: number; y: number }) => void;
-  entities: { id: string; label: string; kind: string; point?: { x: number; y: number } }[];
+  entities: MapRecord[];
+  stopPlacing: () => void;
 }) {
+  const [visible, setVisible] = useState<string[]>([...mapRecordKinds]),
+    [filtersOpen, setFiltersOpen] = useState(false),
+    [details, setDetails] = useState<MapRecord[]>([]),
+    [pinging, setPinging] = useState(false),
+    [color, setColor] = useState<MapPingInput["color"]>("blue");
+  const signals = useMapPings(map.id),
+    useDm = useSeat().role === "dm";
+  const records: MapRecord[] = [
+    ...map.markers
+      .filter((m) => m.visibility === "party" || useDm)
+      .map((m) => ({
+        id: m.id,
+        label: m.label,
+        description: m.description,
+        kind: "Marker",
+        point: m,
+      })),
+    ...entities,
+    ...(party ? [{ id: "party", label: "Party", kind: "Party", point: party }] : []),
+  ];
+  const groups = groupMapRecords(records, visible);
+  const currentDetails = details.flatMap((d) =>
+    records.filter((r) => r.id === d.id && r.kind === d.kind),
+  );
+  useEffect(() => {
+    if (placing || signals.viewOnly) setPinging(false);
+  }, [placing, signals.viewOnly]);
   const root = useRef<HTMLDivElement>(null),
     [ratio, setRatio] = useState(1),
     [size, setSize] = useState({ w: 1, h: 1 }),
@@ -593,8 +648,35 @@ function MapViewport({
     y: ps.reduce((n, p) => n + p.y, 0) / ps.length,
   });
   return (
-    <>
-      <div className="world-toolbar">
+    <MapFrame>
+      <div className="world-toolbar map-controls">
+        <Button aria-expanded={filtersOpen} onClick={() => setFiltersOpen((v) => !v)}>
+          Filters
+        </Button>
+        <Button
+          disabled={signals.viewOnly}
+          aria-pressed={pinging}
+          onClick={() => {
+            stopPlacing();
+            setPinging((v) => !v);
+          }}
+        >
+          Ping
+        </Button>
+        <label>
+          Ping color
+          <select
+            aria-label="Ping color"
+            value={color}
+            onChange={(e) => setColor(e.target.value as MapPingInput["color"])}
+          >
+            {pingColors.map((c) => (
+              <option key={c} value={c}>
+                {c[0].toUpperCase() + c.slice(1)}
+              </option>
+            ))}
+          </select>
+        </label>
         <Button onClick={() => zoom(1.4, size.w / 2, size.h / 2)} aria-label="Zoom in">
           +
         </Button>
@@ -604,9 +686,38 @@ function MapViewport({
         <Button onClick={fit}>Fit map</Button>
         <span aria-live="polite">{Math.round(view.scale * 100)}%</span>
       </div>
+      {filtersOpen && (
+        <fieldset className="map-filters">
+          <legend>Show on map</legend>
+          {mapRecordKinds.map((kind) => (
+            <label key={kind}>
+              <input
+                type="checkbox"
+                checked={visible.includes(kind)}
+                onChange={(e) =>
+                  setVisible((v) => (e.target.checked ? [...v, kind] : v.filter((k) => k !== kind)))
+                }
+              />
+              {kind === "NPC" ? "Characters / NPCs" : kind}
+            </label>
+          ))}
+          <Button onClick={() => setVisible([...mapRecordKinds])}>Show all</Button>
+          <Button onClick={() => setVisible([])}>Hide all</Button>
+        </fieldset>
+      )}
+      {pinging && (
+        <p role="status">
+          Tap the map to ping in {color}.{" "}
+          {signals.joined
+            ? "Everyone viewing this map in the room will see it for five seconds."
+            : "Offline preview; join a room to share pings."}
+        </p>
+      )}
+      {signals.viewOnly && <p className="text-sm text-muted">Resume play to share map pings.</p>}
+      {signals.error && <p role="alert">{signals.error}</p>}
       <div
         ref={root}
-        className={`map-viewport ${placing ? "placing" : ""}`}
+        className={`map-viewport ${placing || pinging ? "placing" : ""}`}
         role="region"
         aria-label="Interactive campaign map"
         tabIndex={0}
@@ -617,6 +728,16 @@ function MapViewport({
             )
           )
             e.preventDefault();
+          if (pinging && (e.key === "Enter" || e.key === " ")) {
+            e.preventDefault();
+            const x = (size.w / 2 - view.x) / (w * view.scale),
+              y = (size.h / 2 - view.y) / (h * view.scale);
+            if (x >= 0 && x <= 1 && y >= 0 && y <= 1) void signals.send({ x, y }, color);
+          }
+          if (e.key === "Escape") {
+            setPinging(false);
+            stopPlacing();
+          }
           if (e.key === "Home") fit();
           else if (e.key === "+" || e.key === "=") zoom(1.2, size.w / 2, size.h / 2);
           else if (e.key === "-") zoom(1 / 1.2, size.w / 2, size.h / 2);
@@ -628,7 +749,9 @@ function MapViewport({
             }));
         }}
         onPointerDown={(e) => {
-          e.currentTarget.setPointerCapture(e.pointerId);
+          if (e.button !== 0) return;
+          const target = (e.target as HTMLElement).closest("button") ?? e.currentTarget;
+          target.setPointerCapture(e.pointerId);
           pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
           if (pointers.current.size === 1) {
             start.current = { x: e.clientX, y: e.clientY };
@@ -668,11 +791,19 @@ function MapViewport({
           }
         }}
         onPointerUp={(e) => {
-          if (placing && !moved.current && pointers.current.size === 1) {
+          if (
+            (placing || pinging) &&
+            !moved.current &&
+            pointers.current.has(e.pointerId) &&
+            pointers.current.size === 1
+          ) {
             const r = e.currentTarget.getBoundingClientRect(),
               x = (e.clientX - r.left - view.x) / (w * view.scale),
               y = (e.clientY - r.top - view.y) / (h * view.scale);
-            if (x >= 0 && x <= 1 && y >= 0 && y <= 1) onPlace({ x, y });
+            if (x >= 0 && x <= 1 && y >= 0 && y <= 1) {
+              if (pinging) void signals.send({ x, y }, color);
+              else onPlace({ x, y });
+            }
           }
           pointers.current.delete(e.pointerId);
         }}
@@ -692,75 +823,110 @@ function MapViewport({
             alt={map.name}
             onLoad={(e) => setRatio(e.currentTarget.naturalWidth / e.currentTarget.naturalHeight)}
           />
-          {map.anchors.map((a) => (
-            <span
-              key={a.locationId}
-              className="map-anchor"
-              style={{ left: `${a.x * 100}%`, top: `${a.y * 100}%` }}
-              title="Reviewed location"
-            >
-              ◇
-            </span>
-          ))}
-          {map.markers.map((m) => (
-            <span
-              key={m.id}
-              className="map-pin"
-              style={{ left: `${m.x * 100}%`, top: `${m.y * 100}%` }}
-              title={m.description}
-            >
-              ⚑{" "}
-              <span>
-                {m.label}
-                {m.visibility === "dm" ? " (DM)" : ""}
-              </span>
-            </span>
-          ))}
-          {entities
-            .filter(
-              (p, i) =>
-                entities.findIndex(
-                  (q) => q.point?.x === p.point?.x && q.point?.y === p.point?.y,
-                ) === i,
-            )
-            .map((p) => (
-              <span
-                key={p.id}
-                className="map-pin map-entity"
-                style={{ left: `${p.point!.x * 100}%`, top: `${p.point!.y * 100}%` }}
-                title={entities
-                  .filter((q) => q.point?.x === p.point?.x && q.point?.y === p.point?.y)
-                  .map((q) => `${q.kind}: ${q.label}`)
-                  .join("; ")}
-              >
-                ⌂{" "}
-                <span>
-                  {
-                    entities.filter((q) => q.point?.x === p.point?.x && q.point?.y === p.point?.y)
-                      .length
-                  }{" "}
-                  records
-                </span>
-              </span>
-            ))}
-          {party && (
-            <span
-              className="map-pin map-party"
-              style={{ left: `${party.x * 100}%`, top: `${party.y * 100}%` }}
-            >
-              ● <span>Party</span>
-            </span>
-          )}
-          {point && (
-            <span
-              className="map-pin"
-              style={{ left: `${point.x * 100}%`, top: `${point.y * 100}%` }}
-            >
-              ✚
-            </span>
-          )}
         </div>
+        {groups.map((group) => (
+          <div
+            key={group.id}
+            className="map-icon-group"
+            style={{
+              left: view.x + group.point.x * w * view.scale,
+              top: view.y + group.point.y * h * view.scale,
+            }}
+          >
+            {group.kinds.map((type) => (
+              <button
+                type="button"
+                key={type.kind}
+                className={`map-record-icon map-kind-${type.kind.toLowerCase().replaceAll(" ", "-")}`}
+                title={`${type.kind}: ${type.records.map((r) => r.label).join(", ")}`}
+                aria-label={`${type.kind}: ${type.records.length} ${type.records.length === 1 ? "record" : "records"}`}
+                onClick={() => {
+                  if (!moved.current && !placing && !pinging) setDetails(type.records);
+                }}
+              >
+                <RecordIcon kind={type.kind} />
+                {type.records.length > 1 && (
+                  <span className="map-count">{type.records.length}</span>
+                )}
+              </button>
+            ))}
+          </div>
+        ))}
+        {point && (
+          <span
+            className="map-place-point"
+            style={{
+              left: view.x + point.x * w * view.scale,
+              top: view.y + point.y * h * view.scale,
+            }}
+            aria-label="Selected placement"
+          >
+            ✚
+          </span>
+        )}
+        {signals.pings.map((p) => (
+          <span
+            key={p.id}
+            className={`map-ping map-ping-${p.color}`}
+            style={{ left: view.x + p.x * w * view.scale, top: view.y + p.y * h * view.scale }}
+            role="img"
+            aria-label={`${p.color} map ping`}
+          />
+        ))}
+        {pinging && (
+          <span className="map-ping-crosshair" aria-hidden="true">
+            +
+          </span>
+        )}
       </div>
-    </>
+      {currentDetails.length > 0 && (
+        <section className="map-record-details" aria-label="Map record details">
+          <div className="world-row">
+            <strong>
+              {currentDetails[0].kind} · {currentDetails.length}{" "}
+              {currentDetails.length === 1 ? "record" : "records"}
+            </strong>
+            <Button onClick={() => setDetails([])}>Close details</Button>
+          </div>
+          {currentDetails.map((r) => (
+            <div key={r.id}>
+              {r.href ? (
+                <AppLink className="settings-link" href={r.href}>
+                  {r.label} →
+                </AppLink>
+              ) : (
+                <strong>{r.label}</strong>
+              )}
+              {r.description && <p>{r.description}</p>}
+            </div>
+          ))}
+        </section>
+      )}
+      {pinging && (
+        <p className="text-sm text-muted">
+          Keyboard: pan to a point, then press Enter to ping the center crosshair. Escape turns ping
+          mode off.
+        </p>
+      )}
+    </MapFrame>
   );
+}
+function RecordIcon({ kind }: { kind: string }) {
+  const Icon =
+    kind === "NPC"
+      ? UserRound
+      : kind === "Party"
+        ? Users
+        : kind === "Shop"
+          ? Store
+          : kind === "Black market"
+            ? EyeOff
+            : kind === "Property"
+              ? House
+              : kind === "Post office"
+                ? Mail
+                : kind === "Marker"
+                  ? Flag
+                  : MapPin;
+  return <Icon size={18} aria-hidden="true" />;
 }

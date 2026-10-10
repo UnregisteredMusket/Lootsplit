@@ -285,6 +285,7 @@ sql.exec(
 );
 sql.exec(readFileSync(new URL("../../../cloudflare/migrations/0012_campaign_room_images.sql",import.meta.url),"utf8"));
 sql.exec(readFileSync(new URL("../../../cloudflare/migrations/0013_campaign_resource_documents.sql",import.meta.url),"utf8"));
+sql.exec(readFileSync(new URL("../../../cloudflare/migrations/0014_campaign_map_pings.sql",import.meta.url),"utf8"));
 (globalThis as any).__env__ = {
   DB: {
     async batch(statements: {run:()=>Promise<unknown>}[]) {
@@ -773,4 +774,47 @@ test("large resource packs deduplicate across archives, hydrate complete bytes a
     2,
   );
   await deleteRoom(room.code, 2);
+});
+
+
+test("map pings cross seats outside turns without changing campaigns; expiry, map privacy and revoked sessions are enforced", async () => {
+  const {mapSignals} = await import("./map-signals.server.ts");
+  const {choosePace,closeRoom,manageRoom} = await import("./cloud.server.ts");
+  const table = emptyCloudTable();
+  table.purses = [{id:"ping-hero",name:"Ping hero",kind:"character",coins:emptyCoins()}];
+  const map = {id:"public-map",name:"Shared map",image:"data:image/webp;base64,fixture",locationId:null,visible:true,anchors:[],markers:[]};
+  table.journal = {sessions:[],events:[],requests:[],world:{maps:[map,{...map,id:"secret-map",visible:false}],npcs:[],trades:[],timeHistory:[],conversations:[],blackMarketActive:false}};
+  const host = await openRoom({name:"Pings DM",table});
+  const guest = await joinRoom({code:host.code,purseId:"ping-hero",name:"Player"});
+  const player = {code:host.code,token:guest.token,mapId:map.id};
+  const dm = {...host,mapId:map.id};
+  const before = await readRoom(host.code), originalNow = Date.now;
+  let now = originalNow(); Date.now = () => now;
+  const ping = {id:crypto.randomUUID(),mapId:map.id,x:.2,y:.8,color:"red"};
+  try {
+    await mapSignals({...player,ping});
+    assert.equal((await mapSignals(dm)).pings[0].color,"red");
+    assert.deepEqual(await readRoom(host.code),before,"signals do not alter room revisions, campaign data, drafts or ledger");
+    await assert.rejects(mapSignals({...player,ping:{...ping,id:crypto.randomUUID()}}),/Wait/);
+    await assert.rejects(mapSignals({...player,ping:{...ping,x:1.2}}));
+    await assert.rejects(mapSignals({...player,ping:{...ping,color:"javascript"}}));
+    await assert.rejects(mapSignals({...player,token:"forged"}),/not seated/);
+    await assert.rejects(mapSignals({...player,mapId:"secret-map"}),/unavailable/);
+    await mapSignals({...host,mapId:"secret-map",ping:{...ping,id:crypto.randomUUID(),mapId:"secret-map"}});
+    assert.equal((await mapSignals(player)).pings.length,1,"secret map pings never cross the player map response");
+    now += 5001;
+    assert.deepEqual((await mapSignals(dm)).pings,[]);
+    assert.equal(sql.prepare("SELECT count(*) AS n FROM campaign_map_pings WHERE code=?").get(host.code)!.n,0);
+    await choosePace({...host,live:true});
+    await mapSignals({...dm,ping:{...ping,id:crypto.randomUUID(),color:"blue"}});
+    assert.equal((await mapSignals(player)).pings[0].color,"blue");
+    await closeRoom({...host,keepOnline:true});
+    await assert.rejects(mapSignals({...player,ping:{...ping,id:crypto.randomUUID()}}),/Resume play/);
+    await choosePace({...host,live:false});
+    sql.exec("CREATE TABLE IF NOT EXISTS library_members(user_id TEXT, code TEXT, seat_id TEXT, token TEXT)");
+    await manageRoom({...host,action:"kick",seatId:guest.seatId});
+    await assert.rejects(mapSignals(player),/not seated/);
+    await closeRoom(host);
+    await assert.rejects(mapSignals(dm),/unavailable/);
+  } finally {Date.now = originalNow; const last=await readRoom(host.code); if(last) await deleteRoom(host.code,last.revision);}
 });
