@@ -209,7 +209,9 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Packaged Worker / accounts / Start disposable built Worker | open | 2 | 7s → 11s | +4s | +57.14% |
 | Packaged Worker / interface / worker-market-locations | open | 2 | 23s → 45s | +22s | +95.65% |
 | Development / gameplay / dev-market-locations | open | 2 | 38s → 68s | +30s | +78.95% |
-| market locations browser audit | open | 2 | 36.179s → 65.756s | +29.577s | +81.75% |
+| market locations browser audit | open | 3 | 36.179s → 110.925s | +74.746s | +206.6% |
+| Packaged Worker / interface / worker-market-locations | open | 2 | 23s → 68s | +45s | +195.65% |
+| Development / gameplay / dev-market-locations | open | 2 | 27s → 68s | +41s | +151.85% |
 | Development / governance / dev-sound | open | 2 | 8s → 34s | +26s | +325% |
 | Cloudflare web build | open | 2 | 8.956s → 16.544s | +7.588s | +84.73% |
 | mobile web build | open | 2 | 6.259s → 12.496s | +6.237s | +99.65% |
@@ -222,6 +224,9 @@ Open trends require investigation. Resolved trends retain their history; each ve
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-10T02:27:21Z | step: Packaged Worker / interface / worker-market-locations | 32s → 68s | +36s | +112.5% | failure | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37811118461/job/113428687791) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38016770316/job/114108904234) |
+| 2026-10-10T02:27:14Z | step: Development / gameplay / dev-market-locations | 52s → 68s | +16s | +30.77% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37811118461/job/113427906196) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38016770316/job/114108667453) |
+| 2026-10-09T18:26:49.234Z | audit: market locations browser audit | 65.756s → 110.925s | +45.169s | +68.69% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/tree/feature/property-marketplace) · [After](https://github.com/UnregisteredMusket/Lootsplit/tree/fix/location-import-response) |
 | 2026-10-10T02:17:54Z | step: Development / gameplay / dev-market-locations | 47s → 68s | +21s | +44.68% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37809135233/job/113421122434) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38016186651/job/114106856170) |
 | 2026-10-09T17:29:39Z | step: Development / governance / dev-backup | 18s → 21s | +3s | +16.67% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37763435596/job/113265181401) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37965977121/job/113940301770) |
 | 2026-10-09T17:28:26Z | step: Packaged standby / Run actions/upload-artifact@v4 | 2s → 3s | +1s | +50% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37263545529/job/111615780341) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37965977121/job/113941067745) |
