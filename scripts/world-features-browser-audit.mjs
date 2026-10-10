@@ -76,6 +76,7 @@ try {
       viewport: { width, height: 950 },
       hasTouch: true,
       serviceWorkers: "block",
+      extraHTTPHeaders: { "cf-connecting-ip": `2001:db8:${crypto.randomUUID().slice(0,4)}:${crypto.randomUUID().slice(0,4)}::1` },
     });
     await context.route(
       (url) => url.origin !== origin && !["data:", "blob:"].includes(url.protocol),
@@ -269,7 +270,13 @@ try {
     assert.equal(savedMap.visible, true);
     assert.match(savedMap.image, /^data:image\/webp;base64,/);
     await page.getByRole("button", { name: "Edit map & anchors", exact: true }).click();
+    await page.getByRole("button",{name:"Fullscreen editor",exact:true}).click();
+    await expect(page.locator(".map-editor-frame")).toHaveClass(/map-fullscreen/);
     await page.getByLabel("Map name", { exact: true }).fill("Port atlas revised");
+    await page.screenshot({path:`${output}/fullscreen-editor-${width}.png`});
+    await page.keyboard.press("Escape");
+    await expect(page.locator(".map-editor-frame")).not.toHaveClass(/map-fullscreen/);
+    await expect(page.getByLabel("Map name",{exact:true})).toHaveValue("Port atlas revised");
     await page.getByRole("button", { name: "Save map", exact: true }).click();
     await expect(page.getByRole("heading", { name: "Edit map", exact: true })).toHaveCount(0);
     await reloadApplication(page);
@@ -295,7 +302,31 @@ try {
     await page.getByLabel("Marker name", { exact: true }).fill("Rendezvous");
     await page.getByLabel("Details", { exact: true }).fill("Meet at the quay");
     await page.getByRole("button", { name: "Save live marker", exact: true }).click();
-    await expect(page.locator(".map-pin").filter({ hasText: "Rendezvous" })).toBeVisible();
+    const marker = page.getByRole("button",{name:"Marker: 1 record",exact:true});
+    await expect(marker).toBeVisible();
+    await marker.click();
+    await expect(page.getByRole("region",{name:"Map record details"})).toContainText("Rendezvous");
+    await page.getByRole("button",{name:"Close details",exact:true}).click();
+    await page.getByRole("button",{name:"Filters",exact:true}).click();
+    await page.getByLabel("Marker",{exact:true}).uncheck();
+    await expect(marker).toHaveCount(0);
+    await page.getByLabel("Marker",{exact:true}).check();
+    await page.getByRole("button",{name:"Hide all",exact:true}).click();
+    await expect(page.locator(".map-record-icon")).toHaveCount(0);
+    await page.getByRole("button",{name:"Show all",exact:true}).click();
+    await page.getByRole("button",{name:"Filters",exact:true}).click();
+    await page.getByRole("button",{name:"Fullscreen map",exact:true}).click();
+    await expect(page.locator(".map-view-frame")).toHaveClass(/map-fullscreen/);
+    const full = await page.locator(".map-view-frame").boundingBox();
+    assert.ok(full.height >= 949 && full.width >= width-1);
+    await page.getByLabel("Ping color",{exact:true}).selectOption("red");
+    await page.getByRole("button",{name:"Ping",exact:true}).click();
+    await region.focus(); await page.keyboard.press("Enter");
+    await expect(page.getByRole("img",{name:"red map ping",exact:true})).toBeVisible();
+    await expect(page.getByRole("img",{name:"red map ping",exact:true})).toHaveCount(0,{timeout:7000});
+    await page.getByRole("button",{name:"Ping",exact:true}).click();
+    await page.screenshot({path:`${output}/fullscreen-map-${width}.png`});
+    await page.getByRole("button",{name:"Exit fullscreen",exact:true}).click();
     await region.hover();
     await page.mouse.wheel(0, -250);
     await expect(page.locator(".world-toolbar [aria-live=polite]")).not.toHaveText("100%");
@@ -424,6 +455,24 @@ try {
     assert.equal((await dbRead(page, "journal")).world.timeHistory.length, 2);
     await fits(page);
     await page.screenshot({ path: `${output}/time-${width}.png`, fullPage: true });
+    await navigateApplication(page, origin + "/features/npcs");
+    await page.getByRole("button",{name:"Create non-party NPC",exact:true}).click();
+    await page.getByLabel("NPC name",{exact:true}).fill("Sera");
+    await page.getByLabel("NPC location",{exact:true}).selectOption("city");
+    await page.getByRole("button",{name:"Create NPC",exact:true}).click();
+    await navigateApplication(page,origin+"/maps");
+    const npcIcon=page.getByRole("button",{name:"NPC: 2 records",exact:true});
+    await expect(npcIcon).toBeVisible();
+    await expect(npcIcon.locator(".map-count")).toHaveText("2");
+    const iconBefore=await npcIcon.boundingBox();
+    await page.getByRole("button",{name:"Zoom in",exact:true}).click();
+    const iconAfter=await npcIcon.boundingBox();
+    assert.equal(iconBefore.width,iconAfter.width,"record icons remain screen-sized while zooming");
+    await page.getByRole("button",{name:"Fit map",exact:true}).click();
+    await npcIcon.click();
+    await expect(page.getByRole("region",{name:"Map record details"})).toContainText("Mara");
+    await expect(page.getByRole("region",{name:"Map record details"})).toContainText("Sera");
+    await page.getByRole("button",{name:"Close details",exact:true}).click();
     // Keep the existing offline gameplay audit, then verify real shared map writes.
     await createAndSaveRoom(page, origin, (p, o, path) => navigateApplication(p, o + path));
     await navigateApplication(page, origin + "/maps");
@@ -476,6 +525,41 @@ try {
     await expect(page.getByRole("region", { name: "Interactive campaign map" })).toBeVisible();
     await fits(page);
     await page.screenshot({ path: `${output}/shared-maps-${width}.png`, fullPage: true });
+    await navigateApplication(page,origin+"/share");
+    await page.evaluate(() => Object.defineProperty(navigator,"share",{configurable:true,value:async data => {window.mapInvite = data.url;}}));
+    await page.getByRole("button",{name:"Share join link",exact:true}).click();
+    const invite = await page.evaluate(() => window.mapInvite);
+    const guestContext = await browser.newContext({viewport:{width:390,height:950},hasTouch:true,serviceWorkers:"block",extraHTTPHeaders:{"cf-connecting-ip":`2001:db8:${crypto.randomUUID().slice(0,4)}:${crypto.randomUUID().slice(0,4)}::1`}});
+    await guestContext.route(url=>url.origin!==origin&&!["data:","blob:"].includes(url.protocol),route=>route.abort());
+    const guest = await guestContext.newPage(); guest.guestAccessAudit=true;
+    guest.on("pageerror",e=>errors.push(e.message));
+    await openApplication(guest,invite);
+    await guest.getByRole("button",{name:"Find characters",exact:true}).click();
+    await guest.getByPlaceholder("What should the party call you?").fill("Map guest");
+    await guest.getByRole("button",{name:"Join room",exact:true}).click();
+    await expect(guest.locator(".room-code")).toBeVisible();
+    await navigateApplication(guest,origin+"/maps");
+    await guest.getByLabel("Map",{exact:true}).selectOption(sharedMap.id);
+    await navigateApplication(page,origin+"/maps");
+    await page.getByLabel("Map",{exact:true}).selectOption(sharedMap.id);
+    await guest.getByRole("button",{name:"Fullscreen map",exact:true}).click();
+    await guest.getByRole("button",{name:"Ping",exact:true}).click();
+    await guest.getByLabel("Ping color",{exact:true}).selectOption("violet");
+    const guestMap=guest.getByRole("region",{name:"Interactive campaign map"});
+    await guestMap.scrollIntoViewIfNeeded();
+    const touchBox=await guestMap.boundingBox();
+    await guest.touchscreen.tap(touchBox.x+touchBox.width*.5,touchBox.y+touchBox.height*.5);
+    await expect(guest.getByRole("img",{name:"violet map ping",exact:true})).toBeVisible();
+    await expect(page.getByRole("img",{name:"violet map ping",exact:true})).toBeVisible();
+    await expect(page.getByRole("img",{name:"violet map ping",exact:true})).toHaveCount(0,{timeout:7000});
+    await page.getByRole("button",{name:"Ping",exact:true}).click();
+    await page.getByLabel("Ping color",{exact:true}).selectOption("green");
+    await page.getByRole("region",{name:"Interactive campaign map"}).focus(); await page.keyboard.press("Enter");
+    await expect(guest.getByRole("img",{name:"green map ping",exact:true})).toBeVisible();
+    await expect(guest.getByRole("img",{name:"green map ping",exact:true})).toHaveCount(0,{timeout:7000});
+    assert.equal(await guest.evaluate(()=>Object.keys(localStorage).some(k=>k.startsWith("quire.cloud"))),false,"pings never persist guest campaigns");
+    await guest.screenshot({path:`${output}/guest-fullscreen-map-${width}.png`});
+    await guestContext.close();
     await context.close();
   }
   assert.deepEqual(errors, []);
@@ -497,6 +581,11 @@ try {
           "real shared-room saves",
           "location anchors",
           "live markers",
+          "compact icons, filter hide/show and record details",
+          "fullscreen map and editor preserve draft",
+          "colored transient local ping and keyboard placement",
+          "NPC count badge and constant icon size across zoom",
+          "DM/player pings cross devices and expire outside turns",
           "wheel and pinch zoom/pan",
           "NPC inventory and dialogue",
           "barter/counter/accept",
