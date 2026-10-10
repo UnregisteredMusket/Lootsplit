@@ -1,0 +1,3 @@
+id,name,unit,category,baseCopper,weight,description,active,materialKey
+custom.moon-salt,Moon salt,1 lb pouch,apothecary,1200,1,Homebrew alchemical trade material,true,
+custom.iron,Iron ingots,10 lb bundle,smith,1000,10,Review quality and exchange availability,true,

@@ -5,7 +5,13 @@ import { applyCommand, type CommandInput } from "./commands.ts";
 import { emptyCloudTable, readCloudTable, type CloudSeat, type CloudTable } from "./cloud.ts";
 import { readJournal, readArchivedSnapshot, preserveJournalMetadata } from "./journal.ts";
 import { projectRecord } from "./session-records.ts";
-import { exchangeQuoteKey, previewTradeSeason, tradeSeasonFingerprint } from "./trade-economy.ts";
+import {
+  exchangeHere,
+  exchangeQuoteKey,
+  executeExchange,
+  previewTradeSeason,
+  tradeSeasonFingerprint,
+} from "./trade-economy.ts";
 import { toCopper } from "./money.ts";
 import { tradeFixture } from "./test-fixtures/trade-economy.ts";
 import {
@@ -45,6 +51,98 @@ const buy = (t: CloudTable, quantity = 10, propertyId?: string) =>
     },
     player,
   );
+test("global exchange buys/sells recheck city access and player projection; scoped local exchanges and DM override remain explicit", () => {
+  const original = tradeFixture(),
+    market = original.journal!.market!;
+  market.locations.push({
+    id: "town",
+    kind: "town",
+    parentId: "coast",
+    name: "Village",
+    description: "",
+  });
+  economy(original).exchanges[0].locationId = null;
+  for (const location of ["port", "dock"]) {
+    market.currentLocationId = location;
+    assert.equal(exchangeHere(original, economy(original).exchanges[0]), true);
+    assert.equal(economy(buy(original, 1)).receipts.length, 1);
+  }
+  market.currentLocationId = "dock";
+  const purchased = buy(original, 1),
+    lot = purchased.holdings.find((h) => h.commodityId === "timber")!;
+  purchased.journal!.market!.currentLocationId = "desert";
+  assert.equal(projectRecord(purchased, player).journal!.tradeEconomy!.exchanges.length, 0);
+  assert.equal(
+    projectRecord(purchased, player).journal!.tradeEconomy!.receipts.length,
+    1,
+    "Own historical receipts survive loss of market access",
+  );
+  const before = JSON.stringify(purchased);
+  assert.throws(
+    () =>
+      act(
+        purchased,
+        {
+          kind: "trade-sell",
+          exchangeId: "harbor",
+          commodityId: "timber",
+          holdingId: lot.id,
+          quantity: 1,
+          before: quote(purchased),
+        },
+        player,
+      ),
+    /city/,
+  );
+  assert.equal(JSON.stringify(purchased), before);
+  for (const location of [null, "coast", "desert", "town"]) {
+    market.currentLocationId = location;
+    assert.throws(() => buy(original, 1), /city/);
+  }
+  const command = {
+    kind: "trade-buy" as const,
+    exchangeId: "harbor",
+    commodityId: "timber",
+    purseId: "a",
+    quantity: 1,
+    before: quote(original),
+    overrideLocation: true,
+  };
+  assert.throws(() => act(original, command, player), /Only the DM/);
+  assert.equal(economy(act(original, command)).receipts.length, 1);
+  economy(original).exchanges[0].locationId = "town";
+  assert.equal(
+    exchangeHere(original, economy(original).exchanges[0]),
+    true,
+    "A configured local town exchange remains distinct from the global market",
+  );
+});
+
+test("a property manager accesses a global exchange from its own city, not through a wilderness address", () => {
+  const table = tradeFixture();
+  economy(table).exchanges[0].locationId = null;
+  table.journal!.market!.currentLocationId = "desert";
+  const command = {
+    id: "managed-global",
+    direction: "buy" as const,
+    exchangeId: "harbor",
+    commodityId: "timber",
+    purseId: "a",
+    quantity: 1,
+    before: quote(table),
+    propertyId: "warehouse",
+  };
+  const failed = structuredClone(table),
+    before = JSON.stringify(failed);
+  assert.throws(
+    () => executeExchange(failed, dm, command, Date.now(), { locationId: "desert" }),
+    /city/,
+  );
+  assert.equal(JSON.stringify(failed), before);
+  executeExchange(table, dm, command, Date.now(), { locationId: "port" });
+  assert.equal(economy(table).receipts.length, 1);
+  assert.equal(table.holdings.find((h) => h.commodityId === "timber")?.custody?.kind, "property");
+});
 const season = (t: CloudTable, endSession = false) => {
   const prepared = act(t, {
     kind: "downtime-plan",

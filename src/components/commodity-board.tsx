@@ -17,6 +17,7 @@ import { CATEGORIES, labelOf } from "@/lib/quire/labels";
 import { formatCopper } from "@/lib/quire/money";
 import {
   readMarketLocations,
+  globalMarketCity,
   locationLabel,
   type MarketLocations,
 } from "@/lib/quire/shop-locations";
@@ -62,14 +63,31 @@ export function GlobalCommodityMarket() {
     [table.journal.tradeEconomy],
   );
   const exchanges = economy.exchanges.filter((e) => dm || (e.visible && exchangeHere(table, e)));
+  const market = readMarketLocations(table.journal.market);
+  if (!globalMarketCity(market))
+    return (
+      <section className="commodity-dashboard commodity-overview" aria-label="Global market access">
+        <div className="commodity-board-top">
+          <h2>Global market</h2>
+          <span className="commodity-board-status">Closed here</span>
+        </div>
+        <p role="status">
+          Visit a city to access the global market. City areas, such as docks and market districts,
+          also have access.
+        </p>
+        <p className="commodity-caption">
+          Party location:{" "}
+          {market.currentLocationId ? locationLabel(market, market.currentLocationId) : "Not set"}.
+        </p>
+        {dm && (
+          <AppLink href="/features/economy?from=%2Fmarket">
+            Configure commodities & exchanges →
+          </AppLink>
+        )}
+      </section>
+    );
   return (
-    <CommodityBoard
-      economy={economy}
-      exchanges={exchanges}
-      market={readMarketLocations(table.journal.market)}
-      dm={dm}
-      overview
-    />
+    <CommodityBoard economy={economy} exchanges={exchanges} market={market} dm={dm} overview />
   );
 }
 

@@ -3,10 +3,11 @@ import type { Holding } from "./types.ts";
 import { canonicalJson } from "./canonical-json.ts";
 import { fromCopper, toCopper } from "./money.ts";
 import { clampRealm, pressureFor, scalePrice, SEASON_NAMES } from "./scale.ts";
-import { locationPath, readMarketLocations } from "./shop-locations.ts";
+import { globalMarketCity, locationPath, readMarketLocations } from "./shop-locations.ts";
 import { canAccessEstate, physicallyHere, storageWeight } from "./estate.ts";
 import { readEstate } from "./estate-schema.ts";
 import { readTradeSettlementHolding } from "./ledger-reversal.ts";
+import { commodityImportFingerprint, previewCommodityImport } from "./commodity-import.ts";
 import {
   readTradeEconomy,
   tradeEconomySchema,
@@ -42,8 +43,8 @@ export function randomTradeRoll(): number {
 }
 
 export function exchangeHere(table: Pick<CloudTable, "journal">, exchange: Exchange): boolean {
-  if (!exchange.locationId) return true;
   const locations = readMarketLocations(table.journal?.market);
+  if (!exchange.locationId) return !!globalMarketCity(locations);
   return (
     !!locations.currentLocationId &&
     locationPath(locations, locations.currentLocationId).some((l) => l.id === exchange.locationId)
@@ -448,12 +449,13 @@ export function executeExchange(
   const managerHere =
     manager &&
     !!manager.locationId &&
-    (!exchange.locationId ||
-      locationPath(readMarketLocations(table.journal?.market), manager.locationId).some(
+    (exchange.locationId
+      ? locationPath(readMarketLocations(table.journal?.market), manager.locationId).some(
         (l) => l.id === exchange.locationId,
-      ));
+      )
+      : !!globalMarketCity({ ...readMarketLocations(table.journal?.market), currentLocationId: manager.locationId }));
   if (!input.overrideLocation && !(manager ? managerHere : exchangeHere(table, exchange)))
-    throw Error("Visit the exchange's location to trade.");
+    throw Error(exchange.locationId ? "Visit the exchange's location to trade." : "Visit a city to access the global commodity exchange.");
   const payer = table.purses.find((p) => p.id === input.purseId);
   if (!payer || payer.nonParty || (seat.role !== "dm" && !seat.purseIds.includes(payer.id)))
     throw Error("Trade only from an assigned party or character account.");
@@ -675,6 +677,10 @@ export function applyTradeCommand(
         ...economy.commodities.filter((c) => c.id !== cmd.commodity.id),
         cmd.commodity,
       ];
+    } else if (cmd.kind === "trade-commodity-import") {
+      if (commodityImportFingerprint(economy) !== cmd.before) conflict();
+      const plan = previewCommodityImport(economy, cmd.commodities);
+      economy.commodities.push(...plan.additions);
     } else if (cmd.kind === "trade-exchange") {
       const prior = economy.exchanges.find((e) => e.id === cmd.exchange.id) ?? null;
       if (!same(prior, cmd.before)) conflict();
