@@ -1,3 +1,4 @@
+import { characterLocation, characterVisible } from "@/lib/quire/character-position";
 import { SearchSelect } from "@/components/search-select";
 import { useEffect, useRef, useState } from "react";
 import { useSeat } from "@/lib/quire/seat";
@@ -80,8 +81,29 @@ export function CampaignMaps() {
             id: n.id,
             label: n.name,
             kind: "NPC",
-            point: anchorFor(map, t, n.locationId),
+            point: anchorFor(
+              map,
+              t,
+              characterLocation(
+                t,
+                t.purses.find((p) => p.id === n.id)!,
+              ),
+            ),
             href: libraryRecordHref("npc", n.id),
+          })),
+        ...t.purses
+          .filter(
+            (p) =>
+              p.kind === "character" &&
+              !w.npcs.some((n) => n.id === p.id) &&
+              (dm || characterVisible(t, p)),
+          )
+          .map((p) => ({
+            id: p.id,
+            label: p.name,
+            kind: p.control === "npc" ? "NPC" : "Character",
+            point: anchorFor(map, t, characterLocation(t, p)),
+            href: libraryRecordHref("character", p.id),
           })),
         ...(t.journal.propertyOperations?.postal.offices ?? []).flatMap((p) => {
           const s = t.shops.find((s) => s.id === p.shopId);
@@ -919,7 +941,7 @@ function MapViewport({
 }
 function RecordIcon({ kind }: { kind: string }) {
   const Icon =
-    kind === "NPC"
+    kind === "NPC" || kind === "Character"
       ? UserRound
       : kind === "Party"
         ? Users

@@ -1,3 +1,4 @@
+import { canReadCharacter } from "../quire/character-position";
 import { accountRequest } from "../account/client";
 import { characterSheet } from "./campaign-sheet.mjs";
 import { economySnapshot, saveCampaignCharacter } from "../quire/economy";
@@ -32,7 +33,7 @@ export async function characterRequest<T>(
   const purseId = linked?.id || payload.id.slice(6);
   payload = { ...payload, id: `party:${purseId}` };
   const p = table.purses.find((p) => p.id === purseId && p.kind === "character");
-  if (!p || (seat.role !== "dm" && !seat.purseIds.includes(purseId)))
+  if (!p || !canReadCharacter(table, p, seat))
     throw Error("This character is not controlled by your campaign seat.");
   const body = characterSheet(
     p,
@@ -41,9 +42,13 @@ export async function characterRequest<T>(
   );
   if (path === "sheets/detail") {
     const room = getCloudTable();
-    const policy = room.joined
-      ? await (await import("../quire/cloud-client")).requestCampaignRoll({ purseId, policy: true })
-      : { manualAllowed: true };
+    const observer = seat.role !== "dm" && !seat.purseIds.includes(p.id);
+    const policy =
+      room.joined && !observer
+        ? await (
+            await import("../quire/cloud-client")
+          ).requestCampaignRoll({ purseId, policy: true })
+        : { manualAllowed: !observer };
     const profile = linked
       ? await accountRequest<{ revision: number }>(
           "sheets/detail",
@@ -56,14 +61,14 @@ export async function characterRequest<T>(
       id: payload.id,
       body,
       revision: p.sheetRevision || 0,
-      editable: seat.role !== "dm" || !p.sheetReadOnlyForDm,
+      editable: !observer && (seat.role !== "dm" || !p.sheetReadOnlyForDm),
       assignmentError: "",
       campaign_code: room.joined ? room.code : "",
       purse_id: p.id,
       campaign: {
         code: getCloudTable().code,
         role: seat.role,
-        editingAllowed: seat.role === "dm" || p.editingAllowed === true,
+        editingAllowed: !observer && (seat.role === "dm" || p.editingAllowed === true),
         permissions: p.permissions || {},
         manualAllowed: policy.manualAllowed,
         coins: body.coins,
@@ -72,6 +77,8 @@ export async function characterRequest<T>(
     } as T;
   }
   if (path === "sheets/save") {
+    if (seat.role !== "dm" && !seat.purseIds.includes(p.id))
+      throw Error("Only the DM can edit this NPC sheet.");
     const input = {
       purseId,
       before: payload.before as PlaySheet,
@@ -87,6 +94,10 @@ export async function characterRequest<T>(
     return { id: payload.id, ...outcome } as T;
   }
   if (path === "sheets/roll" || path === "sheets/log") {
+    if (seat.role !== "dm" && !seat.purseIds.includes(p.id)) {
+      if (path === "sheets/log") return { rolls: [], more: false } as T;
+      throw Error("Only the DM can roll for this NPC.");
+    }
     const { campaignRollRequest } = await import("../quire/character-roll-client");
     return campaignRollRequest(path, payload) as Promise<T>;
   }

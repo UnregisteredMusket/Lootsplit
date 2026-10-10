@@ -1,3 +1,4 @@
+import { characterVisible, canReadCharacter } from "./character-position.ts";
 import { worldCommands, type WorldCommand } from "./world-schema.ts";
 import { resourcePackSchema, resourceFingerprint, previewResourcePack } from "./resource-packs.ts";
 import { tradeCommands, type TradeCommand, type TradeExecution } from "./trade-economy-schema.ts";
@@ -225,6 +226,14 @@ export function applyCommand(input: CloudTable, seat: CloudSeat, raw: Command, e
   const t = structuredClone(input);
   const at = Date.now();
   const journal = (t.journal = readJournal(t.journal));
+  if (seat.role !== "dm")
+    seat = {
+      ...seat,
+      purseIds: seat.purseIds.filter((id) => {
+        const p = t.purses.find((p) => p.id === id);
+        return p && characterVisible(t, p);
+      }),
+    };
   const event = (
     summary: string,
     kind: "management" | "prices" | "request" | "session" = "management",
@@ -241,6 +250,11 @@ export function applyCommand(input: CloudTable, seat: CloudSeat, raw: Command, e
       ...(change ? { change } : {}),
     });
   };
+  if (seat.role !== "dm" && cmd.kind === "character") {
+    const p = t.purses.find((p) => p.id === cmd.purseId);
+    if (p && (!characterVisible(t, p) || (p.control === "npc" && !canReadCharacter(t, p, seat))))
+      throw Error("This character sheet is unavailable.");
+  }
   const own = (purseId: string) => {
     if (seat.role !== "dm" && !seat.purseIds.includes(purseId))
       throw new Error("You do not have permission to spend from this account.");
@@ -299,31 +313,51 @@ export function applyCommand(input: CloudTable, seat: CloudSeat, raw: Command, e
   };
   if (cmd.kind === "ledger-void") {
     applyLedgerVoid(t, seat, cmd, at, execution.source === "local");
-  } else if (tradeCommands.some(schema => schema.shape.kind.value === cmd.kind)) {
+  } else if (tradeCommands.some((schema) => schema.shape.kind.value === cmd.kind)) {
     applyTradeCommand(t, seat, cmd as TradeCommand, at, execution);
-  } else if (worldCommands.some(schema => schema.shape.kind.value === cmd.kind)) {
+  } else if (worldCommands.some((schema) => schema.shape.kind.value === cmd.kind)) {
     applyWorldCommand(t, seat, cmd as WorldCommand, at);
   } else if (cmd.kind === "estate-import") {
     dm();
-    if (finance().downtime.some(d => d.status === "pending")) throw Error("Cancel pending downtime before importing properties.");
-    if (estateImportFingerprint(t) !== cmd.before) throw Error("The campaign changed. Review a fresh property import preview.");
+    if (finance().downtime.some((d) => d.status === "pending"))
+      throw Error("Cancel pending downtime before importing properties.");
+    if (estateImportFingerprint(t) !== cmd.before)
+      throw Error("The campaign changed. Review a fresh property import preview.");
     const next = previewEstateImport(t, cmd.document, cmd.owners, cmd.locations, cmd.id);
-    t.holdings = next.holdings; t.listings = next.listings; t.journal!.market = next.journal!.market; t.journal!.propertyOperations = next.journal!.propertyOperations;
-    event(`Imported property configurations: ${cmd.document.properties.length} records awaiting DM review.`);
+    t.holdings = next.holdings;
+    t.listings = next.listings;
+    t.journal!.market = next.journal!.market;
+    t.journal!.propertyOperations = next.journal!.propertyOperations;
+    event(
+      `Imported property configurations: ${cmd.document.properties.length} records awaiting DM review.`,
+    );
   } else if (cmd.kind.startsWith("estate-")) {
     finance();
     applyEstateCommand(t, seat, cmd as import("./estate-schema.ts").EstateCommand, at);
   } else if (cmd.kind === "listing-edit") {
     dm();
-    const current = t.listings.find(listing => listing.id === cmd.listingId) ?? null;
-    if (!same(current, cmd.before)) throw Error("This listing changed elsewhere. Reload before saving; your draft is retained.");
-    if (cmd.after && (cmd.after.id !== cmd.listingId || (current && current.kind !== cmd.after.kind)))
+    const current = t.listings.find((listing) => listing.id === cmd.listingId) ?? null;
+    if (!same(current, cmd.before))
+      throw Error("This listing changed elsewhere. Reload before saving; your draft is retained.");
+    if (
+      cmd.after &&
+      (cmd.after.id !== cmd.listingId || (current && current.kind !== cmd.after.kind))
+    )
       throw Error("Listing identity and kind cannot change.");
-    t.listings = [...t.listings.filter(listing => listing.id !== cmd.listingId), ...(cmd.after ? [cmd.after] : [])];
-    event(cmd.after ? `Listing saved: ${cmd.after.name}` : `Listing removed: ${current?.name || cmd.listingId}`);
+    t.listings = [
+      ...t.listings.filter((listing) => listing.id !== cmd.listingId),
+      ...(cmd.after ? [cmd.after] : []),
+    ];
+    event(
+      cmd.after
+        ? `Listing saved: ${cmd.after.name}`
+        : `Listing removed: ${current?.name || cmd.listingId}`,
+    );
   } else if (cmd.kind === "property-profile") {
     dm();
-    const h = t.holdings.find(h => h.id === cmd.holdingId && h.kind === "property" && h.quantity > 0);
+    const h = t.holdings.find(
+      (h) => h.id === cmd.holdingId && h.kind === "property" && h.quantity > 0,
+    );
     if (!h) throw Error("Property no longer exists.");
     if (!same({ locationId: h.locationId ?? null, property: h.property ?? null }, cmd.before))
       throw Error("Property location or features changed elsewhere. Reload before saving.");
@@ -352,7 +386,7 @@ export function applyCommand(input: CloudTable, seat: CloudSeat, raw: Command, e
     }
   } else if (cmd.kind === "shop-location") {
     dm();
-    const shop = t.shops.find(shop => shop.id === cmd.shopId);
+    const shop = t.shops.find((shop) => shop.id === cmd.shopId);
     if (!shop) throw Error("This shop no longer exists.");
     if (!same({ locationId: shop.locationId ?? null, image: shop.image ?? null }, cmd.before)) throw Error("This shop's location or image changed elsewhere. Refresh before saving.");
     if (cmd.locationId) shop.locationId = cmd.locationId; else delete shop.locationId;
@@ -361,12 +395,34 @@ export function applyCommand(input: CloudTable, seat: CloudSeat, raw: Command, e
   } else if (cmd.kind === "market-location") {
     dm();
     const market = readMarketLocations(journal.market);
-    const current = market.locations.find(location => location.id === cmd.locationId) ?? null;
-    if (!same(current, cmd.before)) throw Error("This location changed elsewhere. Refresh before saving.");
-    if (cmd.after && cmd.after.id !== cmd.locationId) throw Error("Location identity cannot change.");
-    if (!cmd.after && (market.currentLocationId === cmd.locationId || market.locations.some(location => location.parentId === cmd.locationId) || t.shops.some(shop => shop.locationId === cmd.locationId) || journal.world?.npcs.some(n => n.locationId === cmd.locationId) || journal.world?.maps.some(m => m.locationId === cmd.locationId || m.anchors.some(a => a.locationId === cmd.locationId)) || [...t.listings, ...t.holdings].some(property => property.locationId === cmd.locationId)))
-      throw Error("Move the party, child locations, assigned shops and properties before removing this location.");
-    market.locations = [...market.locations.filter(location => location.id !== cmd.locationId), ...(cmd.after ? [cmd.after] : [])];
+    const current = market.locations.find((location) => location.id === cmd.locationId) ?? null;
+    if (!same(current, cmd.before))
+      throw Error("This location changed elsewhere. Refresh before saving.");
+    if (cmd.after && cmd.after.id !== cmd.locationId)
+      throw Error("Location identity cannot change.");
+    if (
+      !cmd.after &&
+      (market.currentLocationId === cmd.locationId ||
+        market.locations.some((location) => location.parentId === cmd.locationId) ||
+        t.shops.some((shop) => shop.locationId === cmd.locationId) ||
+        journal.world?.characterPositions.some(
+          (s) => s.locationId === cmd.locationId || s.downtime?.returnLocationId === cmd.locationId,
+        ) ||
+        journal.world?.npcs.some((n) => n.locationId === cmd.locationId) ||
+        journal.world?.maps.some(
+          (m) =>
+            m.locationId === cmd.locationId ||
+            m.anchors.some((a) => a.locationId === cmd.locationId),
+        ) ||
+        [...t.listings, ...t.holdings].some((property) => property.locationId === cmd.locationId))
+    )
+      throw Error(
+        "Move the party, child locations, assigned shops and properties before removing this location.",
+      );
+    market.locations = [
+      ...market.locations.filter((location) => location.id !== cmd.locationId),
+      ...(cmd.after ? [cmd.after] : []),
+    ];
     journal.market = readMarketLocations(market);
     event(cmd.after ? `Location saved: ${cmd.after.name}` : "Location removed");
   } else if (cmd.kind === "party-location") {
@@ -374,9 +430,15 @@ export function applyCommand(input: CloudTable, seat: CloudSeat, raw: Command, e
     const market = readMarketLocations(journal.market);
     if (market.currentLocationId !== cmd.before) throw Error("The party moved elsewhere. Refresh before changing location.");
     journal.market = readMarketLocations({ ...market, currentLocationId: cmd.locationId });
-    event(cmd.locationId ? `Party location: ${market.locations.find(location => location.id === cmd.locationId)?.name}` : "Party location cleared; all shops available");
+    event(
+      cmd.locationId
+        ? `Party location: ${market.locations.find((location) => location.id === cmd.locationId)?.name}`
+        : "Party location cleared; all shops available",
+    );
   } else if (cmd.kind === "property-details") {
-    const h = t.holdings.find(h => h.id === cmd.holdingId && h.kind === "property" && h.quantity > 0);
+    const h = t.holdings.find(
+      (h) => h.id === cmd.holdingId && h.kind === "property" && h.quantity > 0,
+    );
     if (!h) throw Error("Property no longer exists.");
     own(h.purseId);
     if (h.name !== cmd.before.name || h.notes !== cmd.before.notes) throw Error("Property details changed. Reload before saving.");
@@ -396,7 +458,10 @@ export function applyCommand(input: CloudTable, seat: CloudSeat, raw: Command, e
     const holding = t.holdings.find((h) => h.id === cmd.holdingId && h.kind === "property" && h.quantity > 0);
     if (!holding) throw Error("Choose an owned campaign property.");
     own(holding.purseId);
-    if (f.rules.some(r => r.holdingId === holding.id && r.estateOperation)) throw Error("This property has reviewed tenancy or staff contracts. Edit their terms in its Rent & operating finances or Staff & managers sections; generic property plans remain available for other holdings.");
+    if (f.rules.some((r) => r.holdingId === holding.id && r.estateOperation))
+      throw Error(
+        "This property has reviewed tenancy or staff contracts. Edit their terms in its Rent & operating finances or Staff & managers sections; generic property plans remain available for other holdings.",
+      );
     for (const kind of ["income", "expense"] as const) {
       const copper = kind === "income" ? cmd.income : cmd.upkeep;
       const existing = f.rules.filter((r) => r.holdingId === holding.id && r.kind === kind);
@@ -405,8 +470,21 @@ export function applyCommand(input: CloudTable, seat: CloudSeat, raw: Command, e
       if (prior && prior.purseId !== holding.purseId) throw Error("Settle the former owner's property agreements before transferring this plan.");
       if (prior?.carryDays && prior.periodDays !== cmd.periodDays) throw Error("Finish the current property period before changing its length.");
       if (!prior && !copper) continue;
-      const next = { id: prior?.id || `${cmd.id}-${kind}`, propertyManaged: true, name: `${holding.name.slice(0,80)}: ${kind === "income" ? "revenue" : "upkeep"}`, purseId: holding.purseId, kind, copper: copper || prior!.copper, periodDays: cmd.periodDays, holdingId: holding.id, active: cmd.active && copper > 0, carryDays: prior?.carryDays || 0, arrears: prior?.arrears || 0 };
-      if (prior) Object.assign(prior, next); else f.rules.push(next);
+      const next = {
+        id: prior?.id || `${cmd.id}-${kind}`,
+        propertyManaged: true,
+        name: `${holding.name.slice(0, 80)}: ${kind === "income" ? "revenue" : "upkeep"}`,
+        purseId: holding.purseId,
+        kind,
+        copper: copper || prior!.copper,
+        periodDays: cmd.periodDays,
+        holdingId: holding.id,
+        active: cmd.active && copper > 0,
+        carryDays: prior?.carryDays || 0,
+        arrears: prior?.arrears || 0,
+      };
+      if (prior) Object.assign(prior, next);
+      else f.rules.push(next);
     }
     event(`Property plan updated: ${holding.name}`, "management", holding.purseId);
   } else if (cmd.kind === "finance-loan") {
@@ -478,7 +556,8 @@ export function applyCommand(input: CloudTable, seat: CloudSeat, raw: Command, e
     if (!l || cmd.copper > l.principal + l.interest)
       throw Error("Repayment exceeds the outstanding debt.");
     own(l.purseId);
-    if (f.downtime.some(d => d.status === "pending")) throw Error("The DM must settle or cancel pending downtime before repayment.");
+    if (f.downtime.some((d) => d.status === "pending"))
+      throw Error("The DM must settle or cancel pending downtime before repayment.");
     financeMove(t, l.purseId, -cmd.copper, cmd.id, `${l.name}: manual repayment`, at, !!l.lenderId);
     if (l.lenderId)
       financeMove(
@@ -547,13 +626,13 @@ export function applyCommand(input: CloudTable, seat: CloudSeat, raw: Command, e
     event("Cancelled pending downtime; no funds moved");
   } else if (cmd.kind === "downtime-apply") {
     dm();
-    const active = journal.sessions.find(s => !s.endedAt);
+    const active = journal.sessions.find((s) => !s.endedAt);
     if (cmd.endSession && !active) throw Error("There is no recorded session to end.");
     applyDowntime(t, cmd.downtimeId, active?.id ?? cmd.id, at);
     event("Applied approved downtime and seasonal settlement once", "session");
     if (cmd.endSession && active) {
       active.endedAt = at;
-      active.endLedgerIds = t.ledger.map(l => l.id);
+      active.endLedgerIds = t.ledger.map((l) => l.id);
       archiveSession(t, active.id, active.name, at);
     }
   } else if (cmd.kind === "journal-note") {
@@ -568,16 +647,21 @@ export function applyCommand(input: CloudTable, seat: CloudSeat, raw: Command, e
       dm();
       if (cmd.visibility !== "party" || cmd.purseId || cmd.reportIds.length)
         throw Error("A loot summary must be a party journal entry without private attachments.");
-      if (cmd.provenance.sessionId && !journal.sessions.some(session => session.id === cmd.provenance!.sessionId))
+      if (
+        cmd.provenance.sessionId &&
+        !journal.sessions.some((session) => session.id === cmd.provenance!.sessionId)
+      )
         throw Error("Choose an existing campaign session for this loot summary.");
-      const existing = journal.entries?.find(entry => entry.provenance?.receiptId === cmd.provenance!.receiptId);
+      const existing = journal.entries?.find(
+        (entry) => entry.provenance?.receiptId === cmd.provenance!.receiptId,
+      );
       if (existing) {
         if (existing.provenance?.encounterId !== cmd.provenance.encounterId)
           throw Error("This award receipt already belongs to another encounter summary.");
         return t;
       }
       const entryId = encounterLootEntryId(cmd.provenance.receiptId);
-      if (journal.entries?.some(entry => entry.id === entryId))
+      if (journal.entries?.some((entry) => entry.id === entryId))
         throw Error("This journal entry identity already exists.");
       (journal.entries ??= []).push({ ...cmd, id: entryId, at, authorId: seat.id });
     } else (journal.entries ??= []).push({ ...cmd, at, authorId: seat.id });
@@ -711,19 +795,33 @@ export function applyCommand(input: CloudTable, seat: CloudSeat, raw: Command, e
       priceAfterCharisma(shopAsking(shop, s.copper), score(cmd.purseId)) * cmd.quantity;
     coins(cmd.purseId, -cost);
     if (s.quantity !== null) s.quantity -= cmd.quantity;
-    const purchasedHolding: import("./types.ts").Holding | null = isService(s) ? null : {
-        id: cmd.id + "-item",
-        purseId: cmd.purseId,
-        category: stockCategory(s, shop),
-        name: s.name,
-        kind: "item",
-        quantity: cmd.quantity,
-        unitCopper: s.copper,
-        notes: s.notes,
-        ...(s.commodityId ? { commodityId: s.commodityId,
-          weight: journal.tradeEconomy?.commodities.find(c => c.id === s.commodityId)?.weight,
-          ...((journal.tradeEconomy?.commodities.find(c => c.id === s.commodityId)?.materialKey) ? { materialKey: journal.tradeEconomy!.commodities.find(c => c.id === s.commodityId)!.materialKey } : {}) } : {}),
-      };
+    const purchasedHolding: import("./types.ts").Holding | null = isService(s)
+      ? null
+      : {
+          id: cmd.id + "-item",
+          purseId: cmd.purseId,
+          category: stockCategory(s, shop),
+          name: s.name,
+          kind: "item",
+          quantity: cmd.quantity,
+          unitCopper: s.copper,
+          notes: s.notes,
+          ...(s.commodityId
+            ? {
+                commodityId: s.commodityId,
+                weight: journal.tradeEconomy?.commodities.find((c) => c.id === s.commodityId)
+                  ?.weight,
+                ...(journal.tradeEconomy?.commodities.find((c) => c.id === s.commodityId)
+                  ?.materialKey
+                  ? {
+                      materialKey: journal.tradeEconomy!.commodities.find(
+                        (c) => c.id === s.commodityId,
+                      )!.materialKey,
+                    }
+                  : {}),
+              }
+            : {}),
+        };
     if (purchasedHolding) t.holdings.push(purchasedHolding);
     log(cmd.purseId, `Bought ${cmd.quantity} ${s.name} from ${shop.name}`, -cost, shop.id);
     const purchase = t.ledger[t.ledger.length - 1];
@@ -752,15 +850,32 @@ export function applyCommand(input: CloudTable, seat: CloudSeat, raw: Command, e
       unitCopper: l.copper,
       notes: l.notes,
       ...(l.locationId ? { locationId: l.locationId } : {}),
-      ...(l.property ? { property: structuredClone(l.property), ...(l.property.images?.[0] ? { image: l.property.images[0] } : {}) } : {}),
-      ...(l.kind === "property" ? { deed: {
-        id: cmd.id + "-deed", transactionId: cmd.id, listingId: l.id, propertyName: l.name,
-        location: locationLabel(readMarketLocations(journal.market), l.locationId),
-        buyerId: cmd.purseId, buyerName: t.purses.find(p => p.id === cmd.purseId)!.name,
-        ownerId: cmd.purseId, ownerName: t.purses.find(p => p.id === cmd.purseId)!.name,
-        purchasedAt: at, campaignDay: readFinance(journal.finance).day, unitCopper: cost / cmd.quantity,
-        totalCopper: cost, purchasedQuantity: cmd.quantity,
-      } } : {}),
+      ...(l.property
+        ? {
+            property: structuredClone(l.property),
+            ...(l.property.images?.[0] ? { image: l.property.images[0] } : {}),
+          }
+        : {}),
+      ...(l.kind === "property"
+        ? {
+            deed: {
+              id: cmd.id + "-deed",
+              transactionId: cmd.id,
+              listingId: l.id,
+              propertyName: l.name,
+              location: locationLabel(readMarketLocations(journal.market), l.locationId),
+              buyerId: cmd.purseId,
+              buyerName: t.purses.find((p) => p.id === cmd.purseId)!.name,
+              ownerId: cmd.purseId,
+              ownerName: t.purses.find((p) => p.id === cmd.purseId)!.name,
+              purchasedAt: at,
+              campaignDay: readFinance(journal.finance).day,
+              unitCopper: cost / cmd.quantity,
+              totalCopper: cost,
+              purchasedQuantity: cmd.quantity,
+            },
+          }
+        : {}),
     };
     t.holdings.push(holding);
     if (holding.kind === "property") initializeEstatePurchase(t, holding, l.estateTemplateKey, l.estateAttachments);
@@ -783,7 +898,9 @@ export function applyCommand(input: CloudTable, seat: CloudSeat, raw: Command, e
     h.quantity -= cmd.quantity;
     t.holdings = t.holdings.filter((x) => x.quantity > 0);
     log(h.purseId, `Sold ${cmd.quantity} ${h.name} to ${s.name}`, paid, s.id);
-    const linked = t.stock.find(line => line.shopId === s.id && line.commodityId === h.commodityId && h.commodityId);
+    const linked = t.stock.find(
+      (line) => line.shopId === s.id && line.commodityId === h.commodityId && h.commodityId,
+    );
     if (linked) {
       const receipt = recordShopTrade(t, { id: cmd.id, at, stockId: linked.id, purseId: h.purseId, direction: "sell", quantity: cmd.quantity, copper: paid });
       if (receipt) t.ledger[t.ledger.length - 1].trade = { receiptId: receipt.id, leg: "owner" };
@@ -803,11 +920,25 @@ export function applyCommand(input: CloudTable, seat: CloudSeat, raw: Command, e
       assertCarried(h);
       if (h.kind === "property") assertEstateDisposable(t, h.id);
       h.quantity -= cmd.quantity;
-      t.holdings.push({ ...h, id: cmd.id + "-item", purseId: cmd.toId, quantity: cmd.quantity,
-        ...(h.deed ? { deed: transferPropertyDeed(h.deed, t.purses.find(p => p.id === cmd.toId)!, cmd.id, at) } : {}) });
+      t.holdings.push({
+        ...h,
+        id: cmd.id + "-item",
+        purseId: cmd.toId,
+        quantity: cmd.quantity,
+        ...(h.deed
+          ? {
+              deed: transferPropertyDeed(
+                h.deed,
+                t.purses.find((p) => p.id === cmd.toId)!,
+                cmd.id,
+                at,
+              ),
+            }
+          : {}),
+      });
       t.holdings = t.holdings.filter((x) => x.quantity > 0);
       if (h.kind === "property" && t.journal?.propertyOperations) {
-        const site = t.journal.propertyOperations.sites.find(s => s.propertyId === h.id);
+        const site = t.journal.propertyOperations.sites.find((s) => s.propertyId === h.id);
         if (site && h.quantity === 0) site.propertyId = cmd.id + "-item";
       }
     }
@@ -960,6 +1091,24 @@ export function applyCommand(input: CloudTable, seat: CloudSeat, raw: Command, e
   validatePropertyLocations(t.listings, t.holdings, t.journal?.market);
   validateEstate(t);
   validateTradeEconomy(t);
+  if (cmd.kind === "patch" && journal.world) {
+    if (
+      journal.world.characterPositions.some(
+        (s) => s.downtime && !t.purses.some((p) => p.id === s.purseId),
+      )
+    )
+      throw Error("Cancel character downtime before deleting its account.");
+    journal.world.characterPositions = journal.world.characterPositions.filter((s) =>
+      t.purses.some((p) => p.id === s.purseId),
+    );
+  }
+  for (const n of journal.world?.npcs ?? []) {
+    const p = t.purses.find((p) => p.id === n.id);
+    if (p) {
+      n.name = p.name;
+      n.portrait = p.portrait;
+    }
+  }
   validateWorld(t);
   return t;
 }

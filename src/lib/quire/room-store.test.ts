@@ -19,6 +19,108 @@ import {
 } from "./push.server.ts";
 import { jwtVerify, importJWK } from "jose";
 const sql = new DatabaseSync(":memory:");
+test("shared NPC transfers, sheet privacy and campaign-time returns survive retries and independent seat reads", async () => {
+  const { characterPosition } = await import("./character-position.ts");
+  const { choosePace, characterRoll } = await import("./cloud.server.ts");
+  const t = tradeFixture(),
+    host = await openRoom({ name: "Placement DM", table: t });
+  const guest = await joinRoom({ code: host.code, purseId: "a", name: "Player" }),
+    auth = { code: host.code, token: guest.token };
+  await choosePace({ ...host, live: true });
+  const create = {
+    id: "placement-npc",
+    kind: "npc-create",
+    npc: {
+      id: "placement-npc",
+      name: "Private scholar",
+      description: "Private NPC text",
+      locationId: "port",
+      visible: true,
+      barterAllowed: false,
+      controllerPurseId: null,
+    },
+    copper: 123,
+    inventory: [{ name: "Book", quantity: 1, unitCopper: 20, notes: "" }],
+  };
+  await submitCommands({ ...host, batchId: "placement-create", commands: [create] });
+  let table = (await roomState(host)).table;
+  const state = () =>
+    characterPosition(
+      table,
+      table.purses.find((p) => p.id === create.npc.id)!,
+    );
+  const join = {
+    id: "placement-join",
+    kind: "character-position",
+    purseId: create.npc.id,
+    before: state(),
+    inParty: true,
+    locationId: null,
+    visible: true,
+    sheetVisible: true,
+  };
+  await assert.rejects(
+    submitCommands({ ...auth, batchId: "placement-forged", commands: [join] }),
+    /Only the DM/,
+  );
+  await submitCommands({ ...host, batchId: "placement-join", commands: [join] });
+  await submitCommands({ ...host, batchId: "placement-join-retry", commands: [join] });
+  table = (await roomState(host)).table;
+  assert.equal(table.purses.filter((p) => p.id === create.npc.id).length, 1);
+  assert.equal(toCopper(table.purses.find((p) => p.id === create.npc.id)!.coins), 123);
+  assert.equal(
+    (await roomState(auth)).table.purses.find((p) => p.id === create.npc.id)!.sheet!.description,
+    "Private NPC text",
+  );
+  await assert.rejects(characterRoll({ ...auth, purseId: create.npc.id, policy: true }), /control/);
+  const start = {
+    id: "placement-action",
+    kind: "character-downtime-start",
+    purseId: create.npc.id,
+    before: state(),
+    name: "Study",
+    days: 1,
+    locationId: "port",
+  };
+  await submitCommands({ ...host, batchId: "placement-start", commands: [start] });
+  await submitCommands({ ...host, batchId: "placement-start-retry", commands: [start] });
+  table = (await roomState(host)).table;
+  assert.equal(state().inParty, false);
+  const hide = {
+    id: "placement-hide",
+    kind: "character-position",
+    purseId: create.npc.id,
+    before: state(),
+    inParty: false,
+    locationId: "port",
+    visible: false,
+    sheetVisible: false,
+  };
+  await submitCommands({ ...host, batchId: "placement-hide", commands: [hide] });
+  assert.ok(!JSON.stringify(await roomState(auth)).includes("Private NPC text"));
+  assert.ok(!JSON.stringify(await roomState(auth)).includes("Private scholar"));
+  table = (await roomState(host)).table;
+  const plan = { id: "placement-plan", kind: "downtime-plan", name: "Study day", days: 1 };
+  await submitCommands({ ...host, batchId: "placement-plan", commands: [plan] });
+  table = (await roomState(host)).table;
+  const apply = {
+    id: "placement-approve",
+    kind: "downtime-apply",
+    downtimeId: table.journal!.finance!.downtime.at(-1)!.id,
+    endSession: false,
+  };
+  await submitCommands({ ...host, batchId: "placement-approve", commands: [apply] });
+  await submitCommands({ ...host, batchId: "placement-approve-retry", commands: [apply] });
+  table = (await roomState(host)).table;
+  assert.equal(state().inParty, true);
+  assert.equal(state().visible, false);
+  assert.equal(state().downtime, undefined);
+  assert.equal(
+    table.journal!.events.filter((e) => e.summary.includes("completed Study")).length,
+    1,
+  );
+  assert.equal(table.holdings.filter((h) => h.purseId === create.npc.id).length, 1);
+});
 test("shared exchange corrections restore both cash legs once across retries and reject changed goods atomically", async () => {
   const { choosePace } = await import("./cloud.server.ts");
   const host = await openRoom({ name: "Correction DM", table: tradeFixture() });
@@ -688,7 +790,7 @@ test("map storage leaves raw character portraits and non-map inventory recovery 
   table.purses=[{id:"portrait-holder",name:"Portrait holder",kind:"character",coins:{cp:0,sp:0,ep:0,gp:0,pp:0},portrait}];
   table.holdings=[{id:"illustrated-item",purseId:"portrait-holder",name:"Illustrated item",kind:"item",quantity:1,unitCopper:1,notes:"",image:portrait}];
   const makeMap=(id:string,image:string)=>({id,name:id,image,locationId:null,visible:true,anchors:[],markers:[]});
-  table.journal!.world={maps:[makeMap("map",mapImage),makeMap("portrait-map",portrait)],npcs:[],trades:[],conversations:[],blackMarketActive:false,timeHistory:[]};
+  table.journal!.world={characterPositions:[],maps:[makeMap("map",mapImage),makeMap("portrait-map",portrait)],npcs:[],trades:[],conversations:[],blackMarketActive:false,timeHistory:[]};
   const snapshot = JSON.stringify(table,null,2);
   table.journal!.reports=[{id:"portrait-report",name:"Portrait record",at:1,snapshot}];
   const encoded=await encodeRoomImages({table,drafts:{dm:[{kind:"map-save",map:makeMap("queued",mapImage),before:null}]}});
@@ -783,7 +885,7 @@ test("map pings cross seats outside turns without changing campaigns; expiry, ma
   const table = emptyCloudTable();
   table.purses = [{id:"ping-hero",name:"Ping hero",kind:"character",coins:emptyCoins()}];
   const map = {id:"public-map",name:"Shared map",image:"data:image/webp;base64,fixture",locationId:null,visible:true,anchors:[],markers:[]};
-  table.journal = {sessions:[],events:[],requests:[],world:{maps:[map,{...map,id:"secret-map",visible:false}],npcs:[],trades:[],timeHistory:[],conversations:[],blackMarketActive:false}};
+  table.journal = {sessions:[],events:[],requests:[],world:{characterPositions:[],maps:[map,{...map,id:"secret-map",visible:false}],npcs:[],trades:[],timeHistory:[],conversations:[],blackMarketActive:false}};
   const host = await openRoom({name:"Pings DM",table});
   const guest = await joinRoom({code:host.code,purseId:"ping-hero",name:"Player"});
   const player = {code:host.code,token:guest.token,mapId:map.id};

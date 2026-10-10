@@ -1,3 +1,4 @@
+import { characterVisible, canReadCharacter } from "./character-position.ts";
 import { readRoom, createRoom, updateRoom, roomStorageBody } from "./room-store.server.ts";
 import {
   claimSeat,
@@ -27,7 +28,12 @@ export async function characterRoll(input: {
   const room = await must(input.code);
   const seat = room.seats.find((s) => s.token === input.token);
   const p = room.table.purses.find((p) => p.id === input.purseId && p.kind === "character");
-  if (!seat || !p || (seat.role !== "dm" && !seat.purseIds.includes(p.id)))
+  if (
+    !seat ||
+    !p ||
+    !canReadCharacter(room.table, p, seat) ||
+    (seat.role !== "dm" && !seat.purseIds.includes(p.id))
+  )
     throw Error("You do not control this character.");
   if (input.policy) return { manualAllowed: await manualCharacterRolls(room.code) };
   if (room.viewOnly && seat.role === "player" && !input.log)
@@ -180,7 +186,10 @@ export async function previewRoom(
         (purse) =>
           purse.kind === "character" &&
           characterControl(purse) === "player" &&
-          !room.seats.some((seat) => seat.purseIds.includes(purse.id) && (!userId || seat.userId !== userId)),
+          characterVisible(room.table, purse) &&
+          !room.seats.some(
+            (seat) => seat.purseIds.includes(purse.id) && (!userId || seat.userId !== userId),
+          ),
       )
       .map((purse) => ({ id: purse.id, name: purse.name })),
   };
@@ -198,15 +207,32 @@ export async function joinRoom(input: { code: string; purseId: string; name: str
   const room = await must(input.code);
   if (room.testMode) throw Error("Test rooms are private to the owner.");
   requireInvitationSession(room, input.sessionId);
-  const existing = input.userId && room.seats.find(s => s.userId === input.userId && s.role === "player");
-  if (existing) return { token: existing.token, seatId: existing.id, revision: room.revision, purseIds: existing.purseIds, shopIds: projectRecord(room.table, existing).shops.map(s => s.id), userId: existing.userId };
+  const existing =
+    input.userId && room.seats.find((s) => s.userId === input.userId && s.role === "player");
+  if (existing)
+    return {
+      token: existing.token,
+      seatId: existing.id,
+      revision: room.revision,
+      purseIds: existing.purseIds,
+      shopIds: projectRecord(room.table, existing).shops.map((s) => s.id),
+      userId: existing.userId,
+    };
   const blocked = input.userId && room.blockedUsers?.[input.userId];
   if (blocked === "banned") throw Error("You are banned from this campaign.");
-  const restriction = room.departed?.find(s => s.purseIds.includes(input.purseId) && (s.status === "kicked" || s.status === "banned"));
-  if (restriction?.status === "banned") throw Error("This character is blocked from joining. Ask the DM.");
-  if ((blocked === "kicked" || restriction) && (!input.invitation || room.invitations?.[input.purseId] !== input.invitation))
+  const restriction = room.departed?.find(
+    (s) => s.purseIds.includes(input.purseId) && (s.status === "kicked" || s.status === "banned"),
+  );
+  if (restriction?.status === "banned")
+    throw Error("This character is blocked from joining. Ask the DM.");
+  if (
+    (blocked === "kicked" || restriction) &&
+    (!input.invitation || room.invitations?.[input.purseId] !== input.invitation)
+  )
     throw Error("A fresh invitation from the DM is required.");
-  const previous = input.userId && room.departed?.find(s => s.userId === input.userId && s.status === "dismissed");
+  const previous =
+    input.userId &&
+    room.departed?.find((s) => s.userId === input.userId && s.status === "dismissed");
   const claimed = claimSeat(room, input.purseId, input.name);
   claimed.seat.userId = input.userId;
   if (previous) claimed.seat.id = previous.id;
@@ -361,7 +387,15 @@ function view(room: CloudRoom, seat: CloudSeat): RoomView {
     who: room.live ? "everyone" : (current?.name ?? "Someone"),
     live: room.live === true,
     testMode: room.testMode === true,
-    departed: seat.role === "dm" ? room.departed?.map(s => ({ id: s.id, name: s.name, status: s.status, invitation: s.purseIds.map(id => room.invitations?.[id]).find(Boolean) })) : undefined,
+    departed:
+      seat.role === "dm"
+        ? room.departed?.map((s) => ({
+            id: s.id,
+            name: s.name,
+            status: s.status,
+            invitation: s.purseIds.map((id) => room.invitations?.[id]).find(Boolean),
+          }))
+        : undefined,
     seatId: seat.id,
     purseIds: seat.purseIds,
     shopIds: record.shops.map((shop) => shop.id),
@@ -378,41 +412,36 @@ function view(room: CloudRoom, seat: CloudSeat): RoomView {
     draft: JSON.stringify(room.drafts?.[seat.id] ?? []),
     table:
       seat.role === "dm"
-        ? { ...room.table, journal, notes: room.table.notes.filter((note) => canReadNote(note, seat)) }
-        : {
+        ? {
             ...room.table,
-            shops: record.shops,
-            stock: record.stock,
-            listings: record.listings,
-            holdings: record.holdings,
-            purses: room.table.purses.map((p) => {
-              if (seat.purseIds.includes(p.id)) return p;
+            journal,
+            notes: room.table.notes.filter((note) => canReadNote(note, seat)),
+          }
+        : {
+            ...record,
+            ledger: room.table.ledger.filter((l) =>
+              room.table.purses.some((p) => p.id === l.purseId && characterVisible(room.table, p)),
+            ),
+            purses: record.purses.map((projected) => {
+              const p = room.table.purses.find((p) => p.id === projected.id)!;
+              if (!characterVisible(room.table, p)) return projected;
               const {
                 sheet: _sheet,
                 sheetRevision: _revision,
                 profileId: _profile,
-                editBaseline: _editBaseline,
+                editBaseline: _baseline,
                 rolls: _rolls,
                 ...publicPurse
               } = p;
-              return publicPurse;
+              return seat.purseIds.includes(p.id) && canReadCharacter(room.table, p, seat)
+                ? p
+                : {
+                    ...publicPurse,
+                    ...(canReadCharacter(room.table, p, seat)
+                      ? { sheet: projected.sheet, sheetRevision: projected.sheetRevision }
+                      : {}),
+                  };
             }),
-            notes: room.table.notes.filter((note) => canReadNote(note, seat)),
-            journal: journal
-              ? {
-                  ...journal,
-                  finance: journal.finance,
-                  editReports: journal.editReports?.filter(r => seat.purseIds.includes(r.purseId)),
-                  requests: journal.requests.filter((r) =>
-                    seat.purseIds.includes(r.purseId),
-                  ),
-                  events: journal.events
-                    .filter((e) => !e.purseId || seat.purseIds.includes(e.purseId))
-                    .map(({ change, ...event }) => event),
-                }
-              : undefined,
-            loans: room.table.loans.filter((loan) => seat.purseIds.includes(loan.purseId)),
-            sheets: room.table.sheets.filter((sheet) => seat.purseIds.includes(sheet.purseId)),
           },
   };
 }
@@ -455,18 +484,18 @@ export async function submitCommands(input: {
   const seasonalRolls = new Map<string, number>();
   const digest = async (value: string) => {
     const bytes = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(value));
-    return Array.from(new Uint8Array(bytes), byte => byte.toString(16).padStart(2, "0")).join("");
+    return Array.from(new Uint8Array(bytes), (byte) => byte.toString(16).padStart(2, "0")).join("");
   };
   const hashes = new Map<string, string>();
   for (const command of commands) {
-    const hash = "v2:" + await digest(commandIdentity(command));
+    const hash = "v2:" + (await digest(commandIdentity(command)));
     if (hashes.has(command.id) && hashes.get(command.id) !== hash)
       throw Error(
         "An action ID contains conflicting changes. Export your pending actions before retrying.",
       );
     hashes.set(command.id, hash);
   }
-  const batchHash = "v2:" + await digest(canonicalJson(commands));
+  const batchHash = "v2:" + (await digest(canonicalJson(commands)));
   for (let attempt = 0; attempt < 5; attempt++) {
     const room = await must(input.code),
       seat = room.seats.find((s) => s.token === input.token);
@@ -479,8 +508,11 @@ export async function submitCommands(input: {
       const previous = room.commandHashes?.[seat.id + ":" + command.id];
       // Unversioned receipts retain their original validated JSON algorithm;
       // only new receipts use canonical semantics and an explicit version.
-      if (previous && previous !== hashes.get(command.id) &&
-          (previous.startsWith("v2:") || previous !== await digest(JSON.stringify(command))))
+      if (
+        previous &&
+        previous !== hashes.get(command.id) &&
+        (previous.startsWith("v2:") || previous !== (await digest(JSON.stringify(command))))
+      )
         throw Error(
           "An action ID contains conflicting changes. Export your pending actions before retrying.",
         );
@@ -492,10 +524,15 @@ export async function submitCommands(input: {
     }
     if (room.batches?.includes(key)) {
       const previous = room.batchHashes?.[key];
-      if ((previous && previous !== batchHash &&
-           (previous.startsWith("v2:") || previous !== await digest(JSON.stringify(commands)))) ||
-          commands.some(c => !(room.commands ?? []).includes(seat.id + ":" + c.id)))
-        throw Error("This batch ID was already used for different actions. Export your pending actions before retrying.");
+      if (
+        (previous &&
+          previous !== batchHash &&
+          (previous.startsWith("v2:") || previous !== (await digest(JSON.stringify(commands))))) ||
+        commands.some((c) => !(room.commands ?? []).includes(seat.id + ":" + c.id))
+      )
+        throw Error(
+          "This batch ID was already used for different actions. Export your pending actions before retrying.",
+        );
       return view(room, seat);
     }
     const messagesOnly = commands.length > 0 && commands.every((c) => c.kind === "message");
@@ -524,11 +561,14 @@ export async function submitCommands(input: {
     for (const command of input.stage ? drafts[seat.id]! : commands) {
       const key = seat.id + ":" + command.id;
       if (seen.has(key)) continue;
-      table = applyCommand(table, seat, command, { source: "server", random: draw => {
-        const key = command.id + ":" + draw;
-        if (!seasonalRolls.has(key)) seasonalRolls.set(key, randomTradeRoll());
-        return seasonalRolls.get(key)!;
-      } });
+      table = applyCommand(table, seat, command, {
+        source: "server",
+        random: (draw) => {
+          const key = command.id + ":" + draw;
+          if (!seasonalRolls.has(key)) seasonalRolls.set(key, randomTradeRoll());
+          return seasonalRolls.get(key)!;
+        },
+      });
       seen.add(key);
       if (!input.stage) commandHashes[key] = hashes.get(command.id)!;
     }
@@ -593,8 +633,9 @@ export async function manageRoom(input: {
   if (!caller) throw new Error("Session not found.");
   if (input.action !== "discard" && input.action !== "leave" && caller.role !== "dm")
     throw new Error("Only the DM can manage participants.");
-  const target = room.seats.find((s) => s.id === input.seatId) ||
-    (input.action === "invite" ? room.departed?.find(s => s.id === input.seatId) : undefined);
+  const target =
+    room.seats.find((s) => s.id === input.seatId) ||
+    (input.action === "invite" ? room.departed?.find((s) => s.id === input.seatId) : undefined);
   if (!target) throw new Error("Participant not found.");
   if (input.action === "leave" && (caller.role !== "player" || target.id !== caller.id))
     throw Error("Only players can leave their own seat. The DM must close the room.");
@@ -614,13 +655,29 @@ export async function manageRoom(input: {
     // Forget removes a library listing, not the canonical account identity of
     // an assigned seat. Keep campaign restrictions attached to that identity.
     const userId = target.userId || member?.user_id;
-    const finalStatus = input.action === "release" ? "dismissed" : input.action === "leave" ? "left" : input.action === "kick" ? "kicked" : "banned";
-    next.departed = [...(next.departed || []).filter(s => s.id !== target.id), { ...target, status: finalStatus as "left" | "dismissed" | "kicked" | "banned", userId }];
+    const finalStatus =
+      input.action === "release"
+        ? "dismissed"
+        : input.action === "leave"
+          ? "left"
+          : input.action === "kick"
+            ? "kicked"
+            : "banned";
+    next.departed = [
+      ...(next.departed || []).filter((s) => s.id !== target.id),
+      { ...target, status: finalStatus as "left" | "dismissed" | "kicked" | "banned", userId },
+    ];
     if (userId && (input.action === "kick" || input.action === "ban"))
       (next.blockedUsers ??= {})[userId] = input.action === "ban" ? "banned" : "kicked";
     const { applyCommand } = await import("./commands.ts");
-    for (const p of next.table.purses.filter(p => target.purseIds.includes(p.id) && p.editingAllowed))
-      next.table = applyCommand(next.table, caller.role === "dm" ? caller : room.seats.find(s => s.role === "dm")!, { id: crypto.randomUUID(), kind: "character-editing", purseId:p.id, allowed:false });
+    for (const p of next.table.purses.filter(
+      (p) => target.purseIds.includes(p.id) && p.editingAllowed,
+    ))
+      next.table = applyCommand(
+        next.table,
+        caller.role === "dm" ? caller : room.seats.find((s) => s.role === "dm")!,
+        { id: crypto.randomUUID(), kind: "character-editing", purseId: p.id, allowed: false },
+      );
     if (next.drafts) delete next.drafts[target.id];
     next.seats = next.seats.filter((s) => s.id !== target.id);
     next.turn = Math.max(
@@ -628,8 +685,11 @@ export async function manageRoom(input: {
       next.seats.findIndex((s) => s.id === current),
     );
   } else if (input.action === "invite") {
-    if (target.role !== "player" || (target as { status?: string }).status === "banned") throw Error("Banned participants cannot be invited.");
-    for (const id of target.purseIds.filter(id => room.table.purses.some(p => p.id === id && p.kind === "character")))
+    if (target.role !== "player" || (target as { status?: string }).status === "banned")
+      throw Error("Banned participants cannot be invited.");
+    for (const id of target.purseIds.filter((id) =>
+      room.table.purses.some((p) => p.id === id && p.kind === "character"),
+    ))
       (next.invitations ??= {})[id] = crypto.randomUUID();
   } else if (input.action === "permission") {
     if (target.role === "dm") throw new Error("The DM already controls all accounts.");

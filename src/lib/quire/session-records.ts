@@ -1,3 +1,4 @@
+import { characterVisible, canReadCharacter, inParty } from "./character-position.ts";
 import { readWorld } from "./world-schema.ts";
 import { exchangeHere } from "./trade-economy.ts";
 import { readTradeEconomy } from "./trade-economy-schema.ts";
@@ -20,6 +21,14 @@ export function projectRecord(
 ): CloudTable {
   const t = structuredClone(table);
   const dm = seat.role === "dm";
+  if (!dm)
+    seat = {
+      ...seat,
+      purseIds: seat.purseIds.filter((id) => {
+        const p = t.purses.find((p) => p.id === id);
+        return p && characterVisible(t, p);
+      }),
+    };
   const ownedDevice = options.ownedDevice === true && dm;
   t.notes = t.notes.filter((n) => canReadNote(n, seat));
   t.journal = readJournalForRecords(t.journal);
@@ -62,14 +71,43 @@ export function projectRecord(
   if (!dm) {
     delete t.journal.resourceLibrary;
     const world = readWorld(t.journal.world);
-    world.maps = world.maps.filter(map => map.visible).map(map => ({...map, markers:map.markers.filter(marker=>marker.visibility === "party")}));
-    const readableNpcs = new Set(world.npcs.filter(npc=>npcAvailableHere(npc,t)).map(npc=>npc.id));
-    const controlledNpcs = new Set(world.npcs.filter(npc=>npcController(npc,seat)).map(npc=>npc.id));
-    world.conversations = world.conversations.filter(c=>(seat.purseIds.includes(c.purseId) || controlledNpcs.has(c.npcId)) && readableNpcs.has(c.npcId));
-    world.trades = world.trades.filter(o=>[o.left.purseId,o.right.purseId].some(id=>seat.purseIds.includes(id)||controlledNpcs.has(id)));
-    world.timeHistory = world.timeHistory.map(r=>({...r,purseIds:r.purseIds.filter(id=>seat.purseIds.includes(id))}));
-    world.npcs = world.npcs.filter(npc=>readableNpcs.has(npc.id));
-    if(options.directory)world.partyCharacters=t.purses.filter(p=>!p.nonParty && p.kind==="character" && p.control!=="npc").map(p=>({id:p.id,name:p.name}));
+    world.maps = world.maps
+      .filter((map) => map.visible)
+      .map((map) => ({
+        ...map,
+        markers: map.markers.filter((marker) => marker.visibility === "party"),
+      }));
+    const readableNpcs = new Set(
+      world.npcs.filter((npc) => npcAvailableHere(npc, t)).map((npc) => npc.id),
+    );
+    const controlledNpcs = new Set(
+      world.npcs.filter((npc) => npcController(npc, seat)).map((npc) => npc.id),
+    );
+    world.conversations = world.conversations.filter(
+      (c) =>
+        (seat.purseIds.includes(c.purseId) || controlledNpcs.has(c.npcId)) &&
+        readableNpcs.has(c.npcId),
+    );
+    world.trades = world.trades.filter((o) =>
+      [o.left.purseId, o.right.purseId].some(
+        (id) => seat.purseIds.includes(id) || controlledNpcs.has(id),
+      ),
+    );
+    world.timeHistory = world.timeHistory.map((r) => ({
+      ...r,
+      purseIds: r.purseIds.filter((id) => seat.purseIds.includes(id)),
+    }));
+    world.npcs = world.npcs.filter((npc) => readableNpcs.has(npc.id));
+    if (options.directory)
+      world.partyCharacters = t.purses
+        .filter(
+          (p) =>
+            inParty(t, p) &&
+            characterVisible(t, p) &&
+            p.kind === "character" &&
+            p.control !== "npc",
+        )
+        .map((p) => ({ id: p.id, name: p.name }));
     else delete world.partyCharacters;
     if(t.journal.world || options.directory)t.journal.world=world;
     const estate = readEstate(t.journal.propertyOperations);
@@ -101,14 +139,22 @@ export function projectRecord(
     const market = readMarketLocations(t.journal.market);
     if (t.journal.tradeEconomy) {
       const economy = t.journal.tradeEconomy;
-      economy.settings = { ...readTradeEconomy().settings, enabled: economy.settings.enabled, mode: economy.settings.mode };
-      economy.exchanges = economy.exchanges.filter(e => economy.settings.enabled && e.visible && exchangeHere(t, e));
-      economy.receipts = economy.receipts.filter(r => seat.purseIds.includes(r.purseId)).map(receipt => {
-        const projected = { ...receipt };
-        delete projected.settlement;
-        delete projected.operationId;
-        return projected;
-      });
+      economy.settings = {
+        ...readTradeEconomy().settings,
+        enabled: economy.settings.enabled,
+        mode: economy.settings.mode,
+      };
+      economy.exchanges = economy.exchanges.filter(
+        (e) => economy.settings.enabled && e.visible && exchangeHere(t, e),
+      );
+      economy.receipts = economy.receipts
+        .filter((r) => seat.purseIds.includes(r.purseId))
+        .map((receipt) => {
+          const projected = { ...receipt };
+          delete projected.settlement;
+          delete projected.operationId;
+          return projected;
+        });
       economy.draws = [];
       economy.history = [];
       delete economy.pendingSeason;
@@ -127,11 +173,25 @@ export function projectRecord(
         market,
         t.holdings
           .filter((h) => seat.purseIds.includes(h.purseId) || visibleSites.has(h.id))
-          .flatMap((h) => (h.locationId ? [h.locationId] : [])).concat(
-            world.maps.flatMap(m=>[...(m.locationId?[m.locationId]:[]),...m.anchors.map(a=>a.locationId)]),
-            world.npcs.map(n=>n.locationId), t.shops.flatMap(s=>s.locationId?[s.locationId]:[]),
-            t.listings.flatMap(l=>l.locationId?[l.locationId]:[]),
-            t.journal.tradeEconomy?.exchanges.flatMap(e=>e.locationId?[e.locationId]:[]) ?? []),
+          .flatMap((h) => (h.locationId ? [h.locationId] : []))
+          .concat(
+            world.maps.flatMap((m) => [
+              ...(m.locationId ? [m.locationId] : []),
+              ...m.anchors.map((a) => a.locationId),
+            ]),
+            world.npcs.map((n) => n.locationId),
+            t.purses
+              .filter((p) => characterVisible(t, p))
+              .flatMap((p) => {
+                const s = t.journal?.world?.characterPositions.find((s) => s.purseId === p.id);
+                return s?.locationId ? [s.locationId] : [];
+              }),
+            t.shops.flatMap((s) => (s.locationId ? [s.locationId] : [])),
+            t.listings.flatMap((l) => (l.locationId ? [l.locationId] : [])),
+            t.journal.tradeEconomy?.exchanges.flatMap((e) =>
+              e.locationId ? [e.locationId] : [],
+            ) ?? [],
+          ),
       );
     t.ledger = t.ledger.filter((l) => seat.purseIds.includes(l.purseId));
     t.holdings = t.holdings.filter(
@@ -175,23 +235,36 @@ export function projectRecord(
           ),
         ),
         ...recipes.map((recipe) => recipe.output?.materialKey),
-        ...(t.journal.tradeEconomy?.commodities.map(c => c.materialKey) ?? []),
+        ...(t.journal.tradeEconomy?.commodities.map((c) => c.materialKey) ?? []),
       ]);
       estate.materials = estate.materials.filter((material) => materials.has(material.key));
     }
     if (t.journal.tradeEconomy) {
       const economy = t.journal.tradeEconomy;
-      const goods = new Set([...economy.exchanges.flatMap(e => e.offers.map(o => o.commodityId)),
-        ...t.holdings.map(h => h.commodityId), ...t.stock.map(s => s.commodityId), ...economy.receipts.map(r => r.commodityId)]);
-      economy.commodities = economy.commodities.filter(c => goods.has(c.id));
+      const goods = new Set([
+        ...economy.exchanges.flatMap((e) => e.offers.map((o) => o.commodityId)),
+        ...t.holdings.map((h) => h.commodityId),
+        ...t.stock.map((s) => s.commodityId),
+        ...economy.receipts.map((r) => r.commodityId),
+      ]);
+      economy.commodities = economy.commodities.filter((c) => goods.has(c.id));
       // A linked shop outside the visible exchange still retains its commodity identity, without disclosing that exchange.
-      for (const line of t.stock) if (!economy.exchanges.some(e => e.id === line.tradeExchangeId)) { delete line.tradeExchangeId; delete line.commodityId; }
+      for (const line of t.stock)
+        if (!economy.exchanges.some((e) => e.id === line.tradeExchangeId)) {
+          delete line.tradeExchangeId;
+          delete line.commodityId;
+        }
     }
     const publicNames = new Set([
-      ...(t.journal.tradeEconomy?.exchanges.map(e => e.purseId) ?? []),
-      ...world.conversations.map(c=>c.purseId),
-      ...world.npcs.map(n=>n.id),
-      ...world.trades.flatMap(o=>[o.left.purseId,o.right.purseId]),
+      ...(options.directory
+        ? t.purses
+            .filter((p) => p.kind === "character" && p.control !== "npc" && characterVisible(t, p))
+            .map((p) => p.id)
+        : []),
+      ...(t.journal.tradeEconomy?.exchanges.map((e) => e.purseId) ?? []),
+      ...world.conversations.map((c) => c.purseId),
+      ...world.npcs.map((n) => n.id),
+      ...world.trades.flatMap((o) => [o.left.purseId, o.right.purseId]),
       ...sharedOwners,
       ...t.holdings.map((h) => h.purseId),
       ...estate.jobs.flatMap((j) => [j.purseId, ...j.assignments.map((a) => a.purseId)]),
@@ -201,10 +274,23 @@ export function projectRecord(
     t.purses = t.purses
       .filter((p) => seat.purseIds.includes(p.id) || publicNames.has(p.id))
       .map((p) =>
-        seat.purseIds.includes(p.id)
+        seat.purseIds.includes(p.id) && canReadCharacter(t, p, seat)
           ? p
-          : { id: p.id, name: p.name, kind: p.kind, ...(p.nonParty?{nonParty:true,control:"npc" as const}:{}), coins: { cp: 0, sp: 0, ep: 0, gp: 0, pp: 0 } },
+          : {
+              id: p.id,
+              name: characterVisible(t, p) ? p.name : "Hidden character",
+              kind: p.kind,
+              ...(p.nonParty ? { nonParty: true } : {}),
+              ...(p.control ? { control: p.control } : {}),
+              ...(canReadCharacter(t, p, seat)
+                ? { sheet: p.sheet, portrait: p.portrait, sheetRevision: p.sheetRevision }
+                : {}),
+              coins: { cp: 0, sp: 0, ep: 0, gp: 0, pp: 0 },
+            },
       );
+    world.characterPositions = world.characterPositions
+      .filter((s) => t.purses.some((p) => p.id === s.purseId))
+      .map((s) => ({ ...s, ...(s.downtime ? { downtime: undefined } : {}) }));
     if (t.journal.finance) {
       const f = readFinance(t.journal.finance);
       t.journal.finance = {
@@ -224,7 +310,11 @@ export function projectRecord(
       )
       .map(({ change, ...e }) => e);
     t.loans = t.loans.filter((l) => seat.purseIds.includes(l.purseId));
-    t.sheets = t.sheets.filter((s) => seat.purseIds.includes(s.purseId));
+    t.sheets = t.sheets.filter(
+      (s) =>
+        seat.purseIds.includes(s.purseId) &&
+        t.purses.some((p) => p.id === s.purseId && canReadCharacter(t, p, seat)),
+    );
   }
   for (const p of t.purses) delete p.editBaseline;
   return t;

@@ -1,3 +1,5 @@
+import { CharacterPlacement } from "@/components/character-placement";
+import { inParty } from "@/lib/quire/character-position";
 import { holdingRecordId } from "@/lib/quire/finance-record-links";
 import { CharacterPermissions } from "@/components/character-permissions";
 import { toast } from "sonner";
@@ -45,6 +47,8 @@ export const Route = createFileRoute("/party")({
 function PartyPage() {
   const economy = useEconomy();
   const profiles = useSheetReadouts();
+  const [managed, setManaged] = useState("");
+  const partyTable = { purses: economy.purses, journal: economy.journal };
   const [section, setSection] = useState("characters");
   const { action: initialAction, section: requestedSection } = Route.useSearch();
   useEffect(() => {
@@ -60,7 +64,7 @@ function PartyPage() {
   const visible =
     seat.role === "player"
       ? economy.purses.filter((purse) => seat.purseIds.includes(purse.id))
-      : economy.purses.filter(p=>!p.nonParty);
+      : economy.purses.filter((p) => inParty(partyTable, p));
   const coin = visible.reduce((sum, purse) => sum + toCopper(purse.coins), 0);
   const goods = economy.holdings
     .filter((holding) => visible.some((purse) => purse.id === holding.purseId))
@@ -127,6 +131,7 @@ function PartyPage() {
           </AppLink>
         </div>
       )}
+      {seat.role === "dm" && <CharacterPlacement selectedId={managed} />}
       {seat.role === "dm" && (
         <div
           className="party-profile-list"
@@ -146,6 +151,17 @@ function PartyPage() {
                   <LedgerArt kind="portrait" src={live?.body.portrait || p.portrait} />
                   <div className="party-profile-body">
                     <h2>{p.name}</h2>
+                    <Button
+                      variant="secondary"
+                      onClick={() => {
+                        setManaged(p.id);
+                        document
+                          .getElementById("character-placement")
+                          ?.scrollIntoView({ block: "start" });
+                      }}
+                    >
+                      Manage placement & downtime
+                    </Button>
                     <label className="flex min-h-11 items-center gap-2 text-sm">
                       <input
                         type="checkbox"
@@ -841,9 +857,18 @@ function GiveToPlayer({ purses }: { purses: Purse[] }) {
           .filter((purse) => purse.id !== fromId)
           .map((purse) => ({ id: purse.id, name: purse.name }))
       : getCloudTable().joined
-        ? everyone.filter(purse => purse.id !== fromId && purse.kind === "character" && characterControl(purse) === "player").map(purse => ({ id: purse.id, name: purse.name }))
-        : roster.filter(person => person.id !== fromId);
-  const mine = holdings.filter((holding) => holding.purseId === fromId && !holding.custody && !holding.reservedFor);
+        ? everyone
+            .filter(
+              (purse) =>
+                purse.id !== fromId &&
+                purse.kind === "character" &&
+                characterControl(purse) === "player",
+            )
+            .map((purse) => ({ id: purse.id, name: purse.name }))
+        : roster.filter((person) => person.id !== fromId);
+  const mine = holdings.filter(
+    (holding) => holding.purseId === fromId && !holding.custody && !holding.reservedFor,
+  );
 
   useEffect(() => {
     if (!purses.some((purse) => purse.id === fromId)) setFromId(purses[0]?.id ?? "");

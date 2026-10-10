@@ -132,6 +132,10 @@ Not implemented or promised by this inventory: OCR, Google Drive backup integrat
 - DM manual/physical rolls and crypto app-generated dice retain distinct labels in a paginated private encounter log. Request receipts deduplicate retry after lost responses. Rolls do not automatically change HP or execute game rules.
 - Existing local/turn-based/live/manual sharing, player sheets, financial features, saved campaigns and Android signing remain intact. The new profile encounter desk requires an online member account and saved DM campaign membership; existing offline gameplay is unchanged. Existing installed APKs need a future signed client update for the new navigation; mobile web is supported now.
 
+## Character placement, NPC transfer and downtime
+
+DMs can move any campaign character or imported location NPC between active party membership, an individual location and the unassigned NPC list from Party or People & NPCs. Transfers retain the same wallet, inventory, sheet, identity and history. Visibility controls hide records from player projections, map/Library links and invitations; NPC sheet sharing is separate and read-only for other players. Individual locations remain fixed when the party moves. Searchable selectors, departed character sheets, party counts, encounter planning and property presence use the canonical placement. DM-defined downtime actions remove participants until explicitly approved campaign time reaches their exact finishing hour, then restore their previous placement once. Cancellation restores placement without rewards. Existing property jobs, recurring finance, sessions, backups, archives, network boundaries and Android compatibility remain available. No migration or wall-clock scheduler is required.
+
 ## Mobile control panel redesign
 
 - DM bottom navigation: Desk, Encounters, Party, Market, Library. Player navigation: Character, Inventory, Campaign, Market, Library. Existing routes remain reachable through these destinations, the unified DM Campaign control screen and role-specific settings. Legacy DM overview URLs resolve to that same screen; the player overview remains available.

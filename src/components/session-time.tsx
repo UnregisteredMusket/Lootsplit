@@ -1,3 +1,5 @@
+import { finishingCharacters } from "@/lib/quire/character-position";
+import { inParty } from "@/lib/quire/character-position";
 import { useState } from "react";
 import { readFinance } from "@/lib/quire/finance";
 import { previewSessionTime, sessionTimeFingerprint } from "@/lib/quire/session-time";
@@ -24,7 +26,7 @@ export function SessionTime() {
     error = e instanceof Error ? e.message : "Time preview unavailable.";
   }
   const active = t.journal.sessions.find((s) => !s.endedAt),
-    characters = t.purses.filter((p) => p.kind === "character" && !p.nonParty);
+    characters = t.purses.filter((p) => p.kind === "character" && inParty(t, p));
   return (
     <section>
       <p>
@@ -129,6 +131,12 @@ export function SessionTime() {
               Day {preview.fromDay}, {Math.floor(preview.fromMinute / 60)}:00 → Day {preview.toDay},{" "}
               {Math.floor(preview.toMinute / 60)}:00
             </p>
+            {finishingCharacters(t, preview.toDay * 1440 + preview.toMinute).map((s) => (
+              <p key={s.purseId}>
+                {t.purses.find((p) => p.id === s.purseId)?.name}: completes {s.downtime?.name};
+                restores previous placement.
+              </p>
+            ))}
             {preview.quote.lines.map((l) => (
               <p key={l.id}>
                 {l.name}: {formatCopper(l.paid)} settled, {formatCopper(l.unpaid)} unpaid

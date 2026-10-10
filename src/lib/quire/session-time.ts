@@ -6,6 +6,7 @@ import { readWorld, type WorldCommand } from "./world-schema.ts";
 import { toCopper } from "./money.ts";
 import { characterSheet } from "../characters/campaign-sheet.mjs";
 import { restedSheet } from "../characters/rest.mjs";
+import { completeCharacterDowntime, inParty } from "./character-position.ts";
 export function sessionTimeFingerprint(
   t: Pick<CloudTable, "journal" | "purses" | "holdings" | "shops" | "stock" | "sheets">,
 ) {
@@ -17,6 +18,7 @@ export function sessionTimeFingerprint(
     estate: t.journal?.propertyOperations,
     sessions: t.journal?.sessions,
     blackMarketActive: t.journal?.world?.blackMarketActive ?? false,
+    characterPositions: t.journal?.world?.characterPositions ?? [],
     purses: rows(t.purses),
     holdings: rows(t.holdings),
     shops: rows(t.shops),
@@ -85,7 +87,7 @@ export function advanceSessionTime(
   if (new Set(cmd.purseIds).size !== cmd.purseIds.length)
     throw Error("Choose each rest recipient once.");
   for (const id of cmd.purseIds)
-    if (!t.purses.some((p) => p.id === id && p.kind === "character" && !p.nonParty))
+    if (!t.purses.some((p) => p.id === id && p.kind === "character" && inParty(t, p)))
       throw Error("Choose existing party characters for the rest.");
   const f = (t.journal!.finance = readFinance(t.journal!.finance)),
     preview = previewSessionTime(t, cmd.hours, cmd.allowDowntime, cmd.id);
@@ -97,6 +99,7 @@ export function advanceSessionTime(
   );
   f.day = preview.toDay;
   f.minuteOfDay = preview.toMinute;
+  completeCharacterDowntime(t, at);
   if (cmd.rest !== "none")
     for (const id of cmd.purseIds) {
       const p = t.purses.find((p) => p.id === id)!;

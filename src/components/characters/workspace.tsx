@@ -1,3 +1,4 @@
+import { canReadCharacter } from "@/lib/quire/character-position";
 import { CharacterTabs } from "./workspace-tabs";
 import "./character-improvements.css";
 import { FeatureLink } from "../feature-navigation";
@@ -7,9 +8,19 @@ import { usePrefs } from "@/lib/quire/prefs";
 import { FantasyIcon } from "@/components/fantasy-icon";
 import { LedgerArt } from "@/components/ledger-art";
 
-function CampaignInventoryArt({ item, holdings }: { item: { id?: string; name: string; kind?: string }; holdings: Holding[] }) {
-  const holding = holdings.find(holding => holding.id === item.id);
-  return holding?.deed ? <LedgerArt kind="property" entry={holding} /> : <FantasyIcon entry={item} size={36} />;
+function CampaignInventoryArt({
+  item,
+  holdings,
+}: {
+  item: { id?: string; name: string; kind?: string };
+  holdings: Holding[];
+}) {
+  const holding = holdings.find((holding) => holding.id === item.id);
+  return holding?.deed ? (
+    <LedgerArt kind="property" entry={holding} />
+  ) : (
+    <FantasyIcon entry={item} size={36} />
+  );
 }
 import { useDraftGuard } from "@/lib/quire/use-draft-guard";
 import { Heart, Shield, Footprints } from "lucide-react";
@@ -140,7 +151,12 @@ export function CharacterWorkspace({
     [reload, setReload] = useState(0),
     [creating, setCreating] = useState(false);
   const campaignRows: Row[] = economy.purses
-    .filter((p) => p.kind === "character" && !p.nonParty && (seat.role === "dm" || seat.purseIds.includes(p.id)))
+    .filter(
+      (p) =>
+        p.kind === "character" &&
+        !economy.journal.tradeEconomy?.exchanges.some((e) => e.purseId === p.id) &&
+        canReadCharacter({ purses: economy.purses, journal: economy.journal }, p, seat),
+    )
     .map((p) => ({
       id: `party:${p.id}`,
       body: characterSheet(
@@ -284,7 +300,10 @@ export function CharacterWorkspace({
           name: registry.campaigns.find((c) => c.id === registry.activeId)?.name || "Campaign",
           ownerId: data.userId,
           purses: economy.purses.filter(
-            (p) => p.kind === "character" && !p.nonParty && (seat.role === "dm" || seat.purseIds.includes(p.id)),
+            (p) =>
+              p.kind === "character" &&
+              !economy.journal.tradeEconomy?.exchanges.some((e) => e.purseId === p.id) &&
+              canReadCharacter({ purses: economy.purses, journal: economy.journal }, p, seat),
           ),
           holdings: economy.holdings,
         }
@@ -433,9 +452,16 @@ function CharacterEditor({
   deviceCampaign?: DeviceCampaign;
 }) {
   const currentSeat = useSeat();
-  const playPrefix = useId(), editPrefix = useId();
-  const playTabs = { tabId: (key: string) => `${playPrefix}-tab-${key}`, panelId: `${playPrefix}-panel` };
-  const editTabs = { tabId: (key: string) => `${editPrefix}-tab-${key}`, panelId: `${editPrefix}-panel` };
+  const playPrefix = useId(),
+    editPrefix = useId();
+  const playTabs = {
+    tabId: (key: string) => `${playPrefix}-tab-${key}`,
+    panelId: `${playPrefix}-panel`,
+  };
+  const editTabs = {
+    tabId: (key: string) => `${editPrefix}-tab-${key}`,
+    panelId: `${editPrefix}-panel`,
+  };
   const [headerHeight, setHeaderHeight] = useState(80);
   useEffect(() => {
     const header = document.querySelector(".loot-shell header");
@@ -1640,7 +1666,11 @@ function CharacterEditor({
                     <ul>
                       {campaignLedger.holdings.map((h) => (
                         <li key={h.id}>
-                          {h.deed ? <LedgerArt kind="property" entry={h} /> : <FantasyIcon entry={h} size={28} className="fantasy-inline" />}
+                          {h.deed ? (
+                            <LedgerArt kind="property" entry={h} />
+                          ) : (
+                            <FantasyIcon entry={h} size={28} className="fantasy-inline" />
+                          )}
                           {h.name} × {h.quantity}
                         </li>
                       ))}

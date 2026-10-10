@@ -9,6 +9,143 @@ import {
 } from "../src/lib/characters/model.mjs";
 import { handleCharacterPlay } from "../cloudflare/character-play.mjs";
 import { localAccountDb } from "./account-dev-db.mjs";
+test("account campaign NPC sheets share readonly stats and reject hidden sheets, guessed saves and rolls", async () => {
+  const db = localAccountDb(),
+    { readJournal } = await import("../src/lib/quire/journal.ts"),
+    { emptyCloudTable } = await import("../src/lib/quire/cloud.ts");
+  const call = (user, path, body = {}) =>
+    handleCharacterPlay(db, user, "sheets" + path, body, new URL("http://localhost/"));
+  try {
+    for (const user of ["npc-player", "npc-dm"])
+      await db
+        .prepare(
+          "INSERT INTO user(id,name,email,emailVerified,createdAt,updatedAt) VALUES (?,?,?,0,0,0)",
+        )
+        .bind(user, user, user + "@example.com")
+        .run();
+    const room = {
+      code: "NPCSHEET",
+      revision: 1,
+      live: true,
+      turn: 0,
+      seats: [
+        {
+          id: "player-seat",
+          token: "player-token",
+          role: "player",
+          name: "Player",
+          purseIds: ["hero"],
+        },
+        { id: "dm-seat", token: "dm-token", role: "dm", name: "DM", purseIds: [] },
+      ],
+      table: {
+        ...emptyCloudTable(),
+        purses: [
+          {
+            id: "hero",
+            name: "Hero",
+            kind: "character",
+            coins: { cp: 0, sp: 0, ep: 0, gp: 0, pp: 0 },
+            sheet: { ...blankSheet(), name: "Hero" },
+          },
+          {
+            id: "npc",
+            name: "Scholar",
+            kind: "character",
+            control: "npc",
+            coins: { cp: 0, sp: 0, ep: 0, gp: 99, pp: 0 },
+            sheet: { ...blankSheet(), name: "Scholar", description: "Private NPC sheet" },
+          },
+        ],
+        holdings: [
+          {
+            id: "gem",
+            purseId: "npc",
+            name: "Private gem",
+            kind: "item",
+            quantity: 1,
+            unitCopper: 500,
+            notes: "",
+          },
+        ],
+        journal: readJournal({
+          market: {
+            currentLocationId: "region",
+            locations: [
+              { id: "region", name: "Region", kind: "region", parentId: null, description: "" },
+            ],
+          },
+          world: {
+            npcs: [
+              {
+                id: "npc",
+                name: "Scholar",
+                description: "Public record",
+                locationId: "region",
+                visible: true,
+                barterAllowed: false,
+                controllerPurseId: null,
+              },
+            ],
+            characterPositions: [
+              {
+                purseId: "npc",
+                inParty: true,
+                locationId: null,
+                visible: true,
+                sheetVisible: true,
+              },
+            ],
+          },
+        }),
+      },
+    };
+    await db
+      .prepare("INSERT INTO campaign_rooms(code,revision,body) VALUES (?,1,?)")
+      .bind(room.code, JSON.stringify(room))
+      .run();
+    for (const [user, seat, token] of [
+      ["npc-player", "player-seat", "player-token"],
+      ["npc-dm", "dm-seat", "dm-token"],
+    ])
+      await db
+        .prepare("INSERT INTO library_members VALUES (?,?,?,?,?,0,0)")
+        .bind(user, room.code, seat, token, "NPC sheets")
+        .run();
+    const id = `campaign:${room.code}:npc`,
+      detail = await call("npc-player", "/detail", { id });
+    assert.equal(detail.body.description, "Private NPC sheet");
+    assert.equal(detail.editable, false);
+    assert.equal(detail.campaign.editingAllowed, false);
+    assert.equal(detail.body.coins.gp, 0);
+    assert.deepEqual(detail.body.equipment, []);
+    assert.deepEqual(detail.campaign.holdings, []);
+    await assert.rejects(
+      call("npc-player", "/save", { id, revision: 0, before: detail.body, sheet: detail.body }),
+      (e) => e.status === 404,
+    );
+    await assert.rejects(
+      call("npc-player", "/roll", {
+        id,
+        revision: 0,
+        kind: "ability",
+        key: "str",
+        requestKey: crypto.randomUUID(),
+      }),
+      (e) => e.status === 403,
+    );
+    room.table.journal.world.characterPositions[0].sheetVisible = false;
+    await db
+      .prepare("UPDATE campaign_rooms SET body=? WHERE code=?")
+      .bind(JSON.stringify(room), room.code)
+      .run();
+    await assert.rejects(call("npc-player", "/detail", { id }), (e) => e.status === 404);
+    assert.equal((await call("npc-dm", "/detail", { id })).body.description, "Private NPC sheet");
+    assert.ok(!(await call("npc-player", "")).campaigns[0].purses.some((p) => p.id === "npc"));
+  } finally {
+    db.close();
+  }
+});
 test("character calculations, dice validation and resource boundaries", () => {
   const s = blankSheet();
   s.scores.dex = 16;
@@ -152,8 +289,14 @@ test("account characters enforce ownership, campaign assignments, DM policy, sta
     const importRequest = (await call("dm", "/imports", { code: "PLAYTEST" })).requests.find((r) => r.id === requestKey);
     assert.equal(importRequest.id, requestKey);
     assert.equal(importRequest.seat_token, undefined);
-    const campaignTarget = await call("dm", "/detail", { id: `campaign:PLAYTEST:${importRequest.purse_id}` });
-    assert.equal(campaignTarget.body.name, "Hero", "Review reads the authorized campaign target, not the submitted account source");
+    const campaignTarget = await call("dm", "/detail", {
+      id: `campaign:PLAYTEST:${importRequest.purse_id}`,
+    });
+    assert.equal(
+      campaignTarget.body.name,
+      "Hero",
+      "Review reads the authorized campaign target, not the submitted account source",
+    );
     assert.equal(importRequest.target_revision, campaignTarget.revision);
     assert.equal(importRequest.source_revision, assignment.revision);
     assert.equal(importRequest.body.name, sheet.name);

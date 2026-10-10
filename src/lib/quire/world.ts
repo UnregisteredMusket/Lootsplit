@@ -13,13 +13,19 @@ import { assertCarried, assertEstateDisposable } from "./estate.ts";
 import { transferPropertyDeed } from "./property-deed.ts";
 import { fromCopper, toCopper } from "./money.ts";
 import { advanceSessionTime } from "./session-time.ts";
+import { applyCharacterPosition } from "./character-position.ts";
 
 export function npcAvailableHere(npc: Npc, table: Pick<CloudTable, "journal">) {
   const market = readMarketLocations(table.journal?.market);
+  const s = table.journal?.world?.characterPositions?.find((s) => s.purseId === npc.id);
   return (
     npc.visible &&
-    !!market.currentLocationId &&
-    locationPath(market, market.currentLocationId).some((l) => l.id === npc.locationId)
+    (s?.visible ?? true) &&
+    (s?.inParty ||
+      (!!market.currentLocationId &&
+        locationPath(market, market.currentLocationId).some(
+          (l) => l.id === (s ? s.locationId : npc.locationId),
+        )))
   );
 }
 export { shopVisible, shopAsking } from "./vendors.ts";
@@ -44,6 +50,24 @@ export function validateWorld(t: CloudTable, projected = false) {
   const unique = (ids: string[], label: string) => {
     if (new Set(ids).size !== ids.length) throw Error(`Duplicate ${label} IDs.`);
   };
+  unique(
+    w.characterPositions.map((s) => s.purseId),
+    "character placement",
+  );
+  for (const s of w.characterPositions) {
+    const p = t.purses.find((p) => p.id === s.purseId && p.kind === "character");
+    if (
+      !p ||
+      (s.locationId && !locations.has(s.locationId)) ||
+      (s.downtime &&
+        (s.inParty ||
+          s.downtime.finishMinute <= s.downtime.startedMinute ||
+          (s.downtime.returnLocationId && !locations.has(s.downtime.returnLocationId))))
+    )
+      throw Error("Character placement or downtime references are invalid.");
+    if (w.npcs.some((n) => n.id === s.purseId) && !!p.nonParty === s.inParty)
+      throw Error("NPC party membership is inconsistent.");
+  }
   unique(
     w.maps.map((m) => m.id),
     "map",
@@ -81,7 +105,6 @@ export function validateWorld(t: CloudTable, projected = false) {
     const p = t.purses.find((p) => p.id === npc.id);
     if (
       !p ||
-      !p.nonParty ||
       p.kind !== "character" ||
       p.control !== "npc" ||
       p.name !== npc.name ||
@@ -103,8 +126,15 @@ export function validateWorld(t: CloudTable, projected = false) {
   }
   // Exchange treasuries are canonical non-party accounts configured by the
   // regional exchange, rather than people players can independently barter with.
-  if (!projected && t.purses.some((p) => p.nonParty && !w.npcs.some((n) => n.id === p.id) &&
-    !t.journal?.tradeEconomy?.exchanges.some(e => e.purseId === p.id)))
+  if (
+    !projected &&
+    t.purses.some(
+      (p) =>
+        p.nonParty &&
+        !w.npcs.some((n) => n.id === p.id) &&
+        !t.journal?.tradeEconomy?.exchanges.some((e) => e.purseId === p.id),
+    )
+  )
     throw Error("A non-party NPC is missing its configuration.");
   for (const trade of w.trades) {
     if (
@@ -223,6 +253,7 @@ function moveItems(t: CloudTable, side: Trade["left"], toId: string, receipt: st
 export function applyWorldCommand(t: CloudTable, seat: CloudSeat, cmd: WorldCommand, at: number) {
   const journal = t.journal!,
     w = (journal.world = readWorld(journal.world));
+  if (applyCharacterPosition(t, seat, cmd, at)) return;
   const dm = () => {
     if (seat.role !== "dm") throw Error("Only the DM can perform this action.");
   };
@@ -296,12 +327,28 @@ export function applyWorldCommand(t: CloudTable, seat: CloudSeat, cmd: WorldComm
       throw Error("NPC configuration changed. Reload before saving.");
     Object.assign(current!, cmd.npc);
     const p = t.purses.find((p) => p.id === cmd.npc.id)!;
+    if (
+      cmd.npc.locationId !== cmd.before.locationId &&
+      journal.finance?.downtime.some((d) => d.status === "pending")
+    )
+      throw Error("Approve or cancel pending campaign downtime before moving an NPC.");
     p.name = cmd.npc.name;
     p.portrait = cmd.npc.portrait;
+    const position = w.characterPositions.find((s) => s.purseId === p.id);
+    if (position) {
+      if (position.downtime && cmd.npc.locationId !== cmd.before.locationId)
+        throw Error("Cancel this character's downtime before moving them.");
+      position.visible = cmd.npc.visible;
+      if (cmd.npc.locationId !== cmd.before.locationId) {
+        position.inParty = false;
+        position.locationId = cmd.npc.locationId;
+        p.nonParty = true;
+      }
+    }
     event("NPC configuration updated.");
   } else if (cmd.kind === "npc-funds") {
     dm();
-    const p = t.purses.find((p) => p.id === cmd.npcId && p.nonParty);
+    const p = t.purses.find((p) => p.id === cmd.npcId);
     if (!p || !w.npcs.some((n) => n.id === p.id)) throw Error("NPC no longer exists.");
     if (toCopper(p.coins) !== cmd.before)
       throw Error("NPC funds changed. Review the current balance.");

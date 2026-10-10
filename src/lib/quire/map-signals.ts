@@ -29,6 +29,7 @@ export const mapRecordKinds = [
   "Location",
   "Marker",
   "NPC",
+  "Character",
   "Shop",
   "Black market",
   "Property",
