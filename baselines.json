@@ -11490,5 +11490,20 @@
     "finishedAt": "2026-10-10T03:46:03.381Z",
     "durationMs": 39632,
     "trendId": "local:91b5fa37-5f0d-4221-b701-8c311aea9e60"
+  },
+  "[\"local\",\"function\",\"resource-pack validation and encounter conversion\",\"node22.23.3/linux-x64/work-mode/warm-files/three-packs-695-records-409-creatures\",\"v1\"]": {
+    "schema": 1,
+    "id": "local:fe7b1210-69d4-4998-bd21-b2c75c7e9691",
+    "scope": "[\"local\",\"function\",\"resource-pack validation and encounter conversion\",\"node22.23.3/linux-x64/work-mode/warm-files/three-packs-695-records-409-creatures\",\"v1\"]",
+    "kind": "function",
+    "name": "resource-pack validation and encounter conversion",
+    "environment": "node22.23.3/linux-x64/work-mode/warm-files/three-packs-695-records-409-creatures",
+    "commit": "0b1d7359256abd64efacb6febaf7a3e5cf182df7",
+    "url": "https://github.com/UnregisteredMusket/Lootsplit/commit/0b1d7359256abd64efacb6febaf7a3e5cf182df7",
+    "outcome": "success",
+    "startedAt": "2026-10-10T07:01:44.645Z",
+    "finishedAt": "2026-10-10T07:01:44.946Z",
+    "durationMs": 301,
+    "trendId": "local:fe7b1210-69d4-4998-bd21-b2c75c7e9691"
   }
 }
