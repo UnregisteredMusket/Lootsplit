@@ -8,6 +8,7 @@ import { estateImportCommand, estateImportFingerprint, previewEstateImport } fro
 import { applyEstateCommand, assertCarried, assertEstateDisposable, initializeEstatePurchase, removeEstateSite, validateEstate } from "./estate.ts";
 import { marketLocationSchema, readMarketLocations, validateShopLocations } from "./shop-locations.ts";
 import { canonicalJson } from "./canonical-json.ts";
+import { applyLedgerVoid, assertNoPartialTradeVoid, ledgerVoidCommandSchema } from "./ledger-reversal.ts";
 import { marketNameRowsSchema, marketNameFingerprint, previewMarketNames } from "./market-name-import.ts";
 import {
   characterPermissionSchema,
@@ -47,6 +48,7 @@ const id = z.string().min(1).max(150),
   qty = amount.min(1).max(100000);
 const base = { id };
 export const commandSchema = z.discriminatedUnion("kind", [
+  ledgerVoidCommandSchema,
   ...tradeCommands,
   ...worldCommands,
   ...estateCommands,
@@ -293,7 +295,9 @@ export function applyCommand(input: CloudTable, seat: CloudSeat, raw: Command, e
       throw Error("Cancel the pending downtime before changing finance agreements.");
     return f;
   };
-  if (tradeCommands.some(schema => schema.shape.kind.value === cmd.kind)) {
+  if (cmd.kind === "ledger-void") {
+    applyLedgerVoid(t, seat, cmd, at, execution.source === "local");
+  } else if (tradeCommands.some(schema => schema.shape.kind.value === cmd.kind)) {
     applyTradeCommand(t, seat, cmd as TradeCommand, at, execution);
   } else if (worldCommands.some(schema => schema.shape.kind.value === cmd.kind)) {
     applyWorldCommand(t, seat, cmd as WorldCommand, at);
@@ -695,8 +699,7 @@ export function applyCommand(input: CloudTable, seat: CloudSeat, raw: Command, e
       priceAfterCharisma(shopAsking(shop, s.copper), score(cmd.purseId)) * cmd.quantity;
     coins(cmd.purseId, -cost);
     if (s.quantity !== null) s.quantity -= cmd.quantity;
-    if (!isService(s))
-      t.holdings.push({
+    const purchasedHolding: import("./types.ts").Holding | null = isService(s) ? null : {
         id: cmd.id + "-item",
         purseId: cmd.purseId,
         category: stockCategory(s, shop),
@@ -708,9 +711,13 @@ export function applyCommand(input: CloudTable, seat: CloudSeat, raw: Command, e
         ...(s.commodityId ? { commodityId: s.commodityId,
           weight: journal.tradeEconomy?.commodities.find(c => c.id === s.commodityId)?.weight,
           ...((journal.tradeEconomy?.commodities.find(c => c.id === s.commodityId)?.materialKey) ? { materialKey: journal.tradeEconomy!.commodities.find(c => c.id === s.commodityId)!.materialKey } : {}) } : {}),
-      });
+      };
+    if (purchasedHolding) t.holdings.push(purchasedHolding);
     log(cmd.purseId, `Bought ${cmd.quantity} ${s.name} from ${shop.name}`, -cost, shop.id);
-    recordShopTrade(t, { id: cmd.id, at, stockId: s.id, purseId: cmd.purseId, direction: "buy", quantity: cmd.quantity, copper: cost });
+    const purchase = t.ledger[t.ledger.length - 1];
+    purchase.purchase = { stockId: s.id, quantity: cmd.quantity, holding: structuredClone(purchasedHolding) };
+    const receipt = recordShopTrade(t, { id: cmd.id, at, stockId: s.id, purseId: cmd.purseId, direction: "buy", quantity: cmd.quantity, copper: cost });
+    if (receipt) purchase.trade = { receiptId: receipt.id, leg: "owner" };
   } else if (cmd.kind === "listing") {
     own(cmd.purseId);
     const l = t.listings.find((x) => x.id === cmd.listingId);
@@ -765,7 +772,10 @@ export function applyCommand(input: CloudTable, seat: CloudSeat, raw: Command, e
     t.holdings = t.holdings.filter((x) => x.quantity > 0);
     log(h.purseId, `Sold ${cmd.quantity} ${h.name} to ${s.name}`, paid, s.id);
     const linked = t.stock.find(line => line.shopId === s.id && line.commodityId === h.commodityId && h.commodityId);
-    if (linked) recordShopTrade(t, { id: cmd.id, at, stockId: linked.id, purseId: h.purseId, direction: "sell", quantity: cmd.quantity, copper: paid });
+    if (linked) {
+      const receipt = recordShopTrade(t, { id: cmd.id, at, stockId: linked.id, purseId: h.purseId, direction: "sell", quantity: cmd.quantity, copper: paid });
+      if (receipt) t.ledger[t.ledger.length - 1].trade = { receiptId: receipt.id, leg: "owner" };
+    }
     if (h.kind === "property" && h.quantity === 0) removeEstateSite(t, h.id);
   } else if (cmd.kind === "give") {
     own(cmd.fromId);
@@ -854,6 +864,7 @@ export function applyCommand(input: CloudTable, seat: CloudSeat, raw: Command, e
     editLegacyCharacter(t, seat, s, before);
   } else if (cmd.kind === "patch") {
     dm();
+    assertNoPartialTradeVoid(t, seat, cmd.changes, execution.source === "local");
     for (const change of cmd.changes) {
       if (change.store === "purses" && change.after === null)
         assertFinanceAccountRemovable(t.journal?.finance, change.id);

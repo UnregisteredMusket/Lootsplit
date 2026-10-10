@@ -1,7 +1,7 @@
 import { z } from "zod";
 import type { Holding, StockLine } from "./types.ts";
 import { goodsKey } from "./goods-key.ts";
-import { tradeEconomySchema } from "./trade-economy-schema.ts";
+import { tradeEconomySchema, tradeLedgerLinkSchema } from "./trade-economy-schema.ts";
 
 const id = z.string().min(1).max(150);
 export const estateKey = goodsKey;
@@ -344,6 +344,7 @@ export const estateQuoteSchema = z.object({
       summary: z.string().max(500),
       shopId: id.optional(),
       transactionType: z.enum(["purchase", "sale", "transfer", "payment"]).optional(),
+      trade: tradeLedgerLinkSchema.optional(),
     }),
   ),
   notices: z.array(z.object({ propertyId: id, summary: z.string().max(1000) })),

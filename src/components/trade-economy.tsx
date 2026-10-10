@@ -16,6 +16,7 @@ import {
   type Exchange,
   type TradeEconomy,
   type TradeOffer,
+  type TradeReceipt,
 } from "@/lib/quire/trade-economy-schema";
 import { exchangeHere, exchangeQuoteKey, tradeSeasonFingerprint } from "@/lib/quire/trade-economy";
 import { canonicalJson } from "@/lib/quire/canonical-json";
@@ -28,6 +29,8 @@ import { CommandForm, CommandButton } from "./world-tools";
 import { CoinAmountInput } from "./finance-input";
 import { AppLink } from "./app-link";
 import { TradeSeasonReview } from "./trade-season-review";
+import { tradeReversalGuidance } from "@/lib/quire/ledger-reversal";
+import { Button, Modal } from "./ui";
 
 function Field({ label, children }: { label: string; children: ReactNode }) {
   const id = useId();
@@ -209,19 +212,19 @@ export function TradeEconomyPanel() {
           <h3>{e.name}</h3>
           <p>
             {locationLabel(readMarketLocations(table.journal.market), e.locationId ?? undefined)} ·{" "}
-            {e.open ? "Open" : "Closed"} · Treasury{" "}
-            {formatCopper(
-              toCopper(
-                table.purses.find((p) => p.id === e.purseId)?.coins ?? {
-                  cp: 0,
-                  sp: 0,
-                  ep: 0,
-                  gp: 0,
-                  pp: 0,
-                },
-              ),
-            )}
+            {e.open ? "Open" : "Closed"}
           </p>
+          {dm ? (
+            <p>
+              {table.purses.find((p) => p.id === e.purseId)
+                ? `Treasury ${formatCopper(toCopper(table.purses.find((p) => p.id === e.purseId)!.coins))}`
+                : "Treasury account unavailable"}
+            </p>
+          ) : (
+            <p className="text-sm text-muted">
+              Exchange balance is private. Purchases and sales check available funds when submitted.
+            </p>
+          )}
           {e.notes && <p>{e.notes}</p>}
           <div className="trade-offer-grid">
             {e.offers.map((o) => {
@@ -254,43 +257,325 @@ export function TradeEconomyPanel() {
           </div>
         </section>
       ))}
-      <details className="journal-entry">
-        <summary>Trade receipts · {economy.receipts.length}</summary>
-        {economy.receipts
-          .slice(-50)
-          .reverse()
-          .map((r) => (
-            <p key={r.id}>
-              Season {r.epoch} · {r.direction === "buy" ? "Bought" : "Sold"} {r.quantity} {r.unit}{" "}
-              of {r.name} · {formatCopper(r.copper)} · {r.origin}
-              {r.propertyId ? " · property storage" : ""}
-            </p>
-          ))}
-        {economy.receipts.length > 50 && (
-          <p>Showing the latest 50. All receipts remain in campaign backups.</p>
-        )}
-      </details>
-      {dm && (
-        <details className="journal-entry">
-          <summary>Seasonal history · {economy.history.length}</summary>
-          {economy.history
-            .slice(-20)
-            .reverse()
-            .map((h) => (
-              <details key={h.id}>
-                <summary>
-                  {SEASON_NAMES[h.realm.season]} · season {h.quote.fromEpoch + 1} · day {h.day} ·{" "}
-                  {h.source}
-                </summary>
-                <p>{h.reason}</p>
-                <TradeSeasonReview
-                  quote={{ ...h.quote, exchanges: h.appliedExchanges, realm: h.realm }}
-                />
-              </details>
-            ))}
-        </details>
-      )}
+      <TradeReceipts economy={economy} dm={dm} />
+      {dm && <SeasonHistory history={economy.history} />}
     </div>
+  );
+}
+
+function HistoryPages({
+  page,
+  count,
+  pageSize,
+  onChange,
+  label,
+}: {
+  page: number;
+  count: number;
+  pageSize: number;
+  onChange: (page: number) => void;
+  label: string;
+}) {
+  if (count <= pageSize) return null;
+  const last = Math.ceil(count / pageSize) - 1;
+  return (
+    <nav aria-label={label} className="trade-history-pages">
+      <p className="text-sm text-muted" role="status">
+        {page * pageSize + 1}–{Math.min((page + 1) * pageSize, count)} of {count} · Page {page + 1}{" "}
+        of {last + 1}
+      </p>
+      <div className="flex flex-wrap gap-2">
+        <Button variant="secondary" disabled={page === 0} onClick={() => onChange(0)}>
+          First
+        </Button>
+        <Button variant="secondary" disabled={page === 0} onClick={() => onChange(page - 1)}>
+          Previous
+        </Button>
+        <Button variant="secondary" disabled={page === last} onClick={() => onChange(page + 1)}>
+          Next
+        </Button>
+        <Button variant="secondary" disabled={page === last} onClick={() => onChange(last)}>
+          Last
+        </Button>
+      </div>
+    </nav>
+  );
+}
+
+function TradeReceipts({ economy, dm }: { economy: TradeEconomy; dm: boolean }) {
+  const table = useWorldTable();
+  const [page, setPage] = useState(0);
+  const [review, setReview] = useState<TradeReceipt | null>(null);
+  const pageSize = 50;
+  const currentPage = Math.min(
+    page,
+    Math.max(0, Math.ceil(economy.receipts.length / pageSize) - 1),
+  );
+  const end = economy.receipts.length - currentPage * pageSize;
+  const rows = economy.receipts.slice(Math.max(0, end - pageSize), end).reverse();
+  const reversals = new Map(
+    economy.receipts.filter((r) => r.reversalOf).map((r) => [r.reversalOf!, r]),
+  );
+  return (
+    <details className="journal-entry">
+      <summary>Trade receipts · {economy.receipts.length}</summary>
+      <p className="text-sm text-muted">
+        Newest first. Every recorded trade and reversal is available across these pages.
+      </p>
+      {!rows.length && <p>No trade receipts have been recorded.</p>}
+      <HistoryPages
+        page={currentPage}
+        count={economy.receipts.length}
+        pageSize={pageSize}
+        onChange={setPage}
+        label="Trade receipt pages"
+      />
+      {rows.map((r) => {
+        const reversed = reversals.get(r.id);
+        const exchangeName = economy.exchanges.find((e) => e.id === r.exchangeId)?.name;
+        const accountName = table.purses.find((p) => p.id === r.purseId)?.name;
+        const propertyName =
+          r.propertyId && table.holdings.find((h) => h.id === r.propertyId)?.name;
+        return (
+          <article
+            key={r.id}
+            id={`trade-receipt-${encodeURIComponent(r.id)}`}
+            className="journal-entry"
+            aria-label={`${r.reversalOf ? "Reversal" : "Trade"}: ${r.name} · season ${r.epoch}`}
+          >
+            <h3>
+              {r.reversalOf
+                ? `Reversal of ${r.direction === "sell" ? "purchase" : "sale"}`
+                : r.direction === "buy"
+                  ? "Bought"
+                  : "Sold"}{" "}
+              {r.quantity} {r.unit} of {r.name}
+            </h3>
+            <p>
+              {formatCopper(r.copper)} · Season {r.epoch} · {new Date(r.at).toLocaleString()}
+            </p>
+            <p>
+              Exchange:{" "}
+              {exchangeName ??
+                (dm
+                  ? `Unavailable exchange (${r.exchangeId})`
+                  : "Exchange unavailable in this view")}{" "}
+              · Account: {accountName ?? "Account unavailable in this view"}
+            </p>
+            <p>
+              Source:{" "}
+              {r.origin === "exchange"
+                ? "Exchange trade"
+                : r.origin === "shop"
+                  ? "Shop activity"
+                  : "Manager activity"}
+              {r.propertyId
+                ? ` · Property storage: ${propertyName || "Property unavailable in this view"}`
+                : ""}
+            </p>
+            {r.reversalOf && (
+              <p className="text-muted">
+                Correction in season {r.epoch}. Original receipt: {r.reversalOf}. {r.reversalReason}
+              </p>
+            )}
+            {reversed && (
+              <p className="text-muted">
+                Reversal receipt recorded in season {reversed.epoch}. {reversed.reversalReason}
+              </p>
+            )}
+            {dm && !r.reversalOf && !reversed && (
+              <Button variant="secondary" onClick={() => setReview(structuredClone(r))}>
+                Review reversal
+              </Button>
+            )}
+          </article>
+        );
+      })}
+      <HistoryPages
+        page={currentPage}
+        count={economy.receipts.length}
+        pageSize={pageSize}
+        onChange={setPage}
+        label="Trade receipt pages at end"
+      />
+      {review && dm && (
+        <TradeReversalReview
+          original={review}
+          reversal={reversals.get(review.id)}
+          onClose={() => setReview(null)}
+        />
+      )}
+    </details>
+  );
+}
+
+function TradeReversalReview({
+  original,
+  reversal,
+  onClose,
+}: {
+  original: TradeReceipt;
+  reversal?: TradeReceipt;
+  onClose: () => void;
+}) {
+  const [reason, setReason] = useState("");
+  const table = useWorldTable();
+  const [operation] = useState(() => {
+    const receipts = readTradeEconomy(table.journal.tradeEconomy).receipts;
+    return original.operationId
+      ? structuredClone(
+          receipts.filter((r) => !r.reversalOf && r.operationId === original.operationId),
+        )
+      : [original];
+  });
+  const guidance = operation.map(tradeReversalGuidance).find(Boolean);
+  return (
+    <Modal
+      open
+      onOpenChange={(open) => {
+        if (!open) onClose();
+      }}
+      title="Review trade reversal"
+    >
+      <div className="trade-reversal-review">
+        {operation.length > 1 && (
+          <section aria-label="Manager operation receipts">
+            <p>
+              This manager operation includes {operation.length} receipts and is reversed as one
+              action.
+            </p>
+            <ul>
+              {operation.map((r) => (
+                <li key={r.id}>
+                  {r.direction === "buy" ? "Bought" : "Sold"} {r.quantity} {r.unit} of {r.name} ·{" "}
+                  {formatCopper(r.copper)}
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
+        <p>
+          {original.direction === "buy" ? "Purchase" : "Sale"}: {original.quantity} {original.unit}{" "}
+          of {original.name} · {formatCopper(original.copper)}
+        </p>
+        <p>
+          Account:{" "}
+          {table.purses.find((p) => p.id === original.purseId)?.name ?? "Account unavailable"} ·
+          Original season {original.epoch}
+        </p>
+        <p>
+          Exchange:{" "}
+          {table.journal.tradeEconomy?.exchanges.find((e) => e.id === original.exchangeId)?.name ??
+            "Exchange unavailable"}
+          {original.propertyId
+            ? ` · Property storage: ${table.holdings.find((h) => h.id === original.propertyId)?.name ?? "Property unavailable"}`
+            : ""}
+        </p>
+        <p>
+          Reverse the recorded goods and related payments together. The campaign checks current
+          funds, stock and custody before committing. A correction affects the current season;
+          earlier settlements and rolls stay recorded.
+        </p>
+        {original.origin === "manager" && (
+          <p className="text-sm text-muted">
+            Review manager budget usage and order timing separately in Property Management. The
+            campaign day stays as recorded.
+          </p>
+        )}
+        {guidance && <p className="text-muted">{guidance}</p>}
+        {reversal && (
+          <p role="status">
+            A reversal receipt is present for this trade. Check the room sync status for any pending
+            submission.
+          </p>
+        )}
+        <CommandForm
+          label="Reverse trade"
+          dirty={!!reason && !reversal}
+          submitDisabled={!!guidance || !!reversal || !reason.trim()}
+          submit={() => ({
+            kind: "ledger-void",
+            target: { kind: "trade", id: original.id },
+            before: canonicalJson(original),
+            reason,
+          })}
+        >
+          <Field label="Reason for trade reversal">
+            <textarea
+              required
+              maxLength={2000}
+              rows={3}
+              value={reason}
+              onChange={(e) => setReason(e.target.value)}
+            />
+          </Field>
+        </CommandForm>
+        <Button variant="secondary" onClick={onClose}>
+          Close reversal review
+        </Button>
+      </div>
+    </Modal>
+  );
+}
+
+function SeasonHistory({ history }: { history: TradeEconomy["history"] }) {
+  const [page, setPage] = useState(0);
+  const pageSize = 20;
+  const currentPage = Math.min(page, Math.max(0, Math.ceil(history.length / pageSize) - 1));
+  const end = history.length - currentPage * pageSize;
+  const rows = history.slice(Math.max(0, end - pageSize), end).reverse();
+  return (
+    <details className="journal-entry">
+      <summary>Seasonal history · {history.length}</summary>
+      <p className="text-sm text-muted">
+        Newest first. Open a record to compare its original baseline, proposal and applied result.
+      </p>
+      {!rows.length && <p>No seasonal settlements have been recorded.</p>}
+      <HistoryPages
+        page={currentPage}
+        count={history.length}
+        pageSize={pageSize}
+        onChange={setPage}
+        label="Seasonal history pages"
+      />
+      {rows.map((record) => (
+        <SeasonHistoryRecord key={record.id} record={record} />
+      ))}
+      <HistoryPages
+        page={currentPage}
+        count={history.length}
+        pageSize={pageSize}
+        onChange={setPage}
+        label="Seasonal history pages at end"
+      />
+    </details>
+  );
+}
+
+function SeasonHistoryRecord({ record }: { record: TradeEconomy["history"][number] }) {
+  const [open, setOpen] = useState(false);
+  return (
+    <details
+      className="journal-entry"
+      id={`trade-season-${encodeURIComponent(record.id)}`}
+      onToggle={(event) => setOpen(event.currentTarget.open)}
+    >
+      <summary>
+        {SEASON_NAMES[record.realm.season]} · season {record.quote.fromEpoch + 1} · day {record.day}{" "}
+        · {record.source}
+      </summary>
+      {open && (
+        <>
+          <p>
+            {new Date(record.at).toLocaleString()} · Approval reason: {record.reason}
+          </p>
+          <TradeSeasonReview
+            quote={record.quote}
+            applied={{ exchanges: record.appliedExchanges, realm: record.realm }}
+          />
+        </>
+      )}
+    </details>
   );
 }
 
@@ -894,6 +1179,12 @@ function GoodsLinks({ economy }: { economy: TradeEconomy }) {
       <p>
         Review the physical unit before linking existing goods. Shop links record seasonal activity
         and preserve custom shop prices.
+      </p>
+      <p className="text-sm text-muted">
+        For supplier deliveries, review the material and physical unit against any linked commodity.
+        Purchases use the shop’s configured asking price and any applicable Charisma adjustment. A
+        reviewed commodity and exchange link records goods demand once, when purchased. Delivery
+        fees stay separate, and arrival does not record another trade.
       </p>
       <CommandForm
         label="Link inventory commodity"

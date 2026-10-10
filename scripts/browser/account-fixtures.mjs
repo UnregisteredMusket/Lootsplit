@@ -87,7 +87,7 @@ export async function navigateAccountScenario(page, origin, path) {
     return;
   }
   if (target.pathname !== "/account" && !page.guestAccessAudit)
-    await prepareDmFixture(page, origin);
+    await prepareDmFixture(page, origin, { useAccountLink: true });
   // Already-confirmed success notices have a real close control. Use it before
   // header navigation: hovering a notice otherwise pauses its dismissal timer.
   const successes = page.locator(
@@ -207,21 +207,22 @@ export async function accountPost(context, origin, path, data) {
 
 // Reuse the real account endpoints. Only unrelated setup bypasses the UI;
 // the library scenario still verifies signup, sign-in, and account linking by clicking them.
-export async function signedInDevices(devices, origin) {
+export async function signedInDevices(devices, origin, { deferPrimaryLibrary = false } = {}) {
   const user = credentials();
   await accountPost(devices.context, origin, "auth/sign-up/email", user);
   const other = await devices.newDevice();
-  // Signup must precede sign-in, and each device must authenticate before its
-  // library opens. Device one's read-only load need not wait for device two's
-  // independent sign-in; retain both cold documents and readiness assertions.
+  // Signup must precede sign-in. Most scenarios use both cold libraries now;
+  // an untouched primary page may wait until another device saves a membership.
+  // That caller keeps its first cold account entry and checks Sign out there.
   await Promise.all([
-    visit(devices.page, origin, "/account"),
+    deferPrimaryLibrary ? Promise.resolve() : visit(devices.page, origin, "/account"),
     (async () => {
       await accountPost(other.context, origin, "auth/sign-in/email", user);
       await visit(other.page, origin, "/account");
     })(),
   ]);
-  await expect(devices.page.getByRole("button", { name: "Sign out", exact: true })).toBeVisible();
+  if (!deferPrimaryLibrary)
+    await expect(devices.page.getByRole("button", { name: "Sign out", exact: true })).toBeVisible();
   await expect(other.page.getByRole("button", { name: "Sign out", exact: true })).toBeVisible();
   return { ...user, other: other.page };
 }

@@ -4,6 +4,7 @@ import { captureDeviceMutationScope, assertDeviceMutationScope } from "./mutatio
 import { isEphemeralCampaign } from "./guest-storage.ts";
 import { assertMerchantSale, isService, stockCategory } from "./merchant.ts";
 import { applyCommand, type CommandInput } from "./commands.ts";
+import { canonicalJson } from "./canonical-json.ts";
 import { validateShopLocations } from "./shop-locations.ts";
 import { propertyAvailableHere } from "./property.ts";
 import { readMarketLocations } from "./shop-locations.ts";
@@ -1041,15 +1042,16 @@ export async function buyFromShop(input: {
     const summary =
       `Bought ${quantity} ${stock.name} from ${shop.name}` +
       (percent ? `, Charisma ${score}, ${percent}% off` : "");
-    const entry = logLine(purse.id, shop.id, summary, -cost, "purchase");
-    tx.objectStore("ledger").put({
-      ...entry,
+    const entry: LedgerLine = {
+      ...logLine(purse.id, shop.id, summary, -cost, "purchase"),
       purchase: { stockId: stock.id, quantity, holding },
-    });
+    };
     if (stock.tradeExchangeId) {
-      recordShopTrade({ ...emptyCloudTable(), journal, stock: [stock] }, { id: entry.id, at: entry.at, stockId: stock.id, purseId: purse.id, direction: "buy", quantity, copper: cost });
+      const receipt = recordShopTrade({ ...emptyCloudTable(), journal, stock: [stock] }, { id: entry.id, at: entry.at, stockId: stock.id, purseId: purse.id, direction: "buy", quantity, copper: cost });
+      if (receipt) entry.trade = { receiptId: receipt.id, leg: "owner" };
       tx.objectStore("meta").put({ id: "journal", value: journal });
     }
+    tx.objectStore("ledger").put(entry);
   });
 }
 
@@ -1087,7 +1089,8 @@ export async function sellToShop(input: {
       const lines = await request<StockLine[]>(tx.objectStore("stock").index("shopId").getAll(shop.id));
       const linked = lines.find(s => s.commodityId === holding.commodityId && s.tradeExchangeId);
       if (linked) {
-        recordShopTrade({ ...emptyCloudTable(), journal, stock: [linked] }, { id: entry.id, at: entry.at, stockId: linked.id, purseId: purse.id, direction: "sell", quantity, copper: paid });
+        const receipt = recordShopTrade({ ...emptyCloudTable(), journal, stock: [linked] }, { id: entry.id, at: entry.at, stockId: linked.id, purseId: purse.id, direction: "sell", quantity, copper: paid });
+        if (receipt) tx.objectStore("ledger").put({ ...entry, trade: { receiptId: receipt.id, leg: "owner" } });
         tx.objectStore("meta").put({ id: "journal", value: journal });
       }
     }
@@ -1572,140 +1575,14 @@ export async function updateCharacterSheet(
   });
 }
 
-export async function voidLedgerLine(id: string): Promise<void> {
+export async function voidLedgerLine(id: string, reason = "DM ledger correction."): Promise<void> {
   if (getSeat().role === "player") throw new Error("Only the DM can reverse a ledger line.");
-  await atomic(["purses", "holdings", "shops", "stock", "ledger"], async (tx) => {
-    const lines = await request<LedgerLine[]>(tx.objectStore("ledger").getAll());
-    const line = lines.find((item) => item.id === id);
-    if (!line) throw new Error("That line is not in this browser on this device.");
-    if (line.reversalOf || line.summary.startsWith("Voided"))
-      throw new Error("That line is already a void.");
-    // Legacy copies identify reversals in their summary; new copies also retain
-    // an explicit source ID. Check both while holding the write transaction.
-    if (lines.some((item) => item.reversalOf === id || item.summary.includes(`(void:${id})`)))
-      return;
-    if (
-      line.transactionType === "transfer" ||
-      line.transactionType === "loan" ||
-      /^(Finance:|Sold |Gave |Transfer (sent|received)|Approved a loan |Bought .* from the market)/.test(
-        line.summary,
-      )
-    )
-      throw new Error(
-        "This trade cannot be reversed safely from the ledger. Record a compensating payment or transfer and correct the holding instead.",
-      );
-    const purse = await request<Purse | undefined>(tx.objectStore("purses").get(line.purseId));
-    if (!purse) throw new Error("This account no longer exists.");
-    const bought = /^Bought (\d+) (.+?) from /.exec(line.summary);
-    let holding: Holding | undefined;
-    let shelf: StockLine | undefined;
-    const quantity = line.purchase?.quantity ?? (bought ? Number(bought[1]) : 0);
-    if (line.purchase || bought) {
-      if (!Number.isSafeInteger(quantity) || quantity < 1 || !line.shopId)
-        throw new Error(
-          "This purchase receipt is incomplete. Correct the assets with a compensating transaction.",
-        );
-      if (bought && Number(bought[1]) !== quantity)
-        throw new Error(
-          "This purchase receipt has conflicting quantities. Correct the assets with a compensating transaction.",
-        );
-      if (line.purchase) {
-        shelf = await request<StockLine | undefined>(
-          tx.objectStore("stock").get(line.purchase.stockId),
-        );
-        if (line.purchase.holding) {
-          holding = await request<Holding | undefined>(
-            tx.objectStore("holdings").get(line.purchase.holding.id),
-          );
-          const original = line.purchase.holding;
-          const keys = new Set([
-            ...Object.keys(holding ?? {}),
-            ...Object.keys(original),
-          ] as (keyof Holding)[]);
-          if (
-            !holding ||
-            holding.purseId !== purse.id ||
-            holding.kind !== "item" ||
-            holding.quantity !== quantity ||
-            [...keys].some((key) => holding![key] !== original[key])
-          )
-            throw new Error(
-              "The purchased items have changed or left this account. Correct the assets with a compensating transaction.",
-            );
-        } else if (!shelf || !isService(shelf))
-          throw new Error(
-            "This purchase is missing its item receipt. Correct the assets with a compensating transaction.",
-          );
-      } else {
-        const name = bought![2].toLowerCase();
-        const holdings = await request<Holding[]>(
-          tx.objectStore("holdings").index("purseId").getAll(purse.id),
-        );
-        const stock = await request<StockLine[]>(
-          tx.objectStore("stock").index("shopId").getAll(line.shopId),
-        );
-        const candidates = holdings.filter(
-          (item) => item.name.toLowerCase() === name && item.kind === "item",
-        );
-        const shelves = stock.filter((item) => item.name.toLowerCase() === name);
-        if (candidates.length !== 1 || shelves.length !== 1)
-          throw new Error(
-            "This older purchase has ambiguous item or stock records. Record a compensating payment and correct the exact holding instead.",
-          );
-        holding = candidates[0];
-        shelf = shelves[0];
-        const shop = await request<Shop | undefined>(tx.objectStore("shops").get(line.shopId));
-        // A sold purchase can leave only an older same-name lot. Without a
-        // source ID, all recorded valuation and item metadata must still agree.
-        if (
-          !shop ||
-          holding.unitCopper !== shelf.copper ||
-          holding.notes !== shelf.notes ||
-          (holding.category && holding.category !== stockCategory(shelf, normalizeShop(shop)))
-        )
-          throw new Error(
-            "This older purchase no longer matches the remaining item and stock records. Record a compensating payment and correct the exact holding instead.",
-          );
-        if (holding.quantity < quantity)
-          throw new Error(
-            "The purchased items are no longer in this account. Return them before reversing the purchase.",
-          );
-      }
-      if (
-        !shelf ||
-        shelf.shopId !== line.shopId ||
-        (bought && shelf.name.toLowerCase() !== bought[2].toLowerCase())
-      )
-        throw new Error(
-          "The original shop stock is missing or changed. Correct the assets with a compensating transaction.",
-        );
-      if (shelf.quantity !== null && !Number.isSafeInteger(shelf.quantity + quantity))
-        throw new Error("The returned stock quantity would be too large.");
-    }
-    const coins =
-      line.copper < 0 ? gain(purse.coins, -line.copper) : spendCoins(purse.coins, line.copper);
-    if (!coins) throw new Error("That account cannot cover reversing this line.");
-    tx.objectStore("purses").put({ ...purse, coins });
-    if (holding) {
-      const left = holding.quantity - quantity;
-      if (left > 0) tx.objectStore("holdings").put({ ...holding, quantity: left });
-      else tx.objectStore("holdings").delete(holding.id);
-    }
-    if (shelf && shelf.quantity !== null)
-      tx.objectStore("stock").put({
-        ...shelf,
-        quantity: shelf.quantity + quantity,
-      });
-    tx.objectStore("ledger").put({
-      ...logLine(
-        purse.id,
-        line.shopId,
-        `Voided ${line.summary} (void:${id})`,
-        -line.copper,
-        "void",
-      ),
-      reversalOf: id,
-    });
+  const table = await economySnapshot();
+  const line = table.ledger.find(entry => entry.id === id);
+  if (!line) throw new Error("That line is not in this browser on this device.");
+  await executeLocalCommand({
+    kind: "ledger-void", target: { kind: "ledger", id },
+    before: canonicalJson(line), reason,
   });
 }
 

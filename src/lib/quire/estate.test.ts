@@ -27,6 +27,9 @@ import {
 import { setSeat, DM_SEAT } from "./table.ts";
 import { toCopper } from "./money.ts";
 import { canonicalJson } from "./canonical-json.ts";
+import { tradeFixture } from "./test-fixtures/trade-economy.ts";
+import { exchangeQuoteKey } from "./trade-economy.ts";
+import { blankSheet } from "../characters/model.mjs";
 
 const dm: CloudSeat = { id: "dm", name: "DM", token: "dm", role: "dm", purseIds: [] };
 const hero: CloudSeat = {
@@ -568,6 +571,221 @@ test("manager supply orders use reviewed stock, budgets and non-carried shipment
   t = advance(t, 1);
   assert.equal(t.journal!.propertyOperations!.shipments[0].status, "delivered");
   assert.equal(t.holdings.filter((h) => h.custody?.kind === "property").length, 1);
+});
+
+function supplierMarket() {
+  const t = fixture(), market = tradeFixture();
+  t.realm = market.realm;
+  t.purses.push(structuredClone(market.purses.find((p) => p.id === "exchange-treasury")!));
+  t.journal!.tradeEconomy = structuredClone(market.journal!.tradeEconomy!);
+  t.journal!.tradeEconomy.exchanges[0].locationId = "city";
+  t.journal!.tradeEconomy.commodities[0].name = "Construction bundles";
+  t.shops[0].sellRate = 1.5;
+  t.stock[0].commodityId = "timber";
+  t.stock[0].tradeExchangeId = "harbor";
+  return command(t, {
+    kind: "estate-supplier", before: null,
+    supplier: { id: "supplier", propertyId: "warehouse", stockId: "stock",
+      materialKey: "timber", deliveryDays: 1, deliveryCopper: 10, weight: 2 },
+  });
+}
+const deliveryOrder = {
+  kind: "estate-delivery" as const, propertyId: "warehouse", purseId: "party",
+  stockId: "stock", quantity: 2, materialKey: "timber", deliveryDays: 1, deliveryCopper: 10,
+};
+function settleSupplierDays(t: CloudTable, days: number, advanceSeason = false) {
+  const planned = applyCommand(t, dm, { id: `supplier-season-${++receipt}`, kind: "downtime-plan",
+    name: "Supplier settlement", days, advanceSeason }, { source: "server", random: () => 50 });
+  return command(planned, { kind: "downtime-apply", downtimeId: planned.journal!.finance!.downtime.at(-1)!.id,
+    endSession: false });
+}
+function supplierManager(t = supplierMarket(), budgetCopper = 1000) {
+  t = manager(t);
+  const staff = t.journal!.propertyOperations!.staff[0];
+  return command(t, { kind: "estate-staff", before: staff, staff: { ...staff, budgetCopper } });
+}
+function standingSupply(t: CloudTable, budgetCopper = 310) {
+  return command(t, { kind: "estate-order", before: null,
+    order: { id: "supply-order", propertyId: "warehouse", managerId: "manager",
+      order: { kind: "supply", stockId: "stock", quantity: 2, materialKey: "timber",
+        deliveryDays: 1, deliveryCopper: 10 },
+      budgetCopper, periodDays: 30, nextDay: 1, active: true, receipt: "" } });
+}
+
+test("supplier purchases keep one canonical commodity lot and goods-only demand through arrival, backup and sale", () => {
+  const original = supplierMarket(), before = canonicalJson(original);
+  let t = command(original, deliveryOrder);
+  assert.equal(canonicalJson(original), before);
+  assert.equal(toCopper(t.purses.find((p) => p.id === "party")!.coins), 9690);
+  assert.equal(t.stock[0].quantity, 18);
+  const lot = t.holdings.find((h) => h.custody?.kind === "transit")!;
+  assert.equal(lot.commodityId, "timber");
+  assert.equal(lot.materialKey, "timber");
+  assert.equal(lot.weight, 2);
+  assert.equal(lot.unitCopper, 150);
+  assert.equal(lot.quantity, 2);
+  const receipt = t.journal!.tradeEconomy!.receipts[0];
+  assert.equal(receipt.copper, 300);
+  assert.equal(receipt.quantity, 2);
+  assert.equal(receipt.propertyId, "warehouse");
+  assert.equal(t.ledger.find((l) => l.id === receipt.id)!.copper, -310);
+  assert.deepEqual(t.ledger.find((l) => l.id === receipt.id)!.trade, { receiptId: receipt.id, leg: "owner" });
+  t = settleSupplierDays(t, 1);
+  const restored = readCloudTable(JSON.parse(JSON.stringify(t)));
+  assert.ok(restored, "complete delivered campaign remains loadable");
+  t = restored;
+  assert.equal(t.holdings.find((h) => h.id === lot.id)!.custody?.kind, "property");
+  assert.equal(t.holdings.find((h) => h.id === lot.id)!.quantity, 2);
+  assert.equal(t.journal!.propertyOperations!.shipments[0].status, "delivered");
+  assert.equal(t.journal!.tradeEconomy!.receipts.length, 1);
+  assert.equal(t.stock[0].quantity, 18);
+  const economy = t.journal!.tradeEconomy!;
+  t = command(t, { kind: "trade-sell", exchangeId: "harbor", commodityId: "timber",
+    holdingId: lot.id, quantity: 2, before: exchangeQuoteKey(economy, economy.exchanges[0], economy.commodities[0]) });
+  assert.equal(t.holdings.some((h) => h.id === lot.id), false);
+  assert.equal(toCopper(t.purses.find((p) => p.id === "party")!.coins), 9810);
+  assert.equal(toCopper(t.purses.find((p) => p.id === "exchange-treasury")!.coins), 49880);
+  assert.equal(t.journal!.tradeEconomy!.exchanges[0].offers[0].stock, 102);
+  assert.deepEqual(t.journal!.tradeEconomy!.receipts.map((r) => [r.direction, r.quantity]), [["buy", 2], ["sell", 2]]);
+});
+
+test("supplier identity uses reviewed material keys or explicit links, never names or an enabled-economy assumption", () => {
+  const unlinked = supplierMarket();
+  delete unlinked.stock[0].commodityId;
+  delete unlinked.stock[0].tradeExchangeId;
+  const identified = command(unlinked, deliveryOrder);
+  assert.equal(identified.holdings.find((h) => h.custody)?.commodityId, "timber");
+  assert.equal(identified.journal!.tradeEconomy!.receipts.length, 0, "material identity alone does not invent exchange activity");
+  const disabled = supplierMarket();
+  disabled.journal!.tradeEconomy!.settings.enabled = false;
+  const inactive = command(disabled, deliveryOrder);
+  assert.equal(inactive.holdings.find((h) => h.custody)?.commodityId, "timber");
+  assert.equal(inactive.journal!.tradeEconomy!.receipts.length, 0);
+  const named = structuredClone(unlinked);
+  delete named.journal!.tradeEconomy!.commodities[0].materialKey;
+  named.journal!.tradeEconomy!.commodities[0].name = named.stock[0].name;
+  const ordinary = command(named, deliveryOrder);
+  assert.equal(ordinary.holdings.find((h) => h.custody)?.commodityId, undefined);
+});
+
+test("supplier identity conflicts, funds, stock and player delivery terms reject without partial assets or demand", () => {
+  for (const scenario of ["identity", "unit", "funds", "stock", "player"] as const) {
+    const t = supplierMarket();
+    if (scenario === "identity") {
+      t.journal!.tradeEconomy!.commodities.push({ ...t.journal!.tradeEconomy!.commodities[0], id: "other-bundles", materialKey: undefined });
+      t.stock[0].commodityId = "other-bundles";
+    }
+    if (scenario === "unit") {
+      delete t.journal!.tradeEconomy!.commodities[0].materialKey;
+      t.journal!.tradeEconomy!.commodities[0].unit = "crate";
+    }
+    if (scenario === "funds") t.purses[0].coins.cp = 309;
+    if (scenario === "stock") t.stock[0].quantity = 1;
+    const before = canonicalJson(t);
+    assert.throws(() => command(t, deliveryOrder, scenario === "player" ? hero : dm),
+      scenario === "identity" || scenario === "unit" ? /conflicts/ : scenario === "funds" ? /funds|enough/i : scenario === "stock" ? /quantity/ : /assigned|Only the DM/);
+    assert.equal(canonicalJson(t), before, scenario);
+  }
+});
+
+test("supplier pricing applies the actual shop rate and black-market premium before one Charisma discount", () => {
+  let t = supplierMarket();
+  t.shops[0].blackMarket = true;
+  t.shops[0].blackMarketPremium = 2;
+  const sheet = blankSheet();
+  sheet.scores.cha = 20;
+  t.purses.find((p) => p.id === "hero")!.sheet = sheet;
+  assert.throws(() => command(t, { ...deliveryOrder, purseId: "hero" }), /open shop/);
+  t = command(t, { kind: "black-market", before: false, active: true });
+  t = command(t, { ...deliveryOrder, purseId: "hero" });
+  assert.equal(toCopper(t.purses.find((p) => p.id === "hero")!.coins), 450, "2 × (100 × 1.5 × 2 × 90%) + 10 delivery");
+  assert.equal(t.holdings.find((h) => h.custody)!.unitCopper, 270);
+  assert.equal(t.journal!.tradeEconomy!.receipts[0].copper, 540);
+});
+
+test("standing supplier orders budget the full configured price and enter the same seasonal proposal once", () => {
+  let t = standingSupply(supplierManager());
+  const planned = applyCommand(t, dm, { id: `supplier-season-${++receipt}`, kind: "downtime-plan",
+    name: "Supply and season", days: 1, advanceSeason: true }, { source: "server", random: () => 50 });
+  const pending = planned.journal!.finance!.downtime.at(-1)!;
+  assert.deepEqual(pending.quote.tradeSeason!.feedback, [{ exchangeId: "harbor", commodityId: "timber", bought: 2, sold: 0 }]);
+  assert.equal(t.stock[0].quantity, 20, "preview leaves live inventory untouched");
+  t = command(planned, { kind: "downtime-apply", downtimeId: pending.id, endSession: false });
+  assert.equal(t.journal!.propertyOperations!.staff[0].budgetSpentCopper, 310);
+  assert.equal(toCopper(t.purses[0].coins), 9680, "purchase plus one wage payment");
+  const tradeReceipt = t.journal!.tradeEconomy!.receipts[0];
+  const line = t.ledger.find((l) => l.trade?.receiptId === tradeReceipt.id)!;
+  assert.ok(line.id !== tradeReceipt.id, "finance remaps the ledger id without rewriting the market receipt");
+  assert.equal(line.copper, -310);
+  assert.equal(tradeReceipt.copper, 300);
+  assert.equal(t.journal!.tradeEconomy!.epoch, 1);
+  t = settleSupplierDays(t, 1, true);
+  assert.equal(t.journal!.propertyOperations!.shipments[0].status, "delivered");
+  assert.equal(t.journal!.tradeEconomy!.receipts.length, 1);
+  assert.deepEqual(t.journal!.tradeEconomy!.history[1].quote.feedback, [{ exchangeId: "harbor", commodityId: "timber", bought: 0, sold: 0 }]);
+  assert.ok(readCloudTable(t));
+});
+
+test("manager supplier failures retain stock, goods and demand while recording the blocked order and wages", () => {
+  for (const scenario of ["order-budget", "manager-budget", "funds", "stock", "identity"] as const) {
+    let t = standingSupply(supplierManager(undefined, scenario === "manager-budget" ? 300 : 1000), scenario === "order-budget" ? 300 : 310);
+    if (scenario === "funds") t.purses[0].coins.cp = 310;
+    if (scenario === "stock") t.stock[0].quantity = 1;
+    if (scenario === "identity") {
+      delete t.journal!.tradeEconomy!.commodities[0].materialKey;
+      t.journal!.tradeEconomy!.commodities[0].unit = "crate";
+    }
+    const beforeStock = t.stock[0].quantity, beforeMoney = toCopper(t.purses[0].coins);
+    t = settleSupplierDays(t, 1);
+    assert.match(t.journal!.propertyOperations!.standingOrders[0].receipt, /budget|funds|enough|quantity|conflicts/i, scenario);
+    assert.equal(toCopper(t.purses[0].coins), beforeMoney - 10, scenario);
+    assert.equal(t.stock[0].quantity, beforeStock, scenario);
+    assert.equal(t.holdings.some((h) => h.custody), false, scenario);
+    assert.equal(t.journal!.propertyOperations!.shipments.length, 0, scenario);
+    assert.equal(t.journal!.propertyOperations!.staff[0].budgetSpentCopper, 0, scenario);
+    assert.equal(t.journal!.tradeEconomy!.receipts.length, 0, scenario);
+  }
+});
+
+test("postal supplier purchases retain the reviewed cost, one postage payment and one demand receipt", () => {
+  let t = supplierManager();
+  t = command(t, { kind: "estate-letter", propertyId: "warehouse", senderId: "hero", managerId: "manager",
+    budgetCopper: 310, order: { kind: "supply", stockId: "stock", quantity: 2, materialKey: "timber",
+      deliveryDays: 1, deliveryCopper: 10 } }, hero);
+  t = command(t, { kind: "party-location", before: "area", locationId: "far" });
+  t = settleSupplierDays(t, 2);
+  assert.equal(toCopper(t.purses.find((p) => p.id === "hero")!.coins), 990);
+  assert.equal(toCopper(t.purses[0].coins), 9670, "two wages and the purchase");
+  assert.equal(t.journal!.propertyOperations!.letters[0].status, "delivered");
+  assert.equal(t.journal!.propertyOperations!.staff[0].budgetSpentCopper, 310);
+  assert.equal(t.journal!.tradeEconomy!.receipts[0].copper, 300);
+  t = settleSupplierDays(t, 1);
+  assert.equal(t.journal!.propertyOperations!.shipments[0].status, "delivered");
+  assert.equal(t.journal!.tradeEconomy!.receipts.length, 1);
+  assert.equal(t.stock[0].quantity, 18);
+  assert.equal(t.holdings.filter((h) => h.custody).length, 1);
+});
+
+test("blocked arrival and an approved retry move the existing goods without charging or recording demand again", () => {
+  let t = supplierMarket();
+  t.journal!.propertyOperations!.sites[0].capacityWeight = 3;
+  t = command(t, deliveryOrder);
+  const lotId = t.holdings.find((h) => h.custody)!.id;
+  t = settleSupplierDays(t, 1);
+  assert.equal(t.journal!.propertyOperations!.shipments[0].status, "blocked");
+  t = readCloudTable(JSON.parse(JSON.stringify(t)))!;
+  assert.ok(t);
+  const site = t.journal!.propertyOperations!.sites[0];
+  t = command(t, { kind: "estate-site", before: site, site: { ...site, capacityWeight: 4 } });
+  t = command(t, { kind: "estate-shipment", shipmentId: t.journal!.propertyOperations!.shipments[0].id,
+    action: "retry", override: false });
+  t = settleSupplierDays(t, 1);
+  assert.equal(t.journal!.propertyOperations!.shipments[0].status, "delivered");
+  assert.equal(t.holdings.find((h) => h.id === lotId)!.custody?.kind, "property");
+  assert.equal(t.holdings.find((h) => h.id === lotId)!.quantity, 2);
+  assert.equal(toCopper(t.purses[0].coins), 9690);
+  assert.equal(t.stock[0].quantity, 18);
+  assert.equal(t.journal!.tradeEconomy!.receipts.length, 1);
 });
 test("unreviewed remote delivery terms and wage arrears block manager execution", () => {
   let t = manager(fixture());

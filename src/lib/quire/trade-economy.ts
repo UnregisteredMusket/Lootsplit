@@ -6,6 +6,7 @@ import { clampRealm, pressureFor, scalePrice, SEASON_NAMES } from "./scale.ts";
 import { locationPath, readMarketLocations } from "./shop-locations.ts";
 import { canAccessEstate, physicallyHere, storageWeight } from "./estate.ts";
 import { readEstate } from "./estate-schema.ts";
+import { readTradeSettlementHolding } from "./ledger-reversal.ts";
 import {
   readTradeEconomy,
   tradeEconomySchema,
@@ -15,6 +16,7 @@ import {
   type TradeCommand,
   type TradeEconomy,
   type TradeExecution,
+  type TradeReceipt,
   type TradeSeasonQuote,
 } from "./trade-economy-schema.ts";
 
@@ -77,6 +79,23 @@ export function validateTradeEconomy(
     economy.history.map((h) => h.id),
     "seasonal settlement",
   );
+  unique(economy.receipts.flatMap(r => r.reversalOf ? [r.reversalOf] : []), "trade correction source");
+  for (const receipt of economy.receipts) {
+    if (receipt.settlement) {
+      if (receipt.origin === "shop" || receipt.settlement.treasuryPurseId === receipt.purseId)
+        throw Error("An exchange settlement needs a separate treasury and exchange origin.");
+      readTradeSettlementHolding(receipt);
+    }
+    if (!!receipt.reversalOf !== !!receipt.reversalReason)
+      throw Error("A market reversal must identify its original receipt and reason.");
+    if (receipt.reversalOf) {
+      const original = economy.receipts.find(r => r.id === receipt.reversalOf);
+      if (!original || original.reversalOf || receipt.direction === original.direction || receipt.epoch < original.epoch ||
+        (["exchangeId", "commodityId", "name", "unit", "purseId", "quantity", "copper", "origin", "propertyId", "operationId"] as const)
+          .some(key => receipt[key] !== original[key]))
+        throw Error("A market reversal must preserve the original trade and reverse its direction.");
+    }
+  }
   const materials = readEstate(table.journal.propertyOperations).materials;
   unique(
     economy.commodities.flatMap((c) => (c.materialKey ? [c.materialKey] : [])),
@@ -398,6 +417,7 @@ export type ExchangeTransaction = {
   holdingId?: string;
   propertyId?: string;
   overrideLocation?: boolean;
+  operationId?: string;
 };
 /** Shared command and manager simulation use the same canonical goods and coin movement. */
 export function executeExchange(
@@ -408,6 +428,8 @@ export function executeExchange(
   manager?: { locationId: string | null },
 ) {
   const economy = readTradeEconomy(table.journal?.tradeEconomy);
+  if (economy.receipts.some(receipt => receipt.id === input.id))
+    throw Error("This exchange transaction already has a market receipt.");
   const exchange = economy.exchanges.find((e) => e.id === input.exchangeId);
   const commodity = economy.commodities.find((c) => c.id === input.commodityId);
   const offer = exchange?.offers.find((o) => o.commodityId === input.commodityId);
@@ -497,6 +519,15 @@ export function executeExchange(
       throw Error("The exchange treasury cannot afford this purchase.");
     money(toCopper(payer.coins) + total);
   }
+  const settlement = {
+    version: 1 as const,
+    treasuryPurseId: treasury.id,
+    holding: canonicalJson(holding!),
+    ...(holding?.custody?.kind === "property" ? {
+      storageOwnerId: table.holdings.find(h => h.id === holding!.custody!.propertyId)!.purseId,
+    } : {}),
+  };
+  const firstLedger = table.ledger.length;
   const summary =
     `${exchange.name}: ${input.direction === "buy" ? "bought" : "sold"} ${input.quantity} ${commodity.unit} of ${commodity.name}`.slice(
       0,
@@ -520,6 +551,8 @@ export function executeExchange(
     at,
     "transfer",
   );
+  for (const line of table.ledger.slice(firstLedger))
+    line.trade = { receiptId: input.id, leg: line.purseId === payer.id ? "owner" : "treasury" };
   if (input.direction === "buy") {
     offer.stock -= input.quantity;
     table.holdings.push(holding!);
@@ -542,6 +575,8 @@ export function executeExchange(
     quantity: input.quantity,
     copper: total,
     origin: manager ? "manager" : "exchange",
+    settlement,
+    ...(input.operationId ? { operationId: input.operationId } : {}),
     ...(input.propertyId || holding?.custody?.propertyId
       ? { propertyId: input.propertyId ?? holding!.custody!.propertyId }
       : {}),
@@ -560,13 +595,17 @@ export function recordShopTrade(
     direction: "buy" | "sell";
     quantity: number;
     copper: number;
+    propertyId?: string;
+    operationId?: string;
   },
-) {
+): TradeReceipt | undefined {
   const economy = table.journal?.tradeEconomy;
   const stock = table.stock.find((s) => s.id === input.stockId);
   const commodity = economy?.commodities.find((c) => c.id === stock?.commodityId);
   if (!economy?.settings.enabled || !stock?.tradeExchangeId || !commodity) return;
-  economy.receipts.push({
+  if (economy.receipts.some(receipt => receipt.id === input.id))
+    throw Error("This shop transaction already has a market receipt.");
+  const receipt: TradeReceipt = {
     id: input.id,
     at: input.at,
     epoch: economy.epoch,
@@ -579,7 +618,11 @@ export function recordShopTrade(
     quantity: input.quantity,
     copper: input.copper,
     origin: "shop",
-  });
+    ...(input.propertyId ? { propertyId: input.propertyId } : {}),
+    ...(input.operationId ? { operationId: input.operationId } : {}),
+  };
+  economy.receipts.push(receipt);
+  return receipt;
 }
 
 export function applyTradeCommand(
