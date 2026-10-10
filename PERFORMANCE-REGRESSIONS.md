@@ -189,7 +189,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | mobile client build | open | 2 | 4.224s → 9.632s | +5.408s | +128.03% |
 | Development / gameplay / dev-control-panel | open | 3 | 14s → 29s | +15s | +107.14% |
 | Development / desktop | open | 2 | 168s → 690s | +522s | +310.71% |
-| Packaged Worker / interface / worker-library-navigation | open | 5 | 9s → 27s | +18s | +200% |
+| Packaged Worker / interface / worker-library-navigation | open | 6 | 9s → 34s | +25s | +277.78% |
 | Development / gameplay / Run npm ci | open | 2 | 13s → 19s | +6s | +46.15% |
 | Packaged Worker / interface / Start disposable built Worker | open | 2 | 7s → 11s | +4s | +57.14% |
 | Development / accounts / Run npm ci | open | 2 | 14s → 23s | +9s | +64.29% |
@@ -224,16 +224,21 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Development / governance / dev-sound | open | 2 | 8s → 35s | +27s | +337.5% |
 | property-browser-audit | open | 2 | 32.709s → 99.355s | +66.646s | +203.75% |
 | world features browser audit | open | 2 | 34.352s → 53.675s | +19.323s | +56.25% |
-| Packaged Worker / interface / worker-world-features | open | 4 | 14s → 65s | +51s | +364.29% |
+| Packaged Worker / interface / worker-world-features | open | 5 | 14s → 85s | +71s | +507.14% |
 | Development / gameplay / dev-world-features | open | 3 | 16s → 106s | +90s | +562.5% |
 | Packaged Worker / interface / worker-world-features | open | 3 | 13s → 88s | +75s | +576.92% |
 | Development / gameplay / dev-world-features | open | 3 | 17s → 86s | +69s | +405.88% |
+| Development / gameplay / dev-trade-economy | open | 2 | 33s → 74s | +41s | +124.24% |
 | Packaged Worker / interface / worker-trade-economy | open | 2 | 22s → 39s | +17s | +77.27% |
 
 ## Recorded slowdowns
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-10T12:56:18Z | step: Packaged Worker / interface / worker-library-navigation | 27s → 34s | +7s | +25.93% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38033323180/job/114158824650) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38053268126/job/114216749462) |
+| 2026-10-10T12:54:54Z | step: Packaged Worker / interface / worker-world-features | 65s → 85s | +20s | +30.77% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38040488796/job/114179904416) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38053268126/job/114216749462) |
+| 2026-10-10T12:54:07Z | step: Development / gameplay / dev-trade-economy | 63s → 74s | +11s | +17.46% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38022072870/job/114125018776) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38053268126/job/114216533406) |
+| 2026-10-10T12:53:29Z | step: Packaged Worker / interface / worker-trade-economy | 39s → 57s | +18s | +46.15% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37962980314/job/113931411988) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38053268126/job/114216749462) |
 | 2026-10-10T12:15:08Z | step: Packaged Worker / interface / worker-library-navigation | 29s → 35s | +6s | +20.69% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38041114058/job/114181642328) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38050722056/job/114209459920) |
 | 2026-10-10T12:13:40Z | step: Packaged Worker / interface / worker-world-features | 65s → 88s | +23s | +35.38% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38041114058/job/114181642328) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38050722056/job/114209459920) |
 | 2026-10-10T12:11:03Z | step: Packaged Worker / accounts / worker-finance | 24s → 29s | +5s | +20.83% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37763435596/job/113265768760) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38050722056/job/114209459946) |
