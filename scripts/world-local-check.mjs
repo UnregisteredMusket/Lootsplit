@@ -6,9 +6,11 @@ import { tmpdir } from "node:os";
 import { resolve, join, dirname } from "node:path";
 import { createServer } from "node:net";
 const root = process.cwd(),
+  auditName = process.argv[2] || "world-features",
   snapshot = await mkdtemp(join(tmpdir(), "lootsplit-world-")),
-  output = resolve("test-results/world-local"),
+  output = resolve(`test-results/${auditName}-local`),
   children = [];
+if (!["world-features", "resource-packs"].includes(auditName)) throw Error("Choose world-features or resource-packs.");
 await mkdir(output, { recursive: true });
 const stop = () => {
   for (const c of children)
@@ -84,7 +86,7 @@ try {
   }
   if (!ready) throw Error("Disposable server did not become ready");
   const started = Date.now(),
-    audit = spawn(process.execPath, ["scripts/world-features-browser-audit.mjs"], {
+    audit = spawn(process.execPath, [`scripts/${auditName}-browser-audit.mjs`], {
       cwd: snapshot,
       env: { ...process.env, AUDIT_ORIGIN: origin },
       detached: true,
@@ -92,7 +94,7 @@ try {
     });
   children.push(audit);
   const [code] = await once(audit, "exit");
-  await cp(join(snapshot, "test-results/world-features"), join(output, "browser"), {
+  await cp(join(snapshot, `test-results/${auditName}`), join(output, "browser"), {
     recursive: true,
   });
   await writeFile(

@@ -1,4 +1,5 @@
 import { worldCommands, type WorldCommand } from "./world-schema.ts";
+import { resourcePackSchema, resourceFingerprint, previewResourcePack } from "./resource-packs.ts";
 import { tradeCommands, type TradeCommand, type TradeExecution } from "./trade-economy-schema.ts";
 import { applyTradeCommand, prepareTradeSeason, recordShopTrade, validateTradeEconomy } from "./trade-economy.ts";
 import { applyWorldCommand, validateWorld, shopVisible, shopAsking } from "./world.ts";
@@ -53,6 +54,7 @@ export const commandSchema = z.discriminatedUnion("kind", [
   ...worldCommands,
   ...estateCommands,
   estateImportCommand,
+  z.object({ ...base, kind: z.literal("resource-pack-import"), before: z.string().max(30000), pack: resourcePackSchema }).strict(),
   z.object({ ...base, kind: z.literal("listing-edit"), listingId: id, before: listingSchema.nullable(), after: listingSchema.nullable() }),
   z.object({ ...base, kind: z.literal("property-profile"), holdingId: id,
     before: z.object({ locationId: id.nullable(), property: propertyProfileSchema.nullable() }),
@@ -328,6 +330,16 @@ export function applyCommand(input: CloudTable, seat: CloudSeat, raw: Command, e
     if (cmd.locationId) h.locationId = cmd.locationId; else delete h.locationId;
     if (cmd.property) h.property = cmd.property; else delete h.property;
     event(`Property location and features saved: ${h.name}`, "management", h.purseId);
+  } else if (cmd.kind === "resource-pack-import") {
+    dm();
+    if (resourceFingerprint(journal.resourceLibrary) !== cmd.before)
+      throw Error("Resource packs changed elsewhere. Review a fresh preview.");
+    const plan = previewResourcePack(journal.resourceLibrary, cmd.pack);
+    if (plan.status === "Import") {
+      journal.resourceLibrary = { packs: [...(journal.resourceLibrary?.packs ?? []), plan.pack] };
+      event(`Resource pack imported: ${plan.pack.title}`);
+      journal.events[journal.events.length - 1].dmOnly = true;
+    }
   } else if (cmd.kind === "market-name-import") {
     dm();
     const market = readMarketLocations(journal.market);

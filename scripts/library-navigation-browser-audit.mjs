@@ -233,3 +233,4 @@ try {
 } finally {
   await browser.close();
 }
+await import("./resource-packs-browser-audit.mjs");

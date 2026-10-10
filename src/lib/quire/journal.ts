@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { resourceLibrarySchema } from "./resource-packs.ts";
 import { worldSchema } from "./world-schema.ts";
 import { validateWorld } from "./world.ts";
 import { estateSchema } from "./estate-schema.ts";
@@ -25,6 +26,7 @@ export const encounterLootProvenanceSchema = z.object({
 export type EncounterLootProvenance = z.infer<typeof encounterLootProvenanceSchema>;
 export const encounterLootEntryId = (receiptId: string) => `encounter-loot:${receiptId}`;
 const journalFields = z.object({
+  resourceLibrary: resourceLibrarySchema.optional(),
   tradeEconomy: tradeEconomySchema.optional(),
   world: worldSchema.optional(),
   propertyOperations: estateSchema.optional(),
@@ -214,6 +216,7 @@ export function sessionSummary(
 /** Older clients omit optional change metadata. Preserve it during their journal patches. */
 export function preserveJournalMetadata(value: unknown, current: Journal): Journal {
   const next = readJournal(value);
+  delete next.resourceLibrary;
   const reports = new Map((current.reports || []).map(report => [report.id, report]));
   for (const report of next.reports || []) {
     // An archive is immutable. Hydrated error placeholders and stale client copies must
@@ -243,6 +246,7 @@ export function preserveJournalMetadata(value: unknown, current: Journal): Journ
     ...(next.market ? {} : current.market ? { market: current.market } : {}),
     ...(next.propertyOperations ? {} : current.propertyOperations ? { propertyOperations: current.propertyOperations } : {}),
     ...(current.tradeEconomy ? { tradeEconomy: current.tradeEconomy } : {}),
+    ...(current.resourceLibrary ? { resourceLibrary: current.resourceLibrary } : {}),
     ...(current.reports || next.reports
       ? {
           reports: [...reports.values()],

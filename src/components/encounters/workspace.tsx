@@ -1,5 +1,6 @@
 import { playSound } from "@/lib/quire/sound";
 import { ImportStatblock } from "./import-statblock";
+import { ResourceCreatures } from "./resource-creatures";
 import { usePrefs } from "@/lib/quire/prefs";
 import { encounterRequest } from "@/lib/encounters/client";
 import { localEncounterRequest } from "@/lib/encounters/local";
@@ -939,7 +940,10 @@ function EncounterEditor({
                 {summaryEntry && (
                   <p>
                     This receipt already has a journal summary. Check sync status for any pending
-                    save. <AppLink href={journalEntryHref(summaryEntry.id)}>Open campaign journal</AppLink>
+                    save.{" "}
+                    <AppLink href={journalEntryHref(summaryEntry.id)}>
+                      Open campaign journal
+                    </AppLink>
                   </p>
                 )}
               </details>
@@ -1371,6 +1375,7 @@ function EncounterEditor({
               <label>
                 Generation target
                 <select
+                  aria-label="Generation target"
                   value={filters.mode}
                   onChange={(e) =>
                     setFilters({
@@ -1388,6 +1393,7 @@ function EncounterEditor({
                   <label>
                     Enemy CR
                     <select
+                      aria-label="Enemy CR"
                       value={filters.cr}
                       onChange={(e) => setFilters({ ...filters, cr: n(e.target.value) })}
                     >
@@ -1431,6 +1437,26 @@ function EncounterEditor({
                 />
               </label>
             </div>
+            {currentContext && (
+              <ResourceCreatures
+                library={journal.resourceLibrary}
+                disabled={review || busy}
+                filters={{
+                  ...filters,
+                  partySize: draft.partySize,
+                  level: draft.level,
+                  difficulty: draft.difficulty,
+                }}
+                onAdd={(creatures) => {
+                  if (draft.combatants.length + creatures.length > 100)
+                    throw Error("An encounter can contain up to 100 combatants.");
+                  change({ ...draft, combatants: [...draft.combatants, ...creatures] });
+                  setNotice(
+                    `Added ${creatures.length} imported enemies. Review their notes and estimated difficulty.`,
+                  );
+                }}
+              />
+            )}
             <ImportStatblock
               disabled={review || busy}
               onImport={(creature) => {

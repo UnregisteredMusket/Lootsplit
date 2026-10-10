@@ -1,4 +1,5 @@
 import { AppLink } from "@/components/app-link";
+import { ResourcePacks } from "@/components/resource-packs";
 import { FantasyIcon } from "@/components/fantasy-icon";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { Search } from "lucide-react";
@@ -46,6 +47,12 @@ function LibraryHub() {
             icon: "Books",
             url: "/books",
             note: "Private PDF library",
+          },
+          {
+            name: "Resource packs",
+            icon: "Books",
+            url: "/library#resource-packs",
+            note: "Reviewed JSON imports",
           },
         ]
       : []),
@@ -143,6 +150,7 @@ function LibraryHub() {
           </p>
         )}
       </section>
+      {dm && <ResourcePacks />}
       <Link to="/resources" className="settings-link mt-5">
         Sources & licenses →
       </Link>
