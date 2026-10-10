@@ -33,9 +33,10 @@ const TradeEconomyPanel = lazy(() =>
   import("@/components/trade-economy").then((m) => ({ default: m.TradeEconomyPanel })),
 );
 export const Route = createFileRoute("/features/$feature")({
-  validateSearch: (s: Record<string, unknown>) => ({
+  validateSearch: (s: Record<string, unknown>): { from: string; code: string | undefined; npc?: string } => ({
     from: safeReturn(s.from),
     code: typeof s.code === "string" ? s.code.slice(0, 24) : undefined,
+    npc: typeof s.npc === "string" ? s.npc.slice(0, 150) : undefined,
   }),
   component: FeaturePage,
 });

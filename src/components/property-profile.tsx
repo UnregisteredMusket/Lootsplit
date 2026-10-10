@@ -1,3 +1,4 @@
+import { SearchSelect } from "@/components/search-select";
 import { useState } from "react";
 import { propertyDraft, readPropertyDraft, type PropertyDraft } from "@/lib/quire/property-draft";
 import { useEconomy } from "@/lib/quire/economy-context";
@@ -13,7 +14,7 @@ import {
 import type { Holding } from "@/lib/quire/types";
 import { LocationOptions } from "./market-locations";
 import { MarketImageUpload } from "./market-image-upload";
-import { Button, Field, Select, TextInput } from "./ui";
+import { Button, Field, TextInput } from "./ui";
 
 export function PropertyProfileFields({
   draft,
@@ -39,22 +40,22 @@ export function PropertyProfileFields({
         label="Property location"
         hint="Uses the same regions, settlements and areas as shops."
       >
-        <Select
+        <SearchSelect
           aria-label="Property location"
           value={locationId}
-          onChange={(event) => onLocationChange(event.target.value)}
+          onValueChange={(selectedValue) => onLocationChange(selectedValue)}
         >
           <option value="">Campaignwide</option>
-          <LocationOptions market={market} />
-        </Select>
+          {LocationOptions({ market: market })}
+        </SearchSelect>
       </Field>
       <div className="property-form-grid">
         <Field label="Property type">
-          <Select
+          <SearchSelect
             aria-label="Property type"
             value={draft.type}
-            onChange={(event) =>
-              onChange({ ...draft, type: event.target.value as PropertyDraft["type"] })
+            onValueChange={(selectedValue) =>
+              onChange({ ...draft, type: selectedValue as PropertyDraft["type"] })
             }
           >
             {Object.entries(PROPERTY_TYPES).map(([value, label]) => (
@@ -62,14 +63,14 @@ export function PropertyProfileFields({
                 {label}
               </option>
             ))}
-          </Select>
+          </SearchSelect>
         </Field>
         <Field label="Property condition">
-          <Select
+          <SearchSelect
             aria-label="Property condition"
             value={draft.condition}
-            onChange={(event) =>
-              onChange({ ...draft, condition: event.target.value as PropertyDraft["condition"] })
+            onValueChange={(selectedValue) =>
+              onChange({ ...draft, condition: selectedValue as PropertyDraft["condition"] })
             }
           >
             <option value="">Not specified</option>
@@ -78,7 +79,7 @@ export function PropertyProfileFields({
                 {label}
               </option>
             ))}
-          </Select>
+          </SearchSelect>
         </Field>
         <Field label="Rooms">
           <TextInput

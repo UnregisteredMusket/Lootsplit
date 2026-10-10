@@ -1,3 +1,4 @@
+import { SearchSelect } from "@/components/search-select";
 import { useEffect, useState } from "react";
 import { Building2, MapPin, ScrollText, Search, Scale, KeyRound } from "lucide-react";
 import { useEconomy } from "@/lib/quire/economy-context";
@@ -197,15 +198,15 @@ export function PropertyMarketplace() {
         </label>
         <div className="property-filter-grid">
           <Field label="Listing location">
-            <Select
+            <SearchSelect
               aria-label="Listing location"
               value={location}
-              onChange={(event) => setLocation(event.target.value)}
+              onValueChange={(selectedValue) => setLocation(selectedValue)}
             >
               <option value="">All locations</option>
               <option value="campaignwide">Campaignwide</option>
-              <LocationOptions market={market} />
-            </Select>
+              {LocationOptions({ market: market })}
+            </SearchSelect>
           </Field>
           <Field label="Listing property type">
             <Select
@@ -275,10 +276,10 @@ export function PropertyMarketplace() {
               </Select>
             </Field>
             <Field label="Property buyer">
-              <Select
+              <SearchSelect
                 aria-label="Property buyer"
                 value={buyer}
-                onChange={(event) => setBuyer(event.target.value)}
+                onValueChange={(selectedValue) => setBuyer(selectedValue)}
                 disabled={!mine.length}
               >
                 <option value="" disabled>
@@ -289,7 +290,7 @@ export function PropertyMarketplace() {
                     {purse.name}
                   </option>
                 ))}
-              </Select>
+              </SearchSelect>
             </Field>
           </div>
           <div className="property-filter-checks">
@@ -638,12 +639,12 @@ function PropertyViewing({
           {review ? "Review your purchase" : "Acquire this property"}
         </h3>
         <Field label="Pay for property from">
-          <Select
+          <SearchSelect
             aria-label="Pay for property from"
             disabled={busy || locked}
             value={buyer}
-            onChange={(event) => {
-              setBuyer(event.target.value);
+            onValueChange={(selectedValue) => {
+              setBuyer(selectedValue);
               setReview(null);
             }}
           >
@@ -653,7 +654,7 @@ function PropertyViewing({
                 {p.name}
               </option>
             ))}
-          </Select>
+          </SearchSelect>
         </Field>
         {listing.quantity !== 1 && (
           <Field label="Property purchase quantity">
@@ -893,7 +894,7 @@ function PropertyListingEditor({
           onChange={(event) => setNotes(event.target.value)}
         />
       </Field>
-      <Field label="Property operations template"><Select value={estateTemplateKey} onChange={e => setEstateTemplateKey(e.target.value)}><option value="">No operations template</option>{journal.propertyOperations?.templates.map(t => <option key={t.key} value={t.key}>{t.name}</option>)}</Select></Field>
+      <Field label="Property operations template"><SearchSelect value={estateTemplateKey} onValueChange={(selectedValue) => setEstateTemplateKey(selectedValue)}><option value="">No operations template</option>{journal.propertyOperations?.templates.map(t => <option key={t.key} value={t.key}>{t.name}</option>)}</SearchSelect></Field>
       <PropertyProfileFields
         draft={draft}
         onChange={setDraft}

@@ -1,4 +1,7 @@
-import { useState } from "react";
+import { SearchSelect } from "@/components/search-select";
+import { useEffect, useState } from "react";
+import { useRouterState } from "@tanstack/react-router";
+import { libraryRecordHref } from "@/lib/quire/library-records";
 import { useSeat } from "@/lib/quire/seat";
 import { readWorld, npcImportSchema, type Npc } from "@/lib/quire/world-schema";
 import { npcAvailableHere, npcController, worldImportFingerprint } from "@/lib/quire/world";
@@ -25,6 +28,11 @@ export function LocationNpcs() {
     [importError, setImportError] = useState("");
   const npcs = world.npcs.filter((n) => dm || npcAvailableHere(n, t)),
     npc = npcs.find((n) => n.id === selected);
+  const requestedNpc = useRouterState({ select: (s) => s.location.search.npc });
+  useEffect(() => {
+    setSelected(typeof requestedNpc === "string" ? requestedNpc : "");
+  }, [requestedNpc]);
+  const [query, setQuery] = useState("");
   let imported: ReturnType<typeof npcImportSchema.parse> | undefined;
   try {
     if (importText) imported = npcImportSchema.parse(JSON.parse(importText));
@@ -112,24 +120,52 @@ export function LocationNpcs() {
           </Fold>
         </>
       )}
-      {npcs.map((n) => (
-        <article className="world-card" key={n.id}>
-          <div className="world-row">
-            {n.portrait && <img width={64} height={64} src={n.portrait} alt={n.name} />}
-            <span>
-              <h2>{n.name}</h2>
-              <p>
-                {locationLabel(market, n.locationId)} ·{" "}
-                {npcAvailableHere(n, t) ? "Nearby" : "Away / hidden"} ·{" "}
-                {n.barterAllowed ? "Bartering allowed" : "No bartering"}
-              </p>
-            </span>
-            <Button onClick={() => setSelected(n.id)}>View & interact</Button>
-            {dm && <Button onClick={() => setEdit(n)}>Configure NPC</Button>}
-          </div>
-          <p>{n.description}</p>
-        </article>
-      ))}
+      <label className="block mt-3">
+        Find an NPC
+        <SearchSelect aria-label="Find an NPC" value={selected} onValueChange={setSelected}>
+          <option value="">Choose an NPC</option>
+          {npcs.map((n) => (
+            <option key={n.id} value={n.id}>
+              {n.name} · {locationLabel(market, n.locationId)}
+            </option>
+          ))}
+        </SearchSelect>
+      </label>
+      <label className="block mt-3">
+        Search NPC records
+        <input
+          className="ledger-search w-full"
+          aria-label="Search NPC records"
+          value={query}
+          onChange={(e) => setQuery(e.target.value)}
+        />
+      </label>
+      {npcs
+        .filter((n) =>
+          `${n.name} ${n.description} ${locationLabel(market, n.locationId)}`
+            .toLocaleLowerCase()
+            .includes(query.toLocaleLowerCase()),
+        )
+        .map((n) => (
+          <article className="world-card" key={n.id}>
+            <div className="world-row">
+              {n.portrait && <img width={64} height={64} src={n.portrait} alt={n.name} />}
+              <span>
+                <h2>
+                  <AppLink href={libraryRecordHref("npc", n.id)}>{n.name} <span aria-hidden="true">→</span></AppLink>
+                </h2>
+                <p>
+                  {locationLabel(market, n.locationId)} ·{" "}
+                  {npcAvailableHere(n, t) ? "Nearby" : "Away / hidden"} ·{" "}
+                  {n.barterAllowed ? "Bartering allowed" : "No bartering"}
+                </p>
+              </span>
+              <Button onClick={() => setSelected(n.id)}>View & interact</Button>
+              {dm && <Button onClick={() => setEdit(n)}>Configure NPC</Button>}
+            </div>
+            <p>{n.description}</p>
+          </article>
+        ))}
       {!npcs.length && <p>No NPCs are available at this location.</p>}
       {npc && <NpcInteraction key={npc.id} npc={npc} table={t} />}
       {edit !== undefined && dm && (
@@ -191,15 +227,15 @@ function NpcEditor({ npc, table, close }: { npc?: Npc; table: CloudTable; close:
         </label>
         <label>
           NPC location
-          <select
+          <SearchSelect
             aria-label="NPC location"
             required
             value={draft.locationId}
-            onChange={(e) => setDraft({ ...draft, locationId: e.target.value })}
+            onValueChange={(selectedValue) => setDraft({ ...draft, locationId: selectedValue })}
           >
             <option value="">Choose location</option>
-            <LocationOptions market={market} />
-          </select>
+            {LocationOptions({ market: market })}
+          </SearchSelect>
         </label>
         <label>
           <input
@@ -219,10 +255,12 @@ function NpcEditor({ npc, table, close }: { npc?: Npc; table: CloudTable; close:
         </label>
         <label>
           NPC controller
-          <select
+          <SearchSelect
             aria-label="NPC controller"
             value={draft.controllerPurseId ?? ""}
-            onChange={(e) => setDraft({ ...draft, controllerPurseId: e.target.value || null })}
+            onValueChange={(selectedValue) =>
+              setDraft({ ...draft, controllerPurseId: selectedValue || null })
+            }
           >
             <option value="">Dungeon Master (default)</option>
             {table.purses
@@ -232,7 +270,7 @@ function NpcEditor({ npc, table, close }: { npc?: Npc; table: CloudTable; close:
                   {p.name}
                 </option>
               ))}
-          </select>
+          </SearchSelect>
         </label>
         <p className="text-sm text-muted">
           A delegated controller can speak and accept or counter offers for this NPC. Configuration
@@ -408,17 +446,17 @@ function NpcInteraction({ npc, table }: { npc: Npc; table: CloudTable }) {
       <h3>Conversation</h3>
       <label>
         Speaking character
-        <select
+        <SearchSelect
           aria-label="Speaking character"
           value={character}
-          onChange={(e) => setCharacter(e.target.value)}
+          onValueChange={(selectedValue) => setCharacter(selectedValue)}
         >
           {characters.map((p) => (
             <option key={p.id} value={p.id}>
               {p.name}
             </option>
           ))}
-        </select>
+        </SearchSelect>
       </label>
       {conversation?.messages.map((m) => (
         <p key={m.id} className="world-message">

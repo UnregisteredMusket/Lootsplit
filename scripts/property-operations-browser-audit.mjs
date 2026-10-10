@@ -1,3 +1,4 @@
+import { chooseOption } from "./search-select-browser.mjs";
 import assert from "node:assert/strict";
 import { chromium } from "playwright";
 import { expect } from "playwright/test";
@@ -163,17 +164,15 @@ try {
     await reloadApplication(page);
     await page.getByRole("button", { name: /^DM estate workshop/ }).click();
     await page.getByRole("button", { name: "Reviewed property import", exact: true }).click();
-    await page
-      .getByLabel("Choose a property import JSON file")
-      .setInputFiles({
-        name: "property-operations.sample.json",
-        mimeType: "application/json",
-        buffer: await readFile("docs/examples/property-operations.sample.json"),
-      });
-    await page.getByLabel("Map to the campaign's party treasury").selectOption("party");
-    await page.getByLabel(/Eastmarch\s*\(region\)/).selectOption("region");
-    await page.getByLabel(/Brackenport\s*\(city\)/).selectOption("city");
-    await page.getByLabel(/Dock Ward\s*\(area\)/).selectOption("area");
+    await page.getByLabel("Choose a property import JSON file").setInputFiles({
+      name: "property-operations.sample.json",
+      mimeType: "application/json",
+      buffer: await readFile("docs/examples/property-operations.sample.json"),
+    });
+    await chooseOption(page.getByLabel("Map to the campaign's party treasury"), "party");
+    await chooseOption(page.getByLabel(/Eastmarch\s*\(region\)/), "region");
+    await chooseOption(page.getByLabel(/Brackenport\s*\(city\)/), "city");
+    await chooseOption(page.getByLabel(/Dock Ward\s*\(area\)/), "area");
     await page.getByRole("button", { name: "Review import preview", exact: true }).click();
     await expect(page.getByRole("form", { name: "Commit reviewed property import" })).toContainText(
       "inactive owned holding",
@@ -194,7 +193,7 @@ try {
     await expect(warehouse).toContainText("Operations enabled");
     await warehouse.getByRole("button", { name: /^Storage & material staging/ }).click();
     const movement = warehouse.getByRole("form", { name: "Move stored goods", exact: true });
-    await movement.getByLabel("Acting / receiving character").selectOption("hero");
+    await chooseOption(movement.getByLabel("Acting / receiving character"), "hero");
     await movement.getByLabel("Item quantity").fill("4");
     await movement
       .getByLabel("Donate deposited goods to the property owner for shared work")
@@ -202,7 +201,7 @@ try {
     await movement.getByRole("button", { name: "Deposit items", exact: true }).click();
     await expect(warehouse).toContainText("4 × Timber bundle");
     await expect(warehouse).toContainText("Owned by Party treasury");
-    await movement.getByLabel("Storage action").selectOption("withdraw");
+    await chooseOption(movement.getByLabel("Storage action"), "withdraw");
     await movement.getByLabel("Item quantity").fill("1");
     await movement.getByRole("button", { name: "Withdraw items", exact: true }).click();
     await expect(warehouse).toContainText("3 × Timber bundle");
@@ -225,11 +224,11 @@ try {
     await postal.getByRole("button", { name: "Save", exact: true }).click();
     await warehouse.getByRole("button", { name: "Letters & manager orders", exact: true }).click();
     const letter = warehouse.getByRole("form", { name: "Send a property letter", exact: true });
-    await letter.getByLabel("Send as", { exact: true }).selectOption("hero");
-    await letter.getByLabel("Property manager", { exact: true }).selectOption({ label: "Mira" });
+    await chooseOption(letter.getByLabel("Send as", { exact: true }), "hero");
+    await chooseOption(letter.getByLabel("Property manager", { exact: true }), { label: "Mira" });
     await letter.getByRole("button", { name: "Pay postage & send", exact: true }).click();
     await expect(warehouse).toContainText("report order · in-transit");
-    await page.getByLabel("Edit a property template").selectOption("warehouse");
+    await chooseOption(page.getByLabel("Edit a property template"), "warehouse");
     const recipe = page.getByRole("form", {
       name: "Add construction, gathering or production recipe",
       exact: true,
@@ -237,7 +236,7 @@ try {
     await recipe.getByLabel("Recipe key", { exact: true }).fill("test-house");
     await recipe.getByLabel("Work name", { exact: true }).fill("Build harbor house");
     await recipe.getByLabel("Required full labor days").fill("2");
-    await recipe.getByLabel("Completed building / upgrade template").selectOption("house");
+    await chooseOption(recipe.getByLabel("Completed building / upgrade template"), "house");
     await recipe.getByLabel("Required Building timber (bundle)").fill("2");
     await recipe.getByRole("button", { name: "Save", exact: true }).click();
     await warehouse
@@ -266,7 +265,7 @@ try {
     await page.locator(".settings-trigger").click();
     const appearance = page.getByRole("dialog", { name: "Settings & Management", exact: true });
     await appearance.getByRole("button", { name: /^Appearance/ }).click();
-    await appearance.getByLabel("Theme", { exact: true }).selectOption("light");
+    await chooseOption(appearance.getByLabel("Theme", { exact: true }), "light");
     await appearance.getByRole("button", { name: "Close", exact: true }).click();
     await noOverflow(page);
     assert.equal(await page.locator(".loot-opening").count(), 0);

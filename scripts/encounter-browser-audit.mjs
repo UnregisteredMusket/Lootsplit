@@ -1,3 +1,4 @@
+import { chooseOption } from "./search-select-browser.mjs";
 import { finishAuditLiveness } from "./audit-liveness.mjs";
 import { scanFixture, scannedPdf } from "./ocr-browser-fixtures.mjs";
 import { characterPdf, characterPdfFields } from "./character-pdf-fixtures.mjs";
@@ -158,7 +159,7 @@ try {
   await continueIntoApp(p);
   await p.getByText("Campaign control", { exact: true }).waitFor();
   await openApplication(p, origin + "/encounters");
-  await p.getByLabel("Save in", { exact: true }).selectOption(code);
+  await chooseOption(p.getByLabel("Save in", { exact: true }), code);
   await p.getByRole("button", { name: "New encounter", exact: true }).click();
   await p.getByRole("button", { name: "Add combatant", exact: true }).waitFor();
   await p.locator(".quire-dawn").waitFor({ state: "hidden" });
@@ -177,7 +178,7 @@ try {
   await p.getByText("Encounter saved.", { exact: true }).waitFor();
   await p.screenshot({ path: output + "/desktop-battle.png", fullPage: true });
   await p.getByRole("button", { name: "Roll history", exact: true }).click();
-  await p.getByLabel("Roll source", { exact: true }).selectOption("manual");
+  await chooseOption(p.getByLabel("Roll source", { exact: true }), "manual");
   await p.getByLabel("Manual total", { exact: true }).fill("18");
   await p.getByRole("button", { name: "Record manual roll", exact: true }).click();
   await p.getByText(/Encounter roll: 18/).waitFor();
@@ -195,9 +196,9 @@ try {
     .click();
   await expect(p.getByLabel("Party size", { exact: true })).toHaveValue("1");
   await expect(p.getByLabel("Party level", { exact: true })).toHaveValue("4");
-  await expect(p.getByRole("combobox", { name: "Desired difficulty", exact: true })).toHaveValue(
-    "medium",
-  );
+  await expect(
+    p.getByRole("combobox", { name: "Desired difficulty", exact: true }),
+  ).toHaveAttribute("data-value", "medium");
   const scan = await scanFixture(p, [
     "Goblin",
     "Small humanoid, neutral evil",
@@ -244,7 +245,7 @@ try {
   await expect(p.getByLabel("Before concluding", { exact: true })).toContainText(
     "Choose or roll a result for Loot table",
   );
-  await p.getByLabel(/^Selected result/).selectOption("0");
+  await chooseOption(p.getByLabel(/^Selected result/), "0");
   await p.getByRole("button", { name: "Save encounter", exact: true }).click();
   await p.getByText("Encounter saved.", { exact: true }).waitFor();
   await p.getByRole("button", { name: "Conclude & review loot", exact: true }).click();
@@ -294,10 +295,11 @@ try {
     assert.ok(!(await chronicle.locator("pre").innerText()).includes(privateText));
   await expect(
     chronicle.getByRole("combobox", { name: "Link to session (optional)", exact: true }),
-  ).toHaveValue("");
-  await chronicle
-    .getByRole("combobox", { name: "Link to session (optional)", exact: true })
-    .selectOption("session-explicit");
+  ).toHaveAttribute("data-value", "");
+  await chooseOption(
+    chronicle.getByRole("combobox", { name: "Link to session (optional)", exact: true }),
+    "session-explicit",
+  );
   await chronicle
     .getByRole("button", { name: "Add reviewed summary to party journal", exact: true })
     .click();
@@ -483,11 +485,11 @@ try {
   await readerContext.close();
   await reloadApplication(p);
   await p.getByText(/locked against a second award/).waitFor();
-  await p.getByLabel("Save in", { exact: true }).selectOption(code);
+  await chooseOption(p.getByLabel("Save in", { exact: true }), code);
   await p.getByRole("button", { name: /Ambush on the northern road/ }).click();
   await p.getByText(/locked against a second award/).waitFor();
   await openApplication(player.page, origin + "/encounters");
-  await player.page.getByLabel("Save in", { exact: true }).selectOption("personal");
+  await chooseOption(player.page.getByLabel("Save in", { exact: true }), "personal");
   assert.equal(
     await player.page
       .getByLabel("Save in", { exact: true })
@@ -515,7 +517,10 @@ try {
   await player.page.getByRole("link", { name: "Open DM encounters", exact: true }).click();
   // The select mounts before the account request populates its options. Its
   // DOM value is temporarily empty even though the requested scope is personal.
-  await expect(player.page.getByLabel("Save in", { exact: true })).toHaveValue("personal");
+  await expect(player.page.getByLabel("Save in", { exact: true })).toHaveAttribute(
+    "data-value",
+    "personal",
+  );
   assert.equal(
     await player.page
       .getByLabel("Save in", { exact: true })

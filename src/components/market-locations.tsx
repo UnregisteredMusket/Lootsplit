@@ -1,3 +1,4 @@
+import { SearchSelect } from "@/components/search-select";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { useEconomy } from "@/lib/quire/economy-context";
@@ -17,11 +18,23 @@ import { MarketImageUpload } from "./market-image-upload";
 import { MarketNameImport } from "./market-name-import";
 
 export function LocationOptions({ market }: { market: MarketLocations }) {
-  return [...market.locations]
-    .sort((a, b) => locationLabel(market, a.id).localeCompare(locationLabel(market, b.id)))
+  const byId = new Map(market.locations.map((l) => [l.id, l]));
+  const choices = market.locations.map((l) => {
+    const names: string[] = [],
+      seen = new Set<string>();
+    let current: MarketLocation | undefined = l;
+    while (current && !seen.has(current.id)) {
+      names.unshift(current.name);
+      seen.add(current.id);
+      current = current.parentId ? byId.get(current.parentId) : undefined;
+    }
+    return { id: l.id, label: names.join(" / "), kind: l.kind };
+  });
+  return choices
+    .sort((a, b) => a.label.localeCompare(b.label))
     .map((location) => (
       <option key={location.id} value={location.id}>
-        {locationLabel(market, location.id)} · {location.kind}
+        {location.label} · {location.kind}
       </option>
     ));
 }
@@ -41,13 +54,13 @@ export function MarketLocationsPanel() {
         {seat.role === "dm" ? (
           <label className="block text-sm font-medium">
             Party location
-            <Select
+            <SearchSelect
               className="mt-1"
               aria-label="Party location"
               value={market.currentLocationId ?? ""}
               disabled={busy}
-              onChange={async (event) => {
-                const locationId = event.target.value || null;
+              onValueChange={async (selectedValue) => {
+                const locationId = selectedValue || null;
                 setBusy(true);
                 setError("");
                 try {
@@ -67,8 +80,8 @@ export function MarketLocationsPanel() {
               }}
             >
               <option value="">All campaign shops · no location set</option>
-              <LocationOptions market={market} />
-            </Select>
+              {LocationOptions({ market: market })}
+            </SearchSelect>
           </label>
         ) : (
           <p className="font-medium">
@@ -123,15 +136,15 @@ export function MarketLocationsPanel() {
           <div className="space-y-3">
             <label className="block text-sm">
               Edit location
-              <Select
+              <SearchSelect
                 aria-label="Edit location"
                 value={editing ?? ""}
                 disabled={!!editing}
-                onChange={(event) => setEditing(event.target.value || null)}
+                onValueChange={(selectedValue) => setEditing(selectedValue || null)}
               >
                 <option value="">Choose a location</option>
-                <LocationOptions market={market} />
-              </Select>
+                {LocationOptions({ market: market })}
+              </SearchSelect>
             </label>
             <Button variant="secondary" disabled={!!editing} onClick={() => setEditing("new")}>
               Create location
@@ -248,11 +261,11 @@ function LocationEditor({
       {kind !== "region" ? (
         <label className="block text-sm">
           {kind === "area" ? "City or town" : "Region"}
-          <Select
+          <SearchSelect
             aria-label="Parent location"
             value={parentId}
             disabled={busy}
-            onChange={(event) => setParentId(event.target.value)}
+            onValueChange={(selectedValue) => setParentId(selectedValue)}
           >
             <option value="">Choose a {kind === "area" ? "city or town" : "region"}</option>
             {parents.map((parent) => (
@@ -260,7 +273,7 @@ function LocationEditor({
                 {locationLabel(market, parent.id)}
               </option>
             ))}
-          </Select>
+          </SearchSelect>
           {!parents.length ? (
             <span className="mt-1 block text-muted">Create the parent location first.</span>
           ) : null}
@@ -377,15 +390,15 @@ export function ShopLocationEditor({ shop }: { shop: Shop }) {
     >
       <label className="block text-sm">
         Shop availability
-        <Select
+        <SearchSelect
           aria-label="Shop availability"
           value={locationId}
           disabled={busy}
-          onChange={(event) => setLocationId(event.target.value)}
+          onValueChange={(selectedValue) => setLocationId(selectedValue)}
         >
           <option value="">Campaignwide · available everywhere</option>
-          <LocationOptions market={market} />
-        </Select>
+          {LocationOptions({ market: market })}
+        </SearchSelect>
       </label>
       <p className="text-sm text-muted">
         A shop assigned to a region, city or town is also available in its areas. Its address, stock

@@ -1,3 +1,4 @@
+import { SearchSelect } from "@/components/search-select";
 import { useDraftGuard } from "@/lib/quire/use-draft-guard";
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useNavigate } from "@tanstack/react-router";
@@ -238,10 +239,10 @@ export function ShopComposer() {
           rollLabel="Random shop name"
         />
         {shopNames.length > 0 ? (
-          <Select
+          <SearchSelect
             aria-label="Saved shop names"
             value=""
-            onChange={(event) => event.target.value && setName(event.target.value)}
+            onValueChange={(selectedValue) => selectedValue && setName(selectedValue)}
           >
             <option value="">Saved shop names</option>
             {shopNames.map((row) => (
@@ -249,18 +250,18 @@ export function ShopComposer() {
                 {row.name}
               </option>
             ))}
-          </Select>
+          </SearchSelect>
         ) : null}
         <label className="text-sm">
           Shop availability
-          <Select
+          <SearchSelect
             aria-label="New shop availability"
             value={locationId}
-            onChange={(event) => setLocationId(event.target.value)}
+            onValueChange={(selectedValue) => setLocationId(selectedValue)}
           >
             <option value="">Campaignwide · available everywhere</option>
-            <LocationOptions market={market} />
-          </Select>
+            {LocationOptions({ market: market })}
+          </SearchSelect>
         </label>
         <MarketImageUpload
           label="New shop image"
@@ -406,10 +407,10 @@ export function ShopComposer() {
           placeholder="NPC"
         />
         {people.length > 0 ? (
-          <Select
+          <SearchSelect
             aria-label="Saved people"
             value=""
-            onChange={(event) => event.target.value && setKeeper(event.target.value)}
+            onValueChange={(selectedValue) => selectedValue && setKeeper(selectedValue)}
           >
             <option value="">Assign a saved person</option>
             {people.map((row) => (
@@ -417,7 +418,7 @@ export function ShopComposer() {
                 {row.name}
               </option>
             ))}
-          </Select>
+          </SearchSelect>
         ) : null}
         <NamedField
           label="Shop location"
@@ -428,10 +429,10 @@ export function ShopComposer() {
           placeholder="Shop location"
         />
         {places.length > 0 ? (
-          <Select
+          <SearchSelect
             aria-label="Saved places"
             value=""
-            onChange={(event) => event.target.value && setPlace(event.target.value)}
+            onValueChange={(selectedValue) => selectedValue && setPlace(selectedValue)}
           >
             <option value="">Use a saved place</option>
             {places.map((row) => (
@@ -439,7 +440,7 @@ export function ShopComposer() {
                 {row.name}
               </option>
             ))}
-          </Select>
+          </SearchSelect>
         ) : null}
       </div>
       <h3 ref={shelfRef} className="mt-6 font-display text-xl tracking-tight">

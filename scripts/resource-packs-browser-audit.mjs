@@ -1,3 +1,4 @@
+import { chooseOption } from "./search-select-browser.mjs";
 import assert from "node:assert/strict";
 import { readFile, mkdir } from "node:fs/promises";
 import { chromium } from "playwright";
@@ -155,6 +156,41 @@ try {
       path: `test-results/resource-packs/library-${width}.png`,
       fullPage: true,
     });
+    await page.evaluate(() => (window.libraryDocumentMarker = "same-document"));
+    await section
+      .getByRole("link", { name: "Open Reed Guardian in Library →", exact: true })
+      .click();
+    const entry = page.getByRole("article", { name: "Library entry", exact: true });
+    await expect(entry.getByRole("heading", { name: "Reed Guardian", exact: true })).toBeVisible();
+    await expect(entry).toContainText("Reed Lash");
+    await expect(entry).toContainText("PDF p. 12");
+    assert.deepEqual(JSON.parse(new URL(page.url()).searchParams.get("record").slice(7)), [
+      "resource",
+      pack.id,
+      pack.revision,
+      "reed-guardian",
+    ]);
+    assert.equal(await page.evaluate(() => window.libraryDocumentMarker), "same-document");
+    assert.equal(await page.locator(".loot-opening").count(), 0);
+    await page.screenshot({ path: `test-results/resource-packs/entry-${width}.png` });
+    await page.goBack();
+    await section
+      .getByRole("link", { name: "Open Reed Workshop in Library →", exact: true })
+      .click();
+    await entry.getByRole("link", { name: "Reed Port →", exact: true }).click();
+    await expect(entry.getByRole("heading", { name: "Reed Port", exact: true })).toBeVisible();
+    await entry.getByRole("link", { name: "Close entry", exact: true }).click();
+    const librarySearch = page.getByLabel("Search library destinations and catalog", {
+      exact: true,
+    });
+    await librarySearch.fill("guardian");
+    await chooseOption(page.getByLabel("Library record type", { exact: true }), "Monster");
+    await expect(page.locator(".library-record-list a")).toHaveCount(2);
+    await librarySearch.fill("no-such-entry");
+    await expect(page.locator(".library-record-list a")).toHaveCount(0);
+    await expect(page.getByText("No entries match your search.", { exact: true })).toBeVisible();
+    await librarySearch.fill("");
+    await chooseOption(page.getByLabel("Library record type", { exact: true }), "");
     await section.getByRole("link", { name: "Use creatures in Encounters →", exact: true }).click();
     assert.equal(await page.locator(".loot-opening").count(), 0);
     await page.getByRole("button", { name: "New encounter", exact: true }).click();
@@ -163,11 +199,20 @@ try {
     await expect(
       creatures.getByRole("button", { name: "Add imported Incomplete Guardian", exact: true }),
     ).toBeDisabled();
+    await creatures.getByLabel("Find an imported monster", { exact: true }).click();
+    const monsterMenu = page.locator(".record-select-menu:visible");
+    await monsterMenu.getByRole("combobox").fill("Reed Guardian");
+    await expect(monsterMenu.getByRole("option")).toHaveCount(1);
+    await page.keyboard.press("Enter");
+    await expect(
+      creatures.getByRole("button", { name: "Add imported Incomplete Guardian", exact: true }),
+    ).toHaveCount(0);
+    await chooseOption(creatures.getByLabel("Find an imported monster", { exact: true }), "");
     await creatures
       .getByRole("button", { name: "Add imported Reed Guardian", exact: true })
       .click();
-    await page.getByLabel("Generation target", { exact: true }).selectOption("cr");
-    await page.getByLabel("Enemy CR", { exact: true }).selectOption("1");
+    await chooseOption(page.getByLabel("Generation target", { exact: true }), "cr");
+    await chooseOption(page.getByLabel("Enemy CR", { exact: true }), "1");
     await page.getByLabel("Enemy count", { exact: true }).fill("2");
     await creatures
       .getByRole("button", { name: "Generate from imported creatures", exact: true })
@@ -203,45 +248,127 @@ try {
     // Optional private local fixture files are never committed or supplied to public CI.
     if (width === 390 && process.env.RESOURCE_PACK_FILES) {
       const files = JSON.parse(process.env.RESOURCE_PACK_FILES);
-      const additional = await Promise.all(files.map(async file => ({ file, pack: JSON.parse(await readFile(file, "utf8")) })));
-      await page.locator('nav[aria-label="Sections"]:visible').getByRole("link", { name: "Library", exact: true }).click();
+      const additional = await Promise.all(
+        files.map(async (file) => ({ file, pack: JSON.parse(await readFile(file, "utf8")) })),
+      );
+      await page
+        .locator('nav[aria-label="Sections"]:visible')
+        .getByRole("link", { name: "Library", exact: true })
+        .click();
       const beforeBook = await records(page);
       for (const record of additional) {
         await section.getByLabel("Resource pack JSON", { exact: true }).setInputFiles(record.file);
         await section.getByRole("button", { name: "Review resource pack", exact: true }).click();
-        await expect(section.getByLabel("Resource import preview")).toContainText(`Import: ${record.pack.entries.length} references`);
+        await expect(section.getByLabel("Resource import preview")).toContainText(
+          `Import: ${record.pack.entries.length} references`,
+        );
         await section.getByRole("button", { name: "Apply resource pack", exact: true }).click();
         await expect(section.getByRole("status")).toContainText("Resource pack imported");
       }
       const afterBook = await records(page);
-      for (const store of ["purses", "holdings", "shops", "stock", "ledger", "catalog"]) assert.deepEqual(afterBook[store], beforeBook[store]);
-      assert.equal(afterBook.meta.find(r => r.id === "journal").value.resourceLibrary.packs.length, 1 + additional.length);
+      for (const store of ["purses", "holdings", "shops", "stock", "ledger", "catalog"])
+        assert.deepEqual(afterBook[store], beforeBook[store]);
+      assert.equal(
+        afterBook.meta.find((r) => r.id === "journal").value.resourceLibrary.packs.length,
+        1 + additional.length,
+      );
       await reloadApplication(page);
       for (const record of additional) {
         await section.getByLabel("Resource pack JSON", { exact: true }).setInputFiles(record.file);
         await section.getByRole("button", { name: "Review resource pack", exact: true }).click();
-        await expect(section.getByLabel("Resource import preview")).toContainText(`Reuse: ${record.pack.entries.length} references`);
+        await expect(section.getByLabel("Resource import preview")).toContainText(
+          `Reuse: ${record.pack.entries.length} references`,
+        );
         await section.getByRole("button", { name: "Apply resource pack", exact: true }).click();
         await expect(section.getByRole("status")).toContainText("no duplicate references");
       }
-      const source = additional.find(r => r.pack.entries.some(e => e.kind === "creature"));
-      const creature = source.pack.entries.find(e => e.kind === "creature");
-      await section.getByRole("link", { name: "Use creatures in Encounters →", exact: true }).click();
+      const source = additional.find((r) => r.pack.entries.some((e) => e.kind === "creature"));
+      const creature = source.pack.entries.find((e) => e.kind === "creature");
+      await section
+        .getByRole("link", { name: "Use creatures in Encounters →", exact: true })
+        .click();
       await page.getByRole("button", { name: "New encounter", exact: true }).click();
       await page.getByRole("button", { name: "Builder & generator", exact: true }).click();
-      await page.getByLabel("Creature resource pack", { exact: true }).selectOption({ label: `${source.pack.title} · ${source.pack.revision}` });
+      await chooseOption(page.getByLabel("Creature resource pack", { exact: true }), {
+        label: `${source.pack.title} · ${source.pack.revision}`,
+      });
       await page.getByLabel("Search imported creatures", { exact: true }).fill(creature.name);
-      await page.getByRole("button", { name: `Add imported ${creature.name}`, exact: true }).click();
+      await page
+        .getByRole("button", { name: `Add imported ${creature.name}`, exact: true })
+        .click();
       await page.getByLabel("Encounter name", { exact: true }).fill("Private source pack check");
       await page.getByRole("button", { name: "Save encounter", exact: true }).click();
       await expect(page.getByText("Encounter saved.", { exact: true })).toBeVisible();
-      const rows = (await records(page)).meta.find(r => r.id === "localEncounters").rows;
-      const copied = rows.find(e => e.body.name === "Private source pack check").body.combatants[0];
-      assert.equal(copied.ac, creature.stats.ac); assert.equal(copied.maxHp, creature.stats.hp);
+      const rows = (await records(page)).meta.find((r) => r.id === "localEncounters").rows;
+      const copied = rows.find((e) => e.body.name === "Private source pack check").body
+        .combatants[0];
+      assert.equal(copied.ac, creature.stats.ac);
+      assert.equal(copied.maxHp, creature.stats.hp);
       assert.ok(copied.notes.startsWith(creature.text));
       assert.deepEqual(errors, []);
-      console.log(`PASS: ${additional.length} private source files imported, reloaded, reused and copied into a saved encounter without economic changes.`);
+      console.log(
+        `PASS: ${additional.length} private source files imported, reloaded, reused and copied into a saved encounter without economic changes.`,
+      );
     }
+    // A long real import must remain searchable beyond the first displayed option batch.
+    await page
+      .locator('nav[aria-label="Sections"]:visible')
+      .getByRole("link", { name: "Library", exact: true })
+      .click();
+    const bulk = {
+      ...pack,
+      id: "bulk-locations",
+      title: "Synthetic Location Index",
+      entries: Array.from({ length: 105 }, (_, i) => ({
+        id: `place-${i}`,
+        kind: "location",
+        name: `Imported Region ${String(i).padStart(3, "0")}`,
+        locationKind: "region",
+        parentId: null,
+        text: "Synthetic place for picker verification.",
+        tags: [],
+        warnings: [],
+        sources: [{ book: "Synthetic index", pdfPage: i + 1, printedPage: null }],
+      })),
+    };
+    await section.getByLabel("Resource pack JSON", { exact: true }).setInputFiles(upload(bulk));
+    await section.getByRole("button", { name: "Review resource pack", exact: true }).click();
+    await section.getByRole("button", { name: "Apply resource pack", exact: true }).click();
+    await expect(section.getByRole("status")).toContainText("Resource pack imported");
+    await section
+      .getByRole("button", { name: "Review campaign locations and shops", exact: true })
+      .click();
+    await section
+      .getByRole("button", { name: "Apply campaign locations and shops", exact: true })
+      .click();
+    await expect(section.getByRole("status")).toContainText(
+      "Campaign locations and shops imported",
+    );
+    await page
+      .locator('nav[aria-label="Sections"]:visible')
+      .getByRole("link", { name: "Maps", exact: true })
+      .click();
+    await page.getByRole("button", { name: "Manage campaign locations", exact: true }).click();
+    const locationPicker = page.getByLabel("Party location", { exact: true });
+    await locationPicker.click();
+    const menu = page.locator(".record-select-menu:visible");
+    await expect(menu.getByRole("option")).toHaveCount(60);
+    await menu.getByRole("button", { name: /^Show more results/ }).click();
+    assert.ok((await menu.getByRole("option").count()) > 60);
+    await menu.getByRole("combobox").fill("no-such-place");
+    await expect(menu.getByText("No matching records.", { exact: true })).toBeVisible();
+    await page.keyboard.press("Escape");
+    await expect(locationPicker).toHaveText("All campaign shops · no location set");
+    await locationPicker.click();
+    await menu.getByRole("combobox").fill("Imported Region 097");
+    await expect(menu.getByRole("option")).toHaveCount(1);
+    await page.screenshot({ path: `test-results/resource-packs/location-search-${width}.png` });
+    await page.keyboard.press("Enter");
+    await expect(locationPicker).toHaveText("Imported Region 097 · region");
+    await chooseOption(locationPicker, "");
+    await expect(locationPicker).toHaveText("All campaign shops · no location set");
+    assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1));
+    assert.deepEqual(errors, []);
     await context.close();
   }
   console.log(

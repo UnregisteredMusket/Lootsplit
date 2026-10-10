@@ -1,3 +1,4 @@
+import { chooseOption } from "../search-select-browser.mjs";
 import assert from "node:assert/strict";
 import { blankEncounter } from "../../src/lib/encounters/model.mjs";
 import { readFile } from "node:fs/promises";
@@ -1317,7 +1318,7 @@ test("shared-recovery", async ({ devices, baseURL: origin }, testInfo) => {
     "The complete private backup stays available after restoration",
   );
   await navigateAccountScenario(page, origin, "/encounters");
-  await page.getByLabel("Save in", { exact: true }).selectOption(restored.code);
+  await chooseOption(page.getByLabel("Save in", { exact: true }), restored.code);
   await page.getByRole("button", { name: /Complete shared recovery/ }).click();
   await expect(
     page.getByRole("heading", { name: "Complete shared recovery", exact: true }),

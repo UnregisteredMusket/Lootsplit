@@ -1,3 +1,4 @@
+import { chooseOption } from "./search-select-browser.mjs";
 import assert from "node:assert/strict";
 import { chromium } from "playwright";
 import { expect } from "playwright/test";
@@ -94,7 +95,7 @@ async function lightAppearance(page) {
   await page.locator(".settings-trigger").click();
   const preferences = page.getByRole("dialog", { name: "Settings & Management", exact: true });
   await preferences.getByRole("button", { name: /^Appearance/ }).click();
-  await preferences.getByLabel("Theme", { exact: true }).selectOption("light");
+  await chooseOption(preferences.getByLabel("Theme", { exact: true }), "light");
   await page.waitForFunction(
     () => document.documentElement.dataset.fantasyTheme === "adventurers-ledger",
   );
@@ -131,7 +132,7 @@ async function join(width, invitation, character) {
   );
   await page.getByRole("button", { name: "Find characters", exact: true }).click();
   await page.getByLabel("Your name", { exact: true }).fill(`${character} player`);
-  await page.getByLabel(/^Choose your character/).selectOption(character);
+  await chooseOption(page.getByLabel(/^Choose your character/), character);
   await page.getByRole("button", { name: "Join room", exact: true }).click();
   await page.getByText("You joined as a player", { exact: true }).waitFor();
   return page;
@@ -239,9 +240,9 @@ try {
       await dialog
         .getByLabel("Listing description", { exact: true })
         .fill("An adventurer's refuge, with a welcoming hearth and a walled garden.");
-      await dialog.getByLabel("Property location", { exact: true }).selectOption(location);
-      await dialog.getByLabel("Property type", { exact: true }).selectOption(type);
-      await dialog.getByLabel("Property condition", { exact: true }).selectOption("maintained");
+      await chooseOption(dialog.getByLabel("Property location", { exact: true }), location);
+      await chooseOption(dialog.getByLabel("Property type", { exact: true }), type);
+      await chooseOption(dialog.getByLabel("Property condition", { exact: true }), "maintained");
       await dialog.getByLabel("Rooms", { exact: true }).fill("8");
       await dialog
         .getByLabel("Property features", { exact: true })
@@ -263,7 +264,7 @@ try {
       towerName = `Ashlands Watchtower ${width}`;
     const innId = await createProperty(innName, "area", "inn", "750 gp", true);
     const towerId = await createProperty(towerName, "remote", "tower", "1500 gp");
-    await dm.getByLabel("Listing location", { exact: true }).selectOption("city");
+    await chooseOption(dm.getByLabel("Listing location", { exact: true }), "city");
     await expect(dm.locator(".property-card")).toHaveCount(1);
     await dm.getByRole("button", { name: "Clear property filters", exact: true }).click();
     await dm.getByRole("button", { name: `Compare ${innName}`, exact: true }).click();
@@ -290,7 +291,7 @@ try {
     await lightEditor.getByRole("button", { name: "Close", exact: true }).click();
     await dm.getByRole("button", { name: `Edit ${towerName} listing`, exact: true }).click();
     const editor = dm.getByRole("dialog", { name: "Edit property listing" });
-    await editor.getByLabel("Listing status", { exact: true }).selectOption("reserved");
+    await chooseOption(editor.getByLabel("Listing status", { exact: true }), "reserved");
     await editor.getByRole("button", { name: "Save property listing", exact: true }).click();
     await expect(editor).toHaveCount(0);
     assert.equal((await listings(dm)).find((l) => l.id === towerId).status, "reserved");
@@ -359,8 +360,8 @@ try {
       .click();
     assert.equal(await buyer.locator(".loot-opening").count(), 0);
     const give = buyer.getByRole("dialog", { name: "Give to a player", exact: true });
-    await give.getByLabel("Give to", { exact: true }).selectOption("recipient");
-    await give.getByLabel("Holding to give", { exact: true }).selectOption(purchased.id);
+    await chooseOption(give.getByLabel("Give to", { exact: true }), "recipient");
+    await chooseOption(give.getByLabel("Holding to give", { exact: true }), purchased.id);
     await give.getByRole("button", { name: "Give", exact: true }).click();
     await expect.poll(async () => (await rows(dm, "holdings"))[0]?.purseId).toBe("recipient");
     await give.getByRole("button", { name: "Close", exact: true }).click();

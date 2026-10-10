@@ -1,3 +1,4 @@
+import { SearchSelect } from "@/components/search-select";
 import { useEffect, useRef, useState } from "react";
 import { useSeat } from "@/lib/quire/seat";
 import { readWorld, type CampaignMap } from "@/lib/quire/world-schema";
@@ -9,6 +10,8 @@ import { CommandForm, CommandButton } from "./world-tools";
 import { LocationOptions, MarketLocationsPanel } from "./market-locations";
 import { Button, Fold } from "./ui";
 import { AppLink } from "./app-link";
+import { libraryRecordHref } from "@/lib/quire/library-records";
+import { useRouterState } from "@tanstack/react-router";
 import { Users, UserRound, Store, House, Mail, Flag, MapPin, EyeOff } from "lucide-react";
 import { MapFrame } from "./map-frame";
 import {
@@ -35,13 +38,14 @@ export function CampaignMaps() {
     [label, setLabel] = useState(""),
     [description, setDescription] = useState(""),
     [secret, setSecret] = useState(false);
+  const requestedMap = useRouterState({ select: (s) => s.location.search.map });
   const maps = w.maps.filter((m) => dm || m.visible),
     best = [...locationPath(market, market.currentLocationId)]
       .reverse()
       .map((l) => maps.find((m) => m.locationId === l.id))
       .find(Boolean);
   const map =
-    maps.find((m) => m.id === selected) ?? best ?? maps.find((m) => !m.locationId) ?? maps[0];
+    maps.find((m) => m.id === (selected || requestedMap)) ?? best ?? maps.find((m) => !m.locationId) ?? maps[0];
   const party = map && anchorFor(map, t, market.currentLocationId);
   const pins = map
     ? [
@@ -59,7 +63,7 @@ export function CampaignMaps() {
             label: h.name,
             kind: "Property",
             point: anchorFor(map, t, h.locationId),
-            href: "/features/properties",
+            href: libraryRecordHref("property", h.id),
           })),
         ...t.shops
           .filter((s) => dm || shopVisible(s, t))
@@ -68,7 +72,7 @@ export function CampaignMaps() {
             label: s.name,
             kind: s.blackMarket ? "Black market" : "Shop",
             point: anchorFor(map, t, s.locationId),
-            href: `/shop/${s.id}`,
+            href: libraryRecordHref("shop", s.id),
           })),
         ...w.npcs
           .filter((n) => dm || npcAvailableHere(n, t))
@@ -77,7 +81,7 @@ export function CampaignMaps() {
             label: n.name,
             kind: "NPC",
             point: anchorFor(map, t, n.locationId),
-            href: "/features/npcs",
+            href: libraryRecordHref("npc", n.id),
           })),
         ...(t.journal.propertyOperations?.postal.offices ?? []).flatMap((p) => {
           const s = t.shops.find((s) => s.id === p.shopId);
@@ -88,7 +92,7 @@ export function CampaignMaps() {
                   label: s.name,
                   kind: "Post office",
                   point: anchorFor(map, t, s.locationId),
-                  href: "/features/properties",
+                  href: libraryRecordHref("shop", s.id),
                 },
               ]
             : [];
@@ -110,11 +114,11 @@ export function CampaignMaps() {
         </AppLink>
         <label>
           Map
-          <select
+          <SearchSelect
             aria-label="Map"
             value={map?.id ?? ""}
-            onChange={(e) => {
-              setSelected(e.target.value);
+            onValueChange={(selectedValue) => {
+              setSelected(selectedValue);
               setPlacement("");
               setPoint(undefined);
             }}
@@ -125,7 +129,7 @@ export function CampaignMaps() {
                 {m.visible ? "" : " (DM only)"}
               </option>
             ))}
-          </select>
+          </SearchSelect>
         </label>
         {dm && (
           <>
@@ -154,6 +158,7 @@ export function CampaignMaps() {
                 label: locationLabel(market, a.locationId),
                 kind: "Location",
                 point: a,
+                href: libraryRecordHref("location", a.locationId),
               })),
             ]}
           />
@@ -220,15 +225,15 @@ export function CampaignMaps() {
                 >
                   <label>
                     Linked location
-                    <select
+                    <SearchSelect
                       aria-label="Linked location"
                       required
                       value={location}
-                      onChange={(e) => setLocation(e.target.value)}
+                      onValueChange={(selectedValue) => setLocation(selectedValue)}
                     >
                       <option value="">Choose location</option>
-                      <LocationOptions market={market} />
-                    </select>
+                      {LocationOptions({ market: market })}
+                    </SearchSelect>
                   </label>
                 </CommandForm>
               )}
@@ -293,7 +298,7 @@ export function CampaignMaps() {
             {map.anchors.map((a) => (
               <div key={a.locationId} className="world-row">
                 <span>
-                  {locationLabel(market, a.locationId)}
+                  <AppLink href={libraryRecordHref("location", a.locationId)}>{locationLabel(market, a.locationId)} →</AppLink>
                   {a.locationId === market.currentLocationId ? " · Party here" : ""}
                 </span>
                 {dm && (
@@ -422,17 +427,17 @@ function MapEditor({
           </label>
           <label>
             Map location
-            <select
+            <SearchSelect
               aria-label="Map location"
               value={draft.locationId ?? ""}
-              onChange={(e) => {
-                const locationId = e.target.value || null;
+              onValueChange={(selectedValue) => {
+                const locationId = selectedValue || null;
                 setDraft((current) => ({ ...current, locationId }));
               }}
             >
               <option value="">World / campaign map</option>
-              <LocationOptions market={market} />
-            </select>
+              {LocationOptions({ market: market })}
+            </SearchSelect>
           </label>
           <label>
             <input
@@ -584,6 +589,7 @@ function MapViewport({
         description: m.description,
         kind: "Marker",
         point: m,
+        href: libraryRecordHref("marker", map.id, m.id),
       })),
     ...entities,
     ...(party ? [{ id: "party", label: "Party", kind: "Party", point: party }] : []),

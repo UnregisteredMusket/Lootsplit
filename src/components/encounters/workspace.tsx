@@ -1,3 +1,4 @@
+import { SearchSelect } from "@/components/search-select";
 import { playSound } from "@/lib/quire/sound";
 import { ImportStatblock } from "./import-statblock";
 import { ResourceCreatures } from "./resource-creatures";
@@ -251,14 +252,14 @@ function EncounterLibrary({ allowDevice }: { allowDevice: boolean }) {
           <div className="character-toolbar">
             <label>
               Save in
-              <select
+              <SearchSelect
                 aria-label="Save in"
                 value={code}
-                onChange={(e) => {
+                onValueChange={(selectedValue) => {
                   if (canLeave()) {
                     dirty.current = false;
                     createKey.current = "";
-                    setCode(e.target.value);
+                    setCode(selectedValue);
                     setSelected("");
                   }
                 }}
@@ -270,7 +271,7 @@ function EncounterLibrary({ allowDevice }: { allowDevice: boolean }) {
                     {!["device", "personal"].includes(c.code) ? ` · ${c.code}` : ""}
                   </option>
                 ))}
-              </select>
+              </SearchSelect>
             </label>
             <button
               disabled={busy || !library.campaigns.some((c) => c.code === code && !c.closed)}
@@ -755,7 +756,7 @@ function EncounterEditor({
   const recipients = (value: string, onChange: (v: string) => void, label = "Recipient") => (
     <label>
       {label}
-      <select value={value} onChange={(e) => onChange(e.target.value)}>
+      <SearchSelect value={value} onValueChange={(selectedValue) => onChange(selectedValue)}>
         <option value="">Choose recipient</option>
         {detail.purses.map((p) => (
           <option key={p.id} value={p.id}>
@@ -763,7 +764,7 @@ function EncounterEditor({
             {p.kind === "party" ? " · party inventory" : ""}
           </option>
         ))}
-      </select>
+      </SearchSelect>
     </label>
   );
   return (
@@ -903,10 +904,10 @@ function EncounterEditor({
                 <pre>{lootSummary.text}</pre>
                 <label>
                   Link to session (optional)
-                  <select
+                  <SearchSelect
                     value={summarySessionId}
                     disabled={busy || !currentContext || detail.readOnly || !!summaryEntry}
-                    onChange={(e) => setSummarySessionId(e.target.value)}
+                    onValueChange={(selectedValue) => setSummarySessionId(selectedValue)}
                   >
                     <option value="">No session association</option>
                     {currentContext &&
@@ -915,7 +916,7 @@ function EncounterEditor({
                           {session.name} · {new Date(session.startedAt).toLocaleDateString()}
                         </option>
                       ))}
-                  </select>
+                  </SearchSelect>
                 </label>
                 <button
                   disabled={
@@ -1342,19 +1343,19 @@ function EncounterEditor({
               </label>
               <label>
                 Desired difficulty
-                <select
+                <SearchSelect
                   value={draft.difficulty}
-                  onChange={(e) =>
+                  onValueChange={(selectedValue) =>
                     change({
                       ...draft,
-                      difficulty: e.target.value as Encounter["difficulty"],
+                      difficulty: selectedValue as Encounter["difficulty"],
                     })
                   }
                 >
                   {["easy", "medium", "hard", "deadly"].map((v) => (
                     <option key={v}>{v}</option>
                   ))}
-                </select>
+                </SearchSelect>
               </label>
             </div>
             <div className="encounter-estimate">
@@ -1839,10 +1840,10 @@ function EncounterEditor({
                         </button>
                         <label>
                           Add catalog result
-                          <select
+                          <SearchSelect
                             value=""
-                            onChange={(e) => {
-                              const c = catalog.find((c) => c.id === e.target.value);
+                            onValueChange={(selectedValue) => {
+                              const c = catalog.find((c) => c.id === selectedValue);
                               if (c)
                                 update({
                                   selected: null,
@@ -1870,16 +1871,16 @@ function EncounterEditor({
                                   {c.name}
                                 </option>
                               ))}
-                          </select>
+                          </SearchSelect>
                         </label>
                       </div>
                       <label>
                         Selected result (physical roll or DM choice)
-                        <select
+                        <SearchSelect
                           value={t.selected ?? ""}
-                          onChange={(e) =>
+                          onValueChange={(selectedValue) =>
                             update({
-                              selected: e.target.value === "" ? null : n(e.target.value),
+                              selected: selectedValue === "" ? null : n(selectedValue),
                             })
                           }
                         >
@@ -1889,7 +1890,7 @@ function EncounterEditor({
                               {i + 1}. {r.loot.name} × {r.loot.quantity}
                             </option>
                           ))}
-                        </select>
+                        </SearchSelect>
                       </label>
                       {manual && (
                         <label>

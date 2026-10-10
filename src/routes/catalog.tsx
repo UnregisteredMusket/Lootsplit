@@ -1,3 +1,4 @@
+import { SearchSelect } from "@/components/search-select";
 import { FantasyIcon } from "@/components/fantasy-icon";
 import { createFileRoute } from "@tanstack/react-router";
 import { Dices } from "lucide-react";
@@ -7,7 +8,7 @@ import { NameGenerator } from "@/components/name-generator";
 import { BookHarvest } from "@/components/book-harvest";
 import { RemoveButton } from "@/components/quire-ui";
 import { Shell } from "@/components/shell";
-import { Button, Segmented, Select, TextInput } from "@/components/ui";
+import { Button, Segmented, TextInput } from "@/components/ui";
 import { useEconomy } from "@/lib/quire/economy-context";
 import { CATEGORIES, LEXEME_KINDS, RARITIES, labelOf } from "@/lib/quire/labels";
 import { formatCopper, parsePrice } from "@/lib/quire/money";
@@ -146,29 +147,29 @@ function GoodsPane() {
             placeholder="List price, 2 gp"
             aria-label="List price"
           />
-          <Select
+          <SearchSelect
             aria-label="Category"
             value={kind}
-            onChange={(event) => setKind(event.target.value as ItemCategory)}
+            onValueChange={(selectedValue) => setKind(selectedValue as ItemCategory)}
           >
             {CATEGORIES.map((option) => (
               <option key={option.value} value={option.value}>
                 {option.label}
               </option>
             ))}
-          </Select>
+          </SearchSelect>
         </div>
-        <Select
+        <SearchSelect
           aria-label="Rarity"
           value={rarity}
-          onChange={(event) => setRarity(event.target.value as ItemRarity)}
+          onValueChange={(selectedValue) => setRarity(selectedValue as ItemRarity)}
         >
           {RARITIES.map((option) => (
             <option key={option.value} value={option.value}>
               {option.label}
             </option>
           ))}
-        </Select>
+        </SearchSelect>
         <Button type="submit" variant="secondary">
           Add to the catalog
         </Button>
@@ -179,17 +180,17 @@ function GoodsPane() {
           Generated items with list prices. No PDF required.
         </p>
         <div className="mt-3 flex flex-col gap-3">
-          <Select
+          <SearchSelect
             aria-label="Generated category"
             value={inventCategory}
-            onChange={(event) => setInventCategory(event.target.value as ItemCategory)}
+            onValueChange={(selectedValue) => setInventCategory(selectedValue as ItemCategory)}
           >
             {CATEGORIES.map((option) => (
               <option key={option.value} value={option.value}>
                 {option.label}
               </option>
             ))}
-          </Select>
+          </SearchSelect>
           <div className="grid grid-cols-2 gap-2">
             {RARITIES.map((option) => (
               <label key={option.value} className="flex min-h-11 items-center gap-2 text-sm">
@@ -229,10 +230,10 @@ function GoodsPane() {
           placeholder="Find an item"
           aria-label="Find an item"
         />
-        <Select
+        <SearchSelect
           aria-label="Filter category"
           value={category}
-          onChange={(event) => setCategory(event.target.value as ItemCategory | "all")}
+          onValueChange={(selectedValue) => setCategory(selectedValue as ItemCategory | "all")}
         >
           <option value="all">All categories</option>
           {CATEGORIES.map((option) => (
@@ -240,7 +241,7 @@ function GoodsPane() {
               {option.label}
             </option>
           ))}
-        </Select>
+        </SearchSelect>
       </div>
       <p className="mt-3 text-sm text-muted">{shown.length} shown</p>
       <ul className="mt-2 border-y border-border lg:grid lg:grid-cols-2 lg:gap-x-8 lg:border-y-0">
@@ -349,26 +350,26 @@ function NamesPane() {
             <Dices className="size-4" />
           </Button>
         </div>
-        <Select
+        <SearchSelect
           aria-label="Name kind"
           value={addKind}
-          onChange={(event) => setAddKind(event.target.value as LexemeKind)}
+          onValueChange={(selectedValue) => setAddKind(selectedValue as LexemeKind)}
         >
           {LEXEME_KINDS.map((option) => (
             <option key={option.value} value={option.value}>
               {option.label}
             </option>
           ))}
-        </Select>
+        </SearchSelect>
         <Button type="submit" variant="secondary">
           Save name
         </Button>
       </form>
       <div className="mt-6">
-        <Select
+        <SearchSelect
           aria-label="Filter names"
           value={kind}
-          onChange={(event) => setKind(event.target.value as LexemeKind | "all")}
+          onValueChange={(selectedValue) => setKind(selectedValue as LexemeKind | "all")}
         >
           <option value="all">All kinds</option>
           {LEXEME_KINDS.map((option) => (
@@ -376,7 +377,7 @@ function NamesPane() {
               {option.label}
             </option>
           ))}
-        </Select>
+        </SearchSelect>
       </div>
       {shown.length === 0 ? (
         <p className="mt-4 text-muted">

@@ -1,3 +1,4 @@
+import { SearchSelect } from "@/components/search-select";
 import { useMemo, useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { Button, Select, TextInput } from "./ui";
@@ -115,11 +116,11 @@ export function ShopStockList({
           <option value="sold-out">Sold out</option>
           <option value="unlimited">Unlimited</option>
         </Select>
-        <Select
+        <SearchSelect
           aria-label="Inventory rarity filter"
           value={rarity}
-          onChange={(event) => {
-            setRarity(event.target.value);
+          onValueChange={(selectedValue) => {
+            setRarity(selectedValue);
             setPage(0);
           }}
         >
@@ -129,7 +130,7 @@ export function ShopStockList({
               {r.label}
             </option>
           ))}
-        </Select>
+        </SearchSelect>
       </div>
       <p className="mt-2 text-sm text-muted" role="status">
         {filtered.length} of {lines.length} item types match. All stock is retained across pages.
@@ -225,11 +226,11 @@ export function CatalogStockPicker({ shop }: { shop: Shop }) {
               setPage(0);
             }}
           />
-          <Select
+          <SearchSelect
             aria-label="Catalog stock category"
             value={category}
-            onChange={(event) => {
-              setCategory(event.target.value);
+            onValueChange={(selectedValue) => {
+              setCategory(selectedValue);
               setPage(0);
             }}
           >
@@ -239,12 +240,12 @@ export function CatalogStockPicker({ shop }: { shop: Shop }) {
                 {kind.label}
               </option>
             ))}
-          </Select>
-          <Select
+          </SearchSelect>
+          <SearchSelect
             aria-label="Catalog stock rarity"
             value={rarity}
-            onChange={(event) => {
-              setRarity(event.target.value);
+            onValueChange={(selectedValue) => {
+              setRarity(selectedValue);
               setPage(0);
             }}
           >
@@ -254,7 +255,7 @@ export function CatalogStockPicker({ shop }: { shop: Shop }) {
                 {r.label}
               </option>
             ))}
-          </Select>
+          </SearchSelect>
         </div>
         <div className="mt-3 flex flex-wrap gap-2">
           <Button

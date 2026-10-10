@@ -1,3 +1,4 @@
+import { SearchSelect } from "@/components/search-select";
 import { useState, type ReactNode } from "react";
 import { toast } from "sonner";
 import { articlesForBook } from "@/lib/quire/db";
@@ -101,12 +102,12 @@ export function BookHarvest() {
         Review detected names and items before saving. Conflicting prices start unselected.
         Re-import older PDFs to use the improved line reader. Up to 200 item candidates are shown.
       </p>
-      <Select
+      <SearchSelect
         aria-label="Book"
         value={bookId}
         disabled={busy}
-        onChange={(event) => {
-          setBookId(event.target.value);
+        onValueChange={(selectedValue) => {
+          setBookId(selectedValue);
           setScanned(false);
           setNames([]);
           setGoods([]);
@@ -118,7 +119,7 @@ export function BookHarvest() {
             {book.title}
           </option>
         ))}
-      </Select>
+      </SearchSelect>
       <Button variant="secondary" disabled={!bookId || busy} onClick={() => void scan()}>
         {busy ? "Reading…" : "Read this book"}
       </Button>

@@ -1,21 +1,49 @@
 import { AppLink } from "@/components/app-link";
 import { ResourcePacks } from "@/components/resource-packs";
+import { SearchSelect } from "@/components/search-select";
+import { Button } from "@/components/ui";
+import { useWorldTable } from "@/lib/quire/use-world-table";
+import {
+  libraryRecords,
+  searchLibraryRecords,
+  libraryRecordHref,
+} from "@/lib/quire/library-records";
 import { FantasyIcon } from "@/components/fantasy-icon";
 import { createFileRoute, Link } from "@tanstack/react-router";
 import { Search } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Shell } from "@/components/shell";
 import { useSeat } from "@/lib/quire/seat";
 import { loadHandouts, type Handout } from "@/lib/quire/handouts";
 import { LedgerArt } from "@/components/ledger-art";
 import { useEconomy } from "@/lib/quire/economy-context";
-export const Route = createFileRoute("/library")({ component: LibraryHub });
+export const Route = createFileRoute("/library")({
+  validateSearch: (s: Record<string, unknown>) => ({
+    record: typeof s.record === "string" && s.record.length <= 800 ? s.record : undefined,
+  }),
+  component: LibraryHub,
+});
 function LibraryHub() {
   const seat = useSeat(),
     dm = seat.role === "dm",
     [query, setQuery] = useState(""),
     [handouts, setHandouts] = useState<Handout[]>([]);
-  const { catalog } = useEconomy();
+  const { catalog, lexicon, ready } = useEconomy();
+  const table = useWorldTable(),
+    { record: recordKey } = Route.useSearch();
+  const [kind, setKind] = useState(""),
+    [page, setPage] = useState(0);
+  const { journal, purses, holdings, shops } = table,
+    { role, purseIds } = seat;
+  const records = useMemo(
+      () =>
+        libraryRecords({ journal, purses, holdings, shops }, { role, purseIds }, catalog, lexicon),
+      [journal, purses, holdings, shops, role, purseIds, catalog, lexicon],
+    ),
+    record = records.find((r) => r.key === recordKey);
+  const matching = searchLibraryRecords(records, query, kind),
+    kinds = [...new Set(records.map((r) => r.kind))].sort();
+  const currentPage = Math.min(page, Math.max(0, Math.ceil(matching.length / 20) - 1));
   useEffect(() => {
     void loadHandouts()
       .then(setHandouts)
@@ -82,9 +110,12 @@ function LibraryHub() {
         <Search size={20} />
         <input
           aria-label="Search library destinations and catalog"
-          placeholder="Search references, items, tools…"
+          placeholder="Search locations, NPCs, monsters, items…"
           value={query}
-          onChange={(e) => setQuery(e.target.value)}
+          onChange={(e) => {
+            setQuery(e.target.value);
+            setPage(0);
+          }}
         />
       </label>
       <div className="library-tiles">
@@ -98,6 +129,112 @@ function LibraryHub() {
             </AppLink>
           ))}
       </div>
+      <section id="records" className="mt-6" aria-label="Campaign library records">
+        <h2>Campaign records & imported data</h2>
+        <p className="text-sm text-muted">
+          Search your saved entries and open a record to see its details.
+        </p>
+        {recordKey && !ready ? (
+          <p role="status">Loading entry…</p>
+        ) : recordKey && !record ? (
+          <p role="alert">
+            This entry is unavailable in the current campaign or is not shared with you.
+          </p>
+        ) : null}
+        {record && (
+          <article className="world-card library-record-detail" aria-label="Library entry">
+            <div className="panel-heading">
+              <h2>{record.name}</h2>
+              <AppLink href="/library#records">Close entry</AppLink>
+            </div>
+            <p className="text-muted">{record.kind}</p>
+            {record.image && <img src={record.image} alt={record.name} />}
+            {record.description && (
+              <p className="whitespace-pre-wrap break-words mt-3">{record.description}</p>
+            )}
+            <dl className="library-record-fields">
+              {record.fields.map(([label, value], i) => (
+                <div className="contents" key={i}>
+                  <dt>{label}</dt>
+                  <dd>{value || "Not recorded"}</dd>
+                </div>
+              ))}
+            </dl>
+            {record.warnings?.map((warning, i) => (
+              <p className="text-danger" key={i}>
+                {warning}
+              </p>
+            ))}
+            <div className="flex flex-wrap gap-3">
+              {record.links.map((link, i) => (
+                <AppLink className="settings-link" key={i} href={link.href}>
+                  {link.name} →
+                </AppLink>
+              ))}
+            </div>
+          </article>
+        )}
+        <label className="block mt-3">
+          Record type
+          <SearchSelect
+            aria-label="Library record type"
+            value={kind}
+            onValueChange={(value) => {
+              setKind(value);
+              setPage(0);
+            }}
+          >
+            <option value="">All records</option>
+            {kinds.map((k) => (
+              <option key={k} value={k}>
+                {k}
+              </option>
+            ))}
+          </SearchSelect>
+        </label>
+        <p className="text-sm text-muted mt-2" role="status">
+          {matching.length} matching entries
+        </p>
+        <div className="library-record-list">
+          {matching.slice(currentPage * 20, (currentPage + 1) * 20).map((r) => (
+            <AppLink href={`/library?record=${encodeURIComponent(r.key)}#records`} key={r.key}>
+              <span>
+                <strong>{r.name}</strong>
+                <small>{r.kind}</small>
+              </span>
+              <span aria-hidden="true">›</span>
+            </AppLink>
+          ))}
+        </div>
+        {!matching.length && (
+          <p className="mt-3">
+            {records.length
+              ? "No entries match your search."
+              : "No campaign entries are available yet."}
+          </p>
+        )}
+        {matching.length > 20 && (
+          <div className="flex items-center justify-between gap-2 mt-3">
+            <Button
+              variant="ghost"
+              disabled={!currentPage}
+              onClick={() => setPage(currentPage - 1)}
+            >
+              Previous entries
+            </Button>
+            <span>
+              {currentPage + 1} / {Math.ceil(matching.length / 20)}
+            </span>
+            <Button
+              variant="ghost"
+              disabled={(currentPage + 1) * 20 >= matching.length}
+              onClick={() => setPage(currentPage + 1)}
+            >
+              More entries
+            </Button>
+          </div>
+        )}
+      </section>
       {dm && (
         <>
           <div className="panel-heading mt-6">
@@ -109,7 +246,7 @@ function LibraryHub() {
               .filter((x) => x.name.toLowerCase().includes(query.toLowerCase()))
               .slice(0, 6)
               .map((x) => (
-                <AppLink href="/catalog" key={x.id}>
+                <AppLink href={libraryRecordHref("catalog", x.id)} key={x.id}>
                   <LedgerArt kind="item" entry={x} />
                   <span>
                     <strong>{x.name}</strong>

@@ -1,3 +1,4 @@
+import { SearchSelect } from "@/components/search-select";
 import { useState } from "react";
 import { toast } from "sonner";
 import { useEconomy } from "@/lib/quire/economy-context";
@@ -143,12 +144,12 @@ export function MarketNameImport({
             {kind !== "region" ? (
               <label className="text-sm">
                 Location for a simple list
-                <Select
+                <SearchSelect
                   aria-label="Import parent location"
                   value={parentId}
                   disabled={busy}
-                  onChange={(event) => {
-                    setParentId(event.target.value);
+                  onValueChange={(selectedValue) => {
+                    setParentId(selectedValue);
                     invalidate();
                   }}
                 >
@@ -162,7 +163,7 @@ export function MarketNameImport({
                       {locationLabel(market, location.id)} · {location.kind}
                     </option>
                   ))}
-                </Select>
+                </SearchSelect>
               </label>
             ) : null}
           </div>

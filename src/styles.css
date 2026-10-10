@@ -2431,3 +2431,25 @@ input,select,textarea { max-width: 100%; }
 .map-ping-crosshair { position:absolute; left:50%; top:50%; transform:translate(-50%,-50%); color:var(--color-fg); text-shadow:0 0 3px var(--color-bg); font-size:28px; pointer-events:none; }
 @keyframes map-ping-pulse { from { transform:scale(.7); opacity:1; } to { transform:scale(2); opacity:0; } }
 @media(prefers-reduced-motion:reduce) { .map-ping::after { animation:none; } }
+
+.record-select { position: relative; min-width: 0; width: 100%; }
+.record-select-trigger { display: flex; align-items: center; justify-content: space-between; gap: .6rem; width: 100%; min-height: 44px; padding: .55rem .75rem; border: 1px solid var(--color-border); border-radius: .25rem; background: var(--color-subtle); color: var(--color-fg); text-align: left; font-size: 1rem; }
+.record-select-trigger > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
+.record-select-trigger > svg { flex-shrink: 0; }
+.record-select-trigger:disabled { opacity: .45; }
+.record-select-menu { z-index: 200; width: max(280px, var(--radix-popover-trigger-width)); max-width: calc(100vw - 24px); max-height: var(--radix-popover-content-available-height); display: flex; flex-direction: column; border: 1px solid var(--color-border); border-radius: .5rem; background: var(--color-bg); color: var(--color-fg); box-shadow: 0 8px 24px #0005; padding: .4rem; }
+.record-select-search { display: flex; align-items: center; gap: .5rem; padding: .25rem; border-bottom: 1px solid var(--color-border); }
+.record-select-search input { width: 100%; min-width: 0; min-height: 44px; color: var(--color-fg); background: var(--color-subtle); padding: .4rem .5rem; font-size: 16px; }
+.record-select-options { overflow-y: auto; max-height: min(320px, 45dvh); min-height: 0; overscroll-behavior: contain; }
+.record-select-options > button { display: flex; align-items: center; justify-content: space-between; gap: .5rem; width: 100%; min-height: 44px; padding: .55rem .65rem; text-align: left; background: transparent; color: var(--color-fg); white-space: normal; overflow-wrap: anywhere; border: 0; }
+.record-select-options > button[data-active="true"], .record-select-options > button:hover { background: var(--color-subtle); outline: 1px solid var(--color-border); outline-offset: -1px; }
+.record-select-options > button:disabled { opacity: .45; }
+.record-select-options > p, .record-select-count { padding: .4rem .65rem; font-size: .85rem; }
+.record-select-more { min-height: 44px; }
+.library-record-detail { scroll-margin-top: 6rem; }
+.library-record-detail > img { max-height: 400px; width: 100%; object-fit: contain; }
+.library-record-fields { display: grid; grid-template-columns: minmax(5rem, 1fr) minmax(0, 3fr); gap: .5rem 1rem; margin: 1rem 0; }
+.library-record-fields dt { color: var(--color-muted); }
+.library-record-fields dd { overflow-wrap: anywhere; white-space: pre-wrap; }
+.library-record-list a { display: flex; justify-content: space-between; gap: 1rem; padding: .75rem 0; border-bottom: 1px solid var(--color-border); }
+.library-record-list small { display: block; color: var(--color-muted); }

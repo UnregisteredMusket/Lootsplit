@@ -1,3 +1,4 @@
+import { chooseOption } from "./search-select-browser.mjs";
 import { navigateApplication, openApplication, prepareDmFixture } from "./title-screen-navigation.mjs";
 import { chromium } from "playwright";
 import assert from "node:assert/strict";
@@ -110,7 +111,7 @@ async function visit(path) {
   if (path.startsWith("/characters"))
     await page.getByRole("heading", { name: "Mira Ashfall", exact: true }).waitFor();
   if (path.startsWith("/encounters")) {
-    await page.getByLabel("Save in", { exact: true }).selectOption(campaign.code);
+    await chooseOption(page.getByLabel("Save in", { exact: true }), campaign.code);
     await page.getByRole("button", { name: /Ambush on the northern road/ }).click();
     await page.getByRole("button", { name: "Save encounter", exact: true }).waitFor();
   }
