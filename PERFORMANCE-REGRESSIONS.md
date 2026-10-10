@@ -16,7 +16,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Code checks and immutable builds / Run npm ci | open | 3 | 7s → 20s | +13s | +185.71% |
 | Development / desktop / Run npm ci | open | 3 | 11s → 20s | +9s | +81.82% |
 | Development / gameplay / Run npm ci | open | 2 | 11s → 17s | +6s | +54.55% |
-| Code checks and immutable builds / unit-tests | open | 4 | 8s → 27s | +19s | +237.5% |
+| Code checks and immutable builds / unit-tests | open | 5 | 8s → 32s | +24s | +300% |
 | Code checks and immutable builds / typecheck | open | 4 | 7s → 20s | +13s | +185.71% |
 | Code checks and immutable builds / lint | open | 3 | 5s → 11s | +6s | +120% |
 | Development / accounts / Run npx playwright install --with-deps chromium | open | 4 | 21s → 372s | +351s | +1671.43% |
@@ -226,6 +226,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-10T07:21:35Z | step: Code checks and immutable builds / unit-tests | 27s → 32s | +5s | +18.52% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37783175577/job/113331147664) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38034098040/job/114160843289) |
 | 2026-10-10T07:14:47Z | step: Development / gameplay / dev-library-navigation | 28s → 38s | +10s | +35.71% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37638440371/job/112850726074) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38033323180/job/114158562449) |
 | 2026-10-10T07:14:45Z | step: Packaged Worker / interface / worker-loot | 6s → 7s | +1s | +16.67% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37389052554/job/112030816533) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38033323180/job/114158824650) |
 | 2026-10-10T07:14:38Z | step: Packaged Worker / interface / worker-library-navigation | 22s → 27s | +5s | +22.73% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37810301899/job/113425923981) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38033323180/job/114158824650) |
