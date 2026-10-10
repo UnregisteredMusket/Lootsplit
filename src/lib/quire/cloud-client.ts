@@ -33,6 +33,7 @@ import { isEphemeralCampaign, setEphemeralCampaign } from "./guest-storage.ts";
 import { closeQuireDb } from "./db.ts";
 import { reconcileAccountResume } from "./account-resume.ts";
 import { sameCommand } from "./command-identity.ts";
+import { readRoomResponse } from "./room-response.ts";
 import {
   rememberRevokedRecovery,
   revokedRecoverySummaries,
@@ -345,8 +346,13 @@ function start() {
   };
   schedule();
 }
-async function accept(remote: RoomView, committed = false) {
+async function accept(value: RoomView, committed = false) {
+  const { remote, draft: incomingDraft } = readRoomResponse(value);
   const s = requireSession();
+  if (remote.code !== s.code || remote.seatId !== s.seatId)
+    throw Error(
+      "The campaign response belongs to a different room or seat. Your pending actions are retained.",
+    );
   if (remote.userId && s.userId && remote.userId !== s.userId)
     throw Error(
       "This seat now belongs to a different account. Export your original pending work before switching.",
@@ -362,7 +368,7 @@ async function accept(remote: RoomView, committed = false) {
   }
   // Unite immutable same-seat drafts from every device. Acknowledged commands
   // never return as pending, including legacy/delayed server responses.
-  const draft = (JSON.parse(remote.draft) as Command[]).filter((c) => !acknowledged.has(c.id));
+  const draft = incomingDraft.filter((c) => !acknowledged.has(c.id));
   const known = new Map(s.pending.map((c) => [c.id, c]));
   for (const command of draft) {
     const local = known.get(command.id);
@@ -595,7 +601,7 @@ export function retryPending() {
     await refresh();
     if (!requireSession().pending.length) return;
     publish({ status: "saving", error: "" });
-    const submit = () => view.live ? flush() : stage(true);
+    const submit = () => (view.live ? flush() : stage(true));
     try {
       await submit();
     } catch (error) {
@@ -665,8 +671,12 @@ export async function queueCommand(
     if (input.kind !== "message" && !view.mine) throw new Error(`It is ${view.who}'s turn.`);
     if (s.pending.length >= 100) throw new Error("Submit your pending actions before adding more.");
     const command = commandSchema.parse({ ...input, id: crypto.randomUUID() });
-    const seasonalPlan = input.kind === "trade-season-plan" || (input.kind === "downtime-plan" && input.advanceSeason);
-    if (seasonalPlan && s.pending.length) throw Error("Submit or resolve pending actions before preparing authoritative seasonal rolls.");
+    const seasonalPlan =
+      input.kind === "trade-season-plan" || (input.kind === "downtime-plan" && input.advanceSeason);
+    if (seasonalPlan && s.pending.length)
+      throw Error(
+        "Submit or resolve pending actions before preparing authoritative seasonal rolls.",
+      );
     if (input.kind === "message" || seasonalPlan) {
       // Chat is independent of transaction turns; retain a failed message in the editor.
       const remote = await submitCloudCommands({
@@ -998,11 +1008,19 @@ export async function resumeAccountMembership(
       (current.seatId !== member.seatId || current.token !== member.token)
     )
       throw new Error("Export your unsynced player changes in Multiplayer before changing seats.");
-    const remote = await pullCloudTable({
-      data: { code: member.code, token: member.token },
-    });
+    const { remote, draft } = readRoomResponse(
+      await pullCloudTable({
+        data: { code: member.code, token: member.token },
+      }),
+    );
     const role = remote.seats.find((s) => s.id === remote.seatId)?.role;
-    if (!role || (role === "player" && !remote.purseIds.length) || remote.seatId !== member.seatId)
+    if (
+      !role ||
+      (role === "player" && !remote.purseIds.length) ||
+      remote.seatId !== member.seatId ||
+      remote.code !== member.code ||
+      (remote.userId && remote.userId !== member.userId)
+    )
       throw new Error("This membership has changed. Refresh your account library.");
     const { selectAccountCampaign } = await import("./campaigns");
     const id = `account-${member.userId}-${member.code}`;
@@ -1048,9 +1066,7 @@ export async function resumeAccountMembership(
     }
     if (reconciled.needsRecovery) {
       // Open the authoritative seat with its own draft. Old work stays exportable.
-      reconciled.pending = (JSON.parse(remote.draft) as Command[]).filter(
-        (c) => !remote.acknowledged.includes(c.id),
-      );
+      reconciled.pending = draft.filter((c) => !remote.acknowledged.includes(c.id));
       reconciled.batchId = crypto.randomUUID();
       reconciled.revision = reconciled.pending.length ? -1 : 0;
     }

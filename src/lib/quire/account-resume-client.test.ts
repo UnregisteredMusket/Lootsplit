@@ -3,6 +3,8 @@ import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import { stripTypeScriptTypes } from "node:module";
 import { reconcileAccountResume } from "./account-resume.ts";
+import { readRoomResponse } from "./room-response.ts";
+import { emptyCloudTable } from "./cloud.ts";
 
 // Execute the actual exported client function with isolated storage/transport.
 // Browser coverage separately exercises its real UI entry points and backend.
@@ -28,6 +30,7 @@ const build = new Function(
   "reloadCampaignContext",
   "reconcileAccountResume",
   "key",
+  "readRoomResponse",
   stripTypeScriptTypes(body) + "; return resumeAccountMembership;",
 );
 const member = {
@@ -55,6 +58,7 @@ function harness(
     account?: string;
     failRecovery?: boolean;
     seatId?: string;
+    remote?: unknown;
   } = {},
 ) {
   const id = "account-owner-TEST",
@@ -75,16 +79,24 @@ function harness(
     () => options.current ?? null,
     { getItem: () => options.account ?? "owner" },
     storage,
-    async () => ({
-      code: "TEST",
-      seatId: options.seatId ?? "dm",
-      seats: [{ id: "dm", role: "dm" }],
-      purseIds: [],
-      shopIds: [],
-      revision: 3,
-      acknowledged: options.acknowledged ?? [],
-      draft: JSON.stringify(options.draft ?? []),
-    }),
+    async () =>
+      "remote" in options
+        ? options.remote
+        : {
+            code: "TEST",
+            seatId: options.seatId ?? "dm",
+            seats: [{ id: "dm", role: "dm", name: "Synthetic DM", pending: 0, allowParty: false }],
+            purseIds: [],
+            shopIds: [],
+            revision: 3,
+            turn: 0,
+            mine: true,
+            who: "Synthetic DM",
+            live: true,
+            table: emptyCloudTable(),
+            acknowledged: options.acknowledged ?? [],
+            draft: JSON.stringify(options.draft ?? []),
+          },
     {
       selectAccountCampaign: () => {
         selected = true;
@@ -99,6 +111,7 @@ function harness(
     },
     reconcileAccountResume,
     () => key,
+    readRoomResponse,
   );
   return {
     resume: () => resume(member),
@@ -108,6 +121,16 @@ function harness(
     reloaded: () => reloaded,
   };
 }
+test("actual resume rejects incomplete replies without replacing the selected campaign or queue", async () => {
+  for (const remote of [undefined, null, {}, { statusCode: 500, message: "Incomplete response" }]) {
+    const h = harness({ cached: saved, current: saved, remote });
+    const before = [...h.values];
+    await assert.rejects(h.resume(), /shared campaign response was incomplete/);
+    assert.deepEqual([...h.values], before);
+    assert.equal(h.selected(), false);
+    assert.equal(h.reloaded(), false);
+  }
+});
 test("actual resume opens a cache with acknowledged stale Live actions", async () => {
   const h = harness({ cached: saved, acknowledged: ["action"] });
   await h.resume();

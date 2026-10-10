@@ -74,6 +74,94 @@ async function rows(page, store) {
 async function market(page) {
   return (await rows(page, "meta")).find((row) => row.id === "journal")?.value?.market;
 }
+async function savedQueue(page) {
+  return page.evaluate(() => {
+    const campaign = localStorage.getItem("quire.campaign.v1") || "main";
+    const session = JSON.parse(localStorage.getItem(`quire.cloud.v2.${campaign}`));
+    return { batchId: session.batchId, commands: session.pending };
+  });
+}
+async function importState(page) {
+  const [locations, shops, stock, purses, ledger, queue] = await Promise.all([
+    market(page),
+    rows(page, "shops"),
+    rows(page, "stock"),
+    rows(page, "purses"),
+    rows(page, "ledger"),
+    savedQueue(page),
+  ]);
+  return { locations, shops, stock, purses, ledger, queue };
+}
+async function importResponseFaults(page, code) {
+  const fault = {
+    reads: false,
+    readUrl: "",
+    incompleteReads: 0,
+    loseImportName: "",
+    lostSubmission: null,
+    submitted: [],
+  };
+  // Keep the handler installed through recovery. Toggling the fault avoids
+  // unroute races with an in-flight background read; context cleanup removes it.
+  await page.route("**/_serverFn/**", async (route) => {
+    const request = route.request();
+    if (new URL(request.url()).origin !== origin) return route.fallback();
+    const body = request.postData() || "";
+    const sameRoom = body.includes(JSON.stringify(code)) && body.includes('"token"');
+    const commands = sameRoom && body.includes('"commands"');
+    // During this Market flow, the code/token-only operation is the room pull.
+    // Learn its actual URL so this works with both development and packaged IDs.
+    if (
+      !fault.readUrl &&
+      request.method() === "POST" &&
+      sameRoom &&
+      !commands &&
+      !["action", "endpoint", "live", "purseId", "table", "endTurn"].some((key) =>
+        body.includes(JSON.stringify(key)),
+      )
+    )
+      fault.readUrl = request.url();
+    if (commands) {
+      const queue = await savedQueue(page);
+      fault.submitted.push(queue);
+      if (fault.loseImportName && body.includes(fault.loseImportName)) {
+        assert.equal(fault.lostSubmission, null, "The user submits this import only once");
+        assert.equal(queue.commands.length, 1);
+        assert.equal(queue.commands[0].kind, "market-name-import");
+        assert.ok(body.includes(JSON.stringify(queue.commands[0].id)));
+        assert.ok(body.includes(JSON.stringify(queue.batchId)));
+        fault.lostSubmission = queue;
+        fault.loseImportName = "";
+        // Hold reads before forwarding the write: a background poll must not
+        // acknowledge the saved action before the real Retry is exercised.
+        fault.reads = true;
+        const response = await route.fetch();
+        assert.ok(response.ok(), "The real command request reached the local server");
+        return route.fulfill({ status: 200, contentType: "application/json", body: "{}" });
+      }
+    }
+    if (fault.reads && request.url() === fault.readUrl) {
+      fault.incompleteReads++;
+      // A JSON response without TanStack's result envelope deserializes to an
+      // undefined room view. It must be rejected before touching saved state.
+      return route.fulfill({ status: 200, contentType: "application/json", body: "{}" });
+    }
+    return route.continue();
+  });
+  return fault;
+}
+function largeHierarchyFile(width) {
+  const region = `Recovery Coast ${width}`;
+  const source = ["region,city,town,area,shop", `${region},,,,`];
+  for (let i = 0; i < 482; i++)
+    source.push(`${region},,Recovery Town ${width} ${i % 25},Recovery Area ${width} ${i},`);
+  // 483 source rows create 1 region + 25 towns + 482 areas = 508 locations.
+  return {
+    name: "synthetic-hierarchy-483.csv",
+    mimeType: "text/csv",
+    buffer: Buffer.from(source.join("\n")),
+  };
+}
 async function decode(locator) {
   await expect(locator).toBeVisible();
   await expect
@@ -388,6 +476,8 @@ try {
       (await rows(dm, "stock")).find((stock) => stock.shopId === remoteShop).quantity,
       7,
     );
+    currentPage = dm;
+    const responseFault = await importResponseFaults(dm, invitation.code);
     // The shared DM imports a plain shop list through the actual server command path.
     await dm.getByRole("button", { name: /^Manage regions, cities, towns and areas/ }).click();
     await dm.getByRole("button", { name: "Import names", exact: true }).click();
@@ -419,12 +509,158 @@ try {
         .length,
       1,
     );
+    // The server may save the import even though the caller receives no result.
+    // Retain that exact queued action and recover with the visible Retry control.
+    currentPage = dm;
+    const recoveredShopName = `Recovered Imported Shop ${width}`;
+    await dm.getByRole("button", { name: "Import names", exact: true }).click();
+    await importDialog.getByLabel("Imported name type", { exact: true }).selectOption("shop");
+    await importDialog.getByLabel("Import parent location", { exact: true }).selectOption(other);
+    await importDialog.getByLabel("Names to import", { exact: true }).fill(recoveredShopName);
+    await importDialog.getByRole("button", { name: "Review import", exact: true }).click();
+    await expect(
+      importDialog.getByText("0 new locations · 1 new shops", { exact: true }),
+    ).toBeVisible();
+    const beforeLostResponse = await importState(dm);
+    const submissionsBefore = responseFault.submitted.length;
+    responseFault.loseImportName = recoveredShopName;
+    await dm.screenshot({ path: `${output}/import-before-lost-response-${width}.png` });
+    await importDialog.getByRole("button", { name: "Import 1 new entries", exact: true }).click();
+    await expect(importDialog).toHaveCount(0);
+    await expect.poll(async () => (await savedQueue(dm)).commands.length).toBe(1);
+    assert.ok(responseFault.lostSubmission, "The real import response was replaced");
+    assert.deepEqual(
+      await savedQueue(dm),
+      responseFault.lostSubmission,
+      "Action and batch IDs survive",
+    );
+    await expect(
+      player.locator(".market-grid").getByRole("link").filter({ hasText: recoveredShopName }),
+    ).toHaveCount(1);
+    await navigateApplication(dm, origin + "/share");
+    const retry = dm.getByRole("button", { name: "Retry", exact: true });
+    if (!(await retry.isVisible()))
+      await dm.getByRole("button", { name: /^Connection & recovery/ }).click();
+    await expect(retry).toBeVisible();
+    await expect(dm.getByText(/shared campaign response was incomplete/i)).toBeVisible();
+    assert.deepEqual(
+      await savedQueue(dm),
+      responseFault.lostSubmission,
+      "Navigation preserves the same queued action",
+    );
+    await dm.screenshot({ path: `${output}/import-lost-response-retry-${width}.png` });
+    responseFault.reads = false;
+    await retry.click();
+    await expect.poll(async () => (await savedQueue(dm)).commands.length).toBe(0);
+    assert.equal(
+      responseFault.submitted.length,
+      submissionsBefore + 1,
+      "Retry acknowledges the committed action without submitting another import",
+    );
+    const importedActionId = responseFault.lostSubmission.commands[0].id;
+    const journal = (await rows(dm, "meta")).find((row) => row.id === "journal").value;
+    assert.equal(
+      journal.events.filter((event) => event.id.startsWith(`${importedActionId}-event-`)).length,
+      1,
+    );
+    const recoveredShops = (await rows(dm, "shops")).filter(
+      (shop) => shop.name === recoveredShopName,
+    );
+    assert.equal(recoveredShops.length, 1);
+    assert.ok(recoveredShops[0].closed);
+    assert.deepEqual(await rows(dm, "stock"), beforeLostResponse.stock);
+    assert.deepEqual(await rows(dm, "purses"), beforeLostResponse.purses);
+    assert.deepEqual(await rows(dm, "ledger"), beforeLostResponse.ledger);
+    assert.deepEqual(await market(dm), beforeLostResponse.locations);
+    await navigateApplication(dm, origin + "/market");
+    await dm.getByRole("button", { name: "Import names", exact: true }).click();
+    await importDialog.getByLabel("Imported name type", { exact: true }).selectOption("shop");
+    await importDialog.getByLabel("Import parent location", { exact: true }).selectOption(other);
+    await importDialog.getByLabel("Names to import", { exact: true }).fill(recoveredShopName);
+    await importDialog.getByRole("button", { name: "Review import", exact: true }).click();
+    await expect(
+      importDialog.getByText("0 new locations · 0 new shops", { exact: true }),
+    ).toBeVisible();
+    await expect(
+      importDialog.getByRole("button", { name: "Import 0 new entries", exact: true }),
+    ).toBeDisabled();
+    await importDialog.getByRole("button", { name: "Clear import", exact: true }).click();
+    await importDialog.getByRole("button", { name: "Close", exact: true }).click();
+    // A complete hierarchy must survive an unreadable preflight room response.
+    // Use only synthetic names; the user's resource-book CSV remains private.
+    currentPage = dm;
+    const largeFile = largeHierarchyFile(width);
+    await dm.getByRole("button", { name: "Import names", exact: true }).click();
+    await importDialog.getByLabel("Import names file", { exact: true }).setInputFiles(largeFile);
+    await importDialog.getByRole("button", { name: "Review import", exact: true }).click();
+    await expect(
+      importDialog.getByText("508 new locations · 0 new shops", { exact: true }),
+    ).toBeVisible();
+    await dm.screenshot({ path: `${output}/import-before-incomplete-${width}.png` });
+    await expect.poll(async () => (await savedQueue(dm)).commands.length).toBe(0);
+    const beforeIncomplete = await importState(dm);
+    const submittedBeforeIncomplete = responseFault.submitted.length;
+    const readsBeforeIncomplete = responseFault.incompleteReads;
+    responseFault.reads = true;
+    await importDialog.getByRole("button", { name: "Import 508 new entries", exact: true }).click();
+    await expect(importDialog.getByRole("alert")).toContainText(
+      /shared campaign response was incomplete/i,
+    );
+    assert.ok(
+      responseFault.incompleteReads > readsBeforeIncomplete,
+      "The actual preflight pull was interrupted",
+    );
+    assert.equal(
+      responseFault.submitted.length,
+      submittedBeforeIncomplete,
+      "A failed preflight sends no import command",
+    );
+    await expect(importDialog.getByLabel("Names to import", { exact: true })).toHaveValue(
+      largeFile.buffer.toString(),
+    );
+    await expect(
+      importDialog.getByText("508 new locations · 0 new shops", { exact: true }),
+    ).toBeVisible();
+    assert.deepEqual(
+      await importState(dm),
+      beforeIncomplete,
+      "The campaign and queue are unchanged",
+    );
+    await dm.screenshot({ path: `${output}/import-incomplete-retained-${width}.png` });
+    responseFault.reads = false;
+    await importDialog.getByRole("button", { name: "Import 508 new entries", exact: true }).click();
+    await expect(importDialog).toHaveCount(0);
+    await expect.poll(async () => (await savedQueue(dm)).commands.length).toBe(0);
+    assert.equal(
+      (await market(dm)).locations.length,
+      beforeIncomplete.locations.locations.length + 508,
+    );
+    assert.deepEqual(await rows(dm, "shops"), beforeIncomplete.shops);
+    assert.deepEqual(await rows(dm, "stock"), beforeIncomplete.stock);
+    assert.deepEqual(await rows(dm, "purses"), beforeIncomplete.purses);
+    assert.deepEqual(await rows(dm, "ledger"), beforeIncomplete.ledger);
+    assert.equal(
+      (await market(dm)).currentLocationId,
+      beforeIncomplete.locations.currentLocationId,
+    );
+    await dm.getByRole("button", { name: "Import names", exact: true }).click();
+    await importDialog.getByLabel("Import names file", { exact: true }).setInputFiles(largeFile);
+    await importDialog.getByRole("button", { name: "Review import", exact: true }).click();
+    await expect(
+      importDialog.getByText("0 new locations · 0 new shops", { exact: true }),
+    ).toBeVisible();
+    await expect(
+      importDialog.getByRole("button", { name: "Import 0 new entries", exact: true }),
+    ).toBeDisabled();
+    await importDialog.getByRole("button", { name: "Clear import", exact: true }).click();
+    await importDialog.getByRole("button", { name: "Close", exact: true }).click();
+
     await player.screenshot({ path: `${output}/player-${width}.png`, fullPage: true });
     await dm.screenshot({ path: `${output}/dm-${width}.png`, fullPage: true });
   }
   assert.deepEqual(errors, []);
   console.log(
-    "PASS: desktop/mobile reviewed CSV/plain name imports, invalid JSON/duplicate protection, closed empty shops, shared server import and reload; DM hierarchy/images, player trade, live location changes and memory-only guest access.",
+    "PASS: desktop/mobile reviewed CSV/plain and 483-row hierarchy imports, malformed preflight draft retention, saved-command response recovery through real Retry, invalid JSON/duplicate protection, closed empty shops, shared server import and reload; DM hierarchy/images, player trade, live location changes and memory-only guest access.",
   );
 } catch (error) {
   console.error(error);
