@@ -622,10 +622,9 @@ test("resume-queue", async ({ devices, baseURL: origin }, testInfo) => {
     await waitForDmCampaign(device);
     expect(await device.locator(".loot-opening").count()).toBe(0);
   }
-  await resumeSaved();
   // A lost Live response must remain recoverable, then an acknowledged stale
-  // queue must open from both account cards and the startup selector.
-  await navigateAccountScenario(device, origin, "/account");
+  // queue must open from both account cards and the startup selector. Room
+  // creation already saved the source device cache and opened My account.
   const original = await device.evaluate(() => {
     const key = `quire.cloud.v2.${localStorage.getItem("quire.campaign.v1")}`;
     return { key, session: JSON.parse(localStorage.getItem(key)) };
@@ -661,6 +660,12 @@ test("resume-queue", async ({ devices, baseURL: origin }, testInfo) => {
       .getByRole("status")
       .filter({ hasText: /Room online.*Play active.*Saved to room/ }),
   ).toBeVisible();
+
+  // The first queued Resume selected the canonical account copy. Subsequent
+  // injections must use its active key; the source copy remains for recovery.
+  original.key = await device.evaluate(
+    () => `quire.cloud.v2.${localStorage.getItem("quire.campaign.v1")}`,
+  );
 
   // Retry above has already acknowledged this no-op batch. Each entry proof
   // now owns a different device cache and only reads the same server receipt.
@@ -1110,7 +1115,10 @@ test("campaign-choice", async ({ devices, baseURL: origin }, testInfo) => {
 
 test("invitations", async ({ devices, baseURL: origin }, testInfo) => {
   async function openGuest(page) {
-    await visitPage(page, origin, "/share");
+    // Keep the real cold startup and DM claim, then follow the actual router
+    // link to invitations in the document that the claim already opened.
+    await prepareDmFixture(page, origin);
+    await navigateAccountScenario(page, origin, "/share");
     const guide = page.getByRole("button", { name: "Not now", exact: true });
     if (await guide.isVisible()) await guide.click();
     await expect(page.locator(".role-chip:enabled")).toBeVisible();
@@ -1127,8 +1135,8 @@ test("invitations", async ({ devices, baseURL: origin }, testInfo) => {
   const { page: otherDm } = await devices.newDevice();
   const { page: player } = await devices.newDevice(390);
   // These unrelated campaigns/devices do not interact until invitation testing.
-  // Keep every initial cold visit and control assertion, without serializing
-  // their account provisioning and room preparation.
+  // Keep each initial cold startup, claim and control assertion, while the
+  // independent account provisioning and room preparation run together.
   const [target, previous] = await Promise.all([host(dm), host(otherDm), openGuest(player)]);
   expect(previous).not.toBe(target);
   await dm.evaluate(() =>
@@ -1251,7 +1259,10 @@ test("invitations", async ({ devices, baseURL: origin }, testInfo) => {
 
 test("shared-recovery", async ({ devices, baseURL: origin }, testInfo) => {
   const { page } = devices;
-  await signedInDevices(devices, origin);
+  // This recovery uses one device. Keep its real signup and cold account entry.
+  await accountPost(devices.context, origin, "auth/sign-up/email", credentials());
+  await visitPage(page, origin, "/account");
+  await expect(page.getByRole("button", { name: "Sign out", exact: true })).toBeVisible();
   await prepareDmFixture(page, origin);
   const [member] = await createAndSaveRoom(page, origin, navigateAccountScenario);
   const encounter = blankEncounter();
