@@ -140,6 +140,26 @@ try {
             notes: "Map fixture",
             locationId: "city",
           });
+          for (let i = 0; i < 28; i++)
+            tx.objectStore("holdings").put({
+              id: `barter-sample-${i}`,
+              purseId: "hero",
+              name: `Travel provision ${String(i).padStart(2, "0")}`,
+              kind: "item",
+              quantity: i + 1,
+              unitCopper: 10,
+              notes: "Synthetic inventory pagination fixture",
+              category: "provisions",
+            });
+          tx.objectStore("holdings").put({
+            id: "private-letter",
+            purseId: "other",
+            name: "Private sealed letter",
+            kind: "item",
+            quantity: 1,
+            unitCopper: 0,
+            notes: "Private player inventory",
+          });
           tx.objectStore("shops").put({
             id: "vendor",
             name: "Moonlit broker",
@@ -406,14 +426,81 @@ try {
     await chooseOption(page.getByLabel("Your offering account", { exact: true }), "hero");
     const npc = (await dbRead(page, "journal")).world.npcs[0];
     await chooseOption(page.getByLabel("Other participant", { exact: true }), npc.id);
+    await expect(page.locator(".barter-participant").filter({ hasText: "Alwen" })).toBeVisible();
+    await expect(page.locator(".barter-participant").filter({ hasText: "Mara" })).toBeVisible();
+    await page.getByRole("button", { name: /Show more first side goods/ }).click();
+    await expect(
+      page.getByRole("button", {
+        name: "Add Travel provision 27 to First side offer",
+        exact: true,
+      }),
+    ).toBeVisible();
+    await page.getByLabel("First side inventory search", { exact: true }).fill("sword");
+    await page
+      .getByRole("button", { name: "Add Iron sword to First side offer", exact: true })
+      .click();
     await page.getByLabel("First side: Iron sword quantity", { exact: true }).fill("1");
+    await page.getByLabel("First side inventory search", { exact: true }).fill("no-matching-goods");
+    await expect(page.getByText("No matching goods.", { exact: true })).toBeVisible();
+    await expect(page.getByLabel("First side: Iron sword quantity", { exact: true })).toHaveValue(
+      "1",
+    );
+    await page.getByLabel("First side inventory search", { exact: true }).fill("");
+    await page
+      .getByLabel("First side inventory categories", { exact: true })
+      .getByRole("button", { name: "Deeds", exact: true })
+      .click();
+    await expect(
+      page.getByRole("button", { name: "Add Dock house to First side offer", exact: true }),
+    ).toBeVisible();
+    await page
+      .getByRole("button", { name: "Add Dock house to First side offer", exact: true })
+      .click();
+    await expect(page.getByLabel("First side: Dock house quantity", { exact: true })).toHaveValue(
+      "1",
+    );
+    await page
+      .getByRole("button", { name: "Remove Dock house from First side tray", exact: true })
+      .click();
+    await expect(page.getByLabel("First side: Dock house quantity", { exact: true })).toHaveCount(
+      0,
+    );
+    await page
+      .getByLabel("First side inventory categories", { exact: true })
+      .getByRole("button", { name: "All", exact: true })
+      .click();
+    await page
+      .getByRole("button", { name: "Add Trade gem from Second side offer", exact: true })
+      .click();
     await page.getByLabel("Second side: Trade gem quantity", { exact: true }).fill("1");
+    await fits(page);
+    await page.screenshot({ path: `${output}/barter-dark-${width}.png`, fullPage: true });
+    await page.evaluate(() => document.documentElement.setAttribute("data-appearance", "light"));
+    await fits(page);
+    await page.screenshot({ path: `${output}/barter-light-${width}.png`, fullPage: true });
+    if (width === 390) {
+      await page.setViewportSize({ width: 320, height: 950 });
+      await fits(page);
+      await page.screenshot({ path: `${output}/barter-light-320.png`, fullPage: true });
+      await page.setViewportSize({ width, height: 950 });
+    }
+    await page.evaluate(() => document.documentElement.setAttribute("data-appearance", "dark"));
     await page.getByRole("button", { name: "Send barter offer", exact: true }).click();
     await page.getByRole("button", { name: "Counteroffer", exact: true }).click();
+    await expect(page.getByLabel("First side: Iron sword quantity", { exact: true })).toHaveValue(
+      "1",
+    );
+    await expect(page.getByLabel("Second side: Trade gem quantity", { exact: true })).toHaveValue(
+      "1",
+    );
     await page.getByLabel("Second side coins (copper)", { exact: true }).fill("50");
     await page.getByRole("button", { name: "Send counteroffer", exact: true }).click();
     await page.getByRole("button", { name: "Accept barter", exact: true }).click();
     await expect(page.getByText("No pending barter offers.", { exact: true })).toBeVisible();
+    await page.getByRole("button", { name: "Trade history", exact: true }).click();
+    await expect(
+      page.locator(".barter-readout").getByText("1 × Trade gem", { exact: true }),
+    ).toBeVisible();
     const lots = await dbRead(page, "holdings");
     assert.equal(
       lots
@@ -654,6 +741,7 @@ try {
           "wheel and pinch zoom/pan",
           "NPC inventory and dialogue",
           "barter/counter/accept",
+          "portrait barter grids, search/category/deed controls, retained trays and light/dark/320px layout",
           "vendor premiums",
           "within-session rest and midnight",
         ],

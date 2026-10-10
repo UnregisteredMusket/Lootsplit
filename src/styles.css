@@ -2351,6 +2351,72 @@ input,select,textarea { max-width: 100%; }
 /* Campaign cartography and location services retain the parchment/ledger controls. */
 .world-toolbar { display:flex; flex-wrap:wrap; gap:.65rem; align-items:center; margin:1rem 0; }
 .world-toolbar label { display:grid; gap:.3rem; flex:1; min-width:150px; }
+.barter-page { min-width:0; }
+.barter-heading { display:flex; align-items:center; justify-content:space-between; gap:1rem; margin-bottom:.75rem; }
+.barter-heading h2 { font-family:var(--font-display); font-size:2rem; margin:0; }
+.barter-intro { max-width:75ch; color:var(--color-muted); }
+.barter-rules { margin:.75rem 0; font-size:.85rem; }
+.barter-rules summary { cursor:pointer; min-height:44px; display:flex; align-items:center; text-decoration:underline; text-underline-offset:4px; }
+.barter-table, .barter-pending { min-width:0; margin:1.25rem 0; padding:1rem; border:1px solid var(--color-lead); border-radius:12px; background:color-mix(in srgb,var(--color-bg) 85%,var(--color-elevated)); box-shadow:inset 0 0 0 4px var(--color-bg),inset 0 0 0 5px color-mix(in srgb,var(--color-lead) 25%,transparent); }
+.barter-table-title { display:flex; justify-content:center; align-items:center; gap:.75rem; padding:.75rem; border-bottom:1px solid var(--color-border); color:var(--color-lead); }
+.barter-table-title h2 { font-family:var(--font-display); font-size:1.5rem; margin:0; color:var(--color-fg); }
+.barter-table-title>span { border:1px solid var(--color-border); border-radius:20px; padding:.15rem .65rem; font-size:.7rem; text-transform:uppercase; letter-spacing:.06em; }
+.barter-workspace { min-width:0; display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:1rem; }
+.barter-side { display:flex; flex-direction:column; gap:.75rem; min-width:0; }
+.barter-participant { min-width:0; text-align:center; padding:.75rem; }
+.barter-portrait { width:82px; height:106px; margin:0 auto .5rem; border:2px solid var(--color-lead); border-radius:38px 38px 8px 8px; padding:3px; display:flex; align-items:center; justify-content:center; color:var(--color-muted); background:var(--color-elevated); box-shadow:0 0 0 3px color-mix(in srgb,var(--color-lead) 15%,transparent); overflow:hidden; }
+.barter-portrait img { width:100%; height:100%; object-fit:cover; border-radius:inherit; }
+.barter-participant h3 { margin:0; font-family:var(--font-display); font-size:1.5rem; overflow-wrap:anywhere; }
+.barter-participant p { margin:.15rem 0; color:var(--color-muted); font-size:.8rem; overflow-wrap:anywhere; }
+.barter-wallet, .barter-coins { display:flex; align-items:center; justify-content:center; gap:.4rem; margin:.5rem 0 0; font-variant-numeric:tabular-nums; flex-wrap:wrap; }
+.barter-wallet small { flex-basis:100%; color:var(--color-muted); font-size:.7rem; }
+.barter-picker { min-width:0; flex:1; display:grid; grid-template-columns:minmax(0,1.25fr) minmax(0,1fr); gap:.65rem; }
+.barter-side-right .barter-inventory { grid-column:2; grid-row:1; }
+.barter-side-right .barter-edit-tray { grid-column:1; grid-row:1; }
+.barter-inventory, .barter-tray { min-width:0; padding:.65rem; border:1px solid var(--color-border); border-radius:6px; background:color-mix(in srgb,var(--color-bg) 60%,var(--color-elevated)); }
+.barter-section-label { display:flex; align-items:center; justify-content:space-between; gap:.5rem; margin-bottom:.6rem; }
+.barter-section-label h3 { margin:0; font-family:var(--font-display); font-size:1.2rem; }
+.barter-section-label small { color:var(--color-muted); font-size:.7rem; }
+.world-form .barter-search { position:relative; display:block; }
+.barter-search>svg { position:absolute; top:14px; left:9px; color:var(--color-muted); }
+.world-form .barter-search input { padding-left:1.9rem; font-size:.85rem; }
+.barter-categories { display:flex; gap:.25rem; flex-wrap:wrap; margin:.5rem 0; }
+.barter-categories button { min-height:44px; padding:.25rem .55rem; border:1px solid var(--color-border); border-radius:4px; color:var(--color-muted); font-size:.75rem; }
+.barter-categories button[aria-pressed=true] { background:var(--color-lead); color:var(--color-bg); border-color:var(--color-lead); }
+.barter-inventory-grid { display:grid; grid-template-columns:repeat(auto-fill,minmax(54px,1fr)); gap:.3rem; align-content:start; max-height:430px; overflow:auto; padding:3px; }
+.barter-tile { position:relative; min-width:0; min-height:75px; padding:.35rem .2rem .25rem; border:1px solid var(--color-border); background:var(--color-elevated); border-radius:4px; display:flex; flex-direction:column; align-items:center; justify-content:center; gap:.3rem; }
+.barter-tile:hover { border-color:var(--color-lead); background:var(--color-subtle); }
+.barter-tile[aria-pressed=true] { border-color:var(--color-lead); box-shadow:inset 0 0 0 1px var(--color-lead); background:color-mix(in srgb,var(--color-lead) 16%,var(--color-bg)); }
+.barter-tile-count { position:absolute; right:3px; top:2px; font-size:.7rem; background:var(--color-bg); color:var(--color-fg); padding:0 .2rem; border-radius:3px; }
+.barter-tile-name { font-size:.65rem; line-height:1.2; width:100%; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; }
+.barter-lot-art { display:flex; align-items:center; justify-content:center; width:36px; height:36px; flex-shrink:0; }
+.barter-lot-art img { width:100%; height:100%; object-fit:contain; }
+.barter-hint { font-size:.7rem; color:var(--color-muted); line-height:1.4; margin:.5rem 0 0; }
+.barter-edit-tray { display:flex; flex-direction:column; }
+.barter-coin-input { padding-bottom:.5rem; border-bottom:1px solid var(--color-border); font-size:.8rem; }
+.barter-coin-input small { color:var(--color-muted); }
+.barter-offer-lots { flex:1; min-height:200px; }
+.barter-offered-lot { display:flex; align-items:center; gap:.4rem; padding:.6rem 0; border-bottom:1px solid var(--color-border); min-width:0; }
+.barter-offered-lot>label, .barter-offered-lot>div { flex:1; min-width:0; }
+.barter-offered-lot strong { display:block; font-size:.85rem; line-height:1.2; overflow-wrap:anywhere; }
+.barter-offered-lot small { display:block; font-size:.7rem; color:var(--color-muted); overflow-wrap:anywhere; }
+.barter-remove { display:flex; justify-content:center; align-items:center; width:44px; height:44px; flex-shrink:0; color:var(--color-muted); border-radius:4px; }
+.barter-remove:hover { background:var(--color-subtle); color:var(--color-fg); }
+.barter-empty-tray { display:flex; flex-direction:column; align-items:center; justify-content:center; min-height:200px; color:var(--color-muted); font-size:.8rem; text-align:center; background:repeating-linear-gradient(0deg,transparent,transparent 47px,color-mix(in srgb,var(--color-border) 30%,transparent) 48px); }
+.barter-tray-value { margin:.6rem 0 0; display:flex; flex-wrap:wrap; justify-content:space-between; gap:.25rem; border-top:1px solid var(--color-lead); padding-top:.6rem; font-size:.75rem; }
+.barter-tray-value strong { font-variant-numeric:tabular-nums; }
+.barter-empty, .barter-private { color:var(--color-muted); font-size:.8rem; }
+.barter-review-band { display:flex; align-items:center; justify-content:center; gap:.65rem; margin:.5rem 0; border-block:1px solid var(--color-border); padding:.75rem; color:var(--color-muted); font-size:.85rem; }
+.barter-review-band p { margin:0; }
+.barter-table>.world-form>fieldset>button[type=submit] { width:min(100%,360px); justify-self:center; border:1px solid var(--color-lead); min-height:48px; }
+.barter-readout { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.75rem; }
+.barter-readout .barter-participant { display:grid; grid-template-columns:50px minmax(0,1fr); gap:.2rem .5rem; text-align:left; align-items:center; padding:0; }
+.barter-readout .barter-portrait { width:46px; height:60px; margin:0; grid-row:span 2; border-radius:8px; }
+.barter-readout .barter-participant h3 { font-size:1.2rem; }
+.barter-readout .barter-coins { justify-content:flex-start; font-size:.8rem; margin:.75rem 0; }
+.barter-page button:focus-visible { outline:2px solid var(--color-lead); outline-offset:3px; }
+@media(max-width:1050px) { .barter-picker { grid-template-columns:minmax(0,1fr); } .barter-side-right .barter-inventory, .barter-side-right .barter-edit-tray { grid-column:auto; grid-row:auto; } .barter-offer-lots { min-height:120px; } .barter-empty-tray { min-height:120px; } }
+@media(max-width:600px) { .barter-heading { align-items:flex-start; flex-direction:column; gap:.5rem; } .barter-workspace, .barter-readout { grid-template-columns:minmax(0,1fr); } .barter-table, .barter-pending { padding:.65rem; } .barter-table-title { flex-wrap:wrap; padding:.6rem .25rem; gap:.35rem; } .barter-table-title h2 { font-size:1.3rem; } .barter-side-right { border-top:1px solid var(--color-lead); padding-top:.75rem; } .barter-participant { display:grid; grid-template-columns:70px minmax(0,1fr); text-align:left; align-items:center; gap:.25rem .75rem; } .barter-portrait { width:64px; height:80px; grid-row:span 3; margin:0; border-radius:20px 20px 6px 6px; } .barter-participant h3 { font-size:1.4rem; } .barter-wallet { justify-content:flex-start; margin:0; font-size:.8rem; gap:.25rem; } .barter-wallet small { flex-basis:auto; } }
 .world-form { min-width:0; margin:.6rem 0; }
 .world-form fieldset { min-width:0; display:grid; gap:.65rem; border:0; padding:0; }
 .world-form label { display:grid; gap:.35rem; min-width:0; }
