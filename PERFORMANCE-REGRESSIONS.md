@@ -30,7 +30,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Packaged Worker / interface / Run actions/checkout@v4 | open | 2 | 1s → 3s | +2s | +200% |
 | Packaged Worker / interface / Run actions/setup-node@v4 | open | 5 | 2s → 15s | +13s | +650% |
 | Packaged Worker / accounts / Run npm ci | open | 4 | 8s → 20s | +12s | +150% |
-| Packaged Worker / interface / Run actions/download-artifact@v4 | open | 2 | 1s → 3s | +2s | +200% |
+| Packaged Worker / interface / Run actions/download-artifact@v4 | open | 3 | 1s → 4s | +3s | +300% |
 | Packaged Worker / accounts / Start disposable built Worker | open | 3 | 5s → 9s | +4s | +80% |
 | Development / accounts / dev-owner | open | 2 | 4s → 6s | +2s | +50% |
 | Development / gameplay / dev-control-panel | resolved | 2 | 20s → 31s | +11s | +55% |
@@ -218,7 +218,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | market locations browser audit | open | 3 | 36.179s → 110.925s | +74.746s | +206.6% |
 | Packaged Worker / interface / worker-market-locations | resolved | 2 | 23s → 68s | +45s | +195.65% |
 | Development / gameplay / dev-market-locations | open | 2 | 27s → 68s | +41s | +151.85% |
-| Development / governance / dev-sound | open | 2 | 8s → 34s | +26s | +325% |
+| Development / governance / dev-sound | open | 3 | 8s → 40s | +32s | +400% |
 | Cloudflare web build | open | 2 | 8.956s → 16.544s | +7.588s | +84.73% |
 | mobile web build | open | 2 | 6.259s → 12.496s | +6.237s | +99.65% |
 | Development / governance / dev-sound | open | 2 | 8s → 35s | +27s | +337.5% |
@@ -236,6 +236,8 @@ Open trends require investigation. Resolved trends retain their history; each ve
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-10T16:40:12Z | step: Development / governance / dev-sound | 34s → 40s | +6s | +17.65% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37888429597/job/113683616303) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38068308871/job/114260371207) |
+| 2026-10-10T16:39:10Z | step: Packaged Worker / interface / Run actions/download-artifact@v4 | 3s → 4s | +1s | +33.33% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37267183280/job/111626615733) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38068308871/job/114260773826) |
 | 2026-10-10T13:50:10Z | step: Development / gameplay / dev-library-navigation | 44s → 51s | +7s | +15.91% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38045806287/job/114194983319) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38056573789/job/114226203438) |
 | 2026-10-10T13:07:27Z | step: Development / gameplay / dev-world-features | 86s → 106s | +20s | +23.26% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38046397037/job/114196698960) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38053941691/job/114218473575) |
 | 2026-10-10T13:05:41Z | step: Development / gameplay / dev-trade-economy | 61s → 83s | +22s | +36.07% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38024734214/job/114133054633) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38053941691/job/114218473575) |
