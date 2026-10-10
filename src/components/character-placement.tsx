@@ -161,7 +161,8 @@ function PlacementEditor({ p, table: t }: { p: Purse; table: CloudTable }) {
             Returns after{" "}
             {Math.max(0, Math.ceil((s.downtime.finishMinute - campaignMinute(t)) / 60))} campaign
             hours, on day {Math.floor(s.downtime.finishMinute / 1440)} at{" "}
-            {String(Math.floor((s.downtime.finishMinute % 1440) / 60)).padStart(2, "0")}:00. Returns{" "}
+            {String(Math.floor((s.downtime.finishMinute % 1440) / 60)).padStart(2, "0")}:
+            {String(s.downtime.finishMinute % 60).padStart(2, "0")}. Returns{" "}
             {s.downtime.returnInParty ? "to the party" : "to the previous location / NPC list"}.
           </p>
           <p>
