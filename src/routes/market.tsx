@@ -1,3 +1,4 @@
+import { SearchSelect } from "@/components/search-select";
 import { BlackMarketToggle } from "@/components/black-market";
 import { shopVisible } from "@/lib/quire/world";
 import { LedgerArt } from "@/components/ledger-art";
@@ -166,22 +167,22 @@ function MarketPage() {
         </div>
       ) : null}
       <div className="mt-3 grid grid-cols-2 gap-3">
-        <select
+        <SearchSelect
           aria-label="Market location"
           className="ledger-search"
           value={location}
-          onChange={(e) => setLocation(e.target.value)}
+          onValueChange={(selectedValue) => setLocation(selectedValue)}
         >
           <option value="">All locations</option>
           {[...new Set(shown.map((x) => x.place).filter(Boolean))].map((x) => (
             <option key={x}>{x}</option>
           ))}
-        </select>
-        <select
+        </SearchSelect>
+        <SearchSelect
           aria-label="Shop category"
           className="ledger-search"
           value={category}
-          onChange={(e) => setCategory(e.target.value)}
+          onValueChange={(selectedValue) => setCategory(selectedValue)}
         >
           <option value="">All categories</option>
           {[...new Set(shown.map((x) => x.category))].map((x) => (
@@ -189,20 +190,20 @@ function MarketPage() {
               {labelKind(x)}
             </option>
           ))}
-        </select>
+        </SearchSelect>
       </div>
       {seat.role === "dm" && market.locations.length ? (
         <div className="mt-3 space-y-2">
-          <select
+          <SearchSelect
             aria-label="Shop assigned location"
             className="ledger-search w-full"
             value={assignedLocation}
-            onChange={(event) => setAssignedLocation(event.target.value)}
+            onValueChange={(selectedValue) => setAssignedLocation(selectedValue)}
           >
             <option value="">All assigned locations</option>
             <option value="campaignwide">Campaignwide shops</option>
-            <LocationOptions market={market} />
-          </select>
+            {LocationOptions({ market: market })}
+          </SearchSelect>
           <label className="flex min-h-11 items-center gap-2 text-sm">
             <input
               type="checkbox"

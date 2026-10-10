@@ -1,3 +1,4 @@
+import { SearchSelect } from "@/components/search-select";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
 import { articlesForBook } from "@/lib/quire/db";
@@ -90,11 +91,11 @@ export function PriceHarvest({ bookId }: { bookId: string }) {
         <p className="mt-4 text-muted">Import a PDF from Books first.</p>
       ) : (
         <div className="mt-4 flex flex-col gap-3">
-          <select
+          <SearchSelect
             value={chosenBook}
             disabled={busy}
-            onChange={(event) => {
-              setChosenBook(event.target.value);
+            onValueChange={(selectedValue) => {
+              setChosenBook(selectedValue);
               setHits([]);
               setScanned(false);
             }}
@@ -106,7 +107,7 @@ export function PriceHarvest({ bookId }: { bookId: string }) {
                 {book.title}
               </option>
             ))}
-          </select>
+          </SearchSelect>
           <Button
             variant="secondary"
             disabled={!chosenBook || busy}
@@ -167,9 +168,9 @@ export function PriceHarvest({ bookId }: { bookId: string }) {
             ))}
           </ul>
           <div className="mt-4 flex flex-col gap-3">
-            <select
+            <SearchSelect
               value={shopId}
-              onChange={(event) => setShopId(event.target.value)}
+              onValueChange={(selectedValue) => setShopId(selectedValue)}
               className="min-h-11 rounded-sm border border-border bg-subtle px-3 text-base text-fg"
             >
               <option value="new">New shop</option>
@@ -178,7 +179,7 @@ export function PriceHarvest({ bookId }: { bookId: string }) {
                   {shop.name}
                 </option>
               ))}
-            </select>
+            </SearchSelect>
             {shopId === "new" ? (
               <TextInput
                 value={newName}

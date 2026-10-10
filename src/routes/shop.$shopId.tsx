@@ -1,3 +1,4 @@
+import { SearchSelect } from "@/components/search-select";
 import { BlackMarketVendor } from "@/components/black-market";
 import { shopVisible } from "@/lib/quire/world";
 import { useFinanceReadiness } from "@/lib/quire/use-finance-readiness";
@@ -32,7 +33,7 @@ import type { Holding, Shop, StockLine, Wealth } from "@/lib/quire/types";
 import { Shell } from "@/components/shell";
 import { RemoveButton } from "@/components/quire-ui";
 import { CatalogStockPicker, ShopStockList } from "@/components/shop-stock-manager";
-import { Button, Confirm, Segmented, Select, Slider, TextInput } from "@/components/ui";
+import { Button, Confirm, Segmented, Slider, TextInput } from "@/components/ui";
 
 export const Route = createFileRoute("/shop/$shopId")({
   component: ShopPage,
@@ -222,9 +223,9 @@ function ShopPage() {
       </div>
       <label className="mt-4 block text-sm text-muted">
         Paying from
-        <select
+        <SearchSelect
           value={purseId}
-          onChange={(event) => setPurseId(event.target.value)}
+          onValueChange={(selectedValue) => setPurseId(selectedValue)}
           className="mt-1 min-h-11 w-full rounded-sm border border-border bg-subtle px-3 text-base text-fg"
         >
           {[...spendable]
@@ -239,7 +240,7 @@ function ShopPage() {
                 {formatCopper(toCopper(purse.coins))}
               </option>
             ))}
-        </select>
+        </SearchSelect>
         {spendable.some((purse) => purse.kind === "party") ? (
           <span className="mt-1 block">
             The party option spends the shared account. A character spends their own.
@@ -305,11 +306,11 @@ function ShelfTuning({ shop }: { shop: Shop }) {
 
   return (
     <div className="flex flex-col gap-3">
-      <Select
+      <SearchSelect
         aria-label="Type of shop"
         value={shop.category}
-        onChange={(event) =>
-          void updateShop({ ...shop, category: event.target.value as Shop["category"] })
+        onValueChange={(selectedValue) =>
+          void updateShop({ ...shop, category: selectedValue as Shop["category"] })
         }
       >
         {SHOP_KINDS.map((option) => (
@@ -317,7 +318,7 @@ function ShelfTuning({ shop }: { shop: Shop }) {
             {option.label}
           </option>
         ))}
-      </Select>
+      </SearchSelect>
       <label className="flex min-h-11 items-center gap-2">
         <input
           type="checkbox"
@@ -722,9 +723,9 @@ function SellBox({ shopId }: { shopId: string }) {
           {notice} <AppLink href="/party?section=funds">Open original inventory & ledger</AppLink>
         </p>
       )}
-      <select
+      <SearchSelect
         value={holdingId}
-        onChange={(event) => setHoldingId(event.target.value)}
+        onValueChange={(selectedValue) => setHoldingId(selectedValue)}
         className="min-h-11 rounded-sm border border-border bg-subtle px-3 text-base text-fg"
       >
         {mine.map((item) => (
@@ -732,7 +733,7 @@ function SellBox({ shopId }: { shopId: string }) {
             {labelHolding(item)}
           </option>
         ))}
-      </select>
+      </SearchSelect>
       <div className="flex gap-2">
         <TextInput
           value={qty}

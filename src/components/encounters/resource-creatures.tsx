@@ -1,7 +1,9 @@
+import { SearchSelect } from "@/components/search-select";
 import { useState } from "react";
 import { z } from "zod";
 import { Button } from "../ui";
 import { AppLink } from "../app-link";
+import { libraryRecordHref } from "@/lib/quire/library-records";
 import { combatantSchema, generatorSchema, generateEncounter } from "@/lib/encounters/model.mjs";
 import {
   missingCreatureFields,
@@ -21,6 +23,7 @@ export function ResourceCreatures({
   onAdd: (creatures: z.infer<typeof combatantSchema>[]) => void;
 }) {
   const [selected, setSelected] = useState(""),
+    [selectedCreature, setSelectedCreature] = useState(""),
     [query, setQuery] = useState(""),
     [page, setPage] = useState(0),
     [error, setError] = useState("");
@@ -48,12 +51,14 @@ export function ResourceCreatures({
         <>
           <label className="block">
             Creature resource pack
-            <select
+            <SearchSelect
               className="w-full"
               aria-label="Creature resource pack"
               value={packKey(active)}
-              onChange={(e) => {
-                setSelected(e.target.value);
+              onValueChange={(selectedValue) => {
+                setSelected(selectedValue);
+                setSelectedCreature("");
+                setQuery("");
                 setPage(0);
                 setError("");
               }}
@@ -63,7 +68,28 @@ export function ResourceCreatures({
                   {p.title} · {p.revision}
                 </option>
               ))}
-            </select>
+            </SearchSelect>
+          </label>
+          <label className="block">
+            Find an imported monster
+            <SearchSelect
+              aria-label="Find an imported monster"
+              value={selectedCreature}
+              onValueChange={(value) => {
+                setSelectedCreature(value);
+                setQuery(active.entries.find((e) => e.id === value)?.name ?? "");
+                setPage(0);
+              }}
+            >
+              <option value="">All imported monsters</option>
+              {active.entries
+                .filter((e) => e.kind === "creature")
+                .map((e) => (
+                  <option key={e.id} value={e.id}>
+                    {e.name}
+                  </option>
+                ))}
+            </SearchSelect>
           </label>
           <label className="block">
             Search imported creatures
@@ -123,7 +149,13 @@ export function ResourceCreatures({
               entry.kind === "creature" && (
                 <div className="encounter-index-row" key={entry.id}>
                   <div>
-                    <strong>{entry.name}</strong>
+                    <strong>
+                      <AppLink
+                        href={libraryRecordHref("resource", active.id, active.revision, entry.id)}
+                      >
+                        {entry.name} →
+                      </AppLink>
+                    </strong>
                     <p>
                       CR {entry.stats.cr ?? "unknown"} · HP {entry.stats.hp ?? "unknown"} · AC{" "}
                       {entry.stats.ac ?? "unknown"}

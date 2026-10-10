@@ -1,3 +1,4 @@
+import { SearchSelect } from "@/components/search-select";
 import { useState } from "react";
 import { useSeat } from "@/lib/quire/seat";
 import { readWorld, type Trade } from "@/lib/quire/world-schema";
@@ -238,13 +239,13 @@ function TradeEditor({
           <div>
             <label>
               {offer ? "First participant" : "Your offering account"}
-              <select
+              <SearchSelect
                 aria-label={offer ? "First participant" : "Your offering account"}
                 required
                 value={leftId}
                 disabled={!!offer}
-                onChange={(e) => {
-                  setLeftId(e.target.value);
+                onValueChange={(selectedValue) => {
+                  setLeftId(selectedValue);
                   setLeftItems({});
                   setLeftCoins("0");
                 }}
@@ -254,7 +255,7 @@ function TradeEditor({
                     {p.name}
                   </option>
                 ))}
-              </select>
+              </SearchSelect>
             </label>
             <ItemOfferPicker
               label="First side"
@@ -268,13 +269,13 @@ function TradeEditor({
           <div>
             <label>
               Other participant
-              <select
+              <SearchSelect
                 aria-label="Other participant"
                 required
                 value={rightId}
                 disabled={!!offer}
-                onChange={(e) => {
-                  setRightId(e.target.value);
+                onValueChange={(selectedValue) => {
+                  setRightId(selectedValue);
                   setRightItems({});
                   setRightCoins("0");
                 }}
@@ -287,7 +288,7 @@ function TradeEditor({
                       {p.nonParty ? " (NPC)" : ""}
                     </option>
                   ))}
-              </select>
+              </SearchSelect>
             </label>
             <ItemOfferPicker
               label="Second side"

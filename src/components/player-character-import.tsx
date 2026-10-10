@@ -1,3 +1,4 @@
+import { SearchSelect } from "./search-select";
 import { useEffect, useRef, useState } from "react";
 import { accountRequest } from "@/lib/account/client";
 import { Link } from "@tanstack/react-router";
@@ -80,25 +81,33 @@ export function PlayerCharacterImport({ code }: { code: string }) {
       >
         <label>
           Saved account character
-          <select value={character} onChange={(e) => setCharacter(e.target.value)}>
+          <SearchSelect
+            aria-label="Saved account character"
+            value={character}
+            onValueChange={setCharacter}
+          >
             <option value="">Choose saved sheet</option>
             {choices.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.body.name}
               </option>
             ))}
-          </select>
+          </SearchSelect>
         </label>
         <label>
           Assigned campaign character
-          <select value={purse} onChange={(e) => setPurse(e.target.value)}>
+          <SearchSelect
+            aria-label="Assigned campaign character"
+            value={purse}
+            onValueChange={setPurse}
+          >
             <option value="">Choose campaign character</option>
             {targets.map((c) => (
               <option key={c.id} value={c.id}>
                 {c.name}
               </option>
             ))}
-          </select>
+          </SearchSelect>
         </label>
         <button disabled={busy || !character || !purse}>Submit character for review</button>
       </form>

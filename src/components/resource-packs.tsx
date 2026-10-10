@@ -1,5 +1,7 @@
+import { SearchSelect } from "@/components/search-select";
 import { useState } from "react";
 import { AppLink } from "./app-link";
+import { libraryRecordHref } from "@/lib/quire/library-records";
 import { Button } from "./ui";
 import { useEconomy } from "@/lib/quire/economy-context";
 import {
@@ -296,12 +298,12 @@ export function ResourcePacks() {
         <div className="space-y-3">
           <label className="block">
             Imported pack
-            <select
+            <SearchSelect
               aria-label="Imported pack"
               className="w-full"
               value={active ? packKey(active) : ""}
-              onChange={(e) => {
-                setSelected(e.target.value);
+              onValueChange={(selectedValue) => {
+                setSelected(selectedValue);
                 setPage(0);
                 setNames(null);
               }}
@@ -311,7 +313,7 @@ export function ResourcePacks() {
                   {p.title} · {p.revision}
                 </option>
               ))}
-            </select>
+            </SearchSelect>
           </label>
           <div className="flex flex-wrap gap-2">
             <Button
@@ -410,6 +412,7 @@ export function ResourcePacks() {
           {entries.slice(page * 20, (page + 1) * 20).map((entry) => (
             <div key={entry.id}>
               <Reference entry={entry} pack={(draft ?? active)!} />
+              {!draft && active && <AppLink className="settings-link" href={libraryRecordHref("resource", active.id, active.revision, entry.id)}>Open {entry.name} in Library →</AppLink>}
               {!draft && entry.kind === "item" && (
                 <div className="flex flex-wrap items-end gap-2 mb-3">
                   <label className="text-sm">

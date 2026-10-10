@@ -1,3 +1,4 @@
+import { SearchSelect } from "@/components/search-select";
 import { useState, useSyncExternalStore, type ReactNode } from "react";
 import { useEconomy } from "@/lib/quire/economy-context";
 import { useSeat } from "@/lib/quire/seat";
@@ -284,10 +285,10 @@ function SiteSettings({ holding: h, state }: { holding: Holding; state: Estate }
         </p>
       )}
       <Field label="Property template">
-        <Select
+        <SearchSelect
           value={site.templateKey}
-          onChange={(e) => {
-            const template = state.templates.find((t) => t.key === e.target.value)!;
+          onValueChange={(selectedValue) => {
+            const template = state.templates.find((t) => t.key === selectedValue)!;
             patch({
               templateKey: template.key,
               capacityWeight: template.storage?.capacityWeight ?? null,
@@ -299,7 +300,7 @@ function SiteSettings({ holding: h, state }: { holding: Holding; state: Estate }
               {t.name}
             </option>
           ))}
-        </Select>
+        </SearchSelect>
       </Field>
       <Tick
         label="Enable this property's operations"
@@ -474,14 +475,14 @@ function Storage({
           </Select>
         </Field>
         <Field label="Item lot">
-          <Select value={item || options[0]?.id || ""} onChange={(e) => setItem(e.target.value)}>
+          <SearchSelect value={item || options[0]?.id || ""} onValueChange={(selectedValue) => setItem(selectedValue)}>
             {!options.length && <option value="">No available goods</option>}
             {options.map((i) => (
               <option key={i.id} value={i.id}>
                 {i.name} · {i.quantity} available
               </option>
             ))}
-          </Select>
+          </SearchSelect>
         </Field>
         {direction === "deposit" && (
           <Tick
@@ -498,7 +499,7 @@ function Storage({
           set={setQuantity}
         />
         <Field label="Acting / receiving character">
-          <Select value={purseId} onChange={(e) => setPurseId(e.target.value)}>
+          <SearchSelect value={purseId} onValueChange={(selectedValue) => setPurseId(selectedValue)}>
             {t.purses
               .filter((p) => dm || seat.purseIds.includes(p.id))
               .map((p) => (
@@ -506,7 +507,7 @@ function Storage({
                   {p.name}
                 </option>
               ))}
-          </Select>
+          </SearchSelect>
         </Field>
       </ActionForm>
       {dm && (
@@ -611,13 +612,13 @@ function MaterialTag({ item, state }: { item: Holding; state: Estate }) {
         command={() => ({ kind: "estate-material", holdingId: item.id, materialKey, weight })}
       >
         <Field label="Material definition">
-          <Select value={materialKey} onChange={(e) => setMaterialKey(e.target.value)}>
+          <SearchSelect value={materialKey} onValueChange={(selectedValue) => setMaterialKey(selectedValue)}>
             {state.materials.map((m) => (
               <option key={m.key} value={m.key}>
                 {m.name} ({m.unit})
               </option>
             ))}
-          </Select>
+          </SearchSelect>
         </Field>
         <NumberField
           label="Weight per item"
@@ -695,9 +696,9 @@ function Projects({
         }}
       >
         <Field label="Work recipe">
-          <Select
+          <SearchSelect
             value={recipeKey || recipe?.key || ""}
-            onChange={(e) => setRecipeKey(e.target.value)}
+            onValueChange={(selectedValue) => setRecipeKey(selectedValue)}
           >
             {!recipes.length && <option value="">DM: add a recipe in the estate workshop</option>}
             {recipes.map((r) => (
@@ -705,10 +706,10 @@ function Projects({
                 {r.name}
               </option>
             ))}
-          </Select>
+          </SearchSelect>
         </Field>
         <Field label="Pay contractors from">
-          <Select value={purseId} onChange={(e) => setPurseId(e.target.value)}>
+          <SearchSelect value={purseId} onValueChange={(selectedValue) => setPurseId(selectedValue)}>
             {t.purses
               .filter((p) => dm || seat.purseIds.includes(p.id))
               .map((p) => (
@@ -716,7 +717,7 @@ function Projects({
                   {p.name}
                 </option>
               ))}
-          </Select>
+          </SearchSelect>
         </Field>
         {recipe && (
           <p>
@@ -1090,7 +1091,7 @@ function Staff({ holding: h, state }: { holding: Holding; state: Estate }) {
         />
         {dm && (
           <Field label="Optional existing NPC">
-            <Select value={npcId} onChange={(e) => setNpcId(e.target.value)}>
+            <SearchSelect value={npcId} onValueChange={(selectedValue) => setNpcId(selectedValue)}>
               <option value="">No NPC link</option>
               {t.purses
                 .filter((p) => p.control === "npc")
@@ -1099,7 +1100,7 @@ function Staff({ holding: h, state }: { holding: Holding; state: Estate }) {
                     {p.name}
                   </option>
                 ))}
-            </Select>
+            </SearchSelect>
           </Field>
         )}
         <Tick label="Manager with delegated duties" checked={manager} set={setManager} />
@@ -1227,9 +1228,9 @@ function SupplierTerms({ supplier }: { supplier: Estate["suppliers"][number] }) 
         command={() => ({ kind: "estate-supplier", before: supplier, supplier: draft })}
       >
         <Field label="Supplier stock">
-          <Select
+          <SearchSelect
             value={draft.stockId}
-            onChange={(e) => setDraft({ ...draft, stockId: e.target.value })}
+            onValueChange={(selectedValue) => setDraft({ ...draft, stockId: selectedValue })}
           >
             {t.stock
               .filter((s) => !s.service)
@@ -1238,19 +1239,19 @@ function SupplierTerms({ supplier }: { supplier: Estate["suppliers"][number] }) 
                   {t.shops.find((shop) => shop.id === s.shopId)?.name}: {s.name}
                 </option>
               ))}
-          </Select>
+          </SearchSelect>
         </Field>
         <Field label="Material definition">
-          <Select
+          <SearchSelect
             value={draft.materialKey}
-            onChange={(e) => setDraft({ ...draft, materialKey: e.target.value })}
+            onValueChange={(selectedValue) => setDraft({ ...draft, materialKey: selectedValue })}
           >
             {state.materials.map((m) => (
               <option key={m.key} value={m.key}>
                 {m.name} ({m.unit})
               </option>
             ))}
-          </Select>
+          </SearchSelect>
         </Field>
         <NumberField
           label="Delivery delay (campaign days)"
@@ -1354,7 +1355,7 @@ function Supplies({ holding: h, state }: { holding: Holding; state: Estate }) {
             })}
           >
             <Field label="Supplier stock">
-              <Select value={stockId} onChange={(e) => setStockId(e.target.value)}>
+              <SearchSelect value={stockId} onValueChange={(selectedValue) => setStockId(selectedValue)}>
                 {t.stock
                   .filter((s) => !s.service)
                   .map((s) => (
@@ -1363,16 +1364,16 @@ function Supplies({ holding: h, state }: { holding: Holding; state: Estate }) {
                       {formatCopper(s.copper)}
                     </option>
                   ))}
-              </Select>
+              </SearchSelect>
             </Field>
             <Field label="Material definition">
-              <Select value={materialKey} onChange={(e) => setMaterialKey(e.target.value)}>
+              <SearchSelect value={materialKey} onValueChange={(selectedValue) => setMaterialKey(selectedValue)}>
                 {state.materials.map((m) => (
                   <option key={m.key} value={m.key}>
                     {m.name} ({m.unit})
                   </option>
                 ))}
-              </Select>
+              </SearchSelect>
             </Field>
             <NumberField
               label="Delivery delay (campaign days)"
@@ -1408,9 +1409,9 @@ function Supplies({ holding: h, state }: { holding: Holding; state: Estate }) {
             }}
           >
             <Field label="Reviewed supplier">
-              <Select
+              <SearchSelect
                 value={supplierId || selected?.id || ""}
-                onChange={(e) => setSupplierId(e.target.value)}
+                onValueChange={(selectedValue) => setSupplierId(selectedValue)}
               >
                 {suppliers.map((s) => (
                   <option key={s.id} value={s.id}>
@@ -1418,7 +1419,7 @@ function Supplies({ holding: h, state }: { holding: Holding; state: Estate }) {
                     days · delivery {formatCopper(s.deliveryCopper)}
                   </option>
                 ))}
-              </Select>
+              </SearchSelect>
             </Field>
             <NumberField
               label="Materials to purchase"
@@ -1508,21 +1509,21 @@ function OrderFields({
       )}
       {value.kind === "project" && (
         <Field label="Reviewed project">
-          <Select value={value.jobId} onChange={(e) => set({ ...value, jobId: e.target.value })}>
+          <SearchSelect value={value.jobId} onValueChange={(selectedValue) => set({ ...value, jobId: selectedValue })}>
             <option value="">Choose approved work</option>
             {jobs.map((j) => (
               <option key={j.id} value={j.id}>
                 {j.name}
               </option>
             ))}
-          </Select>
+          </SearchSelect>
         </Field>
       )}
       {value.kind === "staff" && (
         <Field label="Reviewed staff contract">
-          <Select
+          <SearchSelect
             value={value.staffId}
-            onChange={(e) => set({ ...value, staffId: e.target.value })}
+            onValueChange={(selectedValue) => set({ ...value, staffId: selectedValue })}
           >
             <option value="">Choose approved staff</option>
             {staff.map((s) => (
@@ -1530,7 +1531,7 @@ function OrderFields({
                 {s.name}
               </option>
             ))}
-          </Select>
+          </SearchSelect>
         </Field>
       )}
       {["project", "rent", "staff"].includes(value.kind) && "active" in value && (
@@ -1543,14 +1544,14 @@ function OrderFields({
       {value.kind === "supply" && (
         <>
           <Field label="Reviewed material supplier">
-            <Select
+            <SearchSelect
               value={
                 supplies.find(
                   (s) => s.stockId === value.stockId && s.materialKey === value.materialKey,
                 )?.id ?? ""
               }
-              onChange={(e) => {
-                const s = supplies.find((s) => s.id === e.target.value)!;
+              onValueChange={(selectedValue) => {
+                const s = supplies.find((s) => s.id === selectedValue)!;
                 set({
                   kind: "supply",
                   stockId: s.stockId,
@@ -1568,7 +1569,7 @@ function OrderFields({
                   days · delivery {formatCopper(s.deliveryCopper)}
                 </option>
               ))}
-            </Select>
+            </SearchSelect>
           </Field>
           <NumberField
             label="Supply quantity"
@@ -1580,14 +1581,14 @@ function OrderFields({
         </>
       )}
       {value.kind === "market" && <>
-        <Field label="Property exchange"><Select value={value.exchangeId} onChange={e=>set({...value,exchangeId:e.target.value})}>
+        <Field label="Property exchange"><SearchSelect value={value.exchangeId} onValueChange={(selectedValue) =>set({...value,exchangeId:selectedValue})}>
           <option value="">Choose an exchange</option>
           {t.journal.tradeEconomy?.exchanges.map(e=><option key={e.id} value={e.id}>{e.name}</option>)}
-        </Select></Field>
-        <Field label="Trade commodity"><Select value={value.commodityId} onChange={e=>set({...value,commodityId:e.target.value})}>
+        </SearchSelect></Field>
+        <Field label="Trade commodity"><SearchSelect value={value.commodityId} onValueChange={(selectedValue) =>set({...value,commodityId:selectedValue})}>
           <option value="">Choose a commodity</option>
           {t.journal.tradeEconomy?.commodities.map(c=><option key={c.id} value={c.id}>{c.name} · {c.unit}</option>)}
-        </Select></Field>
+        </SearchSelect></Field>
         <Field label="Manager trade direction"><Select value={value.direction} onChange={e=>set({...value,direction:e.target.value as "buy"|"sell"})}>
           <option value="buy">Buy into property storage</option><option value="sell">Sell stored goods</option>
         </Select></Field>
@@ -1655,10 +1656,10 @@ function Correspondence({ holding: h, state }: { holding: Holding; state: Estate
         })}
       >
         <Field label="Send as">
-          <Select
+          <SearchSelect
             aria-label="Send as"
             value={senderId}
-            onChange={(e) => setSenderId(e.target.value)}
+            onValueChange={(selectedValue) => setSenderId(selectedValue)}
           >
             {t.purses
               .filter((p) => dm || seat.purseIds.includes(p.id))
@@ -1667,13 +1668,13 @@ function Correspondence({ holding: h, state }: { holding: Holding; state: Estate
                   {p.name}
                 </option>
               ))}
-          </Select>
+          </SearchSelect>
         </Field>
         <Field label="Property manager">
-          <Select
+          <SearchSelect
             aria-label="Property manager"
             value={managerId || managers[0]?.id || ""}
-            onChange={(e) => setManagerId(e.target.value)}
+            onValueChange={(selectedValue) => setManagerId(selectedValue)}
           >
             {!managers.length && <option value="">Hire and authorize a manager first</option>}
             {managers.map((m) => (
@@ -1681,7 +1682,7 @@ function Correspondence({ holding: h, state }: { holding: Holding; state: Estate
                 {m.name}
               </option>
             ))}
-          </Select>
+          </SearchSelect>
         </Field>
         <OrderFields holding={h} state={state} value={order} set={setOrder} />
         <NumberField label="Maximum order spend (copper)" value={budget} set={setBudget} />
@@ -1732,16 +1733,16 @@ function Correspondence({ holding: h, state }: { holding: Holding; state: Estate
           })}
         >
           <Field label="Delegated manager">
-            <Select
+            <SearchSelect
               value={managerId || managers[0]?.id || ""}
-              onChange={(e) => setManagerId(e.target.value)}
+              onValueChange={(selectedValue) => setManagerId(selectedValue)}
             >
               {managers.map((m) => (
                 <option key={m.id} value={m.id}>
                   {m.name}
                 </option>
               ))}
-            </Select>
+            </SearchSelect>
           </Field>
           <OrderFields holding={h} state={state} value={order} set={setOrder} />
           <NumberField label="Order spending cap (copper)" value={budget} set={setBudget} />
@@ -1767,7 +1768,7 @@ function Handover({ holding: h }: { holding: Holding }) {
       command={() => ({ kind: "estate-handover", propertyId: h.id, toId, reason })}
     >
       <Field label="New campaign owner">
-        <Select value={toId} onChange={(e) => setToId(e.target.value)}>
+        <SearchSelect value={toId} onValueChange={(selectedValue) => setToId(selectedValue)}>
           {purses
             .filter((p) => p.id !== h.purseId)
             .map((p) => (
@@ -1775,7 +1776,7 @@ function Handover({ holding: h }: { holding: Holding }) {
                 {p.name}
               </option>
             ))}
-        </Select>
+        </SearchSelect>
       </Field>
       <Field label="Handover terms / DM reason">
         <TextArea required value={reason} onChange={(e) => setReason(e.target.value)} />
@@ -1875,10 +1876,10 @@ function TemplateWorkshop({ state }: { state: Estate }) {
   return (
     <>
       <Field label="Edit a property template">
-        <Select
+        <SearchSelect
           value={selected}
-          onChange={(e) => {
-            const key = e.target.value;
+          onValueChange={(selectedValue) => {
+            const key = selectedValue;
             setSelected(key);
             setDraft(state.templates.find((t) => t.key === key) ?? estatePreset(preset));
             setAdvanced("");
@@ -1890,15 +1891,15 @@ function TemplateWorkshop({ state }: { state: Estate }) {
               {t.name}
             </option>
           ))}
-        </Select>
+        </SearchSelect>
       </Field>
       {selected === "new" && (
         <Field label="Property / building preset">
-          <Select
+          <SearchSelect
             value={preset}
-            onChange={(e) => {
-              setPreset(e.target.value);
-              setDraft(estatePreset(e.target.value));
+            onValueChange={(selectedValue) => {
+              setPreset(selectedValue);
+              setDraft(estatePreset(selectedValue));
               setAdvanced("");
             }}
           >
@@ -1907,7 +1908,7 @@ function TemplateWorkshop({ state }: { state: Estate }) {
                 {r[1]}
               </option>
             ))}
-          </Select>
+          </SearchSelect>
         </Field>
       )}
       <ActionForm
@@ -2121,14 +2122,14 @@ function RecipeBuilder({ template, state }: { template: EstateTemplate; state: E
       <NumberField label="Required full labor days" value={days} min={1} max={1e9} set={setDays} />
       <NumberField label="Full contractor labor cost (copper)" value={cost} set={setCost} />
       <Field label="Completed building / upgrade template">
-        <Select value={result} onChange={(e) => setResult(e.target.value)}>
+        <SearchSelect value={result} onValueChange={(selectedValue) => setResult(selectedValue)}>
           <option value="">No attached building result</option>
           {state.templates.map((t) => (
             <option key={t.key} value={t.key}>
               {t.name}
             </option>
           ))}
-        </Select>
+        </SearchSelect>
       </Field>
       <Tick
         label="Repair property to ready condition on completion"
@@ -2172,14 +2173,14 @@ function RecipeBuilder({ template, state }: { template: EstateTemplate; state: E
             set={setOutputWeight}
           />
           <Field label="Produced material definition">
-            <Select value={outputMaterial} onChange={(e) => setOutputMaterial(e.target.value)}>
+            <SearchSelect value={outputMaterial} onValueChange={(selectedValue) => setOutputMaterial(selectedValue)}>
               <option value="">Ordinary item</option>
               {state.materials.map((m) => (
                 <option key={m.key} value={m.key}>
                   {m.name}
                 </option>
               ))}
-            </Select>
+            </SearchSelect>
           </Field>
         </>
       )}
@@ -2327,10 +2328,10 @@ function EstateImporter() {
           </p>
           {document.ownerBindings.map((b) => (
             <Field key={b.key} label={b.label}>
-              <Select
+              <SearchSelect
                 value={owners[b.key] ?? ""}
-                onChange={(e) => {
-                  setOwners((o) => ({ ...o, [b.key]: e.target.value }));
+                onValueChange={(selectedValue) => {
+                  setOwners((o) => ({ ...o, [b.key]: selectedValue }));
                   clear();
                 }}
               >
@@ -2342,15 +2343,15 @@ function EstateImporter() {
                       {p.name}
                     </option>
                   ))}
-              </Select>
+              </SearchSelect>
             </Field>
           ))}
           {document.locations.map((l) => (
             <Field key={l.key} label={`${l.name} (${l.kind})`}>
-              <Select
+              <SearchSelect
                 value={locations[l.key] ?? ""}
-                onChange={(e) => {
-                  setLocations((old) => ({ ...old, [l.key]: e.target.value }));
+                onValueChange={(selectedValue) => {
+                  setLocations((old) => ({ ...old, [l.key]: selectedValue }));
                   clear();
                 }}
               >
@@ -2362,7 +2363,7 @@ function EstateImporter() {
                       {locationLabel(readMarketLocations(t.journal?.market), x.id)}
                     </option>
                   ))}
-              </Select>
+              </SearchSelect>
             </Field>
           ))}
           <Button

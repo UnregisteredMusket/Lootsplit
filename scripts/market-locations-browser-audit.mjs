@@ -1,3 +1,4 @@
+import { chooseOption } from "./search-select-browser.mjs";
 import assert from "node:assert/strict";
 import { chromium } from "playwright";
 import { expect } from "playwright/test";
@@ -181,8 +182,8 @@ async function decode(locator) {
 async function createLocation(page, kind, name, parentId) {
   await page.getByRole("button", { name: "Create location", exact: true }).click();
   const form = page.getByRole("form", { name: "Location configuration" });
-  await form.getByLabel("Location type", { exact: true }).selectOption(kind);
-  if (parentId) await form.getByLabel("Parent location", { exact: true }).selectOption(parentId);
+  await chooseOption(form.getByLabel("Location type", { exact: true }), kind);
+  if (parentId) await chooseOption(form.getByLabel("Parent location", { exact: true }), parentId);
   await form.getByLabel("Location name", { exact: true }).fill(name);
   await form.getByLabel("Location description", { exact: true }).fill(`${name} shared description`);
   await form.getByLabel("Location image", { exact: true }).setInputFiles(upload);
@@ -202,7 +203,7 @@ async function newShop(page, name, locationId) {
     .poll(async () => (await rows(page, "shops")).find((shop) => shop.id === shopId)?.name)
     .toBe(name);
   const form = page.getByRole("form", { name: "Shop location and image" });
-  await form.getByLabel("Shop availability", { exact: true }).selectOption(locationId);
+  await chooseOption(form.getByLabel("Shop availability", { exact: true }), locationId);
   await form.getByLabel("Shop image", { exact: true }).setInputFiles(upload);
   await decode(form.getByAltText("Shop image preview"));
   await form.getByRole("button", { name: "Save shop location and image", exact: true }).click();
@@ -317,7 +318,7 @@ try {
     const city = await createLocation(dm, "city", `Port ${width}`, region);
     const area = await createLocation(dm, "area", `Docks ${width}`, city);
     const other = await createLocation(dm, "region", `Desert ${width}`);
-    await dm.getByLabel("Party location", { exact: true }).selectOption(area);
+    await chooseOption(dm.getByLabel("Party location", { exact: true }), area);
     await expect.poll(async () => (await market(dm)).currentLocationId).toBe(area);
     for (const name of [`Coast ${width}`, `Port ${width}`, `Docks ${width}`])
       await decode(dm.getByAltText(name, { exact: true }));
@@ -330,7 +331,7 @@ try {
       .click();
     await dm.getByRole("button", { name: "Edit", exact: true }).click();
     const assignment = dm.getByRole("form", { name: "Shop location and image" });
-    await assignment.getByLabel("Shop availability", { exact: true }).selectOption(other);
+    await chooseOption(assignment.getByLabel("Shop availability", { exact: true }), other);
     // Emulate an independent writer after the form captured its baseline.
     async function competingAssignment(locationId) {
       await dm.evaluate(
@@ -367,7 +368,7 @@ try {
       .click();
     await expect(assignment.getByRole("alert")).toContainText("changed elsewhere");
     assert.equal(
-      await assignment.getByLabel("Shop availability", { exact: true }).inputValue(),
+      await assignment.getByLabel("Shop availability", { exact: true }).getAttribute("data-value"),
       other,
       "Conflict retains the unfinished draft",
     );
@@ -384,7 +385,7 @@ try {
     await expect(
       assignment.getByRole("button", { name: "Save shop location and image", exact: true }),
     ).toBeDisabled();
-    await assignment.getByLabel("Shop availability", { exact: true }).selectOption(area);
+    await chooseOption(assignment.getByLabel("Shop availability", { exact: true }), area);
     await assignment
       .getByRole("button", { name: "Save shop location and image", exact: true })
       .click();
@@ -457,7 +458,7 @@ try {
       )
       .toBe(6);
     await navigateApplication(dm, origin + "/market");
-    await dm.getByLabel("Party location", { exact: true }).selectOption(other);
+    await chooseOption(dm.getByLabel("Party location", { exact: true }), other);
     await player.getByRole("heading", { name: "Missing shop", exact: true }).waitFor();
     await player.getByRole("link", { name: "Back to the market", exact: true }).click();
     await decode(player.getByAltText(`Desert ${width}`, { exact: true }));
@@ -491,8 +492,8 @@ try {
     // The shared DM imports a plain shop list through the actual server command path.
     await dm.getByRole("button", { name: /^Manage regions, cities, towns and areas/ }).click();
     await dm.getByRole("button", { name: "Import names", exact: true }).click();
-    await importDialog.getByLabel("Imported name type", { exact: true }).selectOption("shop");
-    await importDialog.getByLabel("Import parent location", { exact: true }).selectOption(other);
+    await chooseOption(importDialog.getByLabel("Imported name type", { exact: true }), "shop");
+    await chooseOption(importDialog.getByLabel("Import parent location", { exact: true }), other);
     await importDialog
       .getByLabel("Names to import", { exact: true })
       .fill(`Shared Imported Shop ${width}`);
@@ -524,8 +525,8 @@ try {
     currentPage = dm;
     const recoveredShopName = `Recovered Imported Shop ${width}`;
     await dm.getByRole("button", { name: "Import names", exact: true }).click();
-    await importDialog.getByLabel("Imported name type", { exact: true }).selectOption("shop");
-    await importDialog.getByLabel("Import parent location", { exact: true }).selectOption(other);
+    await chooseOption(importDialog.getByLabel("Imported name type", { exact: true }), "shop");
+    await chooseOption(importDialog.getByLabel("Import parent location", { exact: true }), other);
     await importDialog.getByLabel("Names to import", { exact: true }).fill(recoveredShopName);
     await importDialog.getByRole("button", { name: "Review import", exact: true }).click();
     await expect(
@@ -605,8 +606,8 @@ try {
     assert.deepEqual(await market(dm), beforeLostResponse.locations);
     await navigateApplication(dm, origin + "/market");
     await dm.getByRole("button", { name: "Import names", exact: true }).click();
-    await importDialog.getByLabel("Imported name type", { exact: true }).selectOption("shop");
-    await importDialog.getByLabel("Import parent location", { exact: true }).selectOption(other);
+    await chooseOption(importDialog.getByLabel("Imported name type", { exact: true }), "shop");
+    await chooseOption(importDialog.getByLabel("Import parent location", { exact: true }), other);
     await importDialog.getByLabel("Names to import", { exact: true }).fill(recoveredShopName);
     await importDialog.getByRole("button", { name: "Review import", exact: true }).click();
     await expect(
