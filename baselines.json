@@ -3095,20 +3095,20 @@
   },
   "[\".github/workflows/verify.yml\",\"push\",\"main\",\"step\",\"Development / accounts / dev-account\",\"ubuntu-latest\",1]": {
     "schema": 1,
-    "id": "37303426479:1:e6e2599d3aba3386c3efe16bb1756e1d812100d2fef3902dff1e31681b65f778",
+    "id": "38020451232:1:e6e2599d3aba3386c3efe16bb1756e1d812100d2fef3902dff1e31681b65f778",
     "scope": "[\".github/workflows/verify.yml\",\"push\",\"main\",\"step\",\"Development / accounts / dev-account\",\"ubuntu-latest\",1]",
     "kind": "step",
     "name": "Development / accounts / dev-account",
     "environment": "ubuntu-latest",
-    "commit": "1ec7436a7117e402b276f85653cce80527b251c3",
-    "runId": 37303426479,
+    "commit": "f640e6d050a535527123277b39307f83f9d4e18f",
+    "runId": 38020451232,
     "attempt": 1,
-    "url": "https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37303426479/job/111741324413",
+    "url": "https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38020451232/job/114120085115",
     "outcome": "success",
-    "startedAt": "2026-10-05T11:31:53Z",
-    "finishedAt": "2026-10-05T11:34:31Z",
-    "durationMs": 158000,
-    "trendId": "37233687309:1:e6e2599d3aba3386c3efe16bb1756e1d812100d2fef3902dff1e31681b65f778"
+    "startedAt": "2026-10-10T03:25:26Z",
+    "finishedAt": "2026-10-10T03:27:35Z",
+    "durationMs": 129000,
+    "trendId": "resolution:b4b7d1b2-bd44-4370-af83-49cf616a4de6"
   },
   "[\".github/workflows/verify.yml\",\"push\",\"main\",\"step\",\"Development / governance / dev-backup\",\"ubuntu-latest\",1]": {
     "schema": 1,
@@ -10819,20 +10819,20 @@
   },
   "[\".github/workflows/verify.yml\",\"push\",\"main\",\"step\",\"Packaged Worker / interface / worker-market-locations\",\"ubuntu-latest\",1]": {
     "schema": 1,
-    "id": "38016770316:1:ed27237602955fddc27d2c05d19fcae14c53bd7151b1b9678e3c141ac22bc80b",
+    "id": "38020451232:1:ed27237602955fddc27d2c05d19fcae14c53bd7151b1b9678e3c141ac22bc80b",
     "scope": "[\".github/workflows/verify.yml\",\"push\",\"main\",\"step\",\"Packaged Worker / interface / worker-market-locations\",\"ubuntu-latest\",1]",
     "kind": "step",
     "name": "Packaged Worker / interface / worker-market-locations",
     "environment": "ubuntu-latest",
-    "commit": "ae6a92e05fbd6940e64af8d8438afe066cc1b007",
-    "runId": 38016770316,
+    "commit": "f640e6d050a535527123277b39307f83f9d4e18f",
+    "runId": 38020451232,
     "attempt": 1,
-    "url": "https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38016770316/job/114108904234",
-    "outcome": "failure",
-    "startedAt": "2026-10-10T02:26:13Z",
-    "finishedAt": "2026-10-10T02:27:21Z",
-    "durationMs": 68000,
-    "trendId": "37796847170:1:ed27237602955fddc27d2c05d19fcae14c53bd7151b1b9678e3c141ac22bc80b"
+    "url": "https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38020451232/job/114120387744",
+    "outcome": "success",
+    "startedAt": "2026-10-10T03:27:56Z",
+    "finishedAt": "2026-10-10T03:28:42Z",
+    "durationMs": 46000,
+    "trendId": "resolution:d6750b79-a04c-460b-98d2-a6d31f648590"
   },
   "[\".github/workflows/verify.yml\",\"push\",\"main\",\"step\",\"Code checks and immutable builds / Complete job\",\"ubuntu-latest\",1]": {
     "schema": 1,
@@ -11414,17 +11414,17 @@
   },
   "[\"local\",\"audit\",\"trade-economy browser audit\",\"node22.23.3/linux-x64/work-mode/chromium133/warm/disposable-real-account\",\"v1\"]": {
     "schema": 1,
-    "id": "local:c90990f8-3548-45a7-b8ab-496e56b8f32a",
+    "id": "local:4bd03d10-03bd-4060-97ed-8066e1537f43",
     "scope": "[\"local\",\"audit\",\"trade-economy browser audit\",\"node22.23.3/linux-x64/work-mode/chromium133/warm/disposable-real-account\",\"v1\"]",
     "kind": "audit",
     "name": "trade-economy browser audit",
     "environment": "node22.23.3/linux-x64/work-mode/chromium133/warm/disposable-real-account",
-    "commit": "4d7e7bc96e3a4e1549fddb72affe6e0da70b6d27",
-    "url": "https://github.com/UnregisteredMusket/Lootsplit/pull/81",
+    "commit": "1b64c84709f7206dc644799b13bb2d0b2109c22c",
+    "url": "https://github.com/UnregisteredMusket/Lootsplit/commit/1b64c84709f7206dc644799b13bb2d0b2109c22c",
     "outcome": "success",
-    "startedAt": "2026-10-09T16:46:42.790612+00:00",
-    "finishedAt": "2026-10-09T16:47:44.083524+00:00",
-    "durationMs": 61293,
+    "startedAt": "2026-10-10T03:43:23.241Z",
+    "finishedAt": "2026-10-10T03:44:36.503Z",
+    "durationMs": 73262,
     "trendId": "local:c90990f8-3548-45a7-b8ab-496e56b8f32a"
   },
   "[\".github/workflows/verify.yml\",\"push\",\"main\",\"step\",\"Packaged Worker / interface / worker-trade-economy\",\"ubuntu-latest\",1]": {
@@ -11475,5 +11475,20 @@
     "finishedAt": "2026-10-09T18:31:12.927Z",
     "durationMs": 57631,
     "trendId": "local:1550a015-2e10-4e16-911c-2f6f17d5b87e"
+  },
+  "[\"local\",\"audit\",\"trade-economy browser audit\",\"node22.23.3/linux-x64/chromium133/disposable-worker\",\"v1\"]": {
+    "schema": 1,
+    "id": "local:91b5fa37-5f0d-4221-b701-8c311aea9e60",
+    "scope": "[\"local\",\"audit\",\"trade-economy browser audit\",\"node22.23.3/linux-x64/chromium133/disposable-worker\",\"v1\"]",
+    "kind": "audit",
+    "name": "trade-economy browser audit",
+    "environment": "node22.23.3/linux-x64/chromium133/disposable-worker",
+    "commit": "1b64c84709f7206dc644799b13bb2d0b2109c22c",
+    "url": "https://github.com/UnregisteredMusket/Lootsplit/commit/1b64c84709f7206dc644799b13bb2d0b2109c22c",
+    "outcome": "success",
+    "startedAt": "2026-10-10T03:45:23.749Z",
+    "finishedAt": "2026-10-10T03:46:03.381Z",
+    "durationMs": 39632,
+    "trendId": "local:91b5fa37-5f0d-4221-b701-8c311aea9e60"
   }
 }
