@@ -5,6 +5,14 @@ import { chromium } from "playwright";
 import { verifyArtifact } from "./release-artifact.mjs";
 import { waitForRelease } from "./release-readiness.mjs";
 const origin = process.env.AUDIT_ORIGIN || "http://127.0.0.1:8082";
+// Disposable Worker audits share a server with gameplay fixtures. Anonymous
+// title clients need their own quota too; real production requests stay unchanged.
+const fixtureHeaders = () =>
+  ["127.0.0.1", "localhost"].includes(new URL(origin).hostname)
+    ? {
+        "cf-connecting-ip": `2001:db8:${crypto.randomUUID().slice(0, 4)}:${crypto.randomUUID().slice(0, 4)}::1`,
+      }
+    : undefined;
 const expected = process.env.EXPECTED_RELEASE_SHA;
 assert.match(expected || "", /^[a-f0-9]{40}$/);
 await mkdir("test-results/live-release", { recursive: true });
@@ -19,15 +27,18 @@ console.log(
 );
 // Confirm the account service is configured and private data remains protected.
 const session = await fetch(`${origin}/api/account/auth/get-session`, {
+  headers: fixtureHeaders(),
   signal: AbortSignal.timeout(15000),
 });
 assert.equal(session.status, 200);
 assert.equal(await session.json(), null);
 const privateLibrary = await fetch(`${origin}/api/account/library`, {
+  headers: fixtureHeaders(),
   signal: AbortSignal.timeout(15000),
 });
 assert.equal(privateLibrary.status, 401);
 const privateSheets = await fetch(`${origin}/api/account/sheets`, {
+  headers: fixtureHeaders(),
   signal: AbortSignal.timeout(15000),
 });
 assert.equal(privateSheets.status, 401);
@@ -39,7 +50,10 @@ const errors = [];
 await mkdir("test-results/live-release", { recursive: true });
 try {
   for (const width of [1280, 390]) {
-    const context = await browser.newContext({ viewport: { width, height: 844 } });
+    const context = await browser.newContext({
+      viewport: { width, height: 844 },
+      extraHTTPHeaders: fixtureHeaders(),
+    });
     const page = await context.newPage();
     page.on("pageerror", (error) => errors.push(error.message));
     page.on("response", (response) => {
@@ -114,7 +128,10 @@ try {
     await page.screenshot({ path: `test-results/live-release/app-${width}.png` });
     await context.close();
   }
-  const reduced = await browser.newContext({ reducedMotion: "reduce" });
+  const reduced = await browser.newContext({
+    reducedMotion: "reduce",
+    extraHTTPHeaders: fixtureHeaders(),
+  });
   const page = await reduced.newPage();
   await page.goto(origin, { waitUntil: "networkidle" });
   const title = page.getByRole("button", { name: "Lootsplit. Click to continue", exact: true });

@@ -61,6 +61,10 @@ try {
     const context = await browser.newContext({
       viewport: { width, height: 1000 },
       serviceWorkers: "block",
+      // Isolate the first account lookup too; DM setup assigns its signup identity later.
+      extraHTTPHeaders: {
+        "cf-connecting-ip": `2001:db8:${crypto.randomUUID().slice(0, 4)}:${crypto.randomUUID().slice(0, 4)}::1`,
+      },
     });
     await context.route(
       (url) => url.origin !== origin && !["blob:", "data:"].includes(url.protocol),

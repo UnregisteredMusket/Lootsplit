@@ -14,6 +14,8 @@ The user’s source-file output is saved separately, never committed or publicly
 
 ## Performance evidence
 
+The first exact-head PR run38033323180 passed every resource import and preservation browser scenario, but its final immutable title check reported429 for an anonymous get-session read. The new resource contexts performed their first account lookup before DM fixture setup assigned a synthetic client identity, sharing the default identity used by the final title check. The log proves a fixture quota collision; it does not establish which earlier read exhausted it. Each new resource context and each loopback-only anonymous title client now owns a distinct synthetic IPv6 prefix before any account read. Real production requests, production limits, anonymous title assertions, all account deadlines and every scenario remain unchanged. Keep the failed run/artifact11662993263; fresh complete verification of this fixture correction is required. This is fixture quota isolation, not evidence of a resource-import runtime failure. Corrected local resource scope passed25.540s versus27.447s; no qualifying slowdown or reference reset.
+
 The initial current snapshot contains755 retained observations,686 references and17 resolution records, with zero stale requests and one pre-existing pending run. Recorder38031808754 succeeded. All three observations added since the prior752-observation audit are retained:
 
 | Operation | Last reference → recorded duration | Added time | Increase | Assessment |
