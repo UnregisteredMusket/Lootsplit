@@ -208,7 +208,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | backup / Run actions/setup-node@v4 | open | 2 | 3s → 7s | +4s | +133.33% |
 | backup / Run npm ci --ignore-scripts | open | 2 | 7s → 17s | +10s | +142.86% |
 | Development / governance / dev-backup | resolved | 3 | 7s → 23s | +16s | +228.57% |
-| Development / gameplay / dev-library-navigation | open | 3 | 17s → 44s | +27s | +158.82% |
+| Development / gameplay / dev-library-navigation | open | 4 | 17s → 51s | +34s | +200% |
 | verify:quick | open | 2 | 36.854731s → 52.084s | +15.229269s | +41.32% |
 | Development / gameplay / dev-library-navigation | open | 4 | 18s → 49s | +31s | +172.22% |
 | Packaged Worker / accounts / Start disposable built Worker | open | 2 | 7s → 11s | +4s | +57.14% |
@@ -236,6 +236,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-10T13:50:10Z | step: Development / gameplay / dev-library-navigation | 44s → 51s | +7s | +15.91% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38045806287/job/114194983319) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38056573789/job/114226203438) |
 | 2026-10-10T13:07:27Z | step: Development / gameplay / dev-world-features | 86s → 106s | +20s | +23.26% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38046397037/job/114196698960) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38053941691/job/114218473575) |
 | 2026-10-10T13:05:41Z | step: Development / gameplay / dev-trade-economy | 61s → 83s | +22s | +36.07% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38024734214/job/114133054633) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38053941691/job/114218473575) |
 | 2026-10-10T13:05:13Z | step: Packaged Worker / interface / worker-trade-economy | 39s → 55s | +16s | +41.03% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38041114058/job/114181642328) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38053941691/job/114218842201) |
