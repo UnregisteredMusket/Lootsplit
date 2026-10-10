@@ -2432,8 +2432,8 @@ input,select,textarea { max-width: 100%; }
 @keyframes map-ping-pulse { from { transform:scale(.7); opacity:1; } to { transform:scale(2); opacity:0; } }
 @media(prefers-reduced-motion:reduce) { .map-ping::after { animation:none; } }
 
-.record-select { position: relative; min-width: 0; width: 100%; }
-.record-select-trigger { display: flex; align-items: center; justify-content: space-between; gap: .6rem; width: 100%; min-height: 44px; padding: .55rem .75rem; border: 1px solid var(--color-border); border-radius: .25rem; background: var(--color-subtle); color: var(--color-fg); text-align: left; font-size: 1rem; }
+.record-select { position: relative; display: grid; grid-template-columns: minmax(0, 1fr); min-width: 0; width: 100%; max-width: 100%; }
+.record-select-trigger { display: flex; align-items: center; justify-content: space-between; gap: .6rem; width: 100%; min-width: 0; max-width: 100%; min-height: 44px; padding: .55rem .75rem; border: 1px solid var(--color-border); border-radius: .25rem; background: var(--color-subtle); color: var(--color-fg); text-align: left; font-size: 1rem; }
 .record-select-trigger > span { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; min-width: 0; }
 .record-select-trigger > svg { flex-shrink: 0; }
 .record-select-trigger:disabled { opacity: .45; }
