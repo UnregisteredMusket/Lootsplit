@@ -1,3 +1,9 @@
+# Portrait barter interface — October 10, 2026 UTC
+
+Active branch `feature/portrait-barter-ui` starts from complete/live main `10e468745351090c4f47a8077dd380b16313b6dc` (PR90). Searchable Library/NPC placement/privacy/downtime and commodity boards are COMPLETE; do not repeat their merges, releases or migrations. The remaining owner request is the supplied two-sided barter reference. Implementation and preservation/performance evidence are in `docs/audit/2026-10-10-barter-ui.md`; shared web/mobile client only, no migration or distributed APK. Existing publication authorization persists.
+
+Final local tests890 total/886 passes/four existing skips, clean types, lint0errors29existingwarnings, changed lint clean, web/mobile builds and complete desktop/phone world/barter audit150.393s (164.537s including setup/artifact collection) pass. Final screenshots were inspected. Source is frozen before fresh all-nine PR checks, independent main checks, immutable website/standby publication and read-only live identity/all-JS/CSS hashes/desktop/mobile verification. Local diagnostic Chromium133/Worker limitations require the current-browser CI gates. Store evolving exact head/tree/PR/run/live/performance state in the PR and `test-results/recovery/barter-ui.json`; reconcile after interruption before repeating any mutation.
+
 # Individual character locations, NPC privacy and downtime — October 10, 2026 UTC
 
 Active branch `feature/character-locations-downtime` starts from confirmed main/live `76a904b09fe9eb0d845fd8b4c8b57219e4a98cd9`. The owner requested party departures/locations, NPC transfers and sheet privacy, and campaign-time character downtime. Implementation and local evidence are in `docs/audit/2026-10-10-character-placement.md`. Canonical IDs/assets/ownership, permissions, stale/receipt semantics, financial time, property presence, legacy saves and every prior feature/gate are preserved. No migration or APK change. Publication authorization persists.

@@ -11,6 +11,9 @@ import { useWorldTable } from "@/lib/quire/use-world-table";
 import { CommandForm, CommandButton } from "./world-tools";
 import { Button, Fold } from "./ui";
 import { AppLink } from "./app-link";
+import { FantasyIcon } from "./fantasy-icon";
+import { ArrowLeftRight, Coins, PackageOpen, Search, UserRound, X } from "lucide-react";
+import { toCopper } from "@/lib/quire/money";
 export function CampaignTrading() {
   const t = useWorldTable(),
     world = readWorld(t.journal.world),
@@ -26,20 +29,29 @@ export function CampaignTrading() {
   );
   const name = (id: string) => t.purses.find((p) => p.id === id)?.name ?? "Former account";
   return (
-    <div>
-      <p>
+    <div className="barter-page">
+      <header className="barter-heading">
+        <div>
+          <p className="commodity-eyebrow">The trading table</p>
+          <h2>Exchange goods & coins</h2>
+        </div>
+        <Button onClick={() => setEditing(null)}>New barter offer</Button>
+      </header>
+      <p className="barter-intro">
         Offer coins, goods or property deeds. The recipient can accept, decline or counter. Nothing
         moves until the current recipient accepts the reviewed offer.
       </p>
-      <p className="text-sm text-muted">
-        Stored, in-transit, reserved and service items cannot be bartered. Properties with active
-        obligations require the existing DM handover process. Offered lots are checked again at
-        acceptance.
-      </p>
+      <details className="barter-rules">
+        <summary>What can be traded?</summary>
+        <p className="text-sm text-muted">
+          Stored, in-transit, reserved and service items cannot be bartered. Properties with active
+          obligations require the existing DM handover process. Offered lots are checked again at
+          acceptance.
+        </p>
+      </details>
       <AppLink className="settings-link" href="/features/npcs">
         Find nearby NPCs →
       </AppLink>
-      <Button onClick={() => setEditing(null)}>New barter offer</Button>
       {editing !== undefined && (
         <TradeEditor
           key={editing?.id ?? "new"}
@@ -51,7 +63,7 @@ export function CampaignTrading() {
       {offers
         .filter((o) => o.status === "pending")
         .map((o) => (
-          <article key={o.id} className="world-card">
+          <article key={o.id} className="barter-pending">
             <h2>
               {name(o.left.purseId)} ↔ {name(o.right.purseId)}
             </h2>
@@ -127,21 +139,35 @@ export function CampaignTrading() {
 }
 function OfferReadout({ table, offer }: { table: CloudTable; offer: Trade }) {
   return (
-    <div className="world-columns">
+    <div className="barter-readout">
       {[offer.left, offer.right].map((side) => (
-        <div key={side.purseId}>
-          <h3>{table.purses.find((p) => p.id === side.purseId)?.name ?? "Former account"} gives</h3>
-          <p>{formatCopper(side.copper)}</p>
-          {side.items.map((i) => {
-            const h = JSON.parse(i.before) as Holding;
-            return (
-              <p key={i.holdingId}>
-                {i.quantity} × {h.name}
-                {h.kind === "property" ? " · Property deed" : ""}
-              </p>
-            );
-          })}
-        </div>
+        <section key={side.purseId} className="barter-tray">
+          <Participant table={table} id={side.purseId} />
+          <p className="barter-coins">
+            <Coins size={16} aria-hidden="true" />
+            {formatCopper(side.copper)} offered
+          </p>
+          <div className="barter-readout-items">
+            {side.items.map((i) => {
+              const h = JSON.parse(i.before) as Holding;
+              return (
+                <div key={i.holdingId} className="barter-offered-lot">
+                  <LotArt holding={h} />
+                  <div>
+                    <strong>
+                      {i.quantity} × {h.name}
+                    </strong>
+                    <small>
+                      {h.kind === "property" ? "Property deed · " : ""}
+                      {formatCopper(h.unitCopper * i.quantity)} recorded value
+                    </small>
+                  </div>
+                </div>
+              );
+            })}
+          </div>
+          {!side.items.length && <p className="barter-empty">No goods offered</p>}
+        </section>
       ))}
     </div>
   );
@@ -172,10 +198,12 @@ function TradeEditor({
         coins: { cp: 0, sp: 0, ep: 0, gp: 0, pp: 0 },
       })),
   ];
-  const accounts = directory.filter((p) =>
-      p.nonParty
-        ? world.npcs.some((n) => n.id === p.id && n.barterAllowed && npcAvailableHere(n, table))
-        : p.kind === "party" || p.control !== "npc",
+  const accounts = directory.filter(
+      (p) =>
+        !table.journal?.tradeEconomy?.exchanges.some((e) => e.purseId === p.id) &&
+        (p.nonParty
+          ? world.npcs.some((n) => n.id === p.id && n.barterAllowed && npcAvailableHere(n, table))
+          : p.kind === "party" || p.control !== "npc"),
     ),
     actors = accounts.filter((p) => canAct(p.id));
   const [leftId, setLeftId] = useState(offer?.left.purseId ?? actors[0]?.id ?? ""),
@@ -219,8 +247,12 @@ function TradeEditor({
       }),
   });
   return (
-    <section className="world-card">
-      <h2>{offer ? "Review counteroffer" : "Propose a barter"}</h2>
+    <section className="barter-table">
+      <div className="barter-table-title">
+        <ArrowLeftRight size={20} aria-hidden="true" />
+        <h2>{offer ? "Review counteroffer" : "Propose a barter"}</h2>
+        <span>Barter</span>
+      </div>
       <CommandForm
         label={offer ? "Send counteroffer" : "Send barter offer"}
         dirty
@@ -235,8 +267,13 @@ function TradeEditor({
         })}
         onDone={close}
       >
-        <div className="world-columns">
-          <div>
+        <div className="barter-workspace">
+          <section className="barter-side barter-side-left">
+            <Participant
+              table={table}
+              id={leftId}
+              showBalance={dm || canAct(leftId) || world.npcs.some((n) => n.id === leftId)}
+            />
             <label>
               {offer ? "First participant" : "Your offering account"}
               <SearchSelect
@@ -248,6 +285,11 @@ function TradeEditor({
                   setLeftId(selectedValue);
                   setLeftItems({});
                   setLeftCoins("0");
+                  if (selectedValue === rightId) {
+                    setRightId(accounts.find((p) => p.id !== selectedValue)?.id ?? "");
+                    setRightItems({});
+                    setRightCoins("0");
+                  }
                 }}
               >
                 {(offer ? accounts : actors).map((p) => (
@@ -264,9 +306,15 @@ function TradeEditor({
               setSelected={setLeftItems}
               copper={leftCoins}
               setCopper={setLeftCoins}
+              direction="offer"
             />
-          </div>
-          <div>
+          </section>
+          <section className="barter-side barter-side-right">
+            <Participant
+              table={table}
+              id={rightId}
+              showBalance={dm || canAct(rightId) || world.npcs.some((n) => n.id === rightId)}
+            />
             <label>
               Other participant
               <SearchSelect
@@ -297,14 +345,19 @@ function TradeEditor({
               setSelected={setRightItems}
               copper={rightCoins}
               setCopper={setRightCoins}
+              direction="request"
             />
             {!rightLots.length && (
-              <p>
+              <p className="barter-private">
                 The other player adds their own goods in a counteroffer. Their private inventory is
                 not displayed.
               </p>
             )}
-          </div>
+          </section>
+        </div>
+        <div className="barter-review-band">
+          <ArrowLeftRight size={18} aria-hidden="true" />
+          <p>Review both offer trays. Nothing moves until the recipient accepts.</p>
         </div>
         <label>
           Barter note
@@ -332,6 +385,7 @@ function ItemOfferPicker({
   setSelected,
   copper,
   setCopper,
+  direction,
 }: {
   label: string;
   lots: Holding[];
@@ -339,36 +393,209 @@ function ItemOfferPicker({
   setSelected: (s: Record<string, number>) => void;
   copper: string;
   setCopper: (s: string) => void;
+  direction: "offer" | "request";
 }) {
+  const [query, setQuery] = useState(""),
+    [category, setCategory] = useState("all"),
+    [limit, setLimit] = useState(24);
+  const categoryOf = (h: Holding) => (h.kind === "property" ? "Deeds" : h.category || "Goods");
+  const categories = [...new Set(lots.map(categoryOf))].sort();
+  const filtered = lots.filter(
+    (h) =>
+      (category === "all" || categoryOf(h) === category) &&
+      `${h.name} ${categoryOf(h)} ${h.notes}`
+        .toLocaleLowerCase()
+        .includes(query.toLocaleLowerCase().trim()),
+  );
+  const offered = lots.filter((h) => (selected[h.id] ?? 0) > 0);
+  const recordedValue =
+    offered.reduce((total, h) => total + h.unitCopper * selected[h.id], 0) + (Number(copper) || 0);
   return (
-    <>
-      <label>
-        {label} coins (copper)
-        <input
-          type="number"
-          min={0}
-          max={1e12}
-          step={1}
-          required
-          value={copper}
-          onChange={(e) => setCopper(e.target.value)}
-        />
-      </label>
-      {lots.map((h) => (
-        <label key={h.id}>
-          {h.name}
-          {h.kind === "property" ? " (deed)" : ""} · {h.quantity} available
+    <div className="barter-picker">
+      <div className="barter-inventory">
+        <div className="barter-section-label">
+          <h3>Inventory</h3>
+          <small>{lots.length} lots</small>
+        </div>
+        <label className="barter-search">
+          <span className="sr-only">{label} inventory search</span>
+          <Search size={16} aria-hidden="true" />
           <input
-            aria-label={`${label}: ${h.name} quantity`}
-            type="number"
-            min={0}
-            max={h.quantity}
-            step={1}
-            value={selected[h.id] ?? 0}
-            onChange={(e) => setSelected({ ...selected, [h.id]: Number(e.target.value) })}
+            type="search"
+            placeholder="Search goods or deeds…"
+            value={query}
+            onChange={(e) => {
+              setQuery(e.target.value);
+              setLimit(24);
+            }}
           />
         </label>
-      ))}
-    </>
+        <div className="barter-categories" aria-label={`${label} inventory categories`}>
+          {["all", ...categories].map((c) => (
+            <button
+              type="button"
+              key={c}
+              aria-pressed={category === c}
+              onClick={() => {
+                setCategory(c);
+                setLimit(24);
+              }}
+            >
+              {c === "all" ? "All" : c}
+            </button>
+          ))}
+        </div>
+        <div className="barter-inventory-grid">
+          {filtered.slice(0, limit).map((h) => (
+            <button
+              type="button"
+              className="barter-tile"
+              key={h.id}
+              aria-pressed={(selected[h.id] ?? 0) > 0}
+              aria-label={`${(selected[h.id] ?? 0) > 0 ? "Remove" : "Add"} ${h.name} ${direction === "offer" ? "to" : "from"} ${label} offer`}
+              title={`${h.name} · ${h.quantity} available · ${formatCopper(h.unitCopper)} each${h.kind === "property" ? " · Property deed" : ""}`}
+              onClick={() =>
+                setSelected({ ...selected, [h.id]: (selected[h.id] ?? 0) > 0 ? 0 : 1 })
+              }
+            >
+              <LotArt holding={h} />
+              <span className="barter-tile-count">{h.quantity}</span>
+              <span className="barter-tile-name">{h.name}</span>
+            </button>
+          ))}
+        </div>
+        {!filtered.length && (
+          <p className="barter-empty">
+            {lots.length ? "No matching goods." : "No available goods."}
+          </p>
+        )}
+        {filtered.length > limit && (
+          <Button variant="secondary" onClick={() => setLimit(limit + 48)}>
+            Show more {label.toLowerCase()} goods ({filtered.length - limit})
+          </Button>
+        )}
+        <p className="barter-hint">
+          Tap goods to add or remove them. Set quantities in the offer tray.
+        </p>
+      </div>
+      <div className="barter-tray barter-edit-tray">
+        <div className="barter-section-label">
+          <h3>{direction === "offer" ? "Offering" : "Requesting"}</h3>
+          <PackageOpen size={17} aria-hidden="true" />
+        </div>
+        <label className="barter-coin-input">
+          {label} coins (copper)
+          <input
+            aria-label={`${label} coins (copper)`}
+            type="number"
+            min={0}
+            max={1e12}
+            step={1}
+            required
+            value={copper}
+            onChange={(e) => setCopper(e.target.value)}
+          />
+          <small>{formatCopper(Number(copper) || 0)}</small>
+        </label>
+        <div className="barter-offer-lots">
+          {offered.map((h) => (
+            <div key={h.id} className="barter-offered-lot">
+              <LotArt holding={h} />
+              <label>
+                <strong>{h.name}</strong>
+                <small>
+                  {h.kind === "property" ? "Property deed · " : ""}
+                  {h.quantity} available · {formatCopper(h.unitCopper)} each
+                </small>
+                <input
+                  aria-label={`${label}: ${h.name} quantity`}
+                  type="number"
+                  min={0}
+                  max={h.quantity}
+                  step={1}
+                  value={selected[h.id] ?? 0}
+                  onChange={(e) => setSelected({ ...selected, [h.id]: Number(e.target.value) })}
+                />
+              </label>
+              <button
+                type="button"
+                className="barter-remove"
+                aria-label={`Remove ${h.name} from ${label} tray`}
+                onClick={() => setSelected({ ...selected, [h.id]: 0 })}
+              >
+                <X size={16} aria-hidden="true" />
+              </button>
+            </div>
+          ))}
+          {!offered.length && (
+            <div className="barter-empty-tray">
+              <PackageOpen size={28} aria-hidden="true" />
+              <p>Add goods from inventory</p>
+            </div>
+          )}
+        </div>
+        <p className="barter-tray-value">
+          <span>Recorded offer value</span>
+          <strong>{formatCopper(recordedValue)}</strong>
+        </p>
+        <p className="barter-hint">Saved item values and coins; participants agree the terms.</p>
+      </div>
+    </div>
+  );
+}
+
+function LotArt({ holding }: { holding: Holding }) {
+  return (
+    <span className="barter-lot-art">
+      {holding.image ? (
+        <img src={holding.image} alt="" loading="lazy" />
+      ) : (
+        <FantasyIcon entry={holding} size={32} />
+      )}
+    </span>
+  );
+}
+
+function Participant({
+  table,
+  id,
+  showBalance = false,
+}: {
+  table: CloudTable;
+  id: string;
+  showBalance?: boolean;
+}) {
+  const world = readWorld(table.journal?.world),
+    purse = table.purses.find((p) => p.id === id),
+    person = purse ?? world.partyCharacters?.find((p) => p.id === id),
+    npc = world.npcs.find((n) => n.id === id),
+    portrait = purse?.portrait || purse?.sheet?.portrait || npc?.portrait;
+  return (
+    <header className="barter-participant">
+      <div className="barter-portrait">
+        {portrait ? (
+          <img src={portrait} alt={`${person?.name ?? "Participant"} portrait`} />
+        ) : (
+          <UserRound size={42} aria-hidden="true" />
+        )}
+      </div>
+      <h3>{person?.name ?? "Former account"}</h3>
+      <p>
+        {purse?.sheet
+          ? `Level ${purse.sheet.level} · ${purse.sheet.classes || purse.sheet.species || "Character"}`
+          : npc
+            ? "Nearby trader"
+            : purse?.kind === "party"
+              ? "Party treasury"
+              : "Campaign character"}
+      </p>
+      {showBalance && purse && (
+        <div className="barter-wallet">
+          <Coins size={16} aria-hidden="true" />
+          {formatCopper(toCopper(purse.coins))}
+          <small>available funds</small>
+        </div>
+      )}
+    </header>
   );
 }
