@@ -7,6 +7,7 @@ import { sameCommand } from "./command-identity.ts";
 import { emptyCloudTable, type CloudTable } from "./cloud.ts";
 import { fromCopper, toCopper } from "./money.ts";
 import { readAccountResponse } from "../account/response.ts";
+import { readRoomResponse } from "./room-response.ts";
 
 const source = readFileSync(new URL("./cloud-client.ts", import.meta.url), "utf8");
 const give = (id: string, copper: number): Command => ({
@@ -51,8 +52,12 @@ function acceptance(pending: Command[], acknowledged: string[], draft: Command[]
     code: "TEST",
     seatId: seat.id,
     revision: 2,
+    turn: 0,
+    mine: true,
+    who: seat.name,
+    live: true,
     table: table(),
-    seats: [seat],
+    seats: [{ ...seat, pending: draft.length, allowParty: false }],
     purseIds: seat.purseIds,
     shopIds: [],
     acknowledged,
@@ -67,6 +72,7 @@ function acceptance(pending: Command[], acknowledged: string[], draft: Command[]
   );
   const accept = new Function(
     "requireSession",
+    "readRoomResponse",
     "applyCloudTable",
     "view",
     "rememberIncoming",
@@ -81,6 +87,7 @@ function acceptance(pending: Command[], acknowledged: string[], draft: Command[]
     stripTypeScriptTypes(body) + "; return accept;",
   )(
     () => session,
+    readRoomResponse,
     async (t: ReturnType<typeof table>) => {
       displayed = t;
     },
@@ -110,6 +117,43 @@ test("actual acceptance drops acknowledged delayed drafts and hydrates the autho
   assert.equal(h.error(), "");
   assert.equal(toCopper(h.displayed()!.purses[1]!.coins), 100);
   assert.equal(h.displayed()!.ledger.length, 2);
+});
+test("actual acceptance rejects incomplete room replies before changing pending work", async () => {
+  const command = give("retain-after-incomplete-reply", 100);
+  const invalid = [
+    () => undefined,
+    () => null,
+    () => ({}),
+    (remote: object) => ({ ...remote, acknowledged: undefined }),
+    (remote: object) => ({ ...remote, draft: "{broken" }),
+    (remote: object) => ({ ...remote, draft: "{}" }),
+    (remote: object) => ({ ...remote, draft: '[{"id":"bad","kind":"not-a-command"}]' }),
+    (remote: object) => ({ ...remote, table: undefined }),
+    (remote: object) => ({ ...remote, table: { ...table(), purses: [{ id: "bad" }] } }),
+  ];
+  for (const unreadable of invalid) {
+    const h = acceptance([command], [command.id], []);
+    const before = structuredClone(h.session);
+    await assert.rejects(
+      h.accept(unreadable({ ...h.remote, sessionId: "changed-session" }), true),
+      /shared campaign response was incomplete/,
+    );
+    assert.deepEqual(
+      h.session,
+      before,
+      "Do not remove commands or rotate receipts on an unreadable reply",
+    );
+    assert.equal(h.displayed(), undefined, "Do not replace the displayed campaign");
+  }
+});
+test("actual acceptance keeps pending work when a response belongs to another room or seat", async () => {
+  for (const mismatch of [{ code: "OTHER" }, { seatId: "another-seat" }]) {
+    const h = acceptance([give("keep-original-seat", 100)], [], []);
+    const before = structuredClone(h.session);
+    await assert.rejects(h.accept({ ...h.remote, ...mismatch }, true), /different room or seat/);
+    assert.deepEqual(h.session, before);
+    assert.equal(h.displayed(), undefined);
+  }
 });
 test("actual acceptance unites another device's draft with this device's unsent action", async () => {
   const a = give("this-device", 100),
@@ -548,7 +592,7 @@ function outcomeHarness({ live = true, lostResponse = false, hydrationFailure = 
     who: "Synthetic DM",
     live,
     viewOnly: false,
-    seats: [{ ...seat, id: "dm", role: "dm" }],
+    seats: [{ ...seat, id: "dm", role: "dm", pending: 0, allowParty: false }],
     error: "",
   };
   const session = () => JSON.parse(serialized);
@@ -599,6 +643,7 @@ function outcomeHarness({ live = true, lostResponse = false, hydrationFailure = 
       sessionId: session().sessionId,
       seatId: "dm",
       revision,
+      turn: 0,
       table: authoritative,
       seats: view.seats,
       purseIds: [],
@@ -652,6 +697,7 @@ function outcomeHarness({ live = true, lostResponse = false, hydrationFailure = 
     "setSeat",
     "start",
     "sameCommand",
+    "readRoomResponse",
     stripTypeScriptTypes(body) +
       "; return {queueCommand, runSharedMutation, captureMutationScope, retryPending};",
   )(
@@ -683,6 +729,7 @@ function outcomeHarness({ live = true, lostResponse = false, hydrationFailure = 
     () => {},
     () => {},
     sameCommand,
+    readRoomResponse,
   );
   return {
     ...functions,
