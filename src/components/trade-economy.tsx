@@ -1,5 +1,6 @@
 import {
   useState,
+  useMemo,
   useId,
   cloneElement,
   isValidElement,
@@ -31,6 +32,8 @@ import { AppLink } from "./app-link";
 import { TradeSeasonReview } from "./trade-season-review";
 import { tradeReversalGuidance } from "@/lib/quire/ledger-reversal";
 import { Button, Modal } from "./ui";
+import { CommodityBoard } from "./commodity-board";
+import { useRouterState } from "@tanstack/react-router";
 
 function Field({ label, children }: { label: string; children: ReactNode }) {
   const id = useId();
@@ -116,27 +119,96 @@ export function TradeEconomyPanel() {
   const table = useWorldTable(),
     seat = useSeat(),
     dm = seat.role === "dm";
-  const economy = readTradeEconomy(table.journal.tradeEconomy),
+  const economy = useMemo(
+      () => readTradeEconomy(table.journal.tradeEconomy),
+      [table.journal.tradeEconomy],
+    ),
     realm = clampRealm(table.realm);
   const [commodityId, setCommodityId] = useState(""),
     [exchangeId, setExchangeId] = useState("");
   const visible = economy.exchanges.filter((e) => dm || (e.visible && exchangeHere(table, e)));
+  const search = useRouterState({
+    select: (state) => state.location.search as Record<string, unknown>,
+  });
   return (
     <div className="trade-economy-panel">
-      <p className="text-muted">
-        {SEASON_NAMES[realm.season]} · season {economy.epoch} ·{" "}
-        {economy.settings.mode === "classic" ? "Classic Mode" : "Automatic Mode"} ·{" "}
-        {economy.settings.enabled ? "Trading enabled" : "Trading disabled"}
-      </p>
-      <p>
-        This campaign has its own economy. Prices stay fixed during a season. Purchases and sales
-        feed the next season when the DM approves end-of-session downtime, or an explicit manual
-        settlement.
-      </p>
-      <div className="world-toolbar">
+      <div className="commodity-season-strip">
+        <span>
+          {SEASON_NAMES[realm.season]} · season {economy.epoch}
+        </span>
+        <span>{economy.settings.mode === "classic" ? "Classic Mode" : "Automatic Mode"}</span>
+        <span>{economy.settings.enabled ? "Trading enabled" : "Trading disabled"}</span>
+        {dm && economy.pendingSeason && <a href="#trade-manual-season">Review pending season ↓</a>}
+      </div>
+      <CommodityBoard
+        economy={economy}
+        exchanges={visible}
+        market={readMarketLocations(table.journal.market)}
+        dm={dm}
+        initialExchange={typeof search.exchange === "string" ? search.exchange : ""}
+        initialCommodity={typeof search.commodity === "string" ? search.commodity : ""}
+        renderTrade={({ exchange: e, commodity: c }) => (
+          <>
+            {dm ? (
+              <p className="commodity-caption">
+                {table.purses.find((p) => p.id === e.purseId)
+                  ? `Treasury ${formatCopper(toCopper(table.purses.find((p) => p.id === e.purseId)!.coins))}`
+                  : "Treasury account unavailable"}
+              </p>
+            ) : (
+              <p className="text-sm text-muted">
+                Exchange balance is private. Purchases and sales check available funds when
+                submitted.
+              </p>
+            )}
+            {economy.settings.enabled && e.open && c.active ? (
+              <TradeForm
+                key={exchangeQuoteKey(economy, e, c)}
+                economy={economy}
+                exchange={e}
+                commodity={c}
+              />
+            ) : (
+              <p className="commodity-trading-paused">
+                {!economy.settings.enabled
+                  ? "Campaign trading is disabled."
+                  : !e.open
+                    ? "This exchange is closed."
+                    : "This commodity is inactive."}
+              </p>
+            )}
+          </>
+        )}
+      />
+      <details className="journal-entry">
+        <summary>Exchange directory · {visible.length}</summary>
+        {visible.map((e) => (
+          <section key={e.id} aria-label={`${e.name} exchange profile`}>
+            <h3>{e.name}</h3>
+            <p>
+              {locationLabel(readMarketLocations(table.journal.market), e.locationId ?? undefined)}{" "}
+              · {e.open ? "Open" : "Closed"} · {e.offers.length} goods
+            </p>
+            {e.notes && <p>{e.notes}</p>}
+            {dm && (
+              <p>
+                {table.purses.find((p) => p.id === e.purseId)
+                  ? `Treasury ${formatCopper(toCopper(table.purses.find((p) => p.id === e.purseId)!.coins))}`
+                  : "Treasury account unavailable"}
+              </p>
+            )}
+          </section>
+        ))}
+      </details>
+      <div className="world-toolbar commodity-tools">
         <AppLink href="/features/properties">Property stores & managers →</AppLink>
         {dm && <AppLink href="/features/downtime">Review end-of-session downtime →</AppLink>}
       </div>
+      <p className="commodity-caption">
+        Prices stay fixed during a season. Purchases and sales feed the next season when the DM
+        approves end-of-session downtime or a manual settlement.
+      </p>
+      {dm && <h2 className="commodity-controls-title">DM economy controls</h2>}
       {dm && (
         <>
           <details className="journal-entry">
@@ -193,70 +265,16 @@ export function TradeEconomyPanel() {
             <summary>Link existing inventory & shop activity</summary>
             <GoodsLinks economy={economy} />
           </details>
-          <details className="journal-entry" open={economy.pendingSeason ? true : undefined}>
+          <details
+            id="trade-manual-season"
+            className="journal-entry"
+            open={economy.pendingSeason ? true : undefined}
+          >
             <summary>Manual season control & DM overrides</summary>
             <ManualSeason key={economy.pendingSeason?.id ?? "empty"} economy={economy} />
           </details>
         </>
       )}
-      <h2>Regional exchanges</h2>
-      {!visible.length && (
-        <p>
-          {dm
-            ? "Create a commodity and an exchange to begin."
-            : "No exchanges are available at the current party location."}
-        </p>
-      )}
-      {visible.map((e) => (
-        <section key={e.id} className="journal-entry" aria-label={e.name}>
-          <h3>{e.name}</h3>
-          <p>
-            {locationLabel(readMarketLocations(table.journal.market), e.locationId ?? undefined)} ·{" "}
-            {e.open ? "Open" : "Closed"}
-          </p>
-          {dm ? (
-            <p>
-              {table.purses.find((p) => p.id === e.purseId)
-                ? `Treasury ${formatCopper(toCopper(table.purses.find((p) => p.id === e.purseId)!.coins))}`
-                : "Treasury account unavailable"}
-            </p>
-          ) : (
-            <p className="text-sm text-muted">
-              Exchange balance is private. Purchases and sales check available funds when submitted.
-            </p>
-          )}
-          {e.notes && <p>{e.notes}</p>}
-          <div className="trade-offer-grid">
-            {e.offers.map((o) => {
-              const c = economy.commodities.find((c) => c.id === o.commodityId);
-              return (
-                c && (
-                  <article key={c.id} className="trade-offer journal-entry">
-                    <h4>{c.name}</h4>
-                    <p>{c.description}</p>
-                    <p>
-                      Per {c.unit} · Ask {formatCopper(o.askCopper)} · Bid{" "}
-                      {formatCopper(o.bidCopper)}
-                    </p>
-                    <p>
-                      {o.stock} available · {o.capacity - o.stock} units wanted · Supply {o.supply}{" "}
-                      · Demand {o.demand}
-                    </p>
-                    {economy.settings.enabled && e.open && c.active && (
-                      <TradeForm
-                        key={exchangeQuoteKey(economy, e, c)}
-                        economy={economy}
-                        exchange={e}
-                        commodity={c}
-                      />
-                    )}
-                  </article>
-                )
-              );
-            })}
-          </div>
-        </section>
-      ))}
       <TradeReceipts economy={economy} dm={dm} />
       {dm && <SeasonHistory history={economy.history} />}
     </div>
