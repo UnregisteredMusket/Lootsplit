@@ -221,12 +221,15 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Development / governance / dev-sound | open | 2 | 8s → 35s | +27s | +337.5% |
 | property-browser-audit | open | 2 | 32.709s → 99.355s | +66.646s | +203.75% |
 | world features browser audit | open | 2 | 34.352s → 53.675s | +19.323s | +56.25% |
-| Packaged Worker / interface / worker-world-features | open | 3 | 14s → 37s | +23s | +164.29% |
+| Packaged Worker / interface / worker-world-features | open | 4 | 14s → 65s | +51s | +364.29% |
+| Development / gameplay / dev-world-features | open | 2 | 16s → 81s | +65s | +406.25% |
 
 ## Recorded slowdowns
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-10T09:18:49Z | step: Development / gameplay / dev-world-features | 39s → 81s | +42s | +107.69% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37937913571/job/113844540457) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38040488796/job/114179580158) |
+| 2026-10-10T09:18:20Z | step: Packaged Worker / interface / worker-world-features | 37s → 65s | +28s | +75.68% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37950235670/job/113887581798) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38040488796/job/114179904416) |
 | 2026-10-10T07:37:39Z | step: Development / gameplay / dev-library-navigation | 29s → 40s | +11s | +37.93% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37769999494/job/113292704791) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38034638067/job/114162429633) |
 | 2026-10-10T07:36:38Z | step: Packaged Worker / interface / worker-library-navigation | 18s → 21s | +3s | +16.67% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37661353259/job/112930144013) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38034638067/job/114162701857) |
 | 2026-10-10T07:34:57Z | step: Development / accounts / dev-party-sheet | 20s → 23s | +3s | +15% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37412269946/job/112103114089) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38034638067/job/114162429771) |
