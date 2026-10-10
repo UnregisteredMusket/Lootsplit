@@ -12,6 +12,7 @@ import {
   navigateApplication,
 } from "./title-screen-navigation.mjs";
 import { createAndSaveRoom } from "./browser/account-fixtures.mjs";
+import { chooseOption } from "./search-select-browser.mjs";
 
 const origin = process.env.AUDIT_ORIGIN || "http://127.0.0.1:8080";
 assert.match(
@@ -590,6 +591,14 @@ async function reversalAndPlayerViews(page, width) {
     ),
   ).toBeVisible();
   await expect(playerExchange.getByText(/^Treasury /)).toHaveCount(0);
+  await expect(
+    playerExchange.getByText(
+      "Seasonal history is private. Current exchange quotes, stock and indices are shown above.",
+      { exact: true },
+    ),
+  ).toBeVisible();
+  await expect(playerExchange.getByRole("table")).toHaveCount(0);
+  await expect(playerExchange.getByText(/^Recorded quote data/)).toHaveCount(0);
   await player.getByText("Trade receipts · 3", { exact: true }).click();
   await expect(player.getByRole("article").filter({ hasText: "Account: Arden" })).toHaveCount(3);
   await expect(player.getByRole("article").filter({ hasText: "Account: Briar" })).toHaveCount(0);
@@ -618,6 +627,161 @@ async function fits(page) {
   );
   assert.equal(await page.locator("[data-title-screen]").count(), 0);
 }
+
+async function commodityBoardViews(page, width) {
+  const fixture = completeHistoryFixture(),
+    economy = fixture.journal.tradeEconomy;
+  for (const [id, name, category] of [
+    ["grain", "Golden grain", "provisions"],
+    ["iron", "Iron ingots", "smith"],
+    ["cloth", "Woven cloth", "cloth"],
+    ["herbs", "Healing herbs", "apothecary"],
+  ]) {
+    economy.commodities.push({
+      ...economy.commodities[0],
+      id,
+      name,
+      category,
+      description: "Board audit goods",
+      unit: "bundle",
+    });
+    economy.exchanges[0].offers.push({
+      ...economy.exchanges[0].offers[0],
+      commodityId: id,
+      stock: 45,
+      askCopper: 110,
+      bidCopper: 55,
+    });
+  }
+  economy.exchanges.push({
+    ...structuredClone(economy.exchanges[0]),
+    id: "inland",
+    name: "Inland Exchange",
+    locationId: "desert",
+    open: false,
+  });
+  economy.exchanges.push({
+    ...structuredClone(economy.exchanges[0]),
+    id: "empty",
+    name: "Empty Exchange",
+    notes: "New exchange awaiting supplies",
+    offers: [],
+  });
+  await seed(page, fixture);
+  await reloadApplication(page);
+  await page.getByText("Exchange directory · 3", { exact: true }).click();
+  await expect(
+    page.getByRole("region", { name: "Empty Exchange exchange profile", exact: true }),
+  ).toContainText("New exchange awaiting supplies");
+  await page.getByText("Exchange directory · 3", { exact: true }).click();
+  const board = page.getByRole("region", { name: "Commodity quotes", exact: true });
+  const timber = page.getByRole("button", {
+    name: "View Current timber label at Current Harbor Exchange",
+    exact: true,
+  });
+  const grain = page.getByRole("button", {
+    name: "View Golden grain at Current Harbor Exchange",
+    exact: true,
+  });
+  await expect(board.getByRole("button")).toHaveCount(10);
+  await expect(timber).toContainText("+899.00%");
+  const selected = page.getByRole("region", { name: "Current Harbor Exchange", exact: true });
+  await selected.getByRole("button", { name: "All recorded", exact: true }).click();
+  await selected.getByText("Recorded quote data · 24", { exact: true }).click();
+  const prices = selected.getByRole("table");
+  await expect(prices.getByRole("row")).toHaveCount(25);
+  await expect(prices).toContainText(formatCopper(777));
+  await expect(prices).not.toContainText(formatCopper(999));
+  await selected.getByText("Recorded quote data · 24", { exact: true }).click();
+  await selected.getByRole("button", { name: "Recent 12", exact: true }).click();
+  await page.getByLabel("Search commodities", { exact: true }).fill("golden");
+  await expect(board.getByRole("button")).toHaveCount(2);
+  await grain.click();
+  await selected.getByLabel("Trade quantity", { exact: true }).fill("7");
+  await selected.getByLabel("Trading account", { exact: true }).selectOption("b");
+  await page.getByLabel("Search commodities", { exact: true }).fill("");
+  await timber.click();
+  await grain.click();
+  await expect(selected.getByLabel("Trade quantity", { exact: true })).toHaveValue("7");
+  await expect(selected.getByLabel("Trading account", { exact: true })).toHaveValue("b");
+  await selected.getByLabel("Trade quantity", { exact: true }).fill("1");
+  await page.getByRole("button", { name: "Smith", exact: true }).click();
+  await expect(board.getByRole("button")).toHaveCount(2);
+  await page.getByRole("button", { name: "All goods", exact: true }).click();
+  await chooseOption(
+    page.getByRole("combobox", { name: "Exchange filter", exact: true }),
+    "inland",
+  );
+  await expect(board.getByRole("button")).toHaveCount(5);
+  await page.getByLabel("Open & active only", { exact: true }).check();
+  await expect(board).toContainText("No matching quotes");
+  await page.getByLabel("Open & active only", { exact: true }).uncheck();
+  await chooseOption(page.getByRole("combobox", { name: "Exchange filter", exact: true }), "");
+  await timber.click();
+  const frozen = JSON.stringify((await read(page)).tradeEconomy);
+  await fits(page);
+  await page.screenshot({ path: `${output}/commodity-board-dark-${width}.png`, fullPage: true });
+  await page.evaluate(() => {
+    const prefs = JSON.parse(localStorage.getItem("quire.prefs.v1") || "{}");
+    localStorage.setItem(
+      "quire.prefs.v1",
+      JSON.stringify({ ...prefs, appearance: "light", accent: "#7c3224", ground: "#dfcca2" }),
+    );
+  });
+  await reloadApplication(page);
+  await expect(page.locator("html")).toHaveAttribute("data-appearance", "light");
+  await expect(timber).toBeVisible();
+  await expect(selected.getByRole("button", { name: "Buy commodity", exact: true })).toBeVisible();
+  if (width === 390) {
+    await page.setViewportSize({ width: 320, height: 950 });
+    await fits(page);
+    await page.screenshot({ path: `${output}/commodity-board-light-320.png`, fullPage: true });
+    await page.setViewportSize({ width, height: 950 });
+  }
+  await fits(page);
+  await page.screenshot({ path: `${output}/commodity-board-light-${width}.png`, fullPage: true });
+  await page.evaluate(() => {
+    window.__commodityDocument = crypto.randomUUID();
+  });
+  const documentId = await page.evaluate(() => window.__commodityDocument);
+  await page.getByRole("link", { name: "Market", exact: true }).first().click();
+  await expect(page.getByRole("heading", { name: "Global market", exact: true })).toBeVisible();
+  await expect(
+    page.getByRole("region", { name: "Global commodity quotes", exact: true }).getByRole("link"),
+  ).toHaveCount(10);
+  await page.screenshot({ path: `${output}/global-market-${width}.png`, fullPage: true });
+  await page
+    .getByRole("link", { name: "View Iron ingots at Inland Exchange", exact: true })
+    .click();
+  await expect(
+    page
+      .getByRole("region", { name: "Inland Exchange", exact: true })
+      .getByRole("heading", { name: "Iron ingots", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.getByRole("combobox", { name: "Exchange filter", exact: true }),
+  ).toHaveAttribute("data-value", "inland");
+  assert.equal(
+    await page.evaluate(() => window.__commodityDocument),
+    documentId,
+    "Global quote links retain the running document",
+  );
+  assert.equal(await page.locator("[data-title-screen]").count(), 0);
+  // A cold document hydrates campaign data after the board first mounts.
+  // The linked exchange/good must still be selected once that data arrives.
+  await reloadApplication(page);
+  await expect(
+    page
+      .getByRole("region", { name: "Inland Exchange", exact: true })
+      .getByRole("heading", { name: "Iron ingots", exact: true }),
+  ).toBeVisible();
+  assert.equal(
+    JSON.stringify((await read(page)).tradeEconomy),
+    frozen,
+    "Browsing never changes the saved economy",
+  );
+  await page.evaluate(() => localStorage.removeItem("quire.prefs.v1"));
+}
 try {
   for (const width of [1440, 390]) {
     const context = await browser.newContext({
@@ -636,8 +800,9 @@ try {
     page.on("pageerror", (e) => errors.push(e.message));
     await openApplication(page, origin + "/features/economy");
     await page.getByRole("heading", { name: "Trade Exchanges", exact: true }).waitFor();
+    await commodityBoardViews(page, width);
     await seed(page, tradeFixture());
-    await reloadApplication(page);
+    await openApplication(page, origin + "/features/economy");
     const exchange = page.getByRole("region", { name: "Harbor Exchange" });
     await expect(
       exchange.getByRole("heading", { name: "Harbor Exchange", exact: true }),
@@ -724,6 +889,11 @@ try {
     assert.ok(shared.tradeEconomy.draws.some((d) => d.epoch === 3 && d.source === "server"));
     await page.getByRole("button", { name: "Approve manual season", exact: true }).click();
     await expect.poll(async () => (await read(page)).tradeEconomy.epoch).toBe(3);
+    // The epoch is optimistic. Wait for the authoritative acknowledgement before
+    // the deliberate cold reload, so it cannot interrupt the approval transport.
+    await expect
+      .poll(async () => (await savedQueue(page)).commands.length, { timeout: 20000 })
+      .toBe(0);
     await reloadApplication(page);
     await expect(page.getByRole("heading", { name: "Trade Exchanges", exact: true })).toBeVisible();
     assert.equal((await read(page)).tradeEconomy.epoch, 3);
@@ -749,6 +919,12 @@ try {
         reviewedReversal: true,
         retainedPendingReversal: true,
         playerReceiptPrivacy: true,
+        commodityBoardSearchAndCategories: true,
+        commodityExchangeFilters: true,
+        retainedTradeDrafts: true,
+        recordedPriceCharts: true,
+        lightDarkAnd320pxLayout: true,
+        globalMarketQuoteNavigation: true,
         runtimeErrors: errors,
       },
       null,
