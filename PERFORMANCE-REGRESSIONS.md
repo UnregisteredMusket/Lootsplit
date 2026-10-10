@@ -236,6 +236,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-10T16:56:11Z | step: verify / Set up job | 1s → 2s | +1s | +100% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37233687309/job/111529121545) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38069064641/job/114264325029) |
 | 2026-10-10T16:40:12Z | step: Development / governance / dev-sound | 34s → 40s | +6s | +17.65% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37888429597/job/113683616303) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38068308871/job/114260371207) |
 | 2026-10-10T16:39:10Z | step: Packaged Worker / interface / Run actions/download-artifact@v4 | 3s → 4s | +1s | +33.33% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37267183280/job/111626615733) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38068308871/job/114260773826) |
 | 2026-10-10T13:50:10Z | step: Development / gameplay / dev-library-navigation | 44s → 51s | +7s | +15.91% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38045806287/job/114194983319) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38056573789/job/114226203438) |
