@@ -136,6 +136,7 @@ export function Shell({
 
   const inBooks =
     pathname === "/books" || pathname.startsWith("/book/") || pathname.startsWith("/read/");
+  const tradingWorkspace = ["/market", "/features/economy", "/features/trading"].includes(pathname);
   const dm = seat.role === "dm";
 
   function onSubmit(event: FormEvent) {
@@ -146,7 +147,7 @@ export function Shell({
 
   return (
     <div
-      className={`loot-shell concept-shell min-h-dvh bg-bg text-fg ${dm ? "role-dm" : "role-player"}`}
+      className={`loot-shell concept-shell min-h-dvh bg-bg text-fg ${dm ? "role-dm" : "role-player"}${tradingWorkspace ? " trading-shell" : ""}`}
     >
       <div className="lg:grid lg:grid-cols-[15rem_minmax(0,1fr)]">
         <aside className="sticky top-0 z-20 hidden h-dvh flex-col border-r border-lead/40 bg-bg/95 px-3 py-5 lg:flex">
@@ -159,7 +160,10 @@ export function Shell({
             Lootsplit
           </Link>
           <p className="rail-caption">Your campaign companion</p>
-          <nav className="mt-8 flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto overscroll-contain" aria-label="Sections">
+          <nav
+            className="mt-8 flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto overscroll-contain"
+            aria-label="Sections"
+          >
             {navLinks("rail")}
           </nav>
           <div className="rounded-xl border border-lead/20 p-4 text-sm text-muted">

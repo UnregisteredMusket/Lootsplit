@@ -1082,107 +1082,115 @@ function TradeForm({
         physicallyHere(table, h),
     );
   return (
-    <CommandForm
-      label={direction === "buy" ? "Buy commodity" : "Sell commodity"}
-      submitDisabled={!purseId || (!exchangeHere(table, exchange) && !overrideLocation)}
-      dirty={quantity !== 1 || !!holdingId || !!propertyId}
-      onDone={() => {
-        setQuantity(1);
-        setHoldingId("");
-        setPropertyId("");
-      }}
-      submit={() =>
-        direction === "buy"
-          ? {
-              kind: "trade-buy",
-              exchangeId: exchange.id,
-              commodityId: commodity.id,
-              purseId,
-              quantity,
-              before: exchangeQuoteKey(economy, exchange, commodity),
-              ...(propertyId ? { propertyId } : {}),
-              overrideLocation,
-            }
-          : {
-              kind: "trade-sell",
-              exchangeId: exchange.id,
-              commodityId: commodity.id,
-              holdingId,
-              quantity,
-              before: exchangeQuoteKey(economy, exchange, commodity),
-              overrideLocation,
-            }
-      }
-    >
-      <Field label="Trade direction">
-        <select
-          value={direction}
-          onChange={(e) => setDirection(e.target.value as typeof direction)}
-        >
-          <option value="buy">Buy</option>
-          <option value="sell">Sell</option>
-        </select>
-      </Field>
-      <Field label="Trading account">
-        <select
-          required
-          value={purseId}
-          onChange={(e) => {
-            setPurseId(e.target.value);
-            setHoldingId("");
-          }}
-        >
-          <option value="">Choose account</option>
-          {accounts.map((p) => (
-            <option key={p.id} value={p.id}>
-              {p.name} · {formatCopper(toCopper(p.coins))}
-            </option>
-          ))}
-        </select>
-      </Field>
-      {direction === "sell" ? (
-        <Field label="Commodity lot">
-          <select required value={holdingId} onChange={(e) => setHoldingId(e.target.value)}>
-            <option value="">Choose owned goods</option>
-            {lots.map((h) => (
-              <option key={h.id} value={h.id}>
-                {h.name} · {h.quantity} {commodity.unit}
-                {h.custody ? " · stored" : " · carried"}
+    <div className="commodity-order">
+      <CommandForm
+        label={direction === "buy" ? "Buy commodity" : "Sell commodity"}
+        submitDisabled={!purseId || (!exchangeHere(table, exchange) && !overrideLocation)}
+        dirty={quantity !== 1 || !!holdingId || !!propertyId}
+        onDone={() => {
+          setQuantity(1);
+          setHoldingId("");
+          setPropertyId("");
+        }}
+        submit={() =>
+          direction === "buy"
+            ? {
+                kind: "trade-buy",
+                exchangeId: exchange.id,
+                commodityId: commodity.id,
+                purseId,
+                quantity,
+                before: exchangeQuoteKey(economy, exchange, commodity),
+                ...(propertyId ? { propertyId } : {}),
+                overrideLocation,
+              }
+            : {
+                kind: "trade-sell",
+                exchangeId: exchange.id,
+                commodityId: commodity.id,
+                holdingId,
+                quantity,
+                before: exchangeQuoteKey(economy, exchange, commodity),
+                overrideLocation,
+              }
+        }
+      >
+        <Field label="Trade direction">
+          <select
+            value={direction}
+            onChange={(e) => setDirection(e.target.value as typeof direction)}
+          >
+            <option value="buy">Buy</option>
+            <option value="sell">Sell</option>
+          </select>
+        </Field>
+        <Field label="Trading account">
+          <select
+            required
+            value={purseId}
+            onChange={(e) => {
+              setPurseId(e.target.value);
+              setHoldingId("");
+            }}
+          >
+            <option value="">Choose account</option>
+            {accounts.map((p) => (
+              <option key={p.id} value={p.id}>
+                {p.name} · {formatCopper(toCopper(p.coins))}
               </option>
             ))}
           </select>
         </Field>
-      ) : (
-        <Field label="Purchase destination">
-          <select value={propertyId} onChange={(e) => setPropertyId(e.target.value)}>
-            <option value="">Carried inventory</option>
-            {stores.map((h) => (
-              <option key={h.id} value={h.id}>
-                {h.name} · property storage
-              </option>
-            ))}
-          </select>
-        </Field>
-      )}
-      <NumberField label="Trade quantity" value={quantity} min={1} max={100000} set={setQuantity} />
-      <p>
-        Total{" "}
-        {formatCopper(
-          quantity *
-            exchange.offers.find((o) => o.commodityId === commodity.id)![
-              direction === "buy" ? "askCopper" : "bidCopper"
-            ],
+        {direction === "sell" ? (
+          <Field label="Commodity lot">
+            <select required value={holdingId} onChange={(e) => setHoldingId(e.target.value)}>
+              <option value="">Choose owned goods</option>
+              {lots.map((h) => (
+                <option key={h.id} value={h.id}>
+                  {h.name} · {h.quantity} {commodity.unit}
+                  {h.custody ? " · stored" : " · carried"}
+                </option>
+              ))}
+            </select>
+          </Field>
+        ) : (
+          <Field label="Purchase destination">
+            <select value={propertyId} onChange={(e) => setPropertyId(e.target.value)}>
+              <option value="">Carried inventory</option>
+              {stores.map((h) => (
+                <option key={h.id} value={h.id}>
+                  {h.name} · property storage
+                </option>
+              ))}
+            </select>
+          </Field>
         )}
-        . Stock, storage, ownership and funds are checked together when committed.
-      </p>
-      {dm && (
-        <Tick
-          label="DM override: allow exchange visit from another location"
-          value={overrideLocation}
-          set={setOverride}
+        <NumberField
+          label="Trade quantity"
+          value={quantity}
+          min={1}
+          max={100000}
+          set={setQuantity}
         />
-      )}
-    </CommandForm>
+        <p>
+          Total{" "}
+          {formatCopper(
+            quantity *
+              exchange.offers.find((o) => o.commodityId === commodity.id)![
+                direction === "buy" ? "askCopper" : "bidCopper"
+              ],
+          )}
+          . Stock, storage, ownership and funds are checked together when committed.
+        </p>
+        {dm && (
+          <Tick
+            label="DM override: allow exchange visit from another location"
+            value={overrideLocation}
+            set={setOverride}
+          />
+        )}
+      </CommandForm>
+    </div>
   );
 }
 

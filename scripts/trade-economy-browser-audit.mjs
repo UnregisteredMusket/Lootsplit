@@ -683,7 +683,12 @@ async function commodityBoardViews(page, width) {
     name: "View Golden grain at Current Harbor Exchange",
     exact: true,
   });
-  await expect(board.getByRole("button")).toHaveCount(10);
+  await expect(board.getByRole("button", { name: /^View / })).toHaveCount(8);
+  await page.getByRole("button", { name: "Show all 10 quotes", exact: true }).click();
+  await expect(board.getByRole("button", { name: /^View / })).toHaveCount(10);
+  await page.getByRole("button", { name: "Show fewer quotes", exact: true }).click();
+  await expect(board.getByRole("button", { name: /^View / })).toHaveCount(8);
+  await page.getByRole("button", { name: "Show all 10 quotes", exact: true }).click();
   await expect(timber).toContainText("+899.00%");
   const selected = page.getByRole("region", { name: "Current Harbor Exchange", exact: true });
   await selected.getByRole("button", { name: "All recorded", exact: true }).click();
@@ -695,7 +700,7 @@ async function commodityBoardViews(page, width) {
   await selected.getByText("Recorded quote data · 24", { exact: true }).click();
   await selected.getByRole("button", { name: "Recent 12", exact: true }).click();
   await page.getByLabel("Search commodities", { exact: true }).fill("golden");
-  await expect(board.getByRole("button")).toHaveCount(2);
+  await expect(board.getByRole("button", { name: /^View / })).toHaveCount(2);
   await grain.click();
   await selected.getByLabel("Trade quantity", { exact: true }).fill("7");
   await selected.getByLabel("Trading account", { exact: true }).selectOption("b");
@@ -706,13 +711,13 @@ async function commodityBoardViews(page, width) {
   await expect(selected.getByLabel("Trading account", { exact: true })).toHaveValue("b");
   await selected.getByLabel("Trade quantity", { exact: true }).fill("1");
   await page.getByRole("button", { name: "Smith", exact: true }).click();
-  await expect(board.getByRole("button")).toHaveCount(2);
+  await expect(board.getByRole("button", { name: /^View / })).toHaveCount(2);
   await page.getByRole("button", { name: "All goods", exact: true }).click();
   await chooseOption(
     page.getByRole("combobox", { name: "Exchange filter", exact: true }),
     "inland",
   );
-  await expect(board.getByRole("button")).toHaveCount(5);
+  await expect(board.getByRole("button", { name: /^View / })).toHaveCount(5);
   await page.getByLabel("Open & active only", { exact: true }).check();
   await expect(board).toContainText("No matching quotes");
   await page.getByLabel("Open & active only", { exact: true }).uncheck();
@@ -749,6 +754,13 @@ async function commodityBoardViews(page, width) {
   await expect(
     page.getByRole("region", { name: "Global commodity quotes", exact: true }).getByRole("link"),
   ).toHaveCount(10);
+  await expect(page.locator(".commodity-sector")).toHaveCount(5);
+  if (width === 1440) {
+    const sectors = await page
+      .locator(".commodity-sectors")
+      .evaluate((node) => getComputedStyle(node).gridTemplateColumns.split(" ").length);
+    assert.equal(sectors, 4, "Desktop groups global quotes into four columns");
+  }
   await page.screenshot({ path: `${output}/global-market-${width}.png`, fullPage: true });
   await page
     .getByRole("link", { name: "View Iron ingots at Inland Exchange", exact: true })

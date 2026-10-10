@@ -3108,3 +3108,164 @@ input,select,textarea { max-width: 100%; }
 .library-record-fields dd { overflow-wrap: anywhere; white-space: pre-wrap; }
 .library-record-list a { display: flex; justify-content: space-between; gap: 1rem; padding: .75rem 0; border-bottom: 1px solid var(--color-border); }
 .library-record-list small { display: block; color: var(--color-muted); }
+
+/* Approved trading workspace: dense quotes, chart-led exchanges, central barter slots. */
+.trading-shell .concept-main { max-width:none; padding-top:1rem; }
+.trading-shell .feature-screen>h1 { font-size:2rem; margin-bottom:.5rem; }
+.trading-shell .submenu-workspace[data-submenu-scene] { padding-top:1rem; }
+.trading-shell .commodity-dashboard { border-radius:4px; container:commodity / inline-size; }
+.commodity-board-top { padding:.65rem .9rem; }
+.commodity-board-top h2 { font-size:1.6rem; }
+.commodity-filters { padding:.65rem .75rem .25rem; }
+.commodity-categories { padding:.25rem .75rem; }
+.commodity-board-meta { padding:.25rem .75rem .5rem; }
+.commodity-overview .commodity-columns { display:none; }
+.commodity-overview .commodity-rows { max-height:none; overflow:visible; }
+.commodity-sectors { display:grid; grid-template-columns:repeat(4,minmax(0,1fr)); }
+.commodity-sector { min-width:0; border-right:1px solid var(--color-border); border-bottom:1px solid var(--color-border); }
+.commodity-sector>h3 { display:flex; align-items:center; gap:.45rem; padding:.65rem .75rem; margin:0; background:var(--color-elevated); color:var(--color-lead); font-size:1.15rem; }
+.commodity-sector .commodity-row { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:.4rem; padding:.7rem .75rem; min-height:125px; border-left:0; }
+.commodity-sector .commodity-good { grid-column:1/-1; }
+.commodity-sector .commodity-good strong { font-size:.85rem; }
+.commodity-sector .commodity-good small { font-size:.65rem; }
+.commodity-sector .commodity-good .fantasy-icon { --icon-size:28px !important; }
+.commodity-sector .commodity-price { text-align:left; }
+.commodity-sector .commodity-price strong { font-size:1.15rem; }
+.commodity-sector .commodity-price strong>span { display:none; }
+.commodity-sector .commodity-price small { font-size:.65rem; }
+.commodity-sector .commodity-stock-bars { grid-column:1/-1; grid-row:3; }
+.commodity-sector .commodity-trend { display:flex; flex-direction:column; align-items:flex-end; gap:.2rem; }
+.commodity-sector .commodity-trend>svg { width:60px; height:20px; }
+.commodity-more-quotes { display:flex; justify-content:center; padding:.4rem; border-top:1px solid var(--color-border); }
+.commodity-more-quotes button { min-height:44px; font-size:.8rem; color:var(--color-lead); }
+.commodity-dashboard:not(.commodity-overview) .commodity-board-layout { grid-template-columns:minmax(0,1fr) minmax(0,1.15fr); align-items:start; }
+.commodity-dashboard:not(.commodity-overview) .commodity-row,
+.commodity-dashboard:not(.commodity-overview) .commodity-columns { grid-template-columns:minmax(0,1.2fr) minmax(0,.7fr) minmax(0,1fr) minmax(0,.65fr); gap:.45rem; padding:.6rem .65rem; }
+.commodity-dashboard:not(.commodity-overview) .commodity-row { min-height:68px; }
+.commodity-dashboard:not(.commodity-overview) .commodity-good { gap:.4rem; }
+.commodity-dashboard:not(.commodity-overview) .commodity-good .fantasy-icon { --icon-size:28px !important; }
+.commodity-dashboard:not(.commodity-overview) .commodity-good strong { font-size:.8rem; }
+.commodity-dashboard:not(.commodity-overview) .commodity-good small { font-size:.6rem; }
+.commodity-dashboard:not(.commodity-overview) .commodity-trend>svg { display:none; }
+.commodity-stock-bars>div { display:grid; grid-template-columns:minmax(0,1fr) auto; gap:.2rem .4rem; }
+.commodity-stock-bars .commodity-bar { grid-column:1/-1; grid-row:2; height:5px; }
+.commodity-stock-bars b { grid-column:2; grid-row:1; }
+.commodity-detail { padding:.85rem; border-left:1px solid var(--color-border); }
+.commodity-detail-prices strong { font-size:1.55rem; }
+.commodity-detail-title h4 { font-size:1.9rem; }
+.commodity-detail .commodity-chart { margin-top:.5rem; padding-top:.5rem; }
+.commodity-chart svg[role=img] { width:100%; height:240px; display:block; }
+.commodity-chart-heading { flex-wrap:wrap; }
+.commodity-range button { min-height:44px; }
+.commodity-indices { font-size:.7rem; }
+.commodity-detail>p:not(.commodity-caption) { font-size:.8rem; }
+.commodity-order { border-top:1px solid var(--color-border); margin-top:.6rem; padding-top:.6rem; }
+.commodity-order .world-form fieldset { grid-template-columns:repeat(2,minmax(0,1fr)); gap:.5rem; }
+.commodity-order label { font-size:.75rem; }
+.commodity-order fieldset>p,
+.commodity-order fieldset>label:has(input[type=checkbox]),
+.commodity-order fieldset>button[type=submit] { grid-column:1/-1; }
+.commodity-order fieldset>p { font-size:.75rem; }
+@container commodity (max-width:900px) {
+  .commodity-sectors { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .commodity-dashboard:not(.commodity-overview) .commodity-board-layout { grid-template-columns:minmax(0,1fr); }
+  .commodity-detail { border-left:0; }
+}
+@container commodity (max-width:480px) {
+  .commodity-sectors { grid-template-columns:minmax(0,1fr); }
+  .commodity-dashboard:not(.commodity-overview) .commodity-row { grid-template-columns:minmax(0,1.5fr) minmax(0,1fr); gap:.5rem; }
+  .commodity-dashboard:not(.commodity-overview) .commodity-columns { display:none; }
+  .commodity-order .world-form fieldset { grid-template-columns:minmax(0,1fr); }
+}
+.barter-heading h2 { font-size:1.6rem; }
+.barter-intro { font-size:.85rem; margin:.5rem 0; }
+.barter-rules { margin:.25rem 0; }
+.barter-table { container:barter / inline-size; padding:.75rem; border-radius:4px; margin:.75rem 0; }
+.barter-workspace { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.6rem; align-items:start; }
+.barter-side { display:grid; grid-template-columns:108px minmax(0,1.25fr) minmax(0,1fr); gap:.5rem; align-items:stretch; }
+.barter-picker { display:contents; }
+.barter-profile { grid-column:1; grid-row:1; min-width:0; padding:.5rem; border:1px solid var(--color-lead); background:var(--color-bg); display:flex; flex-direction:column; justify-content:space-between; gap:.75rem; }
+.barter-profile>label { font-size:.7rem; }
+.barter-profile .record-select-trigger { padding:.4rem; font-size:.75rem; }
+.barter-participant-large { padding:0; display:flex; flex-direction:column; text-align:center; gap:.4rem; }
+.barter-participant-large h3 { font-size:1.3rem; }
+.barter-participant-large p { font-size:.7rem; }
+.barter-participant-large .barter-portrait { width:100%; height:280px; border-radius:3px; border-width:1px; padding:0; margin:0 0 .5rem; background:radial-gradient(ellipse at 50% 35%,var(--color-subtle),var(--color-bg) 75%); box-shadow:none; }
+.barter-participant-large .barter-portrait img { object-fit:cover; }
+.barter-inventory { grid-column:2; grid-row:1; }
+.barter-edit-tray { grid-column:3; grid-row:1; border-color:var(--color-lead); }
+.barter-side-right { grid-template-columns:minmax(0,1fr) minmax(0,1.25fr) 108px; }
+.barter-side-right .barter-profile { grid-column:3; }
+.barter-side-right .barter-inventory { grid-column:2; grid-row:1; }
+.barter-side-right .barter-edit-tray { grid-column:1; grid-row:1; }
+.barter-inventory,.barter-edit-tray { padding:.5rem; border-radius:3px; }
+.barter-section-label h3 { font-size:1.05rem; color:var(--color-lead); }
+.barter-section-label small { font-size:.65rem; }
+.barter-categories { gap:.2rem; }
+.barter-categories button { padding:.2rem .3rem; font-size:.65rem; }
+.barter-inventory-grid { grid-template-columns:repeat(3,minmax(0,1fr)); max-height:500px; padding:0; }
+.barter-tile { min-height:64px; aspect-ratio:1/1.17; border-radius:2px; padding:.25rem .15rem; }
+.barter-tile-name { font-size:.6rem; }
+.barter-tile-count { font-size:.65rem; }
+.barter-lot-art { width:30px; height:30px; }
+.barter-offer-slots { display:grid; grid-template-columns:repeat(2,minmax(0,1fr)); gap:.3rem; align-content:start; flex:1; margin:.5rem 0; }
+.barter-empty-slot { min-width:0; min-height:64px; aspect-ratio:1/1.17; border:1px solid var(--color-border); background:color-mix(in srgb,var(--color-bg) 80%,var(--color-subtle)); }
+.barter-coin-input { font-size:.7rem; }
+.barter-tray-value { display:block; font-size:.7rem; }
+.barter-tray-value strong { display:block; font-size:1rem; color:var(--color-lead); }
+.barter-inspector { grid-column:1/-1; grid-row:2; display:flex; align-items:center; gap:.5rem; min-width:0; padding:.5rem; border:1px solid var(--color-border); background:var(--color-bg); }
+.barter-inspector>div { flex:1; min-width:0; }
+.barter-inspector strong { font-size:.8rem; overflow-wrap:anywhere; }
+.barter-inspector small { display:block; color:var(--color-muted); font-size:.65rem; }
+.barter-inspector>label { width:65px; flex-shrink:0; font-size:.7rem; }
+.barter-inspector>p { font-size:.75rem; color:var(--color-muted); }
+.barter-private { grid-column:1/-1; }
+.barter-review-band { font-size:.75rem; padding:.5rem; margin:0; }
+.barter-table>.world-form>fieldset { grid-template-columns:minmax(0,1fr) auto auto; }
+.barter-workspace,.barter-review-band,.barter-consent { grid-column:1/-1; }
+.barter-consent { font-size:.75rem; color:var(--color-muted); }
+.barter-table>.world-form>fieldset>button[type=submit] { width:auto; justify-self:stretch; align-self:end; padding-inline:1rem; }
+.barter-table>.world-form>fieldset>.barter-note textarea { min-height:48px; height:48px; }
+.barter-table>.world-form>fieldset>.barter-note { font-size:.75rem; }
+@container barter (max-width:760px) {
+  .barter-workspace { grid-template-columns:minmax(0,1fr); }
+  .barter-side,.barter-side-right { grid-template-columns:minmax(0,1.3fr) minmax(0,1fr); gap:.5rem; }
+  .barter-profile,.barter-side-right .barter-profile { grid-column:1/-1; grid-row:1; flex-direction:row; align-items:center; padding:.5rem; }
+  .barter-profile>label { flex:1; max-width:45%; }
+  .barter-participant-large { display:grid; grid-template-columns:55px minmax(0,1fr); text-align:left; gap:.1rem .6rem; flex:1; }
+  .barter-participant-large .barter-portrait { width:55px; height:75px; grid-row:span 4; margin:0; }
+  .barter-participant-large .barter-wallet { justify-content:flex-start; font-size:.75rem; margin:0; }
+  .barter-inventory,.barter-side-right .barter-inventory { grid-column:1; grid-row:2; }
+  .barter-edit-tray,.barter-side-right .barter-edit-tray { grid-column:2; grid-row:2; }
+  .barter-inspector { grid-row:3; flex-wrap:wrap; }
+  .barter-table>.world-form>fieldset { grid-template-columns:repeat(2,minmax(0,1fr)); }
+  .barter-note { grid-column:1/-1; }
+  .barter-table>.world-form>fieldset>button { width:100%; font-size:.8rem; padding:.5rem; }
+}
+.barter-workspace { grid-row:1; }
+.barter-review-band { grid-row:2; }
+.barter-table>.world-form>fieldset>.barter-note { grid-column:1; grid-row:3; }
+.barter-table>.world-form>fieldset>button:not([type=submit]) { grid-column:2; grid-row:3; align-self:end; }
+.barter-table>.world-form>fieldset>button[type=submit] { grid-column:3; grid-row:3; }
+.barter-consent { grid-row:4; }
+@container barter (max-width:760px) {
+  .barter-table>.world-form>fieldset>.barter-note { grid-column:1/-1; grid-row:3; }
+  .barter-table>.world-form>fieldset>button:not([type=submit]) { grid-column:1; grid-row:4; }
+  .barter-table>.world-form>fieldset>button[type=submit] { grid-column:2; grid-row:4; }
+  .barter-consent { grid-row:5; }
+}
+:root[data-fantasy-theme="ironbound-dragon"] .commodity-dashboard,
+:root[data-fantasy-theme="ironbound-dragon"] .barter-table {
+  --color-bg:#07111b;
+  --color-elevated:#101d2b;
+  --color-subtle:#142638;
+  --color-border:#2b3d4e;
+  --color-fg:#f0ead9;
+  --color-muted:#a8b6bf;
+  --color-faint:#a8b6bf;
+  background:var(--color-bg);
+  color:var(--color-fg);
+}
+.barter-workspace { align-items:stretch; }
+.barter-side { grid-template-rows:minmax(0,1fr) auto; }
+.barter-table .world-form .barter-search input { padding-left:1.9rem; }
