@@ -2,7 +2,7 @@
 
 Active branch `feature/searchable-library-records` starts from confirmed main/live `3930996c3fcd97cae3911239bf9e628e1d53bdaf` (PR87 complete, migration0014 already applied once). Owner requested searchable imported-record dropdowns and exact Library entry links. Implementation and local evidence are in `docs/audit/2026-10-10-searchable-library.md`. Native form values/permissions, every import, existing map/ping/fullscreen/NPC/trade/property/encounter functions and release gates are preserved. No schema or APK change.
 
-Local tests878 total/874 pass/four existing skips, clean types, lint0errors30existingwarnings, web/mobile builds; resource/long-picker audit47.181s, world129.143s, market91.178s, property45.996s browser, shopstock30.385s and encounter acceptance pass. Source must be frozen and published with fresh complete PR/main/current-browser/immutable Worker/standby/live proof. Final PR metadata is the durable release checkpoint; reconcile its exact branch/head/tree/run identities after interruption before repeating any write. Do not rerun prior migration, map merge or deployment.
+Local tests878 total/874 pass/four existing skips, clean types, lint0errors30existingwarnings, web/mobile builds; resource/long-picker audit32.151s, world129.143s, market91.178s, property45.996s browser, shopstock30.385s and encounter acceptance pass. Source must be frozen and published with fresh complete PR/main/current-browser/immutable Worker/standby/live proof. Final PR metadata is the durable release checkpoint; reconcile its exact branch/head/tree/run identities after interruption before repeating any write. Do not rerun prior migration, map merge or deployment.
 
 # Compact maps, filters, shared pings and fullscreen — October 10, 2026 UTC
 
