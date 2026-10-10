@@ -67,7 +67,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Deploy verified website / initial queue | open | 2 | 4s → 6780s | +6776s | +169400% |
 | deploy / Run actions/setup-node@v4 | open | 2 | 2s → 7s | +5s | +250% |
 | deploy / Run actions/download-artifact@v4 | open | 3 | 1s → 6s | +5s | +500% |
-| Development / governance / Run actions/checkout@v4 | open | 2 | 1s → 3s | +2s | +200% |
+| Development / governance / Run actions/checkout@v4 | open | 3 | 1s → 153s | +152s | +15200% |
 | Code checks and immutable builds / Run actions/setup-node@v4 | open | 3 | 3s → 9s | +6s | +200% |
 | Development / gameplay / dev-bug-edge-cases | open | 3 | 9s → 15s | +6s | +66.67% |
 | Packaged standby / Run actions/setup-node@v4 | open | 3 | 3s → 13s | +10s | +333.33% |
@@ -225,6 +225,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-10T03:18:08Z | step: Development / governance / Run actions/checkout@v4 | 3s → 153s | +150s | +5000% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37829057444/job/113489341452) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38019922874/job/114118433459) |
 | 2026-10-10T02:56:23Z | job: Code checks and immutable builds | 97s → 115s | +18s | +18.56% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37573238905/job/112636350047) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38018663650/job/114114570310) |
 | 2026-10-10T02:56:19Z | step: Code checks and immutable builds / Run actions/upload-artifact@v4 | 4s → 5s | +1s | +25% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37587449746/job/112680781363) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38018663650/job/114114570310) |
 | 2026-10-10T02:46:55Z | step: Code checks and immutable builds / Run node scripts/release-artifact.mjs prepare | 3s → 4s | +1s | +33.33% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37235490768/job/111533630184) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38018106897/job/114112829425) |
