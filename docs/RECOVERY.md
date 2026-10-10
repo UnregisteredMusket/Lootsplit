@@ -1,4 +1,8 @@
-# Active recovery: approved trading layout
+# Active recovery: city market access and commodity catalogue
+
+The approved denser layout is COMPLETE/LIVE as PR92/main `6b4d8acc69513c29a72ef4c7c96d59c8c6834c56`, Worker `0799ae4e-533d-4abb-883a-e823d6da96e3`; PR38068308871, main38069064641 (diagnosed toast race, one standby retry), website38069908992 and standby38069908993 passed. Do not repeat those releases. The owner now requires city access to the global market and a shipped/importable fantasy commodity stock list. Branch `feature/city-commodity-catalog` extends only that approved scope. No migration or distributed APK. Preserve every prior feature/save/permission and gate. See `docs/audit/2026-10-10-city-commodity-catalog.md`; exact evolving identities belong in the new PR and `test-results/recovery/city-commodity-catalog.json`.
+
+# Approved trading layout
 
 The owner approved the interactive market/exchange/barter preview with “That's perfect.” Branch `feature/approved-trading-layout` starts from complete/live main `ed5758b2e4d2c54da8422a0694c4a2cb5202e823` (PR91). Prior Library/NPC placement/privacy/downtime, seasonal economy, commodity boards and initial barter release are COMPLETE. Implement only the approved denser presentation and preserve every capability and gate. See `docs/audit/2026-10-10-approved-trading-layout.md`. No migration or distributed APK. Existing website publication authorization persists. Reconcile evolving exact source/PR/run/deploy identities in the new PR and `test-results/recovery/approved-trading-layout.json` before repeating a write.
 

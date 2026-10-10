@@ -207,6 +207,15 @@ export const tradeCommands = [
   z
     .object({
       id,
+      kind: z.literal("trade-commodity-import"),
+      before: z.string(),
+      commodities: z.array(commoditySchema).min(1).max(500),
+      reason,
+    })
+    .strict(),
+  z
+    .object({
+      id,
       kind: z.literal("trade-exchange"),
       before: exchangeSchema.nullable(),
       exchange: exchangeSchema,

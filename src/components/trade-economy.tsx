@@ -33,6 +33,7 @@ import { TradeSeasonReview } from "./trade-season-review";
 import { tradeReversalGuidance } from "@/lib/quire/ledger-reversal";
 import { Button, Modal } from "./ui";
 import { CommodityBoard } from "./commodity-board";
+import { CommodityCatalogImport } from "./commodity-catalog-import";
 import { useRouterState } from "@tanstack/react-router";
 
 function Field({ label, children }: { label: string; children: ReactNode }) {
@@ -211,6 +212,7 @@ export function TradeEconomyPanel() {
       {dm && <h2 className="commodity-controls-title">DM economy controls</h2>}
       {dm && (
         <>
+          <CommodityCatalogImport economy={economy} />
           <details className="journal-entry">
             <summary>Economy rules · Classic or Automatic</summary>
             <PolicyEditor economy={economy} />
@@ -1172,6 +1174,13 @@ function TradeForm({
           max={100000}
           set={setQuantity}
         />
+        {!exchangeHere(table, exchange) && (
+          <p role="status">
+            {exchange.locationId
+              ? "Visit this exchange's location to trade."
+              : "The global exchange is closed here. Visit a city to trade."}
+          </p>
+        )}
         <p>
           Total{" "}
           {formatCopper(

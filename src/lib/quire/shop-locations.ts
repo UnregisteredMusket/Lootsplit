@@ -66,6 +66,10 @@ export function locationLabel(market: MarketLocations, locationId: string | null
       .join(" / ") || "Campaignwide"
   );
 }
+/** A city district shares its city's market; towns, wilderness and unknown places do not. */
+export function globalMarketCity(market: MarketLocations): MarketLocation | undefined {
+  return locationPath(market, market.currentLocationId).find((location) => location.kind === "city");
+}
 export function shopAvailableHere(
   shop: Pick<Shop, "locationId">,
   market: MarketLocations,

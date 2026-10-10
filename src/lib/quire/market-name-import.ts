@@ -30,7 +30,7 @@ export function marketNameFingerprint(market: MarketLocations, shops: Shop[]): s
 }
 
 /** Strict quoted CSV/TSV, including escaped quotes, CRLF and embedded line breaks. */
-function delimited(text: string, delimiter: string): string[][] {
+export function parseDelimited(text: string, delimiter: string): string[][] {
   const rows: string[][] = [];
   let row: string[] = [],
     field = "",
@@ -132,7 +132,7 @@ export function parseMarketNames(
           "Use column headers region, city, town, area and shop. Include only the columns you need.",
         );
       if (new Set(header).size !== header.length) throw Error("Column headers must be unique.");
-      rows = delimited(source, delimiter)
+      rows = parseDelimited(source, delimiter)
         .slice(1)
         .map((cells, i) => {
           if (cells.length !== header.length)

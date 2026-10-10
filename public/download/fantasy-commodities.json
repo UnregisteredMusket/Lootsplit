@@ -1,0 +1,605 @@
+{
+  "version": 1,
+  "commodities": [
+    {
+      "id": "starter.wheat",
+      "name": "Wheat",
+      "unit": "50 lb sack",
+      "description": "Trade goods supplied as one 50 lb sack. Lootsplit homebrew reference value; the DM defines availability, quality and any special properties.",
+      "category": "provisions",
+      "baseCopper": 100,
+      "weight": 50,
+      "active": true
+    },
+    {
+      "id": "starter.barley",
+      "name": "Barley",
+      "unit": "50 lb sack",
+      "description": "Trade goods supplied as one 50 lb sack. Lootsplit homebrew reference value; the DM defines availability, quality and any special properties.",
+      "category": "provisions",
+      "baseCopper": 80,
+      "weight": 50,
+      "active": true
+    },
+    {
+      "id": "starter.oats",
+      "name": "Oats",
+      "unit": "50 lb sack",
+      "description": "Trade goods supplied as one 50 lb sack. Lootsplit homebrew reference value; the DM defines availability, quality and any special properties.",
+      "category": "provisions",
+      "baseCopper": 75,
+      "weight": 50,
+      "active": true
+    },
+    {
+      "id": "starter.rice",
+      "name": "Rice",
+      "unit": "50 lb sack",
+      "description": "Trade goods supplied as one 50 lb sack. Lootsplit homebrew reference value; the DM defines availability, quality and any special properties.",
+      "category": "provisions",
+      "baseCopper": 200,
+      "weight": 50,
+      "active": true
+    },
+    {
+      "id": "starter.flour",
+      "name": "Flour",
+      "unit": "25 lb sack",
+      "description": "Trade goods supplied as one 25 lb sack. Lootsplit homebrew reference value; the DM defines availability, quality and any special properties.",
+      "category": "provisions",
+      "baseCopper": 150,
+      "weight": 25,
+      "active": true
+    },
+    {
+      "id": "starter.salt",
+      "name": "Salt",
+      "unit": "10 lb sack",
+      "description": "Trade goods supplied as one 10 lb sack. Lootsplit homebrew reference value; the DM defines availability, quality and any special properties.",
+      "category": "provisions",
+      "baseCopper": 250,
+      "weight": 10,
+      "active": true
+    },
+    {
+      "id": "starter.honey",
+      "name": "Honey",
+      "unit": "5 lb jar",
+      "description": "Trade goods supplied as one 5 lb jar. Lootsplit homebrew reference value; the DM defines availability, quality and any special properties.",
+      "category": "provisions",
+      "baseCopper": 300,
+      "weight": 5,
+      "active": true
+    },
+    {
+      "id": "starter.dried-fruit",
+      "name": "Dried fruit",
+      "unit": "5 lb bundle",
+      "description": "Trade goods supplied as one 5 lb bundle. Lootsplit homebrew reference value; the DM defines availability, quality and any special properties.",
+      "category": "provisions",
+      "baseCopper": 150,
+      "weight": 5,
+      "active": true
+    },
+    {
+      "id": "starter.salted-fish",
+      "name": "Salted fish",
+      "unit": "10 lb crate",
+      "description": "Trade goods supplied as one 10 lb crate. Lootsplit homebrew reference value; the DM defines availability, quality and any special properties.",
+      "category": "provisions",
+      "baseCopper": 200,
+      "weight": 10,
+      "active": true
+    },
+    {
+      "id": "starter.cooking-oil",
+      "name": "Cooking oil",
+      "unit": "1 gallon jar",
+      "description": "Trade goods supplied as one 1 gallon jar. Lootsplit homebrew reference value; the DM defines availability, quality and any special properties.",
+      "category": "provisions",
+      "baseCopper": 200,
+      "weight": 8,
+      "active": true
+    },
+    {
+      "id": "starter.pepper",
+      "name": "Pepper",
+      "unit": "1 lb pouch",
+      "description": "Trade goods supplied as one 1 lb pouch. Lootsplit homebrew reference value; the DM defines availability, quality and any special properties.",
+      "category": "provisions",
+      "baseCopper": 2000,
+      "weight": 1,
+      "active": true
+    },
+    {
+      "id": "starter.cinnamon",
+      "name": "Cinnamon",
+      "unit": "1 lb pouch",
+      "description": "Trade goods supplied as one 1 lb pouch. Lootsplit homebrew reference value; the DM defines availability, quality and any special properties.",
+      "category": "provisions",
+      "baseCopper": 3000,
+      "weight": 1,
+      "active": true
+    },
+    {
+      "id": "starter.iron-ore",
+      "name": "Iron ore",
+      "unit": "25 lb sack",
+      "description": "Trade goods supplied as one 25 lb sack. Lootsplit homebrew reference value; the DM defines availability, quality and any special properties.",
+      "category": "smith",
+      "baseCopper": 150,
+      "weight": 25,
+      "active": true
+    },
+    {
+      "id": "starter.iron-ingots",
+      "name": "Iron ingots",
+      "unit": "10 lb bundle",
+      "description": "Trade goods supplied as one 10 lb bundle. Lootsplit homebrew reference value; the DM defines availability, quality and any special properties.",
+      "category": "smith",
+      "baseCopper": 1000,
+      "weight": 10,
+      "active": true
+    },
+    {
+      "id": "starter.copper-ingots",
+      "name": "Copper ingots",
+      "unit": "10 lb bundle",
+      "description": "Trade goods supplied as one 10 lb bundle. Lootsplit homebrew reference value; the DM defines availability, quality and any special properties.",
+      "category": "smith",
+      "baseCopper": 500,
+      "weight": 10,
+      "active": true
+    },
+    {
+      "id": "starter.tin-ingots",
+      "name": "Tin ingots",
+      "unit": "10 lb bundle",
+      "description": "Trade goods supplied as one 10 lb bundle. Lootsplit homebrew reference value; the DM defines availability, quality and any special properties.",
+      "category": "smith",
+      "baseCopper": 600,
+      "weight": 10,
+      "active": true
+    },
+    {
+      "id": "starter.steel-ingots",
+      "name": "Steel ingots",
+      "unit": "10 lb bundle",
+      "description": "Trade goods supplied as one 10 lb bundle. Lootsplit homebrew reference value; the DM defines availability, quality and any special properties.",
+      "category": "smith",
+      "baseCopper": 2000,
+      "weight": 10,
+      "active": true
+    },
+    {
+      "id": "starter.silver-bullion",
+      "name": "Silver bullion",
+      "unit": "1 lb bar",
+      "description": "Trade goods supplied as one 1 lb bar. Lootsplit homebrew reference value; the DM defines availability, quality and any special properties.",
+      "category": "smith",
+      "baseCopper": 500,
+      "weight": 1,
+      "active": true
+    },
+    {
+      "id": "starter.gold-bullion",
+      "name": "Gold bullion",
+      "unit": "1 lb bar",
+      "description": "Trade goods supplied as one 1 lb bar. Lootsplit homebrew reference value; the DM defines availability, quality and any special properties.",
+      "category": "smith",
+      "baseCopper": 5000,
+      "weight": 1,
+      "active": true
+    },
+    {
+      "id": "starter.coal",
+      "name": "Coal",
+      "unit": "25 lb sack",
+      "description": "Trade goods supplied as one 25 lb sack. Lootsplit homebrew reference value; the DM defines availability, quality and any special properties.",
+      "category": "smith",
+      "baseCopper": 200,
+      "weight": 25,
+      "active": true
+    },
+    {
+      "id": "starter.mithral",
+      "name": "Mithral ingots",
+      "unit": "1 lb bar",
+      "description": "Trade goods supplied as one 1 lb bar. Lootsplit homebrew reference value; the DM defines availability, quality and any special properties.",
+      "category": "smith",
+      "baseCopper": 50000,
+      "weight": 1,
+      "active": true
+    },
+    {
+      "id": "starter.adamantine",
+      "name": "Adamantine ingots",
+      "unit": "1 lb bar",
+      "description": "Trade goods supplied as one 1 lb bar. Lootsplit homebrew reference value; the DM defines availability, quality and any special properties.",
+      "category": "smith",
+      "baseCopper": 100000,
+      "weight": 1,
+      "active": true
+    },
+    {
+      "id": "starter.wool",
+      "name": "Raw wool",
+      "unit": "10 lb bale",
+      "description": "Trade goods supplied as one 10 lb bale. Lootsplit homebrew reference value; the DM defines availability, quality and any special properties.",
+      "category": "cloth",
+      "baseCopper": 200,
+      "weight": 10,
+      "active": true
+    },
+    {
+      "id": "starter.linen",
+      "name": "Linen cloth",
+      "unit": "10 yard roll",
+      "description": "Trade goods supplied as one 10 yard roll. Lootsplit homebrew reference value; the DM defines availability, quality and any special properties.",
+      "category": "cloth",
+      "baseCopper": 500,
+      "weight": 3,
+      "active": true
+    },
+    {
+      "id": "starter.cotton",
+      "name": "Cotton cloth",
+      "unit": "10 yard roll",
+      "description": "Trade goods supplied as one 10 yard roll. Lootsplit homebrew reference value; the DM defines availability, quality and any special properties.",
+      "category": "cloth",
+      "baseCopper": 400,
+      "weight": 3,
+      "active": true
+    },
+    {
+      "id": "starter.silk",
+      "name": "Silk cloth",
+      "unit": "10 yard roll",
+      "description": "Trade goods supplied as one 10 yard roll. Lootsplit homebrew reference value; the DM defines availability, quality and any special properties.",
+      "category": "cloth",
+      "baseCopper": 5000,
+      "weight": 2,
+      "active": true
+    },
+    {
+      "id": "starter.leather",
+      "name": "Tanned leather",
+      "unit": "hide",
+      "description": "Trade goods supplied as one hide. Lootsplit homebrew reference value; the DM defines availability, quality and any special properties.",
+      "category": "cloth",
+      "baseCopper": 1000,
+      "weight": 5,
+      "active": true
+    },
+    {
+      "id": "starter.furs",
+      "name": "Furs",
+      "unit": "bundle",
+      "description": "Trade goods supplied as one bundle. Lootsplit homebrew reference value; the DM defines availability, quality and any special properties.",
+      "category": "cloth",
+      "baseCopper": 1500,
+      "weight": 5,
+      "active": true
+    },
+    {
+      "id": "starter.dye",
+      "name": "Cloth dye",
+      "unit": "jar",
+      "description": "Trade goods supplied as one jar. Lootsplit homebrew reference value; the DM defines availability, quality and any special properties.",
+      "category": "cloth",
+      "baseCopper": 500,
+      "weight": 2,
+      "active": true
+    },
+    {
+      "id": "starter.healing-herbs",
+      "name": "Medicinal herbs",
+      "unit": "1 lb bundle",
+      "description": "Trade goods supplied as one 1 lb bundle. Lootsplit homebrew reference value; the DM defines availability, quality and any special properties.",
+      "category": "apothecary",
+      "baseCopper": 500,
+      "weight": 1,
+      "active": true
+    },
+    {
+      "id": "starter.alchemical-salts",
+      "name": "Alchemical salts",
+      "unit": "1 lb jar",
+      "description": "Trade goods supplied as one 1 lb jar. Lootsplit homebrew reference value; the DM defines availability, quality and any special properties.",
+      "category": "apothecary",
+      "baseCopper": 1000,
+      "weight": 1,
+      "active": true
+    },
+    {
+      "id": "starter.sulfur",
+      "name": "Sulfur",
+      "unit": "1 lb pouch",
+      "description": "Trade goods supplied as one 1 lb pouch. Lootsplit homebrew reference value; the DM defines availability, quality and any special properties.",
+      "category": "apothecary",
+      "baseCopper": 500,
+      "weight": 1,
+      "active": true
+    },
+    {
+      "id": "starter.quicksilver",
+      "name": "Quicksilver",
+      "unit": "sealed 1 lb flask",
+      "description": "Trade goods supplied as one sealed 1 lb flask. Lootsplit homebrew reference value; the DM defines availability, quality and any special properties.",
+      "category": "apothecary",
+      "baseCopper": 2000,
+      "weight": 1,
+      "active": true
+    },
+    {
+      "id": "starter.night-bloom",
+      "name": "Night-bloom petals",
+      "unit": "sealed pouch",
+      "description": "Trade goods supplied as one sealed pouch. Lootsplit homebrew reference value; the DM defines availability, quality and any special properties.",
+      "category": "apothecary",
+      "baseCopper": 2500,
+      "weight": 0.25,
+      "active": true
+    },
+    {
+      "id": "starter.mandrake",
+      "name": "Mandrake root",
+      "unit": "root",
+      "description": "Trade goods supplied as one root. Lootsplit homebrew reference value; the DM defines availability, quality and any special properties.",
+      "category": "apothecary",
+      "baseCopper": 1500,
+      "weight": 1,
+      "active": true
+    },
+    {
+      "id": "starter.ale",
+      "name": "Ale",
+      "unit": "5 gallon keg",
+      "description": "Trade goods supplied as one 5 gallon keg. Lootsplit homebrew reference value; the DM defines availability, quality and any special properties.",
+      "category": "inn",
+      "baseCopper": 500,
+      "weight": 40,
+      "active": true
+    },
+    {
+      "id": "starter.wine",
+      "name": "Wine",
+      "unit": "5 gallon keg",
+      "description": "Trade goods supplied as one 5 gallon keg. Lootsplit homebrew reference value; the DM defines availability, quality and any special properties.",
+      "category": "inn",
+      "baseCopper": 1000,
+      "weight": 40,
+      "active": true
+    },
+    {
+      "id": "starter.spirits",
+      "name": "Distilled spirits",
+      "unit": "1 gallon jug",
+      "description": "Trade goods supplied as one 1 gallon jug. Lootsplit homebrew reference value; the DM defines availability, quality and any special properties.",
+      "category": "inn",
+      "baseCopper": 1500,
+      "weight": 8,
+      "active": true
+    },
+    {
+      "id": "starter.timber",
+      "name": "Building timber",
+      "unit": "50 lb bundle",
+      "description": "Trade goods supplied as one 50 lb bundle. Lootsplit homebrew reference value; the DM defines availability, quality and any special properties.",
+      "category": "general",
+      "baseCopper": 500,
+      "weight": 50,
+      "active": true
+    },
+    {
+      "id": "starter.hardwood",
+      "name": "Seasoned hardwood",
+      "unit": "50 lb bundle",
+      "description": "Trade goods supplied as one 50 lb bundle. Lootsplit homebrew reference value; the DM defines availability, quality and any special properties.",
+      "category": "general",
+      "baseCopper": 1000,
+      "weight": 50,
+      "active": true
+    },
+    {
+      "id": "starter.stone",
+      "name": "Dressed stone",
+      "unit": "50 lb crate",
+      "description": "Trade goods supplied as one 50 lb crate. Lootsplit homebrew reference value; the DM defines availability, quality and any special properties.",
+      "category": "general",
+      "baseCopper": 300,
+      "weight": 50,
+      "active": true
+    },
+    {
+      "id": "starter.clay",
+      "name": "Potter's clay",
+      "unit": "25 lb sack",
+      "description": "Trade goods supplied as one 25 lb sack. Lootsplit homebrew reference value; the DM defines availability, quality and any special properties.",
+      "category": "general",
+      "baseCopper": 100,
+      "weight": 25,
+      "active": true
+    },
+    {
+      "id": "starter.glass",
+      "name": "Glass blanks",
+      "unit": "10 lb crate",
+      "description": "Trade goods supplied as one 10 lb crate. Lootsplit homebrew reference value; the DM defines availability, quality and any special properties.",
+      "category": "general",
+      "baseCopper": 1000,
+      "weight": 10,
+      "active": true
+    },
+    {
+      "id": "starter.beeswax",
+      "name": "Beeswax",
+      "unit": "5 lb block",
+      "description": "Trade goods supplied as one 5 lb block. Lootsplit homebrew reference value; the DM defines availability, quality and any special properties.",
+      "category": "general",
+      "baseCopper": 300,
+      "weight": 5,
+      "active": true
+    },
+    {
+      "id": "starter.resin",
+      "name": "Tree resin",
+      "unit": "5 lb jar",
+      "description": "Trade goods supplied as one 5 lb jar. Lootsplit homebrew reference value; the DM defines availability, quality and any special properties.",
+      "category": "general",
+      "baseCopper": 200,
+      "weight": 5,
+      "active": true
+    },
+    {
+      "id": "starter.dragon-scales",
+      "name": "Dragon scales",
+      "unit": "1 lb bundle",
+      "description": "Trade goods supplied as one 1 lb bundle. Lootsplit homebrew reference value; the DM defines availability, quality and any special properties.",
+      "category": "curios",
+      "baseCopper": 10000,
+      "weight": 1,
+      "active": true
+    },
+    {
+      "id": "starter.wyvern-venom",
+      "name": "Wyvern venom",
+      "unit": "sealed vial",
+      "description": "Trade goods supplied as one sealed vial. Lootsplit homebrew reference value; the DM defines availability, quality and any special properties.",
+      "category": "curios",
+      "baseCopper": 25000,
+      "weight": 0.25,
+      "active": true
+    },
+    {
+      "id": "starter.phoenix-ash",
+      "name": "Phoenix ash",
+      "unit": "sealed vial",
+      "description": "Trade goods supplied as one sealed vial. Lootsplit homebrew reference value; the DM defines availability, quality and any special properties.",
+      "category": "curios",
+      "baseCopper": 50000,
+      "weight": 0.25,
+      "active": true
+    },
+    {
+      "id": "starter.ghost-orchid",
+      "name": "Ghost orchid",
+      "unit": "bloom",
+      "description": "Trade goods supplied as one bloom. Lootsplit homebrew reference value; the DM defines availability, quality and any special properties.",
+      "category": "curios",
+      "baseCopper": 5000,
+      "weight": 0.25,
+      "active": true
+    },
+    {
+      "id": "starter.elemental-crystal",
+      "name": "Elemental crystal",
+      "unit": "crystal",
+      "description": "Trade goods supplied as one crystal. Lootsplit homebrew reference value; the DM defines availability, quality and any special properties.",
+      "category": "curios",
+      "baseCopper": 10000,
+      "weight": 1,
+      "active": true
+    },
+    {
+      "id": "starter.enchanted-resin",
+      "name": "Enchanted resin",
+      "unit": "1 lb jar",
+      "description": "Trade goods supplied as one 1 lb jar. Lootsplit homebrew reference value; the DM defines availability, quality and any special properties.",
+      "category": "curios",
+      "baseCopper": 7500,
+      "weight": 1,
+      "active": true
+    },
+    {
+      "id": "starter.hay",
+      "name": "Hay",
+      "unit": "50 lb bale",
+      "description": "Trade goods supplied as one 50 lb bale. Lootsplit homebrew reference value; the DM defines availability, quality and any special properties.",
+      "category": "stable",
+      "baseCopper": 100,
+      "weight": 50,
+      "active": true
+    },
+    {
+      "id": "starter.animal-feed",
+      "name": "Animal feed",
+      "unit": "25 lb sack",
+      "description": "Trade goods supplied as one 25 lb sack. Lootsplit homebrew reference value; the DM defines availability, quality and any special properties.",
+      "category": "stable",
+      "baseCopper": 150,
+      "weight": 25,
+      "active": true
+    },
+    {
+      "id": "starter.parchment",
+      "name": "Parchment",
+      "unit": "20 sheet bundle",
+      "description": "Trade goods supplied as one 20 sheet bundle. Lootsplit homebrew reference value; the DM defines availability, quality and any special properties.",
+      "category": "scribe",
+      "baseCopper": 1000,
+      "weight": 2,
+      "active": true
+    },
+    {
+      "id": "starter.paper",
+      "name": "Paper",
+      "unit": "20 sheet bundle",
+      "description": "Trade goods supplied as one 20 sheet bundle. Lootsplit homebrew reference value; the DM defines availability, quality and any special properties.",
+      "category": "scribe",
+      "baseCopper": 500,
+      "weight": 2,
+      "active": true
+    },
+    {
+      "id": "starter.ink",
+      "name": "Writing ink",
+      "unit": "bottle",
+      "description": "Trade goods supplied as one bottle. Lootsplit homebrew reference value; the DM defines availability, quality and any special properties.",
+      "category": "scribe",
+      "baseCopper": 1000,
+      "weight": 0.25,
+      "active": true
+    },
+    {
+      "id": "starter.arcane-ink",
+      "name": "Arcane ink",
+      "unit": "bottle",
+      "description": "Trade goods supplied as one bottle. Lootsplit homebrew reference value; the DM defines availability, quality and any special properties.",
+      "category": "scribe",
+      "baseCopper": 10000,
+      "weight": 0.25,
+      "active": true
+    },
+    {
+      "id": "starter.quartz",
+      "name": "Quartz",
+      "unit": "1 lb parcel",
+      "description": "Trade goods supplied as one 1 lb parcel. Lootsplit homebrew reference value; the DM defines availability, quality and any special properties.",
+      "category": "jewels",
+      "baseCopper": 500,
+      "weight": 1,
+      "active": true
+    },
+    {
+      "id": "starter.amber",
+      "name": "Amber",
+      "unit": "1 lb parcel",
+      "description": "Trade goods supplied as one 1 lb parcel. Lootsplit homebrew reference value; the DM defines availability, quality and any special properties.",
+      "category": "jewels",
+      "baseCopper": 2500,
+      "weight": 1,
+      "active": true
+    },
+    {
+      "id": "starter.gem-rough",
+      "name": "Uncut gemstones",
+      "unit": "1 lb parcel",
+      "description": "Trade goods supplied as one 1 lb parcel. Lootsplit homebrew reference value; the DM defines availability, quality and any special properties.",
+      "category": "jewels",
+      "baseCopper": 10000,
+      "weight": 1,
+      "active": true
+    }
+  ]
+}

@@ -13,6 +13,7 @@ import {
 } from "./title-screen-navigation.mjs";
 import { createAndSaveRoom } from "./browser/account-fixtures.mjs";
 import { chooseOption } from "./search-select-browser.mjs";
+import { readFileSync } from "node:fs";
 
 const origin = process.env.AUDIT_ORIGIN || "http://127.0.0.1:8080";
 assert.match(
@@ -794,6 +795,165 @@ async function commodityBoardViews(page, width) {
   );
   await page.evaluate(() => localStorage.removeItem("quire.prefs.v1"));
 }
+async function cityAccessAndCatalogue(page, width) {
+  const table = tradeFixture();
+  table.journal.tradeEconomy.exchanges[0].locationId = null;
+  table.journal.market.locations.push(
+    { id: "village", kind: "town", parentId: "coast", name: "Village", description: "" },
+    {
+      id: "village-square",
+      kind: "area",
+      parentId: "village",
+      name: "Town square",
+      description: "",
+    },
+  );
+  await seed(page, table);
+  await reloadApplication(page);
+  const beforeWealth = JSON.stringify(await economicState(page));
+  await page.getByText("Built-in fantasy commodity catalogue · 60 goods", { exact: true }).click();
+  const catalogue = page.getByRole("region", { name: "Built-in commodity catalogue", exact: true });
+  await catalogue
+    .getByRole("searchbox", { name: "Search built-in commodities", exact: true })
+    .fill("Mithral");
+  await expect(
+    catalogue.getByRole("checkbox", { name: "Add Mithral ingots", exact: true }),
+  ).toBeVisible();
+  await catalogue
+    .getByRole("searchbox", { name: "Search built-in commodities", exact: true })
+    .fill("");
+  for (let i = 0; i < 4; i++)
+    await catalogue.getByRole("button", { name: "Next catalogue page", exact: true }).click();
+  await expect(
+    catalogue.getByRole("checkbox", { name: "Add Uncut gemstones", exact: true }),
+  ).toBeVisible();
+  await catalogue.getByRole("button", { name: "Select all missing goods", exact: true }).click();
+  await catalogue.getByRole("button", { name: "Review selected commodities", exact: true }).click();
+  const review = page.getByRole("dialog", { name: "Review built-in commodities", exact: true });
+  await expect(
+    review.getByText("60 new commodities · 0 already present", { exact: true }),
+  ).toBeVisible();
+  await review.getByRole("button", { name: "Next import page", exact: true }).click();
+  await review.getByRole("button", { name: "Next import page", exact: true }).click();
+  await expect(review.getByText("Uncut gemstones", { exact: true })).toBeVisible();
+  if (width === 390) await page.setViewportSize({ width: 320, height: 950 });
+  await fits(page);
+  await review.evaluate((node) => {
+    node.scrollTop = 0;
+  });
+  await page.screenshot({
+    path: `${output}/commodity-catalog-review-${width}.png`,
+    fullPage: false,
+  });
+  await review.getByRole("button", { name: "Add reviewed commodities", exact: true }).click();
+  await expect(review).toBeHidden();
+  await expect.poll(async () => (await read(page)).tradeEconomy.commodities.length).toBe(61);
+  await expect(
+    catalogue.getByRole("button", { name: "Review selected commodities", exact: true }),
+  ).toBeDisabled();
+  await expect(
+    catalogue.getByRole("checkbox", { name: "Add Uncut gemstones", exact: true }),
+  ).toBeDisabled();
+  if (width === 390) await page.setViewportSize({ width, height: 950 });
+  await page.getByRole("button", { name: "Import commodities", exact: true }).click();
+  const modal = page.getByRole("dialog", { name: "Import commodities", exact: true });
+  const file = {
+    name: "commodities.csv",
+    mimeType: "text/csv",
+    buffer: readFileSync("public/download/commodities.sample.csv"),
+  };
+  await modal.getByLabel("Commodity import file", { exact: true }).setInputFiles(file);
+  await modal.getByRole("button", { name: "Review commodity import", exact: true }).click();
+  await expect(
+    modal.getByText("2 new commodities · 0 already present", { exact: true }),
+  ).toBeVisible();
+  await modal.getByRole("button", { name: "Add reviewed commodities", exact: true }).click();
+  await expect(modal).toBeHidden();
+  await expect.poll(async () => (await read(page)).tradeEconomy.commodities.length).toBe(63);
+  assert.equal(
+    JSON.stringify(await economicState(page)),
+    beforeWealth,
+    "Definitions do not grant goods, stock or money",
+  );
+  await page.getByRole("button", { name: "Import commodities", exact: true }).click();
+  await modal.getByLabel("Commodity import file", { exact: true }).setInputFiles(file);
+  await modal.getByRole("button", { name: "Review commodity import", exact: true }).click();
+  await expect(
+    modal.getByText("0 new commodities · 2 already present", { exact: true }),
+  ).toBeVisible();
+  await expect(
+    modal.getByRole("button", { name: "Add reviewed commodities", exact: true }),
+  ).toBeDisabled();
+  await modal
+    .getByLabel("Commodity data", { exact: true })
+    .fill(
+      "id,name,unit,category,baseCopper,weight\ncustom.moon-salt,Moon salt,different unit,apothecary,1200,1",
+    );
+  await modal.getByRole("button", { name: "Review commodity import", exact: true }).click();
+  await expect(modal.getByRole("alert")).toContainText("different definition");
+  await modal.getByLabel("Commodity data", { exact: true }).fill("");
+  await modal.getByRole("button", { name: "Close", exact: true }).click();
+  await page.evaluate(() => (window.__cityMarketDocument = crypto.randomUUID()));
+  const documentId = await page.evaluate(() => window.__cityMarketDocument);
+  await page.getByRole("link", { name: "Market", exact: true }).first().click();
+  const location = page.getByRole("combobox", { name: "Party location", exact: true });
+  for (const id of ["", "coast", "desert", "village", "village-square"]) {
+    await chooseOption(location, id);
+    await expect(
+      page.getByRole("region", { name: "Global market access", exact: true }),
+    ).toContainText("Closed here");
+    await expect(
+      page.getByRole("region", { name: "Global commodity quotes", exact: true }),
+    ).toHaveCount(0);
+  }
+  if (width === 390) await page.setViewportSize({ width: 320, height: 950 });
+  await fits(page);
+  await page.screenshot({ path: `${output}/global-market-closed-${width}.png`, fullPage: true });
+  if (width === 390) await page.setViewportSize({ width, height: 950 });
+  await page
+    .getByRole("link", {
+      name: "Trade Exchanges · regional goods & seasonal market →",
+      exact: true,
+    })
+    .click();
+  const exchange = page.getByRole("region", { name: "Harbor Exchange", exact: true });
+  await expect(exchange.getByRole("button", { name: "Buy commodity", exact: true })).toBeDisabled();
+  await expect(exchange).toContainText("Visit a city to trade");
+  await page.getByRole("link", { name: "Market", exact: true }).first().click();
+  for (const id of ["port", "dock"]) {
+    await chooseOption(location, id);
+    await expect(
+      page.getByRole("region", { name: "Global commodity quotes", exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("region", { name: "Global market access", exact: true }),
+    ).toHaveCount(0);
+  }
+  assert.equal(
+    await page.evaluate(() => window.__cityMarketDocument),
+    documentId,
+    "Market navigation never replaces the document",
+  );
+  assert.equal(await page.locator(".loot-opening").count(), 0);
+  await reloadApplication(page);
+  assert.equal(
+    (await read(page)).tradeEconomy.commodities.length,
+    63,
+    "Catalogue and file imports persist after reload",
+  );
+  await page
+    .getByRole("link", {
+      name: "Trade Exchanges · regional goods & seasonal market →",
+      exact: true,
+    })
+    .click();
+  await expect(
+    page
+      .getByRole("region", { name: "Harbor Exchange", exact: true })
+      .getByRole("button", { name: "Buy commodity", exact: true }),
+  ).toBeEnabled();
+}
+
 try {
   for (const width of [1440, 390]) {
     const context = await browser.newContext({
@@ -813,6 +973,7 @@ try {
     await openApplication(page, origin + "/features/economy");
     await page.getByRole("heading", { name: "Trade Exchanges", exact: true }).waitFor();
     await commodityBoardViews(page, width);
+    await cityAccessAndCatalogue(page, width);
     await seed(page, tradeFixture());
     await openApplication(page, origin + "/features/economy");
     const exchange = page.getByRole("region", { name: "Harbor Exchange" });

@@ -13,7 +13,12 @@ import {
 } from "./economy.ts";
 import { preserveJournalMetadata, readArchivedSnapshot, readJournal } from "./journal.ts";
 import { projectRecord, archiveSession } from "./session-records.ts";
-import { readMarketLocations, shopAvailableHere, type MarketLocations } from "./shop-locations.ts";
+import {
+  globalMarketCity,
+  readMarketLocations,
+  shopAvailableHere,
+  type MarketLocations,
+} from "./shop-locations.ts";
 import { DM_SEAT, setSeat } from "./table.ts";
 import { toCopper } from "./money.ts";
 
@@ -49,6 +54,23 @@ export const marketFixture: MarketLocations = {
     { id: "other", kind: "region", parentId: null, name: "Desert", description: "Dunes" },
   ],
 };
+test("global market access needs a city or city area, never a town, region or unknown location", () => {
+  assert.equal(globalMarketCity(marketFixture)?.id, "city");
+  assert.equal(globalMarketCity({ ...marketFixture, currentLocationId: "city" })?.id, "city");
+  for (const currentLocationId of [null, "region", "town", "other", "missing"])
+    assert.equal(globalMarketCity({ ...marketFixture, currentLocationId }), undefined);
+  assert.equal(
+    globalMarketCity({
+      ...marketFixture,
+      currentLocationId: "town-area",
+      locations: [
+        ...marketFixture.locations,
+        { id: "town-area", kind: "area", parentId: "town", name: "Town square", description: "" },
+      ],
+    }),
+    undefined,
+  );
+});
 const dm: CloudSeat = { id: "dm", name: "DM", token: "dm", role: "dm", purseIds: [] };
 const player: CloudSeat = {
   id: "player",
