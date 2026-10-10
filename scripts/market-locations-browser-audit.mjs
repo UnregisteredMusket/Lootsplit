@@ -97,6 +97,7 @@ async function importResponseFaults(page, code) {
     reads: false,
     readUrl: "",
     incompleteReads: 0,
+    releaseOnTrustedRetry: "",
     loseImportName: "",
     lostSubmission: null,
     submitted: [],
@@ -141,10 +142,19 @@ async function importResponseFaults(page, code) {
       }
     }
     if (fault.reads && request.url() === fault.readUrl) {
-      fault.incompleteReads++;
-      // A JSON response without TanStack's result envelope deserializes to an
-      // undefined room view. It must be rejected before touching saved state.
-      return route.fulfill({ status: 200, contentType: "application/json", body: "{}" });
+      const retryMarker = fault.releaseOnTrustedRetry;
+      if (retryMarker && (await page.evaluate((key) => window[key] === true, retryMarker))) {
+        // Release only after the actual click, not while mobile scrolling is
+        // still positioning it. A background poll must not remove Retry first.
+        fault.reads = false;
+        fault.releaseOnTrustedRetry = "";
+      }
+      if (fault.reads) {
+        fault.incompleteReads++;
+        // A JSON response without TanStack's result envelope deserializes to an
+        // undefined room view. It must be rejected before touching saved state.
+        return route.fulfill({ status: 200, contentType: "application/json", body: "{}" });
+      }
     }
     return route.continue();
   });
@@ -548,10 +558,31 @@ try {
       responseFault.lostSubmission,
       "Navigation preserves the same queued action",
     );
+    const retryMarker = `__lootsplitAuditRetry_${crypto.randomUUID()}`;
+    await retry.evaluate((button, key) => {
+      window[key] = false;
+      button.addEventListener(
+        "click",
+        (event) => {
+          window[key] = event.isTrusted;
+        },
+        { capture: true, once: true },
+      );
+      button.scrollIntoView({ block: "center", inline: "center", behavior: "instant" });
+    }, retryMarker);
+    responseFault.releaseOnTrustedRetry = retryMarker;
     await dm.screenshot({ path: `${output}/import-lost-response-retry-${width}.png` });
-    responseFault.reads = false;
     await retry.click();
+    assert.equal(
+      await dm.evaluate((key) => window[key], retryMarker),
+      true,
+      "Retry receives a real trusted click before responses recover",
+    );
     await expect.poll(async () => (await savedQueue(dm)).commands.length).toBe(0);
+    assert.equal(responseFault.releaseOnTrustedRetry, "", "The Retry response gate is disarmed");
+    await dm.evaluate((key) => {
+      delete window[key];
+    }, retryMarker);
     assert.equal(
       responseFault.submitted.length,
       submissionsBefore + 1,
