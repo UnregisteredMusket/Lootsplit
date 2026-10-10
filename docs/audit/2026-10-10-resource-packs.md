@@ -1,0 +1,25 @@
+# Reviewed resource packs
+
+Base main/live is `2b9c2ca78a4fa6b0a86d23a16eeae86bb6b08e2c`; the earlier import/Save and campaign-market work is complete. This change adds a reviewed DM resource library and encounter reuse without replacing existing imports or distributing source books with the application. See `docs/RESOURCE-PACKS.md` and its synthetic example/schema.
+
+The authoritative command enforces DM role, campaign scope, current library identity, strict schema, immutable revisions and duplicate reuse. Player and nested archive projections exclude packs. Catalogue items require a separate reviewed price; locations/shops use the existing atomic canonical hierarchy importer. No stock, wealth, inventory, NPC accounts or property deeds are granted by the pack import. Required unknown creature values remain null and block encounter use. Related source references preserve lore and salvage once, then copy into editable encounter notes.
+
+Migration0013 adds only private immutable resource documents, keyed by campaign/reference with cascading campaign deletion. Existing rows and bindings are unchanged. Room CAS and missing-document inserts share an atomic batch. Source documents hydrate for complete archives/exports and require campaign-scoped lookups. Large synthetic repeated archives prove deduplication and exact hydration; losing CAS writes create no documents. Existing complete-recovery limits continue to refuse incomplete deletion copies.
+
+Local checks use Node22.23.3. Unit execution passed867 tests with four existing template skips; final TypeScript passed after correcting a fixture-only missing `live` field and a union assertion. Changed-file lint has zero errors and eight pre-existing warnings. Web and mobile bundles pass. The earlier CLI test diagnostic failed because the injected environment warning preceded JSON stderr; `NODE_NO_WARNINGS=1` resolves this local warning contamination without changing the application/test. The locked Playwright Chromium153 download returned an empty/corrupt archive and OS dependency installation was unavailable. Diagnostic Chromium133.0.6943.0 launches; complete current-browser CI remains mandatory and resolves that explicit local gap.
+
+The complete synthetic browser audit passes at390/1440 with320px overflow checks: real file upload/review/apply, invalid import, reimport reuse, pack export, explicit item price, canonical closed empty shops, reusable incomplete/valid creatures, generation, saved encounter source notes and reload. Screenshots were inspected. Its first40.345s failure was an ambiguous existing select label; explicit accessible labels preserve the existing generation controls. The corrected identical synthetic scope passes27.447s. Private local source-file coverage extends that scenario to three actual files, reload/reimport and a saved source creature; the extended workload passes30.808s and is a different scope, not a synthetic-suite slowdown.
+
+The user’s source-file output is saved separately, never committed or publicly bundled. Its extraction matches all409 Armor Class statblock anchors,54 named magic-item appendix headings, and232 deduplicated source-section references. All three files validate against the importer; every creature converts with complete encounter values and related notes under the supported limit. Seven source editorial exceptions were visually checked and explicitly flagged. Missing sale prices remain null; crafting components are not interpreted as sale prices. This new monster-book pack does not merge or re-create the previously validated location/shop pack.
+
+## Performance evidence
+
+The initial current snapshot contains755 retained observations,686 references and17 resolution records, with zero stale requests and one pre-existing pending run. Recorder38031808754 succeeded. All three observations added since the prior752-observation audit are retained:
+
+| Operation | Last reference → recorded duration | Added time | Increase | Assessment |
+| --- | --- | --- | --- | --- |
+| Local expanded trade-economy browser audit |61.293s →73.262s |11.969s |19.53% | Existing expanded supplier/reversal/retry/history coverage; retained unchanged. |
+| Main Worker trade-economy audit,38024734214 |22s →29s |7s |31.82% | Expanded market coverage compared with the older operation; no reset. |
+| Main development trade-economy audit,38024734214 |32s →61s |29s |90.63% | Expanded market coverage and development transport overhead; no source-causality claim or reset. |
+
+Earlier repeated account/setup/cache/total-wait trends and all failed outcomes remain open where no successful comparable fix establishes resolution. This feature does not alter account deadlines, workers, network isolation or release gates. Its expanded Library navigation audit remains under the existing operation name; any qualifying CI increase is retained and explained as added resource-import coverage, never hidden by a renamed operation. Final exact-head PR/main/release identities, additional CI observations and migration/live evidence belong in the PR and external recovery checkpoint to avoid documentation-only head loops.

@@ -60,6 +60,7 @@ export function projectRecord(
     (r) => dm || seat.purseIds.includes(r.purseId),
   );
   if (!dm) {
+    delete t.journal.resourceLibrary;
     const world = readWorld(t.journal.world);
     world.maps = world.maps.filter(map => map.visible).map(map => ({...map, markers:map.markers.filter(marker=>marker.visibility === "party")}));
     const readableNpcs = new Set(world.npcs.filter(npc=>npcAvailableHere(npc,t)).map(npc=>npc.id));

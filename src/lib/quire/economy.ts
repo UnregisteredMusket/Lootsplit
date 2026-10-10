@@ -382,11 +382,13 @@ export async function removeCatalog(id: string): Promise<void> {
   await request(db.transaction("catalog", "readwrite").objectStore("catalog").delete(id));
 }
 
-export async function addCatalogRows(rows: CatalogItem[]): Promise<number> {
+export async function addCatalogRows(rows: CatalogItem[], guard: () => void = () => {}): Promise<number> {
+  guard();
   const db = await quireDb();
   const existing = await request<CatalogItem[]>(
     db.transaction("catalog").objectStore("catalog").getAll(),
   );
+  guard();
   const names = new Set(existing.map((item) => item.name.toLowerCase()));
   const fresh = rows.filter((row) => row.name.trim() && !names.has(row.name.trim().toLowerCase()));
   if (fresh.length === 0) return 0;

@@ -10,6 +10,7 @@ import { canonicalJson } from "./canonical-json.ts";
 import { applyCommand, tablePatch } from "./commands.ts";
 import { openRoom, joinRoom, roomState, previewRoom, submitCommands } from "./cloud.server.ts";
 import { emptyCoins, toCopper } from "./money.ts";
+import { resourcePackFixture } from "./test-fixtures/resource-pack.ts";
 import {
   pushSettings,
   setPushSubscription,
@@ -283,6 +284,7 @@ sql.exec(
   ),
 );
 sql.exec(readFileSync(new URL("../../../cloudflare/migrations/0012_campaign_room_images.sql",import.meta.url),"utf8"));
+sql.exec(readFileSync(new URL("../../../cloudflare/migrations/0013_campaign_resource_documents.sql",import.meta.url),"utf8"));
 (globalThis as any).__env__ = {
   DB: {
     async batch(statements: {run:()=>Promise<unknown>}[]) {
@@ -697,4 +699,78 @@ test("map storage leaves raw character portraits and non-map inventory recovery 
   assert.equal(raw.table.journal.world.maps[1].image,portrait);
   assert.equal(raw.drafts.dm[0].map.image,encoded.assets[0].reference);
   assert.equal(encoded.body.split(encoded.assets[0].reference).join(encoded.assets[0].image),JSON.stringify({table,drafts:{dm:[{kind:"map-save",map:makeMap("queued",mapImage),before:null}]}}));
+});
+
+test("large resource packs deduplicate across archives, hydrate complete bytes and remain campaign-scoped and CAS-atomic", async () => {
+  const { readJournal } = await import("./journal.ts");
+  const { hydrateRoomResources } = await import("../../../cloudflare/room-resources.mjs");
+  const { database } = await import("./room-store.server.ts");
+  const table = emptyCloudTable(),
+    pack = structuredClone(resourcePackFixture);
+  const original = pack.entries[0];
+  pack.entries = Array.from({ length: 100 }, (_, i) => ({
+    ...original,
+    id: `large-${i}`,
+    name: `Large synthetic ${i}`,
+    text: "Synthetic reference text. ".repeat(450),
+  }));
+  table.journal = readJournal({ resourceLibrary: { packs: [pack] } });
+  const archived = JSON.stringify(table);
+  table.journal.reports = Array.from({ length: 3 }, (_, i) => ({
+    id: `large-archive-${i}`,
+    name: "Synthetic archive",
+    at: i,
+    snapshot: archived,
+  }));
+  const room = {
+    code: "resource-storage-test",
+    revision: 1,
+    turn: 0,
+    live: false,
+    seats: [{ id: "dm", token: "test", name: "DM", role: "dm" as const, purseIds: [] }],
+    table,
+    seen: { gifts: [], sales: [] },
+  };
+  await createRoom(room);
+  const raw = sql.prepare("SELECT body FROM campaign_rooms WHERE code=?").get(room.code) as {
+    body: string;
+  };
+  assert.ok(raw.body.length < 10000);
+  assert.equal(
+    (
+      sql
+        .prepare("SELECT count(*) AS n FROM campaign_resource_documents WHERE code=?")
+        .get(room.code) as { n: number }
+    ).n,
+    1,
+  );
+  assert.deepEqual(await readRoom(room.code), room);
+  await assert.rejects(
+    hydrateRoomResources(database()!, "other-campaign", JSON.parse(raw.body)),
+    /missing/,
+  );
+  const changed = structuredClone(room);
+  changed.revision = 2;
+  changed.table.journal!.resourceLibrary!.packs[0].revision = "2";
+  await assert.rejects(updateRoom(changed, 0), /table changed/);
+  assert.equal(
+    (
+      sql
+        .prepare("SELECT count(*) AS n FROM campaign_resource_documents WHERE code=?")
+        .get(room.code) as { n: number }
+    ).n,
+    1,
+  );
+  assert.deepEqual(await readRoom(room.code), room);
+  await updateRoom(changed, 1);
+  assert.deepEqual(await readRoom(room.code), changed);
+  assert.equal(
+    (
+      sql
+        .prepare("SELECT count(*) AS n FROM campaign_resource_documents WHERE code=?")
+        .get(room.code) as { n: number }
+    ).n,
+    2,
+  );
+  await deleteRoom(room.code, 2);
 });

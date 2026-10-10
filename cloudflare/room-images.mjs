@@ -1,9 +1,15 @@
+import {
+  encodeRoomResources,
+  hydrateRoomResources,
+  roomResourceStatements,
+} from "./room-resources.mjs";
 /** Campaign-scoped immutable raster bytes; references are internal storage only. */
 const raster = /data:image\/(?:png|jpeg|webp);base64,[A-Za-z0-9+/=]{8000,}/g;
 const reference = /\/art\/room-image-[a-f0-9]{64}\.webp/g;
 /** @param {unknown} value */
 export async function encodeRoomImages(value) {
-  let body = JSON.stringify(value);
+  const resources = await encodeRoomResources(value);
+  let body = JSON.stringify(resources.value);
   // Existing sheet/profile and recovery SQL reads raw room portraits directly.
   // Extract map images only; keep every image also used outside maps inline.
   const maps = new Set(),
@@ -50,7 +56,7 @@ export async function encodeRoomImages(value) {
     }),
   );
   for (const asset of assets) body = body.split(asset.image).join(asset.reference);
-  return { body, assets };
+  return { body, assets, documents: resources.documents };
 }
 /** Never fetch by hash alone: identical/guessed references confer no cross-campaign access.
  * @template T @param {NonNullable<ReturnType<typeof import('../src/lib/quire/room-store.server.ts').database>>} db
@@ -58,7 +64,7 @@ export async function encodeRoomImages(value) {
 export async function hydrateRoomImages(db, code, value) {
   let body = JSON.stringify(value);
   const refs = [...new Set(body.match(reference) || [])];
-  if (!refs.length) return value;
+  if (!refs.length) return hydrateRoomResources(db, code, value);
   // Fetch only needed references, in bounded parameter groups. No public image endpoint.
   for (let offset = 0; offset < refs.length; offset += 80) {
     const wanted = refs.slice(offset, offset + 80);
@@ -78,25 +84,29 @@ export async function hydrateRoomImages(db, code, value) {
       body = body.split(ref).join(image);
     }
   }
-  return JSON.parse(body);
+  return hydrateRoomResources(db, code, JSON.parse(body));
 }
 /** Writes follow the room CAS in the same atomic D1 batch; a losing writer creates no assets.
  * @param {NonNullable<ReturnType<typeof import('../src/lib/quire/room-store.server.ts').database>>} db
  * @param {{code:string;revision:number}} room @param {{body:string;assets:{reference:string;image:string}[]}} encoded */
 export async function roomImageStatements(db, room, encoded) {
-  if (!encoded.assets.length) return [];
+  const documents = await roomResourceStatements(db, room, encoded);
+  if (!encoded.assets.length) return documents;
   const present = await db
     .prepare("SELECT reference FROM campaign_room_images WHERE code=?")
     .bind(room.code)
     .all();
   const existing = new Set(present.results.map((row) => row.reference));
-  return encoded.assets
-    .filter((asset) => !existing.has(asset.reference))
-    .map((asset) =>
-      db
-        .prepare(
-          "INSERT INTO campaign_room_images(code,reference,image) SELECT ?,?,? WHERE EXISTS(SELECT 1 FROM campaign_rooms WHERE code=? AND revision=? AND body=?) ON CONFLICT(code,reference) DO NOTHING",
-        )
-        .bind(room.code, asset.reference, asset.image, room.code, room.revision, encoded.body),
-    );
+  return [
+    ...documents,
+    ...encoded.assets
+      .filter((asset) => !existing.has(asset.reference))
+      .map((asset) =>
+        db
+          .prepare(
+            "INSERT INTO campaign_room_images(code,reference,image) SELECT ?,?,? WHERE EXISTS(SELECT 1 FROM campaign_rooms WHERE code=? AND revision=? AND body=?) ON CONFLICT(code,reference) DO NOTHING",
+          )
+          .bind(room.code, asset.reference, asset.image, room.code, room.revision, encoded.body),
+      ),
+  ];
 }

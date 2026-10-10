@@ -207,7 +207,7 @@ type EconomyApi = {
   updateSheet: (sheet: CharacterSheet, before?: CharacterSheet) => Promise<void>;
   voidLine: (id: string) => Promise<void>;
   setRealm: (settings: RealmSettings, options?: { reprice?: boolean }) => Promise<void>;
-  addGoods: (rows: CatalogItem[]) => Promise<number>;
+  addGoods: (rows: CatalogItem[], expected?: import("./cloud-client.ts").ExpectedMutationScope) => Promise<number>;
   saveGood: (item: CatalogItem) => Promise<void>;
   deleteGood: (id: string) => Promise<void>;
   invent: (category: ItemCategory, flags: RarityFlags, count: number) => Promise<number>;
@@ -802,9 +802,14 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
               : `Repriced ${count === 1 ? "1 shop" : `${count} shops`}.`,
           );
         }),
-      addGoods: async (rows) => {
+      addGoods: async (rows, expected) => {
         dmOnly();
-        const added = await addCatalogRows(rows);
+        const invoked = captureMutationScope();
+        const added = await addCatalogRows(rows, () => {
+          dmOnly();
+          assertMutationScope(invoked);
+          if (expected) assertMutationScope(expected);
+        });
         await reload();
         return added;
       },
