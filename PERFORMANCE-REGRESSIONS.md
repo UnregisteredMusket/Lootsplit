@@ -229,13 +229,14 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Packaged Worker / interface / worker-world-features | open | 3 | 13s → 88s | +75s | +576.92% |
 | Development / gameplay / dev-world-features | open | 4 | 17s → 106s | +89s | +523.53% |
 | Development / gameplay / dev-trade-economy | open | 2 | 33s → 74s | +41s | +124.24% |
-| Packaged Worker / interface / worker-trade-economy | open | 3 | 22s → 55s | +33s | +150% |
+| Packaged Worker / interface / worker-trade-economy | open | 4 | 22s → 68s | +46s | +209.09% |
 | Development / gameplay / dev-trade-economy | open | 2 | 32s → 83s | +51s | +159.38% |
 
 ## Recorded slowdowns
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-10T18:44:53Z | step: Packaged Worker / interface / worker-trade-economy | 55s → 68s | +13s | +23.64% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38053941691/job/114218842201) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38076562217/job/114285071255) |
 | 2026-10-10T16:59:33Z | step: Packaged standby / Run actions/upload-artifact@v4 | 3s → 4s | +1s | +33.33% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37965977121/job/113941067745) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38069064641/job/114264420838) |
 | 2026-10-10T16:57:54Z | step: Packaged standby / Run actions/download-artifact@v4 | 4s → 5s | +1s | +25% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37429247281/job/112156433460) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38069064641/job/114264420838) |
 | 2026-10-10T16:56:11Z | step: verify / Set up job | 1s → 2s | +1s | +100% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37233687309/job/111529121545) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38069064641/job/114264325029) |

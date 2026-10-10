@@ -11429,19 +11429,19 @@
   },
   "[\".github/workflows/verify.yml\",\"push\",\"main\",\"step\",\"Packaged Worker / interface / worker-trade-economy\",\"ubuntu-latest\",1]": {
     "schema": 1,
-    "id": "38053941691:1:eda27f109b95166fcbc95ea588ec94434d05e63fc297399128459cd852bb5c2b",
+    "id": "38076562217:1:eda27f109b95166fcbc95ea588ec94434d05e63fc297399128459cd852bb5c2b",
     "scope": "[\".github/workflows/verify.yml\",\"push\",\"main\",\"step\",\"Packaged Worker / interface / worker-trade-economy\",\"ubuntu-latest\",1]",
     "kind": "step",
     "name": "Packaged Worker / interface / worker-trade-economy",
     "environment": "ubuntu-latest",
-    "commit": "10e468745351090c4f47a8077dd380b16313b6dc",
-    "runId": 38053941691,
+    "commit": "c3ed29d01c669a60be884a8d6f948c779fab3987",
+    "runId": 38076562217,
     "attempt": 1,
-    "url": "https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38053941691/job/114218842201",
+    "url": "https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38076562217/job/114285071255",
     "outcome": "success",
-    "startedAt": "2026-10-10T13:04:18Z",
-    "finishedAt": "2026-10-10T13:05:13Z",
-    "durationMs": 55000,
+    "startedAt": "2026-10-10T18:43:45Z",
+    "finishedAt": "2026-10-10T18:44:53Z",
+    "durationMs": 68000,
     "trendId": "37965977121:1:eda27f109b95166fcbc95ea588ec94434d05e63fc297399128459cd852bb5c2b"
   },
   "[\".github/workflows/verify.yml\",\"push\",\"main\",\"step\",\"Development / gameplay / dev-trade-economy\",\"ubuntu-latest\",1]": {
@@ -11657,5 +11657,20 @@
     "finishedAt": "2026-10-10T16:32:48.516Z",
     "durationMs": 112646,
     "trendId": "local:8fd330c8-a1f1-4c9c-9c5a-5b8e7f26c17f"
+  },
+  "[\"local\",\"audit\",\"trade-economy browser audit\",\"node22.23.0/linux-x64/work-mode/chromium133/disposable-real-account/process-inclusive\",\"v4-city-access-and-reviewed-commodity-import\"]": {
+    "schema": 1,
+    "id": "local:f168ca45-267d-45a8-98f6-138a4e0d5855",
+    "scope": "[\"local\",\"audit\",\"trade-economy browser audit\",\"node22.23.0/linux-x64/work-mode/chromium133/disposable-real-account/process-inclusive\",\"v4-city-access-and-reviewed-commodity-import\"]",
+    "kind": "audit",
+    "name": "trade-economy browser audit",
+    "environment": "node22.23.0/linux-x64/work-mode/chromium133/disposable-real-account/process-inclusive",
+    "commit": "2eec88d4bcb09e916b52d3399dca2d2e70f8d7b3",
+    "url": "https://github.com/UnregisteredMusket/Lootsplit/commit/2eec88d4bcb09e916b52d3399dca2d2e70f8d7b3",
+    "outcome": "success",
+    "startedAt": "2026-10-10T18:12:24.280Z",
+    "finishedAt": "2026-10-10T18:14:54.452Z",
+    "durationMs": 150172,
+    "trendId": "local:f168ca45-267d-45a8-98f6-138a4e0d5855"
   }
 }
