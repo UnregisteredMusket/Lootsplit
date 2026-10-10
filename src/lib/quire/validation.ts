@@ -9,6 +9,7 @@ import { toCopper } from "./money.ts";
 import { propertyFields, validatePropertyLocations, type PropertyRecord } from "./property.ts";
 import { propertyDeedSchema } from "./property-deed.ts";
 import { custodySchema, estateKey } from "./estate-schema.ts";
+import { tradeLedgerLinkSchema } from "./trade-economy-schema.ts";
 const id = z.string().min(1);
 const amount = z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER);
 export const coinsSchema = z
@@ -79,6 +80,7 @@ const stock = z.object({
 });
 const ledger = z.object({
   reversalOf: id.optional(),
+  trade: tradeLedgerLinkSchema.optional(),
   purchase: z.object({ stockId: id, quantity: amount.positive(), holding: holdingSchema.nullable() }).optional(),
   listingPurchase: z.object({ listingId: id, quantity: amount.positive(), holding: holdingSchema }).optional(),
   transactionType: z

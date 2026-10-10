@@ -100,6 +100,10 @@ export const tradeDrawSchema = z
     source: z.enum(["server", "local"]),
   })
   .strict();
+export const tradeLedgerLinkSchema = z.object({
+  receiptId: z.string().min(1).max(300),
+  leg: z.enum(["owner", "treasury"]),
+}).strict();
 export const tradeReceiptSchema = z
   .object({
     id: z.string().min(1).max(300),
@@ -115,6 +119,17 @@ export const tradeReceiptSchema = z
     copper: money,
     origin: z.enum(["exchange", "shop", "manager"]),
     propertyId: id.optional(),
+    operationId: z.string().min(1).max(300).optional(),
+    reversalOf: z.string().min(1).max(300).optional(),
+    reversalReason: z.string().trim().min(1).max(2000).optional(),
+    // One complete lot: acquired goods for a buy, original goods for a sale.
+    // Direction and quantity derive the expected post-sale quantity or absence.
+    settlement: z.object({
+      version: z.literal(1),
+      treasuryPurseId: id,
+      holding: z.string().min(2),
+      storageOwnerId: id.optional(),
+    }).strict().optional(),
   })
   .strict();
 export const tradeSeasonQuoteSchema = z
@@ -165,6 +180,7 @@ export type Commodity = z.infer<typeof commoditySchema>;
 export type Exchange = z.infer<typeof exchangeSchema>;
 export type TradeOffer = z.infer<typeof tradeOfferSchema>;
 export type TradeSeasonQuote = z.infer<typeof tradeSeasonQuoteSchema>;
+export type TradeReceipt = z.infer<typeof tradeReceiptSchema>;
 export type TradeExecution = { random?: (key: string) => number; source?: "server" | "local" };
 export const readTradeEconomy = (raw?: unknown): TradeEconomy =>
   tradeEconomySchema.parse(raw ?? {});

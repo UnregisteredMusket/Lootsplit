@@ -6,8 +6,10 @@ import { createRoom, readRoom, updateRoom, deleteRoom } from "./room-store.serve
 import { emptyCloudTable } from "./cloud.ts";
 import { tradeFixture } from "./test-fixtures/trade-economy.ts";
 import { exchangeQuoteKey, tradeSeasonFingerprint } from "./trade-economy.ts";
+import { canonicalJson } from "./canonical-json.ts";
+import { applyCommand, tablePatch } from "./commands.ts";
 import { openRoom, joinRoom, roomState, previewRoom, submitCommands } from "./cloud.server.ts";
-import { emptyCoins } from "./money.ts";
+import { emptyCoins, toCopper } from "./money.ts";
 import {
   pushSettings,
   setPushSubscription,
@@ -16,6 +18,148 @@ import {
 } from "./push.server.ts";
 import { jwtVerify, importJWK } from "jose";
 const sql = new DatabaseSync(":memory:");
+test("shared exchange corrections restore both cash legs once across retries and reject changed goods atomically", async () => {
+  const { choosePace } = await import("./cloud.server.ts");
+  const host = await openRoom({ name: "Correction DM", table: tradeFixture() });
+  const joined = await joinRoom({ code: host.code, purseId: "a", name: "Arden" });
+  await choosePace({ ...host, live: true });
+  const auth = { code: host.code, token: joined.token };
+  const initial = (await roomState(host)).table, e = initial.journal!.tradeEconomy!;
+  const purchase = {
+    id: "correction-buy", kind: "trade-buy", exchangeId: "harbor", commodityId: "timber",
+    purseId: "a", quantity: 10, before: exchangeQuoteKey(e, e.exchanges[0], e.commodities[0]),
+  };
+  await submitCommands({ ...auth, batchId: "correction-purchase", commands: [purchase] });
+  const bought = (await roomState(host)).table, receipt = bought.journal!.tradeEconomy!.receipts[0];
+  const correction = {
+    id: "shared-correction", kind: "ledger-void", target: { kind: "trade", id: receipt.id },
+    before: canonicalJson(receipt), reason: "The party reviewed the mistaken purchase.",
+  };
+  const unchanged = await readRoom(host.code);
+  await assert.rejects(submitCommands({ ...auth, batchId: "player-forged-correction", commands: [correction] }), /Only the DM/);
+  assert.deepEqual(await readRoom(host.code), unchanged);
+  await submitCommands({ ...host, batchId: "correct-first", commands: [correction] });
+  await submitCommands({ ...host, batchId: "correct-lost-response", commands: [correction] });
+  const corrected = (await roomState(host)).table;
+  assert.deepEqual(corrected.holdings, initial.holdings);
+  assert.equal(toCopper(corrected.purses.find(p => p.id === "a")!.coins), 100000);
+  assert.equal(toCopper(corrected.purses.find(p => p.id === "exchange-treasury")!.coins), 50000);
+  assert.equal(corrected.journal!.tradeEconomy!.exchanges[0].offers[0].stock, 100);
+  assert.equal(corrected.journal!.tradeEconomy!.receipts.length, 2);
+  assert.equal(corrected.ledger.length, 4);
+  assert.equal(corrected.journal!.events.filter(event => event.summary.startsWith("Ledger correction:")).length, 1);
+  assert.equal(canonicalJson(corrected.journal!.tradeEconomy!.receipts[0]), canonicalJson(receipt));
+  await submitCommands({ ...host, batchId: "independent-duplicate-correction", commands: [{ ...correction, id: "independent-correction" }] });
+  assert.deepEqual((await roomState(host)).table, corrected);
+  const playerView = (await roomState(auth)).table;
+  assert.equal(playerView.journal!.tradeEconomy!.receipts.length, 2);
+  assert.ok(playerView.journal!.tradeEconomy!.receipts.every(r => !r.settlement && !r.operationId));
+  assert.equal(toCopper(playerView.purses.find(p => p.id === "a")!.coins), 100000);
+
+  await submitCommands({ ...auth, batchId: "second-buy", commands: [{ ...purchase, id: "second-correction-buy", quantity: 2 }] });
+  const later = (await roomState(host)).table, laterReceipt = later.journal!.tradeEconomy!.receipts.at(-1)!;
+  await submitCommands({ ...auth, batchId: "goods-moved", commands: [{
+    id: "goods-moved", kind: "give", fromId: "a", toId: "b", copper: 0,
+    holdingId: later.holdings.find(h => h.commodityId)!.id, quantity: 1,
+  }] });
+  const moved = await readRoom(host.code);
+  const rejected = { ...correction, id: "changed-goods-correction", target: { kind: "trade", id: laterReceipt.id }, before: canonicalJson(laterReceipt) };
+  await assert.rejects(submitCommands({ ...host, batchId: "changed-goods-correction", commands: [rejected] }), /changed or left/);
+  await assert.rejects(submitCommands({ ...host, batchId: "stale-correction-review", commands: [{ ...rejected, id: "stale-review", before: "{}" }] }), /receipt changed/);
+  assert.deepEqual(await readRoom(host.code), moved);
+  await deleteRoom(host.code, moved!.revision);
+});
+
+test("shared linked shop corrections preserve seasonal feedback and reject legacy partial table patches", async () => {
+  const { choosePace } = await import("./cloud.server.ts");
+  const table = tradeFixture();
+  table.shops.push({ id: "reviewed-shop", name: "Reviewed shop", keeper: "", place: "", notes: "", sellRate: 1, buyRate: 0.5, wealth: "modest", category: "mixed", priceScale: 1, locationId: "port" });
+  table.stock.push({ id: "reviewed-stock", shopId: "reviewed-shop", name: "Timber bundle", copper: 100, quantity: 100, notes: "", baseCopper: 100, rarity: "common", category: "general", commodityId: "timber", tradeExchangeId: "harbor" });
+  const host = await openRoom({ name: "Shop DM", table }), joined = await joinRoom({ code: host.code, purseId: "a", name: "Arden" });
+  await choosePace({ ...host, live: true });
+  await submitCommands({ code: host.code, token: joined.token, batchId: "linked-shop-purchase", commands: [{ id: "linked-shop-buy", kind: "buy", stockId: "reviewed-stock", purseId: "a", quantity: 3 }] });
+  const bought = (await roomState(host)).table, receipt = bought.journal!.tradeEconomy!.receipts[0];
+  assert.ok(bought.ledger[0].purchase?.holding);
+  assert.deepEqual(bought.ledger[0].trade, { receiptId: receipt.id, leg: "owner" });
+  const correction = { id: "linked-shop-correction", kind: "ledger-void" as const, target: { kind: "ledger" as const, id: bought.ledger[0].id }, before: canonicalJson(bought.ledger[0]), reason: "Wrong shop purchase" };
+  const current = await readRoom(host.code), dm = current!.seats.find(seat => seat.token === host.token)!;
+  const proposed = applyCommand(bought, dm, correction, { source: "server" });
+  await assert.rejects(submitCommands({ ...host, batchId: "legacy-partial-shop-void", commands: [{ ...tablePatch(bought, proposed), id: "legacy-void-patch" }] }), /money, goods and seasonal activity/);
+  assert.deepEqual(await readRoom(host.code), current);
+  await submitCommands({ ...host, batchId: "typed-shop-void", commands: [correction] });
+  await submitCommands({ ...host, batchId: "typed-shop-void-retry", commands: [correction] });
+  const corrected = (await roomState(host)).table;
+  assert.equal(corrected.ledger.length, 2);
+  assert.equal(corrected.stock[0].quantity, 100);
+  assert.equal(toCopper(corrected.purses.find(p => p.id === "a")!.coins), 100000);
+  assert.deepEqual(corrected.holdings, table.holdings);
+  await submitCommands({ ...host, batchId: "corrected-shop-season", commands: [{ id: "corrected-shop-season", kind: "trade-season-plan", before: tradeSeasonFingerprint(corrected) }] });
+  const final = await roomState(host);
+  assert.deepEqual(final.table.journal!.tradeEconomy!.pendingSeason!.feedback, [{ exchangeId: "harbor", commodityId: "timber", bought: 3, sold: 3 }]);
+  await deleteRoom(host.code, final.revision);
+});
+
+test("shared zero-copper sale corrections need no cash ledger and retain historical image metadata through persistence", async () => {
+  const { choosePace } = await import("./cloud.server.ts");
+  const table = tradeFixture();
+  table.journal!.tradeEconomy!.exchanges[0].offers[0].bidCopper = 0;
+  const lot = { id: "zero-price-lot", purseId: "a", name: "Illustrated timber", kind: "item" as const, quantity: 5, unitCopper: 41, notes: "Keep the saved description", commodityId: "timber", weight: 2, image: "data:image/webp;base64," + "P".repeat(12000), historicalMetadata: { source: "Player archive", details: ["original"] } };
+  table.holdings.push(lot);
+  const host = await openRoom({ name: "Zero-price DM", table }), joined = await joinRoom({ code: host.code, purseId: "a", name: "Arden" });
+  await choosePace({ ...host, live: true });
+  const e = table.journal!.tradeEconomy!, sale = { id: "zero-sale", kind: "trade-sell", exchangeId: "harbor", commodityId: "timber", holdingId: lot.id, quantity: 4, before: exchangeQuoteKey(e, e.exchanges[0], e.commodities[0]) };
+  await submitCommands({ code: host.code, token: joined.token, batchId: "zero-sale", commands: [sale] });
+  const sold = (await roomState(host)).table, receipt = sold.journal!.tradeEconomy!.receipts[0];
+  assert.equal(receipt.copper, 0);
+  assert.deepEqual(JSON.parse(receipt.settlement!.holding), lot);
+  assert.equal(sold.ledger.length, 0);
+  const correction = { id: "zero-correction", kind: "ledger-void", target: { kind: "trade", id: receipt.id }, before: canonicalJson(receipt), reason: "Correct free goods movement" };
+  await submitCommands({ ...host, batchId: "zero-correction", commands: [correction] });
+  await submitCommands({ ...host, batchId: "zero-correction-lost", commands: [correction] });
+  const final = await roomState(host);
+  assert.deepEqual(final.table.holdings.find(h => h.id === lot.id), lot);
+  assert.equal(final.table.ledger.length, 0);
+  assert.equal(final.table.journal!.tradeEconomy!.receipts.length, 2);
+  assert.equal(final.table.journal!.tradeEconomy!.exchanges[0].offers[0].stock, 100);
+  await deleteRoom(host.code, final.revision);
+});
+
+test("large exact snapshots retain metadata and leave shared state intact when batch or backing row storage rejects", async () => {
+  const { choosePace } = await import("./cloud.server.ts");
+  const table = tradeFixture();
+  const image = "data:image/webp;base64," + "P".repeat(450000);
+  const lot = { id: "large-image-lot", purseId: "a", name: "Illustrated timber", kind: "item" as const, quantity: 2, unitCopper: 41, notes: "", commodityId: "timber", weight: 2, image, metadata: { preserve: true } };
+  table.holdings.push(lot);
+  const host = await openRoom({ name: "Large receipt DM", table });
+  await choosePace({ ...host, live: true });
+  const e = table.journal!.tradeEconomy!;
+  const sale = { id: "large-sale", kind: "trade-sell", exchangeId: "harbor", commodityId: "timber", holdingId: lot.id, quantity: 1, before: exchangeQuoteKey(e, e.exchanges[0], e.commodities[0]) };
+  await submitCommands({ ...host, batchId: "large-sale", commands: [sale] });
+  const sold = (await roomState(host)).table, receipt = sold.journal!.tradeEconomy!.receipts[0];
+  assert.equal(JSON.parse(receipt.settlement!.holding).image, image);
+  const before = await readRoom(host.code);
+  const oversized = Array.from({ length: 5 }, (_, index) => ({ id: "large-reversal-" + index, kind: "ledger-void", target: { kind: "trade", id: receipt.id }, before: canonicalJson(receipt), reason: "Review" }));
+  await assert.rejects(submitCommands({ ...host, batchId: "oversized-correction-batch", commands: oversized }), /batch is too large/);
+  assert.deepEqual(await readRoom(host.code), before);
+  await deleteRoom(host.code, before!.revision);
+
+  const nearLimit = tradeFixture();
+  nearLimit.holdings.push(...Array.from({ length: 4 }, (_, index) => ({ ...lot, id: "near-limit-" + index })));
+  const bounded = await openRoom({ name: "Backing write DM", table: nearLimit });
+  const saved = await readRoom(bounded.code);
+  // The production account snapshot path reserves a 1.9 MB D1 row budget.
+  // Disposable SQLite models a backing size rejection at the actual UPDATE,
+  // after the command has built its full candidate, without changing product limits.
+  sql.exec("CREATE TEMP TRIGGER market_test_row_budget BEFORE UPDATE ON campaign_rooms WHEN length(CAST(NEW.body AS BLOB)) > 1900000 BEGIN SELECT RAISE(ABORT, 'market test row storage budget'); END");
+  try {
+    await assert.rejects(submitCommands({ ...bounded, batchId: "row-budget-sale", commands: [{ ...sale, id: "row-budget-sale", holdingId: "near-limit-0" }] }), /row storage budget/);
+    assert.deepEqual(await readRoom(bounded.code), saved);
+  } finally {
+    sql.exec("DROP TRIGGER market_test_row_budget");
+    await deleteRoom(bounded.code, saved!.revision);
+  }
+});
+
 test("separate shared campaign exchanges persist authoritative seasonal rolls, trades and one-time settlement across retries", async () => {
   const { choosePace } = await import("./cloud.server.ts");
   const host=await openRoom({name:"Economy DM",table:tradeFixture()}),other=await openRoom({name:"Separate economy",table:tradeFixture()});

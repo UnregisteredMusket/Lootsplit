@@ -408,6 +408,7 @@ export function applyFinanceQuote(table: CloudTable, quote: z.infer<typeof quote
         if (move.shopId) line.shopId = move.shopId;
         if (move.transactionType) line.transactionType = move.transactionType;
         else if (move.shopId) line.transactionType = "purchase";
+        if (move.trade) line.trade = move.trade;
       }
     }
     table.holdings = operations.holdings as CloudTable["holdings"];

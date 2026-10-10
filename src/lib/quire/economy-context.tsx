@@ -13,6 +13,7 @@ import { rememberSave, listSaves } from "./saves.ts";
 import { subscribeSheetChanges, readPartySheetLinks } from "./party-sheet-links.ts";
 import { type Journal } from "./journal.ts";
 import { type CommandInput } from "./commands.ts";
+import { canonicalJson } from "./canonical-json.ts";
 import { economyView, executeLocalCommand, executeFinanceCommand } from "./economy.ts";
 import { loadSeatLock, passwordMatches } from "./lock.ts";
 import {
@@ -66,7 +67,6 @@ import {
   decideLoan as answerLoan,
   importCharacterSheet,
   updateCharacterSheet,
-  voidLedgerLine,
   setCoins,
   giveToPlayer,
   snapshot,
@@ -776,11 +776,20 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
               ownPurse(sheet.purseId);
               await updateCharacterSheet(sheet, before);
             }),
-      voidLine: (id) =>
-        run(async () => {
+      voidLine: async (id) => {
+        try {
           dmOnly();
-          await voidLedgerLine(id);
-        }, "That line was voided."),
+          const line = ledger.find(entry => entry.id === id);
+          if (!line) throw new Error("That ledger line is no longer available.");
+          const outcome = await acceptCommand({
+            kind: "ledger-void", target: { kind: "ledger", id },
+            before: canonicalJson(line), reason: "DM ledger correction.",
+          });
+          toast.success(mutationNotice(outcome, "That line was voided."));
+        } catch (error) {
+          fault(error, "That line could not be reversed.");
+        }
+      },
       setRealm: (settings, options) =>
         run(async () => {
           dmOnly();

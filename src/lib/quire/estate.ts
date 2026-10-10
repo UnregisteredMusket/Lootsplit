@@ -1,7 +1,7 @@
 import { shopVisible, shopAsking } from "./vendors.ts";
-import { exchangeQuoteKey, executeExchange } from "./trade-economy.ts";
+import { exchangeQuoteKey, executeExchange, recordShopTrade } from "./trade-economy.ts";
 import type { CloudTable, CloudSeat } from "./cloud.ts";
-import type { Holding } from "./types.ts";
+import type { Holding, StockLine } from "./types.ts";
 import { canonicalJson } from "./canonical-json.ts";
 import { locationPath, readMarketLocations } from "./shop-locations.ts";
 import { toCopper, fromCopper, spendCoins, priceAfterCharisma } from "./money.ts";
@@ -405,6 +405,32 @@ function syncRules(t: CloudTable, s: Estate) {
     }
   }
 }
+/** Reviewed unit identities survive shipment custody; display names never identify goods. */
+function deliveryCommodity(t: CloudTable, s: Estate, line: StockLine, materialKey: string) {
+  const material = s.materials.find((m) => m.key === materialKey);
+  if (!material) throw Error("Choose a DM-reviewed material definition.");
+  const economy = t.journal?.tradeEconomy;
+  const materialCommodities = economy?.commodities.filter((c) => c.materialKey === materialKey) ?? [];
+  if (materialCommodities.length > 1)
+    throw Error("The supplied material has more than one commodity identity. Ask the DM to review its links.");
+  if (!!line.commodityId !== !!line.tradeExchangeId)
+    throw Error("Supplier activity needs both a reviewed commodity and an exchange.");
+  const commodity = line.commodityId
+    ? economy?.commodities.find((c) => c.id === line.commodityId)
+    : materialCommodities[0];
+  if (line.commodityId && !commodity)
+    throw Error("The supplier's reviewed commodity no longer exists.");
+  if (line.tradeExchangeId && !economy?.exchanges.some((e) => e.id === line.tradeExchangeId))
+    throw Error("The supplier's reviewed exchange no longer exists.");
+  if (commodity && (
+    commodity.unit !== material.unit ||
+    (commodity.materialKey && commodity.materialKey !== materialKey) ||
+    (materialCommodities[0] && materialCommodities[0].id !== commodity.id)
+  ))
+    throw Error("The supplier commodity conflicts with the reviewed material or physical unit.");
+  return commodity?.id;
+}
+
 function delivery(
   t: CloudTable,
   s: Estate,
@@ -433,8 +459,7 @@ function delivery(
     throw Error("The destination needs active storage or a construction staging site.");
   if (!line || !shop || shop.closed || (shop.blackMarket && !t.journal?.world?.blackMarketActive) || isService(line))
     throw Error("Choose stocked physical goods from an open shop.");
-  if (!s.materials.some((m) => m.key === args.materialKey))
-    throw Error("Choose a DM-reviewed material definition.");
+  const commodityId = deliveryCommodity(t, s, line, args.materialKey);
   if (line.quantity !== null && line.quantity < args.quantity)
     throw Error("The supplier no longer has that quantity.");
   if (
@@ -445,12 +470,13 @@ function delivery(
     )
   )
     throw Error("Choose a supplier serving the property's location.");
-  const payer = t.purses.find((p) => p.id === args.purseId)!;
+  const payer = t.purses.find((p) => p.id === args.purseId);
+  if (!payer) throw Error("The paying account no longer exists.");
   const cha =
     payer.kind === "party"
       ? null
       : (payer.sheet?.scores.cha ?? charismaScore(t.sheets.find((x) => x.purseId === payer.id)));
-  const unitCopper = priceAfterCharisma(shop.blackMarket ? shopAsking(shop,line.copper) : line.copper, cha),
+  const unitCopper = priceAfterCharisma(shopAsking(shop, line.copper), cha),
     cost = unitCopper * args.quantity + args.deliveryCopper;
   const approvedSupplier = s.suppliers.find(
     (x) =>
@@ -481,6 +507,7 @@ function delivery(
     unitCopper,
     notes: line.notes,
     materialKey: args.materialKey,
+    ...(commodityId ? { commodityId } : {}),
     ...(approvedSupplier ? { weight: approvedSupplier.weight } : {}),
     custody: { kind: "transit", propertyId: h.id, shipmentId: receipt },
     equipped: false,
@@ -497,6 +524,21 @@ function delivery(
     status: "in-transit",
     message: "Purchased goods awaiting delivery; usable only after receipt.",
   });
+  // Demand is recorded at purchase, once. Arrival changes custody of this same lot.
+  // Delivery fees stay in the property payment, outside the goods-only market receipt.
+  const trade = recordShopTrade(t, {
+    id: receipt,
+    at,
+    stockId: line.id,
+    purseId: payer.id,
+    direction: "buy",
+    quantity: args.quantity,
+    copper: unitCopper * args.quantity,
+    propertyId: h.id,
+    operationId: receipt,
+  });
+  const payment = t.ledger.find((l) => l.id === receipt);
+  if (trade && payment) payment.trade = { receiptId: trade.id, leg: "owner" };
   return cost;
 }
 export function applyEstateCommand(t: CloudTable, seat: CloudSeat, cmd: EstateCommand, at: number) {
@@ -1154,7 +1196,7 @@ export function previewEstate(t: CloudTable, days: number, balances: Map<string,
         const quantity = Math.min(remaining, lot.quantity);
         executeExchange(trial, actor, { id: `${receipt}-trade-${index}`, exchangeId: exchange.id, commodityId: commodity.id,
           purseId: ownerId, direction: order.direction, quantity, before: exchangeQuoteKey(economy, exchange, commodity),
-          propertyId, ...(lot.id ? { holdingId: lot.id } : {}) }, 0, { locationId: h.locationId ?? null });
+          propertyId, operationId: receipt, ...(lot.id ? { holdingId: lot.id } : {}) }, 0, { locationId: h.locationId ?? null });
         remaining -= quantity;
       }
       working.purses = trial.purses;
@@ -1188,10 +1230,21 @@ export function previewEstate(t: CloudTable, days: number, balances: Map<string,
             charismaScore(working.sheets.find((x) => x.purseId === payer.id)));
       const vendor = working.shops.find(shop=>shop.id===line.shopId);
       if(!vendor)throw Error("The selected supply vendor is missing.");
-      const cost = priceAfterCharisma(vendor.blackMarket ? shopAsking(vendor,line.copper) : line.copper, cha) * order.quantity + order.deliveryCopper;
+      const cost = priceAfterCharisma(shopAsking(vendor, line.copper), cha) * order.quantity + order.deliveryCopper;
       if (cost > budget || manager.budgetSpentCopper + cost > manager.budgetCopper)
         throw Error("The order exceeds its authorized spending budget.");
-      delivery(working, s, { ...order, propertyId, purseId: ownerId }, receipt, 0);
+      // A blocked order must retain money, goods and feedback together, even if
+      // a reviewed supplier link has become invalid since the letter was sent.
+      const trial = structuredClone(working);
+      const trialState = readEstate(trial.journal!.propertyOperations);
+      trial.journal!.propertyOperations = trialState;
+      delivery(trial, trialState, { ...order, propertyId, purseId: ownerId }, receipt, 0);
+      working.purses = trial.purses;
+      working.holdings = trial.holdings;
+      working.stock = trial.stock;
+      working.ledger = trial.ledger;
+      working.journal!.tradeEconomy = trial.journal!.tradeEconomy;
+      s.shipments = trialState.shipments;
       manager.budgetSpentCopper += cost;
       return `Purchased ${order.quantity} ${line.name} for ${cost} cp; delivery due day ${day + order.deliveryDays}.`;
     }
@@ -1486,6 +1539,7 @@ export function previewEstate(t: CloudTable, days: number, balances: Map<string,
     summary: l.summary,
     ...(l.shopId ? { shopId: l.shopId } : {}),
     ...(l.transactionType && ["purchase", "sale", "transfer", "payment"].includes(l.transactionType) ? { transactionType: l.transactionType as "purchase" | "sale" | "transfer" | "payment" } : {}),
+    ...(l.trade ? { trade: l.trade } : {}),
   }));
   for (const p of working.purses) balances.set(p.id, toCopper(p.coins));
   validateEstate(working);

@@ -102,7 +102,12 @@ export function projectRecord(
       const economy = t.journal.tradeEconomy;
       economy.settings = { ...readTradeEconomy().settings, enabled: economy.settings.enabled, mode: economy.settings.mode };
       economy.exchanges = economy.exchanges.filter(e => economy.settings.enabled && e.visible && exchangeHere(t, e));
-      economy.receipts = economy.receipts.filter(r => seat.purseIds.includes(r.purseId));
+      economy.receipts = economy.receipts.filter(r => seat.purseIds.includes(r.purseId)).map(receipt => {
+        const projected = { ...receipt };
+        delete projected.settlement;
+        delete projected.operationId;
+        return projected;
+      });
       economy.draws = [];
       economy.history = [];
       delete economy.pendingSeason;

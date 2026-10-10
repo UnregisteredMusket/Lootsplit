@@ -32,6 +32,7 @@ export function currentPurchasedHolding(
   record: LedgerLine,
   holdings: Holding[],
 ): Holding | undefined {
+  if (record.transactionType && record.transactionType !== "purchase") return;
   const original = record.purchase?.holding;
   if (record.purchase && !original) return;
   if (original && original.purseId !== record.purseId) return;
