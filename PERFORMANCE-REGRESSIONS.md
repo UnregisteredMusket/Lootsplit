@@ -131,7 +131,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Packaged standby / Run actions/checkout@v4 | open | 2 | 1s → 3s | +2s | +200% |
 | Development / governance | open | 5 | 160s → 921s | +761s | +475.63% |
 | Development / gameplay / dev-finance | open | 4 | 17s → 41s | +24s | +141.18% |
-| Code checks and immutable builds / unit-tests | open | 4 | 11s → 27s | +16s | +145.45% |
+| Code checks and immutable builds / unit-tests | open | 5 | 11s → 32s | +21s | +190.91% |
 | Packaged Worker / interface / Run npx playwright install --with-deps chromium | open | 2 | 21s → 57s | +36s | +171.43% |
 | Packaged Worker / accounts | open | 4 | 94s → 185s | +91s | +96.81% |
 | Development / accounts | open | 3 | 152s → 732s | +580s | +381.58% |
@@ -210,7 +210,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Development / governance / dev-backup | resolved | 3 | 7s → 23s | +16s | +228.57% |
 | Development / gameplay / dev-library-navigation | open | 3 | 17s → 44s | +27s | +158.82% |
 | verify:quick | open | 2 | 36.854731s → 52.084s | +15.229269s | +41.32% |
-| Development / gameplay / dev-library-navigation | open | 3 | 18s → 40s | +22s | +122.22% |
+| Development / gameplay / dev-library-navigation | open | 4 | 18s → 49s | +31s | +172.22% |
 | Packaged Worker / accounts / Start disposable built Worker | open | 2 | 7s → 11s | +4s | +57.14% |
 | Development / desktop / Run actions/upload-artifact@v4 | open | 2 | 4s → 6s | +2s | +50% |
 | Packaged Worker / interface / worker-market-locations | open | 2 | 23s → 45s | +22s | +95.65% |
@@ -227,13 +227,16 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Packaged Worker / interface / worker-world-features | open | 4 | 14s → 65s | +51s | +364.29% |
 | Development / gameplay / dev-world-features | open | 2 | 16s → 81s | +65s | +406.25% |
 | Packaged Worker / interface / worker-world-features | open | 2 | 13s → 65s | +52s | +400% |
-| Development / gameplay / dev-world-features | open | 2 | 17s → 74s | +57s | +335.29% |
+| Development / gameplay / dev-world-features | open | 3 | 17s → 86s | +69s | +405.88% |
 | Packaged Worker / interface / worker-trade-economy | open | 2 | 22s → 39s | +17s | +77.27% |
 
 ## Recorded slowdowns
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-10T11:01:17Z | step: Development / gameplay / dev-library-navigation | 40s → 49s | +9s | +22.5% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38034638067/job/114162429633) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38046397037/job/114196698960) |
+| 2026-10-10T10:59:58Z | step: Development / gameplay / dev-world-features | 74s → 86s | +12s | +16.22% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38041114058/job/114181384183) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38046397037/job/114196698960) |
+| 2026-10-10T10:52:55Z | step: Code checks and immutable builds / unit-tests | 27s → 32s | +5s | +18.52% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37796847170/job/113378415666) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38046397037/job/114196698814) |
 | 2026-10-10T10:50:33Z | step: Development / gameplay / dev-library-navigation | 38s → 44s | +6s | +15.79% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38033323180/job/114158562449) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38045806287/job/114194983319) |
 | 2026-10-10T10:33:21Z | step: Development / accounts / Run actions/checkout@v4 | 5s → 6s | +1s | +20% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37792759670/job/113364207658) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38045293880/job/114193485165) |
 | 2026-10-10T10:33:15Z | step: Development / accounts / Set up job | 3s → 4s | +1s | +33.33% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37263207826/job/111614535383) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38045293880/job/114193485165) |
