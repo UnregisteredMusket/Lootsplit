@@ -1,3 +1,4 @@
+import { completeCharacterDowntime } from "./character-position.ts";
 import { scheduledMarket } from "./shop-schedule.ts";
 import { estateQuoteSchema } from "./estate-schema.ts";
 import { estateRuleEligible, previewEstate } from "./estate.ts";
@@ -359,6 +360,7 @@ export function applyDowntime(
     );
   applyFinanceQuote(table, quote, { id: d.id, name: d.name }, at);
   f.day += d.days;
+  completeCharacterDowntime(table, at);
   d.status = "applied";
   d.appliedAt = at;
   d.sessionId = sessionId;
@@ -436,9 +438,17 @@ export function applyFinanceQuote(table: CloudTable, quote: z.infer<typeof quote
         summary: notice.summary.slice(0, 500),
       });
   }
-  if (quote.tradeSeason) applyTradeSeason(table, quote.tradeSeason, at, f.day + (f.downtime.find(d => d.id === receipt.id)?.days ?? 0),
-    "downtime", `Approved downtime: ${receipt.name}`);
-  for (const trade of table.journal!.tradeEconomy?.receipts ?? []) if (trade.at === 0) trade.at = at;
+  if (quote.tradeSeason)
+    applyTradeSeason(
+      table,
+      quote.tradeSeason,
+      at,
+      f.day + (f.downtime.find((d) => d.id === receipt.id)?.days ?? 0),
+      "downtime",
+      `Approved downtime: ${receipt.name}`,
+    );
+  for (const trade of table.journal!.tradeEconomy?.receipts ?? [])
+    if (trade.at === 0) trade.at = at;
 }
 
 export function assertFinanceAccountRemovable(value: unknown, purseId: string) {

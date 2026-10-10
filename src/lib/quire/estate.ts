@@ -1,3 +1,4 @@
+import { characterLocation, inParty } from "./character-position.ts";
 import { shopVisible, shopAsking } from "./vendors.ts";
 import { exchangeQuoteKey, executeExchange, recordShopTrade } from "./trade-economy.ts";
 import type { CloudTable, CloudSeat } from "./cloud.ts";
@@ -33,16 +34,18 @@ export function estateTemplates(state: Estate, site: EstateSite): EstateTemplate
 export function estateCapabilities(state: Estate, site: EstateSite) {
   return new Set(estateTemplates(state, site).flatMap((t) => t.capabilities));
 }
-export function physicallyHere(t: Table, h: Holding) {
+export function physicallyHere(t: Table, h: Holding, purseId?: string) {
   const market = readMarketLocations(t.journal?.market);
+  const p = t.purses.find((p) => p.id === purseId),
+    location = p ? characterLocation(t, p) : market.currentLocationId;
   return (
     !!h.locationId &&
-    !!market.currentLocationId &&
-    locationPath(market, market.currentLocationId).some((l) => l.id === h.locationId)
+    !!location &&
+    locationPath(market, location).some((l) => l.id === h.locationId)
   );
 }
 export function canAccessEstate(
-  t: Pick<Table, "purses" | "holdings">,
+  t: Pick<Table, "purses" | "holdings" | "journal">,
   state: Estate,
   propertyId: string,
   seat: Pick<CloudSeat, "role" | "purseIds">,
@@ -54,6 +57,7 @@ export function canAccessEstate(
   return (
     seat.purseIds.includes(h.purseId) ||
     (site.access === "party-members" &&
+      t.purses.some((p) => seat.purseIds.includes(p.id) && inParty(t, p)) &&
       t.purses.some((p) => p.id === h.purseId && p.kind === "party")) ||
     (site.access === "selected" && site.accessPurseIds.some((id) => seat.purseIds.includes(id)))
   );
@@ -174,7 +178,15 @@ export function validateEstate(t: Table, projected = false) {
       throw Error("A property template is missing.");
     if (
       !projected &&
-      site.accessPurseIds.some((id) => !t.purses.some((p) => p.id === id && p.kind === "character" && !p.nonParty))
+      site.accessPurseIds.some(
+        (id) =>
+          !t.purses.some(
+            (p) =>
+              p.id === id &&
+              p.kind === "character" &&
+              (!p.nonParty || t.journal?.world?.npcs.some((n) => n.id === p.id)),
+          ),
+      )
     )
       throw Error("A property permission refers to a missing character.");
   }
@@ -213,7 +225,13 @@ export function validateEstate(t: Table, projected = false) {
       !t.purses.some((p) => p.id === j.purseId) ||
       (!projected &&
         j.assignments.some(
-          (a) => !t.purses.some((p) => p.id === a.purseId && p.kind === "character" && !p.nonParty),
+          (a) =>
+            !t.purses.some(
+              (p) =>
+                p.id === a.purseId &&
+                p.kind === "character" &&
+                (!p.nonParty || t.journal?.world?.npcs.some((n) => n.id === p.id)),
+            ),
         ))
     )
       throw Error("A project has missing property, payer or worker records.");
@@ -624,7 +642,7 @@ export function applyEstateCommand(t: CloudTable, seat: CloudSeat, cmd: EstateCo
       site = state.sites.find((x) => x.propertyId === h.id)!;
     own(cmd.purseId);
     if (cmd.override) dm();
-    if (!cmd.override && !physicallyHere(t, h))
+    if (!cmd.override && !physicallyHere(t, h, cmd.purseId))
       throw Error(
         "The party must be at this property's location to move stored goods. Ask the DM to set the party location.",
       );
@@ -936,7 +954,9 @@ export function applyEstateCommand(t: CloudTable, seat: CloudSeat, cmd: EstateCo
     )
       throw Error("Only the owner or an assigned party character may send management orders.");
     const market = readMarketLocations(journal.market),
-      path = locationPath(market, market.currentLocationId),
+      sender = t.purses.find((p) => p.id === cmd.senderId)!,
+      senderLocation = characterLocation(t, sender),
+      path = locationPath(market, senderLocation),
       settlement = [...path].reverse().find((l) => l.kind === "city" || l.kind === "town");
     const office = state.postal.offices.find((o) => {
       const shop = t.shops.find((s) => s.id === o.shopId);
@@ -949,7 +969,7 @@ export function applyEstateCommand(t: CloudTable, seat: CloudSeat, cmd: EstateCo
         (settlement.kind === "city" || o.allowTown)
       );
     });
-    if (!market.currentLocationId || !settlement || !office)
+    if (!senderLocation || !settlement || !office)
       throw Error("Visit a city with an open, DM-designated post office to send a letter.");
     const manager = state.staff.find(
       (c) => c.id === cmd.managerId && c.propertyId === h.id && c.manager && c.status === "active",
@@ -962,7 +982,7 @@ export function applyEstateCommand(t: CloudTable, seat: CloudSeat, cmd: EstateCo
       ownerId: h.purseId,
       senderId: cmd.senderId,
       managerId: manager.id,
-      originId: market.currentLocationId,
+      originId: senderLocation,
       sentDay: f.day,
       dueDay: f.day + state.postal.deliveryDays,
       feeCopper: state.postal.feeCopper,
@@ -1172,18 +1192,25 @@ export function previewEstate(t: CloudTable, days: number, balances: Map<string,
     }
     if (order.kind === "market") {
       const economy = working.journal!.tradeEconomy;
-      const exchange = economy?.exchanges.find(e => e.id === order.exchangeId);
-      const commodity = economy?.commodities.find(c => c.id === order.commodityId);
-      const offer = exchange?.offers.find(o => o.commodityId === order.commodityId);
-      if (!economy || !exchange || !commodity || !offer) throw Error("This manager order's reviewed exchange or commodity is missing.");
+      const exchange = economy?.exchanges.find((e) => e.id === order.exchangeId);
+      const commodity = economy?.commodities.find((c) => c.id === order.commodityId);
+      const offer = exchange?.offers.find((o) => o.commodityId === order.commodityId);
+      if (!economy || !exchange || !commodity || !offer)
+        throw Error("This manager order's reviewed exchange or commodity is missing.");
       const unitCopper = order.direction === "buy" ? offer.askCopper : offer.bidCopper;
       if (order.direction === "buy" ? unitCopper > order.limitCopper : unitCopper < order.limitCopper)
         throw Error("The seasonal price is outside the owner's authorized limit.");
       const cost = order.direction === "buy" ? unitCopper * order.quantity : 0;
       if (cost > budget || manager.budgetSpentCopper + cost > manager.budgetCopper)
         throw Error("The market order exceeds its authorized spending budget.");
-      const lots = working.holdings.filter(x => x.purseId === ownerId && x.commodityId === commodity.id &&
-        x.custody?.kind === "property" && x.custody.propertyId === propertyId && !x.reservedFor);
+      const lots = working.holdings.filter(
+        (x) =>
+          x.purseId === ownerId &&
+          x.commodityId === commodity.id &&
+          x.custody?.kind === "property" &&
+          x.custody.propertyId === propertyId &&
+          !x.reservedFor,
+      );
       if (order.direction === "sell" && lots.reduce((n, x) => n + x.quantity, 0) < order.quantity)
         throw Error("The property has insufficient unreserved commodity goods.");
       // Each order is atomic, including multi-lot sales. A blocked letter cannot partly spend or sell.
@@ -1194,9 +1221,24 @@ export function previewEstate(t: CloudTable, days: number, balances: Map<string,
       for (const [index, lot] of trades.entries()) {
         if (!remaining) break;
         const quantity = Math.min(remaining, lot.quantity);
-        executeExchange(trial, actor, { id: `${receipt}-trade-${index}`, exchangeId: exchange.id, commodityId: commodity.id,
-          purseId: ownerId, direction: order.direction, quantity, before: exchangeQuoteKey(economy, exchange, commodity),
-          propertyId, operationId: receipt, ...(lot.id ? { holdingId: lot.id } : {}) }, 0, { locationId: h.locationId ?? null });
+        executeExchange(
+          trial,
+          actor,
+          {
+            id: `${receipt}-trade-${index}`,
+            exchangeId: exchange.id,
+            commodityId: commodity.id,
+            purseId: ownerId,
+            direction: order.direction,
+            quantity,
+            before: exchangeQuoteKey(economy, exchange, commodity),
+            propertyId,
+            operationId: receipt,
+            ...(lot.id ? { holdingId: lot.id } : {}),
+          },
+          0,
+          { locationId: h.locationId ?? null },
+        );
         remaining -= quantity;
       }
       working.purses = trial.purses;
@@ -1228,9 +1270,11 @@ export function previewEstate(t: CloudTable, days: number, balances: Map<string,
           ? null
           : (payer.sheet?.scores.cha ??
             charismaScore(working.sheets.find((x) => x.purseId === payer.id)));
-      const vendor = working.shops.find(shop=>shop.id===line.shopId);
-      if(!vendor)throw Error("The selected supply vendor is missing.");
-      const cost = priceAfterCharisma(shopAsking(vendor, line.copper), cha) * order.quantity + order.deliveryCopper;
+      const vendor = working.shops.find((shop) => shop.id === line.shopId);
+      if (!vendor) throw Error("The selected supply vendor is missing.");
+      const cost =
+        priceAfterCharisma(shopAsking(vendor, line.copper), cha) * order.quantity +
+        order.deliveryCopper;
       if (cost > budget || manager.budgetSpentCopper + cost > manager.budgetCopper)
         throw Error("The order exceeds its authorized spending budget.");
       // A blocked order must retain money, goods and feedback together, even if
@@ -1329,11 +1373,25 @@ export function previewEstate(t: CloudTable, days: number, balances: Map<string,
       }
       const stage = jobStages(job)[job.stage],
         required = stage.laborDays * 100;
-      const dailyCharacterWork = physicallyHere(working, property(working, job.propertyId)) && (!time || time.allowCharacterWork)
-        ? job.assignments.reduce((n, a) => n + a.share, 0) : 0;
-      const charUnits = time ? dailyCharacterWork * time.minutes + (job.characterWorkRemainder ?? 0) : dailyCharacterWork * 1440;
-      const paidUnits = time ? job.paidWorkers * 100 * time.minutes + (job.paidWorkRemainder ?? 0) : job.paidWorkers * 100 * 1440;
-      const characterWork = Math.floor(charUnits / 1440), paidLabor = Math.floor(paidUnits / 1440);
+      const dailyCharacterWork =
+        !time || time.allowCharacterWork
+          ? job.assignments.reduce(
+              (n, a) =>
+                n +
+                (physicallyHere(working, property(working, job.propertyId), a.purseId)
+                  ? a.share
+                  : 0),
+              0,
+            )
+          : 0;
+      const charUnits = time
+        ? dailyCharacterWork * time.minutes + (job.characterWorkRemainder ?? 0)
+        : dailyCharacterWork * 1440;
+      const paidUnits = time
+        ? job.paidWorkers * 100 * time.minutes + (job.paidWorkRemainder ?? 0)
+        : job.paidWorkers * 100 * 1440;
+      const characterWork = Math.floor(charUnits / 1440),
+        paidLabor = Math.floor(paidUnits / 1440);
       const labor = Math.min(required - job.progress, characterWork + paidLabor);
       const paidWork = Math.max(0, labor - characterWork),
         cost =
@@ -1420,8 +1478,16 @@ export function previewEstate(t: CloudTable, days: number, balances: Map<string,
             const out = job.recipe.output;
             working.holdings.push({
               ...out,
-              ...(out.materialKey && working.journal!.tradeEconomy?.commodities.find(c => c.materialKey === out.materialKey)
-                ? { commodityId: working.journal!.tradeEconomy!.commodities.find(c => c.materialKey === out.materialKey)!.id } : {}),
+              ...(out.materialKey &&
+              working.journal!.tradeEconomy?.commodities.find(
+                (c) => c.materialKey === out.materialKey,
+              )
+                ? {
+                    commodityId: working.journal!.tradeEconomy!.commodities.find(
+                      (c) => c.materialKey === out.materialKey,
+                    )!.id,
+                  }
+                : {}),
               id: `${job.id}-output`,
               purseId: job.purseId,
               kind: "item",

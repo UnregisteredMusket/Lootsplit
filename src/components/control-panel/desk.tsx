@@ -1,3 +1,4 @@
+import { inParty } from "@/lib/quire/character-position";
 import { localEncounterRequest } from "@/lib/encounters/local";
 import { encounterRequest } from "@/lib/encounters/client";
 import { FeatureCards } from "../feature-navigation";
@@ -114,15 +115,19 @@ function DmDeskContents() {
     }
     return () => c.abort();
   }, [contextKey, room.revision, room.joined, room.code, refresh]);
-  const party = purses.filter((p) => p.kind === "character" && !p.nonParty),
+  const party = purses.filter((p) => p.kind === "character" && inParty({ purses, journal }, p)),
     session = journal.sessions.find((x) => !x.endedAt),
     fund = purses.filter((p) => p.kind === "party").reduce((sum, p) => sum + toCopper(p.coins), 0),
     pending =
       journal.requests.filter((x) => x.status === "pending").length +
       loans.filter((x) => x.status === "pending").length,
     totals = session ? sessionSummary(ledger, session) : null,
-    allCoins = purses.filter(p=>!p.nonParty).reduce((sum, p) => sum + toCopper(p.coins), 0),
-    goods = holdings.filter(h=>!purses.some(p=>p.id===h.purseId&&p.nonParty)).reduce((sum, h) => sum + h.unitCopper * h.quantity, 0),
+    allCoins = purses
+      .filter((p) => inParty({ purses, journal }, p))
+      .reduce((sum, p) => sum + toCopper(p.coins), 0),
+    goods = holdings
+      .filter((h) => purses.some((p) => p.id === h.purseId && inParty({ purses, journal }, p)))
+      .reduce((sum, h) => sum + h.unitCopper * h.quantity, 0),
     rolls = (room.joined ? sharedRolls : purses.flatMap((p) => p.rolls || []))
       .slice()
       .sort((a, b) => b.at - a.at)

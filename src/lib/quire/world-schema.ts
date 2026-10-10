@@ -3,6 +3,27 @@ import { artworkSchema } from "./artwork.ts";
 const id = z.string().min(1).max(150),
   name = z.string().trim().min(1).max(160);
 const copper = z.number().int().min(0).max(1e12);
+export const characterPositionSchema = z
+  .object({
+    purseId: id,
+    inParty: z.boolean(),
+    locationId: id.nullable(),
+    visible: z.boolean(),
+    sheetVisible: z.boolean(),
+    downtime: z
+      .object({
+        id,
+        name: z.string().trim().min(1).max(200),
+        startedMinute: z.number().int().nonnegative(),
+        finishMinute: z.number().int().nonnegative(),
+        returnInParty: z.boolean(),
+        returnLocationId: id.nullable(),
+      })
+      .strict()
+      .optional(),
+  })
+  .strict();
+export type CharacterPosition = z.infer<typeof characterPositionSchema>;
 export const pointSchema = z
   .object({ x: z.number().min(0).max(1), y: z.number().min(0).max(1) })
   .strict();
@@ -121,6 +142,7 @@ const conversationSchema = z
   .strict();
 export const worldSchema = z
   .object({
+    characterPositions: z.array(characterPositionSchema).max(10000).default([]),
     partyCharacters: z.array(z.object({ id, name }).strict()).max(10000).optional(),
     maps: z.array(campaignMapSchema).max(100).default([]),
     npcs: z.array(npcSchema).max(500).default([]),
@@ -153,6 +175,31 @@ export type Npc = z.infer<typeof npcSchema>;
 export type Trade = z.infer<typeof tradeSchema>;
 export const readWorld = (value?: unknown): World => worldSchema.parse(value ?? {});
 export const worldCommands = [
+  z.object({
+    id,
+    kind: z.literal("character-position"),
+    purseId: id,
+    before: characterPositionSchema,
+    inParty: z.boolean(),
+    locationId: id.nullable(),
+    visible: z.boolean(),
+    sheetVisible: z.boolean(),
+  }),
+  z.object({
+    id,
+    kind: z.literal("character-downtime-start"),
+    purseId: id,
+    before: characterPositionSchema,
+    name: z.string().trim().min(1).max(200),
+    days: z.number().int().min(1).max(3650),
+    locationId: id.nullable(),
+  }),
+  z.object({
+    id,
+    kind: z.literal("character-downtime-cancel"),
+    purseId: id,
+    before: characterPositionSchema,
+  }),
   z.object({
     id,
     kind: z.literal("map-save"),

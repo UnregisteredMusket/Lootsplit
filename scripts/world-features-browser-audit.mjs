@@ -1,3 +1,4 @@
+import { auditCharacterPlacement } from "./character-placement-browser.mjs";
 import { chooseOption } from "./search-select-browser.mjs";
 import assert from "node:assert/strict";
 import { chromium } from "playwright";
@@ -622,6 +623,7 @@ try {
       "pings never persist guest campaigns",
     );
     await guest.screenshot({ path: `${output}/guest-fullscreen-map-${width}.png` });
+    await auditCharacterPlacement(page, guest, origin, npc.id, width, output);
     await guestContext.close();
     await context.close();
   }

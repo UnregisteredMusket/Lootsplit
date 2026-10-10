@@ -1,3 +1,4 @@
+import { canReadCharacter } from "../src/lib/quire/character-position.ts";
 import { hydrateCampaignCharacters, campaignBody } from "./campaign-characters.mjs";
 import { statsOnly, editCharacter } from "../src/lib/characters/campaign-sheet.mjs";
 import { sheetSchema, rollSpec, parseDice, throwDice } from "../src/lib/characters/model.mjs";
@@ -26,13 +27,21 @@ async function character(db, user, id, own = false) {
       purseId = parts.join(":");
     const { room, seat } = await membership(db, user, text(code, 16));
     const p = room.table.purses.find((p) => p.id === purseId && p.kind === "character");
-    if (!p || (seat.role !== "dm" && !seat.purseIds.includes(p.id)))
+    if (
+      !p ||
+      !canReadCharacter(room.table, p, seat) ||
+      (own && seat.role !== "dm" && !seat.purseIds.includes(p.id))
+    )
       fail("Character not found.", 404);
     if (own && seat.role === "dm" && p.sheetReadOnlyForDm)
       fail("Only the profile owner can edit this character sheet.", 403);
     return {
       id,
-      user_id: seat.role === "dm" && p.sheetReadOnlyForDm ? "profile-owner" : user,
+      user_id:
+        (seat.role === "dm" && p.sheetReadOnlyForDm) ||
+        (seat.role !== "dm" && !seat.purseIds.includes(p.id))
+          ? "profile-owner"
+          : user,
       campaign_code: code,
       purse_id: p.id,
       revision: p.sheetRevision || 0,
@@ -45,7 +54,9 @@ async function character(db, user, id, own = false) {
   if (row.campaign_code) {
     const { room, seat } = await membership(db, user, row.campaign_code);
     if (
-      !room.table.purses.some((p) => p.id === row.purse_id) ||
+      !room.table.purses.some(
+        (p) => p.id === row.purse_id && canReadCharacter(room.table, p, seat),
+      ) ||
       (seat.role !== "dm" && !seat.purseIds.includes(row.purse_id))
     )
       fail("This character is no longer assigned to your campaign seat.", 403);
@@ -141,9 +152,7 @@ export async function handleCharacterPlay(db, user, path, body, url, approval = 
           name: m.name,
           role: seat.role,
           purses: room.table.purses
-            .filter(
-              (p) => p.kind === "character" && (seat.role === "dm" || seat.purseIds.includes(p.id)),
-            )
+            .filter((p) => p.kind === "character" && canReadCharacter(room.table, p, seat))
             .map((p) => ({ id: p.id, name: p.name })),
         });
       } catch (e) {
@@ -157,7 +166,12 @@ export async function handleCharacterPlay(db, user, path, body, url, approval = 
         try {
           const { room, seat } = await membership(db, user, r.campaign_code);
           if (seat.role !== "dm" && !seat.purseIds.includes(r.purse_id)) continue;
-          if (!room.table.purses.some((p) => p.id === r.purse_id)) continue;
+          if (
+            !room.table.purses.some(
+              (p) => p.id === r.purse_id && canReadCharacter(room.table, p, seat),
+            )
+          )
+            continue;
           body = campaignBody(room, r.purse_id);
         } catch (e) {
           if (e.status !== 403 && e.status !== 404) throw e;
@@ -184,7 +198,11 @@ export async function handleCharacterPlay(db, user, path, body, url, approval = 
         if (room.viewOnly && seat.role === "player")
           fail("The session has ended. This room is view-only until the DM resumes play.", 403);
         const p = room.table.purses.find((p) => p.id === existing.purse_id);
-        if (!p || (seat.role !== "dm" && !seat.purseIds.includes(p.id)))
+        if (
+          !p ||
+          !canReadCharacter(room.table, p, seat) ||
+          (seat.role !== "dm" && !seat.purseIds.includes(p.id))
+        )
           fail("Your seat no longer controls this character.", 403);
         if (!room.live && room.seats[room.turn]?.id !== seat.id)
           fail("Wait for your campaign turn before saving.", 409);
@@ -203,6 +221,11 @@ export async function handleCharacterPlay(db, user, path, body, url, approval = 
           );
         } catch (e) {
           fail(e.message, 409);
+        }
+        const npc = room.table.journal?.world?.npcs.find((n) => n.id === p.id);
+        if (npc) {
+          npc.name = p.name;
+          npc.portrait = p.portrait;
         }
         room.revision++;
         const saved = await db
@@ -237,18 +260,19 @@ export async function handleCharacterPlay(db, user, path, body, url, approval = 
     if (r.campaign_code) {
       const { room, seat } = await membership(db, user, r.campaign_code);
       const p = room.table.purses.find((p) => p.id === r.purse_id);
-      if (!p || (seat.role !== "dm" && !seat.purseIds.includes(p.id)))
+      if (!p || !canReadCharacter(room.table, p, seat))
         fail("This character is no longer assigned to your campaign seat.", 403);
-      projected = campaignBody(room, p.id);
+      const observer = seat.role !== "dm" && !seat.purseIds.includes(p.id);
+      projected = observer ? statsOnly(campaignBody(room, p.id)) : campaignBody(room, p.id);
       revision = p.sheetRevision || 0;
       campaign = {
         code: r.campaign_code,
         role: seat.role,
-        editingAllowed: seat.role === "dm" || p.editingAllowed === true,
+        editingAllowed: !observer && (seat.role === "dm" || p.editingAllowed === true),
         permissions: p.permissions || {},
-        manualAllowed: await policy(db, r.campaign_code),
-        coins: p.coins,
-        holdings: room.table.holdings.filter((h) => h.purseId === p.id),
+        manualAllowed: !observer && (await policy(db, r.campaign_code)),
+        coins: observer ? { cp: 0, sp: 0, ep: 0, gp: 0, pp: 0 } : p.coins,
+        holdings: observer ? [] : room.table.holdings.filter((h) => h.purseId === p.id),
       };
     }
     return {

@@ -1,3 +1,5 @@
+import { CharacterPlacement } from "./character-placement";
+import { characterLocation, characterPosition } from "@/lib/quire/character-position";
 import { SearchSelect } from "@/components/search-select";
 import { useEffect, useState } from "react";
 import { useRouterState } from "@tanstack/react-router";
@@ -155,8 +157,19 @@ export function LocationNpcs() {
                   <AppLink href={libraryRecordHref("npc", n.id)}>{n.name} <span aria-hidden="true">→</span></AppLink>
                 </h2>
                 <p>
-                  {locationLabel(market, n.locationId)} ·{" "}
-                  {npcAvailableHere(n, t) ? "Nearby" : "Away / hidden"} ·{" "}
+                  {characterPosition(
+                    t,
+                    t.purses.find((p) => p.id === n.id)!,
+                  ).inParty
+                    ? "In party"
+                    : locationLabel(
+                        market,
+                        characterLocation(
+                          t,
+                          t.purses.find((p) => p.id === n.id)!,
+                        ),
+                      )}{" "}
+                  · {npcAvailableHere(n, t) ? "Nearby" : "Away / hidden"} ·{" "}
                   {n.barterAllowed ? "Bartering allowed" : "No bartering"}
                 </p>
               </span>
@@ -167,7 +180,12 @@ export function LocationNpcs() {
           </article>
         ))}
       {!npcs.length && <p>No NPCs are available at this location.</p>}
-      {npc && <NpcInteraction key={npc.id} npc={npc} table={t} />}
+      {npc && (
+        <>
+          {dm && <CharacterPlacement npcId={npc.id} />}
+          <NpcInteraction key={npc.id} npc={npc} table={t} />
+        </>
+      )}
       {edit !== undefined && dm && (
         <NpcEditor
           key={edit?.id ?? "new"}

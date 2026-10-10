@@ -1,3 +1,4 @@
+import { inParty } from "@/lib/quire/character-position";
 import type { ReactNode } from "react";
 import { DesktopDeskPanels } from "./control-panel/desktop-panels";
 import { useDesktop } from "@/lib/quire/use-desktop";
@@ -71,8 +72,13 @@ export function HomeBoard({ embedded = false }: { embedded?: boolean }) {
   }, []);
 
   const mine =
-    seat.role === "player" ? purses.filter((purse) => seat.purseIds.includes(purse.id)) : purses.filter(p=>!p.nonParty);
-  const treasury = seat.role === "player" ? mine.filter((p) => p.kind === "character" && !p.nonParty) : mine;
+    seat.role === "player"
+      ? purses.filter((purse) => seat.purseIds.includes(purse.id))
+      : purses.filter((p) => inParty({ purses, journal }, p));
+  const treasury =
+    seat.role === "player"
+      ? mine.filter((p) => p.kind === "character" && inParty({ purses, journal }, p))
+      : mine;
   const activeSession = journal.sessions.find((x) => !x.endedAt);
   const coin = treasury.reduce((sum, purse) => sum + toCopper(purse.coins), 0);
   const loot = holdings.filter((holding) => treasury.some((purse) => purse.id === holding.purseId));
@@ -106,10 +112,10 @@ export function HomeBoard({ embedded = false }: { embedded?: boolean }) {
             <h1 className="mt-1 font-display text-4xl tracking-tight">{campaign}</h1>
             <p className="text-sm text-muted">
               {seat.role === "dm"
-                ? `${purses.filter((purse) => purse.kind === "character" && !purse.nonParty).length} character${purses.filter((purse) => purse.kind === "character" && !purse.nonParty).length === 1 ? "" : "s"}.`
+                ? `${purses.filter((purse) => purse.kind === "character" && inParty({ purses, journal }, purse)).length} character${purses.filter((purse) => purse.kind === "character" && inParty({ purses, journal }, purse)).length === 1 ? "" : "s"}.`
                 : `Playing as ${
                     mine
-                      .filter((p) => p.kind === "character" && !p.nonParty)
+                      .filter((p) => p.kind === "character" && inParty({ purses, journal }, p))
                       .map((p) => p.name)
                       .join(", ") || "an unassigned character"
                   }`}
@@ -180,7 +186,12 @@ export function HomeBoard({ embedded = false }: { embedded?: boolean }) {
                     <Link to="/party" className="stat-card hidden sm:block">
                       <Users className="size-5 text-lead" />
                       <p className="mt-4 font-display text-3xl">
-                        {mine.filter((purse) => purse.kind === "character" && !purse.nonParty).length}
+                        {
+                          mine.filter(
+                            (purse) =>
+                              purse.kind === "character" && inParty({ purses, journal }, purse),
+                          ).length
+                        }
                       </p>
                       <p className="text-sm text-muted">Characters</p>
                     </Link>
@@ -355,29 +366,49 @@ export function HomeBoard({ embedded = false }: { embedded?: boolean }) {
           </OverviewSection>
         </>
       ) : null}
-      {seat.role === "player" && mine.find((p) => p.kind === "character" && !p.nonParty) ? (
+      {seat.role === "player" &&
+      mine.find((p) => p.kind === "character" && inParty({ purses, journal }, p)) ? (
         <Link to="/" search={{ view: "sheet" }} className="character-link">
-          <LedgerArt kind="portrait" src={mine.find((p) => p.kind === "character" && !p.nonParty)?.portrait} />
+          <LedgerArt
+            kind="portrait"
+            src={
+              mine.find((p) => p.kind === "character" && inParty({ purses, journal }, p))?.portrait
+            }
+          />
           <span>
             <strong>Your character sheet</strong>
             <small>
-              {mine.find((p) => p.kind === "character" && !p.nonParty)?.name} ·{" "}
-              {sheets.find((s) => s.purseId === mine.find((p) => p.kind === "character" && !p.nonParty)?.id)
-                ?.classLevel || "Character & handouts"}
+              {mine.find((p) => p.kind === "character" && inParty({ purses, journal }, p))?.name} ·{" "}
+              {sheets.find(
+                (s) =>
+                  s.purseId ===
+                  mine.find((p) => p.kind === "character" && inParty({ purses, journal }, p))?.id,
+              )?.classLevel || "Character & handouts"}
             </small>
           </span>
         </Link>
       ) : null}
-      {seat.role === "player" && <Link to="/share" className="connection-link">
-        Multiplayer · Room, chat & connection status →
-      </Link>}
+      {seat.role === "player" && (
+        <Link to="/share" className="connection-link">
+          Multiplayer · Room, chat & connection status →
+        </Link>
+      )}
       <div id="journal">
         <CampaignJournal section={embedded ? "sessions" : "overview"} />
       </div>
-      <Fold title="Campaign tools" hint={seat.role === "dm" ? "Display options, backups, and this campaign." : "Multiplayer, display options, and this campaign."}>
-        {seat.role === "player" && <Link to="/share" className="quick-action primary">
-          Open Multiplayer — host or join a room
-        </Link>}
+      <Fold
+        title="Campaign tools"
+        hint={
+          seat.role === "dm"
+            ? "Display options, backups, and this campaign."
+            : "Multiplayer, display options, and this campaign."
+        }
+      >
+        {seat.role === "player" && (
+          <Link to="/share" className="quick-action primary">
+            Open Multiplayer — host or join a room
+          </Link>
+        )}
 
         <div className="mt-3">
           <Switch

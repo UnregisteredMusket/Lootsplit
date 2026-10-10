@@ -1,3 +1,4 @@
+import { canReadCharacter, characterPosition, characterLocation } from "./character-position.ts";
 import type { CloudSeat, CloudTable } from "./cloud.ts";
 import type { CatalogItem, Lexeme } from "./types.ts";
 import { readMarketLocations, locationLabel } from "./shop-locations.ts";
@@ -63,6 +64,10 @@ export function libraryRecords(
         ]
       : [],
   }));
+  const npcLocation = (id: string, fallback: string) => {
+    const s=world.characterPositions.find(s=>s.purseId===id);
+    return s ? s.inParty ? market.currentLocationId : s.locationId : fallback;
+  };
   for (const n of world.npcs.filter((n) => dm || npcAvailableHere(n, table)))
     records.push({
       key: libraryRecordKey("npc", n.id),
@@ -71,19 +76,36 @@ export function libraryRecords(
       description: n.description,
       image: n.portrait,
       fields: [
-        ...location(n.locationId),
+        ...location(npcLocation(n.id,n.locationId)),
+        [
+          "Party",
+          world.characterPositions.find((s) => s.purseId === n.id)?.inParty
+            ? "In party"
+            : "Outside party",
+        ],
         ["Bartering", n.barterAllowed ? "Allowed" : "Unavailable"],
         ...(dm
           ? [["Visibility", n.visible ? "Shared when nearby" : "DM only"] as [string, string]]
           : []),
       ],
       links: [
-        { name: "View location", href: libraryRecordHref("location", n.locationId) },
+        ...(npcLocation(n.id,n.locationId) ? [{ name: "View location", href: libraryRecordHref("location", npcLocation(n.id,n.locationId)!) }] : []),
+        ...(table.purses.some((p) => p.id === n.id && canReadCharacter(table, p, seat))
+          ? [
+              {
+                name: "Open NPC sheet",
+                href: `/characters?id=${encodeURIComponent(`party:${n.id}`)}`,
+              },
+            ]
+          : []),
         { name: "Interact with this NPC", href: `/features/npcs?npc=${encodeURIComponent(n.id)}` },
       ],
     });
   for (const p of table.purses.filter(
-    (p) => p.kind === "character" && !p.nonParty && (dm || seat.purseIds.includes(p.id)),
+    (p) =>
+      p.kind === "character" &&
+      !table.journal?.tradeEconomy?.exchanges.some((e) => e.purseId === p.id) &&
+      (dm || canReadCharacter(table, p, seat)),
   ))
     records.push({
       key: libraryRecordKey("character", p.id),
@@ -91,15 +113,21 @@ export function libraryRecords(
       kind: "Character",
       description: p.sheet?.description ?? "",
       image: p.portrait || p.sheet?.portrait || undefined,
-      fields: p.sheet
+      fields: [["Party",characterPosition(table,p).inParty?"In party":"Outside party"],...location(characterLocation(table,p)),...(p.sheet
         ? [
             ["Species", p.sheet.species],
             ["Classes", p.sheet.classes],
             ["Background", p.sheet.background],
             ["Level", String(p.sheet.level)],
           ]
-        : [],
-      links: [{ name: "Party & character sheets", href: "/party" }],
+        : [])] as [string,string][],
+      links: [
+        {
+          name: "Open character sheet",
+          href: `/characters?id=${encodeURIComponent(`party:${p.id}`)}`,
+        },
+        { name: "Party & character sheets", href: "/party" },
+      ],
     });
   for (const s of table.shops.filter((s) => dm || shopVisible(s, table)))
     records.push({

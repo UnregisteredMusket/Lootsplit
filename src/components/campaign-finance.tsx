@@ -1,3 +1,4 @@
+import { finishingCharacters } from "@/lib/quire/character-position";
 import { loanRecordId, loanRequestRecordId } from "@/lib/quire/finance-record-links";
 import { TradeSeasonReview } from "./trade-season-review";
 import { useDraftGuard } from "@/lib/quire/use-draft-guard";
@@ -242,6 +243,15 @@ export function CampaignFinance({
                   {formatCopper(pending.quote.lines.reduce((n, l) => n + l.unpaid, 0))}. Settlement
                   order remains income, loans in creation order, then expenses.
                 </p>
+                {finishingCharacters(
+                  { purses, journal },
+                  (pending.fromDay + pending.days) * 1440 + (f.minuteOfDay ?? 0),
+                ).map((s) => (
+                  <p key={s.purseId}>
+                    {purses.find((p) => p.id === s.purseId)?.name}: completes {s.downtime?.name};
+                    restores previous placement.
+                  </p>
+                ))}
                 {pending.quote.lines.map((l) => (
                   <div className="journal-entry" key={l.id}>
                     <strong>

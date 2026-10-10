@@ -1,3 +1,4 @@
+import { inParty } from "@/lib/quire/character-position";
 import { SearchSelect } from "@/components/search-select";
 import { playSound } from "@/lib/quire/sound";
 import { ImportStatblock } from "./import-statblock";
@@ -715,7 +716,10 @@ function EncounterEditor({
     (detail.code === "device"
       ? !cloud.joined
       : cloud.joined && cloud.code === detail.code && cloud.role === "dm");
-  const currentParty = currentContext && economyReady ? currentPartyMembers(purses) : [];
+  const currentParty =
+    currentContext && economyReady
+      ? currentPartyMembers(purses.filter((p) => inParty({ purses, journal }, p)))
+      : [];
   const partyPlan = reviewedPartyPlan(currentParty, selectedMembers, planningLevel);
   const readiness = encounterReadiness({
     status: detail.status,

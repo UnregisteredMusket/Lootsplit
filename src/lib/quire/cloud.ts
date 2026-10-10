@@ -1,4 +1,10 @@
-import { readJournal, readValidatedJournal, preserveJournalMetadata, type Journal } from "./journal.ts";
+import { characterVisible } from "./character-position.ts";
+import {
+  readJournal,
+  readValidatedJournal,
+  preserveJournalMetadata,
+  type Journal,
+} from "./journal.ts";
 import { validateEconomyRows } from "./validation.ts";
 import { clampRealm } from "./scale.ts";
 import type { RealmSettings } from "./types.ts";
@@ -117,9 +123,18 @@ export function nextTurn(turn: number, count: number): number {
 
 export function applyBillToTable(table: CloudTable, bill: BillFile, seen: CloudSeen): { table: CloudTable; seen: CloudSeen } {
   const purseIds = new Set(bill.purseIds);
-  for (const h of table.holdings.filter(h => purseIds.has(h.purseId) && (h.custody || h.reservedFor || table.journal?.propertyOperations?.sites.some(s => s.propertyId === h.id)))) {
-    const incoming = bill.holdings.find(x => x.id === h.id);
-    if (JSON.stringify(incoming) !== JSON.stringify(h)) throw Error("This report changes property storage or an operating holding. Use the current Property controls and shared commands so its contents and agreements remain intact.");
+  for (const h of table.holdings.filter(
+    (h) =>
+      purseIds.has(h.purseId) &&
+      (h.custody ||
+        h.reservedFor ||
+        table.journal?.propertyOperations?.sites.some((s) => s.propertyId === h.id)),
+  )) {
+    const incoming = bill.holdings.find((x) => x.id === h.id);
+    if (JSON.stringify(incoming) !== JSON.stringify(h))
+      throw Error(
+        "This report changes property storage or an operating holding. Use the current Property controls and shared commands so its contents and agreements remain intact.",
+      );
   }
   const purses = table.purses.map((purse) => {
     const next = bill.purses.find((item) => item.id === purse.id);
@@ -177,8 +192,18 @@ export function applyBillToTable(table: CloudTable, bill: BillFile, seen: CloudS
   };
 }
 
-export function claimSeat(room: CloudRoom, purseId: string, name: string): { room: CloudRoom; seat: CloudSeat } {
-  const purse = room.table.purses.find((item) => item.id === purseId && item.kind === "character" && characterControl(item) === "player");
+export function claimSeat(
+  room: CloudRoom,
+  purseId: string,
+  name: string,
+): { room: CloudRoom; seat: CloudSeat } {
+  const purse = room.table.purses.find(
+    (item) =>
+      item.id === purseId &&
+      item.kind === "character" &&
+      characterControl(item) === "player" &&
+      characterVisible(room.table, item),
+  );
   if (!purse) throw new Error("That character is not at this table.");
   const taken = room.seats.find((seat) => seat.purseIds.includes(purseId));
   if (taken) throw new Error(`${purse.name} is already seated.`);
@@ -207,14 +232,21 @@ export function endPlayerTurn(room: CloudRoom, token: string, bill: BillFile, ba
   const seat = room.live ? seated(room, token) : requireTurn(room, token);
   if (seat.role !== "player") throw new Error("The dungeon master publishes the whole table.");
   expectRevision(room, baseRevision);
+  const allowedIds = seat.purseIds.filter((id) =>
+    room.table.purses.some((p) => p.id === id && characterVisible(room.table, p)),
+  );
   const limited: BillFile = {
     ...bill,
-    purseIds: seat.purseIds,
-    purses: bill.purses.filter((purse) => seat.purseIds.includes(purse.id)),
-    holdings: bill.holdings.filter((holding) => seat.purseIds.includes(holding.purseId)),
-    ledger: bill.ledger.filter((line) => seat.purseIds.includes(line.purseId)),
-    loans: readLoans(bill.loans).filter((loan) => seat.purseIds.includes(loan.purseId)).map((loan) => ({ ...loan, status: "pending" })),
-    notes: readNotes(bill.notes).filter((note) => note.from === "player" && seat.purseIds.includes(note.purseId)),
+    purseIds: allowedIds,
+    purses: bill.purses.filter((purse) => allowedIds.includes(purse.id)),
+    holdings: bill.holdings.filter((holding) => allowedIds.includes(holding.purseId)),
+    ledger: bill.ledger.filter((line) => allowedIds.includes(line.purseId)),
+    loans: readLoans(bill.loans)
+      .filter((loan) => allowedIds.includes(loan.purseId))
+      .map((loan) => ({ ...loan, status: "pending" })),
+    notes: readNotes(bill.notes).filter(
+      (note) => note.from === "player" && seat.purseIds.includes(note.purseId),
+    ),
   };
   const applied = applyBillToTable(room.table, limited, room.seen);
   const next = { ...room, table: applied.table, seen: applied.seen };
