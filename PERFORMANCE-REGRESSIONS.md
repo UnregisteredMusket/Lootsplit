@@ -58,7 +58,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Development / governance / dev-release | open | 2 | 31s → 44s | +13s | +41.94% |
 | Development / governance / dev-backup | open | 4 | 6s → 21s | +15s | +250% |
 | Development / governance / Run actions/upload-artifact@v4 | open | 2 | 1s → 3s | +2s | +200% |
-| Development / governance | open | 4 | 110s → 339s | +229s | +208.18% |
+| Development / governance | open | 5 | 110s → 390s | +280s | +254.55% |
 | Packaged Worker / interface / worker-library-navigation | open | 5 | 9s → 35s | +26s | +288.89% |
 | Packaged Worker / accounts / Run actions/upload-artifact@v4 | open | 2 | 1s → 3s | +2s | +200% |
 | Publish verified standby / initial queue | open | 3 | 3s → 39s | +36s | +1200% |
@@ -186,7 +186,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Code checks and immutable builds / lint | open | 2 | 7s → 11s | +4s | +57.14% |
 | Packaged Worker / interface / worker-sound | open | 4 | 6s → 25s | +19s | +316.67% |
 | Development / accounts / dev-party-sheet | open | 2 | 17s → 23s | +6s | +35.29% |
-| Code checks and immutable builds / typecheck | open | 2 | 12s → 19s | +7s | +58.33% |
+| Code checks and immutable builds / typecheck | open | 3 | 12s → 22s | +10s | +83.33% |
 | Packaged Worker / interface / worker-library-navigation | resolved | 2 | 13s → 37s | +24s | +184.62% |
 | mobile client build | open | 2 | 4.224s → 9.632s | +5.408s | +128.03% |
 | Development / gameplay / dev-control-panel | open | 3 | 14s → 29s | +15s | +107.14% |
@@ -253,6 +253,8 @@ Open trends require investigation. Resolved trends retain their history; each ve
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-11T15:00:25Z | job: Development / governance | 339s → 390s | +51s | +15.04% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37927498722/job/113809849000) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38149040736/job/114498399640) |
+| 2026-10-11T14:55:21Z | step: Code checks and immutable builds / typecheck | 19s → 22s | +3s | +15.79% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37965977121/job/113940301405) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38149040736/job/114498399476) |
 | 2026-10-11T14:53:22.000Z | workflow: Verify preserved functionality | 868s → 1036s | +168s | +19.35% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37784166101) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38147843248) |
 | 2026-10-11T14:19:42Z | step: Development / gameplay / dev-properties | 55s → 67s | +12s | +21.82% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37897679114/job/113712670292) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38146215202/job/114490112399) |
 | 2026-10-11T14:17:20Z | step: Development / gameplay / dev-shop-stock | 19s → 22s | +3s | +15.79% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37783175577/job/113331148194) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38146215202/job/114490112399) |
