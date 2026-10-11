@@ -1,4 +1,5 @@
 import { FantasyIcon } from "@/components/fantasy-icon";
+import { useRouterState } from "@tanstack/react-router";
 import { useEffect, useRef, useState, type FormEvent } from "react";
 import { toast } from "sonner";
 import { Button, Select, TextInput } from "./ui";
@@ -42,6 +43,7 @@ export function Open5eBrowser({ onSelect }: { onSelect?: (item: CatalogItem) => 
     [cached, setCached] = useState("");
   const [searched, setSearched] = useState<OpenQuery | null>(null);
   const request = useRef(0);
+  const locationSearch = useRouterState({ select: (state) => state.location.searchStr });
   const access = lookup.access(referenceSection(kind));
   useEffect(() => {
     request.current++;
@@ -49,11 +51,11 @@ export function Open5eBrowser({ onSelect }: { onSelect?: (item: CatalogItem) => 
     setCached("");
     setError("");
     setBusy(false);
-  }, [access.allowed, seat.role]);
+  }, [access.allowed, seat.role, kind]);
   useEffect(() => {
-    const section = new URLSearchParams(location.search).get("kind");
+    const section = new URLSearchParams(locationSearch).get("kind");
     if (!onSelect && OPEN5E_KINDS.some((k) => k.value === section)) setKind(section as OpenKind);
-  }, [onSelect]);
+  }, [onSelect, locationSearch]);
   useEffect(
     () => () => {
       request.current++;

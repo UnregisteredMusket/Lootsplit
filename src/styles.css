@@ -2269,6 +2269,10 @@ input,select,textarea { max-width: 100%; }
 .information-strip { display:flex; gap:.7rem; overflow-x:auto; overscroll-behavior-x:contain; scroll-snap-type:x mandatory; padding:.35rem 0 .65rem; scrollbar-width:thin; scrollbar-color:var(--edge) var(--color-bg); }
 .information-panel { flex:0 0 91%; min-width:0; display:flex; flex-direction:column; gap:.6rem; padding:1rem; border:1px solid var(--edge); border-radius:8px; background:linear-gradient(120deg,var(--panel),var(--color-bg)); scroll-snap-align:start; overflow-wrap:anywhere; }
 .information-panel h2 { font-size:1.45rem; }
+.information-market-quotes { display:grid; gap:.65rem; font-size:.8rem; }
+.information-market-quotes li { display:grid; gap:.2rem; padding-bottom:.6rem; border-bottom:1px solid var(--edge); }
+.information-market-quotes a { display:grid; gap:.15rem; min-height:44px; }
+.information-market-quotes small { color:var(--color-muted); }
 .information-panel > small, .information-panel > p { font-size:.8rem; color:var(--color-muted); }
 .information-panel > .panel-heading { margin:0; }
 .information-panel > .panel-heading button { min-height:44px; padding:.35rem .5rem; border:1px solid var(--edge); border-radius:6px; font-size:.8rem; }

@@ -25,7 +25,7 @@ function Home() {
   const seat = useSeat();
   const { view } = Route.useSearch();
   const navigate=useNavigate(),hash=useRouterState({select:s=>s.location.hash});
-  useEffect(()=>{const feature=({journal:"journal",review:"bank","review-inbox":"bank","campaign-finance":"downtime","campaign-operations":"properties"} as Record<string,string>)[hash];if(feature)void navigate({to:"/features/$feature",params:{feature},search:{from:"/?view=overview",code:undefined},replace:true});},[hash,navigate]);
+  useEffect(()=>{const feature=({journal:"journal",review:seat.role === "dm" ? "review" : "bank","review-inbox":seat.role === "dm" ? "review" : "bank","campaign-finance":"downtime","campaign-operations":"properties"} as Record<string,string>)[hash];if(feature)void navigate({to:"/features/$feature",params:{feature},search:{from:"/?view=overview",code:undefined},replace:true});},[hash,navigate,seat.role]);
   if (seat.role === "player" && view !== "overview") {
     return (
       <Shell>

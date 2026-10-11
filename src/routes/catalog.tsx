@@ -1,6 +1,6 @@
 import { SearchSelect } from "@/components/search-select";
 import { FantasyIcon } from "@/components/fantasy-icon";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useRouterState } from "@tanstack/react-router";
 import { Dices } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
 import { Open5eBrowser } from "@/components/open5e-browser";
@@ -29,10 +29,11 @@ function CatalogPage() {
   const lookup = useReferenceAccess(),
     access = lookup.access();
   const [pane, setPane] = useState<Pane>(seat.role === "player" ? "open5e" : "goods");
+  const locationSearch = useRouterState({ select: (state) => state.location.searchStr });
   useEffect(() => {
-    const p = new URLSearchParams(location.search).get("pane");
+    const p = new URLSearchParams(locationSearch).get("pane");
     if (["goods", "names", "book", "open5e"].includes(p || "")) setPane(p as Pane);
-  }, []);
+  }, [locationSearch]);
   const dm = seat.role === "dm";
   const activePane = !dm && (pane === "goods" || pane === "book") ? "open5e" : pane;
   return (

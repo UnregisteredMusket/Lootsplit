@@ -8,7 +8,6 @@ import { Button, Modal } from "@/components/ui";
 import {
   defaultShortcuts,
   normalizeShortcuts,
-  shortcutDestinations,
   destinationsFor,
   shortcutIcons,
 } from "@/lib/quire/shortcuts.mjs";
@@ -169,7 +168,7 @@ export function Shortcuts({
       ) : (
         <div className="shortcut-grid">
           {items.map((item, i) => {
-            const target = shortcutDestinations.find((x) => x.id === item.destination)!;
+            const target = destinations.find((x) => x.id === item.destination)!;
             return (
               <AppLink key={i} href={target.href} className="shortcut-button">
                 <FantasyIcon ui={item.icon} size={40} />
@@ -198,7 +197,7 @@ export function Shortcuts({
                   aria-label={`Button ${i + 1}`}
                   value={item.destination}
                   onChange={(e) => {
-                    const target = shortcutDestinations.find((x) => x.id === e.target.value)!;
+                    const target = destinations.find((x) => x.id === e.target.value)!;
                     patch(i, {
                       destination: target.id,
                       label: target.label,

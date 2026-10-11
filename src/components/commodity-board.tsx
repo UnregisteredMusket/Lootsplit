@@ -66,7 +66,7 @@ export function GlobalCommodityMarket() {
   const market = readMarketLocations(table.journal.market);
   if (!globalMarketCity(market))
     return (
-      <section className="commodity-dashboard commodity-overview" aria-label="Global market access">
+      <section id="global-market" className="commodity-dashboard commodity-overview" aria-label="Global market access">
         <div className="commodity-board-top">
           <h2>Global market</h2>
           <span className="commodity-board-status">Closed here</span>
@@ -87,7 +87,7 @@ export function GlobalCommodityMarket() {
       </section>
     );
   return (
-    <CommodityBoard economy={economy} exchanges={exchanges} market={market} dm={dm} overview />
+    <div id="global-market"><CommodityBoard economy={economy} exchanges={exchanges} market={market} dm={dm} overview /></div>
   );
 }
 

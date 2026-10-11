@@ -527,8 +527,9 @@ try {
   ).toContainText("Revenue: 2 sp");
   assert.equal(await player.page.evaluate(() => window.featureDocumentMarker), "same-document");
   assert.equal(await player.page.locator(".loot-opening").count(), 0);
-  await player.page.locator(".feature-return a").click();
-  await player.page.locator('.shortcut-grid a[href^="/features/finances?"]').click();
+  await player.page.getByRole("link", { name: "Return to My Finances", exact: true }).click();
+  await expect(player.page.getByRole("heading", { name: "My Finances", exact: true })).toBeVisible();
+  assert.equal(new URL(player.page.url()).pathname, "/features/finances");
   await player.page.getByText(/Inn revenue.*2 sp every 7 days/).waitFor();
   await player.page.screenshot({ path: output + "/player-finances-mobile.png", fullPage: true });
   await player.page.locator(".feature-return a").click();

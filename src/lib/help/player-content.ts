@@ -116,7 +116,7 @@ export const PLAYER_HELP_GROUPS: HelpGroup[] = [
         title: "Nearby shops and trade exchanges",
         paragraphs: [
           "Market shows available shops at the party's campaign location. Closed, hidden or out-of-reach vendors cannot trade. Review quantities, prices and the chosen purse before confirming. Services are not carried inventory.",
-          "The global commodity market is available in a city or an area inside a city. Towns, regions and an unset location do not grant access. The shipped fantasy commodity list is reference data, not free stock or money. A city's default Trade Exchange can be empty or inactive until configured. Exchange offers and seasonal prices follow the campaign's current settings.",
+          "The global commodity market is available in a city or an area inside a city. Towns, regions and an unset location do not grant access. The shipped fantasy commodity list is reference data, not free stock or money. A city's default Trade Exchange can be empty or inactive until configured. Exchange offers and seasonal prices follow the campaign's current settings. The DM’s Desk market summary can show campaign-wide prices while travelling; it does not grant remote player trading. Use Market for prices and access available to your character.",
         ],
         links: [["Market & exchanges", "/market"]],
       },

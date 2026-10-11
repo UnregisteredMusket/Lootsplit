@@ -3,6 +3,7 @@ import assert from "node:assert/strict";
 import { readdirSync, readFileSync } from "node:fs";
 import { join } from "node:path";
 import ts from "typescript";
+import { controlInventory } from "./control-inventory.mjs";
 
 // A document reload resets the intentional per-launch title gate. Enforce routing
 // at the source boundary, including links added outside the current browser audit.
@@ -58,4 +59,23 @@ test("app-owned navigation uses Link/AppLink instead of full-document anchors", 
     [],
     "Use AppLink for internal URLs; plain anchors are for hash-only, external, or file/API downloads.",
   );
+});
+
+test("literal app destinations resolve to an existing page or download", () => {
+  const routes = files("src/routes").map((file) => readFileSync(file, "utf8"))
+    .flatMap((text) => [...text.matchAll(/createFileRoute\("([^"]+)"\)/g)].map((m) => m[1]));
+  const known = routes.map((route) => new RegExp("^" + route.replace(/\$[^/]+/g, "[^/]+") + "$"));
+  const violations = [];
+  for (const control of controlInventory()) {
+    for (const attribute of ["href", "to"]) {
+      const text = control.attributes[attribute];
+      if (!text || !/^"\//.test(text)) continue;
+      const href = JSON.parse(text);
+      if (href.startsWith("//") || href.startsWith("/api/")) continue;
+      const path = new URL(href, "https://lootsplit.invalid").pathname;
+      if (path.startsWith("/download/") || known.some((r) => r.test(path))) continue;
+      violations.push(`${control.file}:${control.line}: ${href}`);
+    }
+  }
+  assert.deepEqual(violations, []);
 });

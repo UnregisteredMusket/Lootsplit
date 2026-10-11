@@ -27,13 +27,28 @@ export function safeReturn(value: unknown): string {
   const url = new URL(value, "https://lootsplit.invalid");
   if (url.origin !== "https://lootsplit.invalid") return "/?view=home";
   if (
-    !/^\/(?:party|maps|market|share|settings|characters|library|shop\/[^/]+|features\/(?:economy|bank|finances|downtime|financial|properties|reports|review|journal|shops|music|npcs|trading|time))?$/.test(
+    !/^\/(?:party|maps|market|share|settings|characters|library|encounters|account|books|catalog|favorites|welcome|help|resources|donate|downloads|updates|(?:shop|book|read)\/[^/]+|features\/(?:economy|bank|finances|downtime|financial|properties|reports|review|journal|shops|music|npcs|trading|time))?$/.test(
       url.pathname,
     )
   )
     return "/?view=home";
   url.searchParams.delete("from");
   return url.pathname + url.search + url.hash;
+}
+
+/** Preserve same-page hashes and supply the real origin for feature return links. */
+export function appLinkDestination(href: string, currentHref: string, includeOrigin = true) {
+  const base = new URL(currentHref, "https://lootsplit.invalid");
+  const url = new URL(href, base);
+  const feature = url.pathname.split("/")[2] as Feature;
+  if (
+    includeOrigin &&
+    url.pathname.startsWith("/features/") &&
+    featureScreens[feature] &&
+    !url.searchParams.has("from")
+  )
+    url.searchParams.set("from", safeReturn(currentHref));
+  return url;
 }
 export function screenName(href: string, dm: boolean) {
   const url = new URL(href, "https://lootsplit.invalid");
@@ -47,9 +62,7 @@ export function screenName(href: string, dm: boolean) {
         ? "Campaign overview"
         : url.searchParams.get("view") === "sheet"
           ? "Character"
-          : dm
-            ? "Desk"
-            : "Home";
+          : "Home";
   return (
     (
       {
@@ -60,7 +73,25 @@ export function screenName(href: string, dm: boolean) {
         "/settings": "Settings",
         "/characters": "Character",
         "/library": "Library",
+        "/encounters": "Encounters",
+        "/account": "Account",
+        "/books": "Books",
+        "/catalog": "Catalog",
+        "/favorites": "Favorites",
+        "/welcome": "Website",
+        "/help": "Help",
+        "/resources": "Resources",
+        "/donate": "Donate",
+        "/downloads": "Downloads",
+        "/updates": "Changelog",
       } as Record<string, string>
-    )[url.pathname] || "Market"
+    )[url.pathname] ||
+    (url.pathname.startsWith("/shop/")
+      ? "Shop"
+      : url.pathname.startsWith("/book/")
+        ? "Book"
+        : url.pathname.startsWith("/read/")
+          ? "Reading"
+          : "Home")
   );
 }

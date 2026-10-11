@@ -535,7 +535,7 @@ function Storage({
       )}
       {!physicallyHere(t, h) && (
         <p>
-          Set the party location through <AppLink href="/features/shops">market locations</AppLink>{" "}
+          Set the party location through <AppLink href="/market#market-locations">market locations</AppLink>{" "}
           before moving goods.
         </p>
       )}

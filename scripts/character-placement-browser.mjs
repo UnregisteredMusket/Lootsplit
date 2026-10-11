@@ -52,8 +52,18 @@ export async function auditCharacterPlacement(page, guest, origin, npcId, width,
   await navigateApplication(guest, origin + "/library");
   await guest.getByLabel("Search library destinations and catalog", { exact: true }).fill("Mara");
   await expect(records.getByRole("link", { name: "Mara NPC", exact: true })).toHaveCount(0);
-  await navigateApplication(page, origin + "/features/time");
-  await page.getByLabel("Hours to advance", { exact: true }).fill("24");
+  // Use the real Desk link: a cold goto can restore the shared context after
+  // this form first renders and replace an input filled during that restore.
+  const dmDocument = crypto.randomUUID();
+  await page.evaluate((marker) => (window.characterPlacementDmDocument = marker), dmDocument);
+  await navigateApplication(page, origin + "/?view=home");
+  await page.locator(".dm-tool-groups").getByRole("link", { name: "Session Time →", exact: true }).click();
+  await expect(page.getByRole("heading", { name: "Session Time", exact: true })).toBeVisible();
+  assert.equal(await page.evaluate(() => window.characterPlacementDmDocument), dmDocument);
+  await expect(page.locator(".loot-opening")).toHaveCount(0);
+  const hours = page.getByLabel("Hours to advance", { exact: true });
+  await hours.fill("24");
+  await expect(hours).toHaveValue("24");
   await expect(
     page.getByText("Mara: completes Research the harbor; restores previous placement.", {
       exact: true,

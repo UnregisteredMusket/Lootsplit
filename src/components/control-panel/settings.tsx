@@ -91,7 +91,7 @@ export function ManagementPanel({
           icon: "Party",
           links: [
             ["Party & character assignments", "/party"],
-            ["Room members & permissions", "/share"],
+            ["Room members & permissions", "/share?tab=room"],
             ["Assigned character sheets", "/characters"],
           ],
         },
@@ -103,17 +103,18 @@ export function ManagementPanel({
             ["Encounter desk & generator", "/encounters"],
             ["Review character imports", "/features/review"],
             ["Character rolls & manual-roll policy", "/characters#dm-roll-controls"],
-            ["Turn management", "/share"],
+            ["Turn management", "/share?tab=room"],
           ],
         },
         {
           name: "Economy",
           icon: "Treasury",
           links: [
-            ["Shop schedules & properties", "/features/properties"],
+            ["Shop schedules", "/features/shops"],
+            ["Property management", "/features/properties"],
             ["Currency, price modifiers & shop defaults", "/features/financial"],
             ["Shops & stock", "/market"],
-            ["Requests & approvals", "/features/bank"],
+            ["Requests & approvals", "/features/review"],
           ],
         },
         {
@@ -148,7 +149,8 @@ export function ManagementPanel({
           name: "Account & backups",
           icon: "save",
           links: [
-            ["Profile, security & cloud backups", "/account"],
+            ["Profile & security", "/account#account-profile"],
+            ["Cloud backups", "/account#account-backups"],
             ["Device backups & restore", "/settings#backups"],
           ],
         },
@@ -158,7 +160,7 @@ export function ManagementPanel({
           links: [
             ["Guides & help", "/help"],
             ["Report a bug", "/account#bug-reports"],
-            ["Authorized staff tools", "/account"],
+            ["Authorized staff tools", "/account#account-administration"],
             ["Website, downloads & resources", "/welcome"],
           ],
         },
@@ -203,7 +205,7 @@ export function ManagementPanel({
           icon: "save",
           links: [
             ["Device backups & restore", "/settings#backups"],
-            ["Private cloud backup library", "/account"],
+            ["Private cloud backup library", "/account#account-backups"],
           ],
         },
         {

@@ -197,6 +197,9 @@ jobs:
       - name: dev-desktop
         if: matrix.group == 'desktop'
         run: node scripts/recovery-step.mjs dev-desktop 240 node scripts/desktop-browser-audit.mjs
+      - name: dev-navigation
+        if: matrix.group == 'desktop'
+        run: node scripts/recovery-step.mjs dev-navigation 240 node --experimental-strip-types scripts/navigation-browser-audit.mjs
       - name: dev-game-analytics
         if: matrix.group == 'desktop'
         run: node scripts/recovery-step.mjs dev-game-analytics 240 node scripts/game-analytics-browser-audit.mjs
@@ -277,6 +280,11 @@ jobs:
         env:
           AUDIT_ORIGIN: http://127.0.0.1:8082
         run: node scripts/recovery-step.mjs worker-initiative 180 node scripts/initiative-browser-audit.mjs
+      - name: worker-navigation
+        if: matrix.group == 'interface'
+        env:
+          AUDIT_ORIGIN: http://127.0.0.1:8082
+        run: node scripts/recovery-step.mjs worker-navigation 240 node --experimental-strip-types scripts/navigation-browser-audit.mjs
       - name: worker-theme
         if: matrix.group == 'interface'
         env:

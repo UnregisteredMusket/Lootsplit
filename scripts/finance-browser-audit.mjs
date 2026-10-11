@@ -1,4 +1,5 @@
 import { chromium } from "playwright";
+import { expect } from "playwright/test";
 import assert from "node:assert/strict";
 import { mkdir } from "node:fs/promises";
 import { openApplication, reloadApplication } from "./title-screen-navigation.mjs";
@@ -187,22 +188,26 @@ try {
     await page.getByRole("button", { name: "Preview downtime", exact: true }).click();
     await finance.getByText(/Finance party: 20 gp → 18 gp, 5 sp/).waitFor();
     await finance.getByText(/Preview only: 7 in-game days/).waitFor();
-    assert.equal(
-      await finance
-        .getByRole("link", {
-          name: "Approve downtime & start session in Play sessions",
-          exact: true,
-        })
-        .getAttribute("href"),
-      "/#sessions",
-    );
+    const sessionLink = finance.getByRole("link", {
+      name: "Approve downtime & start session in Play sessions",
+      exact: true,
+    });
+    const destination = new URL(await sessionLink.getAttribute("href"), page.url());
+    assert.equal(destination.pathname, "/features/downtime");
+    assert.equal(destination.hash, "#sessions");
     await finance.scrollIntoViewIfNeeded();
     assert.ok(
       await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1),
       "No horizontal overflow at " + width,
     );
     await page.screenshot({ path: `${output}/preview-${width}.png`, fullPage: true });
-    await page.getByRole("button", { name: /^Play sessions/ }).click();
+    await page.evaluate(() => {
+      window.downtimeNavigationDocument = true;
+    });
+    await sessionLink.click();
+    await expect(page.locator('#sessions button[aria-expanded="true"]')).toBeVisible();
+    assert.equal(await page.evaluate(() => window.downtimeNavigationDocument), true);
+    assert.equal(await page.locator(".loot-opening").count(), 0);
     await page.getByLabel("Session name", { exact: true }).fill("Return to town");
     const approve = page.getByRole("button", {
       name: "Approve downtime & start session",
