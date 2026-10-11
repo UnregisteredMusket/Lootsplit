@@ -188,7 +188,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Packaged Worker / interface / worker-library-navigation | resolved | 2 | 13s → 37s | +24s | +184.62% |
 | mobile client build | open | 2 | 4.224s → 9.632s | +5.408s | +128.03% |
 | Development / gameplay / dev-control-panel | open | 3 | 14s → 29s | +15s | +107.14% |
-| Development / governance / dev-help | open | 2 | 13s → 20s | +7s | +53.85% |
+| Development / governance / dev-help | open | 3 | 13s → 23s | +10s | +76.92% |
 | Development / desktop | open | 2 | 168s → 690s | +522s | +310.71% |
 | Packaged Worker / interface / worker-library-navigation | open | 6 | 9s → 34s | +25s | +277.78% |
 | Development / gameplay / Run npm ci | open | 2 | 13s → 19s | +6s | +46.15% |
@@ -239,6 +239,14 @@ Open trends require investigation. Resolved trends retain their history; each ve
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-11T10:24:25Z | step: Development / governance / dev-help | 20s → 23s | +3s | +15% | failure | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38130022245/job/114442237228) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38131540594/job/114446797589) |
+| 2026-10-11T10:23:19Z | job: Player references / development | 63s → 226s | +163s | +258.73% | failure | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38131342389/job/114446131998) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38131540604/job/114446715250) |
+| 2026-10-11T10:23:19.000Z | workflow: Focused player references | 83s → 226s | +143s | +172.29% | failure | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38131342389) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38131540604) |
+| 2026-10-11T10:22:25Z | job: Player references / worker | 83s → 172s | +89s | +107.23% | failure | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38131342389/job/114446132272) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38131540604/job/114446715096) |
+| 2026-10-11T10:20:41Z | step: Player references / development / Verify player references and Help | 12s → 16s | +4s | +33.33% | failure | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38131342389/job/114446131998) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38131540604/job/114446715250) |
+| 2026-10-11T10:20:25Z | step: Player references / development / Start disposable development server | 6s → 8s | +2s | +33.33% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38131342389/job/114446131998) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38131540604/job/114446715250) |
+| 2026-10-11T10:19:56Z | step: Player references / development / Run npm ci | 12s → 18s | +6s | +50% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38131342389/job/114446131998) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38131540604/job/114446715250) |
+| 2026-10-11T10:19:54Z | step: Player references / worker / Run npm ci | 13s → 15s | +2s | +15.38% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38131342389/job/114446132272) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38131540604/job/114446715096) |
 | 2026-10-11T10:01:48Z | step: Development / gameplay / dev-trade-economy | 74s → 105s | +31s | +41.89% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38053268126/job/114216533406) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38130022245/job/114442237224) |
 | 2026-10-11T10:00:03Z | step: Development / gameplay / dev-property-operations | 28s → 33s | +5s | +17.86% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37914033060/job/113766127912) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38130022245/job/114442237224) |
 | 2026-10-11T09:58:33Z | step: Development / governance / dev-help | 15s → 20s | +5s | +33.33% | failure | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37438052113/job/112184649297) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38130022245/job/114442237228) |
