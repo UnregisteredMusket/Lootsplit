@@ -339,7 +339,7 @@ try {
         await expect(page.getByLabel("Payment account", { exact: true })).toHaveCount(0);
       if (label === "Economy rules")
         await expect(
-          page.getByRole("slider", { name: "Inflation amount", exact: true }),
+          page.getByRole("slider", { name: /^Inflation amount / }),
         ).toBeVisible();
       await back(page);
       const treasury = page.getByRole("button", { name: /^Campaign treasury/ });

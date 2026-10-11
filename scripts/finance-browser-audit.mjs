@@ -1,5 +1,5 @@
 import { chromium } from "playwright";
-import { expect } from "@playwright/test";
+import { expect } from "playwright/test";
 import assert from "node:assert/strict";
 import { mkdir } from "node:fs/promises";
 import { openApplication, reloadApplication } from "./title-screen-navigation.mjs";
