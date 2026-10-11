@@ -12593,5 +12593,39 @@
     "finishedAt": "2026-10-11T19:01:42Z",
     "durationMs": 168000,
     "trendId": "38166072876:1:9729fe9d61d95dd8234788dab60d38fb7e651a412a908d44d5404c8693bb9298"
+  },
+  "[\".github/workflows/verify.yml\",\"pull_request\",\"pull-request\",\"step\",\"Development / desktop / dev-navigation\",\"ubuntu-latest\",1]": {
+    "schema": 1,
+    "id": "38166093163:1:2afd04e093edd7c2b1b44879f253c60c812eadaf0a671877b74d20e34c974fe2",
+    "scope": "[\".github/workflows/verify.yml\",\"pull_request\",\"pull-request\",\"step\",\"Development / desktop / dev-navigation\",\"ubuntu-latest\",1]",
+    "kind": "step",
+    "name": "Development / desktop / dev-navigation",
+    "environment": "ubuntu-latest",
+    "commit": "d5fd9456f54361204a803e2db23c8abad8730033",
+    "runId": 38166093163,
+    "attempt": 1,
+    "url": "https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38166093163/job/114548855685",
+    "outcome": "failure",
+    "startedAt": "2026-10-11T19:00:57Z",
+    "finishedAt": "2026-10-11T19:01:36Z",
+    "durationMs": 39000,
+    "trendId": "38166093163:1:2afd04e093edd7c2b1b44879f253c60c812eadaf0a671877b74d20e34c974fe2"
+  },
+  "[\".github/workflows/verify.yml\",\"pull_request\",\"pull-request\",\"step\",\"Packaged Worker / interface / worker-navigation\",\"ubuntu-latest\",1]": {
+    "schema": 1,
+    "id": "38166093163:1:318e6ace81e676e649ec3c341c4409c9166e19ef7fc7ce802dd784f8a002e367",
+    "scope": "[\".github/workflows/verify.yml\",\"pull_request\",\"pull-request\",\"step\",\"Packaged Worker / interface / worker-navigation\",\"ubuntu-latest\",1]",
+    "kind": "step",
+    "name": "Packaged Worker / interface / worker-navigation",
+    "environment": "ubuntu-latest",
+    "commit": "d5fd9456f54361204a803e2db23c8abad8730033",
+    "runId": 38166093163,
+    "attempt": 1,
+    "url": "https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38166093163/job/114549309201",
+    "outcome": "failure",
+    "startedAt": "2026-10-11T19:03:17Z",
+    "finishedAt": "2026-10-11T19:03:50Z",
+    "durationMs": 33000,
+    "trendId": "38166093163:1:318e6ace81e676e649ec3c341c4409c9166e19ef7fc7ce802dd784f8a002e367"
   }
 }
