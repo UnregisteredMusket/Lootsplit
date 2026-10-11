@@ -231,7 +231,12 @@ async function newShop(page, name, locationId) {
   await expect
     .poll(async () => (await rows(page, "stock")).filter((stock) => stock.shopId === shopId).length)
     .toBe(1);
+  // A committed DB row can precede the form's completed save/reload. Wait for
+  // the actual cleared draft before navigating so its guard retains its role.
+  await expect(page.getByLabel("New item", { exact: true })).toHaveValue("");
+  await expect(page.getByRole("status").filter({ hasText: "Item added." })).toBeVisible();
   await page.getByRole("link", { name: "Market", exact: true }).first().click();
+  await expect(page.getByRole("heading", { name: "Market", exact: true })).toBeVisible();
   assert.equal(await page.locator(".loot-opening").count(), 0);
   return shopId;
 }

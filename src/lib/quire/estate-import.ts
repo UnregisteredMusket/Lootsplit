@@ -147,7 +147,10 @@ export function estateImportFingerprint(
   t: Pick<CloudTable, "purses" | "holdings" | "listings" | "journal">,
 ) {
   return canonicalJson({
-    purses: t.purses.map((p) => ({ id: p.id, name: p.name, kind: p.kind })),
+    // The UI sorts accounts by name; IndexedDB and shared rooms retain their own
+    // row order. Compare the same reviewed identities and fields in ID order.
+    purses: t.purses.map((p) => ({ id: p.id, name: p.name, kind: p.kind }))
+      .sort((a, b) => a.id === b.id ? 0 : a.id < b.id ? -1 : 1),
     holdings: t.holdings,
     listings: t.listings,
     market: t.journal?.market,

@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import { readFileSync } from "node:fs";
 import "fake-indexeddb/auto";
 import { ensureCityExchanges } from "./city-exchanges.ts";
 import { applyCommand, tablePatch, type CommandInput } from "./commands.ts";
@@ -7,6 +8,7 @@ import { emptyCloudTable, readCloudTable, type CloudSeat, type CloudTable } from
 import { readJournal, readArchivedSnapshot } from "./journal.ts";
 import { marketNameFingerprint } from "./market-name-import.ts";
 import { estateImportFingerprint } from "./estate-import.ts";
+import { readEstate } from "./estate-schema.ts";
 import { toCopper } from "./money.ts";
 import { projectRecord } from "./session-records.ts";
 import { exchangeHere, prepareTradeSeason, previewTradeSeason } from "./trade-economy.ts";
@@ -138,4 +140,28 @@ test("moving a configured exchange creates the missing city's replacement in the
   assert.equal(exchanges(t).find(x => x.id === e.id)!.locationId, null);
   assert.notEqual(exchanges(t).find(x => x.locationId === city.id)!.purseId, e.purseId);
   assert.equal(toCopper(t.purses.find(p => p.id === exchanges(t).find(x => x.locationId === city.id)!.purseId)!.coins), 0);
+});
+
+test("property imports accept the name-sorted UI preview with city treasuries and still reject changed accounts", async () => {
+  setSeat(DM_SEAT);
+  const legacy = tradeFixture(); legacy.journal!.market!.locations.push(city);
+  legacy.journal!.propertyOperations = readEstate();
+  delete legacy.journal!.tradeEconomy;
+  legacy.purses = legacy.purses.filter(p => p.id !== "exchange-treasury");
+  await applyCloudTable(legacy);
+  const source = await economySnapshot();
+  const view = structuredClone(source);
+  view.purses.sort((a, b) => a.name.localeCompare(b.name));
+  assert.notDeepEqual(view.purses.map(p => p.id), source.purses.map(p => p.id));
+  const before = estateImportFingerprint(view);
+  assert.equal(before, estateImportFingerprint(source));
+  const document = JSON.parse(readFileSync(new URL("../../../docs/examples/property-operations.sample.json", import.meta.url), "utf8"));
+  await executeLocalCommand({ kind: "estate-import", before, document, owners: { "party-treasury": "party" }, locations: {} });
+  const saved = await economySnapshot();
+  assert.ok(saved.holdings.some(h => h.name === "Harbor Storehouse"));
+  const importedCity = saved.journal!.market!.locations.find(l => l.name === "Brackenport")!;
+  assert.equal(exchanges(saved).filter(e => e.locationId === importedCity.id).length, 1);
+  const changed = structuredClone(source); changed.purses[0].name += " changed";
+  assert.throws(() => act(changed, { kind: "estate-import", before, document, owners: { "party-treasury": "party" }, locations: {} }), /fresh property import preview/);
+  assert.notEqual(before, estateImportFingerprint({ ...source, purses: source.purses.slice(1) }));
 });
