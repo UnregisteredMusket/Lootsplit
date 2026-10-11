@@ -241,11 +241,13 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Focused player references | open | 2 | 83s → 271s | +188s | +226.51% |
 | Player references / development | open | 2 | 63s → 271s | +208s | +330.16% |
 | Player references / worker / Verify player references and Help | open | 2 | 15s → 58s | +43s | +286.67% |
+| Player references / worker / Run actions/setup-node@v4 | open | 2 | 4s → 6s | +2s | +50% |
 
 ## Recorded slowdowns
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-11T12:33:42Z | step: Player references / worker / Run actions/setup-node@v4 | 5s → 6s | +1s | +20% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38138347179/job/114466796212) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38139715522/job/114470877068) |
 | 2026-10-11T12:26:19Z | job: Player references / worker | 208s → 240s | +32s | +15.38% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38131890240/job/114447745703) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38138998692/job/114468749350) |
 | 2026-10-11T12:26:16Z | step: Player references / worker / Verify complete account fixtures | 97s → 114s | +17s | +17.53% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38131540604/job/114446715096) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38138998692/job/114468749350) |
 | 2026-10-11T12:24:22Z | step: Player references / worker / Verify player references and Help | 49s → 58s | +9s | +18.37% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38131890240/job/114447745703) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38138998692/job/114468749350) |
