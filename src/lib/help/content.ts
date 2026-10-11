@@ -24,7 +24,7 @@ export const HELP_GROUPS: HelpGroup[] = [
         id: "first-campaign",
         title: "Start a campaign or join your party",
         paragraphs: [
-          "Open the app and choose your device role. The campaign selector at the top creates or switches local campaigns. Each campaign keeps its own characters, purses, inventory, shops and financial history. New blank campaigns do not contain your other campaign’s assets.",
+          "Sign in to create or claim your owned DM campaign. The campaign selector creates or switches owned local campaigns; My account resumes saved shared campaigns. Each campaign keeps its own characters, purses, inventory, shops and financial history. New blank campaigns do not contain your other campaign’s assets. Guests join an open room through its current invitation.",
           "The DM adds characters and shared party funds in Party → Funds & inventory. Mark each character as Player or NPC; only player characters can be assigned to players. To join a shared game, open Campaign, enter the room code and choose an available character. An account is optional for guest room play. Everyone needs access to the website or a compatible app.",
         ],
         links: [
@@ -59,8 +59,9 @@ export const HELP_GROUPS: HelpGroup[] = [
         title: "Character sheets and campaign inventory",
         paragraphs: [
           "Campaign characters use the same character ID, purse and inventory as Party. Changes to permitted coin and equipment fields stay connected to those records. Standalone account characters are separate reusable profiles: their private money and equipment are not silently merged into a campaign.",
-          "Play shows vitals, attacks, spells, skills and dice. Edit changes the sheet; save your changes before leaving. Supported JSON and text/form-based PDF imports can be reviewed before saving. Image-only scans are not supported. Species, classes, levels, conditions, spell effects, hit dice and house rules are maintained manually.",
+          "Play shows vitals, attacks, spells, skills and dice. Edit changes the sheet; save your changes before leaving. Supported JSON, text/form PDFs and device-local image/scanned-PDF recognition can be reviewed before saving. Review every tab: scanned or handwritten extraction can misread values. Player campaign imports require the applicable DM review and preserve campaign money and inventory. Species, classes, levels, conditions, spell effects, hit dice and house rules are maintained manually.",
           "Players control assigned characters and permitted actions. They cannot create money, revalue inventory or change price-affecting Charisma. DM financial adjustments are recorded in the ledger. Buying, selling, transfers and DM awards update the existing inventory. In Party → Add loot, choose Custom loot for items or property, or Open5e loot to search SRD equipment and magic items. Review the item value, quantity, recipient and source notes, then confirm Add holding. Open5e search needs a connection unless saved results are available; custom loot works offline.",
+          "Party and People & NPCs let the DM place characters at individual locations, remove/return them to the active party, hide them, or share an NPC sheet read-only. Transfers retain the same sheet, wallet, inventory and history. Individual downtime removes a participant until approved campaign time reaches the recorded finish, then restores its prior placement once. Selecting a character does not grant another player's seat control; full editing and individual field permissions still apply.",
         ],
         links: [
           ["Character sheets", "/characters"],
@@ -102,6 +103,8 @@ export const HELP_GROUPS: HelpGroup[] = [
         paragraphs: [
           "Library leads to items and services, spell and creature references, and the offline name generator. Open5e imports keep their source credits. Creatures are references, not shop stock. The DM can add custom catalog items, generate goods or review extracted PDF items before adding them to shops.",
           "Import PDFs with selectable text through Books. Private PDFs stay on the device and are not automatically published or sent with player links. Mark an extracted entry as a handout to share its text; review extracted prices and text first. References do not automate rules. Resources lists content and icon licenses.",
+          "Library's Resource packs accepts reviewed reusable JSON creatures, item/NPC/location/shop templates and source references. Preview the complete pack, warnings and source notes before adding it. Imported packs stay private to the DM; separate reviewed actions add campaign records or catalogue items without granting funds, inventory or player access.",
+          "Players receive searchable, read-only Catalog, Items, Spells and Creatures indices and permission-projected campaign records. Library → Player reference lookup, or Settings & Management → Players & permissions, controls the overall lookup, individual indices and Allow lookup during active encounters. Any active campaign encounter pauses lookup by default; conclude every active encounter to restore it, or use the explicit override. Private account drafts do not block campaign players. Saved sheet spells, inventory and shared campaign records remain readable.",
         ],
         links: [
           ["Library", "/library"],
@@ -109,6 +112,7 @@ export const HELP_GROUPS: HelpGroup[] = [
           ["DM books", "/books"],
           ["Handouts", "/library#handouts"],
           ["Sources & licenses", "/resources"],
+          ["Player reference controls", "/library#reference-access"],
         ],
       },
     ],
@@ -140,6 +144,7 @@ export const HELP_GROUPS: HelpGroup[] = [
           "In a shop, choose Edit → Add from catalog to select exact items or every filtered match. Existing prices and quantities are preserved and duplicate names are skipped. Custom items remain available through Add item. Inventory totals, search, rarity and stock filters, and pages help manage large shelves; paging does not remove stock or limit PDF exports. Closed shops cannot trade. Restocking adds to finite quantities without replacing your custom entries or changing unlimited stock.",
           "Price modifiers include season, shortages, war, plague, roads, scarcity and inflation. Review the price preview. Enable automatic repricing or choose Reprice open shops now to apply changes to open shops. New-shop defaults affect future shops; changing defaults is not a replacement for editing existing stock.",
           "Market → Trade Exchanges adds separate campaign economies. The DM defines regional quotes, stable commodity units, stock and treasury funds. Classic retains DM values; Automatic proposes the next season from stored d100 rolls, existing economic settings and recorded trades. Prices stay fixed during the season. Review and approve one seasonal transition with end-of-session Downtime, or use Manual season control for a recorded override without advancing days. Session Time does not settle seasons. Property managers and letters can trade stored goods with price limits and existing budget/location rules.",
+          "The global commodity market requires a city or city-area location; towns, regions and an unset location do not grant access. Sixty editable fantasy commodity templates ship with the app. Reviewed JSON/CSV/TSV imports add definitions without goods, quotes, stock or money. Every city without its own exchange receives an editable empty Trade Exchange and zero-funded NPC treasury, including older saves and imported cities; custom exchanges and their settings remain intact. Populate and enable an exchange deliberately before trading.",
           "Reviewed suppliers keep the same material and commodity identity through delivery. Orders use the shop's configured selling price, any active premium and the payer's existing Charisma discount; manager budgets include delivery fees. Linked goods contribute seasonal demand once when purchased. Arrival and delivery retry move the existing lot without buying it again.",
           "Open Trade receipts to review a supported reversal with a reason. The DM's correction restores original goods, payments and stock together, checks current funds and custody, and records opposite activity in the current season. Manager component trades reverse together; review their budgets and order timing separately. Older incomplete receipts and transport obligations explain when a compensating transaction is needed. All receipts and seasonal history remain accessible across pages. Historical Before, Proposed and Applied values stay tied to their saved record. Players see their own receipts and a private-treasury label rather than an invented zero balance.",
         ],
@@ -281,10 +286,12 @@ export const HELP_GROUPS: HelpGroup[] = [
         paragraphs: [
           "Open the gear for your role’s Appearance controls. Choose Light · Adventurer’s Ledger for aged parchment and dark ink, or Dark · Ironbound Dragon for dark iron and antique brass. Your theme is saved on this device and stays selected after reload. You can also change PDF reading size and toggle dollar estimates. DM Settings also contains ready-made looks and custom accent/page colors. These are display preferences, not campaign economy changes.",
           "The opening animation follows the device’s reduced-motion preference. After dismissal, internal navigation keeps the app open. A fresh app load or refresh shows the title screen again; a restored tab’s old dismissal cannot hide it. Display options do not change your character, coins or rules.",
+          "Music & ambience manages bundled menu/ambient sound and device-local licensed audio/playlist files. A user gesture can be required to start playback. Imported tracks remain on their device rather than being streamed or shared to other players; keep your source permissions and the existing source/license credits. Fantasy backgrounds, sound effects and playback volume are display/audio settings rather than campaign rules.",
         ],
         links: [
           ["Open appearance controls", "/?view=home#management"],
           ["DM custom colors", "/settings#appearance"],
+          ["Music & ambience", "/features/music"],
         ],
       },
       {

@@ -1,5 +1,6 @@
 import { SoundSettings } from "@/components/sound-settings";
 import { PlayerPermissions } from "@/components/character-permissions";
+import { ReferenceControls } from "@/components/reference-controls";
 import { AppLink } from "@/components/app-link";
 import { RollModeSetting } from "@/components/roll-mode-setting";
 import { FantasyIcon } from "@/components/fantasy-icon";
@@ -86,7 +87,7 @@ export function ManagementPanel({
         },
         {
           name: "Players & permissions",
-          content: <PlayerPermissions />,
+          content: <><PlayerPermissions /><ReferenceControls /></>,
           icon: "Party",
           links: [
             ["Party & character assignments", "/party"],

@@ -4,6 +4,7 @@ on:
     workflows:
       [
         Verify preserved functionality,
+        Focused player references,
         Deploy verified website,
         Verify existing live website (read only),
         Publish verified standby,

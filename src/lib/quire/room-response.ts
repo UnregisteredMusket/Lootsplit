@@ -65,6 +65,7 @@ export function readRoomResponse(value: unknown): { remote: RoomView; draft: Com
       !optionalText(value.sessionId) ||
       !optionalBoolean(value.viewOnly) ||
       !optionalBoolean(value.testMode) ||
+      !optionalBoolean(value.encounterActive) ||
       (value.departed !== undefined &&
         (!Array.isArray(value.departed) || !value.departed.every(departedSeat))) ||
       !text(value.draft) ||

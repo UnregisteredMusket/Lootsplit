@@ -2,11 +2,14 @@ import { useEffect, useRef, useState } from "react";
 import { Button, Modal } from "@/components/ui";
 import { APP_VERSION } from "@/lib/quire/version";
 import { APP_DESCRIPTION } from "@/lib/help/content";
+import { PLAYER_DESCRIPTION } from "@/lib/help/player-content";
+import { useSeat } from "@/lib/quire/seat";
 import { HelpContent } from "./help-content";
 
 const OFFER = "quire.guide.offer.v3";
 
 export function Guide() {
+  const seat = useSeat();
   const [ask, setAsk] = useState(false);
   const [open, setOpen] = useState(false);
 
@@ -51,7 +54,7 @@ export function Guide() {
         title="View the instructions?"
       >
         <div className="flex flex-col gap-4">
-          <p className="text-sm text-muted">View the setup guide now, or open Help anytime.</p>
+          <p className="text-sm text-muted">View the guide now, or open Help anytime.</p>
           <div className="flex flex-wrap gap-2">
             <Button variant="secondary" onClick={() => answer(false)}>
               Not now
@@ -63,7 +66,8 @@ export function Guide() {
       <Modal open={open} onOpenChange={setOpen} title="How Lootsplit works">
         <div className="flex flex-col gap-4">
           <p className="text-sm text-muted">
-            Lootsplit {APP_VERSION} · {APP_DESCRIPTION}
+            Lootsplit {APP_VERSION} ·{" "}
+            {seat.role === "player" ? PLAYER_DESCRIPTION : APP_DESCRIPTION}
           </p>
           <HelpContent embedded onNavigate={() => setOpen(false)} />
           <Button onClick={() => setOpen(false)}>Close</Button>

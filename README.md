@@ -4,7 +4,11 @@ Lootsplit is a shared party ledger and campaign application for web and Android.
 
 ## Home and feature screens
 
-The DM Desk and new player Home keep the existing theme and five mobile navigation tabs. Open a compact feature card or saved shortcut to use a full feature screen. Bottom navigation still works; **Return to …** goes to the screen that opened it. Desktop also offers direct feature links.
+Player Library offers searchable, read-only item, spell and creature indices without DM import or setup instructions. Lookup pauses during active campaign encounters by default. DMs can disable lookup, limit indices, or allow it during encounters from **Library → Player reference lookup** or **Settings & Management → Players & permissions**. Shared campaign records, handouts and saved sheets remain available. Character selection does not grant control of another assigned character; existing full-editing and individual-field permissions remain unchanged.
+
+**Help** is available in-app and under **Settings & Management → Help**, with a separate guide selected automatically for players. Every feature change must review/update the affected DM and player Help topics, feature inventory and GitHub development instructions before release; see `docs/CODING-MANUAL.md`.
+
+The DM Desk and player Home keep the existing theme and six mobile navigation tabs, including Maps. Open a compact feature card or saved shortcut to use a full feature screen. Bottom navigation still works; **Return to …** goes to the screen that opened it. Desktop also offers direct feature links.
 
 | Screen | Player access | DM access |
 | --- | --- | --- |

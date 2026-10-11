@@ -95,7 +95,25 @@ export async function navigateAccountScenario(page, origin, path) {
   );
   let remaining = await successes.count();
   while (remaining > 0) {
-    await successes.first().getByRole("button", { name: "Close toast", exact: true }).click();
+    const handles = await successes.elementHandles();
+    if (!handles.length) break;
+    const notice = handles[0];
+    try {
+      const close = await notice.$('button[data-close-button="true"]');
+      if (!close) throw Error("A success notice has no close control.");
+      await close.click();
+    } catch (error) {
+      // Follow this observed node, rather than waiting for a replacement toast.
+      // Natural expiry is allowed only when this exact notice was removed.
+      if (
+        !(await notice.evaluate(
+          (element) => !element.isConnected || element.dataset.removed === "true",
+        ))
+      )
+        throw error;
+    } finally {
+      for (const handle of handles) await handle.dispose();
+    }
     await expect.poll(() => successes.count()).toBeLessThan(remaining);
     remaining = await successes.count();
   }

@@ -57,7 +57,8 @@ import {
   signed,
   rollSpec,
 } from "@/lib/characters/model.mjs";
-import { searchOpen5e } from "@/lib/quire/open5e-api";
+import { searchCampaignReference } from "@/lib/quire/cloud-client";
+import { useReferenceAccess } from "@/lib/quire/use-reference-access";
 import type { OpenEntry } from "@/lib/quire/open5e";
 import { downloadJson } from "@/lib/quire/table";
 
@@ -2541,28 +2542,35 @@ function DmCampaigns({ campaigns }: { campaigns: Campaign[] }) {
   );
 }
 function ReferenceSearch({ onAdd }: { onAdd: (e: OpenEntry) => void }) {
+  const lookup = useReferenceAccess(), access = lookup.access("spells");
   const [query, setQuery] = useState(""),
     [edition, setEdition] = useState<"srd-2014" | "srd-2024">("srd-2014"),
     [entries, setEntries] = useState<OpenEntry[]>([]),
     [error, setError] = useState(""),
     [busy, setBusy] = useState(false);
+  const request = useRef(0);
+  useEffect(() => {
+    request.current++; setEntries([]); setError(""); setBusy(false);
+  }, [access.allowed]);
+  useEffect(() => () => { request.current++; }, []);
+  if (!access.allowed) return <p role="status">{access.reason}</p>;
   return (
     <details>
       <summary>Add spells from Open5e</summary>
       <form
         onSubmit={async (e) => {
           e.preventDefault();
+          const current = ++request.current;
           setBusy(true);
           try {
-            const r = await searchOpen5e({
-              data: { kind: "spells", edition, query, page: 1 },
-            });
+            const r = await searchCampaignReference({ kind: "spells", edition, query, page: 1 });
+            if (current !== request.current) return;
             setEntries(r.entries);
             setError(r.more ? "More matches available. Narrow your search." : "");
           } catch (e) {
-            setError(errorText(e));
+            if (current === request.current) setError(errorText(e));
           } finally {
-            setBusy(false);
+            if (current === request.current) setBusy(false);
           }
         }}
       >

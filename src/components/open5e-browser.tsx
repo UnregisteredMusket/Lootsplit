@@ -15,7 +15,9 @@ import {
   type OpenPage,
   type OpenQuery,
 } from "@/lib/quire/open5e";
-import { searchOpen5e } from "@/lib/quire/open5e-api";
+import { searchCampaignReference } from "@/lib/quire/cloud-client";
+import { useReferenceAccess } from "@/lib/quire/use-reference-access";
+import { referenceSection } from "@/lib/quire/reference-access";
 import type { CatalogItem, ItemCategory } from "@/lib/quire/types";
 const CACHE = "lootsplit.open5e.search.v1";
 type CacheRow = { key: string; at: string; data: OpenPage };
@@ -28,6 +30,8 @@ function cache(): CacheRow[] {
   }
 }
 export function Open5eBrowser({ onSelect }: { onSelect?: (item: CatalogItem) => void } = {}) {
+  const seat = useSeat(),
+    lookup = useReferenceAccess();
   const [kind, setKind] = useState<OpenKind>("items"),
     [edition, setEdition] = useState<OpenEdition>("srd-2014"),
     [query, setQuery] = useState("");
@@ -38,6 +42,14 @@ export function Open5eBrowser({ onSelect }: { onSelect?: (item: CatalogItem) => 
     [cached, setCached] = useState("");
   const [searched, setSearched] = useState<OpenQuery | null>(null);
   const request = useRef(0);
+  const access = lookup.access(referenceSection(kind));
+  useEffect(() => {
+    request.current++;
+    setResult(null);
+    setCached("");
+    setError("");
+    setBusy(false);
+  }, [access.allowed, seat.role]);
   useEffect(() => {
     const section = new URLSearchParams(location.search).get("kind");
     if (!onSelect && OPEN5E_KINDS.some((k) => k.value === section)) setKind(section as OpenKind);
@@ -49,6 +61,7 @@ export function Open5eBrowser({ onSelect }: { onSelect?: (item: CatalogItem) => 
     [],
   );
   async function search(target = 1) {
+    if (!access.allowed) return;
     const q: OpenQuery = { kind, edition, query: query.trim(), page: target },
       key = JSON.stringify(q),
       id = ++request.current;
@@ -59,7 +72,7 @@ export function Open5eBrowser({ onSelect }: { onSelect?: (item: CatalogItem) => 
     setSearched(q);
     setPage(target);
     try {
-      const data = await searchOpen5e({ data: q });
+      const data = await searchCampaignReference(q);
       if (id !== request.current) return;
       setResult(data);
       try {
@@ -77,7 +90,12 @@ export function Open5eBrowser({ onSelect }: { onSelect?: (item: CatalogItem) => 
       }
     } catch (e) {
       if (id !== request.current) return;
-      const saved = cache().find((c) => c.key === key);
+      const denied =
+        e instanceof Error &&
+        /disabled by your DM|paused while an encounter|not seated|room is closed|campaign is closed|No table uses|restricted account|Account access|Account suspended|permanently banned|Sign in to the account/i.test(
+          e.message,
+        );
+      const saved = denied ? undefined : cache().find((c) => c.key === key);
       if (saved) {
         setResult(saved.data);
         setCached(
@@ -106,8 +124,15 @@ export function Open5eBrowser({ onSelect }: { onSelect?: (item: CatalogItem) => 
       <p className="mt-2 text-sm text-muted">
         {onSelect
           ? "Search equipment or magic items, review the value, then choose the recipient and quantity. Nothing is added until you confirm Add holding."
-          : "Search the open rules. Review an item, set its shop price, then add a copy to your catalog. Imported copies stay on this device and never change automatically."}
+          : seat.role === "player"
+            ? "Search and read item, spell and creature references. References do not change your character or inventory. Your DM controls access."
+            : "Search the open rules. Review an item, set its shop price, then add a copy to your catalog. Imported copies stay on this device and never change automatically."}
       </p>
+      {!access.allowed && (
+        <p role="status" className="mt-3">
+          {access.reason}
+        </p>
+      )}
       <form onSubmit={submit} className="mt-4 grid gap-3">
         <div className="grid grid-cols-2 gap-2">
           <label className="text-sm">
@@ -123,7 +148,11 @@ export function Open5eBrowser({ onSelect }: { onSelect?: (item: CatalogItem) => 
               {OPEN5E_KINDS.filter(
                 (k) => !onSelect || ["items", "magicitems"].includes(k.value),
               ).map((k) => (
-                <option key={k.value} value={k.value}>
+                <option
+                  key={k.value}
+                  value={k.value}
+                  disabled={!lookup.access(referenceSection(k.value)).allowed}
+                >
                   {k.label}
                 </option>
               ))}
@@ -134,12 +163,13 @@ export function Open5eBrowser({ onSelect }: { onSelect?: (item: CatalogItem) => 
           Search by name
           <TextInput
             maxLength={100}
+            disabled={!access.allowed}
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Longsword, healing, invisibility…"
           />
         </label>
-        <Button type="submit" disabled={busy}>
+        <Button type="submit" disabled={busy || !access.allowed}>
           {busy ? "Searching…" : "Search Open5e"}
         </Button>
       </form>
@@ -160,15 +190,16 @@ export function Open5eBrowser({ onSelect }: { onSelect?: (item: CatalogItem) => 
         </p>
       ) : null}
       <ul className="mt-4 grid gap-3">
-        {result?.entries.map((entry) => (
-          <OpenResult
-            key={`${entry.edition}:${entry.kind}:${entry.key}`}
-            entry={entry}
-            onSelect={onSelect}
-          />
-        ))}
+        {access.allowed &&
+          result?.entries.map((entry) => (
+            <OpenResult
+              key={`${entry.edition}:${entry.kind}:${entry.key}`}
+              entry={entry}
+              onSelect={onSelect}
+            />
+          ))}
       </ul>
-      {result ? (
+      {access.allowed && result ? (
         <div className="mt-4 flex justify-between gap-2">
           <Button
             disabled={busy || page === 1 || !!changed}
@@ -260,7 +291,9 @@ function OpenResult({
           </span>
           <span className="mt-1 block text-xs text-muted">
             {entry.source}
-            {item ? ` · ${entry.copper === null ? "Set a price" : formatCopper(entry.copper)}` : ""}
+            {item
+              ? ` · ${entry.copper === null ? (seat.role === "dm" ? "Set a price" : "No listed price") : formatCopper(entry.copper)}`
+              : ""}
           </span>
         </summary>
         <div className="mt-3 text-sm">

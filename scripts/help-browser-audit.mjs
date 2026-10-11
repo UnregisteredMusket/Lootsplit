@@ -81,3 +81,4 @@ try {
 } finally {
   await browser.close();
 }
+await import("./player-reference-browser-audit.mjs");

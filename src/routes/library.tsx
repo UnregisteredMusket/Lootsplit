@@ -17,6 +17,9 @@ import { useSeat } from "@/lib/quire/seat";
 import { loadHandouts, type Handout } from "@/lib/quire/handouts";
 import { LedgerArt } from "@/components/ledger-art";
 import { useEconomy } from "@/lib/quire/economy-context";
+import { useReferenceAccess } from "@/lib/quire/use-reference-access";
+import { ReferenceControls } from "@/components/reference-controls";
+import type { ReferenceSection } from "@/lib/quire/reference-access";
 export const Route = createFileRoute("/library")({
   validateSearch: (s: Record<string, unknown>) => ({
     record: typeof s.record === "string" && s.record.length <= 800 ? s.record : undefined,
@@ -29,6 +32,7 @@ function LibraryHub() {
     [query, setQuery] = useState(""),
     [handouts, setHandouts] = useState<Handout[]>([]);
   const { catalog, lexicon, ready } = useEconomy();
+  const lookup = useReferenceAccess();
   const table = useWorldTable(),
     { record: recordKey } = Route.useSearch();
   const [kind, setKind] = useState(""),
@@ -54,19 +58,32 @@ function LibraryHub() {
       name: "Catalog",
       icon: "Catalog",
       url: dm ? "/catalog?pane=goods" : "/catalog?pane=open5e",
-      note: dm ? "Items & services" : "Open rules & items",
+      note: dm ? "Items & services" : "Read-only reference indices",
     },
+    ...(!dm
+      ? [
+          {
+            name: "Items",
+            icon: "Catalog",
+            url: "/catalog?pane=open5e&kind=items",
+            note: "Equipment & magic items",
+            section: "items" as ReferenceSection,
+          },
+        ]
+      : []),
     {
       name: "Creatures",
       icon: "Creatures",
       url: "/catalog?pane=open5e&kind=creatures",
       note: "Open5e index",
+      section: "creatures" as ReferenceSection,
     },
     {
       name: "Spells",
       icon: "Spells",
       url: "/catalog?pane=open5e&kind=spells",
       note: "Rules & references",
+      section: "spells" as ReferenceSection,
     },
     ...(dm
       ? [
@@ -103,14 +120,22 @@ function LibraryHub() {
         <FantasyIcon ui="Library" size={40} />
         <div>
           <h1>Library</h1>
-          <p>Your references, close at hand.</p>
+          <p>
+            {dm
+              ? "Your references, close at hand."
+              : "Search shared campaign records and read the available reference indices."}
+          </p>
         </div>
       </div>
       <label className="hub-search">
         <Search size={20} />
         <input
           aria-label="Search library destinations and catalog"
-          placeholder="Search locations, NPCs, monsters, items…"
+          placeholder={
+            dm
+              ? "Search locations, NPCs, monsters, items…"
+              : "Search shared locations, people and references…"
+          }
           value={query}
           onChange={(e) => {
             setQuery(e.target.value);
@@ -121,16 +146,26 @@ function LibraryHub() {
       <div className="library-tiles">
         {tiles
           .filter((x) => (x.name + " " + x.note).toLowerCase().includes(query.toLowerCase()))
-          .map((x) => (
-            <AppLink href={x.url} key={x.name}>
-              <FantasyIcon ui={x.icon} size={36} />
-              <strong>{x.name}</strong>
-              <small>{x.note}</small>
-            </AppLink>
-          ))}
+          .map((x) =>
+            !dm &&
+            !["Handouts"].includes(x.name) &&
+            !lookup.access("section" in x ? x.section : undefined).allowed ? (
+              <div aria-disabled="true" className="library-tile-disabled" key={x.name}>
+                <FantasyIcon ui={x.icon} size={36} />
+                <strong>{x.name}</strong>
+                <small>{lookup.access("section" in x ? x.section : undefined).reason}</small>
+              </div>
+            ) : (
+              <AppLink href={x.url} key={x.name}>
+                <FantasyIcon ui={x.icon} size={36} />
+                <strong>{x.name}</strong>
+                <small>{x.note}</small>
+              </AppLink>
+            ),
+          )}
       </div>
       <section id="records" className="mt-6" aria-label="Campaign library records">
-        <h2>Campaign records & imported data</h2>
+        <h2>{dm ? "Campaign records & imported data" : "Shared campaign records"}</h2>
         <p className="text-sm text-muted">
           Search your saved entries and open a record to see its details.
         </p>
@@ -278,15 +313,15 @@ function LibraryHub() {
           <p className="text-muted mt-2">
             {dm
               ? "Mark an entry as a handout in your PDF reader, then include it in a player link or file."
-              : "Your DM can include handouts in a player link or file."}
-          </p>
-        )}
-        {!dm && (
-          <p className="text-sm text-muted mt-3">
-            The campaign’s private PDF library is managed by the DM.
+              : "No shared handouts are available yet."}
           </p>
         )}
       </section>
+      {dm && (
+        <section className="world-card mt-6" id="reference-access">
+          <ReferenceControls />
+        </section>
+      )}
       {dm && <ResourcePacks />}
       <Link to="/resources" className="settings-link mt-5">
         Sources & licenses →

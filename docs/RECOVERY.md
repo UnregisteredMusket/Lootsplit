@@ -1,4 +1,8 @@
-# Active recovery: default city exchanges — October 11, 2026 UTC
+# Active recovery: player Library, lookup and Help — October 11, 2026 UTC
+
+PR94 default city exchanges is COMPLETE/LIVE: main `b393f887b7201c0f58bc6ee7e1db0e3d99d29594`, tree `f098a7e4fc9c779e239dea2d2941f85f8678c443`, Worker `3e4fe361-64e5-42c7-bdc3-66c682703f7d`; exact PR38125086913/main38125705689, website38126334991 and standby38126335004 passed. Do not repeat that release. The owner now requests player Library descriptions/read-only search, default encounter lookup restrictions and DM controls, separate maintained player Help, and character-switch verification with correctly working behavior preserved. Branch `feature/player-reference-help` extends only that scope. Character ownership/editing rules already pass and remain unchanged. No migration or distributed APK is included. See `docs/audit/2026-10-11-player-library-help.md`; evolving exact source/PR/run/release identities belong in the PR and `test-results/recovery/player-reference-help.json`.
+
+# Previous recovery: default city exchanges — October 11, 2026 UTC
 
 City access/catalogue PR93 is COMPLETE/LIVE: main `c3ed29d01c669a60be884a8d6f948c779fab3987`, Worker `039cfadf-b1a4-470e-b61a-f6aff661c3da`; all-nine PR38075720286/main38076562217 and website38077277877/standby38077277894 passed. Do not repeat that release. The owner now requests one trade exchange by default for every city. Branch `feature/default-city-exchanges` extends only that scope; existing publication authorization persists. No migration or distributed APK. See `docs/audit/2026-10-11-default-city-exchanges.md`; evolving exact source/PR/run/release identities belong in the PR and `test-results/recovery/default-city-exchanges.json`.
 

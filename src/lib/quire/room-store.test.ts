@@ -21,6 +21,7 @@ import {
 } from "./push.server.ts";
 import { jwtVerify, importJWK } from "jose";
 const sql = new DatabaseSync(":memory:");
+sql.exec(readFileSync(new URL("../../../cloudflare/migrations/0008_encounters.sql", import.meta.url), "utf8"));
 test("shared commodity imports are DM-only, isolated and replay-safe; global trade is checked against the room's city location", async () => {
   const table=tradeFixture(); table.journal!.tradeEconomy!.exchanges[0].locationId=null;
   const host=await openRoom({name:"City market DM",table}), other=await openRoom({name:"Other commodity campaign",table:tradeFixture()});

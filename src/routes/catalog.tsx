@@ -14,6 +14,7 @@ import { CATEGORIES, LEXEME_KINDS, RARITIES, labelOf } from "@/lib/quire/labels"
 import { formatCopper, parsePrice } from "@/lib/quire/money";
 import { useDollarText, usePrefs } from "@/lib/quire/prefs";
 import { useSeat } from "@/lib/quire/seat";
+import { useReferenceAccess } from "@/lib/quire/use-reference-access";
 import { randomPerson, randomPlace, randomShopTitle } from "@/lib/quire/names";
 import type { CatalogItem, ItemCategory, ItemRarity, LexemeKind } from "@/lib/quire/types";
 
@@ -25,6 +26,8 @@ type Pane = "goods" | "names" | "book" | "open5e";
 
 function CatalogPage() {
   const seat = useSeat();
+  const lookup = useReferenceAccess(),
+    access = lookup.access();
   const [pane, setPane] = useState<Pane>(seat.role === "player" ? "open5e" : "goods");
   useEffect(() => {
     const p = new URLSearchParams(location.search).get("pane");
@@ -36,33 +39,43 @@ function CatalogPage() {
     <Shell>
       <h1 className="font-display text-4xl tracking-tight">Catalog</h1>
       <p className="mt-2 max-w-prose text-sm text-muted">
-        Your item collection, open rules, and names for your world.
+        {dm
+          ? "Your item collection, open rules, and names for your world."
+          : "Searchable, read-only references for your adventure."}
       </p>
-      <div className="mt-4">
-        <Segmented
-          label="Catalog section"
-          value={activePane}
-          onChange={setPane}
-          options={[
-            ...(dm ? [{ value: "goods" as Pane, label: "Items" }] : []),
-            { value: "open5e", label: "Open5e" },
-            { value: "names", label: "Names" },
-            ...(dm ? [{ value: "book" as Pane, label: "Book" }] : []),
-          ]}
-        />
-      </div>
-      {activePane === "goods" && dm ? <GoodsPane /> : null}
-      {activePane === "names" ? (
-        dm ? (
-          <NamesPane />
-        ) : (
-          <div className="mt-6">
-            <NameGenerator />
+      {!dm && !access.allowed ? (
+        <p role="status" className="mt-4">
+          {access.reason}
+        </p>
+      ) : (
+        <>
+          <div className="mt-4">
+            <Segmented
+              label="Catalog section"
+              value={activePane}
+              onChange={setPane}
+              options={[
+                ...(dm ? [{ value: "goods" as Pane, label: "Items" }] : []),
+                { value: "open5e", label: "Open5e" },
+                { value: "names", label: "Names" },
+                ...(dm ? [{ value: "book" as Pane, label: "Book" }] : []),
+              ]}
+            />
           </div>
-        )
-      ) : null}
-      {activePane === "open5e" ? <Open5eBrowser /> : null}
-      {activePane === "book" && dm ? <BookHarvest /> : null}
+          {activePane === "goods" && dm ? <GoodsPane /> : null}
+          {activePane === "names" ? (
+            dm ? (
+              <NamesPane />
+            ) : (
+              <div className="mt-6">
+                <NameGenerator />
+              </div>
+            )
+          ) : null}
+          {activePane === "open5e" ? <Open5eBrowser /> : null}
+          {activePane === "book" && dm ? <BookHarvest /> : null}
+        </>
+      )}
     </Shell>
   );
 }
