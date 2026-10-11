@@ -84,6 +84,7 @@ export const PLAYER_HELP_GROUPS: HelpGroup[] = [
         title: "Play during an encounter",
         paragraphs: [
           "Use your assigned sheet, inventory and dice during combat. Your DM runs initiative, rounds, enemies, conditions and loot awards. Lookup restrictions begin when a campaign encounter is started and end when every active encounter is concluded, unless your DM sets an override.",
+          "Your DM chooses when to apply initiative order. Entering or correcting a score does not automatically move combatants or change whose turn it is. Campaign encounter ordering controls remain with the DM.",
           "An encounter roll is a recorded result, not an automatic application of combat rules. Awarded loot appears in its chosen canonical inventory; do not add a second copy manually.",
         ],
         links: [

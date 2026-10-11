@@ -1,4 +1,5 @@
 import { chooseOption } from "./search-select-browser.mjs";
+import { checkManualInitiative, expectInitiativeOrder } from "./initiative-browser-check.mjs";
 import { finishAuditLiveness } from "./audit-liveness.mjs";
 import { scanFixture, scannedPdf } from "./ocr-browser-fixtures.mjs";
 import { characterPdf, characterPdfFields } from "./character-pdf-fixtures.mjs";
@@ -170,8 +171,13 @@ try {
   await p.getByLabel("Initiative", { exact: true }).fill("17");
   await p.getByLabel("HP", { exact: true }).fill("8");
   await p.getByLabel("Conditions", { exact: true }).fill("Prone");
+  const initiativeOrder = await checkManualInitiative(p, "Rimrock ghoul", output);
   await p.getByRole("button", { name: "Save encounter", exact: true }).click();
   await p.getByText("Encounter saved.", { exact: true }).waitFor();
+  await reloadApplication(p);
+  await chooseOption(p.getByLabel("Save in", { exact: true }), code);
+  await p.locator(".encounter-library").getByRole("button", { name: /New encounter/ }).click();
+  await expectInitiativeOrder(p, initiativeOrder);
   await p.getByRole("button", { name: "Start encounter", exact: true }).click();
   await p.getByRole("button", { name: "Next turn", exact: true }).click();
   await p.getByRole("button", { name: "Save encounter", exact: true }).click();

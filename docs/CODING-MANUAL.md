@@ -96,6 +96,10 @@ The user requests speed improvements as **before → after, absolute time saved,
 
 ## Tooling and scope
 
+### Encounter initiative ordering
+
+The combatant array is the persisted display/turn order for device, account and shared campaign encounters. Initiative entry, draft saves, start and reload never sort it implicitly. Only the DM's **Sort initiative** action calls `sortInitiative`; it keeps the active ID and round, retains tied roster order and puts blanks last. `nextTurn` follows the stored array. Preserve schema/version, IDs, revision checks, read-only/role locks and map roster references. Run encounter model/permission tests and the existing device/account browser audits, including stable multi-digit focus, desktop/mobile explicit sorting, clearing scores, turn traversal and reopened order, plus full release gates.
+
 ### Help and instruction maintenance for every feature
 
 Preserve the existing credential-free public `searchOpen5e` GET function for bundled Android clients. Current in-campaign searches use the separate scoped POST function; room credentials must never be put into a reference URL. Unseated local DM searches retain the public lookup protocol. Website role-guide/control updates become bundled APK features only with a separately verified signed Android release.
