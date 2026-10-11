@@ -265,16 +265,23 @@ try {
     assert.equal(await page.getByRole("button", { name: "Search Open5e", exact: true }).count(), 0);
     await page.screenshot({ path: `${output}/blocked-${width}.png`, fullPage: true });
     await openApplication(dmPage, origin + "/library#reference-access");
-    await dmPage.getByLabel("Allow lookup during active encounters", { exact: true }).check();
+    async function setReferenceControl(label, checked) {
+      const input = dmPage.getByLabel(label, { exact: true });
+      // These controlled values change only after the authoritative command.
+      // Click once, then assert the committed value rather than an immediate native toggle.
+      await input.click();
+      await expect(input).toBeChecked({ checked });
+    }
+    await setReferenceControl("Allow lookup during active encounters", true);
     await expect(page.getByRole("button", { name: "Search Open5e", exact: true })).toBeEnabled();
-    await dmPage.getByLabel("Allow creatures lookup", { exact: true }).uncheck();
+    await setReferenceControl("Allow creatures lookup", false);
     await expect(page.getByLabel("Search by name", { exact: true })).toBeDisabled();
     await page
       .getByRole("combobox", { name: "Reference section", exact: true })
       .selectOption("spells");
     await expect(page.getByLabel("Search by name", { exact: true })).toBeEnabled();
-    await dmPage.getByLabel("Allow creatures lookup", { exact: true }).check();
-    await dmPage.getByLabel("Allow lookup during active encounters", { exact: true }).uncheck();
+    await setReferenceControl("Allow creatures lookup", true);
+    await setReferenceControl("Allow lookup during active encounters", false);
     await expect(page.getByText(/Reference lookup is paused while an encounter/)).toBeVisible();
     await openApplication(dmPage, origin + `/encounters?encounter=${id}`);
     dmPage.once("dialog", (dialog) => dialog.accept());
@@ -286,11 +293,11 @@ try {
     ).toBeVisible();
     await expect(page.getByRole("button", { name: "Search Open5e", exact: true })).toBeEnabled();
     await openApplication(dmPage, origin + "/library#reference-access");
-    await dmPage.getByLabel("Allow player reference lookup", { exact: true }).uncheck();
+    await setReferenceControl("Allow player reference lookup", false);
     await expect(
       page.getByText("Reference lookup is disabled by your DM.", { exact: true }),
     ).toBeVisible();
-    await dmPage.getByLabel("Allow player reference lookup", { exact: true }).check();
+    await setReferenceControl("Allow player reference lookup", true);
     await expect(page.getByRole("button", { name: "Search Open5e", exact: true })).toBeEnabled();
     await openApplication(page, origin + "/characters");
     await page.locator(".character-library-controls > summary").click();
