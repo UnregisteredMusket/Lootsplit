@@ -246,7 +246,11 @@ test("damage thresholds apply the full qualifying damage and never deduct the th
 });
 test("cargo retains its lot/owner, stays unavailable remotely and cannot exceed ship capacity", () => {
   let t = fixture();
-  assert.equal(shipHere(t, t.holdings[0], "party"), true, "The treasury uses the party's port, so a DM can choose the receiving character.");
+  assert.equal(
+    shipHere(t, t.holdings[0], "party"),
+    true,
+    "The treasury uses the party's port, so a DM can choose the receiving character.",
+  );
   t = run(
     t,
     {
@@ -576,9 +580,16 @@ test("repair quotes create normal reviewed projects; partial repairs cost money 
     job: { ...job, status: "active" },
   });
   const before = toCopper(t.purses[1].coins);
-  t = readCloudTable(JSON.parse(JSON.stringify(t)));
+  const saved = readCloudTable(JSON.parse(JSON.stringify(t)));
+  assert.ok(saved);
+  t = saved;
   t = run(t, { kind: "downtime-plan", name: "Repair at session start", days: 1 });
-  t = run(t, { kind: "session", name: "Repaired ship", end: false, downtimeId: t.journal!.finance!.downtime.at(-1)!.id });
+  t = run(t, {
+    kind: "session",
+    name: "Repaired ship",
+    end: false,
+    downtimeId: t.journal!.finance!.downtime.at(-1)!.id,
+  });
   assert.equal(vessel(t).stats.components[0].hp, 180);
   assert.equal(before - toCopper(t.purses[1].coins), 200);
   t = days(t, 1);

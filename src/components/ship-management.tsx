@@ -476,7 +476,7 @@ function ShipWork({ holding: h, vessel: s }: { holding: Holding; vessel: Vessel 
     [upgradeKey, setUpgrade] = useState(
       s.upgrades.find((u) => !s.installed.includes(u.key))?.key ?? "",
     ),
-    [payerId, setPayer] = useState(mine[0]?.id ?? ""),
+    [payerId, setPayer] = useState(mine.find((p) => p.id === h.purseId)?.id ?? mine[0]?.id ?? ""),
     [workers, setWorkers] = useState(1),
     [worker, setWorker] = useState(""),
     [share, setShare] = useState(100);
@@ -881,7 +881,7 @@ function Arrears({ holding: h, vessel: s }: { holding: Holding; vessel: Vessel }
   const t = useEstateTable(),
     seat = useSeat(),
     mine = t.purses.filter((p) => seat.role === "dm" || seat.purseIds.includes(p.id)),
-    [payerId, setPayer] = useState(mine[0]?.id ?? "");
+    [payerId, setPayer] = useState(mine.find((p) => p.id === h.purseId)?.id ?? mine[0]?.id ?? "");
   return (
     <ActionForm
       title="Pay ship arrears"

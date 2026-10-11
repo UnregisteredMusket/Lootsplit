@@ -66,8 +66,10 @@ async function previewApply(page, n, name) {
   await page.locator("summary").filter({ hasText: "Set downtime & review calculations" }).click();
   await page.getByLabel("In-game days", { exact: true }).fill(String(n));
   await page.getByRole("button", { name: "Preview downtime", exact: true }).click();
-  await expect.poll(async () => (await readJournal(page)).finance.downtime.at(-1)?.status).toBe("pending");
-  await page.getByRole("button", { name: /^Play sessions/ }).click();
+  await expect
+    .poll(async () => (await readJournal(page)).finance.downtime.at(-1)?.status)
+    .toBe("pending");
+  await page.getByRole("button", { name: /^(Play sessions|Session ·)/ }).click();
   await page.getByLabel("Session name", { exact: true }).fill(name);
   await page.getByRole("checkbox", { name: /I approve the downtime plan/ }).check();
   await page.getByRole("button", { name: "Approve downtime & start session", exact: true }).click();
@@ -221,13 +223,23 @@ try {
     await ship.getByRole("button", { name: "Repairs & ship upgrades", exact: true }).click();
     const work = ship.getByRole("form", { name: "Propose ship work", exact: true });
     await work.getByLabel("HP to repair", { exact: true }).fill("20");
+    assert.equal(
+      await work
+        .getByLabel("Ship work payer", { exact: true })
+        .evaluate((el) => el.closest(".record-select").querySelector("select").value),
+      "party",
+      "DM repair quotes default to the ship owner, rather than unrelated city treasuries",
+    );
+    await chooseOption(work.getByLabel("Ship work payer", { exact: true }), "hero");
     await submit(work);
     await ship.getByRole("button", { name: /^Construction, upgrades & downtime work/ }).click();
     const job = ship.locator(".estate-record").filter({
       has: page.getByRole("heading", { name: "Repair Hull: 20 HP · draft", exact: true }),
     });
     await job.getByRole("button", { name: "Approve / resume", exact: true }).click();
-    await expect.poll(async () => (await readJournal(page)).propertyOperations.jobs[0].status).toBe("active");
+    await expect
+      .poll(async () => (await readJournal(page)).propertyOperations.jobs[0].status)
+      .toBe("active");
     await previewApply(page, 1, "Repair the Dawn Trader");
     await expect
       .poll(async () => (await readJournal(page)).fleet.vessels[0].stats.components[0].hp)
@@ -266,7 +278,10 @@ try {
     await submit(teleport, "Teleport ship, cargo and occupants");
     const result = await readJournal(page);
     assert.equal(result.fleet.voyages[0].status, "dm-overridden");
-    assert.equal(result.world.characterPositions[0].locationId, "far");
+    assert.equal(
+      result.world.characterPositions.find((p) => p.purseId === "hero").locationId,
+      "far",
+    );
     assert.equal(result.fleet.aboard[0].propertyId, "ship");
     await ship.getByRole("button", { name: /^Ship stat block/ }).click();
     await fits(page);
@@ -374,7 +389,10 @@ try {
   );
 } catch (error) {
   if (currentPage && !currentPage.guestAccessAudit)
-    await writeFile(`${output}/failure-state.json`, JSON.stringify(await readJournal(currentPage), null, 2)).catch(() => {});
+    await writeFile(
+      `${output}/failure-state.json`,
+      JSON.stringify(await readJournal(currentPage), null, 2),
+    ).catch(() => {});
   if (currentPage)
     await currentPage.screenshot({ path: `${output}/failure.png`, fullPage: true }).catch(() => {});
   await writeFile(`${output}/failure.txt`, String(error.stack || error));
