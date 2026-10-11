@@ -249,6 +249,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-11T12:45:29.000Z | queue: Focused player references / initial queue | 4s → 28s | +24s | +600% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38131342389) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38140451035) |
 | 2026-10-11T12:45:26Z | job: Player references / worker | 240s → 283s | +43s | +17.92% | cancelled | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38138998692/job/114468749350) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38140169494/job/114472236286) |
 | 2026-10-11T12:44:14Z | step: Packaged Worker / interface / worker-ships | 27s → 39s | +12s | +44.44% | failure | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38138347173/job/114467062781) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38140169481/job/114472597041) |
 | 2026-10-11T12:43:37Z | step: Packaged Worker / accounts / Start disposable built Worker | 9s → 11s | +2s | +22.22% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37638440371/job/112851511436) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38140169481/job/114472596982) |
