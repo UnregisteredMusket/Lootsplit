@@ -289,14 +289,9 @@ try {
     // Share the complete canonical fleet and exercise a real in-memory player seat.
     await createAndSaveRoom(page, origin, (p, o, path) => navigateApplication(p, o + path));
     await navigateApplication(page, origin + "/share");
-    const live = page.getByRole("button", { name: "Live", exact: true });
-    if ((await live.getAttribute("aria-pressed")) !== "true") {
-      await live.click();
-      await page
-        .getByRole("alertdialog")
-        .getByRole("button", { name: "Change mode", exact: true })
-        .click();
-    }
+    const live = page
+      .getByRole("group", { name: "Session mode", exact: true })
+      .getByRole("button", { name: "Live", exact: true });
     await expect(live).toHaveAttribute("aria-pressed", "true");
     await expect(
       page
