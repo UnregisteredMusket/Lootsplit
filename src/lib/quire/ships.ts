@@ -47,7 +47,7 @@ export function shipHere(t: Table, h: Holding, purseId?: string) {
   if (s.mode === "sailing") return false;
   const p = t.purses.find((p) => p.id === purseId),
     m = readMarketLocations(t.journal?.market);
-  const location = p ? characterLocation(t, p) : m.currentLocationId;
+  const location = p?.kind === "character" ? characterLocation(t, p) : m.currentLocationId;
   return (
     !!location && !!h.locationId && locationPath(m, location).some((l) => l.id === h.locationId)
   );

@@ -69,6 +69,7 @@ export function ActionForm({
   command,
   label = "Save",
   disabled = false,
+  submitDisabled = false,
   onAccepted,
 }: {
   title: string;
@@ -76,6 +77,7 @@ export function ActionForm({
   command: () => CommandInput;
   label?: string;
   disabled?: boolean;
+  submitDisabled?: boolean;
   onAccepted?: () => void;
 }) {
   const { commandOutcome } = useEconomy(),
@@ -94,7 +96,7 @@ export function ActionForm({
       onChangeCapture={() => setDirty(true)}
       onSubmit={async (e) => {
         e.preventDefault();
-        if (locked) return;
+        if (locked || submitDisabled) return;
         setBusy(true);
         setError("");
         setNotice("");
@@ -115,7 +117,7 @@ export function ActionForm({
       <fieldset disabled={locked}>
         <legend>{title}</legend>
         <div className="estate-fields">{children}</div>
-        <Button type="submit" disabled={locked}>
+        <Button type="submit" disabled={locked || submitDisabled}>
           {busy ? "Recording…" : label}
         </Button>
       </fieldset>
@@ -447,7 +449,8 @@ function Storage({
       <WithdrawalRequests propertyId={h.id} state={state} />
       <ActionForm
         title="Move stored goods"
-        disabled={!canMove}
+        disabled={!site.enabled}
+        submitDisabled={!canMove}
         label={
           direction === "deposit"
             ? "Deposit items"

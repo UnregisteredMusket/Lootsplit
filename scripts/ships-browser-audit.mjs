@@ -196,7 +196,7 @@ try {
     await expect(ship.locator("table")).toContainText("200/200");
     await ship.getByRole("button", { name: /^Storage & material staging/ }).click();
     const cargo = ship.getByRole("form", { name: "Move stored goods", exact: true });
-    await chooseOption(cargo.getByLabel("Acting / receiving character", { exact: true }), "hero");
+    await chooseOption(cargo.getByLabel("Acting / receiving character"), "hero");
     await cargo.getByLabel("Item quantity", { exact: true }).fill("10");
     await submit(cargo, "Deposit items");
     await expect(ship).toContainText("10 × Trade goods");
@@ -215,7 +215,7 @@ try {
     const berth = ship.getByRole("form", { name: "Change ship storage / launch", exact: true });
     const yardId = (await readJournal(page)).fleet.facilities[0].id;
     await chooseOption(berth.getByLabel("Ship facility", { exact: true }), yardId);
-    await berth.getByLabel("Ship storage mode", { exact: true }).selectOption("shipyard");
+    await berth.getByLabel("Ship storage mode").selectOption("shipyard");
     await submit(berth);
     await ship.getByRole("button", { name: "Repairs & ship upgrades", exact: true }).click();
     const work = ship.getByRole("form", { name: "Propose ship work", exact: true });
@@ -239,7 +239,7 @@ try {
     await submit(boarding, "Board character");
     await ship.getByRole("button", { name: "Docks, dry storage & shipyards", exact: true }).click();
     const afloat = ship.getByRole("form", { name: "Change ship storage / launch", exact: true });
-    await afloat.getByLabel("Ship storage mode", { exact: true }).selectOption("docked");
+    await afloat.getByLabel("Ship storage mode").selectOption("docked");
     await submit(afloat);
     await ship.getByRole("button", { name: "Downtime voyages", exact: true }).click();
     const travel = ship.getByRole("form", { name: "Propose downtime voyage", exact: true });

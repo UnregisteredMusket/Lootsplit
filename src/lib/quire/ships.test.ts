@@ -246,6 +246,7 @@ test("damage thresholds apply the full qualifying damage and never deduct the th
 });
 test("cargo retains its lot/owner, stays unavailable remotely and cannot exceed ship capacity", () => {
   let t = fixture();
+  assert.equal(shipHere(t, t.holdings[0], "party"), true, "The treasury uses the party's port, so a DM can choose the receiving character.");
   t = run(
     t,
     {
