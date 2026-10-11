@@ -12374,5 +12374,20 @@
     "finishedAt": "2026-10-11T16:18:18Z",
     "durationMs": 4000,
     "trendId": "38154610377:1:f81f077694112f0b9d472b71514b46c78f4495808cc54fe34d869cd5d3e92842"
+  },
+  "[\"local\",\"test\",\"encounter initiative and release assignment regressions\",\"node22.23.3/linux-x64/work-mode/warm-dependencies/20-tests\",\"v1-explicit-initiative\"]": {
+    "schema": 1,
+    "id": "local:375faa77-afce-4d28-93dc-60f1e92cbda7",
+    "scope": "[\"local\",\"test\",\"encounter initiative and release assignment regressions\",\"node22.23.3/linux-x64/work-mode/warm-dependencies/20-tests\",\"v1-explicit-initiative\"]",
+    "kind": "test",
+    "name": "encounter initiative and release assignment regressions",
+    "environment": "node22.23.3/linux-x64/work-mode/warm-dependencies/20-tests",
+    "commit": "2b21a26c50309ecd0d12991b086795af7af62079",
+    "url": "https://github.com/UnregisteredMusket/Lootsplit/commit/2b21a26c50309ecd0d12991b086795af7af62079",
+    "outcome": "success",
+    "startedAt": "2026-10-11T16:11:36.495Z",
+    "finishedAt": "2026-10-11T16:11:36.930Z",
+    "durationMs": 435,
+    "trendId": "local:375faa77-afce-4d28-93dc-60f1e92cbda7"
   }
 }
