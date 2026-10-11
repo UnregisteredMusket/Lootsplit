@@ -55,7 +55,8 @@ export const shortcutIcons = [
   "save",
 ];
 export function destinationsFor(role = "dm") {
-  return shortcutDestinations.filter(x=>role === "dm" || !["encounter","loot","funds","downtime","financial","reports","review","shops","backup"].includes(x.id));
+  return shortcutDestinations.filter(x=>role === "dm" || !["encounter","loot","funds","downtime","financial","reports","review","shops","backup"].includes(x.id))
+    .map(x => role === "dm" && x.id === "character" ? { ...x, href: "/characters" } : x);
 }
 /** @param {unknown} raw */
 export function normalizeShortcuts(raw, role = "dm") {

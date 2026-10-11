@@ -166,7 +166,7 @@ export function HomeBoard({ embedded = false }: { embedded?: boolean }) {
                 </div>
               </Card>
               <div className="grid grid-cols-2 gap-3">
-                <Link to="/party" className="stat-card">
+                <Link to="/party" search={{ section: "funds" }} className="stat-card">
                   <Package className="size-5 text-lead" />
                   <p className="mt-4 font-display text-3xl">{loot.length}</p>
                   <p className="text-sm text-muted">Recorded holdings</p>
@@ -234,7 +234,7 @@ export function HomeBoard({ embedded = false }: { embedded?: boolean }) {
                 </Link>
               )}
               {seat.role === "dm" ? (
-                <AppLink href="/features/bank?from=%2F" className="quick-action">
+                <AppLink href="/features/review?from=%2F" className="quick-action">
                   <ScrollText className="size-4" />
                   Review requests
                 </AppLink>
@@ -248,14 +248,13 @@ export function HomeBoard({ embedded = false }: { embedded?: boolean }) {
                 <Store className="size-4" />
                 {seat.role === "dm" ? "Manage shops" : "Browse market"}
               </Link>
-              <Link
-                to={seat.role === "dm" ? "/settings" : "/party"}
-                search={seat.role === "dm" ? undefined : { action: "" }}
+              <AppLink
+                href={seat.role === "dm" ? "/features/financial" : "/party"}
                 className="quick-action"
               >
                 <SlidersHorizontal className="size-4" />
                 {seat.role === "dm" ? "Economy rules" : "Your party"}
-              </Link>
+              </AppLink>
             </div>
           </OverviewSection>
           <OverviewSection

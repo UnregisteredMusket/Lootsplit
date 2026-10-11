@@ -20,6 +20,7 @@ import { Shortcuts } from "./shortcuts";
 import { HomeBoard } from "../home-board";
 import { useSheetReadouts, HpBar } from "./readouts";
 import { InformationStrip } from "./information-strip";
+import { MarketReadout } from "./market-readout";
 import type { Purse } from "@/lib/quire/types";
 import { roomStatusLabels } from "@/lib/quire/room-state";
 import { getOnline, subscribeOnline } from "@/lib/mobile/online";
@@ -324,6 +325,10 @@ function DmDeskContents() {
                 </AppLink>
               </>
             ),
+          },
+          {
+            name: "Market",
+            content: <MarketReadout />,
           },
           {
             name: "Activity",

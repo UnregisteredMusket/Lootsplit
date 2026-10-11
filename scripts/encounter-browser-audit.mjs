@@ -335,7 +335,10 @@ try {
     window.receiptNavigationDocument = true;
   });
   const noteLink = p.getByRole("link", { name: "Open campaign journal", exact: true });
-  await expect(noteLink).toHaveAttribute("href", noteHref);
+  const linkedNote = new URL(await noteLink.getAttribute("href"), p.url());
+  assert.equal(linkedNote.pathname, "/features/journal");
+  assert.equal(linkedNote.hash, new URL(noteHref, p.url()).hash);
+  assert.equal(new URL(linkedNote.searchParams.get("from"), p.url()).pathname, "/encounters");
   // An existing party summary never proves that a different receipt belongs to it.
   let mismatchedReceiptReads = 0;
   const wrongReceipt = async (route) => {
@@ -375,7 +378,9 @@ try {
     name: `Read linked journal entry · ${receiptNotes[0].title}`,
     exact: true,
   });
-  await expect(exactNote).toHaveAttribute("href", noteHref);
+  const linkedSessionNote = new URL(await exactNote.getAttribute("href"), p.url());
+  assert.equal(linkedSessionNote.pathname, "/features/journal");
+  assert.equal(linkedSessionNote.hash, new URL(noteHref, p.url()).hash);
   await exactNote.click();
   await expect(sessionReader).toBeHidden();
   await p.goBack();

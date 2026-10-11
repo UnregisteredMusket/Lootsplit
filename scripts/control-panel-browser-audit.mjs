@@ -66,7 +66,7 @@ try {
   ).toHaveCount(0);
   const information = page.getByRole("region", { name: "Campaign information", exact: true });
   await expect(information).toBeVisible();
-  assert.equal(await page.locator(".information-panel").count(), 5);
+  assert.equal(await page.locator(".information-panel").count(), 6);
   await page
     .locator(".information-selectors")
     .getByRole("button", { name: "Funds", exact: true })
@@ -74,6 +74,11 @@ try {
   await expect(
     page.locator(".information-selectors").getByRole("button", { name: "Funds", exact: true }),
   ).toHaveAttribute("aria-pressed", "true");
+  await page.getByRole("button", { name: "Next information panel", exact: true }).click();
+  await expect(
+    page.locator(".information-selectors").getByRole("button", { name: "Market", exact: true }),
+  ).toHaveAttribute("aria-pressed", "true");
+  await expect(page.getByRole("region", { name: "Market information", exact: true })).toContainText("Global market");
   await page.getByRole("button", { name: "Next information panel", exact: true }).click();
   await expect(
     page.locator(".information-selectors").getByRole("button", { name: "Activity", exact: true }),
@@ -207,10 +212,10 @@ try {
   await page.getByRole("button", { name: /^Campaign treasury/ }).click();
   await expect(page.getByRole("link", { name: "Add loot", exact: true })).toBeVisible();
   await page.getByRole("link", { name: "Review requests", exact: true }).click();
-  await expect(page.getByRole("heading", { name: "Bank", exact: true })).toBeVisible();
+  await expect(page.getByRole("heading", { name: "Review Inbox", exact: true })).toBeVisible();
   await expect(
     page.getByRole("heading", { name: "Queue a character payment for approval", exact: true }),
-  ).toBeVisible();
+  ).toHaveCount(0);
   await page.getByRole("link", { name: "Return to Desk", exact: true }).click();
   await page.getByRole("button", { name: /^Activity & balances/ }).click();
   await expect(page.getByRole("heading", { name: "Recent activity", exact: true })).toHaveCount(1);

@@ -50,7 +50,7 @@ export function MarketLocationsPanel() {
     [error, setError] = useState("");
   const selected = market.locations.find((location) => location.id === editing);
   return (
-    <section aria-label="Market locations" className="mt-5 space-y-3">
+    <section id="market-locations" aria-label="Market locations" className="mt-5 space-y-3">
       <div className="rounded-lg border border-border bg-subtle p-4">
         {seat.role === "dm" ? (
           <label className="block text-sm font-medium">
