@@ -31,7 +31,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Packaged Worker / interface / Run actions/setup-node@v4 | open | 5 | 2s → 15s | +13s | +650% |
 | Packaged Worker / accounts / Run npm ci | open | 4 | 8s → 20s | +12s | +150% |
 | Packaged Worker / interface / Run actions/download-artifact@v4 | open | 3 | 1s → 4s | +3s | +300% |
-| Packaged Worker / accounts / Start disposable built Worker | open | 3 | 5s → 9s | +4s | +80% |
+| Packaged Worker / accounts / Start disposable built Worker | open | 4 | 5s → 11s | +6s | +120% |
 | Development / accounts / dev-owner | open | 2 | 4s → 6s | +2s | +50% |
 | Development / gameplay / dev-control-panel | resolved | 2 | 20s → 31s | +11s | +55% |
 | Development / accounts / dev-bug | open | 2 | 3s → 5s | +2s | +66.67% |
@@ -236,17 +236,28 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Packaged Worker / interface / worker-trade-economy | open | 4 | 22s → 68s | +46s | +209.09% |
 | Development / gameplay / dev-trade-economy | open | 2 | 32s → 83s | +51s | +159.38% |
 | Packaged Worker / interface / worker-trade-economy | open | 2 | 39s → 68s | +29s | +74.36% |
+| Player references / worker / Run npm ci | open | 2 | 13s → 21s | +8s | +61.54% |
 | Player references / development / Verify player references and Help | open | 2 | 12s → 58s | +46s | +383.33% |
-| Player references / worker | open | 3 | 83s → 240s | +157s | +189.16% |
+| Player references / worker | open | 4 | 83s → 283s | +200s | +240.96% |
 | Focused player references | open | 2 | 83s → 271s | +188s | +226.51% |
 | Player references / development | open | 2 | 63s → 271s | +208s | +330.16% |
-| Player references / worker / Verify player references and Help | open | 2 | 15s → 58s | +43s | +286.67% |
-| Player references / worker / Run actions/setup-node@v4 | open | 2 | 4s → 6s | +2s | +50% |
+| Player references / worker / Run npx playwright install --with-deps chromium | open | 2 | 25s → 44s | +19s | +76% |
+| Player references / worker / Verify player references and Help | open | 3 | 15s → 71s | +56s | +373.33% |
+| Player references / worker / Run actions/setup-node@v4 | open | 3 | 4s → 9s | +5s | +125% |
 
 ## Recorded slowdowns
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-11T12:45:26Z | job: Player references / worker | 240s → 283s | +43s | +17.92% | cancelled | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38138998692/job/114468749350) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38140169494/job/114472236286) |
+| 2026-10-11T12:44:14Z | step: Packaged Worker / interface / worker-ships | 27s → 39s | +12s | +44.44% | failure | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38138347173/job/114467062781) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38140169481/job/114472597041) |
+| 2026-10-11T12:43:37Z | step: Packaged Worker / accounts / Start disposable built Worker | 9s → 11s | +2s | +22.22% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37638440371/job/112851511436) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38140169481/job/114472596982) |
+| 2026-10-11T12:43:30Z | step: Player references / worker / Verify player references and Help | 58s → 71s | +13s | +22.41% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38138998692/job/114468749350) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38140169494/job/114472236286) |
+| 2026-10-11T12:42:41Z | step: Development / gameplay / dev-ships | 27s → 44s | +17s | +62.96% | failure | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38138347173/job/114466796483) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38140169481/job/114472236199) |
+| 2026-10-11T12:42:01Z | step: Player references / worker / Run npx playwright install --with-deps chromium | 31s → 44s | +13s | +41.94% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38131890240/job/114447745703) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38140169494/job/114472236286) |
+| 2026-10-11T12:41:16Z | step: Player references / worker / Run npm ci | 15s → 21s | +6s | +40% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38131540604/job/114446715096) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38140169494/job/114472236286) |
+| 2026-10-11T12:40:55Z | step: Player references / worker / Run actions/setup-node@v4 | 6s → 9s | +3s | +50% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38139715522/job/114470877068) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38140169494/job/114472236286) |
+| 2026-10-11T12:40:45Z | step: Player references / development / Set up job | 1s → 2s | +1s | +100% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38131342389/job/114446131998) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38140169494/job/114472236137) |
 | 2026-10-11T12:34:57Z | step: Code checks and immutable builds / typecheck | 20s → 23s | +3s | +15% | failure | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38018106897/job/114112829425) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38139715608/job/114470877114) |
 | 2026-10-11T12:34:34Z | step: Code checks and immutable builds / unit-tests | 32s → 37s | +5s | +15.63% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38034098040/job/114160843289) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38139715608/job/114470877114) |
 | 2026-10-11T12:33:42Z | step: Player references / worker / Run actions/setup-node@v4 | 5s → 6s | +1s | +20% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38138347179/job/114466796212) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38139715522/job/114470877068) |
