@@ -95,13 +95,24 @@ export async function navigateAccountScenario(page, origin, path) {
   );
   let remaining = await successes.count();
   while (remaining > 0) {
+    const handles = await successes.elementHandles();
+    if (!handles.length) break;
+    const notice = handles[0];
     try {
-      await successes.first().getByRole("button", { name: "Close toast", exact: true }).click({ timeout: 1000 });
+      const close = await notice.$('button[data-close-button="true"]');
+      if (!close) throw Error("A success notice has no close control.");
+      await close.click();
     } catch (error) {
-      // A notice can expire between count and click. Accept only its observed
-      // removal; a still-present notice or a different click error remains fatal.
-      if (!(error instanceof Error) || error.name !== "TimeoutError" || await successes.count() >= remaining)
+      // Follow this observed node, rather than waiting for a replacement toast.
+      // Natural expiry is allowed only when this exact notice was removed.
+      if (
+        !(await notice.evaluate(
+          (element) => !element.isConnected || element.dataset.removed === "true",
+        ))
+      )
         throw error;
+    } finally {
+      for (const handle of handles) await handle.dispose();
     }
     await expect.poll(() => successes.count()).toBeLessThan(remaining);
     remaining = await successes.count();

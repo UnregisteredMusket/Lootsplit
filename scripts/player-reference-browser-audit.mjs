@@ -1,6 +1,7 @@
 import { chromium } from "playwright";
 import { expect } from "playwright/test";
 import assert from "node:assert/strict";
+import { execFileSync } from "node:child_process";
 import { mkdir, writeFile } from "node:fs/promises";
 import { localAccountDb } from "./account-dev-db.mjs";
 import { blankSheet } from "../src/lib/characters/model.mjs";
@@ -16,7 +17,45 @@ const browser = await chromium.launch({
   executablePath: process.env.CHROMIUM_EXECUTABLE_PATH,
   args: ["--no-sandbox"],
 });
-const db = localAccountDb("data/account-dev.sqlite"),
+// Match the existing packaged Worker audit's disposable Wrangler D1 fixture.
+// Its store is separate from the development server's SQLite file.
+function workerFixtureDb() {
+  return {
+    prepare(sql) {
+      let values = [];
+      return {
+        bind(...bound) {
+          values = bound;
+          return this;
+        },
+        async run() {
+          let index = 0;
+          const command = sql.replace(/\?/g, () => {
+            if (index >= values.length) throw Error("Missing fixture SQL parameter.");
+            return "'" + String(values[index++]).replaceAll("'", "''") + "'";
+          });
+          if (index !== values.length) throw Error("Unused fixture SQL parameter.");
+          execFileSync(
+            process.execPath,
+            [
+              "node_modules/wrangler/bin/wrangler.js",
+              "d1",
+              "execute",
+              "DB",
+              "--local",
+              "--command",
+              command,
+            ],
+            { stdio: "pipe" },
+          );
+        },
+      };
+    },
+    close() {},
+  };
+}
+const db =
+    new URL(origin).port === "8082" ? workerFixtureDb() : localAccountDb("data/account-dev.sqlite"),
   contexts = [],
   users = [],
   codes = [];
@@ -156,6 +195,10 @@ try {
     }
     await openApplication(dmPage, origin + "/library");
     await dmPage.getByRole("button", { name: "Resume", exact: true }).click();
+    await dmPage
+      .locator('nav[aria-label="Sections"]:visible')
+      .getByRole("link", { name: "Library", exact: true })
+      .click();
     await expect(dmPage.getByLabel("Allow player reference lookup", { exact: true })).toBeChecked();
     await openApplication(page, origin + "/library");
     await expect(
