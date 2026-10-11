@@ -180,6 +180,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Packaged Worker / interface | open | 4 | 126s → 662s | +536s | +425.4% |
 | Development / gameplay / dev-local-encounter | open | 2 | 6s → 10s | +4s | +66.67% |
 | Packaged Worker / interface | open | 7 | 123s → 696s | +573s | +465.85% |
+| verify / Run actions/checkout@v4 | open | 2 | 1s → 3s | +2s | +200% |
 | Packaged Worker / interface / Run actions/download-artifact@v4 | open | 2 | 2s → 4s | +2s | +100% |
 | verify / Development / gameplay / Run actions/setup-node@v4 | open | 2 | 2s → 5s | +3s | +150% |
 | verify / Development / gameplay | open | 2 | 88s → 191s | +103s | +117.05% |
@@ -259,6 +260,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-11T21:25:18Z | step: verify / Run actions/checkout@v4 | 2s → 3s | +1s | +50% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37389751532/job/112033097198) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38175377882/job/114579248545) |
 | 2026-10-11T19:58:02Z | job: Packaged Worker / interface | 565s → 696s | +131s | +23.19% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38133259590/job/114452146661) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38169284057/job/114558702060) |
 | 2026-10-11T19:56:09Z | step: Development / gameplay / dev-control-panel | 27s → 32s | +5s | +18.52% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37564176497/job/112608005379) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38169284057/job/114558280171) |
 | 2026-10-11T19:48:37Z | job: Development / desktop | 161s → 252s | +91s | +56.52% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37233687309/job/111528483481) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38169284057/job/114558280144) |
