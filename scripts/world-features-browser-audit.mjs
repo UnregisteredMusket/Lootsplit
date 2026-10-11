@@ -333,8 +333,10 @@ try {
     await expect(page.getByRole("region", { name: "Interactive campaign map" })).toBeVisible();
     if (width === 390) {
       await page.getByRole("button", { name: "Link location", exact: true }).click();
-      const r = await page.getByRole("region", { name: "Interactive campaign map" }).boundingBox();
-      await page.mouse.click(r.x + r.width / 2, r.y + r.height / 2);
+      const anchorMap = page.getByRole("region", { name: "Interactive campaign map" });
+      await anchorMap.scrollIntoViewIfNeeded();
+      const r = await anchorMap.boundingBox();
+      await anchorMap.click({ position: { x: r.width / 2, y: r.height / 2 } });
       await chooseOption(page.getByLabel("Linked location", { exact: true }), "city");
       await page.getByRole("button", { name: "Save location anchor", exact: true }).click();
     }
