@@ -234,11 +234,24 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Packaged Worker / interface / worker-trade-economy | open | 4 | 22s → 68s | +46s | +209.09% |
 | Development / gameplay / dev-trade-economy | open | 2 | 32s → 83s | +51s | +159.38% |
 | Packaged Worker / interface / worker-trade-economy | open | 2 | 39s → 68s | +29s | +74.36% |
+| Player references / development / Verify player references and Help | open | 2 | 12s → 58s | +46s | +383.33% |
+| Player references / worker | open | 2 | 83s → 208s | +125s | +150.6% |
+| Focused player references | open | 2 | 83s → 271s | +188s | +226.51% |
+| Player references / development | open | 2 | 63s → 271s | +208s | +330.16% |
 
 ## Recorded slowdowns
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-11T10:29:56Z | job: Player references / development | 226s → 271s | +45s | +19.91% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38131540604/job/114446715250) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38131890240/job/114447745822) |
+| 2026-10-11T10:29:56.000Z | workflow: Focused player references | 226s → 271s | +45s | +19.91% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38131540604) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38131890240) |
+| 2026-10-11T10:29:53Z | step: Player references / development / Run actions/upload-artifact@v4 | 1s → 2s | +1s | +100% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38131342389/job/114446131998) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38131890240/job/114447745822) |
+| 2026-10-11T10:28:53Z | job: Player references / worker | 172s → 208s | +36s | +20.93% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38131540604/job/114446715096) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38131890240/job/114447745703) |
+| 2026-10-11T10:27:22Z | step: Player references / worker / Verify player references and Help | 15s → 49s | +34s | +226.67% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38131342389/job/114446132272) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38131890240/job/114447745703) |
+| 2026-10-11T10:27:15Z | step: Player references / development / Verify player references and Help | 16s → 58s | +42s | +262.5% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38131540604/job/114446715250) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38131890240/job/114447745822) |
+| 2026-10-11T10:26:17Z | step: Player references / worker / Run npx playwright install --with-deps chromium | 25s → 31s | +6s | +24% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38131342389/job/114446132272) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38131890240/job/114447745703) |
+| 2026-10-11T10:25:33Z | step: Player references / development / Run actions/setup-node@v4 | 3s → 5s | +2s | +66.67% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38131342389/job/114446131998) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38131890240/job/114447745822) |
+| 2026-10-11T10:25:28Z | step: Player references / worker / Set up job | 1s → 2s | +1s | +100% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38131342389/job/114446132272) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38131890240/job/114447745703) |
 | 2026-10-11T10:24:25Z | step: Development / governance / dev-help | 20s → 23s | +3s | +15% | failure | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38130022245/job/114442237228) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38131540594/job/114446797589) |
 | 2026-10-11T10:23:19Z | job: Player references / development | 63s → 226s | +163s | +258.73% | failure | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38131342389/job/114446131998) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38131540604/job/114446715250) |
 | 2026-10-11T10:23:19.000Z | workflow: Focused player references | 83s → 226s | +143s | +172.29% | failure | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38131342389) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38131540604) |
