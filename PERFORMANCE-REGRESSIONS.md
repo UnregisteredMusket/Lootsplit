@@ -78,7 +78,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Development / gameplay / Run npx playwright install --with-deps chromium | open | 4 | 25s → 319s | +294s | +1176% |
 | Code checks and immutable builds / Run actions/upload-artifact@v4 | open | 2 | 2s → 4s | +2s | +100% |
 | Packaged Worker / accounts / worker-account | resolved | 6 | 22s → 95s | +73s | +331.82% |
-| Development / gameplay | open | 4 | 141s → 581s | +440s | +312.06% |
+| Development / gameplay | open | 5 | 141s → 712s | +571s | +404.96% |
 | Development / gameplay / Run actions/checkout@v4 | open | 2 | 1s → 3s | +2s | +200% |
 | Development / gameplay / Run actions/setup-node@v4 | open | 3 | 2s → 7s | +5s | +250% |
 | Development / accounts / Run actions/setup-node@v4 | open | 4 | 3s → 17s | +14s | +466.67% |
@@ -249,6 +249,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-11T12:57:26Z | job: Development / gameplay | 581s → 712s | +131s | +22.55% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37784166101/job/113335097452) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38140451074/job/114473173492) |
 | 2026-10-11T12:45:29.000Z | queue: Focused player references / initial queue | 4s → 28s | +24s | +600% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38131342389) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38140451035) |
 | 2026-10-11T12:45:26Z | job: Player references / worker | 240s → 283s | +43s | +17.92% | cancelled | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38138998692/job/114468749350) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38140169494/job/114472236286) |
 | 2026-10-11T12:44:14Z | step: Packaged Worker / interface / worker-ships | 27s → 39s | +12s | +44.44% | failure | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38138347173/job/114467062781) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38140169481/job/114472597041) |
