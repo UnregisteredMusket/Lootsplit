@@ -96,6 +96,14 @@ The user requests speed improvements as **before → after, absolute time saved,
 
 ## Tooling and scope
 
+### Help and instruction maintenance for every feature
+
+Before freezing a feature checkpoint, review the DM guide (`src/lib/help/content.ts`) and the player guide (`src/lib/help/player-content.ts`) against the final implemented behavior. Both public Help and the in-app Help dialog automatically select the current role. Update affected steps, labels, entry links, prerequisites, DM permissions, player restrictions, import/recovery instructions and website-versus-APK availability in that same change. Search the guide for stale claims; never imply automatic game rules or unsupported offline/approval behavior. Verify player Help remains reachable from Home and Settings & Management, with no DM setup links or descriptions.
+
+Record the reviewed topics and unchanged relevant topics in the task's audit, update `docs/FEATURE-INVENTORY.md`, and review README, this manual and the affected feature documentation. Update development instructions whenever implementation, commands, authorization, testing, release or recovery procedures change. This review is part of every added feature, not a later documentation task. Preserve the complete Help/navigation audits in development and the immutable Worker.
+
+Player reference lookup policy is optional campaign journal metadata controlled by the DM-only, stale-checked `reference-policy` command. Legacy journal replacements must retain the authoritative policy. Default lookup permits read-only item/spell/creature indices outside encounters and blocks it during any active campaign encounter. `RoomView.encounterActive` is a boolean derived from the private encounter store and updates on normal polling even if room revision is unchanged; no enemy data or encounter identity is projected. Device encounters use their existing canonical local records. Direct reference routes, cached results and sheet spell searches follow the same policy. Shared searches use POST/no-store and recheck the verified seat/policy before and after source retrieval. Preserve saved sheet reading, private source packs, DM lookup and all character ownership rules. Run the reference-access, encounter, character-play, Library privacy tests and the complete Help/player-reference browser audit in both environments. No migration is needed.
+
 Playwright (including its test runner), TypeScript, ESLint and GitHub Actions are already installed. Reuse them before adding another service or paid dependency. Keep application refactors limited to the behavior being changed; shared test fixtures do not justify an unrelated rewrite of gameplay or account permissions.
 
 Sources: [Playwright assertions](https://playwright.dev/docs/test-assertions), [test isolation and debugging](https://playwright.dev/docs/best-practices), [traces](https://playwright.dev/docs/trace-viewer).

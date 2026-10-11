@@ -1,6 +1,8 @@
 import { useEffect, useId, useState } from "react";
 import { useRouterState } from "@tanstack/react-router";
 import { HELP_GROUPS, topicMatches } from "@/lib/help/content";
+import { PLAYER_HELP_GROUPS } from "@/lib/help/player-content";
+import { useSeat, useSeatKnown } from "@/lib/quire/seat";
 import { AppLink } from "./app-link";
 import "./help-content.css";
 
@@ -11,6 +13,12 @@ export function HelpContent({
   embedded?: boolean;
   onNavigate?: () => void;
 }) {
+  const seat = useSeat(),
+    known = useSeatKnown();
+  const source =
+    seat.role === "player"
+      ? [...PLAYER_HELP_GROUPS, ...HELP_GROUPS.filter((g) => g.id === "install")]
+      : HELP_GROUPS;
   const [query, setQuery] = useState("");
   const [interactive, setInteractive] = useState(false);
   useEffect(() => setInteractive(true), []);
@@ -22,14 +30,24 @@ export function HelpContent({
     const target = document.getElementById(hash);
     if (target instanceof HTMLDetailsElement) target.open = true;
     target?.scrollIntoView({ block: "start" });
-  }, [hash, embedded]);
-  const groups = HELP_GROUPS.map((g) => ({
-    ...g,
-    topics: g.topics.filter((t) => topicMatches(t, query)),
-  })).filter((g) => g.topics.length);
+  }, [hash, embedded, known]);
+  if (!known) return <p role="status">Opening your guide…</p>;
+  const groups = source
+    .map((g) => ({
+      ...g,
+      topics: g.topics.filter((t) => topicMatches(t, query)),
+    }))
+    .filter((g) => g.topics.length);
   const count = groups.reduce((sum, g) => sum + g.topics.length, 0);
   return (
     <div className="help-guide">
+      <h2>
+        {known
+          ? seat.role === "player"
+            ? "Player guide"
+            : "Dungeon Master guide"
+          : "Opening your guide…"}
+      </h2>
       <label className="help-search" htmlFor={inputId}>
         Find a rule, menu or task
         <input
@@ -42,7 +60,7 @@ export function HelpContent({
         />
       </label>
       <nav className="help-quick-links" aria-label="Help topics">
-        {HELP_GROUPS.map((group) => (
+        {source.map((group) => (
           <button
             type="button"
             disabled={!interactive}

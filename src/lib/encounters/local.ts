@@ -7,6 +7,7 @@ import type { Purse } from "../quire/types.ts";
 import { blankEncounter, encounterSchema, generatorSchema, generateEncounter } from "./model.mjs";
 import { creatureIndex } from "./index.mjs";
 import { parseDice, throwDice } from "../characters/model.mjs";
+import { announceSheetChange } from "../quire/party-sheet-links.ts";
 
 const rollSchema = z.object({
   seq: z.number().int(),
@@ -32,6 +33,13 @@ export const localEncounterSchema = z.object({
 });
 export const readLocalEncounters = (value: unknown) =>
   z.array(localEncounterSchema).parse(value ?? []);
+export async function activeLocalEncounter(): Promise<boolean> {
+  const db = await quireDb();
+  const value = await request<{ rows: unknown[] } | undefined>(
+    db.transaction("meta", "readonly").objectStore("meta").get("localEncounters"),
+  );
+  return readLocalEncounters(value?.rows).some((r) => r.status === "active");
+}
 type Stored = z.infer<typeof localEncounterSchema>;
 function requireDM() {
   if (getSeat().role !== "dm") throw new Error("Only the DM can access device encounters.");
@@ -267,6 +275,7 @@ export async function localEncounterRequest<T>(path: string, input: unknown = {}
     if (databaseName !== activeDatabaseName()) throw new Error("Campaign changed. Try again.");
     if (changed) tx.objectStore("meta").put({ id: "localEncounters", rows });
     await done;
+    if (changed) announceSheetChange();
     return result as T;
   } catch (error) {
     try {

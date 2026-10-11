@@ -2,6 +2,8 @@
 
 Every coding session must read `docs/CODING-MANUAL.md` before editing. Use its focused reproduction → local verification → full CI → verified release procedure. `README.md` is the human-facing entry point. Keep these instructions and actual commands in sync when the workflow changes. Written instructions do not replace automated release gates.
 
+Every added or changed user feature requires a review of both the in-app/public DM and player Help guides before release. Update affected instructions, role-specific links and restrictions in `src/lib/help/content.ts` and `src/lib/help/player-content.ts`; do not show DM setup instructions to players. Record the review in the task's audit and update the feature inventory. Review this GitHub development manual/README at the same checkpoint and update actual implementation, permission, verification and recovery procedures when affected.
+
 Record measured slowdowns of **15% or above (inclusive)** against the last logged comparable test, function, deployment, action or audit. Follow `docs/PERFORMANCE.md`; commit local measurements and preserve the automated `performance-history` data branch. Every full audit must analyze the latest regression log, its unresolved findings and recorder freshness, and report timings, percentages, causes and next actions.
 
 Once the cause is fixed and a successful comparable verification confirms resolution, archive the old trend and reset its reference to the verified post-fix duration using `performance:resolve`. Preserve every historical entry and link the fix and verification evidence. Do not reset merely because one run was faster.

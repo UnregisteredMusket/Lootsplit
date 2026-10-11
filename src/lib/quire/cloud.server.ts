@@ -16,6 +16,22 @@ import type { BillFile } from "./table.ts";
 import { characterSheet } from "../characters/campaign-sheet.mjs";
 import { makeCampaignRoll } from "../characters/campaign-roll.mjs";
 import { manualCharacterRolls, database } from "./room-store.server.ts";
+import { referenceAccess, referenceSection } from "./reference-access.ts";
+
+async function activeEncounter(code: string): Promise<boolean> {
+  const db = database();
+  return !!(db && await db.prepare("SELECT 1 AS active FROM dm_encounters WHERE code=? AND status='active' LIMIT 1")
+    .bind(code).first());
+}
+/** Only a boolean leaves the private encounter store; names, enemies and drafts stay private. */
+export async function assertReferenceLookup(input: { code: string; token: string }, kind: string) {
+  const room = await must(input.code);
+  const seat = room.seats.find((s) => s.token === input.token);
+  if (!seat) throw Error("This browser is not seated at that table.");
+  const access = referenceAccess(seat.role, room.table.journal?.referenceAccess,
+    seat.role === "dm" ? false : await activeEncounter(room.code), referenceSection(kind));
+  if (!access.allowed) throw Error(access.reason);
+}
 
 export async function characterRoll(input: {
   code: string;
@@ -323,6 +339,7 @@ export async function passTurn(input: { code: string; token: string }): Promise<
 }
 
 export type RoomView = {
+  encounterActive?: boolean;
   userId?: string;
   viewOnly?: boolean;
   sessionId?: string;
@@ -372,11 +389,12 @@ async function must(code: string): Promise<CloudRoom> {
   };
 }
 
-function view(room: CloudRoom, seat: CloudSeat): RoomView {
+async function view(room: CloudRoom, seat: CloudSeat): Promise<RoomView> {
   const current = room.seats[room.turn];
   const record = projectRecord({ ...room.table, journal: room.table.journal }, seat, { directory: true });
   const journal = record.journal;
   return {
+    encounterActive: await activeEncounter(room.code),
     userId: seat.userId,
     code: room.code,
     sessionId: room.sessionId,

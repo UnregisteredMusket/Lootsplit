@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { referencePolicySchema } from "./reference-access.ts";
 import { resourceLibrarySchema } from "./resource-packs.ts";
 import { worldSchema } from "./world-schema.ts";
 import { validateWorld } from "./world.ts";
@@ -26,6 +27,7 @@ export const encounterLootProvenanceSchema = z.object({
 export type EncounterLootProvenance = z.infer<typeof encounterLootProvenanceSchema>;
 export const encounterLootEntryId = (receiptId: string) => `encounter-loot:${receiptId}`;
 const journalFields = z.object({
+  referenceAccess: referencePolicySchema.optional(),
   resourceLibrary: resourceLibrarySchema.optional(),
   tradeEconomy: tradeEconomySchema.optional(),
   world: worldSchema.optional(),
@@ -217,6 +219,7 @@ export function sessionSummary(
 export function preserveJournalMetadata(value: unknown, current: Journal): Journal {
   const next = readJournal(value);
   delete next.resourceLibrary;
+  delete next.referenceAccess;
   const reports = new Map((current.reports || []).map(report => [report.id, report]));
   for (const report of next.reports || []) {
     // An archive is immutable. Hydrated error placeholders and stale client copies must
@@ -237,6 +240,7 @@ export function preserveJournalMetadata(value: unknown, current: Journal): Journ
   }
   return readJournal({
     ...next,
+    ...(current.referenceAccess ? { referenceAccess: current.referenceAccess } : {}),
     ...((next.downtimePrompt ?? current.downtimePrompt)
       ? { downtimePrompt: next.downtimePrompt ?? current.downtimePrompt }
       : {}),

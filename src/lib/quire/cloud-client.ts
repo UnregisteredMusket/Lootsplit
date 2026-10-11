@@ -72,6 +72,7 @@ const initialView = {
   departed: [] as NonNullable<RoomView["departed"]>,
   testMode: false,
   viewOnly: false,
+  encounterActive: undefined as boolean | undefined,
   revision: 0,
   seatId: "",
   pending: 0,
@@ -193,6 +194,14 @@ export function captureMutationScope(): MutationScope {
   });
   mutationCredentials.set(scope, current?.token);
   return scope;
+}
+/** Attach the current seat only to an in-campaign reference request, never to cached results. */
+export async function searchCampaignReference(query: import("./open5e.ts").OpenQuery) {
+  const current = session();
+  const { searchOpen5e } = await import("./open5e-api.ts");
+  return searchOpen5e({ data: { ...query, ...(current ? {
+    campaign: { code: current.code, token: current.token },
+  } : {}) } });
 }
 export function assertMutationScope(expected: ExpectedMutationScope): void {
   const actual = captureMutationScope();
@@ -437,6 +446,7 @@ async function accept(value: RoomView, committed = false) {
       departed: remote.departed || [],
       testMode: remote.testMode === true,
       viewOnly: remote.viewOnly === true,
+      encounterActive: remote.encounterActive,
       seatId: remote.seatId,
       revision: remote.revision,
       pending: s.pending.length,

@@ -5,6 +5,7 @@ import { AppLink } from "./app-link";
 import { FantasyIcon } from "./fantasy-icon";
 import { normalizeShortcuts, shortcutDestinations } from "@/lib/quire/shortcuts.mjs";
 import { characterSheet } from "@/lib/characters/campaign-sheet.mjs";
+import { Guide } from "./guide";
 
 // Fixed player services share the existing destination labels and artwork.
 const playerServices = normalizeShortcuts(null, "player").map((item) =>
@@ -17,7 +18,10 @@ export function PlayerHome() {
   return (
     <div className="dm-control-panel">
       <section className="desk-readouts">
-        <h1>Home</h1>
+        <div className="panel-heading">
+          <h1>Home</h1>
+          <Guide />
+        </div>
         {!ready ? (
           <p>Loading your campaign…</p>
         ) : !mine.length ? (

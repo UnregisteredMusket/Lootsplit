@@ -32,6 +32,7 @@ import { assertMerchantSale, isService, stockCategory } from "./merchant.ts";
 import { archiveSession } from "./session-records.ts";
 import { readJournal, preserveJournalMetadata, encounterLootProvenanceSchema, encounterLootEntryId } from "./journal.ts";
 import { z } from "zod";
+import { referencePolicySchema, referencePolicy } from "./reference-access.ts";
 import { artworkSchema } from "./artwork.ts";
 import { sheetSchema } from "../characters/model.mjs";
 import {
@@ -51,6 +52,7 @@ const id = z.string().min(1).max(150),
   qty = amount.min(1).max(100000);
 const base = { id };
 export const commandSchema = z.discriminatedUnion("kind", [
+  z.object({ ...base, kind: z.literal("reference-policy"), before: referencePolicySchema, policy: referencePolicySchema }).strict(),
   ledgerVoidCommandSchema,
   ...tradeCommands,
   ...worldCommands,
@@ -601,6 +603,12 @@ export function applyCommand(input: CloudTable, seat: CloudSeat, raw: Command, e
     if (prior) Object.assign(prior, next);
     else f.rules.push(next);
     event(`Finance schedule updated: ${cmd.rule.name}`, "management", cmd.rule.purseId);
+  } else if (cmd.kind === "reference-policy") {
+    dm();
+    if (canonicalJson(referencePolicy(journal.referenceAccess)) !== canonicalJson(cmd.before))
+      throw Error("Reference access changed. Review the current controls before saving.");
+    journal.referenceAccess = cmd.policy;
+    event("Player reference access updated", "management");
   } else if (cmd.kind === "downtime-preference") {
     dm();
     journal.downtimePrompt = { enabled: cmd.days > 0, days: cmd.days };
