@@ -1,3 +1,12 @@
+import {
+  shipHere,
+  initializeShipPurchase,
+  assertShipDisposable,
+  removeShip,
+  advanceShips,
+  shipWorkBlock,
+  finishShipWork,
+} from "./ships.ts";
 import { characterLocation, inParty } from "./character-position.ts";
 import { shopVisible, shopAsking } from "./vendors.ts";
 import { exchangeQuoteKey, executeExchange, recordShopTrade } from "./trade-economy.ts";
@@ -35,6 +44,8 @@ export function estateCapabilities(state: Estate, site: EstateSite) {
   return new Set(estateTemplates(state, site).flatMap((t) => t.capabilities));
 }
 export function physicallyHere(t: Table, h: Holding, purseId?: string) {
+  const aboard = shipHere(t, h, purseId);
+  if (aboard !== undefined) return aboard;
   const market = readMarketLocations(t.journal?.market);
   const p = t.purses.find((p) => p.id === purseId),
     location = p ? characterLocation(t, p) : market.currentLocationId;
@@ -57,7 +68,14 @@ export function canAccessEstate(
   return (
     seat.purseIds.includes(h.purseId) ||
     (site.access === "party-members" &&
-      t.purses.some((p) => seat.purseIds.includes(p.id) && inParty(t, p)) &&
+      t.purses.some(
+        (p) =>
+          seat.purseIds.includes(p.id) &&
+          (inParty(t, p) ||
+            t.journal?.fleet?.aboard.some(
+              (s) => s.purseId === p.id && s.propertyId === propertyId && s.returnInParty,
+            )),
+      ) &&
       t.purses.some((p) => p.id === h.purseId && p.kind === "party")) ||
     (site.access === "selected" && site.accessPurseIds.some((id) => seat.purseIds.includes(id)))
   );
@@ -86,6 +104,7 @@ export function assertCarried(h: Holding) {
     );
 }
 export function assertEstateDisposable(t: Table, propertyId: string) {
+  assertShipDisposable(t, propertyId);
   const s = readEstate(t.journal?.propertyOperations);
   if (
     t.holdings.some((h) => h.custody?.propertyId === propertyId) ||
@@ -133,13 +152,15 @@ export function initializeEstatePurchase(
     enabled: true,
     access: template.storage?.defaultAccess ?? "owner",
     accessPurseIds: [],
-    capacityWeight: template.storage?.capacityWeight ?? null,
+    capacityWeight: template.ship?.stats.cargoWeight ?? template.storage?.capacityWeight ?? null,
     completedTemplates: attachments,
     notes: "",
   });
   t.journal!.propertyOperations = s;
+  initializeShipPurchase(t, holding, template);
 }
 export function removeEstateSite(t: CloudTable, propertyId: string) {
+  removeShip(t, propertyId);
   if (!t.journal?.propertyOperations) return;
   const s = t.journal.propertyOperations;
   s.sites = s.sites.filter((site) => site.propertyId !== propertyId);
@@ -428,9 +449,12 @@ function deliveryCommodity(t: CloudTable, s: Estate, line: StockLine, materialKe
   const material = s.materials.find((m) => m.key === materialKey);
   if (!material) throw Error("Choose a DM-reviewed material definition.");
   const economy = t.journal?.tradeEconomy;
-  const materialCommodities = economy?.commodities.filter((c) => c.materialKey === materialKey) ?? [];
+  const materialCommodities =
+    economy?.commodities.filter((c) => c.materialKey === materialKey) ?? [];
   if (materialCommodities.length > 1)
-    throw Error("The supplied material has more than one commodity identity. Ask the DM to review its links.");
+    throw Error(
+      "The supplied material has more than one commodity identity. Ask the DM to review its links.",
+    );
   if (!!line.commodityId !== !!line.tradeExchangeId)
     throw Error("Supplier activity needs both a reviewed commodity and an exchange.");
   const commodity = line.commodityId
@@ -440,11 +464,12 @@ function deliveryCommodity(t: CloudTable, s: Estate, line: StockLine, materialKe
     throw Error("The supplier's reviewed commodity no longer exists.");
   if (line.tradeExchangeId && !economy?.exchanges.some((e) => e.id === line.tradeExchangeId))
     throw Error("The supplier's reviewed exchange no longer exists.");
-  if (commodity && (
-    commodity.unit !== material.unit ||
-    (commodity.materialKey && commodity.materialKey !== materialKey) ||
-    (materialCommodities[0] && materialCommodities[0].id !== commodity.id)
-  ))
+  if (
+    commodity &&
+    (commodity.unit !== material.unit ||
+      (commodity.materialKey && commodity.materialKey !== materialKey) ||
+      (materialCommodities[0] && materialCommodities[0].id !== commodity.id))
+  )
     throw Error("The supplier commodity conflicts with the reviewed material or physical unit.");
   return commodity?.id;
 }
@@ -475,7 +500,13 @@ function delivery(
     )
   )
     throw Error("The destination needs active storage or a construction staging site.");
-  if (!line || !shop || shop.closed || (shop.blackMarket && !t.journal?.world?.blackMarketActive) || isService(line))
+  if (
+    !line ||
+    !shop ||
+    shop.closed ||
+    (shop.blackMarket && !t.journal?.world?.blackMarketActive) ||
+    isService(line)
+  )
     throw Error("Choose stocked physical goods from an open shop.");
   const commodityId = deliveryCommodity(t, s, line, args.materialKey);
   if (line.quantity !== null && line.quantity < args.quantity)
@@ -1058,7 +1089,17 @@ export function applyEstateCommand(t: CloudTable, seat: CloudSeat, cmd: EstateCo
     const h = property(t, cmd.propertyId),
       recipient = t.purses.find((p) => p.id === cmd.toId);
     if (!recipient || recipient.id === h.purseId) throw Error("Choose a different campaign owner.");
+    if (
+      journal.fleet?.voyages.some(
+        (v) => v.propertyId === h.id && ["active", "blocked"].includes(v.status),
+      )
+    )
+      throw Error("Finish or teleport the voyage before handing over its ship.");
     const old = h.purseId;
+    for (const v of journal.fleet?.voyages ?? [])
+      if (v.propertyId === h.id && v.status === "proposed") v.status = "cancelled";
+    for (const r of journal.fleet?.boarding ?? [])
+      if (r.propertyId === h.id && r.status === "pending") r.status = "denied";
     h.purseId = recipient.id;
     if (h.deed) h.deed = transferPropertyDeed(h.deed, recipient, cmd.id, at);
     for (const item of t.holdings.filter(
@@ -1099,6 +1140,7 @@ export function applyEstateCommand(t: CloudTable, seat: CloudSeat, cmd: EstateCo
     });
   }
   journal.propertyOperations = readEstate(state);
+  finishShipWork(t);
   if (["estate-staff", "estate-rent", "estate-handover"].includes(cmd.kind)) syncRules(t, state);
   validateEstate(t);
   if (!["estate-storage", "estate-withdrawal-review"].includes(cmd.kind))
@@ -1123,7 +1165,12 @@ export function applyEstateCommand(t: CloudTable, seat: CloudSeat, cmd: EstateCo
 
 /** Pure simulation. Every output is included in the existing DM downtime quote. */
 export type EstateTime = { minutes: number; allowCharacterWork: boolean; receiptId: string };
-export function previewEstate(t: CloudTable, days: number, balances: Map<string, number>, time?: EstateTime) {
+export function previewEstate(
+  t: CloudTable,
+  days: number,
+  balances: Map<string, number>,
+  time?: EstateTime,
+) {
   if (!t.journal?.propertyOperations) return undefined;
   const before = canonicalJson({
     estate: t.journal.propertyOperations,
@@ -1137,6 +1184,8 @@ export function previewEstate(t: CloudTable, days: number, balances: Map<string,
       cha: p.sheet?.scores.cha,
     })),
     market: t.journal.market,
+    fleet: t.journal.fleet,
+    world: t.journal.world,
     sheets: t.sheets,
     ...(t.journal.tradeEconomy ? { tradeEconomy: t.journal.tradeEconomy } : {}),
   });
@@ -1198,7 +1247,9 @@ export function previewEstate(t: CloudTable, days: number, balances: Map<string,
       if (!economy || !exchange || !commodity || !offer)
         throw Error("This manager order's reviewed exchange or commodity is missing.");
       const unitCopper = order.direction === "buy" ? offer.askCopper : offer.bidCopper;
-      if (order.direction === "buy" ? unitCopper > order.limitCopper : unitCopper < order.limitCopper)
+      if (
+        order.direction === "buy" ? unitCopper > order.limitCopper : unitCopper < order.limitCopper
+      )
         throw Error("The seasonal price is outside the owner's authorized limit.");
       const cost = order.direction === "buy" ? unitCopper * order.quantity : 0;
       if (cost > budget || manager.budgetSpentCopper + cost > manager.budgetCopper)
@@ -1215,7 +1266,13 @@ export function previewEstate(t: CloudTable, days: number, balances: Map<string,
         throw Error("The property has insufficient unreserved commodity goods.");
       // Each order is atomic, including multi-lot sales. A blocked letter cannot partly spend or sell.
       const trial = structuredClone(working);
-      const actor: CloudSeat = { id: "property-manager", token: "", name: manager.name, role: "dm", purseIds: [ownerId] };
+      const actor: CloudSeat = {
+        id: "property-manager",
+        token: "",
+        name: manager.name,
+        role: "dm",
+        purseIds: [ownerId],
+      };
       let remaining = order.quantity;
       const trades = order.direction === "buy" ? [{ id: undefined, quantity: remaining }] : lots;
       for (const [index, lot] of trades.entries()) {
@@ -1331,7 +1388,20 @@ export function previewEstate(t: CloudTable, days: number, balances: Map<string,
   for (let offset = 1; offset <= Math.max(days, time ? 1 : 0); offset++) {
     const day = start + Math.min(offset, days);
     working.journal!.finance!.day = day;
+    advanceShips(
+      working,
+      time?.minutes ?? 1440,
+      !time,
+      `${time?.receiptId ?? "ship-day"}-${day}`,
+      notices,
+    );
     for (const job of s.jobs.filter((j) => ["active", "blocked"].includes(j.status))) {
+      const shipBlock = shipWorkBlock(working, job);
+      if (shipBlock) {
+        job.status = "blocked";
+        job.message = shipBlock;
+        continue;
+      }
       const site = s.sites.find((x) => x.propertyId === job.propertyId)!;
       if (!site.enabled) {
         job.status = "blocked";
@@ -1411,8 +1481,11 @@ export function previewEstate(t: CloudTable, days: number, balances: Map<string,
         }
       }
       if (!labor && (dailyCharacterWork || job.paidWorkers) && time) {
-        job.characterWorkRemainder = charUnits % 1440; job.paidWorkRemainder = paidUnits % 1440;
-        job.status = "active"; job.message = "Partial labor recorded; work continues at the next approved time advance."; continue;
+        job.characterWorkRemainder = charUnits % 1440;
+        job.paidWorkRemainder = paidUnits % 1440;
+        job.status = "active";
+        job.message = "Partial labor recorded; work continues at the next approved time advance.";
+        continue;
       }
       if (!labor && job.progress !== required) {
         job.status = "blocked";
@@ -1434,7 +1507,10 @@ export function previewEstate(t: CloudTable, days: number, balances: Map<string,
         continue;
       }
       if (supervisor) supervisor.budgetSpentCopper += cost;
-      if (time) { job.characterWorkRemainder = charUnits % 1440; job.paidWorkRemainder = paidUnits % 1440; }
+      if (time) {
+        job.characterWorkRemainder = charUnits % 1440;
+        job.paidWorkRemainder = paidUnits % 1440;
+      }
       job.progress += labor;
       job.paidProgress += paidWork;
       job.paidCopper += cost;
@@ -1460,7 +1536,9 @@ export function previewEstate(t: CloudTable, days: number, balances: Map<string,
         working.holdings = working.holdings.filter((h) => h.reservedFor !== job.id);
         if (job.stage + 1 < jobStages(job).length) {
           job.stage++;
-          job.progress = 0; delete job.characterWorkRemainder; delete job.paidWorkRemainder;
+          job.progress = 0;
+          delete job.characterWorkRemainder;
+          delete job.paidWorkRemainder;
           job.paidProgress = 0;
           job.message = `Ready for ${jobStages(job)[job.stage].name}.`;
         } else {
@@ -1506,6 +1584,7 @@ export function previewEstate(t: CloudTable, days: number, balances: Map<string,
         }
       }
     }
+    finishShipWork(working);
     if (offset > days) continue; // Calendar deliveries/orders run once at each crossed campaign day.
     for (const shipment of s.shipments.filter(
       (x) => x.status === "in-transit" && x.dueDay <= day,
@@ -1604,7 +1683,9 @@ export function previewEstate(t: CloudTable, days: number, balances: Map<string,
     copper: -l.copper,
     summary: l.summary,
     ...(l.shopId ? { shopId: l.shopId } : {}),
-    ...(l.transactionType && ["purchase", "sale", "transfer", "payment"].includes(l.transactionType) ? { transactionType: l.transactionType as "purchase" | "sale" | "transfer" | "payment" } : {}),
+    ...(l.transactionType && ["purchase", "sale", "transfer", "payment"].includes(l.transactionType)
+      ? { transactionType: l.transactionType as "purchase" | "sale" | "transfer" | "payment" }
+      : {}),
     ...(l.trade ? { trade: l.trade } : {}),
   }));
   for (const p of working.purses) balances.set(p.id, toCopper(p.coins));
@@ -1612,6 +1693,9 @@ export function previewEstate(t: CloudTable, days: number, balances: Map<string,
   return {
     ...(working.journal!.tradeEconomy ? { tradeEconomy: working.journal!.tradeEconomy } : {}),
     before,
+    ...(working.journal!.fleet
+      ? { fleet: working.journal!.fleet, world: working.journal!.world }
+      : {}),
     state: readEstate(s),
     holdings: working.holdings,
     stock: working.stock,

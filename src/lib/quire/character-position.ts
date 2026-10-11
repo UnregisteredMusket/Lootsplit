@@ -9,21 +9,19 @@ type Table = Pick<CloudTable, "purses" | "journal">;
 export function characterPosition(t: Table, p: Purse): CharacterPosition {
   const w = t.journal?.world,
     n = w?.npcs.find((n) => n.id === p.id);
-  return (
-    w?.characterPositions?.find((s) => s.purseId === p.id) ?? {
-      purseId: p.id,
-      inParty: !p.nonParty,
-      locationId: n?.locationId ?? null,
-      visible: n?.visible ?? true,
-      sheetVisible: !p.nonParty,
-    }
-  );
+  const position = w?.characterPositions?.find((s) => s.purseId === p.id) ?? {
+    purseId: p.id, inParty: !p.nonParty, locationId: n?.locationId ?? null,
+    visible: n?.visible ?? true, sheetVisible: !p.nonParty,
+  };
+  const aboard=t.journal?.fleet?.aboard.find(a=>a.purseId===p.id);
+  return aboard ? {...position,shipId:aboard.propertyId,shipReturnInParty:aboard.returnInParty} : position;
 }
 export function inParty(t: Table, p: Purse) {
   return p.kind === "party" || characterPosition(t, p).inParty;
 }
 export function characterLocation(t: Table, p: Purse) {
   const s = characterPosition(t, p);
+  if (s.shipId) return s.locationId;
   return s.inParty ? readMarketLocations(t.journal?.market).currentLocationId : s.locationId;
 }
 export function characterVisible(t: Table, p: Purse) {
@@ -57,7 +55,9 @@ function place(t: CloudTable, s: CharacterPosition) {
   const w = t.journal!.world!,
     p = t.purses.find((p) => p.id === s.purseId)!;
   w.characterPositions = w.characterPositions.filter((old) => old.purseId !== s.purseId);
-  w.characterPositions.push(s);
+  const {shipId,shipReturnInParty,...stored}=s;
+  void shipId; void shipReturnInParty;
+  w.characterPositions.push(stored);
   const n = w.npcs.find((n) => n.id === p.id);
   if (n) {
     p.nonParty = !s.inParty;
@@ -117,11 +117,15 @@ export function applyCharacterPosition(
     !readMarketLocations(t.journal?.market).locations.some((l) => l.id === cmd.locationId)
   )
     throw Error("Choose an existing location.");
+  if (s.shipId && cmd.kind !== "character-position") throw Error("Disembark before starting character downtime.");
   if (cmd.kind === "character-position") {
     if (s.downtime && (cmd.inParty !== s.inParty || cmd.locationId !== s.locationId))
       throw Error("Cancel this character's downtime before moving them.");
+    const placementChanged = cmd.inParty !== s.inParty || cmd.locationId !== s.locationId;
+    if(placementChanged&&t.journal!.fleet)t.journal!.fleet.aboard=t.journal!.fleet.aboard.filter(a=>a.purseId!==p.id);
     place(t, {
       ...s,
+      ...(placementChanged ? { shipId: undefined, shipReturnInParty: undefined } : {}),
       inParty: cmd.inParty,
       locationId: cmd.locationId,
       visible: cmd.visible,

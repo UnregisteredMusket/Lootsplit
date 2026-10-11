@@ -121,6 +121,12 @@ function DmDeskContents() {
     pending =
       journal.requests.filter((x) => x.status === "pending").length +
       loans.filter((x) => x.status === "pending").length,
+    propertyPending =
+      (journal.propertyOperations?.jobs.filter((j) => j.status === "draft").length ?? 0) +
+      (journal.propertyOperations?.staff.filter((s) => s.status === "proposed").length ?? 0) +
+      (journal.propertyOperations?.withdrawals.filter((r) => r.status === "pending").length ?? 0) +
+      (journal.fleet?.boarding.filter((r) => r.status === "pending").length ?? 0) +
+      (journal.fleet?.voyages.filter((v) => v.status === "proposed").length ?? 0),
     totals = session ? sessionSummary(ledger, session) : null,
     allCoins = purses
       .filter((p) => inParty({ purses, journal }, p))
@@ -177,9 +183,13 @@ function DmDeskContents() {
             <FantasyIcon ui="gift" size={30} />
             <span>
               <small>Pending reviews</small>
-              <strong>{imports === null ? `${pending} financial` : pending + imports}</strong>
+              <strong>
+                {imports === null
+                  ? `${pending} financial · ${propertyPending} property`
+                  : pending + imports + propertyPending}
+              </strong>
               <small>
-                {pending} financial
+                {pending} financial · {propertyPending} property
                 {room.joined
                   ? imports !== null
                     ? ` · ${imports} imports`

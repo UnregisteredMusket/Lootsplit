@@ -120,6 +120,21 @@ export const PLAYER_HELP_GROUPS: HelpGroup[] = [
         links: [["Market & exchanges", "/market"]],
       },
       {
+        id: "ships",
+        title: "Ships, cargo and voyages",
+        paragraphs: [
+          "Open Property Management from Home to view your ships and authorized shared ships. Name your ship and use its Storage section for trade goods; cargo keeps its owner and cannot also be carried or used remotely. The read-only stat block shows STR, DEX, CON, component AC/HP/thresholds, crew, speed and capacity. Crew characters keep their own complete abilities.",
+          "Request boarding or disembarking for your assigned character. Your DM reviews the request. Characters left aboard move with the vessel; characters ashore remain at their location. Boarding does not permit switching to or controlling another character. A boarded character away from the party's market cannot buy or sell there remotely.",
+          "Choose a permitted local dock, dry storage or shipyard. Facilities charge their reviewed daily rates and have berth/length limits. A purchased private shipyard avoids rental fees for its owner's ships; upkeep, wages, materials and labor still apply. Launch afloat before proposing travel. Your DM reviews staff contracts, ship rules and purchases.",
+          "At a suitable yard, propose a damaged component's repair or an available upgrade. Choose your funded paying character. The quote shows work and contractor cost; insufficient funds block paid work and character labor uses the existing downtime allocation. Your DM approves the ordinary property project. Materials are reserved/consumed once and upgrades preserve existing damage. Moving the ship pauses former-yard work.",
+          "Propose a downtime voyage with destination, duration, payer, budget and your aboard crew. Your DM approves it and campaign downtime. Partial advances retain progress; arrival moves ship, cargo and occupants together. Damage, minimum crew, funds and budgets can block travel. Maintenance, provisions, staff wages and facility fees use campaign funds; arrears remain visible. Trade through actual port exchanges or reviewed captain orders, without automatic profits. Your DM can teleport a ship with a recorded override. Tile-based map travel is planned for later. Website controls require a separately signed update before appearing in the Android app.",
+        ],
+        links: [
+          ["Property Management", "/features/properties"],
+          ["My Finances", "/features/finances"],
+        ],
+      },
+      {
         id: "property-operations",
         title: "Use and manage your properties",
         paragraphs: [

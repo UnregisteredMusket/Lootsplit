@@ -1,3 +1,4 @@
+import { assertShipTradingHere } from "./ships.ts";
 import type { CloudSeat, CloudTable } from "./cloud.ts";
 import type { Holding } from "./types.ts";
 import { canonicalJson } from "./canonical-json.ts";
@@ -456,6 +457,7 @@ export function executeExchange(
       : !!globalMarketCity({ ...readMarketLocations(table.journal?.market), currentLocationId: manager.locationId }));
   if (!input.overrideLocation && !(manager ? managerHere : exchangeHere(table, exchange)))
     throw Error(exchange.locationId ? "Visit the exchange's location to trade." : "Visit a city to access the global commodity exchange.");
+  if (seat.role === "player" && !manager) assertShipTradingHere(table, input.purseId);
   const payer = table.purses.find((p) => p.id === input.purseId);
   if (!payer || payer.nonParty || (seat.role !== "dm" && !seat.purseIds.includes(payer.id)))
     throw Error("Trade only from an assigned party or character account.");

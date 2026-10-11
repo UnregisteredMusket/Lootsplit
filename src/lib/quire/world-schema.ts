@@ -6,6 +6,8 @@ const copper = z.number().int().min(0).max(1e12);
 export const characterPositionSchema = z
   .object({
     purseId: id,
+    shipId: id.optional(),
+    shipReturnInParty: z.boolean().optional(),
     inParty: z.boolean(),
     locationId: id.nullable(),
     visible: z.boolean(),

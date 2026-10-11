@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { fleetSchema } from "./ships-schema.ts";
+import { validateFleet } from "./ships.ts";
 import { referencePolicySchema } from "./reference-access.ts";
 import { resourceLibrarySchema } from "./resource-packs.ts";
 import { worldSchema } from "./world-schema.ts";
@@ -32,6 +34,7 @@ const journalFields = z.object({
   tradeEconomy: tradeEconomySchema.optional(),
   world: worldSchema.optional(),
   propertyOperations: estateSchema.optional(),
+  fleet: fleetSchema.optional(),
   market: marketLocationsSchema.optional(),
   downtimePrompt: z
     .object({ enabled: z.boolean(), days: z.number().int().min(0).max(3650) })
@@ -147,6 +150,7 @@ export function readArchivedSnapshot(snapshot: string): CloudTable {
     for (const listing of t.listings ?? []) listingSchema.parse(listing);
     validatePropertyLocations(t.listings ?? [], t.holdings, journal.market);
     validateEstate({ ...t, journal }, true);
+    validateFleet({ ...t, journal }, true);
     validateTradeEconomy({ ...t, journal });
     validateWorld({ ...t, journal }, true);
     for (const key of ["notes", "sheets", "loans", "listings", "handouts"] as const)
@@ -240,6 +244,7 @@ export function preserveJournalMetadata(value: unknown, current: Journal): Journ
   }
   return readJournal({
     ...next,
+    ...(current.fleet ? { fleet: current.fleet } : {}),
     ...(current.referenceAccess ? { referenceAccess: current.referenceAccess } : {}),
     ...((next.downtimePrompt ?? current.downtimePrompt)
       ? { downtimePrompt: next.downtimePrompt ?? current.downtimePrompt }

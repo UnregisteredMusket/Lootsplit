@@ -111,3 +111,5 @@ After a failed focused run, use its printed diagnostics path: `npm run verify:re
 Property storage, projects, staff, rentals, delivery and postal management are documented in [Property operations](docs/PROPERTY-OPERATIONS.md), with a [sample import](docs/examples/property-operations.sample.json) and [strict schema](docs/examples/property-operations.schema.json).
 
 Maps, location NPCs, bilateral barter, black-market vendors and session time: [field guide](docs/WORLD-FEATURES.md), [NPC import example](docs/examples/location-npcs.sample.json). Local focused UI check: `CHROMIUM_EXECUTABLE_PATH=/path/to/chromium node scripts/world-local-check.mjs`; complete release verification remains required.
+
+Ships and private shipyards are managed inside Property Management, using existing custody, staff, projects and reviewed downtime. See [the ship guide](docs/SHIPS.md) for setup, 5e-style physical stats, costs, voyages and the DM teleport override. New features require both role Help and developer-manual review.

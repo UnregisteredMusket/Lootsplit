@@ -427,6 +427,8 @@ export function applyFinanceQuote(table: CloudTable, quote: z.infer<typeof quote
         line.quantity += after.quantity - before;
     }
     table.journal!.propertyOperations = operations.state;
+    if (operations.fleet) table.journal!.fleet = operations.fleet;
+    if (operations.world) table.journal!.world = operations.world;
     if (operations.tradeEconomy) table.journal!.tradeEconomy = operations.tradeEconomy;
     for (const [i, notice] of operations.notices.entries())
       table.journal!.events.push({

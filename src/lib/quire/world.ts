@@ -246,6 +246,8 @@ function moveItems(t: CloudTable, side: Trade["left"], toId: string, receipt: st
     if (h.kind === "property" && h.quantity === 0) {
       const site = t.journal?.propertyOperations?.sites.find((s) => s.propertyId === h.id);
       if (site) site.propertyId = nextId;
+      for(const v of t.journal?.fleet?.vessels??[]) if(v.propertyId===h.id)v.propertyId=nextId;
+      for(const y of t.journal?.fleet?.facilities??[]) if(y.propertyId===h.id)y.propertyId=nextId;
     }
   }
   t.holdings = t.holdings.filter((h) => h.quantity > 0);

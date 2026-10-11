@@ -1,3 +1,4 @@
+import { validateFleet } from "./ships.ts";
 import { projectRecord } from "./session-records.ts";
 import { shopVisible, shopAsking, validateWorld } from "./world.ts";
 import { randomTradeRoll, recordShopTrade, validateTradeEconomy } from "./trade-economy.ts";
@@ -956,6 +957,7 @@ export async function removePurse(id: string): Promise<void> {
       throw Error(
         "An exchange treasury must remain with its recorded exchange. Close the exchange instead of removing its account.",
       );
+    if (journal.fleet?.aboard.some(a=>a.purseId===id) || journal.fleet?.voyages.some(v=>!["arrived","cancelled","denied","dm-overridden"].includes(v.status)&&(v.payerId===id||v.crewPurseIds.includes(id)))) throw Error("Resolve this character’s ship placement and voyages before removing its account.");
     if (journal.world?.characterPositions.some((s) => s.purseId === id && s.downtime))
       throw Error("Cancel this character’s downtime before removing the account.");
     if (journal.world)
@@ -2086,6 +2088,7 @@ export function readQuireFile(value: unknown): QuireFile {
   }
   const diagnostics = validateBackupReferences({ ...(file as QuireFile), ...metadata, journal });
   validateEstate({ ...(file as QuireFile), journal });
+  validateFleet({ ...(file as QuireFile), journal });
   validateWorld({ ...(file as QuireFile), ...metadata, journal });
   validateTradeEconomy({ ...(file as QuireFile), journal });
   // A clone error must occur before the destructive transaction, including non-JSON callers.

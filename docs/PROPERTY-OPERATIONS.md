@@ -1,6 +1,10 @@
 # Property operations in Lootsplit
 
-Open **Market → Property Management**. The estate register, deeds, eight broad property types and shop location hierarchy stay in place. Owned properties now have expandable settings, storage, projects, staff, rental, delivery and correspondence sections. The DM estate workshop contains 24 building presets and custom template controls. Presets set capabilities and proposed roles; the DM defines prices, wages, work, tools, checks and yields.
+Open **Market → Property Management**. The estate register, deeds, eight broad property types and shop location hierarchy stay in place. Owned properties now have expandable settings, storage, projects, staff, rental, delivery and correspondence sections. The DM estate workshop contains 26 building, ship and shipyard presets and custom template controls. Presets set capabilities and proposed roles; the DM defines prices, wages, work, tools, checks and yields.
+
+## Ships and shipyards
+
+Owned ship and Private shipyard presets extend this same register, storage, staff and project engine. See [SHIPS.md](SHIPS.md) for component stats, boarding, repair/upgrades, facility fees, downtime voyages and the DM teleport override. They add no wallet or scheduler.
 
 ## Set up a property
 
@@ -58,7 +62,7 @@ Cancel a pending preview before changing property operations. Automation runs th
 
 ## Transfer or sell
 
-Ordinary Give and shop sale retain their existing deed behavior. Resolve stored goods, ongoing projects, tenants, staff, orders and financial obligations before disposing of an operating property. The DM may instead record an explicit handover that preserves the legal parcel, deed, goods and agreements, transfers the former owner's goods and obligations, retains other owners' goods and pauses orders for review. The future bargaining/trading feature remains deferred.
+Ordinary Give and shop sale retain their existing deed behavior. Resolve stored goods, ongoing projects, tenants, staff, orders and financial obligations before disposing of an operating property. The DM may instead record an explicit handover that preserves the legal parcel, deed, goods and agreements, transfers the former owner's goods and obligations, retains other owners' goods and pauses orders for review. Trading & Barter retains reviewed bilateral deed exchange for clean properties.
 
 ## Import format
 
