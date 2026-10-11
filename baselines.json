@@ -12340,5 +12340,22 @@
     "finishedAt": "2026-10-11T14:57:31Z",
     "durationMs": 17000,
     "trendId": "38149040736:1:f66a84e3a98df7c00571336ca685740f3351bed89c0522f81ec04126b12cafc1"
+  },
+  "[\".github/workflows/player-reference-audit.yml\",\"pull_request\",\"pull-request\",\"step\",\"Player references / worker / Post Run actions/setup-node@v4\",\"ubuntu-latest\",1]": {
+    "schema": 1,
+    "id": "38154610334:1:38673edf875e17af2f67581d782fe1969b3d130a771c74111c0c2de37e7c4c45",
+    "scope": "[\".github/workflows/player-reference-audit.yml\",\"pull_request\",\"pull-request\",\"step\",\"Player references / worker / Post Run actions/setup-node@v4\",\"ubuntu-latest\",1]",
+    "kind": "step",
+    "name": "Player references / worker / Post Run actions/setup-node@v4",
+    "environment": "ubuntu-latest",
+    "commit": "aeb8e368ae3e0a7e05b4554c375d8d6646b85387",
+    "runId": 38154610334,
+    "attempt": 1,
+    "url": "https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38154610334/job/114514891388",
+    "outcome": "success",
+    "startedAt": "2026-10-11T16:17:56Z",
+    "finishedAt": "2026-10-11T16:17:57Z",
+    "durationMs": 1000,
+    "trendId": "38154610334:1:38673edf875e17af2f67581d782fe1969b3d130a771c74111c0c2de37e7c4c45"
   }
 }
