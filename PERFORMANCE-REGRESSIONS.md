@@ -245,8 +245,10 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Player references / worker | open | 4 | 83s → 283s | +200s | +240.96% |
 | Focused player references | open | 2 | 83s → 271s | +188s | +226.51% |
 | Player references / development | open | 2 | 63s → 271s | +208s | +330.16% |
+| Player references / development / Run actions/setup-node@v4 | open | 2 | 3s → 7s | +4s | +133.33% |
 | Player references / worker / Run npx playwright install --with-deps chromium | open | 2 | 25s → 44s | +19s | +76% |
 | Player references / worker / Verify player references and Help | open | 3 | 15s → 71s | +56s | +373.33% |
+| Player references / development / Run actions/upload-artifact@v4 | open | 2 | 1s → 3s | +2s | +200% |
 | Player references / worker / Run actions/setup-node@v4 | open | 3 | 4s → 9s | +5s | +125% |
 | Development / gameplay / dev-ships | open | 2 | 27s → 54s | +27s | +100% |
 
@@ -254,6 +256,9 @@ Open trends require investigation. Resolved trends retain their history; each ve
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-11T19:10:31Z | step: Player references / development / Run actions/upload-artifact@v4 | 2s → 3s | +1s | +50% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38131890240/job/114447745822) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38166556290/job/114550206561) |
+| 2026-10-11T19:06:46Z | step: Player references / development / Run npx playwright install --with-deps chromium | 24s → 30s | +6s | +25% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38131342389/job/114446131998) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38166556290/job/114550206561) |
+| 2026-10-11T19:05:57Z | step: Player references / development / Run actions/setup-node@v4 | 5s → 7s | +2s | +40% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38131890240/job/114447745822) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38166556290/job/114550206561) |
 | 2026-10-11T16:36:05Z | step: Development / gameplay / dev-trade-economy | 83s → 100s | +17s | +20.48% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38053941691/job/114218473575) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38155531326/job/114517616964) |
 | 2026-10-11T16:30:42Z | step: Development / gameplay / dev-local-encounter | 7s → 10s | +3s | +42.86% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37389751532/job/112031761500) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38155531326/job/114517616964) |
 | 2026-10-11T16:29:23Z | step: Development / gameplay / dev-ships | 36s → 46s | +10s | +27.78% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38141690945/job/114476679351) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38155531326/job/114517616964) |
