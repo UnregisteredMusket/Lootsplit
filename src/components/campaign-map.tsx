@@ -228,7 +228,7 @@ export function CampaignMaps() {
       {map ? (
         <>
           <MapViewport
-            key={map.id}
+            key={`viewport-${map.id}`}
             map={map}
             party={party}
             tileMode={tileMode && !!map.grid}
@@ -320,7 +320,7 @@ export function CampaignMaps() {
           </p>
           {dm && (
             <PartyPlacement
-              key={map.id}
+              key={`party-placement-${map.id}`}
               map={map}
               table={t}
               point={placement === "party" ? point : undefined}

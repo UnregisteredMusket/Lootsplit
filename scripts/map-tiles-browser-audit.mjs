@@ -179,6 +179,9 @@ try {
     await expect(page.getByRole("img", { name: "Old city map", exact: true })).toBeVisible();
     await chooseOption(page.getByLabel("Map type filter", { exact: true }), "dungeon");
     await expect(page.getByRole("img", { name: "Keep map", exact: true })).toBeVisible();
+    await expect(
+      page.getByRole("region", { name: "Interactive campaign map", exact: true }),
+    ).toHaveCount(1);
     await page.getByRole("button", { name: "Edit map & anchors", exact: true }).click();
     const editor = page.getByRole("dialog", { name: "Map editor", exact: true });
     await chooseOption(editor.getByLabel("Map category", { exact: true }), "property");
@@ -191,6 +194,9 @@ try {
     await expect(editor).toHaveCount(0);
     await chooseOption(page.getByLabel("Map type filter", { exact: true }), "property");
     await expect(page.getByRole("img", { name: "Keep map", exact: true })).toBeVisible();
+    await expect(
+      page.getByRole("region", { name: "Interactive campaign map", exact: true }),
+    ).toHaveCount(1);
     await page.getByRole("button", { name: "Place party on map", exact: true }).click();
     const viewport = page.getByRole("region", { name: "Interactive campaign map", exact: true }),
       box = await viewport.boundingBox();
