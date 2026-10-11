@@ -67,7 +67,8 @@ function MarketPage() {
         : shop.locationId !== assignedLocation)
     )
       return false;
-    if (availableOnly && !shopAvailableHere(shop, market)) return false;
+    if (availableOnly && !shopAvailableHere(shop, market, !!journal.world?.partyPosition))
+      return false;
     if (location && shop.place !== location) return false;
     if (category && shop.category !== category) return false;
     if (stocked === "open" && shop.closed) return false;

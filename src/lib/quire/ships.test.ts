@@ -1006,3 +1006,144 @@ test("purchasing a ship template initializes a single vessel with the normal rec
   assert.ok(t.holdings.find((h) => h.id === s.propertyId)?.deed);
   assert.equal(toCopper(t.purses[1].coins), 9000);
 });
+
+test("mapped ship routes use reviewed anchors and pace; grid movement carries aboard tokens without travel spending", () => {
+  let t = aboard(fixture());
+  const grid = {
+    columns: 10,
+    rows: 10,
+    feetPerTile: 5280,
+    diagonal: "equal" as const,
+    x: 0,
+    y: 0,
+    width: 1,
+    height: 1,
+  };
+  const map = {
+    id: "sea",
+    name: "Sea route",
+    image: "data:image/png;base64,aA==",
+    locationId: null,
+    visible: true,
+    type: "ship" as const,
+    grid,
+    markers: [],
+    anchors: [
+      { locationId: "port", x: 0.05, y: 0.05 },
+      { locationId: "far", x: 0.95, y: 0.05 },
+    ],
+    tokens: [
+      {
+        id: "ship-t",
+        kind: "ship" as const,
+        entityId: "ship",
+        label: "Dawn Trader",
+        column: 1,
+        row: 1,
+        visibility: "party" as const,
+      },
+      {
+        id: "hero-t",
+        kind: "character" as const,
+        entityId: "hero",
+        label: "Hero",
+        column: 2,
+        row: 1,
+        visibility: "party" as const,
+      },
+    ],
+  };
+  t = run(t, { kind: "map-save", mapId: map.id, before: null, map });
+  const before = structuredClone(t),
+    token = map.tokens[0];
+  t = run(t, {
+    kind: "map-token",
+    mapId: map.id,
+    grid,
+    tokenId: token.id,
+    before: token,
+    token: { ...token, column: 3, row: 4 },
+  });
+  assert.deepEqual(
+    t.journal!.world!.maps[0].tokens!.map((t) => [t.column, t.row]),
+    [
+      [4, 4],
+      [3, 4],
+    ],
+  );
+  assert.deepEqual(t.holdings, before.holdings);
+  assert.deepEqual(t.purses, before.purses);
+  assert.deepEqual(t.journal!.finance, before.journal!.finance);
+  assert.deepEqual(t.journal!.fleet, before.journal!.fleet);
+  const shipToken = t.journal!.world!.maps[0].tokens!.find((t) => t.id === "ship-t")!;
+  assert.throws(
+    () =>
+      run(t, {
+        kind: "map-token",
+        mapId: map.id,
+        grid,
+        tokenId: shipToken.id,
+        before: shipToken,
+        token: { ...shipToken, column: 9 },
+      }),
+    /aboard character outside/,
+  );
+  const mapRoute = {
+      mapId: map.id,
+      grid,
+      points: [
+        { column: 0, row: 0 },
+        { column: 9, row: 0 },
+      ],
+    },
+    duration = Math.max(1, Math.ceil((9 / vessel(t).stats.milesPerDay) * 1440));
+  const v = { ...voyage(t, duration), mapRoute };
+  assert.throws(
+    () => run(t, { kind: "ship-voyage", before: null, voyage: { ...v, durationMinutes: 1 } }),
+    /duration must match/,
+  );
+  assert.throws(
+    () =>
+      run(t, {
+        kind: "ship-voyage",
+        before: null,
+        voyage: {
+          ...v,
+          mapRoute: {
+            ...mapRoute,
+            points: [
+              { column: 1, row: 0 },
+              { column: 9, row: 0 },
+            ],
+          },
+        },
+      }),
+    /endpoints/,
+  );
+  t = run(t, { kind: "ship-voyage", before: null, voyage: v });
+  const proposed = t.journal!.fleet!.voyages[0];
+  t = run(t, { kind: "ship-voyage", before: proposed, voyage: { ...proposed, status: "active" } });
+  const active = t.journal!.fleet!.voyages[0];
+  assert.throws(
+    () =>
+      run(t, {
+        kind: "ship-voyage",
+        before: active,
+        voyage: { ...active, durationMinutes: active.durationMinutes + 1 },
+      }),
+    /underway route/,
+  );
+  const actual = t.journal!.world!.maps[0];
+  assert.throws(
+    () => run(t, { kind: "map-save", mapId: map.id, before: actual, map: null }),
+    /ongoing ship routes/,
+  );
+  t = days(t, 1);
+  assert.equal(t.journal!.fleet!.voyages[0].status, "arrived");
+  assert.equal(t.journal!.fleet!.voyages[0].elapsedMinutes, duration);
+  assert.equal(t.holdings.find((h) => h.id === "ship")!.locationId, "far");
+  assert.equal(
+    t.journal!.world!.characterPositions.find((p) => p.purseId === "hero")!.locationId,
+    "far",
+  );
+});

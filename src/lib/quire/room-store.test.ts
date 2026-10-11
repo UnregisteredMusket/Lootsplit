@@ -972,3 +972,130 @@ test("map pings cross seats outside turns without changing campaigns; expiry, ma
     await assert.rejects(mapSignals(dm),/unavailable/);
   } finally {Date.now = originalNow; const last=await readRoom(host.code); if(last) await deleteRoom(host.code,last.revision);}
 });
+
+test("shared map tiles and travel placement preserve privacy, reject forged moves and commit once", async () => {
+  const { choosePace } = await import("./cloud.server.ts");
+  const table = emptyCloudTable(),
+    grid = {
+      columns: 10,
+      rows: 10,
+      feetPerTile: 5,
+      diagonal: "equal" as const,
+      x: 0,
+      y: 0,
+      width: 1,
+      height: 1,
+    };
+  table.purses = [{ id: "tile-hero", name: "Tile hero", kind: "character", coins: emptyCoins() }];
+  table.journal = {
+    sessions: [],
+    events: [],
+    requests: [],
+    world: {
+      characterPositions: [],
+      maps: [
+        {
+          id: "tiles",
+          name: "Tiles",
+          image: "data:image/png;base64,aA==",
+          visible: true,
+          locationId: null,
+          type: "dungeon",
+          grid,
+          tokens: [],
+          anchors: [],
+          markers: [],
+        },
+      ],
+      npcs: [],
+      trades: [],
+      timeHistory: [],
+      conversations: [],
+      blackMarketActive: false,
+    },
+  };
+  const host = await openRoom({ name: "Tile DM", table }),
+    guest = await joinRoom({ code: host.code, purseId: "tile-hero", name: "Tile player" }),
+    auth = { code: host.code, token: guest.token };
+  await choosePace({ ...host, live: true });
+  const token = {
+      id: "tile-pc",
+      kind: "character",
+      entityId: "tile-hero",
+      label: "Tile hero",
+      column: 1,
+      row: 1,
+      visibility: "party",
+    },
+    add = {
+      id: "tile-add",
+      kind: "map-token",
+      mapId: "tiles",
+      grid,
+      tokenId: token.id,
+      before: null,
+      token,
+    };
+  await assert.rejects(
+    submitCommands({ ...auth, batchId: "forged-tile", commands: [add] }),
+    /Only the DM/,
+  );
+  await submitCommands({ ...host, batchId: "add-tile", commands: [add] });
+  await submitCommands({ ...host, batchId: "retry-tile", commands: [add] });
+  assert.equal((await roomState(host)).table.journal!.world!.maps[0].tokens!.length, 1);
+  const move = { ...add, id: "tile-move", before: token, token: { ...token, column: 3 } };
+  await submitCommands({ ...host, batchId: "move-tile", commands: [move] });
+  await assert.rejects(
+    submitCommands({ ...host, batchId: "stale-tile", commands: [{ ...move, id: "stale-move" }] }),
+    /moved or changed/,
+  );
+  await submitCommands({
+    ...host,
+    batchId: "secret-tile",
+    commands: [
+      {
+        ...add,
+        id: "secret-token",
+        tokenId: "secret",
+        token: {
+          id: "secret",
+          kind: "other",
+          label: "Secret map trap",
+          column: 8,
+          row: 8,
+          visibility: "dm",
+        },
+      },
+    ],
+  });
+  const position = {
+      mapId: "tiles",
+      x: 0.3,
+      y: 0.2,
+      environment: "Sea",
+      description: "Near coast",
+    },
+    placement = {
+      id: "free-party",
+      kind: "party-map-position",
+      before: null,
+      beforeLocationId: null,
+      position,
+    };
+  await assert.rejects(
+    submitCommands({ ...auth, batchId: "forged-party", commands: [placement] }),
+    /Only the DM/,
+  );
+  await submitCommands({ ...host, batchId: "free-party", commands: [placement] });
+  await submitCommands({ ...host, batchId: "retry-party", commands: [placement] });
+  const playerView = (await roomState(auth)).table;
+  assert.deepEqual(playerView.journal!.world!.partyPosition, position);
+  assert.deepEqual(
+    playerView.journal!.world!.maps[0].tokens!.map((t) => t.id),
+    ["tile-pc"],
+  );
+  assert.ok(!JSON.stringify(playerView).includes("Secret map trap"));
+  const final = await roomState(host);
+  assert.equal(final.table.journal!.events.filter((e) => e.id === "free-party-event").length, 1);
+  await deleteRoom(host.code, final.revision);
+});

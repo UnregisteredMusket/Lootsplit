@@ -76,7 +76,20 @@ export function projectRecord(
       .filter((map) => map.visible)
       .map((map) => ({
         ...map,
+        encounterId: undefined,
         markers: map.markers.filter((marker) => marker.visibility === "party"),
+        ...(map.tokens
+          ? {
+              tokens: map.tokens.filter(
+                (token) =>
+                  token.visibility === "party" &&
+                  (token.kind !== "character" ||
+                    !!t.purses.find((p) => p.id === token.entityId && characterVisible(t, p))) &&
+                  (token.kind !== "ship" ||
+                    !!t.journal?.fleet?.vessels.some((v) => v.propertyId === token.entityId)),
+              ),
+            }
+          : {}),
       }));
     const readableNpcs = new Set(
       world.npcs.filter((npc) => npcAvailableHere(npc, t)).map((npc) => npc.id),
@@ -98,6 +111,11 @@ export function projectRecord(
       ...r,
       purseIds: r.purseIds.filter((id) => seat.purseIds.includes(id)),
     }));
+    if (world.partyPosition && !world.maps.some((m) => m.id === world.partyPosition!.mapId)) {
+      delete world.partyPosition.mapId;
+      delete world.partyPosition.x;
+      delete world.partyPosition.y;
+    }
     world.npcs = world.npcs.filter((npc) => readableNpcs.has(npc.id));
     if (options.directory)
       world.partyCharacters = t.purses
@@ -110,7 +128,7 @@ export function projectRecord(
         )
         .map((p) => ({ id: p.id, name: p.name }));
     else delete world.partyCharacters;
-    if(t.journal.world || options.directory)t.journal.world=world;
+    if (t.journal.world || options.directory) t.journal.world = world;
     const estate = readEstate(t.journal.propertyOperations);
     const visibleSites = new Set(
       estate.sites
@@ -118,14 +136,27 @@ export function projectRecord(
         .map((site) => site.propertyId),
     );
     if (t.journal.fleet) {
-      const fleet=t.journal.fleet;
-      fleet.vessels=fleet.vessels.filter(v=>visibleSites.has(v.propertyId)).map(v=>({...v,dmNotes:""}));
-      const currentFacilities=new Set(fleet.vessels.flatMap(v=>v.facilityId?[v.facilityId]:[]));
-      fleet.facilities=fleet.facilities.filter(f=>facilityAccess(t,f,seat)||currentFacilities.has(f.id));
-      fleet.voyages=fleet.voyages.filter(v=>visibleSites.has(v.propertyId));
-      fleet.aboard=fleet.aboard.filter(a=>visibleSites.has(a.propertyId));
-      fleet.boarding=fleet.boarding.filter(r=>seat.purseIds.includes(r.purseId));
-      fleet.work=fleet.work.filter(w=>visibleSites.has(w.propertyId));
+      const fleet = t.journal.fleet;
+      fleet.vessels = fleet.vessels
+        .filter((v) => visibleSites.has(v.propertyId))
+        .map((v) => ({ ...v, dmNotes: "" }));
+      const currentFacilities = new Set(
+        fleet.vessels.flatMap((v) => (v.facilityId ? [v.facilityId] : [])),
+      );
+      fleet.facilities = fleet.facilities.filter(
+        (f) => facilityAccess(t, f, seat) || currentFacilities.has(f.id),
+      );
+      fleet.voyages = fleet.voyages
+        .filter((v) => visibleSites.has(v.propertyId))
+        .map((v) => ({
+          ...v,
+          ...(v.mapRoute && !world.maps.some((m) => m.id === v.mapRoute!.mapId)
+            ? { mapRoute: undefined }
+            : {}),
+        }));
+      fleet.aboard = fleet.aboard.filter((a) => visibleSites.has(a.propertyId));
+      fleet.boarding = fleet.boarding.filter((r) => seat.purseIds.includes(r.purseId));
+      fleet.work = fleet.work.filter((w) => visibleSites.has(w.propertyId));
     }
     const sharedOwners = new Set(
       t.holdings.filter((h) => visibleSites.has(h.id)).map((h) => h.purseId),
@@ -173,7 +204,7 @@ export function projectRecord(
     t.shops = t.shops.filter((shop) => shopVisible(shop, t));
     t.listings = t.listings.filter(
       (listing) =>
-        propertyAvailableHere(listing, market) &&
+        propertyAvailableHere(listing, market, !!world.partyPosition) &&
         listing.quantity !== 0 &&
         listing.status !== "withdrawn",
     );
@@ -191,8 +222,8 @@ export function projectRecord(
               ...m.anchors.map((a) => a.locationId),
             ]),
             world.npcs.map((n) => n.locationId),
-            t.journal.fleet?.facilities.map(f=>f.locationId) ?? [],
-            t.journal.fleet?.voyages.flatMap(v=>[v.originId,v.destinationId]) ?? [],
+            t.journal.fleet?.facilities.map((f) => f.locationId) ?? [],
+            t.journal.fleet?.voyages.flatMap((v) => [v.originId, v.destinationId]) ?? [],
             t.purses
               .filter((p) => characterVisible(t, p))
               .flatMap((p) => {
@@ -205,11 +236,13 @@ export function projectRecord(
               e.locationId ? [e.locationId] : [],
             ) ?? [],
           ),
+        !!world.partyPosition,
       );
     t.ledger = t.ledger.filter((l) => seat.purseIds.includes(l.purseId));
     t.holdings = t.holdings.filter(
       (h) =>
-        seat.purseIds.includes(h.purseId) || (readableNpcs.has(h.purseId) && !h.custody && !h.reservedFor) ||
+        seat.purseIds.includes(h.purseId) ||
+        (readableNpcs.has(h.purseId) && !h.custody && !h.reservedFor) ||
         visibleSites.has(h.id) ||
         (h.custody && visibleSites.has(h.custody.propertyId)),
     );
@@ -305,15 +338,19 @@ export function projectRecord(
       .filter((s) => t.purses.some((p) => p.id === s.purseId))
       .map((s) => ({ ...s, ...(s.downtime ? { downtime: undefined } : {}) }));
     if (t.journal.fleet) {
-      t.journal.fleet.aboard=t.journal.fleet.aboard.filter(a=>t.purses.some(p=>p.id===a.purseId));
-      for(const v of t.journal.fleet.voyages) v.crewPurseIds=v.crewPurseIds.filter(id=>t.purses.some(p=>p.id===id));
-      for(const f of t.journal.fleet.facilities) f.accessPurseIds=f.accessPurseIds.filter(id=>t.purses.some(p=>p.id===id));
+      t.journal.fleet.aboard = t.journal.fleet.aboard.filter((a) =>
+        t.purses.some((p) => p.id === a.purseId),
+      );
+      for (const v of t.journal.fleet.voyages)
+        v.crewPurseIds = v.crewPurseIds.filter((id) => t.purses.some((p) => p.id === id));
+      for (const f of t.journal.fleet.facilities)
+        f.accessPurseIds = f.accessPurseIds.filter((id) => t.purses.some((p) => p.id === id));
     }
     if (t.journal.finance) {
       const f = readFinance(t.journal.finance);
       t.journal.finance = {
         day: f.day,
-        ...(f.minuteOfDay!==undefined?{minuteOfDay:f.minuteOfDay}:{}),
+        ...(f.minuteOfDay !== undefined ? { minuteOfDay: f.minuteOfDay } : {}),
         loans: f.loans.filter((l) => seat.purseIds.includes(l.purseId)),
         rules: f.rules.filter((r) => seat.purseIds.includes(r.purseId)),
         downtime: [],
@@ -321,10 +358,12 @@ export function projectRecord(
     }
     t.journal.requests = t.journal.requests.filter((r) => seat.purseIds.includes(r.purseId));
     t.journal.events = t.journal.events
-      .filter((e) =>
-        !e.dmOnly && (e.propertyId
-          ? visibleSites.has(e.propertyId) || (!!e.purseId && seat.purseIds.includes(e.purseId))
-          : !e.purseId || seat.purseIds.includes(e.purseId)),
+      .filter(
+        (e) =>
+          !e.dmOnly &&
+          (e.propertyId
+            ? visibleSites.has(e.propertyId) || (!!e.purseId && seat.purseIds.includes(e.purseId))
+            : !e.purseId || seat.purseIds.includes(e.purseId)),
       )
       .map(({ change, ...e }) => e);
     t.loans = t.loans.filter((l) => seat.purseIds.includes(l.purseId));

@@ -38,6 +38,96 @@ export const mapMarkerSchema = pointSchema
     visibility: z.enum(["party", "dm"]),
   })
   .strict();
+export const mapTypes = [
+  "regional",
+  "city",
+  "dungeon",
+  "property",
+  "wilderness",
+  "battle",
+  "ship",
+  "other",
+] as const;
+export const travelEnvironments = [
+  "Roads",
+  "Wilderness",
+  "River",
+  "Sea",
+  "Coast",
+  "Underground",
+  "Dungeon",
+  "Settlement",
+  "Other",
+] as const;
+export const wildernessBiomes = [
+  "Forest",
+  "Grassland",
+  "Desert",
+  "Mountains",
+  "Hills",
+  "Swamp",
+  "Arctic",
+  "Tundra",
+  "Jungle",
+  "Savanna",
+  "Coastal",
+  "Underdark",
+] as const;
+export const partyMapPositionSchema = z
+  .object({
+    x: z.number().min(0).max(1).optional(),
+    y: z.number().min(0).max(1).optional(),
+    mapId: id.optional(),
+    environment: z.enum(travelEnvironments),
+    biome: z.enum(wildernessBiomes).optional(),
+    description: z.string().trim().max(200),
+  })
+  .strict()
+  .superRefine((p, ctx) => {
+    const full = p.mapId !== undefined && p.x !== undefined && p.y !== undefined,
+      redacted = p.mapId === undefined && p.x === undefined && p.y === undefined;
+    if (!full && !redacted)
+      ctx.addIssue({ code: "custom", message: "Party map coordinates must be complete." });
+    if (p.environment === "Wilderness" && !p.biome)
+      ctx.addIssue({ code: "custom", message: "Choose a wilderness biome." });
+    if (p.environment !== "Wilderness" && p.biome)
+      ctx.addIssue({ code: "custom", message: "Biomes apply to wilderness positions." });
+  });
+export const mapGridSchema = z
+  .object({
+    columns: z.number().int().min(1).max(200),
+    rows: z.number().int().min(1).max(200),
+    feetPerTile: z.number().finite().min(0.1).max(1000000).default(5),
+    diagonal: z.enum(["equal", "euclidean", "orthogonal"]).default("equal"),
+    x: z.number().min(0).max(1).default(0),
+    y: z.number().min(0).max(1).default(0),
+    width: z.number().min(0.01).max(1).default(1),
+    height: z.number().min(0.01).max(1).default(1),
+  })
+  .strict()
+  .superRefine((g, ctx) => {
+    if (g.x + g.width > 1.000000001 || g.y + g.height > 1.000000001)
+      ctx.addIssue({ code: "custom", message: "Grid must fit inside the map image." });
+  });
+export const mapTokenSchema = z
+  .object({
+    id,
+    label: name,
+    kind: z.enum(["character", "ship", "creature", "other"]),
+    entityId: id.optional(),
+    encounterId: id.optional(),
+    combatantId: id.optional(),
+    column: z.number().int().min(0).max(199),
+    row: z.number().int().min(0).max(199),
+    visibility: z.enum(["party", "dm"]),
+  })
+  .strict()
+  .superRefine((t, ctx) => {
+    if (["character", "ship"].includes(t.kind) && !t.entityId)
+      ctx.addIssue({ code: "custom", message: "Choose an existing character or ship." });
+    if (t.kind === "creature" && (!t.encounterId || !t.combatantId))
+      ctx.addIssue({ code: "custom", message: "Choose an encounter combatant." });
+  });
 export const campaignMapSchema = z
   .object({
     id,
@@ -47,6 +137,11 @@ export const campaignMapSchema = z
     visible: z.boolean(),
     anchors: z.array(mapAnchorSchema).max(500),
     markers: z.array(mapMarkerSchema).max(500),
+    type: z.enum(mapTypes).optional(),
+    propertyId: id.optional(),
+    grid: mapGridSchema.optional(),
+    tokens: z.array(mapTokenSchema).max(200).optional(),
+    encounterId: id.optional(),
   })
   .strict();
 export const npcSchema = z
@@ -147,6 +242,7 @@ export const worldSchema = z
     characterPositions: z.array(characterPositionSchema).max(10000).default([]),
     partyCharacters: z.array(z.object({ id, name }).strict()).max(10000).optional(),
     maps: z.array(campaignMapSchema).max(100).default([]),
+    partyPosition: partyMapPositionSchema.optional(),
     npcs: z.array(npcSchema).max(500).default([]),
     trades: z.array(tradeSchema).default([]),
     conversations: z.array(conversationSchema).default([]),
@@ -173,10 +269,29 @@ export const worldSchema = z
   .strict();
 export type World = z.infer<typeof worldSchema>;
 export type CampaignMap = z.infer<typeof campaignMapSchema>;
+export type MapGrid = z.infer<typeof mapGridSchema>;
+export type MapToken = z.infer<typeof mapTokenSchema>;
+export type PartyMapPosition = z.infer<typeof partyMapPositionSchema>;
 export type Npc = z.infer<typeof npcSchema>;
 export type Trade = z.infer<typeof tradeSchema>;
 export const readWorld = (value?: unknown): World => worldSchema.parse(value ?? {});
 export const worldCommands = [
+  z.object({
+    id,
+    kind: z.literal("party-map-position"),
+    before: partyMapPositionSchema.nullable(),
+    beforeLocationId: id.nullable(),
+    position: partyMapPositionSchema.nullable(),
+  }),
+  z.object({
+    id,
+    kind: z.literal("map-token"),
+    mapId: id,
+    grid: mapGridSchema,
+    tokenId: id,
+    before: mapTokenSchema.nullable(),
+    token: mapTokenSchema.nullable(),
+  }),
   z.object({
     id,
     kind: z.literal("character-position"),

@@ -1,3 +1,4 @@
+import { canonicalJson } from "@/lib/quire/canonical-json";
 import { SearchSelect } from "@/components/search-select";
 import { useEffect, useState } from "react";
 import { toast } from "sonner";
@@ -66,6 +67,7 @@ export function MarketLocationsPanel() {
                 try {
                   const result = await commandOutcome({
                     kind: "party-location",
+                    beforePosition: canonicalJson(journal.world?.partyPosition ?? null),
                     before: market.currentLocationId,
                     locationId,
                   });

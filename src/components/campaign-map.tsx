@@ -1,8 +1,11 @@
+import { GridEditor, PartyPlacement, CombatControls } from "./map-tile-controls";
+import { mapType, partyEnvironment, tilePoint, routePosition } from "@/lib/quire/map-tiles";
+import { canonicalJson } from "@/lib/quire/canonical-json";
 import { characterLocation, characterVisible } from "@/lib/quire/character-position";
 import { SearchSelect } from "@/components/search-select";
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { useSeat } from "@/lib/quire/seat";
-import { readWorld, type CampaignMap } from "@/lib/quire/world-schema";
+import { readWorld, mapTypes, type CampaignMap } from "@/lib/quire/world-schema";
 import { anchorFor, recognizedAnchors, npcAvailableHere, shopVisible } from "@/lib/quire/world";
 import { readMarketLocations, locationLabel, locationPath } from "@/lib/quire/shop-locations";
 import { prepareMapImage, recognizeMap } from "@/lib/quire/map-image";
@@ -13,7 +16,18 @@ import { Button, Fold } from "./ui";
 import { AppLink } from "./app-link";
 import { libraryRecordHref } from "@/lib/quire/library-records";
 import { useRouterState } from "@tanstack/react-router";
-import { Users, UserRound, Store, House, Mail, Flag, MapPin, EyeOff } from "lucide-react";
+import {
+  Users,
+  UserRound,
+  Store,
+  House,
+  Mail,
+  Flag,
+  MapPin,
+  EyeOff,
+  Ship as ShipIcon,
+  Swords,
+} from "lucide-react";
 import { MapFrame } from "./map-frame";
 import {
   groupMapRecords,
@@ -33,21 +47,36 @@ export function CampaignMaps() {
     market = readMarketLocations(t.journal.market);
   const [selected, setSelected] = useState(""),
     [editing, setEditing] = useState<CampaignMap | null | undefined>(),
-    [placement, setPlacement] = useState<"" | "anchor" | "marker">(""),
+    [placement, setPlacement] = useState<"" | "anchor" | "marker" | "party" | "token">(""),
     [location, setLocation] = useState(""),
     [point, setPoint] = useState<{ x: number; y: number }>(),
     [label, setLabel] = useState(""),
     [description, setDescription] = useState(""),
-    [secret, setSecret] = useState(false);
+    [secret, setSecret] = useState(false),
+    [typeFilter, setTypeFilter] = useState(""),
+    [tileMode, setTileMode] = useState(false),
+    [selectedToken, setSelectedToken] = useState("");
   const requestedMap = useRouterState({ select: (s) => s.location.search.map });
-  const maps = w.maps.filter((m) => dm || m.visible),
+  const maps = w.maps.filter(
+      (m) => (dm || m.visible) && (!typeFilter || mapType(m, t) === typeFilter),
+    ),
     best = [...locationPath(market, market.currentLocationId)]
       .reverse()
       .map((l) => maps.find((m) => m.locationId === l.id))
       .find(Boolean);
   const map =
-    maps.find((m) => m.id === (selected || requestedMap)) ?? best ?? maps.find((m) => !m.locationId) ?? maps[0];
-  const party = map && anchorFor(map, t, market.currentLocationId);
+    maps.find((m) => m.id === (selected || requestedMap)) ??
+    maps.find((m) => m.id === w.partyPosition?.mapId) ??
+    best ??
+    maps.find((m) => !m.locationId) ??
+    maps[0];
+  const party =
+    map &&
+    (w.partyPosition?.mapId === map.id &&
+    w.partyPosition.x !== undefined &&
+    w.partyPosition.y !== undefined
+      ? { x: w.partyPosition.x, y: w.partyPosition.y }
+      : anchorFor(map, t, market.currentLocationId));
   const pins = map
     ? [
         ...t.holdings
@@ -119,13 +148,27 @@ export function CampaignMaps() {
               ]
             : [];
         }),
+        ...(t.journal.fleet?.voyages ?? [])
+          .filter(
+            (v) =>
+              v.mapRoute?.mapId === map.id && ["active", "blocked", "arrived"].includes(v.status),
+          )
+          .map((v) => ({
+            id: `voyage-${v.id}`,
+            label: t.holdings.find((h) => h.id === v.propertyId)?.name ?? "Ship voyage",
+            kind: "Ship",
+            point: routePosition(v.mapRoute!, v.elapsedMinutes / v.durationMinutes),
+            href: libraryRecordHref("property", v.propertyId),
+          })),
       ].filter((p) => p.point)
     : [];
   return (
     <div className="campaign-maps">
       <p className="text-muted">
-        {locationLabel(market, market.currentLocationId)} ·{" "}
-        {party ? "Party position shown" : "Link this location to a map to show the party"}
+        {partyEnvironment(w.partyPosition) || locationLabel(market, market.currentLocationId)} ·{" "}
+        {party
+          ? "Party position shown"
+          : "Choose a map position or link a location to show the party"}
       </p>
       <div className="world-toolbar">
         <AppLink className="settings-link" href="/features/npcs">
@@ -135,12 +178,34 @@ export function CampaignMaps() {
           Trading & Barter →
         </AppLink>
         <label>
+          Map type
+          <SearchSelect
+            aria-label="Map type filter"
+            value={typeFilter}
+            onValueChange={(v) => {
+              setTypeFilter(v);
+              setSelected("");
+              setPlacement("");
+              setPoint(undefined);
+              setSelectedToken("");
+            }}
+          >
+            <option value="">All map types</option>
+            {mapTypes.map((v) => (
+              <option key={v} value={v}>
+                {v[0].toUpperCase() + v.slice(1)}
+              </option>
+            ))}
+          </SearchSelect>
+        </label>
+        <label>
           Map
           <SearchSelect
             aria-label="Map"
             value={map?.id ?? ""}
             onValueChange={(selectedValue) => {
               setSelected(selectedValue);
+              setSelectedToken("");
               setPlacement("");
               setPoint(undefined);
             }}
@@ -166,6 +231,71 @@ export function CampaignMaps() {
             key={map.id}
             map={map}
             party={party}
+            tileMode={tileMode && !!map.grid}
+            routes={(t.journal.fleet?.voyages ?? [])
+              .filter(
+                (v) =>
+                  v.mapRoute?.mapId === map.id &&
+                  ["active", "blocked", "arrived"].includes(v.status),
+              )
+              .map((v) => ({
+                id: v.id,
+                points: v.mapRoute!.points.map((p) => tilePoint(v.mapRoute!.grid, p)),
+              }))}
+            onTokenSelect={
+              dm
+                ? (id) => {
+                    setSelectedToken(id);
+                    setPlacement("token");
+                    setPoint(undefined);
+                  }
+                : undefined
+            }
+            controls={
+              <>
+                {map.grid && (
+                  <Button
+                    aria-pressed={tileMode}
+                    onClick={() => {
+                      setTileMode(!tileMode);
+                      setPlacement("");
+                      setPoint(undefined);
+                    }}
+                  >
+                    {tileMode ? "Leave tile mode" : "Enter tile mode"}
+                  </Button>
+                )}
+                {tileMode &&
+                  map.grid &&
+                  (dm ? (
+                    <Fold title="Combat tiles" defaultOpen>
+                      <CombatControls
+                        map={map}
+                        table={t}
+                        point={placement === "token" ? point : undefined}
+                        selected={selectedToken}
+                        select={(id) => {
+                          setSelectedToken(id);
+                          setPoint(undefined);
+                        }}
+                        begin={() => {
+                          setPlacement("token");
+                          setPoint(undefined);
+                        }}
+                        done={() => {
+                          setPoint(undefined);
+                          setPlacement("");
+                        }}
+                      />
+                    </Fold>
+                  ) : (
+                    <p>
+                      Combat grid · {map.grid.feetPerTile} ft per tile. The DM moves tokens; only
+                      shared combatants are shown.
+                    </p>
+                  ))}
+              </>
+            }
             placing={!!placement}
             stopPlacing={() => {
               setPlacement("");
@@ -188,6 +318,22 @@ export function CampaignMaps() {
             Drag to pan. Pinch or use the scroll wheel to zoom. Keyboard: arrows, +, − and Home.
             Markers update through the shared campaign.
           </p>
+          {dm && (
+            <PartyPlacement
+              key={map.id}
+              map={map}
+              table={t}
+              point={placement === "party" ? point : undefined}
+              begin={() => {
+                setPlacement("party");
+                setPoint(undefined);
+              }}
+              done={() => {
+                setPoint(undefined);
+                setPlacement("");
+              }}
+            />
+          )}
           {dm && (
             <Fold title="Place map markers & locations" defaultOpen>
               <div className="world-toolbar">
@@ -218,7 +364,15 @@ export function CampaignMaps() {
               </div>
               {placement && (
                 <p role="status">
-                  Tap the map to place {placement === "anchor" ? "a location anchor" : "a marker"}.
+                  Tap the map to place{" "}
+                  {placement === "anchor"
+                    ? "a location anchor"
+                    : placement === "party"
+                      ? "the party"
+                      : placement === "token"
+                        ? "a combat token"
+                        : "a marker"}
+                  .
                 </p>
               )}
               {point && placement === "anchor" && (
@@ -320,13 +474,16 @@ export function CampaignMaps() {
             {map.anchors.map((a) => (
               <div key={a.locationId} className="world-row">
                 <span>
-                  <AppLink href={libraryRecordHref("location", a.locationId)}>{locationLabel(market, a.locationId)} →</AppLink>
+                  <AppLink href={libraryRecordHref("location", a.locationId)}>
+                    {locationLabel(market, a.locationId)} →
+                  </AppLink>
                   {a.locationId === market.currentLocationId ? " · Party here" : ""}
                 </span>
                 {dm && (
                   <CommandButton
                     input={{
                       kind: "party-location",
+                      beforePosition: canonicalJson(t.journal.world?.partyPosition ?? null),
                       before: market.currentLocationId,
                       locationId: a.locationId,
                     }}
@@ -369,14 +526,16 @@ export function CampaignMaps() {
             ))}
             {!party && (
               <p>
-                No reviewed anchor for the party's selected location. The map does not guess a
-                position.
+                No party position on this map. Link a location anchor or place the party freely.
               </p>
             )}
           </section>
         </>
       ) : (
-        <p>No maps shared yet. The DM can import regional, city and area maps.</p>
+        <p>
+          No maps match this view. The DM can import regional, city, dungeon, property, wilderness,
+          battle and ship maps.
+        </p>
       )}
       {dm && (
         <Fold title="Manage campaign locations">
@@ -447,6 +606,38 @@ function MapEditor({
               }}
             />
           </label>
+          <label>
+            Map category
+            <SearchSelect
+              aria-label="Map category"
+              value={mapType(draft, table)}
+              onValueChange={(type) => setDraft({ ...draft, type: type as CampaignMap["type"] })}
+            >
+              {mapTypes.map((v) => (
+                <option key={v} value={v}>
+                  {v[0].toUpperCase() + v.slice(1)}
+                </option>
+              ))}
+            </SearchSelect>
+          </label>
+          <label>
+            Linked property / ship
+            <SearchSelect
+              aria-label="Linked property / ship"
+              value={draft.propertyId ?? ""}
+              onValueChange={(id) => setDraft({ ...draft, propertyId: id || undefined })}
+            >
+              <option value="">No property link</option>
+              {table.holdings
+                .filter((h) => h.kind === "property" && h.quantity > 0)
+                .map((h) => (
+                  <option key={h.id} value={h.id}>
+                    {h.name}
+                  </option>
+                ))}
+            </SearchSelect>
+          </label>
+          <GridEditor map={draft} set={setDraft} />
           <label>
             Map location
             <SearchSelect
@@ -586,6 +777,10 @@ function MapViewport({
   onPlace,
   entities,
   stopPlacing,
+  tileMode,
+  routes,
+  controls,
+  onTokenSelect,
 }: {
   map: CampaignMap;
   party?: { x: number; y: number };
@@ -594,6 +789,10 @@ function MapViewport({
   onPlace: (p: { x: number; y: number }) => void;
   entities: MapRecord[];
   stopPlacing: () => void;
+  tileMode: boolean;
+  routes: { id: string; points: { x: number; y: number }[] }[];
+  controls: ReactNode;
+  onTokenSelect?: (id: string) => void;
 }) {
   const [visible, setVisible] = useState<string[]>([...mapRecordKinds]),
     [filtersOpen, setFiltersOpen] = useState(false),
@@ -614,6 +813,17 @@ function MapViewport({
         href: libraryRecordHref("marker", map.id, m.id),
       })),
     ...entities,
+    ...(tileMode && map.grid
+      ? (map.tokens ?? [])
+          .filter((t) => useDm || t.visibility === "party")
+          .map((token) => ({
+            id: token.id,
+            label: token.label,
+            kind: token.kind === "ship" ? "Ship" : "Combatant",
+            point: tilePoint(map.grid!, token),
+            description: `Column ${token.column + 1}, row ${token.row + 1}${token.visibility === "dm" ? " · DM only" : ""}`,
+          }))
+      : []),
     ...(party ? [{ id: "party", label: "Party", kind: "Party", point: party }] : []),
   ];
   const groups = groupMapRecords(records, visible);
@@ -756,11 +966,14 @@ function MapViewport({
             )
           )
             e.preventDefault();
-          if (pinging && (e.key === "Enter" || e.key === " ")) {
+          if ((pinging || placing) && (e.key === "Enter" || e.key === " ")) {
             e.preventDefault();
             const x = (size.w / 2 - view.x) / (w * view.scale),
               y = (size.h / 2 - view.y) / (h * view.scale);
-            if (x >= 0 && x <= 1 && y >= 0 && y <= 1) void signals.send({ x, y }, color);
+            if (x >= 0 && x <= 1 && y >= 0 && y <= 1) {
+              if (pinging) void signals.send({ x, y }, color);
+              else onPlace({ x, y });
+            }
           }
           if (e.key === "Escape") {
             setPinging(false);
@@ -821,6 +1034,7 @@ function MapViewport({
         onPointerUp={(e) => {
           if (
             (placing || pinging) &&
+            !(e.target as Element).closest("button") &&
             !moved.current &&
             pointers.current.has(e.pointerId) &&
             pointers.current.size === 1
@@ -851,6 +1065,48 @@ function MapViewport({
             alt={map.name}
             onLoad={(e) => setRatio(e.currentTarget.naturalWidth / e.currentTarget.naturalHeight)}
           />
+          {visible.includes("Ship") && routes.length > 0 && (
+            <svg
+              className="map-route-trails"
+              viewBox="0 0 1000 1000"
+              preserveAspectRatio="none"
+              aria-hidden="true"
+            >
+              {routes.map((route) => (
+                <polyline
+                  key={route.id}
+                  points={route.points.map((p) => `${p.x * 1000},${p.y * 1000}`).join(" ")}
+                />
+              ))}
+            </svg>
+          )}
+          {tileMode && map.grid && (
+            <svg
+              className="map-tile-grid"
+              viewBox="0 0 1000 1000"
+              preserveAspectRatio="none"
+              aria-hidden="true"
+            >
+              {Array.from({ length: map.grid.columns + 1 }, (_, i) => (
+                <line
+                  key={`c${i}`}
+                  x1={(map.grid!.x + (i * map.grid!.width) / map.grid!.columns) * 1000}
+                  x2={(map.grid!.x + (i * map.grid!.width) / map.grid!.columns) * 1000}
+                  y1={map.grid!.y * 1000}
+                  y2={(map.grid!.y + map.grid!.height) * 1000}
+                />
+              ))}
+              {Array.from({ length: map.grid.rows + 1 }, (_, i) => (
+                <line
+                  key={`r${i}`}
+                  y1={(map.grid!.y + (i * map.grid!.height) / map.grid!.rows) * 1000}
+                  y2={(map.grid!.y + (i * map.grid!.height) / map.grid!.rows) * 1000}
+                  x1={map.grid!.x * 1000}
+                  x2={(map.grid!.x + map.grid!.width) * 1000}
+                />
+              ))}
+            </svg>
+          )}
         </div>
         {groups.map((group) => (
           <div
@@ -869,7 +1125,15 @@ function MapViewport({
                 title={`${type.kind}: ${type.records.map((r) => r.label).join(", ")}`}
                 aria-label={`${type.kind}: ${type.records.length} ${type.records.length === 1 ? "record" : "records"}`}
                 onClick={() => {
-                  if (!moved.current && !placing && !pinging) setDetails(type.records);
+                  if (!moved.current && !pinging) {
+                    const token = type.records.find(
+                      (r) =>
+                        r.kind === "Combatant" ||
+                        (r.kind === "Ship" && map.tokens?.some((t) => t.id === r.id)),
+                    );
+                    if (token && onTokenSelect) onTokenSelect(token.id);
+                    else if (!placing) setDetails(type.records);
+                  }
                 }}
               >
                 <RecordIcon kind={type.kind} />
@@ -936,25 +1200,30 @@ function MapViewport({
           mode off.
         </p>
       )}
+      <div className="map-tile-control-area">{controls}</div>
     </MapFrame>
   );
 }
 function RecordIcon({ kind }: { kind: string }) {
   const Icon =
-    kind === "NPC" || kind === "Character"
-      ? UserRound
-      : kind === "Party"
-        ? Users
-        : kind === "Shop"
-          ? Store
-          : kind === "Black market"
-            ? EyeOff
-            : kind === "Property"
-              ? House
-              : kind === "Post office"
-                ? Mail
-                : kind === "Marker"
-                  ? Flag
-                  : MapPin;
+    kind === "Ship"
+      ? ShipIcon
+      : kind === "Combatant"
+        ? Swords
+        : kind === "NPC" || kind === "Character"
+          ? UserRound
+          : kind === "Party"
+            ? Users
+            : kind === "Shop"
+              ? Store
+              : kind === "Black market"
+                ? EyeOff
+                : kind === "Property"
+                  ? House
+                  : kind === "Post office"
+                    ? Mail
+                    : kind === "Marker"
+                      ? Flag
+                      : MapPin;
   return <Icon size={18} aria-hidden="true" />;
 }

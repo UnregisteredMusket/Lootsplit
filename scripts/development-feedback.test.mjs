@@ -1,7 +1,12 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { accountScenarios, selectAccountScenario, localAuditOrigin, externalAuditRequests } from "./account-scenarios.mjs";
+import {
+  accountScenarios,
+  selectAccountScenario,
+  localAuditOrigin,
+  externalAuditRequests,
+} from "./account-scenarios.mjs";
 
 test("focused selection refuses unknown names and cannot narrow CI release coverage", () => {
   assert.equal(selectAccountScenario([], "true"), null);
@@ -38,7 +43,8 @@ test("account network isolation intercepts external origins without routing loca
     "http://127.0.0.1:8080/",
     "http://127.0.0.1:8080/node_modules/.vite/deps/react.js?v=123",
     "http://127.0.0.1:8080/api/account/library",
-  ]) assert.equal(external.test(local), false, local);
+  ])
+    assert.equal(external.test(local), false, local);
   for (const other of [
     "https://127.0.0.1:8080/",
     "http://127.0.0.1:8081/",
@@ -47,8 +53,12 @@ test("account network isolation intercepts external origins without routing loca
     "http://127.0.0.1.example.com:8080/",
     "http://localhost:8080/",
     "https://example.com/",
-  ]) assert.equal(external.test(other), true, other);
-  assert.equal(externalAuditRequests("http://localhost:8080").test("http://localhost:8080/src/router.tsx"), false);
+  ])
+    assert.equal(external.test(other), true, other);
+  assert.equal(
+    externalAuditRequests("http://localhost:8080").test("http://localhost:8080/src/router.tsx"),
+    false,
+  );
   assert.throws(() => externalAuditRequests("https://example.com"));
 });
 
@@ -74,16 +84,41 @@ test("packaged Worker checks all belong to one required isolated group", () => {
       /- name: (worker-[\w-]+|Verify title screen on the built artifact)\n\s+if: matrix.group == '([^']+)'/g,
     ),
   ];
-  assert.equal(assignments.length, 18);
-  assert.ok(assignments.some(([, name, group]) => name === "worker-ships" && group === "interface"));
-  assert.ok(assignments.some(([, name, group]) => name === "worker-trade-economy" && group === "interface"));
-  assert.ok(assignments.some(([, name, group]) => name === "worker-world-features" && group === "interface"));
-  assert.ok(assignments.some(([, name, group]) => name === "worker-property-operations" && group === "interface"));
-  assert.ok(assignments.some(([, name, group]) => name === "worker-properties" && group === "interface"));
-  assert.ok(assignments.some(([, name, group]) => name === "worker-shop-stock" && group === "interface"));
-  assert.ok(assignments.some(([, name, group]) => name === "worker-market-locations" && group === "interface"));
-  assert.equal(new Set(assignments.map((m) => m[1])).size, 18);
-  assert.ok(assignments.some(([, name, group]) => name === "worker-sound" && group === "interface"));
+  assert.equal(assignments.length, 19);
+  assert.ok(
+    assignments.some(([, name, group]) => name === "worker-map-tiles" && group === "interface"),
+  );
+  assert.ok(
+    assignments.some(([, name, group]) => name === "worker-ships" && group === "interface"),
+  );
+  assert.ok(
+    assignments.some(([, name, group]) => name === "worker-trade-economy" && group === "interface"),
+  );
+  assert.ok(
+    assignments.some(
+      ([, name, group]) => name === "worker-world-features" && group === "interface",
+    ),
+  );
+  assert.ok(
+    assignments.some(
+      ([, name, group]) => name === "worker-property-operations" && group === "interface",
+    ),
+  );
+  assert.ok(
+    assignments.some(([, name, group]) => name === "worker-properties" && group === "interface"),
+  );
+  assert.ok(
+    assignments.some(([, name, group]) => name === "worker-shop-stock" && group === "interface"),
+  );
+  assert.ok(
+    assignments.some(
+      ([, name, group]) => name === "worker-market-locations" && group === "interface",
+    ),
+  );
+  assert.equal(new Set(assignments.map((m) => m[1])).size, 19);
+  assert.ok(
+    assignments.some(([, name, group]) => name === "worker-sound" && group === "interface"),
+  );
   for (const [, , group] of assignments) assert.ok(["accounts", "interface"].includes(group));
   assert.match(workflow, /group: \[accounts, interface\]/);
   assert.match(workflow, /fail-fast: false/);

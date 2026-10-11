@@ -7,7 +7,11 @@ export function shopVisible(
 ) {
   return (
     (!shop.blackMarket || table.journal?.world?.blackMarketActive === true) &&
-    shopAvailableHere(shop, readMarketLocations(table.journal?.market))
+    shopAvailableHere(
+      shop,
+      readMarketLocations(table.journal?.market),
+      !!table.journal?.world?.partyPosition,
+    )
   );
 }
 export function shopAsking(

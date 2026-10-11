@@ -1414,7 +1414,7 @@ export async function buyListing(input: {
     if (getSeat().role === "player") {
       if (!getSeat().purseIds.includes(input.purseId)) throw Error("That character is not yours at this table.");
       const journal = readJournal((await request<{ value?: unknown } | undefined>(tx.objectStore("meta").get("journal")))?.value);
-      if (!propertyAvailableHere(listing, readMarketLocations(journal.market)))
+      if (!propertyAvailableHere(listing, readMarketLocations(journal.market), !!journal.world?.partyPosition))
         throw Error("This property is not available at the party's current location.");
     }
     if (listing.quantity !== null && listing.quantity < quantity)

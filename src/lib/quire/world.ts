@@ -14,6 +14,7 @@ import { transferPropertyDeed } from "./property-deed.ts";
 import { fromCopper, toCopper } from "./money.ts";
 import { advanceSessionTime } from "./session-time.ts";
 import { applyCharacterPosition } from "./character-position.ts";
+import { readFleet } from "./ships-schema.ts";
 
 export function npcAvailableHere(npc: Npc, table: Pick<CloudTable, "journal">) {
   const market = readMarketLocations(table.journal?.market);
@@ -100,7 +101,46 @@ export function validateWorld(t: CloudTable, projected = false) {
     );
     if (map.anchors.some((a) => !locations.has(a.locationId)))
       throw Error("A map anchor has a missing location.");
+    if (
+      !projected &&
+      map.propertyId &&
+      !t.holdings.some((h) => h.id === map.propertyId && h.kind === "property")
+    )
+      throw Error("The map's linked property is missing.");
+    unique(
+      (map.tokens ?? []).map((token) => token.id),
+      "combat token",
+    );
+    unique(
+      (map.tokens ?? [])
+        .filter((token) => token.entityId)
+        .map((token) => `${token.kind}:${token.entityId}`),
+      "combat entity",
+    );
+    for (const token of map.tokens ?? []) {
+      if (!map.grid || token.column >= map.grid.columns || token.row >= map.grid.rows)
+        throw Error("Combat tokens must fit inside the configured grid.");
+      if (
+        !projected &&
+        token.kind === "character" &&
+        !t.purses.some((p) => p.id === token.entityId && p.kind === "character")
+      )
+        throw Error("A combat token's character is missing.");
+      if (
+        !projected &&
+        token.kind === "ship" &&
+        !t.journal?.fleet?.vessels.some((s) => s.propertyId === token.entityId)
+      )
+        throw Error("A combat token's ship is missing.");
+    }
   }
+  if (
+    w.partyPosition &&
+    ((!projected &&
+      (!w.partyPosition.mapId || !w.maps.some((m) => m.id === w.partyPosition!.mapId))) ||
+      market.currentLocationId)
+  )
+    throw Error("Free party placement requires an existing map and no linked party location.");
   for (const npc of w.npcs) {
     const p = t.purses.find((p) => p.id === npc.id);
     if (
@@ -246,8 +286,10 @@ function moveItems(t: CloudTable, side: Trade["left"], toId: string, receipt: st
     if (h.kind === "property" && h.quantity === 0) {
       const site = t.journal?.propertyOperations?.sites.find((s) => s.propertyId === h.id);
       if (site) site.propertyId = nextId;
-      for(const v of t.journal?.fleet?.vessels??[]) if(v.propertyId===h.id)v.propertyId=nextId;
-      for(const y of t.journal?.fleet?.facilities??[]) if(y.propertyId===h.id)y.propertyId=nextId;
+      for (const v of t.journal?.fleet?.vessels ?? [])
+        if (v.propertyId === h.id) v.propertyId = nextId;
+      for (const y of t.journal?.fleet?.facilities ?? [])
+        if (y.propertyId === h.id) y.propertyId = nextId;
     }
   }
   t.holdings = t.holdings.filter((h) => h.quantity > 0);
@@ -289,12 +331,74 @@ export function applyWorldCommand(t: CloudTable, seat: CloudSeat, cmd: WorldComm
       t.holdings.push({ ...item, id: `${npc.id}-item-${i}`, purseId: npc.id, kind: "item" }),
     );
   };
-  if (cmd.kind === "map-save") {
+  if (cmd.kind === "party-map-position") {
+    dm();
+    const market = readMarketLocations(journal.market);
+    if (
+      !same(w.partyPosition ?? null, cmd.before) ||
+      market.currentLocationId !== cmd.beforeLocationId
+    )
+      throw Error("The party moved. Refresh before placing it.");
+    if (journal.finance?.downtime.some((d) => d.status === "pending"))
+      throw Error("Approve or cancel pending downtime before moving the party.");
+    if (cmd.position) {
+      w.partyPosition = cmd.position;
+      journal.market = readMarketLocations({ ...market, currentLocationId: null });
+    } else delete w.partyPosition;
+    event(cmd.position ? "Party travel position updated" : "Free party position cleared");
+  } else if (cmd.kind === "map-token") {
+    dm();
+    const map = w.maps.find((m) => m.id === cmd.mapId);
+    if (!map || !same(map.grid, cmd.grid))
+      throw Error("The combat grid changed. Reload before moving tokens.");
+    const current = map.tokens?.find((token) => token.id === cmd.tokenId) ?? null;
+    if (!same(current, cmd.before))
+      throw Error("This combat token moved or changed. Reload before saving.");
+    if (cmd.token && cmd.token.id !== cmd.tokenId) throw Error("Token identity cannot change.");
+    if (
+      current?.kind === "ship" &&
+      cmd.token?.kind === "ship" &&
+      current.entityId === cmd.token.entityId
+    ) {
+      const aboard = new Set(
+        readFleet(journal.fleet)
+          .aboard.filter((a) => a.propertyId === current.entityId)
+          .map((a) => a.purseId),
+      );
+      for (const crew of map.tokens ?? [])
+        if (crew.kind === "character" && aboard.has(crew.entityId!)) {
+          crew.column += cmd.token.column - current.column;
+          crew.row += cmd.token.row - current.row;
+          if (
+            crew.column < 0 ||
+            crew.row < 0 ||
+            crew.column >= cmd.grid.columns ||
+            crew.row >= cmd.grid.rows
+          )
+            throw Error("Moving this ship would place an aboard character outside the grid.");
+        }
+    }
+    map.tokens = [
+      ...(map.tokens ?? []).filter((token) => token.id !== cmd.tokenId),
+      ...(cmd.token ? [cmd.token] : []),
+    ];
+    event("Combat map tokens updated");
+  } else if (cmd.kind === "map-save") {
     dm();
     const current = w.maps.find((m) => m.id === cmd.mapId) ?? null;
     if (!same(current, cmd.before))
       throw Error("This map changed. Reload before saving; your draft is retained.");
     if (cmd.map && cmd.map.id !== cmd.mapId) throw Error("Map identity cannot change.");
+    if (!cmd.map && w.partyPosition?.mapId === cmd.mapId)
+      throw Error("Move or clear the free party position before removing this map.");
+    if (
+      !cmd.map &&
+      readFleet(journal.fleet).voyages.some(
+        (v) =>
+          v.mapRoute?.mapId === cmd.mapId && ["proposed", "active", "blocked"].includes(v.status),
+      )
+    )
+      throw Error("Resolve this map's ongoing ship routes before removing it.");
     w.maps = w.maps.filter((m) => m.id !== cmd.mapId);
     if (cmd.map) w.maps.push(cmd.map);
     event(cmd.map ? "Campaign map saved" : "Campaign map removed");

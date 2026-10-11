@@ -1,5 +1,7 @@
 # Lootsplit
 
+Maps support category filters, dungeon/property/ship layouts, free DM party placement with travel environments and wilderness biomes, configurable combat tiles (5 ft by default), saved encounter roster tokens and mapped ship voyages. Tile movement uses authoritative campaign commands; voyages keep the existing approved downtime clock. See [map and tile guide](docs/MAP-TILES.md).
+
 Lootsplit is a shared party ledger and campaign application for web and Android. Production runs on Cloudflare Workers and D1; GitHub Actions verifies and publishes the exact tested artifact from `main`.
 
 ## Home and feature screens
@@ -10,17 +12,17 @@ Player Library offers searchable, read-only item, spell and creature indices wit
 
 The DM Desk and player Home keep the existing theme and six mobile navigation tabs, including Maps. Open a compact feature card or saved shortcut to use a full feature screen. Bottom navigation still works; **Return to …** goes to the screen that opened it. Desktop also offers direct feature links.
 
-| Screen | Player access | DM access |
-| --- | --- | --- |
-| Bank | Loan applications, repayments and payment requests | Loan officer tools, terms and financial approvals |
-| My Finances | Assigned campaign characters’ funds, debts, recurring agreements and transactions | Use Review Reports |
-| Downtime | No settlement controls | Plan, review and approve campaign time/settlement |
-| Financial Settings | No economic controls | Prices/modifiers and recurring financial agreements |
-| Property Management | Own property name and descriptive notes | Property details, revenue and upkeep |
-| Review Reports | Own transactions remain in My Finances | Campaign balances, session reports, activity and price history |
-| Review Inbox | Submit character imports through the existing character workflow | Approve/deny character imports |
-| Journal | Existing visibility rules and writing tools | Existing private/shared entries and attachments |
-| Shop Management | Browse Market | Opening schedules and downtime-driven restocking |
+| Screen              | Player access                                                                     | DM access                                                      |
+| ------------------- | --------------------------------------------------------------------------------- | -------------------------------------------------------------- |
+| Bank                | Loan applications, repayments and payment requests                                | Loan officer tools, terms and financial approvals              |
+| My Finances         | Assigned campaign characters’ funds, debts, recurring agreements and transactions | Use Review Reports                                             |
+| Downtime            | No settlement controls                                                            | Plan, review and approve campaign time/settlement              |
+| Financial Settings  | No economic controls                                                              | Prices/modifiers and recurring financial agreements            |
+| Property Management | Own property name and descriptive notes                                           | Property details, revenue and upkeep                           |
+| Review Reports      | Own transactions remain in My Finances                                            | Campaign balances, session reports, activity and price history |
+| Review Inbox        | Submit character imports through the existing character workflow                  | Approve/deny character imports                                 |
+| Journal             | Existing visibility rules and writing tools                                       | Existing private/shared entries and attachments                |
+| Shop Management     | Browse Market                                                                     | Opening schedules and downtime-driven restocking               |
 
 Player Home shows six fixed icon buttons for everyone, including guests: Character Sheet, Bank, My Finances, Properties, Journal and Party chat. There is no player shortcut editor or duplicate feature-card list. The DM Desk now uses five swipeable information panels, grouped campaign tools, and a visible Multiplayer settings button. Previously saved DM shortcuts remain accessible through Dashboard → Saved shortcut settings and can still be saved across devices. Conflicting saves ask for a reload. Existing DM device shortcuts are offered as the initial account configuration; a previously verified campaign owner can still read cached DM destinations offline, but account customization requires connectivity. Existing player preference records remain compatible and are not deleted.
 
@@ -47,7 +49,6 @@ Sign in to the same account, then choose the saved campaign in **My account → 
 For Live or Turn-based play, the DM must sign in. **Share join link** and each player's **Copy link** grant access only to the current session. **Close room & revoke access** saves the authoritative campaign with the DM and closes access. Alternatively, **End play & keep room online** archives play while players retain view-only sheets and campaign information. Player changes, chat and rolls pause until **Resume play** or the DM starts a named session. The DM can **Leave room online** and return through My account; memberships and current invitations remain valid while the room stays online. Closing a tab or losing a connection does not end a session. Reopening creates a fresh invitation generation. Old links stay invalid. Signed-in players are linked automatically and can resume on another device during the open session. Guests use an in-memory campaign and a tab-scoped reconnect ticket; they must join and be assigned a character again after the room closes. Unsent guest actions are not persisted across reloads. Offline play belongs to the DM; offline player links/files are retired, while old saves and DM activity-report imports remain preserved for recovery.
 
 At startup, choose an account campaign to load its server save. Existing device-only DM campaigns require an explicit **Claim this device’s existing DM campaign** after sign-in; claiming preserves the save. Offline edits stay in the owner's device copy until explicitly backed up or shared online. Do not overwrite a newer account campaign with an older device copy. Multiple campaigns remain separate.
-
 
 ## Character imports, campaign operations and domain preparation
 
@@ -86,8 +87,8 @@ Use Node 22 (`nvm use`, or the included development container).
 | `npm run verify:focus -- dm-resume`              | Check two-device DM reopening with disposable data                                     |
 | `npm run verify:focus -- accounts`               | Run every account scenario in a disposable source snapshot                             |
 | `npm run verify:quick`                           | Unit tests, type checking and lint                                                     |
-| `npm run verify:report -- PATH/TO/html`         | Open the account HTML report, including failure screenshots and traces                 |
-| `npm run verify:trace -- PATH/TO/trace.zip`       | Inspect a single saved browser trace locally                                           |
+| `npm run verify:report -- PATH/TO/html`          | Open the account HTML report, including failure screenshots and traces                 |
+| `npm run verify:trace -- PATH/TO/trace.zip`      | Inspect a single saved browser trace locally                                           |
 | `npm run verify:timings`                         | Summarize recorded verification durations                                              |
 | `npm run performance:sync`                       | Read GitHub timing history and collect a local snapshot without publishing             |
 | `npm run performance:record -- measurement.json` | Record a measured local operation for inclusion in the task's GitHub commit            |

@@ -977,6 +977,14 @@ function EncounterEditor({
               </h3>
               <span>Round {draft.round}</span>
             </div>
+            <AppLink className="settings-link" href="/maps">
+              Open combat maps →
+            </AppLink>
+            <p>
+              In Maps, enable a grid, enter tile mode and use this saved campaign encounter's
+              roster. Token positions share through campaign commands; turns, HP and loot stay in
+              this tracker.
+            </p>
             <p>
               Enter physical initiative rolls, adjust HP and conditions, and choose any active
               combatant. Ties follow roster order. Effects and defeated turns are handled by the DM.

@@ -179,6 +179,9 @@ jobs:
       - name: dev-trade-economy
         if: matrix.group == 'gameplay'
         run: node scripts/recovery-step.mjs dev-trade-economy 240 node --experimental-strip-types scripts/trade-economy-browser-audit.mjs
+      - name: dev-map-tiles
+        if: matrix.group == 'gameplay'
+        run: node scripts/recovery-step.mjs dev-map-tiles 240 node scripts/map-tiles-browser-audit.mjs
       - name: dev-world-features
         if: matrix.group == 'gameplay'
         run: node scripts/recovery-step.mjs dev-world-features 240 node scripts/world-features-browser-audit.mjs
@@ -294,6 +297,11 @@ jobs:
         env:
           AUDIT_ORIGIN: http://127.0.0.1:8082
         run: node scripts/recovery-step.mjs worker-trade-economy 240 node --experimental-strip-types scripts/trade-economy-browser-audit.mjs
+      - name: worker-map-tiles
+        if: matrix.group == 'interface'
+        env:
+          AUDIT_ORIGIN: http://127.0.0.1:8082
+        run: node scripts/recovery-step.mjs worker-map-tiles 240 node scripts/map-tiles-browser-audit.mjs
       - name: worker-world-features
         if: matrix.group == 'interface'
         env:
