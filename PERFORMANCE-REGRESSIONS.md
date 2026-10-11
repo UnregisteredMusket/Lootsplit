@@ -45,7 +45,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Development / governance / Run npx playwright install --with-deps chromium | open | 2 | 17s → 42s | +25s | +147.06% |
 | Development / governance / Start disposable development server | open | 2 | 4s → 8s | +4s | +100% |
 | Code checks and immutable builds / Run actions/upload-artifact@v4 | open | 3 | 2s → 5s | +3s | +150% |
-| Packaged Worker / interface / Run actions/setup-node@v4 | open | 3 | 3s → 7s | +4s | +133.33% |
+| Packaged Worker / interface / Run actions/setup-node@v4 | open | 4 | 3s → 14s | +11s | +366.67% |
 | Packaged Worker / accounts / Run actions/setup-node@v4 | open | 3 | 2s → 11s | +9s | +450% |
 | Development / governance / dev-campaign-governance | open | 5 | 18s → 114s | +96s | +533.33% |
 | Packaged standby / Run npm ci | open | 3 | 10s → 18s | +8s | +80% |
@@ -249,6 +249,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-11T13:05:45Z | step: Packaged Worker / interface / Run actions/setup-node@v4 | 7s → 14s | +7s | +100% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37453107393/job/112234598017) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38141690945/job/114476960457) |
 | 2026-10-11T12:57:26Z | job: Development / gameplay | 581s → 712s | +131s | +22.55% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37784166101/job/113335097452) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38140451074/job/114473173492) |
 | 2026-10-11T12:45:29.000Z | queue: Focused player references / initial queue | 4s → 28s | +24s | +600% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38131342389) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38140451035) |
 | 2026-10-11T12:45:26Z | job: Player references / worker | 240s → 283s | +43s | +17.92% | cancelled | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38138998692/job/114468749350) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38140169494/job/114472236286) |
