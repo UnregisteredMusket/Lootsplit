@@ -12627,5 +12627,22 @@
     "finishedAt": "2026-10-11T19:03:50Z",
     "durationMs": 33000,
     "trendId": "38166093163:1:318e6ace81e676e649ec3c341c4409c9166e19ef7fc7ce802dd784f8a002e367"
+  },
+  "[\".github/workflows/android-test-apk.yml\",\"push\",\"improvement/navigation-market-readout\",\"step\",\"test-apk / Run actions/setup-java@v4\",\"ubuntu-latest\",1]": {
+    "schema": 1,
+    "id": "38166988589:1:82c7656a1aa2ceec81852f944b9ed61bc20ad420152c2c97b355f1f815d7004a",
+    "scope": "[\".github/workflows/android-test-apk.yml\",\"push\",\"improvement/navigation-market-readout\",\"step\",\"test-apk / Run actions/setup-java@v4\",\"ubuntu-latest\",1]",
+    "kind": "step",
+    "name": "test-apk / Run actions/setup-java@v4",
+    "environment": "ubuntu-latest",
+    "commit": "21c037ceb404afbc155c0243c4307e39c63f0f82",
+    "runId": 38166988589,
+    "attempt": 1,
+    "url": "https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38166988589/job/114551489721",
+    "outcome": "success",
+    "startedAt": "2026-10-11T19:12:01Z",
+    "finishedAt": "2026-10-11T19:12:02Z",
+    "durationMs": 1000,
+    "trendId": "38166988589:1:82c7656a1aa2ceec81852f944b9ed61bc20ad420152c2c97b355f1f815d7004a"
   }
 }
