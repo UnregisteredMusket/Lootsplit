@@ -155,6 +155,7 @@ export const HELP_GROUPS: HelpGroup[] = [
         paragraphs: [
           "Build encounters in your owned campaign after signing in. Offline encounters belong to the DM’s device copy. Signing in also enables private account drafts; you do not need a multiplayer DM campaign to create those drafts. Export encounter JSON on the website and import it into the app when you want to move a draft.",
           "Add or generate creatures, edit the party and difficulty, then track initiative, rounds, HP, AC and conditions. Difficulty uses 2014 encounter XP thresholds and group-size multipliers; terrain, tactics and house rules still need DM judgment. The tracker does not execute combat rules automatically.",
+          "Enter initiative scores in Battle tracker without moving the combatant rows. Press Sort initiative when you are ready to arrange highest scores first; ties retain roster order and blank scores go last. Editing or clearing a score keeps the current order until you press the button again. Next turn follows that order. Sorting preserves the current combatant and round; Save encounter keeps the order when you reopen it.",
           "Conclude the encounter, review generated or chosen loot, set item and coin recipients, then explicitly transfer the award. A confirmed award is applied only once. Account drafts cannot award into campaigns; shared campaign awards require the active DM’s permission. Imported drafts reset outcomes, award receipts and recipients so they can be reused safely.",
         ],
         links: [

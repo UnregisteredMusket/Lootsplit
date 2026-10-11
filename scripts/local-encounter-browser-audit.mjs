@@ -2,6 +2,7 @@ import { chromium } from "playwright";
 import assert from "node:assert/strict";
 import { mkdir } from "node:fs/promises";
 import { openApplication, reloadApplication } from "./title-screen-navigation.mjs";
+import { checkManualInitiative } from "./initiative-browser-check.mjs";
 const origin = process.env.ENCOUNTER_ORIGIN || "http://127.0.0.1:8080";
 const browser = await chromium.launch({
   executablePath: process.env.CHROMIUM_EXECUTABLE_PATH,
@@ -19,6 +20,7 @@ try {
   await page.getByRole("button", { name: "New encounter", exact: true }).click();
   await page.getByRole("button", { name: "Add combatant", exact: true }).click();
   await page.getByLabel("Name", { exact: true }).fill("Local ghoul");
+  const initiativeOrder = await checkManualInitiative(page, "Local ghoul", "test-results/local-encounters");
   await page.getByRole("button", { name: "Save encounter", exact: true }).click();
   await page.getByText("Encounter saved.", { exact: true }).waitFor();
   await page.getByRole("button", { name: "Builder & generator", exact: true }).click();
@@ -57,6 +59,7 @@ try {
   await reloadApplication(page);
   await page.getByRole("button", { name: /Device ambush/ }).click();
   await page.getByText("Saved on this device", { exact: true }).waitFor();
+  assert.deepEqual((await page.locator(".combat-identity strong").allTextContents()).slice(0, 4), initiativeOrder);
   // Exercise local persistence, validation, transactions, recipient checks, and role enforcement.
   const result = await page.evaluate(async () => {
     const { localEncounterRequest: call } = await import("/src/lib/encounters/local.ts");

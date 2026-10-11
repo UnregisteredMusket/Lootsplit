@@ -272,6 +272,11 @@ jobs:
         env:
           AUDIT_ORIGIN: http://127.0.0.1:8082
         run: node scripts/recovery-step.mjs worker-map-tiles 240 node scripts/map-tiles-browser-audit.mjs
+      - name: worker-initiative
+        if: matrix.group == 'interface'
+        env:
+          AUDIT_ORIGIN: http://127.0.0.1:8082
+        run: node scripts/recovery-step.mjs worker-initiative 180 node scripts/initiative-browser-audit.mjs
       - name: worker-theme
         if: matrix.group == 'interface'
         env:

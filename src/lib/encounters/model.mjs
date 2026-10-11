@@ -209,8 +209,15 @@ export function generateEncounter(creatures, input, random = Math.random) {
   }));
 }
 /** @param {z.infer<typeof encounterSchema>} e */
+export function sortInitiative(e) {
+  return {
+    ...e,
+    combatants: [...e.combatants].sort((a, b) => (b.initiative ?? -1001) - (a.initiative ?? -1001)),
+  };
+}
+/** @param {z.infer<typeof encounterSchema>} e */
 export function nextTurn(e) {
-  const order = [...e.combatants].sort((a, b) => (b.initiative ?? -1001) - (a.initiative ?? -1001));
+  const order = e.combatants;
   if (!order.length) return e;
   const current = order.findIndex((c) => c.id === e.activeId),
     next = (current + 1) % order.length;

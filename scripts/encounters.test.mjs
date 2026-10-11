@@ -12,6 +12,7 @@ import {
   multiplier,
   generateEncounter,
   nextTurn,
+  sortInitiative,
 } from "../src/lib/encounters/model.mjs";
 import { localAccountDb } from "./account-dev-db.mjs";
 async function fixture() {
@@ -82,7 +83,8 @@ test("encounter estimates, generators, turn order and schema boundaries", () => 
   assert.equal(estimate(e).adjusted, 150);
   assert.equal(multiplier(1, 6), 0.5);
   assert.equal(multiplier(15, 2), 5);
-  assert.equal(nextTurn(e).activeId, e.combatants[1].id);
+  assert.equal(nextTurn(e).activeId, e.combatants[0].id);
+  assert.equal(nextTurn(sortInitiative(e)).activeId, e.combatants[1].id);
   const turn = nextTurn(nextTurn(nextTurn(e)));
   assert.equal(turn.round, 2);
   const filters = {
@@ -117,6 +119,32 @@ test("encounter estimates, generators, turn order and schema boundaries", () => 
     false,
   );
 });
+test("initiative sorting is explicit, stable and preserves the current turn and original draft", () => {
+  const e = blankEncounter();
+  e.combatants = [null, -1000, 18, 18, 0, null].map((initiative) => ({
+    ...blankCombatant(), initiative,
+  }));
+  e.activeId = e.combatants[4].id;
+  e.round = 7;
+  const ids = e.combatants.map((c) => c.id);
+  const sorted = sortInitiative(e);
+  assert.deepEqual(sorted.combatants.map((c) => c.id), [ids[2], ids[3], ids[4], ids[1], ids[0], ids[5]]);
+  assert.deepEqual(e.combatants.map((c) => c.id), ids);
+  assert.equal(sorted.activeId, e.activeId);
+  assert.equal(sorted.round, 7);
+  assert.deepEqual(sortInitiative(sorted), sorted);
+  // Editing a score does not change turn traversal until the DM sorts again.
+  sorted.combatants = sorted.combatants.map((c) => c.id === ids[4] ? {...c, initiative: 25} : c);
+  const next = nextTurn(sorted);
+  assert.equal(next.activeId, ids[1]);
+  assert.equal(next.round, 7);
+  assert.equal(nextTurn({...sorted, activeId: ids[5]}).round, 8);
+  assert.equal(nextTurn({...sorted, activeId: ""}).activeId, ids[2]);
+  assert.equal(sortInitiative(sorted).combatants[0].id, ids[4]);
+  const empty = blankEncounter();
+  assert.equal(nextTurn(empty), empty);
+  assert.deepEqual(sortInitiative(empty), empty);
+});
 test("DM-only account persistence, stale drafts, manual rolls and campaign revocation", async () => {
   const { db, call, id } = await fixture();
   try {
@@ -132,12 +160,14 @@ test("DM-only account persistence, stale drafts, manual rolls and campaign revoc
     }
     const e = blankEncounter();
     e.name = "Saved ambush";
+    e.combatants = [10, 18, null].map((initiative) => ({...blankCombatant(), initiative}));
     await call("dm", "/save", { id, revision: 0, encounter: e });
     await assert.rejects(
       call("dm", "/save", { id, revision: 0, encounter: e }),
       (e) => e.status === 409,
     );
     assert.equal((await call("dm", "/detail", { id })).body.name, "Saved ambush");
+    assert.deepEqual((await call("dm", "/detail", { id })).body.combatants, e.combatants);
     const roll = {
       id,
       revision: 1,

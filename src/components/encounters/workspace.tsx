@@ -47,6 +47,7 @@ import {
   generatorSchema,
   estimate,
   nextTurn,
+  sortInitiative,
 } from "@/lib/encounters/model.mjs";
 type Encounter = z.infer<typeof encounterSchema>;
 type Combatant = z.infer<typeof combatantSchema>;
@@ -987,7 +988,9 @@ function EncounterEditor({
             </p>
             <p>
               Enter physical initiative rolls, adjust HP and conditions, and choose any active
-              combatant. Ties follow roster order. Effects and defeated turns are handled by the DM.
+              combatant. Scores stay in place while you enter them. Press Sort initiative when
+              ready; ties keep their roster order and blank scores go last. Next turn follows that
+              saved order. Effects and defeated turns are handled by the DM.
             </p>
             <div className="character-toolbar">
               <label>
@@ -1003,6 +1006,12 @@ function EncounterEditor({
                 Next turn
               </button>
               <button
+                disabled={draft.combatants.length < 2}
+                onClick={() => change(sortInitiative(draft))}
+              >
+                Sort initiative
+              </button>
+              <button
                 onClick={() =>
                   change({
                     ...draft,
@@ -1016,200 +1025,198 @@ function EncounterEditor({
             {!draft.combatants.length && (
               <p>No combatants yet. Add a custom combatant or open Builder & generator.</p>
             )}
-            {[...draft.combatants]
-              .sort((a, b) => (b.initiative ?? -1001) - (a.initiative ?? -1001))
-              .map((c) => (
-                <details
-                  key={c.id}
-                  open={draft.activeId === c.id || expanded === c.id || !draft.activeId}
-                  className={`encounter-combatant ${draft.activeId === c.id ? "is-active" : ""}`}
-                >
-                  <summary className="combat-summary" onClick={() => setExpanded(c.id)}>
-                    <span className="initiative-number">{c.initiative ?? "—"}</span>
-                    <span className="combat-portrait">
-                      <FantasyIcon entry={{ ...c, kind: "creatures" }} size={36} />
-                    </span>
-                    <span className="combat-identity">
-                      <strong>{c.name}</strong>
-                      <HpBar hp={c.hp} max={c.maxHp} />
-                    </span>
-                    <span className="combat-hp">
-                      {c.hp} / {c.maxHp}
-                      <small>{c.hp === 0 ? "Defeated" : c.conditions || `AC ${c.ac}`}</small>
-                    </span>
-                  </summary>
-                  <div className="combat-expanded">
-                    <div className="combat-quick-adjust">
-                      <label>
-                        HP adjustment
-                        <input
-                          type="number"
-                          min="1"
-                          max="1000000"
-                          value={hpAmount}
-                          onChange={(e) => setHpAmount(Math.max(1, n(e.target.value)))}
-                        />
-                      </label>
-                      <button
-                        onClick={() =>
+            {draft.combatants.map((c) => (
+              <details
+                key={c.id}
+                open={draft.activeId === c.id || expanded === c.id || !draft.activeId}
+                className={`encounter-combatant ${draft.activeId === c.id ? "is-active" : ""}`}
+              >
+                <summary className="combat-summary" onClick={() => setExpanded(c.id)}>
+                  <span className="initiative-number">{c.initiative ?? "—"}</span>
+                  <span className="combat-portrait">
+                    <FantasyIcon entry={{ ...c, kind: "creatures" }} size={36} />
+                  </span>
+                  <span className="combat-identity">
+                    <strong>{c.name}</strong>
+                    <HpBar hp={c.hp} max={c.maxHp} />
+                  </span>
+                  <span className="combat-hp">
+                    {c.hp} / {c.maxHp}
+                    <small>{c.hp === 0 ? "Defeated" : c.conditions || `AC ${c.ac}`}</small>
+                  </span>
+                </summary>
+                <div className="combat-expanded">
+                  <div className="combat-quick-adjust">
+                    <label>
+                      HP adjustment
+                      <input
+                        type="number"
+                        min="1"
+                        max="1000000"
+                        value={hpAmount}
+                        onChange={(e) => setHpAmount(Math.max(1, n(e.target.value)))}
+                      />
+                    </label>
+                    <button
+                      onClick={() =>
+                        updateCombatant(c.id, {
+                          hp: Math.max(0, c.hp - hpAmount),
+                        })
+                      }
+                    >
+                      Damage
+                    </button>
+                    <button
+                      onClick={() =>
+                        updateCombatant(c.id, {
+                          hp: Math.min(c.maxHp, c.hp + hpAmount),
+                        })
+                      }
+                    >
+                      Heal
+                    </button>
+                  </div>
+                  <div className="encounter-heading">
+                    <h4>
+                      {c.name} {c.hp === 0 ? "· 0 HP" : ""}
+                    </h4>
+                    <button
+                      aria-pressed={draft.activeId === c.id}
+                      onClick={() => change({ ...draft, activeId: c.id })}
+                    >
+                      {draft.activeId === c.id ? "Current turn" : "Set active"}
+                    </button>
+                  </div>
+                  <div className="encounter-vitals">
+                    <label>
+                      Name
+                      <input
+                        value={c.name}
+                        onChange={(e) => updateCombatant(c.id, { name: e.target.value })}
+                      />
+                    </label>
+                    <label>
+                      Side
+                      <select
+                        value={c.side}
+                        onChange={(e) =>
                           updateCombatant(c.id, {
-                            hp: Math.max(0, c.hp - hpAmount),
+                            side: e.target.value as Combatant["side"],
                           })
                         }
                       >
-                        Damage
-                      </button>
-                      <button
-                        onClick={() =>
+                        <option value="enemy">Enemy</option>
+                        <option value="ally">Ally / player</option>
+                      </select>
+                    </label>
+                    <label>
+                      Initiative
+                      <input
+                        type="number"
+                        value={c.initiative ?? ""}
+                        placeholder="Not rolled"
+                        onChange={(e) =>
                           updateCombatant(c.id, {
-                            hp: Math.min(c.maxHp, c.hp + hpAmount),
+                            initiative: e.target.value === "" ? null : n(e.target.value),
                           })
                         }
-                      >
-                        Heal
-                      </button>
-                    </div>
-                    <div className="encounter-heading">
-                      <h4>
-                        {c.name} {c.hp === 0 ? "· 0 HP" : ""}
-                      </h4>
-                      <button
-                        aria-pressed={draft.activeId === c.id}
-                        onClick={() => change({ ...draft, activeId: c.id })}
-                      >
-                        {draft.activeId === c.id ? "Current turn" : "Set active"}
-                      </button>
-                    </div>
-                    <div className="encounter-vitals">
+                      />
+                    </label>
+                    <label>
+                      HP
+                      <input
+                        type="number"
+                        min="0"
+                        max={c.maxHp}
+                        value={c.hp}
+                        onChange={(e) => updateCombatant(c.id, { hp: n(e.target.value) })}
+                      />
+                    </label>
+                    <label>
+                      Max HP
+                      <input
+                        type="number"
+                        min="1"
+                        value={c.maxHp}
+                        onChange={(e) => updateCombatant(c.id, { maxHp: n(e.target.value) })}
+                      />
+                    </label>
+                    <label>
+                      AC
+                      <input
+                        type="number"
+                        value={c.ac}
+                        onChange={(e) => updateCombatant(c.id, { ac: n(e.target.value) })}
+                      />
+                    </label>
+                  </div>
+                  <label>
+                    Conditions
+                    <input
+                      placeholder="Prone, frightened, concentration…"
+                      value={c.conditions}
+                      onChange={(e) => updateCombatant(c.id, { conditions: e.target.value })}
+                    />
+                  </label>
+                  <details>
+                    <summary>Stats, notes & source</summary>
+                    <div className="encounter-grid">
                       <label>
-                        Name
-                        <input
-                          value={c.name}
-                          onChange={(e) => updateCombatant(c.id, { name: e.target.value })}
-                        />
-                      </label>
-                      <label>
-                        Side
-                        <select
-                          value={c.side}
-                          onChange={(e) =>
-                            updateCombatant(c.id, {
-                              side: e.target.value as Combatant["side"],
-                            })
-                          }
-                        >
-                          <option value="enemy">Enemy</option>
-                          <option value="ally">Ally / player</option>
-                        </select>
-                      </label>
-                      <label>
-                        Initiative
-                        <input
-                          type="number"
-                          value={c.initiative ?? ""}
-                          placeholder="Not rolled"
-                          onChange={(e) =>
-                            updateCombatant(c.id, {
-                              initiative: e.target.value === "" ? null : n(e.target.value),
-                            })
-                          }
-                        />
-                      </label>
-                      <label>
-                        HP
+                        CR
                         <input
                           type="number"
                           min="0"
-                          max={c.maxHp}
-                          value={c.hp}
-                          onChange={(e) => updateCombatant(c.id, { hp: n(e.target.value) })}
+                          max="30"
+                          step="0.125"
+                          value={c.cr}
+                          onChange={(e) => updateCombatant(c.id, { cr: n(e.target.value) })}
                         />
                       </label>
                       <label>
-                        Max HP
+                        XP
                         <input
                           type="number"
-                          min="1"
-                          value={c.maxHp}
-                          onChange={(e) => updateCombatant(c.id, { maxHp: n(e.target.value) })}
+                          value={c.xp}
+                          onChange={(e) => updateCombatant(c.id, { xp: n(e.target.value) })}
                         />
                       </label>
                       <label>
-                        AC
+                        Initiative modifier
                         <input
                           type="number"
-                          value={c.ac}
-                          onChange={(e) => updateCombatant(c.id, { ac: n(e.target.value) })}
+                          value={c.initiativeBonus}
+                          onChange={(e) =>
+                            updateCombatant(c.id, {
+                              initiativeBonus: n(e.target.value),
+                            })
+                          }
                         />
                       </label>
                     </div>
                     <label>
-                      Conditions
-                      <input
-                        placeholder="Prone, frightened, concentration…"
-                        value={c.conditions}
-                        onChange={(e) => updateCombatant(c.id, { conditions: e.target.value })}
+                      Actions & notes
+                      <textarea
+                        rows={5}
+                        value={c.notes}
+                        onChange={(e) => updateCombatant(c.id, { notes: e.target.value })}
                       />
                     </label>
-                    <details>
-                      <summary>Stats, notes & source</summary>
-                      <div className="encounter-grid">
-                        <label>
-                          CR
-                          <input
-                            type="number"
-                            min="0"
-                            max="30"
-                            step="0.125"
-                            value={c.cr}
-                            onChange={(e) => updateCombatant(c.id, { cr: n(e.target.value) })}
-                          />
-                        </label>
-                        <label>
-                          XP
-                          <input
-                            type="number"
-                            value={c.xp}
-                            onChange={(e) => updateCombatant(c.id, { xp: n(e.target.value) })}
-                          />
-                        </label>
-                        <label>
-                          Initiative modifier
-                          <input
-                            type="number"
-                            value={c.initiativeBonus}
-                            onChange={(e) =>
-                              updateCombatant(c.id, {
-                                initiativeBonus: n(e.target.value),
-                              })
-                            }
-                          />
-                        </label>
-                      </div>
-                      <label>
-                        Actions & notes
-                        <textarea
-                          rows={5}
-                          value={c.notes}
-                          onChange={(e) => updateCombatant(c.id, { notes: e.target.value })}
-                        />
-                      </label>
-                      <p className="text-sm text-muted">{c.source}</p>
-                      <button
-                        onClick={() =>
-                          change({
-                            ...draft,
-                            combatants: draft.combatants.filter((r) => r.id !== c.id),
-                            activeId: draft.activeId === c.id ? "" : draft.activeId,
-                          })
-                        }
-                      >
-                        Remove combatant
-                      </button>
-                    </details>
-                  </div>
-                </details>
-              ))}
+                    <p className="text-sm text-muted">{c.source}</p>
+                    <button
+                      onClick={() =>
+                        change({
+                          ...draft,
+                          combatants: draft.combatants.filter((r) => r.id !== c.id),
+                          activeId: draft.activeId === c.id ? "" : draft.activeId,
+                        })
+                      }
+                    >
+                      Remove combatant
+                    </button>
+                  </details>
+                </div>
+              </details>
+            ))}
           </div>
         )}
         {tab === "build" && (

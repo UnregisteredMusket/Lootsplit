@@ -1,4 +1,8 @@
-# Active recovery: map categories, travel placement and combat tiles — October 11, 2026 UTC
+# Active recovery: manual encounter initiative — October 11, 2026 UTC
+
+The map/tile release is COMPLETE/LIVE: PR97, main `0b330bdb0336e6e87066ed61f84a20b30245337d`, tree `dae0f50fe858954d54508c656dcb97186a93c422`, Worker `a57262b8-7895-40a0-955c-16e6efd820a3`. All-nine PR38147843248/main38149040736, website38149810301 and standby38149810385 passed. Do not repeat that release. The owner now requests stable initiative entry with explicit DM sorting. Branch `fix/manual-initiative-order` starts from that confirmed main. Preserve encounter saves/IDs, turns, role locks, awards and map integration. Existing website publication authorization persists; no migration or APK distribution. See `docs/audit/2026-10-11-manual-initiative.md`; exact evolving head/tree/PR/runs/live evidence belongs in the PR and `test-results/recovery/manual-initiative.json`.
+
+# Previous recovery: map categories, travel placement and combat tiles — October 11, 2026 UTC
 
 The ships/shipyards release is COMPLETE/LIVE: PR96, main `f7ca23bc5f4dee90a4512bf5ad35bc727ecb9b7a`, tree `f9eade9fdf2cfc96b847694171247315811a73d2`, Worker `cbeee04d-5954-46ea-a255-1dc08cd5f064`. All-nine PR38140451074/main38141690945, supplemental38140451035, website38142436301 and standby38142436169 succeeded. Do not repeat that release.
 
