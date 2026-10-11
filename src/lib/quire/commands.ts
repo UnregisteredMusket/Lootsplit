@@ -1,4 +1,5 @@
 import { characterVisible, canReadCharacter } from "./character-position.ts";
+import { ensureCityExchanges, removeUnusedCityExchange, renameUnusedCityExchange } from "./city-exchanges.ts";
 import { worldCommands, type WorldCommand } from "./world-schema.ts";
 import { resourcePackSchema, resourceFingerprint, previewResourcePack } from "./resource-packs.ts";
 import { tradeCommands, type TradeCommand, type TradeExecution } from "./trade-economy-schema.ts";
@@ -226,6 +227,9 @@ export function applyCommand(input: CloudTable, seat: CloudSeat, raw: Command, e
   const t = structuredClone(input);
   const at = Date.now();
   const journal = (t.journal = readJournal(t.journal));
+  // Exchange editors can address a legacy city's default before its first save.
+  // Other commands retain their original financial/patch preview baselines.
+  if (cmd.kind.startsWith("trade-")) ensureCityExchanges(t);
   if (seat.role !== "dm")
     seat = {
       ...seat,
@@ -419,6 +423,8 @@ export function applyCommand(input: CloudTable, seat: CloudSeat, raw: Command, e
       throw Error(
         "Move the party, child locations, assigned shops and properties before removing this location.",
       );
+    if (current?.kind === "city" && cmd.after?.kind !== "city") removeUnusedCityExchange(t, current);
+    if (current?.kind === "city" && cmd.after?.kind === "city") renameUnusedCityExchange(t, current, cmd.after);
     market.locations = [
       ...market.locations.filter((location) => location.id !== cmd.locationId),
       ...(cmd.after ? [cmd.after] : []),
@@ -1085,6 +1091,9 @@ export function applyCommand(input: CloudTable, seat: CloudSeat, raw: Command, e
     }
   }
   if (journal.finance) journal.finance = readFinance(journal.finance);
+  if (cmd.kind === "market-location" || cmd.kind === "market-name-import" || cmd.kind === "trade-exchange" ||
+    !same(input.journal?.market?.locations, t.journal?.market?.locations))
+    ensureCityExchanges(t);
   validateEconomyRows(t);
   validateShopLocations(t.shops, t.journal?.market);
   for (const listing of t.listings) listingSchema.parse(listing);

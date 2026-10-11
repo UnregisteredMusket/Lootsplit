@@ -242,6 +242,7 @@ export function TradeEconomyPanel() {
           </details>
           <details className="journal-entry">
             <summary>Exchange workshop · stock, quotes and treasury</summary>
+            <p>Each city starts with a trade exchange. Set its goods, stock and treasury here; new exchanges start empty.</p>
             <Field label="Edit exchange">
               <select
                 className="ledger-search"

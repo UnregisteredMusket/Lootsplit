@@ -75,6 +75,20 @@ async function rows(page, store) {
 async function market(page) {
   return (await rows(page, "meta")).find((row) => row.id === "journal")?.value?.market;
 }
+async function assertCityDefaults(page) {
+  const journal = (await rows(page, "meta")).find(row => row.id === "journal")?.value;
+  const exchanges = journal?.tradeEconomy?.exchanges ?? [];
+  const purses = await rows(page, "purses");
+  for (const city of journal.market.locations.filter(l => l.kind === "city")) {
+    const matches = exchanges.filter(e => e.locationId === city.id);
+    assert.equal(matches.length, 1, "One default exchange per created/imported city");
+    assert.deepEqual(matches[0].offers, []);
+    const treasury = purses.find(p => p.id === matches[0].purseId);
+    assert.equal(treasury.control, "npc"); assert.equal(treasury.nonParty, true);
+    assert.equal(Object.values(treasury.coins).reduce((sum, n) => sum + n, 0), 0);
+  }
+  assert.equal(exchanges.length, journal.market.locations.filter(l => l.kind === "city").length);
+}
 async function savedQueue(page) {
   return page.evaluate(() => {
     const campaign = localStorage.getItem("quire.campaign.v1") || "main";
@@ -217,7 +231,12 @@ async function newShop(page, name, locationId) {
   await expect
     .poll(async () => (await rows(page, "stock")).filter((stock) => stock.shopId === shopId).length)
     .toBe(1);
+  // A committed DB row can precede the form's completed save/reload. Wait for
+  // the actual cleared draft before navigating so its guard retains its role.
+  await expect(page.getByLabel("New item", { exact: true })).toHaveValue("");
+  await expect(page.getByRole("status").filter({ hasText: "Item added." })).toBeVisible();
   await page.getByRole("link", { name: "Market", exact: true }).first().click();
+  await expect(page.getByRole("heading", { name: "Market", exact: true })).toBeVisible();
   assert.equal(await page.locator(".loot-opening").count(), 0);
   return shopId;
 }
@@ -295,6 +314,7 @@ try {
     );
     const importedLocations = (await market(dm)).locations;
     assert.equal(importedLocations.length, 4);
+    await assertCityDefaults(dm);
     await dm.getByRole("button", { name: "Import names", exact: true }).click();
     await importDialog.getByLabel("Import names file", { exact: true }).setInputFiles(namesFile);
     await importDialog.getByRole("button", { name: "Review import", exact: true }).click();
@@ -317,6 +337,7 @@ try {
     const region = await createLocation(dm, "region", `Coast ${width}`);
     const city = await createLocation(dm, "city", `Port ${width}`, region);
     const area = await createLocation(dm, "area", `Docks ${width}`, city);
+    await assertCityDefaults(dm);
     const other = await createLocation(dm, "region", `Desert ${width}`);
     await chooseOption(dm.getByLabel("Party location", { exact: true }), area);
     await expect.poll(async () => (await market(dm)).currentLocationId).toBe(area);

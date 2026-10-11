@@ -3,6 +3,7 @@ import { chromium } from "playwright";
 import { expect } from "playwright/test";
 import { mkdir, writeFile } from "node:fs/promises";
 import { tradeFixture } from "../src/lib/quire/test-fixtures/trade-economy.ts";
+import { ensureCityExchanges } from "../src/lib/quire/city-exchanges.ts";
 import { prepareTradeSeason, previewTradeSeason } from "../src/lib/quire/trade-economy.ts";
 import { formatCopper, toCopper } from "../src/lib/quire/money.ts";
 import { SEASON_NAMES } from "../src/lib/quire/scale.ts";
@@ -53,6 +54,7 @@ async function read(page) {
   });
 }
 async function seed(page, table) {
+  ensureCityExchanges(table);
   await page.evaluate(async (table) => {
     const active = localStorage.getItem("quire.campaign.v1"),
       name =
@@ -811,6 +813,16 @@ async function cityAccessAndCatalogue(page, width) {
   await seed(page, table);
   await reloadApplication(page);
   const beforeWealth = JSON.stringify(await economicState(page));
+  const defaultExchange = (await read(page)).tradeEconomy.exchanges.find(e => e.locationId === "port");
+  assert.ok(defaultExchange, "An existing city gets its own exchange beside the global exchange");
+  assert.equal(defaultExchange.name, "Port Trade Exchange");
+  assert.deepEqual(defaultExchange.offers, []);
+  await page.getByText("Exchange workshop · stock, quotes and treasury", { exact: true }).click();
+  await page.getByLabel("Edit exchange", { exact: true }).selectOption(defaultExchange.id);
+  await page.getByLabel("Exchange name", { exact: true }).fill("Port Guild Exchange");
+  await page.getByRole("button", { name: "Save exchange", exact: true }).click();
+  await expect.poll(async () => (await read(page)).tradeEconomy.exchanges.find(e => e.id === defaultExchange.id)?.name).toBe("Port Guild Exchange");
+  await page.getByText("Exchange workshop · stock, quotes and treasury", { exact: true }).click();
   await page.getByText("Built-in fantasy commodity catalogue · 60 goods", { exact: true }).click();
   const catalogue = page.getByRole("region", { name: "Built-in commodity catalogue", exact: true });
   await catalogue

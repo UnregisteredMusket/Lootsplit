@@ -2,6 +2,7 @@ import { encodeRoomImages, hydrateRoomImages, roomImageStatements } from "../../
 import { mkdir, open, readFile, rename, unlink } from "node:fs/promises";
 import path from "node:path";
 import type { CloudRoom } from "./cloud.ts";
+import { ensureCityExchanges } from "./city-exchanges.ts";
 
 type Result = { meta: { changes: number } };
 type Statement = {
@@ -110,11 +111,15 @@ export async function readRoom(code: string): Promise<CloudRoom | null> {
     const stored = room.revision === revision ? row.body : JSON.stringify(room);
     const hydrated = await hydrateRoomImages(db, room.code, room);
     Object.defineProperty(hydrated, STORED_BODY, { value: stored });
+    ensureCityExchanges(hydrated.table);
     return hydrated;
   }
-  return (await localRooms()).find((room) => room.code === code) ?? null;
+  const room = (await localRooms()).find((room) => room.code === code) ?? null;
+  if (room) ensureCityExchanges(room.table);
+  return room;
 }
 export async function createRoom(room: CloudRoom): Promise<void> {
+  ensureCityExchanges(room.table);
   const db = database();
   if (db) {
     const encoded = await encodeRoomImages(room);
