@@ -43,6 +43,7 @@ export const PLAYER_HELP_GROUPS: HelpGroup[] = [
         title: "Play and edit your assigned character",
         paragraphs: [
           "Play shows your vitals, attacks, skills, spells, equipment and dice. Your assigned campaign character uses the same purse and inventory as the party ledger. Other characters do not become yours when you open a record. An explicitly shared NPC sheet is read-only and does not let you roll or act for it.",
+          "If the sheet cannot load, use Retry character sheet on the error message. This retries the read in your current room without signing out or clearing pending actions. Roll permissions still come from the DM. Once a sheet is open, Reload sheet fetches it again; export or save an unsaved draft before confirming that reload.",
           "Your DM controls Live character editing and individual field permissions. When full editing is off, permitted play actions remain available; restricted sheet edits are reported for DM review. You cannot use the character selector or a direct link to control an unassigned character. A standalone account character remains separate from the campaign until an authorized assignment/import.",
           "Use Import character or the sheet's import controls to review supported JSON, text/form PDF, or image/scanned-PDF extraction. Device-local recognition can misread handwritten or scanned values: compare every tab before submitting. Campaign imports can require DM approval and do not replace campaign funds or possessions. Save before leaving an edited sheet.",
         ],

@@ -49,6 +49,10 @@ export async function characterRequest<T>(
             await import("../quire/cloud-client")
           ).requestCampaignRoll({ purseId, policy: true })
         : { manualAllowed: !observer };
+    if (!policy || typeof policy.manualAllowed !== "boolean")
+      throw Error(
+        "The campaign roll settings could not be loaded. Retry opening the character sheet.",
+      );
     const profile = linked
       ? await accountRequest<{ revision: number }>(
           "sheets/detail",

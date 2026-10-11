@@ -160,6 +160,40 @@ test("ownership", async ({ devices, baseURL: origin }, testInfo) => {
   expect(
     await guest.evaluate(() => Object.keys(localStorage).some((k) => k.startsWith("quire.cloud"))),
   ).toBe(false);
+  // A failed policy read must be recoverable in the same guest document, without
+  // reconnecting, clearing its in-memory campaign, or granting manual rolls.
+  const beforeSheetRetry = await guest.evaluate(() =>
+    sessionStorage.getItem("lootsplit.player.reconnect.v1"),
+  );
+  expect(beforeSheetRetry).toBeTruthy();
+  let failRollPolicy = true;
+  await guest.route("**/_serverFn/**", (route) =>
+    failRollPolicy && route.request().postData()?.includes('"policy"')
+      ? route.fulfill({
+          status: 503,
+          contentType: "application/json",
+          body: '{"error":"Synthetic unavailable roll policy"}',
+        })
+      : route.continue(),
+  );
+  await guest.getByRole("link", { name: "Home", exact: true }).first().click();
+  await guest.getByRole("link", { name: "Character Sheet", exact: true }).click();
+  await expect(
+    guest.getByRole("button", { name: "Retry character sheet", exact: true }),
+  ).toBeVisible();
+  await expect(guest.getByRole("alert")).toBeVisible();
+  failRollPolicy = false;
+  await guest.getByRole("button", { name: "Retry character sheet", exact: true }).click();
+  await expect(guest.getByRole("heading", { name: "Dice tray", exact: true })).toBeVisible();
+  await expect(guest.getByRole("alert")).toHaveCount(0);
+  expect(await guest.evaluate(() => sessionStorage.getItem("lootsplit.player.reconnect.v1"))).toBe(
+    beforeSheetRetry,
+  );
+  expect(await guest.evaluate(async () => (await indexedDB.databases()).length)).toBe(0);
+  await guest.getByRole("link", { name: "Home", exact: true }).first().click();
+  await guest
+    .getByRole("link", { name: "Campaign, messages & session status →", exact: true })
+    .click();
   await guest.reload();
   await continueIntoApp(guest);
   await expect(guest.locator(".room-code")).toHaveText(code);
