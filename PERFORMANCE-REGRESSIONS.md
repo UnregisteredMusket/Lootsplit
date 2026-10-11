@@ -249,6 +249,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-11T14:00:55Z | step: Development / desktop / dev-website | 16s → 19s | +3s | +18.75% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37300924028/job/111733697203) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38145295160/job/114487254100) |
 | 2026-10-11T13:05:45Z | step: Packaged Worker / interface / Run actions/setup-node@v4 | 7s → 14s | +7s | +100% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37453107393/job/112234598017) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38141690945/job/114476960457) |
 | 2026-10-11T12:57:26Z | job: Development / gameplay | 581s → 712s | +131s | +22.55% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37784166101/job/113335097452) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38140451074/job/114473173492) |
 | 2026-10-11T12:45:29.000Z | queue: Focused player references / initial queue | 4s → 28s | +24s | +600% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38131342389) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38140451035) |
