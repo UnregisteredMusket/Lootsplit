@@ -237,14 +237,18 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Development / gameplay / dev-trade-economy | open | 2 | 32s → 83s | +51s | +159.38% |
 | Packaged Worker / interface / worker-trade-economy | open | 2 | 39s → 68s | +29s | +74.36% |
 | Player references / development / Verify player references and Help | open | 2 | 12s → 58s | +46s | +383.33% |
-| Player references / worker | open | 2 | 83s → 208s | +125s | +150.6% |
+| Player references / worker | open | 3 | 83s → 240s | +157s | +189.16% |
 | Focused player references | open | 2 | 83s → 271s | +188s | +226.51% |
 | Player references / development | open | 2 | 63s → 271s | +208s | +330.16% |
+| Player references / worker / Verify player references and Help | open | 2 | 15s → 58s | +43s | +286.67% |
 
 ## Recorded slowdowns
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-11T12:26:19Z | job: Player references / worker | 208s → 240s | +32s | +15.38% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38131890240/job/114447745703) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38138998692/job/114468749350) |
+| 2026-10-11T12:26:16Z | step: Player references / worker / Verify complete account fixtures | 97s → 114s | +17s | +17.53% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38131540604/job/114446715096) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38138998692/job/114468749350) |
+| 2026-10-11T12:24:22Z | step: Player references / worker / Verify player references and Help | 49s → 58s | +9s | +18.37% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38131890240/job/114447745703) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38138998692/job/114468749350) |
 | 2026-10-11T12:15:35Z | step: Player references / worker / Run actions/upload-artifact@v4 | 2s → 3s | +1s | +50% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38131342389/job/114446132272) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38138347179/job/114466796212) |
 | 2026-10-11T12:13:01Z | step: Player references / worker / Build and start disposable immutable Worker | 18s → 22s | +4s | +22.22% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38131342389/job/114446132272) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38138347179/job/114466796212) |
 | 2026-10-11T12:12:01Z | step: Player references / worker / Run actions/setup-node@v4 | 4s → 5s | +1s | +25% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38131342389/job/114446132272) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38138347179/job/114466796212) |
