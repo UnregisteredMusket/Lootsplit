@@ -22,6 +22,30 @@ import {
 import { jwtVerify, importJWK } from "jose";
 const sql = new DatabaseSync(":memory:");
 sql.exec(readFileSync(new URL("../../../cloudflare/migrations/0008_encounters.sql", import.meta.url), "utf8"));
+test("shared ships enforce DM overrides, player-owned boarding reviews, projection privacy and one-time receipts", async()=>{
+  const {defaultShip}=await import("./ships-schema.ts"),{shipFingerprint}=await import("./ships.ts");
+  let table=tradeFixture();
+  const seat={id:"dm",token:"",name:"DM",role:"dm" as const,purseIds:[]};
+  table=applyCommand(table,seat,{id:"ship-setup",kind:"ship-configure",before:null,vessel:{...defaultShip(),propertyId:"warehouse",mode:"docked",facilityId:null,installed:[],arrearsCopper:0,expenseRemainder:0,dmNotes:"Private navigation clue"}});
+  const host=await openRoom({name:"Ship DM",table});
+  const guest=await joinRoom({code:host.code,purseId:"a",name:"Ship player"}),auth={code:host.code,token:guest.token};
+  const {choosePace}=await import("./cloud.server.ts");await choosePace({...host,live:true});
+  const view=(await roomState(auth)).table;assert.equal(view.journal!.fleet!.vessels[0].dmNotes,"");
+  const forbidden={id:"forged-teleport",kind:"ship-teleport",propertyId:"warehouse",destinationId:"desert",facilityId:null,before:shipFingerprint(view,"warehouse"),reason:""};
+  await assert.rejects(submitCommands({...auth,batchId:"forged-ship",commands:[forbidden]}),/Only the DM/);
+  const request={id:"board-review",kind:"ship-board",propertyId:"warehouse",purseId:"a",action:"board",before:shipFingerprint(view,"warehouse")};
+  await submitCommands({...auth,batchId:"board-first",commands:[request]});await submitCommands({...auth,batchId:"board-response-retry",commands:[request]});
+  let saved=(await roomState(host)).table;assert.equal(saved.journal!.fleet!.boarding.length,1);assert.equal(saved.journal!.fleet!.aboard.length,0);
+  const r=saved.journal!.fleet!.boarding[0],approve={id:"approve-board",kind:"ship-board-review",requestId:r.id,before:r,approve:true};
+  await submitCommands({...host,batchId:"approve-first",commands:[approve]});await submitCommands({...host,batchId:"approve-retry",commands:[approve]});
+  saved=(await roomState(host)).table;assert.equal(saved.journal!.fleet!.aboard.length,1);
+  const teleport={...forbidden,id:"real-teleport",before:shipFingerprint(saved,"warehouse"),reason:"DM portal"};
+  const coins=saved.purses.map(p=>p.coins),day=saved.journal!.finance!.day;
+  await submitCommands({...host,batchId:"teleport-first",commands:[teleport]});await submitCommands({...host,batchId:"teleport-response-retry",commands:[teleport]});
+  saved=(await roomState(host)).table;assert.deepEqual(saved.purses.map(p=>p.coins),coins);assert.equal(saved.journal!.finance!.day,day);
+  assert.equal(saved.journal!.world!.characterPositions.find(p=>p.purseId==="a")!.locationId,"desert");
+  assert.equal(saved.journal!.events.filter(e=>e.id==="real-teleport-ship").length,1);
+});
 test("shared commodity imports are DM-only, isolated and replay-safe; global trade is checked against the room's city location", async () => {
   const table=tradeFixture(); table.journal!.tradeEconomy!.exchanges[0].locationId=null;
   const host=await openRoom({name:"City market DM",table}), other=await openRoom({name:"Other commodity campaign",table:tradeFixture()});

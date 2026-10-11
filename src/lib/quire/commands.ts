@@ -1,3 +1,5 @@
+import { shipCommands, type ShipCommand } from "./ships-schema.ts";
+import { applyShipCommand, validateFleet, assertShipTradingHere } from "./ships.ts";
 import { characterVisible, canReadCharacter } from "./character-position.ts";
 import { ensureCityExchanges, removeUnusedCityExchange, renameUnusedCityExchange } from "./city-exchanges.ts";
 import { worldCommands, type WorldCommand } from "./world-schema.ts";
@@ -57,6 +59,7 @@ export const commandSchema = z.discriminatedUnion("kind", [
   ...tradeCommands,
   ...worldCommands,
   ...estateCommands,
+  ...shipCommands,
   estateImportCommand,
   z.object({ ...base, kind: z.literal("resource-pack-import"), before: z.string().max(30000), pack: resourcePackSchema }).strict(),
   z.object({ ...base, kind: z.literal("listing-edit"), listingId: id, before: listingSchema.nullable(), after: listingSchema.nullable() }),
@@ -317,6 +320,10 @@ export function applyCommand(input: CloudTable, seat: CloudSeat, raw: Command, e
       throw Error("Cancel the pending downtime before changing finance agreements.");
     return f;
   };
+  if (seat.role === "player" && ["buy", "sell", "listing"].includes(cmd.kind)) {
+    const payerId = "purseId" in cmd ? cmd.purseId : "holdingId" in cmd ? t.holdings.find(h=>h.id===cmd.holdingId)?.purseId : undefined;
+    if (payerId) assertShipTradingHere(t, payerId);
+  }
   if (cmd.kind === "ledger-void") {
     applyLedgerVoid(t, seat, cmd, at, execution.source === "local");
   } else if (tradeCommands.some((schema) => schema.shape.kind.value === cmd.kind)) {
@@ -337,6 +344,8 @@ export function applyCommand(input: CloudTable, seat: CloudSeat, raw: Command, e
     event(
       `Imported property configurations: ${cmd.document.properties.length} records awaiting DM review.`,
     );
+  } else if (cmd.kind.startsWith("ship-")) {
+    applyShipCommand(t, seat, cmd as ShipCommand, at);
   } else if (cmd.kind.startsWith("estate-")) {
     finance();
     applyEstateCommand(t, seat, cmd as import("./estate-schema.ts").EstateCommand, at);
@@ -367,6 +376,7 @@ export function applyCommand(input: CloudTable, seat: CloudSeat, raw: Command, e
     if (!h) throw Error("Property no longer exists.");
     if (!same({ locationId: h.locationId ?? null, property: h.property ?? null }, cmd.before))
       throw Error("Property location or features changed elsewhere. Reload before saving.");
+    if (journal.fleet?.vessels.some(v=>v.propertyId===h.id) && cmd.locationId!==(h.locationId??null)) throw Error("Use ship travel or DM Teleport Ship to move this vessel and its occupants.");
     if (cmd.locationId) h.locationId = cmd.locationId; else delete h.locationId;
     if (cmd.property) h.property = cmd.property; else delete h.property;
     event(`Property location and features saved: ${h.name}`, "management", h.purseId);
@@ -414,6 +424,8 @@ export function applyCommand(input: CloudTable, seat: CloudSeat, raw: Command, e
         journal.world?.characterPositions.some(
           (s) => s.locationId === cmd.locationId || s.downtime?.returnLocationId === cmd.locationId,
         ) ||
+        journal.fleet?.facilities.some(y=>y.locationId===cmd.locationId) ||
+        journal.fleet?.voyages.some(v=>!["arrived","cancelled","dm-overridden","denied"].includes(v.status)&&(v.originId===cmd.locationId||v.destinationId===cmd.locationId)) ||
         journal.world?.npcs.some((n) => n.locationId === cmd.locationId) ||
         journal.world?.maps.some(
           (m) =>
@@ -954,6 +966,10 @@ export function applyCommand(input: CloudTable, seat: CloudSeat, raw: Command, e
       if (h.kind === "property" && t.journal?.propertyOperations) {
         const site = t.journal.propertyOperations.sites.find((s) => s.propertyId === h.id);
         if (site && h.quantity === 0) site.propertyId = cmd.id + "-item";
+        if (h.quantity === 0 && journal.fleet) {
+          for(const v of journal.fleet.vessels) if(v.propertyId===h.id)v.propertyId=cmd.id+"-item";
+          for(const y of journal.fleet.facilities) if(y.propertyId===h.id)y.propertyId=cmd.id+"-item";
+        }
       }
     }
     log(cmd.fromId, "Transfer sent", -cmd.copper);
@@ -1127,6 +1143,7 @@ export function applyCommand(input: CloudTable, seat: CloudSeat, raw: Command, e
     }
   }
   validateWorld(t);
+  validateFleet(t);
   return t;
 }
 export function same(a: unknown, b: unknown): boolean {

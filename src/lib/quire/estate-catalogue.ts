@@ -1,3 +1,4 @@
+import { defaultShip } from "./ships-schema.ts";
 import type { EstateTemplate } from "./estate-schema.ts";
 type Category = [
   string,
@@ -7,6 +8,8 @@ type Category = [
   string?,
 ];
 export const ESTATE_CATALOGUE: Category[] = [
+  ["ship", "Owned ship", "other", ["storage", "transport", "trade"]],
+  ["shipyard", "Private shipyard", "workshop", ["storage", "transport", "crafting"]],
   ["land", "Land plot", "land", ["construction-site"]],
   ["house", "Cottage or house", "residence", ["storage", "rental"]],
   ["manor", "Townhouse or manor", "residence", ["storage", "rental", "administration"]],
@@ -78,6 +81,8 @@ export const ESTATE_CATALOGUE: Category[] = [
 export function estatePreset(key: string): EstateTemplate {
   const row = ESTATE_CATALOGUE.find((r) => r[0] === key) ?? ESTATE_CATALOGUE[0];
   return {
+    ...(key === "ship" ? {ship: defaultShip()} : {}),
+    ...(key === "shipyard" ? {shipyard: {slots: 4, maxLengthFeet: 200, maxDimensions: "DM-reviewed ship sizes", dockCopper: 0, dryCopper: 0, yardCopper: 0, repair: true, upgrades: true}} : {}),
     key: row[0],
     name: row[1],
     propertyType: row[2],

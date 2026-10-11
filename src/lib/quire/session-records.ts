@@ -1,3 +1,4 @@
+import { facilityAccess } from "./ships.ts";
 import { characterVisible, canReadCharacter, inParty } from "./character-position.ts";
 import { readWorld } from "./world-schema.ts";
 import { exchangeHere } from "./trade-economy.ts";
@@ -116,6 +117,16 @@ export function projectRecord(
         .filter((site) => canAccessEstate(t, estate, site.propertyId, seat))
         .map((site) => site.propertyId),
     );
+    if (t.journal.fleet) {
+      const fleet=t.journal.fleet;
+      fleet.vessels=fleet.vessels.filter(v=>visibleSites.has(v.propertyId)).map(v=>({...v,dmNotes:""}));
+      const currentFacilities=new Set(fleet.vessels.flatMap(v=>v.facilityId?[v.facilityId]:[]));
+      fleet.facilities=fleet.facilities.filter(f=>facilityAccess(t,f,seat)||currentFacilities.has(f.id));
+      fleet.voyages=fleet.voyages.filter(v=>visibleSites.has(v.propertyId));
+      fleet.aboard=fleet.aboard.filter(a=>visibleSites.has(a.propertyId));
+      fleet.boarding=fleet.boarding.filter(r=>seat.purseIds.includes(r.purseId));
+      fleet.work=fleet.work.filter(w=>visibleSites.has(w.propertyId));
+    }
     const sharedOwners = new Set(
       t.holdings.filter((h) => visibleSites.has(h.id)).map((h) => h.purseId),
     );
@@ -180,6 +191,8 @@ export function projectRecord(
               ...m.anchors.map((a) => a.locationId),
             ]),
             world.npcs.map((n) => n.locationId),
+            t.journal.fleet?.facilities.map(f=>f.locationId) ?? [],
+            t.journal.fleet?.voyages.flatMap(v=>[v.originId,v.destinationId]) ?? [],
             t.purses
               .filter((p) => characterVisible(t, p))
               .flatMap((p) => {
@@ -291,6 +304,11 @@ export function projectRecord(
     world.characterPositions = world.characterPositions
       .filter((s) => t.purses.some((p) => p.id === s.purseId))
       .map((s) => ({ ...s, ...(s.downtime ? { downtime: undefined } : {}) }));
+    if (t.journal.fleet) {
+      t.journal.fleet.aboard=t.journal.fleet.aboard.filter(a=>t.purses.some(p=>p.id===a.purseId));
+      for(const v of t.journal.fleet.voyages) v.crewPurseIds=v.crewPurseIds.filter(id=>t.purses.some(p=>p.id===id));
+      for(const f of t.journal.fleet.facilities) f.accessPurseIds=f.accessPurseIds.filter(id=>t.purses.some(p=>p.id===id));
+    }
     if (t.journal.finance) {
       const f = readFinance(t.journal.finance);
       t.journal.finance = {

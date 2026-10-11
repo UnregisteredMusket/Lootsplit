@@ -1,3 +1,9 @@
+import {
+  ShipManagement,
+  ShipyardWorkshop,
+  ShipBoardingReviews,
+  ShipVoyageReviews,
+} from "./ship-management";
 import { SearchSelect } from "@/components/search-select";
 import { useState, useSyncExternalStore, type ReactNode } from "react";
 import { useEconomy } from "@/lib/quire/economy-context";
@@ -39,7 +45,7 @@ import { Button, Field, Fold, Select, TextArea, TextInput } from "./ui";
 import { AppLink } from "./app-link";
 import "./property-operations.css";
 
-function useEstateTable() {
+export function useEstateTable() {
   const e = useEconomy();
   return {
     ...emptyCloudTable(),
@@ -57,7 +63,7 @@ function useEstateActor() {
     useSyncExternalStore(subscribeCloudTable, getCloudTable, getServerCloudTable).seatId || "local"
   );
 }
-function ActionForm({
+export function ActionForm({
   title,
   children,
   command,
@@ -121,7 +127,7 @@ function ActionForm({
     </form>
   );
 }
-function NumberField({
+export function NumberField({
   label,
   value,
   set,
@@ -177,6 +183,7 @@ export function PropertyOperations({ holding: h }: { holding: Holding }) {
   const here = physicallyHere(t, h);
   return (
     <section className="estate-operations" aria-label={`${h.name} operations`}>
+      <ShipManagement holding={h} />
       <h3>Property operations</h3>
       <p>
         {site?.enabled ? "Operations enabled" : "Awaiting DM setup"} ·{" "}
@@ -404,7 +411,7 @@ function Storage({
       r.status === "approved",
   );
   const used = storageWeight(t, h.id),
-    canMove = site.enabled && (physicallyHere(t, h) || (dm && override));
+    canMove = site.enabled && (physicallyHere(t, h, purseId) || (dm && override));
   return (
     <>
       <p>
@@ -475,7 +482,10 @@ function Storage({
           </Select>
         </Field>
         <Field label="Item lot">
-          <SearchSelect value={item || options[0]?.id || ""} onValueChange={(selectedValue) => setItem(selectedValue)}>
+          <SearchSelect
+            value={item || options[0]?.id || ""}
+            onValueChange={(selectedValue) => setItem(selectedValue)}
+          >
             {!options.length && <option value="">No available goods</option>}
             {options.map((i) => (
               <option key={i.id} value={i.id}>
@@ -499,7 +509,10 @@ function Storage({
           set={setQuantity}
         />
         <Field label="Acting / receiving character">
-          <SearchSelect value={purseId} onValueChange={(selectedValue) => setPurseId(selectedValue)}>
+          <SearchSelect
+            value={purseId}
+            onValueChange={(selectedValue) => setPurseId(selectedValue)}
+          >
             {t.purses
               .filter((p) => dm || seat.purseIds.includes(p.id))
               .map((p) => (
@@ -612,7 +625,10 @@ function MaterialTag({ item, state }: { item: Holding; state: Estate }) {
         command={() => ({ kind: "estate-material", holdingId: item.id, materialKey, weight })}
       >
         <Field label="Material definition">
-          <SearchSelect value={materialKey} onValueChange={(selectedValue) => setMaterialKey(selectedValue)}>
+          <SearchSelect
+            value={materialKey}
+            onValueChange={(selectedValue) => setMaterialKey(selectedValue)}
+          >
             {state.materials.map((m) => (
               <option key={m.key} value={m.key}>
                 {m.name} ({m.unit})
@@ -709,7 +725,10 @@ function Projects({
           </SearchSelect>
         </Field>
         <Field label="Pay contractors from">
-          <SearchSelect value={purseId} onValueChange={(selectedValue) => setPurseId(selectedValue)}>
+          <SearchSelect
+            value={purseId}
+            onValueChange={(selectedValue) => setPurseId(selectedValue)}
+          >
             {t.purses
               .filter((p) => dm || seat.purseIds.includes(p.id))
               .map((p) => (
@@ -732,7 +751,9 @@ function Projects({
           </p>
         )}
         {t.purses
-          .filter((p) => p.kind === "character" && !p.nonParty && (dm || seat.purseIds.includes(p.id)))
+          .filter(
+            (p) => p.kind === "character" && !p.nonParty && (dm || seat.purseIds.includes(p.id)),
+          )
           .map((p) => (
             <NumberField
               key={p.id}
@@ -1355,7 +1376,10 @@ function Supplies({ holding: h, state }: { holding: Holding; state: Estate }) {
             })}
           >
             <Field label="Supplier stock">
-              <SearchSelect value={stockId} onValueChange={(selectedValue) => setStockId(selectedValue)}>
+              <SearchSelect
+                value={stockId}
+                onValueChange={(selectedValue) => setStockId(selectedValue)}
+              >
                 {t.stock
                   .filter((s) => !s.service)
                   .map((s) => (
@@ -1367,7 +1391,10 @@ function Supplies({ holding: h, state }: { holding: Holding; state: Estate }) {
               </SearchSelect>
             </Field>
             <Field label="Material definition">
-              <SearchSelect value={materialKey} onValueChange={(selectedValue) => setMaterialKey(selectedValue)}>
+              <SearchSelect
+                value={materialKey}
+                onValueChange={(selectedValue) => setMaterialKey(selectedValue)}
+              >
                 {state.materials.map((m) => (
                   <option key={m.key} value={m.key}>
                     {m.name} ({m.unit})
@@ -1462,25 +1489,32 @@ function OrderFields({
     );
   const initial = (kind: EstateOrder["kind"]): EstateOrder =>
     kind === "market"
-      ? { kind, exchangeId: t.journal.tradeEconomy?.exchanges[0]?.id ?? "", commodityId: t.journal.tradeEconomy?.commodities[0]?.id ?? "", direction: "buy", quantity: 1, limitCopper: 0 }
+      ? {
+          kind,
+          exchangeId: t.journal.tradeEconomy?.exchanges[0]?.id ?? "",
+          commodityId: t.journal.tradeEconomy?.commodities[0]?.id ?? "",
+          direction: "buy",
+          quantity: 1,
+          limitCopper: 0,
+        }
       : kind === "message"
-      ? { kind, text: "" }
-      : kind === "report"
-        ? { kind }
-        : kind === "project"
-          ? { kind, jobId: jobs[0]?.id ?? "", active: true }
-          : kind === "rent"
-            ? { kind, active: true }
-            : kind === "staff"
-              ? { kind, staffId: staff[0]?.id ?? "", active: true }
-              : {
-                  kind,
-                  stockId: supplies[0]?.stockId ?? "",
-                  materialKey: supplies[0]?.materialKey ?? "",
-                  deliveryDays: supplies[0]?.deliveryDays ?? 0,
-                  deliveryCopper: supplies[0]?.deliveryCopper ?? 0,
-                  quantity: 1,
-                };
+        ? { kind, text: "" }
+        : kind === "report"
+          ? { kind }
+          : kind === "project"
+            ? { kind, jobId: jobs[0]?.id ?? "", active: true }
+            : kind === "rent"
+              ? { kind, active: true }
+              : kind === "staff"
+                ? { kind, staffId: staff[0]?.id ?? "", active: true }
+                : {
+                    kind,
+                    stockId: supplies[0]?.stockId ?? "",
+                    materialKey: supplies[0]?.materialKey ?? "",
+                    deliveryDays: supplies[0]?.deliveryDays ?? 0,
+                    deliveryCopper: supplies[0]?.deliveryCopper ?? 0,
+                    quantity: 1,
+                  };
   return (
     <>
       <Field label="Manager instruction">
@@ -1494,7 +1528,9 @@ function OrderFields({
           <option value="rent">Manage approved tenancy</option>
           <option value="staff">Manage approved staff contract</option>
           <option value="supply">Order reviewed material supplies</option>
-          {t.journal.tradeEconomy?.settings.enabled && <option value="market">Trade stored commodities at a local exchange</option>}
+          {t.journal.tradeEconomy?.settings.enabled && (
+            <option value="market">Trade stored commodities at a local exchange</option>
+          )}
         </Select>
       </Field>
       {value.kind === "message" && (
@@ -1509,7 +1545,10 @@ function OrderFields({
       )}
       {value.kind === "project" && (
         <Field label="Reviewed project">
-          <SearchSelect value={value.jobId} onValueChange={(selectedValue) => set({ ...value, jobId: selectedValue })}>
+          <SearchSelect
+            value={value.jobId}
+            onValueChange={(selectedValue) => set({ ...value, jobId: selectedValue })}
+          >
             <option value="">Choose approved work</option>
             {jobs.map((j) => (
               <option key={j.id} value={j.id}>
@@ -1580,22 +1619,68 @@ function OrderFields({
           />
         </>
       )}
-      {value.kind === "market" && <>
-        <Field label="Property exchange"><SearchSelect value={value.exchangeId} onValueChange={(selectedValue) =>set({...value,exchangeId:selectedValue})}>
-          <option value="">Choose an exchange</option>
-          {t.journal.tradeEconomy?.exchanges.map(e=><option key={e.id} value={e.id}>{e.name}</option>)}
-        </SearchSelect></Field>
-        <Field label="Trade commodity"><SearchSelect value={value.commodityId} onValueChange={(selectedValue) =>set({...value,commodityId:selectedValue})}>
-          <option value="">Choose a commodity</option>
-          {t.journal.tradeEconomy?.commodities.map(c=><option key={c.id} value={c.id}>{c.name} · {c.unit}</option>)}
-        </SearchSelect></Field>
-        <Field label="Manager trade direction"><Select value={value.direction} onChange={e=>set({...value,direction:e.target.value as "buy"|"sell"})}>
-          <option value="buy">Buy into property storage</option><option value="sell">Sell stored goods</option>
-        </Select></Field>
-        <NumberField label="Commodity quantity" value={value.quantity} min={1} max={100000} set={quantity=>set({...value,quantity})}/>
-        <NumberField label={value.direction==="buy"?"Maximum purchase price per unit (cp)":"Minimum sale price per unit (cp)"} value={value.limitCopper} min={0} max={1e12} set={limitCopper=>set({...value,limitCopper})}/>
-        <p>The exchange must serve this property's location. The supplies duty, staff wages, manager budget, treasury, stock and storage are rechecked at execution. Sales use the owner's stored, unreserved goods.</p>
-      </>}
+      {value.kind === "market" && (
+        <>
+          <Field label="Property exchange">
+            <SearchSelect
+              value={value.exchangeId}
+              onValueChange={(selectedValue) => set({ ...value, exchangeId: selectedValue })}
+            >
+              <option value="">Choose an exchange</option>
+              {t.journal.tradeEconomy?.exchanges.map((e) => (
+                <option key={e.id} value={e.id}>
+                  {e.name}
+                </option>
+              ))}
+            </SearchSelect>
+          </Field>
+          <Field label="Trade commodity">
+            <SearchSelect
+              value={value.commodityId}
+              onValueChange={(selectedValue) => set({ ...value, commodityId: selectedValue })}
+            >
+              <option value="">Choose a commodity</option>
+              {t.journal.tradeEconomy?.commodities.map((c) => (
+                <option key={c.id} value={c.id}>
+                  {c.name} · {c.unit}
+                </option>
+              ))}
+            </SearchSelect>
+          </Field>
+          <Field label="Manager trade direction">
+            <Select
+              value={value.direction}
+              onChange={(e) => set({ ...value, direction: e.target.value as "buy" | "sell" })}
+            >
+              <option value="buy">Buy into property storage</option>
+              <option value="sell">Sell stored goods</option>
+            </Select>
+          </Field>
+          <NumberField
+            label="Commodity quantity"
+            value={value.quantity}
+            min={1}
+            max={100000}
+            set={(quantity) => set({ ...value, quantity })}
+          />
+          <NumberField
+            label={
+              value.direction === "buy"
+                ? "Maximum purchase price per unit (cp)"
+                : "Minimum sale price per unit (cp)"
+            }
+            value={value.limitCopper}
+            min={0}
+            max={1e12}
+            set={(limitCopper) => set({ ...value, limitCopper })}
+          />
+          <p>
+            The exchange must serve this property's location. The supplies duty, staff wages,
+            manager budget, treasury, stock and storage are rechecked at execution. Sales use the
+            owner's stored, unreserved goods.
+          </p>
+        </>
+      )}
     </>
   );
 }
@@ -1799,9 +1884,15 @@ export function PropertyOperationReviews() {
   return (
     <section className="estate-operations">
       <h2>Property proposals</h2>
-      {!jobs.length && !staff.length && !withdrawals.length && (
-        <p>No property work, hires or withdrawals awaiting review.</p>
-      )}
+      {!jobs.length &&
+        !staff.length &&
+        !withdrawals.length &&
+        !t.journal?.fleet?.boarding.some((r) => r.status === "pending") &&
+        !t.journal?.fleet?.voyages.some((v) => v.status === "proposed") && (
+          <p>No property work, hires or withdrawals awaiting review.</p>
+        )}
+      <ShipBoardingReviews />
+      <ShipVoyageReviews />
       <WithdrawalRequests state={state} pendingOnly />
       {jobs.map((j) => (
         <JobCard key={JSON.stringify(j)} job={j} />
@@ -1853,6 +1944,7 @@ export function EstateWorkshop() {
           Set campaign rules before activating properties. Presets provide capabilities and staff
           roles; costs, yields and work remain your decisions.
         </p>
+        <ShipyardWorkshop />
         <TemplateWorkshop key={state.templates.map((t) => t.key).join(",")} state={state} />
         <PostalSettings key={JSON.stringify(state.postal)} state={state} />
         <EstateImporter />
@@ -2173,7 +2265,10 @@ function RecipeBuilder({ template, state }: { template: EstateTemplate; state: E
             set={setOutputWeight}
           />
           <Field label="Produced material definition">
-            <SearchSelect value={outputMaterial} onValueChange={(selectedValue) => setOutputMaterial(selectedValue)}>
+            <SearchSelect
+              value={outputMaterial}
+              onValueChange={(selectedValue) => setOutputMaterial(selectedValue)}
+            >
               <option value="">Ordinary item</option>
               {state.materials.map((m) => (
                 <option key={m.key} value={m.key}>

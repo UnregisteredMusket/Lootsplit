@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { shipDefaultsSchema, shipyardDefaultsSchema, fleetSchema } from "./ships-schema.ts";
+import { worldSchema } from "./world-schema.ts";
 import type { Holding, StockLine } from "./types.ts";
 import { goodsKey } from "./goods-key.ts";
 import { tradeEconomySchema, tradeLedgerLinkSchema } from "./trade-economy-schema.ts";
@@ -63,6 +65,8 @@ export const recipeSchema = z
   .strict();
 export const estateTemplateSchema = z
   .object({
+    ship: shipDefaultsSchema.optional(),
+    shipyard: shipyardDefaultsSchema.optional(),
     key: estateKey,
     name,
     propertyType: z.enum([
@@ -314,6 +318,8 @@ export const custodySchema = z
   .strict();
 export type zCustody = z.infer<typeof custodySchema>;
 export const estateQuoteSchema = z.object({
+  fleet: fleetSchema.optional(),
+  world: worldSchema.optional(),
   tradeEconomy: tradeEconomySchema.optional(),
   before: z.string(),
   state: estateSchema,

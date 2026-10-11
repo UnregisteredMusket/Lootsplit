@@ -118,6 +118,14 @@ The `ownership` scenario must cover anonymous entry restrictions, explicit legac
 
 ## Roadmap feature maintenance
 
+### Ships, shipyards and voyages
+
+Read `docs/SHIPS.md`. Ships remain single owned property holdings; cargo uses estate custody, crews use staff contracts, and repairs/upgrades use ordinary reviewed projects. Fleet data is optional journal metadata; aboard membership lives there while character location stays canonical. Do not persist the derived ship identity fields into character-position records: older clients must retain their existing readable placement shape. Legacy journal replacements preserve authoritative fleet metadata. Never create another wallet, scheduler or stored cargo copy.
+
+Use stale-checked ship commands and existing room receipts. DM-only configuration, damage, boarding reviews and teleport must remain enforced on the server. Players propose only their own payer/workers/boarding characters. Presence, berth slots/length, cargo weights/capacity, critical components, minimum crew, wage arrears, current access and travel/manager budgets are rechecked. Voyage progress is between-session downtime only; session-hour advances settle maintenance without voyage progress. Teleport moves ship and all aboard positions atomically with no time/cost, closes ongoing voyages and pauses former-yard work. Ship expenses retain remainders/arrears; upgrade completion preserves damage and applies once.
+
+Run `ships.test.ts`, shared `room-store.test.ts`, estate/finance/character-position/trade tests, full quick checks and web/mobile builds. The unchanged full nine-group PR/main workflow additionally requires `scripts/ships-browser-audit.mjs` in development and the immutable Worker at desktop/mobile widths. Preserve every prior gate, account/network bound, guest-memory/privacy rule and signed Android release requirement. Tile routing remains future work using the same clock. Update DM/player Help, SHIPS, README and feature inventory in each affected change.
+
 ### Seasonal campaign trade economies
 
 Read `docs/TRADE-ECONOMY.md` and `docs/plans/SEASONAL-TRADE-ECONOMY.md`. Economy state is optional campaign journal data; never share exchange balances, seasonal draws or feedback across campaigns. Reuse canonical inventory/purses, location hierarchy, property manager budgets/postal orders and the atomic stored downtime approval. Price quotes stay fixed for the season; current transactions feed the next automatic proposal. Rolls are authoritative and retained across cancellation/retry, including server CAS retries. Classic preserves exact DM values and every mode supports recorded overrides. Within-session clock advances never settle seasons. Preserve older saves, immutable archives, recovery drafts, all existing release gates and the independent packaged Worker checks. Run `trade-economy.test.ts`, shared `room-store.test.ts`, and the complete desktop/mobile trade-economy audit in both environments.

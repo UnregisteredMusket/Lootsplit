@@ -86,3 +86,18 @@
     grid-column: 1 / -1;
   }
 }
+
+.ship-table-scroll {
+  overflow-x: auto;
+  max-width: 100%;
+}
+.ship-table-scroll table {
+  width: 100%;
+  border-collapse: collapse;
+  text-align: left;
+}
+.ship-table-scroll th,
+.ship-table-scroll td {
+  padding: 0.5rem;
+  border-bottom: 1px solid var(--line);
+}

@@ -40,13 +40,21 @@ test("each development check belongs to exactly one declared isolated group", ()
     .map((v) => v.trim());
   assert.equal(new Set(groups).size, groups.length);
   const checks = [...workflow.matchAll(/- name: (dev-[\w-]+)\n\s+if: matrix.group == '([^']+)'/g)];
-  assert.equal(checks.length, 31);
+  assert.equal(checks.length, 32);
+  assert.ok(checks.some(([, name, group]) => name === "dev-ships" && group === "gameplay"));
+  assert.match(workflow, /worker-ships 240 node scripts\/ships-browser-audit\.mjs/);
   assert.ok(checks.some(([, name, group]) => name === "dev-trade-economy" && group === "gameplay"));
-  assert.ok(checks.some(([, name, group]) => name === "dev-world-features" && group === "gameplay"));
-  assert.ok(checks.some(([, name, group]) => name === "dev-property-operations" && group === "gameplay"));
+  assert.ok(
+    checks.some(([, name, group]) => name === "dev-world-features" && group === "gameplay"),
+  );
+  assert.ok(
+    checks.some(([, name, group]) => name === "dev-property-operations" && group === "gameplay"),
+  );
   assert.ok(checks.some(([, name, group]) => name === "dev-properties" && group === "gameplay"));
   assert.ok(checks.some(([, name, group]) => name === "dev-shop-stock" && group === "gameplay"));
-  assert.ok(checks.some(([, name, group]) => name === "dev-market-locations" && group === "gameplay"));
+  assert.ok(
+    checks.some(([, name, group]) => name === "dev-market-locations" && group === "gameplay"),
+  );
   assert.ok(checks.some(([, name, group]) => name === "dev-sound" && group === "governance"));
   for (const [, name, group] of checks) assert.ok(groups.includes(group), `${name}: ${group}`);
   for (const group of groups) assert.ok(checks.some(([, , assigned]) => assigned === group));

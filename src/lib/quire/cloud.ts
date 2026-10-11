@@ -73,6 +73,7 @@ import { validateShopLocations } from "./shop-locations.ts";
 import { validatePropertyLocations } from "./property.ts";
 import { validateEstate } from "./estate.ts";
 import { validateTradeEconomy } from "./trade-economy.ts";
+import { validateFleet } from "./ships.ts";
 import { validateWorld } from "./world.ts";
 
 export function emptyCloudTable(): CloudTable {
@@ -91,6 +92,7 @@ export function readCloudTable(value: unknown): CloudTable | null {
     validateEstate(table as CloudTable, true);
     validateTradeEconomy(table as CloudTable);
     validateWorld(table as CloudTable, true);
+    validateFleet(table as CloudTable, true);
   } catch { return null; }
   return {
     journal: readJournal(table.journal),

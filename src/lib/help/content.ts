@@ -9,13 +9,74 @@ export type HelpTopic = {
 };
 export type HelpGroup = { id: string; title: string; topics: HelpTopic[] };
 export const HELP_GROUPS: HelpGroup[] = [
-  { id: "world", title: "Maps, NPCs, barter & session time", topics: [
-    { id: "campaign-maps", title: "Import maps and show locations", audience: "DM / Players", paragraphs: ["Maps is the sixth main tab. The DM imports PNG, JPEG or WebP maps for existing locations, reviews device-local Read location labels suggestions, or links locations manually. The party marker follows Market's selected location; owned/accessible properties, shops, NPCs and post offices share its anchors. Unmapped locations are explicitly unplaced.", "Drag to pan, pinch or scroll to zoom; buttons and keyboard controls are available. The DM places/removes shared or DM-only markers live. Players see everything drawn into a shared image, so keep secret map artwork on a DM-only map."], links: [["Open Maps", "/maps"], ["Complete instructions", "/download/world-features.md"]] },
-    { id: "location-npcs", title: "Create, import and interact with NPCs", audience: "DM / Players", paragraphs: ["Market → People & NPCs lets DMs create non-party NPCs with location, description, portrait, inventory and funds. Players meet visible NPCs at their selected location; the DM responds by default. A configured player-character controller may speak/decide trades for that NPC without gaining configuration permissions.", "NPC JSON imports use format lootsplit.npcs, schemaVersion 1, and existing campaign location IDs. Preview before importing; every record is validated atomically. Dialogue is private to the interacting character, DM and configured NPC controller."], links: [["People & NPCs", "/features/npcs"], ["NPC import sample", "/download/location-npcs.sample.json"]] },
-    { id: "barter", title: "Barter goods and property deeds", audience: "DM / Players", paragraphs: ["Trading & Barter uses bilateral offers and counteroffers for coins, carried goods and clean property deeds. The current recipient accepts or declines; either participant may cancel. Another player's inventory remains private until they offer it. Nearby NPCs require the DM's Bartering allowed flag, and their DM/controller supplies consent.", "Acceptance rechecks funds, lots, ownership and location, then exchanges both sides atomically. Stored, reserved, transit or service items cannot be offered. Resolve property obligations or use the existing DM handover. Deeds retain their original receipt and update their owner; accepted history is retained."], links: [["Trading & Barter", "/features/trading"], ["Property Management", "/features/properties"]] },
-    { id: "black-market", title: "Reveal hidden black-market vendors", audience: "DM", paragraphs: ["Market's Black market toggle reveals/hides configured vendors during play. Each shop's Black-market vendor rules set its hidden status and premium (greater than 1, default 1.5). Stock, location, schedules, rarity, illegal-goods descriptions and ordinary purchase receipts use existing Market tools. The premium applies before the existing Charisma adjustment.", "Hidden vendors are absent from player data; stale purchases are rejected. Toggling does not open closed shops or bypass location. The DM can edit hidden vendors at any time."], links: [["Market", "/market"]] },
-    { id: "session-clock", title: "Advance session hours, rest and downtime", audience: "DM", paragraphs: ["Start a recorded play session, then open Session Time. Review and advance 1–24 hours per action. Optional short/long rests use the existing sheet resource policies; the DM decides whether the time qualifies. Hit dice, conditions and manual resources remain manually controlled.", "The canonical campaign clock settles finances, shop schedules, letters and deliveries at crossed days once. Approved property work can progress by elapsed hours using existing assignments, materials and permissions; travel/rest grants no character labor unless the DM enables it. Pending between-session downtime must be approved/cancelled first."], links: [["Session Time", "/features/time"], ["Downtime", "/features/downtime"]] },
-  ] },
+  {
+    id: "world",
+    title: "Maps, NPCs, barter & session time",
+    topics: [
+      {
+        id: "campaign-maps",
+        title: "Import maps and show locations",
+        audience: "DM / Players",
+        paragraphs: [
+          "Maps is the sixth main tab. The DM imports PNG, JPEG or WebP maps for existing locations, reviews device-local Read location labels suggestions, or links locations manually. The party marker follows Market's selected location; owned/accessible properties, shops, NPCs and post offices share its anchors. Unmapped locations are explicitly unplaced.",
+          "Drag to pan, pinch or scroll to zoom; buttons and keyboard controls are available. The DM places/removes shared or DM-only markers live. Players see everything drawn into a shared image, so keep secret map artwork on a DM-only map.",
+        ],
+        links: [
+          ["Open Maps", "/maps"],
+          ["Complete instructions", "/download/world-features.md"],
+        ],
+      },
+      {
+        id: "location-npcs",
+        title: "Create, import and interact with NPCs",
+        audience: "DM / Players",
+        paragraphs: [
+          "Market → People & NPCs lets DMs create non-party NPCs with location, description, portrait, inventory and funds. Players meet visible NPCs at their selected location; the DM responds by default. A configured player-character controller may speak/decide trades for that NPC without gaining configuration permissions.",
+          "NPC JSON imports use format lootsplit.npcs, schemaVersion 1, and existing campaign location IDs. Preview before importing; every record is validated atomically. Dialogue is private to the interacting character, DM and configured NPC controller.",
+        ],
+        links: [
+          ["People & NPCs", "/features/npcs"],
+          ["NPC import sample", "/download/location-npcs.sample.json"],
+        ],
+      },
+      {
+        id: "barter",
+        title: "Barter goods and property deeds",
+        audience: "DM / Players",
+        paragraphs: [
+          "Trading & Barter uses bilateral offers and counteroffers for coins, carried goods and clean property deeds. The current recipient accepts or declines; either participant may cancel. Another player's inventory remains private until they offer it. Nearby NPCs require the DM's Bartering allowed flag, and their DM/controller supplies consent.",
+          "Acceptance rechecks funds, lots, ownership and location, then exchanges both sides atomically. Stored, reserved, transit or service items cannot be offered. Resolve property obligations or use the existing DM handover. Deeds retain their original receipt and update their owner; accepted history is retained.",
+        ],
+        links: [
+          ["Trading & Barter", "/features/trading"],
+          ["Property Management", "/features/properties"],
+        ],
+      },
+      {
+        id: "black-market",
+        title: "Reveal hidden black-market vendors",
+        audience: "DM",
+        paragraphs: [
+          "Market's Black market toggle reveals/hides configured vendors during play. Each shop's Black-market vendor rules set its hidden status and premium (greater than 1, default 1.5). Stock, location, schedules, rarity, illegal-goods descriptions and ordinary purchase receipts use existing Market tools. The premium applies before the existing Charisma adjustment.",
+          "Hidden vendors are absent from player data; stale purchases are rejected. Toggling does not open closed shops or bypass location. The DM can edit hidden vendors at any time.",
+        ],
+        links: [["Market", "/market"]],
+      },
+      {
+        id: "session-clock",
+        title: "Advance session hours, rest and downtime",
+        audience: "DM",
+        paragraphs: [
+          "Start a recorded play session, then open Session Time. Review and advance 1–24 hours per action. Optional short/long rests use the existing sheet resource policies; the DM decides whether the time qualifies. Hit dice, conditions and manual resources remain manually controlled.",
+          "The canonical campaign clock settles finances, shop schedules, letters and deliveries at crossed days once. Approved property work can progress by elapsed hours using existing assignments, materials and permissions; travel/rest grants no character labor unless the DM enables it. Pending between-session downtime must be approved/cancelled first.",
+        ],
+        links: [
+          ["Session Time", "/features/time"],
+          ["Downtime", "/features/downtime"],
+        ],
+      },
+    ],
+  },
   {
     id: "start",
     title: "Start here & find a menu",
@@ -183,6 +244,25 @@ export const HELP_GROUPS: HelpGroup[] = [
         ],
       },
       {
+        id: "ships",
+        title: "Own ships, shipyards and downtime voyages",
+        audience: "DM / Players",
+        paragraphs: [
+          "Property Management contains ship controls. In the DM estate workshop choose Owned ship or Private shipyard, review its settings and assign that template to a normal property listing. Purchase through the existing register/deed flow, or configure an existing located property as a ship. Example stats and costs are editable campaign choices. A ship remains an independently valued holding; a berth is storage, not ownership.",
+          "Review the ship stat block: STR, DEX and CON only, speed/pace, crew, character and cargo capacity, actions/defenses, and separate hull, helm, movement and weapon AC/HP/thresholds. Record damage through the DM control. Below-threshold damage causes no loss; qualifying damage applies in full. Upgrade and material definitions use the advanced JSON fields; no intelligence, wisdom or charisma is assigned to the vessel.",
+          "Players with ship access can name it, load real inventory through Storage, propose repairs/upgrades and voyages, and request boarding/disembarking for their assigned characters. The DM approves placement in the property or Review Inbox. Aboard characters retain their identity, sheet and inventory and move with the ship. Boarding grants no character-control permissions. Characters ashore stay in place; a boarded character away from the party market cannot trade there remotely.",
+          "Create commercial facilities in Docks & shipyards, or purchase a private shipyard. Facilities enforce slots and ship length and have separate dock, dry and yard rates. Dry/yard storage must launch afloat before travel. Own ships avoid rental charges in their owner's private yard, while maintenance, wages, materials and labor remain due. Staff contracts named captain/sailor/crew/navigator provide paid crew. A linked NPC must actually be aboard. An unattended voyage needs a paid captain with delegated manager authority and a sufficient budget.",
+          "Ship work becomes an ordinary draft property project. Review allocations, checks, materials and contractors in Construction, upgrades & downtime work or Review Inbox. Personal labor shares existing limits; remote paid labor needs a manager. Completion repairs the specified HP or installs the upgrade once, preserving existing damage. Leaving or teleporting out pauses former-yard work. Sailing crew cannot also perform project labor.",
+          "Approve a proposed voyage in its ship screen or Review Inbox, then preview and approve between-session Downtime. Travel rechecks crew, components, pace, access, capacity, funds and spending caps. Partial time retains progress; arrival splits sailing and docked costs and moves aboard characters. Session-hour advances settle maintenance but do not progress voyages. Unpaid expenses remain arrears; pay them in Ship expenses. Trade uses real port exchanges and reviewed manager orders, with no automatic profit.",
+          "DM Override · Teleport Ship moves the ship, cargo and everyone aboard instantly to an existing location, optionally a compatible berth. It consumes no downtime or travel expense and bypasses crew and damage restrictions. Active voyages close as DM overridden and former-yard work pauses for review. A pending downtime preview must first be decided or cancelled. Tile travel is future work; present voyages retain stable IDs and versioned route notes. These controls reach Android only through a separately signed update.",
+        ],
+        links: [
+          ["Property Management", "/features/properties"],
+          ["Review Inbox", "/features/review"],
+          ["Downtime", "/features/downtime"],
+        ],
+      },
+      {
         id: "property-operations",
         title: "Store, build and manage properties",
         paragraphs: [
@@ -191,7 +271,11 @@ export const HELP_GROUPS: HelpGroup[] = [
           "Players propose work and hires for DM review. Approved projects reserve materials, share character downtime or pay contractors and attach completed buildings to the original parcel. Managers need delegated duties, paid contracts and spending limits. Rental income, upkeep and wages use existing finance schedules; vacancy, missing staff and arrears can block new operation benefits.",
           "Send a property letter while at an open city post office. Postage is paid once; campaign-day delivery rechecks the manager, ownership, reviewed instruction and budget. Letters do not allow remote item withdrawal. Review property effects in the existing downtime preview and explicitly approve at the next session. Active obligations must be resolved before ordinary sale/Give, or the DM records a handover retaining contents and history.",
         ],
-        links: [["Property Management", "/features/properties"], ["Property proposals", "/features/review"], ["Approved downtime", "/features/downtime"]],
+        links: [
+          ["Property Management", "/features/properties"],
+          ["Property proposals", "/features/review"],
+          ["Approved downtime", "/features/downtime"],
+        ],
       },
       {
         id: "analytics",
