@@ -12661,5 +12661,20 @@
     "finishedAt": "2026-10-11T19:16:39Z",
     "durationMs": 1000,
     "trendId": "38166992912:1:8ed9984183afea90c7f14b002df075bf93e7197a3372ec6ab16fe67b93158ba4"
+  },
+  "[\"local\",\"test\",\"navigation destinations and saved shortcut rules\",\"node22.23.3/linux-x64/work-mode/warm-dependencies/8-tests\",\"v1-control-audit\"]": {
+    "schema": 1,
+    "id": "local:c62670c4-fa4d-4a1e-85b5-27d46c0604cb",
+    "scope": "[\"local\",\"test\",\"navigation destinations and saved shortcut rules\",\"node22.23.3/linux-x64/work-mode/warm-dependencies/8-tests\",\"v1-control-audit\"]",
+    "kind": "test",
+    "name": "navigation destinations and saved shortcut rules",
+    "environment": "node22.23.3/linux-x64/work-mode/warm-dependencies/8-tests",
+    "commit": "842322fd15262bd652614fa4daed4774d09ed4b4",
+    "url": "https://github.com/UnregisteredMusket/Lootsplit/commit/842322fd15262bd652614fa4daed4774d09ed4b4",
+    "outcome": "success",
+    "startedAt": "2026-10-11T18:39:39.228Z",
+    "finishedAt": "2026-10-11T18:39:40.274Z",
+    "durationMs": 1046,
+    "trendId": "local:c62670c4-fa4d-4a1e-85b5-27d46c0604cb"
   }
 }
