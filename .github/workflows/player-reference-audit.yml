@@ -37,6 +37,7 @@ jobs:
       - run: npm ci
       - run: npx playwright install --with-deps chromium
       - name: Start disposable development server
+        id: development
         if: matrix.runtime == 'development'
         run: |
           mkdir -p test-results
@@ -47,6 +48,7 @@ jobs:
           done
           exit 1
       - name: Build and start disposable immutable Worker
+        id: worker
         if: matrix.runtime == 'worker'
         run: |
           mkdir -p test-results
@@ -65,6 +67,7 @@ jobs:
           AUDIT_ORIGIN: ${{ matrix.runtime == 'worker' && 'http://127.0.0.1:8082' || 'http://127.0.0.1:8080' }}
         run: node scripts/recovery-step.mjs focused-player-references 180 node scripts/player-reference-browser-audit.mjs
       - name: Verify complete account fixtures
+        if: always() && (steps.development.outcome == 'success' || steps.worker.outcome == 'success')
         env:
           ACCOUNT_AUDIT_ORIGIN: ${{ matrix.runtime == 'worker' && 'http://127.0.0.1:8082' || 'http://127.0.0.1:8080' }}
         run: node scripts/recovery-step.mjs focused-account-fixtures 180 node scripts/account-browser-audit.mjs

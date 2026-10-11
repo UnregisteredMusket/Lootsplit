@@ -217,7 +217,9 @@ try {
         .locator(".library-tiles a")
         .filter({ has: page.locator("strong", { hasText: new RegExp(`^${tile}$`) }) })
         .click();
-      await expect(page.getByLabel("Reference section", { exact: true })).toHaveValue(kind);
+      await expect(
+        page.getByRole("combobox", { name: "Reference section", exact: true }),
+      ).toHaveValue(kind);
       await page.getByLabel("Search by name", { exact: true }).fill("Reference audit");
       await page.getByRole("button", { name: "Search Open5e", exact: true }).click();
       await page.getByText(`Reference audit ${kind}`, { exact: true }).click();
@@ -267,7 +269,9 @@ try {
     await expect(page.getByRole("button", { name: "Search Open5e", exact: true })).toBeEnabled();
     await dmPage.getByLabel("Allow creatures lookup", { exact: true }).uncheck();
     await expect(page.getByLabel("Search by name", { exact: true })).toBeDisabled();
-    await page.getByLabel("Reference section", { exact: true }).selectOption("spells");
+    await page
+      .getByRole("combobox", { name: "Reference section", exact: true })
+      .selectOption("spells");
     await expect(page.getByLabel("Search by name", { exact: true })).toBeEnabled();
     await dmPage.getByLabel("Allow creatures lookup", { exact: true }).check();
     await dmPage.getByLabel("Allow lookup during active encounters", { exact: true }).uncheck();
@@ -309,7 +313,7 @@ try {
     );
     await page.screenshot({ path: `${output}/player-help-${width}.png`, fullPage: true });
     await page.keyboard.press("Escape");
-    await page.locator(".settings-trigger").click();
+    await page.locator(".settings-trigger:visible").first().click();
     const settings = page.getByRole("dialog", { name: "Settings & Management", exact: true });
     await settings.getByRole("button", { name: "Help", exact: true }).click();
     await settings.getByRole("link", { name: "Guides & help", exact: false }).click();
