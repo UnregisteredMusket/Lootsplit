@@ -20,12 +20,14 @@ import type { LedgerLine } from "./types.ts";
 const id = z.string().min(1).max(150),
   at = z.number().int().nonnegative();
 /** Optional receipt identity; it carries no recipient, financial or enemy data. */
-export const encounterLootProvenanceSchema = z.object({
-  kind: z.literal("encounter-loot"),
-  encounterId: id,
-  receiptId: z.string().min(1).max(120),
-  sessionId: id.optional(),
-}).strict();
+export const encounterLootProvenanceSchema = z
+  .object({
+    kind: z.literal("encounter-loot"),
+    encounterId: id,
+    receiptId: z.string().min(1).max(120),
+    sessionId: id.optional(),
+  })
+  .strict();
 export type EncounterLootProvenance = z.infer<typeof encounterLootProvenanceSchema>;
 export const encounterLootEntryId = (receiptId: string) => `encounter-loot:${receiptId}`;
 const journalFields = z.object({
@@ -124,14 +126,22 @@ const journalFields = z.object({
 });
 export const journalSchema = journalFields.superRefine((journal, ctx) => {
   for (const [index, report] of (journal.reports || []).entries()) {
-    try { readCompleteArchive(report); }
-    catch { ctx.addIssue({ code: "custom", path: ["reports", index, "snapshot"],
-      message: "An archived report has an invalid campaign snapshot or unreadable diagnostic placeholder. The current campaign was not changed." }); }
+    try {
+      readCompleteArchive(report);
+    } catch {
+      ctx.addIssue({
+        code: "custom",
+        path: ["reports", index, "snapshot"],
+        message:
+          "An archived report has an invalid campaign snapshot or unreadable diagnostic placeholder. The current campaign was not changed.",
+      });
+    }
   }
 });
 
 function readCompleteArchive(report: { snapshot: string; error?: string }): CloudTable {
-  if (report.error !== undefined) throw Error("An unreadable diagnostic placeholder is not a complete archived report.");
+  if (report.error !== undefined)
+    throw Error("An unreadable diagnostic placeholder is not a complete archived report.");
   return readArchivedSnapshot(report.snapshot);
 }
 
@@ -155,18 +165,37 @@ export function readArchivedSnapshot(snapshot: string): CloudTable {
     validateWorld({ ...t, journal }, true);
     for (const key of ["notes", "sheets", "loans", "listings", "handouts"] as const)
       if (t[key] !== undefined && !Array.isArray(t[key])) throw Error("Invalid archived records.");
-    if (!z.array(z.object({ id: z.string(), at: z.number().finite(), from: z.enum(["dm", "player"]),
-      to: z.enum(["dm", "party", "player"]), purseId: z.string(), text: z.string(),
-      recipientId: z.string().optional() })).safeParse(t.notes ?? []).success)
+    if (
+      !z
+        .array(
+          z.object({
+            id: z.string(),
+            at: z.number().finite(),
+            from: z.enum(["dm", "player"]),
+            to: z.enum(["dm", "party", "player"]),
+            purseId: z.string(),
+            text: z.string(),
+            recipientId: z.string().optional(),
+          }),
+        )
+        .safeParse(t.notes ?? []).success
+    )
       throw Error("Invalid archived messages.");
     for (const report of journal.reports || []) {
-      if (report.error !== undefined) throw Error("An unreadable diagnostic placeholder is not a complete archived report.");
+      if (report.error !== undefined)
+        throw Error("An unreadable diagnostic placeholder is not a complete archived report.");
       pending.push({ table: JSON.parse(report.snapshot), depth: depth + 1 });
     }
   }
   const table = root as CloudTable;
-  return { ...table, notes: table.notes ?? [], sheets: table.sheets ?? [], loans: table.loans ?? [],
-    listings: table.listings ?? [], handouts: table.handouts ?? [] };
+  return {
+    ...table,
+    notes: table.notes ?? [],
+    sheets: table.sheets ?? [],
+    loans: table.loans ?? [],
+    listings: table.listings ?? [],
+    handouts: table.handouts ?? [],
+  };
 }
 
 /** Existing unreadable archives remain discoverable without breaking other authorized records. */
@@ -203,7 +232,9 @@ export function selectSessionLedgerRows(
 }
 // An account movement is not campaign income. Legacy transfers use their recorded summaries.
 export function isExternalLedgerLine(row: LedgerLine): boolean {
-  return row.transactionType ? row.transactionType !== "transfer" : !/^(Transfer (sent|received)$|Gave )/.test(row.summary);
+  return row.transactionType
+    ? row.transactionType !== "transfer"
+    : !/^(Transfer (sent|received)$|Gave )/.test(row.summary);
 }
 export function sessionSummary(
   ledger: LedgerLine[],
@@ -224,7 +255,7 @@ export function preserveJournalMetadata(value: unknown, current: Journal): Journ
   const next = readJournal(value);
   delete next.resourceLibrary;
   delete next.referenceAccess;
-  const reports = new Map((current.reports || []).map(report => [report.id, report]));
+  const reports = new Map((current.reports || []).map((report) => [report.id, report]));
   for (const report of next.reports || []) {
     // An archive is immutable. Hydrated error placeholders and stale client copies must
     // never replace the authoritative source bytes of an existing record.
@@ -234,8 +265,8 @@ export function preserveJournalMetadata(value: unknown, current: Journal): Journ
     }
   }
   const changes = new Map(current.events.map((event) => [event.id, event.change]));
-  const privateEvents = new Set(current.events.filter(e => e.dmOnly).map(e => e.id));
-  const entries = new Map((current.entries || []).map(entry => [entry.id, entry]));
+  const privateEvents = new Set(current.events.filter((e) => e.dmOnly).map((e) => e.id));
+  const entries = new Map((current.entries || []).map((entry) => [entry.id, entry]));
   for (const entry of next.entries || []) {
     const provenance = entries.get(entry.id)?.provenance ?? entry.provenance;
     // Older clients do not know this optional field. Keep a confirmed record's
@@ -249,11 +280,39 @@ export function preserveJournalMetadata(value: unknown, current: Journal): Journ
     ...((next.downtimePrompt ?? current.downtimePrompt)
       ? { downtimePrompt: next.downtimePrompt ?? current.downtimePrompt }
       : {}),
-    ...(next.finance && next.finance.minuteOfDay===undefined && current.finance?.minuteOfDay!==undefined ? {finance:{...next.finance,minuteOfDay:current.finance.minuteOfDay}} : {}),
+    ...(next.finance &&
+    next.finance.minuteOfDay === undefined &&
+    current.finance?.minuteOfDay !== undefined
+      ? { finance: { ...next.finance, minuteOfDay: current.finance.minuteOfDay } }
+      : {}),
     ...(next.finance ? {} : current.finance ? { finance: current.finance } : {}),
-    ...(next.world ? {} : current.world ? { world: current.world } : {}),
+    ...(next.world
+      ? {
+          world: {
+            ...next.world,
+            ...(current.world?.partyPosition ? { partyPosition: current.world.partyPosition } : {}),
+            maps: next.world.maps.map((map) => {
+              const old = current.world?.maps.find((m) => m.id === map.id);
+              return {
+                ...map,
+                ...(old?.type ? { type: old.type } : {}),
+                ...(old?.propertyId ? { propertyId: old.propertyId } : {}),
+                ...(old?.grid ? { grid: old.grid } : {}),
+                ...(old?.tokens ? { tokens: old.tokens } : {}),
+                ...(old?.encounterId ? { encounterId: old.encounterId } : {}),
+              };
+            }),
+          },
+        }
+      : current.world
+        ? { world: current.world }
+        : {}),
     ...(next.market ? {} : current.market ? { market: current.market } : {}),
-    ...(next.propertyOperations ? {} : current.propertyOperations ? { propertyOperations: current.propertyOperations } : {}),
+    ...(next.propertyOperations
+      ? {}
+      : current.propertyOperations
+        ? { propertyOperations: current.propertyOperations }
+        : {}),
     ...(current.tradeEconomy ? { tradeEconomy: current.tradeEconomy } : {}),
     ...(current.resourceLibrary ? { resourceLibrary: current.resourceLibrary } : {}),
     ...(current.reports || next.reports
@@ -277,7 +336,11 @@ export function preserveJournalMetadata(value: unknown, current: Journal): Journ
       : {}),
     events: next.events.map((event) => {
       const change = event.change ?? changes.get(event.id);
-      return { ...event, ...(change ? { change } : {}), ...(privateEvents.has(event.id) ? { dmOnly: true } : {}) };
+      return {
+        ...event,
+        ...(change ? { change } : {}),
+        ...(privateEvents.has(event.id) ? { dmOnly: true } : {}),
+      };
     }),
   });
 }

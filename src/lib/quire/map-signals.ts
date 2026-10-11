@@ -35,6 +35,8 @@ export const mapRecordKinds = [
   "Property",
   "Post office",
   "Party",
+  "Combatant",
+  "Ship",
 ] as const;
 /** Group by exact image position and type; each visible type keeps its own icon/count. */
 export function groupMapRecords(records: MapRecord[], visible: readonly string[]) {

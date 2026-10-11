@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { mapGridSchema } from "./world-schema.ts";
 
 const id = z.string().min(1).max(150),
   name = z.string().trim().min(1).max(160);
@@ -139,6 +140,28 @@ export const voyageSchema = z
     requestedBy: id,
     routeVersion: z.literal(1),
     routeNotes: z.string().max(2000),
+    mapRoute: z
+      .object({
+        mapId: id,
+        grid: mapGridSchema,
+        points: z
+          .array(
+            z
+              .object({
+                column: z.number().int().min(0).max(199),
+                row: z.number().int().min(0).max(199),
+              })
+              .strict(),
+          )
+          .min(2)
+          .max(100),
+      })
+      .strict()
+      .superRefine((r, ctx) => {
+        if (r.points.some((p) => p.column >= r.grid.columns || p.row >= r.grid.rows))
+          ctx.addIssue({ code: "custom", message: "Ship route must fit inside its grid." });
+      })
+      .optional(),
   })
   .strict();
 export const boardingRequestSchema = z

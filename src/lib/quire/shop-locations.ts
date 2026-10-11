@@ -68,12 +68,16 @@ export function locationLabel(market: MarketLocations, locationId: string | null
 }
 /** A city district shares its city's market; towns, wilderness and unknown places do not. */
 export function globalMarketCity(market: MarketLocations): MarketLocation | undefined {
-  return locationPath(market, market.currentLocationId).find((location) => location.kind === "city");
+  return locationPath(market, market.currentLocationId).find(
+    (location) => location.kind === "city",
+  );
 }
 export function shopAvailableHere(
   shop: Pick<Shop, "locationId">,
   market: MarketLocations,
+  travelling = false,
 ): boolean {
+  if (travelling && shop.locationId) return false;
   if (!market.currentLocationId || !shop.locationId) return true;
   return locationPath(market, market.currentLocationId).some(
     (location) => location.id === shop.locationId,
@@ -89,12 +93,21 @@ export function validateShopLocations(
     throw Error("A shop refers to a missing location. The current campaign was not changed.");
 }
 /** Public places follow the party's path; unrelated places stay with the DM. */
-export function publicMarketLocations(market: MarketLocations, ownedLocationIds: string[] = []): MarketLocations {
-  const visible = new Set([market.currentLocationId, ...ownedLocationIds].flatMap(id => locationPath(market, id).map(location => location.id)));
+export function publicMarketLocations(
+  market: MarketLocations,
+  ownedLocationIds: string[] = [],
+  travelling = false,
+): MarketLocations {
+  const visible = new Set(
+    [market.currentLocationId, ...ownedLocationIds].flatMap((id) =>
+      locationPath(market, id).map((location) => location.id),
+    ),
+  );
   return {
     currentLocationId: market.currentLocationId,
-    locations: market.currentLocationId
-      ? market.locations.filter(location => visible.has(location.id))
-      : market.locations,
+    locations:
+      market.currentLocationId || travelling
+        ? market.locations.filter((location) => visible.has(location.id))
+        : market.locations,
   };
 }

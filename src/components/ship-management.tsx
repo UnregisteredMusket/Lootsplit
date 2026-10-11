@@ -1,3 +1,6 @@
+import { VoyageMapRoute } from "./voyage-map-route";
+import { routeDistance } from "@/lib/quire/map-tiles";
+import { AppLink } from "./app-link";
 import { useState } from "react";
 import { useSeat } from "@/lib/quire/seat";
 import {
@@ -628,6 +631,14 @@ function Voyages({ holding: h, vessel: s }: { holding: Holding; vessel: Vessel }
             {formatCopper(v.spentCopper)}/{formatCopper(v.budgetCopper)} travel budget · {v.message}
           </p>
           <p>{v.routeNotes}</p>
+          {v.mapRoute && (
+            <AppLink
+              className="settings-link"
+              href={`/maps?map=${encodeURIComponent(v.mapRoute.mapId)}`}
+            >
+              View voyage route →
+            </AppLink>
+          )}
           {seat.role === "dm" && ["proposed", "blocked"].includes(v.status) && (
             <ActionForm
               title="Approve / resume voyage"
@@ -657,7 +668,7 @@ function Voyages({ holding: h, vessel: s }: { holding: Holding; vessel: Vessel }
     </>
   );
 }
-function VoyageForm({ holding: h }: { holding: Holding; vessel: Vessel }) {
+function VoyageForm({ holding: h, vessel: s }: { holding: Holding; vessel: Vessel }) {
   const t = useEstateTable(),
     seat = useSeat(),
     dm = seat.role === "dm",
@@ -671,7 +682,8 @@ function VoyageForm({ holding: h }: { holding: Holding; vessel: Vessel }) {
     [payerId, setPayer] = useState(mine.find((p) => p.id === h.purseId)?.id ?? mine[0]?.id ?? ""),
     [captainId, setCaptain] = useState(""),
     [crew, setCrew] = useState<string[]>([]),
-    [notes, setNotes] = useState("");
+    [notes, setNotes] = useState(""),
+    [mapRoute, setMapRoute] = useState<ShipVoyage["mapRoute"]>();
   const chars = mine.filter(
     (p) => p.kind === "character" && characterPosition(t, p).shipId === h.id,
   );
@@ -688,7 +700,16 @@ function VoyageForm({ holding: h }: { holding: Holding; vessel: Vessel }) {
           originId: h.locationId!,
           destinationId,
           destinationFacilityId: facilityId || null,
-          durationMinutes: Math.round(days * 1440),
+          durationMinutes: mapRoute
+            ? Math.max(
+                1,
+                Math.ceil(
+                  (routeDistance(mapRoute.grid, mapRoute.points) / (s.stats.milesPerDay * 5280)) *
+                    1440,
+                ),
+              )
+            : Math.round(days * 1440),
+          ...(mapRoute ? { mapRoute } : {}),
           elapsedMinutes: 0,
           budgetCopper: budget,
           spentCopper: 0,
@@ -710,6 +731,7 @@ function VoyageForm({ holding: h }: { holding: Holding; vessel: Vessel }) {
           value={destinationId}
           onValueChange={(v) => {
             setDest(v);
+            setMapRoute(undefined);
             setFacility("");
           }}
           required
@@ -730,14 +752,39 @@ function VoyageForm({ holding: h }: { holding: Holding; vessel: Vessel }) {
             ))}
         </SearchSelect>
       </Field>
-      <NumberField
-        label="Voyage downtime days"
-        value={days}
-        min={1 / 24}
-        max={3650}
-        step={1 / 24}
-        set={setDays}
+      <VoyageMapRoute
+        maps={t.journal?.world?.maps ?? []}
+        originId={h.locationId}
+        destinationId={destinationId}
+        route={mapRoute}
+        set={setMapRoute}
       />
+      {mapRoute ? (
+        <p>
+          Mapped duration:{" "}
+          {s.stats.milesPerDay > 0
+            ? Math.max(
+                1,
+                Math.ceil(
+                  (routeDistance(mapRoute.grid, mapRoute.points) / (s.stats.milesPerDay * 5280)) *
+                    1440,
+                ),
+              )
+            : 0}{" "}
+          minutes at {s.stats.milesPerDay} miles/day. The DM reviews the route before departure.
+        </p>
+      ) : (
+        <>
+          <NumberField
+            label="Voyage downtime days"
+            value={days}
+            min={1 / 24}
+            max={3650}
+            step={1 / 24}
+            set={setDays}
+          />
+        </>
+      )}
       <NumberField label="Maximum travel budget (cp)" value={budget} set={setBudget} />
       <Field label="Voyage payer">
         <SearchSelect aria-label="Voyage payer" value={payerId} onValueChange={setPayer}>
@@ -777,8 +824,8 @@ function VoyageForm({ holding: h }: { holding: Holding; vessel: Vessel }) {
       </Field>
       <p>
         The DM reviews duration and outcomes. Use existing port exchanges or reviewed captain
-        manager orders for actual trading; arrival does not create profit. Tile movement will be
-        added later.
+        manager orders for actual trading; arrival does not create profit. Combat map tiles use
+        separate tactical placement and do not advance this voyage.
       </p>
     </ActionForm>
   );

@@ -71,7 +71,7 @@ export const commandSchema = z.discriminatedUnion("kind", [
     before: z.object({ locationId: id.nullable(), image: artworkSchema.nullable() }),
     locationId: id.nullable(), image: artworkSchema.nullable() }),
   z.object({ ...base, kind: z.literal("market-location"), locationId: id, before: marketLocationSchema.nullable(), after: marketLocationSchema.nullable() }),
-  z.object({ ...base, kind: z.literal("party-location"), before: id.nullable(), locationId: id.nullable() }),
+  z.object({ ...base, kind: z.literal("party-location"), before: id.nullable(), locationId: id.nullable(), beforePosition: z.string().optional() }),
   z.object({ ...base, kind: z.literal("bank-repay"), loanId: id, copper: amount.min(1) }),
   z.object({ ...base, kind: z.literal("property-details"), holdingId: id, before: z.object({name:z.string(),notes:z.string()}), name: z.string().trim().min(1).max(160), notes: z.string().max(4000) }),
   z.object({ ...base, kind: z.literal("shop-schedule"), shopId: id, schedule: shopScheduleSchema.nullable() }),
@@ -449,6 +449,9 @@ export function applyCommand(input: CloudTable, seat: CloudSeat, raw: Command, e
     dm();
     const market = readMarketLocations(journal.market);
     if (market.currentLocationId !== cmd.before) throw Error("The party moved elsewhere. Refresh before changing location.");
+    if (journal.world?.partyPosition && canonicalJson(journal.world.partyPosition) !== cmd.beforePosition) throw Error("The party travel position changed. Refresh before choosing a location.");
+    if (journal.finance?.downtime.some(d=>d.status==="pending")) throw Error("Approve or cancel pending downtime before moving the party.");
+    if (journal.world) delete journal.world.partyPosition;
     journal.market = readMarketLocations({ ...market, currentLocationId: cmd.locationId });
     event(
       cmd.locationId
@@ -860,7 +863,7 @@ export function applyCommand(input: CloudTable, seat: CloudSeat, raw: Command, e
     if (!l) throw new Error("Listing no longer exists.");
     if (cmd.before && !same(l, cmd.before)) throw Error("This listing changed. Review its current price and details before buying.");
     if (l.kind === "property" && l.status && l.status !== "available") throw Error("This property is not currently for sale.");
-    if (seat.role === "player" && !propertyAvailableHere(l, readMarketLocations(journal.market)))
+    if (seat.role === "player" && !propertyAvailableHere(l, readMarketLocations(journal.market), !!journal.world?.partyPosition))
       throw Error("This property is not available at the party's current location.");
     if (l.quantity !== null && l.quantity < cmd.quantity)
       throw new Error("Not enough listing stock.");

@@ -42,12 +42,25 @@ export const listingSchema = z
     quantity: z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER).nullable(),
     notes: z.string(),
     ...propertyFields,
-    estateTemplateKey: z.string().regex(/^[a-z0-9][a-z0-9._-]{0,79}$/).optional(),
-    estateAttachments: z.array(z.string().regex(/^[a-z0-9][a-z0-9._-]{0,79}$/)).max(100).optional(),
+    estateTemplateKey: z
+      .string()
+      .regex(/^[a-z0-9][a-z0-9._-]{0,79}$/)
+      .optional(),
+    estateAttachments: z
+      .array(z.string().regex(/^[a-z0-9][a-z0-9._-]{0,79}$/))
+      .max(100)
+      .optional(),
     status: z.enum(["available", "reserved", "withdrawn"]).optional(),
   })
   .superRefine((listing, ctx) => {
-    if (listing.kind !== "property" && (listing.locationId || listing.property || listing.status || listing.estateTemplateKey || listing.estateAttachments))
+    if (
+      listing.kind !== "property" &&
+      (listing.locationId ||
+        listing.property ||
+        listing.status ||
+        listing.estateTemplateKey ||
+        listing.estateAttachments)
+    )
       ctx.addIssue({ code: "custom", message: "Property details belong to a property listing." });
   });
 export type PropertyRecord = {
@@ -60,7 +73,9 @@ export type PropertyRecord = {
 export function propertyAvailableHere(
   property: Pick<PropertyRecord, "locationId">,
   market: MarketLocations,
+  travelling = false,
 ) {
+  if (travelling && property.locationId) return false;
   return (
     !market.currentLocationId ||
     !property.locationId ||

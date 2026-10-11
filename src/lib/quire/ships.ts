@@ -8,6 +8,7 @@ import { readEstate, type EstateJob } from "./estate-schema.ts";
 import { applyEstateCommand, canAccessEstate, storageWeight } from "./estate.ts";
 import { readFinance, financeMove } from "./finance.ts";
 import { toCopper } from "./money.ts";
+import { routeDistance, tileAt } from "./map-tiles.ts";
 import {
   readFleet,
   type Fleet,
@@ -272,6 +273,12 @@ export function validateFleet(t: Table, projected = false) {
   for (const v of f.voyages)
     if (!closed(v)) {
       if (
+        !projected &&
+        v.mapRoute &&
+        !t.journal?.world?.maps.some((m) => m.id === v.mapRoute!.mapId)
+      )
+        throw Error("An ongoing voyage's map is missing.");
+      if (
         !f.vessels.some((s) => s.propertyId === v.propertyId) ||
         !locations.has(v.originId) ||
         !locations.has(v.destinationId) ||
@@ -472,6 +479,39 @@ export function applyShipCommand(t: CloudTable, seat: CloudSeat, cmd: ShipComman
       old = f.voyages.find((x) => x.id === v.id) ?? null;
     if (!same(old, cmd.before)) throw Error("The voyage changed. Reload before reviewing.");
     if (old && closed(old)) throw Error("This voyage is already closed.");
+    if (
+      old &&
+      ["active", "blocked"].includes(old.status) &&
+      (!same(v.mapRoute, old.mapRoute) ||
+        v.durationMinutes !== old.durationMinutes ||
+        v.originId !== old.originId ||
+        v.destinationId !== old.destinationId)
+    )
+      throw Error(
+        "An underway route and its duration cannot change. Use DM teleport for an override.",
+      );
+    if (v.mapRoute && (!old || old.status === "proposed")) {
+      const map = t.journal?.world?.maps.find((m) => m.id === v.mapRoute!.mapId);
+      if (!map?.grid || !same(map.grid, v.mapRoute.grid) || (seat.role !== "dm" && !map.visible))
+        throw Error("The route map/grid changed or is not shared. Review a fresh route.");
+      const origin = map.anchors.find((a) => a.locationId === v.originId),
+        destination = map.anchors.find((a) => a.locationId === v.destinationId);
+      if (
+        !origin ||
+        !destination ||
+        !same(tileAt(map.grid, origin), v.mapRoute.points[0]) ||
+        !same(tileAt(map.grid, destination), v.mapRoute.points.at(-1))
+      )
+        throw Error("Route endpoints must use reviewed origin and destination anchors.");
+      const distance = routeDistance(map.grid, v.mapRoute.points);
+      if (!distance || !s.stats.milesPerDay)
+        throw Error("A mapped voyage needs a nonzero route and ship travel speed.");
+      const duration = Math.max(1, Math.ceil((distance / (s.stats.milesPerDay * 5280)) * 1440));
+      if (v.durationMinutes !== duration)
+        throw Error(
+          "Mapped voyage duration must match its reviewed grid distance and ship travel speed.",
+        );
+    }
     if (
       old &&
       (v.propertyId !== old.propertyId ||

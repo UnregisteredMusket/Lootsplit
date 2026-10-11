@@ -90,7 +90,7 @@ export function PropertyMarketplace() {
     (listing) =>
       listing.kind === "property" &&
       (dm ||
-        (propertyAvailableHere(listing, market) &&
+        (propertyAvailableHere(listing, market, !!journal.world?.partyPosition) &&
           listing.quantity !== 0 &&
           listing.status !== "withdrawn")),
   );
@@ -115,7 +115,8 @@ export function PropertyMarketplace() {
         return false;
       if (status === "sold" && listing.quantity !== 0) return false;
       if (status === "withdrawn" && listing.status !== "withdrawn") return false;
-      if (here && !propertyAvailableHere(listing, market)) return false;
+      if (here && !propertyAvailableHere(listing, market, !!journal.world?.partyPosition))
+        return false;
       if (
         location === "campaignwide"
           ? !!listing.locationId
@@ -780,7 +781,8 @@ function PropertyListingEditor({
     JSON.stringify({ name, notes, price, quantity, status, locationId, estateTemplateKey, draft }),
   );
   const dirty =
-    initial !== JSON.stringify({ name, notes, price, quantity, status, locationId, estateTemplateKey, draft });
+    initial !==
+    JSON.stringify({ name, notes, price, quantity, status, locationId, estateTemplateKey, draft });
   useDraftGuard(dirty, "property listing");
   useEffect(() => {
     onState({ dirty, busy: busy || imageBusy });
@@ -894,7 +896,19 @@ function PropertyListingEditor({
           onChange={(event) => setNotes(event.target.value)}
         />
       </Field>
-      <Field label="Property operations template"><SearchSelect value={estateTemplateKey} onValueChange={(selectedValue) => setEstateTemplateKey(selectedValue)}><option value="">No operations template</option>{journal.propertyOperations?.templates.map(t => <option key={t.key} value={t.key}>{t.name}</option>)}</SearchSelect></Field>
+      <Field label="Property operations template">
+        <SearchSelect
+          value={estateTemplateKey}
+          onValueChange={(selectedValue) => setEstateTemplateKey(selectedValue)}
+        >
+          <option value="">No operations template</option>
+          {journal.propertyOperations?.templates.map((t) => (
+            <option key={t.key} value={t.key}>
+              {t.name}
+            </option>
+          ))}
+        </SearchSelect>
+      </Field>
       <PropertyProfileFields
         draft={draft}
         onChange={setDraft}
