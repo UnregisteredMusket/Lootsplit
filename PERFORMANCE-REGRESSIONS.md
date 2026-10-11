@@ -213,6 +213,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Development / gameplay / dev-library-navigation | open | 4 | 18s → 49s | +31s | +172.22% |
 | Packaged Worker / accounts / Start disposable built Worker | open | 2 | 7s → 11s | +4s | +57.14% |
 | Development / desktop / Run actions/upload-artifact@v4 | open | 2 | 4s → 6s | +2s | +50% |
+| Packaged Worker / interface / Start disposable built Worker | open | 2 | 7s → 11s | +4s | +57.14% |
 | Packaged Worker / interface / worker-market-locations | open | 3 | 23s → 63s | +40s | +173.91% |
 | Development / gameplay / dev-market-locations | open | 2 | 38s → 68s | +30s | +78.95% |
 | market locations browser audit | open | 3 | 36.179s → 110.925s | +74.746s | +206.6% |
@@ -231,11 +232,14 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Development / gameplay / dev-trade-economy | open | 2 | 33s → 74s | +41s | +124.24% |
 | Packaged Worker / interface / worker-trade-economy | open | 4 | 22s → 68s | +46s | +209.09% |
 | Development / gameplay / dev-trade-economy | open | 2 | 32s → 83s | +51s | +159.38% |
+| Packaged Worker / interface / worker-trade-economy | open | 2 | 39s → 68s | +29s | +74.36% |
 
 ## Recorded slowdowns
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-11T08:37:26Z | step: Packaged Worker / interface / worker-trade-economy | 57s → 68s | +11s | +19.3% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38053268126/job/114216749462) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38125086913/job/114427941214) |
+| 2026-10-11T08:33:44Z | step: Packaged Worker / interface / Start disposable built Worker | 9s → 11s | +2s | +22.22% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37784166101/job/113335892592) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38125086913/job/114427941214) |
 | 2026-10-11T08:26:17Z | step: Packaged Worker / interface / worker-market-locations | 45s → 63s | +18s | +40% | failure | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37810301899/job/113425923981) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38124502509/job/114426303644) |
 | 2026-10-10T18:44:53Z | step: Packaged Worker / interface / worker-trade-economy | 55s → 68s | +13s | +23.64% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38053941691/job/114218842201) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38076562217/job/114285071255) |
 | 2026-10-10T16:59:33Z | step: Packaged standby / Run actions/upload-artifact@v4 | 3s → 4s | +1s | +33.33% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37965977121/job/113941067745) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38069064641/job/114264420838) |
