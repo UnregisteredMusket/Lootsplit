@@ -95,7 +95,14 @@ export async function navigateAccountScenario(page, origin, path) {
   );
   let remaining = await successes.count();
   while (remaining > 0) {
-    await successes.first().getByRole("button", { name: "Close toast", exact: true }).click();
+    try {
+      await successes.first().getByRole("button", { name: "Close toast", exact: true }).click({ timeout: 1000 });
+    } catch (error) {
+      // A notice can expire between count and click. Accept only its observed
+      // removal; a still-present notice or a different click error remains fatal.
+      if (!(error instanceof Error) || error.name !== "TimeoutError" || await successes.count() >= remaining)
+        throw error;
+    }
     await expect.poll(() => successes.count()).toBeLessThan(remaining);
     remaining = await successes.count();
   }

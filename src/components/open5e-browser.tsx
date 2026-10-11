@@ -92,7 +92,7 @@ export function Open5eBrowser({ onSelect }: { onSelect?: (item: CatalogItem) => 
       if (id !== request.current) return;
       const denied =
         e instanceof Error &&
-        /disabled by your DM|paused while an encounter|not seated|room is closed|campaign is closed/i.test(
+        /disabled by your DM|paused while an encounter|not seated|room is closed|campaign is closed|No table uses|restricted account|Account access|Account suspended|permanently banned|Sign in to the account/i.test(
           e.message,
         );
       const saved = denied ? undefined : cache().find((c) => c.key === key);

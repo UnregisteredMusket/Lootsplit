@@ -94,19 +94,6 @@ try {
       .run();
     await host.addInitScript((code) => {
       localStorage.setItem("quire.guide.offer.v3", "seen");
-      localStorage.setItem(
-        "quire.cloud.v2.main",
-        JSON.stringify({
-          code,
-          token: "dm-token",
-          seatId: "dm",
-          role: "dm",
-          purseIds: [],
-          revision: 0,
-          pending: [],
-          batchId: crypto.randomUUID(),
-        }),
-      );
     }, code);
     const player = await browser.newContext({ viewport: { width, height: 900 } });
     contexts.push(player);
@@ -168,6 +155,7 @@ try {
       p.on("pageerror", (e) => errors.push(e.message));
     }
     await openApplication(dmPage, origin + "/library");
+    await dmPage.getByRole("button", { name: "Resume", exact: true }).click();
     await expect(dmPage.getByLabel("Allow player reference lookup", { exact: true })).toBeChecked();
     await openApplication(page, origin + "/library");
     await expect(
