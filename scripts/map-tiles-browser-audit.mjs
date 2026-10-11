@@ -182,7 +182,7 @@ try {
     await page.getByRole("button", { name: "Edit map & anchors", exact: true }).click();
     const editor = page.getByRole("dialog", { name: "Map editor", exact: true });
     await chooseOption(editor.getByLabel("Map category", { exact: true }), "property");
-    await editor.locator("summary").filter({ hasText: "Combat grid settings" }).click();
+    await editor.getByRole("button", { name: "Combat grid settings", exact: true }).click();
     await editor.getByRole("checkbox", { name: "Enable tile grid", exact: true }).check();
     await editor.getByLabel("Grid columns", { exact: true }).fill("10");
     await editor.getByLabel("Grid rows", { exact: true }).fill("10");
@@ -229,7 +229,7 @@ try {
         async () => (await journal(page)).world.maps.find((m) => m.id === "keep").tokens[0].column,
       )
       .toBe(4);
-    await controls.locator("summary").filter({ hasText: "Use encounter roster" }).click();
+    await controls.getByRole("button", { name: "Use encounter roster", exact: true }).click();
     await controls.getByRole("button", { name: "Load campaign encounters", exact: true }).click();
     await chooseOption(controls.getByLabel("Map encounter", { exact: true }), encounter.id);
     await controls.getByRole("button", { name: "Place encounter roster", exact: true }).click();

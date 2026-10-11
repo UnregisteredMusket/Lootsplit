@@ -4,6 +4,10 @@ These features use the same campaign, room permissions, location hierarchy, purs
 
 ## Maps
 
+Map categories now include Regional, City, Dungeon, Property, Wilderness, Battle, Ship and Other, with a type filter. Property/ship maps can link an existing holding. **Move party freely** places the party without a listed location and records Roads, Wilderness with a biome, or another travel environment. Travelling closes located shops/listings; selecting a listed party location ends free placement. Private-map party coordinates remain private.
+
+**Combat grid settings** enables configurable columns/rows, alignment, diagonal measurement and tile scale (5 ft by default). In tile mode, the DM places canonical character/ship tokens or imports saved encounter roster tokens, then moves them by tapping a tile or entering coordinates. Players see shared tokens/grid; secret tokens and encounter statistics stay private. The encounter tracker retains turns, HP, conditions and loot. Ship moves carry placed aboard tokens together, while mapped voyage markers follow existing approved downtime. See the complete [map and tile guide](MAP-TILES.md).
+
 DMs import PNG, JPEG or WebP maps, name them and optionally select their existing region, city/town or area. Import multiple maps for world, regional and local views; a map matching the party's closest current-location ancestor opens by default. Original uploads can be up to 20 MB / 64 megapixels; the shared raster is compressed to at most 2400 pixels on the long edge and 500,000 data-URL characters. If a map cannot fit, split it into regional maps. No SVG scripts or external image URLs are accepted. Keep original files for future re-import.
 
 You can enter or change the name, location and sharing choice while the image is being prepared or its labels are being read. Those edits are retained. **Save map** becomes available when processing finishes; review the preview and details, then save. A missing or invalid image shows an explanation and keeps the draft open so you can choose another file.

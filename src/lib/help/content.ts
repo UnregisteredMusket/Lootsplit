@@ -27,6 +27,7 @@ export const HELP_GROUPS: HelpGroup[] = [
         links: [
           ["Open Maps", "/maps"],
           ["Complete instructions", "/download/world-features.md"],
+          ["Map and tile guide", "/download/map-tiles.md"],
         ],
       },
       {
