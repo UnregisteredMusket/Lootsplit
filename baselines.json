@@ -12110,5 +12110,39 @@
     "finishedAt": "2026-10-11T10:03:02.823337+00:00",
     "durationMs": 42501.63868799973,
     "trendId": "local:2b2ce3a2-a831-4e19-8e84-89e580fdfa2d"
+  },
+  "[\".github/workflows/verify.yml\",\"pull_request\",\"pull-request\",\"step\",\"Packaged Worker / interface / worker-ships\",\"ubuntu-latest\",1]": {
+    "schema": 1,
+    "id": "38138347173:1:499c63f86dd93eb455a626ae2717c1dc7a46eb2ea6cff7361660a7fda66d8d50",
+    "scope": "[\".github/workflows/verify.yml\",\"pull_request\",\"pull-request\",\"step\",\"Packaged Worker / interface / worker-ships\",\"ubuntu-latest\",1]",
+    "kind": "step",
+    "name": "Packaged Worker / interface / worker-ships",
+    "environment": "ubuntu-latest",
+    "commit": "6384e0758e77c041f917321e9e79554d9808143e",
+    "runId": 38138347173,
+    "attempt": 1,
+    "url": "https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38138347173/job/114467062781",
+    "outcome": "failure",
+    "startedAt": "2026-10-11T12:17:05Z",
+    "finishedAt": "2026-10-11T12:17:32Z",
+    "durationMs": 27000,
+    "trendId": "38138347173:1:499c63f86dd93eb455a626ae2717c1dc7a46eb2ea6cff7361660a7fda66d8d50"
+  },
+  "[\".github/workflows/verify.yml\",\"pull_request\",\"pull-request\",\"step\",\"Development / gameplay / dev-ships\",\"ubuntu-latest\",1]": {
+    "schema": 1,
+    "id": "38138347173:1:74238182195320f8ea64f776256e158d8abf982283dbb103efc046c1df5e6e38",
+    "scope": "[\".github/workflows/verify.yml\",\"pull_request\",\"pull-request\",\"step\",\"Development / gameplay / dev-ships\",\"ubuntu-latest\",1]",
+    "kind": "step",
+    "name": "Development / gameplay / dev-ships",
+    "environment": "ubuntu-latest",
+    "commit": "6384e0758e77c041f917321e9e79554d9808143e",
+    "runId": 38138347173,
+    "attempt": 1,
+    "url": "https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38138347173/job/114466796483",
+    "outcome": "failure",
+    "startedAt": "2026-10-11T12:17:33Z",
+    "finishedAt": "2026-10-11T12:18:00Z",
+    "durationMs": 27000,
+    "trendId": "38138347173:1:74238182195320f8ea64f776256e158d8abf982283dbb103efc046c1df5e6e38"
   }
 }
