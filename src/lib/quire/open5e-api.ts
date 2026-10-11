@@ -4,7 +4,32 @@ import { z } from "zod";
 const campaign = z
   .object({ code: z.string().min(1).max(16), token: z.string().min(1).max(200) })
   .strict();
-export const searchOpen5e = createServerFn({ method: "POST" })
+async function fetchReference(data: OpenQuery) {
+  const { openUrl, normalizeOpenPage } = await import("./open5e.ts");
+  const response = await fetch(openUrl(data), {
+    signal: AbortSignal.timeout(12000),
+    headers: { Accept: "application/json" },
+  });
+  if (!response.ok)
+    throw new Error(
+      response.status === 429
+        ? "Open5e is busy. Please try again shortly."
+        : "Open5e is unavailable. Try again later.",
+    );
+  return normalizeOpenPage(await response.json(), data);
+}
+// Keep the public, credential-free GET function for existing bundled Android clients.
+export const searchOpen5e = createServerFn({ method: "GET" })
+  .validator((input: OpenQuery) => {
+    const q = openQuery(input);
+    return { kind: q.kind, edition: q.edition, query: q.query, page: q.page };
+  })
+  .handler(async ({ data }) => {
+    const { setResponseHeader } = await import("@tanstack/react-start/server");
+    setResponseHeader("Cache-Control", "no-store");
+    return fetchReference(data);
+  });
+export const searchScopedOpen5e = createServerFn({ method: "POST" })
   .validator((input: OpenQuery & { campaign?: z.infer<typeof campaign> }) => ({
     ...openQuery(input),
     ...(input.campaign ? { campaign: campaign.parse(input.campaign) } : {}),
@@ -20,18 +45,7 @@ export const searchOpen5e = createServerFn({ method: "POST" })
       await assertReferenceLookup(data.campaign, data.kind);
     };
     await check();
-    const { openUrl, normalizeOpenPage } = await import("./open5e.ts");
-    const response = await fetch(openUrl(data), {
-      signal: AbortSignal.timeout(12000),
-      headers: { Accept: "application/json" },
-    });
-    if (!response.ok)
-      throw new Error(
-        response.status === 429
-          ? "Open5e is busy. Please try again shortly."
-          : "Open5e is unavailable. Try again later.",
-      );
-    const result = normalizeOpenPage(await response.json(), data);
+    const result = await fetchReference(data);
     await check();
     return result;
   });

@@ -21,6 +21,10 @@ Reviewed the complete field guide. Corrected obsolete image-import and account-s
 
 ## Verification checkpoint
 
+Focused verification `38131890240` passed the complete new desktop/mobile player-reference/Help audit and all 12 account scenarios in development and the immutable Worker. Both player Help entry points, read-only searches, default encounter block, section/overall/encounter controls, restored access after conclusion, shared handouts and assigned-character selector passed. The Android protocol compatibility follow-up passed all 913 local tests, TypeScript and lint; its unused fixture parameter warning was then removed and the affected files linted again. Freeze the final compatibility tree and require fresh complete PR/main checks before publication.
+
+Compatibility review of the installed TanStack handler confirms mismatched HTTP methods are rejected before parsing. Preserve the original public `searchOpen5e` GET function for previously bundled Android clients and unseated DM lookup; introduce a separate scoped POST function for current campaign credentials/checks. Both functions remain referenced in the client so the original RPC remains packaged. This prevents a website update from breaking the earlier APK's public reference lookup. No APK was distributed by this task.
+
 Focused reference, private encounter, character ownership and Library privacy checks: 23/23 passed on Node22.23.3. The new browser audit preserves every original Help assertion and adds real desktop/mobile read-only searches, DM encounter start/conclusion, direct-link blocks, all/section/encounter controls, shared handouts, assigned-character selection and both player Help entry points. The required Help audit runs it in development and the immutable Worker.
 
 Local dev:doctor: locked Playwright Chromium1243 is absent; existing diagnostic Chromium fails to launch (SIGSEGV). This is an environment blocker, not a browser pass. Full current-browser CI must close the gap. Assertions, deadlines, isolation and retry counts remain unchanged.

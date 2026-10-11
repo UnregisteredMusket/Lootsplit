@@ -198,10 +198,10 @@ export function captureMutationScope(): MutationScope {
 /** Attach the current seat only to an in-campaign reference request, never to cached results. */
 export async function searchCampaignReference(query: import("./open5e.ts").OpenQuery) {
   const current = session();
-  const { searchOpen5e } = await import("./open5e-api.ts");
-  return searchOpen5e({ data: { ...query, ...(current ? {
+  const { searchOpen5e, searchScopedOpen5e } = await import("./open5e-api.ts");
+  return current ? searchScopedOpen5e({ data: { ...query,
     campaign: { code: current.code, token: current.token },
-  } : {}) } });
+  } }) : searchOpen5e({ data: query });
 }
 export function assertMutationScope(expected: ExpectedMutationScope): void {
   const actual = captureMutationScope();

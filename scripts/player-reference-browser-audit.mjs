@@ -131,9 +131,9 @@ try {
       .prepare("INSERT INTO library_members VALUES (?,?,?,?,?,0,0)")
       .bind(user, code, "dm", "dm-token", "Reference audit")
       .run();
-    await host.addInitScript((code) => {
+    await host.addInitScript(() => {
       localStorage.setItem("quire.guide.offer.v3", "seen");
-    }, code);
+    });
     const player = await browser.newContext({ viewport: { width, height: 900 } });
     contexts.push(player);
     await player.addInitScript((code) => {
