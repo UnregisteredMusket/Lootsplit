@@ -37,11 +37,16 @@ export function safeReturn(value: unknown): string {
 }
 
 /** Preserve same-page hashes and supply the real origin for feature return links. */
-export function appLinkDestination(href: string, currentHref: string) {
+export function appLinkDestination(href: string, currentHref: string, includeOrigin = true) {
   const base = new URL(currentHref, "https://lootsplit.invalid");
   const url = new URL(href, base);
   const feature = url.pathname.split("/")[2] as Feature;
-  if (url.pathname.startsWith("/features/") && featureScreens[feature] && !url.searchParams.has("from"))
+  if (
+    includeOrigin &&
+    url.pathname.startsWith("/features/") &&
+    featureScreens[feature] &&
+    !url.searchParams.has("from")
+  )
     url.searchParams.set("from", safeReturn(currentHref));
   return url;
 }
@@ -80,6 +85,13 @@ export function screenName(href: string, dm: boolean) {
         "/downloads": "Downloads",
         "/updates": "Changelog",
       } as Record<string, string>
-    )[url.pathname] || (url.pathname.startsWith("/shop/") ? "Shop" : url.pathname.startsWith("/book/") ? "Book" : url.pathname.startsWith("/read/") ? "Reading" : "Home")
+    )[url.pathname] ||
+    (url.pathname.startsWith("/shop/")
+      ? "Shop"
+      : url.pathname.startsWith("/book/")
+        ? "Book"
+        : url.pathname.startsWith("/read/")
+          ? "Reading"
+          : "Home")
   );
 }

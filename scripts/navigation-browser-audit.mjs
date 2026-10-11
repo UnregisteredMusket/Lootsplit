@@ -106,7 +106,7 @@ async function destination(page, href, label) {
         .getByRole("button", { name, exact: true }),
     ).toHaveAttribute("aria-pressed", "true");
     if (target.searchParams.has("kind"))
-      await expect(page.getByLabel("Reference section", { exact: true })).toHaveValue(
+      await expect(page.getByRole("combobox", { name: "Reference section", exact: true })).toHaveValue(
         target.searchParams.get("kind"),
       );
   }

@@ -59,3 +59,19 @@ test("return links reject external, API, download and unknown destinations", () 
   assert.equal(screenName("/?view=sheet", false), "Character");
   assert.equal(screenName("/?view=overview", false), "Campaign overview");
 });
+
+test("nested feature Return links do not create a reverse origin loop", () => {
+  const property = appLinkDestination(
+    "/features/properties#property-one",
+    "/features/finances?from=%2F%3Fview%3Dhome",
+  );
+  assert.equal(property.searchParams.get("from"), "/features/finances");
+  const returning = appLinkDestination(
+    property.searchParams.get("from")!,
+    property.pathname + property.search + property.hash,
+    false,
+  );
+  assert.equal(returning.pathname, "/features/finances");
+  assert.equal(returning.searchParams.has("from"), false);
+  assert.equal(safeReturn(undefined), "/?view=home");
+});

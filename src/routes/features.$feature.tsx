@@ -167,7 +167,7 @@ function FeaturePage() {
           </>
         )}
         <footer className="feature-return">
-          <AppLink className="quick-action" href={from}>
+          <AppLink className="quick-action" href={from} returnLink>
             Return to {screenName(from, dm)}
           </AppLink>
         </footer>
