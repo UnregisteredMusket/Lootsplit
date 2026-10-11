@@ -573,10 +573,12 @@ test("repair quotes create normal reviewed projects; partial repairs cost money 
   t = run(t, {
     kind: "estate-job",
     before: job,
-    job: { ...job, status: "active", approvedChecks: true },
+    job: { ...job, status: "active" },
   });
   const before = toCopper(t.purses[1].coins);
-  t = days(t, 1);
+  t = readCloudTable(JSON.parse(JSON.stringify(t)));
+  t = run(t, { kind: "downtime-plan", name: "Repair at session start", days: 1 });
+  t = run(t, { kind: "session", name: "Repaired ship", end: false, downtimeId: t.journal!.finance!.downtime.at(-1)!.id });
   assert.equal(vessel(t).stats.components[0].hp, 180);
   assert.equal(before - toCopper(t.purses[1].coins), 200);
   t = days(t, 1);

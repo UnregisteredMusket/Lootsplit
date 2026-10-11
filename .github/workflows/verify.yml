@@ -152,6 +152,9 @@ jobs:
       - name: dev-bug-permission-transfers
         if: matrix.group == 'gameplay'
         run: node scripts/recovery-step.mjs dev-bug-permission-transfers 240 node --experimental-strip-types scripts/bug-audit-permission-transfers.mjs
+      - name: dev-ships
+        if: matrix.group == 'gameplay'
+        run: node scripts/recovery-step.mjs dev-ships 240 node scripts/ships-browser-audit.mjs
       - name: dev-encounter
         if: matrix.group == 'gameplay'
         run: node scripts/recovery-step.mjs dev-encounter 240 node scripts/encounter-browser-audit.mjs
@@ -173,9 +176,6 @@ jobs:
       - name: dev-property-operations
         if: matrix.group == 'gameplay'
         run: node scripts/recovery-step.mjs dev-property-operations 240 node scripts/property-operations-browser-audit.mjs
-      - name: dev-ships
-        if: matrix.group == 'gameplay'
-        run: node scripts/recovery-step.mjs dev-ships 240 node scripts/ships-browser-audit.mjs
       - name: dev-trade-economy
         if: matrix.group == 'gameplay'
         run: node scripts/recovery-step.mjs dev-trade-economy 240 node --experimental-strip-types scripts/trade-economy-browser-audit.mjs
@@ -246,6 +246,11 @@ jobs:
           done
           echo "Built Worker did not become ready" >&2
           exit 1
+      - name: worker-ships
+        if: matrix.group == 'interface'
+        env:
+          AUDIT_ORIGIN: http://127.0.0.1:8082
+        run: node scripts/recovery-step.mjs worker-ships 240 node scripts/ships-browser-audit.mjs
       - name: worker-account
         if: matrix.group == 'accounts'
         env:
@@ -284,11 +289,6 @@ jobs:
         env:
           AUDIT_ORIGIN: http://127.0.0.1:8082
         run: node scripts/recovery-step.mjs worker-property-operations 180 node scripts/property-operations-browser-audit.mjs
-      - name: worker-ships
-        if: matrix.group == 'interface'
-        env:
-          AUDIT_ORIGIN: http://127.0.0.1:8082
-        run: node scripts/recovery-step.mjs worker-ships 240 node scripts/ships-browser-audit.mjs
       - name: worker-trade-economy
         if: matrix.group == 'interface'
         env:

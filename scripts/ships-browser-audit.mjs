@@ -66,6 +66,7 @@ async function previewApply(page, n, name) {
   await page.locator("summary").filter({ hasText: "Set downtime & review calculations" }).click();
   await page.getByLabel("In-game days", { exact: true }).fill(String(n));
   await page.getByRole("button", { name: "Preview downtime", exact: true }).click();
+  await expect.poll(async () => (await readJournal(page)).finance.downtime.at(-1)?.status).toBe("pending");
   await page.getByRole("button", { name: /^Play sessions/ }).click();
   await page.getByLabel("Session name", { exact: true }).fill(name);
   await page.getByRole("checkbox", { name: /I approve the downtime plan/ }).check();
@@ -226,6 +227,7 @@ try {
       has: page.getByRole("heading", { name: "Repair Hull: 20 HP · draft", exact: true }),
     });
     await job.getByRole("button", { name: "Approve / resume", exact: true }).click();
+    await expect.poll(async () => (await readJournal(page)).propertyOperations.jobs[0].status).toBe("active");
     await previewApply(page, 1, "Repair the Dawn Trader");
     await expect
       .poll(async () => (await readJournal(page)).fleet.vessels[0].stats.components[0].hp)
@@ -371,6 +373,8 @@ try {
     }),
   );
 } catch (error) {
+  if (currentPage && !currentPage.guestAccessAudit)
+    await writeFile(`${output}/failure-state.json`, JSON.stringify(await readJournal(currentPage), null, 2)).catch(() => {});
   if (currentPage)
     await currentPage.screenshot({ path: `${output}/failure.png`, fullPage: true }).catch(() => {});
   await writeFile(`${output}/failure.txt`, String(error.stack || error));
