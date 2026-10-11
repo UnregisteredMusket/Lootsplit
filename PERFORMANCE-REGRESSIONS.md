@@ -16,8 +16,8 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Code checks and immutable builds / Run npm ci | open | 3 | 7s → 20s | +13s | +185.71% |
 | Development / desktop / Run npm ci | open | 3 | 11s → 20s | +9s | +81.82% |
 | Development / gameplay / Run npm ci | open | 2 | 11s → 17s | +6s | +54.55% |
-| Code checks and immutable builds / unit-tests | open | 5 | 8s → 32s | +24s | +300% |
-| Code checks and immutable builds / typecheck | open | 4 | 7s → 20s | +13s | +185.71% |
+| Code checks and immutable builds / unit-tests | open | 6 | 8s → 37s | +29s | +362.5% |
+| Code checks and immutable builds / typecheck | open | 5 | 7s → 23s | +16s | +228.57% |
 | Code checks and immutable builds / lint | open | 3 | 5s → 11s | +6s | +120% |
 | Development / accounts / Run npx playwright install --with-deps chromium | open | 4 | 21s → 372s | +351s | +1671.43% |
 | Development / gameplay / Start disposable development server | open | 2 | 4s → 8s | +4s | +100% |
@@ -247,6 +247,8 @@ Open trends require investigation. Resolved trends retain their history; each ve
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-11T12:34:57Z | step: Code checks and immutable builds / typecheck | 20s → 23s | +3s | +15% | failure | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38018106897/job/114112829425) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38139715608/job/114470877114) |
+| 2026-10-11T12:34:34Z | step: Code checks and immutable builds / unit-tests | 32s → 37s | +5s | +15.63% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38034098040/job/114160843289) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38139715608/job/114470877114) |
 | 2026-10-11T12:33:42Z | step: Player references / worker / Run actions/setup-node@v4 | 5s → 6s | +1s | +20% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38138347179/job/114466796212) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38139715522/job/114470877068) |
 | 2026-10-11T12:26:19Z | job: Player references / worker | 208s → 240s | +32s | +15.38% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38131890240/job/114447745703) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38138998692/job/114468749350) |
 | 2026-10-11T12:26:16Z | step: Player references / worker / Verify complete account fixtures | 97s → 114s | +17s | +17.53% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38131540604/job/114446715096) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38138998692/job/114468749350) |
