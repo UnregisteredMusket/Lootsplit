@@ -570,6 +570,7 @@ function CharacterEditor({
         if (!c.signal.aborted) {
           setDetail(d);
           setSheet(d.body);
+          setError("");
         }
       })
       .catch((e) => {
@@ -681,7 +682,12 @@ function CharacterEditor({
     }
   }
   if (!sheet || !detail)
-    return <p role={error ? "alert" : "status"}>{error || "Loading character…"}</p>;
+    return (
+      <div>
+        <p role={error ? "alert" : "status"}>{error || "Loading character…"}</p>
+        {error && <button onClick={() => setReload((n) => n + 1)}>Retry character sheet</button>}
+      </div>
+    );
   const canPlay = detail.editable && !detail.assignmentError;
   const canEdit = (field: string) =>
     canPlay &&

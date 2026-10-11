@@ -30,6 +30,8 @@ Player Home shows six fixed icon buttons for everyone, including guests: Charact
 
 Player Home links to the full Character Sheet, Inventory, Campaign/chat and existing tools. Campaign funds remain separate from standalone account characters. Property descriptions never grant authority to change price, ownership or income. Foreclosures and new special-property purchase rules are not included.
 
+If a character sheet cannot load its campaign roll settings, **Retry character sheet** retries in the same tab while preserving the room connection and pending guest actions. Retry never enables manual rolls without the DM's permission. Save or export drafts before using the separate **Reload sheet** control; guests should submit pending actions before refreshing the whole page.
+
 **Deployment requirement:** Migration `0010_account_shortcuts.sql` is additive and was applied to production on October 6, 2026. New installations still require it; the fixed player buttons require no additional migration. No new APK or domain change is included.
 
 ## Unified DM home

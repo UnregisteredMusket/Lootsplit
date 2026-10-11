@@ -12,6 +12,8 @@ Read this at the start of every task, including a new chat, recovered workspace,
 
 ## 2. Define the smallest useful reproduction
 
+For a campaign character-sheet load failure, distinguish the canonical sheet/wallet projection from the separate manual-roll policy read. Validate the policy's boolean before rendering controls; an absent response must not grant permission or strand a guest. Verify the real Retry character sheet button in the same document after an injected policy transport failure, with the room seat and guest memory preserved. Do not recommend clearing storage to recover a failed read.
+
 Write down the behavior being changed, the affected data/permissions, and one exact acceptance scenario. For a bug, demonstrate that the scenario fails before changing the implementation where practical. Read existing helpers and tests before creating another implementation.
 
 Prefer a direct unit/API regression for logic and permissions, plus a browser scenario for what a person clicks and sees. Preserve meaningful user flows even when fixtures prepare unrelated prerequisite data. Never replace a user-visible check with a database assertion alone.
