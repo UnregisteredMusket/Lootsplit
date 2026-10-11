@@ -2244,6 +2244,9 @@ function initializeCityExchanges<T extends CloudTable>(tx: IDBTransaction, table
   if (table.purses.length !== count) {
     for (const purse of table.purses.slice(count)) tx.objectStore("purses").put(purse);
     tx.objectStore("meta").put({ id: "journal", value: table.journal });
+    // Match getAll's string-key order immediately, including the first read.
+    // Reviewed imports fingerprint account arrays before the next DB read.
+    table.purses.sort((a, b) => a.id === b.id ? 0 : a.id < b.id ? -1 : 1);
   }
   return table;
 }

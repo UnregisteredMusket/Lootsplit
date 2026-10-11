@@ -1091,8 +1091,8 @@ export function applyCommand(input: CloudTable, seat: CloudSeat, raw: Command, e
     }
   }
   if (journal.finance) journal.finance = readFinance(journal.finance);
-  if (cmd.kind === "market-location" || cmd.kind === "market-name-import" ||
-    (cmd.kind === "patch" && !same(input.journal?.market?.locations, t.journal?.market?.locations)))
+  if (cmd.kind === "market-location" || cmd.kind === "market-name-import" || cmd.kind === "trade-exchange" ||
+    !same(input.journal?.market?.locations, t.journal?.market?.locations))
     ensureCityExchanges(t);
   validateEconomyRows(t);
   validateShopLocations(t.shops, t.journal?.market);

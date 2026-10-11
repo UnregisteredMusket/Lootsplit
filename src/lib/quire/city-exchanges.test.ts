@@ -6,6 +6,7 @@ import { applyCommand, tablePatch, type CommandInput } from "./commands.ts";
 import { emptyCloudTable, readCloudTable, type CloudSeat, type CloudTable } from "./cloud.ts";
 import { readJournal, readArchivedSnapshot } from "./journal.ts";
 import { marketNameFingerprint } from "./market-name-import.ts";
+import { estateImportFingerprint } from "./estate-import.ts";
 import { toCopper } from "./money.ts";
 import { projectRecord } from "./session-records.ts";
 import { exchangeHere, prepareTradeSeason, previewTradeSeason } from "./trade-economy.ts";
@@ -113,6 +114,8 @@ test("local legacy recovery exposes defaults to the DM, saves them atomically on
   const legacy = tradeFixture(); legacy.journal!.market!.locations.push(city);
   await applyCloudTable(legacy);
   const shown = await economySnapshot(), e = exchanges(shown).at(-1)!;
+  assert.equal(estateImportFingerprint(shown), estateImportFingerprint(await economySnapshot()),
+    "The first initialized view uses persisted account order for immediate reviewed imports");
   assert.equal(e.locationId, city.id);
   await executeLocalCommand({ kind: "trade-exchange", before: e, exchange: { ...e, notes: "Saved locally" }, reason: "Configure" });
   const saved = await economySnapshot(); assert.equal(exchanges(saved).at(-1)!.notes, "Saved locally");
@@ -125,4 +128,14 @@ test("local legacy recovery exposes defaults to the DM, saves them atomically on
   await applyCloudTable(projectRecord(saved, player));
   assert.equal(exchanges(await economySnapshot()).some(x => x.id === e.id), false);
   setSeat(DM_SEAT);
+});
+
+test("moving a configured exchange creates the missing city's replacement in the same command", () => {
+  let t = act(tradeFixture(), { kind: "market-location", locationId: city.id, before: null, after: city });
+  const e = exchanges(t).find(x => x.locationId === city.id)!;
+  t = act(t, { kind: "trade-exchange", before: e, exchange: { ...e, locationId: null, notes: "DM moved this exchange" }, reason: "Reassign" });
+  assert.equal(exchanges(t).filter(x => x.locationId === city.id).length, 1);
+  assert.equal(exchanges(t).find(x => x.id === e.id)!.locationId, null);
+  assert.notEqual(exchanges(t).find(x => x.locationId === city.id)!.purseId, e.purseId);
+  assert.equal(toCopper(t.purses.find(p => p.id === exchanges(t).find(x => x.locationId === city.id)!.purseId)!.coins), 0);
 });
