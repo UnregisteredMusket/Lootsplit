@@ -344,8 +344,11 @@ try {
     await page.getByRole("button", { name: "Place marker", exact: true }).click();
     const region = page.getByRole("region", { name: "Interactive campaign map" });
     await region.scrollIntoViewIfNeeded();
-    let r = await region.boundingBox();
-    await page.mouse.click(r.x + r.width * 0.6, r.y + r.height * 0.5);
+    // Use an empty part of the image; the linked location's icon stack occupies its center.
+    const mapImage = region.locator(".map-layer"),
+      imageBox = await mapImage.boundingBox();
+    await mapImage.click({ position: { x: imageBox.width * 0.85, y: imageBox.height * 0.25 } });
+    await expect(page.getByLabel("Selected placement", { exact: true })).toBeVisible();
     await page.getByLabel("Marker name", { exact: true }).fill("Rendezvous");
     await page.getByLabel("Details", { exact: true }).fill("Meet at the quay");
     await page.getByRole("button", { name: "Save live marker", exact: true }).click();
@@ -385,7 +388,7 @@ try {
     await page.getByRole("button", { name: "Fit map", exact: true }).click();
     await expect(page.locator(".world-toolbar [aria-live=polite]")).toHaveText("100%");
     await region.scrollIntoViewIfNeeded();
-    r = await region.boundingBox();
+    const r = await region.boundingBox();
     const layer = page.locator(".map-layer"),
       before = await layer.getAttribute("style");
     await page.mouse.move(r.x + r.width / 2, r.y + r.height / 2);
