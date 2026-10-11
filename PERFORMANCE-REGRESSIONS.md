@@ -218,6 +218,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Development / desktop / Run actions/upload-artifact@v4 | open | 2 | 4s → 6s | +2s | +50% |
 | Development / gameplay / dev-shop-stock | open | 2 | 16s → 22s | +6s | +37.5% |
 | Packaged Worker / interface / Start disposable built Worker | open | 2 | 7s → 11s | +4s | +57.14% |
+| Verify preserved functionality | open | 2 | 422s → 1036s | +614s | +145.5% |
 | Development / gameplay / Run actions/upload-artifact@v4 | open | 2 | 3s → 5s | +2s | +66.67% |
 | Packaged Worker / interface / worker-market-locations | open | 3 | 23s → 63s | +40s | +173.91% |
 | Development / gameplay / dev-market-locations | open | 2 | 38s → 68s | +30s | +78.95% |
@@ -252,6 +253,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-11T14:53:22.000Z | workflow: Verify preserved functionality | 868s → 1036s | +168s | +19.35% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37784166101) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38147843248) |
 | 2026-10-11T14:19:42Z | step: Development / gameplay / dev-properties | 55s → 67s | +12s | +21.82% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37897679114/job/113712670292) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38146215202/job/114490112399) |
 | 2026-10-11T14:17:20Z | step: Development / gameplay / dev-shop-stock | 19s → 22s | +3s | +15.79% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37783175577/job/113331148194) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38146215202/job/114490112399) |
 | 2026-10-11T14:16:58Z | step: Development / gameplay / dev-finance | 41s → 48s | +7s | +17.07% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37788622946/job/113349768282) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38146215202/job/114490112399) |
