@@ -24,8 +24,7 @@ for (const [name, read] of [
       const tx = original(stores, mode);
       if (
         !injected &&
-        Array.from(typeof stores === "string" ? [stores] : stores).includes("purses") &&
-        mode !== "readwrite"
+        Array.from(typeof stores === "string" ? [stores] : stores).includes("purses")
       ) {
         injected = true;
         // Queue a real atomic save immediately behind the first read. Separate

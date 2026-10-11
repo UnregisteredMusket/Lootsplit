@@ -5,6 +5,7 @@ import { captureDeviceMutationScope, assertDeviceMutationScope } from "./mutatio
 import { isEphemeralCampaign } from "./guest-storage.ts";
 import { assertMerchantSale, isService, stockCategory } from "./merchant.ts";
 import { applyCommand, type CommandInput } from "./commands.ts";
+import { ensureCityExchanges } from "./city-exchanges.ts";
 import { canonicalJson } from "./canonical-json.ts";
 import { validateShopLocations } from "./shop-locations.ts";
 import { propertyAvailableHere } from "./property.ts";
@@ -2230,17 +2231,30 @@ function readEconomyTransaction(tx: IDBTransaction, includeReferences = true): P
 
 export async function economySnapshot(): Promise<CloudTable> {
   const db = await quireDb();
-  const tx = db.transaction([...ECONOMY], "readonly");
-  const [table] = await Promise.all([readEconomyTransaction(tx), finish(tx)]);
+  const dm = getSeat().role === "dm";
+  const tx = db.transaction([...ECONOMY], dm ? "readwrite" : "readonly");
+  const [table] = await Promise.all([readEconomyTransaction(tx).then(table =>
+    dm ? initializeCityExchanges(tx, table) : table), finish(tx)]);
+  return table;
+}
+
+function initializeCityExchanges<T extends CloudTable>(tx: IDBTransaction, table: T): T {
+  const count = table.purses.length;
+  ensureCityExchanges(table);
+  if (table.purses.length !== count) {
+    for (const purse of table.purses.slice(count)) tx.objectStore("purses").put(purse);
+    tx.objectStore("meta").put({ id: "journal", value: table.journal });
+  }
   return table;
 }
 
 /** One coherent read for all financial views, without copying private books. */
 export async function economyView() {
   const db = await quireDb();
-  const tx = db.transaction([...ECONOMY, "catalog", "lexicon"], "readonly");
+  const dm = getSeat().role === "dm";
+  const tx = db.transaction([...ECONOMY, "catalog", "lexicon"], dm ? "readwrite" : "readonly");
   const [table, catalog, lexicon] = await Promise.all([
-    readEconomyTransaction(tx, false),
+    readEconomyTransaction(tx, false).then(table => dm ? initializeCityExchanges(tx, table) : table),
     request<CatalogItem[]>(tx.objectStore("catalog").getAll()),
     request<Lexeme[]>(tx.objectStore("lexicon").getAll()),
     finish(tx),

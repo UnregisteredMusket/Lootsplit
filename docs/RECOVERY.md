@@ -1,3 +1,7 @@
+# Active recovery: default city exchanges — October 11, 2026 UTC
+
+City access/catalogue PR93 is COMPLETE/LIVE: main `c3ed29d01c669a60be884a8d6f948c779fab3987`, Worker `039cfadf-b1a4-470e-b61a-f6aff661c3da`; all-nine PR38075720286/main38076562217 and website38077277877/standby38077277894 passed. Do not repeat that release. The owner now requests one trade exchange by default for every city. Branch `feature/default-city-exchanges` extends only that scope; existing publication authorization persists. No migration or distributed APK. See `docs/audit/2026-10-11-default-city-exchanges.md`; evolving exact source/PR/run/release identities belong in the PR and `test-results/recovery/default-city-exchanges.json`.
+
 # Active recovery: city market access and commodity catalogue
 
 The approved denser layout is COMPLETE/LIVE as PR92/main `6b4d8acc69513c29a72ef4c7c96d59c8c6834c56`, Worker `0799ae4e-533d-4abb-883a-e823d6da96e3`; PR38068308871, main38069064641 (diagnosed toast race, one standby retry), website38069908992 and standby38069908993 passed. Do not repeat those releases. The owner now requires city access to the global market and a shipped/importable fantasy commodity stock list. Branch `feature/city-commodity-catalog` extends only that approved scope. No migration or distributed APK. Preserve every prior feature/save/permission and gate. See `docs/audit/2026-10-10-city-commodity-catalog.md`; exact evolving identities belong in the new PR and `test-results/recovery/city-commodity-catalog.json`.

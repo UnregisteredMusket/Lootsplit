@@ -54,6 +54,14 @@ The existing purchased inventory lot keeps its reviewed material key and commodi
 
 Arrival and approved delivery retries update custody of the same goods. They do not purchase another lot or add demand again. Supplier and manager purchases performed during approved downtime are included in that downtime's seasonal proposal before approval, so the reviewed finances and market outcome describe the same activity.
 
+## Default city exchanges
+
+Each city receives one location-linked **City Name Trade Exchange**, including newly created and imported cities and cities in an older campaign. An existing exchange directly assigned to that city counts, including a closed or private exchange. District and campaignwide exchanges remain independent. Reopening a campaign or repeating an import never duplicates the default.
+
+Defaults have an empty non-party NPC treasury and no commodity offers, stock or funds. Economy rules and activation remain the DM's choice. Use the Exchange workshop to configure the exchange, add goods and explicitly fund its treasury. Players can access it only when it is visible, trading is enabled and the party is in that city or one of its areas. An untouched default follows a city rename and can be removed with an otherwise unused city. Edited, funded or referenced exchanges remain protected; reassign them before deleting their location. Historical archives and player-projected data are never seeded with defaults.
+
+Adding an exchange can make an existing seasonal preview stale. Its saved proposal and history remain available; prepare a fresh preview before approval.
+
 ## Correcting a recorded trade
 
 The DM can open **Trade receipts**, choose **Review reversal**, enter a reason, and review the original transaction before choosing **Reverse trade**. New exchange purchases and sales retain an exact inventory snapshot and explicit references to both money movements. A reversal returns the original copper amounts, adjusts the original exchange stock, removes the unchanged purchased lot or restores the original sold lot, and records opposite activity in the current market season. It never recalculates the original price. Zero-copper trades can be corrected from their trade receipt as well.
