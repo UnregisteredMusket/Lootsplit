@@ -12776,5 +12776,22 @@
     "finishedAt": "2026-10-12T10:04:06Z",
     "durationMs": 28000,
     "trendId": "38233656239:1:bc3c66d08179137ac1af108f0211b13720c4255b1fcc91c6f9bc8829cf531621"
+  },
+  "[\".github/workflows/verify.yml\",\"pull_request\",\"pull-request\",\"step\",\"Packaged Worker / interface / worker-blacksmith\",\"ubuntu-latest\",1]": {
+    "schema": 1,
+    "id": "38234358570:1:473eb274f93c61702c9b554c01544d5c3dcaf0679c6d39468f401143aa73994a",
+    "scope": "[\".github/workflows/verify.yml\",\"pull_request\",\"pull-request\",\"step\",\"Packaged Worker / interface / worker-blacksmith\",\"ubuntu-latest\",1]",
+    "kind": "step",
+    "name": "Packaged Worker / interface / worker-blacksmith",
+    "environment": "ubuntu-latest",
+    "commit": "0989ca288b3d4bc6a118e748ab511d01c6d89ddd",
+    "runId": 38234358570,
+    "attempt": 1,
+    "url": "https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38234358570/job/114762407176",
+    "outcome": "failure",
+    "startedAt": "2026-10-12T10:12:37Z",
+    "finishedAt": "2026-10-12T10:13:01Z",
+    "durationMs": 24000,
+    "trendId": "38234358570:1:473eb274f93c61702c9b554c01544d5c3dcaf0679c6d39468f401143aa73994a"
   }
 }
