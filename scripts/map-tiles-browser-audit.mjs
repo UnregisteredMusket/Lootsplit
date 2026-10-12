@@ -243,6 +243,21 @@ try {
       .poll(async () => (await journal(page)).world.maps.find((m) => m.id === "keep").tokens.length)
       .toBe(2);
     await expect(controls).toContainText("Keep ambush");
+    const heroIcon = page.getByTitle("Combatant: Tile Hero", { exact: true }),
+      guardIcon = page.getByTitle("Combatant: Hidden guard", { exact: true });
+    await expect(heroIcon).toHaveAttribute("aria-pressed", "true");
+    const selectedColor = await heroIcon.evaluate((el) => getComputedStyle(el).backgroundColor);
+    await guardIcon.click();
+    await expect(guardIcon).toHaveAttribute("aria-pressed", "true");
+    await expect(heroIcon).toHaveAttribute("aria-pressed", "false");
+    assert.notEqual(
+      await heroIcon.evaluate((el) => getComputedStyle(el).backgroundColor),
+      selectedColor,
+    );
+    await chooseOption(controls.getByLabel("Combat token", { exact: true }), token.id);
+    await expect(heroIcon).toHaveAttribute("aria-pressed", "true");
+    await expect(guardIcon).toHaveAttribute("aria-pressed", "false");
+    await expect(page.locator('.map-record-icon[aria-pressed="true"]')).toHaveCount(1);
     await page.getByRole("button", { name: "Fullscreen map", exact: true }).click();
     await expect(page.getByRole("button", { name: "Save token move", exact: true })).toBeVisible();
     await fits(page);
@@ -252,6 +267,11 @@ try {
     await chooseOption(page.getByLabel("Map type filter", { exact: true }), "property");
     await page.getByRole("button", { name: "Enter tile mode", exact: true }).click();
     await expect(page.getByTitle("Combatant: Tile Hero", { exact: true })).toBeVisible();
+    await expect(heroIcon).toHaveAttribute("aria-pressed", "false");
+    await heroIcon.click();
+    await expect(heroIcon).toHaveAttribute("aria-pressed", "true");
+    await chooseOption(controls.getByLabel("Combat token", { exact: true }), "");
+    await expect(heroIcon).toHaveAttribute("aria-pressed", "false");
     await fits(page);
     await createAndSaveRoom(page, origin, (p, o, path) => navigateApplication(p, o + path));
     await navigateApplication(page, origin + "/share");
@@ -301,6 +321,14 @@ try {
       guest.getByRole("button", { name: "Place party on map", exact: true }),
     ).toHaveCount(0);
     await expect(guest.locator(".campaign-maps")).not.toContainText("Hidden guard");
+    const sharedIcon = guest.getByTitle("Combatant: Tile Hero", { exact: true });
+    await sharedIcon.click();
+    await expect(sharedIcon).toHaveAttribute("aria-pressed", "true");
+    await expect(guest.getByRole("region", { name: "Map record details" })).toContainText(
+      "Tile Hero",
+    );
+    await guest.getByRole("button", { name: "Close details", exact: true }).click();
+    await expect(sharedIcon).toHaveAttribute("aria-pressed", "false");
     await fits(guest);
     await guest.screenshot({ path: `${output}/player-tiles-${width}.png`, fullPage: true });
     assert.equal(

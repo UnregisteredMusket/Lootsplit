@@ -354,11 +354,19 @@ try {
     await page.getByRole("button", { name: "Save live marker", exact: true }).click();
     const marker = page.getByRole("button", { name: "Marker: 1 record", exact: true });
     await expect(marker).toBeVisible();
+    const markerColor = await marker.evaluate((el) => getComputedStyle(el).backgroundColor);
     await marker.click();
+    await expect(marker).toHaveAttribute("aria-pressed", "true");
+    assert.notEqual(
+      await marker.evaluate((el) => getComputedStyle(el).backgroundColor),
+      markerColor,
+    );
     await expect(page.getByRole("region", { name: "Map record details" })).toContainText(
       "Rendezvous",
     );
     await page.getByRole("button", { name: "Close details", exact: true }).click();
+    await expect(marker).toHaveAttribute("aria-pressed", "false");
+    assert.equal(await marker.evaluate((el) => getComputedStyle(el).backgroundColor), markerColor);
     await page.getByRole("button", { name: "Filters", exact: true }).click();
     await page.getByLabel("Marker", { exact: true }).uncheck();
     await expect(marker).toHaveCount(0);
@@ -646,6 +654,15 @@ try {
     );
     await page.getByRole("button", { name: "Fit map", exact: true }).click();
     await npcIcon.click();
+    await expect(npcIcon).toHaveAttribute("aria-pressed", "true");
+    await expect(page.locator('.map-record-icon[aria-pressed="true"]')).toHaveCount(1);
+    const partyIcon = page.getByRole("button", { name: "Party: 1 record", exact: true });
+    await partyIcon.click();
+    await expect(partyIcon).toHaveAttribute("aria-pressed", "true");
+    await expect(npcIcon).toHaveAttribute("aria-pressed", "false");
+    await expect(page.locator('.map-record-icon[aria-pressed="true"]')).toHaveCount(1);
+    await npcIcon.click();
+    await expect(partyIcon).toHaveAttribute("aria-pressed", "false");
     await expect(page.getByRole("region", { name: "Map record details" })).toContainText("Mara");
     await expect(page.getByRole("region", { name: "Map record details" })).toContainText("Sera");
     await page.evaluate(() => (window.mapRecordDocument = "same-document"));

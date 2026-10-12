@@ -184,6 +184,8 @@ Preserve existing visible shared balance/ledger readouts while removing hidden c
 
 ## Map and tile preservation
 
+Map icon selection is local UI state. Keep `aria-pressed` synchronized with selected record details and the DM combat-token selector. The selected blue fill/ring must not alter the 32px icon geometry, input drafts, map commands, visibility or saved data. World and map-tile browser audits retain record switching/close and token click/selector/reload/player selection coverage.
+
 Use `map-save`, `map-token` and `party-map-position` commands for map changes. Character/ship tokens reference canonical IDs; grid movement changes no economic or physical location data. Player projections remove secret/hidden-character tokens and redact private-map party coordinates while retaining travel availability rules. Encounter roster imports verify the active campaign before copying only token identity/name; tracker HP, initiative, conditions and loot are never sent to players. Underway mapped voyages freeze the reviewed route/grid and duration; map position derives from their existing elapsed time. All legacy manual map/voyage paths and room modes remain covered. Run the dedicated development and immutable Worker map-tiles audits, both Help audits and the full preservation gates.
 
 ## Application control audits and DM market readout

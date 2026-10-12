@@ -1,5 +1,7 @@
 # Maps, party travel and combat tiles
 
+Selected map icons use a blue fill and ring. Selecting another record moves the highlight; **Close details** clears a record selection. DM combat-token selection is also highlighted when chosen on the map or in the **Combat token** list. The highlight is local to your view and changes no campaign data.
+
 The six existing tabs and all existing map tools remain available. Old maps without a category or grid continue to load. City/town-linked old maps appear in City; other old maps appear in Regional.
 
 Import or edit maps as Regional, City, Dungeon, Property, Wilderness, Battle, Ship or Other. Filter by type above the map selector. Dungeon and property floor plans use the same image import, reviewed anchors, markers, pings, records and fullscreen tools. A property/ship map can link to a canonical holding without requiring a new market location.
