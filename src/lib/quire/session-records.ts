@@ -292,6 +292,7 @@ export function projectRecord(
         ),
         ...recipes.map((recipe) => recipe.output?.materialKey),
         ...(t.journal.tradeEconomy?.commodities.map((c) => c.materialKey) ?? []),
+        ...(t.journal.blacksmith?.profiles.flatMap(p => p.materials.map(m => m.materialKey)) ?? []),
       ]);
       estate.materials = estate.materials.filter((material) => materials.has(material.key));
     }

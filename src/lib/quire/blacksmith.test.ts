@@ -344,6 +344,11 @@ test("profiles/orders preserve legacy saves and archives; projections disclose o
   const away = projectRecord(t, smithPlayer);
   assert.equal(away.journal!.blacksmith!.profiles.length, 0);
   assert.equal(away.journal!.blacksmith!.orders.length, 1);
+  assert.deepEqual(
+    away.journal!.propertyOperations!.materials.map((m) => m.key),
+    ["steel"],
+    "Travelling exposes owned material definitions, not the absent forge's unrelated supply catalogue",
+  );
   assert.ok(away.journal!.market!.locations.some((l) => l.id === "city"));
 });
 test("canonical smith material names and units remain required while projected players retain valid partial catalogues", () => {
@@ -352,6 +357,35 @@ test("canonical smith material names and units remain required while projected p
   assert.throws(() => validateBlacksmith(t), /canonical material/);
   const valid = smithFixture();
   assert.doesNotThrow(() => validateBlacksmith(projectRecord(valid, smithPlayer), true));
+});
+test("the player's projected forge retains offered material definitions for optimistic and authoritative commissioning", () => {
+  const t = smithFixture(),
+    visible = projectRecord(t, smithPlayer),
+    design = smithDesign(visible);
+  const q = smithQuote(visible, "forge", "hero", design);
+  const command = {
+    id: "projected-commission",
+    kind: "smith-order" as const,
+    shopId: "forge",
+    purseId: "hero",
+    design,
+    before: q.before,
+  };
+  const optimistic = applyCommand(visible, smithPlayer, command),
+    authoritative = applyCommand(t, smithPlayer, command);
+  assert.equal(
+    optimistic.journal!.blacksmith!.orders[0].terms.costCopper,
+    authoritative.journal!.blacksmith!.orders[0].terms.costCopper,
+  );
+  assert.deepEqual(
+    optimistic.purses.find((p) => p.id === "hero")!.coins,
+    authoritative.purses.find((p) => p.id === "hero")!.coins,
+  );
+  assert.deepEqual(visible.journal!.propertyOperations!.materials.map((m) => m.key).sort(), [
+    "leather",
+    "steel",
+    "wood",
+  ]);
 });
 test("offline deletion and backup validation protect open commissions atomically; resolved history is retained", async () => {
   const {
