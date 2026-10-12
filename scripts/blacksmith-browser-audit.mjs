@@ -3,6 +3,7 @@ import { chromium } from "playwright";
 import { expect } from "playwright/test";
 import { mkdir, writeFile } from "node:fs/promises";
 import { smithFixture } from "../src/lib/quire/test-fixtures/blacksmith.ts";
+import { validateWorld } from "../src/lib/quire/world.ts";
 import {
   openApplication,
   reloadApplication,
@@ -49,7 +50,15 @@ async function readJournal(page) {
 }
 async function submit(form, button, accepted) {
   await form.getByRole("button", { name: button, exact: true }).click();
-  await accepted();
+  await Promise.race([
+    accepted(),
+    form
+      .getByRole("alert")
+      .waitFor({ state: "visible", timeout: 20000 })
+      .then(async () => {
+        throw Error(await form.getByRole("alert").innerText());
+      }),
+  ]);
   await expect(form.getByRole("alert")).toHaveCount(0);
 }
 const formFor = (page, label) =>
@@ -94,8 +103,8 @@ try {
     await openApplication(page, origin + "/market");
     const fixture = smithFixture();
     fixture.journal.world.npcs[0].blacksmithServices = false;
-    fixture.purses.find((p) => p.id === "other").control = "npc";
-    fixture.purses.find((p) => p.id === "other").nonParty = true;
+    fixture.purses = fixture.purses.filter((p) => p.id !== "other");
+    validateWorld(fixture);
     await page.evaluate(async (table) => {
       const active = localStorage.getItem("quire.campaign.v1"),
         name =
