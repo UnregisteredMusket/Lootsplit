@@ -12759,5 +12759,22 @@
     "finishedAt": "2026-10-12T08:57:06Z",
     "durationMs": 1000,
     "trendId": "38226688401:1:740893d51bd1d88e2df657c3ec63fa0a1bb7821c089a526b0b66913ebc2c7745"
+  },
+  "[\".github/workflows/verify.yml\",\"pull_request\",\"pull-request\",\"step\",\"Development / gameplay / dev-blacksmith\",\"ubuntu-latest\",1]": {
+    "schema": 1,
+    "id": "38233656239:1:bc3c66d08179137ac1af108f0211b13720c4255b1fcc91c6f9bc8829cf531621",
+    "scope": "[\".github/workflows/verify.yml\",\"pull_request\",\"pull-request\",\"step\",\"Development / gameplay / dev-blacksmith\",\"ubuntu-latest\",1]",
+    "kind": "step",
+    "name": "Development / gameplay / dev-blacksmith",
+    "environment": "ubuntu-latest",
+    "commit": "f4ce71a1ab89051ef9f7002067e0b0cb1dfb5f15",
+    "runId": 38233656239,
+    "attempt": 1,
+    "url": "https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38233656239/job/114758906127",
+    "outcome": "failure",
+    "startedAt": "2026-10-12T10:03:38Z",
+    "finishedAt": "2026-10-12T10:04:06Z",
+    "durationMs": 28000,
+    "trendId": "38233656239:1:bc3c66d08179137ac1af108f0211b13720c4255b1fcc91c6f9bc8829cf531621"
   }
 }
