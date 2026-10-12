@@ -1,4 +1,6 @@
 import { shipCommands, type ShipCommand } from "./ships-schema.ts";
+import { downtimeActivityCommands, type DowntimeActivityCommand } from "./downtime-activities-schema.ts";
+import { applyDowntimeActivity, validateDowntimeActivities } from "./downtime-activities.ts";
 import { smithCommands, type SmithCommand } from "./blacksmith-schema.ts";
 import { applyShipCommand, validateFleet, assertShipTradingHere } from "./ships.ts";
 import { characterVisible, canReadCharacter } from "./character-position.ts";
@@ -64,6 +66,7 @@ export const commandSchema = z.discriminatedUnion("kind", [
   ...estateCommands,
   ...shipCommands,
   ...smithCommands,
+  ...downtimeActivityCommands,
   estateImportCommand,
   z.object({ ...base, kind: z.literal("resource-pack-import"), before: z.string().max(30000), pack: resourcePackSchema }).strict(),
   z.object({ ...base, kind: z.literal("listing-edit"), listingId: id, before: listingSchema.nullable(), after: listingSchema.nullable() }),
@@ -330,6 +333,8 @@ export function applyCommand(input: CloudTable, seat: CloudSeat, raw: Command, e
   }
   if (cmd.kind === "ledger-void") {
     applyLedgerVoid(t, seat, cmd, at, execution.source === "local");
+  } else if (downtimeActivityCommands.some(schema => schema.shape.kind.value === cmd.kind)) {
+    applyDowntimeActivity(t, seat, cmd as DowntimeActivityCommand, at, execution.preview === true);
   } else if (tradeCommands.some((schema) => schema.shape.kind.value === cmd.kind)) {
     applyTradeCommand(t, seat, cmd as TradeCommand, at, execution);
   } else if (worldCommands.some((schema) => schema.shape.kind.value === cmd.kind)) {
@@ -1154,6 +1159,7 @@ export function applyCommand(input: CloudTable, seat: CloudSeat, raw: Command, e
   validateWorld(t);
   validateFleet(t);
   validateBlacksmith(t);
+  validateDowntimeActivities(t, execution.preview === true);
   return t;
 }
 export function same(a: unknown, b: unknown): boolean {

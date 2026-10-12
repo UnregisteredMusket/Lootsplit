@@ -953,6 +953,8 @@ export async function removePurse(id: string): Promise<void> {
     );
     const journal = readJournal(row?.value);
     assertFinanceAccountRemovable(journal.finance, id);
+    if (journal.downtimeActivities?.requests.some(r => r.status === "pending" && [r.trainerId,r.npcId].includes(id)))
+      throw Error("Resolve pending NPC training before removing this character.");
     if (journal.blacksmith?.profiles.some(p => p.npcId === id))
       throw Error("Remove this maker's forge configuration before deleting the NPC account.");
     if (journal.blacksmith?.orders.some(o => o.purseId === id && ["active", "paused", "ready"].includes(o.status)))
@@ -2436,8 +2438,7 @@ export async function executeFinanceCommand(
     throw Error("Not a finance command.");
   const market =
     input.kind === "shop-schedule" ||
-    input.kind === "downtime-plan" ||
-    input.kind === "downtime-apply" ||
+    input.kind.startsWith("downtime-") ||
     input.kind === "session";
   const stores: Parameters<typeof atomic>[0] = [
     "purses",

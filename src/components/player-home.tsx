@@ -47,6 +47,9 @@ export function PlayerHome() {
         <AppLink className="settings-link" href="/share">
           Campaign, messages & session status →
         </AppLink>
+        <AppLink className="settings-link" href="/features/downtime">
+          Downtime & NPC training →
+        </AppLink>
       </section>
       <section className="desk-shortcuts" aria-label="Player features">
         <div className="shortcut-grid">

@@ -1,4 +1,5 @@
 import { facilityAccess } from "./ships.ts";
+import { readDowntimeActivities } from "./downtime-activities-schema.ts";
 import { readBlacksmith } from "./blacksmith-schema.ts";
 import { characterVisible, canReadCharacter, inParty } from "./character-position.ts";
 import { readWorld } from "./world-schema.ts";
@@ -118,6 +119,18 @@ export function projectRecord(
       delete world.partyPosition.y;
     }
     world.npcs = world.npcs.filter((npc) => readableNpcs.has(npc.id));
+    if (t.journal.downtimeActivities) {
+      const activities = readDowntimeActivities(t.journal.downtimeActivities);
+      activities.windows = activities.windows.map((w) => ({
+        ...w,
+        budgets: w.budgets.filter((b) => seat.purseIds.includes(b.purseId)),
+      }));
+      activities.requests = activities.requests
+        .filter((r) => seat.purseIds.includes(r.trainerId))
+        .map((r) => (readableNpcs.has(r.npcId) ? r : { ...r, npcName: "Unavailable NPC" }));
+      activities.resets = activities.resets.filter((r) => seat.purseIds.includes(r.trainerId));
+      t.journal.downtimeActivities = activities;
+    }
     if (options.directory)
       world.partyCharacters = t.purses
         .filter(
@@ -205,10 +218,15 @@ export function projectRecord(
     t.shops = t.shops.filter((shop) => shopVisible(shop, t));
     if (t.journal.blacksmith) {
       const smith = readBlacksmith(t.journal.blacksmith);
-      smith.profiles = smith.profiles.filter(p => t.shops.some(s => s.id === p.shopId) && readableNpcs.has(p.npcId));
+      smith.profiles = smith.profiles.filter(
+        (p) => t.shops.some((s) => s.id === p.shopId) && readableNpcs.has(p.npcId),
+      );
       // Only offered enchantments are public; approval drafts remain DM-only.
-      smith.profiles = smith.profiles.map(p => ({ ...p, enchantments: p.enchantments.filter(e => e.approved) }));
-      smith.orders = smith.orders.filter(o => seat.purseIds.includes(o.purseId));
+      smith.profiles = smith.profiles.map((p) => ({
+        ...p,
+        enchantments: p.enchantments.filter((e) => e.approved),
+      }));
+      smith.orders = smith.orders.filter((o) => seat.purseIds.includes(o.purseId));
       t.journal.blacksmith = smith;
     }
     t.listings = t.listings.filter(
@@ -240,7 +258,7 @@ export function projectRecord(
                 return s?.locationId ? [s.locationId] : [];
               }),
             t.shops.flatMap((s) => (s.locationId ? [s.locationId] : [])),
-            t.journal.blacksmith?.orders.map(o => o.terms.locationId) ?? [],
+            t.journal.blacksmith?.orders.map((o) => o.terms.locationId) ?? [],
             t.listings.flatMap((l) => (l.locationId ? [l.locationId] : [])),
             t.journal.tradeEconomy?.exchanges.flatMap((e) =>
               e.locationId ? [e.locationId] : [],
@@ -292,7 +310,8 @@ export function projectRecord(
         ),
         ...recipes.map((recipe) => recipe.output?.materialKey),
         ...(t.journal.tradeEconomy?.commodities.map((c) => c.materialKey) ?? []),
-        ...(t.journal.blacksmith?.profiles.flatMap(p => p.materials.map(m => m.materialKey)) ?? []),
+        ...(t.journal.blacksmith?.profiles.flatMap((p) => p.materials.map((m) => m.materialKey)) ??
+          []),
       ]);
       estate.materials = estate.materials.filter((material) => materials.has(material.key));
     }

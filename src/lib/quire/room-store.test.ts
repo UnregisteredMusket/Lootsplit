@@ -50,6 +50,106 @@ test("shared blacksmith commissions debit materials and funds once, enforce DM e
   assert.match(saved.holdings.find(h => h.id.endsWith("-crafted"))!.notes, /Made by Aster/);
 });
 sql.exec(readFileSync(new URL("../../../cloudflare/migrations/0008_encounters.sql", import.meta.url), "utf8"));
+test("shared hourly training preserves private NPC budgets and applies requests, decisions and resets once", async () => {
+  const { choosePace } = await import("./cloud.server.ts");
+  const { blankSheet } = await import("../characters/model.mjs");
+  const { trainingCounters } = await import("./downtime-activities.ts");
+  const table = smithFixture();
+  table.purses.find((p) => p.id === "hero")!.sheet = { ...blankSheet(), name: "Hero", level: 5 };
+  const host = await openRoom({ name: "Training DM", table });
+  const guest = await joinRoom({ code: host.code, purseId: "hero", name: "Training player" });
+  const auth = { code: host.code, token: guest.token };
+  await choosePace({ ...host, live: true });
+  await submitCommands({
+    ...host,
+    batchId: "training-clock",
+    commands: [{ id: "training-clock", kind: "downtime-plan", name: "Training day", days: 1 }],
+  });
+  await submitCommands({
+    ...host,
+    batchId: "training-clock-apply",
+    commands: [
+      {
+        id: "training-clock-apply",
+        kind: "downtime-apply",
+        downtimeId: "training-clock",
+        endSession: false,
+      },
+    ],
+  });
+  const before = (await roomState(host)).table;
+  const view = (await roomState(auth)).table;
+  assert.deepEqual(
+    view.journal!.downtimeActivities!.windows[0].budgets.map((b) => b.purseId),
+    ["hero"],
+  );
+  const request = {
+    id: "shared-training",
+    kind: "downtime-training" as const,
+    windowId: "training-clock",
+    trainerId: "hero",
+    npcId: "maker",
+    category: "martial" as const,
+    topic: "Weapon care",
+    description: "Blade maintenance and stance drills",
+    className: "",
+    minutes: 480,
+  };
+  const preview = applyCommand(
+    view,
+    {
+      id: guest.seatId,
+      token: guest.token,
+      name: "Training player",
+      role: "player",
+      purseIds: ["hero"],
+    },
+    request,
+    { preview: true },
+  );
+  assert.equal(preview.journal!.downtimeActivities!.requests.length, 1);
+  await submitCommands({ ...auth, batchId: "shared-training-first", commands: [request] });
+  await submitCommands({ ...auth, batchId: "shared-training-retry", commands: [request] });
+  let saved = (await roomState(host)).table;
+  const r = saved.journal!.downtimeActivities!.requests[0];
+  assert.equal(saved.journal!.downtimeActivities!.requests.length, 1);
+  const approve = {
+    id: "approve-training",
+    kind: "downtime-training-review",
+    requestId: r.id,
+    before: r,
+    approve: true,
+    note: "DM confirms NPC is lower level and time was completed together.",
+  };
+  await assert.rejects(
+    submitCommands({ ...auth, batchId: "forged-training-approve", commands: [approve] }),
+    /Only the DM/,
+  );
+  await submitCommands({ ...host, batchId: "training-approve-first", commands: [approve] });
+  await submitCommands({ ...host, batchId: "training-approve-retry", commands: [approve] });
+  saved = (await roomState(host)).table;
+  assert.deepEqual(saved.purses, before.purses);
+  assert.deepEqual(saved.holdings, before.holdings);
+  assert.deepEqual(saved.sheets, before.sheets);
+  assert.equal(trainingCounters(saved.journal!.downtimeActivities!)[0].lifetimeMinutes, 480);
+  const reset = {
+    id: "training-reset",
+    kind: "downtime-training-reset",
+    trainerId: "hero",
+    npcId: "maker",
+    category: "martial",
+    topic: "Weapon care",
+    before: [r.id],
+    note: "Milestone applied manually.",
+  };
+  await submitCommands({ ...host, batchId: "training-reset-first", commands: [reset] });
+  await submitCommands({ ...host, batchId: "training-reset-retry", commands: [reset] });
+  saved = (await roomState(host)).table;
+  assert.equal(saved.journal!.downtimeActivities!.resets.length, 1);
+  assert.equal(trainingCounters(saved.journal!.downtimeActivities!)[0].currentMinutes, 0);
+  assert.equal(trainingCounters(saved.journal!.downtimeActivities!)[0].lifetimeMinutes, 480);
+  await deleteRoom(host.code, (await roomState(host)).revision);
+});
 test("shared ships enforce DM overrides, player-owned boarding reviews, projection privacy and one-time receipts", async()=>{
   const {defaultShip}=await import("./ships-schema.ts"),{shipFingerprint}=await import("./ships.ts");
   let table=tradeFixture();

@@ -1192,6 +1192,7 @@ export function previewEstate(
   for (const p of working.purses) p.coins = fromCopper(balances.get(p.id)!);
   working.ledger = [];
   const notices: { propertyId: string; summary: string }[] = [];
+  const characterWorkDays = new Map<string, number>();
   const blocked = (error: unknown) =>
     error instanceof Error ? error.message : "This operation needs DM review.";
   const runOrder = (
@@ -1503,6 +1504,16 @@ export function previewEstate(
         continue;
       }
       if (supervisor) supervisor.budgetSpentCopper += cost;
+      if (!time && characterWork) {
+        const used = Math.min(labor, characterWork);
+        for (const assignment of job.assignments)
+          if (physicallyHere(working, property(working, job.propertyId), assignment.purseId))
+            characterWorkDays.set(
+              assignment.purseId,
+              (characterWorkDays.get(assignment.purseId) ?? 0) +
+                (used * assignment.share) / dailyCharacterWork / 100,
+            );
+      }
       if (time) {
         job.characterWorkRemainder = charUnits % 1440;
         job.paidWorkRemainder = paidUnits % 1440;
@@ -1693,6 +1704,9 @@ export function previewEstate(
       ? { fleet: working.journal!.fleet, world: working.journal!.world }
       : {}),
     state: readEstate(s),
+    ...(!time
+      ? { characterWorkDays: [...characterWorkDays].map(([purseId, days]) => ({ purseId, days })) }
+      : {}),
     holdings: working.holdings,
     stock: working.stock,
     movements,

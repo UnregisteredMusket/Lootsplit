@@ -1,5 +1,7 @@
 # Lootsplit
 
+[Hourly downtime and NPC training](docs/DOWNTIME-ACTIVITIES.md) gives each character 16 usable hours per approved downtime day by default. Players allocate training across Martial, Academic or Skill / Profession with a written description; the DM reviews eligibility and records manual milestone resets. Training changes no character sheets, and lifetime hours/days remain saved. The DM configures daily hours and the default 8-hour training-day conversion. Property work shares the resource; ship travel uses no personal hours. The guide also proposes additional tracking activities for a later decision.
+
 Blacksmith shops now support [custom weapon and armor commissions](docs/BLACKSMITH-SERVICES.md): component designs, engravings, player material contributions, DM-configured skill/rarity pricing and quality, approved magical enchantments, NPC service permission and completion through campaign downtime. Finished inventory descriptions retain maker and campaign dates. Existing ordinary shop services and stock remain available.
 
 Encounter initiative stays in roster order while scores are entered or edited. In **Battle tracker**, press **Sort initiative** to arrange scores highest first, with ties stable and blank scores last. **Next turn** follows the saved order; sorting keeps the active combatant and round.

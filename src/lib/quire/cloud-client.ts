@@ -199,9 +199,11 @@ export function captureMutationScope(): MutationScope {
 export async function searchCampaignReference(query: import("./open5e.ts").OpenQuery) {
   const current = session();
   const { searchOpen5e, searchScopedOpen5e } = await import("./open5e-api.ts");
-  return current ? searchScopedOpen5e({ data: { ...query,
-    campaign: { code: current.code, token: current.token },
-  } }) : searchOpen5e({ data: query });
+  return current
+    ? searchScopedOpen5e({
+        data: { ...query, campaign: { code: current.code, token: current.token } },
+      })
+    : searchOpen5e({ data: query });
 }
 export function assertMutationScope(expected: ExpectedMutationScope): void {
   const actual = captureMutationScope();
@@ -414,6 +416,7 @@ async function accept(value: RoomView, committed = false) {
             purseIds: remote.purseIds,
           },
           cmd,
+          { preview: true },
         );
       await applyCloudTable(preview);
     } catch (error) {
@@ -715,6 +718,7 @@ export async function queueCommand(
         purseIds: current.purseIds,
       },
       command,
+      { preview: true },
     );
     current.pending.push(command);
     current.batchId = crypto.randomUUID();

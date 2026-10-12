@@ -183,9 +183,16 @@ export const rentalSchema = z
   })
   .strict();
 export const orderSchema = z.discriminatedUnion("kind", [
-  z.object({ kind: z.literal("market"), exchangeId: id, commodityId: estateKey,
-    direction: z.enum(["buy", "sell"]), quantity: quantity.max(100000),
-    limitCopper: money }).strict(),
+  z
+    .object({
+      kind: z.literal("market"),
+      exchangeId: id,
+      commodityId: estateKey,
+      direction: z.enum(["buy", "sell"]),
+      quantity: quantity.max(100000),
+      limitCopper: money,
+    })
+    .strict(),
   z.object({ kind: z.literal("message"), text: z.string().min(1).max(2000) }).strict(),
   z.object({ kind: z.literal("report") }).strict(),
   z.object({ kind: z.literal("project"), jobId: id, active: z.boolean() }).strict(),
@@ -318,6 +325,9 @@ export const custodySchema = z
   .strict();
 export type zCustody = z.infer<typeof custodySchema>;
 export const estateQuoteSchema = z.object({
+  characterWorkDays: z
+    .array(z.object({ purseId: id, days: z.number().nonnegative().max(3650) }))
+    .optional(),
   fleet: fleetSchema.optional(),
   world: worldSchema.optional(),
   tradeEconomy: tradeEconomySchema.optional(),

@@ -1,4 +1,9 @@
 import { completeCharacterDowntime } from "./character-position.ts";
+import { previewActivityWindow } from "./downtime-activities.ts";
+import {
+  downtimeActivityQuoteSchema,
+  readDowntimeActivities,
+} from "./downtime-activities-schema.ts";
 import { scheduledMarket } from "./shop-schedule.ts";
 import { estateQuoteSchema } from "./estate-schema.ts";
 import { estateRuleEligible, previewEstate } from "./estate.ts";
@@ -59,6 +64,7 @@ const lineSchema = z.object({
   balance: money,
 });
 export const quoteSchema = z.object({
+  downtimeActivities: downtimeActivityQuoteSchema.optional(),
   blacksmith: smithQuoteSchema.optional(),
   tradeSeason: tradeSeasonQuoteSchema.optional(),
   propertyOperations: estateQuoteSchema.optional(),
@@ -307,10 +313,30 @@ export function previewDowntime(
     : undefined;
   const smith = previewSmith({ journal: table.journal }, days, !!estateTime);
   return quoteSchema.parse({
+    ...(!estateTime
+      ? {
+          downtimeActivities: previewActivityWindow(
+            { purses: table.purses, journal: table.journal },
+            days,
+            operations?.characterWorkDays,
+          ),
+        }
+      : {}),
     ...(smith ? { blacksmith: smith } : {}),
-    ...(seasonReceiptId && table.journal?.tradeEconomy?.settings.enabled ? { tradeSeason: previewTradeSeason({
-      ...table, journal: { ...table.journal, tradeEconomy: operations?.tradeEconomy ?? table.journal.tradeEconomy },
-    }, seasonReceiptId) } : {}),
+    ...(seasonReceiptId && table.journal?.tradeEconomy?.settings.enabled
+      ? {
+          tradeSeason: previewTradeSeason(
+            {
+              ...table,
+              journal: {
+                ...table.journal,
+                tradeEconomy: operations?.tradeEconomy ?? table.journal.tradeEconomy,
+              },
+            },
+            seasonReceiptId,
+          ),
+        }
+      : {}),
     ...(operations ? { propertyOperations: operations } : {}),
     ...(market.length ? { market } : {}),
     loans: f.loans,
@@ -359,11 +385,24 @@ export function applyDowntime(
   const d = f.downtime.find((d) => d.id === downtimeId);
   if (!d || d.status !== "pending") throw Error("Downtime is missing or has already been decided.");
   const quote = previewDowntime(table, f, d.days, undefined, d.quote.tradeSeason?.id);
-  if (JSON.stringify(quote) !== JSON.stringify(d.quote))
+  // An older saved pending quote has no hourly metadata. Compare its original
+  // fields, then add the new resource window in the same authoritative approval.
+  const comparable = structuredClone(quote);
+  if (!d.quote.downtimeActivities) delete comparable.downtimeActivities;
+  if (comparable.propertyOperations && !d.quote.propertyOperations?.characterWorkDays)
+    delete comparable.propertyOperations.characterWorkDays;
+  if (JSON.stringify(comparable) !== JSON.stringify(d.quote))
     throw Error(
       "Campaign finances changed after this preview. Recalculate downtime before approving.",
     );
   applyFinanceQuote(table, quote, { id: d.id, name: d.name }, at);
+  if (quote.downtimeActivities) {
+    const activities = readDowntimeActivities(table.journal!.downtimeActivities);
+    if (activities.windows.some((w) => w.id === d.id))
+      throw Error("This hourly downtime period is already recorded.");
+    activities.windows.push({ ...quote.downtimeActivities.window, id: d.id, name: d.name });
+    table.journal!.downtimeActivities = activities;
+  }
   f.day += d.days;
   completeCharacterDowntime(table, at);
   d.status = "applied";
@@ -372,7 +411,12 @@ export function applyDowntime(
 }
 
 /** Shared atomic settlement for approved downtime and within-session clock advances. */
-export function applyFinanceQuote(table: CloudTable, quote: z.infer<typeof quoteSchema>, receipt: {id:string;name:string}, at:number) {
+export function applyFinanceQuote(
+  table: CloudTable,
+  quote: z.infer<typeof quoteSchema>,
+  receipt: { id: string; name: string },
+  at: number,
+) {
   const f = table.journal!.finance!;
   for (const l of quote.lines) {
     const debt = quote.loans.find((x) => x.id === l.id);
@@ -409,8 +453,13 @@ export function applyFinanceQuote(table: CloudTable, quote: z.infer<typeof quote
   if (quote.blacksmith) {
     table.journal!.blacksmith = quote.blacksmith.state;
     for (const [i, notice] of quote.blacksmith.notices.entries())
-      table.journal!.events.push({ id: `${receipt.id}-smith-${i}`, at, kind: "management",
-        purseId: notice.purseId, summary: notice.summary.slice(0, 500) });
+      table.journal!.events.push({
+        id: `${receipt.id}-smith-${i}`,
+        at,
+        kind: "management",
+        purseId: notice.purseId,
+        summary: notice.summary.slice(0, 500),
+      });
   }
   if (quote.propertyOperations) {
     const operations = quote.propertyOperations;

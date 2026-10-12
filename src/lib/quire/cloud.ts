@@ -1,4 +1,5 @@
 import { characterVisible } from "./character-position.ts";
+import { validateDowntimeActivities } from "./downtime-activities.ts";
 import {
   readJournal,
   readValidatedJournal,
@@ -95,6 +96,7 @@ export function readCloudTable(value: unknown): CloudTable | null {
     validateWorld(table as CloudTable, true);
     validateFleet(table as CloudTable, true);
     validateBlacksmith(table as CloudTable, true);
+    validateDowntimeActivities(table as CloudTable, true);
   } catch { return null; }
   return {
     journal: readJournal(table.journal),

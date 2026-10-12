@@ -27,6 +27,7 @@ import { CharacterImportReviews } from "@/components/character-import-reviews";
 import { getCloudTable, getServerCloudTable, subscribeCloudTable } from "@/lib/quire/cloud-client";
 import { SettingsPage } from "@/components/settings-page";
 import { LocalAudioPanel } from "@/components/local-audio-panel";
+import { DowntimeActivities } from "@/components/downtime-activities";
 // Load exchange editors only for this screen. Downtime shares the small review
 // without pulling every market editor into startup.
 const TradeEconomyPanel = lazy(() =>
@@ -103,11 +104,12 @@ function FeaturePage() {
               (dm ? <CampaignJournal section="reports" /> : <PersonalFinances />)}
             {feature === "downtime" && (
               <>
+                <DowntimeActivities />
                 <AppLink className="settings-link" href="/features/properties">
                   Property Management →
                 </AppLink>
                 <CampaignFinance section="downtime" />
-                <CampaignJournal section="sessions" />
+                {dm && <CampaignJournal section="sessions" />}
               </>
             )}
             {feature === "financial" && (
@@ -149,6 +151,7 @@ function FeaturePage() {
             )}
             {feature === "review" && (
               <>
+                {(!code || code === room.code) && <DowntimeActivities reviewsOnly />}
                 <PropertyOperationReviews />
                 {(!code || code === room.code) && <CampaignJournal section="bank" reviewOnly />}
                 {code || room.joined ? (
