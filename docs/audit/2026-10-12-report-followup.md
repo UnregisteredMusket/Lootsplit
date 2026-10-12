@@ -1,0 +1,48 @@
+# October 12 report foundation improvements
+
+The owner authorized the feature/backend review's functional improvements before a separate UI redesign. Baseline source/live main: `3b391090c3e954da25dc9e4cad4f547ce029827c`. See [acceptance plan](../plans/REPORT-FOLLOWUP.md). All existing features, private projections, offline DM/Live/turn-based modes, memory-only guests, exact receipts, old saves and recovery paths remain the preservation contract.
+
+## Implemented mapping
+
+| Finding | Result |
+| --- | --- |
+| F01 | Existing 10,000 ms CPU limit, persistent invocation logs, full existing log sampling and query redaction are explicit in source/artifact policy. Post-deploy and read-only live verification compare actual values and fail on drift. |
+| F02/F04 | Compact authenticated unchanged envelopes skip full table/media/reference hydration and projection. The running document must first commit a full snapshot; fresh account/seat/closure and encounter-active checks remain. Initial/changed/manual reads and installed older clients retain full snapshots. One bounded read-only protocol fallback keeps pending work. Command batches own one working clone, validate every action, deduplicate exact IDs and preserve random draws across CAS retries. |
+| F03 | Complete development ships, blacksmith, downtime, map-tiles and world-feature audits move from gameplay to desktop. All 36 development audits, individual bounds, 15-minute group bounds, two packaged Worker groups, standby and nine mandatory jobs remain. The gameplay/desktop job display names carry balanced-v2 scopes because their workload differs; individual unchanged stages and complete first-attempt workflow totals provide comparable evidence. |
+| F05/F06/F15 | Inventory accurately identifies local OCR, six main tabs and implemented map tiles/routes. Both Help guides, README, downtime/ship guides and coding manual are reconciled. Exact-source full callable CSV/summary become verification artifacts; dated checked-in evidence remains historical. |
+| F07 | Android 1.7.0/code10 candidate includes current functionality with unchanged package/permanent certificate and a versioned three-category changelog. Public download metadata must stay 1.6.0 until signed APK/certificate/checksum are verified. |
+| F08 | DM NPC/category counters combine teachers/subjects; original per-teacher counters and reset history remain. Subject Unicode/case/spacing normalization changes grouping only. Category resets capture exact outstanding request IDs, reject stale totals, retain lifetime/captured conversions and refund no hours. Player counters are labeled own-contribution totals, never complete private NPC balances. |
+| F09 | Explicit historical context plus DM historical-confirmation checkbox/note allows late time bookkeeping after movement/level changes. Current ownership/visibility, canonical identities, selected-period budgets, pending reservations and stale checks remain; ordinary current-context checks stay unchanged. No sheet edits/rewards occur. |
+| F10 | Calendar days (24 elapsed hours), configured usable allowances (default16) and captured training-day conversions (default8) are distinct. Away controls add quarter-hour elapsed duration with optional minutes, retaining old whole-day commands and exact return clocks. Existing away prorating, property labor, session time, smith and voyage rules stay intact. |
+| F11 | Trusted failure reporter now uses production secret scope. A publication readiness check records missing setting names only, with deliveryTested=false. It never sends a test message, infers a recipient or claims delivery. Actual credentials/provider/domain/recipient remain required if settings are absent. |
+| F12 | Sampled/slow/failed read events identify full-read/poll, phases, outcome and wall duration. They exclude account/room/seat IDs, tokens, query strings, payloads and raw error text. These are wall timings, not per-function CPU measurements. |
+| F13/F14 | Recovery-fenced Worker-first assets and authorized D1 media/reference storage remain. The compact path removes repeated unchanged media hydration. Current measured D1 is ~14 MB; no demonstrated storage or consistency bottleneck justifies R2, replicas or Durable Objects now. Optional metered services remain unconfigured. Asset/changed-read and live timing evidence should guide a later targeted decision. |
+| F16 | Ten self/environment downtime activities, automatic milestone thresholds and unrelated taxes/foreclosure proposals remain documented designs. They are not claimed live. UI redesign follows this functional release and preserves the feature/permission tree. |
+
+## Measured performance
+
+Fixed synthetic inputs, Node22.23.3, same workspace, warm SQLite-memory room benchmark. Measurements include response serialization; they exclude network/auth middleware/live D1 and are not live latency promises. Full source measurements and timestamps: [benchmark evidence](report-followup-benchmarks.json).
+
+| Operation | Before mean | After mean | Saved | Reduction |
+| --- | ---: | ---: | ---: | ---: |
+| Unchanged large room (40 characters, 6 maps, 2,000 ledger rows; 30 samples) | 44.48 ms full read | 0.55 ms compact read | 43.93 ms | 98.76% |
+| Response size for that room | 1,372,161 bytes | 141 bytes | 1,372,020 bytes | 99.99% |
+| 20 portrait commands (40 characters, 6 maps; 20 samples) | 85.02 ms individual clones | 45.88 ms owned batch | 39.14 ms | 46.03% |
+
+Post-change complete read mean40.87ms/p9561.50ms versus baseline44.48ms/p9559.35ms: +3.63% p95, below the15% regression threshold; do not claim every changed read became faster. Compact p950.71ms. Batch p95105.39→55.49ms. Budget/private/retry tests remain the correctness requirement.
+
+Performance history was refreshed before work:918 retained qualifying regression entries,433 trends,416 open,241 repeatedly open;17 recorded resolutions and one old pending run. Latest recorder38292728572 succeeded at18:42:40UTC. Prior development/gameplay883s was near900s cap; last main846s versus prior896s (-50s,5.58%) was observed workflow behavior, not this optimization's effect. New CI observations require a fresh full-workflow comparison and inclusive>=15% logging; redistributed group totals cannot establish a same-workload speedup or justify resetting old trends.
+
+## Verification and release checkpoint
+
+Local browser doctor: Node22 available, required Playwright headless Chromium1243 absent. No browser pass is claimed locally; current-browser CI development/immutable Worker checks must close that environment gap. Local npm test passed:389 script checks (four pre-existing skips),549 app/mobile checks and55 supporting checks;993 passes and zero failures. Typecheck, lint (zero errors), web build and bundled mobile build passed. Exact PR/main runs, published runtime check, Android signature and actual email readiness are recorded in the final checkpoint after completion. Physical Android installation/file-picker/force-close remains separate device validation.
+
+Both DM/player Help were reviewed for training privacy, historical review, resets and time units. App shell/navigation design is unchanged; functional controls reuse existing forms/folds. The UI redesign should organize the existing growing surface only after the release passes preservation gates.
+
+## Local slowdown observation
+
+The same389-check script test phase measured13,615.395ms then17,058.702ms (+3,443.306ms,25.29%). The latter ran concurrently with mobile build/typecheck in this workspace; this is measured machine contention, not a proven application regression. Keep the observation rather than resetting a faster reference. TAP phase durations are measured; exact per-phase wall start/end was not instrumented, so none is fabricated for a normalized performance-history import. New controlled measurements should use the recovery-step timing wrapper. CI remains independently recorded with exact timestamps.
+
+## First PR browser diagnosis
+
+PR105 headcb3ca39 run38301994659 passed immutable code/build checks and the expanded downtime browser cases, then exposed two protocol integration issues. Governance read rejection came from comparing a legacy local account cache with a server seat that legitimately omitted account identity. Compact envelopes now compare exact user/session identity from the last accepted authoritative snapshot; unexpected identities still fail. The market lost-response fixture blocked a single full-read URL, letting the additive conditional endpoint acknowledge a saved action before the required visible Retry assertion. It now holds both room-read protocols with every recovery/receipt assertion retained. New focused tests cover legacy linked identity and unexpected envelope identity. Do not retry unchanged failed source; the corrected head requires fresh full CI before merge.

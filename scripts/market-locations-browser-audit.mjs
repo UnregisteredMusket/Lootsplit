@@ -125,17 +125,16 @@ async function importResponseFaults(page, code) {
     const body = request.postData() || "";
     const sameRoom = body.includes(JSON.stringify(code)) && body.includes('"token"');
     const commands = sameRoom && body.includes('"commands"');
-    // During this Market flow, the code/token-only operation is the room pull.
-    // Learn its actual URL so this works with both development and packaged IDs.
-    if (
-      !fault.readUrl &&
+    // During this Market flow these are full and conditional room reads.
+    // Hold both protocols so background acknowledgement cannot bypass Retry.
+    const roomRead =
       request.method() === "POST" &&
       sameRoom &&
       !commands &&
       !["action", "endpoint", "live", "purseId", "table", "endTurn"].some((key) =>
         body.includes(JSON.stringify(key)),
-      )
-    )
+      );
+    if (!fault.readUrl && roomRead)
       fault.readUrl = request.url();
     if (commands) {
       const queue = await savedQueue(page);
@@ -156,7 +155,7 @@ async function importResponseFaults(page, code) {
         return route.fulfill({ status: 200, contentType: "application/json", body: "{}" });
       }
     }
-    if (fault.reads && request.url() === fault.readUrl) {
+    if (fault.reads && roomRead) {
       const retryMarker = fault.releaseOnTrustedRetry;
       if (retryMarker && (await page.evaluate((key) => window[key] === true, retryMarker))) {
         // Release only after the actual click, not while mobile scrolling is

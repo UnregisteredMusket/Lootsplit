@@ -87,11 +87,14 @@ export async function prepareDmFixture(page, origin, { useAccountLink = false } 
 export async function navigateApplication(page, destination) {
   const target = new URL(destination);
   if (page.url().startsWith(target.origin)) {
-    const links = page.locator("a[href]");
-    for (let i = 0; i < await links.count(); i++) {
-      const link = links.nth(i);
+    // Read hrefs in one DOM snapshot. Background sync may replace a live list
+    // between count/nth/getAttribute and make an unrelated index wait forever.
+    const hrefs = await page.locator("a[href]").evaluateAll(nodes => nodes.map(node => node.getAttribute("href")));
+    for (const href of hrefs) {
+      if (href === null) continue;
+      const link = page.locator(`a[href=${JSON.stringify(href)}]:visible`).first();
       if (!await link.isVisible()) continue;
-      const url = new URL(await link.getAttribute("href"), page.url());
+      const url = new URL(href, page.url());
       if (url.origin !== target.origin || url.pathname !== target.pathname ||
           (!target.search && url.search && !((target.pathname === "/market" && url.searchParams.get("book") === "") || (target.pathname === "/" && url.searchParams.get("view") === "home"))) ||
           [...target.searchParams].some(([key, value]) => url.searchParams.get(key) !== value)) continue;

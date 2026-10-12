@@ -248,6 +248,33 @@ try {
     await expect(guest.locator("#hourly-downtime")).toContainText(
       "Lifetime: 8 hours · 1 training days",
     );
+    // Preserve the original flow above, then exercise explicit historical review
+    // and the additive recipient/category meter on both audited viewports.
+    const historicalRequest = formFor(guest, "Request NPC training");
+    await chooseOption(historicalRequest.getByLabel("NPC receiving training", { exact: true }), "maker");
+    await historicalRequest.getByLabel("Training subject", { exact: true }).fill("SWORD   drills");
+    await historicalRequest.getByLabel("Hours to allocate", { exact: true }).fill("4");
+    await historicalRequest.getByLabel("Record training completed earlier").check();
+    await expect(historicalRequest.getByRole("button", { name:"Request NPC training",exact:true })).toBeDisabled();
+    await historicalRequest.getByLabel("Historical training context", { exact: true }).fill("Four hours completed in camp while pupil was level 3 and teacher level 5.");
+    await submit(historicalRequest,"Request NPC training",async()=>
+      expect.poll(async()=>(await journal(page)).downtimeActivities.requests.length).toBe(2));
+    const historicalDecision = formFor(page,"Record training decision");
+    await expect(historicalDecision.getByRole("button",{name:"Record training decision",exact:true})).toBeDisabled();
+    await historicalDecision.getByLabel("Training review note",{exact:true}).fill("Historical same-location, level and completed time confirmed.");
+    await historicalDecision.getByLabel("Confirm historical training: together, equal-or-lower levels and completed time at that time").check();
+    await submit(historicalDecision,"Record training decision",async()=>
+      expect.poll(async()=>(await journal(page)).downtimeActivities.requests[1].status).toBe("approved"));
+    await expect(guest.locator("#hourly-downtime")).toContainText("Lifetime: 12 hours · 1.5 training days");
+    await expect(guest.getByRole("button",{name:"Reset NPC category counter",exact:true})).toHaveCount(0);
+    await page.getByRole("button",{name:"DM category milestone & reset",exact:true}).click();
+    const categoryReset = formFor(page,"Reset NPC category counter");
+    await categoryReset.getByLabel("Manual milestone / reward note",{exact:true}).fill("Second manual milestone; reset reviewed category progress only.");
+    await submit(categoryReset,"Reset NPC category counter",async()=>
+      expect.poll(async()=>(await journal(page)).downtimeActivities.resets.length).toBe(2));
+    await expect(guest.locator("#hourly-downtime")).toContainText("hero: 4 hours available");
+    await expect(guest.locator("#hourly-downtime")).toContainText("My contributions by NPC and category");
+    await fits(page);await fits(guest);
     assert.equal(
       await guest.evaluate(() =>
         Object.keys(localStorage).some((k) => k.startsWith("quire.cloud.v2.")),

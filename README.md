@@ -1,3 +1,5 @@
+[Report foundation improvements](docs/audit/2026-10-12-report-followup.md) add authenticated compact unchanged sync reads, less cloning in atomic command batches, reproducible Cloudflare CPU/log policy, clearer time units, complete NPC/category training counters and explicitly reviewed historical bookkeeping. Existing saves, features and permissions remain. The broader UI redesign is a separate next phase.
+
 # Lootsplit
 
 [Hourly downtime and NPC training](docs/DOWNTIME-ACTIVITIES.md) gives each character 16 usable hours per approved downtime day by default. Players allocate training across Martial, Academic or Skill / Profession with a written description; the DM reviews eligibility and records manual milestone resets. Training changes no character sheets, and lifetime hours/days remain saved. The DM configures daily hours and the default 8-hour training-day conversion. Property work shares the resource; ship travel uses no personal hours. The guide also proposes additional tracking activities for a later decision.

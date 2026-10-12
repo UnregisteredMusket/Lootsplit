@@ -235,8 +235,17 @@ export type CommandInput = Command extends infer C
     : never
   : never;
 export function applyCommand(input: CloudTable, seat: CloudSeat, raw: Command, execution: TradeExecution = {}): CloudTable {
+  return applyOwnedCommand(structuredClone(input), seat, raw, execution);
+}
+/** One private working copy per atomic batch. Every command retains its full validation. */
+export function applyCommandBatch(input: CloudTable, seat: CloudSeat, commands: Command[], executionFor: (command: Command) => TradeExecution = () => ({})): CloudTable {
+  let table = structuredClone(input);
+  for (const command of commands) table = applyOwnedCommand(table, seat, command, executionFor(command));
+  return table;
+}
+function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, execution: TradeExecution): CloudTable {
+  const originalLocations = structuredClone(t.journal?.market?.locations);
   const cmd = commandSchema.parse(raw);
-  const t = structuredClone(input);
   const at = Date.now();
   const journal = (t.journal = readJournal(t.journal));
   // Exchange editors can address a legacy city's default before its first save.
@@ -1130,7 +1139,7 @@ export function applyCommand(input: CloudTable, seat: CloudSeat, raw: Command, e
   }
   if (journal.finance) journal.finance = readFinance(journal.finance);
   if (cmd.kind === "market-location" || cmd.kind === "market-name-import" || cmd.kind === "trade-exchange" ||
-    !same(input.journal?.market?.locations, t.journal?.market?.locations))
+    !same(originalLocations, t.journal?.market?.locations))
     ensureCityExchanges(t);
   validateEconomyRows(t);
   validateShopLocations(t.shops, t.journal?.market);

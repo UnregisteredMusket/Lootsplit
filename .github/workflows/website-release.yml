@@ -53,6 +53,18 @@ jobs:
         run: |
           node scripts/production-preflight.mjs
           npx wrangler deploy --config dist/website-release/wrangler.toml --no-bundle --keep-vars --message "GitHub verified $RELEASE_SHA run ${{ github.event.workflow_run.id }}"
+      - name: Verify deployed CPU and observability policy
+        env:
+          EXPECTED_RELEASE_SHA: ${{ env.RELEASE_SHA }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+        run: node scripts/runtime-policy.mjs
+      - name: Record failure-email readiness without sending mail
+        env:
+          RESEND_API_KEY: ${{ secrets.RESEND_API_KEY }}
+          FAILURE_REPORT_EMAIL: ${{ secrets.FAILURE_REPORT_EMAIL }}
+          FAILURE_REPORT_FROM: ${{ secrets.FAILURE_REPORT_FROM }}
+        run: node scripts/failure-report.mjs --check-config
       - name: Verify deployed identity and read-only desktop/mobile website behavior
         env:
           EXPECTED_RELEASE_SHA: ${{ env.RELEASE_SHA }}

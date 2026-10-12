@@ -673,7 +673,9 @@ function Projects({
     <>
       <p>
         Building work, repairs, gathering and production use DM-reviewed recipes. Assignments share
-        a character's downtime day. Materials are reserved and consumed at each completed stage.
+        a character's usable hours per approved downtime day (16 by default). A 50% assignment uses
+        half that allowance. Training days use a separate conversion (8 hours by default).
+        Materials are reserved and consumed at each completed stage.
       </p>
       {state.jobs
         .filter((j) => j.propertyId === h.id)

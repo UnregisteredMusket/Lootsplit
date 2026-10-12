@@ -78,6 +78,18 @@ export const pullCloudTable = createServerFn({ method: "POST" })
     return roomState(data);
   });
 
+/** Separate additive protocol: bundled/older clients keep the full pull endpoint. */
+export const pollCloudTable = createServerFn({ method: "POST" })
+  .validator((input: import("./cloud.server.ts").RoomPollInput) => input)
+  .handler(async ({ data }) => {
+    const { setResponseHeader } = await import("@tanstack/react-start/server");
+    setResponseHeader("Cache-Control", "no-store");
+    const { guardMemberSeat } = await import("./member-access.server.ts");
+    await guardMemberSeat(data);
+    const { pollRoom } = await import("./cloud.server.ts");
+    return pollRoom(data);
+  });
+
 export const finishCloudTurn = createServerFn({ method: "POST" })
   .validator(
     (input: {

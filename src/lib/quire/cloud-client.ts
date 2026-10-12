@@ -11,6 +11,7 @@ import {
   openCloudTable,
   previewCloudTable,
   pullCloudTable,
+  pollCloudTable,
   setCloudPace,
   skipCloudTurn,
   submitCloudCommands,
@@ -33,7 +34,7 @@ import { isEphemeralCampaign, setEphemeralCampaign } from "./guest-storage.ts";
 import { closeQuireDb } from "./db.ts";
 import { reconcileAccountResume } from "./account-resume.ts";
 import { sameCommand } from "./command-identity.ts";
-import { readRoomResponse } from "./room-response.ts";
+import { readRoomResponse, readUnchangedRoom } from "./room-response.ts";
 import {
   rememberRevokedRecovery,
   revokedRecoverySummaries,
@@ -94,6 +95,7 @@ let polling = false;
 let pollGeneration = 0;
 let pollFailures = 0;
 let chain: Promise<unknown> = Promise.resolve();
+let acceptedPoll: { campaignKey: string; token: string; seatId: string; revision: number; userId?: string; sessionId?: string } | undefined;
 export async function requestCampaignRoll(body: { purseId: string; [key: string]: unknown }) {
   const s = requireSession();
   if (
@@ -320,6 +322,7 @@ function warnUnsentPlayerActions(event: BeforeUnloadEvent) {
   }
 }
 function stopPolling() {
+  acceptedPoll = undefined;
   if (typeof window !== "undefined" && !hasRevokedMemoryWork())
     window.removeEventListener("beforeunload", warnUnsentPlayerActions);
   polling = false;
@@ -342,7 +345,7 @@ function start() {
       if (navigator.onLine !== false && document.visibilityState !== "hidden") {
         try {
           await serial(async () => {
-            if (generation === pollGeneration) await refresh();
+            if (generation === pollGeneration) await refresh(true);
           });
           pollFailures = 0;
         } catch (error) {
@@ -395,7 +398,9 @@ async function accept(value: RoomView, committed = false) {
       known.set(command.id, command);
     }
   }
-  const changed = s.revision !== remote.revision;
+  const hydratedHere = acceptedPoll?.campaignKey === key() && acceptedPoll.token === s.token &&
+    acceptedPoll.seatId === s.seatId && acceptedPoll.revision === remote.revision;
+  const changed = s.revision !== remote.revision || !hydratedHere;
   if (changed && !s.pending.length) s.batchId = crypto.randomUUID();
   const previousRevision = s.revision;
   s.revision = remote.revision;
@@ -429,6 +434,9 @@ async function accept(value: RoomView, committed = false) {
   // interrupt IndexedDB hydration; saving the revision first made the next page
   // treat an empty/incomplete local copy as already synchronized.
   remember(s);
+  acceptedPoll = s.revision === remote.revision
+    ? { campaignKey: key(), token: s.token, seatId: s.seatId, revision: s.revision, userId: remote.userId, sessionId: remote.sessionId }
+    : undefined;
   if (s.role === "player")
     setSeat({
       ...getSeat(),
@@ -461,13 +469,23 @@ async function accept(value: RoomView, committed = false) {
   );
   start();
 }
-async function refresh() {
+async function refresh(conditional = false) {
   const s = session();
   if (!s) return;
   const campaignKey = key();
-  let remote: RoomView;
+  let remote: RoomView | import("./cloud.server.ts").RoomUnchanged;
   try {
-    remote = await pullCloudTable({ data: { code: s.code, token: s.token } });
+    const known = conditional && acceptedPoll?.campaignKey === campaignKey && acceptedPoll.token === s.token &&
+      acceptedPoll.seatId === s.seatId && acceptedPoll.revision === s.revision;
+    if (known) {
+      try {
+        remote = await pollCloudTable({ data: { code: s.code, token: s.token, knownRevision: s.revision, knownSeatId: s.seatId } });
+      } catch {
+        // One bounded readonly fallback supports an older edge/client protocol.
+        // Full reads recheck the same credentials; errors still retain all pending work.
+        remote = await pullCloudTable({ data: { code: s.code, token: s.token } });
+      }
+    } else remote = await pullCloudTable({ data: { code: s.code, token: s.token } });
   } catch (error) {
     if (key() !== campaignKey || session()?.token !== s.token) return;
     const message = error instanceof Error ? error.message : "";
@@ -490,6 +508,14 @@ async function refresh() {
     throw error;
   }
   if (key() !== campaignKey || session()?.token !== s.token) return;
+  if (remote && typeof remote === "object" && "unchanged" in remote) {
+    // Compare with the last authoritative envelope, not a legacy account cache:
+    // older linked seats may legitimately omit userId in both full and compact views.
+    const fresh = readUnchangedRoom(remote, { ...s, userId: acceptedPoll?.userId, sessionId: acceptedPoll?.sessionId });
+    publish({ encounterActive: fresh.encounterActive, lastSync: Date.now(), error: s.pending.length ? view.error : "",
+      status: s.pending.length ? (view.error ? "attention" : "pending") : "synced" }, false);
+    return;
+  }
   await accept(remote);
 }
 export async function refreshShared() {

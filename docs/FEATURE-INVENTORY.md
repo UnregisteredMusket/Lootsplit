@@ -1,3 +1,7 @@
+# Report foundation — October 12, 2026
+
+Authenticated compact unchanged sync reads retain fresh access and encounter policy, complete manual refresh and exact pending recovery. Atomic command batches reduce full-room cloning while validating every action. Verified artifacts pin current Cloudflare CPU/private log policy and check deployed values. Complete CI audits are redistributed without weaker gates. Training adds complete DM recipient/category meters, contribution-only player totals, normalized subject grouping, captured-ID category resets and explicit historical DM review. Character away durations support elapsed hours while legacy day/recipe/voyage clocks remain. See [implementation evidence](audit/2026-10-12-report-followup.md). Full current callable inventory is generated in verification artifacts; the checked-in earlier CSV is historical. Android 1.7.0/code10 is a separately signed candidate until its APK and download metadata are verified. The UI redesign and additional proposed activities are a later phase.
+
 # Hourly downtime and NPC training — October 12, 2026
 
 DM-approved downtime creates per-character hourly resources (default 16 usable hours per day). Players reach Downtime from Home and submit assigned-character NPC training in Martial, Academic or Skill / Profession with subject, duration, optional class and description. Both participants allocate the same time; known higher recipient levels are blocked, and absent sheet/class levels require written DM confirmation. DM review and milestone/reset controls record time only. Current and lifetime hours/training days retain categories, original conversion (default 8 hours/day), notes and history; reset refunds no hours and changes no sheets. Actual property labor and legacy away activities share the resource; ship travel consumes no personal hours. Settings apply to new periods. Backups, archives, privacy, guest-memory/turn drafts and older journal writes retain metadata. See [guide and additional activity design](DOWNTIME-ACTIVITIES.md).
@@ -69,7 +73,7 @@ The October 8 preservation improvements extend the existing entry points with ac
 | Light/dark/custom appearance, reading scale, display settings and reduced motion                                                                                                                               | Settings                           |
 | Android bundled client, native share/file save, network/back behavior and permanent signing                                                                                                                    | Android                            |
 
-Not implemented or promised by this inventory: OCR, Google Drive backup integration, native Android push, online presence, or editors for every kind of image.
+Not implemented or promised by this inventory: Google Drive backup integration, native Android push, online presence, or editors for every kind of image. Local OCR for scanned PDFs and creature/statblock pictures is implemented; see Reference imports below.
 
 ## Website and optional account library
 
@@ -296,9 +300,9 @@ DMs sign in and own their hosted campaigns. Open sessions survive closed tabs; e
 
 Release status must be taken from the latest recovery checkpoint/PR, not this implementation inventory.
 
-## Feature screens and player Home (2026-10-06, release pending)
+## Feature screens and player Home (implemented October 6, 2026)
 
-- Full screens for Bank, My Finances, Downtime, Financial Settings, Property Management, Review Reports, Review Inbox, Journal and Shop Management. Existing theme/components remain; mobile has five main tabs and desktop exposes additional direct destinations.
+- Full screens for Bank, My Finances, Downtime, Financial Settings, Property Management, Review Reports, Review Inbox, Journal and Shop Management. Existing theme/components remain; mobile has six main tabs: Home, Inventory, Campaign, Market, Library and Maps and desktop exposes additional direct destinations.
 - Compact summary/open controls replace the former embedded finance, operations and journal sections. Each feature has a Return-to-origin footer; router navigation preserves the running document. Legacy journal/finance/operations/economy links redirect to their new destinations.
 - Player Home replaces the mobile Character tab and retains one-tap access to the complete sheet, owned-character readouts, campaign/messages and feature controls. Account shortcut records are user-and-role scoped and revision checked; no guest preferences are stored.
 - Bank uses existing requests/debt/ledger records. New player repayment commands verify borrower ownership, available funds, outstanding amount and absence of pending downtime. Existing command receipts protect retried shared actions; turn-based changes still require turn submission.

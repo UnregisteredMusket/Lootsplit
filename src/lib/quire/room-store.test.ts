@@ -4,7 +4,7 @@ import { DatabaseSync } from "node:sqlite";
 import { smithFixture, smithDesign } from "./test-fixtures/blacksmith.ts";
 import { smithQuote } from "./blacksmith.ts";
 import { readFileSync } from "node:fs";
-import { createRoom, readRoom, updateRoom, deleteRoom } from "./room-store.server.ts";
+import { createRoom, readRoom, readRoomAccess, updateRoom, deleteRoom } from "./room-store.server.ts";
 import { emptyCloudTable } from "./cloud.ts";
 import { tradeFixture } from "./test-fixtures/trade-economy.ts";
 import { STARTER_COMMODITIES } from "./commodity-catalog.ts";
@@ -12,8 +12,8 @@ import { commodityImportFingerprint } from "./commodity-import.ts";
 import { exchangeQuoteKey, tradeSeasonFingerprint } from "./trade-economy.ts";
 import { canonicalJson } from "./canonical-json.ts";
 import { applyCommand, tablePatch } from "./commands.ts";
-import { openRoom, joinRoom, roomState, previewRoom, submitCommands } from "./cloud.server.ts";
-import { emptyCoins, toCopper } from "./money.ts";
+import { openRoom, joinRoom, roomState, pollRoom, previewRoom, submitCommands } from "./cloud.server.ts";
+import { emptyCoins, fromCopper, toCopper } from "./money.ts";
 import { resourcePackFixture } from "./test-fixtures/resource-pack.ts";
 import {
   pushSettings,
@@ -615,6 +615,65 @@ test("durable shared rooms reject stale writes and survive independent reads", a
   await assert.rejects(deleteRoom(room.code, 1), /table changed/);
   await deleteRoom(room.code, 2);
   assert.equal(await readRoom(room.code), null);
+});
+test("unchanged reads retain seat checks and fresh encounter policy without hydrating private media", async () => {
+  const { readJournal } = await import("./journal.ts");
+  const table = { ...emptyCloudTable(), purses: [{ id: "poll-hero", name: "Hero", kind: "character" as const, coins: emptyCoins() }],
+    journal: readJournal({ world: { maps: [{ id: "poll-map", name: "Map", image: "data:image/png;base64," + "A".repeat(120000), locationId: null, visible: true, anchors: [], markers: [] }] } }) };
+  const host = await openRoom({ name: "Poll DM", table });
+  const guest = await joinRoom({ code: host.code, purseId: "poll-hero", name: "Poll guest" });
+  const auth = { code: host.code, token: guest.token }, first = await roomState(auth);
+  const known = { ...auth, knownRevision: first.revision, knownSeatId: guest.seatId };
+  const access = await readRoomAccess(host.code);
+  assert.equal(access!.revision, first.revision);
+  assert.equal("table" in access!, false);
+  assert.equal("seats" in access!, true);
+  let unchanged = await pollRoom(known);
+  assert.equal("unchanged" in unchanged && unchanged.unchanged, true);
+  assert.equal("table" in unchanged, false);
+  assert.equal(unchanged.encounterActive, false);
+  sql.exec("CREATE TABLE IF NOT EXISTS user(id TEXT PRIMARY KEY)");
+  sql.prepare("INSERT OR IGNORE INTO user(id) VALUES (?)").run("synthetic-owner");
+  sql.prepare("INSERT INTO dm_encounters(id,user_id,code,body,status,revision,created_at,updated_at) VALUES (?,?,?,?,'active',0,1,1)")
+    .run("poll-encounter", "synthetic-owner", host.code, JSON.stringify({ name: "Private enemy name" }));
+  unchanged = await pollRoom(known);
+  assert.equal(unchanged.encounterActive, true);
+  assert.ok(!JSON.stringify(unchanged).includes("Private enemy name"));
+  assert.ok("table" in await pollRoom({ ...known, knownSeatId: "another-seat" }));
+  await assert.rejects(pollRoom({ ...known, token: "invalid-token" }), /not seated/);
+  // If referenced media becomes unreadable, the unchanged path still does no media read.
+  sql.prepare("DELETE FROM campaign_room_images WHERE code=?").run(host.code);
+  assert.equal("unchanged" in await pollRoom(known), true);
+  await assert.rejects(roomState(auth), /image is missing/);
+  const body = JSON.parse(sql.prepare("SELECT body FROM campaign_rooms WHERE code=?").get(host.code)!.body as string);
+  body.closed = true;body.revision++;
+  sql.prepare("UPDATE campaign_rooms SET revision=?,body=? WHERE code=?").run(body.revision, JSON.stringify(body), host.code);
+  await assert.rejects(pollRoom(known), /closed/);
+});
+test("changed revisions force complete reads with current drafts and acknowledgements", async () => {
+  const host = await openRoom({ name: "Changed poll DM", table: { ...emptyCloudTable(), purses: [{ id: "poll-next", name: "Next", kind: "character" as const, coins: emptyCoins() }] } });
+  const first = await roomState(host), known = { ...host, knownRevision: first.revision, knownSeatId: first.seatId };
+  const command = { id: "poll-staged", kind: "portrait", purseId: "poll-next", portrait: "/art/player.webp" };
+  await submitCommands({ ...host, batchId: "poll-stage", commands: [command], stage: true });
+  const staged = await pollRoom(known);
+  assert.ok("table" in staged);
+  assert.match((staged as typeof first).draft, /poll-staged/);
+  await submitCommands({ ...host, batchId: "poll-commit", commands: [command] });
+  const committed = await pollRoom(known);
+  assert.ok("table" in committed);
+  assert.deepEqual((committed as typeof first).acknowledged, [command.id]);
+});
+test("one atomic command batch deduplicates repeated action IDs before applying financial changes", async () => {
+  const host = await openRoom({ name:"Batch DM",table:{...emptyCloudTable(),purses:[
+    {id:"batch-a",name:"A",kind:"character",coins:fromCopper(500)},
+    {id:"batch-b",name:"B",kind:"character",coins:fromCopper(0)},
+  ]} });
+  const command={id:"batch-duplicate",kind:"give",fromId:"batch-a",toId:"batch-b",copper:100,holdingId:null,quantity:0};
+  const request={...host,batchId:"batch-duplicate-receipt",commands:[command,command]};
+  const saved=await submitCommands(request);
+  assert.equal(toCopper(saved.table.purses[0].coins),400);assert.equal(toCopper(saved.table.purses[1].coins),100);
+  assert.equal(saved.table.ledger.length,2);
+  assert.deepEqual((await submitCommands(request)).table,saved.table);
 });
 test("a cloudflare worker without D1 does not fall back to a local file", async () => {
   const previous = (globalThis as { __env__?: unknown }).__env__;

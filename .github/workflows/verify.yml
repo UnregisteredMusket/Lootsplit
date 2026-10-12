@@ -32,6 +32,10 @@ jobs:
         run: node scripts/recovery-step.mjs typecheck 120 npm run typecheck
       - name: lint
         run: node scripts/recovery-step.mjs lint 120 npm run lint
+      - name: Generate current source function inventory
+        env:
+          INVENTORY_OUTPUT_DIR: test-results/function-inventory
+        run: node scripts/function-inventory.mjs
       - name: web-build
         run: node scripts/recovery-step.mjs web-build 240 npm run build:cloudflare
       - run: node scripts/release-artifact.mjs prepare
@@ -72,7 +76,7 @@ jobs:
           retention-days: 30
 
   development:
-    name: Development / ${{ matrix.group }}
+    name: Development / ${{ matrix.group }}${{ (matrix.group == 'gameplay' || matrix.group == 'desktop') && ' (balanced v2)' || '' }}
     runs-on: ubuntu-latest
     timeout-minutes: 15
     strategy:
@@ -153,16 +157,16 @@ jobs:
         if: matrix.group == 'gameplay'
         run: node scripts/recovery-step.mjs dev-bug-permission-transfers 240 node --experimental-strip-types scripts/bug-audit-permission-transfers.mjs
       - name: dev-ships
-        if: matrix.group == 'gameplay'
+        if: matrix.group == 'desktop'
         run: node scripts/recovery-step.mjs dev-ships 240 node scripts/ships-browser-audit.mjs
       - name: dev-blacksmith
-        if: matrix.group == 'gameplay'
+        if: matrix.group == 'desktop'
         run: node scripts/recovery-step.mjs dev-blacksmith 240 node --experimental-strip-types scripts/blacksmith-browser-audit.mjs
       - name: dev-downtime
-        if: matrix.group == 'gameplay'
+        if: matrix.group == 'desktop'
         run: node scripts/recovery-step.mjs dev-downtime 240 node --experimental-strip-types scripts/downtime-browser-audit.mjs
       - name: dev-map-tiles
-        if: matrix.group == 'gameplay'
+        if: matrix.group == 'desktop'
         run: node scripts/recovery-step.mjs dev-map-tiles 240 node scripts/map-tiles-browser-audit.mjs
       - name: dev-encounter
         if: matrix.group == 'gameplay'
@@ -189,7 +193,7 @@ jobs:
         if: matrix.group == 'gameplay'
         run: node scripts/recovery-step.mjs dev-trade-economy 240 node --experimental-strip-types scripts/trade-economy-browser-audit.mjs
       - name: dev-world-features
-        if: matrix.group == 'gameplay'
+        if: matrix.group == 'desktop'
         run: node scripts/recovery-step.mjs dev-world-features 240 node scripts/world-features-browser-audit.mjs
       - name: dev-control-panel
         if: matrix.group == 'gameplay'

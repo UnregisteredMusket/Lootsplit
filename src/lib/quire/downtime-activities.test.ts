@@ -9,6 +9,7 @@ import { readDowntimeActivities } from "./downtime-activities-schema.ts";
 import {
   downtimeRemaining,
   trainingCounters,
+  recipientTrainingCounters,
   previewActivityWindow,
 } from "./downtime-activities.ts";
 import { projectRecord } from "./session-records.ts";
@@ -303,4 +304,56 @@ test("an older saved pending finance quote can be approved without losing the ne
   t = act(t, { kind: "downtime-apply", downtimeId: d.id, endSession: false });
   assert.equal(t.journal!.downtimeActivities!.windows.length, 1);
   assert.equal(t.journal!.finance!.day, 1);
+});
+
+test("recipient category totals combine trainers and normalized subjects; category resets preserve exact history and budgets", () => {
+  let t = advance(fixture(), 2);
+  const add = (trainerId: string, topic: string) => {
+    t = act(t, { kind: "downtime-training", windowId: t.journal!.downtimeActivities!.windows[0].id,
+      trainerId, npcId: "npc", category: "martial", topic, description: "Original wording", className: "", minutes: 120 });
+    t = decide(t, true, "Levels and conditions confirmed.");
+  };
+  add("hero", "Sword  Drills"); add("hero", "sword drills"); add("other", "Shield drills");
+  const s = t.journal!.downtimeActivities!, original = structuredClone(s.requests);
+  assert.equal(trainingCounters(s).length, 2);
+  const total = recipientTrainingCounters(s)[0];
+  assert.equal(total.currentMinutes, 360);
+  const reset: CommandInput = { kind: "downtime-training-reset-category", npcId: "npc", category: "martial",
+    before: total.requestIds, note: "DM applied a manual milestone." };
+  assert.throws(() => act(t, reset, player), /Only the DM/);
+  assert.throws(() => act(t, { ...reset, before: [] }), /progress changed/);
+  t = act(t, reset);
+  assert.deepEqual(t.journal!.downtimeActivities!.requests, original);
+  assert.equal(recipientTrainingCounters(t.journal!.downtimeActivities!)[0].currentMinutes, 0);
+  assert.equal(recipientTrainingCounters(t.journal!.downtimeActivities!)[0].lifetimeMinutes, 360);
+  assert.equal(downtimeRemaining(t.journal!.downtimeActivities!, s.windows[0].id, "npc"), 32 * 60 - 360);
+  assert.equal(recipientTrainingCounters(projectRecord(t, player).journal!.downtimeActivities!)[0].lifetimeMinutes, 240);
+  assert.throws(() => act(t, reset), /progress changed/);
+});
+
+test("late bookkeeping needs explicit historical DM confirmation while ownership, visibility and original budgets remain enforced", () => {
+  let t = propose(advance(fixture()), 8);
+  const npc = t.purses.find(p => p.id === "npc")!;
+  npc.sheet!.level = 8;
+  t.journal = readJournal({ ...t.journal, world: {} });
+  t.journal!.world!.characterPositions = [{ purseId: "npc", inParty: false, locationId: null, visible: true, sheetVisible: false }];
+  assert.throws(() => decide(t), /together/);
+  const r = t.journal!.downtimeActivities!.requests[0];
+  const review: CommandInput = { kind: "downtime-training-review", requestId: r.id, before: r,
+    approve: true, historicalConfirmed: true, note: "Earlier together in camp: pupil level 3 and teacher level 5; completed eight hours." };
+  assert.throws(() => act(t, review, player), /Only the DM/);
+  assert.throws(() => act(t, { ...review, note: "" }), /historical/);
+  t = act(t, review);
+  const request: CommandInput = { kind: "downtime-training", windowId: r.windowId, trainerId: "hero", npcId: "npc",
+    category: "academic", topic: "History", description: "", className: "", minutes: 480,
+    historicalContext: "Completed later that same camp day before the NPC departed." };
+  t = act(t, request, player);
+  assert.throws(() => decide(t, true, "Historical conditions reviewed"), /historical/);
+  assert.throws(() => act(t, { ...request, minutes: 600 }), /Insufficient/);
+  const hidden = structuredClone(t);hidden.journal!.world!.characterPositions[0].visible = false;
+  assert.throws(() => act(hidden, { ...request, minutes: 60 }, player), /available/);
+  const next = t.journal!.downtimeActivities!.requests.at(-1)!;
+  t = act(t, { kind: "downtime-training-review", requestId: next.id, before: next, approve: true,
+    historicalConfirmed: true, note: "Same location, equal-or-lower levels then, completed time confirmed." });
+  assert.equal(downtimeRemaining(t.journal!.downtimeActivities!, r.windowId, "hero"), 0);
 });

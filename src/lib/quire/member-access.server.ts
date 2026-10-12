@@ -1,4 +1,5 @@
 import { assertLinkedSeatActive } from "../../../cloudflare/members.mjs";
+import { readRoomAccess } from "./room-store.server.ts";
 type Statement = { bind(...values: unknown[]): Statement; first<T>(): Promise<T | null> };
 type Database = { prepare(sql: string): Statement };
 /** Guest seats remain supported; linked seats also honor the account's restrictions. */
@@ -6,13 +7,9 @@ export async function guardMemberSeat(input: unknown) {
   const db = (globalThis as typeof globalThis & { __env__?: { DB?: Database } }).__env__?.DB;
   const data = input as { code?: string; token?: string };
   if (!db || !data.code || !data.token) return;
-  const roomRow = await db
-    .prepare("SELECT body FROM campaign_rooms WHERE code=?")
-    .bind(data.code.trim().toUpperCase())
-    .first<{ body: string }>();
-  const room = roomRow ? JSON.parse(roomRow.body) : null;
+  const room = await readRoomAccess(data.code);
   const seat = room?.seats?.find((s: { token: string }) => s.token === data.token);
-  if (seat?.role === "dm") {
+  if (room && seat?.role === "dm") {
     const userId = await currentAccountId();
     const linked = await db
       .prepare("SELECT user_id FROM library_members WHERE code=? AND seat_id=?")

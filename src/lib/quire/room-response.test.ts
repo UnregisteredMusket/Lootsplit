@@ -3,9 +3,26 @@ import assert from "node:assert/strict";
 import { emptyCloudTable } from "./cloud.ts";
 import type { RoomView } from "./cloud.server.ts";
 import { readJournal } from "./journal.ts";
-import { readRoomResponse } from "./room-response.ts";
+import { readRoomResponse, readUnchangedRoom } from "./room-response.ts";
 
 const incomplete = /The shared campaign response was incomplete\./;
+
+test("unchanged responses are scoped to the exact accepted identity and never contain a partial table", () => {
+  const scope = { code: "ROOM", seatId: "seat", revision: 4, userId: "owner", sessionId: "session" };
+  const value = { ...scope, unchanged: true, protocol: "lootsplit.room.unchanged.v1", encounterActive: true };
+  freeze(value);
+  assert.equal(readUnchangedRoom(value, scope), value);
+  for (const change of [{ code: "OTHER" }, { seatId: "other" }, { revision: 5 },
+    { userId: "other" }, { sessionId: "other" }, { encounterActive: "true" },
+    { protocol: "unknown" }, { table: {} }, { acknowledged: ["pending"] }]) {
+    assert.throws(() => readUnchangedRoom({ ...value, ...change }, scope), incomplete);
+  }
+  assert.throws(() => readUnchangedRoom(undefined, scope), incomplete);
+  const guest = { code: "ROOM", seatId: "guest", revision: 0 };
+  assert.ok(readUnchangedRoom({ ...guest, unchanged: true, protocol: value.protocol, encounterActive: false }, guest));
+  assert.throws(() => readUnchangedRoom({ ...guest, userId: "unexpected-account", unchanged: true,
+    protocol: value.protocol, encounterActive: false }, guest), incomplete);
+});
 
 function response(): RoomView {
   return {
