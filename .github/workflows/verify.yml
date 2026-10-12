@@ -155,6 +155,9 @@ jobs:
       - name: dev-ships
         if: matrix.group == 'gameplay'
         run: node scripts/recovery-step.mjs dev-ships 240 node scripts/ships-browser-audit.mjs
+      - name: dev-blacksmith
+        if: matrix.group == 'gameplay'
+        run: node scripts/recovery-step.mjs dev-blacksmith 240 node --experimental-strip-types scripts/blacksmith-browser-audit.mjs
       - name: dev-map-tiles
         if: matrix.group == 'gameplay'
         run: node scripts/recovery-step.mjs dev-map-tiles 240 node scripts/map-tiles-browser-audit.mjs
@@ -257,6 +260,11 @@ jobs:
         env:
           AUDIT_ORIGIN: http://127.0.0.1:8082
         run: node scripts/recovery-step.mjs worker-ships 240 node scripts/ships-browser-audit.mjs
+      - name: worker-blacksmith
+        if: matrix.group == 'interface'
+        env:
+          AUDIT_ORIGIN: http://127.0.0.1:8082
+        run: node scripts/recovery-step.mjs worker-blacksmith 240 node --experimental-strip-types scripts/blacksmith-browser-audit.mjs
       - name: worker-account
         if: matrix.group == 'accounts'
         env:

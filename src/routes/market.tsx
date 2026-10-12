@@ -1,4 +1,5 @@
 import { SearchSelect } from "@/components/search-select";
+import { BlacksmithOrders } from "@/components/blacksmith-services";
 import { BlackMarketToggle } from "@/components/black-market";
 import { shopVisible } from "@/lib/quire/world";
 import { LedgerArt } from "@/components/ledger-art";
@@ -129,6 +130,7 @@ function MarketPage() {
         ) : null}
       </div>
       {ready && <GlobalCommodityMarket />}
+      {ready && <BlacksmithOrders/>}
       {ready ? <MarketLocationsPanel /> : null}
       <BlackMarketToggle />
       <AppLink className="settings-link" href="/features/economy?from=%2Fmarket">

@@ -1,4 +1,5 @@
 import { SearchSelect } from "@/components/search-select";
+import { BlacksmithServices } from "@/components/blacksmith-services";
 import { BlackMarketVendor } from "@/components/black-market";
 import { shopVisible } from "@/lib/quire/world";
 import { useFinanceReadiness } from "@/lib/quire/use-finance-readiness";
@@ -224,6 +225,7 @@ function ShopPage() {
       <label className="mt-4 block text-sm text-muted">
         Paying from
         <SearchSelect
+          aria-label="Paying from"
           value={purseId}
           onValueChange={(selectedValue) => setPurseId(selectedValue)}
           className="mt-1 min-h-11 w-full rounded-sm border border-border bg-subtle px-3 text-base text-fg"
@@ -248,6 +250,7 @@ function ShopPage() {
         ) : null}
         <CharismaNote purseId={purseId} />
       </label>
+      <BlacksmithServices shop={shop} purseId={purseId}/>
       <TurnLock />
       {viewing === "edit" ? <CatalogStockPicker key={`catalog-${shop.id}`} shop={shop} /> : null}
       <ShopStockList

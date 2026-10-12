@@ -40,7 +40,9 @@ test("each development check belongs to exactly one declared isolated group", ()
     .map((v) => v.trim());
   assert.equal(new Set(groups).size, groups.length);
   const checks = [...workflow.matchAll(/- name: (dev-[\w-]+)\n\s+if: matrix.group == '([^']+)'/g)];
-  assert.equal(checks.length, 34);
+  assert.equal(checks.length, 35);
+  assert.ok(checks.some(([, name, group]) => name === "dev-blacksmith" && group === "gameplay"));
+  assert.match(workflow, /worker-blacksmith 240 node --experimental-strip-types scripts\/blacksmith-browser-audit\.mjs/);
   assert.ok(checks.some(([, name, group]) => name === "dev-navigation" && group === "desktop"));
   assert.ok(checks.some(([, name, group]) => name === "dev-map-tiles" && group === "gameplay"));
   assert.match(workflow, /worker-map-tiles 240 node scripts\/map-tiles-browser-audit\.mjs/);

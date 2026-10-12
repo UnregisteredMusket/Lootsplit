@@ -313,12 +313,20 @@ export function CampaignFinance({
                     </p>
                   </details>
                 )}
+                {pending.quote.blacksmith && (
+                  <div className="mt-3">
+                    <h3>Blacksmith commissions</h3>
+                    {pending.quote.blacksmith.notices.map(n => <p key={n.orderId}>{n.summary}</p>)}
+                    {!pending.quote.blacksmith.notices.length && <p>No active smith work; paused orders keep their progress.</p>}
+                  </div>
+                )}
                 {pending.quote.tradeSeason && (
                   <TradeSeasonReview quote={pending.quote.tradeSeason} />
                 )}
                 {!pending.quote.lines.length &&
                   !pending.quote.market?.length &&
                   !pending.quote.propertyOperations &&
+                  !pending.quote.blacksmith &&
                   !pending.quote.tradeSeason && (
                     <p>No active financial agreements; approval advances only in-game time.</p>
                   )}

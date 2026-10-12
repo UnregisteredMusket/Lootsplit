@@ -1,4 +1,13 @@
 @import "tailwindcss";
+
+.smith-services { margin-top: 1rem; min-width: 0; }
+.smith-services h2, .smith-services h3, .smith-services h4 { font-weight: 600; margin: .75rem 0 .4rem; }
+.smith-services p { margin: .5rem 0; }
+.smith-services .smith-part { border: 1px solid var(--color-border); border-radius: .5rem; padding: .75rem; margin: .75rem 0; min-width: 0; }
+.smith-services legend { font-weight: 600; padding: 0 .25rem; }
+.smith-services textarea, .smith-services input:not([type="checkbox"]), .smith-services select { max-width: 100%; min-width: 0; }
+.smith-services .smith-review { padding: .75rem; border: 1px solid var(--color-border); border-radius: .5rem; }
+.smith-services .whitespace-pre-wrap { overflow-wrap: anywhere; }
 @font-face { font-family: "Cormorant Garamond"; font-style: normal; font-weight: 600; font-display: swap; src: url("/fonts/cormorant-garamond-latin-600-normal.woff2") format("woff2"); }
 @font-face { font-family: "Cormorant Garamond"; font-style: normal; font-weight: 700; font-display: swap; src: url("/fonts/cormorant-garamond-latin-700-normal.woff2") format("woff2"); }
 @font-face { font-family: "Source Sans 3"; font-style: normal; font-weight: 400; font-display: swap; src: url("/fonts/source-sans-3-latin-400-normal.woff2") format("woff2"); }

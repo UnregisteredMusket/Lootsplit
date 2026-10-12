@@ -190,6 +190,22 @@ export const HELP_GROUPS: HelpGroup[] = [
     title: "Money, shops & downtime",
     topics: [
       {
+        id: "blacksmith-services",
+        title: "Custom blacksmith commissions",
+        audience: "DM",
+        paragraphs: [
+          "Open a blacksmith shop → Blacksmith services → Configure blacksmith services. Assign a physical shop location and an existing NPC maker. In People & NPCs, check Offers blacksmith services and save that NPC's permission. Every skill level, including legendary, requires this deliberate permission; meeting a smith alone does not enable commissions.",
+          "Choose apprentice, journeyman, expert, master or legendary to load editable pricing/quality examples. Adjust labor, item value and work time multipliers, engraving price/days, material rarity/value/stock, and craftsmanship. Magical forge permits only your approved enchantments at or below the maker's skill. Add enchantments with their effects, fees, value and days; new entries start unapproved. Advanced parts, materials & item settings edits validated JSON for any weapon/armor, component, style, material requirement, weight, base description and price. Values are fictional DM rules; no combat modifier is applied automatically.",
+          "Players review a full design and price before placing a paid commission. Materials come from finite/unlimited smith supplies or matching, unequipped carried inventory belonging to the paying account. Stored, travelling or reserved materials are unavailable. Acceptance deducts coins and commits materials once, saving the maker, skill, specifications, price, original forge and campaign date. Changed quotes require another review; editing the smith afterward does not rewrite an existing order.",
+          "Downtime previews show smith progress and completion alongside ordinary financial/property results. Only approving that preview performs work; session hours and wall-clock time do not. Completed items wait at the original forge for one-time collection into inventory, with components, engraving, enchantment, craftsmanship, maker, order date and actual completion campaign day/time in their description. Market's Blacksmith commission register remains readable while travelling. The DM can pause, resume or cancel with a recorded reason; refunds and salvage are separate recorded finance/inventory adjustments. Review existing commitments before deleting a customer, forge configuration or pickup location. These website controls need a separately signed update to appear in the Android app.",
+        ],
+        links: [
+          ["Market", "/market"],
+          ["People & NPCs", "/features/npcs"],
+          ["Downtime", "/features/downtime"],
+        ],
+      },
+      {
         id: "currency",
         title: "Coin values, purchases and transfers",
         paragraphs: [

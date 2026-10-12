@@ -1,3 +1,7 @@
+# Blacksmith services — October 12, 2026
+
+Blacksmith shops add fully configurable custom weapon/armor components, styles, engravings, canonical material contributions, rarity/skill pricing and quality, magical-forge and skill/DM-approved enchantments. A saved NPC service checkbox defaults off and gates every maker, including legendary smiths. Reviewed authoritative orders pay/consume supplies once, retain accepted specifications and dates, progress only through the existing approved downtime preview and create one provenance-described holding on local collection. Market retains travelling order reports; players receive only their own orders and offered definitions. Existing shelves, schedules, sales, PDFs, property operations, clock, NPC permissions, saves/backups/modes/platforms and release gates are preserved. See [guide](BLACKSMITH-SERVICES.md) and [audit](audit/2026-10-12-blacksmith-services.md).
+
 # Navigation/control audit and global DM market information — October 11, 2026
 
 The DM information strip retains Session, Party, Funds, Activity and Rolls and adds Market: current campaign season/mode, inflation, exchange/active-quote counts, three canonical active offers with ask/bid per unit, stock/wanted and recorded prior-season comparison. City access is labeled independently of the DM’s campaign-wide read-only data. Quote links select the exact exchange and commodity; Global market opens its addressed Market section. Player projections and all trading permissions remain enforced.
