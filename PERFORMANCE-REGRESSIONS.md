@@ -262,11 +262,13 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Development / desktop / dev-navigation | open | 2 | 39s → 115s | +76s | +194.87% |
 | Development / gameplay / dev-blacksmith | open | 2 | 28s → 62s | +34s | +121.43% |
 | Packaged Worker / interface / worker-blacksmith | open | 3 | 24s → 44s | +20s | +83.33% |
+| Code checks and immutable builds / Generate current source function inventory | open | 2 | 12s → 19s | +7s | +58.33% |
 
 ## Recorded slowdowns
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-12T20:23:08Z | step: Code checks and immutable builds / Generate current source function inventory | 16s → 19s | +3s | +18.75% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38302748488/job/114989857781) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38303503043/job/114992302085) |
 | 2026-10-12T20:20:55Z | job: Development / gameplay (balanced v2) | 215s → 394s | +179s | +83.26% | cancelled | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38301994659/job/114986882408) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38302748488/job/114989858029) |
 | 2026-10-12T20:20:53Z | step: Development / gameplay (balanced v2) / Run actions/upload-artifact@v4 | 1s → 3s | +2s | +200% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38301994659/job/114986882408) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38302748488/job/114989858029) |
 | 2026-10-12T20:20:49Z | step: Development / desktop (balanced v2) / dev-navigation | 20s → 38s | +18s | +90% | cancelled | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38301994659/job/114986882289) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38302748488/job/114989858520) |
