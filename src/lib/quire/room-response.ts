@@ -51,7 +51,7 @@ export function readUnchangedRoom(value: unknown, expected: {
   if (!record(value) || value.unchanged !== true || value.protocol !== "lootsplit.room.unchanged.v1" ||
       value.code !== expected.code || value.seatId !== expected.seatId || value.revision !== expected.revision ||
       !count(value.revision) || !optionalText(value.userId) || !optionalText(value.sessionId) ||
-      (expected.userId && value.userId !== expected.userId) || value.sessionId !== expected.sessionId ||
+      value.userId !== expected.userId || value.sessionId !== expected.sessionId ||
       typeof value.encounterActive !== "boolean" ||
       Object.keys(value).some(k => !["unchanged","protocol","code","seatId","userId","sessionId","revision","encounterActive"].includes(k)))
     throw Error(incompleteResponse);

@@ -12,7 +12,7 @@ import { readRoomResponse, readUnchangedRoom } from "./room-response.ts";
 const source = readFileSync(new URL("./cloud-client.ts", import.meta.url), "utf8");
 
 test("actual conditional refresh retains pending work and attention, updates encounter policy and leaves manual refresh complete", async () => {
-  const sessionValue = { code: "TEST", token: "token", seatId: "player", revision: 2, pending: [{ id: "unsent" }] };
+  const sessionValue = { code: "TEST", token: "token", seatId: "player", revision: 2, userId: "legacy-linked-account-cache", pending: [{ id: "unsent" }] };
   const view = { error: "Retain recoverable attention", encounterActive: false, status: "attention" };
   let polls = 0, pulls = 0, accepts = 0;
   const body = source.slice(source.indexOf("async function refresh("), source.indexOf("export async function refreshShared()"));

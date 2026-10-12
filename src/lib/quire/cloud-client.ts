@@ -95,7 +95,7 @@ let polling = false;
 let pollGeneration = 0;
 let pollFailures = 0;
 let chain: Promise<unknown> = Promise.resolve();
-let acceptedPoll: { campaignKey: string; token: string; seatId: string; revision: number } | undefined;
+let acceptedPoll: { campaignKey: string; token: string; seatId: string; revision: number; userId?: string; sessionId?: string } | undefined;
 export async function requestCampaignRoll(body: { purseId: string; [key: string]: unknown }) {
   const s = requireSession();
   if (
@@ -435,7 +435,7 @@ async function accept(value: RoomView, committed = false) {
   // treat an empty/incomplete local copy as already synchronized.
   remember(s);
   acceptedPoll = s.revision === remote.revision
-    ? { campaignKey: key(), token: s.token, seatId: s.seatId, revision: s.revision }
+    ? { campaignKey: key(), token: s.token, seatId: s.seatId, revision: s.revision, userId: remote.userId, sessionId: remote.sessionId }
     : undefined;
   if (s.role === "player")
     setSeat({
@@ -509,7 +509,9 @@ async function refresh(conditional = false) {
   }
   if (key() !== campaignKey || session()?.token !== s.token) return;
   if (remote && typeof remote === "object" && "unchanged" in remote) {
-    const fresh = readUnchangedRoom(remote, s);
+    // Compare with the last authoritative envelope, not a legacy account cache:
+    // older linked seats may legitimately omit userId in both full and compact views.
+    const fresh = readUnchangedRoom(remote, { ...s, userId: acceptedPoll?.userId, sessionId: acceptedPoll?.sessionId });
     publish({ encounterActive: fresh.encounterActive, lastSync: Date.now(), error: s.pending.length ? view.error : "",
       status: s.pending.length ? (view.error ? "attention" : "pending") : "synced" });
     return;

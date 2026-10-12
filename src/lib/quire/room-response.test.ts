@@ -20,6 +20,8 @@ test("unchanged responses are scoped to the exact accepted identity and never co
   assert.throws(() => readUnchangedRoom(undefined, scope), incomplete);
   const guest = { code: "ROOM", seatId: "guest", revision: 0 };
   assert.ok(readUnchangedRoom({ ...guest, unchanged: true, protocol: value.protocol, encounterActive: false }, guest));
+  assert.throws(() => readUnchangedRoom({ ...guest, userId: "unexpected-account", unchanged: true,
+    protocol: value.protocol, encounterActive: false }, guest), incomplete);
 });
 
 function response(): RoomView {
