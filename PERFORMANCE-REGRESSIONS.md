@@ -264,11 +264,18 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Development / gameplay / dev-blacksmith | open | 2 | 28s → 62s | +34s | +121.43% |
 | Packaged Worker / interface / worker-blacksmith | open | 3 | 24s → 44s | +20s | +83.33% |
 | Code checks and immutable builds / Generate current source function inventory | open | 2 | 12s → 19s | +7s | +58.33% |
+| Development / desktop (balanced v2) / dev-navigation | open | 2 | 20s → 115s | +95s | +475% |
+| Development / gameplay (balanced v2) | open | 2 | 215s → 544s | +329s | +153.02% |
 
 ## Recorded slowdowns
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-12T20:33:39Z | job: Development / desktop (balanced v2) | 472s → 567s | +95s | +20.13% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38301994659/job/114986882289) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38303829968/job/114993398409) |
+| 2026-10-12T20:33:15Z | job: Development / gameplay (balanced v2) | 394s → 544s | +150s | +38.07% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38302748488/job/114989858029) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38303829968/job/114993398235) |
+| 2026-10-12T20:33:09Z | step: Development / desktop (balanced v2) / dev-navigation | 38s → 115s | +77s | +202.63% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38302748488/job/114989858520) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38303829968/job/114993398409) |
+| 2026-10-12T20:31:42Z | step: Development / gameplay (balanced v2) / dev-trade-economy | 29s → 102s | +73s | +251.72% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38302748488/job/114989858029) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38303829968/job/114993398235) |
+| 2026-10-12T20:24:23Z | step: Development / desktop (balanced v2) / Run actions/setup-node@v4 | 4s → 7s | +3s | +75% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38301994659/job/114986882289) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38303829968/job/114993398409) |
 | 2026-10-12T20:23:28.000Z | queue: Focused player references / initial queue | 28s → 38s | +10s | +35.71% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38140451035) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38303830017) |
 | 2026-10-12T20:23:08Z | step: Code checks and immutable builds / Generate current source function inventory | 16s → 19s | +3s | +18.75% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38302748488/job/114989857781) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38303503043/job/114992302085) |
 | 2026-10-12T20:20:55Z | job: Development / gameplay (balanced v2) | 215s → 394s | +179s | +83.26% | cancelled | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38301994659/job/114986882408) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38302748488/job/114989858029) |
