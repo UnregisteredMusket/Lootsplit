@@ -155,6 +155,7 @@ function SmithMaterialIdentification({
             min={0}
             max={9999}
             step={0.01}
+            aria-label="Contribution unit weight"
             value={weight}
             onChange={(e) => setWeight(Number(e.target.value))}
           />
@@ -280,6 +281,7 @@ function SmithEditor({
       <label>
         Blacksmith skill
         <select
+          aria-label="Blacksmith skill"
           value={draft.skill}
           onChange={(e) => {
             const skill = e.target.value as SmithProfile["skill"];
@@ -295,6 +297,7 @@ function SmithEditor({
       <label>
         <input
           type="checkbox"
+          aria-label="Magical forge"
           checked={draft.magicalForge}
           onChange={(e) => change({ magicalForge: e.target.checked })}
         />{" "}
@@ -315,6 +318,7 @@ function SmithEditor({
             type="number"
             min={key === "timeMultiplier" ? 0.01 : 0}
             step={key.endsWith("Multiplier") ? 0.01 : 1}
+            aria-label={label}
             value={draft[key]}
             onChange={(e) => change({ [key]: Number(e.target.value) })}
           />
@@ -324,6 +328,7 @@ function SmithEditor({
         Craftsmanship description
         <textarea
           maxLength={1000}
+          aria-label="Craftsmanship description"
           value={draft.quality}
           onChange={(e) => change({ quality: e.target.value })}
         />
@@ -344,6 +349,7 @@ function SmithEditor({
             <label>
               {m.name} rarity
               <select
+                aria-label={`${m.name} rarity`}
                 value={m.rarity}
                 onChange={(e) => {
                   const rarity = e.target.value as typeof m.rarity;
@@ -368,6 +374,7 @@ function SmithEditor({
                 type="number"
                 min={0}
                 step={0.01}
+                aria-label={`${m.name} rarity multiplier`}
                 value={m.rarityMultiplier}
                 onChange={(e) => update({ rarityMultiplier: Number(e.target.value) })}
               />
@@ -377,6 +384,7 @@ function SmithEditor({
               <input
                 type="number"
                 min={0}
+                aria-label={`${m.name} base unit value (cp)`}
                 value={m.unitCopper}
                 onChange={(e) => update({ unitCopper: Number(e.target.value) })}
               />
@@ -384,6 +392,7 @@ function SmithEditor({
             <label>
               <input
                 type="checkbox"
+                aria-label={`${m.name} unlimited stock`}
                 checked={m.quantity === null}
                 onChange={(e) => update({ quantity: e.target.checked ? null : 0 })}
               />{" "}
@@ -395,6 +404,7 @@ function SmithEditor({
                 <input
                   type="number"
                   min={0}
+                  aria-label={`${m.name} available units`}
                   value={m.quantity}
                   onChange={(e) => update({ quantity: Number(e.target.value) })}
                 />
@@ -419,6 +429,7 @@ function SmithEditor({
             <label>
               <input
                 type="checkbox"
+                aria-label={`Approve ${e.name}`}
                 checked={e.approved}
                 onChange={(v) => update({ approved: v.target.checked })}
               />{" "}
@@ -427,6 +438,7 @@ function SmithEditor({
             <label>
               {e.name} minimum skill
               <select
+                aria-label={`${e.name} minimum skill`}
                 value={e.minimumSkill}
                 onChange={(v) => update({ minimumSkill: v.target.value as typeof e.minimumSkill })}
               >
@@ -447,6 +459,7 @@ function SmithEditor({
                 <input
                   type="number"
                   min={0}
+                  aria-label={`${e.name} ${label}`}
                   value={e[key]}
                   onChange={(v) => update({ [key]: Number(v.target.value) })}
                 />
@@ -456,6 +469,7 @@ function SmithEditor({
               {e.name} effect description
               <textarea
                 maxLength={1500}
+                aria-label={`${e.name} effect description`}
                 value={e.description}
                 onChange={(v) => update({ description: v.target.value })}
               />
@@ -472,6 +486,7 @@ function SmithEditor({
       <label>
         New enchantment name
         <input
+          aria-label="New enchantment name"
           value={enchantmentName}
           maxLength={160}
           onChange={(e) => setEnchantmentName(e.target.value)}
@@ -518,6 +533,7 @@ function SmithEditor({
               Full forge configuration JSON
               <textarea
                 rows={18}
+                aria-label="Full forge configuration JSON"
                 value={advanced}
                 onChange={(e) => setAdvanced(e.target.value)}
                 spellCheck={false}
@@ -630,6 +646,7 @@ function SmithDesignForm({
         <input
           required
           maxLength={160}
+          aria-label="Unique item name"
           value={design.name}
           onChange={(e) => change({ ...design, name: e.target.value })}
         />
@@ -714,6 +731,7 @@ function SmithDesignForm({
         Engraving
         <textarea
           maxLength={500}
+          aria-label="Engraving"
           value={design.engraving}
           onChange={(e) => change({ ...design, engraving: e.target.value })}
         />
@@ -833,6 +851,7 @@ function SmithOrderCard({
             Commission control
             <select
               name="action"
+              aria-label="Commission control"
               value={action(o)}
               onChange={(e) => setAction(e.target.value as "pause" | "resume" | "cancel")}
             >
@@ -846,6 +865,7 @@ function SmithOrderCard({
             <textarea
               required
               maxLength={1000}
+              aria-label="Reason for commission control"
               value={reason}
               onChange={(e) => setReason(e.target.value)}
             />
