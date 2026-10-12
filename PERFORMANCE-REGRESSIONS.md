@@ -277,12 +277,15 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Packaged Worker / interface / worker-blacksmith | open | 3 | 24s → 44s | +20s | +83.33% |
 | Code checks and immutable builds / Generate current source function inventory | open | 2 | 12s → 19s | +7s | +58.33% |
 | Development / desktop (balanced v2) / dev-navigation | open | 2 | 20s → 115s | +95s | +475% |
+| Development / gameplay (balanced v2) / Run actions/upload-artifact@v4 | open | 2 | 1s → 4s | +3s | +300% |
 | Development / gameplay (balanced v2) | open | 2 | 215s → 544s | +329s | +153.02% |
 
 ## Recorded slowdowns
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-12T21:20:43Z | step: Development / gameplay (balanced v2) / Run actions/upload-artifact@v4 | 3s → 4s | +1s | +33.33% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38302748488/job/114989858029) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38309026871/job/115009957568) |
+| 2026-10-12T21:20:34Z | step: Development / desktop (balanced v2) / dev-game-analytics | 5s → 6s | +1s | +20% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38303829968/job/114993398409) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38309026871/job/115009957801) |
 | 2026-10-12T20:59:18.000Z | workflow: Android signed release APK | 496s → 1128s | +632s | +127.42% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37587450064) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38305743849) |
 | 2026-10-12T20:56:44Z | step: release-apk / Run npm run typecheck | 14s → 24s | +10s | +71.43% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37599705908/job/112722522266) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38305743849/job/115004301916) |
 | 2026-10-12T20:56:20Z | step: release-apk / Run npm test | 12s → 40s | +28s | +233.33% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37391400899/job/112039018014) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38305743849/job/115004301916) |
