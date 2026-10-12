@@ -138,6 +138,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Packaged Worker / accounts | open | 4 | 94s → 185s | +91s | +96.81% |
 | Development / accounts | open | 3 | 152s → 732s | +580s | +381.58% |
 | production release asset readiness | open | 2 | 2.465s → 27.818s | +25.353s | +1028.52% |
+| Packaged Worker / accounts / Run actions/checkout@v4 | open | 2 | 1s → 3s | +2s | +200% |
 | Packaged standby / Run actions/download-artifact@v4 | open | 2 | 2s → 6s | +4s | +200% |
 | Packaged standby | open | 4 | 78s → 523s | +445s | +570.51% |
 | Development / accounts | open | 4 | 152s → 681s | +529s | +348.03% |
@@ -261,6 +262,9 @@ Open trends require investigation. Resolved trends retain their history; each ve
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-12T10:31:51Z | step: Packaged Worker / interface / worker-blacksmith | 24s → 29s | +5s | +20.83% | failure | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38234358570/job/114762407176) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38236437410/job/114768915976) |
+| 2026-10-12T10:30:11Z | step: Development / gameplay / dev-blacksmith | 28s → 35s | +7s | +25% | failure | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38233656239/job/114758906127) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38236437410/job/114768159939) |
+| 2026-10-12T10:29:48Z | step: Packaged Worker / accounts / Run actions/checkout@v4 | 2s → 3s | +1s | +50% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37279628295/job/111664793033) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38236437410/job/114768916064) |
 | 2026-10-12T09:35:24Z | step: backup / Set up job | 1s → 2s | +1s | +100% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37290872931/job/111700688668) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38230851313/job/114749666827) |
 | 2026-10-12T08:57:08.000Z | workflow: Verify remote standby recovery | 22s → 28s | +6s | +27.27% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37286435016) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38226688401) |
 | 2026-10-12T08:57:08Z | job: rehearsal | 22s → 28s | +6s | +27.27% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37286435016/job/111686330548) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38226688401/job/114735819394) |
