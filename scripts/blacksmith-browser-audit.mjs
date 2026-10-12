@@ -223,7 +223,12 @@ try {
     guest.on("pageerror", (e) => errors.push(e.message));
     await openApplication(guest, invite);
     await guest.getByRole("button", { name: "Find characters", exact: true }).click();
-    await guest.getByLabel("Choose your character", { exact: true }).selectOption("hero");
+    const characterPicker = guest
+      .locator("form")
+      .filter({ has: guest.getByRole("button", { name: "Join room", exact: true }) })
+      .getByRole("combobox");
+    await characterPicker.selectOption("hero");
+    await expect(characterPicker).toHaveValue("hero");
     await guest.getByPlaceholder("What should the party call you?").fill("Smith guest");
     await guest.getByRole("button", { name: "Join room", exact: true }).click();
     await expect(guest.locator(".room-code")).toBeVisible();
