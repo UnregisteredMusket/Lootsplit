@@ -12827,5 +12827,39 @@
     "finishedAt": "2026-10-12T12:04:25Z",
     "durationMs": 40000,
     "trendId": "38246253534:1:8002bf7056abd877a0d995906b5c430a9fcfcce43450fbf56ddbae726ce9ebf5"
+  },
+  "[\".github/workflows/verify.yml\",\"pull_request\",\"pull-request\",\"step\",\"Development / gameplay / dev-downtime\",\"ubuntu-latest\",1]": {
+    "schema": 1,
+    "id": "38284304933:1:a1766714411c3aad4d11cd264d9c8aa7fb9fd3204cc49cb0abe494b4c599da7d",
+    "scope": "[\".github/workflows/verify.yml\",\"pull_request\",\"pull-request\",\"step\",\"Development / gameplay / dev-downtime\",\"ubuntu-latest\",1]",
+    "kind": "step",
+    "name": "Development / gameplay / dev-downtime",
+    "environment": "ubuntu-latest",
+    "commit": "47ff3967dd4c1494a508625cca3ecd659cac29d1",
+    "runId": 38284304933,
+    "attempt": 1,
+    "url": "https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38284304933/job/114928868549",
+    "outcome": "failure",
+    "startedAt": "2026-10-12T17:29:49Z",
+    "finishedAt": "2026-10-12T17:30:23Z",
+    "durationMs": 34000,
+    "trendId": "38284304933:1:a1766714411c3aad4d11cd264d9c8aa7fb9fd3204cc49cb0abe494b4c599da7d"
+  },
+  "[\".github/workflows/verify.yml\",\"pull_request\",\"pull-request\",\"step\",\"Packaged Worker / interface / worker-downtime\",\"ubuntu-latest\",1]": {
+    "schema": 1,
+    "id": "38284304933:1:1ec3f07f730e4644ccec098eb4b6a93d2a3e3ca0e6bd92c7913c39ff57a1cc49",
+    "scope": "[\".github/workflows/verify.yml\",\"pull_request\",\"pull-request\",\"step\",\"Packaged Worker / interface / worker-downtime\",\"ubuntu-latest\",1]",
+    "kind": "step",
+    "name": "Packaged Worker / interface / worker-downtime",
+    "environment": "ubuntu-latest",
+    "commit": "47ff3967dd4c1494a508625cca3ecd659cac29d1",
+    "runId": 38284304933,
+    "attempt": 1,
+    "url": "https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38284304933/job/114929650718",
+    "outcome": "failure",
+    "startedAt": "2026-10-12T17:32:01Z",
+    "finishedAt": "2026-10-12T17:32:35Z",
+    "durationMs": 34000,
+    "trendId": "38284304933:1:1ec3f07f730e4644ccec098eb4b6a93d2a3e3ca0e6bd92c7913c39ff57a1cc49"
   }
 }
