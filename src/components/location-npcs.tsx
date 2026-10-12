@@ -1,7 +1,7 @@
 import { CharacterPlacement } from "./character-placement";
 import { characterLocation, characterPosition } from "@/lib/quire/character-position";
 import { SearchSelect } from "@/components/search-select";
-import { useEffect, useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useRouterState } from "@tanstack/react-router";
 import { libraryRecordHref } from "@/lib/quire/library-records";
 import { useSeat } from "@/lib/quire/seat";
@@ -55,6 +55,14 @@ export function LocationNpcs() {
           <div className="world-toolbar">
             <Button onClick={() => setEdit(null)}>Create non-party NPC</Button>
           </div>
+          {edit !== undefined && (
+            <NpcEditor
+              key={edit?.id ?? "new"}
+              npc={edit ?? undefined}
+              table={t}
+              close={() => setEdit(undefined)}
+            />
+          )}
           <Fold title="Import NPCs">
             <p>
               <a href="/download/location-npcs.sample.json" download>
@@ -175,23 +183,28 @@ export function LocationNpcs() {
                   {n.barterAllowed ? "Bartering allowed" : "No bartering"}
                 </p>
               </span>
-              <Button onClick={() => setSelected(n.id)}>View & interact</Button>
-              {dm && <Button onClick={() => setEdit(n)}>Configure NPC</Button>}
             </div>
-            <p>{n.description}</p>
-            {t.journal.blacksmith?.profiles
-              .filter((p) => p.npcId === n.id)
-              .map((p) => (
-                <p key={p.shopId}>
-                  {p.skill} blacksmith ·{" "}
-                  <AppLink href={`/shop/${encodeURIComponent(p.shopId)}`}>
-                    Blacksmith services →
-                  </AppLink>
-                </p>
-              ))}
-            {dm && t.journal.blacksmith?.profiles.some((p) => p.npcId === n.id) && (
-              <NpcSmithToggle npc={n} />
-            )}
+            <details className="npc-record-details">
+              <summary aria-label={`Details & actions for ${n.name}`}>Details & actions</summary>
+              <div className="world-toolbar">
+                <Button onClick={() => setSelected(n.id)}>View & interact</Button>
+                {dm && <Button onClick={() => setEdit(n)}>Configure NPC</Button>}
+              </div>
+              <p>{n.description}</p>
+              {t.journal.blacksmith?.profiles
+                .filter((p) => p.npcId === n.id)
+                .map((p) => (
+                  <p key={p.shopId}>
+                    {p.skill} blacksmith ·{" "}
+                    <AppLink href={`/shop/${encodeURIComponent(p.shopId)}`}>
+                      Blacksmith services →
+                    </AppLink>
+                  </p>
+                ))}
+              {dm && t.journal.blacksmith?.profiles.some((p) => p.npcId === n.id) && (
+                <NpcSmithToggle npc={n} />
+              )}
+            </details>
           </article>
         ))}
       {!npcs.length && <p>No NPCs are available at this location.</p>}
@@ -201,18 +214,15 @@ export function LocationNpcs() {
           <NpcInteraction key={npc.id} npc={npc} table={t} />
         </>
       )}
-      {edit !== undefined && dm && (
-        <NpcEditor
-          key={edit?.id ?? "new"}
-          npc={edit ?? undefined}
-          table={t}
-          close={() => setEdit(undefined)}
-        />
-      )}
     </div>
   );
 }
 function NpcEditor({ npc, table, close }: { npc?: Npc; table: CloudTable; close: () => void }) {
+  const heading = useRef<HTMLHeadingElement>(null);
+  useEffect(() => {
+    heading.current?.scrollIntoView({ block: "start" });
+    heading.current?.focus({ preventScroll: true });
+  }, []);
   const market = readMarketLocations(table.journal?.market),
     [draft, setDraft] = useState<Npc>(
       npc ?? {
@@ -228,8 +238,10 @@ function NpcEditor({ npc, table, close }: { npc?: Npc; table: CloudTable; close:
     [copper, setCopper] = useState("0"),
     [uploadBusy, setUploadBusy] = useState(false);
   return (
-    <section className="world-card">
-      <h2>{npc ? "Configure NPC" : "New non-party NPC"}</h2>
+    <section className="world-card" aria-label="NPC editor">
+      <h2 ref={heading} tabIndex={-1} style={{ scrollMarginTop: "6rem" }}>
+        {npc ? "Configure NPC" : "New non-party NPC"}
+      </h2>
       <CommandForm
         label={npc ? "Save NPC configuration" : "Create NPC"}
         dirty

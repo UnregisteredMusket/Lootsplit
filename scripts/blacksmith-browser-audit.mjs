@@ -200,8 +200,18 @@ try {
     );
     await section.getByRole("link", { name: /People & NPCs/ }).click();
     await expect(page.locator(".loot-opening")).toHaveCount(0);
+    const npcDetails = page.getByLabel("Details & actions for Aster", { exact: true });
+    await npcDetails.click();
     const permission = formFor(page, "Save Aster smith permission");
     await permission.getByLabel("Offers blacksmith services · Aster", { exact: true }).check();
+    await npcDetails.click();
+    await expect(
+      permission.getByLabel("Offers blacksmith services · Aster", { exact: true }),
+    ).toBeHidden();
+    await npcDetails.click();
+    await expect(
+      permission.getByLabel("Offers blacksmith services · Aster", { exact: true }),
+    ).toBeChecked();
     await submit(permission, "Save Aster smith permission", async () =>
       expect
         .poll(async () => (await readJournal(page)).world.npcs[0].blacksmithServices)

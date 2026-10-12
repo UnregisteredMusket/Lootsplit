@@ -187,6 +187,7 @@ export const PLAYER_HELP_GROUPS: HelpGroup[] = [
         title: "Meet nearby NPCs",
         paragraphs: [
           "People & NPCs lists visible people available at your current location. Open their record for shared details or start a private interaction. The DM or an assigned NPC controller responds. NPC visibility, availability and barter permission are campaign settings.",
+          "Expand Details & actions under an NPC to read its description and choose View & interact. The NPC name opens its shared Library entry. Find an NPC and Search NPC records remain available above the list.",
           "Dialogue is shared with the interacting character, DM and configured controller. Opening an NPC record does not assign its character sheet or configuration controls to you.",
         ],
         links: [["People & NPCs", "/features/npcs"]],

@@ -154,6 +154,8 @@ Not implemented or promised by this inventory: OCR, Google Drive backup integrat
 
 ## Character placement, NPC transfer and downtime
 
+People & NPCs keeps names, Library links and location/availability visible while each record's **Details & actions** starts collapsed. Expanding restores descriptions, interaction/configuration controls and linked smith permissions without unmounting their drafts. Creation/configuration uses one focused editor above the records beside the create control, preserving existing NPC commands, imports, search, privacy and inventories.
+
 DMs can move any campaign character or imported location NPC between active party membership, an individual location and the unassigned NPC list from Party or People & NPCs. Transfers retain the same wallet, inventory, sheet, identity and history. Visibility controls hide records from player projections, map/Library links and invitations; NPC sheet sharing is separate and read-only for other players. Individual locations remain fixed when the party moves. Searchable selectors, departed character sheets, party counts, encounter planning and property presence use the canonical placement. DM-defined downtime actions remove participants until explicitly approved campaign time reaches their exact finishing hour, then restore their previous placement once. Cancellation restores placement without rewards. Existing property jobs, recurring finance, sessions, backups, archives, network boundaries and Android compatibility remain available. No migration or wall-clock scheduler is required.
 
 ## Mobile control panel redesign
