@@ -267,6 +267,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-12T15:17:12.000Z | queue: Deploy verified website / initial queue | 6s → 7s | +1s | +16.67% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37928213093) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38255560075) |
 | 2026-10-12T13:24:59Z | step: Development / gameplay / Run actions/upload-artifact@v4 | 4s → 6s | +2s | +50% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37796847170/job/113378416980) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38253801733/job/114826539465) |
 | 2026-10-12T13:23:15Z | step: Development / gameplay / dev-world-features | 106s → 122s | +16s | +15.09% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38053941691/job/114218473575) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38253801733/job/114826539465) |
 | 2026-10-12T13:19:22Z | step: Development / gameplay / dev-property-operations | 28s → 33s | +5s | +17.86% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37927498722/job/113809849067) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38253801733/job/114826539465) |
