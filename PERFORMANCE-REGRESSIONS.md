@@ -261,6 +261,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-12T09:35:24Z | step: backup / Set up job | 1s → 2s | +1s | +100% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37290872931/job/111700688668) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38230851313/job/114749666827) |
 | 2026-10-12T08:57:08.000Z | workflow: Verify remote standby recovery | 22s → 28s | +6s | +27.27% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37286435016) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38226688401) |
 | 2026-10-12T08:57:08Z | job: rehearsal | 22s → 28s | +6s | +27.27% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37286435016/job/111686330548) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38226688401/job/114735819394) |
 | 2026-10-12T08:57:04Z | step: rehearsal / Run npm ci --ignore-scripts | 13s → 17s | +4s | +30.77% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37286435016/job/111686330548) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38226688401/job/114735819394) |
