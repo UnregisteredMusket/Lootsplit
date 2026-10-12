@@ -438,6 +438,21 @@ try {
     await page.getByLabel("Starting funds (copper)", { exact: true }).fill("5000");
     await page.getByRole("button", { name: "Create NPC", exact: true }).click();
     await expect(page.getByRole("heading", { name: "Mara", exact: true })).toBeVisible();
+    const maraRecord = page.locator("article.world-card").filter({
+      has: page.getByRole("heading", { name: "Mara", exact: true }),
+    });
+    const maraDetails = maraRecord.locator("details.npc-record-details");
+    await expect(maraDetails).not.toHaveAttribute("open", "");
+    await expect(maraRecord.getByText("Dock broker", { exact: true })).toBeHidden();
+    const maraSummary = maraDetails.locator("summary");
+    await maraSummary.click();
+    await expect(maraRecord.getByText("Dock broker", { exact: true })).toBeVisible();
+    await maraSummary.focus();
+    await maraSummary.press("Space");
+    await expect(maraRecord.getByText("Dock broker", { exact: true })).toBeHidden();
+    await maraSummary.press("Enter");
+    await expect(maraRecord.getByText("Dock broker", { exact: true })).toBeVisible();
+    await page.screenshot({ path: `${output}/npc-expanded-${width}.png`, fullPage: true });
     await page.getByRole("button", { name: "View & interact", exact: true }).click();
     await page.getByText("Configure NPC inventory & funds", { exact: true }).click();
     await page.getByLabel("Item name", { exact: true }).fill("Trade gem");
@@ -637,9 +652,39 @@ try {
     await page.screenshot({ path: `${output}/time-${width}.png`, fullPage: true });
     await navigateApplication(page, origin + "/features/npcs");
     await page.getByRole("button", { name: "Create non-party NPC", exact: true }).click();
+    const npcEditor = page.getByRole("region", { name: "NPC editor", exact: true });
+    await expect(
+      npcEditor.getByRole("heading", { name: "New non-party NPC", exact: true }),
+    ).toBeInViewport();
+    assert.equal(
+      await npcEditor.evaluate(
+        (el) =>
+          !!(
+            el.compareDocumentPosition(document.querySelector("article.world-card")) &
+            Node.DOCUMENT_POSITION_FOLLOWING
+          ),
+      ),
+      true,
+      "The NPC creation editor appears before existing records",
+    );
+    await page.screenshot({ path: `${output}/npc-create-${width}.png`, fullPage: true });
     await page.getByLabel("NPC name", { exact: true }).fill("Sera");
     await chooseOption(page.getByLabel("NPC location", { exact: true }), "city");
     await page.getByRole("button", { name: "Create NPC", exact: true }).click();
+    await expect(page.getByRole("heading", { name: "Sera", exact: true })).toBeVisible();
+    await expect(page.locator("details.npc-record-details[open]")).toHaveCount(0);
+    await maraDetails.locator("summary").click();
+    await maraRecord.getByRole("button", { name: "Configure NPC", exact: true }).click();
+    await expect(
+      npcEditor.getByRole("heading", { name: "Configure NPC", exact: true }),
+    ).toBeInViewport();
+    await expect(npcEditor.getByLabel("NPC name", { exact: true })).toHaveValue("Mara");
+    page.once("dialog", (dialog) => dialog.accept());
+    await npcEditor.getByRole("button", { name: "Close editor", exact: true }).click();
+    await expect(npcEditor).toHaveCount(0);
+    await maraDetails.locator("summary").click();
+    await fits(page);
+    await page.screenshot({ path: `${output}/npc-collapsed-${width}.png`, fullPage: true });
     await navigateApplication(page, origin + "/maps");
     const npcIcon = page.getByRole("button", { name: "NPC: 2 records", exact: true });
     await expect(npcIcon).toBeVisible();

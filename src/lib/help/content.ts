@@ -36,6 +36,7 @@ export const HELP_GROUPS: HelpGroup[] = [
         audience: "DM / Players",
         paragraphs: [
           "Market → People & NPCs lets DMs create non-party NPCs with location, description, portrait, inventory and funds. Players meet visible NPCs at their selected location; the DM responds by default. A configured player-character controller may speak/decide trades for that NPC without gaining configuration permissions.",
+          "NPC records start with Details & actions collapsed; expand a record to read its description, interact or configure it. Names still link to Library entries. Create non-party NPC opens its editor beside the creation button above the records; Configure NPC brings that same editor into view. Collapsing a record retains unsaved smith-permission changes.",
           "NPC JSON imports use format lootsplit.npcs, schemaVersion 1, and existing campaign location IDs. Preview before importing; every record is validated atomically. Dialogue is private to the interacting character, DM and configured NPC controller.",
         ],
         links: [

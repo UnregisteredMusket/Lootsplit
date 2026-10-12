@@ -60,6 +60,8 @@ Optionally award no rest, a short rest or a long rest to selected party characte
 
 ## Search and Library records
 
+NPC records start with **Details & actions** collapsed. Expand an individual record to read its description, interact, configure it or manage linked blacksmith permissions. Its name and location remain visible; the name still opens the matching Library entry. Collapsing retains unsaved permission drafts. **Create non-party NPC** opens its editor above the records beside the creation control, and **Configure NPC** brings the same editor into view. Existing search, import, dialogue and visibility rules remain.
+
 Data dropdowns include a search box; type a name or hierarchy words, then tap a result or use arrows and Enter. Escape cancels. Long result lists offer Show more, and every option remains searchable. NPC and imported monster screens retain their existing searches and now also provide searchable record pickers.
 
 Map record names and NPC/source-reference links open the matching entry in Library, including its saved description, image, source pages, monster fields and warnings. Library has a record-type filter, full-text search and pagination. Related references open their own entries. Interact with this NPC opens that person; View saved map opens that map. Entries follow current campaign permissions, and source packs remain private to DMs.
