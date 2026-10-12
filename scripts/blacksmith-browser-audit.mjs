@@ -59,6 +59,7 @@ async function submit(form, button, accepted) {
         throw Error(await form.getByRole("alert").innerText());
       }),
   ]);
+  await form.getByRole("button", { name: button, exact: true }).waitFor({ state: "visible" });
   await expect(form.getByRole("alert")).toHaveCount(0);
 }
 const formFor = (page, label) =>
@@ -71,12 +72,25 @@ async function fits(page) {
 }
 async function advance(page, days, status) {
   await navigateApplication(page, origin + "/features/downtime");
-  await page.locator("summary").filter({ hasText: "Set downtime & review calculations" }).click();
+  // The feature's room/session key changes during a cold shared-room restore.
+  // Wait for the authoritative room before opening/filling its remountable form.
+  await expect(
+    page
+      .getByRole("status")
+      .filter({ hasText: /Room online.*Play active.*Saved to room/ })
+      .first(),
+  ).toBeVisible();
+  const summary = page.locator("summary").filter({ hasText: "Set downtime & review calculations" });
+  if (!(await summary.locator("..").evaluate((el) => el.open))) await summary.click();
   await page.getByLabel("In-game days", { exact: true }).fill(String(days));
-  await page.getByRole("button", { name: "Preview downtime", exact: true }).click();
+  await expect(page.getByLabel("In-game days", { exact: true })).toHaveValue(String(days));
+  await page.getByRole("button", { name: /^(Preview|Recalculate) downtime$/ }).click();
   await expect
-    .poll(async () => (await readJournal(page)).finance.downtime.at(-1)?.status)
-    .toBe("pending");
+    .poll(async () => {
+      const d = (await readJournal(page)).finance.downtime.at(-1);
+      return d?.status === "pending" && d.days === days;
+    })
+    .toBe(true);
   await expect(page.locator("main")).toContainText("Blacksmith commissions");
   await page.getByRole("button", { name: /^(Play sessions|Session ·)/ }).click();
   await page.getByLabel("Session name", { exact: true }).fill("Approved smith work");
@@ -260,6 +274,7 @@ try {
     await expect.poll(async () => (await readJournal(page)).blacksmith.orders.length).toBe(1);
     await navigateApplication(page, origin + "/shop/forge");
     const saved = (await readJournal(page)).blacksmith.orders[0];
+    currentPage = page;
     assert.equal(saved.progressDays, 0);
     assert.equal(saved.terms.skill, "legendary");
     const controls = formFor(page, "Record commission control");
@@ -280,6 +295,7 @@ try {
       .poll(async () => (await readJournal(page)).blacksmith.orders[0].progressDays)
       .toBe(2);
     await advance(page, saved.terms.workDays - 2, "ready");
+    currentPage = guest;
     await expect(
       gs.getByRole("button", { name: "Collect crafted item", exact: true }),
     ).toBeVisible();
