@@ -267,6 +267,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-12T20:15:32Z | step: test-apk / Upload test APK | 2s → 3s | +1s | +50% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38301966281/job/114986784599) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38302744845/job/114989373301) |
 | 2026-10-12T17:49:08Z | job: Development / gameplay | 712s → 883s | +171s | +24.02% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38140451074/job/114473173492) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38285102588/job/114931468377) |
 | 2026-10-12T17:38:25Z | step: Development / gameplay / dev-downtime | 34s → 42s | +8s | +23.53% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38284304933/job/114928868549) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38285102588/job/114931468377) |
 | 2026-10-12T15:17:12.000Z | queue: Deploy verified website / initial queue | 6s → 7s | +1s | +16.67% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37928213093) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38255560075) |
