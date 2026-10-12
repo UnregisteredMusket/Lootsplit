@@ -1,0 +1,61 @@
+{
+  "sync-before": {
+    "scope": "synthetic-room-sync/node22/sqlite-memory/warm/v1/40characters-6maps-2000ledger",
+    "node": "22.23.3",
+    "at": "2026-10-12T19:39:51.694Z",
+    "results": [
+      {
+        "name": "full",
+        "iterations": 30,
+        "meanMs": 44.47793206666666,
+        "medianMs": 43.77142200000003,
+        "p95Ms": 59.34679300000016,
+        "responseBytes": 1372161
+      }
+    ]
+  },
+  "sync-after": {
+    "scope": "synthetic-room-sync/node22/sqlite-memory/warm/v1/40characters-6maps-2000ledger",
+    "node": "22.23.3",
+    "at": "2026-10-12T19:45:04.479Z",
+    "results": [
+      {
+        "name": "full",
+        "iterations": 30,
+        "meanMs": 40.87175173333335,
+        "medianMs": 39.74294000000009,
+        "p95Ms": 61.49967400000014,
+        "responseBytes": 1372161
+      },
+      {
+        "name": "unchanged",
+        "iterations": 30,
+        "meanMs": 0.5495306666666996,
+        "medianMs": 0.6223430000000008,
+        "p95Ms": 0.705989000000045,
+        "responseBytes": 141
+      }
+    ]
+  },
+  "command-benchmark": {
+    "scope": "synthetic-command-batch/node22/warm/v1/40characters-6maps-20portraits",
+    "at": "2026-10-12T19:53:39.397Z",
+    "node": "22.23.3",
+    "results": [
+      {
+        "name": "before",
+        "iterations": 20,
+        "meanMs": 85.01848350000006,
+        "medianMs": 83.98037299999987,
+        "p95Ms": 105.39080600000034
+      },
+      {
+        "name": "after",
+        "iterations": 20,
+        "meanMs": 45.880287900000056,
+        "medianMs": 46.211776999999984,
+        "p95Ms": 55.49268399999983
+      }
+    ]
+  }
+}

@@ -310,6 +310,7 @@ export const worldCommands = [
     before: characterPositionSchema,
     name: z.string().trim().min(1).max(200),
     days: z.number().int().min(1).max(3650),
+    durationMinutes: z.number().int().min(15).max(3650 * 1440).optional(),
     locationId: id.nullable(),
   }),
   z.object({

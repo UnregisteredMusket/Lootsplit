@@ -145,7 +145,8 @@ export function applyCharacterPosition(
   } else if (cmd.kind === "character-downtime-start") {
     if (s.downtime) throw Error("This character already has an active downtime action.");
     const start = campaignMinute(t);
-    if (start + cmd.days * 1440 > 1e9 * 1440)
+    const duration = cmd.durationMinutes ?? cmd.days * 1440;
+    if (start + duration > 1e9 * 1440)
       throw Error("Downtime exceeds the supported campaign clock.");
     place(t, {
       ...s,
@@ -155,7 +156,7 @@ export function applyCharacterPosition(
         id: cmd.id,
         name: cmd.name,
         startedMinute: start,
-        finishMinute: start + cmd.days * 1440,
+        finishMinute: start + duration,
         returnInParty: s.inParty,
         returnLocationId: s.locationId,
       },

@@ -31,6 +31,25 @@ const STORED_BODY = Symbol("authoritative-room-body");
 export function roomStorageBody(room: CloudRoom): string {
   return (room as CloudRoom & { [STORED_BODY]?: string })[STORED_BODY] ?? JSON.stringify(room);
 }
+export type RoomAccess = Pick<CloudRoom, "code" | "revision" | "ownerId" | "sessionId" | "closed" | "seats">;
+/** Read authorization/revision only, without private campaign/media hydration. */
+export async function readRoomAccess(code: string): Promise<RoomAccess | null> {
+  const canonicalCode = code.trim().toUpperCase(), db = database();
+  if (!db) {
+    const room = (await localRooms()).find((r) => r.code === canonicalCode);
+    if (!room) return null;
+    const { revision, ownerId, sessionId, closed, seats } = room;
+    return { code: canonicalCode, revision, ownerId, sessionId, closed, seats };
+  }
+  const row = await db.prepare(
+    "SELECT revision,json_extract(body,'$.ownerId') AS ownerId,json_extract(body,'$.sessionId') AS sessionId,json_extract(body,'$.closed') AS closed,json_extract(body,'$.seats') AS seats FROM campaign_rooms WHERE code=?",
+  ).bind(canonicalCode).first<{ revision: number; ownerId: string | null; sessionId: string | null; closed: number | null; seats: string }>();
+  if (!row) return null;
+  const seats: unknown = JSON.parse(row.seats);
+  if (!Array.isArray(seats)) throw Error("The shared campaign's seat records are incomplete.");
+  return { code: canonicalCode, revision: row.revision, ownerId: row.ownerId ?? undefined,
+    sessionId: row.sessionId ?? undefined, closed: row.closed === 1, seats: seats as RoomAccess["seats"] };
+}
 const FILE = path.join(process.cwd(), "data", "cloud-rooms.json");
 let localWrites: Promise<unknown> = Promise.resolve();
 function localWrite<T>(work: () => Promise<T>): Promise<T> {

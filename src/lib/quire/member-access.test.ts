@@ -18,18 +18,16 @@ test("linked room tokens honor active, expired, permanent and revoked account re
           DB: {
             prepare: (sql: string) => ({
               bind: (...values: string[]) => {
-                if (sql.includes("SELECT body")) {
+                if (sql.includes("FROM campaign_rooms")) {
                   assert.equal(values[0], "ABC");
                   return {
                     first: async () =>
                       linkedId
                         ? {
-                            body: JSON.stringify({
-                              code: "ABC",
-                              seats: [
+                            revision: 1, ownerId: null, sessionId: null, closed: 0,
+                            seats: JSON.stringify([
                                 { id: "player", token: "token", role: "player", userId: linkedId },
-                              ],
-                            }),
+                              ]),
                           }
                         : null,
                   };

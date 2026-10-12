@@ -1,3 +1,31 @@
+# Lootsplit 1.7.0 candidate
+
+Android version code 10. This candidate retains package `com.unregisteredmusket.lootsplit` and the permanent signing certificate. The public download remains 1.6.0 until the new signed APK and checksum exist.
+
+## Added features
+
+- The Android bundle includes the current website's map grids/routes, property operations, commodity exchanges, bilateral barter, blacksmith commissions and local reference OCR.
+- NPC training uses approved hourly downtime budgets, DM review, complete NPC/category totals and manual milestone resets with lifetime history.
+
+## Improvements
+
+- Compact authenticated unchanged reads retain fresh access and encounter policy without repeatedly transferring/hydrating campaign media. Manual refresh and old clients retain complete snapshots.
+- Atomic command batches share one working copy while validating every action and retaining exact financial receipts.
+- Character away actions support elapsed campaign hours. Calendar days, usable downtime and displayed training days are explicitly distinguished.
+- Cloudflare CPU/log settings travel with the verified artifact and are checked after deployment. Full browser audits are redistributed across existing groups without weaker gates or longer deadlines.
+
+## Bug fixes
+
+- Late bookkeeping can use explicit DM confirmation of historical conditions while enforcing current access and original period budgets.
+- Subject spacing/case variants group without rewriting original requests; category totals combine teachers while player totals remain scoped to their contributions.
+- Documentation now reflects implemented OCR, six navigation tabs and map tiles. Failure email uses the production secret scope and reports configuration honestly.
+
+## Candidate verification
+
+Full PR/main preservation checks and the signed Android workflow must pass. Verify APK version/code, permanent certificate and checksum before updating website download metadata. Physical-device installation, file-picker and force-close behavior require separate validation. The broader UI redesign follows this functional release.
+
+---
+
 # Lootsplit 1.6.0 candidate
 
 Android version code 9. This candidate retains package `com.unregisteredmusket.lootsplit` and the permanent signing certificate.

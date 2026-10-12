@@ -5,7 +5,7 @@ import {
   readDowntimeActivities,
   type TrainingRequest,
 } from "@/lib/quire/downtime-activities-schema";
-import { downtimeRemaining, trainingCounters, trainingKey } from "@/lib/quire/downtime-activities";
+import { downtimeRemaining, trainingCounters, trainingKey, recipientTrainingCounters } from "@/lib/quire/downtime-activities";
 import { useFinanceReadiness } from "@/lib/quire/use-finance-readiness";
 import { SearchSelect } from "./search-select";
 import { CommandForm, CommandButton } from "./world-tools";
@@ -40,6 +40,7 @@ export function DowntimeActivities({ reviewsOnly = false }: { reviewsOnly?: bool
     [description, setDescription] = useState(""),
     [className, setClassName] = useState("");
   const [duration, setDuration] = useState("8");
+  const [historical, setHistorical] = useState(false), [historicalContext, setHistoricalContext] = useState("");
   const selectedTrainer = trainerId || mine[0]?.id || "",
     selectedWindow = windowId || state.windows.at(-1)?.id || "";
   const counters = trainingCounters(state);
@@ -109,7 +110,7 @@ export function DowntimeActivities({ reviewsOnly = false }: { reviewsOnly?: bool
               <Fold title="Train an NPC" defaultOpen>
                 <CommandForm
                   label="Request NPC training"
-                  submitDisabled={locked || !selectedTrainer || !npcId || !topic.trim()}
+                  submitDisabled={locked || !selectedTrainer || !npcId || !topic.trim() || (historical && !historicalContext.trim())}
                   dirty={
                     !!topic ||
                     !!description ||
@@ -118,12 +119,13 @@ export function DowntimeActivities({ reviewsOnly = false }: { reviewsOnly?: bool
                     !!trainerId ||
                     !!npcId ||
                     !!windowId ||
-                    category !== "martial"
+                    category !== "martial" || historical || !!historicalContext
                   }
                   onDone={() => {
                     setTopic("");
                     setDescription("");
                     setClassName("");
+                    setHistorical(false);setHistoricalContext("");
                   }}
                   submit={() => ({
                     kind: "downtime-training",
@@ -135,6 +137,7 @@ export function DowntimeActivities({ reviewsOnly = false }: { reviewsOnly?: bool
                     description,
                     className,
                     minutes: Number(duration) * 60,
+                    ...(historical ? { historicalContext } : {}),
                   })}
                 >
                   <label>
@@ -231,10 +234,27 @@ export function DowntimeActivities({ reviewsOnly = false }: { reviewsOnly?: bool
                     same hours to both participants. Missing sheets or unrecognized class levels
                     require a DM review note.
                   </p>
+                  <label>
+                    <input type="checkbox" checked={historical} onChange={e => setHistorical(e.target.checked)} />
+                    Record training completed earlier
+                  </label>
+                  {historical && <label>Historical training context
+                    <textarea aria-label="Historical training context" required maxLength={4000} value={historicalContext} onChange={e => setHistoricalContext(e.target.value)} />
+                    <span>Describe when and where training happened and the participants' levels then. The DM must confirm this history. The selected period's remaining hours still apply.</span>
+                  </label>}
                 </CommandForm>
               </Fold>
             </>
           )}
+          <Fold title={dm ? "NPC training totals by category" : "My contributions by NPC and category"} defaultOpen>
+            {!dm && <p>These totals include your visible contributions only. The DM can review the complete NPC totals.</p>}
+            {recipientTrainingCounters(state).map(c => <article className="journal-entry" key={JSON.stringify([c.record.npcId, c.record.category])}>
+              <h3>{c.record.npcName} · {labels[c.record.category]}</h3>
+              <p>Since reset: {hours(c.currentMinutes)} hours · {days(c.currentDays)} training days</p>
+              <p>Lifetime: {hours(c.lifetimeMinutes)} hours · {days(c.lifetimeDays)} training days</p>
+              {dm && <ResetCounter record={c.record} requestIds={c.requestIds} locked={locked} categoryTotal />}
+            </article>)}
+          </Fold>
           <Fold title="Training progress counters" defaultOpen>
             {!counters.length && <p>No approved training yet.</p>}
             {counters.map((c) => (
@@ -278,6 +298,7 @@ export function DowntimeActivities({ reviewsOnly = false }: { reviewsOnly?: bool
                 {labels[r.category]} · {r.topic} · {hours(r.minutes)} hours · {r.status}
               </p>
               {r.description && <p>{r.description}</p>}
+              {r.historicalContext && <p>Historical context: {r.historicalContext}</p>}
               {r.className && <p>Class comparison: {r.className}</p>}
               {r.reviewNote && <p>DM review: {r.reviewNote}</p>}
               {r.status === "pending" &&
@@ -358,17 +379,19 @@ function HourSettings({
 function TrainingReview({ request: r, locked }: { request: TrainingRequest; locked: boolean }) {
   const [note, setNote] = useState(""),
     [approve, setApprove] = useState(true);
+  const [historicalConfirmed, setHistoricalConfirmed] = useState(false);
   return (
     <CommandForm
       label="Record training decision"
-      submitDisabled={locked}
-      dirty={!!note || !approve}
+      submitDisabled={locked || (approve && !!r.historicalContext && (!historicalConfirmed || !note.trim()))}
+      dirty={!!note || !approve || historicalConfirmed}
       submit={() => ({
         kind: "downtime-training-review",
         requestId: r.id,
         before: r,
         approve,
         note,
+        ...(historicalConfirmed ? { historicalConfirmed: true } : {}),
       })}
     >
       <label>
@@ -396,6 +419,9 @@ function TrainingReview({ request: r, locked }: { request: TrainingRequest; lock
         level is unavailable, record that confirmation here. Approval changes only the time
         allocation and tracking records.
       </p>
+      <label><input type="checkbox" checked={historicalConfirmed} onChange={e => setHistoricalConfirmed(e.target.checked)} />
+        Confirm historical training: together, equal-or-lower levels and completed time at that time
+      </label>
     </CommandForm>
   );
 }
@@ -403,20 +429,25 @@ function ResetCounter({
   record: r,
   requestIds,
   locked,
+  categoryTotal = false,
 }: {
   record: TrainingRequest;
   requestIds: string[];
   locked: boolean;
+  categoryTotal?: boolean;
 }) {
   const [note, setNote] = useState("");
   return (
-    <Fold title="DM milestone & reset">
+    <Fold title={categoryTotal ? "DM category milestone & reset" : "DM milestone & reset"}>
       <CommandForm
-        label="Reset training counter"
+        label={categoryTotal ? "Reset NPC category counter" : "Reset training counter"}
         submitDisabled={locked || !requestIds.length || !note.trim()}
         dirty={!!note}
         onDone={() => setNote("")}
-        submit={() => ({
+        submit={() => categoryTotal ? ({
+          kind: "downtime-training-reset-category", npcId: r.npcId, category: r.category,
+          before: requestIds, note,
+        }) : ({
           kind: "downtime-training-reset",
           trainerId: r.trainerId,
           npcId: r.npcId,

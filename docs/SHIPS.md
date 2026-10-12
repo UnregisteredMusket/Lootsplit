@@ -66,9 +66,9 @@ The existing single stored downtime quote previews all financial settlement, shi
 
 **DM Override · Teleport Ship** chooses an existing destination and optional compatible berth, plus an optional reason. It moves the ship and every aboard character in the same authoritative command; cargo remains attached to the same canonical holding. No elapsed time, travel spending, repair or refund is applied. Crew/damage restrictions are bypassed. Ongoing/proposed voyages close as `dm-overridden`; former-yard work pauses. The move is journaled. Decide or cancel pending downtime first. Repeat shared receipts do not move or log twice.
 
-## Future maps and compatibility
+## Maps and compatibility
 
-Voyages retain IDs, origin/destination, elapsed minutes and `routeVersion: 1`/route notes. Future map grids, port anchors and tile routes should feed this same reviewed downtime engine. Present maps remain their existing image/anchor model; tile movement is not implemented in this release.
+Voyages retain IDs, origin/destination, elapsed minutes and reviewed route metadata. Maps now support configurable combat grids, port anchors, saved token placement and frozen voyage tile routes; see [Map tiles](MAP-TILES.md). Mapped voyage progress uses the same approved downtime engine. Legacy voyages and maps without grids remain available.
 
 Optional journal fleet data needs no database migration. Old saves without it remain readable. Backups, archives, account-owned rooms, memory-only guests and privacy projections retain it. Legacy journal replacements preserve authoritative fleet metadata. Website code is shared with the Android build, but distributing these new controls requires a separately verified signed APK; no APK is published with this website feature.
 

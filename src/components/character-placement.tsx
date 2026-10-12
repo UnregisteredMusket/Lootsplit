@@ -85,6 +85,7 @@ function PlacementEditor({ p, table: t }: { p: Purse; table: CloudTable }) {
     [sheetVisible, setSheetVisible] = useState(s.sheetVisible),
     [name, setName] = useState(""),
     [days, setDays] = useState(1);
+  const [unit, setUnit] = useState("days");
   const actualLocation = characterLocation(t, p);
   return (
     <div>
@@ -177,13 +178,14 @@ function PlacementEditor({ p, table: t }: { p: Purse; table: CloudTable }) {
         <>
           <CommandForm
             label="Start character downtime"
-            dirty={!!name}
+            dirty={!!name || unit !== "days" || days !== 1}
             submit={() => ({
               kind: "character-downtime-start",
               purseId: p.id,
               before: s,
               name,
-              days,
+              days: unit === "days" ? days : Math.ceil(days / 24),
+              ...(unit === "hours" ? { durationMinutes: days * 60 } : {}),
               locationId: location || null,
             })}
           >
@@ -198,14 +200,21 @@ function PlacementEditor({ p, table: t }: { p: Purse; table: CloudTable }) {
                 onChange={(e) => setName(e.target.value)}
               />
             </label>
+            <label>Duration unit
+              <select aria-label="Character downtime duration unit" value={unit} onChange={e => { setUnit(e.target.value);setDays(1); }}>
+                <option value="days">Elapsed campaign days (24 hours)</option>
+                <option value="hours">Elapsed campaign hours</option>
+              </select>
+            </label>
             <label>
-              Campaign days
+              {unit === "days" ? "Campaign days" : "Elapsed campaign hours"}
               <input
-                aria-label="Character downtime days"
+                aria-label={unit === "days" ? "Character downtime days" : "Character downtime hours"}
                 type="number"
                 required
-                min={1}
-                max={3650}
+                min={unit === "days" ? 1 : 0.25}
+                step={unit === "days" ? 1 : 0.25}
+                max={unit === "days" ? 3650 : 87600}
                 value={days}
                 onChange={(e) => setDays(Number(e.target.value))}
               />
@@ -224,6 +233,8 @@ function PlacementEditor({ p, table: t }: { p: Purse; table: CloudTable }) {
             <p className="text-sm text-muted">
               Temporarily leaves the party until this action's campaign time is complete. Completion
               restores the current saved placement. This action does not award money or items.
+              Elapsed time uses a 24-hour campaign day. Approved downtime budgets prorate away time
+              against the period's usable-hours allowance; training days use their separate conversion.
             </p>
           </CommandForm>
         </>

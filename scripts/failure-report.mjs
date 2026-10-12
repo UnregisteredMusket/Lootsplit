@@ -50,10 +50,14 @@ export function buildReport(run, jobs, liveCommit = "unconfirmed") {
   };
 }
 
-export async function emailReport(report, env = process.env, request = requestJson) {
+export function emailConfiguration(env = process.env) {
   const required = ["FAILURE_REPORT_EMAIL", "FAILURE_REPORT_FROM", "RESEND_API_KEY"];
   const missing = required.filter((key) => !env[key]);
-  if (missing.length) return { status: "not_configured", missing };
+  return missing.length ? { status: "not_configured", missing } : { status: "configured", missing: [] };
+}
+export async function emailReport(report, env = process.env, request = requestJson) {
+  const configuration = emailConfiguration(env);
+  if (configuration.status === "not_configured") return configuration;
   const delivery = await request("https://api.resend.com/emails", {
     method: "POST",
     headers: {
@@ -140,8 +144,15 @@ async function main() {
       "::warning::Failure email is not configured; see the report summary for missing setting names.",
     );
 }
-if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href)
-  main().catch((error) => {
+if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
+  if (process.argv.includes("--check-config")) {
+    const readiness = { ...emailConfiguration(), checkedAt: new Date().toISOString(), deliveryTested: false };
+    mkdirSync("test-results/failure-report", { recursive: true });
+    writeFileSync("test-results/failure-report/readiness.json", JSON.stringify(readiness, null, 2) + "\n");
+    console.log(JSON.stringify(readiness));
+    if (readiness.status === "not_configured") console.log("::warning::Failure email settings are missing; no email delivery was attempted.");
+  } else main().catch((error) => {
     console.error(error.message);
     process.exitCode = 1;
   });
+}

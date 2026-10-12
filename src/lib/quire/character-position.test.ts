@@ -73,6 +73,18 @@ const position = (t: CloudTable, id = "npc") =>
     t,
     t.purses.find((p) => p.id === id)!,
   );
+test("hour-based away activities preserve legacy calendar-day commands and exact campaign return time", () => {
+  const t = fixture(), before = position(t, "hero");
+  const start: CommandInput = { kind:"character-downtime-start",purseId:"hero",before,
+    name:"Short errand",days:1,durationMinutes:90,locationId:"away" };
+  const hourly = act(t,start);
+  assert.equal(position(hourly,"hero").downtime!.finishMinute,90);
+  const legacy = act(t,{ ...start, durationMinutes: undefined });
+  assert.equal(position(legacy,"hero").downtime!.finishMinute,1440);
+  assert.throws(()=>act(t,start,player),/Only the DM/);
+  assert.throws(()=>act(t,{ ...start,durationMinutes:0 }));
+  assert.ok(readCloudTable(hourly));
+});
 function move(t: CloudTable, id: string, changes: Partial<ReturnType<typeof position>>) {
   const s = position(t, id);
   return act(t, {

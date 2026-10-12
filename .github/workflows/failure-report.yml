@@ -26,6 +26,7 @@ jobs:
       github.event.workflow_run.head_repository.full_name == github.repository &&
       github.repository == 'UnregisteredMusket/Lootsplit'
     runs-on: ubuntu-latest
+    environment: production
     timeout-minutes: 5
     steps:
       # Always use trusted default-branch scripts; never execute a failing PR's code.

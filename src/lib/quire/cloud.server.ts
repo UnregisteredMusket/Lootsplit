@@ -1,5 +1,6 @@
 import { characterVisible, canReadCharacter } from "./character-position.ts";
-import { readRoom, createRoom, updateRoom, roomStorageBody } from "./room-store.server.ts";
+import { readRoom, readRoomAccess, createRoom, updateRoom, roomStorageBody } from "./room-store.server.ts";
+import { syncTimer } from "./sync-timing.server.ts";
 import {
   claimSeat,
   readCloudTableForImport,
@@ -268,10 +269,46 @@ export async function joinRoom(input: { code: string; purseId: string; name: str
 }
 
 export async function roomState(input: { code: string; token: string }): Promise<RoomView> {
-  const room = await must(input.code);
-  const seat = room.seats.find((item) => item.token === input.token);
-  if (!seat) throw new Error("This browser is not seated at that table.");
-  return view(room, seat);
+  const timer = syncTimer("full-read");
+  try {
+    const room = await timer.measure("hydrate", () => must(input.code));
+    const seat = room.seats.find((item) => item.token === input.token);
+    if (!seat) throw new Error("This browser is not seated at that table.");
+    const result = await timer.measure("projection", () => view(room, seat));
+    timer.finish("full");
+    return result;
+  } catch (error) { timer.finish("failed");throw error; }
+}
+export type RoomPollInput = { code: string; token: string; knownRevision?: number; knownSeatId?: string };
+export type RoomUnchanged = {
+  unchanged: true;
+  protocol: "lootsplit.room.unchanged.v1";
+  code: string;
+  seatId: string;
+  userId?: string;
+  sessionId?: string;
+  revision: number;
+  encounterActive: boolean;
+};
+export async function pollRoom(input: RoomPollInput): Promise<RoomView | RoomUnchanged> {
+  const timer = syncTimer("poll");
+  try {
+    const access = await timer.measure("access", () => readRoomAccess(input.code));
+    if (!access) throw Error("No table uses that code.");
+    if (access.closed) throw Error("This room is closed.");
+    const seat = access.seats.find(s => s.token === input.token);
+    if (!seat) throw Error("This browser is not seated at that table.");
+    if (Number.isSafeInteger(input.knownRevision) && input.knownRevision === access.revision && input.knownSeatId === seat.id) {
+      const encounterActive = await timer.measure("encounter", () => activeEncounter(access.code));
+      timer.finish("unchanged");
+      return { unchanged: true, protocol: "lootsplit.room.unchanged.v1", code: access.code,
+        seatId: seat.id, userId: seat.userId, sessionId: access.sessionId, revision: access.revision, encounterActive };
+    }
+    // Initial/changed reads retain the complete legacy projection and migration behavior.
+    const result = await roomState(input);
+    timer.finish("full");
+    return result;
+  } catch (error) { timer.finish("failed");throw error; }
 }
 
 export async function publishTurn(_input: {
@@ -484,7 +521,7 @@ export async function submitCommands(input: {
   endTurn?: boolean;
   stage?: boolean;
 }): Promise<RoomView> {
-  const { commandSchema, applyCommand } = await import("./commands.ts");
+  const { commandSchema, applyCommandBatch } = await import("./commands.ts");
   const { commandIdentity, canonicalJson, sameCommand } = await import("./command-identity.ts");
   if (JSON.stringify(input).length > 2_000_000)
     throw new Error("The pending batch is too large. Submit smaller changes.");
@@ -576,17 +613,22 @@ export async function submitCommands(input: {
     const commandHashes = { ...(room.commandHashes ?? {}) };
     // Validate the entire merged draft against the authoritative table. Two
     // individually valid device queues may overspend when combined.
-    for (const command of input.stage ? drafts[seat.id]! : commands) {
+    const selected = new Set(seen);
+    const unapplied = (input.stage ? drafts[seat.id]! : commands).filter(command => {
       const key = seat.id + ":" + command.id;
-      if (seen.has(key)) continue;
-      table = applyCommand(table, seat, command, {
-        source: "server",
-        random: (draw) => {
-          const key = command.id + ":" + draw;
-          if (!seasonalRolls.has(key)) seasonalRolls.set(key, randomTradeRoll());
-          return seasonalRolls.get(key)!;
-        },
-      });
+      if (selected.has(key)) return false;
+      selected.add(key);return true;
+    });
+    table = applyCommandBatch(table, seat, unapplied, command => ({
+      source: "server",
+      random: (draw) => {
+        const key = command.id + ":" + draw;
+        if (!seasonalRolls.has(key)) seasonalRolls.set(key, randomTradeRoll());
+        return seasonalRolls.get(key)!;
+      },
+    }));
+    for (const command of unapplied) {
+      const key = seat.id + ":" + command.id;
       seen.add(key);
       if (!input.stage) commandHashes[key] = hashes.get(command.id)!;
     }

@@ -3,6 +3,26 @@ main = "cloudflare/worker.mjs"
 compatibility_date = "2026-10-01"
 compatibility_flags = ["nodejs_compat"]
 
+# Existing Paid runtime policy; the verified artifact and post-deploy readback enforce it.
+[limits]
+cpu_ms = 10000
+
+[observability]
+enabled = true
+head_sampling_rate = 1
+redact_query_string = true
+
+[observability.logs]
+enabled = true
+head_sampling_rate = 1
+persist = true
+invocation_logs = true
+
+[observability.traces]
+enabled = false
+persist = true
+head_sampling_rate = 1
+
 # Every request, including the interface, goes through the Worker.
 # The Worker serves built files from ASSETS and shared rooms from D1.
 [assets]

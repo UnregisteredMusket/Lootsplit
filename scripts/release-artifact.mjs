@@ -3,6 +3,7 @@ import { createHash } from "node:crypto";
 import { cpSync, mkdirSync, readdirSync, readFileSync, rmSync, writeFileSync } from "node:fs";
 import { execFileSync } from "node:child_process";
 import { join } from "node:path";
+import { assertRuntimeConfig } from "./runtime-policy.mjs";
 
 const root = "dist/website-release";
 export function fileHashes(directory, prefix = "") {
@@ -34,11 +35,13 @@ if (process.argv[1]?.endsWith("/release-artifact.mjs")) {
     execFileSync(process.execPath, ["node_modules/wrangler/bin/wrangler.js", "deploy", "--dry-run", "--outdir", `${root}/worker`], { stdio: "inherit" });
     cpSync("dist/client", `${root}/assets`, { recursive: true });
     cpSync("cloudflare/migrations", `${root}/migrations`, { recursive: true });
+    cpSync("cloudflare/runtime-policy.json", `${root}/runtime-policy.json`);
     const config = readFileSync("wrangler.toml", "utf8")
       .replace('main = "cloudflare/worker.mjs"', 'main = "worker/worker.js"\nno_bundle = true\nkeep_vars = true')
       .replace('directory = "./dist/client"', 'directory = "./assets"')
       .replace('migrations_dir = "cloudflare/migrations"', 'migrations_dir = "migrations"');
     assert.ok(config.includes('no_bundle = true'));
+    assertRuntimeConfig(config, JSON.parse(readFileSync(`${root}/runtime-policy.json`, "utf8")));
     writeFileSync(`${root}/wrangler.toml`, config);
     writeFileSync(`${root}/assets/assets/release-identity.json`, JSON.stringify({ commit, runId: process.env.GITHUB_RUN_ID || "local" }) + "\n");
     writeFileSync(`${root}/manifest.json`, JSON.stringify({ commit, files: fileHashes(root) }, null, 2) + "\n");

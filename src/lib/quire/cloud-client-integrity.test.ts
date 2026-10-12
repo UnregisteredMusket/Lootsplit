@@ -7,9 +7,34 @@ import { sameCommand } from "./command-identity.ts";
 import { emptyCloudTable, type CloudTable } from "./cloud.ts";
 import { fromCopper, toCopper } from "./money.ts";
 import { readAccountResponse } from "../account/response.ts";
-import { readRoomResponse } from "./room-response.ts";
+import { readRoomResponse, readUnchangedRoom } from "./room-response.ts";
 
 const source = readFileSync(new URL("./cloud-client.ts", import.meta.url), "utf8");
+
+test("actual conditional refresh retains pending work and attention, updates encounter policy and leaves manual refresh complete", async () => {
+  const sessionValue = { code: "TEST", token: "token", seatId: "player", revision: 2, pending: [{ id: "unsent" }] };
+  const view = { error: "Retain recoverable attention", encounterActive: false, status: "attention" };
+  let polls = 0, pulls = 0, accepts = 0;
+  const body = source.slice(source.indexOf("async function refresh("), source.indexOf("export async function refreshShared()"));
+  const refresh = new Function("context", "readUnchangedRoom", stripTypeScriptTypes(`
+    const {sessionValue,view,pollCloudTable,pullCloudTable,accept}=context;
+    const session=()=>sessionValue,key=()=>"campaign";
+    const acceptedPoll={campaignKey:key(),token:sessionValue.token,seatId:sessionValue.seatId,revision:sessionValue.revision};
+    const publish=patch=>Object.assign(view,patch);
+    ${body}
+  `) + "; return refresh;")({ sessionValue, view,
+    pollCloudTable: async () => { polls++;return { code: "TEST", seatId: "player", revision: 2, unchanged: true,
+      protocol: "lootsplit.room.unchanged.v1", encounterActive: true }; },
+    pullCloudTable: async () => { pulls++;return {}; },
+    accept: async () => { accepts++; },
+  }, readUnchangedRoom);
+  await refresh(true);
+  assert.equal(polls, 1);assert.equal(pulls, 0);assert.equal(accepts, 0);
+  assert.equal(view.encounterActive, true);assert.equal(view.error, "Retain recoverable attention");
+  assert.equal(view.status, "attention");assert.deepEqual(sessionValue.pending, [{ id: "unsent" }]);
+  await refresh();assert.equal(pulls, 1);assert.equal(accepts, 1);
+  sessionValue.revision = 3;await refresh(true);assert.equal(pulls, 2);assert.equal(polls, 1);
+});
 const give = (id: string, copper: number): Command => ({
   id,
   kind: "give",
@@ -68,7 +93,7 @@ function acceptance(pending: Command[], acknowledged: string[], draft: Command[]
   const view = { error: "" };
   const body = source.slice(
     source.indexOf("async function accept("),
-    source.indexOf("async function refresh()"),
+    source.indexOf("async function refresh("),
   );
   const accept = new Function(
     "requireSession",
@@ -84,7 +109,7 @@ function acceptance(pending: Command[], acknowledged: string[], draft: Command[]
     "applyCommand",
     "fail",
     "sameCommand",
-    stripTypeScriptTypes(body) + "; return accept;",
+    stripTypeScriptTypes('let acceptedPoll; const key=()=>"synthetic-key";\n' + body) + "; return accept;",
   )(
     () => session,
     readRoomResponse,
@@ -117,6 +142,13 @@ test("actual acceptance drops acknowledged delayed drafts and hydrates the autho
   assert.equal(h.error(), "");
   assert.equal(toCopper(h.displayed()!.purses[1]!.coins), 100);
   assert.equal(h.displayed()!.ledger.length, 2);
+});
+test("a persisted revision cannot skip full hydration in a fresh document", async () => {
+  const h = acceptance([],[],[]);
+  h.session.revision = h.remote.revision;
+  await h.accept(h.remote);
+  assert.ok(h.displayed());
+  assert.deepEqual(h.displayed(),h.remote.table);
 });
 test("actual acceptance rejects incomplete room replies before changing pending work", async () => {
   const command = give("retain-after-incomplete-reply", 100);
@@ -253,7 +285,7 @@ async function recoveryHarness(ephemeral = true, owner?: string) {
   const moduleUrl = new URL("./revoked-recovery.ts?test=" + crypto.randomUUID(), import.meta.url);
   const recovery = await import(moduleUrl.href);
   const refresh = source.slice(
-    source.indexOf("async function refresh() {"),
+    source.indexOf("async function refresh("),
     source.indexOf("export async function refreshShared()"),
   );
   const detach = source.slice(
@@ -275,7 +307,7 @@ async function recoveryHarness(ephemeral = true, owner?: string) {
     "emptyCloudTable",
     "downloadJson",
     stripTypeScriptTypes(`function harness() {
-    let playerSession=original;
+    let playerSession=original,acceptedPoll;
     const session=()=>playerSession,key=()=>"quire.cloud.v2.main",isEphemeralCampaign=()=>ephemeral;
     const stopPolling=()=>{},polling=false,publish=()=>{},initialView={},PLAYER_TICKET="lootsplit.player.reconnect.v1";
     const warnUnsentPlayerActions=()=>{},applyCloudTable=async()=>{},setSeat=()=>{},notify=()=>{};
@@ -662,7 +694,7 @@ function outcomeHarness({ live = true, lostResponse = false, hydrationFailure = 
     ),
     source.slice(
       source.indexOf("async function accept("),
-      source.indexOf("async function refresh()"),
+      source.indexOf("async function refresh("),
     ),
     source.slice(
       source.indexOf("async function flush("),
@@ -698,7 +730,7 @@ function outcomeHarness({ live = true, lostResponse = false, hydrationFailure = 
     "start",
     "sameCommand",
     "readRoomResponse",
-    stripTypeScriptTypes(body) +
+    stripTypeScriptTypes('let acceptedPoll; const key=()=>"synthetic-key";\n' + body) +
       "; return {queueCommand, runSharedMutation, captureMutationScope, retryPending};",
   )(
     () => Object.freeze({ ...deviceScope }),

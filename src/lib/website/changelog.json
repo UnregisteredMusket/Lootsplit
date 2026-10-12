@@ -1,5 +1,24 @@
 [
   {
+    "version": "1.7.0",
+    "date": "2026-10-12",
+    "summary": "Current campaign tools, training bookkeeping and more efficient shared sync.",
+    "features": [
+      "NPC training with hourly downtime budgets, DM reviews, category totals and manual milestone resets.",
+      "Current map grids/routes, property operations, commodity exchanges, bilateral barter, blacksmith commissions and local reference OCR are included in this Android update."
+    ],
+    "improvements": [
+      "Authenticated unchanged-room reads avoid repeatedly transferring complete campaign snapshots; manual refresh and legacy clients retain full reads.",
+      "Atomic command batches share one private working copy while retaining every validation and retry receipt.",
+      "Character away actions accept elapsed campaign hours; calendar, usable downtime and training-day units are explicit."
+    ],
+    "fixes": [
+      "Late training bookkeeping can be explicitly confirmed against historical location and levels without bypassing access or original hour budgets.",
+      "Training subject spacing/case variants share a counter while original descriptions and lifetime history remain intact.",
+      "Cloudflare CPU and private persistent-log settings are pinned in verified release artifacts; failure-email readiness is reported honestly."
+    ]
+  },
+  {
     "version": "1.6.0",
     "date": "2026-10-07",
     "summary": "Keep rooms online for player viewing between sessions.",
@@ -29,7 +48,7 @@
     "fixes": [
       "Account campaign resume reconciles server acknowledgements before treating cached actions as unsynced, removing the false unfinished-turn blocker.",
       "Genuine unsynced actions and server turn drafts remain reachable through Multiplayer recovery while preserving command and retry identifiers.",
-      "Older-seat device actions are preserved separately and are not replayed with another seat’s permissions."
+      "Older-seat device actions are preserved separately and are not replayed with another seat\u2019s permissions."
     ]
   },
   {
@@ -60,7 +79,7 @@
     "summary": "Account-owned campaigns, safer shared sessions, refreshed themes and optional fantasy sounds.",
     "features": [
       "Animated opening scene with a loot-hauling adventurer, coin-collecting rogue, and reduced-motion support.",
-      "Adventurer’s Ledger light theme and Ironbound Dragon dark theme, plus Pen & Paper and Virtual roll modes.",
+      "Adventurer\u2019s Ledger light theme and Ironbound Dragon dark theme, plus Pen & Paper and Virtual roll modes.",
       "Optional CC0 coin, loot and page-turn sound effects, with device volume and preview controls; automatic sounds default off.",
       "Account-owned DM campaigns with explicit End session, expiring invitations and guest play without persistent campaign storage.",
       "Party Add loot supports Open5e search and custom items; scanned character/statblock imports offer local OCR and review."

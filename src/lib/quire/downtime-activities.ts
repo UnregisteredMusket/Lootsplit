@@ -17,7 +17,7 @@ type Table = Pick<CloudTable, "purses" | "journal">;
 export function trainingKey(
   r: Pick<TrainingRequest, "trainerId" | "npcId" | "category" | "topic">,
 ) {
-  return canonicalJson([r.trainerId, r.npcId, r.category, r.topic]);
+  return canonicalJson([r.trainerId, r.npcId, r.category, r.topic.normalize("NFKC").trim().replace(/\s+/g, " ").toLowerCase()]);
 }
 export function trainingCounters(state: DowntimeActivities) {
   const groups = new Map<
@@ -31,6 +31,12 @@ export function trainingCounters(state: DowntimeActivities) {
       requestIds: string[];
     }
   >();
+  const resetIds = new Map<string, Set<string>>();
+  for (const reset of state.resets) {
+    const key = trainingKey(reset), ids = resetIds.get(key) ?? new Set<string>();
+    for (const id of reset.requestIds) ids.add(id);
+    resetIds.set(key, ids);
+  }
   for (const r of state.requests.filter((r) => r.status === "approved")) {
     const key = trainingKey(r),
       group = groups.get(key) ?? {
@@ -43,13 +49,30 @@ export function trainingCounters(state: DowntimeActivities) {
       };
     group.lifetimeMinutes += r.minutes;
     group.lifetimeDays += r.minutes / (r.trainingHoursPerDay * 60);
-    const reset = state.resets.some((x) => trainingKey(x) === key && x.requestIds.includes(r.id));
+    const reset = resetIds.get(key)?.has(r.id);
     if (!reset) {
       group.currentMinutes += r.minutes;
       group.currentDays += r.minutes / (r.trainingHoursPerDay * 60);
       group.requestIds.push(r.id);
     }
     groups.set(key, group);
+  }
+  return [...groups.values()];
+}
+/** Complete totals for a DM; a player projection contains only their own contributions. */
+export function recipientTrainingCounters(state: DowntimeActivities) {
+  const groups = new Map<string, ReturnType<typeof trainingCounters>[number]>();
+  for (const counter of trainingCounters(state)) {
+    const key = canonicalJson([counter.record.npcId, counter.record.category]);
+    const group = groups.get(key);
+    if (!group) groups.set(key, { ...counter, requestIds: [...counter.requestIds] });
+    else {
+      group.currentMinutes += counter.currentMinutes;
+      group.lifetimeMinutes += counter.lifetimeMinutes;
+      group.currentDays += counter.currentDays;
+      group.lifetimeDays += counter.lifetimeDays;
+      group.requestIds.push(...counter.requestIds);
+    }
   }
   return [...groups.values()];
 }
@@ -121,7 +144,7 @@ export function previewActivityWindow(
     },
   };
 }
-function eligibility(t: Table, trainerId: string, npcId: string, className: string) {
+function eligibility(t: Table, trainerId: string, npcId: string, className: string, historical = false) {
   const trainer = t.purses.find((p) => p.id === trainerId && p.kind === "character"),
     npc = t.purses.find(
       (p) =>
@@ -137,6 +160,9 @@ function eligibility(t: Table, trainerId: string, npcId: string, className: stri
     !characterVisible(t, npc)
   )
     throw Error("Choose an available trainer and NPC.");
+  // Historical bookkeeping still requires current visible identities and ownership.
+  // The DM explicitly verifies location and level as they were when training occurred.
+  if (historical) return { trainer, npc, verify: true };
   const a = characterPosition(t, trainer),
     b = characterPosition(t, npc);
   if (a.downtime || b.downtime)
@@ -195,7 +221,7 @@ export function applyDowntimeActivity(
     state.settings = cmd.settings;
   } else if (cmd.kind === "downtime-training") {
     own(cmd.trainerId);
-    const { trainer, npc } = eligibility(t, cmd.trainerId, cmd.npcId, cmd.className);
+    const { trainer, npc } = eligibility(t, cmd.trainerId, cmd.npcId, cmd.className, !!cmd.historicalContext);
     const window = state.windows.find((w) => w.id === cmd.windowId);
     if (!window) throw Error("Choose approved campaign downtime.");
     for (const id of [trainer.id, npc.id])
@@ -216,6 +242,18 @@ export function applyDowntimeActivity(
       at,
       reviewNote: "",
     });
+  } else if (cmd.kind === "downtime-training-reset-category") {
+    dm();
+    const groups = trainingCounters(state).filter(g => g.record.npcId === cmd.npcId && g.record.category === cmd.category);
+    const ids = groups.flatMap(g => g.requestIds);
+    if (!ids.length || canonicalJson(ids) !== canonicalJson(cmd.before))
+      throw Error("Training progress changed. Review the category total before resetting.");
+    for (const [index, group] of groups.entries()) {
+      if (!group.requestIds.length) continue;
+      const r = group.record;
+      state.resets.push({ id: `${cmd.id}-${index}`, trainerId: r.trainerId, npcId: r.npcId,
+        category: r.category, topic: r.topic, requestIds: group.requestIds, at, note: cmd.note });
+    }
   } else if (cmd.kind === "downtime-training-reset") {
     dm();
     const group = trainingCounters(state).find((g) => trainingKey(g.record) === trainingKey(cmd));
@@ -245,7 +283,10 @@ export function applyDowntimeActivity(
     } else {
       dm();
       if (cmd.approve) {
-        const { verify } = eligibility(t, r.trainerId, r.npcId, r.className);
+        const historical = !!r.historicalContext || cmd.historicalConfirmed === true;
+        if (historical && (!cmd.historicalConfirmed || !cmd.note.trim()))
+          throw Error("Confirm historical location, equal-or-lower levels and completed time in the DM review note.");
+        const { verify } = eligibility(t, r.trainerId, r.npcId, r.className, historical);
         if (verify && !cmd.note.trim())
           throw Error(
             "Record DM confirmation of the equal-or-lower level requirement when a sheet or class level is unavailable.",
@@ -266,7 +307,7 @@ export function applyDowntimeActivity(
     kind: "management",
     dmOnly: true,
     summary:
-      cmd.kind === "downtime-training-reset"
+      cmd.kind === "downtime-training-reset" || cmd.kind === "downtime-training-reset-category"
         ? `Training counter reset; DM manually applies milestone changes. ${cmd.note}`.slice(0, 500)
         : `Hourly downtime: ${cmd.kind}. Training tracks time only; character sheets are unchanged.`,
   });

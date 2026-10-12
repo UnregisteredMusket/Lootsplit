@@ -1,6 +1,6 @@
 import { readCloudTable } from "./cloud.ts";
 import { commandSchema, type Command } from "./commands.ts";
-import type { RoomView } from "./cloud.server.ts";
+import type { RoomView, RoomUnchanged } from "./cloud.server.ts";
 
 const incompleteResponse =
   "The shared campaign response was incomplete. Your pending actions are retained. Try again; if this continues, export any pending actions before refreshing the page.";
@@ -42,6 +42,20 @@ function departedSeat(value: unknown): boolean {
     text(value.status) &&
     optionalText(value.invitation)
   );
+}
+
+/** Only an already-hydrated, same-seat revision may accept an unchanged envelope. */
+export function readUnchangedRoom(value: unknown, expected: {
+  code: string; seatId: string; revision: number; userId?: string; sessionId?: string;
+}): RoomUnchanged {
+  if (!record(value) || value.unchanged !== true || value.protocol !== "lootsplit.room.unchanged.v1" ||
+      value.code !== expected.code || value.seatId !== expected.seatId || value.revision !== expected.revision ||
+      !count(value.revision) || !optionalText(value.userId) || !optionalText(value.sessionId) ||
+      (expected.userId && value.userId !== expected.userId) || value.sessionId !== expected.sessionId ||
+      typeof value.encounterActive !== "boolean" ||
+      Object.keys(value).some(k => !["unchanged","protocol","code","seatId","userId","sessionId","revision","encounterActive"].includes(k)))
+    throw Error(incompleteResponse);
+  return value as RoomUnchanged;
 }
 
 /** Validate a response before any caller changes its session, receipts or pending work. */

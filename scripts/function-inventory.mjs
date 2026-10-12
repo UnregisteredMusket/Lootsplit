@@ -205,9 +205,10 @@ const rows = functions.map((f) => {
     [...f.returns].slice(0, 8).join("; "),
   ];
 });
-await mkdir("docs/audit", { recursive: true });
+const outputDirectory = process.env.INVENTORY_OUTPUT_DIR || "docs/audit";
+await mkdir(outputDirectory, { recursive: true });
 await writeFile(
-  "docs/audit/function-inventory.csv",
+  path.join(outputDirectory, "function-inventory.csv"),
   [
     [
       "file",
@@ -241,5 +242,5 @@ const summary = {
   domains: counts,
   note: "Includes nested callbacks and test/build functions. Excludes declarations/generated routes/dependencies. Static registration/call evidence is not dynamic coverage or formal correctness proof.",
 };
-await writeFile("docs/audit/function-summary.json", JSON.stringify(summary, null, 2) + "\n");
+await writeFile(path.join(outputDirectory, "function-summary.json"), JSON.stringify(summary, null, 2) + "\n");
 console.log(JSON.stringify(summary, null, 2));

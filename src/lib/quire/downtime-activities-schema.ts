@@ -24,6 +24,7 @@ export const trainingRequestSchema = z.object({
   at: z.number(),
   decidedAt: z.number().optional(),
   reviewNote: z.string().max(4000).default(""),
+  historicalContext: z.string().trim().min(1).max(4000).optional(),
 });
 export const trainingResetSchema = z.object({
   id,
@@ -79,6 +80,7 @@ export const downtimeActivityCommands = [
       description: z.string().max(4000),
       className: z.string().trim().max(120).default(""),
       minutes: minutes.min(1),
+      historicalContext: z.string().trim().min(1).max(4000).optional(),
     })
     .strict(),
   z
@@ -89,6 +91,7 @@ export const downtimeActivityCommands = [
       before: trainingRequestSchema,
       approve: z.boolean(),
       note: z.string().max(4000),
+      historicalConfirmed: z.boolean().optional(),
     })
     .strict(),
   z
@@ -97,6 +100,16 @@ export const downtimeActivityCommands = [
       kind: z.literal("downtime-training-cancel"),
       requestId: id,
       before: trainingRequestSchema,
+    })
+    .strict(),
+  z
+    .object({
+      id: id.max(140),
+      kind: z.literal("downtime-training-reset-category"),
+      npcId: id,
+      category: trainingCategorySchema,
+      before: z.array(id),
+      note: z.string().trim().min(1).max(4000),
     })
     .strict(),
   z
