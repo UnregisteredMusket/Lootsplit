@@ -227,7 +227,7 @@ try {
     ).toHaveCount(0);
     await fits(guest);
     await guest.screenshot({ path: `${output}/player-training-${width}.png`, fullPage: true });
-    await page.locator("summary").filter({ hasText: "DM milestone & reset" }).click();
+    await page.getByRole("button", { name: "DM milestone & reset", exact: true }).click();
     const reset = formFor(page, "Reset training counter");
     await reset
       .getByLabel("Manual milestone / reward note", { exact: true })

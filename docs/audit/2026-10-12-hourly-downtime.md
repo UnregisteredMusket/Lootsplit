@@ -27,4 +27,6 @@ Relevant trends include main development smith61→71s (+10s/+16.39%) and earlie
 
 ## Next exact action
 
+First PR head47ff3967dd4c1494a508625cca3ecd659cac29d1 / complete run38284304933 passed code checks/immutable builds and the new shared training path through real guest submission, DM sheetless eligibility confirmation, approved time counters and private guest UI. `dev-downtime` stopped at the reset disclosure because the audit looked for a native `summary`; shared `Fold` uses an accessible button. The audit now clicks **DM milestone & reset** by button role/name, preserving the actual UI action and all assertions/deadlines. Application code is unchanged. Failed development evidence is retained in artifact11762423028, ZIP SHA256 `d63a22acefa9769de16d0a4acd0306c8e89a8943bf630c1485ad507a426d56da`.
+
 Freeze the functional checkpoint after quick verification, submit the complete PR suite once, inspect retained UI results/screenshots and any failure cause, then reconcile exact PR/main and authorized publication. A passing unit/build or merged PR is not a live release. Update evolving run IDs and completion proof in PR metadata so documentation-only checkpoint churn does not unnecessarily repeat full gates.
