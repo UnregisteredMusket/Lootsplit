@@ -146,6 +146,7 @@ export const campaignMapSchema = z
   .strict();
 export const npcSchema = z
   .object({
+    blacksmithServices: z.boolean().optional(),
     id,
     name,
     description: z.string().max(4000),

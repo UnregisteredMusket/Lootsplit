@@ -1,4 +1,5 @@
 import { facilityAccess } from "./ships.ts";
+import { readBlacksmith } from "./blacksmith-schema.ts";
 import { characterVisible, canReadCharacter, inParty } from "./character-position.ts";
 import { readWorld } from "./world-schema.ts";
 import { exchangeHere } from "./trade-economy.ts";
@@ -202,6 +203,14 @@ export function projectRecord(
       delete economy.pendingSeason;
     }
     t.shops = t.shops.filter((shop) => shopVisible(shop, t));
+    if (t.journal.blacksmith) {
+      const smith = readBlacksmith(t.journal.blacksmith);
+      smith.profiles = smith.profiles.filter(p => t.shops.some(s => s.id === p.shopId) && readableNpcs.has(p.npcId));
+      // Only offered enchantments are public; approval drafts remain DM-only.
+      smith.profiles = smith.profiles.map(p => ({ ...p, enchantments: p.enchantments.filter(e => e.approved) }));
+      smith.orders = smith.orders.filter(o => seat.purseIds.includes(o.purseId));
+      t.journal.blacksmith = smith;
+    }
     t.listings = t.listings.filter(
       (listing) =>
         propertyAvailableHere(listing, market, !!world.partyPosition) &&
@@ -231,6 +240,7 @@ export function projectRecord(
                 return s?.locationId ? [s.locationId] : [];
               }),
             t.shops.flatMap((s) => (s.locationId ? [s.locationId] : [])),
+            t.journal.blacksmith?.orders.map(o => o.terms.locationId) ?? [],
             t.listings.flatMap((l) => (l.locationId ? [l.locationId] : [])),
             t.journal.tradeEconomy?.exchanges.flatMap((e) =>
               e.locationId ? [e.locationId] : [],

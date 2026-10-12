@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { DatabaseSync } from "node:sqlite";
+import { smithFixture, smithDesign } from "./test-fixtures/blacksmith.ts";
+import { smithQuote } from "./blacksmith.ts";
 import { readFileSync } from "node:fs";
 import { createRoom, readRoom, updateRoom, deleteRoom } from "./room-store.server.ts";
 import { emptyCloudTable } from "./cloud.ts";
@@ -21,6 +23,32 @@ import {
 } from "./push.server.ts";
 import { jwtVerify, importJWK } from "jose";
 const sql = new DatabaseSync(":memory:");
+test("shared blacksmith commissions debit materials and funds once, enforce DM enchantments and collect once after approved downtime", async () => {
+  const table = smithFixture(), host = await openRoom({ name: "Smith DM", table });
+  const guest = await joinRoom({ code: host.code, purseId: "hero", name: "Smith hero" }), auth = { code: host.code, token: guest.token };
+  const { choosePace } = await import("./cloud.server.ts"); await choosePace({ ...host, live: true });
+  const initial = (await roomState(auth)).table, design = smithDesign(initial); design.parts[0].holdingId = "steel-lot";
+  const q = smithQuote(initial, "forge", "hero", design), command = { id: "shared-smith-order", kind: "smith-order", shopId: "forge", purseId: "hero", design, before: q.before };
+  const p = table.journal!.blacksmith!.profiles[0];
+  await assert.rejects(submitCommands({ ...auth, batchId: "smith-forged-config", commands: [{ id: "forged-smith", kind: "smith-profile", shopId: "forge", before: p, profile: { ...p, magicalForge: true } }] }), /Only the DM/);
+  await submitCommands({ ...auth, batchId: "smith-order-first", commands: [command] });
+  await submitCommands({ ...auth, batchId: "smith-order-lost-response", commands: [command] });
+  let saved = (await roomState(host)).table;
+  assert.equal(saved.journal!.blacksmith!.orders.length, 1); assert.equal(saved.holdings[0].quantity, 5);
+  assert.equal(toCopper(saved.purses.find(p => p.id === "hero")!.coins), 100000 - q.terms.costCopper);
+  assert.equal(saved.ledger.filter(l => l.shopId === "forge").length, 1);
+  const preview = { id: "smith-downtime", kind: "downtime-plan", name: "Forge downtime", days: 5 };
+  await assert.rejects(submitCommands({ ...auth, batchId: "forged-smith-downtime", commands: [preview] }), /Only the DM/);
+  await submitCommands({ ...host, batchId: "smith-preview", commands: [preview] });
+  await submitCommands({ ...host, batchId: "smith-approve", commands: [{ id: "smith-approval", kind: "downtime-apply", downtimeId: preview.id, endSession: false }] });
+  saved = (await roomState(auth)).table; const o = saved.journal!.blacksmith!.orders[0]; assert.equal(o.status, "ready");
+  const collect = { id: "smith-collection", kind: "smith-claim", orderId: o.id, before: o };
+  await submitCommands({ ...auth, batchId: "smith-collect-first", commands: [collect] });
+  await submitCommands({ ...auth, batchId: "smith-collect-retry", commands: [collect] });
+  saved = (await roomState(host)).table;
+  assert.equal(saved.holdings.filter(h => h.id.endsWith("-crafted")).length, 1); assert.equal(saved.journal!.blacksmith!.orders[0].status, "claimed");
+  assert.match(saved.holdings.find(h => h.id.endsWith("-crafted"))!.notes, /Made by Aster/);
+});
 sql.exec(readFileSync(new URL("../../../cloudflare/migrations/0008_encounters.sql", import.meta.url), "utf8"));
 test("shared ships enforce DM overrides, player-owned boarding reviews, projection privacy and one-time receipts", async()=>{
   const {defaultShip}=await import("./ships-schema.ts"),{shipFingerprint}=await import("./ships.ts");

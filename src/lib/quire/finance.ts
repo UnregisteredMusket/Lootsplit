@@ -5,6 +5,8 @@ import { estateRuleEligible, previewEstate } from "./estate.ts";
 import { tradeSeasonQuoteSchema } from "./trade-economy-schema.ts";
 import { applyTradeSeason, previewTradeSeason } from "./trade-economy.ts";
 import { z } from "zod";
+import { smithQuoteSchema } from "./blacksmith-schema.ts";
+import { previewSmith } from "./blacksmith-time.ts";
 import type { CloudTable } from "./cloud.ts";
 import { toCopper, fromCopper, spendCoins } from "./money.ts";
 const id = z.string().min(1).max(150);
@@ -57,6 +59,7 @@ const lineSchema = z.object({
   balance: money,
 });
 export const quoteSchema = z.object({
+  blacksmith: smithQuoteSchema.optional(),
   tradeSeason: tradeSeasonQuoteSchema.optional(),
   propertyOperations: estateQuoteSchema.optional(),
   market: z
@@ -302,7 +305,9 @@ export function previewDowntime(
         estateTime,
       )
     : undefined;
+  const smith = previewSmith({ journal: table.journal }, days, !!estateTime);
   return quoteSchema.parse({
+    ...(smith ? { blacksmith: smith } : {}),
     ...(seasonReceiptId && table.journal?.tradeEconomy?.settings.enabled ? { tradeSeason: previewTradeSeason({
       ...table, journal: { ...table.journal, tradeEconomy: operations?.tradeEconomy ?? table.journal.tradeEconomy },
     }, seasonReceiptId) } : {}),
@@ -401,6 +406,12 @@ export function applyFinanceQuote(table: CloudTable, quote: z.infer<typeof quote
   }
   f.loans = quote.loans;
   f.rules = quote.rules;
+  if (quote.blacksmith) {
+    table.journal!.blacksmith = quote.blacksmith.state;
+    for (const [i, notice] of quote.blacksmith.notices.entries())
+      table.journal!.events.push({ id: `${receipt.id}-smith-${i}`, at, kind: "management",
+        purseId: notice.purseId, summary: notice.summary.slice(0, 500) });
+  }
   if (quote.propertyOperations) {
     const operations = quote.propertyOperations;
     for (const move of operations.movements) {

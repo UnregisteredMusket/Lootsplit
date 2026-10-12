@@ -1,3 +1,4 @@
+import { assertCarried } from "./custody.ts";
 import {
   shipHere,
   initializeShipPurchase,
@@ -97,12 +98,7 @@ function capacity(t: Pick<Table, "holdings">, site: EstateSite, item: Holding, c
   if (used.weight + item.weight * count > site.capacityWeight)
     throw Error("This storage has insufficient remaining capacity.");
 }
-export function assertCarried(h: Holding) {
-  if (h.custody || h.reservedFor)
-    throw Error(
-      "Retrieve this item from its property first. Goods in storage, delivery or reserved for work cannot be equipped, consumed, sold or given remotely.",
-    );
-}
+export { assertCarried } from "./custody.ts";
 export function assertEstateDisposable(t: Table, propertyId: string) {
   assertShipDisposable(t, propertyId);
   const s = readEstate(t.journal?.propertyOperations);

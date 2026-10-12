@@ -124,6 +124,12 @@ The `ownership` scenario must cover anonymous entry restrictions, explicit legac
 
 ## Roadmap feature maintenance
 
+### Blacksmith commissions
+
+Read `docs/BLACKSMITH-SERVICES.md`. Use `smith-profile`, `smith-order`, `smith-control` and `smith-claim` commands, canonical material keys/holdings, NPC service permission and the existing approved finance downtime quote. Profiles and immutable accepted orders are optional journal metadata, retained across older journal writes. Smith work advances only in between-session downtime, never session hours or wall time. Payments/material consumption and collection use existing authoritative receipt/CAS protection. Recheck finite supplies, contribution custody/ownership/combined quantity, physical presence, funds, magical forge, skill and DM approval; expose no other player's orders or unapproved enchantment drafts. Original completion day/time and maker/specifications survive later edits. Resolve open commissions before deleting referenced customers/locations/profiles. Refunds/salvage remain explicit recorded DM adjustments.
+
+Run smith unit/shared-room/finance/estate/world/ship checks, quick verification, both Help reviews and web/mobile builds. Require the added desktop/phone development and immutable Worker smith browser audits alongside every existing all-nine PR/main/immutable/live gate. Diagnose retained failures; never replace those flows with database-only assertions or weaken account limits/network isolation. No schema migration or APK distribution is required by this feature.
+
 ### Ships, shipyards and voyages
 
 Read `docs/SHIPS.md`. Ships remain single owned property holdings; cargo uses estate custody, crews use staff contracts, and repairs/upgrades use ordinary reviewed projects. Fleet data is optional journal metadata; aboard membership lives there while character location stays canonical. Do not persist the derived ship identity fields into character-position records: older clients must retain their existing readable placement shape. Legacy journal replacements preserve authoritative fleet metadata. Never create another wallet, scheduler or stored cargo copy.

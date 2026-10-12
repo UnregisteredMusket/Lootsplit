@@ -154,7 +154,9 @@ export function LocationNpcs() {
               {n.portrait && <img width={64} height={64} src={n.portrait} alt={n.name} />}
               <span>
                 <h2>
-                  <AppLink href={libraryRecordHref("npc", n.id)}>{n.name} <span aria-hidden="true">→</span></AppLink>
+                  <AppLink href={libraryRecordHref("npc", n.id)}>
+                    {n.name} <span aria-hidden="true">→</span>
+                  </AppLink>
                 </h2>
                 <p>
                   {characterPosition(
@@ -177,6 +179,19 @@ export function LocationNpcs() {
               {dm && <Button onClick={() => setEdit(n)}>Configure NPC</Button>}
             </div>
             <p>{n.description}</p>
+            {t.journal.blacksmith?.profiles
+              .filter((p) => p.npcId === n.id)
+              .map((p) => (
+                <p key={p.shopId}>
+                  {p.skill} blacksmith ·{" "}
+                  <AppLink href={`/shop/${encodeURIComponent(p.shopId)}`}>
+                    Blacksmith services →
+                  </AppLink>
+                </p>
+              ))}
+            {dm && t.journal.blacksmith?.profiles.some((p) => p.npcId === n.id) && (
+              <NpcSmithToggle npc={n} />
+            )}
           </article>
         ))}
       {!npcs.length && <p>No NPCs are available at this location.</p>}
@@ -226,6 +241,18 @@ function NpcEditor({ npc, table, close }: { npc?: Npc; table: CloudTable; close:
         }}
         onDone={close}
       >
+        <label>
+          <input
+            type="checkbox"
+            checked={draft.blacksmithServices === true}
+            onChange={(e) => setDraft({ ...draft, blacksmithServices: e.target.checked })}
+          />{" "}
+          Offers blacksmith services
+        </label>
+        <p>
+          Enable only when this NPC agrees to accept commissions. Configure the linked forge's
+          skill, materials, parts and enchantments in its shop.
+        </p>
         <label>
           NPC name
           <input
@@ -323,6 +350,26 @@ function NpcEditor({ npc, table, close }: { npc?: Npc; table: CloudTable; close:
         Close editor
       </Button>
     </section>
+  );
+}
+function NpcSmithToggle({ npc }: { npc: Npc }) {
+  const [allowed, setAllowed] = useState(npc.blacksmithServices === true);
+  useEffect(() => setAllowed(npc.blacksmithServices === true), [npc.blacksmithServices]);
+  return (
+    <CommandForm
+      label={`Save ${npc.name} smith permission`}
+      dirty={allowed !== (npc.blacksmithServices === true)}
+      submit={() => ({
+        kind: "npc-save",
+        before: npc,
+        npc: { ...npc, blacksmithServices: allowed },
+      })}
+    >
+      <label>
+        <input type="checkbox" checked={allowed} onChange={(e) => setAllowed(e.target.checked)} />{" "}
+        Offers blacksmith services · {npc.name}
+      </label>
+    </CommandForm>
   );
 }
 function NpcInteraction({ npc, table }: { npc: Npc; table: CloudTable }) {

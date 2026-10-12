@@ -1,4 +1,5 @@
 import { shipCommands, type ShipCommand } from "./ships-schema.ts";
+import { smithCommands, type SmithCommand } from "./blacksmith-schema.ts";
 import { applyShipCommand, validateFleet, assertShipTradingHere } from "./ships.ts";
 import { characterVisible, canReadCharacter } from "./character-position.ts";
 import { ensureCityExchanges, removeUnusedCityExchange, renameUnusedCityExchange } from "./city-exchanges.ts";
@@ -49,6 +50,8 @@ import { validateEconomyRows } from "./validation.ts";
 import { listingSchema, propertyProfileSchema, propertyAvailableHere, validatePropertyLocations } from "./property.ts";
 import { transferPropertyDeed } from "./property-deed.ts";
 import { locationLabel } from "./shop-locations.ts";
+import { applySmithCommand } from "./blacksmith-command.ts";
+import { validateBlacksmith } from "./blacksmith-validation.ts";
 const id = z.string().min(1).max(150),
   amount = z.number().int().nonnegative().max(1e12),
   qty = amount.min(1).max(100000);
@@ -60,6 +63,7 @@ export const commandSchema = z.discriminatedUnion("kind", [
   ...worldCommands,
   ...estateCommands,
   ...shipCommands,
+  ...smithCommands,
   estateImportCommand,
   z.object({ ...base, kind: z.literal("resource-pack-import"), before: z.string().max(30000), pack: resourcePackSchema }).strict(),
   z.object({ ...base, kind: z.literal("listing-edit"), listingId: id, before: listingSchema.nullable(), after: listingSchema.nullable() }),
@@ -344,6 +348,8 @@ export function applyCommand(input: CloudTable, seat: CloudSeat, raw: Command, e
     event(
       `Imported property configurations: ${cmd.document.properties.length} records awaiting DM review.`,
     );
+  } else if (cmd.kind.startsWith("smith-")) {
+    applySmithCommand(t, seat, cmd as SmithCommand, at);
   } else if (cmd.kind.startsWith("ship-")) {
     applyShipCommand(t, seat, cmd as ShipCommand, at);
   } else if (cmd.kind.startsWith("estate-")) {
@@ -1147,6 +1153,7 @@ export function applyCommand(input: CloudTable, seat: CloudSeat, raw: Command, e
   }
   validateWorld(t);
   validateFleet(t);
+  validateBlacksmith(t);
   return t;
 }
 export function same(a: unknown, b: unknown): boolean {
