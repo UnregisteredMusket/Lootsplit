@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { downtimeActivitiesSchema } from "./downtime-activities-schema.ts";
+import { validateDowntimeActivities } from "./downtime-activities.ts";
 import { blacksmithSchema } from "./blacksmith-schema.ts";
 import { validateBlacksmith } from "./blacksmith-validation.ts";
 import { fleetSchema } from "./ships-schema.ts";
@@ -33,6 +35,7 @@ export const encounterLootProvenanceSchema = z
 export type EncounterLootProvenance = z.infer<typeof encounterLootProvenanceSchema>;
 export const encounterLootEntryId = (receiptId: string) => `encounter-loot:${receiptId}`;
 const journalFields = z.object({
+  downtimeActivities: downtimeActivitiesSchema.optional(),
   blacksmith: blacksmithSchema.optional(),
   referenceAccess: referencePolicySchema.optional(),
   resourceLibrary: resourceLibrarySchema.optional(),
@@ -165,6 +168,7 @@ export function readArchivedSnapshot(snapshot: string): CloudTable {
     validateEstate({ ...t, journal }, true);
     validateFleet({ ...t, journal }, true);
     validateBlacksmith({ ...t, journal }, true);
+    validateDowntimeActivities({ ...t, journal }, true);
     validateTradeEconomy({ ...t, journal });
     validateWorld({ ...t, journal }, true);
     for (const key of ["notes", "sheets", "loans", "listings", "handouts"] as const)
@@ -280,6 +284,7 @@ export function preserveJournalMetadata(value: unknown, current: Journal): Journ
   return readJournal({
     ...next,
     ...(current.blacksmith ? { blacksmith: current.blacksmith } : {}),
+    ...(current.downtimeActivities ? { downtimeActivities: current.downtimeActivities } : {}),
     ...(current.fleet ? { fleet: current.fleet } : {}),
     ...(current.referenceAccess ? { referenceAccess: current.referenceAccess } : {}),
     ...((next.downtimePrompt ?? current.downtimePrompt)
@@ -295,9 +300,14 @@ export function preserveJournalMetadata(value: unknown, current: Journal): Journ
       ? {
           world: {
             ...next.world,
-            npcs: next.world.npcs.map(n => {
-              const old = current.world?.npcs.find(o => o.id === n.id);
-              return { ...n, ...(old?.blacksmithServices !== undefined ? { blacksmithServices: old.blacksmithServices } : {}) };
+            npcs: next.world.npcs.map((n) => {
+              const old = current.world?.npcs.find((o) => o.id === n.id);
+              return {
+                ...n,
+                ...(old?.blacksmithServices !== undefined
+                  ? { blacksmithServices: old.blacksmithServices }
+                  : {}),
+              };
             }),
             ...(current.world?.partyPosition ? { partyPosition: current.world.partyPosition } : {}),
             maps: next.world.maps.map((map) => {

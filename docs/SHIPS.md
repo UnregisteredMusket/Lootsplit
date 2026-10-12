@@ -52,6 +52,8 @@ Completion repairs the quoted HP up to current maximum, or installs its reviewed
 
 ## Expenses and downtime travel
 
+Voyage travel consumes no personal hourly downtime resource. Passengers/crew can log appropriate training aboard the same ship for DM review; the ordinary location, eligibility and hour checks still apply. Actual shipyard project labor shares the character's hourly resource through the existing property assignments. Voyage elapsed time, costs, minimum crew and physical shipyard requirements are unchanged.
+
 Maintenance/provisions rates distinguish sailing, docked and dry/yard storage. Facility fees and staff wages are separate. Fractional daily charges retain copper remainders. Unpaid maintenance remains ship arrears; explicit payments use a real authorized purse. No app-open or wall-clock time accrues expenses or travel.
 
 Propose a voyage with stable ship/voyage IDs, origin, destination, optional arrival berth, duration, payer, budget, captain, assigned crew and route notes. The DM approves it on the ship or in Review Inbox. Ordinary travel requires docked/afloat launch, usable critical components, positive pace, minimum crew and current approvals. An underway ship has no port location; its cargo remains at that ship and its occupants' canonical location is unset until arrival.

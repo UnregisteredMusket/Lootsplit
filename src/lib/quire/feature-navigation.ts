@@ -5,7 +5,7 @@ export const featureScreens = {
   time: { title: "Session Time", dm: true },
   bank: { title: "Bank", dm: false },
   finances: { title: "My Finances", dm: false },
-  downtime: { title: "Downtime", dm: true },
+  downtime: { title: "Downtime", dm: false },
   financial: { title: "Financial Settings", dm: true },
   properties: { title: "Property Management", dm: false },
   reports: { title: "Review Reports", dm: true },

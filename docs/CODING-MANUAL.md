@@ -124,6 +124,12 @@ The `ownership` scenario must cover anonymous entry restrictions, explicit legac
 
 ## Roadmap feature maintenance
 
+### Hourly downtime and NPC training
+
+Read `docs/DOWNTIME-ACTIVITIES.md`. `downtimeActivities` is optional journal metadata; only reviewed commands mutate it. Approving the existing financial preview creates a per-character resource window (default 16 usable hours/day), deducting actual property labor and existing away activities. Ship travel consumes no personal time. Session-hour advances retain their existing semantics. Private NPC balances must never be projected: client previews may defer that check, but server/local approvals enforce it. Retain all turn receipts and pending drafts. Level checks and same-location/ship presence are rechecked; missing sheets or unrecognized class levels require written DM confirmation. Training records time only. DM milestone/reset preserves lifetime/captured conversions/history and refunds no hours; character rewards stay manual. Old pending financial quotes and older journal writes remain readable/preserved.
+
+Run downtime-activities, shared-room, finance, estate, placement, ships and smith regressions, quick checks and both builds. The complete workflow requires the new desktop/mobile downtime browser audit in development and the immutable Worker alongside all previous gates. Review both role Help guides, resource previews, player Home link and Review Inbox. Additional activities in the guide are design proposals until separately authorized for implementation.
+
 ### Blacksmith commissions
 
 Read `docs/BLACKSMITH-SERVICES.md`. Use `smith-profile`, `smith-order`, `smith-control` and `smith-claim` commands, canonical material keys/holdings, NPC service permission and the existing approved finance downtime quote. Profiles and immutable accepted orders are optional journal metadata, retained across older journal writes. Smith work advances only in between-session downtime, never session hours or wall time. Payments/material consumption and collection use existing authoritative receipt/CAS protection. Recheck finite supplies, contribution custody/ownership/combined quantity, physical presence, funds, magical forge, skill and DM approval; expose no other player's orders or unapproved enchantment drafts. Original completion day/time and maker/specifications survive later edits. Resolve open commissions before deleting referenced customers/locations/profiles. Refunds/salvage remain explicit recorded DM adjustments.

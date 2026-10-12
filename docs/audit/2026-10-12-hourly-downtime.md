@@ -1,0 +1,32 @@
+# Hourly downtime and NPC training — October 12, 2026
+
+Baseline main/live: `fb9961a51309e151c527e5fbcfc9c77409c754d5` (NPC collapsible records, confirmed live before this task). Branch: `feature/hourly-downtime-training`. The user's new request authorizes NPC training and an hourly downtime resource, plus a design for further activities. Additional activities are proposals, not implemented game rules.
+
+## Behavior and preservation
+
+Approved finance downtime creates individual period budgets, default 16 usable hours per day. Actual property labor contributes recorded fractional work days from the existing simulator; legacy away actions also reserve time. Ship travel consumes no personal hours and retains its existing elapsed clock, costs and crew/location requirements. The DM can configure 1–24 usable hours/day and a 1–24 hour training-day conversion (default 8). Historical periods/counters keep their captured values. Old saved pending financial quotes still approve their original fields atomically before adding the hourly window.
+
+Player Home and role-aware Downtime expose assigned-character NPC training with category, subject, hours, optional class and description. Pending requests reserve the same time for teacher and pupil. DM decisions recheck ownership, level, location/ship and balances. Known higher levels fail; missing sheets/class text need explicit confirmation. Training changes no sheet, holdings, funds or character fields. Current/lifetime counters and manual milestone resets preserve history and refund no hours. Review Inbox includes pending requests. Server checks private NPC budgets; optimistic player previews defer only that private check and retain turn/recovery behavior.
+
+Optional journal metadata is retained by older journal patches and backups/archives. Players see only their own requests and resource balances; private NPC sheets and other characters' allocations remain excluded. Pending participants cannot be removed without resolving requests. All modes, saves, six primary tabs, fixed player services, location/NPC permissions and Android signing requirements remain. No migration or APK publication is included.
+
+Reviewed both role Help guides, README, coding manual, ship guide and feature inventory. Updated allocation/approval/reset instructions and role links; existing account recovery, guest-memory, lookup, sheet permissions, ship travel, property/material, ordinary finance and smith instructions remain available. `docs/DOWNTIME-ACTIVITIES.md` contains the ten-action design matrix and manual reward model.
+
+## Focused verification checkpoint
+
+- New unit and shared-room regressions cover categories sharing a budget, both participants, reservations/rejection/cancel, no-sheet confirmation, levels/classes, manual reset/lifetime/no-refund, captured settings, roles/stale/repeat approvals, property resource consumption, private optimistic projections, legacy quotes, backups and immutable journal metadata. The combined downtime/shared-room run passed 38 tests in 4.415 seconds; related finance/estate/ship/smith/placement run passed 89 tests in 2.078 seconds on Node22.23.3.
+- Local quick checks completed: 987 tests, 983 passing and four existing skips, clean types and zero lint errors / 30 existing warnings. Web and mobile-compatible builds passed locally. No release assertion is made here.
+- Local current Chromium download yielded an invalid ZIP, so the required UI checks must pass in hosted current-browser development and immutable Worker gates. No browser assertions, account cases, deadlines, retries or gates were weakened. Dedicated downtime audits exercise real DM/guest controls at 1280px and 390px, including Home navigation, description, manual review, counters/reset, saved hours, guest reconnect and memory privacy.
+- Initial quick check found the new required browser step was missing from two old expected-count assertions; both count inventories now include it. An environment-injected Node warning contaminated a pre-existing CLI JSON-only stderr assertion; local quick verification uses `NODE_NO_WARNINGS=1` for warning-free diagnostics, without changing product code or assertions. Failure evidence remains in the task logs.
+
+## Performance review
+
+Latest read-only performance-history snapshot retains 916 slowdown observations and 17 resolution records, cursor `2026-10-12T15:19:42.963Z`, with older pending run37642398740 preserved. This matches the prior NPC publication audit; no new threshold observations were present at the implementation checkpoint. Historical setup/cache/install and test trends remain open; none were reset or deleted.
+
+Relevant trends include main development smith61→71s (+10s/+16.39%) and earlier cumulative ship27→54s (+27s/+100%, two increases) / ship36→59s (+23s/+63.89%, distinct scope). PR development smith28→62s (+34s/+121.43%, two increases) and packaged smith24→44s (+20s/+83.33%, three increases) include expanded feature coverage and retained failures. Coverage explains additional work, but does not establish all unchanged-scenario timing variance. Compare the ensuing successful complete CI outcomes and total elapsed workflow, preserving all automatic qualifying entries. The new downtime audit adds required coverage and gets its own initial timing scope; no existing operation is renamed to conceal a regression.
+
+## Next exact action
+
+First PR head47ff3967dd4c1494a508625cca3ecd659cac29d1 / complete run38284304933 passed code checks/immutable builds and the new shared training path through real guest submission, DM sheetless eligibility confirmation, approved time counters and private guest UI. `dev-downtime` stopped at the reset disclosure because the audit looked for a native `summary`; shared `Fold` uses an accessible button. The audit now clicks **DM milestone & reset** by button role/name, preserving the actual UI action and all assertions/deadlines. Application code is unchanged. Failed development evidence is retained in artifact11762423028, ZIP SHA256 `d63a22acefa9769de16d0a4acd0306c8e89a8943bf630c1485ad507a426d56da`.
+
+Freeze the functional checkpoint after quick verification, submit the complete PR suite once, inspect retained UI results/screenshots and any failure cause, then reconcile exact PR/main and authorized publication. A passing unit/build or merged PR is not a live release. Update evolving run IDs and completion proof in PR metadata so documentation-only checkpoint churn does not unnecessarily repeat full gates.

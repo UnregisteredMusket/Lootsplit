@@ -243,6 +243,24 @@ export function CampaignFinance({
                   {formatCopper(pending.quote.lines.reduce((n, l) => n + l.unpaid, 0))}. Settlement
                   order remains income, loans in creation order, then expenses.
                 </p>
+                {pending.quote.downtimeActivities && (
+                  <div className="journal-entry">
+                    <h3>Hourly activity resources</h3>
+                    <p>
+                      {pending.quote.downtimeActivities.window.settings.hoursPerDay} usable hours
+                      per character per day. Ship travel consumes no personal hours. Training uses{" "}
+                      {pending.quote.downtimeActivities.window.settings.trainingHoursPerDay} hours
+                      per displayed training day.
+                    </p>
+                    {pending.quote.downtimeActivities.window.budgets.map((b) => (
+                      <p key={b.purseId}>
+                        {purses.find((p) => p.id === b.purseId)?.name}:{" "}
+                        {(b.totalMinutes - b.committedMinutes) / 60} unallocated hours ·{" "}
+                        {b.committedMinutes / 60} committed to property work / away activities
+                      </p>
+                    ))}
+                  </div>
+                )}
                 {finishingCharacters(
                   { purses, journal },
                   (pending.fromDay + pending.days) * 1440 + (f.minuteOfDay ?? 0),
@@ -316,8 +334,12 @@ export function CampaignFinance({
                 {pending.quote.blacksmith && (
                   <div className="mt-3">
                     <h3>Blacksmith commissions</h3>
-                    {pending.quote.blacksmith.notices.map(n => <p key={n.orderId}>{n.summary}</p>)}
-                    {!pending.quote.blacksmith.notices.length && <p>No active smith work; paused orders keep their progress.</p>}
+                    {pending.quote.blacksmith.notices.map((n) => (
+                      <p key={n.orderId}>{n.summary}</p>
+                    ))}
+                    {!pending.quote.blacksmith.notices.length && (
+                      <p>No active smith work; paused orders keep their progress.</p>
+                    )}
                   </div>
                 )}
                 {pending.quote.tradeSeason && (

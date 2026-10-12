@@ -154,10 +154,14 @@ export const PLAYER_HELP_GROUPS: HelpGroup[] = [
         id: "downtime",
         title: "Downtime and campaign time",
         paragraphs: [
+          "Open Downtime & NPC training from Home. After the DM approves a downtime period, allocate its usable hours to NPC training. The defaults are 16 usable hours per character per downtime day and 8 hours per displayed training day; the DM can configure both for new periods. Multiple categories use the same resource. Ship travel consumes no personal hours, while approved property labor and away activities share the budget.",
+          "Choose your assigned trainer, an NPC, Martial, Academic or Skill / Profession, a subject, hours and a description. The NPC must be at an equal or lower character level, and class level if you specify a class; both participants need to be together. Training uses the same hours from each participant. Submit for DM review; missing sheets or unrecognized class levels need a written DM confirmation. Pending requests reserve hours, and cancelled/denied requests release them.",
+          "Approved training records hours and training days only. It does not change levels, skills, funds, inventory or any character sheet. Review your counters and history. The DM can record a manually applied milestone and reset the current counter; lifetime totals stay saved and spent hours are not refunded. Each historical entry retains its original training-day conversion.",
           "Your DM reviews and approves campaign time and downtime. Income, expenses, property work and deliveries advance through that clock, rather than elapsed real-world time. Individual activities may remove a character from the active party until their recorded finish.",
           "Check your own recurring agreements, possessions and work proposals before the next advance. The DM decides when time counts for rest, travel or labour; the app does not impose new game rules or automatic character rewards.",
         ],
         links: [
+          ["Downtime & NPC training", "/features/downtime"],
           ["My Finances", "/features/finances"],
           ["Properties", "/features/properties"],
         ],
