@@ -18,7 +18,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Development / gameplay / Run npm ci | open | 2 | 11s → 17s | +6s | +54.55% |
 | Code checks and immutable builds / unit-tests | open | 6 | 8s → 37s | +29s | +362.5% |
 | Code checks and immutable builds / typecheck | open | 5 | 7s → 23s | +16s | +228.57% |
-| Code checks and immutable builds / lint | open | 3 | 5s → 11s | +6s | +120% |
+| Code checks and immutable builds / lint | open | 4 | 5s → 13s | +8s | +160% |
 | Development / accounts / Run npx playwright install --with-deps chromium | open | 4 | 21s → 372s | +351s | +1671.43% |
 | Development / gameplay / Start disposable development server | open | 2 | 4s → 8s | +4s | +100% |
 | Code checks and immutable builds / web-build | open | 2 | 4s → 9s | +5s | +125% |
@@ -258,11 +258,16 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Development / gameplay / dev-ships | open | 2 | 27s → 54s | +27s | +100% |
 | Development / gameplay / dev-ships | open | 2 | 36s → 59s | +23s | +63.89% |
 | Development / desktop / dev-navigation | open | 2 | 39s → 115s | +76s | +194.87% |
+| Development / gameplay / dev-blacksmith | open | 2 | 28s → 62s | +34s | +121.43% |
+| Packaged Worker / interface / worker-blacksmith | open | 2 | 24s → 35s | +11s | +45.83% |
 
 ## Recorded slowdowns
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-12T10:42:24Z | step: Packaged Worker / interface / worker-blacksmith | 29s → 35s | +6s | +20.69% | failure | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38236437410/job/114768915976) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38237543385/job/114772550728) |
+| 2026-10-12T10:41:04Z | step: Development / gameplay / dev-blacksmith | 35s → 62s | +27s | +77.14% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38236437410/job/114768159939) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38237543385/job/114771828947) |
+| 2026-10-12T10:39:39Z | step: Code checks and immutable builds / lint | 11s → 13s | +2s | +18.18% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37913636690/job/113764459944) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38237543385/job/114771829064) |
 | 2026-10-12T10:34:18Z | step: report / Run actions/checkout@v4 | 2s → 3s | +1s | +50% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37279973920/job/111665529992) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38237146215/job/114770507446) |
 | 2026-10-12T10:31:51Z | step: Packaged Worker / interface / worker-blacksmith | 24s → 29s | +5s | +20.83% | failure | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38234358570/job/114762407176) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38236437410/job/114768915976) |
 | 2026-10-12T10:30:11Z | step: Development / gameplay / dev-blacksmith | 28s → 35s | +7s | +25% | failure | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38233656239/job/114758906127) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38236437410/job/114768159939) |
