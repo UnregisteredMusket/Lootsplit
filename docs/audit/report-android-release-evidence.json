@@ -1,0 +1,18 @@
+{
+  "file": "Lootsplit-1.7.0.apk",
+  "bytes": 27891028,
+  "sha256": "6b7c7e9afec896a81ab4a60cb5e7a74b4428cb94387bcdf4ab31bf0083e6ca7a",
+  "package": "com.unregisteredmusket.lootsplit",
+  "version": "1.7.0",
+  "versionCode": 10,
+  "certificateSHA256": "baca95a880d14d0d8c422c397decd4c9bf0e7f710a3fd6a5be1e47abd3f730a0",
+  "v2IntegrityVerified": true,
+  "algorithmId": "0x103",
+  "sourceCommit": "2b4abca6f8ff6734bf8272e0c11538719b9aef68",
+  "workflowRun": 38305743849,
+  "releaseId": 410991859,
+  "assetId": 634976402,
+  "publishedAt": "2026-10-12T20:59:16Z",
+  "publicAssetDigestMatches": true,
+  "physicalDeviceTested": false
+}

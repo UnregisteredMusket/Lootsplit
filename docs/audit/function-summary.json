@@ -1,12 +1,12 @@
 {
-  "files": 640,
-  "functions": 12587,
-  "namedSymbols": 2706,
+  "files": 641,
+  "functions": 12621,
+  "namedSymbols": 2708,
   "domains": {
     "Account service: verified identities, roles, private records and moderation": 71,
     "Application controls: navigation, role context, preferences, drafts and status": 1639,
     "Application support: shared utilities, initialization and presentation": 1442,
-    "Build/development tooling: environment, packaging, preview or audit": 725,
+    "Build/development tooling: environment, packaging, preview or audit": 729,
     "Character play: sheet ownership, assignment, stats, rolls and party integration": 594,
     "Economy: validated money, inventory, catalog, purchases and ledger operations": 1415,
     "Encounter play: DM lifecycle, manual combat, loot review and atomic awards": 336,
@@ -18,9 +18,9 @@
     "Router entry: render page, validate search or handle request": 135,
     "Server entry: request dispatch, environment, origin and response handling": 7,
     "Shared campaign: seat authorization, synchronization, turns, messaging and recovery": 790,
-    "Verification: assertions, fixtures and browser workflows": 3825
+    "Verification: assertions, fixtures and browser workflows": 3855
   },
   "note": "Includes nested callbacks and test/build functions. Excludes declarations/generated routes/dependencies. Static registration/call evidence is not dynamic coverage or formal correctness proof.",
-  "snapshot": "October 12 report-followup candidate; regenerate from exact release source in CI artifacts.",
-  "index": "The checked-in function-inventory.csv is the earlier historical index. Current complete CSV and summary are generated in every verification build artifact under function-inventory/."
+  "snapshot": "October 12 verified report release follow-up; full exact-source CSV/summary are regenerated in each verification artifact.",
+  "index": "The checked-in function-inventory.csv is historical. Current complete CSV and summary are in the build verification artifact under function-inventory/."
 }

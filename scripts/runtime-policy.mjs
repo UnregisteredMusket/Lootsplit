@@ -40,7 +40,7 @@ export function assertRuntimeConfig(config, expected) {
   check(expected, "");
 }
 
-if (process.argv[1]?.endsWith("/runtime-policy.mjs")) {
+async function main() {
   const [{ cfRequest }, { verifyArtifact }] = await Promise.all([
     import("./production-preflight.mjs"), import("./release-artifact.mjs"),
   ]);
@@ -60,3 +60,9 @@ if (process.argv[1]?.endsWith("/runtime-policy.mjs")) {
   }, null, 2) + "\n");
   console.log("Verified the artifact's CPU, persistent log and query-redaction policy; no settings were changed.");
 }
+// Do not await dynamic imports during module evaluation: release-artifact imports
+// the pure policy checks from this module and otherwise forms a top-level-await cycle.
+if (process.argv[1]?.endsWith("/runtime-policy.mjs")) main().catch(error => {
+  console.error(error.message);
+  process.exitCode = 1;
+});

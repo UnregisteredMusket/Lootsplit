@@ -86,10 +86,10 @@ test("packaged Worker checks all belong to one required isolated group", () => {
   ];
   assert.equal(assignments.length, 23);
   assert.ok(
-    assignments.some(([, name, group]) => name === "worker-downtime" && group === "interface"),
+    assignments.some(([, name, group]) => name === "worker-downtime" && group === "accounts"),
   );
   assert.ok(
-    assignments.some(([, name, group]) => name === "worker-blacksmith" && group === "interface"),
+    assignments.some(([, name, group]) => name === "worker-blacksmith" && group === "accounts"),
   );
   assert.ok(
     assignments.some(([, name, group]) => name === "worker-navigation" && group === "interface"),
@@ -98,17 +98,17 @@ test("packaged Worker checks all belong to one required isolated group", () => {
     assignments.some(([, name, group]) => name === "worker-initiative" && group === "interface"),
   );
   assert.ok(
-    assignments.some(([, name, group]) => name === "worker-map-tiles" && group === "interface"),
+    assignments.some(([, name, group]) => name === "worker-map-tiles" && group === "accounts"),
   );
   assert.ok(
-    assignments.some(([, name, group]) => name === "worker-ships" && group === "interface"),
+    assignments.some(([, name, group]) => name === "worker-ships" && group === "accounts"),
   );
   assert.ok(
-    assignments.some(([, name, group]) => name === "worker-trade-economy" && group === "interface"),
+    assignments.some(([, name, group]) => name === "worker-trade-economy" && group === "accounts"),
   );
   assert.ok(
     assignments.some(
-      ([, name, group]) => name === "worker-world-features" && group === "interface",
+      ([, name, group]) => name === "worker-world-features" && group === "accounts",
     ),
   );
   assert.ok(
