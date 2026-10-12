@@ -90,7 +90,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Development / gameplay / Run actions/upload-artifact@v4 | open | 3 | 1s → 4s | +3s | +300% |
 | Development / accounts / Run actions/upload-artifact@v4 | open | 3 | 1s → 7s | +6s | +600% |
 | verify | open | 2 | 5s → 40s | +35s | +700% |
-| deploy / Check current main, existing bindings and applied migrations; deploy without rebuild | open | 3 | 9s → 28s | +19s | +211.11% |
+| deploy / Check current main, existing bindings and applied migrations; deploy without rebuild | open | 4 | 9s → 52s | +43s | +477.78% |
 | Development / accounts / Set up job | open | 2 | 1s → 4s | +3s | +300% |
 | Development / accounts / Run actions/checkout@v4 | open | 3 | 1s → 6s | +5s | +500% |
 | Packaged Worker / interface / Set up job | open | 2 | 1s → 3s | +2s | +200% |
@@ -266,6 +266,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-12T12:16:15Z | step: deploy / Check current main, existing bindings and applied migrations; deploy without rebuild | 28s → 52s | +24s | +85.71% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37412626230/job/112104223178) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38247786427/job/114805952265) |
 | 2026-10-12T12:04:25Z | step: Development / desktop / dev-website | 16s → 19s | +3s | +18.75% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37233687309/job/111528483481) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38246253534/job/114800750323) |
 | 2026-10-12T12:01:43Z | step: Code checks and immutable builds / lint | 11s → 13s | +2s | +18.18% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37965977121/job/113940301405) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38246253534/job/114800749892) |
 | 2026-10-12T12:01:07Z | step: Code checks and immutable builds / unit-tests | 32s → 38s | +6s | +18.75% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38046397037/job/114196698814) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38246253534/job/114800749892) |
