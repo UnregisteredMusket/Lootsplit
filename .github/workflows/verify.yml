@@ -227,7 +227,7 @@ jobs:
           retention-days: 30
 
   worker:
-    name: Packaged Worker / ${{ matrix.group }}
+    name: Packaged Worker / ${{ matrix.group }} (balanced v2)
     needs: build
     strategy:
       fail-fast: false
@@ -262,21 +262,6 @@ jobs:
           done
           echo "Built Worker did not become ready" >&2
           exit 1
-      - name: worker-ships
-        if: matrix.group == 'interface'
-        env:
-          AUDIT_ORIGIN: http://127.0.0.1:8082
-        run: node scripts/recovery-step.mjs worker-ships 240 node scripts/ships-browser-audit.mjs
-      - name: worker-blacksmith
-        if: matrix.group == 'interface'
-        env:
-          AUDIT_ORIGIN: http://127.0.0.1:8082
-        run: node scripts/recovery-step.mjs worker-blacksmith 240 node --experimental-strip-types scripts/blacksmith-browser-audit.mjs
-      - name: worker-downtime
-        if: matrix.group == 'interface'
-        env:
-          AUDIT_ORIGIN: http://127.0.0.1:8082
-        run: node scripts/recovery-step.mjs worker-downtime 240 node --experimental-strip-types scripts/downtime-browser-audit.mjs
       - name: worker-account
         if: matrix.group == 'accounts'
         env:
@@ -290,11 +275,36 @@ jobs:
         env:
           AUDIT_ORIGIN: http://127.0.0.1:8082
         run: node scripts/recovery-step.mjs worker-finance 180 node scripts/finance-browser-audit.mjs
+      - name: worker-ships
+        if: matrix.group == 'accounts'
+        env:
+          AUDIT_ORIGIN: http://127.0.0.1:8082
+        run: node scripts/recovery-step.mjs worker-ships 240 node scripts/ships-browser-audit.mjs
+      - name: worker-blacksmith
+        if: matrix.group == 'accounts'
+        env:
+          AUDIT_ORIGIN: http://127.0.0.1:8082
+        run: node scripts/recovery-step.mjs worker-blacksmith 240 node --experimental-strip-types scripts/blacksmith-browser-audit.mjs
+      - name: worker-downtime
+        if: matrix.group == 'accounts'
+        env:
+          AUDIT_ORIGIN: http://127.0.0.1:8082
+        run: node scripts/recovery-step.mjs worker-downtime 240 node --experimental-strip-types scripts/downtime-browser-audit.mjs
       - name: worker-map-tiles
-        if: matrix.group == 'interface'
+        if: matrix.group == 'accounts'
         env:
           AUDIT_ORIGIN: http://127.0.0.1:8082
         run: node scripts/recovery-step.mjs worker-map-tiles 240 node scripts/map-tiles-browser-audit.mjs
+      - name: worker-trade-economy
+        if: matrix.group == 'accounts'
+        env:
+          AUDIT_ORIGIN: http://127.0.0.1:8082
+        run: node scripts/recovery-step.mjs worker-trade-economy 240 node --experimental-strip-types scripts/trade-economy-browser-audit.mjs
+      - name: worker-world-features
+        if: matrix.group == 'accounts'
+        env:
+          AUDIT_ORIGIN: http://127.0.0.1:8082
+        run: node scripts/recovery-step.mjs worker-world-features 240 node scripts/world-features-browser-audit.mjs
       - name: worker-initiative
         if: matrix.group == 'interface'
         env:
@@ -330,16 +340,6 @@ jobs:
         env:
           AUDIT_ORIGIN: http://127.0.0.1:8082
         run: node scripts/recovery-step.mjs worker-property-operations 180 node scripts/property-operations-browser-audit.mjs
-      - name: worker-trade-economy
-        if: matrix.group == 'interface'
-        env:
-          AUDIT_ORIGIN: http://127.0.0.1:8082
-        run: node scripts/recovery-step.mjs worker-trade-economy 240 node --experimental-strip-types scripts/trade-economy-browser-audit.mjs
-      - name: worker-world-features
-        if: matrix.group == 'interface'
-        env:
-          AUDIT_ORIGIN: http://127.0.0.1:8082
-        run: node scripts/recovery-step.mjs worker-world-features 240 node scripts/world-features-browser-audit.mjs
       - name: worker-sound
         if: matrix.group == 'interface'
         env:

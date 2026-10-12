@@ -7,6 +7,7 @@ import { fileHashes, verifyArtifact } from "./release-artifact.mjs";
 import { assertCurrentMain, assertMigrations } from "./production-preflight.mjs";
 import { readFileSync } from "node:fs";
 import { assertRuntimeSettings, assertRuntimeConfig } from "./runtime-policy.mjs";
+import { spawnSync } from "node:child_process";
 const sha = "a".repeat(40);
 test("release verification rejects changed, added, missing files and wrong commit", () => {
   const directory = mkdtempSync(join(tmpdir(), "release-test-"));
@@ -42,4 +43,12 @@ test("the verified upload pins Paid CPU and private persistent logs; runtime dri
   assert.throws(() => assertRuntimeSettings({ ...policy, limits: { cpu_ms: 30 } }, policy), /policy drift/);
   assert.throws(() => assertRuntimeSettings({ ...policy, observability: { ...policy.observability, logs: { ...policy.observability.logs, persist: false } } }, policy), /policy drift/);
   assert.throws(() => assertRuntimeConfig(config + "\n[limits]\ncpu_ms = 10", policy), /Repeated/);
+});
+test("runtime policy CLI resolves its artifact imports and reaches validation without an await cycle", () => {
+  const run=spawnSync(process.execPath,["scripts/runtime-policy.mjs"],{
+    encoding:"utf8",timeout:15000,env:{...process.env,EXPECTED_RELEASE_SHA:"invalid"},
+  });
+  assert.equal(run.status,1,run.stderr);
+  assert.match(run.stderr,/did not match the regular expression/);
+  assert.doesNotMatch(run.stderr,/unsettled top-level await/);
 });

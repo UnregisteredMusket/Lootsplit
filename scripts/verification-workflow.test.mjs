@@ -72,3 +72,17 @@ test("each development check belongs to exactly one declared isolated group", ()
   for (const [, name, group] of checks) assert.ok(groups.includes(group), `${name}: ${group}`);
   for (const group of groups) assert.ok(checks.some(([, , assigned]) => assigned === group));
 });
+
+test("balanced Worker groups retain every complete audit and run account isolation before campaign fixtures", () => {
+  const workflow = readFileSync(".github/workflows/verify.yml", "utf8");
+  const checks = [...workflow.matchAll(/- name: (worker-[\w-]+)\n\s+if: matrix.group == '([^']+)'/g)];
+  assert.equal(checks.length,22);
+  assert.equal(new Set(checks.map(([,name])=>name)).size,22);
+  for (const [,,group] of checks) assert.ok(["accounts","interface"].includes(group));
+  const accounts=checks.filter(([,,group])=>group==="accounts").map(([,name])=>name);
+  assert.deepEqual(accounts.slice(0,3),["worker-account","worker-monitor","worker-finance"]);
+  for (const name of ["ships","blacksmith","downtime","map-tiles","trade-economy","world-features"])
+    assert.ok(accounts.includes(`worker-${name}`));
+  assert.match(workflow,/timeout-minutes: 15/);
+  assert.doesNotMatch(workflow,/continue-on-error: true/);
+});

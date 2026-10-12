@@ -1,0 +1,241 @@
+{
+  "runId": 38303829968,
+  "commit": "6007cdb5d5cac6edc0813bcc89c05e17c4621246",
+  "url": "https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38303829968",
+  "environment": "ubuntu-latest/node22/current Chromium",
+  "measurement": "GitHub job and step timestamps, completed first attempt; actual wall seconds",
+  "groups": [
+    {
+      "name": "Packaged Worker / interface",
+      "seconds": 772,
+      "stages": [
+        {
+          "name": "worker-ships",
+          "seconds": 36,
+          "result": "success"
+        },
+        {
+          "name": "worker-blacksmith",
+          "seconds": 44,
+          "result": "success"
+        },
+        {
+          "name": "worker-downtime",
+          "seconds": 37,
+          "result": "success"
+        },
+        {
+          "name": "worker-account",
+          "seconds": 0,
+          "result": "skipped"
+        },
+        {
+          "name": "worker-monitor",
+          "seconds": 0,
+          "result": "skipped"
+        },
+        {
+          "name": "worker-finance",
+          "seconds": 0,
+          "result": "skipped"
+        },
+        {
+          "name": "worker-map-tiles",
+          "seconds": 20,
+          "result": "success"
+        },
+        {
+          "name": "worker-initiative",
+          "seconds": 4,
+          "result": "success"
+        },
+        {
+          "name": "worker-navigation",
+          "seconds": 86,
+          "result": "success"
+        },
+        {
+          "name": "worker-theme",
+          "seconds": 30,
+          "result": "success"
+        },
+        {
+          "name": "worker-shop-stock",
+          "seconds": 13,
+          "result": "success"
+        },
+        {
+          "name": "worker-market-locations",
+          "seconds": 47,
+          "result": "success"
+        },
+        {
+          "name": "worker-properties",
+          "seconds": 43,
+          "result": "success"
+        },
+        {
+          "name": "worker-property-operations",
+          "seconds": 23,
+          "result": "success"
+        },
+        {
+          "name": "worker-trade-economy",
+          "seconds": 71,
+          "result": "success"
+        },
+        {
+          "name": "worker-world-features",
+          "seconds": 93,
+          "result": "success"
+        },
+        {
+          "name": "worker-sound",
+          "seconds": 25,
+          "result": "success"
+        },
+        {
+          "name": "worker-help",
+          "seconds": 58,
+          "result": "success"
+        },
+        {
+          "name": "worker-game-analytics",
+          "seconds": 4,
+          "result": "success"
+        },
+        {
+          "name": "worker-website",
+          "seconds": 14,
+          "result": "success"
+        },
+        {
+          "name": "worker-library-navigation",
+          "seconds": 33,
+          "result": "success"
+        },
+        {
+          "name": "worker-loot",
+          "seconds": 6,
+          "result": "success"
+        }
+      ]
+    },
+    {
+      "name": "Packaged Worker / accounts",
+      "seconds": 191,
+      "stages": [
+        {
+          "name": "worker-ships",
+          "seconds": 0,
+          "result": "skipped"
+        },
+        {
+          "name": "worker-blacksmith",
+          "seconds": 0,
+          "result": "skipped"
+        },
+        {
+          "name": "worker-downtime",
+          "seconds": 0,
+          "result": "skipped"
+        },
+        {
+          "name": "worker-account",
+          "seconds": 102,
+          "result": "success"
+        },
+        {
+          "name": "worker-monitor",
+          "seconds": 7,
+          "result": "success"
+        },
+        {
+          "name": "worker-finance",
+          "seconds": 25,
+          "result": "success"
+        },
+        {
+          "name": "worker-map-tiles",
+          "seconds": 0,
+          "result": "skipped"
+        },
+        {
+          "name": "worker-initiative",
+          "seconds": 0,
+          "result": "skipped"
+        },
+        {
+          "name": "worker-navigation",
+          "seconds": 0,
+          "result": "skipped"
+        },
+        {
+          "name": "worker-theme",
+          "seconds": 0,
+          "result": "skipped"
+        },
+        {
+          "name": "worker-shop-stock",
+          "seconds": 0,
+          "result": "skipped"
+        },
+        {
+          "name": "worker-market-locations",
+          "seconds": 0,
+          "result": "skipped"
+        },
+        {
+          "name": "worker-properties",
+          "seconds": 0,
+          "result": "skipped"
+        },
+        {
+          "name": "worker-property-operations",
+          "seconds": 0,
+          "result": "skipped"
+        },
+        {
+          "name": "worker-trade-economy",
+          "seconds": 0,
+          "result": "skipped"
+        },
+        {
+          "name": "worker-world-features",
+          "seconds": 0,
+          "result": "skipped"
+        },
+        {
+          "name": "worker-sound",
+          "seconds": 0,
+          "result": "skipped"
+        },
+        {
+          "name": "worker-help",
+          "seconds": 0,
+          "result": "skipped"
+        },
+        {
+          "name": "worker-game-analytics",
+          "seconds": 0,
+          "result": "skipped"
+        },
+        {
+          "name": "worker-website",
+          "seconds": 0,
+          "result": "skipped"
+        },
+        {
+          "name": "worker-library-navigation",
+          "seconds": 0,
+          "result": "skipped"
+        },
+        {
+          "name": "worker-loot",
+          "seconds": 0,
+          "result": "skipped"
+        }
+      ]
+    }
+  ]
+}

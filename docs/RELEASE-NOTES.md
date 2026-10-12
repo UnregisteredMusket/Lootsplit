@@ -1,6 +1,6 @@
-# Lootsplit 1.7.0 candidate
+# Lootsplit 1.7.0
 
-Android version code 10. This candidate retains package `com.unregisteredmusket.lootsplit` and the permanent signing certificate. The public download remains 1.6.0 until the new signed APK and checksum exist.
+Android version code 10. This release retains package `com.unregisteredmusket.lootsplit` and the permanent signing certificate.
 
 ## Added features
 
@@ -20,9 +20,9 @@ Android version code 10. This candidate retains package `com.unregisteredmusket.
 - Subject spacing/case variants group without rewriting original requests; category totals combine teachers while player totals remain scoped to their contributions.
 - Documentation now reflects implemented OCR, six navigation tabs and map tiles. Failure email uses the production secret scope and reports configuration honestly.
 
-## Candidate verification
+## Verification
 
-Full PR/main preservation checks and the signed Android workflow must pass. Verify APK version/code, permanent certificate and checksum before updating website download metadata. Physical-device installation, file-picker and force-close behavior require separate validation. The broader UI redesign follows this functional release.
+PR #105 all-nine verification 38303829968 and independent main38305743510 passed. Signed release38305743849 passed its own all-nine verification and published Android 1.7.0/code10 from main 2b4abca6. The actual APK manifest, permanent certificate and v2 signed-data/content integrity were independently checked; SHA256 matches the published GitHub asset digest. See `docs/audit/report-android-release-evidence.json`. Website download metadata is updated through the separately verified release follow-up. Physical-device installation, file-picker and force-close remain untested. The broader UI redesign follows this functional release.
 
 ---
 
