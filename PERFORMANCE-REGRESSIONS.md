@@ -148,7 +148,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Packaged Worker / interface / worker-theme | resolved | 3 | 13s → 44s | +31s | +238.46% |
 | Packaged Worker / interface / worker-game-analytics | open | 3 | 3s → 8s | +5s | +166.67% |
 | Development / gameplay / Set up job | open | 2 | 1s → 3s | +2s | +200% |
-| Code checks and immutable builds | open | 3 | 71s → 115s | +44s | +61.97% |
+| Code checks and immutable builds | open | 4 | 71s → 140s | +69s | +97.18% |
 | Packaged Worker / accounts / Run npm ci | open | 2 | 13s → 19s | +6s | +46.15% |
 | Packaged Worker / interface / worker-game-analytics | open | 2 | 3s → 5s | +2s | +66.67% |
 | Packaged standby / Run actions/upload-artifact@v4 | open | 2 | 2s → 4s | +2s | +100% |
@@ -271,6 +271,8 @@ Open trends require investigation. Resolved trends retain their history; each ve
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-12T20:45:13Z | step: Packaged Worker / interface / worker-downtime | 25s → 30s | +5s | +20% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38287069654/job/114938655680) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38305743510/job/115000061647) |
+| 2026-10-12T20:42:50Z | job: Code checks and immutable builds | 115s → 140s | +25s | +21.74% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38018663650/job/114114570310) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38305743510/job/114999237365) |
 | 2026-10-12T20:33:39Z | job: Development / desktop (balanced v2) | 472s → 567s | +95s | +20.13% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38301994659/job/114986882289) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38303829968/job/114993398409) |
 | 2026-10-12T20:33:15Z | job: Development / gameplay (balanced v2) | 394s → 544s | +150s | +38.07% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38302748488/job/114989858029) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38303829968/job/114993398235) |
 | 2026-10-12T20:33:09Z | step: Development / desktop (balanced v2) / dev-navigation | 38s → 115s | +77s | +202.63% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38302748488/job/114989858520) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38303829968/job/114993398409) |
