@@ -79,7 +79,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Development / gameplay / Run npx playwright install --with-deps chromium | open | 4 | 25s → 319s | +294s | +1176% |
 | Code checks and immutable builds / Run actions/upload-artifact@v4 | open | 2 | 2s → 4s | +2s | +100% |
 | Packaged Worker / accounts / worker-account | resolved | 6 | 22s → 95s | +73s | +331.82% |
-| Development / gameplay | open | 5 | 141s → 712s | +571s | +404.96% |
+| Development / gameplay | open | 6 | 141s → 883s | +742s | +526.24% |
 | Development / gameplay / Run actions/checkout@v4 | open | 2 | 1s → 3s | +2s | +200% |
 | Development / gameplay / Run actions/setup-node@v4 | open | 3 | 2s → 7s | +5s | +250% |
 | Development / accounts / Run actions/setup-node@v4 | open | 4 | 3s → 17s | +14s | +466.67% |
@@ -267,6 +267,8 @@ Open trends require investigation. Resolved trends retain their history; each ve
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-12T17:49:08Z | job: Development / gameplay | 712s → 883s | +171s | +24.02% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38140451074/job/114473173492) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38285102588/job/114931468377) |
+| 2026-10-12T17:38:25Z | step: Development / gameplay / dev-downtime | 34s → 42s | +8s | +23.53% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38284304933/job/114928868549) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38285102588/job/114931468377) |
 | 2026-10-12T15:17:12.000Z | queue: Deploy verified website / initial queue | 6s → 7s | +1s | +16.67% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37928213093) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38255560075) |
 | 2026-10-12T13:24:59Z | step: Development / gameplay / Run actions/upload-artifact@v4 | 4s → 6s | +2s | +50% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37796847170/job/113378416980) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38253801733/job/114826539465) |
 | 2026-10-12T13:23:15Z | step: Development / gameplay / dev-world-features | 106s → 122s | +16s | +15.09% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38053941691/job/114218473575) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38253801733/job/114826539465) |
