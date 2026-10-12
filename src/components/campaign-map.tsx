@@ -231,6 +231,7 @@ export function CampaignMaps() {
             key={`viewport-${map.id}`}
             map={map}
             party={party}
+            selectedToken={selectedToken}
             tileMode={tileMode && !!map.grid}
             routes={(t.journal.fleet?.voyages ?? [])
               .filter(
@@ -781,6 +782,7 @@ function MapViewport({
   routes,
   controls,
   onTokenSelect,
+  selectedToken,
 }: {
   map: CampaignMap;
   party?: { x: number; y: number };
@@ -793,6 +795,7 @@ function MapViewport({
   routes: { id: string; points: { x: number; y: number }[] }[];
   controls: ReactNode;
   onTokenSelect?: (id: string) => void;
+  selectedToken: string;
 }) {
   const [visible, setVisible] = useState<string[]>([...mapRecordKinds]),
     [filtersOpen, setFiltersOpen] = useState(false),
@@ -831,7 +834,11 @@ function MapViewport({
     records.filter((r) => r.id === d.id && r.kind === d.kind),
   );
   useEffect(() => {
+    setDetails([]);
+  }, [selectedToken]);
+  useEffect(() => {
     if (placing || signals.viewOnly) setPinging(false);
+    if (placing) setDetails([]);
   }, [placing, signals.viewOnly]);
   const root = useRef<HTMLDivElement>(null),
     [ratio, setRatio] = useState(1),
@@ -1124,6 +1131,19 @@ function MapViewport({
                 className={`map-record-icon map-kind-${type.kind.toLowerCase().replaceAll(" ", "-")}`}
                 title={`${type.kind}: ${type.records.map((r) => r.label).join(", ")}`}
                 aria-label={`${type.kind}: ${type.records.length} ${type.records.length === 1 ? "record" : "records"}`}
+                aria-pressed={
+                  currentDetails.length > 0
+                    ? currentDetails.length === type.records.length &&
+                      type.records.every((r) =>
+                        currentDetails.some((d) => d.id === r.id && d.kind === r.kind),
+                      )
+                    : type.records.some(
+                        (r) =>
+                          r.id === selectedToken &&
+                          (r.kind === "Combatant" || r.kind === "Ship") &&
+                          map.tokens?.some((t) => t.id === r.id),
+                      )
+                }
                 onClick={() => {
                   if (!moved.current && !pinging) {
                     const token = type.records.find(
@@ -1131,8 +1151,12 @@ function MapViewport({
                         r.kind === "Combatant" ||
                         (r.kind === "Ship" && map.tokens?.some((t) => t.id === r.id)),
                     );
-                    if (token && onTokenSelect) onTokenSelect(token.id);
-                    else if (!placing) setDetails(type.records);
+                    if (token && onTokenSelect) {
+                      setDetails([]);
+                      onTokenSelect(token.id);
+                    } else if (!placing) {
+                      setDetails(type.records);
+                    }
                   }
                 }}
               >

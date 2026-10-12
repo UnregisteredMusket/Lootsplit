@@ -331,6 +331,7 @@ Music & Ambience is available from DM Campaign tools and feature navigation. Pre
 
 ## Map visibility and shared pings (2026-10-10)
 
+- Selected record and combat-token icons have a blue fill/ring and accessible pressed state; record-detail selection and the DM token selector drive the highlight without saving or sharing selection.
 - Saved maps use compact type-specific screen-sized icons, independent category filters, upper-right counts for multiple characters/NPCs, and tappable record details/links. The complete register, privacy projections, party locations, anchors and marker commands remain available.
 - DM and players can select five ping colors and tap/click the map in an active room, outside turns. Normalized points share only within the same authorized map/room/session and expire after five seconds. Pings remain separate from campaign data, drafts, journals and financial history. View-only, removed seats, closed rooms and private maps enforce access. Offline DM preview and keyboard placement are available; reduced motion retains a static visible glow.
 - Saved-map and import/edit fullscreen views preserve controls, unsaved drafts and processing. Native dialog focus/escape behavior, mobile safe areas, pan, touch/pinch/wheel and keyboard alternatives are retained.

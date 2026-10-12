@@ -1,0 +1,17 @@
+# Selected map icon color — October 12, 2026 UTC
+
+The owner requests a different color for the active selected map icon. Existing record icons have no selected style, and the map viewport receives no DM token selection. The current behavior is visible in source: only keyboard focus changes appearance.
+
+Selected icons now have a blue fill, white glyph, pale-blue border and ring, plus `aria-pressed`. Grouped records retain their count badges. Record selection comes from the existing inspected-record identity set; DM combat selection uses the existing selected token ID. Clicking a token or choosing another token clears the old inspected-record selection. Starting placement clears stale inspected records. Closing ordinary record details clears their highlight; selected combat controls remain intact. Selection is local and resets with the viewport/document. Forced-color display uses system Highlight/HighlightText and an outline.
+
+Preserved: all map categories, type/record filters, markers/anchors, grouping, badges, party placement, pan/zoom/pinch/keyboard/fullscreen/pings, token drafts/movement, roster imports, privacy, shared commands, encounter/ship data, all modes, legacy saves and financial behavior. No migration, dependency, backend mutation or APK distribution.
+
+Both Help guides, map/tile documents, public downloadable guide, feature inventory, README and manual were reviewed/updated. Player guidance remains inspection-only; DM movement permissions stay unchanged. No third-party resource added.
+
+Existing world browser audits retain every original flow and add selected marker color/close checks plus grouped NPC → Party → NPC selection. Existing tile audits add token click/selector switching, deselection after reload/New token, and guest shared-record selection/close. Both run at desktop and phone widths in development and immutable Worker CI. No scenario, account deadline, worker/retry limit, network boundary or release gate is removed.
+
+Local Node22 dependencies are reused from the identical lockfile. `dev:doctor` confirms the locked Chromium executable is missing. The prior same-workspace installation/archive/SIGSEGV and Vite interface restrictions remain documented; do not repeat failed setup loops or claim a local browser pass. Focused lint, quick tests and web/mobile builds are required; current-browser CI closes the render gap. Exact validation/source/PR/main/publication/live and performance state will be recorded in the PR and ignored recovery checkpoint after checks complete.
+
+Local verification: 961 tests / 957 passes / four existing skips; clean types; lint zero errors / 30 existing warnings. Focused changed-file lint passes. Sequential web/mobile builds passed. No local browser pass is claimed.
+
+Performance baseline: snapshot `5fbb915ab6f1bc48b10b3bf8ae204a9cfb016a5d` has 881 observations, 17 resolutions, 402 open trends and 234 repeated trends; cursor `2026-10-11T21:27:28.716Z`, successful recorder38192681222. Latest qualifying record38175377882 final checkout2→3s (+1s/+50%) is short setup with one-second timestamp resolution. Existing map/ship/coverage and infrastructure trends remain recorded and unresolved. This presentation change claims no speed optimization or cause/fix resolution. Complete current PR/main/release timing and new >=15% observations will be reviewed in the PR checkpoint; history and references stay intact.

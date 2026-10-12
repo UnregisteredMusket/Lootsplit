@@ -3080,6 +3080,9 @@ input,select,textarea { max-width: 100%; }
 .map-record-icon { position:relative; display:grid; place-items:center; flex:0 0 32px; width:32px; height:32px; min-height:32px; padding:0; border:1px solid var(--color-lead); border-radius:50%; background:var(--color-elevated); color:var(--color-lead); box-shadow:0 1px 3px #0007; pointer-events:auto; }
 .map-record-icon:focus-visible { outline:3px solid var(--color-positive); outline-offset:2px; }
 .map-kind-party { color:var(--color-positive); border-color:var(--color-positive); }
+.map-record-icon[aria-pressed="true"] { background:#1e5e96; color:#fff; border-color:#9bd7ff; box-shadow:0 0 0 3px #60baff,0 2px 6px #0008; z-index:1; }
+.map-record-icon[aria-pressed="true"] .map-count { background:#1e5e96; color:#fff; border-color:#9bd7ff; }
+@media (forced-colors:active) { .map-record-icon[aria-pressed="true"] { background:Highlight; color:HighlightText; border-color:Highlight; outline:2px solid Highlight; outline-offset:2px; } }
 .map-count { position:absolute; top:-5px; right:-6px; min-width:16px; height:16px; padding:0 3px; border-radius:8px; font-size:10px; font-weight:bold; line-height:16px; background:var(--color-lead); color:var(--color-bg); border:1px solid var(--color-bg); }
 .map-record-details { margin-top:8px; padding:12px; border:1px solid var(--color-border); border-radius:6px; max-height:30vh; overflow:auto; }
 .map-record-details > div { margin-bottom:8px; }
