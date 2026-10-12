@@ -1,4 +1,5 @@
 import { validateFleet } from "./ships.ts";
+import { validateBlacksmith } from "./blacksmith-validation.ts";
 import { projectRecord } from "./session-records.ts";
 import { shopVisible, shopAsking, validateWorld } from "./world.ts";
 import { randomTradeRoll, recordShopTrade, validateTradeEconomy } from "./trade-economy.ts";
@@ -912,15 +913,14 @@ function clampRate(rate: number): number {
 }
 
 export async function removeShop(id: string): Promise<void> {
-  const db = await quireDb();
-  const lines = await request(
-    db.transaction("stock").objectStore("stock").index("shopId").getAll(id),
-  );
-  const tx = db.transaction(["shops", "stock"], "readwrite");
-  const done = finish(tx);
-  tx.objectStore("shops").delete(id);
-  for (const line of lines) tx.objectStore("stock").delete(line.id);
-  await done;
+  await atomic(["shops", "stock", "meta"], async (tx) => {
+    const journal = readJournal((await request<{ value: unknown } | undefined>(tx.objectStore("meta").get("journal")))?.value);
+    if (journal.blacksmith?.profiles.some(p => p.shopId === id))
+      throw Error("Resolve commissions and remove this forge's blacksmith configuration before deleting its shop.");
+    const lines = await request<StockLine[]>(tx.objectStore("stock").index("shopId").getAll(id));
+    tx.objectStore("shops").delete(id);
+    for (const line of lines) tx.objectStore("stock").delete(line.id);
+  });
 }
 
 export async function removeStock(id: string): Promise<void> {
@@ -953,6 +953,10 @@ export async function removePurse(id: string): Promise<void> {
     );
     const journal = readJournal(row?.value);
     assertFinanceAccountRemovable(journal.finance, id);
+    if (journal.blacksmith?.profiles.some(p => p.npcId === id))
+      throw Error("Remove this maker's forge configuration before deleting the NPC account.");
+    if (journal.blacksmith?.orders.some(o => o.purseId === id && ["active", "paused", "ready"].includes(o.status)))
+      throw Error("Resolve this customer's outstanding blacksmith commissions before deleting the account.");
     if (journal.tradeEconomy?.exchanges.some((e) => e.purseId === id))
       throw Error(
         "An exchange treasury must remain with its recorded exchange. Close the exchange instead of removing its account.",
@@ -2089,6 +2093,7 @@ export function readQuireFile(value: unknown): QuireFile {
   const diagnostics = validateBackupReferences({ ...(file as QuireFile), ...metadata, journal });
   validateEstate({ ...(file as QuireFile), journal });
   validateFleet({ ...(file as QuireFile), journal });
+  validateBlacksmith({ ...(file as QuireFile), journal });
   validateWorld({ ...(file as QuireFile), ...metadata, journal });
   validateTradeEconomy({ ...(file as QuireFile), journal });
   // A clone error must occur before the destructive transaction, including non-JSON callers.

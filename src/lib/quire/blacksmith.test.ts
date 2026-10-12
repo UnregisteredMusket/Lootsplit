@@ -1,9 +1,10 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import { execFileSync } from "node:child_process";
+import "fake-indexeddb/auto";
 import { applyCommand, type CommandInput } from "./commands.ts";
 import { smithFixture, smithDesign, smithDm, smithPlayer } from "./test-fixtures/blacksmith.ts";
-import { smithQuote, smithDescription, previewSmith } from "./blacksmith.ts";
+import { smithQuote, smithDescription, previewSmith, validateBlacksmith } from "./blacksmith.ts";
 import { previewDowntime } from "./finance.ts";
 import { projectRecord } from "./session-records.ts";
 import { preserveJournalMetadata, readArchivedSnapshot } from "./journal.ts";
@@ -344,4 +345,63 @@ test("profiles/orders preserve legacy saves and archives; projections disclose o
   assert.equal(away.journal!.blacksmith!.profiles.length, 0);
   assert.equal(away.journal!.blacksmith!.orders.length, 1);
   assert.ok(away.journal!.market!.locations.some((l) => l.id === "city"));
+});
+test("canonical smith material names and units remain required while projected players retain valid partial catalogues", () => {
+  const t = smithFixture();
+  t.journal!.blacksmith!.profiles[0].materials[0].unit = "incompatible unit";
+  assert.throws(() => validateBlacksmith(t), /canonical material/);
+  const valid = smithFixture();
+  assert.doesNotThrow(() => validateBlacksmith(projectRecord(valid, smithPlayer), true));
+});
+test("offline deletion and backup validation protect open commissions atomically; resolved history is retained", async () => {
+  const {
+    applyCloudTable,
+    economySnapshot,
+    executeLocalCommand,
+    removePurse,
+    removeShop,
+    readQuireFile,
+    snapshot,
+  } = await import("./economy.ts");
+  await applyCloudTable(smithFixture());
+  let t = await economySnapshot();
+  const design = smithDesign(t),
+    q = smithQuote(t, "forge", "hero", design);
+  await executeLocalCommand({
+    kind: "smith-order",
+    shopId: "forge",
+    purseId: "hero",
+    design,
+    before: q.before,
+  });
+  const before = await economySnapshot();
+  await assert.rejects(removePurse("hero"), /outstanding blacksmith/);
+  await assert.rejects(removePurse("maker"), /forge configuration/);
+  await assert.rejects(removeShop("forge"), /blacksmith configuration/);
+  assert.deepEqual(await economySnapshot(), before);
+  const file = await snapshot();
+  assert.doesNotThrow(() => readQuireFile(file));
+  const brokenMaker = structuredClone(file);
+  brokenMaker.journal!.blacksmith!.profiles[0].npcId = "missing-maker";
+  assert.throws(() => readQuireFile(brokenMaker), /existing located shop and NPC/);
+  const brokenUnit = structuredClone(file);
+  brokenUnit.journal!.blacksmith!.profiles[0].materials[0].unit = "wrong unit";
+  assert.throws(() => readQuireFile(brokenUnit), /canonical material/);
+  assert.deepEqual(await economySnapshot(), before);
+  const o = before.journal!.blacksmith!.orders[0];
+  await executeLocalCommand({
+    kind: "smith-control",
+    orderId: o.id,
+    before: o,
+    action: "cancel",
+    reason: "Resolved for test disposal; refunds manual",
+  });
+  t = await economySnapshot();
+  const p = t.journal!.blacksmith!.profiles[0];
+  await executeLocalCommand({ kind: "smith-profile", shopId: "forge", before: p, profile: null });
+  await removeShop("forge");
+  await removePurse("hero");
+  t = await economySnapshot();
+  assert.equal(t.journal!.blacksmith!.orders[0].status, "cancelled");
+  assert.equal(t.journal!.blacksmith!.orders[0].terms.makerName, "Aster");
 });

@@ -1,6 +1,7 @@
 import type { CloudTable } from "./cloud.ts";
 import { readBlacksmith, smithProfileSchema, type SmithOrder } from "./blacksmith-schema.ts";
 import { readMarketLocations } from "./shop-locations.ts";
+import { readEstate } from "./estate-schema.ts";
 const open = (o: SmithOrder) => ["active", "paused", "ready"].includes(o.status);
 function unique(keys: string[], label: string) {
   if (new Set(keys).size !== keys.length) throw Error(`Duplicate ${label}.`);
@@ -19,6 +20,8 @@ export function validateBlacksmith(
     "smith orders",
   );
   const locations = readMarketLocations(t.journal?.market).locations;
+  const definitions =
+    !projected && s.profiles.length ? readEstate(t.journal?.propertyOperations).materials : [];
   for (const p of s.profiles) {
     smithProfileSchema.parse(p);
     if (
@@ -31,6 +34,14 @@ export function validateBlacksmith(
       p.items.map((i) => i.key),
       "smith designs",
     );
+    if (!projected)
+      for (const material of p.materials) {
+        const definition = definitions.find((m) => m.key === material.materialKey);
+        if (!definition || definition.name !== material.name || definition.unit !== material.unit)
+          throw Error(
+            "Smith materials must retain their canonical material definitions and units.",
+          );
+      }
     unique(
       p.materials.map((m) => m.materialKey),
       "smith materials",
