@@ -225,6 +225,7 @@ function ShopPage() {
       <label className="mt-4 block text-sm text-muted">
         Paying from
         <SearchSelect
+          aria-label="Paying from"
           value={purseId}
           onValueChange={(selectedValue) => setPurseId(selectedValue)}
           className="mt-1 min-h-11 w-full rounded-sm border border-border bg-subtle px-3 text-base text-fg"
