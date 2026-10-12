@@ -15,14 +15,16 @@ test("actual conditional refresh retains pending work and attention, updates enc
   const sessionValue = { code: "TEST", token: "token", seatId: "player", revision: 2, userId: "legacy-linked-account-cache", pending: [{ id: "unsent" }] };
   const view = { error: "Retain recoverable attention", encounterActive: false, status: "attention" };
   let polls = 0, pulls = 0, accepts = 0;
+  let tableChangedSignal: boolean | undefined;
   const body = source.slice(source.indexOf("async function refresh("), source.indexOf("export async function refreshShared()"));
   const refresh = new Function("context", "readUnchangedRoom", stripTypeScriptTypes(`
-    const {sessionValue,view,pollCloudTable,pullCloudTable,accept}=context;
+    const {sessionValue,view,pollCloudTable,pullCloudTable,accept,signal}=context;
     const session=()=>sessionValue,key=()=>"campaign";
     const acceptedPoll={campaignKey:key(),token:sessionValue.token,seatId:sessionValue.seatId,revision:sessionValue.revision};
-    const publish=patch=>Object.assign(view,patch);
+    const publish=(patch,dataChanged)=>{signal(dataChanged);Object.assign(view,patch);};
     ${body}
   `) + "; return refresh;")({ sessionValue, view,
+    signal: (changed: boolean) => { tableChangedSignal = changed; },
     pollCloudTable: async () => { polls++;return { code: "TEST", seatId: "player", revision: 2, unchanged: true,
       protocol: "lootsplit.room.unchanged.v1", encounterActive: true }; },
     pullCloudTable: async () => { pulls++;return {}; },
@@ -31,6 +33,7 @@ test("actual conditional refresh retains pending work and attention, updates enc
   await refresh(true);
   assert.equal(polls, 1);assert.equal(pulls, 0);assert.equal(accepts, 0);
   assert.equal(view.encounterActive, true);assert.equal(view.error, "Retain recoverable attention");
+  assert.equal(tableChangedSignal, false, "A policy/status update must not announce a database change");
   assert.equal(view.status, "attention");assert.deepEqual(sessionValue.pending, [{ id: "unsent" }]);
   await refresh();assert.equal(pulls, 1);assert.equal(accepts, 1);
   sessionValue.revision = 3;await refresh(true);assert.equal(pulls, 2);assert.equal(polls, 1);

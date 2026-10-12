@@ -513,7 +513,7 @@ async function refresh(conditional = false) {
     // older linked seats may legitimately omit userId in both full and compact views.
     const fresh = readUnchangedRoom(remote, { ...s, userId: acceptedPoll?.userId, sessionId: acceptedPoll?.sessionId });
     publish({ encounterActive: fresh.encounterActive, lastSync: Date.now(), error: s.pending.length ? view.error : "",
-      status: s.pending.length ? (view.error ? "attention" : "pending") : "synced" });
+      status: s.pending.length ? (view.error ? "attention" : "pending") : "synced" }, false);
     return;
   }
   await accept(remote);
