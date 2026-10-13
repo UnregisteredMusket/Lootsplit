@@ -1,5 +1,5 @@
 import { SearchSelect } from "@/components/search-select";
-import { useEffect, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { Building2, MapPin, ScrollText, Search, Scale, KeyRound } from "lucide-react";
 import { useEconomy } from "@/lib/quire/economy-context";
 import { useSeat } from "@/lib/quire/seat";
@@ -29,6 +29,9 @@ import { LocationOptions } from "./market-locations";
 import { AppLink } from "./app-link";
 import { Button, Field, Select, TextInput, TextArea, Modal } from "./ui";
 import { propertyDraft, readPropertyDraft } from "@/lib/quire/property-draft";
+import { readEstate } from "@/lib/quire/estate-schema";
+import { ESTATE_CATALOGUE } from "@/lib/quire/estate-catalogue";
+import { TemplateWorkshop } from "./property-operations";
 import "./property-marketplace.css";
 
 function PropertyImage({
@@ -488,7 +491,10 @@ export function PropertyMarketplace() {
         open={editing !== null}
         onOpenChange={(open) => {
           if (open || editorState.busy) return;
-          if (editorState.dirty && !window.confirm("Discard your unsaved property listing draft?"))
+          if (
+            editorState.dirty &&
+            !window.confirm("Discard your unsaved property listing or template draft?")
+          )
             return;
           setEditing(null);
         }}
@@ -775,7 +781,14 @@ function PropertyListingEditor({
     [draft, setDraft] = useState(propertyDraft(listing?.property)),
     [busy, setBusy] = useState(false),
     [imageBusy, setImageBusy] = useState(false),
-    [error, setError] = useState("");
+    [error, setError] = useState(""),
+    [creatingPreset, setCreatingPreset] = useState(""),
+    [templateState, setTemplateState] = useState({ dirty: false, busy: false }),
+    [templateNotice, setTemplateNotice] = useState("");
+  const templatePickerId = useId(),
+    templatePanel = useRef<HTMLHeadingElement>(null),
+    listingScroll = useRef(0),
+    returningToListing = useRef(false);
   const { locked, reason } = useFinanceReadiness();
   const [initial, setInitial] = useState(
     JSON.stringify({ name, notes, price, quantity, status, locationId, estateTemplateKey, draft }),
@@ -783,10 +796,27 @@ function PropertyListingEditor({
   const dirty =
     initial !==
     JSON.stringify({ name, notes, price, quantity, status, locationId, estateTemplateKey, draft });
-  useDraftGuard(dirty, "property listing");
+  useDraftGuard(dirty || !!creatingPreset, "property listing or template");
   useEffect(() => {
-    onState({ dirty, busy: busy || imageBusy });
-  }, [dirty, busy, imageBusy, onState]);
+    onState({ dirty: dirty || !!creatingPreset, busy: busy || imageBusy || templateState.busy });
+  }, [dirty, busy, imageBusy, creatingPreset, templateState.busy, onState]);
+  useEffect(() => {
+    if (creatingPreset) {
+      const panel = templatePanel.current;
+      panel?.closest(".modal-pop")?.scrollTo({ top: 0 });
+      panel?.focus({ preventScroll: true });
+    } else if (returningToListing.current) {
+      returningToListing.current = false;
+      const picker = document.getElementById(templatePickerId);
+      picker?.closest(".modal-pop")?.scrollTo({ top: listingScroll.current });
+      picker?.focus({ preventScroll: true });
+    }
+  }, [creatingPreset, templatePickerId]);
+  function returnToListing() {
+    returningToListing.current = true;
+    setCreatingPreset("");
+    setTemplateState({ dirty: false, busy: false });
+  }
   const current = listings.find((l) => l.id === id) ?? null,
     stale = JSON.stringify(current) !== JSON.stringify(before);
   async function save(remove = false) {
@@ -835,6 +865,46 @@ function PropertyListingEditor({
       setBusy(false);
     }
   }
+  if (creatingPreset)
+    return (
+      <section>
+        <h3 ref={templatePanel} tabIndex={-1}>
+          Review operations template
+        </h3>
+        <p>
+          Your listing draft is retained. Review this preset and save the template to select it for
+          the listing. Creating a template does not buy a property or configure an owned ship.
+        </p>
+        <Button
+          variant="secondary"
+          disabled={templateState.busy}
+          onClick={() => {
+            if (window.confirm("Discard this unsaved template and return to your listing draft?"))
+              returnToListing();
+          }}
+        >
+          Return to listing without saving template
+        </Button>
+        <fieldset disabled={templateState.busy || locked}>
+          <TemplateWorkshop
+            state={readEstate(journal.propertyOperations)}
+            initialPreset={creatingPreset}
+            templateOnly
+            onState={setTemplateState}
+            onRecorded={(template, outcome) => {
+              setEstateTemplateKey(template.key);
+              setTemplateNotice(
+                mutationNotice(
+                  outcome,
+                  `${template.name} template saved. Review and save the property listing next.`,
+                ),
+              );
+              returnToListing();
+            }}
+          />
+        </fieldset>
+      </section>
+    );
   return (
     <form
       aria-label="Property listing editor"
@@ -898,16 +968,38 @@ function PropertyListingEditor({
       </Field>
       <Field label="Property operations template">
         <SearchSelect
+          id={templatePickerId}
+          aria-label="Property operations template"
           value={estateTemplateKey}
-          onValueChange={(selectedValue) => setEstateTemplateKey(selectedValue)}
+          disabled={busy || imageBusy || locked}
+          onValueChange={(selectedValue) => {
+            if (selectedValue.startsWith("preset:")) {
+              listingScroll.current =
+                document.getElementById(templatePickerId)?.closest(".modal-pop")?.scrollTop ?? 0;
+              setCreatingPreset(selectedValue.slice(7));
+            } else setEstateTemplateKey(selectedValue);
+          }}
         >
           <option value="">No operations template</option>
-          {journal.propertyOperations?.templates.map((t) => (
-            <option key={t.key} value={t.key}>
-              {t.name}
-            </option>
-          ))}
+          <optgroup label="Saved templates">
+            {journal.propertyOperations?.templates.map((t) => (
+              <option key={t.key} value={t.key}>
+                {t.name}
+              </option>
+            ))}
+          </optgroup>
+          <optgroup label="Create from preset">
+            {ESTATE_CATALOGUE.map(([key, name]) => (
+              <option key={key} value={`preset:${key}`}>
+                {name}
+              </option>
+            ))}
+          </optgroup>
         </SearchSelect>
+        {!journal.propertyOperations?.templates.length && (
+          <p>No saved operations templates yet. Choose a preset to review and save one.</p>
+        )}
+        {templateNotice && <p role="status">{templateNotice}</p>}
       </Field>
       <PropertyProfileFields
         draft={draft}

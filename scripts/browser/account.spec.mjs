@@ -167,15 +167,15 @@ test("ownership", async ({ devices, baseURL: origin }, testInfo) => {
   );
   expect(beforeSheetRetry).toBeTruthy();
   let failRollPolicy = true;
-  await guest.route("**/_serverFn/**", (route) =>
+  const rejectRollPolicy = (route) =>
     failRollPolicy && route.request().postData()?.includes('"policy"')
       ? route.fulfill({
           status: 503,
           contentType: "application/json",
           body: '{"error":"Synthetic unavailable roll policy"}',
         })
-      : route.continue(),
-  );
+      : route.continue();
+  await guest.route("**/_serverFn/**", rejectRollPolicy);
   await guest.getByRole("link", { name: "Home", exact: true }).first().click();
   await guest.getByRole("link", { name: "Character Sheet", exact: true }).click();
   await expect(
@@ -190,6 +190,10 @@ test("ownership", async ({ devices, baseURL: origin }, testInfo) => {
     beforeSheetRetry,
   );
   expect(await guest.evaluate(async () => (await indexedDB.databases()).length)).toBe(0);
+  // The injected outage is over. Routing disables HTTP caching even for an RPC-only
+  // pattern; remove this handler before later cold guest reloads and account resumes.
+  // The fixture's independent external-network boundary remains in place.
+  await guest.unroute("**/_serverFn/**", rejectRollPolicy);
   await guest.getByRole("link", { name: "Home", exact: true }).first().click();
   await guest
     .getByRole("link", { name: "Campaign, messages & session status →", exact: true })
