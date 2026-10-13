@@ -127,7 +127,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Packaged Worker / accounts / worker-account | open | 7 | 25s → 133s | +108s | +432% |
 | deploy / Run actions/upload-artifact@v4 | open | 2 | 1s → 3s | +2s | +200% |
 | Development / accounts / Start disposable development server | open | 2 | 6s → 9s | +3s | +50% |
-| Development / accounts / Run actions/upload-artifact@v4 | open | 2 | 1s → 3s | +2s | +200% |
+| Development / accounts / Run actions/upload-artifact@v4 | open | 3 | 1s → 4s | +3s | +300% |
 | Verify preserved functionality / initial queue | open | 2 | 3s → 94s | +91s | +3033.33% |
 | Development / desktop / Set up job | open | 2 | 1s → 4s | +3s | +300% |
 | Code checks and immutable builds / Run actions/checkout@v4 | open | 2 | 1s → 3s | +2s | +200% |
@@ -288,6 +288,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-13T13:37:27Z | step: Development / accounts / Run actions/upload-artifact@v4 | 3s → 4s | +1s | +33.33% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37302876093/job/111739542079) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38404276239/job/115325337610) |
 | 2026-10-13T13:31:53Z | step: Packaged Worker / interface (balanced v2) / worker-loot | 6s → 7s | +1s | +16.67% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38309026871/job/115010777504) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38404276239/job/115320597368) |
 | 2026-10-13T13:31:46Z | step: Packaged Worker / interface (balanced v2) / worker-library-navigation | 34s → 40s | +6s | +17.65% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38309026871/job/115010777504) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38404276239/job/115320597368) |
 | 2026-10-13T13:29:44Z | step: Packaged Worker / interface (balanced v2) / worker-sound | 25s → 33s | +8s | +32% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38309026871/job/115010777504) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38404276239/job/115320597368) |
