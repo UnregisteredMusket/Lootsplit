@@ -1,0 +1,46 @@
+# Approved current-layout improvements — October 13, 2026
+
+The owner rejected the replacement-layout concepts, chose to keep the live application layout, requested previews first, then approved the five-screen incremental preview with “Looks good.” This implementation starts at verified/live main `a57caad5e01bb7baac23d2ff4042c35efcec3e22` (tree `07f49a4da99de945156b8f43b7296afdeac161cf`). It retains the existing shell, role-aware six primary destinations, player six fixed shortcuts, desktop links, artwork/fonts/themes, fullscreen feature pages and searchable selectors. The DM may retain task-appropriate complexity.
+
+| Surface | Approved improvement | Preservation boundary |
+| --- | --- | --- |
+| Player Home | Portrait and canonical character readout; exact assigned-sheet link; Your services heading | Same purse identity, wallet and six destinations; account and guest ownership unchanged; real router navigation |
+| Character sheet | Compact introduction; Sheet tools groups export/reload; phone dice focus shortcut; larger play controls | Full fields, imports, tabs, vitals, actions, resources, equipment, draft export, reload confirmation, save-before-roll, policies and existing tray remain |
+| Shared status | Compact Retry and Pending changes; actionable draft/offline/attention detail; recovery deep link opens existing support fold and action list | Existing retry/export/import/discard/disconnect and receipt handling remain; accepted server draft membership is readout-only, exact command identity checked; draft is never labeled committed |
+| DM Desk | Destination cues; phone readouts use full width below their icon/label; 3×2 information selectors; clearer tool hints | Six actual swipeable panels, arrows, keyboard/touch input, multiplayer settings, all grouped tools, details and saved shortcut settings remain. Shared status uses the existing global strip; local device status stays visible |
+| Downtime/training | Available/pending/allocated hour bar plus text; participant, activity/time and description/context groups; period-specific day summary; full rules disclosure | Same commands, canonical captured budgets/conversions, descriptions, category/teacher totals, current/lifetime history, settings, eligibility/historical notes, reviews, reservations and manual resets. No refunds, character edits or rewards added |
+
+No migration, dependency/framework change, new backend service, gameplay rule, automatic reward, API/protocol change or separately distributed APK. The only client readout addition counts exact local pending actions appearing in the last accepted same-seat server draft; it grants no authority and changes no stored campaign data. Offline/unknown/error states cannot claim a current fully confirmed draft. Older saves, imported records, exports, privacy projections, room lifecycle, turn/live play, guest-memory recovery and authoritative commit logic remain.
+
+## Verification
+
+Local Node22.23.3/npm10.9.4 with locked dependencies. Required Playwright Chromium1243 installation is blocked locally: OS dependency installation lacks setgroups permission and the download returns truncated ZIP data. A compatible custom Chromium153.0.8010.0 runs local diagnostics; it does not replace the locked browser release gates or establish physical Android/Safari coverage. An initial separate-process server connection failed because executor commands use separate network namespaces; diagnostic server and audits now run together. No production data is used.
+
+- Character audit passed: account/campaign sheets, imports, editing, dirty export, cancelled reload, restored focus, mobile sticky save and dice shortcut, permissions, exact rolls/receipts, inventory and manual policy.
+- Downtime audit passed at1280/390: guest Home link, canonical approved budget, searchable participants, descriptions, missing-sheet DM review, historical approval, category/teacher counters and manual resets retaining lifetime/spent hours.
+- Control-panel audit passed at320/390/768/1440: all six panels, native horizontal input, jump/arrows, room entry, grouped tools, saved shortcuts, themes and role settings. Screenshots inspected for retained atmosphere and wrapping.
+- Campaign-governance audit passed: real Home-to-exact-sheet router link on a phone, same document/no title replay, fixed buttons, guest/privacy, repayment, property permissions, editing policy, play, archives, room lifecycle and owner tools. A new extra cold helper visit initially changed the fixture's return context; the test now follows the user's real Home link and keeps its marker, retaining all original checks.
+- `verify:focus -- portrait-resume` passed42.1s: interrupted upload retains work, compact Retry, Pending changes opens the action list, no duplicate upload, confirmed server turn draft remains uncommitted, membership and portrait recovery remain.
+- `verify:quick` passed998 tests/four existing skips, types, lint zero errors/30 existing warnings. The subsequent exact-draft membership regression plus room-state/integrity cases passed42/42. An initial brand CLI test failed because the executor's injected experimental proxy warning polluted stderr JSON; local rerun suppresses runtime warnings only (`NODE_NO_WARNINGS=1`), without changing assertions, application code or CI.
+- Web and bundled mobile builds passed; final types/lint and diff checks passed. The last new conversion wording distinguishes singular day from days; fresh CI verifies final source.
+
+Fresh all-nine PR/main preservation jobs, current-browser development and independent immutable Worker audits, standby publication, website upload/runtime policy and read-only live checks remain mandatory. Store evolving exact head/tree/PR/run/publication identities in PR metadata and ignored `test-results/recovery/current-layout.json`; do not churn source to record running jobs. Website publication authorization persists. The signed Android1.7.0/code10 artifact is unchanged; a native distribution is a separate release.
+
+## Performance history review
+
+Latest fetched `performance-history` contains990 retained qualifying observations;72 are newer than the918 reviewed at the functional-foundation checkpoint:60 steps,10 jobs,1 queue and1 workflow. Latest recorder38371036217 succeeded; capture cursor is2026-10-12T21:35:46.822Z with one retained older pending run37642398740. Current run metadata shows successful foundation main38310299946, website38311362171 and standby38311362083; these are completed, not pending recovery actions.
+
+Review all retained observations at [performance history](https://github.com/UnregisteredMusket/Lootsplit/tree/performance-history). >=15% is inclusive; no historical entry/reference is removed or reset by this UI work. The new rows include setup/cache/check/build noise at second-resolution, a cancelled partial gameplay group, expanded individual audit workloads, Android wrapper work and successful complete stages. None measures production UI latency or establishes a confirmed application slowdown. Group totals must retain their outcomes and scopes; cancelled and differently distributed work cannot prove a same-workload regression/fix.
+
+| Relevant retained observation | Before → logged | Added / increase | Assessment and next comparison |
+| --- | --- | --- | --- |
+| Main38310299946 finance |36s→44s|8s /22.22%|Successful audit; compare same named stage at exact new PR/main source |
+| Main38310299946 trade economy |84s→102s|18s /21.43%|Retain previous29s→102s expanded PR observation too; do not reset from one faster run |
+| Main38310299946 control panel |25s→29s|4s /16%|This change adds real entry/focus/recovery checks; preserve full assertions and compare logged stage |
+| Main38310299946 library navigation |42s→51s|9s /21.43%|Unchanged Library functionality; keep open historical signal |
+| PR38303829968 navigation |38s→115s|77s /202.63%|Successful larger UI workload; separate coverage growth from runtime cause |
+| Android38305743849 full wrapper |496s→1128s|632s /127.42%|Includes verification and signed packaging; Worker-interface group155s→761s added606s. It is not website interaction latency; no APK rebuild in this task |
+
+The10 job rows include cancelled gameplay215s→394s, successful PR gameplay394s→544s and desktop472s→567s, main code checks115s→140s, Android standby128s→166s/accounts160s→193s/governance221s→394s/interface155s→761s/gate6s→8s, and main gameplay462s→548s. The queue28s→38s is waiting, not execution. Related individual spikes include market locations31s→65s, Android governance67s→113s/sound7s→39s/help14s→69s, and Worker Help10s→58s; retained smaller observations remain in the linked log. Causes remain unconfirmed without comparable tracing; no unrelated timing fix is claimed. New release durations are automatically recorded with unchanged scope and threshold. Local diagnostic runs use a different browser/environment and new assertions, so their times are not compared to GitHub or earlier workloads.
+
+Both role Help guides, feature inventory, handoff and README are reconciled. Coding manual and release procedures were reviewed; their commands/gates remain unchanged. No new third-party content requires attribution. Rollback is a verified revert through the same gates, with no data migration or balance changes.

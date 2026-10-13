@@ -77,6 +77,8 @@ const initialView = {
   revision: 0,
   seatId: "",
   pending: 0,
+  // Readout only: exact local actions present in the last accepted server draft.
+  staged: 0,
   status: "local" as SyncState,
   error: "",
   lastSync: 0,
@@ -461,6 +463,9 @@ async function accept(value: RoomView, committed = false) {
       seatId: remote.seatId,
       revision: remote.revision,
       pending: s.pending.length,
+      staged: s.pending.filter((command) =>
+        draft.some((saved) => saved.id === command.id && sameCommand(saved, command)),
+      ).length,
       status: s.pending.length ? (view.error ? "attention" : "pending") : "synced",
       error: s.pending.length ? view.error : "",
       lastSync: Date.now(),

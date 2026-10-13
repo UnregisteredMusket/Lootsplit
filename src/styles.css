@@ -3287,6 +3287,78 @@ input,select,textarea { max-width: 100%; }
 .barter-workspace { align-items:stretch; }
 .barter-side { grid-template-rows:minmax(0,1fr) auto; }
 .barter-table .world-form .barter-search input { padding-left:1.9rem; }
+
+/* Approved current-layout improvements: retain the shell, artwork and theme tokens. */
+.player-character {
+  display: grid;
+  grid-template-columns: 64px minmax(0, 1fr);
+  gap: .6rem .85rem;
+  align-items: center;
+}
+.player-character > .ledger-art { width: 64px; height: 80px; object-fit: cover; border-radius: 8px; }
+.player-character-details { min-width: 0; }
+.player-character-details h2 { overflow-wrap: anywhere; font-size: 1.65rem; line-height: 1.15; }
+.player-character-details p { margin: .25rem 0; }
+.player-character-details .eyebrow { font-size: .65rem; }
+.player-sheet-link {
+  grid-column: 1 / -1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 48px;
+  padding: .6rem;
+  border: 1px solid var(--color-lead);
+  border-radius: 7px;
+  color: var(--color-lead);
+}
+.player-home .desk-shortcuts > h2 { margin: .5rem 0 .75rem; font-size: 1.4rem; }
+.sheet-tools-actions { display: grid; gap: .75rem; }
+.sheet-tools-actions button {
+  min-height: 44px;
+  padding: .65rem;
+  border: 1px solid var(--color-border);
+  border-radius: 6px;
+  background: var(--color-subtle);
+}
+.sheet-tools-actions button:disabled { opacity: .5; }
+.sheet-dice-jump { display: none; }
+.sync-status-label { min-width: 0; overflow-wrap: anywhere; }
+.sync-save-detail { margin: .4rem 0 0; }
+.sync-recovery-actions { display: flex; align-items: center; gap: 1rem; flex-wrap: wrap; margin-top: .6rem; }
+.sync-recovery-actions a, .sync-status a { display: inline-flex; align-items: center; min-height: 44px; }
+#pending-changes { scroll-margin-top: 8rem; }
+.desk-pinned-readouts .readout-action { color: var(--color-lead); margin-top: .35rem; }
+.information-controls button { min-width: 44px; min-height: 44px; }
+.downtime-rules { margin: .5rem 0 .75rem; font-size: .85rem; }
+.downtime-rules summary { min-height: 44px; cursor: pointer; align-content: center; }
+.downtime-rules p { margin: .5rem 0; }
+.downtime-character-budget { margin: .75rem 0; min-width: 0; }
+.downtime-character-budget p { margin: 0 0 .35rem; overflow-wrap: anywhere; }
+.downtime-character-budget small { color: var(--color-muted); }
+.downtime-budget-bar { display: flex; height: 10px; border: 1px solid var(--color-border); border-radius: 5px; overflow: hidden; background: var(--color-subtle); margin: .35rem 0; }
+.downtime-budget-bar .budget-allocated { background: var(--color-lead); }
+.downtime-budget-bar .budget-pending { background: repeating-linear-gradient(135deg, var(--color-lead) 0 2px, var(--color-elevated) 2px 5px); }
+.hourly-downtime .world-form .training-step { border: 1px solid var(--color-border); border-radius: 8px; padding: .75rem; grid-template-columns: repeat(2, minmax(0, 1fr)); }
+.training-step legend { font-family: var(--font-display); font-size: 1.15rem; padding: 0 .3rem; }
+.training-step .training-allocation-summary, .training-step:has(textarea) > label { grid-column: 1 / -1; }
+.training-allocation-summary, .training-recipient-context { font-size: .85rem; overflow-wrap: anywhere; }
+.hourly-downtime > .journal-entry > p { font-size: .85rem; }
+@media (max-width: 700px) {
+  .concept-shell .play-sheet .character-savebar button,
+  .concept-shell .play-sheet .play-mode-switch button,
+  .concept-shell .play-sheet .play-action-rolls .quick-roll button,
+  .concept-shell .play-sheet .character-tablist [role=tab] { min-height: 44px; }
+  .concept-shell .sheet-dice-jump { display: inline-flex; align-items: center; min-height: 44px; margin: .5rem .5rem .5rem 0; }
+  .play-action-rolls { gap: .65rem; }
+  .swipe-dm-desk .desk-pinned-readouts .readout { display: grid; grid-template-columns: 24px minmax(0, 1fr); align-content: start; }
+  .desk-pinned-readouts .readout > span { display: contents; }
+  .desk-pinned-readouts .readout > .fantasy-icon { align-self: start; }
+  .desk-pinned-readouts .readout small:first-child { align-self: center; }
+  .desk-pinned-readouts .readout strong,
+  .desk-pinned-readouts .readout small:not(:first-child) { grid-column: 1 / -1; overflow-wrap: break-word; }
+  .information-selectors { display: grid; grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .hourly-downtime .world-form .training-step { grid-template-columns: minmax(0, 1fr); padding: .6rem; }
+}
 /* Reviewed commodity definitions use the existing trading palette. */
 .commodity-catalog-list { display: grid; gap: .4rem; margin-block: .75rem; }
 .commodity-catalog-row { display: flex; align-items: center; gap: .75rem; padding: .65rem; border: 1px solid var(--color-border); background: var(--color-subtle); }

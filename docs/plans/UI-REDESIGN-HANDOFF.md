@@ -1,6 +1,6 @@
-# UI redesign after the functional foundation
+# Current-layout improvement direction
 
-The owner wants a separate UI redesign because the current organization no longer fits the application's feature set. Start from the complete feature review, `docs/FEATURE-INVENTORY.md`, `docs/REDESIGN.md` and the current verified source. The report foundation is implemented in PR105; exact website/Android publication evidence is recorded in its audit and recovery checkpoint. This document adds no UI or gameplay changes.
+After reviewing replacement concepts, the owner chose to retain and improve the live layout. The October 13 five-screen incremental preview was approved with “Looks good”: Player Home, character sheet, sync/recovery, DM Desk and downtime/training. Preserve the current atmosphere, navigation and recent searchable selectors; DM surfaces may retain the complexity their tasks need. Start from the complete feature review, `docs/FEATURE-INVENTORY.md`, `docs/REDESIGN.md` and the current verified source. The report foundation is implemented in PR105; exact website/Android publication evidence is recorded in its audit and recovery checkpoint. The first pass is presentation and access only; see the October 13 audit. Earlier full-replacement concepts are research, not the implementation direction.
 
 ## Preserve these role boundaries
 

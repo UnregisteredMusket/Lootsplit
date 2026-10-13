@@ -1006,6 +1006,12 @@ test("portrait-resume", async ({ devices, baseURL: origin }) => {
   await expect.poll(() => blocked).toBeGreaterThan(0);
   await expect(phone.getByText("Portrait saved", { exact: true })).toHaveCount(0);
   await expect(phone.getByText(/Portrait kept on this device.*not synced/)).toBeVisible();
+  await expect(phone.locator(".sync-status").getByRole("button", { name: "Retry", exact: true })).toBeVisible();
+  await phone.locator(".sync-status").getByRole("link", { name: "Pending changes →", exact: true }).click();
+  await expect(phone.locator("#pending-changes")).toHaveAttribute("open", "");
+  await expect(phone.locator("#pending-changes ol li")).toHaveCount(1);
+  await navigateAccountScenario(phone, origin, "/party?section=funds");
+  await phone.locator(`#${id} > summary`).click();
   const pendingPortrait = await phone.locator(`#${id} .portrait-picker img`).getAttribute("src");
   expect(pendingPortrait).not.toBe(portrait);
   await expect(restored.locator(".portrait-picker img")).toHaveAttribute("src", portrait);
@@ -1061,6 +1067,7 @@ test("portrait-resume", async ({ devices, baseURL: origin }) => {
       exact: true,
     }),
   ).toBeVisible();
+  await expect(desktop.locator(".sync-save-detail")).toContainText("Turn saved to room. Changes are not committed");
   await navigateAccountScenario(desktop, origin, "/account");
   await desktop.getByRole("button", { name: "Save current membership", exact: true }).click();
   await expect(

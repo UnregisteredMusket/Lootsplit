@@ -22,8 +22,6 @@ import { useSheetReadouts, HpBar } from "./readouts";
 import { InformationStrip } from "./information-strip";
 import { MarketReadout } from "./market-readout";
 import type { Purse } from "@/lib/quire/types";
-import { roomStatusLabels } from "@/lib/quire/room-state";
-import { getOnline, subscribeOnline } from "@/lib/mobile/online";
 type Roll = NonNullable<Purse["rolls"]>[number];
 
 export function DmDesk() {
@@ -38,8 +36,6 @@ function DmDeskContents() {
   const campaigns = useSyncExternalStore(subscribeCampaigns, getCampaigns, serverCampaigns),
     room = useSyncExternalStore(subscribeCloudTable, getCloudTable, getServerCloudTable);
   const search = useRouterState({ select: (s) => s.location.searchStr });
-  const online = useSyncExternalStore(subscribeOnline, getOnline, () => true);
-  const status = roomStatusLabels(room, { online, ready });
   const savedShortcuts = new URLSearchParams(search).get("customize") === "1";
   const [encounter, setEncounter] = useState<{
       name: string;
@@ -154,12 +150,11 @@ function DmDeskContents() {
           <Guide />
         </div>
         <div className="desk-connection-row">
-          <p className="desk-status">
-            <span className={room.status === "attention" ? "status-attention" : "status-dot"} />
-            {[status.mode, status.room, status.play, status.turn, status.save]
-              .filter(Boolean)
-              .join(" · ")}
-          </p>
+          {!room.joined && (
+            <p className="desk-status">
+              {ready ? "DM device campaign · Saved on device" : "Opening campaign…"}
+            </p>
+          )}
           <AppLink href="/share?tab=room" className="multiplayer-settings">
             <Users size={18} />
             Multiplayer settings
@@ -178,6 +173,7 @@ function DmDeskContents() {
                   : encounterState || "Choose encounter"}
               </strong>
               {encounter && <small>{encounter.name}</small>}
+              <small className="readout-action">Open encounter →</small>
             </span>
           </AppLink>
           <AppLink href="/features/review?from=%2F" className="readout">
@@ -199,6 +195,7 @@ function DmDeskContents() {
                       : " · Imports loading…"
                   : " · Imports online"}
               </small>
+              <small className="readout-action">Open Review Inbox →</small>
             </span>
           </AppLink>
         </div>

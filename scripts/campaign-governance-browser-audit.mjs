@@ -379,6 +379,16 @@ try {
   await player.page.setViewportSize({ width: 390, height: 844 });
   await visit(player.page, "/");
   await player.page.getByRole("heading", { name: "Home", exact: true }).waitFor();
+  await player.page.evaluate(() => { window.playerSheetEntry = "same-document"; });
+  const directSheet = player.page.getByRole("link", { name: "Open character sheet →", exact: true });
+  await expect(directSheet).toHaveAttribute("href", "/characters?id=party%3Ahero");
+  await directSheet.click();
+  await expect(player.page.locator(".character-title")).toBeVisible();
+  assert.equal(await player.page.evaluate(() => window.playerSheetEntry), "same-document");
+  await expect(player.page.locator(".loot-opening")).toHaveCount(0);
+  await player.page.locator('nav[aria-label="Sections"]:visible').getByRole("link", { name: "Home", exact: true }).click();
+  await player.page.getByRole("heading", { name: "Home", exact: true }).waitFor();
+  assert.equal(await player.page.evaluate(() => window.playerSheetEntry), "same-document");
   // Hold a local storage fault through background refreshes until Retry is tested.
   // A one-shot fault can be consumed by a concurrent campaign snapshot read.
   await player.page.evaluate(async () => {

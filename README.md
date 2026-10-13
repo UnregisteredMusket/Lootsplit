@@ -36,7 +36,7 @@ Player Home shows six fixed icon buttons for everyone, including guests: Charact
 
 Player Home links to the full Character Sheet, Inventory, Campaign/chat and existing tools. Campaign funds remain separate from standalone account characters. Property descriptions never grant authority to change price, ownership or income. Foreclosures and new special-property purchase rules are not included.
 
-If a character sheet cannot load its campaign roll settings, **Retry character sheet** retries in the same tab while preserving the room connection and pending guest actions. Retry never enables manual rolls without the DM's permission. Save or export drafts before using the separate **Reload sheet** control; guests should submit pending actions before refreshing the whole page.
+If a character sheet cannot load its campaign roll settings, **Retry character sheet** retries in the same tab while preserving the room connection and pending guest actions. Retry never enables manual rolls without the DM's permission. Save or export drafts before using the **Sheet tools → Reload sheet** control; guests should submit pending actions before refreshing the whole page.
 
 **Deployment requirement:** Migration `0010_account_shortcuts.sql` is additive and was applied to production on October 6, 2026. New installations still require it; the fixed player buttons require no additional migration. No new APK or domain change is included.
 
@@ -126,3 +126,5 @@ Maps, location NPCs, bilateral barter, black-market vendors and session time: [f
 Ships and private shipyards are managed inside Property Management, using existing custody, staff, projects and reviewed downtime. See [the ship guide](docs/SHIPS.md) for setup, 5e-style physical stats, costs, voyages and the DM teleport override. New features require both role Help and developer-manual review.
 
 Map icons show the selected record or combat token with a blue fill and ring. Selection follows record details and the DM token selector; campaign map data and player visibility remain unchanged.
+
+The October 13 current-layout improvements retain the existing navigation, themes, searchable selectors and campaign commands. Player Home opens the exact assigned sheet; Sheet tools groups export/reload; the shared strip links directly to pending recovery; DM readouts and phone selectors wrap more clearly; downtime groups training fields and displays the captured-period hour budget. See [preservation audit](docs/audit/2026-10-13-current-layout.md).

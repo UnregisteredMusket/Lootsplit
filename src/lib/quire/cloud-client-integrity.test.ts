@@ -93,7 +93,7 @@ function acceptance(pending: Command[], acknowledged: string[], draft: Command[]
   };
   let displayed: ReturnType<typeof table> | undefined;
   let error = "";
-  const view = { error: "" };
+  const view = { error: "", staged: 0 };
   const body = source.slice(
     source.indexOf("async function accept("),
     source.indexOf("async function refresh("),
@@ -124,7 +124,7 @@ function acceptance(pending: Command[], acknowledged: string[], draft: Command[]
     () => {},
     () => ({}),
     () => {},
-    () => {},
+    (next: object) => { Object.assign(view, next); },
     () => {},
     applyCommand,
     (e: Error) => {
@@ -133,8 +133,24 @@ function acceptance(pending: Command[], acknowledged: string[], draft: Command[]
     },
     sameCommand,
   );
-  return { session, remote, accept, displayed: () => displayed, error: () => error };
+  return { session, remote, accept, displayed: () => displayed, error: () => error, staged: () => view.staged };
 }
+
+test("the saved-turn readout counts only exact accepted draft actions, excluding conflicts and receipts", async () => {
+  const a = give("saved-turn-action", 100), b = give("device-only-action", 200);
+  const partial = acceptance([a, b], [], [a]);
+  await partial.accept(partial.remote);
+  assert.equal(partial.staged(), 1);
+  assert.equal(partial.session.pending.length, 2);
+  const conflict = acceptance([a], [], [give(a.id, 250)]);
+  await conflict.accept(conflict.remote);
+  assert.equal(conflict.staged(), 0);
+  assert.match(conflict.error(), /different changes/);
+  const committed = acceptance([a], [a.id], [a]);
+  await committed.accept(committed.remote);
+  assert.equal(committed.staged(), 0);
+  assert.equal(committed.session.pending.length, 0);
+});
 
 test("actual acceptance drops acknowledged delayed drafts and hydrates the authoritative table", async () => {
   const a = give("already-committed", 100);

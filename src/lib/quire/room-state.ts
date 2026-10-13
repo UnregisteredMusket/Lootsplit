@@ -18,10 +18,30 @@ export type RoomStatusInput = RoomLifecycle & {
   mine?: boolean;
   who?: string;
   pending: number;
+  staged?: number;
   status: "local" | "synced" | "pending" | "saving" | "attention";
   lastSync?: number;
   error?: string;
 };
+
+/** A server draft is recoverable turn work, never a committed campaign change. */
+export function roomSaveDetail(state: RoomStatusInput, { online = true } = {}) {
+  if (!state.joined || state.lastSync === 0) return "";
+  if (!online)
+    return state.pending
+      ? "Pending work remains in this document. Reconnect to confirm its server copy."
+      : "Reconnect to confirm the latest campaign state.";
+  if (state.pending) {
+    if (state.error || state.status === "attention")
+      return "Pending changes are retained. Retry or inspect them before leaving.";
+    if (!state.live && state.staged === state.pending)
+      return "Turn saved to room. Changes are not committed until you submit your turn.";
+    return state.live
+      ? "Changes are pending on this device; campaign confirmation is still needed."
+      : "Turn changes are pending in this document; their server draft is not fully confirmed.";
+  }
+  return "";
+}
 
 /** Keep connection, play permission and save acknowledgement separate. */
 export function roomStatusLabels(
