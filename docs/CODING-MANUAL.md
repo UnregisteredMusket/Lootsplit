@@ -12,7 +12,7 @@ Read this at the start of every task, including a new chat, recovered workspace,
 
 ## 2. Define the smallest useful reproduction
 
-For a campaign character-sheet load failure, distinguish the canonical sheet/wallet projection from the separate manual-roll policy read. Validate the policy's boolean before rendering controls; an absent response must not grant permission or strand a guest. Verify the real Retry character sheet button in the same document after an injected policy transport failure, with the room seat and guest memory preserved. Do not recommend clearing storage to recover a failed read.
+For a campaign character-sheet load failure, distinguish the canonical sheet/wallet projection from the separate manual-roll policy read. Validate the policy's boolean before rendering controls; an absent response must not grant permission or strand a guest. Verify the real Retry character sheet button in the same document after an injected policy transport failure, with the room seat and guest memory preserved. Do not recommend clearing storage to recover a failed read. After the policy-retry assertions finish, remove only the temporary injected RPC route; leaving it active disables page HTTP caching during later cold reload/account-resume checks. Keep the independent external-network boundary and every ownership/recovery assertion,60s case/170s suite limits,2workers and zero retries.
 
 Write down the behavior being changed, the affected data/permissions, and one exact acceptance scenario. For a bug, demonstrate that the scenario fails before changing the implementation where practical. Read existing helpers and tests before creating another implementation.
 
