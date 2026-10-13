@@ -1,4 +1,5 @@
 import { chooseOption } from "./search-select-browser.mjs";
+import { emptyCoins, toCopper } from "../src/lib/quire/money.ts";
 import assert from "node:assert/strict";
 import { chromium } from "playwright";
 import { expect } from "playwright/test";
@@ -27,6 +28,8 @@ let currentPage;
 async function device(width, guest = false) {
   const context = await browser.newContext({
     viewport: { width, height: 950 },
+    hasTouch: width < 600,
+    isMobile: width < 600,
     serviceWorkers: "block",
     extraHTTPHeaders: {
       "cf-connecting-ip": `2001:db8:${crypto.randomUUID().slice(0, 4)}:${crypto.randomUUID().slice(0, 4)}::1`,
@@ -232,6 +235,132 @@ try {
       }
     });
     await reloadApplication(dm);
+    const holdingsBeforePreset = await rows(dm, "holdings"),
+      pursesBeforePreset = await rows(dm, "purses");
+    // Review a built-in ship preset from an otherwise empty campaign without losing the listing draft.
+    await dm.getByRole("button", { name: "New property listing", exact: true }).click();
+    const setup = dm.getByRole("dialog", { name: "Post a property deed", exact: true });
+    await setup
+      .getByLabel("Listing name", { exact: true })
+      .fill("The Dawnward Star — retained draft");
+    await setup.getByLabel("Listing asking price", { exact: true }).fill("1200 gp");
+    const templatePicker = setup.getByLabel("Property operations template", { exact: true });
+    await chooseOption(templatePicker, "preset:ship");
+    await expect(setup.getByRole("heading", { name: "Review operations template" })).toBeFocused();
+    await expect(setup.getByLabel("Template name", { exact: true })).toHaveValue("Owned ship");
+    assert.equal((await listings(dm)).length, 0, "Opening a preset does not publish a listing");
+    assert.equal(
+      (await rows(dm, "meta")).find((r) => r.id === "journal")?.value?.propertyOperations?.templates
+        ?.length ?? 0,
+      0,
+      "Opening a preset does not save it",
+    );
+    // Cancellation is explicit and restores the original draft and selection focus.
+    dm.once("dialog", (dialog) => dialog.accept());
+    await setup
+      .getByRole("button", { name: "Return to listing without saving template", exact: true })
+      .click();
+    await expect(templatePicker).toBeFocused();
+    await expect(setup.getByLabel("Listing name", { exact: true })).toHaveValue(
+      "The Dawnward Star — retained draft",
+    );
+    await chooseOption(templatePicker, "preset:ship");
+    await setup.getByLabel("Template key", { exact: true }).fill(`audit-ship-${width}`);
+    await setup.getByRole("button", { name: "Save", exact: true }).click();
+    await expect(templatePicker).toHaveAttribute("data-value", `audit-ship-${width}`);
+    assert.ok(
+      (await rows(dm, "meta"))
+        .find((r) => r.id === "journal")
+        ?.value?.propertyOperations?.templates.some(
+          (t) => t.key === `audit-ship-${width}` && t.ship,
+        ),
+      "Saved preset contains the existing ship configuration",
+    );
+    assert.deepEqual(
+      await rows(dm, "holdings"),
+      holdingsBeforePreset,
+      "Template setup creates no holdings or deeds",
+    );
+    const pursesAfterPreset = await rows(dm, "purses");
+    for (const prior of pursesBeforePreset)
+      assert.equal(
+        toCopper({ ...emptyCoins(), ...pursesAfterPreset.find((p) => p.id === prior.id)?.coins }),
+        toCopper({ ...emptyCoins(), ...prior.coins }),
+        "Template setup preserves each original wallet balance",
+      );
+    assert.equal(
+      pursesAfterPreset.reduce((n, p) => n + toCopper({ ...emptyCoins(), ...p.coins }), 0),
+      pursesBeforePreset.reduce((n, p) => n + toCopper({ ...emptyCoins(), ...p.coins }), 0),
+      "Template setup creates and spends no money",
+    );
+    await expect(templatePicker).toBeFocused();
+    await expect(setup.getByLabel("Listing asking price", { exact: true })).toHaveValue("1200 gp");
+    assert.equal(
+      (await listings(dm)).length,
+      0,
+      "Saving a template does not publish or buy the draft",
+    );
+    if (width < 600) {
+      const typePicker = setup.getByLabel("Property type", { exact: true });
+      await typePicker.click();
+      const menu = dm.locator(".record-select-menu:visible"),
+        list = menu.getByRole("listbox");
+      await expect(menu.getByRole("combobox")).toBeFocused();
+      // Let modal positioning finish before choosing gesture coordinates; no fixed sleeps.
+      await dm
+        .locator(".modal-pop")
+        .evaluate((e) => Promise.all(e.getAnimations().map((a) => a.finished)));
+      const before = await dm.evaluate(() => ({
+        page: scrollY,
+        dialog: document.querySelector(".modal-pop").scrollTop,
+      }));
+      const box = await list.boundingBox(),
+        session = await dm.context().newCDPSession(dm);
+      await session.send("Input.dispatchTouchEvent", {
+        type: "touchStart",
+        touchPoints: [{ x: box.x + box.width / 2, y: box.y + box.height * 0.75 }],
+      });
+      for (let step = 1; step <= 8; step++) {
+        await session.send("Input.dispatchTouchEvent", {
+          type: "touchMove",
+          touchPoints: [{ x: box.x + box.width / 2, y: box.y + box.height * 0.75 - step * 20 }],
+        });
+        await dm.evaluate(() => new Promise(requestAnimationFrame));
+      }
+      await session.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
+      await expect.poll(() => list.evaluate((e) => e.scrollTop)).toBeGreaterThan(0);
+      assert.deepEqual(
+        await dm.evaluate(() => ({
+          page: scrollY,
+          dialog: document.querySelector(".modal-pop").scrollTop,
+        })),
+        before,
+        "Touch scroll stays inside the menu",
+      );
+      await menu.getByRole("combobox").press("Escape");
+      await expect(typePicker).toBeFocused();
+      // A shorter phone viewport models the space left by browser chrome/keyboard.
+      await dm.setViewportSize({ width: 390, height: 430 });
+      await templatePicker.click();
+      await expect
+        .poll(() =>
+          menu.evaluate((e) => {
+            const b = e.getBoundingClientRect(),
+              v = visualViewport;
+            return b.top >= v.offsetTop - 1 && b.bottom <= v.offsetTop + v.height + 1;
+          }),
+        )
+        .toBe(true);
+      await menu.getByRole("combobox").fill("private shipyard");
+      await expect(menu.getByRole("option")).toHaveCount(1);
+      await menu.getByRole("combobox").press("Escape");
+      await expect(templatePicker).toBeFocused();
+      await dm.setViewportSize({ width, height: 950 });
+      await session.detach();
+    }
+    dm.once("dialog", (dialog) => dialog.accept());
+    await setup.getByRole("button", { name: "Close", exact: true }).click();
+    await expect(setup).toHaveCount(0);
     async function createProperty(name, location, type, price, images = false) {
       await dm.getByRole("button", { name: "New property listing", exact: true }).click();
       const dialog = dm.getByRole("dialog", { name: "Post a property deed" });
@@ -409,9 +538,13 @@ try {
     "PASS: desktop/mobile property publishing/images, shared light/dark themes, 320px editor fit, location filters, comparison, reserve/reload, real shared purchase and deed rendering, character transfer, recipient reload, sale removal, receipt preservation and memory-only guests.",
   );
 } catch (error) {
+  console.error(error);
   if (currentPage && !currentPage.isClosed()) {
     await currentPage.screenshot({ path: `${output}/failure.png`, fullPage: true });
-    console.error((await currentPage.locator("main").innerText()).slice(-4500));
+    const main = currentPage.locator("main");
+    console.error(
+      (await ((await main.count()) ? main : currentPage.locator("body")).innerText()).slice(-4500),
+    );
   }
   throw error;
 } finally {

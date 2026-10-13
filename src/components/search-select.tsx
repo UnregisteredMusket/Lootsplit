@@ -2,11 +2,13 @@ import {
   Children,
   Fragment,
   isValidElement,
+  useEffect,
   useId,
   useMemo,
   useRef,
   useState,
   type ReactNode,
+  type CSSProperties,
   type SelectHTMLAttributes,
 } from "react";
 import * as Popover from "@radix-ui/react-popover";
@@ -76,8 +78,26 @@ export function SearchSelect({
     [query, setQuery] = useState(""),
     [limit, setLimit] = useState(60),
     [active, setActive] = useState(0);
+  const [viewport, setViewport] = useState<{ width: number; height: number } | null>(null);
   const button = useRef<HTMLButtonElement>(null),
-    input = useRef<HTMLInputElement>(null);
+    input = useRef<HTMLInputElement>(null),
+    list = useRef<HTMLDivElement>(null);
+  useEffect(() => {
+    if (!open || disabled) return;
+    const visible = window.visualViewport;
+    const measure = () =>
+      setViewport({
+        width: visible?.width ?? window.innerWidth,
+        height: visible?.height ?? window.innerHeight,
+      });
+    measure();
+    visible?.addEventListener("resize", measure);
+    window.addEventListener("resize", measure);
+    return () => {
+      visible?.removeEventListener("resize", measure);
+      window.removeEventListener("resize", measure);
+    };
+  }, [open, disabled]);
   const listId = useId(),
     current = String(value ?? defaultValue ?? "");
   const terms = normalize(query).trim().split(/\s+/).filter(Boolean);
@@ -91,6 +111,7 @@ export function SearchSelect({
   }
   return (
     <Popover.Root
+      modal
       open={open && !disabled}
       onOpenChange={(next) => {
         setOpen(next);
@@ -144,14 +165,30 @@ export function SearchSelect({
           {children}
         </select>
       </div>
-      <Popover.Portal container={button.current?.closest("dialog") ?? undefined}>
+      <Popover.Portal
+        container={
+          button.current?.closest('dialog, [role="dialog"], [role="alertdialog"]') ?? undefined
+        }
+      >
         <Popover.Content
           className="record-select-menu"
+          style={
+            viewport
+              ? ({
+                  "--record-select-visible-width": `${Math.max(0, viewport.width - 24)}px`,
+                  "--record-select-visible-height": `${Math.max(0, viewport.height - 24)}px`,
+                } as CSSProperties)
+              : undefined
+          }
           sideOffset={6}
           collisionPadding={12}
           onOpenAutoFocus={(e) => {
             e.preventDefault();
-            input.current?.focus();
+            input.current?.focus({ preventScroll: true });
+          }}
+          onCloseAutoFocus={(e) => {
+            e.preventDefault();
+            button.current?.focus({ preventScroll: true });
           }}
         >
           <div className="record-select-search">
@@ -181,9 +218,14 @@ export function SearchSelect({
                     if (!shown[next].disabled) break;
                   }
                   setActive(next);
-                  document
-                    .getElementById(`${listId}-${next}`)
-                    ?.scrollIntoView({ block: "nearest" });
+                  const option = document.getElementById(`${listId}-${next}`);
+                  if (option && list.current) {
+                    const row = option.getBoundingClientRect(),
+                      bounds = list.current.getBoundingClientRect();
+                    if (row.top < bounds.top) list.current.scrollTop += row.top - bounds.top;
+                    else if (row.bottom > bounds.bottom)
+                      list.current.scrollTop += row.bottom - bounds.bottom;
+                  }
                 }
                 if (e.key === "Enter") {
                   e.preventDefault();
@@ -193,6 +235,7 @@ export function SearchSelect({
             />
           </div>
           <div
+            ref={list}
             id={listId}
             role="listbox"
             aria-label={label ?? "Records"}

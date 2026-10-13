@@ -5,12 +5,12 @@ import {
   ShipVoyageReviews,
 } from "./ship-management";
 import { SearchSelect } from "@/components/search-select";
-import { useState, useSyncExternalStore, type ReactNode } from "react";
+import { useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
 import { useEconomy } from "@/lib/quire/economy-context";
 import { useSeat } from "@/lib/quire/seat";
 import { getCloudTable, getServerCloudTable, subscribeCloudTable } from "@/lib/quire/cloud-client";
 import { useDraftGuard } from "@/lib/quire/use-draft-guard";
-import { mutationNotice } from "@/lib/quire/mutation-outcome";
+import { mutationNotice, type EconomyMutationOutcome } from "@/lib/quire/mutation-outcome";
 import { canonicalJson } from "@/lib/quire/canonical-json";
 import { formatCopper } from "@/lib/quire/money";
 import { emptyCloudTable } from "@/lib/quire/cloud";
@@ -71,6 +71,8 @@ export function ActionForm({
   disabled = false,
   submitDisabled = false,
   onAccepted,
+  onState,
+  onRecorded,
 }: {
   title: string;
   children: ReactNode;
@@ -79,6 +81,8 @@ export function ActionForm({
   disabled?: boolean;
   submitDisabled?: boolean;
   onAccepted?: () => void;
+  onState?: (state: { dirty: boolean; busy: boolean }) => void;
+  onRecorded?: (input: CommandInput, outcome: EconomyMutationOutcome) => void;
 }) {
   const { commandOutcome } = useEconomy(),
     seat = useSeat(),
@@ -88,6 +92,9 @@ export function ActionForm({
     [error, setError] = useState(""),
     [notice, setNotice] = useState("");
   useDraftGuard(dirty, "property operation");
+  useEffect(() => {
+    onState?.({ dirty, busy });
+  }, [dirty, busy, onState]);
   const locked = disabled || busy || (room.joined && room.viewOnly && seat.role === "player");
   return (
     <form
@@ -101,10 +108,12 @@ export function ActionForm({
         setError("");
         setNotice("");
         try {
-          const outcome = await commandOutcome(command());
+          const input = command();
+          const outcome = await commandOutcome(input);
           setNotice(mutationNotice(outcome, `${title} recorded.`));
           setDirty(false);
           if (outcome.status === "committed") onAccepted?.();
+          onRecorded?.(input, outcome);
         } catch (e) {
           setError(
             e instanceof Error ? e.message : "This property operation could not be recorded.",
@@ -1957,10 +1966,22 @@ export function EstateWorkshop() {
     </section>
   );
 }
-function TemplateWorkshop({ state }: { state: Estate }) {
+export function TemplateWorkshop({
+  state,
+  initialPreset = "warehouse",
+  templateOnly = false,
+  onState,
+  onRecorded,
+}: {
+  state: Estate;
+  initialPreset?: string;
+  templateOnly?: boolean;
+  onState?: (state: { dirty: boolean; busy: boolean }) => void;
+  onRecorded?: (template: EstateTemplate, outcome: EconomyMutationOutcome) => void;
+}) {
   const [selected, setSelected] = useState("new"),
-    [preset, setPreset] = useState("warehouse"),
-    [draft, setDraft] = useState<EstateTemplate>(estatePreset("warehouse")),
+    [preset, setPreset] = useState(initialPreset),
+    [draft, setDraft] = useState<EstateTemplate>(estatePreset(initialPreset)),
     [advanced, setAdvanced] = useState(""),
     [materialKey, setMaterialKey] = useState("timber"),
     [materialName, setMaterialName] = useState("Building timber"),
@@ -1972,24 +1993,26 @@ function TemplateWorkshop({ state }: { state: Estate }) {
   };
   return (
     <>
-      <Field label="Edit a property template">
-        <SearchSelect
-          value={selected}
-          onValueChange={(selectedValue) => {
-            const key = selectedValue;
-            setSelected(key);
-            setDraft(state.templates.find((t) => t.key === key) ?? estatePreset(preset));
-            setAdvanced("");
-          }}
-        >
-          <option value="new">New template</option>
-          {state.templates.map((t) => (
-            <option key={t.key} value={t.key}>
-              {t.name}
-            </option>
-          ))}
-        </SearchSelect>
-      </Field>
+      {!templateOnly && (
+        <Field label="Edit a property template">
+          <SearchSelect
+            value={selected}
+            onValueChange={(selectedValue) => {
+              const key = selectedValue;
+              setSelected(key);
+              setDraft(state.templates.find((t) => t.key === key) ?? estatePreset(preset));
+              setAdvanced("");
+            }}
+          >
+            <option value="new">New template</option>
+            {state.templates.map((t) => (
+              <option key={t.key} value={t.key}>
+                {t.name}
+              </option>
+            ))}
+          </SearchSelect>
+        </Field>
+      )}
       {selected === "new" && (
         <Field label="Property / building preset">
           <SearchSelect
@@ -2010,6 +2033,10 @@ function TemplateWorkshop({ state }: { state: Estate }) {
       )}
       <ActionForm
         title="Save property template"
+        onState={onState}
+        onRecorded={(input, outcome) => {
+          if (input.kind === "estate-template") onRecorded?.(input.template, outcome);
+        }}
         command={() => ({
           kind: "estate-template",
           before: prior,
@@ -2116,38 +2143,40 @@ function TemplateWorkshop({ state }: { state: Estate }) {
           />
         </details>
       </ActionForm>
-      <ActionForm
-        title="Add a reviewed material definition"
-        command={() => ({
-          kind: "estate-template",
-          before: prior,
-          template: prior ?? draft,
-          materials: [{ key: materialKey, name: materialName, unit: materialUnit }],
-        })}
-      >
-        <Field label="Material key">
-          <TextInput
-            required
-            value={materialKey}
-            onChange={(e) => setMaterialKey(e.target.value)}
-          />
-        </Field>
-        <Field label="Material name">
-          <TextInput
-            required
-            value={materialName}
-            onChange={(e) => setMaterialName(e.target.value)}
-          />
-        </Field>
-        <Field label="Material unit">
-          <TextInput
-            required
-            value={materialUnit}
-            onChange={(e) => setMaterialUnit(e.target.value)}
-          />
-        </Field>
-      </ActionForm>
-      {prior && (
+      {!templateOnly && (
+        <ActionForm
+          title="Add a reviewed material definition"
+          command={() => ({
+            kind: "estate-template",
+            before: prior,
+            template: prior ?? draft,
+            materials: [{ key: materialKey, name: materialName, unit: materialUnit }],
+          })}
+        >
+          <Field label="Material key">
+            <TextInput
+              required
+              value={materialKey}
+              onChange={(e) => setMaterialKey(e.target.value)}
+            />
+          </Field>
+          <Field label="Material name">
+            <TextInput
+              required
+              value={materialName}
+              onChange={(e) => setMaterialName(e.target.value)}
+            />
+          </Field>
+          <Field label="Material unit">
+            <TextInput
+              required
+              value={materialUnit}
+              onChange={(e) => setMaterialUnit(e.target.value)}
+            />
+          </Field>
+        </ActionForm>
+      )}
+      {!templateOnly && prior && (
         <RecipeBuilder
           key={prior.key + JSON.stringify(prior.recipes)}
           template={prior}

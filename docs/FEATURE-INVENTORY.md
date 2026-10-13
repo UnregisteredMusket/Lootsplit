@@ -362,6 +362,7 @@ Music & Ambience is available from DM Campaign tools and feature navigation. Pre
 
 ## Owned ships, shipyards and downtime voyages
 
+- DM property listings expose existing saved templates and a searchable Create from preset group, including Owned ship and Private shipyard. The existing template editor preserves the listing draft and returns its saved template selection; templates never publish/buy a listing automatically. Searchable popovers contain touch/keyboard scrolling, lock background interaction, fit the visible viewport, and return focus on close.
 - Property Management adds named ships with STR/DEX/CON-only vehicle stats, independent component AC/HP/thresholds, cargo/crew/passenger limits, actions and pace. Normal listings/purchases/deeds initialize ship and private-yard templates; existing properties can be reviewed by the DM.
 - Canonical inventory provides ship cargo; existing staff provide crew/captains and wages; normal estate projects provide reviewed repairs/upgrades/materials/labor. Aboard membership attaches existing characters without new accounts, copies or ownership grants. Passenger movement is DM reviewed, and ship access never grants other character control.
 - Commercial docks/dry storage/shipyards and purchased private yards enforce berth/length/access limits and charge distinct rates. Own private-yard ships avoid rental only. Maintenance uses campaign purses, copper remainders and arrears, with no wall-clock scheduler.

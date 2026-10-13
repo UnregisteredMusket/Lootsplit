@@ -123,7 +123,7 @@ Property storage, projects, staff, rentals, delivery and postal management are d
 
 Maps, location NPCs, bilateral barter, black-market vendors and session time: [field guide](docs/WORLD-FEATURES.md), [NPC import example](docs/examples/location-npcs.sample.json). Local focused UI check: `CHROMIUM_EXECUTABLE_PATH=/path/to/chromium node scripts/world-local-check.mjs`; complete release verification remains required.
 
-Ships and private shipyards are managed inside Property Management, using existing custody, staff, projects and reviewed downtime. See [the ship guide](docs/SHIPS.md) for setup, 5e-style physical stats, costs, voyages and the DM teleport override. New features require both role Help and developer-manual review.
+Ships and private shipyards are managed inside Property Management, using existing custody, staff, projects and reviewed downtime. DMs can start with **New property listing → Property operations template → Create from preset · Owned ship**, review/save the template, then save the retained listing draft separately. Saved templates and the full estate workshop remain available. See [the ship guide](docs/SHIPS.md) for setup, 5e-style physical stats, costs, voyages and the DM teleport override. New features require both role Help and developer-manual review.
 
 Map icons show the selected record or combat token with a blue fill and ring. Selection follows record details and the DM token selector; campaign map data and player visibility remain unchanged.
 
