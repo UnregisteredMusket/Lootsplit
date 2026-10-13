@@ -1,3 +1,9 @@
+# Active recovery: approved current-layout improvements — October 13, 2026 UTC
+
+The owner approved the five-screen incremental preview with “Looks good.” Branch `improvement/current-layout-first-pass` extends live/verified main `a57caad5e01bb7baac23d2ff4042c35efcec3e22`. Keep the current shell/themes/navigation/searchable selectors and existing commands; improve Player Home, sheet tools/mobile controls, sync recovery, DM Desk and downtime grouping. See `docs/audit/2026-10-13-current-layout.md`. Local diagnostic audits, quick checks and web/mobile builds pass; locked-browser CI must close the local installation gap. Require fresh all-nine PR/main gates, immutable website/standby and read-only live checks. Existing website publication authorization persists; no migration, new service or APK distribution. Exact evolving head/tree/PR/run/live/performance identities belong in PR metadata and ignored `test-results/recovery/current-layout.json`.
+
+PR106 follow-up is complete: main all-nine38310299946, website38311362171, standby38311362083 succeeded at a57caad5; production Worker3c6f4387-cbfd-4b22-87e1-f54e3ed09d14. Android1.7.0/code10 remains the verified published download. Older active/pending entries below are historical; do not repeat completed releases.
+
 # Active recovery: report foundation and Android parity — October 12, 2026 UTC
 
 PR #105 foundation is merged as main `2b4abca6f8ff6734bf8272e0c11538719b9aef68`, tree `d153ff7cbb754963d1b444c45630331c335667da`. All-nine PR38303829968/main38305743510 and supplemental38303830017 succeeded. Android38305743849 independently passed all nine and published 1.7.0/code10 from that main, with permanent certificate and independently verified manifest/v2 integrity/public asset SHA256; see `docs/audit/report-android-release-evidence.json`. Standby 38307147257 succeeded.

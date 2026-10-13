@@ -5,7 +5,12 @@ import {
   readDowntimeActivities,
   type TrainingRequest,
 } from "@/lib/quire/downtime-activities-schema";
-import { downtimeRemaining, trainingCounters, trainingKey, recipientTrainingCounters } from "@/lib/quire/downtime-activities";
+import {
+  downtimeRemaining,
+  trainingCounters,
+  trainingKey,
+  recipientTrainingCounters,
+} from "@/lib/quire/downtime-activities";
 import { useFinanceReadiness } from "@/lib/quire/use-finance-readiness";
 import { SearchSelect } from "./search-select";
 import { CommandForm, CommandButton } from "./world-tools";
@@ -40,25 +45,43 @@ export function DowntimeActivities({ reviewsOnly = false }: { reviewsOnly?: bool
     [description, setDescription] = useState(""),
     [className, setClassName] = useState("");
   const [duration, setDuration] = useState("8");
-  const [historical, setHistorical] = useState(false), [historicalContext, setHistoricalContext] = useState("");
+  const [historical, setHistorical] = useState(false),
+    [historicalContext, setHistoricalContext] = useState("");
   const selectedTrainer = trainerId || mine[0]?.id || "",
     selectedWindow = windowId || state.windows.at(-1)?.id || "";
   const counters = trainingCounters(state);
+  const period = state.windows.find((w) => w.id === selectedWindow);
   return (
-    <section id="hourly-downtime" aria-label="Hourly downtime activities">
+    <section
+      id="hourly-downtime"
+      className="hourly-downtime"
+      aria-label="Hourly downtime activities"
+    >
       {!reviewsOnly && (
         <>
           <h2>Hourly downtime & NPC training</h2>
           <p>
-            Each approved downtime day provides {state.settings.hoursPerDay} usable hours per
-            character. Split those hours across activities. Ship travel uses no personal downtime
-            hours.
+            Split approved hours across activities. Ship travel uses no personal downtime hours.
           </p>
-          <p>
-            Training records time and your description. The DM applies any milestone rewards or
-            character changes manually. One training day is {state.settings.trainingHoursPerDay}{" "}
-            hours; each period keeps its original conversion.
-          </p>
+          <details className="downtime-rules">
+            <summary>Time rules & training eligibility</summary>
+            <p>
+              A calendar day is 24 elapsed hours. Each approved downtime day provides{" "}
+              {state.settings.hoursPerDay} usable hours per character. One training day is{" "}
+              {state.settings.trainingHoursPerDay} hours. Each approved period keeps its original
+              budget and conversion.
+            </p>
+            <p>
+              Training records time and your description. The DM applies milestone rewards and
+              character changes manually. A counter reset keeps lifetime history and does not refund
+              hours.
+            </p>
+            <p>
+              The NPC must be at an equal or lower character level, and class level when a class is
+              specified. Trainer and NPC must be together. Training allocates the same hours to both
+              participants. Missing sheets or unrecognized class levels require a DM review note.
+            </p>
+          </details>
           {pending && (
             <p role="status">
               The DM must approve or cancel the campaign preview before allocating hours.
@@ -89,28 +112,62 @@ export function DowntimeActivities({ reviewsOnly = false }: { reviewsOnly?: bool
                   ))}
                 </SearchSelect>
               </label>
-              <div className="journal-entry">
+              <div className="journal-entry downtime-budget">
                 <h3>Unallocated hours</h3>
-                {mine.map((p) => (
-                  <p key={p.id}>
-                    {p.name}: {hours(downtimeRemaining(state, selectedWindow, p.id, true))} hours
-                    available ·{" "}
-                    {hours(
-                      downtimeRemaining(state, selectedWindow, p.id) -
-                        downtimeRemaining(state, selectedWindow, p.id, true),
-                    )}{" "}
-                    awaiting review
-                  </p>
-                ))}
+                {mine.map((p) => {
+                  const budget = period?.budgets.find((b) => b.purseId === p.id);
+                  const available = downtimeRemaining(state, selectedWindow, p.id, true);
+                  const remaining = downtimeRemaining(state, selectedWindow, p.id);
+                  const awaiting = remaining - available;
+                  const total = budget?.totalMinutes ?? 0;
+                  const allocated = total - remaining;
+                  return (
+                    <div key={p.id} className="downtime-character-budget">
+                      <p>
+                        {p.name}: {hours(available)} hours available · {hours(awaiting)} awaiting
+                        review
+                      </p>
+                      <div
+                        className="downtime-budget-bar"
+                        role="img"
+                        aria-label={`${p.name}: ${hours(allocated)} hours allocated, ${hours(awaiting)} awaiting review, ${hours(available)} available of ${hours(total)} approved hours`}
+                      >
+                        <span
+                          className="budget-allocated"
+                          style={{ width: `${total ? (allocated / total) * 100 : 0}%` }}
+                        />
+                        <span
+                          className="budget-pending"
+                          style={{ width: `${total ? (awaiting / total) * 100 : 0}%` }}
+                        />
+                      </div>
+                      <small>
+                        {budget
+                          ? `${hours(allocated)} allocated · ${hours(total)} approved hours`
+                          : "No approved budget for this character in this period."}
+                      </small>
+                    </div>
+                  );
+                })}
                 <p>
                   Approved property labor and away activities share this budget. Unused hours remain
                   attached to this period and cannot be added to another period.
                 </p>
               </div>
-              <Fold title="Train an NPC" defaultOpen>
+              <Fold
+                title="Train an NPC"
+                hint="Allocate hours, describe training, then request DM review"
+                defaultOpen
+              >
                 <CommandForm
                   label="Request NPC training"
-                  submitDisabled={locked || !selectedTrainer || !npcId || !topic.trim() || (historical && !historicalContext.trim())}
+                  submitDisabled={
+                    locked ||
+                    !selectedTrainer ||
+                    !npcId ||
+                    !topic.trim() ||
+                    (historical && !historicalContext.trim())
+                  }
                   dirty={
                     !!topic ||
                     !!description ||
@@ -119,13 +176,16 @@ export function DowntimeActivities({ reviewsOnly = false }: { reviewsOnly?: bool
                     !!trainerId ||
                     !!npcId ||
                     !!windowId ||
-                    category !== "martial" || historical || !!historicalContext
+                    category !== "martial" ||
+                    historical ||
+                    !!historicalContext
                   }
                   onDone={() => {
                     setTopic("");
                     setDescription("");
                     setClassName("");
-                    setHistorical(false);setHistoricalContext("");
+                    setHistorical(false);
+                    setHistoricalContext("");
                   }}
                   submit={() => ({
                     kind: "downtime-training",
@@ -140,120 +200,185 @@ export function DowntimeActivities({ reviewsOnly = false }: { reviewsOnly?: bool
                     ...(historical ? { historicalContext } : {}),
                   })}
                 >
-                  <label>
-                    Trainer
-                    <SearchSelect
-                      aria-label="Trainer"
-                      value={selectedTrainer}
-                      onValueChange={setTrainerId}
-                    >
-                      {mine.map((p) => (
-                        <option key={p.id} value={p.id}>
-                          {p.name}
-                        </option>
-                      ))}
-                    </SearchSelect>
-                  </label>
-                  <label>
-                    NPC receiving training
-                    <SearchSelect
-                      aria-label="NPC receiving training"
-                      value={npcId}
-                      onValueChange={setNpcId}
-                    >
-                      <option value="">Choose an NPC</option>
-                      {npcs
-                        .filter((p) => p.id !== selectedTrainer)
-                        .map((p) => (
+                  <fieldset className="training-step">
+                    <legend>Participants</legend>
+                    <label>
+                      Trainer
+                      <SearchSelect
+                        aria-label="Trainer"
+                        value={selectedTrainer}
+                        onValueChange={setTrainerId}
+                      >
+                        {mine.map((p) => (
                           <option key={p.id} value={p.id}>
                             {p.name}
                           </option>
                         ))}
-                    </SearchSelect>
-                  </label>
-                  <label>
-                    Training category
-                    <select
-                      aria-label="Training category"
-                      value={category}
-                      onChange={(e) => setCategory(e.target.value as TrainingRequest["category"])}
-                    >
-                      {Object.entries(labels).map(([value, label]) => (
-                        <option key={value} value={value}>
-                          {label}
-                        </option>
-                      ))}
-                    </select>
-                  </label>
-                  <label>
-                    Training subject
-                    <input
-                      aria-label="Training subject"
-                      required
-                      maxLength={160}
-                      value={topic}
-                      onChange={(e) => setTopic(e.target.value)}
-                      placeholder="Sword drills, history, carpentry…"
-                    />
-                  </label>
-                  <label>
-                    Hours to allocate
-                    <input
-                      aria-label="Hours to allocate"
-                      type="number"
-                      required
-                      min="0.25"
-                      step="0.25"
-                      max="87600"
-                      value={duration}
-                      onChange={(e) => setDuration(e.target.value)}
-                    />
-                  </label>
-                  <label>
-                    Class to compare (optional)
-                    <input
-                      aria-label="Class to compare (optional)"
-                      maxLength={120}
-                      value={className}
-                      onChange={(e) => setClassName(e.target.value)}
-                      placeholder="Fighter"
-                    />
-                  </label>
-                  <label>
-                    Training description
-                    <textarea
-                      aria-label="Training description"
-                      maxLength={4000}
-                      value={description}
-                      onChange={(e) => setDescription(e.target.value)}
-                    />
-                  </label>
+                      </SearchSelect>
+                    </label>
+                    <label>
+                      NPC receiving training
+                      <SearchSelect
+                        aria-label="NPC receiving training"
+                        value={npcId}
+                        onValueChange={setNpcId}
+                      >
+                        <option value="">Choose an NPC</option>
+                        {npcs
+                          .filter((p) => p.id !== selectedTrainer)
+                          .map((p) => (
+                            <option key={p.id} value={p.id}>
+                              {p.name}
+                            </option>
+                          ))}
+                      </SearchSelect>
+                    </label>
+                  </fieldset>
+                  {npcId && (
+                    <p className="training-recipient-context">
+                      Training recipient:{" "}
+                      {npcs.find((p) => p.id === npcId)?.name || "No longer available"}. Eligibility
+                      is checked when requested; missing sheet information requires a DM review
+                      note.
+                    </p>
+                  )}
+                  <fieldset className="training-step">
+                    <legend>Activity & time</legend>
+                    <label>
+                      Training category
+                      <select
+                        aria-label="Training category"
+                        value={category}
+                        onChange={(e) => setCategory(e.target.value as TrainingRequest["category"])}
+                      >
+                        {Object.entries(labels).map(([value, label]) => (
+                          <option key={value} value={value}>
+                            {label}
+                          </option>
+                        ))}
+                      </select>
+                    </label>
+                    <label>
+                      Training subject
+                      <input
+                        aria-label="Training subject"
+                        required
+                        maxLength={160}
+                        value={topic}
+                        onChange={(e) => setTopic(e.target.value)}
+                        placeholder="Sword drills, history, carpentry…"
+                      />
+                    </label>
+                    <label>
+                      Hours to allocate
+                      <input
+                        aria-label="Hours to allocate"
+                        type="number"
+                        required
+                        min="0.25"
+                        step="0.25"
+                        max="87600"
+                        value={duration}
+                        onChange={(e) => setDuration(e.target.value)}
+                      />
+                    </label>
+                    <label>
+                      Class to compare (optional)
+                      <input
+                        aria-label="Class to compare (optional)"
+                        maxLength={120}
+                        value={className}
+                        onChange={(e) => setClassName(e.target.value)}
+                        placeholder="Fighter"
+                      />
+                    </label>
+                    <p className="training-allocation-summary" role="status">
+                      {Number.isFinite(Number(duration)) && Number(duration) > 0
+                        ? `${hours(Number(duration) * 60)} hours = ${days(Number(duration) / (period?.settings.trainingHoursPerDay ?? state.settings.trainingHoursPerDay))} training ${Number(duration) === (period?.settings.trainingHoursPerDay ?? state.settings.trainingHoursPerDay) ? "day" : "days"}`
+                        : "Enter training hours"}{" "}
+                      · {period?.settings.trainingHoursPerDay ?? state.settings.trainingHoursPerDay}{" "}
+                      hours per training day for this period. Both participants use these hours.
+                    </p>
+                  </fieldset>
+                  <fieldset className="training-step">
+                    <legend>Description & context</legend>
+                    <label>
+                      Training description
+                      <textarea
+                        aria-label="Training description"
+                        maxLength={4000}
+                        value={description}
+                        onChange={(e) => setDescription(e.target.value)}
+                      />
+                    </label>
+                    <label>
+                      <input
+                        type="checkbox"
+                        checked={historical}
+                        onChange={(e) => setHistorical(e.target.checked)}
+                      />
+                      Record training completed earlier
+                    </label>
+                    {historical && (
+                      <label>
+                        Historical training context
+                        <textarea
+                          aria-label="Historical training context"
+                          required
+                          maxLength={4000}
+                          value={historicalContext}
+                          onChange={(e) => setHistoricalContext(e.target.value)}
+                        />
+                        <span>
+                          Describe when and where training happened and the participants' levels
+                          then. The DM must confirm this history. The selected period's remaining
+                          hours still apply.
+                        </span>
+                      </label>
+                    )}
+                  </fieldset>
                   <p>
-                    The NPC must be at an equal or lower character level, and class level when a
-                    class is specified. Trainer and NPC must be together. Training allocates the
-                    same hours to both participants. Missing sheets or unrecognized class levels
-                    require a DM review note.
+                    Request review to reserve these hours. Training changes no character statistics;
+                    milestones remain manual.
                   </p>
-                  <label>
-                    <input type="checkbox" checked={historical} onChange={e => setHistorical(e.target.checked)} />
-                    Record training completed earlier
-                  </label>
-                  {historical && <label>Historical training context
-                    <textarea aria-label="Historical training context" required maxLength={4000} value={historicalContext} onChange={e => setHistoricalContext(e.target.value)} />
-                    <span>Describe when and where training happened and the participants' levels then. The DM must confirm this history. The selected period's remaining hours still apply.</span>
-                  </label>}
                 </CommandForm>
               </Fold>
             </>
           )}
-          <Fold title={dm ? "NPC training totals by category" : "My contributions by NPC and category"} defaultOpen>
-            {!dm && <p>These totals include your visible contributions only. The DM can review the complete NPC totals.</p>}
-            {recipientTrainingCounters(state).map(c => <article className="journal-entry" key={JSON.stringify([c.record.npcId, c.record.category])}>
-              <h3>{c.record.npcName} · {labels[c.record.category]}</h3>
-              <p>Since reset: {hours(c.currentMinutes)} hours · {days(c.currentDays)} training days</p>
-              <p>Lifetime: {hours(c.lifetimeMinutes)} hours · {days(c.lifetimeDays)} training days</p>
-              {dm && <ResetCounter record={c.record} requestIds={c.requestIds} locked={locked} categoryTotal />}
-            </article>)}
+          <Fold
+            title={dm ? "NPC training totals by category" : "My contributions by NPC and category"}
+            defaultOpen
+          >
+            {!dm && (
+              <p>
+                These totals include your visible contributions only. The DM can review the complete
+                NPC totals.
+              </p>
+            )}
+            {recipientTrainingCounters(state).map((c) => (
+              <article
+                className="journal-entry"
+                key={JSON.stringify([c.record.npcId, c.record.category])}
+              >
+                <h3>
+                  {c.record.npcName} · {labels[c.record.category]}
+                </h3>
+                <p>
+                  Since reset: {hours(c.currentMinutes)} hours · {days(c.currentDays)} training days
+                </p>
+                <p>
+                  Lifetime: {hours(c.lifetimeMinutes)} hours · {days(c.lifetimeDays)} training days
+                </p>
+                {dm && (
+                  <ResetCounter
+                    record={c.record}
+                    requestIds={c.requestIds}
+                    locked={locked}
+                    categoryTotal
+                  />
+                )}
+              </article>
+            ))}
           </Fold>
           <Fold title="Training progress counters" defaultOpen>
             {!counters.length && <p>No approved training yet.</p>}

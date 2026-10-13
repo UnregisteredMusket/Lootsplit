@@ -1,6 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
-import { roomLifecycleLabels, roomStatusLabels } from "./room-state.ts";
+import { roomLifecycleLabels, roomStatusLabels, roomSaveDetail } from "./room-state.ts";
 
 const active = {
   joined: true,
@@ -52,4 +52,19 @@ test("guest memory and owned local campaigns have different storage labels", () 
     roomStatusLabels({ ...active, joined: false }, { ephemeral: true }).save,
     "In this document only",
   );
+});
+
+test("only a fully confirmed server draft is labeled saved turn, never committed", () => {
+  const draft = { ...active, pending: 2, staged: 2 };
+  assert.match(roomSaveDetail(draft), /Turn saved to room.*not committed/);
+  assert.doesNotMatch(roomSaveDetail({ ...draft, staged: 1 }), /Turn saved/);
+  assert.doesNotMatch(roomSaveDetail({ ...draft, live: true }), /Turn saved/);
+  assert.doesNotMatch(
+    roomSaveDetail({ ...draft, status: "attention", error: "Lost response" }),
+    /Turn saved/,
+  );
+  assert.doesNotMatch(roomSaveDetail(draft, { online: false }), /Turn saved/);
+  assert.equal(roomSaveDetail({ ...draft, lastSync: 0 }), "");
+  assert.equal(roomSaveDetail({ ...draft, joined: false }), "");
+  assert.equal(roomSaveDetail(active), "");
 });

@@ -7,6 +7,7 @@ import { canEditCharacterField, characterPermissions } from "@/lib/characters/pe
 import { usePrefs } from "@/lib/quire/prefs";
 import { FantasyIcon } from "@/components/fantasy-icon";
 import { LedgerArt } from "@/components/ledger-art";
+import { Modal } from "@/components/ui";
 
 function CampaignInventoryArt({
   item,
@@ -354,10 +355,7 @@ export function CharacterWorkspace({
         <div>
           <p className="eyebrow">YOUR ADVENTURER, EVERYWHERE</p>
           <h1>Character sheets</h1>
-          <p>
-            Play from your phone or computer. Campaign characters share their sheet, funds and
-            inventory.
-          </p>
+          <p>Your sheet, funds and inventory — on phone or computer.</p>
         </div>
         <Link to="/account">My account</Link>
       </header>
@@ -485,6 +483,8 @@ function CharacterEditor({
   const loadedCampaign = useRef(activeCampaignId);
   const [playView, setPlayView] = useState(true),
     [playTab, setPlayTab] = useState("actions");
+  const [sheetToolsOpen, setSheetToolsOpen] = useState(false);
+  const diceTray = useRef<HTMLElement>(null);
   const [detail, setDetail] = useState<Detail | null>(null),
     [sheet, setSheet] = useState<Sheet | null>(null),
     [error, setError] = useState(""),
@@ -847,22 +847,44 @@ function CharacterEditor({
           </button>
         )}
         <button
-          onClick={() =>
-            downloadJson(`${sheet.name.replace(/[^a-zA-Z0-9_-]/g, "_")}-character.json`, sheet)
-          }
+          id={`${playPrefix}-tools`}
+          aria-haspopup="dialog"
+          onClick={() => setSheetToolsOpen(true)}
         >
-          Export sheet / draft
-        </button>
-        <button
-          disabled={busy}
-          onClick={() => {
-            if (!dirty || window.confirm("Discard unsaved changes and reload this character?"))
-              setReload((n) => n + 1);
-          }}
-        >
-          Reload sheet
+          Sheet tools
         </button>
       </div>
+      <Modal
+        open={sheetToolsOpen}
+        onOpenChange={setSheetToolsOpen}
+        title="Sheet tools"
+        returnFocus={`[id="${playPrefix}-tools"]`}
+      >
+        <div className="sheet-tools-actions">
+          <p>
+            Export includes your current draft. Reload replaces unsaved edits only after
+            confirmation.
+          </p>
+          <button
+            onClick={() =>
+              downloadJson(`${sheet.name.replace(/[^a-zA-Z0-9_-]/g, "_")}-character.json`, sheet)
+            }
+          >
+            Export sheet / draft
+          </button>
+          <button
+            disabled={busy}
+            onClick={() => {
+              if (!dirty || window.confirm("Discard unsaved changes and reload this character?")) {
+                setSheetToolsOpen(false);
+                setReload((n) => n + 1);
+              }
+            }}
+          >
+            Reload sheet
+          </button>
+        </div>
+      </Modal>
       {error && (
         <p role="alert" className="character-error">
           {error}
@@ -927,6 +949,21 @@ function CharacterEditor({
             label="Play sections"
             ids={playTabs}
           />
+          <button
+            type="button"
+            className="sheet-dice-jump"
+            onClick={() => {
+              diceTray.current?.focus({ preventScroll: true });
+              diceTray.current?.scrollIntoView({
+                block: "start",
+                behavior: matchMedia("(prefers-reduced-motion: reduce)").matches
+                  ? "instant"
+                  : "smooth",
+              });
+            }}
+          >
+            Jump to dice tray ↓
+          </button>
           <button
             type="button"
             onClick={() => {
@@ -2011,7 +2048,13 @@ function CharacterEditor({
             )}
           </div>
         </div>
-        <section className="sheet-card" id="dice">
+        <section
+          className="sheet-card"
+          id="dice"
+          ref={diceTray}
+          tabIndex={-1}
+          style={{ scrollMarginTop: headerHeight + 150 }}
+        >
           <h3>Dice tray</h3>
           <DiceTray
             detail={detail}

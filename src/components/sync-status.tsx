@@ -1,6 +1,6 @@
 import { getServerCloudTable } from "@/lib/quire/cloud-client";
-import { useState, useSyncExternalStore } from "react";
-import { Link } from "@tanstack/react-router";
+import { useEffect, useRef, useState, useSyncExternalStore } from "react";
+import { Link, useRouterState } from "@tanstack/react-router";
 import {
   getCloudTable,
   subscribeCloudTable,
@@ -15,15 +15,24 @@ import {
 } from "@/lib/quire/cloud-client";
 import { Button, Confirm } from "./ui";
 import { toast } from "sonner";
-import { roomStatusLabels } from "@/lib/quire/room-state";
+import { roomStatusLabels, roomSaveDetail } from "@/lib/quire/room-state";
 import { getOnline, subscribeOnline } from "@/lib/mobile/online";
 export function SyncStatus({ compact = false }: { compact?: boolean }) {
   const state = useSyncExternalStore(subscribeCloudTable, getCloudTable, getServerCloudTable);
   const online = useSyncExternalStore(subscribeOnline, getOnline, () => true);
   const labels = roomStatusLabels(state, { online });
+  const saveDetail = roomSaveDetail(state, { online });
   const [discard, setDiscard] = useState(false);
   const [disconnect, setDisconnect] = useState(false);
   const [discardRecovery, setDiscardRecovery] = useState<string | null>(null);
+  const recoveryDetails = useRef<HTMLDetailsElement>(null);
+  const hash = useRouterState({ select: (s) => s.location.hash });
+  useEffect(() => {
+    if (!compact && state.joined && (hash === "pending-changes" || hash === "connection-recovery") && recoveryDetails.current) {
+      recoveryDetails.current.open = true;
+      recoveryDetails.current.scrollIntoView({ block: "start" });
+    }
+  }, [compact, state.joined, hash]);
   if (
     !state.joined &&
     state.status === "local" &&
@@ -35,7 +44,7 @@ export function SyncStatus({ compact = false }: { compact?: boolean }) {
     void fn().catch((e) => toast.error(e instanceof Error ? e.message : "Action failed."));
   return (
     <aside
-      className="mb-4 rounded-xl border border-lead/30 bg-elevated p-3 text-sm"
+      className="sync-status mb-4 rounded-xl border border-lead/30 bg-elevated p-3 text-sm"
       aria-live="polite"
     >
       {state.recoveries.map((recovery) => (
@@ -77,7 +86,7 @@ export function SyncStatus({ compact = false }: { compact?: boolean }) {
       ) : null}
       {state.joined ? (
         <div className="flex flex-wrap items-center justify-between gap-2">
-          <span role="status">
+          <span role="status" className="sync-status-label">
             {[labels.mode, labels.room, labels.play, labels.turn, labels.save]
               .filter(Boolean)
               .join(" · ")}
@@ -87,9 +96,20 @@ export function SyncStatus({ compact = false }: { compact?: boolean }) {
           </Link>
         </div>
       ) : null}
+      {saveDetail && <p className="sync-save-detail">{saveDetail}</p>}
+      {compact && state.joined && (state.pending || state.error) ? (
+        <div className="sync-recovery-actions">
+          <Button variant="secondary" onClick={() => act(retryPending)}>
+            Retry
+          </Button>
+          <Link to="/share" hash="connection-recovery" className="underline">
+            Pending changes →
+          </Link>
+        </div>
+      ) : null}
       {!compact && state.joined ? (
         <>
-          <details className="mt-2">
+          <details className="mt-2" id="pending-changes" ref={recoveryDetails}>
             <summary className="cursor-pointer">Pending actions and recovery</summary>
             {pendingActions().length ? (
               <ol className="mt-2 list-inside list-decimal">

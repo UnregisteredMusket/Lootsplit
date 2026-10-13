@@ -193,6 +193,7 @@ try {
   await page.getByText("17 gp", { exact: true }).waitFor();
   await openApplication(dm.page, origin + "/characters");
   await dm.page.getByLabel("Allow manual rolls in this campaign", { exact: true }).check();
+  await page.getByRole("button", { name: "Sheet tools", exact: true }).click();
   await page.getByRole("button", { name: "Reload sheet", exact: true }).click();
   await page.getByLabel("Enter a manual total", { exact: true }).waitFor();
   await page.getByLabel("Enter a manual total", { exact: true }).check();
@@ -221,7 +222,19 @@ try {
     const rect = el.getBoundingClientRect(), header = document.querySelector(".loot-shell header")?.getBoundingClientRect();
     return rect.top >= (header?.bottom || 0) && rect.bottom < innerHeight && el.contains(document.elementFromPoint(rect.x + rect.width / 2, rect.y + rect.height / 2));
   }), true, "Explicit save remains unobscured after an action near the bottom of the mobile editor");
+  const sheetTools = page.getByRole("button", { name: "Sheet tools", exact: true });
+  await sheetTools.click();
   assert.equal(await page.getByRole("button", { name: "Export sheet / draft", exact: true }).evaluate(el => el.getBoundingClientRect().bottom < innerHeight), true);
+  // Grouping preserves export of the current dirty draft and the reload guard.
+  const exported = page.waitForEvent("download");
+  await page.getByRole("button", { name: "Export sheet / draft", exact: true }).click();
+  assert.match((await exported).suggestedFilename(), /Mira_Ashfall-character.json$/);
+  page.once("dialog", dialog => dialog.dismiss());
+  await page.getByRole("button", { name: "Reload sheet", exact: true }).click();
+  await page.getByRole("dialog", { name: "Sheet tools", exact: true }).waitFor();
+  await page.getByRole("button", { name: "Close", exact: true }).click();
+  assert.equal(await sheetTools.evaluate(el => document.activeElement === el), true);
+  await page.getByText("Unsaved changes — save before rolling", { exact: true }).waitFor();
   await mobileSave.click();
   await page.getByText("Saved character", { exact: true }).waitFor();
 
@@ -230,6 +243,9 @@ try {
     false,
   );
   await page.getByRole("button", { name: "Play sheet", exact: true }).click();
+  await page.getByRole("button", { name: "Jump to dice tray ↓", exact: true }).click();
+  assert.equal(await page.locator("#dice").evaluate(el => document.activeElement === el), true);
+  assert.equal(await page.locator(".loot-opening").count(), 0);
   await page.locator(".play-action-row").filter({ hasText: "Longbow" }).waitFor();
   await page.getByRole("tab", { name: "Spells", exact: true }).click();
   await page.locator(".play-action-row").filter({ hasText: "Spark" }).waitFor();

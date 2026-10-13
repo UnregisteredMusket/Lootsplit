@@ -194,7 +194,11 @@ try {
       guest.getByRole("button", { name: "Save downtime hour settings", exact: true }),
     ).toHaveCount(0);
     const request = formFor(guest, "Request NPC training");
+    await expect(guest.locator('.downtime-budget-bar').first()).toHaveAttribute("aria-label", /16 approved hours$/);
+    await expect(request.getByRole("group", { name: "Participants", exact: true })).toBeVisible();
+    await expect(request.getByRole("status")).toContainText("8 hours = 1 training day");
     await chooseOption(request.getByLabel("NPC receiving training", { exact: true }), "maker");
+    await expect(request.locator('.training-recipient-context')).toContainText("Training recipient:");
     await request.getByLabel("Training subject", { exact: true }).fill("Sword drills");
     await request
       .getByLabel("Training description", { exact: true })

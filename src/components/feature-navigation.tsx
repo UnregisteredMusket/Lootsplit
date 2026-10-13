@@ -45,7 +45,7 @@ export function FeatureCards({
       <section className="feature-cards dm-tool-groups" aria-label="Campaign features">
         <h2>Campaign tools</h2>
         <FeatureLink feature="music">Music & Ambience</FeatureLink>
-        <Fold title="Sessions & records" hint="Journal, reports, downtime and reviews." defaultOpen>
+        <Fold title="Sessions & records" hint="Journal, reports, downtime, training and reviews." defaultOpen>
           <div className="dm-tool-links">
             {(["journal", "reports", "downtime", "time", "review"] as Feature[]).map((id) => (
               <FeatureLink key={id} feature={id}>
@@ -54,7 +54,7 @@ export function FeatureCards({
             ))}
           </div>
         </Fold>
-        <Fold title="Economy & properties" hint="Bank, shops, property and financial rules.">
+        <Fold title="Economy & properties" hint="Bank, shops, property, NPCs, trading and financial rules.">
           <div className="dm-tool-links">
             {(["bank", "shops", "economy", "properties", "npcs", "trading", "financial"] as Feature[]).map((id) => (
               <FeatureLink key={id} feature={id}>
