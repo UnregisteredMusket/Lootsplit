@@ -289,6 +289,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-13T13:58:29Z | step: verify / Set up job | 1s → 2s | +1s | +100% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37235490768/job/111534272124) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38407877455/job/115337338397) |
 | 2026-10-13T13:47:45Z | step: Player references / worker / Set up job | 2s → 3s | +1s | +50% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38131890240/job/114447745703) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38407877373/job/115332152752) |
 | 2026-10-13T13:37:27Z | step: Development / accounts / Run actions/upload-artifact@v4 | 3s → 4s | +1s | +33.33% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37302876093/job/111739542079) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38404276239/job/115325337610) |
 | 2026-10-13T13:31:53Z | step: Packaged Worker / interface (balanced v2) / worker-loot | 6s → 7s | +1s | +16.67% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38309026871/job/115010777504) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38404276239/job/115320597368) |
