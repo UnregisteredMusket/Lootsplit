@@ -17298,5 +17298,22 @@
     "finishedAt": "2026-10-13T09:36:41Z",
     "durationMs": 1000,
     "trendId": "38376270621:1:39d3a74faa127b91f329fd9d9d8301d20bc718efd246405f435001de47fab283"
+  },
+  "[\".github/workflows/website-release.yml\",\"workflow_run\",\"main\",\"step\",\"deploy / Verify deployed CPU and observability policy\",\"ubuntu-latest\",1]": {
+    "schema": 1,
+    "id": "38377580902:1:085f076136b5cc5a91e19934cf7b8dab80a3945c358ca58ac5b4de7d1d816695",
+    "scope": "[\".github/workflows/website-release.yml\",\"workflow_run\",\"main\",\"step\",\"deploy / Verify deployed CPU and observability policy\",\"ubuntu-latest\",1]",
+    "kind": "step",
+    "name": "deploy / Verify deployed CPU and observability policy",
+    "environment": "ubuntu-latest",
+    "commit": "9c9647eb6968d9f62ea19ee0b0702b05bd0d797a",
+    "runId": 38377580902,
+    "attempt": 1,
+    "url": "https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38377580902/job/115229729374",
+    "outcome": "success",
+    "startedAt": "2026-10-13T09:37:55Z",
+    "finishedAt": "2026-10-13T09:37:56Z",
+    "durationMs": 1000,
+    "trendId": "38377580902:1:085f076136b5cc5a91e19934cf7b8dab80a3945c358ca58ac5b4de7d1d816695"
   }
 }
