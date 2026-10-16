@@ -20,6 +20,20 @@ export const PLAYER_HELP_GROUPS: HelpGroup[] = [
         ],
       },
       {
+        id: "multiple-windows",
+        title: "Use multiple tabs and displays",
+        paragraphs: [
+          "Choose Tabs & windows in the app header, select a permitted screen, then Open new tab or Open separate window. Move separate browser windows onto your monitors. Allow pop-ups if your browser blocks the action, and complete the title screen in each new window. Use the desktop website for multiple monitors; the Android app keeps its normal navigation.",
+          "New windows reconnect to your existing authorized seat and retain your assigned-character permissions. They do not grant DM tools or access to private records. Saved campaign changes synchronize through the current play mode; unsaved form entries stay in their original window. Pending actions still need the normal submission or DM approval. Keep unsent guest work open or export it before closing its document. Closing a window does not close the campaign room.",
+          "The DM can also show a read-only Player display on a TV. It contains only the selected shared map, revealed combatants and optional confirmed loot awards. It does not give control of characters or access to DM notes, hidden combatants or unawarded loot. Continue using your own invited player session for actions.",
+          "Each window keeps its own screen and campaign selection. Account sign-in and sign-out affect other windows in the same browser profile. Restore minimized windows to refresh their data. Use browser tab mute if you only want audio from one window.",
+        ],
+        links: [
+          ["Player Home", "/?view=home"],
+          ["Campaign connection", "/share"],
+        ],
+      },
+      {
         id: "menus",
         title: "Player menus and Help",
         paragraphs: [

@@ -1,4 +1,6 @@
+import { PlayerDisplayButton } from "../player-display-controller";
 import { inParty } from "@/lib/quire/character-position";
+import { subscribeWorkspaceChanges } from "@/lib/quire/workspace-events";
 import { SearchSelect } from "@/components/search-select";
 import { playSound } from "@/lib/quire/sound";
 import { ImportStatblock } from "./import-statblock";
@@ -131,6 +133,13 @@ function EncounterLibrary({ allowDevice }: { allowDevice: boolean }) {
   selectedCode.current = code;
   const dirty = useRef(false),
     createKey = useRef("");
+  useEffect(
+    () =>
+      subscribeWorkspaceChanges((change) => {
+        if (change.kind === "data" && !dirty.current) setRefresh((value) => value + 1);
+      }),
+    [],
+  );
   useEffect(() => {
     const c = new AbortController();
     type Library = { campaigns: Campaign[]; encounters: Summary[] };
@@ -437,6 +446,15 @@ function EncounterEditor({
     [selectedMembers, setSelectedMembers] = useState<string[]>([]),
     [planningLevel, setPlanningLevel] = useState(1),
     [summarySessionId, setSummarySessionId] = useState("");
+  const editing = useRef(false);
+  editing.current = dirty || busy;
+  useEffect(
+    () =>
+      subscribeWorkspaceChanges((change) => {
+        if (change.kind === "data" && !editing.current) setReload((value) => value + 1);
+      }),
+    [],
+  );
   const pendingRoll = useRef<{
     path: string;
     body: Record<string, unknown>;
@@ -761,7 +779,11 @@ function EncounterEditor({
   const recipients = (value: string, onChange: (v: string) => void, label = "Recipient") => (
     <label>
       {label}
-      <SearchSelect value={value} onValueChange={(selectedValue) => onChange(selectedValue)}>
+      <SearchSelect
+        aria-label={label}
+        value={value}
+        onValueChange={(selectedValue) => onChange(selectedValue)}
+      >
         <option value="">Choose recipient</option>
         {detail.purses.map((p) => (
           <option key={p.id} value={p.id}>
@@ -781,6 +803,10 @@ function EncounterEditor({
               {detail.status === "review" ? "READY FOR LOOT REVIEW" : detail.status.toUpperCase()}
             </p>
             <h2>{draft.name}</h2>
+            {detail.code !== "personal" &&
+              detail.code === (getCloudTable().joined ? getCloudTable().code : "device") && (
+                <PlayerDisplayButton encounterId={detail.id} />
+              )}
           </div>
           <span className="encounter-badge">
             {dirty

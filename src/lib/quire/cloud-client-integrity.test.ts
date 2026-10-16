@@ -574,6 +574,7 @@ test("actual account authentication clears old recovery identity before announci
     "API_ORIGIN",
     "TOKEN",
     "readAccountResponse",
+    "announceWorkspaceChange",
     "let identityRead; " + stripTypeScriptTypes(body) + ";return accountRequestCore;",
   );
   for (const path of ["auth/sign-in/email", "auth/sign-up/email", "auth/sign-out"]) {
@@ -601,6 +602,10 @@ test("actual account authentication clears old recovery identity before announci
       "",
       "token",
       readAccountResponse,
+      (kind: string) => {
+        assert.equal(kind, "account");
+        assert.equal(session.getItem("lootsplit.verified-account"), null);
+      },
     );
     await request(path, {});
     assert.equal(changed, true);

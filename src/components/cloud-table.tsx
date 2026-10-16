@@ -1,3 +1,4 @@
+import { activeCampaignId } from "../lib/quire/campaign-context.ts";
 import { getServerCloudTable } from "@/lib/quire/cloud-client";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { Copy, Crown, DoorOpen, Radio, Users, ArrowLeft } from "lucide-react";
@@ -138,7 +139,7 @@ export function CloudTable() {
     const file = await captureDeviceBackup();
     await rememberSave({
       name: `Before switching from ${cloud.code}`,
-      campaignId: localStorage.getItem("quire.campaign.v1") || "main",
+      campaignId: activeCampaignId(),
       file,
     });
     }

@@ -1,3 +1,4 @@
+import { activeCampaignId } from "./campaign-context.ts";
 import { validateFleet } from "./ships.ts";
 import { validateBlacksmith } from "./blacksmith-validation.ts";
 import { projectRecord } from "./session-records.ts";
@@ -189,7 +190,7 @@ async function seedEconomy(): Promise<void> {
         id: string;
         blank?: boolean;
       }[];
-      blank ||= !!registry.find((c) => c.id === localStorage.getItem("quire.campaign.v1"))?.blank;
+      blank ||= !!registry.find((c) => c.id === activeCampaignId())?.blank;
     } catch {
       /* Original DM campaigns retain their existing initialization. */
     }

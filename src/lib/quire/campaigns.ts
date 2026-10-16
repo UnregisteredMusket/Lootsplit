@@ -1,6 +1,7 @@
 import { getCloudWatch } from "./cloud-turn.ts";
 import { closeQuireDb, deleteQuireDatabase } from "./db.ts";
 import { getSeat, reloadSeat } from "./table.ts";
+import { activeCampaignId, selectWindowCampaign } from "./campaign-context.ts";
 
 export type Campaign = { id: string; name: string; db: string; blank?: boolean };
 
@@ -69,7 +70,8 @@ export function switchCampaign(id: string) {
   playersCannotChangeCampaigns();
   if (!state.campaigns.some((campaign) => campaign.id === id) || id === state.activeId) return;
   const owner = localStorage.getItem(`quire.owner.${id}`);
-  if (owner && owner !== sessionStorage.getItem("lootsplit.verified-account")) throw Error("Sign in to the account that owns this campaign.");
+  if (owner && owner !== sessionStorage.getItem("lootsplit.verified-account"))
+    throw Error("Sign in to the account that owns this campaign.");
   if (!owner) throw Error("Claim this device campaign after signing in before opening it.");
   state = { ...state, activeId: id };
   persist();
@@ -129,7 +131,7 @@ function boot() {
       ? parsed.map(readCampaign).filter((campaign): campaign is Campaign => campaign !== null)
       : [];
     const list = campaigns.length > 0 ? campaigns : [FIRST_CAMPAIGN];
-    const stored = window.localStorage.getItem(ACTIVE);
+    const stored = activeCampaignId();
     const activeId = list.some((campaign) => campaign.id === stored) ? stored! : list[0]!.id;
     state = { campaigns: list, activeId };
   } catch {
@@ -154,7 +156,7 @@ function boot() {
       /* Retain the existing registry if the intent cannot be read. */
     }
   }
-  persist();
+  persist(false);
 }
 
 function refreshRegistry() {
@@ -164,24 +166,33 @@ function refreshRegistry() {
     if (!Array.isArray(raw)) return;
     const campaigns = raw.map(readCampaign).filter((c): c is Campaign => c !== null);
     if (!campaigns.length) return;
-    const active = window.localStorage.getItem(ACTIVE);
+    const active = activeCampaignId();
     // Registry reconciliation must not silently switch this tab into another tab's seat.
-    const activeId = campaigns.some(c => c.id === state.activeId) ? state.activeId
-      : campaigns.some(c => c.id === active) ? active! : campaigns[0]!.id;
+    const activeId = campaigns.some((c) => c.id === state.activeId)
+      ? state.activeId
+      : campaigns.some((c) => c.id === active)
+        ? active!
+        : campaigns[0]!.id;
     state = { campaigns, activeId };
-  } catch { /* Preserve the last readable registry. */ }
+  } catch {
+    /* Preserve the last readable registry. */
+  }
 }
 
 function completeDeletion(target: Campaign, fallback: CampaignState) {
   // The durable intent is a recovery hint, not an authoritative replacement registry.
   // Another tab (including an older client) may have committed newer metadata while IDB was blocked.
   refreshRegistry();
-  const campaigns = state.campaigns.filter(c => c.id !== target.id);
-  if (!campaigns.length) campaigns.push(...fallback.campaigns.filter(c => c.id !== target.id));
+  const campaigns = state.campaigns.filter((c) => c.id !== target.id);
+  if (!campaigns.length) campaigns.push(...fallback.campaigns.filter((c) => c.id !== target.id));
   const latestActive = localStorage.getItem(ACTIVE);
-  const activeId = campaigns.some(c => c.id === state.activeId) ? state.activeId
-    : campaigns.some(c => c.id === latestActive) ? latestActive!
-    : campaigns.some(c => c.id === fallback.activeId) ? fallback.activeId : campaigns[0]!.id;
+  const activeId = campaigns.some((c) => c.id === state.activeId)
+    ? state.activeId
+    : campaigns.some((c) => c.id === latestActive)
+      ? latestActive!
+      : campaigns.some((c) => c.id === fallback.activeId)
+        ? fallback.activeId
+        : campaigns[0]!.id;
   state = { campaigns, activeId };
   persist();
   localStorage.removeItem(DELETION);
@@ -191,10 +202,11 @@ function completeDeletion(target: Campaign, fallback: CampaignState) {
   publish();
 }
 
-function persist() {
+function persist(select = true) {
   if (typeof window === "undefined") return;
   window.localStorage.setItem(REGISTRY, JSON.stringify(state.campaigns));
-  window.localStorage.setItem(ACTIVE, state.activeId);
+  if (select) selectWindowCampaign(state.activeId);
+  else window.localStorage.setItem(ACTIVE, state.activeId);
 }
 
 function publish() {
@@ -220,14 +232,19 @@ function readCampaign(value: unknown): Campaign | null {
 }
 
 /** Account resume selects a separate device database; it never promotes the old player copy. */
-export function selectAccountCampaign(id: string, name: string, seat: import('./table.ts').Seat) {
+export function selectAccountCampaign(id: string, name: string, seat: import("./table.ts").Seat) {
   boot();
   assertNoDeletion();
   refreshRegistry();
-  if (!/^account-[a-zA-Z0-9_-]+$/.test(id)) throw new Error('Invalid account campaign.');
-  const existing = state.campaigns.find(c => c.id === id);
+  if (!/^account-[a-zA-Z0-9_-]+$/.test(id)) throw new Error("Invalid account campaign.");
+  const existing = state.campaigns.find((c) => c.id === id);
   localStorage.setItem(`quire.seat.v1.${id}`, JSON.stringify(seat));
-  state = { campaigns: existing ? state.campaigns : [...state.campaigns, { id, name: cleanName(name), db: `quire-${id}`, blank: true }], activeId: id };
+  state = {
+    campaigns: existing
+      ? state.campaigns
+      : [...state.campaigns, { id, name: cleanName(name), db: `quire-${id}`, blank: true }],
+    activeId: id,
+  };
   persist();
   closeQuireDb();
   reloadSeat();

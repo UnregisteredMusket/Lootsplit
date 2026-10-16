@@ -1,3 +1,11 @@
+# Active extension: player-facing TV / map case — October 16, 2026 UTC
+
+Continue the same `feature/multi-window` task. The latest owner request adds a dedicated sanitized display, with current map/encounter/confirmed-loot integration, calibrated grid, camera, blanking and browser fullscreen/casting guidance. Local implementation is in progress; exact commits/results remain in `test-results/recovery/multi-window.json`. Do not claim live before all existing release gates. See the appended player-display audit. Publication authorization and every privacy/data/account/platform requirement below remain.
+
+# Active recovery: multiple tabs, windows and monitors — October 16, 2026 UTC
+
+Branch `feature/multi-window` extends complete/live main `862bda82be96153f31b39a1180ff6e8465aeab5d`. The owner requests concurrent tabs and multi-monitor use. Preserve current layouts, six main destinations, every role/mode/platform and saved data. Header controls, per-window campaign scoping, existing-lock queuing, privacy-safe invalidations and draft-preserving refresh are in development; see `docs/audit/2026-10-16-multi-window.md`. Publication authorization persists. No domain activation, data migration, new service/dependency or signed Android distribution. Require focused concurrent-window browser proof, all-nine fresh PR/main groups, immutable website/standby and read-only live verification. Exact evolving source/tree/PR/run/results belong in PR metadata and ignored `test-results/recovery/multi-window.json`. Do not repeat the completed PR108 release documented below.
+
 # Active recovery: mobile picker containment and ship templates — October 13, 2026 UTC
 
 Branch `fix/mobile-picker-ship-templates` starts from verified/live main `9c9647eb6968d9f62ea19ee0b0702b05bd0d797a`. The owner reports an empty template selector and blocked/mobile popup scrolling. Keep the approved current layout; repair the shared searchable picker and expose existing presets through the property listing editor. See `docs/audit/2026-10-13-mobile-picker.md`. No gameplay/backend/dependency/migration or Android distribution change. Website publication authorization persists. Preserve all nine PR/main gates, immutable website/standby and read-only live verification. Evolving source/PR/run identities belong in PR metadata and ignored `test-results/recovery/mobile-picker.json`.

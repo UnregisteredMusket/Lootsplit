@@ -17,6 +17,7 @@ import {
   setFavorite,
 } from "./db.ts";
 import { subscribeCampaigns } from "./campaigns.ts";
+import { announceWorkspaceChange, subscribeWorkspaceChanges } from "./workspace-events.ts";
 import type { Book } from "./types.ts";
 
 export type ImportJob = {
@@ -48,6 +49,13 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
   const refresh = useCallback(async () => {
     setBooks(await listBooks());
   }, []);
+  useEffect(
+    () =>
+      subscribeWorkspaceChanges((change) => {
+        if (change.kind === "data") void refresh().catch(() => undefined);
+      }),
+    [refresh],
+  );
 
   useEffect(() => {
     let cancelled = false;
@@ -113,6 +121,7 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
             `${result.title}: ${result.skippedPages.length} pages have low-confidence OCR. Review the extracted text against the original before importing values.`,
           );
         added += 1;
+        announceWorkspaceChange();
         setBooks(await listBooks());
       } catch (error) {
         const message = error instanceof Error ? error.message : "That PDF could not be read.";
@@ -127,6 +136,7 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
     const next = title.trim();
     if (!next) return;
     await renameBook(id, next);
+    announceWorkspaceChange();
     setBooks((current) =>
       current.map((book) => (book.id === id ? { ...book, title: next } : book)),
     );
@@ -134,6 +144,7 @@ export function LibraryProvider({ children }: { children: ReactNode }) {
 
   const remove = useCallback(async (id: string) => {
     await deleteBook(id);
+    announceWorkspaceChange();
     setBooks((current) => current.filter((book) => book.id !== id));
     toast.success("PDF removed.");
   }, []);

@@ -1,3 +1,5 @@
+import { activeCampaignId } from "./campaign-context.ts";
+import { announceWorkspaceChange, subscribeWorkspaceChanges } from "./workspace-events.ts";
 import {
   captureMutationScope,
   assertMutationScope,
@@ -83,6 +85,7 @@ import {
   queueCommand,
   runSharedMutation,
   hasPendingChanges,
+  refreshShared,
 } from "./cloud-client.ts";
 import { loadNotes } from "./chat.ts";
 import { primeNotices } from "./notify.ts";
@@ -207,7 +210,10 @@ type EconomyApi = {
   updateSheet: (sheet: CharacterSheet, before?: CharacterSheet) => Promise<void>;
   voidLine: (id: string) => Promise<void>;
   setRealm: (settings: RealmSettings, options?: { reprice?: boolean }) => Promise<void>;
-  addGoods: (rows: CatalogItem[], expected?: import("./cloud-client.ts").ExpectedMutationScope) => Promise<number>;
+  addGoods: (
+    rows: CatalogItem[],
+    expected?: import("./cloud-client.ts").ExpectedMutationScope,
+  ) => Promise<number>;
   saveGood: (item: CatalogItem) => Promise<void>;
   deleteGood: (id: string) => Promise<void>;
   invent: (category: ItemCategory, flags: RarityFlags, count: number) => Promise<number>;
@@ -246,7 +252,7 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
   const reloadSequence = useRef(0);
   const reload = useCallback(async () => {
     const sequence = ++reloadSequence.current;
-    const campaignKey = localStorage.getItem("quire.campaign.v1");
+    const campaignKey = activeCampaignId();
     await ensureEconomy();
     // A once-per-campaign safety copy. Never bypass an existing password-protected-save policy.
     if (
@@ -254,7 +260,7 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
       getSeat().role === "dm" &&
       !(await loadSeatLock())?.protectSaves
     ) {
-      const campaignId = localStorage.getItem("quire.campaign.v1") || "main";
+      const campaignId = activeCampaignId();
       const marker = `lootsplit.before-illustrated.${campaignId}`;
       if (!localStorage.getItem(marker)) {
         const name = "Before illustrated UI update";
@@ -277,11 +283,7 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
       sheets: nextSheets,
       journal: nextJournal,
     } = await economyView();
-    if (
-      sequence !== reloadSequence.current ||
-      campaignKey !== localStorage.getItem("quire.campaign.v1")
-    )
-      return;
+    if (sequence !== reloadSequence.current || campaignKey !== activeCampaignId()) return;
     setPurses(nextPurses.sort((a, b) => a.name.localeCompare(b.name)));
     setHoldings(nextHoldings.sort((a, b) => a.name.localeCompare(b.name)));
     setShops(nextShops.sort((a, b) => a.name.localeCompare(b.name)));
@@ -342,8 +344,32 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
     [reload],
   );
   useEffect(() => {
+    let timer: ReturnType<typeof setTimeout> | undefined;
+    const refresh = () => {
+      if (timer) return;
+      timer = setTimeout(() => {
+        timer = undefined;
+        void (async () => {
+          if (getCloudWatch().joined) await refreshShared();
+          await reload();
+        })().catch((error) =>
+          fault(error, "This window could not refresh. Your draft is retained."),
+        );
+      }, 100);
+    };
+    const unsubscribe = subscribeWorkspaceChanges((change) => {
+      if (change.kind === "data") refresh();
+    });
+    window.addEventListener("focus", refresh);
+    return () => {
+      unsubscribe();
+      window.removeEventListener("focus", refresh);
+      if (timer) clearTimeout(timer);
+    };
+  }, [reload]);
+  useEffect(() => {
     let cancelled = false;
-    const campaignId = localStorage.getItem("quire.campaign.v1") || "main";
+    const campaignId = activeCampaignId();
     if (
       !ready ||
       getCloudWatch().joined ||
@@ -361,12 +387,7 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
             body: import("../characters/model.mjs").PlaySheet;
           }[];
         }>("sheets");
-        if (
-          cancelled ||
-          getCloudWatch().joined ||
-          (localStorage.getItem("quire.campaign.v1") || "main") !== campaignId
-        )
-          return;
+        if (cancelled || getCloudWatch().joined || activeCampaignId() !== campaignId) return;
         let changed = false;
         for (const link of readPartySheetLinks(own.userId, campaignId)) {
           const profile = own.characters.find((r) => r.id === link.sheetId && !r.campaign_code);
@@ -405,6 +426,7 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
       try {
         if (gate.joined) await runSharedMutation(work);
         else await work();
+        announceWorkspaceChange();
         await reload();
         if (
           ok &&
@@ -455,6 +477,7 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
       }
     };
     const refreshAccepted = async () => {
+      announceWorkspaceChange();
       await reload().catch(() =>
         toast.error(
           "Action accepted, but this view could not refresh. Check sync before repeating it.",
@@ -525,11 +548,16 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
       return outcome;
     };
     const mutation = async <T,>(work: () => Promise<T>): Promise<T> => {
-      if (!getCloudWatch().joined) return work();
+      if (!getCloudWatch().joined) {
+        const result = await work();
+        announceWorkspaceChange();
+        return result;
+      }
       let result!: T;
       await runSharedMutation(async () => {
         result = await work();
       });
+      announceWorkspaceChange();
       return result;
     };
     return {
@@ -538,6 +566,7 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
       command: async (input) => {
         if (getCloudWatch().joined) {
           await queueCommand(input);
+          announceWorkspaceChange();
           await reload();
           return;
         }
@@ -551,10 +580,12 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
           input.kind === "session"
         ) {
           await executeFinanceCommand(input);
+          announceWorkspaceChange();
           await reload();
           return;
         }
         await executeLocalCommand(input);
+        announceWorkspaceChange();
         await reload();
       },
       ready,
@@ -698,7 +729,14 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
               await buyFromShop({ stockId, purseId, quantity });
             }, "Purchase recorded."),
       sell: (holdingId, shopId, quantity) =>
-        getCloudWatch().joined || holdings.some(h => h.id === holdingId && (h.custody || h.reservedFor || journal.propertyOperations?.sites.some(s => s.propertyId === h.id)))
+        getCloudWatch().joined ||
+        holdings.some(
+          (h) =>
+            h.id === holdingId &&
+            (h.custody ||
+              h.reservedFor ||
+              journal.propertyOperations?.sites.some((s) => s.propertyId === h.id)),
+        )
           ? acceptCommand({ kind: "sell", holdingId, shopId, quantity })
           : accept(async () => {
               ownShop(shopId);
@@ -719,10 +757,18 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
       give: (input) =>
         getCloudWatch().joined
           ? shared({ kind: "give", ...input })
-          : holdings.some(h => h.id === input.holdingId && (h.custody || h.reservedFor || journal.propertyOperations?.sites.some(s => s.propertyId === h.id))) ? acceptCommand({ kind: "give", ...input }).then(() => {}) : run(async () => {
-              ownPurse(input.fromId);
-              await giveToPlayer(input);
-            }, "Transfer recorded and added to party messages."),
+          : holdings.some(
+                (h) =>
+                  h.id === input.holdingId &&
+                  (h.custody ||
+                    h.reservedFor ||
+                    journal.propertyOperations?.sites.some((s) => s.propertyId === h.id)),
+              )
+            ? acceptCommand({ kind: "give", ...input }).then(() => {})
+            : run(async () => {
+                ownPurse(input.fromId);
+                await giveToPlayer(input);
+              }, "Transfer recorded and added to party messages."),
       addListing: (input) =>
         accept(async (guard) => {
           dmOnly();
@@ -734,7 +780,7 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
           await removeListing(id);
         }, "Listing removed."),
       buyListing: (listingId, purseId, quantity) =>
-        getCloudWatch().joined || listings.some(l => l.id === listingId && l.estateTemplateKey)
+        getCloudWatch().joined || listings.some((l) => l.id === listingId && l.estateTemplateKey)
           ? acceptCommand({ kind: "listing", listingId, purseId, quantity })
           : accept(async () => {
               ownPurse(purseId);
@@ -779,11 +825,13 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
       voidLine: async (id) => {
         try {
           dmOnly();
-          const line = ledger.find(entry => entry.id === id);
+          const line = ledger.find((entry) => entry.id === id);
           if (!line) throw new Error("That ledger line is no longer available.");
           const outcome = await acceptCommand({
-            kind: "ledger-void", target: { kind: "ledger", id },
-            before: canonicalJson(line), reason: "DM ledger correction.",
+            kind: "ledger-void",
+            target: { kind: "ledger", id },
+            before: canonicalJson(line),
+            reason: "DM ledger correction.",
           });
           toast.success(mutationNotice(outcome, "That line was voided."));
         } catch (error) {

@@ -1,3 +1,4 @@
+import { checkPlayerDisplay } from "./player-display-browser-check.mjs";
 import assert from "node:assert/strict";
 import { chromium } from "playwright";
 import { expect } from "playwright/test";
@@ -273,6 +274,7 @@ try {
     await chooseOption(controls.getByLabel("Combat token", { exact: true }), "");
     await expect(heroIcon).toHaveAttribute("aria-pressed", "false");
     await fits(page);
+    const viewer = await checkPlayerDisplay(page, context, width, output);
     await createAndSaveRoom(page, origin, (p, o, path) => navigateApplication(p, o + path));
     await navigateApplication(page, origin + "/share");
     await expect(
@@ -310,6 +312,7 @@ try {
     await guest.getByPlaceholder("What should the party call you?").fill("Tile guest");
     await guest.getByRole("button", { name: "Join room", exact: true }).click();
     await expect(guest.locator(".room-code")).toBeVisible();
+    await guest.waitForURL((u) => u.pathname === "/share" && !u.searchParams.has("join"));
     await navigateApplication(guest, origin + "/maps");
     await chooseOption(guest.getByLabel("Map type filter", { exact: true }), "property");
     await guest.getByRole("button", { name: "Enter tile mode", exact: true }).click();
@@ -338,6 +341,12 @@ try {
       false,
       "Guest board stays in memory",
     );
+    await expect(viewer.getByRole("img")).toHaveCount(0);
+    await page.close();
+    await expect(
+      viewer.getByRole("heading", { name: "Waiting for the DM", exact: true }),
+    ).toBeVisible({ timeout: 8000 });
+    await viewer.close();
     await guestContext.close();
     await context.close();
   }
@@ -356,6 +365,7 @@ try {
         "fullscreen",
         "reload",
         "shared-player-privacy",
+        "player-display-privacy-calibration-fullscreen-reload-blank-campaign-switch",
         "guest-memory",
       ],
       errors,

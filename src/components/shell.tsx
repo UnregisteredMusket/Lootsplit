@@ -1,4 +1,5 @@
 import { FeatureCards } from "./feature-navigation";
+import { WorkspaceWindows } from "./workspace-windows";
 import { SubmenuBackdrop } from "./submenu-backdrop";
 import { AppLink } from "@/components/app-link";
 import { FantasyIcon } from "@/components/fantasy-icon";
@@ -198,6 +199,7 @@ export function Shell({
                 {testRoom.testMode && <span className="ml-2 text-negative">Test mode</span>}
               </button>
               <div className="header-actions">
+                <WorkspaceWindows />
                 <AppLink
                   className="header-icon"
                   href="/share?chat=1"

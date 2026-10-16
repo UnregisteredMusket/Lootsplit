@@ -1,12 +1,10 @@
-import {
-  useEffect,
-  useState,
-  useSyncExternalStore,
-  type ReactNode,
-} from "react";
+import { activeCampaignId, pinCampaignContext } from "../../lib/quire/campaign-context.ts";
+import { subscribeWorkspaceChanges } from "@/lib/quire/workspace-events";
+import { useEffect, useState, useSyncExternalStore, type ReactNode } from "react";
 import { Link, useRouterState } from "@tanstack/react-router";
 import {
   accountRequest,
+  forgetAccountIdentity,
   type AccountLibrary,
   type AccountMembership,
 } from "@/lib/account/client";
@@ -41,9 +39,18 @@ export function CampaignGate({ children }: { children: ReactNode }) {
   const [identityEpoch, setIdentityEpoch] = useState(0);
   useEffect(() => {
     const refresh = () => setIdentityEpoch((x) => x + 1);
+    const unsubscribe = subscribeWorkspaceChanges((change) => {
+      if (change.kind === "account") {
+        forgetAccountIdentity();
+        sessionStorage.removeItem("lootsplit.verified-account");
+        refresh();
+      }
+    });
     window.addEventListener("lootsplit-account-changed", refresh);
-    return () =>
+    return () => {
+      unsubscribe();
       window.removeEventListener("lootsplit-account-changed", refresh);
+    };
   }, []);
   const [library, setLibrary] = useState<AccountLibrary | null>(null);
   const [ready, setReady] = useState(false);
@@ -54,13 +61,11 @@ export function CampaignGate({ children }: { children: ReactNode }) {
     let active = true;
 
     void (async () => {
+      pinCampaignContext();
       let next: AccountLibrary | null = null;
       try {
-        const session = await accountRequest<{ user: { id: string } } | null>(
-          "auth/get-session",
-        );
-        if (session?.user)
-          next = await accountRequest<AccountLibrary>("library");
+        const session = await accountRequest<{ user: { id: string } } | null>("auth/get-session");
+        if (session?.user) next = await accountRequest<AccountLibrary>("library");
       } catch {
         if (navigator.onLine) {
           if (active)
@@ -70,18 +75,15 @@ export function CampaignGate({ children }: { children: ReactNode }) {
         }
       }
       if (!active) return;
-      const id = localStorage.getItem("quire.campaign.v1") || "main";
+      const id = activeCampaignId();
       const owner = localStorage.getItem(`quire.owner.${id}`);
       const ticket = sessionStorage.getItem("lootsplit.player.reconnect.v1");
       const offlineOwner =
-        !navigator.onLine &&
-        owner &&
-        owner === localStorage.getItem("lootsplit.offline-owner");
+        !navigator.onLine && owner && owner === localStorage.getItem("lootsplit.offline-owner");
       if (next) {
         sessionStorage.setItem("lootsplit.verified-account", next.user.id);
         localStorage.setItem("lootsplit.offline-owner", next.user.id);
-      } else if (offlineOwner)
-        sessionStorage.setItem("lootsplit.verified-account", owner!);
+      } else if (offlineOwner) sessionStorage.setItem("lootsplit.verified-account", owner!);
       else if (navigator.onLine) {
         sessionStorage.removeItem("lootsplit.verified-account");
         localStorage.removeItem("lootsplit.offline-owner");
@@ -104,8 +106,7 @@ export function CampaignGate({ children }: { children: ReactNode }) {
       active = false;
     };
   }, [identityEpoch]);
-  const invitation =
-    path === "/share" && !!new URLSearchParams(search).get("join");
+  const invitation = path === "/share" && !!new URLSearchParams(search).get("join");
   if (!ready)
     return (
       <main className="mx-auto max-w-xl p-6" role="status">
@@ -126,9 +127,7 @@ export function CampaignGate({ children }: { children: ReactNode }) {
     try {
       const result = await accountRequest<AccountMembership>("resume", {
         code: member.code,
-        ...(member.closed
-          ? { reopen: true, revision: member.room_revision }
-          : {}),
+        ...(member.closed ? { reopen: true, revision: member.room_revision } : {}),
       });
       await resumeAccountMembership(result);
     } catch (e) {
@@ -138,36 +137,27 @@ export function CampaignGate({ children }: { children: ReactNode }) {
     }
   }
   async function claim() {
-    const id = localStorage.getItem("quire.campaign.v1") || "main";
+    const id = activeCampaignId();
     const owner = localStorage.getItem(`quire.owner.${id}`);
     if (!library || (owner && owner !== library.user.id)) return;
     const seat = JSON.parse(
-      localStorage.getItem(
-        id === "main" ? "quire.seat.v1" : `quire.seat.v1.${id}`,
-      ) || "null",
+      localStorage.getItem(id === "main" ? "quire.seat.v1" : `quire.seat.v1.${id}`) || "null",
     );
     if (seat?.role === "player") {
-      setError(
-        "This is a player copy. Resume a campaign you own from My account.",
-      );
+      setError("This is a player copy. Resume a campaign you own from My account.");
       return;
     }
     setBusy(true);
     setError("");
     try {
-      const saved = JSON.parse(
-        localStorage.getItem(`quire.cloud.v2.${id}`) || "null",
-      );
+      const saved = JSON.parse(localStorage.getItem(`quire.cloud.v2.${id}`) || "null");
       if (saved?.role === "dm" && saved.code && saved.token) {
-        const campaigns = JSON.parse(
-          localStorage.getItem("quire.campaigns.v1") || "[]",
-        );
+        const campaigns = JSON.parse(localStorage.getItem("quire.campaigns.v1") || "[]");
         await accountRequest("link", {
           code: saved.code,
           token: saved.token,
           name:
-            campaigns.find((c: { id: string; name: string }) => c.id === id)
-              ?.name || "Campaign",
+            campaigns.find((c: { id: string; name: string }) => c.id === id)?.name || "Campaign",
         });
       }
       localStorage.setItem(`quire.owner.${id}`, library.user.id);
@@ -187,15 +177,10 @@ export function CampaignGate({ children }: { children: ReactNode }) {
   }
   return (
     <main className="mx-auto max-w-xl space-y-4 p-6">
-      <h1 className="text-3xl">
-        {library ? "Choose your campaign" : "Welcome to Lootsplit"}
-      </h1>
+      <h1 className="text-3xl">{library ? "Choose your campaign" : "Welcome to Lootsplit"}</h1>
       {!library ? (
         <>
-          <p>
-            Create an account or sign in to proceed as a Dungeon Master in your
-            own campaign
-          </p>
+          <p>Create an account or sign in to proceed as a Dungeon Master in your own campaign</p>
           <Link to="/account" className="settings-link">
             Create an account or sign in
           </Link>
@@ -205,9 +190,7 @@ export function CampaignGate({ children }: { children: ReactNode }) {
         </>
       ) : (
         <>
-          <p>
-            Your account owns your campaigns. Choose one to load its saved data.
-          </p>
+          <p>Your account owns your campaigns. Choose one to load its saved data.</p>
           <DeviceRecovery userId={library.user.id} />
           {library.members
             .filter((m) => m.role === "dm" && !m.archived)
@@ -224,16 +207,12 @@ export function CampaignGate({ children }: { children: ReactNode }) {
           <Link to="/account" className="settings-link">
             My account and saved campaigns
           </Link>
-          <Button
-            disabled={busy}
-            variant="secondary"
-            onClick={() => void claim()}
-          >
+          <Button disabled={busy} variant="secondary" onClick={() => void claim()}>
             Claim this device’s existing DM campaign
           </Button>
           <p className="text-sm">
-            Existing device saves are preserved. Claiming enables offline DM
-            play; start a room to save the shared campaign to your account.
+            Existing device saves are preserved. Claiming enables offline DM play; start a room to
+            save the shared campaign to your account.
           </p>
         </>
       )}

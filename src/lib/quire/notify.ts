@@ -1,3 +1,4 @@
+import { activeCampaignId } from "./campaign-context.ts";
 import { toast } from "sonner";
 
 const KEY = "quire.notices.v1";
@@ -61,7 +62,7 @@ export function notify(title: string, body: string, tag: string) {
 function currentSeat(): { role: "dm" | "player"; purseIds: string[] } {
   if (typeof window === "undefined") return { role: "dm", purseIds: [] };
   try {
-    const id = window.localStorage.getItem("quire.campaign.v1") || "main";
+    const id = activeCampaignId();
     const key = id === "main" ? "quire.seat.v1" : `quire.seat.v1.${id}`;
     const raw = window.localStorage.getItem(key);
     if (!raw) return { role: "dm", purseIds: [] };
