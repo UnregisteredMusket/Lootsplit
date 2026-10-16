@@ -4,6 +4,7 @@ import { readWorld } from "./world-schema.ts";
 import { blankCombatant, blankEncounter } from "../encounters/model.mjs";
 import {
   defaultDisplaySettings,
+  displayMapSize,
   projectPlayerDisplay,
   playerDisplaySchema,
   openPlayerDisplay,
@@ -250,4 +251,28 @@ test("display follows saved roster order and never marks an unlinked token activ
     false,
     "Physical calibration retains grid geometry with lines hidden",
   );
+});
+
+test("TV calibration keeps both tile axes square and fits rotated maps inside the viewport", () => {
+  const image = { width: 800, height: 600 },
+    viewport = { width: 1280, height: 720 };
+  const camera = { rotation: 0, zoom: 100, tilePixels: 0 };
+  assert.deepEqual(displayMapSize(image, viewport, null, camera), { width: 960, height: 720 });
+  assert.deepEqual(displayMapSize(image, viewport, null, { ...camera, rotation: 90 }), {
+    width: 720,
+    height: 540,
+  });
+  const grid = {
+    columns: 10,
+    rows: 8,
+    x: 0.1,
+    y: 0.1,
+    width: 0.5,
+    height: 0.8,
+    feetPerTile: 5,
+    diagonal: "equal" as const,
+  };
+  const calibrated = displayMapSize(image, viewport, grid, { ...camera, tilePixels: 36 });
+  assert.equal((calibrated.width * grid.width) / grid.columns, 36);
+  assert.equal((calibrated.height * grid.height) / grid.rows, 36);
 });

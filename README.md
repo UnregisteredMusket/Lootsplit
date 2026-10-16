@@ -14,7 +14,7 @@ Lootsplit is a shared party ledger and campaign application for web and Android.
 
 ## Tabs and multiple monitors
 
-The app header’s **Tabs & windows** control opens the current screen or another permitted screen in a browser tab or separate window. Move windows between monitors using the operating system. Each window retains its own campaign selection and drafts; saved local changes invalidate other windows and hosted rooms retain the existing authoritative sync/receipts. Child windows keep current permissions and reconnect to the same seat without putting credentials in URLs. A DM window remains private DM UI; use a player invitation in a separate browser profile/device for a player-facing screen. Android retains normal navigation and provides desktop guidance. See [verification and preservation](docs/audit/2026-10-16-multi-window.md).
+The app header’s **Tabs & windows** control opens the current screen or another permitted screen in a browser tab or separate window. Move windows between monitors using the operating system. Each window retains its own campaign selection and drafts; saved local changes invalidate other windows and hosted rooms retain the existing authoritative sync/receipts. Child windows keep current permissions and reconnect to the same seat without putting credentials in URLs. A DM window remains private DM UI; use **Player display** for a controlled TV map/tracker, or a player invitation in a separate browser profile/device for a normal player session. Android retains normal navigation and provides desktop guidance. See [verification and preservation](docs/audit/2026-10-16-multi-window.md).
 
 ## Home and feature screens
 

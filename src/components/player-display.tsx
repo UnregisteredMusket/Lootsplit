@@ -1,6 +1,8 @@
 import { useEffect, useRef, useState } from "react";
 import {
   displayChannelName,
+  displayMapSize,
+  defaultDisplaySettings,
   playerDisplaySchema,
   validDisplayId,
   type PlayerDisplayFrame,
@@ -74,16 +76,13 @@ export function PlayerDisplay() {
       setError("Fullscreen is unavailable here. Use your browser’s fullscreen control.");
     }
   }
-  const camera = frame?.camera,
-    rotated = !!camera && camera.rotation % 180 !== 0;
-  const fit = Math.min(
-    (rotated ? size.height : size.width) / image.width,
-    (rotated ? size.width : size.height) / image.height,
+  const camera = frame?.camera;
+  const dimensions = displayMapSize(
+    image,
+    size,
+    frame?.map?.grid ?? null,
+    camera ?? defaultDisplaySettings,
   );
-  const scale =
-    frame?.map?.grid && camera?.tilePixels
-      ? (camera.tilePixels * frame.map.grid.columns) / (image.width * frame.map.grid.width)
-      : fit;
   const visible = frame && !frame.paused;
   return (
     <main className="player-display" onPointerMove={() => setControls(true)}>
@@ -115,8 +114,8 @@ export function PlayerDisplay() {
               <div
                 className="display-map-plane"
                 style={{
-                  width: image.width * scale * (camera!.zoom / 100),
-                  height: image.height * scale * (camera!.zoom / 100),
+                  width: dimensions.width,
+                  height: dimensions.height,
                   left: `${50 + camera!.panX}%`,
                   top: `${50 + camera!.panY}%`,
                   transform: `translate(-50%, -50%) rotate(${camera!.rotation}deg)`,

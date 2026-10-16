@@ -228,3 +228,24 @@ export function openPlayerDisplay(id: string, tab = false) {
     throw Error("This browser could not open a player display.");
   }
 }
+
+/** Physical calibration makes each logical tile square on the display, including cropped grids. */
+export function displayMapSize(
+  image: { width: number; height: number },
+  viewport: { width: number; height: number },
+  grid: z.infer<typeof mapGridSchema> | null,
+  camera: Pick<DisplaySettings, "rotation" | "zoom" | "tilePixels">,
+) {
+  const rotated = camera.rotation % 180 !== 0;
+  const fit = Math.min(
+    (rotated ? viewport.height : viewport.width) / image.width,
+    (rotated ? viewport.width : viewport.height) / image.height,
+  );
+  const zoom = camera.zoom / 100;
+  return grid && camera.tilePixels
+    ? {
+        width: ((camera.tilePixels * grid.columns) / grid.width) * zoom,
+        height: ((camera.tilePixels * grid.rows) / grid.height) * zoom,
+      }
+    : { width: image.width * fit * zoom, height: image.height * fit * zoom };
+}

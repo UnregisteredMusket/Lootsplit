@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useRef, useState, type ReactNode } from "react";
+import { useEffect, useRef, useState, type ReactNode } from "react";
 import { MonitorPlay } from "lucide-react";
 import { Button, Field, Modal, Select } from "./ui";
 import { useSeat } from "@/lib/quire/seat";
@@ -20,16 +20,18 @@ import {
 } from "@/lib/quire/player-display";
 
 type Request = { mapId?: string; encounterId?: string };
-const Context = createContext<(request?: Request) => void>(() => {});
+const DISPLAY_REQUEST = "lootsplit:player-display";
 export function PlayerDisplayButton({
   mapId,
   encounterId,
   icon = false,
 }: Request & { icon?: boolean }) {
-  const show = useContext(Context),
-    dm = useSeat().role === "dm";
+  const dm = useSeat().role === "dm";
   if (!dm || import.meta.env.VITE_MOBILE === "true") return null;
-  const launch = () => show({ mapId, encounterId });
+  const launch = () =>
+    window.dispatchEvent(
+      new CustomEvent<Request>(DISPLAY_REQUEST, { detail: { mapId, encounterId } }),
+    );
   return icon ? (
     <button
       type="button"
@@ -51,15 +53,16 @@ export function PlayerDisplayProvider({ children }: { children: ReactNode }) {
   const seat = useSeat(),
     campaignId = activeCampaignId();
   return (
-    <DisplaySession
-      key={`${campaignId}:${seat.openedAt}:${seat.role}:${getCloudTable().code}`}
-      dm={seat.role === "dm"}
-    >
+    <>
       {children}
-    </DisplaySession>
+      <DisplaySession
+        key={`${campaignId}:${seat.openedAt}:${seat.role}:${getCloudTable().code}`}
+        dm={seat.role === "dm"}
+      />
+    </>
   );
 }
-function DisplaySession({ children, dm }: { children: ReactNode; dm: boolean }) {
+function DisplaySession({ dm }: { dm: boolean }) {
   const table = useWorldTable(),
     campaignId = activeCampaignId(),
     code = getCloudTable().joined ? getCloudTable().code : "device";
@@ -186,27 +189,32 @@ function DisplaySession({ children, dm }: { children: ReactNode; dm: boolean }) 
       setError(e instanceof Error ? e.message : "Display unavailable in this browser.");
     }
   }
-  function show(request: Request = {}) {
+  useEffect(() => {
     if (!dm) return;
-    setError("");
-    setSettings((s) => ({
-      ...s,
-      ...(request.mapId ? { mapId: request.mapId } : {}),
-      ...(request.encounterId && request.encounterId !== s.encounterId
-        ? {
-            encounterId: request.encounterId,
-            combatantIds: [],
-            showLoot: false,
-            showHp: false,
-            showConditions: false,
-          }
-        : {}),
-    }));
-    setOpen(true);
-  }
+    const show = (event: Event) => {
+      const request = (event as CustomEvent<Request>).detail;
+      if (!request) return;
+      setError("");
+      setSettings((s) => ({
+        ...s,
+        ...(request.mapId ? { mapId: request.mapId } : {}),
+        ...(request.encounterId && request.encounterId !== s.encounterId
+          ? {
+              encounterId: request.encounterId,
+              combatantIds: [],
+              showLoot: false,
+              showHp: false,
+              showConditions: false,
+            }
+          : {}),
+      }));
+      setOpen(true);
+    };
+    window.addEventListener(DISPLAY_REQUEST, show);
+    return () => window.removeEventListener(DISPLAY_REQUEST, show);
+  }, [dm]);
   return (
-    <Context.Provider value={show}>
-      {children}
+    <>
       {dm && (
         <Modal open={open} onOpenChange={setOpen} title="Player display">
           <div className="space-y-4">
@@ -384,7 +392,8 @@ function DisplaySession({ children, dm }: { children: ReactNode; dm: boolean }) 
             </Field>
             <p className="text-sm text-muted">
               For physical miniatures, measure a tile on the TV with a ruler and adjust pixel size.
-              Keep browser zoom at 100%. Grid calibration uses the map’s saved grid.
+              Keep browser zoom at 100%. Grid calibration uses the map’s saved grid and makes tiles
+              square on both axes.
             </p>
             <Button
               onClick={() => update({ zoom: 100, panX: 0, panY: 0, rotation: 0, tilePixels: 0 })}
@@ -409,7 +418,7 @@ function DisplaySession({ children, dm }: { children: ReactNode; dm: boolean }) 
           </div>
         </Modal>
       )}
-    </Context.Provider>
+    </>
   );
 }
 function Check({

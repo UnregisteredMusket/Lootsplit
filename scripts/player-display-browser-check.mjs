@@ -46,6 +46,7 @@ export async function checkPlayerDisplay(page, context, width, output) {
   await controls.getByLabel("Tile size in screen pixels", { exact: true }).fill("32");
   await expect(viewer.locator(".display-map-plane")).toHaveCSS("transform", /matrix\(0, 1, -1, 0,/);
   await expect(viewer.locator(".display-map-plane")).toHaveCSS("width", "320px");
+  await expect(viewer.locator(".display-map-plane")).toHaveCSS("height", "320px");
   await controls.getByRole("checkbox", { name: "Show grid", exact: true }).check();
   await expect(viewer.locator(".display-grid")).toHaveCount(1);
   await controls.getByRole("button", { name: "Fit map", exact: true }).click();
