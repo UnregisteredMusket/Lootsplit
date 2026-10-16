@@ -287,11 +287,13 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Packaged Worker / accounts (balanced v2) / worker-account | open | 2 | 85s → 117s | +32s | +37.65% |
 | Packaged Worker / accounts (balanced v2) / worker-finance | open | 2 | 22s → 34s | +12s | +54.55% |
 | Packaged Worker / accounts (balanced v2) / worker-ships | open | 2 | 27s → 47s | +20s | +74.07% |
+| backup / Export consistently and encrypt before writing to disk | open | 2 | 3s → 6s | +3s | +100% |
 
 ## Recorded slowdowns
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-16T09:42:40Z | step: backup / Export consistently and encrypt before writing to disk | 4s → 6s | +2s | +50% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38715104620/job/116355772933) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38882264810/job/116911561404) |
 | 2026-10-15T09:44:30Z | step: backup / Export consistently and encrypt before writing to disk | 3s → 4s | +1s | +33.33% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37290872931/job/111700688668) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38715104620/job/116355772933) |
 | 2026-10-14T09:43:36Z | step: backup / Run actions/checkout@v4 | 2s → 3s | +1s | +50% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37290872931/job/111700688668) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38544436444/job/115786877775) |
 | 2026-10-14T09:43:31.000Z | queue: Encrypted offsite database backup / initial queue | 5s → 6s | +1s | +20% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37290872931) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38544436444) |
