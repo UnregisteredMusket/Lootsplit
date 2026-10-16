@@ -2,7 +2,7 @@ import { chromium } from "playwright";
 import { expect } from "playwright/test";
 import assert from "node:assert/strict";
 import { mkdir } from "node:fs/promises";
-import { openApplication, reloadApplication } from "./title-screen-navigation.mjs";
+import { openApplication, reloadApplication, continueIntoApp } from "./title-screen-navigation.mjs";
 const origin = process.env.AUDIT_ORIGIN || "http://127.0.0.1:8080";
 const output = process.env.FINANCE_SCREENSHOTS || "test-results/finance";
 await mkdir(output, { recursive: true });
@@ -300,10 +300,20 @@ try {
     // Two local tabs share IndexedDB but have independently rendered forms.
     // Both accepted requests must survive instead of replacing an old snapshot.
     await go("bank");
-    const other = await context.newPage();
+    // Open through the shipped multi-window control; the child keeps the same campaign.
+    await page.getByRole("button", { name: "Tabs & windows", exact: true }).click();
+    await page.screenshot({ path: `${output}/workspace-controls-${width}.png` });
+    await page.getByLabel("Screen to open", { exact: true }).selectOption("/features/bank");
+    const openedTab = context.waitForEvent("page");
+    await page.getByRole("button", { name: "Open new tab", exact: true }).click();
+    const other = await openedTab;
     other.on("pageerror", (error) => errors.push(error.message));
-    await openApplication(other, origin + "/features/bank");
+    await other.waitForURL((url) => url.pathname === "/features/bank");
+    await continueIntoApp(other);
+    assert.equal(await other.evaluate(() => window.opener), null);
+    await page.keyboard.press("Escape");
     await other.locator("#campaign-finance").waitFor();
+    await expect(other).toHaveTitle("Bank · Lootsplit");
     const drafts = [
       [page, "First tab expense", "100"],
       [other, "Second tab expense", "200"],
@@ -340,10 +350,65 @@ try {
         db.close();
       }
     });
+    // Both visible windows must update without a reload or lost draft.
+    await expect(page.getByText("Second tab expense", { exact: true })).toBeVisible();
+    await expect(other.getByText("First tab expense", { exact: true })).toBeVisible();
+    await page
+      .getByPlaceholder("What is this payment for?", { exact: true })
+      .fill("Unfinished primary window draft");
+    const parentCampaign = await page.evaluate(() =>
+      sessionStorage.getItem("lootsplit.window.campaign.v1"),
+    );
+    await page.getByRole("button", { name: "Tabs & windows", exact: true }).click();
+    await page.getByLabel("Screen to open", { exact: true }).selectOption("/maps");
+    const openedWindow = context.waitForEvent("page");
+    await page.getByRole("button", { name: "Open separate window", exact: true }).click();
+    const mapWindow = await openedWindow;
+    mapWindow.on("pageerror", (error) => errors.push(error.message));
+    await mapWindow.waitForURL((url) => url.pathname === "/maps");
+    await continueIntoApp(mapWindow);
+    await expect(
+      mapWindow.getByRole("heading", { name: "Campaign maps", exact: true }),
+    ).toBeVisible();
+    await expect(mapWindow).toHaveTitle("Maps · Lootsplit");
+    assert.equal(
+      await mapWindow.evaluate(() => sessionStorage.getItem("lootsplit.window.campaign.v1")),
+      parentCampaign,
+    );
+    await page.keyboard.press("Escape");
+    await expect(page.getByPlaceholder("What is this payment for?", { exact: true })).toHaveValue(
+      "Unfinished primary window draft",
+    );
+    await mapWindow.screenshot({ path: `${output}/multi-window-maps-${width}.png` });
+    // Create a second campaign through real controls in the second tab.
+    // Its new selection must not redirect the first tab's subsequent writes.
+    await other.getByRole("button", { name: "Select campaign", exact: true }).click();
+    await other.getByLabel("New campaign name", { exact: true }).fill("Other monitor campaign");
+    await other.getByRole("button", { name: "New campaign", exact: true }).click();
+    await expect(other.getByLabel("Campaign name", { exact: true })).toHaveValue(
+      "Other monitor campaign",
+    );
+    assert.notEqual(
+      await other.evaluate(() => sessionStorage.getItem("lootsplit.window.campaign.v1")),
+      parentCampaign,
+    );
+    assert.equal(
+      await page.evaluate(() => sessionStorage.getItem("lootsplit.window.campaign.v1")),
+      parentCampaign,
+    );
+    assert.equal(
+      await mapWindow.evaluate(() => sessionStorage.getItem("lootsplit.window.campaign.v1")),
+      parentCampaign,
+    );
+    await page.getByLabel("Payment amount in copper", { exact: true }).fill("50");
+    await page.getByRole("button", { name: "Queue payment", exact: true }).click();
+    await expect(page.getByText("Unfinished primary window draft", { exact: true })).toBeVisible();
+    await mapWindow.close();
     await other.close();
     await reloadApplication(page);
     await page.getByText("First tab expense", { exact: true }).waitFor();
     await page.getByText("Second tab expense", { exact: true }).waitFor();
+    await page.getByText("Unfinished primary window draft", { exact: true }).waitFor();
     await context.close();
   }
   assert.deepEqual(errors, []);

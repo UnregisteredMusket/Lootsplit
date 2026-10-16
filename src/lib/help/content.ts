@@ -10,6 +10,43 @@ export type HelpTopic = {
 export type HelpGroup = { id: string; title: string; topics: HelpTopic[] };
 export const HELP_GROUPS: HelpGroup[] = [
   {
+    id: "workspace-windows",
+    title: "Tabs, windows & multiple monitors",
+    topics: [
+      {
+        id: "multiple-displays",
+        title: "Open screens side by side",
+        audience: "DM / Players",
+        paragraphs: [
+          "Choose Tabs & windows in the app header, select Current screen or another permitted screen, then Open new tab or Open separate window. Move a separate window to another monitor using your computer’s window controls. Your browser may require pop-up permission or choose how a new window opens. Complete the title screen in each new document. The website supports these controls; the Android app keeps its existing navigation and points you to the desktop website for multiple monitors.",
+          "Each window keeps its own screen, scroll position, form entries and selected campaign. Opening a new window preserves the current one. Saved changes refresh other windows viewing the same campaign; shared campaign updates still use the authoritative server and normal Live/Turn-based rules. Pending changes remain pending until submitted. Closing a window does not end the hosted session; retain or export unsent guest work before closing its document. Private PDFs remain on the same device and browser profile.",
+          "Another window retains the current role and character permissions. A second DM window contains DM information; it is not automatically a safe player display. For a normal player session, open a current player invitation in a separate browser profile or device. For a TV map or tracker, use the dedicated Player display control. Guests keep campaign contents in document memory, while the new window reconnects to the same authorized seat. Finish or resolve existing drafts before intentionally changing seats or accounts. Sign-in and sign-out affect the browser profile’s account across its windows.",
+          "Edit separate records where practical. Saving stale versions of protected records may require a refresh and review; the app does not silently overwrite an unfinished character or encounter form. Tab titles name their screens. Music remains device-local; use browser tab mute when only one window should produce audio. Browsers may throttle minimized or background tabs; restore the window to refresh it.",
+        ],
+        links: [
+          ["Open campaign", "/?view=home"],
+          ["Campaign sync & pending changes", "/share"],
+        ],
+      },
+      {
+        id: "player-display",
+        title: "Show a map or encounter on a TV",
+        audience: "DM",
+        paragraphs: [
+          "Choose Player display in the header, Maps, or a campaign encounter. Select a shared map and an encounter from the current campaign. Open player window for an HDMI or extended desktop display, or Open player tab for browser tab casting. Move the window to the TV and use Fullscreen. For wireless use, choose Cast tab from the browser casting menu; TV and browser support varies. Lootsplit does not discover receivers or create a remote public display link.",
+          "The display starts blank. Select the combatants to reveal, then Show display. New combatants remain hidden until selected; exact HP and conditions are optional. Only saved encounter updates appear. Shared map tokens follow their existing positions and the selected encounter’s active turn. Creature tokens also require a revealed combatant. DM-only markers, tokens, notes, stat blocks and private financial records are excluded. Shared images are shown whole; prepare player-ready artwork because this view does not add fog of war.",
+          "Use rotation, zoom and position controls for the map case. Enable the grid if desired. For physical miniatures, set tile pixels, measure the grid on the TV with a ruler and adjust; browser zoom should be 100%. Fit map resets the camera. Grid settings use the map’s saved rows, columns and alignment. Tile-pixel calibration makes tiles square on both axes; fit mode retains the image proportions. Blank display clears its map, tracker and loot immediately.",
+          "Show confirmed awarded loot is optional. Loot appears only after the normal Transfer loot once succeeds and records a receipt. Presenting an award does not transfer anything again. The display shows item names and quantities plus the receipt summary; recipient finances, notes, item values and unawarded loot stay private.",
+          "Keep the controlling DM window open. Controls remain available across normal in-app navigation. Changing campaign or role resets the display; closing or reloading the DM window clears it after its connection expires. The viewer holds only the sanitized presentation in memory, receives no copied reconnect ticket and loads no campaign/account interface. A fresh viewer skips the normal campaign title screen. This is presentation on your own device, not a security boundary for someone using your signed-in browser or a replacement for player invitations. Desktop web provides these controls; no new signed Android update is included.",
+        ],
+        links: [
+          ["Open Maps", "/maps"],
+          ["Campaign encounters", "/encounters"],
+        ],
+      },
+    ],
+  },
+  {
     id: "world",
     title: "Maps, NPCs, barter & session time",
     topics: [

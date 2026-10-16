@@ -23,6 +23,7 @@ import { Route as LibraryRouteImport } from './routes/library'
 import { Route as MapsRouteImport } from './routes/maps'
 import { Route as MarketRouteImport } from './routes/market'
 import { Route as PartyRouteImport } from './routes/party'
+import { Route as PlayerDisplayRouteImport } from './routes/player-display'
 import { Route as ResourcesRouteImport } from './routes/resources'
 import { Route as SettingsRouteImport } from './routes/settings'
 import { Route as ShareRouteImport } from './routes/share'
@@ -104,6 +105,11 @@ const PartyRoute = PartyRouteImport.update({
   path: '/party',
   getParentRoute: () => rootRouteImport,
 } as any)
+const PlayerDisplayRoute = PlayerDisplayRouteImport.update({
+  id: '/player-display',
+  path: '/player-display',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const ResourcesRoute = ResourcesRouteImport.update({
   id: '/resources',
   path: '/resources',
@@ -170,6 +176,7 @@ export interface FileRoutesByFullPath {
   '/maps': typeof MapsRoute
   '/market': typeof MarketRoute
   '/party': typeof PartyRoute
+  '/player-display': typeof PlayerDisplayRoute
   '/resources': typeof ResourcesRoute
   '/settings': typeof SettingsRoute
   '/share': typeof ShareRoute
@@ -196,6 +203,7 @@ export interface FileRoutesByTo {
   '/maps': typeof MapsRoute
   '/market': typeof MarketRoute
   '/party': typeof PartyRoute
+  '/player-display': typeof PlayerDisplayRoute
   '/resources': typeof ResourcesRoute
   '/settings': typeof SettingsRoute
   '/share': typeof ShareRoute
@@ -223,6 +231,7 @@ export interface FileRoutesById {
   '/maps': typeof MapsRoute
   '/market': typeof MarketRoute
   '/party': typeof PartyRoute
+  '/player-display': typeof PlayerDisplayRoute
   '/resources': typeof ResourcesRoute
   '/settings': typeof SettingsRoute
   '/share': typeof ShareRoute
@@ -251,6 +260,7 @@ export interface FileRouteTypes {
     | '/maps'
     | '/market'
     | '/party'
+    | '/player-display'
     | '/resources'
     | '/settings'
     | '/share'
@@ -277,6 +287,7 @@ export interface FileRouteTypes {
     | '/maps'
     | '/market'
     | '/party'
+    | '/player-display'
     | '/resources'
     | '/settings'
     | '/share'
@@ -303,6 +314,7 @@ export interface FileRouteTypes {
     | '/maps'
     | '/market'
     | '/party'
+    | '/player-display'
     | '/resources'
     | '/settings'
     | '/share'
@@ -330,6 +342,7 @@ export interface RootRouteChildren {
   MapsRoute: typeof MapsRoute
   MarketRoute: typeof MarketRoute
   PartyRoute: typeof PartyRoute
+  PlayerDisplayRoute: typeof PlayerDisplayRoute
   ResourcesRoute: typeof ResourcesRoute
   SettingsRoute: typeof SettingsRoute
   ShareRoute: typeof ShareRoute
@@ -442,6 +455,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof PartyRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/player-display': {
+      id: '/player-display'
+      path: '/player-display'
+      fullPath: '/player-display'
+      preLoaderRoute: typeof PlayerDisplayRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/resources': {
       id: '/resources'
       path: '/resources'
@@ -530,6 +550,7 @@ const rootRouteChildren: RootRouteChildren = {
   MapsRoute: MapsRoute,
   MarketRoute: MarketRoute,
   PartyRoute: PartyRoute,
+  PlayerDisplayRoute: PlayerDisplayRoute,
   ResourcesRoute: ResourcesRoute,
   SettingsRoute: SettingsRoute,
   ShareRoute: ShareRoute,

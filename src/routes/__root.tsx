@@ -1,3 +1,4 @@
+import { PlayerDisplayProvider } from "@/components/player-display-controller";
 import { CampaignGate } from "@/components/account/campaign-gate";
 import { AppNotifications } from "@/components/app-notifications";
 import { RouteLoading } from "@/components/route-loading";
@@ -51,6 +52,7 @@ export const Route = createRootRoute({
       "/resources",
       "/donate",
     ].includes(pathname.replace(/\/$/, ""));
+    const playerDisplay = pathname.replace(/\/$/, "") === "/player-display";
     installMobileApi();
     return (
       <html lang="en" suppressHydrationWarning>
@@ -59,21 +61,29 @@ export const Route = createRootRoute({
         </head>
         <body>
           <PreviewHostBridge />
-          <MemberActivity />
+          {!playerDisplay && <MemberActivity />}
           <RouteLoading />
-          <OpeningGate publicPage={publicPage}>
-            <AuthProvider>
-              <CampaignGate><LibraryProvider>
-                <PrefsProvider>
-                  <MenuAudioBridge />
-                  <EconomyProvider>
-                    <AppNotifications />
-                    <Outlet />
-                  </EconomyProvider>
-                </PrefsProvider>
-              </LibraryProvider></CampaignGate>
-            </AuthProvider>
-          </OpeningGate>
+          {playerDisplay ? (
+            <Outlet />
+          ) : (
+            <OpeningGate publicPage={publicPage}>
+              <AuthProvider>
+                <CampaignGate>
+                  <LibraryProvider>
+                    <PrefsProvider>
+                      <MenuAudioBridge />
+                      <EconomyProvider>
+                        <PlayerDisplayProvider>
+                          <AppNotifications />
+                          <Outlet />
+                        </PlayerDisplayProvider>
+                      </EconomyProvider>
+                    </PrefsProvider>
+                  </LibraryProvider>
+                </CampaignGate>
+              </AuthProvider>
+            </OpeningGate>
+          )}
           <Scripts />
         </body>
       </html>

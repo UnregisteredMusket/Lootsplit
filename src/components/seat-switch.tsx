@@ -1,3 +1,4 @@
+import { activeCampaignId } from "../lib/quire/campaign-context.ts";
 import { useEffect, useState, type FormEvent } from "react";
 import { Button, Field, Modal, TextInput } from "@/components/ui";
 import { releasePlayerSeat } from "@/lib/quire/cloud-client";
@@ -36,7 +37,7 @@ export function SeatSwitch({
       setError("Disconnect from the shared campaign before changing roles.");
       return;
     }
-    const campaign = localStorage.getItem("quire.campaign.v1") || "main";
+    const campaign = activeCampaignId();
     const owner = localStorage.getItem(`quire.owner.${campaign}`);
     if (!owner || owner !== sessionStorage.getItem("lootsplit.verified-account")) {
       setError("Sign in and open a campaign you own to act as its Dungeon Master.");

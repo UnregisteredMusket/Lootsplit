@@ -1,3 +1,4 @@
+import { activeCampaignId } from "./campaign-context.ts";
 import { activeDatabaseName } from "./db.ts";
 import { isEphemeralCampaign } from "./guest-storage.ts";
 
@@ -15,7 +16,7 @@ export function captureDeviceMutationScope(): DeviceMutationScope {
     campaignId:
       typeof localStorage === "undefined"
         ? "main"
-        : localStorage.getItem("quire.campaign.v1") || "main",
+        : activeCampaignId(),
     databaseName: ephemeral ? "guest-memory" : activeDatabaseName(),
     accountId:
       typeof sessionStorage === "undefined"

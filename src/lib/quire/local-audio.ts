@@ -1,3 +1,4 @@
+import { activeCampaignId } from "./campaign-context.ts";
 import {
   AudioLibraryStorage,
   type LocalAudioLibrary,
@@ -16,7 +17,7 @@ export function localAudioAllowed() {
   if (typeof window === "undefined" || getSeat().role !== "dm") return false;
   try {
     const account = sessionStorage.getItem("lootsplit.verified-account");
-    const campaign = localStorage.getItem("quire.campaign.v1") || "main";
+    const campaign = activeCampaignId();
     return !!account && localStorage.getItem(`quire.owner.${campaign}`) === account;
   } catch {
     return false;

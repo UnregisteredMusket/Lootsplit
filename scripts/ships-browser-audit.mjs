@@ -6,6 +6,7 @@ import {
   openApplication,
   reloadApplication,
   navigateApplication,
+  continueIntoApp,
 } from "./title-screen-navigation.mjs";
 import { chooseOption } from "./search-select-browser.mjs";
 import { createAndSaveRoom } from "./browser/account-fixtures.mjs";
@@ -357,6 +358,54 @@ try {
       ),
       false,
       "Guest fleet stays in memory",
+    );
+    // A companion window reuses only the same authorized reconnect ticket.
+    await guest.getByRole("button", { name: "Tabs & windows", exact: true }).click();
+    await guest.getByLabel("Screen to open", { exact: true }).selectOption("/features/properties");
+    await expect(
+      guest.getByLabel("Screen to open").locator('option[value="/encounters"]'),
+    ).toHaveCount(0);
+    const opened = guestContext.waitForEvent("page");
+    await guest.getByRole("button", { name: "Open separate window", exact: true }).click();
+    const companion = await opened;
+    companion.guestAccessAudit = true;
+    companion.on("pageerror", (e) => errors.push(e.message));
+    await companion.waitForURL((url) => url.pathname === "/features/properties");
+    await continueIntoApp(companion);
+    const companionShip = companion.locator("#property-ship");
+    await expect(
+      companionShip.getByRole("heading", { name: "Ship · Silver Wake", exact: true }),
+    ).toBeVisible();
+    await expect(
+      companionShip.getByRole("button", { name: "DM ship settings", exact: true }),
+    ).toHaveCount(0);
+    await expect(companionShip).not.toContainText("Synthetic private navigation clue");
+    assert.equal(await companion.evaluate(() => window.opener), null);
+    assert.equal(
+      await companion.evaluate(() => sessionStorage.getItem("lootsplit.player.reconnect.v1")),
+      await guest.evaluate(() => sessionStorage.getItem("lootsplit.player.reconnect.v1")),
+    );
+    const companionNaming = companionShip.getByRole("form", {
+      name: "Name your ship",
+      exact: true,
+    });
+    await companionNaming.getByLabel("Ship name", { exact: true }).fill("Across displays");
+    await companionNaming.getByRole("button", { name: "Save", exact: true }).click();
+    await guest.keyboard.press("Escape");
+    await expect(
+      guestShip.getByRole("heading", { name: "Ship · Across displays", exact: true }),
+    ).toBeVisible();
+    await companion.close();
+    await expect(
+      guestShip.getByRole("heading", { name: "Ship · Across displays", exact: true }),
+    ).toBeVisible();
+    assert.deepEqual(
+      await guest.evaluate(() =>
+        Object.keys(localStorage).filter(
+          (k) => k.startsWith("quire.cloud") || k.includes("pending"),
+        ),
+      ),
+      [],
     );
     await guestContext.close();
     await context.close();

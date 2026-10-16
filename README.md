@@ -12,6 +12,10 @@ Maps support category filters, dungeon/property/ship layouts, free DM party plac
 
 Lootsplit is a shared party ledger and campaign application for web and Android. Production runs on Cloudflare Workers and D1; GitHub Actions verifies and publishes the exact tested artifact from `main`.
 
+## Tabs and multiple monitors
+
+The app header’s **Tabs & windows** control opens the current screen or another permitted screen in a browser tab or separate window. Move windows between monitors using the operating system. Each window retains its own campaign selection and drafts; saved local changes invalidate other windows and hosted rooms retain the existing authoritative sync/receipts. Child windows keep current permissions and reconnect to the same seat without putting credentials in URLs. A DM window remains private DM UI; use **Player display** for a controlled TV map/tracker, or a player invitation in a separate browser profile/device for a normal player session. Android retains normal navigation and provides desktop guidance. See [verification and preservation](docs/audit/2026-10-16-multi-window.md).
+
 ## Home and feature screens
 
 Player Library offers searchable, read-only item, spell and creature indices without DM import or setup instructions. Lookup pauses during active campaign encounters by default. DMs can disable lookup, limit indices, or allow it during encounters from **Library → Player reference lookup** or **Settings & Management → Players & permissions**. Shared campaign records, handouts and saved sheets remain available. Character selection does not grant control of another assigned character; existing full-editing and individual-field permissions remain unchanged.
@@ -128,3 +132,8 @@ Ships and private shipyards are managed inside Property Management, using existi
 Map icons show the selected record or combat token with a blue fill and ring. Selection follows record details and the DM token selector; campaign map data and player visibility remain unchanged.
 
 The October 13 current-layout improvements retain the existing navigation, themes, searchable selectors and campaign commands. Player Home opens the exact assigned sheet; Sheet tools groups export/reload; the shared strip links directly to pending recovery; DM readouts and phone selectors wrap more clearly; downtime groups training fields and displays the captured-period hour budget. See [preservation audit](docs/audit/2026-10-13-current-layout.md).
+
+
+### TV and player display (October 16, 2026)
+
+DMs can open Player display from the header, Maps or the current campaign encounter. A separate window/tab shows only an explicitly projected shared map, selected combatants and optional confirmed loot awards. Fullscreen, rotation, fit/zoom/pan and measured tile-pixel calibration support TVs and map cases. HDMI/extended desktop uses OS window placement; wireless use relies on the browser’s Cast tab support. This adds no public receiver link or remote seat. The viewer mounts no campaign/account providers, clears copied session credentials, receives only strict-schema presentation frames in memory and clears on blanking/controller loss. Secret notes, DM-only map records, unrevealed combatants and unawarded loot are excluded. Awards still use the existing atomic transaction and receipt. Player Help and DM Help cover the distinct workflows. Native Android navigation, all six main tabs and prior maps/encounters/loot remain. Verification extends the complete development/immutable Worker map audit rather than replacing original scenarios; see `docs/audit/2026-10-16-multi-window.md`.

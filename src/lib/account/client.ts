@@ -1,11 +1,15 @@
 import { API_ORIGIN } from "../mobile/origin";
 import { announceSheetChange } from "../quire/party-sheet-links";
 import { readAccountResponse } from "./response";
+import { announceWorkspaceChange } from "../quire/workspace-events";
 const native = () => import.meta.env.VITE_MOBILE === "true";
 const TOKEN = "lootsplit.account.token.v1";
 // Coalesce the startup gate and account controls' identity reads. This is UI
 // state only: every server mutation independently authenticates the request.
 let identityRead: { until: number; result: Promise<unknown> } | undefined;
+export function forgetAccountIdentity() {
+  identityRead = undefined;
+}
 export function accountRequest<T>(path: string, body?: unknown, signal?: AbortSignal): Promise<T> {
   if (body !== undefined && path.startsWith("auth/")) identityRead = undefined;
   if (path === "auth/get-session" && body === undefined && !signal) {
@@ -63,6 +67,7 @@ async function accountRequestCore<T>(
     // checking the newly authenticated account (or after sign-out).
     sessionStorage.removeItem("lootsplit.verified-account");
     window.dispatchEvent(new Event("lootsplit-account-changed"));
+    announceWorkspaceChange("account");
   }
   return result as T;
 }

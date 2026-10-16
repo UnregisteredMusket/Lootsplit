@@ -1,3 +1,4 @@
+import { PlayerDisplayButton } from "./player-display-controller";
 import { GridEditor, PartyPlacement, CombatControls } from "./map-tile-controls";
 import { mapType, partyEnvironment, tilePoint, routePosition } from "@/lib/quire/map-tiles";
 import { canonicalJson } from "@/lib/quire/canonical-json";
@@ -221,6 +222,10 @@ export function CampaignMaps() {
         {dm && (
           <>
             <Button onClick={() => setEditing(null)}>Import map</Button>
+            <PlayerDisplayButton
+              mapId={map?.visible ? map.id : undefined}
+              encounterId={map?.encounterId}
+            />
             {map && <Button onClick={() => setEditing(map)}>Edit map & anchors</Button>}
           </>
         )}

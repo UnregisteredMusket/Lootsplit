@@ -1,3 +1,4 @@
+import { activeCampaignId } from "./campaign-context.ts";
 import { canReadNote } from "./chat-visibility.ts";
 import type {ReportBase} from "./local-report.ts";
 import type { Coins, Holding, LedgerLine, Purse, RealmSettings, Shop, StockLine } from "./types.ts";
@@ -66,7 +67,7 @@ let loaded = false;
 
 function seatKey() {
   if (typeof window === "undefined") return KEY;
-  const id = window.localStorage.getItem("quire.campaign.v1") || "main";
+  const id = activeCampaignId();
   return id === "main" ? KEY : `${KEY}.${id}`;
 }
 

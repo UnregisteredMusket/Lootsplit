@@ -1,3 +1,4 @@
+import { activeCampaignId } from "./campaign-context.ts";
 import type { Article, Book, DraftArticle } from "./types.ts";
 
 import { isEphemeralCampaign } from "./guest-storage.ts";
@@ -6,14 +7,24 @@ let memoryFactory: IDBFactory | undefined;
 
 export function activeDatabaseName(): string {
   if (typeof window === "undefined") return "quire";
+  let missingPinnedCampaign = false;
   try {
-    const list = JSON.parse(window.localStorage.getItem("quire.campaigns.v1") || "[]") as { id?: string; db?: string }[];
-    const active = window.localStorage.getItem("quire.campaign.v1");
+    const list = JSON.parse(window.localStorage.getItem("quire.campaigns.v1") || "[]") as {
+      id?: string;
+      db?: string;
+    }[];
+    const active = activeCampaignId();
     const found = Array.isArray(list) ? list.find((row) => row.id === active) : undefined;
     if (found && typeof found.db === "string" && found.db.startsWith("quire")) return found.db;
+    missingPinnedCampaign =
+      active !== "main" && !!sessionStorage.getItem("lootsplit.window.campaign.v1");
   } catch {
     // Keep the original store.
   }
+  if (missingPinnedCampaign)
+    throw Error(
+      "This campaign was removed in another window. Open a saved campaign before continuing.",
+    );
   return "quire";
 }
 
@@ -32,52 +43,59 @@ async function database(): Promise<IDBDatabase> {
     return Promise.reject(new Error("Library storage is only available in the browser."));
   }
   const memory = isEphemeralCampaign();
-  if (memory && !memoryFactory) { const { IDBFactory } = await import("fake-indexeddb"); memoryFactory ||= new IDBFactory(); }
+  if (memory && !memoryFactory) {
+    const { IDBFactory } = await import("fake-indexeddb");
+    memoryFactory ||= new IDBFactory();
+  }
   const factory = memory ? memoryFactory! : indexedDB;
   const name = memory ? "guest-memory" : activeDatabaseName();
   if (opening && openName === name) return opening;
   openName = name;
   opening = new Promise((resolve, reject) => {
     const open = factory.open(name, DB_VERSION);
-      open.onupgradeneeded = () => {
-        const db = open.result;
-        if (!db.objectStoreNames.contains("books")) db.createObjectStore("books", { keyPath: "id" });
-        if (!db.objectStoreNames.contains("articles")) {
-          const store = db.createObjectStore("articles", { keyPath: "id" });
-          store.createIndex("bookId", "bookId", { unique: false });
-        }
-        if (!db.objectStoreNames.contains("purses")) db.createObjectStore("purses", { keyPath: "id" });
-        if (!db.objectStoreNames.contains("holdings")) {
-          const store = db.createObjectStore("holdings", { keyPath: "id" });
-          store.createIndex("purseId", "purseId", { unique: false });
-        }
-        if (!db.objectStoreNames.contains("shops")) db.createObjectStore("shops", { keyPath: "id" });
-        if (!db.objectStoreNames.contains("stock")) {
-          const store = db.createObjectStore("stock", { keyPath: "id" });
-          store.createIndex("shopId", "shopId", { unique: false });
-        }
-        if (!db.objectStoreNames.contains("ledger")) db.createObjectStore("ledger", { keyPath: "id" });
-        if (!db.objectStoreNames.contains("meta")) db.createObjectStore("meta", { keyPath: "id" });
-        if (!db.objectStoreNames.contains("catalog")) db.createObjectStore("catalog", { keyPath: "id" });
-        if (!db.objectStoreNames.contains("lexicon")) db.createObjectStore("lexicon", { keyPath: "id" });
-      };
-      open.onblocked = () => {
+    open.onupgradeneeded = () => {
+      const db = open.result;
+      if (!db.objectStoreNames.contains("books")) db.createObjectStore("books", { keyPath: "id" });
+      if (!db.objectStoreNames.contains("articles")) {
+        const store = db.createObjectStore("articles", { keyPath: "id" });
+        store.createIndex("bookId", "bookId", { unique: false });
+      }
+      if (!db.objectStoreNames.contains("purses"))
+        db.createObjectStore("purses", { keyPath: "id" });
+      if (!db.objectStoreNames.contains("holdings")) {
+        const store = db.createObjectStore("holdings", { keyPath: "id" });
+        store.createIndex("purseId", "purseId", { unique: false });
+      }
+      if (!db.objectStoreNames.contains("shops")) db.createObjectStore("shops", { keyPath: "id" });
+      if (!db.objectStoreNames.contains("stock")) {
+        const store = db.createObjectStore("stock", { keyPath: "id" });
+        store.createIndex("shopId", "shopId", { unique: false });
+      }
+      if (!db.objectStoreNames.contains("ledger"))
+        db.createObjectStore("ledger", { keyPath: "id" });
+      if (!db.objectStoreNames.contains("meta")) db.createObjectStore("meta", { keyPath: "id" });
+      if (!db.objectStoreNames.contains("catalog"))
+        db.createObjectStore("catalog", { keyPath: "id" });
+      if (!db.objectStoreNames.contains("lexicon"))
+        db.createObjectStore("lexicon", { keyPath: "id" });
+    };
+    open.onblocked = () => {
+      opening = null;
+      reject(new Error("Close other Lootsplit tabs, then reload."));
+    };
+    open.onsuccess = () => {
+      const db = open.result;
+      db.onversionchange = () => {
+        db.close();
         opening = null;
-        reject(new Error("Close other Lootsplit tabs, then reload."));
       };
-      open.onsuccess = () => {
-        const db = open.result;
-        db.onversionchange = () => {
-          db.close();
-          opening = null;
-        };
-        resolve(db);
-      };
-      open.onerror = () => {
-        opening = null;
-        reject(open.error ?? new Error("Could not open the library."));
-      };
-    });
+      resolve(db);
+    };
+    open.onerror = () => {
+      opening = null;
+      reject(open.error ?? new Error("Could not open the library."));
+    };
+  });
   return opening;
 }
 
@@ -98,13 +116,17 @@ export function deleteQuireDatabase(name: string): Promise<void> {
   return new Promise((resolve, reject) => {
     const request = indexedDB.deleteDatabase(name);
     request.onsuccess = () => resolve();
-    request.onerror = () => reject(request.error ?? new Error("That campaign could not be removed."));
+    request.onerror = () =>
+      reject(request.error ?? new Error("That campaign could not be removed."));
     // A delete request cannot be cancelled. Keep it pending until other connections close.
     request.onblocked = () => {};
   });
 }
 
-export function byReadingOrder(a: Pick<Article, "pageStart" | "pageEnd" | "title">, b: Pick<Article, "pageStart" | "pageEnd" | "title">) {
+export function byReadingOrder(
+  a: Pick<Article, "pageStart" | "pageEnd" | "title">,
+  b: Pick<Article, "pageStart" | "pageEnd" | "title">,
+) {
   return a.pageStart - b.pageStart || a.pageEnd - b.pageEnd || a.title.localeCompare(b.title);
 }
 
@@ -121,7 +143,9 @@ export async function getBook(id: string): Promise<Book | null> {
 
 export async function articlesForBook(bookId: string): Promise<Article[]> {
   const db = await database();
-  const articles = await request(db.transaction("articles").objectStore("articles").index("bookId").getAll(bookId));
+  const articles = await request(
+    db.transaction("articles").objectStore("articles").index("bookId").getAll(bookId),
+  );
   return articles.sort(byReadingOrder);
 }
 
@@ -130,7 +154,9 @@ export async function getArticle(id: string): Promise<Article | null> {
   return (await request(db.transaction("articles").objectStore("articles").get(id))) ?? null;
 }
 
-export async function articleNeighbors(article: Article): Promise<{ prev: Article | null; next: Article | null }> {
+export async function articleNeighbors(
+  article: Article,
+): Promise<{ prev: Article | null; next: Article | null }> {
   const articles = await articlesForBook(article.bookId);
   const index = articles.findIndex((item) => item.id === article.id);
   return {
@@ -142,7 +168,9 @@ export async function articleNeighbors(article: Article): Promise<{ prev: Articl
 export async function listFavorites(): Promise<Article[]> {
   const db = await database();
   const articles = await request(db.transaction("articles").objectStore("articles").getAll());
-  return articles.filter((article) => article.favorite).sort((a, b) => a.title.localeCompare(b.title));
+  return articles
+    .filter((article) => article.favorite)
+    .sort((a, b) => a.title.localeCompare(b.title));
 }
 
 export async function randomArticleId(): Promise<string | null> {
@@ -209,7 +237,9 @@ export async function setFavorite(id: string, favorite: boolean): Promise<Articl
 
 export async function deleteBook(id: string): Promise<void> {
   const db = await database();
-  const articles = await request(db.transaction("articles").objectStore("articles").index("bookId").getAll(id));
+  const articles = await request(
+    db.transaction("articles").objectStore("articles").index("bookId").getAll(id),
+  );
   await new Promise<void>((resolve, reject) => {
     const tx = db.transaction(["books", "articles"], "readwrite");
     tx.oncomplete = () => resolve();

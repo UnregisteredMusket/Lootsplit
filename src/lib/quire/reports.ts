@@ -1,3 +1,4 @@
+import { activeCampaignId } from "./campaign-context.ts";
 import { getCloudWatch } from "./cloud-turn.ts";
 import { APP_VERSION } from "./version.ts";
 
@@ -72,7 +73,7 @@ function modeLabel(): string {
 function roleLabel(): string {
   if (typeof window === "undefined") return "";
   try {
-    const id = window.localStorage.getItem("quire.campaign.v1") || "main";
+    const id = activeCampaignId();
     const key = id === "main" ? "quire.seat.v1" : `quire.seat.v1.${id}`;
     const parsed = JSON.parse(window.localStorage.getItem(key) || "") as { role?: string };
     return parsed.role === "player" ? "player" : "dungeon master";
