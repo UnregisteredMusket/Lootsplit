@@ -289,12 +289,18 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Packaged Worker / accounts (balanced v2) / worker-account | open | 2 | 85s → 117s | +32s | +37.65% |
 | Packaged Worker / accounts (balanced v2) / worker-finance | open | 2 | 22s → 34s | +12s | +54.55% |
 | Packaged Worker / accounts (balanced v2) / worker-ships | open | 2 | 27s → 47s | +20s | +74.07% |
+| Packaged Worker / accounts (balanced v2) / worker-map-tiles | open | 2 | 17s → 44s | +27s | +158.82% |
+| Packaged Worker / interface (balanced v2) / Run actions/upload-artifact@v4 | open | 2 | 3s → 6s | +3s | +100% |
 | backup / Export consistently and encrypt before writing to disk | open | 2 | 3s → 6s | +3s | +100% |
 
 ## Recorded slowdowns
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-16T17:26:19Z | step: Packaged Worker / interface (balanced v2) / Run actions/upload-artifact@v4 | 4s → 6s | +2s | +50% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38409667330/job/115339634011) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38938272606/job/117100276181) |
+| 2026-10-16T17:24:07Z | step: Packaged Worker / accounts (balanced v2) / worker-map-tiles | 20s → 44s | +24s | +120% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38376270621/job/115226315645) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38938272606/job/117100276339) |
+| 2026-10-16T17:20:09Z | step: Development / desktop (balanced v2) / dev-map-tiles | 35s → 55s | +20s | +57.14% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38305743510/job/114999237632) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38938272606/job/117099144192) |
+| 2026-10-16T17:15:27Z | step: Development / gameplay (balanced v2) / Set up job | 1s → 2s | +1s | +100% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38305743510/job/114999237721) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38938272606/job/117099144147) |
 | 2026-10-16T17:13:37Z | step: Packaged Worker / interface (balanced v2) / Run actions/upload-artifact@v4 | 3s → 4s | +1s | +33.33% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38309026871/job/115010777504) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38936690063/job/117094844399) |
 | 2026-10-16T17:11:34Z | step: Packaged Worker / accounts (balanced v2) / worker-map-tiles | 20s → 44s | +24s | +120% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38309026871/job/115010777381) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38936690063/job/117094844393) |
 | 2026-10-16T17:09:44Z | step: Development / gameplay (balanced v2) / dev-property-operations | 28s → 34s | +6s | +21.43% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38302748488/job/114989858029) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38936690063/job/117093857666) |
