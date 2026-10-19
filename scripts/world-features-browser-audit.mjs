@@ -1,3 +1,4 @@
+import { checkFullscreenMap } from "./fullscreen-map-browser-check.mjs";
 import { auditCharacterPlacement } from "./character-placement-browser.mjs";
 import { chooseOption } from "./search-select-browser.mjs";
 import assert from "node:assert/strict";
@@ -380,7 +381,10 @@ try {
     await expect(page.locator(".map-view-frame")).toHaveClass(/map-fullscreen/);
     const full = await page.locator(".map-view-frame").boundingBox();
     assert.ok(full.height >= 949 && full.width >= width - 1);
+    await checkFullscreenMap(page, output, width);
+    await page.getByRole("button", { name: "Map tools", exact: true }).click();
     await chooseOption(page.getByLabel("Ping color", { exact: true }), "red");
+    await page.getByRole("button", { name: "Close tools", exact: true }).click();
     await page.getByRole("button", { name: "Ping", exact: true }).click();
     await region.focus();
     await page.keyboard.press("Enter");
@@ -815,7 +819,9 @@ try {
     await chooseOption(page.getByLabel("Map", { exact: true }), sharedMap.id);
     await guest.getByRole("button", { name: "Fullscreen map", exact: true }).click();
     await guest.getByRole("button", { name: "Ping", exact: true }).click();
+    await guest.getByRole("button", { name: "Map tools", exact: true }).click();
     await chooseOption(guest.getByLabel("Ping color", { exact: true }), "violet");
+    await guest.getByRole("button", { name: "Close tools", exact: true }).click();
     const guestMap = guest.getByRole("region", { name: "Interactive campaign map" });
     await guestMap.scrollIntoViewIfNeeded();
     const touchBox = await guestMap.boundingBox();

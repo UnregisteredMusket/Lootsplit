@@ -3083,8 +3083,13 @@ input,select,textarea { max-width: 100%; }
 .map-frame-bar button { display:inline-flex; align-items:center; gap:6px; }
 .map-fullscreen { position:fixed; inset:0; box-sizing:border-box; width:100vw; height:100dvh; margin:0; padding:max(12px,env(safe-area-inset-top)) max(12px,env(safe-area-inset-right)) max(12px,env(safe-area-inset-bottom)) max(12px,env(safe-area-inset-left)); overflow:auto; background:var(--color-bg); color:var(--color-fg); }
 .map-fullscreen::backdrop { background:var(--color-bg); }
-.map-view-frame.map-fullscreen { display:flex; flex-direction:column; gap:8px; }
-.map-view-frame.map-fullscreen .map-viewport { flex:1 0 200px; height:auto; min-height:200px; }
+.map-view-frame:not(.map-fullscreen) { display:flex; flex-direction:column; }
+.map-tool-drawer { display:contents; }
+.map-tool-drawer[hidden] { display:none; }
+.map-view-frame:not(.map-fullscreen) .map-navigation { order:2; }
+.map-view-frame:not(.map-fullscreen) .map-feedback { order:3; }
+.map-view-frame:not(.map-fullscreen) .tabletop-workspace { order:4; }
+.map-view-frame:not(.map-fullscreen) .map-tile-control-area { order:5; }
 .map-fullscreen .map-frame-bar { flex-shrink:0; margin:0; }
 .map-editor-frame.map-fullscreen .map-preview { max-height:55dvh; }
 .map-controls { gap:8px; }
@@ -3471,11 +3476,39 @@ input,select,textarea { max-width: 100%; }
 .tabletop-preview-image { position:relative; background:#101216; max-width:800px; min-height:100px; margin:12px auto; }
 .tabletop-preview-image img { width:100%; display:block; }
 .tabletop-preview-image span { position:absolute; transform:translate(-50%,-50%); max-width:100px; padding:2px 6px; font-size:.75rem; background:#18212e; color:white; border:1px solid #91c6ff; border-radius:4px; overflow-wrap:anywhere; }
-.map-view-frame.map-fullscreen .tabletop-workspace { flex:1 0 auto; }
-.map-view-frame.map-fullscreen .tabletop-surface { display:flex; flex-direction:column; min-height:50dvh; }
 @media(max-width:900px) { .tabletop-workspace.has-inspector { grid-template-columns:minmax(0,1fr); } .tabletop-inspector { max-height:45dvh; } }
 
-.map-view-frame.map-fullscreen .tabletop-surface .map-viewport { flex:1 0 300px; height:min(55dvh,600px); }
+/* Fullscreen is a map surface with overlays, never a scrolling tool page.
+   The map reaches all viewport edges; only controls respect device safe areas. */
+.map-view-frame.map-fullscreen { display:block; padding:0; overflow:hidden; overscroll-behavior:none; }
+.map-view-frame.map-fullscreen .tabletop-workspace,
+.map-view-frame.map-fullscreen .tabletop-surface,
+.map-view-frame.map-fullscreen .tabletop-surface .map-viewport { position:absolute; inset:0; display:block; width:100%; height:100%; min-height:0; margin:0; padding:0; border:0; border-radius:0; }
+.map-view-frame.map-fullscreen .map-frame-bar { position:absolute; top:max(12px,env(safe-area-inset-top)); left:max(12px,env(safe-area-inset-left)); right:max(12px,env(safe-area-inset-right)); z-index:40; align-items:center; gap:6px; pointer-events:none; }
+.map-view-frame.map-fullscreen .map-frame-bar > * { pointer-events:auto; flex-shrink:0; min-height:44px; }
+.map-view-frame.map-fullscreen .map-frame-bar button { white-space:nowrap; color:var(--color-fg); }
+.map-frame-title { margin-right:auto; padding:10px 14px; min-width:0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-family:var(--font-display,Georgia,serif); }
+.map-view-frame.map-fullscreen .map-frame-bar .map-frame-title { flex:0 1 auto; }
+.map-frame-title,.map-view-frame.map-fullscreen .map-navigation,.map-view-frame.map-fullscreen .map-frame-bar button { background:var(--color-bg); border:1px solid var(--color-border); border-radius:8px; box-shadow:0 4px 16px #0003; }
+.map-navigation { display:flex; flex-wrap:wrap; align-items:center; gap:6px; }
+.map-navigation output { min-width:44px; text-align:center; font-size:.8rem; font-variant-numeric:tabular-nums; }
+.map-view-frame.map-fullscreen .map-navigation { position:absolute; bottom:max(12px,env(safe-area-inset-bottom)); left:50%; transform:translateX(-50%); z-index:40; margin:0; padding:5px; max-width:calc(100% - 24px - env(safe-area-inset-left) - env(safe-area-inset-right)); flex-wrap:nowrap; white-space:nowrap; }
+.map-view-frame.map-fullscreen .map-navigation button { min-width:44px; min-height:44px; padding:8px 10px; }
+.map-view-frame.map-fullscreen .map-tool-drawer { position:absolute; z-index:30; top:calc(68px + env(safe-area-inset-top)); bottom:calc(80px + env(safe-area-inset-bottom)); right:max(12px,env(safe-area-inset-right)); display:block; width:360px; max-width:calc(100% - 24px - env(safe-area-inset-left) - env(safe-area-inset-right)); padding:14px; border:1px solid var(--color-border); border-radius:8px; background:var(--color-bg); box-shadow:0 8px 30px #0004; overflow:auto; overscroll-behavior:contain; }
+.map-view-frame.map-fullscreen .map-tool-drawer[hidden] { display:none; }
+.map-view-frame.map-fullscreen .map-tool-drawer .map-tile-control-area { max-height:none; overflow:visible; }
+.map-drawer-heading { margin-bottom:12px; }
+.map-tool-drawer input,.map-tool-drawer select { max-width:100%; }
+.map-view-frame.map-fullscreen .tabletop-inspector { position:absolute; z-index:30; right:max(12px,env(safe-area-inset-right)); top:calc(68px + env(safe-area-inset-top)); bottom:calc(80px + env(safe-area-inset-bottom)); width:360px; max-width:calc(100% - 24px); max-height:none; box-shadow:0 8px 30px #0004; }
+.map-view-frame.map-fullscreen .map-record-details { position:absolute; z-index:30; left:max(12px,env(safe-area-inset-left)); bottom:calc(80px + env(safe-area-inset-bottom)); width:360px; max-width:calc(100% - 24px); max-height:45dvh; overflow:auto; overscroll-behavior:contain; background:var(--color-bg); }
+.map-view-frame.map-fullscreen .map-feedback { position:absolute; z-index:20; left:max(12px,env(safe-area-inset-left)); bottom:calc(80px + env(safe-area-inset-bottom)); max-width:min(520px,calc(100% - 24px)); max-height:25dvh; overflow:auto; overscroll-behavior:contain; pointer-events:none; }
+.map-view-frame.map-fullscreen .map-feedback p { margin:4px 0 0; padding:6px 10px; border-radius:6px; background:var(--color-bg); color:var(--color-fg); box-shadow:0 2px 10px #0003; font-size:.8rem; overflow-wrap:anywhere; pointer-events:auto; }
+.map-view-frame.map-fullscreen .tabletop-connection[data-idle="true"] { display:none; }
+@media(max-width:600px) {
+  .map-view-frame.map-fullscreen .map-frame-bar button { padding:8px; font-size:.8rem; }
+  .map-frame-title { padding:10px; font-size:.9rem; }
+  .map-view-frame.map-fullscreen .tabletop-inspector { top:auto; max-height:45dvh; }
+}
 .tabletop-token-portrait { width:100%; height:100%; object-fit:cover; border-radius:50%; pointer-events:none; }
 .tabletop-token-label { position:absolute; left:50%; top:calc(100% + 4px); transform:translateX(-50%); max-width:140px; width:max-content; padding:2px 5px; border:1px solid var(--color-border); border-radius:3px; background:var(--color-bg); color:var(--color-fg); font-size:11px; overflow-wrap:anywhere; pointer-events:none; }
 

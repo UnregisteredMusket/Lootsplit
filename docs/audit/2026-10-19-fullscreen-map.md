@@ -1,0 +1,50 @@
+# Fullscreen map viewport — October 19, 2026
+
+## Requested behavior and preservation
+
+The saved-map fullscreen previously stacked toolbars above a canvas limited to about 55dvh, leaving much of the screen occupied by controls. It now uses every viewport edge, with a compact floating title/tools/exit header, bottom zoom/Fit map/Ping controls and a scrollable Map tools drawer. The existing token Inspector floats above the canvas (bottom sheet on phones). Controls respect device safe areas; the map retains its image aspect ratio. No artwork stretching or automatic cropping is introduced.
+
+Every existing authorized tool remains mounted: selection/dragging, pan, measurement, templates, fog/vision, walls/lights, filters, ping colors, saved/shared views, player preview and combat-tile forms. Closing the tools drawer restores map focus. Status/errors remain visible when the drawer is closed. The current camera center and zoom survive fullscreen transitions, panel changes and phone rotation; Fit map is explicit. Native browser fullscreen is requested on the same user gesture where supported, with an edge-to-edge page fallback on rejection/unavailability. The modal is raised after native fullscreen enters the top layer so it remains visible and interactive. Browser-controlled exit restores the normal viewer and toggle focus. The existing fullscreen editor keeps its form, upload/OCR work and unsaved drafts.
+
+No canonical room, token, fog, protected-media, inventory, money, travel, campaign save or permission logic changes. The six main tabs and normal viewer remain. Both DM and player Help, map guide, feature inventory, README and coding manual were reviewed and updated. This is a website/client-source update, not a newly distributed Android APK. No D1 migration or production test fixtures.
+
+The design was previewed before application in [interactive synthetic map](../previews/fullscreen-map.html). It uses fictional tokens/artwork only. Local browser screenshots and account fixtures stay out of the public source.
+
+## Verification and diagnosis
+
+The existing full map and world audits now check viewport-edge canvas bounds, no document scrolling, independent drawer scrolling, camera stability, focused close, desktop/phone/landscape/320px layouts, native browser exit and denied-native fallback. Hit testing checks that the map is on top rather than only measuring a hidden dialog. All original token/encounter/ship/shared-ping/private-map/media/OCR/import/player-display assertions are retained.
+
+Local runtime: Node22.23.3. Standard Playwright dependency installation is blocked by container apt permissions and a corrupted browser download. Diagnostic Chromium153.0.8010.0 launches; the locked CI browser153.0.8010.12 remains mandatory. This environment isolates loopback between command sessions, so the disposable server and browser run within the same process tree; Vite binds 127.0.0.1 to avoid restricted interface enumeration. Node's injected experimental proxy warning polluted one CLI stderr JSON assertion; NODE_NO_WARNINGS=1 removes that unrelated environment noise for the unmodified tests. Source snapshots keep browser runs independent of later edits.
+
+The first layout inspection found the native document above the modal and unreadable header button contrast. Both were corrected. A first mobile test incorrectly expected the center map hit target while the tools drawer intentionally covered it; bounds still remain required and the overlay check now requires the frame on top while open. The retained world audit caught the removed explicit aria-live attribute on the zoom readout; it is restored, with the added accessible Map zoom name.
+
+Local checkpoints: 1038 tests /1034 passes/four existing skips; types and lint pass (30 existing warnings); Cloudflare and mobile builds pass. Complete map/world browser reruns and final exact-head CI are in progress. These checkpoints are not a release claim. Exact changing head/tree/PR/run identities and final live evidence belong in the PR and local recovery JSON, so they do not invalidate the source under test.
+
+## Performance history review
+
+History `9b8361eb458f7fd17fb0cbb923156427681be7b5` was fetched and its readable log/references reviewed:1088 observations,17 recorded resolutions. Recorder39322856793 succeeded at2026-10-19T20:52:08Z. The content cursor remains14:26 because later catch-up runs had no new eligible data. No history is deleted or automatically reset. Since the preceding audit's1070-observation checkpoint, the following18 observations were added. URLs identify the actual run; raw IDs and timestamps remain in the permanent [history](https://github.com/UnregisteredMusket/Lootsplit/blob/performance-history/regressions.jsonl).
+
+| Run | Operation | Last logged → current | Added | Increase |
+| --- | --- | ---: | ---: | ---: |
+| [39257669088](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39257669088) | Development / desktop (balanced v2) / dev-map-tiles | 56s → 102s | +46s | 82.14% |
+| [39257669088](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39257669088) | Packaged Worker / accounts (balanced v2) / worker-map-tiles | 44s → 85s | +41s | 93.18% |
+| [39262626961](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39262626961) | Development / gameplay (balanced v2) / dev-encounter | 39s → 48s | +9s | 23.08% |
+| [39262626961](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39262626961) | Development / desktop (balanced v2) / dev-map-tiles | 102s → 120s | +18s | 17.65% |
+| [39262626961](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39262626961) | Development / desktop (balanced v2) | 567s → 693s | +126s | 22.22% |
+| [39262626961](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39262626961) | Packaged Worker / accounts (balanced v2) | 497s → 609s | +112s | 22.54% |
+| [39264605774](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39264605774) | Packaged Worker / accounts (balanced v2) / Run actions/upload-artifact@v4 | 3s → 4s | +1s | 33.33% |
+| local | navigation-browser-194-actions | 125.872s → 160.656s | +34.784s | 27.63% |
+| [39266580213](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39266580213) | Development / gameplay (balanced v2) / dev-finance | 44s → 58s | +14s | 31.82% |
+| [39266580213](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39266580213) | Packaged Worker / interface (balanced v2) / Run npx playwright install --with-deps chromium | 22s → 29s | +7s | 31.82% |
+| [39266580213](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39266580213) | Packaged Worker / accounts (balanced v2) / Start disposable built Worker | 9s → 11s | +2s | 22.22% |
+| [39266580213](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39266580213) | Packaged Worker / interface (balanced v2) / worker-initiative | 5s → 6s | +1s | 20% |
+| [39266580213](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39266580213) | Development / desktop (balanced v2) / dev-map-tiles | 55s → 122s | +67s | 121.82% |
+| [39266580213](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39266580213) | Packaged Worker / interface (balanced v2) / worker-game-analytics | 4s → 5s | +1s | 25% |
+| [39266580213](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39266580213) | Packaged Worker / accounts (balanced v2) / worker-map-tiles | 44s → 95s | +51s | 115.91% |
+| [39266580213](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39266580213) | Development / desktop (balanced v2) | 598s → 698s | +100s | 16.72% |
+| [39266580213](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39266580213) | Packaged Worker / accounts (balanced v2) / Run actions/upload-artifact@v4 | 3s → 4s | +1s | 33.33% |
+| [39266580213](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39266580213) | Packaged Worker / accounts (balanced v2) | 513s → 607s | +94s | 18.32% |
+
+All18 outcomes are successful. The prior online-tabletop release materially expanded map coverage (protected media, remote controllers, imports and video); its added workload explains much of the map-step growth, but its recorded time remains real and is preserved. Main map steps rose55→122s (+67s,121.82%) and44→95s (+51s,115.91%). Desktop and Worker-account job totals also grew598→698s (+100s,16.72%) and513→607s (+94s,18.32%). PR development map has two logged increases56→102→120s: cumulative+64s/+114.29%. The local194-action navigation measurement rose125.872→160.656s (+34.784s,27.63%) and remains an unresolved observation from the prior audit. Finance44→58s and encounter39→48s require comparison against fresh same-scope runs; there is no evidence here of a finance/encounter code regression. Browser installation, worker startup and upload fluctuations are infrastructure measurements, with short one-second increments particularly noisy. None are discarded.
+
+Earlier account/governance/gameplay/interface/unit and setup/cache trends remain as recorded, including explicitly resolved historical trends. No verified cause/fix for those unrelated trends is introduced by this presentation change. New fullscreen scenarios add workload to the unchanged CI operation names; final PR/main audit must compare map/world steps, job totals and workflow elapsed time, separate queue/setup time and retain any inclusive >=15% observation. The local diagnostic browser/snapshot environment differs from earlier locked-browser measurements; do not compare those as equivalent or manufacture a baseline. Automatic recording remains enabled and all9 verification groups remain required before immutable publication/standby/live read-only checks.
