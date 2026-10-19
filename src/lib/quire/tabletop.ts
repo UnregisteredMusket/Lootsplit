@@ -78,6 +78,13 @@ export function sceneViewers(
 /** Safe fallback until an authorized, visibility-baked render has been published. */
 export const concealedMapImage =
   "data:image/png;base64,iVBORw0KGgoAAAANSUhEUgAAAAEAAAABCAQAAAC1HAwCAAAAC0lEQVR42mNk+A8AAQUBAScY42YAAAAASUVORK5CYII=";
+export function mapNeedsMask(settings: MapTabletop) {
+  return (
+    settings.vision !== "off" ||
+    (settings.fog.enabled &&
+      (settings.fog.base === "concealed" || settings.fog.shapes.some((shape) => !shape.reveal)))
+  );
+}
 /** Explicit projection: hidden geometry, edit history and original pixels never reach a player. */
 export function projectTabletopMap(
   table: Pick<CloudTable, "journal" | "purses">,
@@ -90,6 +97,14 @@ export function projectTabletopMap(
     viewers = sceneViewers(table, map, seat, party);
   const visible = (point: { x: number; y: number }) =>
     scenePointVisible(point, settings, map.grid, viewers);
+  const masked = mapNeedsMask(settings);
+  const frames = settings.frames.filter(
+    (frame) =>
+      frame.revision === settings.revision &&
+      (party || settings.vision !== "individual"
+        ? frame.audience === "party"
+        : seat.purseIds.some((id) => frame.audience === "purse:" + id)),
+  );
   const projected = mapTabletopSchema.parse({
     revision: settings.revision,
     playerMovement: settings.playerMovement,
@@ -98,6 +113,8 @@ export function projectTabletopMap(
     unitLabel: settings.unitLabel,
     unitsPerFoot: settings.unitsPerFoot,
     initialView: settings.initialView,
+    media: masked ? frames[0]?.media : settings.media,
+    frames: masked ? frames : [],
     vision: settings.vision,
     ambientLight: settings.ambientLight,
     fog: { enabled: settings.fog.enabled, base: "concealed", shapes: [] },
@@ -113,7 +130,7 @@ export function projectTabletopMap(
   });
   return {
     ...map,
-    image: settings.fog.enabled || settings.vision !== "off" ? concealedMapImage : map.image,
+    image: masked ? concealedMapImage : map.image,
     anchors: map.anchors.filter(visible),
     markers: map.markers.filter((m) => m.visibility === "party" && visible(m)),
     tokens: map.tokens
@@ -195,7 +212,27 @@ export function applyTabletopCommand(
   const map = world.maps.find((m) => m.id === command.mapId);
   if (!map || !mapAccessible(table, map, seat)) throw Error("This map is unavailable.");
   const settings = readMapTabletop(map);
-  if (command.kind === "map-tabletop") {
+  if (command.kind === "map-render") {
+    dm();
+    if (settings.revision !== command.revision || command.frame.revision !== settings.revision)
+      throw Error("Visibility changed while rendering. Refresh the player view.");
+    const current = settings.frames.find((frame) => frame.audience === command.frame.audience);
+    if ((current?.id ?? null) !== command.beforeFrameId)
+      throw Error("This player view was already updated.");
+    if (
+      command.frame.audience !== "party" &&
+      !table.purses.some(
+        (p) => p.kind === "character" && command.frame.audience === "purse:" + p.id,
+      )
+    )
+      throw Error("Choose an existing character's view.");
+    settings.frames = [
+      ...settings.frames.filter((frame) => frame.audience !== command.frame.audience),
+      command.frame,
+    ];
+    if (settings.frames.length > 201) throw Error("Too many player views.");
+    map.tabletop = settings;
+  } else if (command.kind === "map-tabletop") {
     dm();
     if (!same(map.tabletop ?? null, command.before))
       throw Error("Map configuration changed. Your draft is retained; refresh before saving.");

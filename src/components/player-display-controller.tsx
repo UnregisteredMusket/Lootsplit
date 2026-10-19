@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { MonitorPlay } from "lucide-react";
+import { MapVisibilityPublisher } from "./map-visibility-publisher";
 import { Button, Field, Modal, Select } from "./ui";
 import { useSeat } from "@/lib/quire/seat";
 import { useWorldTable } from "@/lib/quire/use-world-table";
@@ -55,6 +56,7 @@ export function PlayerDisplayProvider({ children }: { children: ReactNode }) {
   return (
     <>
       {children}
+      <MapVisibilityPublisher />
       <DisplaySession
         key={`${campaignId}:${seat.openedAt}:${seat.role}:${getCloudTable().code}`}
         dm={seat.role === "dm"}

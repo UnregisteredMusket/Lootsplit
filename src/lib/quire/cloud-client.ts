@@ -513,14 +513,25 @@ async function refresh(conditional = false) {
     if (known) {
       try {
         remote = await pollCloudTable({
-          data: { tabletopProtocol: 1, code: s.code, token: s.token, knownRevision: s.revision, knownSeatId: s.seatId },
+          data: {
+            tabletopProtocol: 1,
+            code: s.code,
+            token: s.token,
+            knownRevision: s.revision,
+            knownSeatId: s.seatId,
+          },
         });
       } catch {
         // One bounded readonly fallback supports an older edge/client protocol.
         // Full reads recheck the same credentials; errors still retain all pending work.
-        remote = await pullCloudTable({ data: { tabletopProtocol: 1, code: s.code, token: s.token } });
+        remote = await pullCloudTable({
+          data: { tabletopProtocol: 1, code: s.code, token: s.token },
+        });
       }
-    } else remote = await pullCloudTable({ data: { tabletopProtocol: 1, code: s.code, token: s.token } });
+    } else
+      remote = await pullCloudTable({
+        data: { tabletopProtocol: 1, code: s.code, token: s.token },
+      });
   } catch (error) {
     if (key() !== campaignKey || session()?.token !== s.token) return;
     const message = error instanceof Error ? error.message : "";
@@ -645,7 +656,8 @@ async function flush(endTurn = false) {
   publish({ status: "saving", error: "" });
   try {
     const remote = await submitCloudCommands({
-      data: { tabletopProtocol: 1,
+      data: {
+        tabletopProtocol: 1,
         code: s.code,
         token: s.token,
         batchId: s.batchId,
@@ -664,7 +676,8 @@ async function stage(rethrow = false) {
   if (!s.pending.length) return;
   try {
     const remote = await submitCloudCommands({
-      data: { tabletopProtocol: 1,
+      data: {
+        tabletopProtocol: 1,
         code: s.code,
         token: s.token,
         batchId: s.batchId,
@@ -729,7 +742,8 @@ export function discardPending() {
   return serial(async () => {
     const s = requireSession();
     const remote = await manageCloudRoom({
-      data: { tabletopProtocol: 1,
+      data: {
+        tabletopProtocol: 1,
         code: s.code,
         token: s.token,
         action: "discard",
@@ -765,7 +779,8 @@ export async function queueCommand(
     if (input.kind === "message" || seasonalPlan) {
       // Chat is independent of transaction turns; retain a failed message in the editor.
       const remote = await submitCloudCommands({
-        data: { tabletopProtocol: 1,
+        data: {
+          tabletopProtocol: 1,
           code: s.code,
           token: s.token,
           batchId: command.id,
@@ -921,7 +936,9 @@ export function leaveViewableRoom() {
 export function skipTableTurn() {
   return serial(async () => {
     const s = requireSession();
-    await accept(await skipCloudTurn({ data: { tabletopProtocol: 1, code: s.code, token: s.token } }));
+    await accept(
+      await skipCloudTurn({ data: { tabletopProtocol: 1, code: s.code, token: s.token } }),
+    );
   });
 }
 export function manageParticipant(
@@ -965,7 +982,13 @@ export async function leaveTable() {
   if (s?.role === "dm") throw Error("The DM must end the session before leaving.");
   if (s)
     await manageCloudRoom({
-      data: { tabletopProtocol: 1, code: s.code, token: s.token, action: "leave", seatId: s.seatId },
+      data: {
+        tabletopProtocol: 1,
+        code: s.code,
+        token: s.token,
+        action: "leave",
+        seatId: s.seatId,
+      },
     });
   await detachTable(true);
 }
@@ -1044,7 +1067,8 @@ export function sendRoomMessage(command: Extract<Command, { kind: "message" }>) 
   return serial(async () => {
     const s = requireSession();
     const remote = await submitCloudCommands({
-      data: { tabletopProtocol: 1,
+      data: {
+        tabletopProtocol: 1,
         code: s.code,
         token: s.token,
         batchId: command.id,
@@ -1200,4 +1224,14 @@ export async function requestMapSignals(
   });
   if (key() !== campaign || session()?.token !== s.token) throw Error("The campaign changed.");
   return { ...result, serverNow: result.serverNow + Math.max(0, Date.now() - started) };
+}
+
+/** Private media travels separately; a stale campaign response never enters another window. */
+export async function requestMapAssets(request: unknown) {
+  const s = requireSession(),
+    campaign = key();
+  const { requestCloudMapAssets } = await import("./cloud-api.ts");
+  const result = await requestCloudMapAssets({ data: { code: s.code, token: s.token, request } });
+  if (key() !== campaign || session()?.token !== s.token) throw Error("The campaign changed.");
+  return result;
 }

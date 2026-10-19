@@ -1,5 +1,11 @@
 import { characterVisible, canReadCharacter } from "./character-position.ts";
-import { readRoom, readRoomAccess, createRoom, updateRoom, roomStorageBody } from "./room-store.server.ts";
+import {
+  readRoom,
+  readRoomAccess,
+  createRoom,
+  updateRoom,
+  roomStorageBody,
+} from "./room-store.server.ts";
 import { syncTimer } from "./sync-timing.server.ts";
 import {
   claimSeat,
@@ -21,16 +27,25 @@ import { referenceAccess, referenceSection } from "./reference-access.ts";
 
 async function activeEncounter(code: string): Promise<boolean> {
   const db = database();
-  return !!(db && await db.prepare("SELECT 1 AS active FROM dm_encounters WHERE code=? AND status='active' LIMIT 1")
-    .bind(code).first());
+  return !!(
+    db &&
+    (await db
+      .prepare("SELECT 1 AS active FROM dm_encounters WHERE code=? AND status='active' LIMIT 1")
+      .bind(code)
+      .first())
+  );
 }
 /** Only a boolean leaves the private encounter store; names, enemies and drafts stay private. */
 export async function assertReferenceLookup(input: { code: string; token: string }, kind: string) {
   const room = await must(input.code);
   const seat = room.seats.find((s) => s.token === input.token);
   if (!seat) throw Error("This browser is not seated at that table.");
-  const access = referenceAccess(seat.role, room.table.journal?.referenceAccess,
-    seat.role === "dm" ? false : await activeEncounter(room.code), referenceSection(kind));
+  const access = referenceAccess(
+    seat.role,
+    room.table.journal?.referenceAccess,
+    seat.role === "dm" ? false : await activeEncounter(room.code),
+    referenceSection(kind),
+  );
   if (!access.allowed) throw Error(access.reason);
 }
 
@@ -165,7 +180,10 @@ export async function openRoom(input: {
   userId?: string;
 }): Promise<{ code: string; token: string; seatId: string; revision: number; userId?: string }> {
   const table = readCloudTableForImport(input.table);
-  if (!table) throw new Error("This campaign has invalid saved data. Keep a recovery export and repair unreadable archives before sharing a new room.");
+  if (!table)
+    throw new Error(
+      "This campaign has invalid saved data. Keep a recovery export and repair unreadable archives before sharing a new room.",
+    );
   if (table.purses.length === 0) throw new Error("The table has no characters to share.");
   const code = await freshCode();
   const seat: CloudSeat = {
@@ -212,7 +230,13 @@ export async function previewRoom(
   };
 }
 
-export async function joinRoom(input: { code: string; purseId: string; name: string; invitation?: string; userId?: string; sessionId?: string;
+export async function joinRoom(input: {
+  code: string;
+  purseId: string;
+  name: string;
+  invitation?: string;
+  userId?: string;
+  sessionId?: string;
 }): Promise<{
   token: string;
   seatId: string;
@@ -253,7 +277,8 @@ export async function joinRoom(input: { code: string; purseId: string; name: str
   const claimed = claimSeat(room, input.purseId, input.name);
   claimed.seat.userId = input.userId;
   if (previous) claimed.seat.id = previous.id;
-  if (input.invitation && room.invitations?.[input.purseId] !== input.invitation) throw Error("This invitation has expired.");
+  if (input.invitation && room.invitations?.[input.purseId] !== input.invitation)
+    throw Error("This invitation has expired.");
   if (input.userId && claimed.room.blockedUsers) delete claimed.room.blockedUsers[input.userId];
   if (claimed.room.invitations) delete claimed.room.invitations[input.purseId];
   const next = { ...claimed.room, revision: claimed.room.revision + 1 };
@@ -277,9 +302,18 @@ export async function roomState(input: { code: string; token: string }): Promise
     const result = await timer.measure("projection", () => view(room, seat));
     timer.finish("full");
     return result;
-  } catch (error) { timer.finish("failed");throw error; }
+  } catch (error) {
+    timer.finish("failed");
+    throw error;
+  }
 }
-export type RoomPollInput = { tabletopProtocol?: number; code: string; token: string; knownRevision?: number; knownSeatId?: string };
+export type RoomPollInput = {
+  tabletopProtocol?: number;
+  code: string;
+  token: string;
+  knownRevision?: number;
+  knownSeatId?: string;
+};
 export type RoomUnchanged = {
   unchanged: true;
   protocol: "lootsplit.room.unchanged.v1";
@@ -296,19 +330,34 @@ export async function pollRoom(input: RoomPollInput): Promise<RoomView | RoomUnc
     const access = await timer.measure("access", () => readRoomAccess(input.code));
     if (!access) throw Error("No table uses that code.");
     if (access.closed) throw Error("This room is closed.");
-    const seat = access.seats.find(s => s.token === input.token);
+    const seat = access.seats.find((s) => s.token === input.token);
     if (!seat) throw Error("This browser is not seated at that table.");
-    if (Number.isSafeInteger(input.knownRevision) && input.knownRevision === access.revision && input.knownSeatId === seat.id) {
+    if (
+      Number.isSafeInteger(input.knownRevision) &&
+      input.knownRevision === access.revision &&
+      input.knownSeatId === seat.id
+    ) {
       const encounterActive = await timer.measure("encounter", () => activeEncounter(access.code));
       timer.finish("unchanged");
-      return { unchanged: true, protocol: "lootsplit.room.unchanged.v1", code: access.code,
-        seatId: seat.id, userId: seat.userId, sessionId: access.sessionId, revision: access.revision, encounterActive };
+      return {
+        unchanged: true,
+        protocol: "lootsplit.room.unchanged.v1",
+        code: access.code,
+        seatId: seat.id,
+        userId: seat.userId,
+        sessionId: access.sessionId,
+        revision: access.revision,
+        encounterActive,
+      };
     }
     // Initial/changed reads retain the complete legacy projection and migration behavior.
     const result = await roomState(input);
     timer.finish("full");
     return result;
-  } catch (error) { timer.finish("failed");throw error; }
+  } catch (error) {
+    timer.finish("failed");
+    throw error;
+  }
 }
 
 export async function publishTurn(_input: {
@@ -332,15 +381,23 @@ export async function choosePace(input: {
   if (Object.values(room.drafts ?? {}).some((c) => c.length))
     throw new Error("Submit or discard all pending turns before changing modes.");
   const paced = setRoomLive(room, input.token, input.live);
-  const next = { ...paced, viewOnly: false,
-    revision: room.viewOnly && paced.revision === room.revision ? room.revision + 1 : paced.revision };
+  const next = {
+    ...paced,
+    viewOnly: false,
+    revision:
+      room.viewOnly && paced.revision === room.revision ? room.revision + 1 : paced.revision,
+  };
   await updateRoom(next, room.revision);
   const seat = next.seats.find((item) => item.token === input.token);
   if (!seat) throw new Error("This browser is not seated at that table.");
   return view(next, seat);
 }
 
-export async function closeRoom(input: { code: string; token: string; keepOnline?: boolean }): Promise<void> {
+export async function closeRoom(input: {
+  code: string;
+  token: string;
+  keepOnline?: boolean;
+}): Promise<void> {
   const room = await must(input.code);
   const seat = room.seats.find((item) => item.token === input.token);
   if (!seat || seat.role !== "dm")
@@ -351,14 +408,25 @@ export async function closeRoom(input: { code: string; token: string; keepOnline
   if (room.viewOnly && keepOnline) return;
   const next = structuredClone(room);
   const active = next.table.journal?.sessions.find((s) => !s.endedAt);
-  if (active) { active.endedAt = Date.now(); active.endLedgerIds = next.table.ledger.map((l) => l.id); }
+  if (active) {
+    active.endedAt = Date.now();
+    active.endLedgerIds = next.table.ledger.map((l) => l.id);
+  }
   if (!room.viewOnly || active)
-    archiveSession(next.table, active?.id || crypto.randomUUID(), active?.name || (keepOnline ? "Session ended" : "Room closed"));
-  for (const report of next.table.journal?.reports || []) if (!report.seatIds) report.seatIds = room.seats.map((s) => s.id);
+    archiveSession(
+      next.table,
+      active?.id || crypto.randomUUID(),
+      active?.name || (keepOnline ? "Session ended" : "Room closed"),
+    );
+  for (const report of next.table.journal?.reports || [])
+    if (!report.seatIds) report.seatIds = room.seats.map((s) => s.id);
   next.closed = !keepOnline;
   next.viewOnly = keepOnline;
   next.revision++;
-  for (const p of next.table.purses) { p.editingAllowed = false; delete p.editBaseline; }
+  for (const p of next.table.purses) {
+    p.editingAllowed = false;
+    delete p.editBaseline;
+  }
   await updateRoom(next, room.revision);
 }
 
@@ -428,8 +496,19 @@ async function must(code: string): Promise<CloudRoom> {
 
 async function view(room: CloudRoom, seat: CloudSeat): Promise<RoomView> {
   const current = room.seats[room.turn];
-  const record = projectRecord({ ...room.table, journal: room.table.journal }, seat, { directory: true });
+  const record = projectRecord({ ...room.table, journal: room.table.journal }, seat, {
+    directory: true,
+  });
   const journal = record.journal;
+  if (seat.role !== "dm" && room.ownerId) {
+    const { projectedMapPoster } = await import("./map-assets.server.ts");
+    await Promise.all(
+      (journal?.world?.maps ?? []).map(async (map) => {
+        if (map.tabletop?.media)
+          map.image = (await projectedMapPoster(room.ownerId!, map.tabletop.media)) ?? map.image;
+      }),
+    );
+  }
   return {
     encounterActive: await activeEncounter(room.code),
     userId: seat.userId,
@@ -533,8 +612,10 @@ export async function submitCommands(input: {
   )
     throw new Error("Invalid command batch (maximum 100 actions).");
   const commands = input.commands.map((c) => commandSchema.parse(c));
-  const seasonalPlan = (c: (typeof commands)[number]) => c.kind === "trade-season-plan" || (c.kind === "downtime-plan" && c.advanceSeason);
-  if (input.stage && commands.some(seasonalPlan)) throw Error("Seasonal previews must be prepared directly by the DM authority.");
+  const seasonalPlan = (c: (typeof commands)[number]) =>
+    c.kind === "trade-season-plan" || (c.kind === "downtime-plan" && c.advanceSeason);
+  if (input.stage && commands.some(seasonalPlan))
+    throw Error("Seasonal previews must be prepared directly by the DM authority.");
   const { randomTradeRoll } = await import("./trade-economy.ts");
   const seasonalRolls = new Map<string, number>();
   const digest = async (value: string) => {
@@ -614,12 +695,13 @@ export async function submitCommands(input: {
     // Validate the entire merged draft against the authoritative table. Two
     // individually valid device queues may overspend when combined.
     const selected = new Set(seen);
-    const unapplied = (input.stage ? drafts[seat.id]! : commands).filter(command => {
+    const unapplied = (input.stage ? drafts[seat.id]! : commands).filter((command) => {
       const key = seat.id + ":" + command.id;
       if (selected.has(key)) return false;
-      selected.add(key);return true;
+      selected.add(key);
+      return true;
     });
-    table = applyCommandBatch(table, seat, unapplied, command => ({
+    table = applyCommandBatch(table, seat, unapplied, (command) => ({
       source: "server",
       random: (draw) => {
         const key = command.id + ":" + draw;
@@ -638,7 +720,9 @@ export async function submitCommands(input: {
     if (!input.stage)
       drafts[seat.id] = (drafts[seat.id] ?? []).filter((c) => !seen.has(seat.id + ":" + c.id));
     if (!input.stage && input.endTurn && drafts[seat.id]?.length)
-      throw Error("Another device has saved unfinished actions. Refresh and submit the complete turn, or export and resolve those actions before ending it.");
+      throw Error(
+        "Another device has saved unfinished actions. Refresh and submit the complete turn, or export and resolve those actions before ending it.",
+      );
     const next: CloudRoom = {
       ...room,
       table: input.stage ? room.table : table,
@@ -651,7 +735,9 @@ export async function submitCommands(input: {
       commands: input.stage ? room.commands : [...seen],
       commandHashes: input.stage ? room.commandHashes : commandHashes,
       batches: input.stage ? room.batches : [...(room.batches ?? []), key],
-      batchHashes: input.stage ? room.batchHashes : { ...(room.batchHashes ?? {}), [key]: batchHash },
+      batchHashes: input.stage
+        ? room.batchHashes
+        : { ...(room.batchHashes ?? {}), [key]: batchHash },
       turn:
         !input.stage && input.endTurn && !room.live
           ? (room.turn + 1) % room.seats.length
@@ -711,7 +797,12 @@ export async function manageRoom(input: {
       );
     const current = room.seats[room.turn]?.id;
     const db = database();
-    const member = db ? await db.prepare("SELECT user_id FROM library_members WHERE code=? AND seat_id=? AND token=?").bind(room.code, target.id, target.token).first<{user_id:string}>() : null;
+    const member = db
+      ? await db
+          .prepare("SELECT user_id FROM library_members WHERE code=? AND seat_id=? AND token=?")
+          .bind(room.code, target.id, target.token)
+          .first<{ user_id: string }>()
+      : null;
     // Forget removes a library listing, not the canonical account identity of
     // an assigned seat. Keep campaign restrictions attached to that identity.
     const userId = target.userId || member?.user_id;

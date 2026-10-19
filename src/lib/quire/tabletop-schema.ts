@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { mapMediaReferenceSchema, mapRenderedFrameSchema } from "./map-assets-schema.ts";
 
 const id = z.string().min(1).max(150);
 export const scenePointSchema = z
@@ -121,6 +122,8 @@ export const mapTabletopSchema = z
     unitLabel: z.string().trim().min(1).max(20).default("ft"),
     unitsPerFoot: z.number().finite().positive().max(1000000).default(1),
     initialView: sceneCameraSchema.optional(),
+    media: mapMediaReferenceSchema.optional(),
+    frames: z.array(mapRenderedFrameSchema).max(201).default([]),
     fog: fogStateSchema.default({ enabled: false, base: "concealed", shapes: [] }),
     fogUndo: z.array(fogStateSchema).max(20).default([]),
     fogRedo: z.array(fogStateSchema).max(20).default([]),
@@ -152,6 +155,16 @@ const tile = z
   })
   .strict();
 export const tabletopCommands = [
+  z
+    .object({
+      id,
+      kind: z.literal("map-render"),
+      mapId: id,
+      revision: z.number().int().nonnegative(),
+      beforeFrameId: z.string().uuid().nullable(),
+      frame: mapRenderedFrameSchema,
+    })
+    .strict(),
   z
     .object({
       id,

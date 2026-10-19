@@ -1,6 +1,8 @@
 import { database, readRoom } from "./room-store.server.ts";
 import { mapPingInput, PING_DURATION, type MapPing } from "./map-signals.ts";
 import type { CloudRoom } from "./cloud.ts";
+import { mapAccessible, readMapTabletop, sceneViewers } from "./tabletop.ts";
+import { scenePointVisible } from "./tabletop-geometry.ts";
 // Development fallback only; deployed Workers require D1 via database().
 const local = new Map<string, MapPing[]>();
 export async function mapSignals(input: {
@@ -23,7 +25,10 @@ export async function mapSignals(input: {
   const seat = room.seats.find((s) => s.token === input.token);
   if (!seat) throw Error("This browser is not seated at that table.");
   const map = room.table.journal?.world?.maps.find((m) => m.id === input.mapId);
-  if (!map || (seat.role !== "dm" && !map.visible)) throw Error("This map is unavailable.");
+  if (!map || !mapAccessible(room.table, map, seat)) throw Error("This map is unavailable.");
+  const canSee = (point: { x: number; y: number }) =>
+    seat.role === "dm" ||
+    scenePointVisible(point, readMapTabletop(map), map.grid, sceneViewers(room.table, map, seat));
   const now = Date.now(),
     sessionId = room.sessionId || "";
   let ping: MapPing | undefined;
@@ -31,6 +36,7 @@ export async function mapSignals(input: {
     if (room.viewOnly) throw Error("Resume play before sending map pings.");
     const parsed = mapPingInput.parse(input.ping);
     if (parsed.mapId !== map.id) throw Error("The ping belongs to a different map.");
+    if (!canSee(parsed)) throw Error("Choose a visible point to ping.");
     ping = { ...parsed, seatId: seat.id, createdAt: now, expiresAt: now + PING_DURATION };
   }
   if (db) {
@@ -72,7 +78,9 @@ export async function mapSignals(input: {
       serverNow: now,
       pings: rows.results
         .map((r) => JSON.parse(r.body) as MapPing)
-        .filter((p) => p.mapId === map.id && room.seats.some((s) => s.id === p.seatId)),
+        .filter(
+          (p) => p.mapId === map.id && canSee(p) && room.seats.some((s) => s.id === p.seatId),
+        ),
     };
   }
   for (const [key, pings] of local) {
@@ -90,7 +98,7 @@ export async function mapSignals(input: {
   return {
     serverNow: now,
     pings: (local.get(key) || []).filter(
-      (p) => p.mapId === map.id && room.seats.some((s) => s.id === p.seatId),
+      (p) => p.mapId === map.id && canSee(p) && room.seats.some((s) => s.id === p.seatId),
     ),
   };
 }

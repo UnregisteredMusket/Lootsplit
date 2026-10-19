@@ -95,7 +95,8 @@ export const pollCloudTable = createServerFn({ method: "POST" })
 export const finishCloudTurn = createServerFn({ method: "POST" })
   .validator(
     (input: {
-      tabletopProtocol?: number; code: string;
+      tabletopProtocol?: number;
+      code: string;
       token: string;
       baseRevision?: number;
       table?: CloudTable;
@@ -110,7 +111,9 @@ export const finishCloudTurn = createServerFn({ method: "POST" })
   });
 
 export const setCloudPace = createServerFn({ method: "POST" })
-  .validator((input: { tabletopProtocol?: number; code: string; token: string; live: boolean }) => input)
+  .validator(
+    (input: { tabletopProtocol?: number; code: string; token: string; live: boolean }) => input,
+  )
   .handler(async ({ data }) => {
     const { guardMemberSeat } = await import("./member-access.server.ts");
     await guardMemberSeat(data);
@@ -139,7 +142,8 @@ export const skipCloudTurn = createServerFn({ method: "POST" })
 export const submitCloudCommands = createServerFn({ method: "POST" })
   .validator(
     (input: {
-      tabletopProtocol?: number; code: string;
+      tabletopProtocol?: number;
+      code: string;
       token: string;
       batchId: string;
       commands: unknown[];
@@ -156,7 +160,8 @@ export const submitCloudCommands = createServerFn({ method: "POST" })
 export const manageCloudRoom = createServerFn({ method: "POST" })
   .validator(
     (input: {
-      tabletopProtocol?: number; code: string;
+      tabletopProtocol?: number;
+      code: string;
       token: string;
       action: "release" | "leave" | "kick" | "ban" | "invite" | "permission" | "start" | "discard";
       seatId: string;
@@ -196,4 +201,15 @@ export const requestCloudMapSignals = createServerFn({ method: "POST" })
     await guardMemberSeat(data);
     const { mapSignals } = await import("./map-signals.server.ts");
     return mapSignals(data);
+  });
+
+export const requestCloudMapAssets = createServerFn({ method: "POST" })
+  .validator((input: { code: string; token: string; request: unknown }) => input)
+  .handler(async ({ data }) => {
+    const { setResponseHeader } = await import("@tanstack/react-start/server");
+    setResponseHeader("Cache-Control", "no-store");
+    const { guardMemberSeat } = await import("./member-access.server.ts");
+    await guardMemberSeat(data);
+    const { mapAssets } = await import("./map-assets.server.ts");
+    return mapAssets(data);
   });

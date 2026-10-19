@@ -9,7 +9,12 @@ import { useSeat } from "@/lib/quire/seat";
 import { readWorld, mapTypes, type CampaignMap } from "@/lib/quire/world-schema";
 import { anchorFor, recognizedAnchors, npcAvailableHere, shopVisible } from "@/lib/quire/world";
 import { readMarketLocations, locationLabel, locationPath } from "@/lib/quire/shop-locations";
-import { prepareMapImage, recognizeMap } from "@/lib/quire/map-image";
+import { recognizeMap } from "@/lib/quire/map-image";
+import { prepareMapMedia } from "@/lib/quire/map-media";
+import { cacheMapAsset, publishMapAsset, loadMapAsset, mapAssetBlob } from "@/lib/quire/map-assets";
+import { mapMediaReference, type MapAssetBundle } from "@/lib/quire/map-assets-schema";
+import { readMapTabletop } from "@/lib/quire/tabletop";
+import { MapArtwork } from "./map-artwork";
 import { useWorldTable } from "@/lib/quire/use-world-table";
 import { CommandForm, CommandButton } from "./world-tools";
 import { LocationOptions, MarketLocationsPanel } from "./market-locations";
@@ -574,11 +579,12 @@ function MapEditor({
         name: "",
         image: "",
         locationId: null,
-        visible: true,
+        visible: false,
         anchors: [],
         markers: [],
       },
     ),
+    [mediaBundle, setMediaBundle] = useState<MapAssetBundle>(),
     [busy, setBusy] = useState(false),
     [progress, setProgress] = useState(""),
     [error, setError] = useState("");
@@ -591,11 +597,12 @@ function MapEditor({
           label="Save map"
           dirty
           submitDisabled={busy}
-          submit={() => {
+          submit={async () => {
             if (busy) throw Error("Wait for the image to finish processing.");
             if (!draft.image)
               throw Error("Choose a map image before saving. Your draft is retained.");
             if (!draft.name.trim()) throw Error("Enter a map name before saving.");
+            if (mediaBundle) await publishMapAsset(mediaBundle, setProgress);
             return { kind: "map-save", mapId: draft.id, before: map ?? null, map: draft };
           }}
           onDone={close}
@@ -670,10 +677,10 @@ function MapEditor({
             Share this map image with players
           </label>
           <label>
-            Map image
+            Map artwork or video
             <input
               type="file"
-              accept="image/png,image/jpeg,image/webp"
+              accept="image/png,image/jpeg,image/webp,video/mp4,video/webm"
               disabled={busy}
               onChange={async (e) => {
                 const file = e.target.files?.[0];
@@ -683,8 +690,19 @@ function MapEditor({
                 setError("");
                 setProgress("Preparing map image… You can fill in the map details while you wait.");
                 try {
-                  const image = await prepareMapImage(file);
-                  setDraft((current) => ({ ...current, image, anchors: [] }));
+                  const bundle = await prepareMapMedia(file);
+                  await cacheMapAsset(bundle);
+                  setMediaBundle(bundle);
+                  setDraft((current) => ({
+                    ...current,
+                    image: bundle.manifest.preview,
+                    anchors: [],
+                    tabletop: {
+                      ...readMapTabletop(current),
+                      media: mapMediaReference(bundle.manifest),
+                      frames: [],
+                    },
+                  }));
                   setProgress("Map image ready. Review the details, then save the map.");
                 } catch (e) {
                   setProgress("");
@@ -696,8 +714,10 @@ function MapEditor({
             />
           </label>
           <p className="text-sm text-muted">
-            PNG, JPEG or WebP up to 20 MB. Shared copy: up to 2400 pixels and 500 KB. Players see
-            everything drawn in the shared image.
+            PNG, JPEG, WebP, MP4 or WebM up to 20 MB, 8192 pixels per edge and 64 megapixels.
+            Original detail is retained separately from optimized previews. Video starts paused.
+            Protected video scenes use a still player view. Share only artwork you have permission
+            to use.
           </p>
           {draft.image && (
             <>
@@ -709,25 +729,36 @@ function MapEditor({
                   setError("");
                   setProgress("Reading location labels… You can continue editing the map details.");
                   try {
-                    const result = await recognizeMap(draft.image, setProgress);
-                    const matches = recognizedAnchors(
-                      result.lines,
-                      result.width,
-                      result.height,
-                      table,
-                    );
-                    setDraft((current) => ({
-                      ...current,
-                      anchors: [
-                        ...current.anchors,
-                        ...matches.filter(
-                          (a) => !current.anchors.some((b) => a.locationId === b.locationId),
-                        ),
-                      ],
-                    }));
-                    setProgress(
-                      `${matches.length} unique location labels matched. Review their positions before saving; ambiguous or unreadable labels can be linked manually.`,
-                    );
+                    let url: string | undefined;
+                    try {
+                      if (draft.tabletop?.media?.mime.startsWith("image/"))
+                        url = URL.createObjectURL(
+                          await mapAssetBlob(
+                            mediaBundle ?? (await loadMapAsset(draft.id, draft.tabletop.media)),
+                          ),
+                        );
+                      const result = await recognizeMap(url ?? draft.image, setProgress);
+                      const matches = recognizedAnchors(
+                        result.lines,
+                        result.width,
+                        result.height,
+                        table,
+                      );
+                      setDraft((current) => ({
+                        ...current,
+                        anchors: [
+                          ...current.anchors,
+                          ...matches.filter(
+                            (a) => !current.anchors.some((b) => a.locationId === b.locationId),
+                          ),
+                        ],
+                      }));
+                      setProgress(
+                        `${matches.length} unique location labels matched. Review their positions before saving; ambiguous or unreadable labels can be linked manually.`,
+                      );
+                    } finally {
+                      if (url) URL.revokeObjectURL(url);
+                    }
                   } catch (e) {
                     setProgress("");
                     setError(
@@ -1071,12 +1102,7 @@ function MapViewport({
             transform: `translate(${view.x}px, ${view.y}px) scale(${view.scale})`,
           }}
         >
-          <img
-            draggable={false}
-            src={map.image}
-            alt={map.name}
-            onLoad={(e) => setRatio(e.currentTarget.naturalWidth / e.currentTarget.naturalHeight)}
-          />
+          <MapArtwork map={map} onRatio={setRatio} />
           {visible.includes("Ship") && routes.length > 0 && (
             <svg
               className="map-route-trails"
