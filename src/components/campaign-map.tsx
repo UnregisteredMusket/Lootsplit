@@ -896,10 +896,15 @@ function MapViewport({
     [filtersOpen, setFiltersOpen] = useState(false),
     [details, setDetails] = useState<MapRecord[]>([]),
     [pinging, setPinging] = useState(false),
-    [color, setColor] = useState<MapPingInput["color"]>("blue");
+    [color, setColor] = useState<MapPingInput["color"]>("blue"),
+    [full, setFull] = useState(false),
+    [drawerOpen, setDrawerOpen] = useState(false);
   const signals = useMapPings(map.id),
     useDm = useSeat().role === "dm",
     tools = useMapTabletopTools(map, selectedToken, onTokenSelect);
+  useEffect(() => {
+    if (full && tools.inspecting) setDrawerOpen(false);
+  }, [full, tools.inspecting]);
   const records: MapRecord[] = [
     ...map.markers
       .filter((m) => m.visibility === "party" || useDm)
@@ -962,7 +967,43 @@ function MapViewport({
   }, []);
   const cameraNonce =
     !useDm && tools.session.camera?.mapId === map.id ? tools.session.camera.nonce : undefined;
+  const previousViewport = useRef<
+    | {
+        mapId: string;
+        nonce?: string;
+        width: number;
+        height: number;
+        w: number;
+        h: number;
+      }
+    | undefined
+  >(undefined);
   useEffect(() => {
+    const previous = previousViewport.current;
+    previousViewport.current = {
+      mapId: map.id,
+      nonce: cameraNonce,
+      width: size.w,
+      height: size.h,
+      w,
+      h,
+    };
+    if (
+      previous &&
+      previous.mapId === map.id &&
+      previous.nonce === cameraNonce &&
+      previous.width > 1 &&
+      previous.height > 1
+    ) {
+      // Opening fullscreen, rotating a phone or resizing the window keeps the
+      // same world point at the center instead of unexpectedly fitting the map.
+      setView((v) => ({
+        scale: v.scale,
+        x: size.w / 2 - ((previous.width / 2 - v.x) / previous.w) * w,
+        y: size.h / 2 - ((previous.height / 2 - v.y) / previous.h) * h,
+      }));
+      return;
+    }
     const camera =
       !useDm && tools.session.camera?.mapId === map.id
         ? tools.session.camera.view
@@ -1018,19 +1059,121 @@ function MapViewport({
     };
   }
   return (
-    <MapFrame>
-      <div
-        onClickCapture={() => {
-          stopPlacing();
-          setPinging(false);
-        }}
-      >
-        {tools.toolControls}
-      </div>
-      <div className="world-toolbar map-controls">
-        <Button aria-expanded={filtersOpen} onClick={() => setFiltersOpen((v) => !v)}>
-          Filters
+    <MapFrame
+      title={map.name}
+      onFullChange={(next) => {
+        setFull(next);
+        setDrawerOpen(false);
+        if (next) tools.hideInspector();
+      }}
+      actions={
+        <Button
+          aria-expanded={drawerOpen}
+          aria-controls="fullscreen-map-tools"
+          onClick={() => {
+            tools.hideInspector();
+            setDrawerOpen((open) => !open);
+          }}
+        >
+          Map tools
         </Button>
+      }
+    >
+      <div id="fullscreen-map-tools" className="map-tool-drawer" hidden={full && !drawerOpen}>
+        {full && (
+          <div className="world-row map-drawer-heading">
+            <strong>Map tools</strong>
+            <Button
+              onClick={() => {
+                setDrawerOpen(false);
+                root.current?.focus();
+              }}
+            >
+              Close tools
+            </Button>
+          </div>
+        )}
+        <div
+          onClickCapture={() => {
+            stopPlacing();
+            setPinging(false);
+          }}
+        >
+          {tools.toolControls}
+        </div>
+        <div className="world-toolbar map-controls">
+          <Button aria-expanded={filtersOpen} onClick={() => setFiltersOpen((v) => !v)}>
+            Filters
+          </Button>
+          <label>
+            Ping color
+            <select
+              aria-label="Ping color"
+              value={color}
+              onChange={(e) => setColor(e.target.value as MapPingInput["color"])}
+            >
+              {pingColors.map((c) => (
+                <option key={c} value={c}>
+                  {c[0].toUpperCase() + c.slice(1)}
+                </option>
+              ))}
+            </select>
+          </label>
+          {useDm && (
+            <>
+              <Button
+                disabled={tools.busy || !map.visible}
+                onClick={() => void tools.shareCamera(currentCamera())}
+              >
+                Share this view
+              </Button>
+              <Button
+                disabled={tools.busy}
+                onClick={() => void tools.saveInitialView(currentCamera())}
+              >
+                Save starting view
+              </Button>
+            </>
+          )}
+        </div>
+        {filtersOpen && (
+          <fieldset className="map-filters">
+            <legend>Show on map</legend>
+            {mapRecordKinds.map((kind) => (
+              <label key={kind}>
+                <input
+                  type="checkbox"
+                  checked={visible.includes(kind)}
+                  onChange={(e) =>
+                    setVisible((v) =>
+                      e.target.checked ? [...v, kind] : v.filter((k) => k !== kind),
+                    )
+                  }
+                />
+                {kind === "NPC" ? "Characters / NPCs" : kind}
+              </label>
+            ))}
+            <Button onClick={() => setVisible([...mapRecordKinds])}>Show all</Button>
+            <Button onClick={() => setVisible([])}>Hide all</Button>
+          </fieldset>
+        )}
+        {useDm && tools.showPreview && <MapPlayerPreview map={map} />}
+        {pinging && (
+          <p className="text-sm text-muted">
+            Keyboard: pan to a point, then press Enter to ping the center crosshair. Escape turns
+            ping mode off.
+          </p>
+        )}
+        <div className="map-tile-control-area">{controls}</div>
+      </div>
+      <div className="world-toolbar map-navigation" aria-label="Map navigation">
+        <Button onClick={() => zoom(1.4, size.w / 2, size.h / 2)} aria-label="Zoom in">
+          +
+        </Button>
+        <Button onClick={() => zoom(1 / 1.4, size.w / 2, size.h / 2)} aria-label="Zoom out">
+          −
+        </Button>
+        <Button onClick={fit}>Fit map</Button>
         <Button
           disabled={signals.viewOnly}
           aria-pressed={pinging}
@@ -1042,75 +1185,29 @@ function MapViewport({
         >
           Ping
         </Button>
-        <label>
-          Ping color
-          <select
-            aria-label="Ping color"
-            value={color}
-            onChange={(e) => setColor(e.target.value as MapPingInput["color"])}
-          >
-            {pingColors.map((c) => (
-              <option key={c} value={c}>
-                {c[0].toUpperCase() + c.slice(1)}
-              </option>
-            ))}
-          </select>
-        </label>
-        <Button onClick={() => zoom(1.4, size.w / 2, size.h / 2)} aria-label="Zoom in">
-          +
-        </Button>
-        <Button onClick={() => zoom(1 / 1.4, size.w / 2, size.h / 2)} aria-label="Zoom out">
-          −
-        </Button>
-        <Button onClick={fit}>Fit map</Button>
-        {useDm && (
-          <>
-            <Button
-              disabled={tools.busy || !map.visible}
-              onClick={() => void tools.shareCamera(currentCamera())}
-            >
-              Share this view
-            </Button>
-            <Button
-              disabled={tools.busy}
-              onClick={() => void tools.saveInitialView(currentCamera())}
-            >
-              Save starting view
-            </Button>
-          </>
-        )}
-        <span aria-live="polite">{Math.round(view.scale * 100)}%</span>
+        <output aria-label="Map zoom" aria-live="polite">
+          {Math.round(view.scale * 100)}%
+        </output>
       </div>
-      {filtersOpen && (
-        <fieldset className="map-filters">
-          <legend>Show on map</legend>
-          {mapRecordKinds.map((kind) => (
-            <label key={kind}>
-              <input
-                type="checkbox"
-                checked={visible.includes(kind)}
-                onChange={(e) =>
-                  setVisible((v) => (e.target.checked ? [...v, kind] : v.filter((k) => k !== kind)))
-                }
-              />
-              {kind === "NPC" ? "Characters / NPCs" : kind}
-            </label>
-          ))}
-          <Button onClick={() => setVisible([...mapRecordKinds])}>Show all</Button>
-          <Button onClick={() => setVisible([])}>Hide all</Button>
-        </fieldset>
-      )}
-      {pinging && (
-        <p role="status">
-          Tap the map to ping in {color}.{" "}
-          {signals.joined
-            ? "Everyone viewing this map in the room will see it for five seconds."
-            : "Offline preview; join a room to share pings."}
-        </p>
-      )}
-      {signals.viewOnly && <p className="text-sm text-muted">Resume play to share map pings.</p>}
-      {signals.error && <p role="alert">{signals.error}</p>}
-      {useDm && tools.showPreview && <MapPlayerPreview map={map} />}
+      <div className="map-feedback">
+        {full && (
+          <p className="map-active-tool" role="status">
+            {pinging ? `Ping · ${color}` : tools.toolLabel}
+            {tools.measurement && ` · ${tools.measurement}`}
+          </p>
+        )}
+        {tools.feedback}
+        {pinging && (
+          <p role="status">
+            Tap the map to ping in {color}.{" "}
+            {signals.joined
+              ? "Everyone viewing this map in the room will see it for five seconds."
+              : "Offline preview; join a room to share pings."}
+          </p>
+        )}
+        {signals.viewOnly && <p className="text-sm text-muted">Resume play to share map pings.</p>}
+        {signals.error && <p role="alert">{signals.error}</p>}
+      </div>
       <div className={`tabletop-workspace ${tools.panel ? "has-inspector" : ""}`}>
         <div className="tabletop-surface">
           <div
@@ -1415,13 +1512,6 @@ function MapViewport({
         </div>
         {tools.panel}
       </div>
-      {pinging && (
-        <p className="text-sm text-muted">
-          Keyboard: pan to a point, then press Enter to ping the center crosshair. Escape turns ping
-          mode off.
-        </p>
-      )}
-      <div className="map-tile-control-area">{controls}</div>
     </MapFrame>
   );
 }

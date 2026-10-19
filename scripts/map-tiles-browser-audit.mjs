@@ -1,3 +1,4 @@
+import { checkFullscreenMap } from "./fullscreen-map-browser-check.mjs";
 import { checkPlayerDisplay } from "./player-display-browser-check.mjs";
 import { checkOnlineTabletop } from "./online-tabletop-browser-check.mjs";
 import assert from "node:assert/strict";
@@ -263,6 +264,8 @@ try {
     await expect(guardIcon).toHaveAttribute("aria-pressed", "false");
     await expect(page.locator('.map-record-icon[aria-pressed="true"]')).toHaveCount(1);
     await page.getByRole("button", { name: "Fullscreen map", exact: true }).click();
+    await checkFullscreenMap(page, output, width);
+    await page.getByRole("button", { name: "Map tools", exact: true }).click();
     await expect(page.getByRole("button", { name: "Save token move", exact: true })).toBeVisible();
     await fits(page);
     await page.screenshot({ path: `${output}/dm-tiles-${width}.png`, fullPage: true });

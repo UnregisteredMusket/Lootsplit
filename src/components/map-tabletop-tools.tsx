@@ -663,10 +663,23 @@ export function useMapTabletopTools(
           </p>
         </Fold>
       )}
+    </section>
+  );
+  const feedback = (
+    <>
       {notice && <p role="status">{notice}</p>}
       {error && <p role="alert">{error}</p>}
       {cloud.joined && (
-        <p className="tabletop-connection" role="status">
+        <p
+          className="tabletop-connection"
+          data-idle={
+            cloud.status !== "attention" &&
+            cloud.status !== "saving" &&
+            !cloud.pending &&
+            cloud.mine
+          }
+          role="status"
+        >
           {cloud.status === "attention"
             ? `Reconnect required · ${cloud.error}`
             : cloud.status === "saving"
@@ -677,7 +690,7 @@ export function useMapTabletopTools(
           {!cloud.mine && ` · Waiting for ${cloud.who}`}
         </p>
       )}
-    </section>
+    </>
   );
   const panel = inspector && (
     <aside className="tabletop-inspector" aria-label="Map inspector">
@@ -973,6 +986,11 @@ export function useMapTabletopTools(
   return {
     tool,
     toolControls,
+    feedback,
+    toolLabel: toolNames[tool],
+    measurement: tool === "measure" ? `${measured.toFixed(1)} ${settings.unitLabel}` : "",
+    inspecting: inspector,
+    hideInspector: () => setInspector(false),
     panel,
     overlay,
     pointerDown,
