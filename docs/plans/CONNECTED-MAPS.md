@@ -77,6 +77,8 @@ If the DM configured a default battle map for that place, preselect it. Never pi
 
 The overlay option only makes sense at an appropriate scale. A miles-per-cell regional map cannot become a five-foot battle map by toggling grid visibility. Keep the calibrated grid on a local map, or open a tactical map. Saving, hiding or leaving a grid must retain its calibration, token positions and fog.
 
+The current tile-mode toggle is local component state. A DM toggling it does not direct every player's display. A shared combat transition needs an explicit validated presentation mode in the encounter/scene binding, while retaining independent cameras and the existing scene-access policy.
+
 After the authoritative encounter start succeeds, activate the chosen shared scene and show its combat controls. Expose round, turn and authorized token details in the floating HUD. DM actions write through the existing encounter API; players receive only an explicit permitted combat presentation. The existing shared `encounterActive` flag does not expose full tracker data, and current map projection strips the private map-level encounter ID. A player HUD therefore needs a deliberate safe projection, not access to the DM encounter endpoint.
 
 Tokens already carry encounter/combatant IDs, but combatants do not currently have a dedicated canonical character-ID field. Names and `sourceKey` are not a safe basis for automatic character-sheet HP synchronization. Preserve tracker HP/initiative/conditions and link permitted sheets explicitly. If bidirectional sheet/tracker synchronization is added later, define the owning record, revision checks and stable character mapping first.
@@ -95,7 +97,7 @@ Use the existing campaign maps and canonical locations as the base. Proposed fie
 | Place-to-map assignments | Select default overview/local/battle map per place, with optional variants | Multiple maps supported; explicit preference beats array order; no ambiguous automatic migration |
 | Scene links | Source point/region, target map, optional entry camera, visibility | Cross-links may be bidirectional; target access and source fog are checked; no automatic movement |
 | Record placements | Map ID, record kind/ID, point, visibility/display options | Refer to canonical records, never copy inventory, balances or authority; inherited anchors remain fallback |
-| Encounter presentation binding | Encounter/map IDs, entry policy and return context | Same campaign and revision checks; survive refresh/retry; private setup excluded from player responses |
+| Encounter presentation binding | Encounter/map IDs, presentation mode, entry policy and return context | Same campaign and revision checks; survive refresh/retry; private setup excluded from player responses |
 | Per-view navigation state | Trail and camera per scene; currently open panel | Local to the current campaign/window; does not change active scene or authoritative location |
 
 Refactor the Maps page so the frame remains mounted across scene changes. Hoist map selection, breadcrumb and per-scene camera state above the keyed viewport; keep canvas content replaceable. Route/back handling should address the selected map and permitted record while preserving the running document. Unsaved map/encounter/service drafts need the existing leave/reload safeguards.
