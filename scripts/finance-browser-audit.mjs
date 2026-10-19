@@ -227,30 +227,25 @@ try {
     await finance.scrollIntoViewIfNeeded();
     await page.screenshot({ path: `${output}/applied-${width}.png`, fullPage: true });
     assert.equal(await finance.locator('[role="alert"]').count(), 0);
-    // Switch to a separate campaign in this disposable browser and ensure no debt follows.
-    const original = await page.evaluate(() => {
-      const active = localStorage.getItem("quire.campaign.v1") || "main";
-      const rows = JSON.parse(
-        localStorage.getItem("quire.campaigns.v1") || '[{"id":"main","name":"Main","db":"quire"}]',
-      );
-      rows.push({
-        id: "finance-isolation",
-        name: "Other campaign",
-        db: "quire-finance-isolation",
-        blank: true,
-      });
-      localStorage.setItem("quire.campaigns.v1", JSON.stringify(rows));
-      // This synthetic second campaign belongs to the already authenticated fixture DM.
-      localStorage.setItem(
-        "quire.owner.finance-isolation",
-        localStorage.getItem(`quire.owner.${active || "main"}`),
-      );
-      localStorage.setItem("quire.campaign.v1", "finance-isolation");
-      return active;
-    });
+    // Switch through the real UI so both the device default and this window's
+    // pinned campaign are updated. Editing only localStorage leaves this tab on
+    // its original campaign, by design, since independent windows were added.
+    await page.getByRole("button", { name: "Select campaign", exact: true }).click();
+    const originalName = await page.getByLabel("Campaign name", { exact: true }).inputValue();
+    await page.getByLabel("New campaign name", { exact: true }).fill("Other campaign");
+    await page.getByRole("button", { name: "New campaign", exact: true }).click();
+    await expect(page.getByLabel("Campaign name", { exact: true })).toHaveValue("Other campaign");
+    await page.keyboard.press("Escape");
     await reloadApplication(page);
     await finance.getByText(/Outstanding loans 0 cp · In-game day 0/).waitFor();
-    await page.evaluate((active) => localStorage.setItem("quire.campaign.v1", active), original);
+    await page.getByRole("button", { name: "Select campaign", exact: true }).click();
+    await page
+      .getByRole("listitem")
+      .filter({ has: page.getByText(originalName, { exact: true }) })
+      .getByRole("button", { name: "Open", exact: true })
+      .click();
+    await expect(page.getByLabel("Campaign name", { exact: true })).toHaveValue(originalName);
+    await page.keyboard.press("Escape");
     await reloadApplication(page);
     await finance.getByText(/Outstanding loans 8 gp · In-game day 7/).waitFor();
     await go("properties");
