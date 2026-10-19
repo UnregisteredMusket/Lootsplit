@@ -274,7 +274,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Player references / development / Run actions/upload-artifact@v4 | open | 2 | 1s → 3s | +2s | +200% |
 | Player references / worker / Run actions/setup-node@v4 | open | 3 | 4s → 9s | +5s | +125% |
 | Development / gameplay / dev-ships | open | 2 | 27s → 54s | +27s | +100% |
-| Focused player references / initial queue | open | 2 | 4s → 38s | +34s | +850% |
+| Focused player references / initial queue | open | 3 | 4s → 124s | +120s | +3000% |
 | Development / gameplay / dev-ships | open | 2 | 36s → 59s | +23s | +63.89% |
 | Development / desktop / dev-navigation | open | 2 | 39s → 115s | +76s | +194.87% |
 | rehearsal / Run actions/setup-node@v4 | open | 2 | 3s → 6s | +3s | +100% |
@@ -307,6 +307,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-19T21:36:03.000Z | queue: Focused player references / initial queue | 38s → 124s | +86s | +226.32% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38303830017) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39328485877) |
 | 2026-10-19T14:23:19Z | job: Packaged Worker / accounts (balanced v2) | 513s → 607s | +94s | +18.32% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38409667330/job/115346481950) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39266580213/job/118108928948) |
 | 2026-10-19T14:23:16Z | step: Packaged Worker / accounts (balanced v2) / Run actions/upload-artifact@v4 | 3s → 4s | +1s | +33.33% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38310299946/job/115014983127) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39266580213/job/118108928948) |
 | 2026-10-19T14:22:17Z | job: Development / desktop (balanced v2) | 598s → 698s | +100s | +16.72% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38305743510/job/114999237632) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39266580213/job/118107614794) |
