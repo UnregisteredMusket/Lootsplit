@@ -301,6 +301,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-19T14:09:32Z | step: Packaged Worker / accounts (balanced v2) / Run actions/upload-artifact@v4 | 3s → 4s | +1s | +33.33% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38309026871/job/115010777381) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39264605774/job/118101856540) |
 | 2026-10-19T13:56:02Z | job: Packaged Worker / accounts (balanced v2) | 497s → 609s | +112s | +22.54% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38309026871/job/115010777381) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39262626961/job/118094990974) |
 | 2026-10-19T13:55:25Z | job: Development / desktop (balanced v2) | 567s → 693s | +126s | +22.22% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38303829968/job/114993398409) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39262626961/job/118093975300) |
 | 2026-10-19T13:49:57Z | step: Development / desktop (balanced v2) / dev-map-tiles | 102s → 120s | +18s | +17.65% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39257669088/job/118076935765) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39262626961/job/118093975300) |

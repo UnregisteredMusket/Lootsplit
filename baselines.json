@@ -16315,19 +16315,19 @@
   },
   "[\".github/workflows/verify.yml\",\"pull_request\",\"pull-request\",\"step\",\"Packaged Worker / accounts (balanced v2) / Run actions/upload-artifact@v4\",\"ubuntu-latest\",1]": {
     "schema": 1,
-    "id": "38309026871:1:91482fb873107577f0887bc861ca1a9eeb59a299c921c4de399778bad3b19236",
+    "id": "39264605774:1:91482fb873107577f0887bc861ca1a9eeb59a299c921c4de399778bad3b19236",
     "scope": "[\".github/workflows/verify.yml\",\"pull_request\",\"pull-request\",\"step\",\"Packaged Worker / accounts (balanced v2) / Run actions/upload-artifact@v4\",\"ubuntu-latest\",1]",
     "kind": "step",
     "name": "Packaged Worker / accounts (balanced v2) / Run actions/upload-artifact@v4",
     "environment": "ubuntu-latest",
-    "commit": "e0627c68cc2c41b3793f240ca2c7c4150bd9c202",
-    "runId": 38309026871,
+    "commit": "958ef065020bc806599d8dc0c1f65e90945a9c6d",
+    "runId": 39264605774,
     "attempt": 1,
-    "url": "https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38309026871/job/115010777381",
+    "url": "https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39264605774/job/118101856540",
     "outcome": "success",
-    "startedAt": "2026-10-12T21:21:49Z",
-    "finishedAt": "2026-10-12T21:21:52Z",
-    "durationMs": 3000,
+    "startedAt": "2026-10-19T14:09:28Z",
+    "finishedAt": "2026-10-19T14:09:32Z",
+    "durationMs": 4000,
     "trendId": "38309026871:1:91482fb873107577f0887bc861ca1a9eeb59a299c921c4de399778bad3b19236"
   },
   "[\".github/workflows/verify.yml\",\"pull_request\",\"pull-request\",\"job\",\"Packaged Worker / accounts (balanced v2)\",\"ubuntu-latest\",\"\"]": {
@@ -17600,5 +17600,22 @@
     "finishedAt": "2026-10-19T13:56:01Z",
     "durationMs": 1000,
     "trendId": "39262626961:1:ba4914fc2254442e0631bd9245d7b94d0faa73b477fdad191a10206c5ea58e79"
+  },
+  "[\".github/workflows/verify.yml\",\"pull_request\",\"pull-request\",\"step\",\"Packaged Worker / interface (balanced v2) / Confirm audited bytes are unchanged\",\"ubuntu-latest\",1]": {
+    "schema": 1,
+    "id": "39264605774:1:46a5f068a29caa3e9f695286158ec872a59e56df7441506d71b9e6a85d2d34a3",
+    "scope": "[\".github/workflows/verify.yml\",\"pull_request\",\"pull-request\",\"step\",\"Packaged Worker / interface (balanced v2) / Confirm audited bytes are unchanged\",\"ubuntu-latest\",1]",
+    "kind": "step",
+    "name": "Packaged Worker / interface (balanced v2) / Confirm audited bytes are unchanged",
+    "environment": "ubuntu-latest",
+    "commit": "958ef065020bc806599d8dc0c1f65e90945a9c6d",
+    "runId": 39264605774,
+    "attempt": 1,
+    "url": "https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39264605774/job/118101856611",
+    "outcome": "success",
+    "startedAt": "2026-10-19T14:06:59Z",
+    "finishedAt": "2026-10-19T14:07:00Z",
+    "durationMs": 1000,
+    "trendId": "39264605774:1:46a5f068a29caa3e9f695286158ec872a59e56df7441506d71b9e6a85d2d34a3"
   }
 }
