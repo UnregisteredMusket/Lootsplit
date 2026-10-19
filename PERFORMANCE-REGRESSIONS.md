@@ -286,21 +286,38 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Development / gameplay (balanced v2) / Run actions/upload-artifact@v4 | open | 2 | 1s → 4s | +3s | +300% |
 | Development / gameplay (balanced v2) | open | 2 | 215s → 544s | +329s | +153.02% |
 | Development / desktop (balanced v2) | open | 2 | 472s → 693s | +221s | +46.82% |
+| Development / gameplay (balanced v2) / dev-finance | open | 2 | 36s → 58s | +22s | +61.11% |
 | Packaged Worker / interface (balanced v2) / Run actions/setup-node@v4 | open | 2 | 2s → 7s | +5s | +250% |
 | Packaged Worker / interface (balanced v2) / Run actions/download-artifact@v4 | open | 2 | 1s → 3s | +2s | +200% |
+| Packaged Worker / accounts (balanced v2) / Start disposable built Worker | open | 2 | 7s → 11s | +4s | +57.14% |
+| Packaged Worker / interface (balanced v2) / worker-initiative | open | 2 | 4s → 6s | +2s | +50% |
 | Packaged Worker / accounts (balanced v2) / worker-account | open | 2 | 85s → 117s | +32s | +37.65% |
 | Packaged Worker / accounts (balanced v2) / worker-finance | open | 2 | 22s → 34s | +12s | +54.55% |
 | Packaged Worker / accounts (balanced v2) / worker-ships | open | 2 | 27s → 47s | +20s | +74.07% |
-| Packaged Worker / accounts (balanced v2) / worker-map-tiles | open | 2 | 17s → 44s | +27s | +158.82% |
+| Packaged Worker / accounts (balanced v2) / worker-map-tiles | open | 3 | 17s → 95s | +78s | +458.82% |
+| Packaged Worker / interface (balanced v2) / worker-game-analytics | open | 2 | 3s → 5s | +2s | +66.67% |
 | Packaged Worker / interface (balanced v2) / Run actions/upload-artifact@v4 | open | 2 | 3s → 6s | +3s | +100% |
+| Packaged Worker / accounts (balanced v2) | open | 2 | 434s → 607s | +173s | +39.86% |
 | backup / Export consistently and encrypt before writing to disk | open | 2 | 3s → 6s | +3s | +100% |
 | Development / desktop (balanced v2) / dev-map-tiles | open | 3 | 35s → 120s | +85s | +242.86% |
 | Packaged Worker / accounts (balanced v2) / worker-map-tiles | open | 2 | 20s → 85s | +65s | +325% |
+| Development / desktop (balanced v2) / dev-map-tiles | open | 2 | 35s → 122s | +87s | +248.57% |
 
 ## Recorded slowdowns
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-19T14:23:19Z | job: Packaged Worker / accounts (balanced v2) | 513s → 607s | +94s | +18.32% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38409667330/job/115346481950) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39266580213/job/118108928948) |
+| 2026-10-19T14:23:16Z | step: Packaged Worker / accounts (balanced v2) / Run actions/upload-artifact@v4 | 3s → 4s | +1s | +33.33% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38310299946/job/115014983127) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39266580213/job/118108928948) |
+| 2026-10-19T14:22:17Z | job: Development / desktop (balanced v2) | 598s → 698s | +100s | +16.72% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38305743510/job/114999237632) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39266580213/job/118107614794) |
+| 2026-10-19T14:20:18Z | step: Packaged Worker / accounts (balanced v2) / worker-map-tiles | 44s → 95s | +51s | +115.91% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38938272606/job/117100276339) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39266580213/job/118108928948) |
+| 2026-10-19T14:20:14Z | step: Packaged Worker / interface (balanced v2) / worker-game-analytics | 4s → 5s | +1s | +25% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38409667330/job/115339634011) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39266580213/job/118108928983) |
+| 2026-10-19T14:16:47Z | step: Development / desktop (balanced v2) / dev-map-tiles | 55s → 122s | +67s | +121.82% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38938272606/job/117099144192) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39266580213/job/118107614794) |
+| 2026-10-19T14:14:29Z | step: Packaged Worker / interface (balanced v2) / worker-initiative | 5s → 6s | +1s | +20% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38376270621/job/115226315634) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39266580213/job/118108928983) |
+| 2026-10-19T14:14:12Z | step: Packaged Worker / accounts (balanced v2) / Start disposable built Worker | 9s → 11s | +2s | +22.22% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38376270621/job/115226315645) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39266580213/job/118108928948) |
+| 2026-10-19T14:14:10Z | step: Packaged Worker / interface (balanced v2) / Run npx playwright install --with-deps chromium | 22s → 29s | +7s | +31.82% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38310299946/job/115014983235) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39266580213/job/118108928983) |
+| 2026-10-19T14:13:44Z | step: Development / gameplay (balanced v2) / dev-finance | 44s → 58s | +14s | +31.82% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38310299946/job/115014088792) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39266580213/job/118107615052) |
+| 2026-10-19T13:20:11.330000Z | audit: navigation-browser-194-actions | 125.872s → 160.656s | +34.784s | +27.63% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/pull/109) · [After](https://github.com/UnregisteredMusket/Lootsplit/pull/110) |
 | 2026-10-19T14:09:32Z | step: Packaged Worker / accounts (balanced v2) / Run actions/upload-artifact@v4 | 3s → 4s | +1s | +33.33% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38309026871/job/115010777381) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39264605774/job/118101856540) |
 | 2026-10-19T13:56:02Z | job: Packaged Worker / accounts (balanced v2) | 497s → 609s | +112s | +22.54% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38309026871/job/115010777381) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39262626961/job/118094990974) |
 | 2026-10-19T13:55:25Z | job: Development / desktop (balanced v2) | 567s → 693s | +126s | +22.22% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38303829968/job/114993398409) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39262626961/job/118093975300) |

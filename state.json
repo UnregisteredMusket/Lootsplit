@@ -1,8 +1,10 @@
 {
   "schema": 1,
-  "scanAfter": "2026-10-19T14:09:55.544Z",
+  "scanAfter": "2026-10-19T14:23:54.702Z",
   "pending": [
-    37642398740
+    37642398740,
+    39268555219,
+    39268555243
   ],
   "processed": [
     "37233308988:1",
@@ -910,7 +912,9 @@
     "39264443729:1",
     "39264605774:1",
     "39264605889:1",
-    "39266460699:1"
+    "39266460699:1",
+    "39266580213:1",
+    "39268555195:1"
   ],
   "manualProcessed": [
     "local:009bc747-0726-4cfb-aa65-118e114f7221",
@@ -920,6 +924,7 @@
     "local:05def99e-0525-4756-90f8-ce67dbd92e87",
     "local:0ba4e1d5-ab86-4058-b982-49a8820c5054",
     "local:0eb648bc-aabd-45ef-98f8-1624c1631df2",
+    "local:0f6fbb89-a2e1-4fb4-ad26-381043602df8",
     "local:0ffaa569-0885-4c35-a38a-3308e38b4371",
     "local:12e43fe6-b313-4894-a62b-e30dcd62adf6",
     "local:13199943-fd4d-4a88-849b-36fcf212f84a",
@@ -951,6 +956,7 @@
     "local:4bd6dd2a-07f2-4e49-9846-25cb824264d1",
     "local:4d331e5a-6cea-45b2-9474-e537c8758a0e",
     "local:4d64aaa8-e4b1-4d74-a8ff-0252d2a93385",
+    "local:4da50b18-bd93-4852-a3ba-82278928d9d0",
     "local:4f895954-75c9-43eb-9761-c2683af11f78",
     "local:50349d85-509d-4ed1-8ffd-23eb8bedbe1d",
     "local:55959c59-30e7-45e0-b9fc-18007afa7e1d",
@@ -1030,8 +1036,10 @@
     "local:c9778846-5fb6-42f5-9b41-a66d33098da4",
     "local:ca6fea07-cfb0-4728-bebd-b6cf15cec15c",
     "local:cc22bc70-2976-46d6-900f-cf5bebf49835",
+    "local:d03c0be0-e46f-4e9b-a57a-1cc1481bdda4",
     "local:d4e835d5-fc5a-4b04-9d13-d50be98820bd",
     "local:d66679e9-b870-4ba8-aa00-998ac58cdaec",
+    "local:d6bba3f0-35a4-4f83-a14f-f5385a982007",
     "local:d87381fd-b1dc-42bf-8635-4473ef22a75b",
     "local:d8b6b32f-1088-491b-9884-3a94ecdff165",
     "local:da63514c-32f3-4f1a-8f38-0cdbc9980f85",
