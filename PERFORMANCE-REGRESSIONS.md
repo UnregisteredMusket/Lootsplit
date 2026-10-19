@@ -293,11 +293,15 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Packaged Worker / accounts (balanced v2) / worker-map-tiles | open | 2 | 17s → 44s | +27s | +158.82% |
 | Packaged Worker / interface (balanced v2) / Run actions/upload-artifact@v4 | open | 2 | 3s → 6s | +3s | +100% |
 | backup / Export consistently and encrypt before writing to disk | open | 2 | 3s → 6s | +3s | +100% |
+| Development / desktop (balanced v2) / dev-map-tiles | open | 2 | 35s → 102s | +67s | +191.43% |
+| Packaged Worker / accounts (balanced v2) / worker-map-tiles | open | 2 | 20s → 85s | +65s | +325% |
 
 ## Recorded slowdowns
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-19T13:18:19Z | step: Packaged Worker / accounts (balanced v2) / worker-map-tiles | 44s → 85s | +41s | +93.18% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38936690063/job/117094844393) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39257669088/job/118078183628) |
+| 2026-10-19T13:14:13Z | step: Development / desktop (balanced v2) / dev-map-tiles | 56s → 102s | +46s | +82.14% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38936690063/job/117093857438) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39257669088/job/118076935765) |
 | 2026-10-19T09:14:54Z | step: rehearsal / Verify synthetic recovery on the dedicated empty standby | 1s → 2s | +1s | +100% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37286435016/job/111686330548) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39228550754/job/117980687276) |
 | 2026-10-19T09:14:39Z | step: rehearsal / Run actions/setup-node@v4 | 4s → 6s | +2s | +50% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38226688401/job/114735819394) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39228550754/job/117980687276) |
 | 2026-10-19T09:14:33Z | step: rehearsal / Run actions/checkout@v4 | 1s → 2s | +1s | +100% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37286435016/job/111686330548) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39228550754/job/117980687276) |
