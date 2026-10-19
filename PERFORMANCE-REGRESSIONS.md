@@ -277,6 +277,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Focused player references / initial queue | open | 2 | 4s → 38s | +34s | +850% |
 | Development / gameplay / dev-ships | open | 2 | 36s → 59s | +23s | +63.89% |
 | Development / desktop / dev-navigation | open | 2 | 39s → 115s | +76s | +194.87% |
+| rehearsal / Run actions/setup-node@v4 | open | 2 | 3s → 6s | +3s | +100% |
 | Development / gameplay / dev-blacksmith | open | 2 | 28s → 62s | +34s | +121.43% |
 | Packaged Worker / interface / worker-blacksmith | open | 3 | 24s → 44s | +20s | +83.33% |
 | Code checks and immutable builds / Generate current source function inventory | open | 2 | 12s → 19s | +7s | +58.33% |
@@ -297,6 +298,9 @@ Open trends require investigation. Resolved trends retain their history; each ve
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-19T09:14:54Z | step: rehearsal / Verify synthetic recovery on the dedicated empty standby | 1s → 2s | +1s | +100% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37286435016/job/111686330548) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39228550754/job/117980687276) |
+| 2026-10-19T09:14:39Z | step: rehearsal / Run actions/setup-node@v4 | 4s → 6s | +2s | +50% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38226688401/job/114735819394) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39228550754/job/117980687276) |
+| 2026-10-19T09:14:33Z | step: rehearsal / Run actions/checkout@v4 | 1s → 2s | +1s | +100% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37286435016/job/111686330548) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39228550754/job/117980687276) |
 | 2026-10-16T17:26:19Z | step: Packaged Worker / interface (balanced v2) / Run actions/upload-artifact@v4 | 4s → 6s | +2s | +50% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38409667330/job/115339634011) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38938272606/job/117100276181) |
 | 2026-10-16T17:24:07Z | step: Packaged Worker / accounts (balanced v2) / worker-map-tiles | 20s → 44s | +24s | +120% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38376270621/job/115226315645) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38938272606/job/117100276339) |
 | 2026-10-16T17:20:09Z | step: Development / desktop (balanced v2) / dev-map-tiles | 35s → 55s | +20s | +57.14% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38305743510/job/114999237632) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38938272606/job/117099144192) |
