@@ -138,6 +138,7 @@ export const tabletopSessionSchema = z
   .object({
     tvEnabled: z.boolean().default(false),
     activeMapId: id.nullable().default(null),
+    activationId: id.optional(),
     playerBrowsing: z.boolean().default(true),
     camera: z
       .object({ mapId: id, view: sceneCameraSchema, nonce: id })
@@ -187,6 +188,7 @@ export const tabletopCommands = [
       id,
       kind: z.literal("map-token-move"),
       mapId: id,
+      grid: z.string().max(1000).optional(),
       moves: z
         .array(z.object({ tokenId: id, before: tile, after: tile }).strict())
         .min(1)

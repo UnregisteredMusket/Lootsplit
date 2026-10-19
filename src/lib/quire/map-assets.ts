@@ -15,9 +15,12 @@ import {
 import type { CampaignMap } from "./world-schema.ts";
 
 export async function cacheMapAsset(bundle: MapAssetBundle) {
+  const campaign = activeCampaignId();
   if (getSeat().role !== "dm") throw Error("Only the DM keeps map originals for offline play.");
   await verifyMapAsset(bundle);
   const db = await quireDb();
+  if (activeCampaignId() !== campaign || getSeat().role !== "dm")
+    throw Error("The campaign changed before the map could be cached.");
   await new Promise<void>((resolve, reject) => {
     const tx = db.transaction("meta", "readwrite");
     tx.objectStore("meta").put({ id: "map-asset:" + bundle.manifest.id, bundle });
@@ -138,17 +141,37 @@ export async function bundleMapAsset(
   await verifyMapAsset(bundle);
   return bundle;
 }
-export function mapAssetReferences(maps: CampaignMap[]) {
-  return maps.flatMap((map) =>
-    [map.tabletop?.media, ...(map.tabletop?.frames.map((frame) => frame.media) ?? [])]
-      .filter((media): media is MapMediaReference => !!media)
-      .map((media) => ({ mapId: map.id, media })),
-  );
+export function mapAssetReferences(
+  maps: CampaignMap[],
+  reports: { snapshot: string }[] = [],
+  depth = 0,
+): { mapId: string; media: MapMediaReference }[] {
+  if (depth > 10) throw Error("Too many nested map archives. Keep the original recovery export.");
+  return [
+    ...maps.flatMap((map) =>
+      [map.tabletop?.media, ...(map.tabletop?.frames.map((frame) => frame.media) ?? [])]
+        .filter((media): media is MapMediaReference => !!media)
+        .map((media) => ({ mapId: map.id, media })),
+    ),
+    ...reports.flatMap((report) => {
+      let table;
+      try {
+        table = JSON.parse(report.snapshot);
+      } catch {
+        return [];
+      } // Preserve unreadable archive bytes in the backup.
+      return mapAssetReferences(
+        table?.journal?.world?.maps ?? [],
+        table?.journal?.reports ?? [],
+        depth + 1,
+      );
+    }),
+  ];
 }
-export async function mapBackupAssets(maps: CampaignMap[]) {
+export async function mapBackupAssets(maps: CampaignMap[], reports: { snapshot: string }[] = []) {
   const seen = new Set<string>(),
     bundles = [];
-  for (const { mapId, media } of mapAssetReferences(maps)) {
+  for (const { mapId, media } of mapAssetReferences(maps, reports)) {
     if (seen.has(media.id)) continue;
     seen.add(media.id);
     bundles.push(await loadMapAsset(mapId, media));

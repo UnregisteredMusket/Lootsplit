@@ -2001,9 +2001,13 @@ export async function snapshot(): Promise<QuireFile> {
     sales: readSales(await sales),
   });
   await done;
-  if (file.journal?.world?.maps.some((map) => map.tabletop?.media || map.tabletop?.frames.length)) {
+  if (file.journal) {
     const { mapBackupAssets } = await import("./map-assets.ts");
-    file.mapAssets = await mapBackupAssets(file.journal.world.maps);
+    const assets = await mapBackupAssets(
+      file.journal.world?.maps ?? [],
+      file.journal.reports ?? [],
+    );
+    if (assets.length) file.mapAssets = assets;
   }
   return file;
 }
@@ -2283,7 +2287,10 @@ export async function restore(file: QuireFile): Promise<void> {
     throw Error("This backup contains duplicate map assets. The campaign was not changed.");
   for (const bundle of assets) await verifyMapAsset(bundle);
   const { mapAssetReferences } = await import("./map-assets.ts");
-  for (const { media } of mapAssetReferences(file.journal?.world?.maps ?? []))
+  for (const { media } of mapAssetReferences(
+    file.journal?.world?.maps ?? [],
+    file.journal?.reports ?? [],
+  ))
     if (
       !assets.some(
         (asset) => asset.manifest.id === media.id && asset.manifest.sha256 === media.sha256,
@@ -2493,13 +2500,20 @@ export async function economyView() {
     finish(tx),
   ]);
   return {
-    ...(getSeat().role === "player" ? projectRecord(table, getSeat(), { directory: true }) : table),
+    ...(getSeat().role === "player"
+      ? projectRecord(table, getSeat(), {
+          directory: true,
+          tabletopProjected: getCloudWatch().joined,
+        })
+      : table),
     realm: table.realm,
     journal: readJournal(
-      getSeat().role === "player" ? projectRecord(table, getSeat()).journal : table.journal,
+      getSeat().role === "player"
+        ? projectRecord(table, getSeat(), { tabletopProjected: getCloudWatch().joined }).journal
+        : table.journal,
     ),
     ledger: (getSeat().role === "player"
-      ? projectRecord(table, getSeat()).ledger
+      ? projectRecord(table, getSeat(), { tabletopProjected: getCloudWatch().joined }).ledger
       : table.ledger
     ).sort((a, b) => b.at - a.at),
     catalog: catalog.sort((a, b) => a.name.localeCompare(b.name)),

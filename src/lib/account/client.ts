@@ -30,6 +30,7 @@ async function accountRequestCore<T>(
 ): Promise<T> {
   const headers = new Headers();
   headers.set("accept", "application/json");
+  headers.set("x-lootsplit-tabletop", "1");
   if (body !== undefined) headers.set("content-type", "application/json");
   const token = native() ? localStorage.getItem(TOKEN) : null;
   if (token) headers.set("authorization", `Bearer ${token}`);

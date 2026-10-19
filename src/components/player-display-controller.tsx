@@ -7,6 +7,7 @@ import { useWorldTable } from "@/lib/quire/use-world-table";
 import { readWorld } from "@/lib/quire/world-schema";
 import { activeCampaignId } from "@/lib/quire/campaign-context";
 import { getCloudTable } from "@/lib/quire/cloud-client";
+import { readTabletopSession } from "@/lib/quire/tabletop";
 import { encounterRequest } from "@/lib/encounters/client";
 import { localEncounterRequest } from "@/lib/encounters/local";
 import { accountRequest } from "@/lib/account/client";
@@ -27,8 +28,8 @@ export function PlayerDisplayButton({
   encounterId,
   icon = false,
 }: Request & { icon?: boolean }) {
-  const dm = useSeat().role === "dm";
-  if (!dm || import.meta.env.VITE_MOBILE === "true") return null;
+  const dm = useSeat().role === "dm", table = useWorldTable();
+  if (!dm || !readTabletopSession(table).tvEnabled || import.meta.env.VITE_MOBILE === "true") return null;
   const launch = () =>
     window.dispatchEvent(
       new CustomEvent<Request>(DISPLAY_REQUEST, { detail: { mapId, encounterId } }),
@@ -68,6 +69,7 @@ function DisplaySession({ dm }: { dm: boolean }) {
   const table = useWorldTable(),
     campaignId = activeCampaignId(),
     code = getCloudTable().joined ? getCloudTable().code : "device";
+  const enabled = dm && readTabletopSession(table).tvEnabled;
   const [open, setOpen] = useState(false),
     [settings, setSettings] = useState<DisplaySettings>(defaultDisplaySettings),
     [detail, setDetail] = useState<DisplayEncounter | null>(null),
@@ -79,13 +81,13 @@ function DisplaySession({ dm }: { dm: boolean }) {
     channelId = useRef(""),
     lastSeen = useRef(0);
   const frame = useRef<ReturnType<typeof projectPlayerDisplay> | null>(null);
-  frame.current = dm ? projectPlayerDisplay(table, detail, settings, code) : null;
+  frame.current = enabled ? projectPlayerDisplay(table, detail, settings, code) : null;
   const maps = readWorld(table.journal.world).maps.filter((m) => m.visible);
   function update(patch: Partial<DisplaySettings>) {
     setSettings((s) => ({ ...s, ...patch }));
   }
   useEffect(() => {
-    if (!dm || !open) return;
+    if (!enabled || !open) return;
     let cancelled = false;
     type Library = { encounters: Array<{ id: string; code: string; name: string }> };
     Promise.all([
@@ -102,11 +104,11 @@ function DisplaySession({ dm }: { dm: boolean }) {
     return () => {
       cancelled = true;
     };
-  }, [dm, open, code]);
+  }, [enabled, open, code]);
   useEffect(() => {
     setDetail(null);
     setDetailError("");
-    if (!dm || !settings.encounterId) return;
+    if (!enabled || !settings.encounterId) return;
     let cancelled = false,
       loading = false;
     const id = settings.encounterId;
@@ -148,9 +150,9 @@ function DisplaySession({ dm }: { dm: boolean }) {
       clearInterval(timer);
       unsubscribe();
     };
-  }, [settings.encounterId, campaignId, code, dm, open]);
+  }, [settings.encounterId, campaignId, code, enabled, open]);
   useEffect(() => {
-    if (!dm) return;
+    if (!enabled) { setOpen(false); setSettings(defaultDisplaySettings); return; }
     const timer = window.setInterval(() => {
       if (channel.current && frame.current && activeCampaignId() === campaignId)
         channel.current.postMessage("alive");
@@ -168,11 +170,12 @@ function DisplaySession({ dm }: { dm: boolean }) {
       channel.current?.close();
       channel.current = null;
     };
-  }, [dm, campaignId]);
+  }, [enabled, campaignId]);
   useEffect(() => {
     if (channel.current && frame.current) channel.current.postMessage(frame.current);
   }, [table.journal, table.purses, detail, settings]);
   function launch(tab: boolean) {
+    if (!enabled) return;
     setError("");
     try {
       if (!channel.current) {
@@ -192,7 +195,7 @@ function DisplaySession({ dm }: { dm: boolean }) {
     }
   }
   useEffect(() => {
-    if (!dm) return;
+    if (!enabled) return;
     const show = (event: Event) => {
       const request = (event as CustomEvent<Request>).detail;
       if (!request) return;
@@ -214,10 +217,10 @@ function DisplaySession({ dm }: { dm: boolean }) {
     };
     window.addEventListener(DISPLAY_REQUEST, show);
     return () => window.removeEventListener(DISPLAY_REQUEST, show);
-  }, [dm]);
+  }, [enabled]);
   return (
     <>
-      {dm && (
+      {enabled && (
         <Modal open={open} onOpenChange={setOpen} title="Player display">
           <div className="space-y-4">
             <p>

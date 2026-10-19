@@ -48,12 +48,25 @@ export function MapVisibilityPublisher() {
       if (cancelled) return;
       const { table, economy, seat } = latest.current,
         scope = captureMutationScope();
-      if (latest.current.campaign !== campaign || getCloudTable().pending) return;
+      const connection = getCloudTable();
+      if (
+        latest.current.campaign !== campaign ||
+        connection.pending ||
+        (connection.joined && !connection.mine)
+      )
+        return;
       for (const map of table.journal.world?.maps ?? []) {
         if (cancelled) return;
         const settings = readMapTabletop(map);
         if (settings.media) {
           const cached = await cachedMapAsset(settings.media.id);
+          if (cached) await publishMapAsset(cached);
+        }
+        // Offline preparation may already contain finished frames. Upload them when hosting starts.
+        for (const frame of settings.frames.filter(
+          (frame) => frame.revision === settings.revision,
+        )) {
+          const cached = await cachedMapAsset(frame.media.id);
           if (cached) await publishMapAsset(cached);
         }
         if (!map.visible) continue;
@@ -89,8 +102,12 @@ export function MapVisibilityPublisher() {
             );
             const bundle = await renderMapVisibility(bitmap, map, settings, viewers);
             if (cancelled) return;
-            await cacheMapAsset(bundle);
-            await publishMapAsset(bundle);
+            const previous = settings.frames.find((frame) => frame.audience === audience);
+            const identical = previous?.media.sha256 === bundle.manifest.sha256;
+            if (!identical) {
+              await cacheMapAsset(bundle);
+              await publishMapAsset(bundle);
+            }
             if (cancelled) return;
             const result = await economy.commandOutcome(
               {
@@ -103,7 +120,7 @@ export function MapVisibilityPublisher() {
                   id: crypto.randomUUID(),
                   audience,
                   revision: settings.revision,
-                  media: mapMediaReference(bundle.manifest),
+                  media: identical ? previous.media : mapMediaReference(bundle.manifest),
                 },
               },
               scope,
@@ -135,7 +152,18 @@ export function MapVisibilityPublisher() {
       cancelled = true;
       clearTimeout(timer);
     };
-  }, [campaign, known, seat.role, signature, cloud.pending, cloud.viewOnly, retry]);
+  }, [
+    campaign,
+    known,
+    seat.role,
+    signature,
+    cloud.pending,
+    cloud.viewOnly,
+    cloud.joined,
+    cloud.code,
+    cloud.mine,
+    retry,
+  ]);
   if (!failure || !known || seat.role !== "dm") return null;
   return (
     <aside className="map-render-notice" role="status">

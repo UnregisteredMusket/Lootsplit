@@ -316,6 +316,8 @@ export function applyTabletopCommand(
     event("Map area template updated");
   } else if (command.kind === "map-token-move") {
     if (!map.grid) throw Error("Configure a combat grid before moving tokens.");
+    if (canonicalJson(map.grid) !== command.grid)
+      throw Error("The combat grid changed. Refresh before moving tokens.");
     if (command.ignoreWalls && seat.role !== "dm")
       throw Error("Only the DM can override configured map barriers.");
     if (new Set(command.moves.map((m) => m.tokenId)).size !== command.moves.length)

@@ -19,11 +19,15 @@ export function SessionReportReader({
   open,
   onOpenChange,
   seat,
+  onDownload,
+  exporting,
 }: {
   report: SessionReport;
   open: boolean;
   onOpenChange: (open: boolean) => void;
   seat?: ArchiveSeat;
+  onDownload?: () => Promise<void>;
+  exporting?: boolean;
 }) {
   const result = useMemo(() => readArchiveResult(report, seat), [report, seat]);
   const snapshot = result.available ? result.snapshot : null;
@@ -109,8 +113,12 @@ export function SessionReportReader({
         <div className="flex flex-wrap gap-2">
           <Button
             variant="secondary"
-            disabled={!result.available}
+            disabled={!result.available || exporting}
             onClick={() => {
+              if (onDownload) {
+                void onDownload();
+                return;
+              }
               if (result.available)
                 void downloadJson("lootsplit-session-" + report.id + ".json", result.snapshot);
             }}

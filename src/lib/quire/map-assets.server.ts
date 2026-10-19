@@ -36,8 +36,11 @@ async function localPut(file: string, value: unknown) {
   await writeFile(temporary, JSON.stringify(value), { flag: "wx" });
   await rename(temporary, file);
 }
-export async function storedMapAsset(owner: string, id: string): Promise<StoredAsset | null> {
-  const db = database();
+export async function storedMapAsset(
+  owner: string,
+  id: string,
+  db = database(),
+): Promise<StoredAsset | null> {
   const row = db
     ? await db
         .prepare("SELECT manifest,complete FROM campaign_map_assets WHERE owner_id=? AND id=?")
@@ -58,8 +61,8 @@ async function parts(
   id: string,
   from: number,
   count: number,
+  db = database(),
 ): Promise<MapAssetBundle["parts"]> {
-  const db = database();
   if (db)
     return (
       await db
@@ -91,14 +94,34 @@ export async function mapAssets(input: { code: string; token: string; request: u
   if (!room || room.closed || !room.ownerId) throw Error("This campaign is unavailable.");
   const seat = room.seats.find((seat) => seat.token === input.token);
   if (!seat) throw Error("This browser is not seated at that table.");
-  const owner = room.ownerId,
-    db = database();
+  const owner = room.ownerId;
   const writing = !["manifest", "read"].includes(request.action);
   if (writing && (seat.role !== "dm" || room.viewOnly))
     throw Error("Only the campaign DM can publish map media during play.");
+  if (request.action === "manifest" || request.action === "read") {
+    const asset = await storedMapAsset(owner, request.assetId);
+    if (!asset?.complete)
+      throw Object.assign(Error("This map asset is unavailable."), { status: 404 });
+    if (seat.role !== "dm") {
+      const map = room.table.journal?.world?.maps.find((map) => map.id === request.mapId);
+      if (!map || !mapAccessible(room.table, map, seat)) throw Error("This map is unavailable.");
+      const authorized = projectTabletopMap(room.table, map, seat);
+      const refs = [
+        authorized.tabletop?.media,
+        ...(authorized.tabletop?.frames.map((frame) => frame.media) ?? []),
+      ];
+      if (!refs.some((reference) => reference?.id === request.assetId && matches(asset, reference)))
+        throw Object.assign(Error("This map asset is unavailable."), { status: 404 });
+    }
+  }
+  return ownedMapAsset(owner, request);
+}
+/** Internal storage primitive: callers MUST establish account ownership or projected seat access first. */
+export async function ownedMapAsset(owner: string, input: unknown, db = database()) {
+  const request = mapAssetRequestSchema.parse(input);
   if (request.action === "begin") {
     const manifest = request.manifest,
-      existing = await storedMapAsset(owner, manifest.id);
+      existing = await storedMapAsset(owner, manifest.id, db);
     if (existing) {
       if (canonicalJson(existing.manifest) !== canonicalJson(manifest))
         throw Error("That map asset identity is already used.");
@@ -133,25 +156,14 @@ export async function mapAssets(input: { code: string; token: string; request: u
       });
     return { complete: false };
   }
-  const asset = await storedMapAsset(owner, request.assetId);
-  if (!asset) throw Error("This map asset is unavailable.");
+  const asset = await storedMapAsset(owner, request.assetId, db);
+  if (!asset) throw Object.assign(Error("This map asset is unavailable."), { status: 404 });
   if (request.action === "manifest" || request.action === "read") {
-    if (seat.role === "dm" && asset.complete)
-      return request.action === "manifest"
-        ? { manifest: asset.manifest }
-        : { parts: await parts(owner, request.assetId, request.from, request.count) };
-    const map = room.table.journal?.world?.maps.find((map) => map.id === request.mapId);
-    if (!map || !mapAccessible(room.table, map, seat)) throw Error("This map is unavailable.");
-    const authorized = seat.role === "dm" ? map : projectTabletopMap(room.table, map, seat);
-    const refs = [
-      authorized.tabletop?.media,
-      ...(authorized.tabletop?.frames.map((frame) => frame.media) ?? []),
-    ];
-    if (!refs.some((reference) => reference?.id === request.assetId && matches(asset, reference)))
-      throw Error("This map asset is unavailable.");
+    if (!asset.complete)
+      throw Object.assign(Error("This map asset is unavailable."), { status: 404 });
     return request.action === "manifest"
       ? { manifest: asset.manifest }
-      : { parts: await parts(owner, request.assetId, request.from, request.count) };
+      : { parts: await parts(owner, request.assetId, request.from, request.count, db) };
   }
   if (request.action === "parts") {
     if (asset.complete) return { complete: true };
@@ -162,7 +174,7 @@ export async function mapAssets(input: { code: string; token: string; request: u
       );
       if (expected <= 0 || decodeMapPart(part.base64).length !== expected)
         throw Error("The map upload part has the wrong size.");
-      const prior = (await parts(owner, request.assetId, part.index, 1))[0];
+      const prior = (await parts(owner, request.assetId, part.index, 1, db))[0];
       if (prior && prior.base64 !== part.base64)
         throw Error("An uploaded map part cannot change. Start a new upload instead.");
     }
@@ -190,6 +202,7 @@ export async function mapAssets(input: { code: string; token: string; request: u
       request.assetId,
       0,
       mapAssetPartCount(asset.manifest.bytes),
+      db,
     );
     if (uploaded.length !== mapAssetPartCount(asset.manifest.bytes))
       throw Error("The map upload is incomplete.");

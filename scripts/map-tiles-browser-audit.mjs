@@ -1,4 +1,5 @@
 import { checkPlayerDisplay } from "./player-display-browser-check.mjs";
+import { checkOnlineTabletop } from "./online-tabletop-browser-check.mjs";
 import assert from "node:assert/strict";
 import { chromium } from "playwright";
 import { expect } from "playwright/test";
@@ -211,7 +212,9 @@ try {
       .poll(async () => (await journal(page)).world.partyPosition?.environment)
       .toBe("Wilderness");
     await expect(page.locator(".campaign-maps > p").first()).toContainText("Forest");
-    await page.getByRole("button", { name: "Enter tile mode", exact: true }).click();
+    // The online workspace starts with its token/grid layer visible; the legacy toggle remains.
+    const enterTiles = page.getByRole("button", { name: "Enter tile mode", exact: true });
+    if (await enterTiles.count()) await enterTiles.click();
     await expect(page.locator(".map-tile-grid")).toBeVisible();
     const controls = page.getByRole("region", { name: "Combat tile controls", exact: true });
     await chooseOption(
@@ -266,7 +269,7 @@ try {
     await page.getByRole("button", { name: "Exit fullscreen", exact: true }).click();
     await reloadApplication(page);
     await chooseOption(page.getByLabel("Map type filter", { exact: true }), "property");
-    await page.getByRole("button", { name: "Enter tile mode", exact: true }).click();
+    if (await enterTiles.count()) await enterTiles.click();
     await expect(page.getByTitle("Combatant: Tile Hero", { exact: true })).toBeVisible();
     await expect(heroIcon).toHaveAttribute("aria-pressed", "false");
     await heroIcon.click();
@@ -315,7 +318,8 @@ try {
     await guest.waitForURL((u) => u.pathname === "/share" && !u.searchParams.has("join"));
     await navigateApplication(guest, origin + "/maps");
     await chooseOption(guest.getByLabel("Map type filter", { exact: true }), "property");
-    await guest.getByRole("button", { name: "Enter tile mode", exact: true }).click();
+    const guestEnterTiles = guest.getByRole("button", { name: "Enter tile mode", exact: true });
+    if (await guestEnterTiles.count()) await guestEnterTiles.click();
     await expect(guest.getByTitle("Combatant: Tile Hero", { exact: true })).toBeVisible();
     await expect(
       guest.getByRole("region", { name: "Combat tile controls", exact: true }),
@@ -327,10 +331,10 @@ try {
     const sharedIcon = guest.getByTitle("Combatant: Tile Hero", { exact: true });
     await sharedIcon.click();
     await expect(sharedIcon).toHaveAttribute("aria-pressed", "true");
-    await expect(guest.getByRole("region", { name: "Map record details" })).toContainText(
+    await expect(guest.getByRole("complementary", { name: "Map inspector" })).toContainText(
       "Tile Hero",
     );
-    await guest.getByRole("button", { name: "Close details", exact: true }).click();
+    await guest.getByRole("button", { name: "Close inspector", exact: true }).click();
     await expect(sharedIcon).toHaveAttribute("aria-pressed", "false");
     await fits(guest);
     await guest.screenshot({ path: `${output}/player-tiles-${width}.png`, fullPage: true });
@@ -341,6 +345,7 @@ try {
       false,
       "Guest board stays in memory",
     );
+    await checkOnlineTabletop(page, guest, origin, width, output, journal);
     await expect(viewer.getByRole("img")).toHaveCount(0);
     await page.close();
     await expect(
@@ -367,6 +372,10 @@ try {
         "shared-player-privacy",
         "player-display-privacy-calibration-fullscreen-reload-blank-campaign-switch",
         "guest-memory",
+        "online-assigned-coordinate-keyboard-drag",
+        "online-measurement-area-template",
+        "explicit-activation-camera",
+        "pixel-fog-reveal-conceal-undo-redo-reconnect",
       ],
       errors,
     }),

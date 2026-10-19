@@ -4,6 +4,8 @@ import { downloadJson } from "@/lib/quire/table";
 import { readArchiveResult } from "@/lib/quire/archive-reader";
 import { filterAccountReports } from "@/lib/account/report-library";
 import { SessionReportReader } from "@/components/session-report-reader";
+import { hydrateAccountMapBackup } from "@/lib/account/map-media";
+import type { CloudTable } from "@/lib/quire/cloud";
 
 type AccountReport = {
   id: string;
@@ -25,6 +27,26 @@ export function AccountSessionRecords() {
   const [after, setAfter] = useState(""),
     [before, setBefore] = useState("");
   const [selected, setSelected] = useState<AccountReport | null>(null);
+  const [exporting, setExporting] = useState(false);
+  async function downloadReport(report: AccountReport) {
+    setExporting(true);
+    setError("");
+    try {
+      const payload = await hydrateAccountMapBackup(report.snapshot as CloudTable, {
+        code: report.code,
+        id: report.id,
+      });
+      await downloadJson("lootsplit-session-" + report.id + ".json", payload);
+    } catch (error) {
+      setError(
+        error instanceof Error
+          ? error.message
+          : "The complete report could not be downloaded. The original archive is retained.",
+      );
+    } finally {
+      setExporting(false);
+    }
+  }
   const availability = useMemo(
     () =>
       new Map(
@@ -164,11 +186,9 @@ export function AccountSessionRecords() {
                 Read report
               </button>
               <button
-                disabled={!!unavailable}
+                disabled={!!unavailable || exporting}
                 className="portal-button secondary"
-                onClick={() =>
-                  void downloadJson("lootsplit-session-" + report.id + ".json", report.snapshot)
-                }
+                onClick={() => void downloadReport(report)}
               >
                 Download report
               </button>
@@ -179,6 +199,8 @@ export function AccountSessionRecords() {
       {selected && (
         <SessionReportReader
           report={selected}
+          onDownload={() => downloadReport(selected)}
+          exporting={exporting}
           open
           onOpenChange={(open) => {
             if (!open) setSelected(null);

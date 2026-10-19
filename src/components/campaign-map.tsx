@@ -1,4 +1,3 @@
-import { PlayerDisplayButton } from "./player-display-controller";
 import { GridEditor, PartyPlacement, CombatControls } from "./map-tile-controls";
 import { mapType, partyEnvironment, tilePoint, routePosition } from "@/lib/quire/map-tiles";
 import { canonicalJson } from "@/lib/quire/canonical-json";
@@ -11,10 +10,15 @@ import { anchorFor, recognizedAnchors, npcAvailableHere, shopVisible } from "@/l
 import { readMarketLocations, locationLabel, locationPath } from "@/lib/quire/shop-locations";
 import { recognizeMap } from "@/lib/quire/map-image";
 import { prepareMapMedia } from "@/lib/quire/map-media";
+import { readMapInterchange, MAP_INTERCHANGE_LIMIT } from "@/lib/quire/map-import";
 import { cacheMapAsset, publishMapAsset, loadMapAsset, mapAssetBlob } from "@/lib/quire/map-assets";
 import { mapMediaReference, type MapAssetBundle } from "@/lib/quire/map-assets-schema";
-import { readMapTabletop } from "@/lib/quire/tabletop";
+import { readMapTabletop, readTabletopSession } from "@/lib/quire/tabletop";
 import { MapArtwork } from "./map-artwork";
+import { MapBrowser, MapSessionBar } from "./map-session-bar";
+import { useMapTabletopTools } from "./map-tabletop-tools";
+import { MapPlayerPreview } from "./map-player-preview";
+import { sceneTokenPoint } from "@/lib/quire/tabletop-geometry";
 import { useWorldTable } from "@/lib/quire/use-world-table";
 import { CommandForm, CommandButton } from "./world-tools";
 import { LocationOptions, MarketLocationsPanel } from "./market-locations";
@@ -50,6 +54,7 @@ export function CampaignMaps() {
     w = readWorld(t.journal.world),
     seat = useSeat(),
     dm = seat.role === "dm",
+    tabletopSession = readTabletopSession(t),
     market = readMarketLocations(t.journal.market);
   const [selected, setSelected] = useState(""),
     [editing, setEditing] = useState<CampaignMap | null | undefined>(),
@@ -60,9 +65,18 @@ export function CampaignMaps() {
     [description, setDescription] = useState(""),
     [secret, setSecret] = useState(false),
     [typeFilter, setTypeFilter] = useState(""),
-    [tileMode, setTileMode] = useState(false),
+    [tileMode, setTileMode] = useState(true),
     [selectedToken, setSelectedToken] = useState("");
   const requestedMap = useRouterState({ select: (s) => s.location.search.map });
+  useEffect(() => {
+    if (!dm && tabletopSession.activeMapId) {
+      setTypeFilter("");
+      setSelected(tabletopSession.activeMapId);
+      setSelectedToken("");
+      setPlacement("");
+      setPoint(undefined);
+    }
+  }, [dm, tabletopSession.activeMapId, tabletopSession.activationId]);
   const maps = w.maps.filter(
       (m) => (dm || m.visible) && (!typeFilter || mapType(m, t) === typeFilter),
     ),
@@ -170,6 +184,17 @@ export function CampaignMaps() {
     : [];
   return (
     <div className="campaign-maps">
+      <MapSessionBar map={map} />
+      <MapBrowser
+        maps={maps}
+        current={map?.id}
+        select={(id) => {
+          setSelected(id);
+          setSelectedToken("");
+          setPlacement("");
+          setPoint(undefined);
+        }}
+      />
       <p className="text-muted">
         {partyEnvironment(w.partyPosition) || locationLabel(market, market.currentLocationId)} ·{" "}
         {party
@@ -227,10 +252,6 @@ export function CampaignMaps() {
         {dm && (
           <>
             <Button onClick={() => setEditing(null)}>Import map</Button>
-            <PlayerDisplayButton
-              mapId={map?.visible ? map.id : undefined}
-              encounterId={map?.encounterId}
-            />
             {map && <Button onClick={() => setEditing(map)}>Edit map & anchors</Button>}
           </>
         )}
@@ -253,15 +274,11 @@ export function CampaignMaps() {
                 id: v.id,
                 points: v.mapRoute!.points.map((p) => tilePoint(v.mapRoute!.grid, p)),
               }))}
-            onTokenSelect={
-              dm
-                ? (id) => {
-                    setSelectedToken(id);
-                    setPlacement("token");
-                    setPoint(undefined);
-                  }
-                : undefined
-            }
+            onTokenSelect={(id) => {
+              setSelectedToken(id);
+              setPlacement("");
+              setPoint(undefined);
+            }}
             controls={
               <>
                 {map.grid && (
@@ -301,8 +318,8 @@ export function CampaignMaps() {
                     </Fold>
                   ) : (
                     <p>
-                      Combat grid · {map.grid.feetPerTile} ft per tile. The DM moves tokens; only
-                      shared combatants are shown.
+                      Combat grid · {map.grid.feetPerTile} ft per tile. Move assigned tokens when
+                      permitted by the DM; only authorized combatants are shown.
                     </p>
                   ))}
               </>
@@ -346,7 +363,7 @@ export function CampaignMaps() {
             />
           )}
           {dm && (
-            <Fold title="Place map markers & locations" defaultOpen>
+            <Fold title="Place map markers & locations">
               <div className="world-toolbar">
                 <Button
                   onClick={() => {
@@ -585,6 +602,7 @@ function MapEditor({
       },
     ),
     [mediaBundle, setMediaBundle] = useState<MapAssetBundle>(),
+    [importWarnings, setImportWarnings] = useState<string[]>([]),
     [busy, setBusy] = useState(false),
     [progress, setProgress] = useState(""),
     [error, setError] = useState("");
@@ -680,7 +698,7 @@ function MapEditor({
             Map artwork or video
             <input
               type="file"
-              accept="image/png,image/jpeg,image/webp,video/mp4,video/webm"
+              accept="image/png,image/jpeg,image/webp,video/mp4,video/webm,.uvtt,.dd2vtt,.df2vtt"
               disabled={busy}
               onChange={async (e) => {
                 const file = e.target.files?.[0];
@@ -690,15 +708,41 @@ function MapEditor({
                 setError("");
                 setProgress("Preparing map image… You can fill in the map details while you wait.");
                 try {
-                  const bundle = await prepareMapMedia(file);
+                  const interchange = /\.(uvtt|dd2vtt|df2vtt)$/i.test(file.name);
+                  if (interchange && file.size > MAP_INTERCHANGE_LIMIT)
+                    throw Error("Choose a Universal VTT file up to 30 MB.");
+                  const imported = interchange ? readMapInterchange(await file.text()) : undefined;
+                  if (imported && map?.tokens?.length)
+                    throw Error(
+                      "Import this file as a new map to preserve the existing scene's tokens and grid.",
+                    );
+                  const bundle = await prepareMapMedia(
+                    imported
+                      ? new File([imported.bytes.buffer as ArrayBuffer], "map", {
+                          type: imported.mime,
+                        })
+                      : file,
+                  );
+                  if (
+                    imported &&
+                    (bundle.manifest.width !== imported.width ||
+                      bundle.manifest.height !== imported.height)
+                  )
+                    throw Error(
+                      "Embedded image dimensions do not match the exported grid. Correct the export before importing.",
+                    );
                   await cacheMapAsset(bundle);
                   setMediaBundle(bundle);
+                  setImportWarnings(imported?.warnings ?? []);
                   setDraft((current) => ({
                     ...current,
+                    ...(imported
+                      ? { visible: false, grid: imported.grid, type: "battle" as const }
+                      : {}),
                     image: bundle.manifest.preview,
                     anchors: [],
                     tabletop: {
-                      ...readMapTabletop(current),
+                      ...(imported?.settings ?? readMapTabletop(current)),
                       media: mapMediaReference(bundle.manifest),
                       frames: [],
                     },
@@ -713,6 +757,21 @@ function MapEditor({
               }}
             />
           </label>
+          {importWarnings.length > 0 && (
+            <section className="map-import-review" aria-label="Map import review">
+              <strong>Review imported map before saving</strong>
+              <p>
+                {draft.tabletop?.walls.length ?? 0} walls / doors ·{" "}
+                {draft.tabletop?.lights.length ?? 0} lights · {draft.grid?.columns} ×{" "}
+                {draft.grid?.rows} cells
+              </p>
+              <ul>
+                {importWarnings.map((warning) => (
+                  <li key={warning}>{warning}</li>
+                ))}
+              </ul>
+            </section>
+          )}
           <p className="text-sm text-muted">
             PNG, JPEG, WebP, MP4 or WebM up to 20 MB, 8192 pixels per edge and 64 megapixels.
             Original detail is retained separately from optimized previews. Video starts paused.
@@ -839,7 +898,8 @@ function MapViewport({
     [pinging, setPinging] = useState(false),
     [color, setColor] = useState<MapPingInput["color"]>("blue");
   const signals = useMapPings(map.id),
-    useDm = useSeat().role === "dm";
+    useDm = useSeat().role === "dm",
+    tools = useMapTabletopTools(map, selectedToken, onTokenSelect);
   const records: MapRecord[] = [
     ...map.markers
       .filter((m) => m.visibility === "party" || useDm)
@@ -859,7 +919,7 @@ function MapViewport({
             id: token.id,
             label: token.label,
             kind: token.kind === "ship" ? "Ship" : "Combatant",
-            point: tilePoint(map.grid!, token),
+            point: sceneTokenPoint(map.grid!, token),
             description: `Column ${token.column + 1}, row ${token.row + 1}${token.visibility === "dm" ? " · DM only" : ""}`,
           }))
       : []),
@@ -877,6 +937,7 @@ function MapViewport({
     if (placing) setDetails([]);
   }, [placing, signals.viewOnly]);
   const root = useRef<HTMLDivElement>(null),
+    toolPointer = useRef<number | undefined>(undefined),
     [ratio, setRatio] = useState(1),
     [size, setSize] = useState({ w: 1, h: 1 }),
     [view, setView] = useState({ x: 0, y: 0, scale: 1 }),
@@ -899,9 +960,30 @@ function MapViewport({
     observer.observe(el);
     return () => observer.disconnect();
   }, []);
+  const cameraNonce =
+    !useDm && tools.session.camera?.mapId === map.id ? tools.session.camera.nonce : undefined;
   useEffect(() => {
-    setView({ x: (size.w - w) / 2, y: (size.h - h) / 2, scale: 1 });
-  }, [size.w, size.h, w, h]);
+    const camera =
+      !useDm && tools.session.camera?.mapId === map.id
+        ? tools.session.camera.view
+        : map.tabletop?.initialView;
+    setView(
+      camera
+        ? {
+            x: size.w / 2 - camera.x * w * camera.zoom,
+            y: size.h / 2 - camera.y * h * camera.zoom,
+            scale: camera.zoom,
+          }
+        : { x: (size.w - w) / 2, y: (size.h - h) / 2, scale: 1 },
+    );
+    // A DM camera action applies once. Ordinary room polling never drags a player's camera.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [size.w, size.h, w, h, map.id, cameraNonce]);
+  const currentCamera = () => ({
+    x: Math.max(-5, Math.min(5, (size.w / 2 - view.x) / (w * view.scale))),
+    y: Math.max(-5, Math.min(5, (size.h / 2 - view.y) / (h * view.scale))),
+    zoom: view.scale,
+  });
   function zoom(factor: number, x: number, y: number) {
     setView((v) => {
       const scale = Math.min(8, Math.max(0.5, v.scale * factor)),
@@ -928,8 +1010,23 @@ function MapViewport({
     x: ps.reduce((n, p) => n + p.x, 0) / ps.length,
     y: ps.reduce((n, p) => n + p.y, 0) / ps.length,
   });
+  function mapPoint(clientX: number, clientY: number) {
+    const rect = root.current!.getBoundingClientRect();
+    return {
+      x: Math.max(0, Math.min(1, (clientX - rect.left - view.x) / (w * view.scale))),
+      y: Math.max(0, Math.min(1, (clientY - rect.top - view.y) / (h * view.scale))),
+    };
+  }
   return (
     <MapFrame>
+      <div
+        onClickCapture={() => {
+          stopPlacing();
+          setPinging(false);
+        }}
+      >
+        {tools.toolControls}
+      </div>
       <div className="world-toolbar map-controls">
         <Button aria-expanded={filtersOpen} onClick={() => setFiltersOpen((v) => !v)}>
           Filters
@@ -938,6 +1035,7 @@ function MapViewport({
           disabled={signals.viewOnly}
           aria-pressed={pinging}
           onClick={() => {
+            tools.cancel();
             stopPlacing();
             setPinging((v) => !v);
           }}
@@ -965,6 +1063,22 @@ function MapViewport({
           −
         </Button>
         <Button onClick={fit}>Fit map</Button>
+        {useDm && (
+          <>
+            <Button
+              disabled={tools.busy || !map.visible}
+              onClick={() => void tools.shareCamera(currentCamera())}
+            >
+              Share this view
+            </Button>
+            <Button
+              disabled={tools.busy}
+              onClick={() => void tools.saveInitialView(currentCamera())}
+            >
+              Save starting view
+            </Button>
+          </>
+        )}
         <span aria-live="polite">{Math.round(view.scale * 100)}%</span>
       </div>
       {filtersOpen && (
@@ -996,259 +1110,311 @@ function MapViewport({
       )}
       {signals.viewOnly && <p className="text-sm text-muted">Resume play to share map pings.</p>}
       {signals.error && <p role="alert">{signals.error}</p>}
-      <div
-        ref={root}
-        className={`map-viewport ${placing || pinging ? "placing" : ""}`}
-        role="region"
-        aria-label="Interactive campaign map"
-        tabIndex={0}
-        onKeyDown={(e) => {
-          if (
-            ["+", "=", "-", "Home", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(
-              e.key,
-            )
-          )
-            e.preventDefault();
-          if ((pinging || placing) && (e.key === "Enter" || e.key === " ")) {
-            e.preventDefault();
-            const x = (size.w / 2 - view.x) / (w * view.scale),
-              y = (size.h / 2 - view.y) / (h * view.scale);
-            if (x >= 0 && x <= 1 && y >= 0 && y <= 1) {
-              if (pinging) void signals.send({ x, y }, color);
-              else onPlace({ x, y });
-            }
-          }
-          if (e.key === "Escape") {
-            setPinging(false);
-            stopPlacing();
-          }
-          if (e.key === "Home") fit();
-          else if (e.key === "+" || e.key === "=") zoom(1.2, size.w / 2, size.h / 2);
-          else if (e.key === "-") zoom(1 / 1.2, size.w / 2, size.h / 2);
-          else if (e.key.startsWith("Arrow"))
-            setView((v) => ({
-              ...v,
-              x: v.x + (e.key === "ArrowLeft" ? 40 : e.key === "ArrowRight" ? -40 : 0),
-              y: v.y + (e.key === "ArrowUp" ? 40 : e.key === "ArrowDown" ? -40 : 0),
-            }));
-        }}
-        onPointerDown={(e) => {
-          if (e.button !== 0) return;
-          const target = (e.target as HTMLElement).closest("button") ?? e.currentTarget;
-          target.setPointerCapture(e.pointerId);
-          pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
-          if (pointers.current.size === 1) {
-            start.current = { x: e.clientX, y: e.clientY };
-            moved.current = false;
-          } else moved.current = true;
-        }}
-        onPointerMove={(e) => {
-          if (!pointers.current.has(e.pointerId)) return;
-          const before = [...pointers.current.values()],
-            previous = pointers.current.get(e.pointerId)!;
-          pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
-          if (Math.hypot(e.clientX - start.current.x, e.clientY - start.current.y) > 6)
-            moved.current = true;
-          const after = [...pointers.current.values()];
-          if (after.length === 1)
-            setView((v) => ({
-              ...v,
-              x: v.x + e.clientX - previous.x,
-              y: v.y + e.clientY - previous.y,
-            }));
-          else {
-            const a = center(before),
-              b = center(after),
-              dist = (ps: { x: number; y: number }[]) =>
-                Math.hypot(ps[0].x - ps[1].x, ps[0].y - ps[1].y),
-              factor = dist(after) / Math.max(1, dist(before)),
-              rect = root.current!.getBoundingClientRect();
-            setView((v) => {
-              const scale = Math.min(8, Math.max(0.5, v.scale * factor)),
-                f = scale / v.scale;
-              return {
-                scale,
-                x: b.x - rect.left - (a.x - rect.left - v.x) * f,
-                y: b.y - rect.top - (a.y - rect.top - v.y) * f,
-              };
-            });
-          }
-        }}
-        onPointerUp={(e) => {
-          if (
-            (placing || pinging) &&
-            !(e.target as Element).closest("button") &&
-            !moved.current &&
-            pointers.current.has(e.pointerId) &&
-            pointers.current.size === 1
-          ) {
-            const r = e.currentTarget.getBoundingClientRect(),
-              x = (e.clientX - r.left - view.x) / (w * view.scale),
-              y = (e.clientY - r.top - view.y) / (h * view.scale);
-            if (x >= 0 && x <= 1 && y >= 0 && y <= 1) {
-              if (pinging) void signals.send({ x, y }, color);
-              else onPlace({ x, y });
-            }
-          }
-          pointers.current.delete(e.pointerId);
-        }}
-        onPointerCancel={(e) => pointers.current.delete(e.pointerId)}
-      >
-        <div
-          className="map-layer"
-          style={{
-            width: w,
-            height: h,
-            transform: `translate(${view.x}px, ${view.y}px) scale(${view.scale})`,
-          }}
-        >
-          <MapArtwork map={map} onRatio={setRatio} />
-          {visible.includes("Ship") && routes.length > 0 && (
-            <svg
-              className="map-route-trails"
-              viewBox="0 0 1000 1000"
-              preserveAspectRatio="none"
-              aria-hidden="true"
-            >
-              {routes.map((route) => (
-                <polyline
-                  key={route.id}
-                  points={route.points.map((p) => `${p.x * 1000},${p.y * 1000}`).join(" ")}
-                />
-              ))}
-            </svg>
-          )}
-          {tileMode && map.grid && (
-            <svg
-              className="map-tile-grid"
-              viewBox="0 0 1000 1000"
-              preserveAspectRatio="none"
-              aria-hidden="true"
-            >
-              {Array.from({ length: map.grid.columns + 1 }, (_, i) => (
-                <line
-                  key={`c${i}`}
-                  x1={(map.grid!.x + (i * map.grid!.width) / map.grid!.columns) * 1000}
-                  x2={(map.grid!.x + (i * map.grid!.width) / map.grid!.columns) * 1000}
-                  y1={map.grid!.y * 1000}
-                  y2={(map.grid!.y + map.grid!.height) * 1000}
-                />
-              ))}
-              {Array.from({ length: map.grid.rows + 1 }, (_, i) => (
-                <line
-                  key={`r${i}`}
-                  y1={(map.grid!.y + (i * map.grid!.height) / map.grid!.rows) * 1000}
-                  y2={(map.grid!.y + (i * map.grid!.height) / map.grid!.rows) * 1000}
-                  x1={map.grid!.x * 1000}
-                  x2={(map.grid!.x + map.grid!.width) * 1000}
-                />
-              ))}
-            </svg>
-          )}
-        </div>
-        {groups.map((group) => (
+      {useDm && tools.showPreview && <MapPlayerPreview map={map} />}
+      <div className={`tabletop-workspace ${tools.panel ? "has-inspector" : ""}`}>
+        <div className="tabletop-surface">
           <div
-            key={group.id}
-            className="map-icon-group"
-            style={{
-              left: view.x + group.point.x * w * view.scale,
-              top: view.y + group.point.y * h * view.scale,
+            ref={root}
+            className={`map-viewport ${placing || pinging ? "placing" : ""}`}
+            role="region"
+            aria-label="Interactive campaign map"
+            tabIndex={0}
+            onKeyDown={(e) => {
+              if (
+                tools.keyboard(e, {
+                  x: Math.max(0, Math.min(1, (size.w / 2 - view.x) / (w * view.scale))),
+                  y: Math.max(0, Math.min(1, (size.h / 2 - view.y) / (h * view.scale))),
+                })
+              )
+                return;
+              if (
+                ["+", "=", "-", "Home", "ArrowUp", "ArrowDown", "ArrowLeft", "ArrowRight"].includes(
+                  e.key,
+                )
+              )
+                e.preventDefault();
+              if ((pinging || placing) && (e.key === "Enter" || e.key === " ")) {
+                e.preventDefault();
+                const x = (size.w / 2 - view.x) / (w * view.scale),
+                  y = (size.h / 2 - view.y) / (h * view.scale);
+                if (x >= 0 && x <= 1 && y >= 0 && y <= 1) {
+                  if (pinging) void signals.send({ x, y }, color);
+                  else onPlace({ x, y });
+                }
+              }
+              if (e.key === "Escape") {
+                setPinging(false);
+                stopPlacing();
+              }
+              if (e.key === "Home") fit();
+              else if (e.key === "+" || e.key === "=") zoom(1.2, size.w / 2, size.h / 2);
+              else if (e.key === "-") zoom(1 / 1.2, size.w / 2, size.h / 2);
+              else if (e.key.startsWith("Arrow"))
+                setView((v) => ({
+                  ...v,
+                  x: v.x + (e.key === "ArrowLeft" ? 40 : e.key === "ArrowRight" ? -40 : 0),
+                  y: v.y + (e.key === "ArrowUp" ? 40 : e.key === "ArrowDown" ? -40 : 0),
+                }));
+            }}
+            onPointerDown={(e) => {
+              if (e.button !== 0) return;
+              const token = (e.target as Element).closest<HTMLElement>("[data-map-token]")?.dataset
+                .mapToken;
+              if (
+                !placing &&
+                !pinging &&
+                tools.pointerDown(mapPoint(e.clientX, e.clientY), token, e.shiftKey)
+              ) {
+                moved.current = false;
+                e.currentTarget.setPointerCapture(e.pointerId);
+                toolPointer.current = e.pointerId;
+                return;
+              }
+              const target = (e.target as HTMLElement).closest("button") ?? e.currentTarget;
+              target.setPointerCapture(e.pointerId);
+              pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+              if (pointers.current.size === 1) {
+                start.current = { x: e.clientX, y: e.clientY };
+                moved.current = false;
+              } else moved.current = true;
+            }}
+            onPointerMove={(e) => {
+              if (toolPointer.current === e.pointerId) {
+                moved.current = true;
+                tools.pointerMove(mapPoint(e.clientX, e.clientY));
+                return;
+              }
+              if (!pointers.current.has(e.pointerId)) return;
+              const before = [...pointers.current.values()],
+                previous = pointers.current.get(e.pointerId)!;
+              pointers.current.set(e.pointerId, { x: e.clientX, y: e.clientY });
+              if (Math.hypot(e.clientX - start.current.x, e.clientY - start.current.y) > 6)
+                moved.current = true;
+              const after = [...pointers.current.values()];
+              if (after.length === 1)
+                setView((v) => ({
+                  ...v,
+                  x: v.x + e.clientX - previous.x,
+                  y: v.y + e.clientY - previous.y,
+                }));
+              else {
+                const a = center(before),
+                  b = center(after),
+                  dist = (ps: { x: number; y: number }[]) =>
+                    Math.hypot(ps[0].x - ps[1].x, ps[0].y - ps[1].y),
+                  factor = dist(after) / Math.max(1, dist(before)),
+                  rect = root.current!.getBoundingClientRect();
+                setView((v) => {
+                  const scale = Math.min(8, Math.max(0.5, v.scale * factor)),
+                    f = scale / v.scale;
+                  return {
+                    scale,
+                    x: b.x - rect.left - (a.x - rect.left - v.x) * f,
+                    y: b.y - rect.top - (a.y - rect.top - v.y) * f,
+                  };
+                });
+              }
+            }}
+            onPointerUp={(e) => {
+              if (toolPointer.current === e.pointerId) {
+                tools.pointerUp(mapPoint(e.clientX, e.clientY));
+                toolPointer.current = undefined;
+                return;
+              }
+              if (
+                (placing || pinging) &&
+                !(e.target as Element).closest("button") &&
+                !moved.current &&
+                pointers.current.has(e.pointerId) &&
+                pointers.current.size === 1
+              ) {
+                const r = e.currentTarget.getBoundingClientRect(),
+                  x = (e.clientX - r.left - view.x) / (w * view.scale),
+                  y = (e.clientY - r.top - view.y) / (h * view.scale);
+                if (x >= 0 && x <= 1 && y >= 0 && y <= 1) {
+                  if (pinging) void signals.send({ x, y }, color);
+                  else onPlace({ x, y });
+                }
+              }
+              pointers.current.delete(e.pointerId);
+            }}
+            onPointerCancel={(e) => {
+              pointers.current.delete(e.pointerId);
+              if (toolPointer.current === e.pointerId) {
+                toolPointer.current = undefined;
+                tools.cancel();
+              }
             }}
           >
-            {group.kinds.map((type) => (
-              <button
-                type="button"
-                key={type.kind}
-                className={`map-record-icon map-kind-${type.kind.toLowerCase().replaceAll(" ", "-")}`}
-                title={`${type.kind}: ${type.records.map((r) => r.label).join(", ")}`}
-                aria-label={`${type.kind}: ${type.records.length} ${type.records.length === 1 ? "record" : "records"}`}
-                aria-pressed={
-                  currentDetails.length > 0
-                    ? currentDetails.length === type.records.length &&
-                      type.records.every((r) =>
-                        currentDetails.some((d) => d.id === r.id && d.kind === r.kind),
-                      )
-                    : type.records.some(
-                        (r) =>
-                          r.id === selectedToken &&
-                          (r.kind === "Combatant" || r.kind === "Ship") &&
-                          map.tokens?.some((t) => t.id === r.id),
-                      )
-                }
-                onClick={() => {
-                  if (!moved.current && !pinging) {
-                    const token = type.records.find(
-                      (r) =>
-                        r.kind === "Combatant" ||
-                        (r.kind === "Ship" && map.tokens?.some((t) => t.id === r.id)),
-                    );
-                    if (token && onTokenSelect) {
-                      setDetails([]);
-                      onTokenSelect(token.id);
-                    } else if (!placing) {
-                      setDetails(type.records);
-                    }
-                  }
+            <div
+              className="map-layer"
+              style={{
+                width: w,
+                height: h,
+                transform: `translate(${view.x}px, ${view.y}px) scale(${view.scale})`,
+              }}
+            >
+              <MapArtwork map={map} onRatio={setRatio} />
+              {visible.includes("Ship") && routes.length > 0 && (
+                <svg
+                  className="map-route-trails"
+                  viewBox="0 0 1000 1000"
+                  preserveAspectRatio="none"
+                  aria-hidden="true"
+                >
+                  {routes.map((route) => (
+                    <polyline
+                      key={route.id}
+                      points={route.points.map((p) => `${p.x * 1000},${p.y * 1000}`).join(" ")}
+                    />
+                  ))}
+                </svg>
+              )}
+              {tileMode && map.grid && (
+                <svg
+                  className="map-tile-grid"
+                  viewBox="0 0 1000 1000"
+                  preserveAspectRatio="none"
+                  aria-hidden="true"
+                >
+                  {Array.from({ length: map.grid.columns + 1 }, (_, i) => (
+                    <line
+                      key={`c${i}`}
+                      x1={(map.grid!.x + (i * map.grid!.width) / map.grid!.columns) * 1000}
+                      x2={(map.grid!.x + (i * map.grid!.width) / map.grid!.columns) * 1000}
+                      y1={map.grid!.y * 1000}
+                      y2={(map.grid!.y + map.grid!.height) * 1000}
+                    />
+                  ))}
+                  {Array.from({ length: map.grid.rows + 1 }, (_, i) => (
+                    <line
+                      key={`r${i}`}
+                      y1={(map.grid!.y + (i * map.grid!.height) / map.grid!.rows) * 1000}
+                      y2={(map.grid!.y + (i * map.grid!.height) / map.grid!.rows) * 1000}
+                      x1={map.grid!.x * 1000}
+                      x2={(map.grid!.x + map.grid!.width) * 1000}
+                    />
+                  ))}
+                </svg>
+              )}
+              {tools.overlay}
+            </div>
+            {groups.map((group) => (
+              <div
+                key={group.id}
+                className="map-icon-group"
+                style={{
+                  left: view.x + group.point.x * w * view.scale,
+                  top: view.y + group.point.y * h * view.scale,
                 }}
               >
-                <RecordIcon kind={type.kind} />
-                {type.records.length > 1 && (
-                  <span className="map-count">{type.records.length}</span>
-                )}
-              </button>
+                {group.kinds.map((type) => (
+                  <button
+                    type="button"
+                    key={type.kind}
+                    data-map-token={
+                      type.records.find((record) =>
+                        map.tokens?.some((token) => token.id === record.id),
+                      )?.id
+                    }
+                    className={`map-record-icon map-kind-${type.kind.toLowerCase().replaceAll(" ", "-")}`}
+                    title={`${type.kind}: ${type.records.map((r) => r.label).join(", ")}`}
+                    aria-label={`${type.kind}: ${type.records.length} ${type.records.length === 1 ? "record" : "records"}`}
+                    aria-pressed={
+                      currentDetails.length > 0
+                        ? currentDetails.length === type.records.length &&
+                          type.records.every((r) =>
+                            currentDetails.some((d) => d.id === r.id && d.kind === r.kind),
+                          )
+                        : type.records.some(
+                            (r) =>
+                              r.id === selectedToken &&
+                              (r.kind === "Combatant" || r.kind === "Ship") &&
+                              map.tokens?.some((t) => t.id === r.id),
+                          )
+                    }
+                    onClick={(event) => {
+                      if (!moved.current && !pinging) {
+                        const token = type.records.find(
+                          (r) =>
+                            r.kind === "Combatant" ||
+                            (r.kind === "Ship" && map.tokens?.some((t) => t.id === r.id)),
+                        );
+                        if (token && onTokenSelect) {
+                          setDetails([]);
+                          if (event.detail === 0) tools.choose(token.id, event.shiftKey);
+                        } else if (!placing) {
+                          setDetails(type.records);
+                        }
+                      }
+                    }}
+                  >
+                    <MapRecordGlyph
+                      kind={type.kind}
+                      records={type.records}
+                      map={map}
+                      selected={type.records.some((record) => tools.selected.includes(record.id))}
+                    />
+                    {type.records.length > 1 && (
+                      <span className="map-count">{type.records.length}</span>
+                    )}
+                  </button>
+                ))}
+              </div>
             ))}
+            {point && (
+              <span
+                className="map-place-point"
+                style={{
+                  left: view.x + point.x * w * view.scale,
+                  top: view.y + point.y * h * view.scale,
+                }}
+                aria-label="Selected placement"
+              >
+                ✚
+              </span>
+            )}
+            {signals.pings.map((p) => (
+              <span
+                key={p.id}
+                className={`map-ping map-ping-${p.color}`}
+                style={{ left: view.x + p.x * w * view.scale, top: view.y + p.y * h * view.scale }}
+                role="img"
+                aria-label={`${p.color} map ping`}
+              />
+            ))}
+            {pinging && (
+              <span className="map-ping-crosshair" aria-hidden="true">
+                +
+              </span>
+            )}
           </div>
-        ))}
-        {point && (
-          <span
-            className="map-place-point"
-            style={{
-              left: view.x + point.x * w * view.scale,
-              top: view.y + point.y * h * view.scale,
-            }}
-            aria-label="Selected placement"
-          >
-            ✚
-          </span>
-        )}
-        {signals.pings.map((p) => (
-          <span
-            key={p.id}
-            className={`map-ping map-ping-${p.color}`}
-            style={{ left: view.x + p.x * w * view.scale, top: view.y + p.y * h * view.scale }}
-            role="img"
-            aria-label={`${p.color} map ping`}
-          />
-        ))}
-        {pinging && (
-          <span className="map-ping-crosshair" aria-hidden="true">
-            +
-          </span>
-        )}
+          {currentDetails.length > 0 && (
+            <section className="map-record-details" aria-label="Map record details">
+              <div className="world-row">
+                <strong>
+                  {currentDetails[0].kind} · {currentDetails.length}{" "}
+                  {currentDetails.length === 1 ? "record" : "records"}
+                </strong>
+                <Button onClick={() => setDetails([])}>Close details</Button>
+              </div>
+              {currentDetails.map((r) => (
+                <div key={r.id}>
+                  {r.href ? (
+                    <AppLink className="settings-link" href={r.href}>
+                      {r.label} →
+                    </AppLink>
+                  ) : (
+                    <strong>{r.label}</strong>
+                  )}
+                  {r.description && <p>{r.description}</p>}
+                </div>
+              ))}
+            </section>
+          )}
+        </div>
+        {tools.panel}
       </div>
-      {currentDetails.length > 0 && (
-        <section className="map-record-details" aria-label="Map record details">
-          <div className="world-row">
-            <strong>
-              {currentDetails[0].kind} · {currentDetails.length}{" "}
-              {currentDetails.length === 1 ? "record" : "records"}
-            </strong>
-            <Button onClick={() => setDetails([])}>Close details</Button>
-          </div>
-          {currentDetails.map((r) => (
-            <div key={r.id}>
-              {r.href ? (
-                <AppLink className="settings-link" href={r.href}>
-                  {r.label} →
-                </AppLink>
-              ) : (
-                <strong>{r.label}</strong>
-              )}
-              {r.description && <p>{r.description}</p>}
-            </div>
-          ))}
-        </section>
-      )}
       {pinging && (
         <p className="text-sm text-muted">
           Keyboard: pan to a point, then press Enter to ping the center crosshair. Escape turns ping
@@ -1257,6 +1423,37 @@ function MapViewport({
       )}
       <div className="map-tile-control-area">{controls}</div>
     </MapFrame>
+  );
+}
+function MapRecordGlyph({
+  kind,
+  records,
+  map,
+  selected,
+}: {
+  kind: string;
+  records: MapRecord[];
+  map: CampaignMap;
+  selected: boolean;
+}) {
+  const table = useWorldTable(),
+    token = map.tokens?.find((token) => records.some((record) => record.id === token.id)),
+    portrait =
+      token?.kind === "character"
+        ? table.purses.find((person) => person.id === token.entityId)?.portrait
+        : undefined;
+  return (
+    <>
+      {portrait ? (
+        <img className="tabletop-token-portrait" src={portrait} alt="" draggable={false} />
+      ) : (
+        <RecordIcon kind={kind} />
+      )}
+      {token?.style &&
+        (token.style.labels === "always" || (token.style.labels === "selected" && selected)) && (
+          <span className="tabletop-token-label">{token.label}</span>
+        )}
+    </>
   );
 }
 function RecordIcon({ kind }: { kind: string }) {

@@ -21,6 +21,7 @@ import {
   inAreaTemplate,
 } from "./tabletop-geometry.ts";
 import { projectRecord } from "./session-records.ts";
+import { canonicalJson } from "./canonical-json.ts";
 
 const dm: CloudSeat = { id: "dm", token: "dm-token", name: "DM", role: "dm", purseIds: [] };
 const player: CloudSeat = {
@@ -82,7 +83,13 @@ function fixture(settings?: unknown): CloudTable {
 }
 const map = (t: CloudTable) => t.journal!.world!.maps[0];
 const act = (t: CloudTable, c: CommandInput, seat = dm) =>
-  applyCommand(t, seat, { ...c, id: `tabletop-${++seq}` });
+  applyCommand(
+    t,
+    seat,
+    c.kind === "map-token-move"
+      ? { ...c, grid: canonicalJson(map(t).grid), id: `tabletop-${++seq}` }
+      : { ...c, id: `tabletop-${++seq}` },
+  );
 const move = (id = "hero-token", column = 2, row = 1) => ({
   tokenId: id,
   before: { column: id === "hero-token" ? 1 : 5, row: id === "hero-token" ? 1 : 5 },
@@ -95,6 +102,24 @@ test("legacy maps retain their exact optional fields and TV defaults off", () =>
   assert.equal(map(t).tabletop, undefined);
   assert.equal(readTabletopSession(t).tvEnabled, false);
   assert.equal(readMapTabletop(map(t)).playerMovement, false);
+});
+test("client display retains the server's visible tokens without recomputing from redacted geometry", () => {
+  const table = fixture({
+    fog: {
+      enabled: true,
+      base: "concealed",
+      shapes: [
+        { id: "reveal", kind: "rectangle", reveal: true, a: { x: 0, y: 0 }, b: { x: 0.4, y: 0.4 } },
+      ],
+    },
+  });
+  const projected = projectRecord(table, player);
+  assert.equal(map(projected).tokens!.length, 1);
+  assert.equal(map(projected).tabletop!.fog.shapes.length, 0);
+  const displayed = projectRecord(projected, player, { tabletopProjected: true });
+  assert.equal(map(displayed).tokens!.length, 1);
+  assert.equal(map(displayed).image, concealedMapImage);
+  assert.equal(map(displayed).tabletop!.walls.length, 0);
 });
 test("only explicitly permitted assigned tokens move; wealth and source input stay unchanged", () => {
   const denied = fixture();
@@ -419,14 +444,26 @@ test("older DM map/token writes preserve new configuration, locks, control and v
   map(t).tokens![0].locked = true;
   map(t).tokens![0].controllerPurseIds = ["hero"];
   const old = legacyTabletopMap(map(t));
-  t = act(t, { kind: "map-save", mapId: "map", before: old, map: { ...old, name: "Renamed on older app" } });
+  t = act(t, {
+    kind: "map-save",
+    mapId: "map",
+    before: old,
+    map: { ...old, name: "Renamed on older app" },
+  });
   assert.equal(readMapTabletop(map(t)).playerMovement, true);
   assert.equal(map(t).tokens![0].locked, true);
   const token = legacyTabletopToken(map(t).tokens![0]);
-  t = act(t, { kind: "map-token", mapId: "map", grid, tokenId: token.id, before: token, token: { ...token, column: 3 } });
-  assert.equal(map(t).tokens!.find(v => v.id === token.id)!.column, 3);
-  assert.equal(map(t).tokens!.find(v => v.id === token.id)!.locked, true);
-  assert.deepEqual(map(t).tokens!.find(v => v.id === token.id)!.controllerPurseIds, ["hero"]);
+  t = act(t, {
+    kind: "map-token",
+    mapId: "map",
+    grid,
+    tokenId: token.id,
+    before: token,
+    token: { ...token, column: 3 },
+  });
+  assert.equal(map(t).tokens!.find((v) => v.id === token.id)!.column, 3);
+  assert.equal(map(t).tokens!.find((v) => v.id === token.id)!.locked, true);
+  assert.deepEqual(map(t).tokens!.find((v) => v.id === token.id)!.controllerPurseIds, ["hero"]);
   const oldJournal = structuredClone(t.journal!);
   delete oldJournal.world!.tabletop;
   oldJournal.world!.maps = oldJournal.world!.maps.map(legacyTabletopMap);

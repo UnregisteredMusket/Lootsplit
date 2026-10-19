@@ -21,7 +21,7 @@ import { mapAccessible, projectTabletopMap } from "./tabletop.ts";
 export function projectRecord(
   table: CloudTable,
   seat: Pick<CloudSeat, "role" | "purseIds"> & { id?: string },
-  options: { ownedDevice?: boolean; directory?: boolean } = {},
+  options: { ownedDevice?: boolean; directory?: boolean; tabletopProjected?: boolean } = {},
 ): CloudTable {
   const t = structuredClone(table);
   const dm = seat.role === "dm";
@@ -48,7 +48,10 @@ export function projectRecord(
         return {
           ...r,
           snapshot: JSON.stringify(
-            projectRecord(readArchivedSnapshot(r.snapshot), seat, { ownedDevice }),
+            projectRecord(readArchivedSnapshot(r.snapshot), seat, {
+              ownedDevice,
+              tabletopProjected: options.tabletopProjected,
+            }),
           ),
         };
       } catch {
@@ -94,10 +97,12 @@ export function projectRecord(
             }
           : {}),
       }))
-      .map(map => projectTabletopMap(t, map, seat));
+      .map((map) => (options.tabletopProjected ? map : projectTabletopMap(t, map, seat)));
     if (world.tabletop) {
-      if (!world.maps.some(m => m.id === world.tabletop!.activeMapId)) world.tabletop.activeMapId = null;
-      if (world.tabletop.camera && !world.maps.some(m => m.id === world.tabletop!.camera!.mapId)) world.tabletop.camera = null;
+      if (!world.maps.some((m) => m.id === world.tabletop!.activeMapId))
+        world.tabletop.activeMapId = null;
+      if (world.tabletop.camera && !world.maps.some((m) => m.id === world.tabletop!.camera!.mapId))
+        world.tabletop.camera = null;
       world.tabletop.tvEnabled = false;
     }
     const readableNpcs = new Set(
