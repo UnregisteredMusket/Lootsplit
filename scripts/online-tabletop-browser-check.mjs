@@ -145,8 +145,180 @@ export async function checkOnlineTabletop(dm, player, origin, width, output, jou
     path: `${output}/online-tabletop-player-${width}.png`,
     fullPage: true,
   });
+  await dm
+    .locator(".map-session-bar")
+    .getByRole("button", { name: "Player display", exact: true })
+    .click();
+  const displayControls = dm.getByRole("dialog", { name: "Player display", exact: true }),
+    displayPopup = dm.waitForEvent("popup");
+  await displayControls.getByRole("button", { name: "Open player window", exact: true }).click();
+  const display = await displayPopup;
+  await displayControls.getByRole("button", { name: "Show display", exact: true }).click();
+  const displayMap = display.getByRole("img", { name: "Keep map", exact: true });
+  await expect
+    .poll(() => displayMap.evaluate((img) => (img.complete ? img.naturalWidth : 0)))
+    .toBeGreaterThan(1);
+  await expect
+    .poll(() =>
+      displayMap.evaluate(async (img) => {
+        await img.decode();
+        const canvas = document.createElement("canvas");
+        canvas.width = img.naturalWidth;
+        canvas.height = img.naturalHeight;
+        const ctx = canvas.getContext("2d");
+        ctx.drawImage(img, 0, 0);
+        return ctx.getImageData(
+          Math.floor(canvas.width * 0.2),
+          Math.floor(canvas.height * 0.2),
+          1,
+          1,
+        ).data[3];
+      }),
+    )
+    .toBe(255);
+  assert.equal(
+    await displayMap.evaluate(async (img) => {
+      await img.decode();
+      const canvas = document.createElement("canvas");
+      canvas.width = img.naturalWidth;
+      canvas.height = img.naturalHeight;
+      const ctx = canvas.getContext("2d");
+      ctx.drawImage(img, 0, 0);
+      return ctx.getImageData(
+        Math.floor(canvas.width * 0.95),
+        Math.floor(canvas.height * 0.95),
+        1,
+        1,
+      ).data[3];
+    }),
+    0,
+    "Optional display also receives baked visible pixels only",
+  );
+  await display.close();
+  await displayControls.getByRole("button", { name: "Close", exact: true }).click();
   assert.equal(
     await player.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1),
     true,
   );
+  // Import a real embedded raster and reviewed geometry through the production file control.
+  await dm.getByRole("button", { name: "Cancel tool", exact: true }).click();
+  await dm.getByRole("button", { name: "Import map", exact: true }).click();
+  const editor = dm.getByRole("dialog", { name: "Map editor", exact: true });
+  await editor.getByLabel("Map name", { exact: true }).fill("Imported media audit");
+  const image = await dm.evaluate(() => {
+    const canvas = document.createElement("canvas");
+    canvas.width = 640;
+    canvas.height = 320;
+    const ctx = canvas.getContext("2d");
+    ctx.fillStyle = "#a52a2a";
+    ctx.fillRect(0, 0, 320, 320);
+    ctx.fillStyle = "#234b9a";
+    ctx.fillRect(320, 0, 320, 320);
+    return canvas.toDataURL("image/png").split(",")[1];
+  });
+  const uvtt = {
+    format: 0.3,
+    resolution: { map_origin: { x: 0, y: 0 }, map_size: { x: 8, y: 4 }, pixels_per_grid: 80 },
+    image,
+    line_of_sight: [
+      [
+        { x: 0, y: 0 },
+        { x: 8, y: 0 },
+      ],
+    ],
+    portals: [
+      {
+        bounds: [
+          { x: 4, y: 0 },
+          { x: 4, y: 4 },
+        ],
+        closed: true,
+      },
+    ],
+    lights: [{ position: { x: 2, y: 2 }, range: 3, color: "ffaabbcc", intensity: 0.5 }],
+  };
+  await editor.getByLabel("Map artwork or video", { exact: true }).setInputFiles({
+    name: "audit.dd2vtt",
+    mimeType: "application/json",
+    buffer: Buffer.from(JSON.stringify(uvtt)),
+  });
+  await expect(editor.getByRole("region", { name: "Map import review" })).toContainText(
+    "2 walls / doors",
+  );
+  await expect(
+    editor.getByRole("checkbox", { name: "Share this map image with players", exact: true }),
+  ).not.toBeChecked();
+  await editor.getByRole("button", { name: "Save map", exact: true }).click();
+  await expect(editor).toHaveCount(0);
+  const imported = async () =>
+    (await journal(dm)).world.maps.find((map) => map.name === "Imported media audit");
+  await expect.poll(async () => !!(await imported())?.tabletop.media).toBe(true);
+  const importedMap = await imported();
+  assert.equal(importedMap.tabletop.media.width, 640);
+  assert.equal(importedMap.grid.columns, 8);
+  assert.equal(importedMap.visible, false);
+  assert.equal(importedMap.tabletop.fog.enabled, true);
+  await expect(player.locator(".campaign-maps")).not.toContainText("Imported media audit");
+  await chooseOption(dm.getByLabel("Map type filter", { exact: true }), "battle");
+  await expect(
+    dm.getByRole("img", { name: "Imported media audit", exact: true }).first(),
+  ).toBeVisible();
+  await expect
+    .poll(() => dm.locator(".map-media-detail").evaluate((img) => img.naturalWidth))
+    .toBe(640);
+  await dm.screenshot({ path: `${output}/online-tabletop-import-${width}.png`, fullPage: true });
+  const videoBase64 = await dm.evaluate(async () => {
+    const canvas = document.createElement("canvas");
+    canvas.width = 320;
+    canvas.height = 160;
+    const ctx = canvas.getContext("2d"),
+      stream = canvas.captureStream(5),
+      recorder = new MediaRecorder(stream, { mimeType: "video/webm" }),
+      parts = [];
+    recorder.ondataavailable = (event) => parts.push(event.data);
+    const stopped = new Promise((resolve) => {
+      recorder.onstop = resolve;
+    });
+    ctx.fillStyle = "#234b9a";
+    ctx.fillRect(0, 0, 320, 160);
+    recorder.start();
+    // Capture actual animation frames; this bounded delay is the synthetic video's duration.
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    ctx.fillStyle = "#a52a2a";
+    ctx.fillRect(100, 0, 100, 160);
+    await new Promise((resolve) => setTimeout(resolve, 300));
+    recorder.stop();
+    await stopped;
+    stream.getTracks().forEach((track) => track.stop());
+    return await new Promise((resolve) => {
+      const reader = new FileReader();
+      reader.onload = () => resolve(reader.result.split(",")[1]);
+      reader.readAsDataURL(new Blob(parts, { type: "video/webm" }));
+    });
+  });
+  await dm.getByRole("button", { name: "Import map", exact: true }).click();
+  await editor.getByLabel("Map name", { exact: true }).fill("Animated media audit");
+  await editor.getByLabel("Map artwork or video", { exact: true }).setInputFiles({
+    name: "animation.webm",
+    mimeType: "video/webm",
+    buffer: Buffer.from(videoBase64, "base64"),
+  });
+  await expect(
+    editor.getByText("Map image ready. Review the details, then save the map.", { exact: true }),
+  ).toBeVisible();
+  await editor.getByRole("button", { name: "Save map", exact: true }).click();
+  await expect(editor).toHaveCount(0);
+  await chooseOption(dm.getByLabel("Map type filter", { exact: true }), "");
+  const animated = (await journal(dm)).world.maps.find(
+    (map) => map.name === "Animated media audit",
+  );
+  await chooseOption(dm.getByLabel("Map", { exact: true }), animated.id);
+  await expect(dm.getByRole("button", { name: "Play map animation", exact: true })).toBeVisible();
+  await expect(dm.locator("video.map-media-detail")).toHaveCount(0);
+  await dm.getByRole("button", { name: "Play map animation", exact: true }).click();
+  await expect(dm.locator("video.map-media-detail")).toBeVisible();
+  await dm.emulateMedia({ reducedMotion: "reduce" });
+  await expect(dm.locator("video.map-media-detail")).toHaveCount(0);
+  await expect(dm.getByRole("img", { name: "Animated media audit", exact: true })).toBeVisible();
+  await dm.emulateMedia({ reducedMotion: "no-preference" });
 }

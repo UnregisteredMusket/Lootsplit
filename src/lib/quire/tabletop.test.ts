@@ -22,6 +22,7 @@ import {
 } from "./tabletop-geometry.ts";
 import { projectRecord } from "./session-records.ts";
 import { canonicalJson } from "./canonical-json.ts";
+import { readArchiveResult } from "./archive-reader.ts";
 
 const dm: CloudSeat = { id: "dm", token: "dm-token", name: "DM", role: "dm", purseIds: [] };
 const player: CloudSeat = {
@@ -103,6 +104,21 @@ test("legacy maps retain their exact optional fields and TV defaults off", () =>
   assert.equal(readTabletopSession(t).tvEnabled, false);
   assert.equal(readMapTabletop(map(t)).playerMovement, false);
 });
+test("older clients retain pending token locks, free-placement offsets and advanced before-state", () => {
+  for (const value of [
+    { token: { locked: false } },
+    { token: { offsetX: 0.2 } },
+    { before: { vision: { enabled: true } } },
+  ])
+    assert.throws(
+      () =>
+        tabletopResponse({
+          table: fixture(),
+          draft: JSON.stringify([{ kind: "map-token", ...value }]),
+        }),
+      /unfinished map actions/,
+    );
+});
 test("client display retains the server's visible tokens without recomputing from redacted geometry", () => {
   const table = fixture({
     fog: {
@@ -120,6 +136,12 @@ test("client display retains the server's visible tokens without recomputing fro
   assert.equal(map(displayed).tokens!.length, 1);
   assert.equal(map(displayed).image, concealedMapImage);
   assert.equal(map(displayed).tabletop!.walls.length, 0);
+  const archive = readArchiveResult(
+    { snapshot: JSON.stringify(projected) },
+    { ...player, tabletopProjected: true },
+  );
+  assert.equal(archive.available, true);
+  if (archive.available) assert.equal(map(archive.snapshot).tokens!.length, 1);
 });
 test("only explicitly permitted assigned tokens move; wealth and source input stay unchanged", () => {
   const denied = fixture();

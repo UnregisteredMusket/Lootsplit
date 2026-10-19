@@ -1,3 +1,4 @@
+import { mapAssetReferences } from "./map-assets-references.ts";
 import { activeCampaignId } from "./campaign-context.ts";
 import { validateFleet } from "./ships.ts";
 import { validateBlacksmith } from "./blacksmith-validation.ts";
@@ -2001,11 +2002,11 @@ export async function snapshot(): Promise<QuireFile> {
     sales: readSales(await sales),
   });
   await done;
-  if (file.journal) {
+  if (mapAssetReferences(file.journal?.world?.maps ?? [], file.journal?.reports ?? []).length) {
     const { mapBackupAssets } = await import("./map-assets.ts");
     const assets = await mapBackupAssets(
-      file.journal.world?.maps ?? [],
-      file.journal.reports ?? [],
+      file.journal?.world?.maps ?? [],
+      file.journal?.reports ?? [],
     );
     if (assets.length) file.mapAssets = assets;
   }
@@ -2286,7 +2287,6 @@ export async function restore(file: QuireFile): Promise<void> {
   if (new Set(assets.map((asset) => asset.manifest.id)).size !== assets.length)
     throw Error("This backup contains duplicate map assets. The campaign was not changed.");
   for (const bundle of assets) await verifyMapAsset(bundle);
-  const { mapAssetReferences } = await import("./map-assets.ts");
   for (const { media } of mapAssetReferences(
     file.journal?.world?.maps ?? [],
     file.journal?.reports ?? [],

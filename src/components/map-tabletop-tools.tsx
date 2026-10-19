@@ -837,10 +837,12 @@ export function useMapTabletopTools(
           </div>
         ))}
       </Fold>
-      <AppLink href="/encounters" className="settings-link">
-        Open canonical encounters →
-      </AppLink>
-      {import.meta.env.VITE_MOBILE !== "true" && (
+      {dm && (
+        <AppLink href="/encounters" className="settings-link">
+          Open encounters →
+        </AppLink>
+      )}
+      {dm && import.meta.env.VITE_MOBILE !== "true" && (
         <Button
           onClick={() => {
             try {

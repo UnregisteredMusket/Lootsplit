@@ -1,13 +1,12 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { lazy, Suspense, useEffect, useRef, useState, type ReactNode } from "react";
 import { MonitorPlay } from "lucide-react";
-import { MapVisibilityPublisher } from "./map-visibility-publisher";
 import { Button, Field, Modal, Select } from "./ui";
 import { useSeat } from "@/lib/quire/seat";
 import { useWorldTable } from "@/lib/quire/use-world-table";
 import { readWorld } from "@/lib/quire/world-schema";
 import { activeCampaignId } from "@/lib/quire/campaign-context";
 import { getCloudTable } from "@/lib/quire/cloud-client";
-import { readTabletopSession } from "@/lib/quire/tabletop";
+import { readTabletopSession, projectTabletopMap } from "@/lib/quire/tabletop";
 import { encounterRequest } from "@/lib/encounters/client";
 import { localEncounterRequest } from "@/lib/encounters/local";
 import { accountRequest } from "@/lib/account/client";
@@ -23,13 +22,20 @@ import {
 
 type Request = { mapId?: string; encounterId?: string };
 const DISPLAY_REQUEST = "lootsplit:player-display";
+const MapVisibilityPublisher = lazy(() =>
+  import("./map-visibility-publisher").then((module) => ({
+    default: module.MapVisibilityPublisher,
+  })),
+);
 export function PlayerDisplayButton({
   mapId,
   encounterId,
   icon = false,
 }: Request & { icon?: boolean }) {
-  const dm = useSeat().role === "dm", table = useWorldTable();
-  if (!dm || !readTabletopSession(table).tvEnabled || import.meta.env.VITE_MOBILE === "true") return null;
+  const dm = useSeat().role === "dm",
+    table = useWorldTable();
+  if (!dm || !readTabletopSession(table).tvEnabled || import.meta.env.VITE_MOBILE === "true")
+    return null;
   const launch = () =>
     window.dispatchEvent(
       new CustomEvent<Request>(DISPLAY_REQUEST, { detail: { mapId, encounterId } }),
@@ -53,11 +59,16 @@ export function PlayerDisplayButton({
 }
 export function PlayerDisplayProvider({ children }: { children: ReactNode }) {
   const seat = useSeat(),
+    table = useWorldTable(),
     campaignId = activeCampaignId();
   return (
     <>
       {children}
-      <MapVisibilityPublisher />
+      {seat.role === "dm" && table.journal.world?.maps.some((map) => map.tabletop) && (
+        <Suspense fallback={null}>
+          <MapVisibilityPublisher />
+        </Suspense>
+      )}
       <DisplaySession
         key={`${campaignId}:${seat.openedAt}:${seat.role}:${getCloudTable().code}`}
         dm={seat.role === "dm"}
@@ -77,12 +88,55 @@ function DisplaySession({ dm }: { dm: boolean }) {
     [error, setError] = useState(""),
     [connected, setConnected] = useState(false),
     [detailError, setDetailError] = useState("");
+  const [artwork, setArtwork] = useState({ key: "", image: "" }),
+    [mapError, setMapError] = useState("");
   const channel = useRef<BroadcastChannel | null>(null),
     channelId = useRef(""),
     lastSeen = useRef(0);
   const frame = useRef<ReturnType<typeof projectPlayerDisplay> | null>(null);
   frame.current = enabled ? projectPlayerDisplay(table, detail, settings, code) : null;
   const maps = readWorld(table.journal.world).maps.filter((m) => m.visible);
+  const sourceMap = maps.find((map) => map.id === settings.mapId),
+    presentationMap = sourceMap
+      ? projectTabletopMap(table, sourceMap, { role: "player", purseIds: [] }, true)
+      : undefined,
+    media = presentationMap?.tabletop?.media,
+    artworkKey = JSON.stringify([
+      campaignId,
+      code,
+      sourceMap?.id,
+      sourceMap?.tabletop?.revision,
+      media?.id,
+      media?.sha256,
+    ]);
+  if (frame.current?.map && artwork.key === artworkKey && media)
+    frame.current.map.image = artwork.image;
+  useEffect(() => {
+    if (!enabled || settings.paused || !media || !sourceMap) return;
+    let cancelled = false;
+    setMapError("");
+    void (async () => {
+      const { loadMapAsset, mapAssetBlob } = await import("@/lib/quire/map-assets"),
+        { mapPresentationRaster } = await import("@/lib/quire/map-media"),
+        bundle = await loadMapAsset(sourceMap.id, media),
+        image = media.mime.startsWith("image/")
+          ? await mapPresentationRaster(await mapAssetBlob(bundle))
+          : bundle.manifest.preview;
+      if (!cancelled) setArtwork({ key: artworkKey, image });
+    })().catch((error) => {
+      if (!cancelled)
+        setMapError(
+          error instanceof Error
+            ? error.message
+            : "Player map could not update. It remains concealed.",
+        );
+    });
+    return () => {
+      cancelled = true;
+    };
+    // Only authorized media identity/epoch changes prepare new pixel frames.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [enabled, settings.paused, artworkKey]);
   function update(patch: Partial<DisplaySettings>) {
     setSettings((s) => ({ ...s, ...patch }));
   }
@@ -152,7 +206,11 @@ function DisplaySession({ dm }: { dm: boolean }) {
     };
   }, [settings.encounterId, campaignId, code, enabled, open]);
   useEffect(() => {
-    if (!enabled) { setOpen(false); setSettings(defaultDisplaySettings); return; }
+    if (!enabled) {
+      setOpen(false);
+      setSettings(defaultDisplaySettings);
+      return;
+    }
     const timer = window.setInterval(() => {
       if (channel.current && frame.current && activeCampaignId() === campaignId)
         channel.current.postMessage("alive");
@@ -173,7 +231,7 @@ function DisplaySession({ dm }: { dm: boolean }) {
   }, [enabled, campaignId]);
   useEffect(() => {
     if (channel.current && frame.current) channel.current.postMessage(frame.current);
-  }, [table.journal, table.purses, detail, settings]);
+  }, [table.journal, table.purses, detail, settings, artwork]);
   function launch(tab: boolean) {
     if (!enabled) return;
     setError("");
@@ -296,6 +354,7 @@ function DisplaySession({ dm }: { dm: boolean }) {
               </Select>
             </Field>
             {detailError && <p role="alert">{detailError}</p>}
+            {mapError && <p role="alert">{mapError}</p>}
             {detail && detail.code === code && (
               <fieldset className="space-y-2">
                 <legend>Combatants to reveal</legend>

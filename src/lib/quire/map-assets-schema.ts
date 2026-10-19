@@ -12,10 +12,17 @@ const mediaFields = {
   width: z.number().int().positive().max(8192),
   height: z.number().int().positive().max(8192),
   sha256: z.string().regex(/^[a-f0-9]{64}$/),
+  animated: z.boolean().optional(),
 };
-const mediaBounds = (value: { width: number; height: number; purpose: string; mime: string }) =>
+const mediaBounds = (value: {
+  width: number;
+  height: number;
+  purpose: string;
+  mime: string;
+  animated?: boolean;
+}) =>
   value.width * value.height <= 64_000_000 &&
-  (value.purpose !== "render" || value.mime.startsWith("image/"));
+  (value.purpose !== "render" || (value.mime.startsWith("image/") && !value.animated));
 export const mapMediaReferenceSchema = z
   .object(mediaFields)
   .strict()

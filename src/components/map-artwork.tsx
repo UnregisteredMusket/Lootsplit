@@ -34,7 +34,16 @@ export function MapArtwork({
   ]);
   const [resolved, setResolved] = useState<{ key: string; urls: string[] }>({ key: "", urls: [] }),
     [error, setError] = useState(""),
-    [playing, setPlaying] = useState(false);
+    [playing, setPlaying] = useState(false),
+    [retry, setRetry] = useState(0);
+  useEffect(() => {
+    const preference = window.matchMedia("(prefers-reduced-motion: reduce)");
+    const pause = () => {
+      if (preference.matches) setPlaying(false);
+    };
+    preference.addEventListener("change", pause);
+    return () => preference.removeEventListener("change", pause);
+  }, []);
   useEffect(() => {
     let cancelled = false;
     const urls: string[] = [];
@@ -57,7 +66,7 @@ export function MapArtwork({
     };
     // Media identity, not unrelated room revisions, controls downloads and object URL lifetime.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [signature]);
+  }, [signature, retry]);
   const urls = resolved.key === signature ? resolved.urls : [],
     video = !!media?.mime.startsWith("video/");
   const imageLoaded = (image: HTMLImageElement) =>
@@ -71,19 +80,21 @@ export function MapArtwork({
         onLoad={(event) => imageLoaded(event.currentTarget)}
       />
       {!video &&
-        urls.map((url, index) => (
+        (!media?.animated || (animated && playing)) &&
+        urls.map((url) => (
           <img
             className="map-media-detail"
             key={url}
             draggable={false}
             src={url}
-            alt={index ? "Additional assigned character visibility" : map.name}
+            alt=""
+            aria-hidden="true"
             onLoad={(event) => imageLoaded(event.currentTarget)}
           />
         ))}
-      {video && animated && urls[0] && (
+      {(video || media?.animated) && animated && urls[0] && (
         <>
-          {playing && (
+          {video && playing && (
             <video
               className="map-media-detail"
               src={urls[0]}
@@ -110,6 +121,15 @@ export function MapArtwork({
       {references.length > 0 && urls.length === 0 && (
         <span className="map-media-status" role="status">
           {error || "Loading detailed map…"}
+          {error && (
+            <button
+              type="button"
+              onPointerDown={(event) => event.stopPropagation()}
+              onClick={() => setRetry((value) => value + 1)}
+            >
+              Retry map artwork
+            </button>
+          )}
         </span>
       )}
       {map.image === concealedMapImage && references.length === 0 && (

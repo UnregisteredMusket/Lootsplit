@@ -30,7 +30,8 @@ export function MapVisibilityPublisher() {
     [failure, setFailure] = useState(""),
     [retry, setRetry] = useState(0),
     cloud = useSyncExternalStore(subscribeCloudTable, getCloudTable, getServerCloudTable);
-  const latest = useRef({ table, economy, seat, campaign });
+  const latest = useRef({ table, economy, seat, campaign }),
+    published = useRef(new Set<string>());
   latest.current = { table, economy, seat, campaign };
   const signature = JSON.stringify(
     (table.journal.world?.maps ?? []).map((map) => [
@@ -55,19 +56,25 @@ export function MapVisibilityPublisher() {
         (connection.joined && !connection.mine)
       )
         return;
+      const ensurePublished = async (media: { id: string }) => {
+        if (!connection.joined) return;
+        const key = `${campaign}:${connection.code}:${media.id}`;
+        if (published.current.has(key)) return;
+        const cached = await cachedMapAsset(media.id);
+        if (cached) {
+          await publishMapAsset(cached);
+          published.current.add(key);
+        }
+      };
       for (const map of table.journal.world?.maps ?? []) {
         if (cancelled) return;
         const settings = readMapTabletop(map);
-        if (settings.media) {
-          const cached = await cachedMapAsset(settings.media.id);
-          if (cached) await publishMapAsset(cached);
-        }
+        if (settings.media) await ensurePublished(settings.media);
         // Offline preparation may already contain finished frames. Upload them when hosting starts.
         for (const frame of settings.frames.filter(
           (frame) => frame.revision === settings.revision,
         )) {
-          const cached = await cachedMapAsset(frame.media.id);
-          if (cached) await publishMapAsset(cached);
+          await ensurePublished(frame.media);
         }
         if (!map.visible) continue;
         if (!mapNeedsMask(settings)) continue;
@@ -107,6 +114,8 @@ export function MapVisibilityPublisher() {
             if (!identical) {
               await cacheMapAsset(bundle);
               await publishMapAsset(bundle);
+              if (connection.joined)
+                published.current.add(`${campaign}:${connection.code}:${bundle.manifest.id}`);
             }
             if (cancelled) return;
             const result = await economy.commandOutcome(

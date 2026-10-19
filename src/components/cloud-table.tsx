@@ -508,6 +508,7 @@ export function CloudTable() {
                   </Field>
                   <Field label="Choose your character">
                     <select
+                      aria-label="Choose your character"
                       disabled={busy}
                       value={purseId}
                       onChange={(event) => setPurseId(event.target.value)}

@@ -13,6 +13,8 @@ import {
   type MapMediaReference,
 } from "./map-assets-schema.ts";
 import type { CampaignMap } from "./world-schema.ts";
+import { mapAssetReferences } from "./map-assets-references.ts";
+export { mapAssetReferences } from "./map-assets-references.ts";
 
 export async function cacheMapAsset(bundle: MapAssetBundle) {
   const campaign = activeCampaignId();
@@ -111,6 +113,7 @@ export async function bundleMapAsset(
   preview: string,
   purpose: "original" | "render" = "original",
   credit?: MapAssetBundle["manifest"]["credit"],
+  animated?: boolean,
 ): Promise<MapAssetBundle> {
   if (blob.size > MAP_ASSET_LIMIT) throw Error("Choose a map up to 20 MB.");
   const bytes = new Uint8Array(await blob.arrayBuffer());
@@ -135,38 +138,12 @@ export async function bundleMapAsset(
       sha256,
       preview,
       credit,
+      ...(animated ? { animated: true } : {}),
     },
     parts,
   });
   await verifyMapAsset(bundle);
   return bundle;
-}
-export function mapAssetReferences(
-  maps: CampaignMap[],
-  reports: { snapshot: string }[] = [],
-  depth = 0,
-): { mapId: string; media: MapMediaReference }[] {
-  if (depth > 10) throw Error("Too many nested map archives. Keep the original recovery export.");
-  return [
-    ...maps.flatMap((map) =>
-      [map.tabletop?.media, ...(map.tabletop?.frames.map((frame) => frame.media) ?? [])]
-        .filter((media): media is MapMediaReference => !!media)
-        .map((media) => ({ mapId: map.id, media })),
-    ),
-    ...reports.flatMap((report) => {
-      let table;
-      try {
-        table = JSON.parse(report.snapshot);
-      } catch {
-        return [];
-      } // Preserve unreadable archive bytes in the backup.
-      return mapAssetReferences(
-        table?.journal?.world?.maps ?? [],
-        table?.journal?.reports ?? [],
-        depth + 1,
-      );
-    }),
-  ];
 }
 export async function mapBackupAssets(maps: CampaignMap[], reports: { snapshot: string }[] = []) {
   const seen = new Set<string>(),

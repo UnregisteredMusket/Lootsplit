@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readMapInterchange } from "./map-import.ts";
+import { animatedMapImage } from "./map-image-animation.ts";
 
 const fixture = () => ({
   format: 0.3,
@@ -22,6 +23,19 @@ const fixture = () => ({
     },
   ],
   lights: [{ position: { x: 12, y: 21 }, range: 3, color: "ffaabbcc", intensity: 0.5 }],
+});
+test("animated raster containers are identified before a motion map is displayed", () => {
+  const png = new Uint8Array(28);
+  png.set(Buffer.from("acTL"), 12);
+  assert.equal(animatedMapImage(png, "image/png"), true);
+  const webp = new Uint8Array(24);
+  webp.set(Buffer.from("RIFF"));
+  webp.set(Buffer.from("WEBP"), 8);
+  webp.set(Buffer.from("ANIM"), 12);
+  assert.equal(animatedMapImage(webp, "image/webp"), true);
+  assert.equal(animatedMapImage(new Uint8Array([137, 80, 78, 71]), "image/png"), false);
+  png.set([255, 255, 255, 255], 8);
+  assert.equal(animatedMapImage(png, "image/png"), false);
 });
 test("UVTT normalizes origin, clips exterior geometry and preserves reviewed doors, scale and colors", () => {
   const imported = readMapInterchange(JSON.stringify(fixture()));

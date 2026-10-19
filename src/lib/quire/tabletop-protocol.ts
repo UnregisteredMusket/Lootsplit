@@ -62,7 +62,13 @@ export function tabletopResponse<T extends { table: CloudTable; draft: string }>
         (commands.has(c.kind) ||
           (c.kind === "map-save" && (c.map?.tabletop || c.before?.tabletop)) ||
           (c.kind === "map-token" &&
-            (c.token?.style || c.token?.vision || c.token?.controllerPurseIds))),
+            [c.token, c.before].some(
+              (token) =>
+                token &&
+                ["locked", "controllerPurseIds", "offsetX", "offsetY", "style", "vision"].some(
+                  (key) => token[key] !== undefined,
+                ),
+            ))),
     )
   )
     throw Error(

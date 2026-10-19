@@ -1,5 +1,6 @@
 import { bundleMapAsset } from "./map-assets.ts";
 import { MAP_ASSET_LIMIT, type MapAssetBundle } from "./map-assets-schema.ts";
+import { animatedMapImage } from "./map-image-animation.ts";
 
 export function canvasBlob(canvas: HTMLCanvasElement, type = "image/webp", quality = 0.9) {
   return new Promise<Blob>((resolve, reject) =>
@@ -32,6 +33,35 @@ export function mapThumbnail(source: CanvasImageSource, width: number, height: n
   if (preview.length > 65_000) throw Error("This device could not make a bounded map preview.");
   return preview;
 }
+/** A bounded, provider-free display frame; callers supply only an authorized original or baked render. */
+export async function mapPresentationRaster(blob: Blob) {
+  const bitmap = await createImageBitmap(blob);
+  try {
+    const canvas = document.createElement("canvas"),
+      scale = Math.min(1, 2048 / Math.max(bitmap.width, bitmap.height));
+    canvas.width = Math.max(1, Math.round(bitmap.width * scale));
+    canvas.height = Math.max(1, Math.round(bitmap.height * scale));
+    const ctx = canvas.getContext("2d");
+    if (!ctx) throw Error("This device cannot prepare the player display.");
+    ctx.drawImage(bitmap, 0, 0, canvas.width, canvas.height);
+    let image = canvas.toDataURL("image/webp", 0.85);
+    while (image.length > 490_000 && canvas.width > 40 && canvas.height > 40) {
+      const copy = document.createElement("canvas");
+      copy.width = canvas.width;
+      copy.height = canvas.height;
+      copy.getContext("2d")!.drawImage(canvas, 0, 0);
+      canvas.width = Math.max(1, Math.floor(canvas.width * 0.75));
+      canvas.height = Math.max(1, Math.floor(canvas.height * 0.75));
+      ctx.drawImage(copy, 0, 0, canvas.width, canvas.height);
+      image = canvas.toDataURL("image/webp", 0.8);
+    }
+    if (image.length > 490_000)
+      throw Error("The player display image exceeds its safe frame size.");
+    return image;
+  } finally {
+    bitmap.close();
+  }
+}
 export async function prepareMapMedia(file: File): Promise<MapAssetBundle> {
   if (
     !/^(image\/(png|jpeg|webp)|video\/(mp4|webm))$/.test(file.type) ||
@@ -39,6 +69,7 @@ export async function prepareMapMedia(file: File): Promise<MapAssetBundle> {
   )
     throw Error("Choose a PNG, JPEG, WebP, MP4 or WebM map up to 20 MB.");
   if (file.type.startsWith("image/")) {
+    const animated = animatedMapImage(new Uint8Array(await file.arrayBuffer()), file.type);
     const bitmap = await createImageBitmap(file);
     try {
       return await bundleMapAsset(
@@ -46,6 +77,9 @@ export async function prepareMapMedia(file: File): Promise<MapAssetBundle> {
         bitmap.width,
         bitmap.height,
         mapThumbnail(bitmap, bitmap.width, bitmap.height),
+        "original",
+        undefined,
+        animated,
       );
     } finally {
       bitmap.close();

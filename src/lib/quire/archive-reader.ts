@@ -7,6 +7,7 @@ export type ArchiveInput = { snapshot: unknown; error?: string };
 export type ArchiveSeat = Pick<CloudSeat, "role" | "purseIds"> & {
   id?: string;
   ownedDevice?: boolean;
+  tabletopProjected?: boolean;
 };
 export type ArchiveResult =
   { available: true; snapshot: CloudTable } | { available: false; error: string };
@@ -23,7 +24,12 @@ export function readArchiveResult(report: ArchiveInput, seat?: ArchiveSeat): Arc
     );
     return {
       available: true,
-      snapshot: seat ? projectRecord(snapshot, seat, { ownedDevice: seat.ownedDevice }) : snapshot,
+      snapshot: seat
+        ? projectRecord(snapshot, seat, {
+            ownedDevice: seat.ownedDevice,
+            tabletopProjected: seat.tabletopProjected,
+          })
+        : snapshot,
     };
   } catch {
     // Do not echo malformed bytes or private data into an error message.
