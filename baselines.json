@@ -17849,5 +17849,22 @@
     "finishedAt": "2026-10-19T21:33:47.000Z",
     "durationMs": 164000,
     "trendId": "39328098133:1:d8d19fc2bd12b4b4973137054d3d8e2c48d9e6d7bf326f97c6737824c2d6937e"
+  },
+  "[\".github/workflows/verify.yml\",\"pull_request\",\"pull-request\",\"step\",\"Packaged Worker / interface (balanced v2) / Summarize measured verification stages\",\"ubuntu-latest\",1]": {
+    "schema": 1,
+    "id": "39328485846:1:92867d52af697ccca89dfdbb510dc80cc833b3967387f458d8bea8b3ea1a66c6",
+    "scope": "[\".github/workflows/verify.yml\",\"pull_request\",\"pull-request\",\"step\",\"Packaged Worker / interface (balanced v2) / Summarize measured verification stages\",\"ubuntu-latest\",1]",
+    "kind": "step",
+    "name": "Packaged Worker / interface (balanced v2) / Summarize measured verification stages",
+    "environment": "ubuntu-latest",
+    "commit": "00caa1bad93ed7c1adb5c1cc8a194a2c6fe31f5f",
+    "runId": 39328485846,
+    "attempt": 1,
+    "url": "https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39328485846/job/118322042420",
+    "outcome": "success",
+    "startedAt": "2026-10-19T21:44:46Z",
+    "finishedAt": "2026-10-19T21:44:47Z",
+    "durationMs": 1000,
+    "trendId": "39328485846:1:92867d52af697ccca89dfdbb510dc80cc833b3967387f458d8bea8b3ea1a66c6"
   }
 }
