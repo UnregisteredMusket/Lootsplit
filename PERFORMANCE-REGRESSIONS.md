@@ -285,6 +285,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Development / desktop (balanced v2) / dev-navigation | open | 2 | 20s → 115s | +95s | +475% |
 | Development / gameplay (balanced v2) / Run actions/upload-artifact@v4 | open | 2 | 1s → 4s | +3s | +300% |
 | Development / gameplay (balanced v2) | open | 2 | 215s → 544s | +329s | +153.02% |
+| Development / desktop (balanced v2) | open | 2 | 472s → 693s | +221s | +46.82% |
 | Packaged Worker / interface (balanced v2) / Run actions/setup-node@v4 | open | 2 | 2s → 7s | +5s | +250% |
 | Packaged Worker / interface (balanced v2) / Run actions/download-artifact@v4 | open | 2 | 1s → 3s | +2s | +200% |
 | Packaged Worker / accounts (balanced v2) / worker-account | open | 2 | 85s → 117s | +32s | +37.65% |
@@ -293,13 +294,17 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Packaged Worker / accounts (balanced v2) / worker-map-tiles | open | 2 | 17s → 44s | +27s | +158.82% |
 | Packaged Worker / interface (balanced v2) / Run actions/upload-artifact@v4 | open | 2 | 3s → 6s | +3s | +100% |
 | backup / Export consistently and encrypt before writing to disk | open | 2 | 3s → 6s | +3s | +100% |
-| Development / desktop (balanced v2) / dev-map-tiles | open | 2 | 35s → 102s | +67s | +191.43% |
+| Development / desktop (balanced v2) / dev-map-tiles | open | 3 | 35s → 120s | +85s | +242.86% |
 | Packaged Worker / accounts (balanced v2) / worker-map-tiles | open | 2 | 20s → 85s | +65s | +325% |
 
 ## Recorded slowdowns
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-19T13:56:02Z | job: Packaged Worker / accounts (balanced v2) | 497s → 609s | +112s | +22.54% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38309026871/job/115010777381) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39262626961/job/118094990974) |
+| 2026-10-19T13:55:25Z | job: Development / desktop (balanced v2) | 567s → 693s | +126s | +22.22% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38303829968/job/114993398409) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39262626961/job/118093975300) |
+| 2026-10-19T13:49:57Z | step: Development / desktop (balanced v2) / dev-map-tiles | 102s → 120s | +18s | +17.65% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39257669088/job/118076935765) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39262626961/job/118093975300) |
+| 2026-10-19T13:45:51Z | step: Development / gameplay (balanced v2) / dev-encounter | 39s → 48s | +9s | +23.08% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38301994659/job/114986882408) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39262626961/job/118093975214) |
 | 2026-10-19T13:18:19Z | step: Packaged Worker / accounts (balanced v2) / worker-map-tiles | 44s → 85s | +41s | +93.18% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38936690063/job/117094844393) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39257669088/job/118078183628) |
 | 2026-10-19T13:14:13Z | step: Development / desktop (balanced v2) / dev-map-tiles | 56s → 102s | +46s | +82.14% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38936690063/job/117093857438) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39257669088/job/118076935765) |
 | 2026-10-19T09:14:54Z | step: rehearsal / Verify synthetic recovery on the dedicated empty standby | 1s → 2s | +1s | +100% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37286435016/job/111686330548) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39228550754/job/117980687276) |
