@@ -1,0 +1,214 @@
+import { z } from "zod";
+
+const id = z.string().min(1).max(150);
+export const scenePointSchema = z
+  .object({ x: z.number().finite().min(0).max(1), y: z.number().finite().min(0).max(1) })
+  .strict();
+export const sceneCameraSchema = z
+  .object({
+    x: z.number().finite().min(-5).max(5),
+    y: z.number().finite().min(-5).max(5),
+    zoom: z.number().finite().min(0.1).max(8),
+  })
+  .strict();
+const color = z.string().regex(/^#[0-9a-fA-F]{6}$/);
+export const fogShapeSchema = z.discriminatedUnion("kind", [
+  z
+    .object({
+      id,
+      kind: z.literal("rectangle"),
+      reveal: z.boolean(),
+      a: scenePointSchema,
+      b: scenePointSchema,
+    })
+    .strict(),
+  z
+    .object({
+      id,
+      kind: z.literal("ellipse"),
+      reveal: z.boolean(),
+      a: scenePointSchema,
+      b: scenePointSchema,
+    })
+    .strict(),
+  z
+    .object({
+      id,
+      kind: z.literal("polygon"),
+      reveal: z.boolean(),
+      points: z.array(scenePointSchema).min(3).max(200),
+    })
+    .strict(),
+  z
+    .object({
+      id,
+      kind: z.literal("brush"),
+      reveal: z.boolean(),
+      points: z.array(scenePointSchema).min(1).max(200),
+      radius: z.number().finite().min(0.001).max(0.5),
+    })
+    .strict(),
+]);
+export const fogStateSchema = z
+  .object({
+    enabled: z.boolean().default(false),
+    base: z.enum(["revealed", "concealed"]).default("concealed"),
+    shapes: z.array(fogShapeSchema).max(500).default([]),
+  })
+  .strict();
+export const wallSchema = z
+  .object({
+    id,
+    a: scenePointSchema,
+    b: scenePointSchema,
+    kind: z.enum(["wall", "door", "window", "secret-door"]).default("wall"),
+    open: z.boolean().default(false),
+    blocksSight: z.boolean().default(true),
+    blocksMovement: z.boolean().default(false),
+  })
+  .strict();
+export const sceneLightSchema = z
+  .object({
+    id,
+    at: scenePointSchema,
+    radiusFeet: z.number().finite().positive().max(1000000),
+    color,
+    visible: z.boolean().default(true),
+  })
+  .strict();
+export const areaTemplateSchema = z
+  .object({
+    id,
+    label: z.string().trim().max(100).default(""),
+    kind: z.enum(["circle", "cone", "rectangle", "ray"]),
+    origin: scenePointSchema,
+    distanceFeet: z.number().finite().positive().max(1000000),
+    widthFeet: z.number().finite().positive().max(1000000).default(5),
+    direction: z.number().finite().min(0).max(360).default(0),
+    angle: z.number().finite().min(1).max(360).default(90),
+    visibility: z.enum(["party", "dm"]).default("party"),
+    controllerPurseId: id.optional(),
+  })
+  .strict();
+export const tokenTabletopFields = {
+  locked: z.boolean().optional(),
+  controllerPurseIds: z.array(id).max(100).optional(),
+  offsetX: z.number().finite().min(-0.5).max(0.5).optional(),
+  offsetY: z.number().finite().min(-0.5).max(0.5).optional(),
+  style: z
+    .object({
+      color: color.optional(),
+      size: z.number().finite().min(0.25).max(8).default(1),
+      labels: z.enum(["always", "selected", "never"]).default("always"),
+    })
+    .strict()
+    .optional(),
+  vision: z
+    .object({
+      enabled: z.boolean().default(true),
+      rangeFeet: z.number().finite().positive().max(1000000).default(60),
+      darkvisionFeet: z.number().finite().min(0).max(1000000).default(0),
+    })
+    .strict()
+    .optional(),
+};
+export const mapTabletopSchema = z
+  .object({
+    revision: z.number().int().nonnegative().default(0),
+    playerMovement: z.boolean().default(false),
+    playerTemplates: z.boolean().default(false),
+    snap: z.boolean().default(true),
+    unitLabel: z.string().trim().min(1).max(20).default("ft"),
+    unitsPerFoot: z.number().finite().positive().max(1000000).default(1),
+    initialView: sceneCameraSchema.optional(),
+    fog: fogStateSchema.default({ enabled: false, base: "concealed", shapes: [] }),
+    fogUndo: z.array(fogStateSchema).max(20).default([]),
+    fogRedo: z.array(fogStateSchema).max(20).default([]),
+    vision: z.enum(["off", "party", "individual"]).default("off"),
+    ambientLight: z.boolean().default(true),
+    walls: z.array(wallSchema).max(1000).default([]),
+    lights: z.array(sceneLightSchema).max(200).default([]),
+    templates: z.array(areaTemplateSchema).max(200).default([]),
+  })
+  .strict();
+export const tabletopSessionSchema = z
+  .object({
+    tvEnabled: z.boolean().default(false),
+    activeMapId: id.nullable().default(null),
+    playerBrowsing: z.boolean().default(true),
+    camera: z
+      .object({ mapId: id, view: sceneCameraSchema, nonce: id })
+      .strict()
+      .nullable()
+      .default(null),
+  })
+  .strict();
+const tile = z
+  .object({
+    column: z.number().int().min(0).max(199),
+    row: z.number().int().min(0).max(199),
+    offsetX: z.number().finite().min(-0.5).max(0.5).optional(),
+    offsetY: z.number().finite().min(-0.5).max(0.5).optional(),
+  })
+  .strict();
+export const tabletopCommands = [
+  z
+    .object({
+      id,
+      kind: z.literal("tabletop-session"),
+      before: tabletopSessionSchema.nullable(),
+      session: tabletopSessionSchema,
+    })
+    .strict(),
+  z
+    .object({
+      id,
+      kind: z.literal("map-tabletop"),
+      mapId: id,
+      before: mapTabletopSchema.nullable(),
+      settings: mapTabletopSchema,
+    })
+    .strict(),
+  z
+    .object({
+      id,
+      kind: z.literal("map-token-move"),
+      mapId: id,
+      moves: z
+        .array(z.object({ tokenId: id, before: tile, after: tile }).strict())
+        .min(1)
+        .max(100),
+      ignoreWalls: z.boolean().default(false),
+    })
+    .strict(),
+  z
+    .object({
+      id,
+      kind: z.literal("map-fog"),
+      mapId: id,
+      before: fogStateSchema,
+      action: z.enum(["shape", "undo", "redo", "reveal-all", "conceal-all", "enable", "disable"]),
+      shape: fogShapeSchema.optional(),
+    })
+    .strict(),
+  z
+    .object({
+      id,
+      kind: z.literal("map-template"),
+      mapId: id,
+      templateId: id,
+      before: areaTemplateSchema.nullable(),
+      template: areaTemplateSchema.nullable(),
+    })
+    .strict(),
+] as const;
+export type ScenePoint = z.infer<typeof scenePointSchema>;
+export type SceneCamera = z.infer<typeof sceneCameraSchema>;
+export type FogShape = z.infer<typeof fogShapeSchema>;
+export type FogState = z.infer<typeof fogStateSchema>;
+export type SceneWall = z.infer<typeof wallSchema>;
+export type SceneLight = z.infer<typeof sceneLightSchema>;
+export type AreaTemplate = z.infer<typeof areaTemplateSchema>;
+export type MapTabletop = z.infer<typeof mapTabletopSchema>;
+export type TabletopSession = z.infer<typeof tabletopSessionSchema>;
+export type TabletopCommand = z.infer<(typeof tabletopCommands)[number]>;

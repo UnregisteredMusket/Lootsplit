@@ -25,6 +25,7 @@ Owner-authorized scope: complete online DM/player map play, incremental Maps UI,
 - Private source images and private geometry/records are absent from player payloads and unauthorized asset responses. Player render assets must contain only explicitly published imagery; new visibility calculations cannot override explicit DM secrecy.
 - DM preparation, player access and active/presented scene are separate states. Camera synchronization is deliberate. TV controls are optional and disabled by default; ordinary online play is independent.
 - Guests retain campaign contents and pending work only in document memory. Existing campaign-scoped cross-window locks, credentials, draft guards and fresh authentication are retained.
+- Older Android/client readers use strict map schemas. Add an explicit additive protocol boundary so unsupported tabletop fields are omitted from legacy envelopes after privacy projection; preserve the original source metadata on older writes. Do not silently discard unknown pending map actions. Verify account-resume/archive boundaries as well as ordinary room reads.
 - No production campaign is used as a mutation fixture. Main-only immutable publication, recovery fences, CPU/log policy and all nine verification groups remain intact.
 
 Exact evolving commits, tests, runs and blockers belong in the task audit/checkpoint and PR. This document is an implementation contract, not evidence that unfinished items have shipped.

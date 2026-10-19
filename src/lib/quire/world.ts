@@ -15,6 +15,9 @@ import { fromCopper, toCopper } from "./money.ts";
 import { advanceSessionTime } from "./session-time.ts";
 import { applyCharacterPosition } from "./character-position.ts";
 import { readFleet } from "./ships-schema.ts";
+import { applyTabletopCommand, validateTabletop } from "./tabletop.ts";
+import { tabletopCommands, type TabletopCommand } from "./tabletop-schema.ts";
+import { legacyTabletopMap, legacyTabletopToken } from "./tabletop-protocol.ts";
 
 export function npcAvailableHere(npc: Npc, table: Pick<CloudTable, "journal">) {
   const market = readMarketLocations(table.journal?.market);
@@ -45,6 +48,7 @@ export function worldImportFingerprint(t: CloudTable) {
   });
 }
 export function validateWorld(t: CloudTable, projected = false) {
+  validateTabletop(t, projected);
   const w = readWorld(t.journal?.world),
     market = readMarketLocations(t.journal?.market),
     locations = new Set(market.locations.map((l) => l.id));
@@ -297,6 +301,10 @@ function moveItems(t: CloudTable, side: Trade["left"], toId: string, receipt: st
 export function applyWorldCommand(t: CloudTable, seat: CloudSeat, cmd: WorldCommand, at: number) {
   const journal = t.journal!,
     w = (journal.world = readWorld(journal.world));
+  if (tabletopCommands.some(schema => schema.shape.kind.value === cmd.kind)) {
+    applyTabletopCommand(t, seat, cmd as TabletopCommand, at);
+    return;
+  }
   if (applyCharacterPosition(t, seat, cmd, at)) return;
   const dm = () => {
     if (seat.role !== "dm") throw Error("Only the DM can perform this action.");
@@ -352,9 +360,14 @@ export function applyWorldCommand(t: CloudTable, seat: CloudSeat, cmd: WorldComm
     if (!map || !same(map.grid, cmd.grid))
       throw Error("The combat grid changed. Reload before moving tokens.");
     const current = map.tokens?.find((token) => token.id === cmd.tokenId) ?? null;
-    if (!same(current, cmd.before))
+    const legacy = current && cmd.before && !same(current, cmd.before) && same(legacyTabletopToken(current), cmd.before);
+    if (!same(current, cmd.before) && !legacy)
       throw Error("This combat token moved or changed. Reload before saving.");
     if (cmd.token && cmd.token.id !== cmd.tokenId) throw Error("Token identity cannot change.");
+    if (legacy && cmd.token) {
+      if (current.kind !== cmd.token.kind || current.entityId !== cmd.token.entityId) throw Error("Open the updated website before changing this token's identity; existing tabletop permissions are retained.");
+      cmd.token = { ...current, ...cmd.token };
+    }
     if (
       current?.kind === "ship" &&
       cmd.token?.kind === "ship" &&
@@ -382,11 +395,13 @@ export function applyWorldCommand(t: CloudTable, seat: CloudSeat, cmd: WorldComm
       ...(map.tokens ?? []).filter((token) => token.id !== cmd.tokenId),
       ...(cmd.token ? [cmd.token] : []),
     ];
+    if (map.tabletop && map.tabletop.vision !== "off") map.tabletop.revision++;
     event("Combat map tokens updated");
   } else if (cmd.kind === "map-save") {
     dm();
     const current = w.maps.find((m) => m.id === cmd.mapId) ?? null;
-    if (!same(current, cmd.before))
+    const legacy = current && cmd.before && !same(current, cmd.before) && same(legacyTabletopMap(current), cmd.before);
+    if (!same(current, cmd.before) && !legacy)
       throw Error("This map changed. Reload before saving; your draft is retained.");
     if (cmd.map && cmd.map.id !== cmd.mapId) throw Error("Map identity cannot change.");
     if (!cmd.map && w.partyPosition?.mapId === cmd.mapId)
@@ -399,6 +414,19 @@ export function applyWorldCommand(t: CloudTable, seat: CloudSeat, cmd: WorldComm
       )
     )
       throw Error("Resolve this map's ongoing ship routes before removing it.");
+    if (cmd.map && current?.tabletop) {
+      cmd.map.tabletop = { ...(cmd.map.tabletop ?? current.tabletop), revision: current.tabletop.revision + 1 };
+      if (legacy && cmd.map.tokens) cmd.map.tokens = cmd.map.tokens.map(token => {
+        const old = current.tokens?.find(t => t.id === token.id);
+        if (!old) return token;
+        if (old.kind !== token.kind || old.entityId !== token.entityId) throw Error("Open the updated website before changing a configured token's identity.");
+        return { ...old, ...token };
+      });
+    }
+    if (w.tabletop && (!cmd.map || !cmd.map.visible)) {
+      if (w.tabletop.activeMapId === cmd.mapId) w.tabletop.activeMapId = null;
+      if (w.tabletop.camera?.mapId === cmd.mapId) w.tabletop.camera = null;
+    }
     w.maps = w.maps.filter((m) => m.id !== cmd.mapId);
     if (cmd.map) w.maps.push(cmd.map);
     event(cmd.map ? "Campaign map saved" : "Campaign map removed");

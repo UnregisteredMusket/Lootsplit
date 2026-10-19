@@ -279,7 +279,7 @@ export async function roomState(input: { code: string; token: string }): Promise
     return result;
   } catch (error) { timer.finish("failed");throw error; }
 }
-export type RoomPollInput = { code: string; token: string; knownRevision?: number; knownSeatId?: string };
+export type RoomPollInput = { tabletopProtocol?: number; code: string; token: string; knownRevision?: number; knownSeatId?: string };
 export type RoomUnchanged = {
   unchanged: true;
   protocol: "lootsplit.room.unchanged.v1";

@@ -1,4 +1,16 @@
-# Active extension: player-facing TV / map case — October 16, 2026 UTC
+# Active task: complete online tabletop — October 19, 2026
+
+The owner explicitly authorizes the comprehensive update in `docs/plans/ONLINE-TABLETOP.md`: online DM/player play is primary; TV output is optional/default-off. Keep the current layout/themes/six tabs and canonical campaign/economy/encounter/world systems. A self-contained interactive preview is committed at3303016dbe0a3924e879f4038abc2b94277f6172 on feature/online-tabletop and was shared for review before substantial layout edits. Independent foundation implementation continues; do not stop at that prototype or claim it is an integrated release.
+
+Baseline remains complete/live main1cce8f7383022575dc920d20387f712f00fa858f/tree16ed447b575364e5c324f06c2109412972564b82, complete main verification38938272606, Worker1630d4a5-c4b7-4c4b-b036-d3471d1f7711. Android1.7.0/code10 is unchanged. The October16 multi-window/display task below is completed history, not a pending release to repeat.
+
+Read `docs/audit/2026-10-19-online-tabletop.md`. Optional schemas, authoritative moves/fog/templates, visibility math/projections and older-room-client protocol/write preservation are in development. Focused55/55 tests and types pass; lint0errors/1existingwarning. Asset publication/high-detail media, workspace UI, account/archive compatibility, browser evidence, Help/manual/inventory updates and complete release gates remain. Production has not changed.
+
+The recovered checkout was restored to a hash-verified shallow Git main and locked Node22 dependencies without changing source. Local retained Chrome binaries crash; a fresh browser archive was truncated; cloud browser loopback navigation is blocked. Preserve these diagnostics and use current-browser CI for the documented visual gap. Never weaken existing gates or repeat failed installations without a diagnosed change. Existing website publication authorization persists. No domain changes or signed APK distribution are claimed.
+
+Exact evolving source/tree/test/run/publication state belongs in ignored `test-results/recovery/online-tabletop.json` and the task PR; useful source checkpoints must be pushed. Continue this complete scope through its remaining phases.
+
+# Completed extension: player-facing TV / map case — October 16, 2026 UTC
 
 Continue the same `feature/multi-window` task. The latest owner request adds a dedicated sanitized display, with current map/encounter/confirmed-loot integration, calibrated grid, camera, blanking and browser fullscreen/casting guidance. Local implementation is in progress; exact commits/results remain in `test-results/recovery/multi-window.json`. Do not claim live before all existing release gates. See the appended player-display audit. Publication authorization and every privacy/data/account/platform requirement below remain.
 

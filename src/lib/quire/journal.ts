@@ -300,6 +300,7 @@ export function preserveJournalMetadata(value: unknown, current: Journal): Journ
       ? {
           world: {
             ...next.world,
+            ...(current.world?.tabletop ? { tabletop: current.world.tabletop } : {}),
             npcs: next.world.npcs.map((n) => {
               const old = current.world?.npcs.find((o) => o.id === n.id);
               return {
@@ -319,6 +320,7 @@ export function preserveJournalMetadata(value: unknown, current: Journal): Journ
                 ...(old?.grid ? { grid: old.grid } : {}),
                 ...(old?.tokens ? { tokens: old.tokens } : {}),
                 ...(old?.encounterId ? { encounterId: old.encounterId } : {}),
+                ...(old?.tabletop ? { tabletop: old.tabletop } : {}),
               };
             }),
           },

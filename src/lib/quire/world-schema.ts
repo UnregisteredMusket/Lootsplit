@@ -1,5 +1,6 @@
 import { z } from "zod";
 import { artworkSchema } from "./artwork.ts";
+import { mapTabletopSchema, tabletopSessionSchema, tabletopCommands, tokenTabletopFields } from "./tabletop-schema.ts";
 const id = z.string().min(1).max(150),
   name = z.string().trim().min(1).max(160);
 const copper = z.number().int().min(0).max(1e12);
@@ -111,6 +112,7 @@ export const mapGridSchema = z
   });
 export const mapTokenSchema = z
   .object({
+    ...tokenTabletopFields,
     id,
     label: name,
     kind: z.enum(["character", "ship", "creature", "other"]),
@@ -130,6 +132,7 @@ export const mapTokenSchema = z
   });
 export const campaignMapSchema = z
   .object({
+    tabletop: mapTabletopSchema.optional(),
     id,
     name,
     image: artworkSchema,
@@ -240,6 +243,7 @@ const conversationSchema = z
   .strict();
 export const worldSchema = z
   .object({
+    tabletop: tabletopSessionSchema.optional(),
     characterPositions: z.array(characterPositionSchema).max(10000).default([]),
     partyCharacters: z.array(z.object({ id, name }).strict()).max(10000).optional(),
     maps: z.array(campaignMapSchema).max(100).default([]),
@@ -277,6 +281,7 @@ export type Npc = z.infer<typeof npcSchema>;
 export type Trade = z.infer<typeof tradeSchema>;
 export const readWorld = (value?: unknown): World => worldSchema.parse(value ?? {});
 export const worldCommands = [
+  ...tabletopCommands,
   z.object({
     id,
     kind: z.literal("party-map-position"),
