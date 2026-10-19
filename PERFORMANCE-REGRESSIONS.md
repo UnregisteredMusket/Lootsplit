@@ -295,6 +295,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Packaged Worker / accounts (balanced v2) / worker-finance | open | 2 | 22s → 34s | +12s | +54.55% |
 | Packaged Worker / accounts (balanced v2) / worker-ships | open | 2 | 27s → 47s | +20s | +74.07% |
 | Packaged Worker / accounts (balanced v2) / worker-map-tiles | open | 3 | 17s → 95s | +78s | +458.82% |
+| Development / desktop (balanced v2) / Run npx playwright install --with-deps chromium | open | 2 | 20s → 33s | +13s | +65% |
 | Packaged Worker / interface (balanced v2) / worker-game-analytics | open | 2 | 3s → 5s | +2s | +66.67% |
 | Packaged Worker / interface (balanced v2) / Run actions/upload-artifact@v4 | open | 2 | 3s → 6s | +3s | +100% |
 | Packaged Worker / accounts (balanced v2) | open | 2 | 434s → 607s | +173s | +39.86% |
@@ -307,6 +308,8 @@ Open trends require investigation. Resolved trends retain their history; each ve
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-19T21:48:36Z | step: Packaged Worker / interface (balanced v2) / Start disposable built Worker | 10s → 12s | +2s | +20% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38309026871/job/115010777504) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39329870802/job/118326287113) |
+| 2026-10-19T21:45:57Z | step: Development / desktop (balanced v2) / Run npx playwright install --with-deps chromium | 23s → 33s | +10s | +43.48% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38404276239/job/115319646524) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39329870802/job/118325208291) |
 | 2026-10-19T21:36:03.000Z | queue: Focused player references / initial queue | 38s → 124s | +86s | +226.32% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38303830017) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39328485877) |
 | 2026-10-19T14:23:19Z | job: Packaged Worker / accounts (balanced v2) | 513s → 607s | +94s | +18.32% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38409667330/job/115346481950) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39266580213/job/118108928948) |
 | 2026-10-19T14:23:16Z | step: Packaged Worker / accounts (balanced v2) / Run actions/upload-artifact@v4 | 3s → 4s | +1s | +33.33% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38310299946/job/115014983127) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39266580213/job/118108928948) |
