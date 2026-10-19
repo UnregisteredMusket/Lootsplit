@@ -28,6 +28,7 @@ export function useArchiveReaderSeat(seat: Pick<ArchiveSeat, "role" | "purseIds"
       purseIds: seat.purseIds,
       ...(room.joined && room.seatId ? { id: room.seatId } : {}),
       ownedDevice,
+      tabletopProjected: seat.role === "player" && (room.joined || isEphemeralCampaign()),
     }),
     [seat, room.joined, room.seatId, ownedDevice],
   );

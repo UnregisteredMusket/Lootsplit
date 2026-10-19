@@ -25,7 +25,7 @@ export const PLAYER_HELP_GROUPS: HelpGroup[] = [
         paragraphs: [
           "Choose Tabs & windows in the app header, select a permitted screen, then Open new tab or Open separate window. Move separate browser windows onto your monitors. Allow pop-ups if your browser blocks the action, and complete the title screen in each new window. Use the desktop website for multiple monitors; the Android app keeps its normal navigation.",
           "New windows reconnect to your existing authorized seat and retain your assigned-character permissions. They do not grant DM tools or access to private records. Saved campaign changes synchronize through the current play mode; unsaved form entries stay in their original window. Pending actions still need the normal submission or DM approval. Keep unsent guest work open or export it before closing its document. Closing a window does not close the campaign room.",
-          "The DM can also show a read-only Player display on a TV. It contains only the selected shared map, revealed combatants and optional confirmed loot awards. It does not give control of characters or access to DM notes, hidden combatants or unawarded loot. Continue using your own invited player session for actions.",
+          "The DM can optionally enable a read-only Player display on a TV; it is off by default and is not required for online play. It contains only the selected shared map, revealed combatants and optional confirmed loot awards. It does not give control of characters or access to DM notes, hidden combatants or unawarded loot. Continue using your own invited player session for actions.",
           "Each window keeps its own screen and campaign selection. Account sign-in and sign-out affect other windows in the same browser profile. Restore minimized windows to refresh their data. Use browser tab mute if you only want audio from one window.",
         ],
         links: [
@@ -193,11 +193,25 @@ export const PLAYER_HELP_GROUPS: HelpGroup[] = [
           "Maps filters shared Regional, City, Dungeon, Property, Wilderness, Battle, Ship and Other maps by type and shows the party's position and visible markers. Drag to pan, pinch or scroll to zoom, or use the buttons and keyboard controls. Select an icon to inspect its records; the selected icon has a blue fill and ring. Choose another icon to move the highlight, or Close details to clear it. A linked label opens its shared Library entry. Hidden maps, markers and characters are absent from your campaign view.",
           "Party membership and individual locations are controlled by the DM. A departed character does not automatically follow the party. Shared NPC sheets permit reading, while character control remains with its assigned participant.",
           "Your DM can place the party anywhere on a map and describe Roads, Wilderness with a biome, or another travel environment. Located shops and property listings are unavailable while travelling; campaignwide records retain their existing rules. A private travel map keeps its image and coordinates hidden while sharing the travel environment.",
-          "Enter tile mode on a shared gridded map to see combat tokens. Tiles default to 5 feet and the displayed scale can differ. The DM moves characters, ships and shared encounter combatants. Hidden tokens and private encounter statistics stay private. Token placement does not change character control, inventory, boarding or campaign travel time. Pan, zoom, filters and fullscreen remain available.",
+          "A shared gridded map shows its combat token layer by default; Enter tile mode / Leave tile mode toggles it. Tiles default to 5 feet and the displayed scale can differ. The DM can enable movement of your assigned or explicitly delegated, unlocked tokens. Drag them, use arrow keys with the map focused, or enter an exact column/row in Inspector. Other tokens remain under their authorized controllers. Hidden tokens and private encounter statistics stay private. Token placement does not change character control, inventory, boarding or campaign travel time. Pan, zoom, filters and fullscreen remain available.",
         ],
         links: [
           ["Maps", "/maps"],
           ["Shared Library", "/library"],
+        ],
+      },
+      {
+        id: "online-tabletop",
+        title: "Play remotely on the tabletop",
+        paragraphs: [
+          "Join with the DM's current invitation and open Maps on your own device. Online play needs no TV, casting device or shared room. The session bar shows your viewed scene, the active player scene, connection status and whether play is view only. Scene access, token control and current transaction turns still apply.",
+          "Your camera is independent until the DM explicitly shares a view. You can pan/zoom afterward. Browse maps shows the scenes available to you; the DM may direct the active scene or restrict browsing. Select / move opens a token's Inspector, including its shared linked record. Close inspector clears selection. Shift selects a group; Alt + arrows pans. Pan mode lets you drag without moving a token. Measure adds temporary waypoints. If area templates are enabled, place a circle, cone, line or rectangle; this applies no damage or other rules. Cancel tool or Escape stops the tool.",
+          "Hidden map pixels, private markers and DM geometry do not arrive behind a removable overlay. When visibility changes, the scene stays concealed until its current protected view is ready. Keep the room open and use Retry map artwork or the existing sync/retry controls if connection is interrupted. Tokens and area previews change no money, inventory, boarding or travel time. Guest contents and pending actions stay in memory; refresh reconnects only while the invitation remains valid.",
+          "Animated PNG/WebP and MP4/WebM map animation starts paused and has play/pause controls. Concealed animated scenes use a still view. The updated website receives these controls first; an installed Android app retains its bundled controls until a separately signed update is distributed.",
+        ],
+        links: [
+          ["Maps", "/maps"],
+          ["Room and connection", "/share"],
         ],
       },
       {

@@ -5,11 +5,20 @@ import { expect } from "playwright/test";
 
 /** Called from the full map audit on development and immutable Worker fixtures. */
 export async function checkPlayerDisplay(page, context, width, output) {
+  await expect(
+    page.getByRole("button", { name: "Enable optional TV / player display", exact: true }),
+  ).toBeVisible();
+  await expect(
+    page.locator(".campaign-maps").getByRole("button", { name: "Player display", exact: true }),
+  ).toHaveCount(0);
+  await page
+    .getByRole("button", { name: "Enable optional TV / player display", exact: true })
+    .click();
   await page.evaluate(() =>
     sessionStorage.setItem("display-private-test", "DM credential placeholder"),
   );
   await page
-    .locator(".campaign-maps")
+    .locator(".map-session-bar")
     .getByRole("button", { name: "Player display", exact: true })
     .click();
   const controls = page.getByRole("dialog", { name: "Player display", exact: true });

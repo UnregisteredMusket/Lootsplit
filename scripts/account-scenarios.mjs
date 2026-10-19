@@ -1,16 +1,18 @@
 // Keep this list and the named Playwright tests in sync. CI always runs all of them.
+// The order balances the measured cold-CI and local two-worker timelines;
+// ownership and partial recovery still start early. See the October19 tabletop audit.
 export const accountScenarios = [
   "network-boundary",
   "ownership",
   "resume-partial",
-  "layout",
-  "library",
-  "dm-resume",
-  "resume-queue",
-  "recovery",
-  "portrait-resume",
-  "campaign-choice",
   "invitations",
+  "library",
+  "portrait-resume",
+  "recovery",
+  "campaign-choice",
+  "layout",
+  "resume-queue",
+  "dm-resume",
   "shared-recovery",
 ];
 

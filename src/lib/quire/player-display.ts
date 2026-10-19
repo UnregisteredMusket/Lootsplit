@@ -2,10 +2,11 @@ import { z } from "zod";
 import { artworkSchema } from "./artwork.ts";
 import { mapGridSchema, readWorld } from "./world-schema.ts";
 import { characterVisible } from "./character-position.ts";
-import { tilePoint } from "./map-tiles.ts";
+import { sceneTokenPoint } from "./tabletop-geometry.ts";
 import { confirmedLootSummary } from "../encounters/presentation.ts";
 import type { encounterSchema } from "../encounters/model.mjs";
 import type { CloudTable } from "./cloud.ts";
+import { projectTabletopMap } from "./tabletop.ts";
 
 export type DisplayEncounter = {
   id: string;
@@ -137,9 +138,12 @@ export function projectPlayerDisplay(
     detail && detail.id === settings.encounterId && detail.code === campaignCode ? detail : null;
   const visible =
     encounter?.body.combatants.filter((c) => settings.combatantIds.includes(c.id)) ?? [];
-  const map = readWorld(table.journal?.world).maps.find(
+  const sourceMap = readWorld(table.journal?.world).maps.find(
     (m) => m.id === settings.mapId && m.visible,
   );
+  const map = sourceMap
+    ? projectTabletopMap(table, sourceMap, { role: "player", purseIds: [] }, true)
+    : undefined;
   const award = settings.showLoot && encounter ? confirmedLootSummary(encounter) : null;
   return playerDisplaySchema.parse({
     ...empty,
@@ -175,7 +179,7 @@ export function projectPlayerDisplay(
                     return true;
                   })
                   .map((t) => ({
-                    ...tilePoint(map.grid!, t),
+                    ...sceneTokenPoint(map.grid!, t),
                     label: t.label,
                     active:
                       !!encounter &&

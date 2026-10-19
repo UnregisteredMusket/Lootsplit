@@ -2,6 +2,8 @@ import { accountShortcuts } from "./account-shortcuts.mjs";
 import { accountRequestOrigin } from "../src/lib/deployment/origins.mjs";
 import { ownerTestMode } from "./test-mode.mjs";
 import { campaignRecords } from "./campaign-records.mjs";
+import { accountMapAsset, validateBackupMapAssets } from "./account-map-assets.mjs";
+import { legacyTabletopTable } from "../src/lib/quire/tabletop-protocol.ts";
 import { publicAnalytics, ownerAnalytics } from "./game-analytics.mjs";
 import { handleEncounters } from "./encounters.mjs";
 import { handleCharacterPlay } from "./character-play.mjs";
@@ -178,7 +180,10 @@ export async function handleAccounts(request, env) {
     if (native) {
       headers.set("access-control-allow-origin", origin);
       headers.set("access-control-allow-methods", "GET, POST, OPTIONS");
-      headers.set("access-control-allow-headers", "content-type, authorization");
+      headers.set(
+        "access-control-allow-headers",
+        "content-type, authorization, x-lootsplit-tabletop",
+      );
       headers.set("access-control-expose-headers", "set-auth-token");
     }
     return new Response(response.body, { status: response.status, headers });
@@ -337,8 +342,15 @@ export async function handleAccounts(request, env) {
       return cors(json(await saveAnnouncement(db, userId, body, session.session.id)));
     if (path === "/api/account/owner/test-mode" && request.method === "POST")
       return cors(json(await ownerTestMode(db, userId, body, session.session.id)));
-    if (path === "/api/account/records" && request.method === "GET")
-      return cors(json(await campaignRecords(db, userId)));
+    if (path === "/api/account/map-assets" && request.method === "POST")
+      return cors(json(await accountMapAsset(db, userId, body)));
+    if (path === "/api/account/records" && request.method === "GET") {
+      const result = await campaignRecords(db, userId);
+      if (request.headers.get("x-lootsplit-tabletop") !== "1")
+        for (const report of result.reports)
+          if (report.snapshot) report.snapshot = legacyTabletopTable(report.snapshot);
+      return cors(json(result));
+    }
     if (path === "/api/account/library" && request.method === "GET") {
       const [members, backups, characters, recovery] = await Promise.all([
         db
@@ -479,6 +491,7 @@ export async function handleAccounts(request, env) {
         fail("Invalid campaign backup.");
       if (payload.books?.length || payload.articles?.length)
         fail("Private PDFs must stay on your device.");
+      await validateBackupMapAssets(db, userId, payload);
       const id = crypto.randomUUID();
       await db
         .prepare("INSERT INTO library_backups (id,user_id,name,body,created_at) VALUES (?,?,?,?,?)")
@@ -492,7 +505,16 @@ export async function handleAccounts(request, env) {
         .bind(text(body.id), userId)
         .first();
       if (!row) fail("Backup not found.", 404);
-      return cors(json({ payload: JSON.parse(row.body) }));
+      const payload = JSON.parse(row.body);
+      if (
+        request.headers.get("x-lootsplit-tabletop") !== "1" &&
+        JSON.stringify(legacyTabletopTable(payload)) !== JSON.stringify(payload)
+      )
+        fail(
+          "This backup includes detailed tabletop maps. Restore it on the updated website; the complete backup is retained.",
+          409,
+        );
+      return cors(json({ payload }));
     }
     if (path === "/api/account/character" && request.method === "POST") {
       const profile = {

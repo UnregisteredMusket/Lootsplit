@@ -15,12 +15,13 @@ import { readMarketLocations, publicMarketLocations } from "./shop-locations.ts"
 import { propertyAvailableHere } from "./property.ts";
 import { canAccessEstate } from "./estate.ts";
 import { readEstate } from "./estate-schema.ts";
+import { mapAccessible, projectTabletopMap } from "./tabletop.ts";
 
 /** Server/default projections enforce historical seats; verified local DM readers may retain their owned nested records. */
 export function projectRecord(
   table: CloudTable,
   seat: Pick<CloudSeat, "role" | "purseIds"> & { id?: string },
-  options: { ownedDevice?: boolean; directory?: boolean } = {},
+  options: { ownedDevice?: boolean; directory?: boolean; tabletopProjected?: boolean } = {},
 ): CloudTable {
   const t = structuredClone(table);
   const dm = seat.role === "dm";
@@ -47,7 +48,10 @@ export function projectRecord(
         return {
           ...r,
           snapshot: JSON.stringify(
-            projectRecord(readArchivedSnapshot(r.snapshot), seat, { ownedDevice }),
+            projectRecord(readArchivedSnapshot(r.snapshot), seat, {
+              ownedDevice,
+              tabletopProjected: options.tabletopProjected,
+            }),
           ),
         };
       } catch {
@@ -75,7 +79,7 @@ export function projectRecord(
     delete t.journal.resourceLibrary;
     const world = readWorld(t.journal.world);
     world.maps = world.maps
-      .filter((map) => map.visible)
+      .filter((map) => mapAccessible(t, map, seat))
       .map((map) => ({
         ...map,
         encounterId: undefined,
@@ -92,7 +96,15 @@ export function projectRecord(
               ),
             }
           : {}),
-      }));
+      }))
+      .map((map) => (options.tabletopProjected ? map : projectTabletopMap(t, map, seat)));
+    if (world.tabletop) {
+      if (!world.maps.some((m) => m.id === world.tabletop!.activeMapId))
+        world.tabletop.activeMapId = null;
+      if (world.tabletop.camera && !world.maps.some((m) => m.id === world.tabletop!.camera!.mapId))
+        world.tabletop.camera = null;
+      world.tabletop.tvEnabled = false;
+    }
     const readableNpcs = new Set(
       world.npcs.filter((npc) => npcAvailableHere(npc, t)).map((npc) => npc.id),
     );

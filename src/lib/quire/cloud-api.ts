@@ -1,6 +1,7 @@
 import { createServerFn } from "@tanstack/react-start";
 import type { CloudTable } from "./cloud.ts";
 import type { BillFile } from "./table.ts";
+import { tabletopResponse } from "./tabletop-protocol.ts";
 
 export const rollCampaignCharacter = createServerFn({ method: "POST" })
   .validator(
@@ -70,12 +71,12 @@ export const joinCloudTable = createServerFn({ method: "POST" })
   });
 
 export const pullCloudTable = createServerFn({ method: "POST" })
-  .validator((input: { code: string; token: string }) => input)
+  .validator((input: { tabletopProtocol?: number; code: string; token: string }) => input)
   .handler(async ({ data }) => {
     const { guardMemberSeat } = await import("./member-access.server.ts");
     await guardMemberSeat(data);
     const { roomState } = await import("./cloud.server.ts");
-    return roomState(data);
+    return tabletopResponse(await roomState(data), data.tabletopProtocol);
   });
 
 /** Separate additive protocol: bundled/older clients keep the full pull endpoint. */
@@ -87,12 +88,14 @@ export const pollCloudTable = createServerFn({ method: "POST" })
     const { guardMemberSeat } = await import("./member-access.server.ts");
     await guardMemberSeat(data);
     const { pollRoom } = await import("./cloud.server.ts");
-    return pollRoom(data);
+    const result = await pollRoom(data);
+    return "table" in result ? tabletopResponse(result, data.tabletopProtocol) : result;
   });
 
 export const finishCloudTurn = createServerFn({ method: "POST" })
   .validator(
     (input: {
+      tabletopProtocol?: number;
       code: string;
       token: string;
       baseRevision?: number;
@@ -104,16 +107,18 @@ export const finishCloudTurn = createServerFn({ method: "POST" })
     const { guardMemberSeat } = await import("./member-access.server.ts");
     await guardMemberSeat(data);
     const { publishTurn } = await import("./cloud.server.ts");
-    return publishTurn(data);
+    return tabletopResponse(await publishTurn(data), data.tabletopProtocol);
   });
 
 export const setCloudPace = createServerFn({ method: "POST" })
-  .validator((input: { code: string; token: string; live: boolean }) => input)
+  .validator(
+    (input: { tabletopProtocol?: number; code: string; token: string; live: boolean }) => input,
+  )
   .handler(async ({ data }) => {
     const { guardMemberSeat } = await import("./member-access.server.ts");
     await guardMemberSeat(data);
     const { choosePace } = await import("./cloud.server.ts");
-    return choosePace(data);
+    return tabletopResponse(await choosePace(data), data.tabletopProtocol);
   });
 
 export const closeCloudTable = createServerFn({ method: "POST" })
@@ -126,17 +131,18 @@ export const closeCloudTable = createServerFn({ method: "POST" })
   });
 
 export const skipCloudTurn = createServerFn({ method: "POST" })
-  .validator((input: { code: string; token: string }) => input)
+  .validator((input: { tabletopProtocol?: number; code: string; token: string }) => input)
   .handler(async ({ data }) => {
     const { guardMemberSeat } = await import("./member-access.server.ts");
     await guardMemberSeat(data);
     const { passTurn } = await import("./cloud.server.ts");
-    return passTurn(data);
+    return tabletopResponse(await passTurn(data), data.tabletopProtocol);
   });
 
 export const submitCloudCommands = createServerFn({ method: "POST" })
   .validator(
     (input: {
+      tabletopProtocol?: number;
       code: string;
       token: string;
       batchId: string;
@@ -149,11 +155,12 @@ export const submitCloudCommands = createServerFn({ method: "POST" })
     const { guardMemberSeat } = await import("./member-access.server.ts");
     await guardMemberSeat(data);
     const { submitCommands } = await import("./cloud.server.ts");
-    return submitCommands(data);
+    return tabletopResponse(await submitCommands(data), data.tabletopProtocol);
   });
 export const manageCloudRoom = createServerFn({ method: "POST" })
   .validator(
     (input: {
+      tabletopProtocol?: number;
       code: string;
       token: string;
       action: "release" | "leave" | "kick" | "ban" | "invite" | "permission" | "start" | "discard";
@@ -165,7 +172,7 @@ export const manageCloudRoom = createServerFn({ method: "POST" })
     const { guardMemberSeat } = await import("./member-access.server.ts");
     await guardMemberSeat(data);
     const { manageRoom } = await import("./cloud.server.ts");
-    return manageRoom(data);
+    return tabletopResponse(await manageRoom(data), data.tabletopProtocol);
   });
 
 export const getRoomPushSettings = createServerFn({ method: "POST" })
@@ -194,4 +201,15 @@ export const requestCloudMapSignals = createServerFn({ method: "POST" })
     await guardMemberSeat(data);
     const { mapSignals } = await import("./map-signals.server.ts");
     return mapSignals(data);
+  });
+
+export const requestCloudMapAssets = createServerFn({ method: "POST" })
+  .validator((input: { code: string; token: string; request: unknown }) => input)
+  .handler(async ({ data }) => {
+    const { setResponseHeader } = await import("@tanstack/react-start/server");
+    setResponseHeader("Cache-Control", "no-store");
+    const { guardMemberSeat } = await import("./member-access.server.ts");
+    await guardMemberSeat(data);
+    const { mapAssets } = await import("./map-assets.server.ts");
+    return mapAssets(data);
   });

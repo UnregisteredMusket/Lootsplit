@@ -19,6 +19,7 @@ import {
 } from "../quire/economy";
 import { accountRequest, type AccountMembership, type CharacterProfile } from "./client";
 import { accountRestoreRequest, acknowledgeAccountRestore } from "./restore-request";
+import { saveAccountMapAsset, hydrateAccountMapBackup } from "./map-media";
 export async function saveAccountBackup() {
   if (getSeat().role !== "dm")
     throw new Error(
@@ -29,10 +30,12 @@ export async function saveAccountBackup() {
       "This campaign requires encrypted backups. Use its existing password-protected device backup tools.",
     );
   const file = await captureDeviceBackup();
+  for (const asset of file.mapAssets ?? []) await saveAccountMapAsset(asset);
   const state = getCampaigns();
   // PDFs and extracted reference content are device-local. Never upload them implicitly.
   const payload = {
     ...file,
+    mapAssets: undefined,
     books: [],
     articles: [],
     lexicon: [],
@@ -57,7 +60,7 @@ export async function restoreAccountBackup(id: string, name: string) {
       "Open a local DM campaign before restoring a backup. Your current campaign will be kept.",
     );
   const { payload } = await accountRequest<{ payload: QuireFile }>("read-backup", { id });
-  const file = readQuireFile(payload);
+  const file = readQuireFile(await hydrateAccountMapBackup(payload));
   createCampaign(`${name} (restored)`);
   await ensureEconomy();
   await restore(file);

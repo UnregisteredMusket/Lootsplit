@@ -1,3 +1,4 @@
+import { mapAssetReferences } from "./map-assets-references.ts";
 import { activeCampaignId } from "./campaign-context.ts";
 import { validateFleet } from "./ships.ts";
 import { validateBlacksmith } from "./blacksmith-validation.ts";
@@ -27,9 +28,19 @@ import {
   legacyCharacter,
 } from "../characters/campaign-sheet.mjs";
 import { getCloudWatch } from "./cloud-turn.ts";
-import { assertCarried, assertEstateDisposable, removeEstateSite, validateEstate } from "./estate.ts";
+import {
+  assertCarried,
+  assertEstateDisposable,
+  removeEstateSite,
+  validateEstate,
+} from "./estate.ts";
 import { verifyReportBase, type ReportBase } from "./local-report.ts";
-import { coinsSchema, validateEconomyRows, validateBackupRows, validateBackupReferences } from "./validation.ts";
+import {
+  coinsSchema,
+  validateEconomyRows,
+  validateBackupRows,
+  validateBackupReferences,
+} from "./validation.ts";
 import { CATALOG_REVISION, PREVIOUS_LIST, starterCatalog } from "./catalog-seed.ts";
 import { quireDb, activeDatabaseName } from "./db.ts";
 import { guessRarity } from "./extract.ts";
@@ -182,7 +193,10 @@ async function seedEconomy(): Promise<void> {
   const tx = db.transaction([...ECONOMY], "readwrite");
   const done = finish(tx);
   const seeded = await request(tx.objectStore("meta").get("seeded"));
-  if (seeded) { await done; return; }
+  if (seeded) {
+    await done;
+    return;
+  }
   let blank = isEphemeralCampaign();
   if (typeof window !== "undefined") {
     try {
@@ -392,7 +406,10 @@ export async function removeCatalog(id: string): Promise<void> {
   await request(db.transaction("catalog", "readwrite").objectStore("catalog").delete(id));
 }
 
-export async function addCatalogRows(rows: CatalogItem[], guard: () => void = () => {}): Promise<number> {
+export async function addCatalogRows(
+  rows: CatalogItem[],
+  guard: () => void = () => {},
+): Promise<number> {
   guard();
   const db = await quireDb();
   const existing = await request<CatalogItem[]>(
@@ -502,19 +519,19 @@ export async function openComposedShop(input: {
     validateEconomyRows({ purses: [], holdings: [], shops: [shop], stock: [], ledger: [] });
     tx.objectStore("shops").put(shop);
     for (const line of input.lines) {
-    const stock: StockLine = {
-      id: crypto.randomUUID(),
-      shopId: shop.id,
-      service: line.service,
-      category: line.category,
-      name: line.name,
-      copper: line.copper,
-      quantity: line.quantity,
-      notes: line.notes,
-      baseCopper: line.baseCopper,
-      rarity: line.rarity,
-    };
-    tx.objectStore("stock").put(stock);
+      const stock: StockLine = {
+        id: crypto.randomUUID(),
+        shopId: shop.id,
+        service: line.service,
+        category: line.category,
+        name: line.name,
+        copper: line.copper,
+        quantity: line.quantity,
+        notes: line.notes,
+        baseCopper: line.baseCopper,
+        rarity: line.rarity,
+      };
+      tx.objectStore("stock").put(stock);
     }
   });
   return shop.id;
@@ -624,11 +641,14 @@ export async function updatePurseMetadata(input: Purse): Promise<void> {
   });
 }
 
-export async function saveCampaignCharacter(input: {
-  purseId: string;
-  before: import("../characters/model.mjs").PlaySheet;
-  sheet: import("../characters/model.mjs").PlaySheet;
-}, assertCurrentScope?: () => void) {
+export async function saveCampaignCharacter(
+  input: {
+    purseId: string;
+    before: import("../characters/model.mjs").PlaySheet;
+    sheet: import("../characters/model.mjs").PlaySheet;
+  },
+  assertCurrentScope?: () => void,
+) {
   return atomic(["purses", "holdings", "ledger", "meta"], async (tx) => {
     const purses = await request<Purse[]>(tx.objectStore("purses").getAll());
     const holdings = await request<Holding[]>(tx.objectStore("holdings").getAll());
@@ -733,10 +753,18 @@ export async function saveShop(shop: Shop): Promise<void> {
   const db = await quireDb();
   await atomic(["shops", "meta"], async (tx) => {
     const before = await request<Shop | undefined>(tx.objectStore("shops").get(shop.id));
-    const journal = await request<{ value?: Journal } | undefined>(tx.objectStore("meta").get("journal"));
+    const journal = await request<{ value?: Journal } | undefined>(
+      tx.objectStore("meta").get("journal"),
+    );
     validateShopLocations([shop], journal?.value?.market);
     if (before?.schedule && before.closed !== shop.closed) delete shop.schedule;
-    validateEconomyRows({ purses: [], holdings: [], shops: [normalizeShop(shop)], stock: [], ledger: [] });
+    validateEconomyRows({
+      purses: [],
+      holdings: [],
+      shops: [normalizeShop(shop)],
+      stock: [],
+      ledger: [],
+    });
     tx.objectStore("shops").put(normalizeShop(shop));
     await audit(
       tx,
@@ -765,10 +793,7 @@ export async function saveShop(shop: Shop): Promise<void> {
   });
 }
 
-export async function saveStock(
-  line: StockLine,
-  assertScope?: () => void,
-): Promise<void> {
+export async function saveStock(line: StockLine, assertScope?: () => void): Promise<void> {
   const invoked = captureDeviceMutationScope();
   const guard = () => {
     assertDeviceMutationScope(invoked);
@@ -776,9 +801,7 @@ export async function saveStock(
   };
   guard();
   await atomic(["stock", "meta"], async (tx) => {
-    const before = await request<StockLine | undefined>(
-      tx.objectStore("stock").get(line.id),
-    );
+    const before = await request<StockLine | undefined>(tx.objectStore("stock").get(line.id));
     guard();
     tx.objectStore("stock").put(line);
     if (before && before.copper !== line.copper)
@@ -847,9 +870,22 @@ export async function saveHolding(holding: Holding): Promise<void> {
   await atomic(["holdings", "meta", "purses"], async (tx) => {
     const old = await request<Holding | undefined>(tx.objectStore("holdings").get(holding.id));
     if (old?.custody || old?.reservedFor) {
-      if (old.purseId !== holding.purseId || old.quantity !== holding.quantity || old.kind !== holding.kind || old.reservedFor !== holding.reservedFor || JSON.stringify(old.custody) !== JSON.stringify(holding.custody) || holding.equipped) throw Error("Move stored goods or release project reservations through Property management before changing their inventory identity.");
+      if (
+        old.purseId !== holding.purseId ||
+        old.quantity !== holding.quantity ||
+        old.kind !== holding.kind ||
+        old.reservedFor !== holding.reservedFor ||
+        JSON.stringify(old.custody) !== JSON.stringify(holding.custody) ||
+        holding.equipped
+      )
+        throw Error(
+          "Move stored goods or release project reservations through Property management before changing their inventory identity.",
+        );
     }
-    const journal = readJournal((await request<{ value?: unknown } | undefined>(tx.objectStore("meta").get("journal")))?.value);
+    const journal = readJournal(
+      (await request<{ value?: unknown } | undefined>(tx.objectStore("meta").get("journal")))
+        ?.value,
+    );
     const rows = await request<Holding[]>(tx.objectStore("holdings").getAll());
     if (
       old?.kind === "property" &&
@@ -915,9 +951,13 @@ function clampRate(rate: number): number {
 
 export async function removeShop(id: string): Promise<void> {
   await atomic(["shops", "stock", "meta"], async (tx) => {
-    const journal = readJournal((await request<{ value: unknown } | undefined>(tx.objectStore("meta").get("journal")))?.value);
-    if (journal.blacksmith?.profiles.some(p => p.shopId === id))
-      throw Error("Resolve commissions and remove this forge's blacksmith configuration before deleting its shop.");
+    const journal = readJournal(
+      (await request<{ value: unknown } | undefined>(tx.objectStore("meta").get("journal")))?.value,
+    );
+    if (journal.blacksmith?.profiles.some((p) => p.shopId === id))
+      throw Error(
+        "Resolve commissions and remove this forge's blacksmith configuration before deleting its shop.",
+      );
     const lines = await request<StockLine[]>(tx.objectStore("stock").index("shopId").getAll(id));
     tx.objectStore("shops").delete(id);
     for (const line of lines) tx.objectStore("stock").delete(line.id);
@@ -933,12 +973,20 @@ export async function removeHolding(id: string): Promise<void> {
   const db = await quireDb();
   await atomic(["holdings", "meta"], async (tx) => {
     const old = await request<Holding | undefined>(tx.objectStore("holdings").get(id));
-    const journal = readJournal((await request<{ value?: unknown } | undefined>(tx.objectStore("meta").get("journal")))?.value);
+    const journal = readJournal(
+      (await request<{ value?: unknown } | undefined>(tx.objectStore("meta").get("journal")))
+        ?.value,
+    );
     if (old) {
       assertCarried(old);
       if (old.kind === "property") {
-        const table = { ...emptyCloudTable(), journal, holdings: await request<Holding[]>(tx.objectStore("holdings").getAll()) };
-        assertEstateDisposable(table, id); removeEstateSite(table, id);
+        const table = {
+          ...emptyCloudTable(),
+          journal,
+          holdings: await request<Holding[]>(tx.objectStore("holdings").getAll()),
+        };
+        assertEstateDisposable(table, id);
+        removeEstateSite(table, id);
         tx.objectStore("meta").put({ id: "journal", value: table.journal });
       }
     }
@@ -954,17 +1002,37 @@ export async function removePurse(id: string): Promise<void> {
     );
     const journal = readJournal(row?.value);
     assertFinanceAccountRemovable(journal.finance, id);
-    if (journal.downtimeActivities?.requests.some(r => r.status === "pending" && [r.trainerId,r.npcId].includes(id)))
+    if (
+      journal.downtimeActivities?.requests.some(
+        (r) => r.status === "pending" && [r.trainerId, r.npcId].includes(id),
+      )
+    )
       throw Error("Resolve pending NPC training before removing this character.");
-    if (journal.blacksmith?.profiles.some(p => p.npcId === id))
+    if (journal.blacksmith?.profiles.some((p) => p.npcId === id))
       throw Error("Remove this maker's forge configuration before deleting the NPC account.");
-    if (journal.blacksmith?.orders.some(o => o.purseId === id && ["active", "paused", "ready"].includes(o.status)))
-      throw Error("Resolve this customer's outstanding blacksmith commissions before deleting the account.");
+    if (
+      journal.blacksmith?.orders.some(
+        (o) => o.purseId === id && ["active", "paused", "ready"].includes(o.status),
+      )
+    )
+      throw Error(
+        "Resolve this customer's outstanding blacksmith commissions before deleting the account.",
+      );
     if (journal.tradeEconomy?.exchanges.some((e) => e.purseId === id))
       throw Error(
         "An exchange treasury must remain with its recorded exchange. Close the exchange instead of removing its account.",
       );
-    if (journal.fleet?.aboard.some(a=>a.purseId===id) || journal.fleet?.voyages.some(v=>!["arrived","cancelled","denied","dm-overridden"].includes(v.status)&&(v.payerId===id||v.crewPurseIds.includes(id)))) throw Error("Resolve this character’s ship placement and voyages before removing its account.");
+    if (
+      journal.fleet?.aboard.some((a) => a.purseId === id) ||
+      journal.fleet?.voyages.some(
+        (v) =>
+          !["arrived", "cancelled", "denied", "dm-overridden"].includes(v.status) &&
+          (v.payerId === id || v.crewPurseIds.includes(id)),
+      )
+    )
+      throw Error(
+        "Resolve this character’s ship placement and voyages before removing its account.",
+      );
     if (journal.world?.characterPositions.some((s) => s.purseId === id && s.downtime))
       throw Error("Cancel this character’s downtime before removing the account.");
     if (journal.world)
@@ -1088,8 +1156,14 @@ export async function buyFromShop(input: {
     const shop = await request<Shop | undefined>(tx.objectStore("shops").get(stock.shopId));
     const purse = await request<Purse | undefined>(tx.objectStore("purses").get(input.purseId));
     if (!shop || !purse) throw new Error("Choose an account and a shop.");
-    const journal = readJournal((await request<{value:unknown}|undefined>(tx.objectStore("meta").get("journal")))?.value);
-    if ((shop.blackMarket && !journal.world?.blackMarketActive) || (getSeat().role === "player" && !shopVisible(shop, {journal}))) throw Error("This vendor is not available at the current location.");
+    const journal = readJournal(
+      (await request<{ value: unknown } | undefined>(tx.objectStore("meta").get("journal")))?.value,
+    );
+    if (
+      (shop.blackMarket && !journal.world?.blackMarketActive) ||
+      (getSeat().role === "player" && !shopVisible(shop, { journal }))
+    )
+      throw Error("This vendor is not available at the current location.");
     if (shop.closed) throw new Error("This shop is closed.");
     if (stock.quantity !== null && stock.quantity < quantity)
       throw new Error("The shop does not have that many.");
@@ -1143,7 +1217,18 @@ export async function buyFromShop(input: {
       purchase: { stockId: stock.id, quantity, holding },
     };
     if (stock.tradeExchangeId) {
-      const receipt = recordShopTrade({ ...emptyCloudTable(), journal, stock: [stock] }, { id: entry.id, at: entry.at, stockId: stock.id, purseId: purse.id, direction: "buy", quantity, copper: cost });
+      const receipt = recordShopTrade(
+        { ...emptyCloudTable(), journal, stock: [stock] },
+        {
+          id: entry.id,
+          at: entry.at,
+          stockId: stock.id,
+          purseId: purse.id,
+          direction: "buy",
+          quantity,
+          copper: cost,
+        },
+      );
       if (receipt) entry.trade = { receiptId: receipt.id, leg: "owner" };
       tx.objectStore("meta").put({ id: "journal", value: journal });
     }
@@ -1166,9 +1251,25 @@ export async function sellToShop(input: {
     const shop = await request<Shop | undefined>(tx.objectStore("shops").get(input.shopId));
     if (!holding || !shop) throw new Error("That sale cannot be made.");
     assertCarried(holding);
-    const journal = readJournal((await request<{value:unknown}|undefined>(tx.objectStore("meta").get("journal")))?.value);
-    if ((shop.blackMarket && !journal.world?.blackMarketActive) || (getSeat().role === "player" && !shopVisible(shop, {journal}))) throw Error("This vendor is not available at the current location.");
-    if (holding.kind === "property") assertEstateDisposable({purses:[],holdings:await request<Holding[]>(tx.objectStore("holdings").getAll()),shops:[],stock:[],journal}, holding.id);
+    const journal = readJournal(
+      (await request<{ value: unknown } | undefined>(tx.objectStore("meta").get("journal")))?.value,
+    );
+    if (
+      (shop.blackMarket && !journal.world?.blackMarketActive) ||
+      (getSeat().role === "player" && !shopVisible(shop, { journal }))
+    )
+      throw Error("This vendor is not available at the current location.");
+    if (holding.kind === "property")
+      assertEstateDisposable(
+        {
+          purses: [],
+          holdings: await request<Holding[]>(tx.objectStore("holdings").getAll()),
+          shops: [],
+          stock: [],
+          journal,
+        },
+        holding.id,
+      );
     if (shop.closed) throw new Error("This shop is closed.");
     assertMerchantSale(holding, shop);
     if (holding.quantity < quantity) throw new Error("You do not have that many.");
@@ -1193,8 +1294,23 @@ export async function sellToShop(input: {
       );
       const linked = lines.find((s) => s.commodityId === holding.commodityId && s.tradeExchangeId);
       if (linked) {
-        const receipt = recordShopTrade({ ...emptyCloudTable(), journal, stock: [linked] }, { id: entry.id, at: entry.at, stockId: linked.id, purseId: purse.id, direction: "sell", quantity, copper: paid });
-        if (receipt) tx.objectStore("ledger").put({ ...entry, trade: { receiptId: receipt.id, leg: "owner" } });
+        const receipt = recordShopTrade(
+          { ...emptyCloudTable(), journal, stock: [linked] },
+          {
+            id: entry.id,
+            at: entry.at,
+            stockId: linked.id,
+            purseId: purse.id,
+            direction: "sell",
+            quantity,
+            copper: paid,
+          },
+        );
+        if (receipt)
+          tx.objectStore("ledger").put({
+            ...entry,
+            trade: { receiptId: receipt.id, leg: "owner" },
+          });
         tx.objectStore("meta").put({ id: "journal", value: journal });
       }
     }
@@ -1308,7 +1424,13 @@ export async function giveToPlayer(input: {
           );
       }
       gift.holding = moved = itemForGift(holdingRow, moved.quantity);
-      if (holdingRow.deed) moved.deed = transferPropertyDeed(holdingRow.deed, { id: gift.toId, name: to?.name || toName }, gift.id, gift.at);
+      if (holdingRow.deed)
+        moved.deed = transferPropertyDeed(
+          holdingRow.deed,
+          { id: gift.toId, name: to?.name || toName },
+          gift.id,
+          gift.at,
+        );
     }
     const pendingRow =
       sitting.role === "player" ? await request(tx.objectStore("meta").get("gifts")) : null;
@@ -1373,22 +1495,16 @@ export async function addListing(
   const copper = Math.round(input.copper);
   if (!name) throw new Error("Name the listing.");
   if (!Number.isFinite(copper) || copper < 0) throw new Error("Enter a price.");
-  if (getSeat().role === "player")
-    throw new Error("Only the DM can edit the market.");
+  if (getSeat().role === "player") throw new Error("Only the DM can edit the market.");
   await atomic(["meta"], async (tx) => {
-    const listings = readListings(
-      await request(tx.objectStore("meta").get("listings")),
-    );
+    const listings = readListings(await request(tx.objectStore("meta").get("listings")));
     guard();
     listings.push({
       id: crypto.randomUUID(),
       name,
       kind: input.kind,
       copper,
-      quantity:
-        input.quantity === null
-          ? null
-          : Math.max(0, Math.floor(input.quantity)),
+      quantity: input.quantity === null ? null : Math.max(0, Math.floor(input.quantity)),
       notes: input.notes.trim(),
     });
     tx.objectStore("meta").put({ id: "listings", listings });
@@ -1417,11 +1533,22 @@ export async function buyListing(input: {
     const listings = readListings(await request(tx.objectStore("meta").get("listings")));
     const listing = listings.find((item) => item.id === input.listingId);
     if (!listing) throw new Error("That listing is gone.");
-    if (listing.status && listing.status !== "available") throw Error("This property is not currently for sale.");
+    if (listing.status && listing.status !== "available")
+      throw Error("This property is not currently for sale.");
     if (getSeat().role === "player") {
-      if (!getSeat().purseIds.includes(input.purseId)) throw Error("That character is not yours at this table.");
-      const journal = readJournal((await request<{ value?: unknown } | undefined>(tx.objectStore("meta").get("journal")))?.value);
-      if (!propertyAvailableHere(listing, readMarketLocations(journal.market), !!journal.world?.partyPosition))
+      if (!getSeat().purseIds.includes(input.purseId))
+        throw Error("That character is not yours at this table.");
+      const journal = readJournal(
+        (await request<{ value?: unknown } | undefined>(tx.objectStore("meta").get("journal")))
+          ?.value,
+      );
+      if (
+        !propertyAvailableHere(
+          listing,
+          readMarketLocations(journal.market),
+          !!journal.world?.partyPosition,
+        )
+      )
         throw Error("This property is not available at the party's current location.");
     }
     if (listing.quantity !== null && listing.quantity < quantity)
@@ -1437,8 +1564,12 @@ export async function buyListing(input: {
         ? readSales(await request(tx.objectStore("meta").get("sales")))
         : null;
     tx.objectStore("purses").put({ ...purse, coins });
-    const receiptId = crypto.randomUUID(), purchasedAt = Date.now();
-    const journal = readJournal((await request<{ value?: unknown } | undefined>(tx.objectStore("meta").get("journal")))?.value);
+    const receiptId = crypto.randomUUID(),
+      purchasedAt = Date.now();
+    const journal = readJournal(
+      (await request<{ value?: unknown } | undefined>(tx.objectStore("meta").get("journal")))
+        ?.value,
+    );
     const holding: Holding = {
       id: crypto.randomUUID(),
       purseId: purse.id,
@@ -1448,13 +1579,32 @@ export async function buyListing(input: {
       unitCopper: listing.copper,
       notes: listing.notes,
       ...(listing.locationId ? { locationId: listing.locationId } : {}),
-      ...(listing.property ? { property: structuredClone(listing.property), ...(listing.property.images?.[0] ? { image: listing.property.images[0] } : {}) } : {}),
-      ...(listing.kind === "property" ? { deed: {
-        id: receiptId + "-deed", transactionId: receiptId, listingId: listing.id, propertyName: listing.name,
-        location: locationLabel(readMarketLocations(journal.market), listing.locationId), buyerId: purse.id, buyerName: purse.name,
-        ownerId: purse.id, ownerName: purse.name, purchasedAt, campaignDay: readFinance(journal.finance).day,
-        unitCopper: cost / quantity, totalCopper: cost, purchasedQuantity: quantity,
-      } } : {}),
+      ...(listing.property
+        ? {
+            property: structuredClone(listing.property),
+            ...(listing.property.images?.[0] ? { image: listing.property.images[0] } : {}),
+          }
+        : {}),
+      ...(listing.kind === "property"
+        ? {
+            deed: {
+              id: receiptId + "-deed",
+              transactionId: receiptId,
+              listingId: listing.id,
+              propertyName: listing.name,
+              location: locationLabel(readMarketLocations(journal.market), listing.locationId),
+              buyerId: purse.id,
+              buyerName: purse.name,
+              ownerId: purse.id,
+              ownerName: purse.name,
+              purchasedAt,
+              campaignDay: readFinance(journal.finance).day,
+              unitCopper: cost / quantity,
+              totalCopper: cost,
+              purchasedQuantity: quantity,
+            },
+          }
+        : {}),
     };
     tx.objectStore("holdings").put(holding);
     tx.objectStore("meta").put({
@@ -1483,8 +1633,12 @@ export async function buyListing(input: {
     const summary =
       `Bought ${quantity} ${listing.name} from the market` +
       (percent ? `, Charisma ${score}, ${percent}% off` : "");
-    tx.objectStore("ledger").put({ ...logLine(purse.id, null, summary, -cost, "purchase"), id: receiptId, at: purchasedAt,
-      listingPurchase: { listingId: listing.id, quantity, holding: structuredClone(holding) } });
+    tx.objectStore("ledger").put({
+      ...logLine(purse.id, null, summary, -cost, "purchase"),
+      id: receiptId,
+      at: purchasedAt,
+      listingPurchase: { listingId: listing.id, quantity, holding: structuredClone(holding) },
+    });
   });
 }
 
@@ -1505,28 +1659,19 @@ export async function askLoan(
   guard();
   const copper = Math.round(input.copper);
   const note = input.note.trim();
-  if (getCloudWatch().joined && !getCloudWatch().mine)
-    throw new Error("It is not your turn.");
+  if (getCloudWatch().joined && !getCloudWatch().mine) throw new Error("It is not your turn.");
   if (!Number.isSafeInteger(copper) || copper <= 0)
     throw new Error("Enter how much to borrow in whole copper.");
   if (!note) throw new Error("Write what the loan is for.");
   const id = input.requestId || crypto.randomUUID();
   await atomic(["purses", "meta"], async (tx) => {
-    const purse = await request<Purse | undefined>(
-      tx.objectStore("purses").get(input.purseId),
-    );
+    const purse = await request<Purse | undefined>(tx.objectStore("purses").get(input.purseId));
     if (!purse) throw new Error("This account no longer exists.");
     const loans = readLoans(await request(tx.objectStore("meta").get("loans")));
     const prior = loans.find((loan) => loan.id === id);
     if (prior) {
-      if (
-        prior.purseId !== purse.id ||
-        prior.copper !== copper ||
-        prior.note !== note
-      )
-        throw new Error(
-          "That loan request ID already identifies a different request.",
-        );
+      if (prior.purseId !== purse.id || prior.copper !== copper || prior.note !== note)
+        throw new Error("That loan request ID already identifies a different request.");
       return;
     }
     const at = Date.now();
@@ -1691,8 +1836,10 @@ export async function voidLedgerLine(id: string, reason = "DM ledger correction.
   const line = table.ledger.find((entry) => entry.id === id);
   if (!line) throw new Error("That line is not in this browser on this device.");
   await executeLocalCommand({
-    kind: "ledger-void", target: { kind: "ledger", id },
-    before: canonicalJson(line), reason,
+    kind: "ledger-void",
+    target: { kind: "ledger", id },
+    before: canonicalJson(line),
+    reason,
   });
 }
 
@@ -1744,6 +1891,7 @@ export async function postCopper(purseId: string, copper: number, summary: strin
 }
 
 export type QuireFile = {
+  mapAssets?: import("./map-assets-schema.ts").MapAssetBundle[];
   /** Supplemental account recovery history is preserved even in a device-only copy. */
   campaignRecovery?: unknown;
   recoveryDiagnostics?: string[];
@@ -1806,8 +1954,12 @@ export async function snapshot(): Promise<QuireFile> {
   const baseRow = request<{ value: ReportBase } | undefined>(
     tx.objectStore("meta").get("shareBase"),
   );
-  const diagnosticsRow = request<{ value: string[] } | undefined>(tx.objectStore("meta").get("recoveryDiagnostics"));
-  const recoveryRow = request<{ value: unknown } | undefined>(tx.objectStore("meta").get("campaignRecovery"));
+  const diagnosticsRow = request<{ value: string[] } | undefined>(
+    tx.objectStore("meta").get("recoveryDiagnostics"),
+  );
+  const recoveryRow = request<{ value: unknown } | undefined>(
+    tx.objectStore("meta").get("campaignRecovery"),
+  );
   const encountersRow = request<{ rows: unknown } | undefined>(
     tx.objectStore("meta").get("localEncounters"),
   );
@@ -1840,11 +1992,24 @@ export async function snapshot(): Promise<QuireFile> {
   };
   const shared = await metadata;
   Object.assign(file, {
-    listings: shared.listings, loans: shared.loans, sheets: shared.sheets,
-    notes: shared.notes, handouts: shared.handouts, journal: shared.journal,
-    gifts: readGifts((await gifts)?.gifts), sales: readSales(await sales),
+    listings: shared.listings,
+    loans: shared.loans,
+    sheets: shared.sheets,
+    notes: shared.notes,
+    handouts: shared.handouts,
+    journal: shared.journal,
+    gifts: readGifts((await gifts)?.gifts),
+    sales: readSales(await sales),
   });
   await done;
+  if (mapAssetReferences(file.journal?.world?.maps ?? [], file.journal?.reports ?? []).length) {
+    const { mapBackupAssets } = await import("./map-assets.ts");
+    const assets = await mapBackupAssets(
+      file.journal?.world?.maps ?? [],
+      file.journal?.reports ?? [],
+    );
+    if (assets.length) file.mapAssets = assets;
+  }
   return file;
 }
 
@@ -2027,7 +2192,10 @@ export async function applySeatLink(): Promise<"player" | "dm" | "bill" | null> 
   if (typeof window === "undefined" || seatLinkClaimed) return null;
   const role = new URLSearchParams(window.location.search).get("as");
   if (role !== "dm" && role !== "player") return null;
-  if (["player"].includes(role)) throw new Error("Offline player links have retired. Ask the DM for the current session invitation. Existing saves are preserved.");
+  if (["player"].includes(role))
+    throw new Error(
+      "Offline player links have retired. Ask the DM for the current session invitation. Existing saves are preserved.",
+    );
   seatLinkClaimed = true;
   const hash = window.location.hash;
   let result: "player" | "dm" | "bill" = role;
@@ -2083,9 +2251,15 @@ export function readQuireFile(value: unknown): QuireFile {
   validateBackupRows(file as unknown as Record<string, unknown>);
   const journal = readValidatedJournal(file.journal);
   readLocalEncounters(file.localEncounters);
-  const metadata = { listings: readListings(file.listings), loans: readLoans(file.loans),
-    sheets: readSheets(file.sheets), notes: readNotes(file.notes), handouts: readHandouts(file.handouts),
-    gifts: readGifts(file.gifts), sales: readSales(file.sales) };
+  const metadata = {
+    listings: readListings(file.listings),
+    loans: readLoans(file.loans),
+    sheets: readSheets(file.sheets),
+    notes: readNotes(file.notes),
+    handouts: readHandouts(file.handouts),
+    gifts: readGifts(file.gifts),
+    sales: readSales(file.sales),
+  };
   for (const [key, rows] of Object.entries(metadata)) {
     const source = file[key as keyof typeof metadata];
     if (source !== undefined && (!Array.isArray(source) || source.length !== rows.length))
@@ -2108,12 +2282,39 @@ export async function restore(file: QuireFile): Promise<void> {
   if (getCloudWatch().joined)
     throw new Error("Return to Local Mode before importing or restoring campaign data.");
   file = structuredClone(readQuireFile(file));
+  const { mapAssetBundleSchema, verifyMapAsset } = await import("./map-assets-schema.ts");
+  const assets = (file.mapAssets ?? []).map((bundle) => mapAssetBundleSchema.parse(bundle));
+  if (new Set(assets.map((asset) => asset.manifest.id)).size !== assets.length)
+    throw Error("This backup contains duplicate map assets. The campaign was not changed.");
+  for (const bundle of assets) await verifyMapAsset(bundle);
+  for (const { media } of mapAssetReferences(
+    file.journal?.world?.maps ?? [],
+    file.journal?.reports ?? [],
+  ))
+    if (
+      !assets.some(
+        (asset) => asset.manifest.id === media.id && asset.manifest.sha256 === media.sha256,
+      )
+    )
+      throw Error(
+        "This backup is missing map media. Export a complete backup from its original campaign before restoring.",
+      );
   // Compute all readers/normalizers before opening the replacement transaction.
-  const prepared = { encounters: readLocalEncounters(file.localEncounters), shops: file.shops.map(normalizeShop),
-    stock: file.stock.map(normalizeStock), gifts: readGifts(file.gifts), sales: readSales(file.sales),
-    listings: readListings(file.listings), loans: readLoans(file.loans), sheets: readSheets(file.sheets),
-    notes: readNotes(file.notes), handouts: readHandouts(file.handouts), journal: readJournal(file.journal),
-    lock: readSeatLock(file.seatLock), settings: file.settings ? clampRealm(file.settings) : undefined };
+  const prepared = {
+    encounters: readLocalEncounters(file.localEncounters),
+    shops: file.shops.map(normalizeShop),
+    stock: file.stock.map(normalizeStock),
+    gifts: readGifts(file.gifts),
+    sales: readSales(file.sales),
+    listings: readListings(file.listings),
+    loans: readLoans(file.loans),
+    sheets: readSheets(file.sheets),
+    notes: readNotes(file.notes),
+    handouts: readHandouts(file.handouts),
+    journal: readJournal(file.journal),
+    lock: readSeatLock(file.seatLock),
+    settings: file.settings ? clampRealm(file.settings) : undefined,
+  };
   const db = await quireDb();
   const stores = [
     "books",
@@ -2131,6 +2332,8 @@ export async function restore(file: QuireFile): Promise<void> {
   const done = finish(tx);
   try {
     for (const store of stores) tx.objectStore(store).clear();
+    for (const bundle of assets)
+      tx.objectStore("meta").put({ id: "map-asset:" + bundle.manifest.id, bundle });
     tx.objectStore("meta").put({
       id: "localEncounters",
       rows: prepared.encounters,
@@ -2171,10 +2374,17 @@ export async function restore(file: QuireFile): Promise<void> {
     tx.objectStore("meta").put({ id: "catalogSeeded" });
     if (file.campaignRecovery !== undefined)
       tx.objectStore("meta").put({ id: "campaignRecovery", value: file.campaignRecovery });
-    tx.objectStore("meta").put({ id: "recoveryDiagnostics", value: file.recoveryDiagnostics ?? [] });
+    tx.objectStore("meta").put({
+      id: "recoveryDiagnostics",
+      value: file.recoveryDiagnostics ?? [],
+    });
     await done;
   } catch (error) {
-    try { tx.abort(); } catch { /* It may already have aborted. */ }
+    try {
+      tx.abort();
+    } catch {
+      /* It may already have aborted. */
+    }
     await done.catch(() => undefined);
     throw error;
   }
@@ -2214,19 +2424,27 @@ function readCampaignMetadata(tx: IDBTransaction, includeReferences = true) {
   const meta = tx.objectStore("meta");
   return Promise.all([
     request<Partial<RealmSettings> | undefined>(meta.get("settings")),
-    request(meta.get("listings")), request(meta.get("loans")),
+    request(meta.get("listings")),
+    request(meta.get("loans")),
     request(meta.get("sheets")),
     includeReferences ? request(meta.get("chat")) : Promise.resolve([]),
     includeReferences ? request(meta.get("handouts")) : Promise.resolve([]),
     request<{ value: unknown } | undefined>(meta.get("journal")),
   ]).then(([realm, listings, loans, sheets, notes, handouts, journal]) => ({
-    realm: clampRealm(realm), listings: readListings(listings), loans: readLoans(loans),
-    sheets: readSheets(sheets), notes: readNotes(notes), handouts: readHandouts(handouts),
+    realm: clampRealm(realm),
+    listings: readListings(listings),
+    loans: readLoans(loans),
+    sheets: readSheets(sheets),
+    notes: readNotes(notes),
+    handouts: readHandouts(handouts),
     journal: readJournal(journal?.value),
   }));
 }
 
-function readEconomyTransaction(tx: IDBTransaction, includeReferences = true): Promise<CloudTable & { realm: RealmSettings; journal: Journal }> {
+function readEconomyTransaction(
+  tx: IDBTransaction,
+  includeReferences = true,
+): Promise<CloudTable & { realm: RealmSettings; journal: Journal }> {
   return Promise.all([
     request<Purse[]>(tx.objectStore("purses").getAll()),
     request<Holding[]>(tx.objectStore("holdings").getAll()),
@@ -2235,8 +2453,12 @@ function readEconomyTransaction(tx: IDBTransaction, includeReferences = true): P
     request<LedgerLine[]>(tx.objectStore("ledger").getAll()),
     readCampaignMetadata(tx, includeReferences),
   ]).then(([purses, holdings, shops, stock, ledger, metadata]) => ({
-    purses, holdings, shops: shops.map(normalizeShop), stock: stock.map(normalizeStock),
-    ledger, ...metadata,
+    purses,
+    holdings,
+    shops: shops.map(normalizeShop),
+    stock: stock.map(normalizeStock),
+    ledger,
+    ...metadata,
   }));
 }
 
@@ -2244,8 +2466,10 @@ export async function economySnapshot(): Promise<CloudTable> {
   const db = await quireDb();
   const dm = getSeat().role === "dm";
   const tx = db.transaction([...ECONOMY], dm ? "readwrite" : "readonly");
-  const [table] = await Promise.all([readEconomyTransaction(tx).then(table =>
-    dm ? initializeCityExchanges(tx, table) : table), finish(tx)]);
+  const [table] = await Promise.all([
+    readEconomyTransaction(tx).then((table) => (dm ? initializeCityExchanges(tx, table) : table)),
+    finish(tx),
+  ]);
   return table;
 }
 
@@ -2257,7 +2481,7 @@ function initializeCityExchanges<T extends CloudTable>(tx: IDBTransaction, table
     tx.objectStore("meta").put({ id: "journal", value: table.journal });
     // Match getAll's string-key order immediately, including the first read.
     // Reviewed imports fingerprint account arrays before the next DB read.
-    table.purses.sort((a, b) => a.id === b.id ? 0 : a.id < b.id ? -1 : 1);
+    table.purses.sort((a, b) => (a.id === b.id ? 0 : a.id < b.id ? -1 : 1));
   }
   return table;
 }
@@ -2268,19 +2492,28 @@ export async function economyView() {
   const dm = getSeat().role === "dm";
   const tx = db.transaction([...ECONOMY, "catalog", "lexicon"], dm ? "readwrite" : "readonly");
   const [table, catalog, lexicon] = await Promise.all([
-    readEconomyTransaction(tx, false).then(table => dm ? initializeCityExchanges(tx, table) : table),
+    readEconomyTransaction(tx, false).then((table) =>
+      dm ? initializeCityExchanges(tx, table) : table,
+    ),
     request<CatalogItem[]>(tx.objectStore("catalog").getAll()),
     request<Lexeme[]>(tx.objectStore("lexicon").getAll()),
     finish(tx),
   ]);
   return {
-    ...(getSeat().role === "player" ? projectRecord(table, getSeat(), { directory: true }) : table),
+    ...(getSeat().role === "player"
+      ? projectRecord(table, getSeat(), {
+          directory: true,
+          tabletopProjected: getCloudWatch().joined,
+        })
+      : table),
     realm: table.realm,
     journal: readJournal(
-      getSeat().role === "player" ? projectRecord(table, getSeat()).journal : table.journal,
+      getSeat().role === "player"
+        ? projectRecord(table, getSeat(), { tabletopProjected: getCloudWatch().joined }).journal
+        : table.journal,
     ),
     ledger: (getSeat().role === "player"
-      ? projectRecord(table, getSeat()).ledger
+      ? projectRecord(table, getSeat(), { tabletopProjected: getCloudWatch().joined }).ledger
       : table.ledger
     ).sort((a, b) => b.at - a.at),
     catalog: catalog.sort((a, b) => a.name.localeCompare(b.name)),
@@ -2288,10 +2521,7 @@ export async function economyView() {
   };
 }
 
-export async function applyCloudTable(
-  table: CloudTable,
-  assertScope?: () => void,
-): Promise<void> {
+export async function applyCloudTable(table: CloudTable, assertScope?: () => void): Promise<void> {
   const next = readCloudTable(table);
   if (!next) throw new Error("That table could not be read.");
   assertScope?.();
@@ -2303,23 +2533,14 @@ export async function applyCloudTable(
   );
   const done = finish(tx);
   tx.objectStore("meta").put({ id: "seeded" });
-  for (const store of [
-    "purses",
-    "holdings",
-    "shops",
-    "stock",
-    "ledger",
-  ] as const)
+  for (const store of ["purses", "holdings", "shops", "stock", "ledger"] as const)
     tx.objectStore(store).clear();
   for (const purse of next.purses) tx.objectStore("purses").put(purse);
   for (const holding of next.holdings) tx.objectStore("holdings").put(holding);
-  for (const shop of next.shops)
-    tx.objectStore("shops").put(normalizeShop(shop));
-  for (const line of next.stock)
-    tx.objectStore("stock").put(normalizeStock(line));
+  for (const shop of next.shops) tx.objectStore("shops").put(normalizeShop(shop));
+  for (const line of next.stock) tx.objectStore("stock").put(normalizeStock(line));
   for (const entry of next.ledger) tx.objectStore("ledger").put(entry);
-  if (next.realm)
-    tx.objectStore("meta").put({ id: "settings", ...clampRealm(next.realm) });
+  if (next.realm) tx.objectStore("meta").put({ id: "settings", ...clampRealm(next.realm) });
   tx.objectStore("meta").put({ id: "listings", listings: next.listings });
   tx.objectStore("meta").put({ id: "loans", loans: next.loans });
   tx.objectStore("meta").put({ id: "sheets", sheets: next.sheets });
@@ -2383,30 +2604,19 @@ export async function executeLocalCommand(
       { ...input, id: crypto.randomUUID() },
       { source: "local", random: randomTradeRoll },
     );
-    for (const store of [
-      "purses",
-      "holdings",
-      "shops",
-      "stock",
-      "ledger",
-    ] as const) {
-      const prior = new Map(
-        source[store].map((row) => [row.id, JSON.stringify(row)]),
-      );
+    for (const store of ["purses", "holdings", "shops", "stock", "ledger"] as const) {
+      const prior = new Map(source[store].map((row) => [row.id, JSON.stringify(row)]));
       const retained = new Set(next[store].map((row) => row.id));
       for (const row of next[store]) {
-        if (prior.get(row.id) !== JSON.stringify(row))
-          tx.objectStore(store).put(row);
+        if (prior.get(row.id) !== JSON.stringify(row)) tx.objectStore(store).put(row);
       }
-      for (const id of prior.keys())
-        if (!retained.has(id)) tx.objectStore(store).delete(id);
+      for (const id of prior.keys()) if (!retained.has(id)) tx.objectStore(store).delete(id);
     }
     const meta = tx.objectStore("meta");
     if (JSON.stringify(source.realm) !== JSON.stringify(next.realm))
       meta.put({ id: "settings", ...clampRealm(next.realm) });
     for (const id of ["listings", "loans", "sheets", "handouts"] as const) {
-      if (JSON.stringify(source[id]) !== JSON.stringify(next[id]))
-        meta.put({ id, [id]: next[id] });
+      if (JSON.stringify(source[id]) !== JSON.stringify(next[id])) meta.put({ id, [id]: next[id] });
     }
     if (JSON.stringify(source.journal) !== JSON.stringify(next.journal))
       meta.put({ id: "journal", value: next.journal });
@@ -2441,16 +2651,14 @@ export async function executeFinanceCommand(
     input.kind === "shop-schedule" ||
     input.kind.startsWith("downtime-") ||
     input.kind === "session";
-  const stores: Parameters<typeof atomic>[0] = [
-    "purses",
-    "holdings",
-    "ledger",
-    "meta",
-  ];
+  const stores: Parameters<typeof atomic>[0] = ["purses", "holdings", "ledger", "meta"];
   if (market) stores.push("shops", "stock");
   await atomic(stores, async (tx) => {
     const source: CloudTable = market
-      ? await readEconomyTransaction(tx, input.kind === "session" || input.kind === "downtime-apply")
+      ? await readEconomyTransaction(
+          tx,
+          input.kind === "session" || input.kind === "downtime-apply",
+        )
       : await Promise.all([
           request<Purse[]>(tx.objectStore("purses").getAll()),
           request<Holding[]>(tx.objectStore("holdings").getAll()),
@@ -2478,16 +2686,12 @@ export async function executeFinanceCommand(
       { ...input, id: crypto.randomUUID() },
       { source: "local", random: randomTradeRoll },
     );
-    const priorShops = new Map(
-      source.shops.map((s) => [s.id, JSON.stringify(s)]),
-    );
+    const priorShops = new Map(source.shops.map((s) => [s.id, JSON.stringify(s)]));
     const priorStock = new Map(source.stock.map((s) => [s.id, s.quantity]));
     for (const shop of next.shops)
-      if (priorShops.get(shop.id) !== JSON.stringify(shop))
-        tx.objectStore("shops").put(shop);
+      if (priorShops.get(shop.id) !== JSON.stringify(shop)) tx.objectStore("shops").put(shop);
     for (const line of next.stock)
-      if (priorStock.get(line.id) !== line.quantity)
-        tx.objectStore("stock").put(line);
+      if (priorStock.get(line.id) !== line.quantity) tx.objectStore("stock").put(line);
     for (const p of next.purses) tx.objectStore("purses").put(p);
     if (
       input.kind === "property-details" ||

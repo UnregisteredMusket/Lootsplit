@@ -252,7 +252,7 @@ try {
       x.fillText("Docks", 700, 450);
       return c.toDataURL("image/png").split(",")[1];
     });
-    await page.getByLabel("Map image", { exact: true }).setInputFiles({
+    await page.getByLabel("Map artwork or video", { exact: true }).setInputFiles({
       name: "port.png",
       mimeType: "image/png",
       buffer: Buffer.from(image, "base64"),
@@ -330,6 +330,7 @@ try {
     assert.equal(revisedMap.name, "Port atlas revised");
     assert.equal(revisedMap.image, savedMap.image);
     assert.deepEqual(revisedMap.anchors, savedMap.anchors);
+    await page.getByRole("button", { name: "Place map markers & locations", exact: true }).click();
     await expect(page.getByRole("region", { name: "Interactive campaign map" })).toBeVisible();
     if (width === 390) {
       await page.getByRole("button", { name: "Link location", exact: true }).click();
@@ -729,7 +730,7 @@ try {
     await navigateApplication(page, origin + "/maps");
     await page.getByRole("button", { name: "Import map", exact: true }).click();
     await holdMapDecode(page);
-    await page.getByLabel("Map image", { exact: true }).setInputFiles({
+    await page.getByLabel("Map artwork or video", { exact: true }).setInputFiles({
       name: "shared-port.png",
       mimeType: "image/png",
       buffer: Buffer.from(image, "base64"),
@@ -739,6 +740,7 @@ try {
     await chooseOption(page.getByLabel("Map location", { exact: true }), "area");
     await page.evaluate(() => window.mapDecodeGate.release());
     await expect(page.getByLabel("Map name", { exact: true })).toHaveValue("Shared Port atlas");
+    await page.getByLabel("Share this map image with players", { exact: true }).check();
     await expect(page.getByRole("button", { name: "Save map", exact: true })).toBeEnabled();
     await page.getByRole("button", { name: "Save map", exact: true }).click();
     await expect(page.getByRole("heading", { name: "Import a map", exact: true })).toHaveCount(0);

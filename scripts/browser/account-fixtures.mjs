@@ -54,7 +54,8 @@ export const test = base.extend({
       await runFixture({ context, page, newDevice });
       expect(errors, "Browser runtime errors").toEqual([]);
     } finally {
-      for (const other of contexts.slice(1)) await other.close();
+      // Independent simulated devices can release tracing/browser resources together.
+      await Promise.all(contexts.slice(1).map((other) => other.close()));
     }
   },
 });
