@@ -118,7 +118,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Packaged standby / Run npm ci | open | 2 | 12s → 18s | +6s | +50% |
 | Development / accounts / dev-account | resolved | 4 | 57s → 156s | +99s | +173.68% |
 | Packaged Worker / interface / worker-help | resolved | 2 | 6s → 22s | +16s | +266.67% |
-| Packaged standby / standby-audit | open | 5 | 28s → 91s | +63s | +225% |
+| Packaged standby / standby-audit | open | 6 | 28s → 105s | +77s | +275% |
 | Development / accounts / Run actions/checkout@v4 | open | 2 | 1s → 3s | +2s | +200% |
 | Packaged standby / Set up job | open | 2 | 1s → 3s | +2s | +200% |
 | Packaged standby / Run actions/download-artifact@v4 | open | 3 | 2s → 5s | +3s | +150% |
@@ -300,7 +300,9 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Packaged Worker / interface (balanced v2) / Run actions/upload-artifact@v4 | open | 2 | 3s → 6s | +3s | +100% |
 | Packaged Worker / accounts (balanced v2) | open | 2 | 434s → 607s | +173s | +39.86% |
 | backup / Export consistently and encrypt before writing to disk | open | 2 | 3s → 6s | +3s | +100% |
-| Development / desktop (balanced v2) / dev-map-tiles | open | 3 | 35s → 120s | +85s | +242.86% |
+| Development / desktop (balanced v2) / dev-map-tiles | open | 4 | 35s → 140s | +105s | +300% |
+| Packaged Worker / accounts (balanced v2) / worker-finance | open | 2 | 28s → 48s | +20s | +71.43% |
+| Packaged Worker / accounts (balanced v2) / worker-ships | open | 2 | 33s → 45s | +12s | +36.36% |
 | Packaged Worker / accounts (balanced v2) / worker-map-tiles | open | 2 | 20s → 85s | +65s | +325% |
 | Development / desktop (balanced v2) / dev-map-tiles | open | 2 | 35s → 122s | +87s | +248.57% |
 
@@ -308,6 +310,12 @@ Open trends require investigation. Resolved trends retain their history; each ve
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-20T02:31:55Z | step: Packaged Worker / accounts (balanced v2) / worker-blacksmith | 42s → 49s | +7s | +16.67% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38309026871/job/115010777381) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39358706522/job/118420187436) |
+| 2026-10-20T02:31:06Z | step: Packaged Worker / accounts (balanced v2) / worker-ships | 38s → 45s | +7s | +18.42% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38936690063/job/117094844393) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39358706522/job/118420187436) |
+| 2026-10-20T02:30:28Z | step: Development / desktop (balanced v2) / dev-map-tiles | 120s → 140s | +20s | +16.67% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39262626961/job/118093975300) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39358706522/job/118419517706) |
+| 2026-10-20T02:30:21Z | step: Packaged Worker / accounts (balanced v2) / worker-finance | 36s → 48s | +12s | +33.33% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38936690063/job/117094844393) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39358706522/job/118420187436) |
+| 2026-10-20T02:29:26Z | step: Packaged Worker / accounts (balanced v2) / worker-account | 100s → 118s | +18s | +18% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38309026871/job/115010777381) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39358706522/job/118420187436) |
+| 2026-10-20T02:29:01Z | step: Packaged standby / standby-audit | 91s → 105s | +14s | +15.38% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37788622946/job/113350513119) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39358706522/job/118420187623) |
 | 2026-10-19T22:06:27Z | step: Packaged Worker / accounts (balanced v2) / worker-finance | 34s → 41s | +7s | +20.59% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38409667330/job/115339633856) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39331912265/job/118332663464) |
 | 2026-10-19T21:48:36Z | step: Packaged Worker / interface (balanced v2) / Start disposable built Worker | 10s → 12s | +2s | +20% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38309026871/job/115010777504) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39329870802/job/118326287113) |
 | 2026-10-19T21:45:57Z | step: Development / desktop (balanced v2) / Run npx playwright install --with-deps chromium | 23s → 33s | +10s | +43.48% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38404276239/job/115319646524) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39329870802/job/118325208291) |
