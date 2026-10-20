@@ -24255,5 +24255,22 @@
     "finishedAt": "2026-10-20T19:12:36.557904+00:00",
     "durationMs": 108413,
     "trendId": "local:dbb96e76-4bed-43b5-8ea2-ba523116e90c"
+  },
+  "[\".github/workflows/android-widget.yml\",\"pull_request\",\"pull-request\",\"step\",\"native-widget (35) / Post Run actions/setup-java@v4\",\"ubuntu-latest\",1]": {
+    "schema": 1,
+    "id": "39503564845:1:fdf8df32aa1471ff147d0580619ed11217d1a30ae5146a9fd826de284f7fefe0",
+    "scope": "[\".github/workflows/android-widget.yml\",\"pull_request\",\"pull-request\",\"step\",\"native-widget (35) / Post Run actions/setup-java@v4\",\"ubuntu-latest\",1]",
+    "kind": "step",
+    "name": "native-widget (35) / Post Run actions/setup-java@v4",
+    "environment": "ubuntu-latest",
+    "commit": "11892cd7eaaa03bd0009833c4c3f37b6b2b25326",
+    "runId": 39503564845,
+    "attempt": 1,
+    "url": "https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39503564845/job/118906781479",
+    "outcome": "success",
+    "startedAt": "2026-10-20T21:57:08Z",
+    "finishedAt": "2026-10-20T21:57:09Z",
+    "durationMs": 1000,
+    "trendId": "39503564845:1:fdf8df32aa1471ff147d0580619ed11217d1a30ae5146a9fd826de284f7fefe0"
   }
 }
