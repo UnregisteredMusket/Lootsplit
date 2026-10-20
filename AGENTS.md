@@ -1,5 +1,7 @@
 # Lootsplit: read before every coding session
 
+**Every future log explicitly requested or designated for Lootsplit must automatically become part of the daily report.** Follow `docs/OWNER-MONITORING.md`: register new sources, retain missing-source coverage, and publish explicit development starts/progress/pauses/handoffs/completion.
+
 Read `AGENTS.project.md` and `docs/CODING-MANUAL.md` first. After an interruption also read `docs/RECOVERY.md` and reconcile current repository, CI and live state before repeating an action. Use focused local verification before full CI; the manual contains the commands and required preservation procedures. The original scaffold guidance below applies where consistent with the current Lootsplit project instructions (production is Cloudflare Workers/D1).
 
 # App Builder Workspace

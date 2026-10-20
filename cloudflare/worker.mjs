@@ -7,11 +7,19 @@ import { handleAccounts } from "./accounts.mjs";
 import { recoveryGuard } from "./recovery-guard.mjs";
 import { serveBuildAsset, releaseResponse } from "./release-assets.mjs";
 import handler from "../dist/server/index.mjs";
+import { scheduledMonitor } from "./monitor-journal.mjs";
+import { telemetryResponse } from "./monitor-telemetry.mjs";
 
 export default {
+  async scheduled(controller, env) {
+    // Await the durable result: rejected scheduled executions remain visible in Cloudflare.
+    await scheduledMonitor(env, controller.scheduledTime);
+  },
   async fetch(request, env, context) {
     const recovery = await recoveryGuard(request, env);
     if (recovery) return recovery;
+    const telemetry = await telemetryResponse(request, env);
+    if (telemetry) return telemetry;
     const asset = await serveBuildAsset(request, env);
     if (asset) return asset;
     const accountResponse = await handleAccounts(request, env);

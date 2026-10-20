@@ -15,6 +15,7 @@ import {
 } from "./bug-reports.mjs";
 import { serverMonitor } from "./monitoring.mjs";
 import { ownerMonitor } from "./owner-monitor.mjs";
+import { monitorApi } from "./monitor-journal.mjs";
 import {
   assertActive,
   touchMember,
@@ -312,7 +313,9 @@ export async function handleAccounts(request, env) {
     if (path === "/api/account/monitor" && request.method === "GET")
       return cors(json(await serverMonitor(env, userId)));
     if (path === "/api/account/owner/monitor" && request.method === "GET")
-      return cors(json(await ownerMonitor(env, userId, session.session.id)));
+      return cors(json(await ownerMonitor(env, userId, session.session.id, request)));
+    if (path.startsWith("/api/account/owner/monitor/"))
+      return cors(json(await monitorApi(env, userId, session.session.id, request, body)));
     if (path === "/api/account/profile" && request.method === "POST")
       return cors(json(await saveProfile(db, userId, body)));
     if (path === "/api/account/activity" && request.method === "GET")
