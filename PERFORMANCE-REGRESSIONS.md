@@ -140,7 +140,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Development / gameplay / dev-finance | open | 5 | 17s → 48s | +31s | +182.35% |
 | Code checks and immutable builds / unit-tests | open | 7 | 11s → 54s | +43s | +390.91% |
 | Packaged Worker / interface / Run npx playwright install --with-deps chromium | open | 2 | 21s → 57s | +36s | +171.43% |
-| Development / accounts / dev-monitor | open | 3 | 3s → 6s | +3s | +100% |
+| Development / accounts / dev-monitor | open | 4 | 3s → 7s | +4s | +133.33% |
 | Packaged Worker / accounts | open | 5 | 94s → 257s | +163s | +173.4% |
 | Development / accounts | open | 3 | 152s → 732s | +580s | +381.58% |
 | production release asset readiness | open | 2 | 2.465s → 27.818s | +25.353s | +1028.52% |
@@ -307,6 +307,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Development / gameplay (balanced v2) / dev-library-navigation | open | 2 | 42s → 63s | +21s | +50% |
 | Packaged Worker / interface (balanced v2) / Run actions/setup-node@v4 | open | 2 | 2s → 7s | +5s | +250% |
 | Packaged Worker / interface (balanced v2) / Run actions/download-artifact@v4 | open | 2 | 1s → 3s | +2s | +200% |
+| Packaged Worker / interface (balanced v2) / Run npm ci | open | 2 | 12s → 20s | +8s | +66.67% |
 | Packaged Worker / accounts (balanced v2) / Start disposable built Worker | open | 2 | 7s → 11s | +4s | +57.14% |
 | Packaged Worker / interface (balanced v2) / worker-initiative | open | 3 | 4s → 7s | +3s | +75% |
 | Packaged Worker / accounts (balanced v2) / worker-account | open | 2 | 85s → 117s | +32s | +37.65% |
@@ -316,6 +317,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Packaged Worker / accounts (balanced v2) / worker-blacksmith | open | 2 | 35s → 48s | +13s | +37.14% |
 | Packaged Worker / interface (balanced v2) / worker-property-operations | open | 2 | 20s → 29s | +9s | +45% |
 | Packaged Worker / accounts (balanced v2) / worker-map-tiles | open | 4 | 17s → 112s | +95s | +558.82% |
+| Development / desktop (balanced v2) / dev-game-analytics | open | 2 | 5s → 7s | +2s | +40% |
 | Development / desktop (balanced v2) / Run npx playwright install --with-deps chromium | open | 2 | 20s → 33s | +13s | +65% |
 | Packaged Worker / accounts (balanced v2) / Run actions/setup-node@v4 | open | 2 | 4s → 9s | +5s | +125% |
 | Packaged Worker / accounts (balanced v2) / Run actions/download-artifact@v4 | open | 2 | 2s → 4s | +2s | +100% |
@@ -359,6 +361,9 @@ Open trends require investigation. Resolved trends retain their history; each ve
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-20T22:20:41Z | step: Development / desktop (balanced v2) / dev-game-analytics | 6s → 7s | +1s | +16.67% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38376270621/job/115225320234) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39506221936/job/118915695014) |
+| 2026-10-20T22:14:37Z | step: Development / accounts / dev-monitor | 6s → 7s | +1s | +16.67% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39421997760/job/118625001679) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39506221936/job/118915695093) |
+| 2026-10-20T22:14:20Z | step: Packaged Worker / interface (balanced v2) / Run npm ci | 17s → 20s | +3s | +17.65% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38376270621/job/115226315634) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39506221936/job/118916784429) |
 | 2026-10-20T21:45:37Z | step: Packaged Worker / accounts (balanced v2) / worker-downtime | 37s → 43s | +6s | +16.22% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38309026871/job/115010777381) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39501737667/job/118901975639) |
 | 2026-10-20T21:45:50.000Z | workflow: Android native widget verification | 431s → 554s | +123s | +28.54% | failure | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39454444495) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39501737683) |
 | 2026-10-20T21:45:50Z | job: native-widget (24) | 430s → 554s | +124s | +28.84% | failure | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39500945465/job/118897980669) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39501737683/job/118900658741) |
