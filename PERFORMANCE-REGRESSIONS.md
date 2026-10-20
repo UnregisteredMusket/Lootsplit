@@ -319,6 +319,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-20T08:55:26Z | step: Packaged Worker / interface (balanced v2) / Set up job | 2s → 3s | +1s | +50% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38310299946/job/115014983235) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39396568402/job/118541738810) |
 | 2026-10-20T08:49:03Z | step: Packaged Worker / interface (balanced v2) / worker-library-navigation | 40s → 46s | +6s | +15% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38404276239/job/115320597368) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39394850169/job/118535985677) |
 | 2026-10-20T07:28:29Z | step: Development / governance / dev-campaign-governance | 114s → 138s | +24s | +21.05% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37661353259/job/112929395891) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39386388734/job/118507127846) |
 | 2026-10-20T07:12:01Z | step: Code checks and immutable builds / unit-tests | 37s → 43s | +6s | +16.22% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38139715608/job/114470877114) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39384840390/job/118502107783) |
