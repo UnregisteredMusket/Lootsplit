@@ -50,7 +50,11 @@ async function capture(operation) {
   }
 }
 async function json(fetcher, url, options = {}) {
-  const response = await fetcher(url, { ...options, signal: AbortSignal.timeout(4500) });
+  const response = await fetcher(url, {
+    ...options,
+    redirect: "manual",
+    signal: AbortSignal.timeout(4500),
+  });
   if (!response.ok) throw providerFailure(response);
   return response.json();
 }

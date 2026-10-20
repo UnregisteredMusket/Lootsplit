@@ -47,7 +47,7 @@
     "Physical OEM launchers, prolonged Doze, reboot delivery and large-font accessibility not verified.",
     "Production owner dashboard browser session not authenticated; real disposable-owner browser and native synthetic-host checks passed.",
     "Initial production GitHub OIDC subject rejected; strict immutable-ID correction requires follow-up deployment and actual ingestion verification.",
-    "Public GitHub collectors unavailable during initial production checks; specific safe provider diagnosis is included in follow-up.",
+    "Public GitHub collectors unavailable during initial production checks; GitHub safe provider diagnosis and a confirmed performance/JWKS unsupported-redirect correction are included in follow-up.",
     "First scheduled daily report is not due until 2026-10-21T04:10:00Z.",
     "Raw runtime-log feed and full scheduled multiplayer round-trip remain explicit coverage gaps."
   ]

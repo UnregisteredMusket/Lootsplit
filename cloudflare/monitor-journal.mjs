@@ -583,7 +583,8 @@ export async function monitorSnapshot(
 async function textFetch(url, fetcher) {
   const response = await fetcher(url, {
     signal: AbortSignal.timeout(8000),
-    redirect: "error",
+    // Workers supports manual/follow, not the browser's error redirect mode.
+    redirect: "manual",
     headers: { "User-Agent": "Lootsplit-monitoring", Accept: "application/json" },
   });
   if (!response.ok) throw providerFailure(response);

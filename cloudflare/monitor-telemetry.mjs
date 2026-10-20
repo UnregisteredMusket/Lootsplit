@@ -73,7 +73,7 @@ export async function verifyTelemetryToken(token, env, now = Date.now(), fetcher
   if (!cached || cached.until < now || !cached.value.some((k) => k.kid === header.kid)) {
     const response = await fetcher(`${ISSUER}/.well-known/jwks`, {
       signal: AbortSignal.timeout(4000),
-      redirect: "error",
+      redirect: "manual",
     });
     if (!response.ok || Number(response.headers.get("content-length")) > 65536)
       fail("Workflow signing keys unavailable.", 503);
