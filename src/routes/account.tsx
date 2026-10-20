@@ -85,21 +85,29 @@ function Account() {
   const reload = async () => setLibrary(await accountRequest<AccountLibrary>("library"));
   useEffect(() => {
     let live = true;
-    void accountRequest<{ user: unknown } | null>("auth/get-session")
-      .then(async (session) => {
-        if (session?.user) {
-          const data = await accountRequest<AccountLibrary>("library");
-          if (live) setLibrary(data);
-        }
-      })
-      .catch((e) => {
-        if (live) setError(e.message);
-      })
-      .finally(() => {
-        if (live) setLoading(false);
-      });
+    const check = () => {
+      void accountRequest<{ user: unknown } | null>("auth/get-session")
+        .then(async (session) => {
+          if (session?.user) {
+            const data = await accountRequest<AccountLibrary>("library");
+            if (live) setLibrary(data);
+          } else if (live) setLibrary(null);
+        })
+        .catch((e) => {
+          if (live) {
+            setError(e.message);
+            if (e.status === 401 || e.status === 403) setLibrary(null);
+          }
+        })
+        .finally(() => {
+          if (live) setLoading(false);
+        });
+    };
+    check();
+    window.addEventListener("lootsplit-monitor-sign-in", check);
     return () => {
       live = false;
+      window.removeEventListener("lootsplit-monitor-sign-in", check);
     };
   }, []);
   async function run(work: () => Promise<void>) {
@@ -570,9 +578,7 @@ function Account() {
             </section>
           )}
           <div id="account-administration">
-            {library?.user.role === "owner" && import.meta.env.VITE_MOBILE !== "true" && (
-              <OwnerMonitor key={library.user.id} />
-            )}
+            {library?.user.role === "owner" && <OwnerMonitor key={library.user.id} />}
             {(library?.user.role === "owner" || library?.user.role === "admin") && (
               <ServerMonitor />
             )}
@@ -646,7 +652,7 @@ function Account() {
             <p role="status">Opening your library…</p>
           ) : !library ? (
             <div className="portal-auth-layout">
-              <section className="portal-card">
+              <section className="portal-card" id="account-sign-in">
                 <div className="portal-tabs">
                   <button
                     className={mode === "signin" ? "selected" : ""}

@@ -5,7 +5,12 @@ import { ownerAnalytics } from "./game-analytics.mjs";
 const repository = "UnregisteredMusket/Lootsplit";
 const github = `https://api.github.com/repos/${repository}`;
 const caches = new WeakMap();
-const unavailable = () => ({ state: "unavailable", checkedAt: Date.now(), data: null });
+const unavailable = (error) => ({
+  state: "unavailable",
+  checkedAt: Date.now(),
+  data: null,
+  errorCode: error?.providerCode || "SOURCE_UNAVAILABLE",
+});
 const disconnected = () => ({ state: "not-connected", checkedAt: null, data: null });
 const number = (n) => typeof n === "number" && Number.isFinite(n) && n >= 0;
 const label = (s) => (typeof s === "string" ? s.slice(0, 160) : "");
@@ -20,16 +25,19 @@ async function capture(operation) {
       }),
     ]);
     return { state: "ready", checkedAt: Date.now(), data };
-  } catch {
+  } catch (error) {
     // Never forward provider errors, headers, credentials or raw response payloads.
-    return unavailable();
+    return unavailable(error);
   } finally {
     clearTimeout(timer);
   }
 }
 async function json(fetcher, url, options = {}) {
   const response = await fetcher(url, { ...options, signal: AbortSignal.timeout(4500) });
-  if (!response.ok) throw new Error("Provider unavailable");
+  if (!response.ok)
+    throw Object.assign(new Error("Provider unavailable"), {
+      providerCode: `HTTP_${response.status}`,
+    });
   return response.json();
 }
 async function cached(env, key, operation) {
@@ -72,11 +80,14 @@ export async function developmentActivity(env, fetcher = fetch) {
         commit: /^[a-f0-9]{40}$/.test(run.head_sha) ? run.head_sha : null,
         url: `https://github.com/${repository}/actions/runs/${run.id}`,
         deployment: run.path === ".github/workflows/website-release.yml",
+        startedAt: Date.parse(run.run_started_at || run.created_at) || null,
+        updatedAt: Date.parse(run.updated_at) || null,
       };
     });
     return {
       // Explicit bounded scope: not evidence about unsubmitted local/Codex work.
       scannedRuns: runs.length,
+      runs,
       active: runs.filter((run) => run.status !== "completed"),
       latestDeployment: runs.find((run) => run.deployment) || null,
       openPulls: pulls.map((pr) => {
@@ -92,20 +103,20 @@ export async function developmentActivity(env, fetcher = fetch) {
   });
 }
 
-export async function cloudflareTraffic(env, fetcher = fetch) {
+export async function cloudflareTraffic(env, fetcher = fetch, window = null) {
   const token = env.OWNER_MONITOR_CLOUDFLARE_TOKEN;
   const account = env.OWNER_MONITOR_CLOUDFLARE_ACCOUNT_ID;
   if (!token || !/^[a-f0-9]{32}$/.test(account || "")) return disconnected();
-  return cached(env, "cloudflare", async () => {
-    const until = new Date().toISOString();
-    const since = new Date(Date.now() - 86400000).toISOString();
+  const operation = async () => {
+    const until = new Date(window?.end ?? Date.now()).toISOString();
+    const since = new Date(window?.start ?? Date.now() - 86400000).toISOString();
     const response = await json(fetcher, "https://api.cloudflare.com/client/v4/graphql", {
       method: "POST",
       headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },
       body: JSON.stringify({
         query: `query ($account: string, $since: string, $until: string) {
           viewer { accounts(filter: {accountTag: $account}) {
-            workersInvocationsAdaptive(limit: 1, filter: {scriptName: "lootsplit", datetime_geq: $since, datetime_leq: $until}) {
+            workersInvocationsAdaptive(limit: 1, filter: {scriptName: "lootsplit", datetime_geq: $since, datetime_lt: $until}) {
               sum { requests errors }
             }
           } }
@@ -126,23 +137,23 @@ export async function cloudflareTraffic(env, fetcher = fetch) {
     const sum = rows.length === 0 ? { requests: 0, errors: 0 } : rows[0].sum;
     if (!number(sum?.requests) || !number(sum?.errors)) throw new Error("Invalid totals");
     return { requests: sum.requests, errors: sum.errors, since, until };
-  });
+  };
+  return window ? capture(operation) : cached(env, "cloudflare", operation);
 }
 
-export async function ownerMonitor(env, userId, sessionId) {
-  async function authorize() {
-    await assertActive(env.DB, userId);
-    if ((await roleOf(env.DB, userId)) !== "owner")
-      throw Object.assign(new Error("Owner access is required."), { status: 403 });
-    const session = await env.DB.prepare(
-      "SELECT id FROM session WHERE id=? AND userId=? AND julianday(expiresAt)>julianday('now')",
-    )
-      .bind(sessionId, userId)
-      .first();
-    if (!session)
-      throw Object.assign(new Error("Sign in again to view monitoring."), { status: 401 });
-  }
-  await authorize();
+export async function authorizeOwner(env, userId, sessionId) {
+  await assertActive(env.DB, userId);
+  if ((await roleOf(env.DB, userId)) !== "owner")
+    throw Object.assign(new Error("Owner access is required."), { status: 403 });
+  const session = await env.DB.prepare(
+    "SELECT id FROM session WHERE id=? AND userId=? AND julianday(expiresAt)>julianday('now')",
+  )
+    .bind(sessionId, userId)
+    .first();
+  if (!session)
+    throw Object.assign(new Error("Sign in again to view monitoring."), { status: 401 });
+}
+export async function collectOwnerMonitor(env, userId) {
   const [health, analytics, development, traffic, release] = await Promise.all([
     serverMonitor(env, userId),
     capture(() => ownerAnalytics(env.DB, userId)),
@@ -159,11 +170,35 @@ export async function ownerMonitor(env, userId, sessionId) {
       return { commit: data.commit };
     }),
   ]);
+  return { checkedAt: Date.now(), health, analytics, development, traffic, release };
+}
+export async function ownerMonitor(env, userId, sessionId, request) {
+  await authorizeOwner(env, userId, sessionId);
+  const device = request?.headers.get("x-lootsplit-device");
+  if (device && /^[a-f0-9-]{36}$/.test(device)) {
+    const { monitorApi } = await import("./monitor-journal.mjs");
+    await monitorApi(
+      env,
+      userId,
+      sessionId,
+      new Request(new URL("/api/account/owner/monitor/device", env.ACCOUNT_ORIGIN), {
+        method: "POST",
+      }),
+      {
+        id: device,
+        snapshotId: Number(request.headers.get("x-lootsplit-snapshot")) || 0,
+        version: request.headers.get("x-lootsplit-version") || "unknown",
+        delivery: "Refresh requested; reports the previously received snapshot",
+      },
+    );
+  }
+  const { monitorSnapshot } = await import("./monitor-journal.mjs");
+  const snapshot = await monitorSnapshot(env, userId);
   // Role, account and session revocations during provider reads must fail closed.
-  await authorize();
+  await authorizeOwner(env, userId, sessionId);
   const account = await env.DB.prepare("SELECT name,email FROM user WHERE id=?")
     .bind(userId)
     .first();
   if (!account) throw Object.assign(new Error("Sign in again."), { status: 401 });
-  return { checkedAt: Date.now(), account, health, analytics, development, traffic, release };
+  return { ...snapshot, account };
 }

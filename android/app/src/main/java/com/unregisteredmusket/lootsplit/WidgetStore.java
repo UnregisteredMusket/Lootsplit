@@ -92,6 +92,12 @@ final class WidgetStore {
     static synchronized boolean finish(Context context, String generation, JSONObject snapshot, String message) throws Exception {
         JSONObject current = read(context);
         if (!generation.equals(current.optString("generation"))) return false;
+        JSONObject old = current.optJSONObject("snapshot");
+        if (snapshot != null && old != null && snapshot.optLong("snapshotId") > 0 && old.optLong("snapshotId") > snapshot.optLong("snapshotId")) return false;
+        if (snapshot != null && old != null) {
+            JSONObject task = snapshot.optJSONObject("task"), prior = old.optJSONObject("task");
+            if (task != null && prior != null && task.optString("id").equals(prior.optString("id")) && task.optLong("revision") < prior.optLong("revision")) { snapshot.put("task", prior); snapshot.put("warning",old.optString("warning")); }
+        }
         current.put("snapshot", snapshot == null ? JSONObject.NULL : snapshot).put("message", message);
         save(context, current);
         return true;
@@ -116,5 +122,20 @@ final class WidgetStore {
     static synchronized boolean clearGeneration(Context context, String generation) {
         if (!generation.equals(read(context).optString("generation"))) return false;
         return clear(context, null);
+    }
+    static synchronized boolean revoke(Context context, String generation, String reason) throws Exception {
+        if (!generation.equals(read(context).optString("generation"))) return false;
+        clear(context, null);
+        save(context, empty().put("message", reason));
+        return true;
+    }
+    static synchronized String deviceId(Context context) {
+        File file = new File(context.getNoBackupFilesDir(), "owner-widget-device.txt");
+        try {
+            if (file.exists()) { String id = new String(new AtomicFile(file).readFully(), StandardCharsets.UTF_8); if (id.matches("[a-f0-9-]{36}")) return id; }
+            String id = UUID.randomUUID().toString();
+            try (FileOutputStream output = new FileOutputStream(file)) { output.write(id.getBytes(StandardCharsets.UTF_8)); }
+            return id;
+        } catch (Exception ignored) { return ""; }
     }
 }

@@ -769,12 +769,15 @@ test("owner overview requires current owner session and returns actual account w
       403,
     );
     assert.equal((await call("owner/monitor", {}, member.cookie)).response.status, 404);
+    // Expire the shared provider snapshot so this remains an in-flight revocation check.
+    await DB.prepare("UPDATE owner_monitor_snapshots SET collected_at=0").run();
     env.ASSETS.fetch = async () => {
       await DB.prepare("UPDATE site_roles SET role='admin' WHERE user_id=?").bind(id).run();
       return Response.json({ commit: "b".repeat(40) });
     };
     assert.equal((await call("owner/monitor", undefined, member.cookie)).response.status, 403);
     await DB.prepare("UPDATE site_roles SET role='owner' WHERE user_id=?").bind(id).run();
+    await DB.prepare("UPDATE owner_monitor_snapshots SET collected_at=0").run();
     env.ASSETS.fetch = async () => {
       await DB.prepare("DELETE FROM session WHERE userId=?").bind(id).run();
       return Response.json({ commit: "b".repeat(40) });
@@ -949,52 +952,205 @@ test("interactive sheets require active accounts and reject cross-origin changes
 test("account-owned sessions rotate invitations, retain campaign data and reconnect only current account seats", async () => {
   const { DB, env, call, signup } = setup();
   globalThis.__env__ = env;
-  const { openRoom, previewRoom, joinRoom, manageRoom } = await import("../src/lib/quire/cloud.server.ts");
+  const { openRoom, previewRoom, joinRoom, manageRoom } =
+    await import("../src/lib/quire/cloud.server.ts");
   const { emptyCloudTable } = await import("../src/lib/quire/cloud.ts");
   const { blankPurse } = await import("../src/lib/quire/economy.ts");
   try {
-    const dm = await signup("owned-dm@example.com"), player = await signup("owned-player@example.com");
+    const dm = await signup("owned-dm@example.com"),
+      player = await signup("owned-player@example.com");
     const dmId = (await call("library", undefined, dm.cookie)).data.user.id;
     const playerId = (await call("library", undefined, player.cookie)).data.user.id;
     const table = emptyCloudTable();
-    table.purses = [{ ...blankPurse("character"), id: "hero", name: "Hero" }, { ...blankPurse("character"), id: "other", name: "Other" }];
+    table.purses = [
+      { ...blankPurse("character"), id: "hero", name: "Hero" },
+      { ...blankPurse("character"), id: "other", name: "Other" },
+    ];
     const opened = await openRoom({ name: "DM", table, userId: dmId });
     const view = await roomState(opened);
     assert.ok(view.sessionId);
     assert.equal((await call("library", undefined, dm.cookie)).data.members[0].role, "dm");
     await assert.rejects(previewRoom(opened.code), /expired/);
-    const joined = await joinRoom({ code: opened.code, sessionId: view.sessionId, purseId: "hero", name: "Player", userId: playerId });
-    const again = await joinRoom({ code: opened.code, sessionId: view.sessionId, purseId: "hero", name: "Player", userId: playerId });
+    const joined = await joinRoom({
+      code: opened.code,
+      sessionId: view.sessionId,
+      purseId: "hero",
+      name: "Player",
+      userId: playerId,
+    });
+    const again = await joinRoom({
+      code: opened.code,
+      sessionId: view.sessionId,
+      purseId: "hero",
+      name: "Player",
+      userId: playerId,
+    });
     assert.equal(again.token, joined.token);
     assert.equal((await call("library", undefined, player.cookie)).data.members[0].role, "player");
     await closeRoom(opened);
     await assert.rejects(roomState({ ...joined, code: opened.code }), /closed/);
     const member = (await call("library", undefined, dm.cookie)).data.members[0];
-    assert.equal((await call("resume", { code: opened.code, reopen: true, revision: member.room_revision }, dm.cookie)).response.status, 200);
+    assert.equal(
+      (
+        await call(
+          "resume",
+          { code: opened.code, reopen: true, revision: member.room_revision },
+          dm.cookie,
+        )
+      ).response.status,
+      200,
+    );
     const reopened = await roomState(opened);
     assert.notEqual(reopened.sessionId, view.sessionId);
-    assert.deepEqual(reopened.table.purses.map(p => p.id), ["hero", "other"]);
-    await assert.rejects(joinRoom({ code: opened.code, sessionId: view.sessionId, purseId: "hero", name: "Player", userId: playerId }), /expired/);
+    assert.deepEqual(
+      reopened.table.purses.map((p) => p.id),
+      ["hero", "other"],
+    );
+    await assert.rejects(
+      joinRoom({
+        code: opened.code,
+        sessionId: view.sessionId,
+        purseId: "hero",
+        name: "Player",
+        userId: playerId,
+      }),
+      /expired/,
+    );
     await assert.rejects(roomState({ ...joined, code: opened.code }), /not seated/);
-    const fresh = await joinRoom({ code: opened.code, sessionId: reopened.sessionId, purseId: "hero", name: "Player", userId: playerId });
+    const fresh = await joinRoom({
+      code: opened.code,
+      sessionId: reopened.sessionId,
+      purseId: "hero",
+      name: "Player",
+      userId: playerId,
+    });
     assert.notEqual(fresh.token, joined.token);
-    assert.equal((await call("resume", { code: opened.code }, player.cookie)).data.token, fresh.token);
+    assert.equal(
+      (await call("resume", { code: opened.code }, player.cookie)).data.token,
+      fresh.token,
+    );
     await manageRoom({ ...opened, action: "release", seatId: fresh.seatId });
-    const reassigned = await joinRoom({ code: opened.code, sessionId: reopened.sessionId, purseId: "other", name: "Player", userId: playerId });
-    assert.deepEqual(reassigned.purseIds, ["other"], "The DM can release an account player for a different character assignment");
-  } finally { delete globalThis.__env__; DB.close(); }
+    const reassigned = await joinRoom({
+      code: opened.code,
+      sessionId: reopened.sessionId,
+      purseId: "other",
+      name: "Player",
+      userId: playerId,
+    });
+    assert.deepEqual(
+      reassigned.purseIds,
+      ["other"],
+      "The DM can release an account player for a different character assignment",
+    );
+  } finally {
+    delete globalThis.__env__;
+    DB.close();
+  }
 });
 
-test("account shortcuts persist by owner and role and reject stale writes",async()=>{
- const {call,signup}=setup();const a=await signup("shortcuts-a@example.test"), b=await signup("shortcuts-b@example.test");
- assert.equal((await call("shortcuts?role=player")).response.status,401);
- const initial=await call("shortcuts?role=player",undefined,a.cookie);assert.equal(initial.data.revision,0);
- const items=[{destination:"bank",label:"My bank",icon:"coins"}];
- const saved=await call("shortcuts",{role:"player",revision:0,items},a.cookie);assert.equal(saved.response.status,200);assert.equal(saved.data.revision,1);
- assert.equal((await call("shortcuts?role=player",undefined,a.cookie)).data.items[0].label,"My bank");
- assert.equal((await call("shortcuts?role=player",undefined,b.cookie)).data.revision,0);
- assert.equal((await call("shortcuts?role=dm",undefined,a.cookie)).data.revision,0);
- assert.equal((await call("shortcuts",{role:"player",revision:0,items},a.cookie)).response.status,409);
- const restricted=await call("shortcuts",{role:"player",revision:1,items:[{destination:"financial",label:"Forbidden",icon:"coins"}]},a.cookie);
- assert.notEqual(restricted.data.items[0].destination,"financial");
+test("account shortcuts persist by owner and role and reject stale writes", async () => {
+  const { call, signup } = setup();
+  const a = await signup("shortcuts-a@example.test"),
+    b = await signup("shortcuts-b@example.test");
+  assert.equal((await call("shortcuts?role=player")).response.status, 401);
+  const initial = await call("shortcuts?role=player", undefined, a.cookie);
+  assert.equal(initial.data.revision, 0);
+  const items = [{ destination: "bank", label: "My bank", icon: "coins" }];
+  const saved = await call("shortcuts", { role: "player", revision: 0, items }, a.cookie);
+  assert.equal(saved.response.status, 200);
+  assert.equal(saved.data.revision, 1);
+  assert.equal(
+    (await call("shortcuts?role=player", undefined, a.cookie)).data.items[0].label,
+    "My bank",
+  );
+  assert.equal((await call("shortcuts?role=player", undefined, b.cookie)).data.revision, 0);
+  assert.equal((await call("shortcuts?role=dm", undefined, a.cookie)).data.revision, 0);
+  assert.equal(
+    (await call("shortcuts", { role: "player", revision: 0, items }, a.cookie)).response.status,
+    409,
+  );
+  const restricted = await call(
+    "shortcuts",
+    {
+      role: "player",
+      revision: 1,
+      items: [{ destination: "financial", label: "Forbidden", icon: "coins" }],
+    },
+    a.cookie,
+  );
+  assert.notEqual(restricted.data.items[0].destination, "financial");
+});
+
+test("monitoring writes, logs, reports and device records require the current owner session", async () => {
+  const { DB, call, signup } = setup();
+  try {
+    const member = await signup("monitor-journal-owner@example.com");
+    const id = member.data.user.id;
+    const task = {
+      id: "audit-task",
+      eventId: "audit-start",
+      revision: 0,
+      title: "Verify",
+      objective: "Check authorization",
+      state: "testing",
+    };
+    const register = {
+      id: "external-check",
+      name: "External check",
+      description: "Disposable integration",
+      mode: "external",
+      expectedMs: 1800000,
+    };
+    const entry = {
+      source: "external-check",
+      id: "observation-1",
+      summary: "Actual synthetic test observation",
+      observedAt: Date.now(),
+    };
+    const paths = [
+      ["task", task],
+      ["registry", register],
+      ["entry", entry],
+      ["device", { id: "device-audit-123", snapshotId: 4, version: "test" }],
+      ["settings", {}],
+      ["report", {}],
+    ];
+    for (const [path, body] of paths)
+      assert.equal((await call("owner/monitor/" + path, body, member.cookie)).response.status, 403);
+    await DB.prepare("INSERT INTO site_roles VALUES (?,'owner',?)").bind(id, Date.now()).run();
+    assert.equal((await call("owner/monitor/entry", entry, member.cookie)).response.status, 400);
+    for (const [path, body] of paths)
+      assert.equal(
+        (await call("owner/monitor/" + path, body, member.cookie)).response.status,
+        200,
+        path,
+      );
+    assert.equal((await call("owner/monitor/entry", entry, member.cookie)).data.recorded, false);
+    assert.equal(
+      (await call("owner/monitor/task", { ...task, eventId: "stale-revision" }, member.cookie))
+        .response.status,
+      409,
+    );
+    for (const path of ["history", "export", "reports", "registry", "task"]) {
+      const response = await call("owner/monitor/" + path, undefined, member.cookie);
+      assert.equal(response.response.status, 200, path);
+      assert.equal(response.response.headers.get("cache-control"), "no-store");
+    }
+    assert.equal(
+      (await call("owner/monitor/registry", register, member.cookie, "https://evil.example"))
+        .response.status,
+      403,
+    );
+    await DB.prepare("UPDATE site_roles SET role='admin' WHERE user_id=?").bind(id).run();
+    for (const [path, body] of paths)
+      assert.equal((await call("owner/monitor/" + path, body, member.cookie)).response.status, 403);
+    await DB.prepare("DELETE FROM session WHERE userId=?").bind(id).run();
+    for (const path of ["history", "reports", "task"])
+      assert.equal(
+        (await call("owner/monitor/" + path, undefined, member.cookie)).response.status,
+        401,
+      );
+  } finally {
+    DB.close();
+  }
 });

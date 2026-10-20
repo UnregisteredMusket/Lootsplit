@@ -3,6 +3,10 @@ main = "cloudflare/worker.mjs"
 compatibility_date = "2026-10-01"
 compatibility_flags = ["nodejs_compat"]
 
+# Minute dispatcher; actual measurement slots are half-hourly. Calendar reports use the stored IANA timezone.
+[triggers]
+crons = ["* * * * *"]
+
 # Existing Paid runtime policy; the verified artifact and post-deploy readback enforce it.
 [limits]
 cpu_ms = 10000

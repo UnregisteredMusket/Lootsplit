@@ -21,12 +21,15 @@ on:
       - '.github/workflows/android-test-apk.yml'
 
 permissions:
+  id-token: write
   contents: read
 
 concurrency:
   group: android-test-${{ github.ref }}
   cancel-in-progress: true
 
+env:
+  LOOTSPLIT_MONITOR_TELEMETRY: "true"
 jobs:
   test-apk:
     runs-on: ubuntu-latest

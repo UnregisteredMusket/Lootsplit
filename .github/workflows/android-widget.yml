@@ -13,7 +13,10 @@ on:
       - ".github/workflows/android-widget.yml"
       - ".github/workflows/android-release.yml"
 permissions:
+  id-token: write
   contents: read
+env:
+  LOOTSPLIT_MONITOR_TELEMETRY: "true"
 jobs:
   native-widget:
     runs-on: ubuntu-latest

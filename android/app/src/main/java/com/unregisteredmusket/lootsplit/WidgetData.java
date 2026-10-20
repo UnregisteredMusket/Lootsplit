@@ -70,7 +70,7 @@ final class WidgetData {
         String commit = release == null ? "Unavailable" : text(release, "commit");
         if (release != null) commit = commit.matches("[a-f0-9]{40}") ? commit.substring(0, 7) : "Unavailable";
         JSONObject projected = new JSONObject().put("name", name).put("email", email).put("checkedAt", checked)
-            .put("healthy", healthy).put("health", healthy ? "SYSTEMS HEALTHY" : "CHECK SERVICES")
+            .put("healthy", healthy).put("health", "STATUS UNVERIFIED")
             .put("active", count(stats, "active5m")).put("accounts", count(stats, "accounts"))
             .put("campaigns", count(stats, "sharedCampaigns")).put("backups", count(stats, "cloudBackups"))
             .put("traffic", trafficText).put("trafficTime", sourceTime(root, "traffic"))
@@ -78,6 +78,34 @@ final class WidgetData {
             .put("developmentTime", sourceTime(root, "development"))
             .put("games", games).put("gamesTime", sourceTime(root, "analytics"))
             .put("commit", commit);
+        projected.put("snapshotId", root.optLong("snapshotId",0));
+        JSONObject overall=root.optJSONObject("overall");
+        projected.put("statusColor",overall==null?"yellow":text(overall,"color"));
+        projected.put("overallReason",overall==null?"Component coverage unavailable":text(overall,"reason"));
+        if(overall!=null)projected.put("health","green".equals(text(overall,"color"))?"HEALTHY AT LAST CHECK":"red".equals(text(overall,"color"))?"CONFIRMED ERROR":"STATUS UNVERIFIED");
+        JSONObject monitoring=root.optJSONObject("monitoring"),report=root.optJSONObject("dailyReport"),status=root.optJSONObject("developmentStatus");
+        projected.put("log",monitoring==null?"No scheduled monitoring entry yet":text(monitoring,"summary"));
+        JSONArray recent=root.optJSONArray("recentEntries"),safeRecent=new JSONArray();
+        if(recent!=null)for(int i=0;i<Math.min(3,recent.length());i++){JSONObject entry=recent.optJSONObject(i);if(entry!=null)safeRecent.put(new JSONObject().put("summary",text(entry,"summary")).put("observedAt",entry.optLong("observedAt")));}
+        projected.put("recentEntries",safeRecent);
+        projected.put("report",report==null?"No daily report yet":text(report,"summary"));
+        if(status!=null) {
+            JSONObject sourceTask=status.optJSONObject("task"),warning=status.optJSONObject("warning");
+            projected.put("warning",warning==null?"":text(warning,"message")+" "+text(warning,"nextAction"));
+            if(sourceTask!=null) {
+                JSONObject task=new JSONObject();
+                for(String field:new String[]{"id","title","objective","phase","progress","state","blocker","nextAction"})task.put(field,text(sourceTask,field));
+                for(String field:new String[]{"revision","startedAt","heartbeatAt","progressAt","completedAt","totalElapsedMs","unobservedMs"})task.put(field,sourceTask.optLong(field,0));
+                task.put("active",sourceTask.optBoolean("active",false));projected.put("task",task);
+            }
+        }
+        JSONArray diagnostics=root.optJSONArray("diagnostics"),safe=new JSONArray();
+        if(diagnostics!=null)for(int i=0;i<Math.min(30,diagnostics.length());i++) {
+            JSONObject source=diagnostics.optJSONObject(i);if(source==null)continue;JSONObject entry=new JSONObject();
+            for(String field:new String[]{"component","color","state","symptom","impact","action","errorCode"})entry.put(field,text(source,field));
+            safe.put(entry);
+        }
+        projected.put("diagnostics",safe);
         JSONArray checks = health.optJSONArray("checks");
         StringBuilder service = new StringBuilder();
         if (checks != null) for (int i = 0; i < checks.length(); i++) {

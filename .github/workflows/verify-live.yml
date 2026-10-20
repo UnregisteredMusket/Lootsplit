@@ -9,8 +9,11 @@ on:
         description: Successful main verification run containing its immutable website artifact
         required: true
 permissions:
+  id-token: write
   contents: read
   actions: read
+env:
+  LOOTSPLIT_MONITOR_TELEMETRY: "true"
 jobs:
   verify:
     runs-on: ubuntu-latest

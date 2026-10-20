@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<appwidget-provider xmlns:android="http://schemas.android.com/apk/res/android"
+    android:minWidth="250dp" android:minHeight="56dp" android:minResizeWidth="250dp" android:minResizeHeight="56dp"
+    android:targetCellWidth="4" android:targetCellHeight="1" android:resizeMode="horizontal"
+    android:updatePeriodMillis="1800000" android:initialLayout="@layout/companion_widget" android:previewLayout="@layout/companion_widget"
+    android:configure="com.unregisteredmusket.lootsplit.CompanionWidgetConfigureActivity"
+    android:widgetFeatures="reconfigurable" android:widgetCategory="home_screen" />

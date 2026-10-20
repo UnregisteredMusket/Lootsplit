@@ -20,6 +20,11 @@ final class WidgetRefresh {
     private static final ExecutorService NETWORK = Executors.newFixedThreadPool(2);
     private static final ScheduledExecutorService DEADLINES = Executors.newSingleThreadScheduledExecutor();
     private static Task active;
+    // Modern Android may serialize broadcasts until the first goAsync result finishes.
+    // A queued double-tap can therefore arrive just after the shared request completes.
+    private static String lastSuccessfulGeneration = "";
+    private static long lastSuccessfulAt;
+    private static final long SUCCESS_COALESCE_MILLIS = 2000;
 
     static final class Task {
         final Context context;
@@ -36,6 +41,7 @@ final class WidgetRefresh {
 
     static synchronized Task request(Context context, boolean manual, Completion completion) {
         Context app = context.getApplicationContext();
+        WidgetClient.initialize(app);
         JSONObject state = WidgetStore.read(app);
         String token = state.optString("token"), generation = state.optString("generation");
         if (token.isEmpty()) {
@@ -46,6 +52,12 @@ final class WidgetRefresh {
             active.manual |= manual;
             active.completions.add(completion);
             return active;
+        }
+        if (manual && generation.equals(lastSuccessfulGeneration)
+                && android.os.SystemClock.elapsedRealtime() - lastSuccessfulAt < SUCCESS_COALESCE_MILLIS
+                && state.optJSONObject("snapshot") != null && state.optString("message").isEmpty()) {
+            completion.finish("");
+            return null;
         }
         Task task = new Task(app, generation, manual);
         task.completions.add(completion);
@@ -89,10 +101,14 @@ final class WidgetRefresh {
             if (active == task) active = null;
             try {
                 boolean current;
-                if (denied) current = WidgetStore.clearGeneration(task.context, task.generation);
+                if (denied) current = WidgetStore.revoke(task.context, task.generation, "Owner authorization was rejected. Tap Sign in to reconnect.");
                 else if (snapshot != null) current = WidgetStore.finish(task.context, task.generation, snapshot, "");
                 else current = WidgetStore.message(task.context, task.generation, error);
                 if (!current) error = "Account changed. Refresh the current account.";
+                else if (snapshot != null && error.isEmpty()) {
+                    lastSuccessfulGeneration = task.generation;
+                    lastSuccessfulAt = android.os.SystemClock.elapsedRealtime();
+                }
             } catch (Exception ignored) { error = "Widget storage unavailable. Reconnect in My account."; }
             callbacks = new ArrayList<>(task.completions);
             task.completions.clear();

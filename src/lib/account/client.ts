@@ -52,7 +52,7 @@ async function accountRequestCore<T>(
     cache: "no-store",
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
   });
-  if (native() && token && response.status === 401) await disconnectOwnerWidget(token);
+  if (native() && token && (response.status === 401 || (response.status === 403 && path.startsWith("owner/monitor")))) await disconnectOwnerWidget(token);
   const result = await readAccountResponse<{
     error?: string | { message?: string };
     message?: string;
@@ -71,10 +71,13 @@ async function accountRequestCore<T>(
   if (response.ok && path === "library") localStorage.setItem("lootsplit.account.active", "yes");
   if (path === "auth/sign-out" && response.ok) localStorage.removeItem("lootsplit.account.active");
   if (!response.ok)
-    throw new Error(
-      (typeof result?.error === "object" ? result.error?.message : result?.error) ||
-        result?.message ||
-        "The account service is unavailable. Try again when online.",
+    throw Object.assign(
+      new Error(
+        (typeof result?.error === "object" ? result.error?.message : result?.error) ||
+          result?.message ||
+          "The account service is unavailable. Try again when online.",
+      ),
+      { status: response.status },
     );
   const nextToken = response.headers.get("set-auth-token");
   if (native() && nextToken) localStorage.setItem(TOKEN, nextToken);

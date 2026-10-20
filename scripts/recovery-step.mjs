@@ -2,6 +2,7 @@ import { spawn, execFileSync } from "node:child_process";
 import { mkdirSync, writeFileSync, renameSync } from "node:fs";
 import { resolve, join } from "node:path";
 import { pathToFileURL } from "node:url";
+import { stepTelemetry } from "./monitor-publish.mjs";
 
 export function atomicJson(path, value) {
   writeFileSync(path + ".tmp", JSON.stringify(value, null, 2) + "\n", { mode: 0o600 });
@@ -43,6 +44,8 @@ export async function runStep({
   const path = join(directory, `${id}.json`);
   const save = () => atomicJson(path, record);
   save();
+  const publish = stepTelemetry({ id, seconds, startedAt: record.startedAt });
+  void publish("running");
   console.log(`[recovery] START ${id}, deadline ${seconds}s`);
   const child = spawn(command, args, { stdio: "inherit", detached: process.platform !== "win32" });
   let reason, killTimer;
@@ -70,6 +73,7 @@ export async function runStep({
   const heartbeat = setInterval(() => {
     record.heartbeatAt = new Date().toISOString();
     save();
+    void publish("running");
     console.log(
       `[recovery] ${id}: ${record.status}, ${Math.round((Date.now() - Date.parse(record.startedAt)) / 1000)}s elapsed`,
     );
@@ -91,6 +95,7 @@ export async function runStep({
   });
   save();
   console.log(`[recovery] ${record.status.toUpperCase()} ${id}`);
+  await publish(record.status === "passed" ? "success" : record.status);
   return record;
 }
 

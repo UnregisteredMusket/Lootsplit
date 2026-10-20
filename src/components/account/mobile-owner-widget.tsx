@@ -20,8 +20,11 @@ export function MobileOwnerWidgetBridge() {
     const open = async () => {
       try {
         const request = await OwnerWidget.consumeOpenRequest();
-        if (alive && request.open && allowContextChange())
-          await navigate({ to: "/account", hash: "home-screen-widget" });
+        if (alive && request.open && allowContextChange()) {
+          await navigate({ to: "/account", hash: request.destination || "home-screen-widget" });
+          window.dispatchEvent(new Event("lootsplit-monitor-destination"));
+          window.dispatchEvent(new Event("lootsplit-monitor-sign-in"));
+        }
       } catch {
         // The launcher action is optional and never blocks normal app startup.
       }
@@ -99,13 +102,15 @@ export function MobileOwnerWidget({ name, email }: { name: string; email: string
       </div>
       <p className="text-sm text-muted">
         Add the green terminal widget to your Android home screen for service checks, account
-        activity, app analytics and recent GitHub deployment activity. Resize it vertically for full
-        or compact details.
+        activity, app analytics, monitoring logs, task timers and daily reports. Scroll inside the
+        main widget for details. The separate 4×1 companion has two configurable summaries and two
+        toolbar actions, with independent presets and appearance for each instance.
       </p>
       <p className="text-sm text-muted">
         Readings are dated. Android requests background checks about every 30 minutes and may delay
-        them to save battery; tap Refresh to check directly from the home screen. Your last dated
-        reading stays visible while refreshing. Provider data may be cached for five minutes.
+        them to save battery. Backend collection continues every 30 minutes even when your phone is
+        asleep, offline or closed; tap Refresh to check directly from the home screen. Your last
+        dated reading stays visible while refreshing. Provider data may be cached for five minutes.
         Unconnected Cloudflare traffic stays labeled.
       </p>
       <p className="text-sm text-muted">
@@ -162,6 +167,50 @@ export function MobileOwnerWidget({ name, email }: { name: string; email: string
             >
               Add to home screen
             </button>
+            <button
+              type="button"
+              className="portal-button secondary"
+              disabled={busy || !status?.connected}
+              onClick={() =>
+                void run(async () => {
+                  if (status?.pinSupported) {
+                    const result = await OwnerWidget.pin({ kind: "companion" });
+                    setMessage(
+                      result.requested
+                        ? "Confirm Add, then choose this companion’s summaries and actions."
+                        : "Add Lootsplit 4×1 companion from your launcher’s Widgets menu.",
+                    );
+                  } else
+                    setMessage(
+                      "Long-press your home screen, choose Widgets, then Lootsplit 4×1 companion. Configure its summaries and actions after placing it.",
+                    );
+                })
+              }
+            >
+              Add 4×1 companion
+            </button>
+            {status?.mainWidgets?.map((id) => (
+              <button
+                key={id}
+                type="button"
+                className="portal-button secondary"
+                disabled={busy}
+                onClick={() => void run(() => OwnerWidget.configure({ widgetId: id }))}
+              >
+                Field monitor {id} appearance
+              </button>
+            ))}
+            {status?.companions?.map((id) => (
+              <button
+                key={id}
+                type="button"
+                className="portal-button secondary"
+                disabled={busy}
+                onClick={() => void run(() => OwnerWidget.configure({ widgetId: id }))}
+              >
+                Configure companion {id}
+              </button>
+            ))}
             <button
               type="button"
               className="portal-button secondary"

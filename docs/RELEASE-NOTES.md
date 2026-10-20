@@ -1,3 +1,33 @@
+# Lootsplit 1.9.0 candidate
+
+Android version code **13**. This candidate retains package `com.unregisteredmusket.lootsplit` and the permanent signing certificate.
+
+## Added
+
+- Private backend monitoring every 30 minutes, independent of phone connectivity, with persistent history, comparisons, recovery evidence and daily reports at 00:10 America/New_York by default.
+- A central registry includes existing and future designated logs in daily reporting; missing sources appear as coverage gaps.
+- Shared development tasks, persistent elapsed and recorded timing, workflow telemetry, component diagnostics and explained progress warnings.
+- A separate customizable 4×1 companion widget with Development, Server Health, Analytics and Quick Actions presets, per-instance summaries/actions and appearance settings.
+
+## Improved
+
+- The main Android widget has a supported scrolling collection with task, diagnostic, log and report links. The matching website and Android account dashboard has bounded scrolling, history search/filters, exports and full daily reports.
+- Both widget types use the same encrypted owner authorization and shared dated snapshot, reject older updates and refresh all instances together when data arrives.
+- Light/dark/terminal appearance, readable status labels and native elapsed timers accompany the website's reduced-motion-aware warnings and transitions.
+- Lootsplit's existing campaign layout, gameplay, accounts, saves, themes and permanent signing identity remain.
+
+## Fixed
+
+- Retains direct home-screen refresh without visiting My account; genuine access denial clears private information and opens a working sign-in route.
+- Keeps confirmed component failures visible when their source disconnects, preserves incomplete observations during historical recovery, and carries unresolved incidents into subsequent daily reports.
+- Prevents analytics-label clipping in the main widget's fixed header.
+
+## Candidate verification
+
+The release pipeline requires all preservation gates, API24/API35 framework instrumentation, native lint, permanent-key signing and independent APK/checksum inspection. The public download remains 1.8.1 until the new signed APK and checksum exist. Android background delivery remains subject to OS and launcher restrictions; backend collection runs independently. Continuous custom widget animation is unsupported, so static status and native timers are intentional. Physical OEM launcher, prolonged Doze, reboot delivery and large-font checks require separate device validation. Raw runtime-log ingestion and end-to-end scheduled multiplayer checks are explicit coverage gaps until connected, never fabricated healthy results. Install over the permanently signed app; do not uninstall it.
+
+---
+
 # Lootsplit 1.8.1
 
 Android version code **12**. This release retains package `com.unregisteredmusket.lootsplit` and the permanent signing certificate.

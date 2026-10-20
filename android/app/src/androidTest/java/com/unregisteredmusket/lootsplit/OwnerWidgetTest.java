@@ -172,6 +172,12 @@ public class OwnerWidgetTest {
             WidgetRefresh.request(context, true, error -> { assertEquals("", error); done.countDown(); });
             release.countDown();
             assertTrue(done.await(3, TimeUnit.SECONDS));
+            // API35 may deliver the queued second broadcast only after the first finishes.
+            // Also exercise that post-completion arrival deterministically through the same path.
+            CountDownLatch queued = new CountDownLatch(1);
+            assertNull(WidgetRefresh.request(context, true, error -> { assertEquals("", error); queued.countDown(); }));
+            assertTrue(queued.await(1, TimeUnit.SECONDS));
+            InstrumentationRegistry.getInstrumentation().waitForIdleSync();
             assertEquals("Rapid taps coalesce into one check", 1, requests.get());
             JSONObject refreshed = WidgetStore.read(context);
             assertEquals("129", refreshed.getJSONObject("snapshot").getString("accounts"));
@@ -230,6 +236,144 @@ public class OwnerWidgetTest {
         } finally { release.countDown(); }
     }
 
+    private JSONObject journalFixture() throws Exception {
+        JSONObject source=fixture(); long now=System.currentTimeMillis();
+        source.put("snapshotId",42).put("schemaVersion",2)
+            .put("overall",new JSONObject().put("color","yellow").put("label","Current status unverified").put("reason","Widget synchronization"))
+            .put("monitoring",new JSONObject().put("summary","Accounts: 100 → 128 (+28%). Review missing sources."))
+            .put("dailyReport",new JSONObject().put("summary","48 intervals; one source unavailable."))
+            .put("developmentStatus",new JSONObject().put("task",new JSONObject().put("id","native-audit").put("revision",3).put("title","Monitoring widgets").put("objective","Independent refresh and synchronized history").put("phase","Native verification").put("progress","Collection scrolling check").put("state","testing").put("active",true).put("startedAt",now-120000).put("heartbeatAt",now).put("progressAt",now-30000).put("completedAt",0)))
+            .put("diagnostics",new org.json.JSONArray().put(new JSONObject().put("component","GitHub").put("color","yellow").put("state","unavailable").put("symptom","The source did not respond.").put("action","Check the integration connection.")));
+        return source;
+    }
+    @Test public void snapshotOrderingTimerPersistenceAndPerInstanceSettings() throws Exception {
+        String generation=WidgetStore.connect(context,"synthetic-persistent");
+        JSONObject snapshot=WidgetData.project(journalFixture(),System.currentTimeMillis());
+        assertTrue(WidgetStore.finish(context,generation,snapshot,""));
+        JSONObject older=new JSONObject(snapshot.toString()).put("snapshotId",41);
+        assertFalse(WidgetStore.finish(context,generation,older,""));
+        java.lang.reflect.Field memory=WidgetStore.class.getDeclaredField("state");memory.setAccessible(true);memory.set(null,null);
+        assertEquals(42,WidgetStore.read(context).getJSONObject("snapshot").getLong("snapshotId"));
+        assertEquals(snapshot.getJSONObject("task").getLong("startedAt"),WidgetStore.read(context).getJSONObject("snapshot").getJSONObject("task").getLong("startedAt"));
+        CompanionSettings.save(context,101,CompanionSettings.preset("Development"));CompanionSettings.save(context,102,CompanionSettings.preset("Analytics"));
+        assertEquals("task",CompanionSettings.read(context,101).getString("first"));assertEquals("analytics",CompanionSettings.read(context,102).getString("first"));
+        OwnerWidgetJob.schedule(context);
+        android.app.job.JobInfo job=context.getSystemService(JobScheduler.class).getPendingJob(OwnerWidgetJob.ID);
+        assertNotNull(job);assertTrue(job.isPeriodic());assertTrue(job.isPersisted());assertEquals(1800000,job.getIntervalMillis());
+        OwnerWidgetService.Factory factory=new OwnerWidgetService.Factory(context,generation);factory.onCreate();assertTrue(factory.getCount()>8);
+        WidgetStore.clear(context,null);factory.onDataSetChanged();assertEquals(1,factory.getCount());
+        CompanionSettings.remove(context,101);CompanionSettings.remove(context,102);
+    }
+    @Test public void companionFootprintPresetsThemesAndIndependentRefresh() throws Exception {
+        String generation=WidgetStore.connect(context,"synthetic-companion");
+        WidgetStore.finish(context,generation,WidgetData.project(journalFixture(),System.currentTimeMillis()),"");
+        for(String preset:CompanionSettings.PRESETS) for(String theme:new String[]{"terminal","light","dark"}) {
+            JSONObject settings=CompanionSettings.preset(preset).put("theme",theme);
+            for(int width:new int[]{250,350,448}) renderCompanion(WidgetStore.read(context),settings,width,72,"companion-"+preset.replace(" ","-")+"-"+theme+"-"+width);
+        }
+        CountDownLatch refreshed=new CountDownLatch(1);
+        renderCompanion(WidgetStore.read(context),CompanionSettings.preset("Development"),250,56,"minimum-4x1");
+        WidgetRefresh.fetcher=token->{ assertEquals("synthetic-companion",token);refreshed.countDown();return WidgetData.project(journalFixture(),System.currentTimeMillis()); };
+        InstrumentationRegistry.getInstrumentation().runOnMainSync(()->{
+            assertTrue(ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(Stage.RESUMED).isEmpty());
+            View view=CompanionWidgetProvider.views(context,WidgetStore.read(context),CompanionSettings.preset("Development"),101).apply(context,new FrameLayout(context));
+            assertTrue(view.findViewById(R.id.companion_action1).performClick());
+        });
+        assertTrue(refreshed.await(2,TimeUnit.SECONDS));
+    }
+    private void renderCompanion(JSONObject state,JSONObject settings,int width,int height,String name) throws Exception {
+        AtomicReference<Throwable> failure=new AtomicReference<>();
+        InstrumentationRegistry.getInstrumentation().runOnMainSync(()->{ try {
+            FrameLayout parent=new FrameLayout(context);View view=CompanionWidgetProvider.views(context,state,settings,101).apply(context,parent);parent.addView(view);
+            float density=context.getResources().getDisplayMetrics().density;int w=Math.round(width*density),h=Math.round(height*density);
+            parent.measure(View.MeasureSpec.makeMeasureSpec(w,View.MeasureSpec.EXACTLY),View.MeasureSpec.makeMeasureSpec(h,View.MeasureSpec.EXACTLY));parent.layout(0,0,w,h);bounds(view);
+            assertTrue(view.findViewById(R.id.companion_action1).getWidth()>=44*density);assertTrue(view.findViewById(R.id.companion_action1).getHeight()>=44*density);
+            assertTrue(view.findViewById(R.id.companion_action2).hasOnClickListeners());
+            Bitmap bitmap=Bitmap.createBitmap(w,h,Bitmap.Config.ARGB_8888);parent.draw(new Canvas(bitmap));
+            File dir=context.getExternalFilesDir("widget-audit");if(dir!=null)dir.mkdirs();try(FileOutputStream out=new FileOutputStream(new File(dir,name+".png"))){bitmap.compress(Bitmap.CompressFormat.PNG,100,out);}bitmap.recycle();
+        }catch(Throwable error){failure.set(error);} });
+        if(failure.get()!=null)throw new AssertionError(name,failure.get());
+    }
+    private String shell(String command) throws Exception {
+        try(android.os.ParcelFileDescriptor fd=InstrumentationRegistry.getInstrumentation().getUiAutomation().executeShellCommand(command);InputStream input=new android.os.ParcelFileDescriptor.AutoCloseInputStream(fd);ByteArrayOutputStream out=new ByteArrayOutputStream()){
+            byte[] bytes=new byte[1024];int size;while((size=input.read(bytes))!=-1)out.write(bytes,0,size);return out.toString("UTF-8").trim();
+        }
+    }
+    @Test public void collectionRowsKeepReadableThemesAndIndependentStatusColors() throws Exception {
+        AtomicReference<Throwable> failure=new AtomicReference<>();
+        for(String theme:new String[]{"terminal","light"}) for(String color:new String[]{"green","yellow","red"}) {
+            CompanionSettings.save(context,103,CompanionSettings.preset("Server Health").put("theme",theme));
+            JSONObject source=journalFixture();source.getJSONArray("diagnostics").getJSONObject(0).put("color",color);
+            org.json.JSONArray rows=WidgetRows.rows(WidgetData.project(source,System.currentTimeMillis()));JSONObject diagnostic=null;
+            for(int i=0;i<rows.length();i++)if("diagnostics".equals(rows.getJSONObject(i).optString("action")) && color.equals(rows.getJSONObject(i).optString("color")))diagnostic=rows.getJSONObject(i);
+            assertNotNull(diagnostic);JSONObject row=diagnostic;
+            InstrumentationRegistry.getInstrumentation().runOnMainSync(()->{try{
+                View view=OwnerWidgetService.rowView(context,row,103).apply(context,new FrameLayout(context));
+                TextView title=view.findViewById(R.id.widget_row_title),detail=view.findViewById(R.id.widget_row_detail);
+                int background=((android.graphics.drawable.ColorDrawable)view.getBackground()).getColor();
+                assertTrue(title.getText().toString().contains(color.toUpperCase(java.util.Locale.ROOT)));
+                assertEquals(OwnerWidgetProvider.color(color,"light".equals(theme)),title.getCurrentTextColor());
+                assertTrue("Status text contrast "+theme+"/"+color,androidx.core.graphics.ColorUtils.calculateContrast(title.getCurrentTextColor(),background)>=4.5);
+                assertTrue("Detail text contrast "+theme,androidx.core.graphics.ColorUtils.calculateContrast(detail.getCurrentTextColor(),background)>=4.5);
+            }catch(Throwable error){failure.set(error);}});
+            if(failure.get()!=null)throw new AssertionError(theme+"/"+color,failure.get());
+        }
+        CompanionSettings.remove(context,103);
+    }
+    private void captureHostedWidget(View view,String name) throws Exception {
+        assertTrue(view.getWidth()>0 && view.getHeight()>0);
+        Bitmap bitmap=Bitmap.createBitmap(view.getWidth(),view.getHeight(),Bitmap.Config.ARGB_8888);view.draw(new Canvas(bitmap));
+        File dir=context.getExternalFilesDir("widget-audit");if(dir!=null)dir.mkdirs();
+        try(FileOutputStream output=new FileOutputStream(new File(dir,name+".png"))){bitmap.compress(Bitmap.CompressFormat.PNG,100,output);}finally{bitmap.recycle();}
+    }
+    @Test public void actualFrameworkHostScrollsCollectionAndClearsRevokedRows() throws Exception {
+        assertEquals("1",shell("getprop ro.kernel.qemu"));
+        shell("appwidget grantbind --package "+context.getPackageName()+" --user 0");
+        String generation=WidgetStore.connect(context,"synthetic-host");WidgetStore.finish(context,generation,WidgetData.project(journalFixture(),System.currentTimeMillis()),"");
+        android.appwidget.AppWidgetHost host=new android.appwidget.AppWidgetHost(context,197409);
+        android.appwidget.AppWidgetManager manager=android.appwidget.AppWidgetManager.getInstance(context);
+        int id=host.allocateAppWidgetId();
+        WidgetAuditActivity activity=null;
+        try {
+            assertTrue(manager.bindAppWidgetIdIfAllowed(id,new android.content.ComponentName(context,OwnerWidgetProvider.class)));
+            activity=(WidgetAuditActivity)InstrumentationRegistry.getInstrumentation().startActivitySync(new android.content.Intent(context,WidgetAuditActivity.class).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK));
+            WidgetAuditActivity screen=activity;AtomicReference<android.appwidget.AppWidgetHostView> hosted=new AtomicReference<>();
+            InstrumentationRegistry.getInstrumentation().runOnMainSync(()->{
+                host.startListening();android.appwidget.AppWidgetHostView view=host.createView(screen,id,manager.getAppWidgetInfo(id));screen.setContentView(view);hosted.set(view);
+                OwnerWidgetProvider.renderAll(context);
+            });
+            long deadline=android.os.SystemClock.elapsedRealtime()+8000;AtomicInteger count=new AtomicInteger();
+            while(android.os.SystemClock.elapsedRealtime()<deadline){InstrumentationRegistry.getInstrumentation().runOnMainSync(()->{android.widget.ListView list=hosted.get().findViewById(R.id.monitor_list);count.set(list==null?0:list.getCount());});if(count.get()>8)break;android.os.SystemClock.sleep(100);}
+            assertTrue("Actual AppWidgetHost receives the collection",count.get()>8);
+            AtomicReference<Throwable> captureFailure=new AtomicReference<>();
+            InstrumentationRegistry.getInstrumentation().runOnMainSync(()->{try{captureHostedWidget(hosted.get(),"hosted-main-terminal");}catch(Throwable error){captureFailure.set(error);}});
+            if(captureFailure.get()!=null)throw new AssertionError("Hosted screenshot",captureFailure.get());
+            AtomicInteger first=new AtomicInteger();InstrumentationRegistry.getInstrumentation().runOnMainSync(()->{android.widget.ListView list=hosted.get().findViewById(R.id.monitor_list);list.setSelection(list.getCount()-1);});
+            InstrumentationRegistry.getInstrumentation().waitForIdleSync();InstrumentationRegistry.getInstrumentation().runOnMainSync(()->{android.widget.ListView list=hosted.get().findViewById(R.id.monitor_list);first.set(list.getFirstVisiblePosition());});assertTrue(first.get()>0);
+            CompanionSettings.save(context,id,CompanionSettings.preset("Development").put("theme","light"));
+            InstrumentationRegistry.getInstrumentation().runOnMainSync(()->OwnerWidgetProvider.renderAll(context));
+            AtomicInteger lightRows=new AtomicInteger();deadline=android.os.SystemClock.elapsedRealtime()+5000;
+            while(android.os.SystemClock.elapsedRealtime()<deadline){
+                InstrumentationRegistry.getInstrumentation().runOnMainSync(()->{
+                    android.widget.ListView list=hosted.get().findViewById(R.id.monitor_list);View child=list==null?null:list.getChildAt(0);View row=child==null?null:child.findViewById(R.id.widget_row);
+                    if(row!=null && row.getBackground() instanceof android.graphics.drawable.ColorDrawable && ((android.graphics.drawable.ColorDrawable)row.getBackground()).getColor()==android.graphics.Color.rgb(247,242,228))lightRows.set(1);
+                });
+                if(lightRows.get()==1)break;android.os.SystemClock.sleep(20);
+            }
+            assertEquals("Actual collection follows the light theme",1,lightRows.get());
+            InstrumentationRegistry.getInstrumentation().runOnMainSync(()->{try{captureHostedWidget(hosted.get(),"hosted-main-light");}catch(Throwable error){captureFailure.set(error);}});
+            if(captureFailure.get()!=null)throw new AssertionError("Light hosted screenshot",captureFailure.get());
+            WidgetStore.revoke(context,generation,"Owner authorization rejected. Sign in again.");
+            InstrumentationRegistry.getInstrumentation().runOnMainSync(()->OwnerWidgetProvider.renderAll(context));
+            deadline=android.os.SystemClock.elapsedRealtime()+5000;
+            while(android.os.SystemClock.elapsedRealtime()<deadline){InstrumentationRegistry.getInstrumentation().runOnMainSync(()->{android.widget.ListView list=hosted.get().findViewById(R.id.monitor_list);count.set(list==null?0:list.getCount());});if(count.get()==1)break;android.os.SystemClock.sleep(100);}
+            assertEquals(1,count.get());
+        }finally{
+            if(activity!=null){WidgetAuditActivity screen=activity;InstrumentationRegistry.getInstrumentation().runOnMainSync(screen::finish);InstrumentationRegistry.getInstrumentation().waitForIdleSync();}
+            host.stopListening();host.deleteHost();CompanionSettings.remove(context,id);shell("appwidget revokebind --package "+context.getPackageName()+" --user 0");
+        }
+    }
+
     private void tapRefresh() {
         InstrumentationRegistry.getInstrumentation().runOnMainSync(() -> {
             assertTrue("No account activity is open", ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(Stage.RESUMED).isEmpty());
@@ -256,7 +400,8 @@ public class OwnerWidgetTest {
                 if (dir == null || (!dir.isDirectory() && !dir.mkdirs())) throw new Exception("Missing screenshot directory");
                 try (FileOutputStream output = new FileOutputStream(new File(dir, name + ".png"))) { image.compress(Bitmap.CompressFormat.PNG, 100, output); }
                 image.recycle();
-                assertEquals(expanded ? View.VISIBLE : View.GONE, view.findViewById(R.id.monitor_details).getVisibility());
+                assertEquals(View.VISIBLE, view.findViewById(R.id.monitor_details).getVisibility());
+                assertTrue(view.findViewById(R.id.monitor_list) instanceof android.widget.ListView);
                 assertTrue(view.findViewById(R.id.monitor_refresh).getHeight() >= 40 * density);
                 assertTrue(view.findViewById(R.id.monitor_refresh).hasOnClickListeners());
                 assertTrue(view.findViewById(R.id.monitor_account).hasOnClickListeners());
@@ -278,7 +423,8 @@ public class OwnerWidgetTest {
         if (failure[0] != null) throw new AssertionError(name, failure[0]);
     }
     private void bounds(View view) {
-        if (!(view instanceof ViewGroup)) return;
+        // ListView children are intentionally partially clipped while scrolling.
+        if (!(view instanceof ViewGroup) || view instanceof android.widget.ListView) return;
         ViewGroup group = (ViewGroup) view;
         for (int i = 0; i < group.getChildCount(); i++) {
             View child = group.getChildAt(i);

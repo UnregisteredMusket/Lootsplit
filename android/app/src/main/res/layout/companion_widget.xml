@@ -1,0 +1,16 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:id="@+id/companion_root" android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="horizontal" android:padding="4dp" android:background="@drawable/monitor_background" android:baselineAligned="false" android:gravity="center_vertical">
+    <LinearLayout android:layout_width="0dp" android:layout_weight="1" android:layout_height="match_parent" android:orientation="vertical" android:gravity="center_vertical">
+        <LinearLayout android:layout_width="match_parent" android:layout_height="10dp" android:orientation="horizontal">
+            <TextView android:id="@+id/companion_light" android:layout_width="16dp" android:layout_height="10dp" android:text="?" android:textSize="10sp" android:includeFontPadding="false" android:textColor="#EEC771" android:gravity="center" />
+            <TextView android:id="@+id/companion_identity" android:layout_width="0dp" android:layout_weight="1" android:layout_height="10dp" android:text="OWNER · SIGN IN" android:textSize="9sp" android:includeFontPadding="false" android:textColor="#B1D6C1" android:maxLines="1" android:ellipsize="end" />
+        </LinearLayout>
+        <TextView android:id="@+id/companion_first" android:layout_width="match_parent" android:layout_height="wrap_content" android:includeFontPadding="false" android:maxLines="1" android:ellipsize="end" android:textSize="12sp" android:textColor="#E6F8EC" android:text="No development task active" />
+        <Chronometer android:id="@+id/companion_timer_first" android:layout_width="match_parent" android:layout_height="wrap_content" android:includeFontPadding="false" android:textSize="12sp" android:textColor="#E6F8EC" android:visibility="gone" />
+        <TextView android:id="@+id/companion_second" android:layout_width="match_parent" android:layout_height="wrap_content" android:includeFontPadding="false" android:maxLines="1" android:ellipsize="end" android:textSize="11sp" android:textColor="#E6F8EC" android:text="Connect in My account" />
+        <Chronometer android:id="@+id/companion_timer" android:layout_width="match_parent" android:layout_height="wrap_content" android:includeFontPadding="false" android:textSize="11sp" android:textColor="#E6F8EC" android:visibility="gone" />
+        <TextView android:id="@+id/companion_age" android:layout_width="match_parent" android:layout_height="wrap_content" android:includeFontPadding="false" android:maxLines="1" android:ellipsize="end" android:textSize="9sp" android:textColor="#B1D6C1" />
+    </LinearLayout>
+    <TextView android:id="@+id/companion_action1" android:layout_width="44dp" android:layout_height="48dp" android:text="Refresh" android:textColor="#13F580" android:textSize="10sp" android:gravity="center" android:background="@drawable/monitor_button" />
+    <TextView android:id="@+id/companion_action2" android:layout_width="44dp" android:layout_height="48dp" android:text="Settings" android:textColor="#13F580" android:textSize="10sp" android:gravity="center" android:background="@drawable/monitor_button" />
+</LinearLayout>

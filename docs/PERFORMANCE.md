@@ -71,3 +71,9 @@ Example: a recorded trend of 100s → 115s → 132.25s remains archived after a 
 Read-only collection: `npm run performance:sync` saves a local snapshot under `test-results/performance/`. The automated workflow supplies the publishing token; no extra service or subscription is needed.
 
 References: [GitHub workflow-run security](https://docs.github.com/en/actions/reference/workflows-and-actions/events-that-trigger-workflows#workflow_run), [workflow job timing API](https://docs.github.com/en/rest/actions/workflow-jobs).
+
+## Daily owner report integration
+
+The central monitoring registry registers this existing history as `performance`. The backend imports retained regression and resolution evidence in bounded bulk writes, records the capture cursor and pending-run count, and cross-references the preceding calendar day's observations with workflow, incident and development entries. Missing/stale capture remains a coverage gap. It never rewrites this history or resets a reference. Every future log explicitly requested or designated for Lootsplit must automatically become part of the daily report; follow `docs/OWNER-MONITORING.md` for in-code and external registration.
+
+The October20 monitoring implementation's local verification and scope/environment distinctions are recorded in `docs/audit/2026-10-20-monitoring.md`. The interim21:16 UTC history sync found no new observations or stale resolutions and retained the historical pending run plus this then-running verification. No comparable ≥15% slowdown was established by the changed focused workload, and no trend reset was requested. Full CI measurements remain captured automatically; review their new observations before release completion.
