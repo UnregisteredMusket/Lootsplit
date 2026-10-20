@@ -48,6 +48,9 @@ export async function checkOnlineTabletop(dm, player, origin, width, output, jou
   await viewport.press("ArrowRight");
   await expect.poll(async () => (await hero()).column).toBe(6);
   await player.getByRole("button", { name: "Close inspector", exact: true }).click();
+  // The immersive initial camera covers the portrait viewport. Fit the image
+  // before dragging to a grid cell that could otherwise be outside the screen.
+  await player.getByRole("button", { name: "Fit map", exact: true }).click();
   await ownToken.scrollIntoViewIfNeeded();
   const start = await ownToken.boundingBox(),
     layer = await player.locator(".map-layer").boundingBox();
@@ -58,7 +61,7 @@ export async function checkOnlineTabletop(dm, player, origin, width, output, jou
   });
   await player.mouse.up();
   await expect.poll(async () => (await hero()).column).toBe(7);
-  await player.getByRole("button", { name: "Close inspector", exact: true }).click();
+  await expect(playerInspector).toBeHidden();
   await player.getByRole("button", { name: "Measure", exact: true }).click();
   await viewport.scrollIntoViewIfNeeded();
   const box = await viewport.boundingBox();

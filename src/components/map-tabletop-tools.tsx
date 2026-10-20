@@ -180,7 +180,6 @@ export function useMapTabletopTools(
           : [tokenId];
       setSelected(ids);
       selectToken?.(tokenId);
-      setInspector(true);
       gesture.current = {
         point,
         token: !disabled && canMoveMapToken(table, map, token, seat) ? token : undefined,
@@ -288,6 +287,8 @@ export function useMapTabletopTools(
     const current = gesture.current;
     gesture.current = undefined;
     if (!current) return false;
+    // A tap inspects; dragging keeps the map unobstructed until the move ends.
+    if (current.ids?.length && !current.moved) setInspector(true);
     if (current.token) {
       if (current.moved && movePreview.current.length) saveMoves(movePreview.current, current.grid);
       return true;

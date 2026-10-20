@@ -78,6 +78,13 @@ export function MapWorkspaceChrome({
   }, [map?.id]);
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
+      if (
+        e.defaultPrevented ||
+        (e.target as HTMLElement).closest(
+          'dialog,[role="dialog"],[role="alertdialog"],.record-select-menu',
+        )
+      )
+        return;
       if ((e.target as HTMLElement).closest('input,textarea,select,[contenteditable="true"]'))
         return;
       if (e.key === "/") {
@@ -372,7 +379,14 @@ export function MapEmptyWorkspace({ dm, settings }: { dm: boolean; settings: Rea
     [hidden, setHidden] = useState(false);
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
-      if (e.key === "Escape" && !(e.target as HTMLElement).closest("dialog")) setOpen(false);
+      if (
+        e.defaultPrevented ||
+        (e.target as HTMLElement).closest(
+          'dialog,[role="dialog"],[role="alertdialog"],.record-select-menu',
+        )
+      )
+        return;
+      if (e.key === "Escape") setOpen(false);
     };
     document.addEventListener("keydown", key);
     return () => document.removeEventListener("keydown", key);

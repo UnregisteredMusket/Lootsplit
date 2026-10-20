@@ -71,6 +71,19 @@ async function destination(page, href, label) {
       [...target.searchParams].every(([key, value]) => url.searchParams.get(key) === value),
   );
   await expect(page.locator("main").first()).toBeVisible();
+  if (target.pathname === "/maps") {
+    const workspace = page.getByRole("region", { name: "Map workspace", exact: true });
+    await expect(workspace).toBeVisible();
+    const bounds = await workspace.boundingBox();
+    const viewport = page.viewportSize();
+    assert.ok(
+      bounds &&
+        viewport &&
+        Math.abs(bounds.width - viewport.width) <= 1 &&
+        Math.abs(bounds.height - viewport.height) <= 1,
+      "Maps fills the viewport after real navigation",
+    );
+  }
   if (target.pathname.startsWith("/features/")) {
     await expect(
       page.getByRole("heading", {
@@ -385,6 +398,12 @@ try {
       const nav = page.locator('nav[aria-label="Sections"]:visible');
       const labels = await nav.locator("a").allTextContents();
       for (const label of labels) {
+        if (new URL(page.url()).pathname === "/maps")
+          await click(
+            page,
+            page.getByRole("link", { name: "Back to Lootsplit", exact: true }),
+            `${role} Maps return before desktop feature navigation`,
+          );
         await click(
           page,
           nav.getByRole("link", { name: label.trim(), exact: true }),

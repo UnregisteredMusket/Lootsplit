@@ -1,3 +1,4 @@
+import { openMapSettings } from "./map-workspace-browser.mjs";
 import { chooseOption } from "./search-select-browser.mjs";
 import assert from "node:assert/strict";
 import { readFile, mkdir } from "node:fs/promises";
@@ -348,6 +349,7 @@ try {
       .locator('nav[aria-label="Sections"]:visible')
       .getByRole("link", { name: "Maps", exact: true })
       .click();
+    await openMapSettings(page);
     await page.getByRole("button", { name: "Manage campaign locations", exact: true }).click();
     const locationPicker = page.getByLabel("Party location", { exact: true });
     await locationPicker.click();

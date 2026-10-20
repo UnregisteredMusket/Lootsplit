@@ -3552,7 +3552,7 @@ input,select,textarea { max-width: 100%; }
 /* Maps workspace: reference composition, with canonical Lootsplit tools. */
 .maps-shell > div > aside, .maps-shell > div > div > header, .maps-shell > nav[aria-label="Sections"] { display:none !important; }
 .maps-shell > div { display:block; }
-.maps-shell .concept-main { max-width:none; padding:0; }
+.maps-shell .concept-main { max-width:none; min-height:100dvh; padding:0; }
 .map-workspace-loading { position:fixed; inset:0; display:grid; place-items:center; background:var(--color-bg); z-index:45; }
 .map-workspace.map-view-frame { position:fixed; inset:0; z-index:45; width:100%; height:100dvh; padding:0; margin:0; overflow:hidden; font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",sans-serif; font-size:14px; --map-panel:color-mix(in srgb,var(--color-bg) 89%,transparent); --map-edge:color-mix(in srgb,var(--color-fg) 10%,transparent); --map-shadow:0 3px 15px #0002; }
 .map-glass { background:var(--map-panel); color:var(--color-fg); border:1px solid var(--map-edge); border-radius:18px; box-shadow:var(--map-shadow); backdrop-filter:blur(14px); -webkit-backdrop-filter:blur(14px); }

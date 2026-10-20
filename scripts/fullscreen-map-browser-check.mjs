@@ -62,6 +62,12 @@ export async function checkFullscreenMap(page, output, width) {
   await page.getByRole("button", { name: "Map settings", exact: true }).click();
   const drawer = page.locator("#map-settings");
   await expect(drawer).toBeVisible();
+  const categoryPicker = page.getByLabel("Map type filter", { exact: true });
+  await categoryPicker.click();
+  await expect(page.locator(".record-select-menu:visible")).toBeVisible();
+  await page.keyboard.press("Escape");
+  await expect(categoryPicker).toHaveAttribute("aria-expanded", "false");
+  await expect(drawer).toBeVisible();
   await expectMapFillsScreen(page, true);
   await expect.poll(sameCamera).toBe(true);
   if (width < 600) {

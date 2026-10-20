@@ -1606,7 +1606,13 @@ function MapViewport({
   };
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
-      if (e.defaultPrevented || (e.target as HTMLElement).closest("dialog")) return;
+      if (
+        e.defaultPrevented ||
+        (e.target as HTMLElement).closest(
+          'dialog,[role="dialog"],[role="alertdialog"],.record-select-menu',
+        )
+      )
+        return;
       if (e.key === "Escape") {
         if (drawerOpen) setDrawerOpen(false);
         else if (moreTools) setMoreTools(false);
@@ -1764,6 +1770,13 @@ function MapViewport({
         role="region"
         aria-label="Map settings"
         onKeyDown={(e) => {
+          if (
+            e.defaultPrevented ||
+            (e.target as HTMLElement).closest(
+              'dialog,[role="dialog"],[role="alertdialog"],.record-select-menu',
+            )
+          )
+            return;
           if (e.key === "Escape") {
             e.stopPropagation();
             setDrawerOpen(false);
