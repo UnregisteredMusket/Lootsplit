@@ -350,11 +350,15 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | native / native-widget (24) / Run actions/setup-node@v4 | open | 2 | 2s → 7s | +5s | +250% |
 | native / native-widget (35) / Run android-actions/setup-android@v3 | open | 2 | 11s → 15s | +4s | +36.36% |
 | verify / Packaged Worker / interface (balanced v2) / Run actions/setup-node@v4 | open | 2 | 3s → 5s | +2s | +66.67% |
+| native-widget (24) / Run android-actions/setup-android@v3 | open | 2 | 15s → 33s | +18s | +120% |
 
 ## Recorded slowdowns
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-20T21:37:54Z | job: native-widget (24) | 353s → 430s | +77s | +21.81% | failure | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39414345683/job/118599590044) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39500945465/job/118897980669) |
+| 2026-10-20T21:35:18Z | step: native-widget (24) / Compile native app, instrumentation and lint | 153s → 207s | +54s | +35.29% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39414345683/job/118599590044) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39500945465/job/118897980669) |
+| 2026-10-20T21:31:26Z | step: native-widget (24) / Run android-actions/setup-android@v3 | 18s → 33s | +15s | +83.33% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39454345394/job/118737126267) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39500945465/job/118897980669) |
 | 2026-10-20T21:32:07Z | step: Development / gameplay (balanced v2) / Run actions/upload-artifact@v4 | 4s → 5s | +1s | +25% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38309026871/job/115009957568) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39499912844/job/118894993129) |
 | 2026-10-20T21:28:02Z | step: Development / accounts / dev-monitor | 6s → 7s | +1s | +16.67% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39420205097/job/118619170610) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39499912844/job/118894992959) |
 | 2026-10-20T21:21:19Z | step: native-widget (24) / Run actions/checkout@v4 | 1s → 2s | +1s | +100% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39414345683/job/118599590044) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39499647350/job/118893583521) |
