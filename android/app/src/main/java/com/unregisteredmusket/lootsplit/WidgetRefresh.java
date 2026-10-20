@@ -36,6 +36,7 @@ final class WidgetRefresh {
 
     static synchronized Task request(Context context, boolean manual, Completion completion) {
         Context app = context.getApplicationContext();
+        WidgetClient.initialize(app);
         JSONObject state = WidgetStore.read(app);
         String token = state.optString("token"), generation = state.optString("generation");
         if (token.isEmpty()) {
@@ -89,7 +90,7 @@ final class WidgetRefresh {
             if (active == task) active = null;
             try {
                 boolean current;
-                if (denied) current = WidgetStore.clearGeneration(task.context, task.generation);
+                if (denied) current = WidgetStore.revoke(task.context, task.generation, "Owner authorization was rejected. Tap Sign in to reconnect.");
                 else if (snapshot != null) current = WidgetStore.finish(task.context, task.generation, snapshot, "");
                 else current = WidgetStore.message(task.context, task.generation, error);
                 if (!current) error = "Account changed. Refresh the current account.";

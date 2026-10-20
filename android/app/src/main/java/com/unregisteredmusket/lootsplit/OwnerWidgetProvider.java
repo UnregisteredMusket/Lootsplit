@@ -26,74 +26,64 @@ public class OwnerWidgetProvider extends AppWidgetProvider {
     static void renderAll(Context context) {
         AppWidgetManager manager = AppWidgetManager.getInstance(context);
         for (int id : ids(context)) render(context, manager, id, manager.getAppWidgetOptions(id));
+        CompanionWidgetProvider.renderAll(context);
+        manager.notifyAppWidgetViewDataChanged(ids(context), R.id.monitor_list);
     }
-    static void render(Context context, AppWidgetManager manager, int id, Bundle options) {
-        JSONObject state = WidgetStore.read(context);
-        if (Build.VERSION.SDK_INT >= 31) {
-            Map<SizeF, RemoteViews> layouts = new LinkedHashMap<>();
-            layouts.put(new SizeF(250, 300), views(context, state, false));
-            layouts.put(new SizeF(250, 480), views(context, state, true));
-            manager.updateAppWidget(id, new RemoteViews(layouts));
-        } else {
-            boolean portrait = context.getResources().getConfiguration().orientation != android.content.res.Configuration.ORIENTATION_LANDSCAPE;
-            int height = options.getInt(portrait ? AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT : AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, 480);
-            manager.updateAppWidget(id, views(context, state, height >= 480));
-        }
-    }
-
-    static RemoteViews views(Context context, JSONObject state, boolean expanded) {
-        RemoteViews view = new RemoteViews(context.getPackageName(), R.layout.owner_widget);
-        view.setViewVisibility(R.id.monitor_details, expanded ? View.VISIBLE : View.GONE);
-        view.setViewVisibility(R.id.monitor_services, expanded ? View.VISIBLE : View.GONE);
-        view.setViewVisibility(R.id.monitor_development_time, expanded ? View.VISIBLE : View.GONE);
-        view.setViewVisibility(R.id.monitor_release, expanded ? View.VISIBLE : View.GONE);
-        view.setViewVisibility(R.id.monitor_deployment, expanded ? View.VISIBLE : View.GONE);
+    static JSONObject current(JSONObject state) {
         JSONObject snapshot = state.optJSONObject("snapshot");
-        // A cached snapshot is explicitly dated; old cache is cleared on the next host render.
-        if (snapshot != null && System.currentTimeMillis() - snapshot.optLong("checkedAt") > 3600000) snapshot = null;
-        boolean connected = !state.optString("token").isEmpty();
-        String message = state.optString("message");
-        boolean refreshing = connected && "Refreshing…".equals(message);
-        if (!connected) snapshot = null;
-        text(view, R.id.monitor_identity, snapshot == null ? "OWNER ACCESS" : "OWNER ACCESS  /  " + snapshot.optString("name"));
-        text(view, R.id.monitor_email, snapshot == null ? "Tap to open My account" : snapshot.optString("email"));
-        text(view, R.id.monitor_health, refreshing ? "REFRESHING" : snapshot == null
-            ? (connected ? "AWAITING CHECK" : "CONNECT ACCOUNT")
-            : message.isEmpty() ? snapshot.optString("health") : "LAST KNOWN STATUS");
-        view.setTextColor(R.id.monitor_health, snapshot != null && message.isEmpty() && snapshot.optBoolean("healthy") ? Color.rgb(19, 245, 128) : Color.rgb(238, 199, 113));
-        text(view, R.id.monitor_services, !message.isEmpty() ? message : snapshot == null ? "Tap refresh to check" : snapshot.optString("services"));
-        text(view, R.id.monitor_active, value(snapshot, "active"));
-        text(view, R.id.monitor_totals, "ACCOUNTS " + value(snapshot, "accounts") + "    CAMPAIGNS " + value(snapshot, "campaigns"));
-        text(view, R.id.monitor_traffic, snapshot == null ? "Unavailable" : snapshot.optString("traffic"));
-        text(view, R.id.monitor_traffic_time, "LAST 24 HOURS" + (snapshot == null ? "" : snapshot.optString("trafficTime")));
-        text(view, R.id.monitor_game, snapshot == null ? "Unavailable" : snapshot.optString("games"));
-        text(view, R.id.monitor_game_time, "SHARED CAMPAIGNS" + (snapshot == null ? "" : snapshot.optString("gamesTime")));
-        text(view, R.id.monitor_backups, "CLOUD BACKUPS  " + value(snapshot, "backups"));
-        text(view, R.id.monitor_development, snapshot == null ? "Development unavailable" : expanded
-            ? snapshot.optString("development") : snapshot.optString("development") + " / " + snapshot.optString("deployment"));
-        text(view, R.id.monitor_deployment, snapshot == null ? "Deployment unavailable" : snapshot.optString("deployment"));
-        text(view, R.id.monitor_development_time, "RECENT GITHUB ACTIVITY" + (snapshot == null ? "" : snapshot.optString("developmentTime")));
-        text(view, R.id.monitor_release, "WEB " + value(snapshot, "commit") + "  /  APP " + appVersion(context));
-        text(view, R.id.monitor_checked, snapshot == null ? "No current reading" : (message.isEmpty() ? "Checked " : "Last reading ") + WidgetData.time(snapshot.optLong("checkedAt")));
-        Intent open = new Intent(context, MainActivity.class).putExtra(OPEN, true)
-            .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
-        PendingIntent account = PendingIntent.getActivity(context, 197400, open, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
-        view.setOnClickPendingIntent(R.id.monitor_account, account);
-        view.setOnClickPendingIntent(R.id.monitor_open, account);
-        view.setOnClickPendingIntent(R.id.monitor_refresh, PendingIntent.getBroadcast(context, 197401,
-            new Intent(context, OwnerWidgetProvider.class).setAction(REFRESH).addFlags(Intent.FLAG_RECEIVER_FOREGROUND),
-            PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE));
+        if (state.optString("token").isEmpty() || snapshot == null || System.currentTimeMillis()-snapshot.optLong("checkedAt")>3600000) return null;
+        return snapshot;
+    }
+    static String statusColor(JSONObject snapshot) {
+        if(snapshot==null)return "yellow";
+        String color=snapshot.optString("statusColor","yellow");
+        return "red".equals(color)?"red":System.currentTimeMillis()-snapshot.optLong("checkedAt")>120000?"yellow":color;
+    }
+    static int color(String value) { return "red".equals(value)?Color.rgb(244,114,114):"green".equals(value)?Color.rgb(19,245,128):Color.rgb(238,199,113); }
+    static void render(Context context, AppWidgetManager manager, int id, Bundle options) {
+        manager.updateAppWidget(id, views(context, WidgetStore.read(context), true, id));
+    }
+    static RemoteViews views(Context context, JSONObject state, boolean expanded) { return views(context,state,expanded,-1); }
+    static RemoteViews views(Context context, JSONObject state, boolean expanded, int id) {
+        RemoteViews view=new RemoteViews(context.getPackageName(),R.layout.owner_widget);
+        boolean light=WidgetAppearance.light(context,id);
+        view.setInt(R.id.monitor_root,"setBackgroundColor",light?Color.rgb(247,242,228):Color.rgb(7,23,18));
+        if(light) for(int target: new int[]{R.id.monitor_title,R.id.monitor_identity,R.id.monitor_email,R.id.monitor_services,R.id.monitor_active,R.id.monitor_totals,R.id.monitor_development,R.id.monitor_timer,R.id.monitor_checked,R.id.monitor_open,R.id.monitor_refresh}) view.setTextColor(target,light?Color.rgb(32,72,51):Color.rgb(177,214,193));
+        JSONObject snapshot=current(state),task=snapshot==null?null:snapshot.optJSONObject("task");
+        boolean connected=!state.optString("token").isEmpty(); String message=state.optString("message");
+        boolean refreshing=connected&&"Refreshing…".equals(message);
+        text(view,R.id.monitor_identity,snapshot==null?"OWNER ACCESS":"OWNER ACCESS / "+snapshot.optString("name"));
+        text(view,R.id.monitor_email,snapshot==null?"Tap Sign in to connect your owner account":snapshot.optString("email"));
+        text(view,R.id.monitor_health,refreshing?"REFRESHING":snapshot==null?(connected?"AWAITING CHECK":"SIGN IN REQUIRED"):message.isEmpty()?snapshot.optString("health"):"LAST KNOWN STATUS");
+        view.setTextColor(R.id.monitor_health,color(statusColor(snapshot)));
+        text(view,R.id.monitor_services,!message.isEmpty()?message:snapshot==null?"No current reading":snapshot.optString("overallReason"));
+        text(view,R.id.monitor_active,snapshot==null?"—":snapshot.optString("active"));
+        text(view,R.id.monitor_totals,snapshot==null?"ACCOUNT ACTIVITY · PAST 5 MINUTES":"ACTIVE · 5 MINUTES   /   ACCOUNTS "+snapshot.optString("accounts")+"   /   CAMPAIGNS "+snapshot.optString("campaigns"));
+        text(view,R.id.monitor_development,task==null||!task.optBoolean("active")?"No development task active":task.optString("title")+" · "+task.optString("phase")+" · "+task.optString("state"));
+        view.setViewVisibility(R.id.monitor_timer,task==null?View.GONE:View.VISIBLE);
+        if(task!=null) { long start=task.optLong("startedAt"),end=task.optLong("completedAt",0); view.setChronometer(R.id.monitor_timer,android.os.SystemClock.elapsedRealtime()-Math.max(0,(end>0?end:System.currentTimeMillis())-start),"Total elapsed %s",end==0&&task.optBoolean("active")); }
+        view.setOnClickPendingIntent(R.id.monitor_development,WidgetActions.pending(context,id,"task",false));
+        view.setOnClickPendingIntent(R.id.monitor_timer,WidgetActions.pending(context,id,"task",false));
+        org.json.JSONArray rows=WidgetRows.rows(snapshot);
+        if(Build.VERSION.SDK_INT>=31) {
+            RemoteViews.RemoteCollectionItems.Builder items=new RemoteViews.RemoteCollectionItems.Builder().setViewTypeCount(1).setHasStableIds(false);
+            for(int i=0;i<rows.length();i++)items.addItem(i,OwnerWidgetService.rowView(context,rows.optJSONObject(i),id));
+            view.setRemoteAdapter(R.id.monitor_list,items.build());
+        } else {
+            Intent service=new Intent(context,OwnerWidgetService.class).putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID,id).putExtra("generation",state.optString("generation"));
+            service.setData(android.net.Uri.parse("lootsplit-widget://collection/"+id+"/"+state.optString("generation","empty")));
+            view.setRemoteAdapter(R.id.monitor_list,service);
+        }
+        Intent template=new Intent(context,MainActivity.class).putExtra(OPEN,true).setData(android.net.Uri.parse("lootsplit-widget://collection-open/"+id)).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP|Intent.FLAG_ACTIVITY_SINGLE_TOP);
+        view.setPendingIntentTemplate(R.id.monitor_list,PendingIntent.getActivity(context,230000+Math.max(0,id),template,PendingIntent.FLAG_UPDATE_CURRENT|(Build.VERSION.SDK_INT>=31?PendingIntent.FLAG_MUTABLE:0)));
+        text(view,R.id.monitor_checked,snapshot==null?"No current reading":(message.isEmpty()?"Checked ":"Last reading ")+WidgetData.time(snapshot.optLong("checkedAt"))+" · #"+snapshot.optLong("snapshotId"));
+        view.setOnClickPendingIntent(R.id.monitor_account,WidgetActions.pending(context,id,"account",false));
+        text(view,R.id.monitor_open,connected?"LOGS / REPORTS":"SIGN IN");
+        view.setOnClickPendingIntent(R.id.monitor_open,WidgetActions.pending(context,id,connected?"logs":"account",false));
+        view.setOnClickPendingIntent(R.id.monitor_refresh,WidgetActions.pending(context,id,"refresh",false));
         return view;
     }
-    private static String appVersion(Context context) {
-        try { return context.getPackageManager().getPackageInfo(context.getPackageName(), 0).versionName; }
-        catch (Exception ignored) { return "—"; }
-    }
-    private static String value(JSONObject snapshot, String key) { return snapshot == null ? "—" : snapshot.optString(key, "—"); }
-    private static void text(RemoteViews view, int id, String text) {
-        view.setTextViewText(id, text);
-        view.setContentDescription(id, text);
-    }
+    private static void text(RemoteViews view,int id,String text) { view.setTextViewText(id,text);view.setContentDescription(id,text); }
     @Override public void onUpdate(Context context, AppWidgetManager manager, int[] ids) {
         renderAll(context);
         OwnerWidgetJob.schedule(context);
@@ -108,8 +98,11 @@ public class OwnerWidgetProvider extends AppWidgetProvider {
             WidgetRefresh.request(context, true, error -> pending.finish());
         }
     }
+    @Override public void onDeleted(Context context,int[] ids){ for(int id:ids)CompanionSettings.remove(context,id); }
     @Override public void onDisabled(Context context) {
-        OwnerWidgetJob.cancel(context);
-        WidgetStore.clear(context, null);
+        if (CompanionWidgetProvider.ids(context).length == 0) {
+            OwnerWidgetJob.cancel(context);
+            WidgetStore.clear(context, null);
+        }
     }
 }

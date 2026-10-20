@@ -5,4 +5,5 @@
     android:targetCellWidth="4" android:targetCellHeight="4"
     android:resizeMode="horizontal|vertical" android:updatePeriodMillis="1800000"
     android:initialLayout="@layout/owner_widget" android:previewLayout="@layout/owner_widget"
+    android:configure="com.unregisteredmusket.lootsplit.CompanionWidgetConfigureActivity" android:widgetFeatures="reconfigurable|configuration_optional"
     android:description="@string/owner_widget_description" android:widgetCategory="home_screen" />

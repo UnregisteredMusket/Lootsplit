@@ -1,5 +1,24 @@
 [
   {
+    "version": "1.9.0",
+    "date": "2026-10-20",
+    "summary": "Synchronized owner monitoring, daily reports and configurable Android companion.",
+    "features": [
+      "Persistent backend monitoring every30 minutes, daily calendar reports and a central registry that includes future logs.",
+      "Shared development tasks, persistent timing, component diagnostics and explicit coverage/stall warnings.",
+      "Independent4\u00d71 companion widgets with per-instance presets, summaries, toolbar actions and themes."
+    ],
+    "improvements": [
+      "Shared website and Android account monitoring, bounded web scrolling and native main-widget collections.",
+      "Dated snapshots, source freshness, historical recovery, exports and performance-log cross-references.",
+      "Supported native elapsed timers and reduced-motion website warnings."
+    ],
+    "fixes": [
+      "Retains direct home-screen refresh independently of My account and explains actual sign-in requirements.",
+      "Preserves confirmed component failures during disconnection and rejects out-of-order snapshots/task updates."
+    ]
+  },
+  {
     "version": "1.8.1",
     "date": "2026-10-20",
     "summary": "Home-screen Field monitor refresh reliability.",
@@ -22,7 +41,7 @@
       "Includes the current Maps workspace, connected scenes, encounter handoff, protected map media, fog and drawing tools."
     ],
     "improvements": [
-      "Connect, add, refresh and disconnect the home-screen widget from My account; the in-app and website interfaces retain Lootsplit’s theme.",
+      "Connect, add, refresh and disconnect the home-screen widget from My account; the in-app and website interfaces retain Lootsplit\u2019s theme.",
       "Dated readings, explicit unavailable sources and battery-aware background checks make monitoring status clear.",
       "Packages the current campaign controls, role-specific Help and preserved account recovery flows."
     ],
@@ -78,7 +97,7 @@
     "fixes": [
       "Account campaign resume reconciles server acknowledgements before treating cached actions as unsynced, removing the false unfinished-turn blocker.",
       "Genuine unsynced actions and server turn drafts remain reachable through Multiplayer recovery while preserving command and retry identifiers.",
-      "Older-seat device actions are preserved separately and are not replayed with another seat’s permissions."
+      "Older-seat device actions are preserved separately and are not replayed with another seat\u2019s permissions."
     ]
   },
   {
@@ -109,7 +128,7 @@
     "summary": "Account-owned campaigns, safer shared sessions, refreshed themes and optional fantasy sounds.",
     "features": [
       "Animated opening scene with a loot-hauling adventurer, coin-collecting rogue, and reduced-motion support.",
-      "Adventurer’s Ledger light theme and Ironbound Dragon dark theme, plus Pen & Paper and Virtual roll modes.",
+      "Adventurer\u2019s Ledger light theme and Ironbound Dragon dark theme, plus Pen & Paper and Virtual roll modes.",
       "Optional CC0 coin, loot and page-turn sound effects, with device volume and preview controls; automatic sounds default off.",
       "Account-owned DM campaigns with explicit End session, expiring invitations and guest play without persistent campaign storage.",
       "Party Add loot supports Open5e search and custom items; scanned character/statblock imports offer local OCR and review."

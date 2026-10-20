@@ -8,6 +8,8 @@ import java.nio.charset.StandardCharsets;
 import javax.net.ssl.HttpsURLConnection;
 
 final class WidgetClient {
+    private static android.content.Context appContext;
+    static void initialize(android.content.Context context) { appContext = context.getApplicationContext(); }
     static final String ENDPOINT = "https://lootsplit.oliverstorie2017.workers.dev/api/account/owner/monitor";
     static final class AccessDenied extends Exception { }
     interface ConnectionFactory { HttpsURLConnection open() throws Exception; }
@@ -26,6 +28,12 @@ final class WidgetClient {
             connection.setRequestProperty("Authorization", "Bearer " + token);
             connection.setRequestProperty("Accept", "application/json");
             connection.setRequestProperty("Cache-Control", "no-store");
+            if (appContext != null) {
+                connection.setRequestProperty("X-Lootsplit-Device", WidgetStore.deviceId(appContext));
+                JSONObject previous = WidgetStore.read(appContext).optJSONObject("snapshot");
+                connection.setRequestProperty("X-Lootsplit-Snapshot", Long.toString(previous == null ? 0 : previous.optLong("snapshotId")));
+                try { connection.setRequestProperty("X-Lootsplit-Version", appContext.getPackageManager().getPackageInfo(appContext.getPackageName(), 0).versionName); } catch (Exception ignored) { }
+            }
             int code = connection.getResponseCode();
             if (code == 401 || code == 403) throw new AccessDenied();
             String contentType = connection.getContentType();

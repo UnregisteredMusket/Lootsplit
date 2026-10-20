@@ -16,9 +16,10 @@ public class OwnerWidgetJob extends JobService {
     static void schedule(Context context) {
         if (WidgetStore.read(context).optString("token").isEmpty()) return;
         JobScheduler scheduler = context.getSystemService(JobScheduler.class);
-        if (scheduler.getPendingJob(ID) == null) scheduler.schedule(new JobInfo.Builder(ID,
+        JobInfo existing=scheduler.getPendingJob(ID);
+        if (existing == null || !existing.isPeriodic() || !existing.isPersisted()) scheduler.schedule(new JobInfo.Builder(ID,
             new ComponentName(context, OwnerWidgetJob.class))
-            .setRequiredNetworkType(JobInfo.NETWORK_TYPE_ANY).setMinimumLatency(0).build());
+            .setRequiredNetworkType(JobInfo.NETWORK_TYPE_ANY).setPeriodic(1800000, 300000).setPersisted(true).build());
     }
     static void cancel(Context context) { context.getSystemService(JobScheduler.class).cancel(ID); }
     @Override public boolean onStartJob(JobParameters params) {
