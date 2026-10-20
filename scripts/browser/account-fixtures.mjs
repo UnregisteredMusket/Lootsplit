@@ -4,6 +4,12 @@ import { openApplication, prepareDmFixture } from "../title-screen-navigation.mj
 import { accountScenarios, externalAuditRequests } from "../account-scenarios.mjs";
 
 export { expect };
+// Account recovery uses devices whose optional Help offer was already answered.
+// The Help audit checks the real first offer/dismissal at both screen widths.
+// Keep startup, cold documents, authentication and network isolation unchanged.
+const answeredGuide = (origin) => {
+  if (location.origin === origin) localStorage.setItem("quire.guide.offer.v3", "seen");
+};
 async function isolatePage(context, page, origin) {
   // Playwright routing turns off HTTP caching and intercepts every request at
   // the protocol layer, even with an external-only regex. Current Chromium can
@@ -28,6 +34,7 @@ async function isolatePage(context, page, origin) {
 export const test = base.extend({
   devices: async ({ context, page, browser, baseURL }, runFixture, testInfo) => {
     const contexts = [context];
+    await context.addInitScript(answeredGuide, baseURL);
     await isolatePage(context, page, baseURL);
     // Each synthetic device is a separate local client, including its rate-limit
     // identity. Faster independent tests must not share one localhost quota.
@@ -45,6 +52,7 @@ export const test = base.extend({
         extraHTTPHeaders: { "cf-connecting-ip": `192.0.2.${address + contexts.length}` },
       });
       contexts.push(other);
+      await other.addInitScript(answeredGuide, baseURL);
       other.on("page", watch);
       const otherPage = await other.newPage();
       await isolatePage(other, otherPage, baseURL);

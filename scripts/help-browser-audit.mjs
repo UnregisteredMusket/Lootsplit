@@ -13,7 +13,6 @@ let activePage;
 try {
   for (const width of [1280, 390]) {
     const context = await browser.newContext({ viewport: { width, height: 844 } });
-    await context.addInitScript(() => localStorage.setItem("quire.guide.offer.v3", "seen"));
     const page = await context.newPage();
     activePage = page;
     page.setDefaultTimeout(20000);
@@ -39,6 +38,10 @@ try {
     );
     // Public help stays anonymous; protected destinations require a real DM account.
     await prepareDmFixture(page, origin);
+    const offer = page.getByRole("dialog", { name: "View the instructions?", exact: true });
+    await offer.getByRole("button", { name: "Not now", exact: true }).click();
+    await offer.waitFor({ state: "hidden" });
+    assert.equal(await page.evaluate(() => localStorage.getItem("quire.guide.offer.v3")), "no");
     await openApplication(page, origin + "/help#downtime");
     await page.locator("#downtime[open]").waitFor();
     await page.getByRole("link", { name: "Play sessions", exact: false }).click();
@@ -46,6 +49,7 @@ try {
     const { continueIntoApp } = await import("./title-screen-navigation.mjs");
     await continueIntoApp(page);
     await page.locator('#sessions button[aria-expanded="true"]').waitFor();
+    assert.equal(await offer.count(), 0, "The dismissed offer stays dismissed after a cold entry");
     await openApplication(page, origin + "/settings#appearance");
     await page.getByLabel("Accent color", { exact: true }).waitFor();
     await openApplication(page, origin + "/?view=home#management");
