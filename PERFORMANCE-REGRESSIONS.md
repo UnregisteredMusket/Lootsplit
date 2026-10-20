@@ -49,7 +49,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Code checks and immutable builds / Run actions/upload-artifact@v4 | open | 3 | 2s → 5s | +3s | +150% |
 | Packaged Worker / interface / Run actions/setup-node@v4 | open | 4 | 3s → 14s | +11s | +366.67% |
 | Packaged Worker / accounts / Run actions/setup-node@v4 | open | 3 | 2s → 11s | +9s | +450% |
-| Development / governance / dev-campaign-governance | open | 5 | 18s → 114s | +96s | +533.33% |
+| Development / governance / dev-campaign-governance | open | 6 | 18s → 138s | +120s | +666.67% |
 | Packaged standby / Run npm ci | open | 3 | 10s → 18s | +8s | +80% |
 | Development / governance / dev-theme | open | 4 | 13s → 45s | +32s | +246.15% |
 | Packaged Worker / accounts / Run actions/download-artifact@v4 | open | 3 | 1s → 10s | +9s | +900% |
@@ -318,6 +318,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-20T07:28:29Z | step: Development / governance / dev-campaign-governance | 114s → 138s | +24s | +21.05% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37661353259/job/112929395891) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39386388734/job/118507127846) |
 | 2026-10-20T07:12:01Z | step: Code checks and immutable builds / unit-tests | 37s → 43s | +6s | +16.22% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38139715608/job/114470877114) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39384840390/job/118502107783) |
 | 2026-10-20T07:10:58Z | step: Development / desktop (balanced v2) / Run actions/checkout@v4 | 2s → 3s | +1s | +50% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38301994659/job/114986882289) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39384840390/job/118502107553) |
 | 2026-10-20T07:07:15Z | job: Packaged Worker / interface (balanced v2) | 446s → 567s | +121s | +27.13% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38310299946/job/115014983235) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39383219852/job/118497700523) |
