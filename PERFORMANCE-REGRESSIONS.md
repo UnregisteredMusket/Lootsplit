@@ -352,11 +352,16 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | native / native-widget (35) / Run android-actions/setup-android@v3 | open | 2 | 11s → 15s | +4s | +36.36% |
 | verify / Packaged Worker / interface (balanced v2) / Run actions/setup-node@v4 | open | 2 | 3s → 5s | +2s | +66.67% |
 | native-widget (24) / Run android-actions/setup-android@v3 | open | 2 | 15s → 33s | +18s | +120% |
+| Android native widget verification | open | 2 | 354s → 554s | +200s | +56.5% |
+| native-widget (24) | open | 2 | 353s → 554s | +201s | +56.94% |
 
 ## Recorded slowdowns
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-20T21:45:50.000Z | workflow: Android native widget verification | 431s → 554s | +123s | +28.54% | failure | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39454444495) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39501737683) |
+| 2026-10-20T21:45:50Z | job: native-widget (24) | 430s → 554s | +124s | +28.84% | failure | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39500945465/job/118897980669) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39501737683/job/118900658741) |
+| 2026-10-20T21:45:47Z | step: native-widget (24) / Verify owner isolation, refresh transport and actual RemoteViews layouts | 145s → 388s | +243s | +167.59% | failure | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39414345683/job/118599590044) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39501737683/job/118900658741) |
 | 2026-10-20T21:42:46Z | step: Player references / worker / Run actions/upload-artifact@v4 | 3s → 6s | +3s | +100% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38138347179/job/114466796212) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39501737752/job/118902072554) |
 | 2026-10-20T21:37:54Z | job: native-widget (24) | 353s → 430s | +77s | +21.81% | failure | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39414345683/job/118599590044) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39500945465/job/118897980669) |
 | 2026-10-20T21:35:18Z | step: native-widget (24) / Compile native app, instrumentation and lint | 153s → 207s | +54s | +35.29% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39414345683/job/118599590044) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39500945465/job/118897980669) |
