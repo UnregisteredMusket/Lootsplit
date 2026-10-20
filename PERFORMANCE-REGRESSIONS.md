@@ -202,7 +202,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Packaged Worker / interface / worker-library-navigation | resolved | 2 | 13s → 37s | +24s | +184.62% |
 | mobile client build | open | 2 | 4.224s → 9.632s | +5.408s | +128.03% |
 | Development / gameplay / dev-control-panel | open | 3 | 14s → 29s | +15s | +107.14% |
-| Development / governance / dev-help | open | 4 | 13s → 67s | +54s | +415.38% |
+| Development / governance / dev-help | open | 5 | 13s → 78s | +65s | +500% |
 | Development / desktop | open | 2 | 168s → 690s | +522s | +310.71% |
 | Packaged Worker / interface / worker-library-navigation | open | 6 | 9s → 34s | +25s | +277.78% |
 | Development / gameplay / Run npm ci | open | 2 | 13s → 19s | +6s | +46.15% |
@@ -352,6 +352,8 @@ Open trends require investigation. Resolved trends retain their history; each ve
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-20T19:13:44Z | step: Packaged Worker / accounts (balanced v2) / worker-world-features | 94s → 110s | +16s | +17.02% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38309026871/job/115010777381) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39479706328/job/118825836861) |
+| 2026-10-20T19:06:24Z | step: Development / governance / dev-help | 67s → 78s | +11s | +16.42% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38131890269/job/114447832375) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39479706328/job/118824755668) |
 | 2026-10-20T18:53:20Z | step: native / native-widget (24) / Run actions/upload-artifact@v4 | 1s → 2s | +1s | +100% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39475576975/job/118810534367) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39475576975/job/118817769990) |
 | 2026-10-20T18:50:22Z | step: native / native-widget (24) / Compile native app, instrumentation and lint | 114s → 172s | +58s | +50.88% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39475576975/job/118810534367) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39475576975/job/118817769990) |
 | 2026-10-20T18:47:30Z | step: native / native-widget (24) / Run npm run build:mobile && npx cap sync android | 5s → 8s | +3s | +60% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39475576975/job/118810534367) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39475576975/job/118817769990) |
