@@ -287,6 +287,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Player references / worker / Verify player references and Help | open | 3 | 15s → 71s | +56s | +373.33% |
 | Player references / development / Run actions/upload-artifact@v4 | open | 2 | 1s → 3s | +2s | +200% |
 | Player references / worker / Run actions/setup-node@v4 | open | 3 | 4s → 9s | +5s | +125% |
+| Player references / worker / Run actions/upload-artifact@v4 | open | 2 | 2s → 6s | +4s | +200% |
 | Development / gameplay / dev-ships | open | 2 | 27s → 54s | +27s | +100% |
 | Focused player references / initial queue | open | 4 | 4s → 199s | +195s | +4875% |
 | Development / gameplay / dev-ships | open | 2 | 36s → 59s | +23s | +63.89% |
@@ -356,6 +357,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-20T21:42:46Z | step: Player references / worker / Run actions/upload-artifact@v4 | 3s → 6s | +3s | +100% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38138347179/job/114466796212) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39501737752/job/118902072554) |
 | 2026-10-20T21:37:54Z | job: native-widget (24) | 353s → 430s | +77s | +21.81% | failure | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39414345683/job/118599590044) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39500945465/job/118897980669) |
 | 2026-10-20T21:35:18Z | step: native-widget (24) / Compile native app, instrumentation and lint | 153s → 207s | +54s | +35.29% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39414345683/job/118599590044) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39500945465/job/118897980669) |
 | 2026-10-20T21:31:26Z | step: native-widget (24) / Run android-actions/setup-android@v3 | 18s → 33s | +15s | +83.33% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39454345394/job/118737126267) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39500945465/job/118897980669) |
