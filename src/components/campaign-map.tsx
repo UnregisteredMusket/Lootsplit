@@ -180,6 +180,14 @@ function CampaignMapWorkspace() {
     best ??
     maps.find((m) => !m.locationId) ??
     maps[0];
+  const combatPresentation =
+    dm && w.combat?.phase === "active" && w.combat.mapId === map?.id
+      ? w.combat.mode
+      : tabletopSession.presentation?.mapId === map?.id
+        ? tabletopSession.presentation?.mode
+        : undefined;
+  const effectiveTileMode =
+    !!map?.grid && (combatPresentation ? combatPresentation === "grid" : tileMode);
   const viewedMapId = map?.id;
   useEffect(() => {
     if (!viewedMapId || lastMap.current === viewedMapId) return;
@@ -450,14 +458,7 @@ function CampaignMapWorkspace() {
             }}
             party={party}
             selectedToken={selectedToken}
-            tileMode={
-              !!map.grid &&
-              (dm && w.combat?.phase === "active" && w.combat.mapId === map.id
-                ? w.combat.mode === "grid"
-                : tabletopSession.presentation?.mapId === map.id
-                  ? tabletopSession.presentation.mode === "grid"
-                  : tileMode)
-            }
+            tileMode={effectiveTileMode}
             routes={(t.journal.fleet?.voyages ?? [])
               .filter(
                 (v) =>
@@ -496,17 +497,29 @@ function CampaignMapWorkspace() {
 
                 {map.grid && (
                   <Button
-                    aria-pressed={tileMode}
+                    aria-pressed={effectiveTileMode}
+                    disabled={!!combatPresentation}
+                    title={
+                      combatPresentation
+                        ? "Return to exploration to change the local grid view."
+                        : undefined
+                    }
                     onClick={() => {
                       setTileMode(!tileMode);
                       setPlacement("");
                       setPoint(undefined);
                     }}
                   >
-                    {tileMode ? "Leave tile mode" : "Enter tile mode"}
+                    {combatPresentation
+                      ? effectiveTileMode
+                        ? "Encounter grid active"
+                        : "Encounter theatre view"
+                      : tileMode
+                        ? "Leave tile mode"
+                        : "Enter tile mode"}
                   </Button>
                 )}
-                {tileMode &&
+                {effectiveTileMode &&
                   map.grid &&
                   (dm ? (
                     <Fold title="Combat tiles" defaultOpen>
@@ -1342,7 +1355,13 @@ function MapViewport({
           aria-expanded={drawerOpen}
           aria-controls="fullscreen-map-tools"
           onClick={() => {
+            if (!drawerOpen && (service || combatOpen) && !allowContextChange()) return;
             tools.hideInspector();
+            if (!drawerOpen) {
+              setDetails([]);
+              setService(undefined);
+              setCombatOpen(false);
+            }
             setDrawerOpen((open) => !open);
           }}
         >

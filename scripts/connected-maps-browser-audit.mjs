@@ -16,7 +16,16 @@ try {
   });
   await writeFile(
     `${output}/result.json`,
-    JSON.stringify({ durationMs: Date.now() - started, results }, null, 2),
+    JSON.stringify(
+      {
+        startedAt: new Date(started).toISOString(),
+        finishedAt: new Date().toISOString(),
+        durationMs: Date.now() - started,
+        results,
+      },
+      null,
+      2,
+    ),
   );
   console.log(JSON.stringify({ durationMs: Date.now() - started, results }));
 } finally {

@@ -3516,8 +3516,8 @@ input,select,textarea { max-width: 100%; }
 
 /* Connected scene navigation stays inside the same fullscreen frame. */
 .map-scene-navigation { display:flex; flex-wrap:wrap; align-items:center; gap:6px; margin:6px 0 12px; }
-.map-scene-navigation > label { display:flex; align-items:center; gap:6px; min-width:0; flex:1; }
-.map-scene-navigation [role="combobox"] { min-width:100px; max-width:260px; }
+.map-scene-navigation > label { display:flex; align-items:center; gap:6px; min-width:0; flex:1 1 160px; }
+.map-scene-navigation [role="combobox"] { min-width:0; width:100%; max-width:260px; }
 .map-breadcrumbs { display:flex; gap:4px; overflow:auto; max-width:100%; }
 .map-breadcrumbs button { white-space:nowrap; }
 .map-breadcrumbs [aria-current="page"] { color:var(--color-accent); }

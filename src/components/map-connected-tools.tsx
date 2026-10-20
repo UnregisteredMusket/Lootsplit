@@ -293,6 +293,16 @@ export function MapConnectedTools({
           Visibility: {visibility === "party" ? "shared when both maps are accessible" : "DM only"}.
           Entry cameras change the view; they do not move tokens.
         </p>
+        <label>
+          Entrance visibility
+          <select
+            value={visibility}
+            onChange={(e) => setVisibility(e.target.value as typeof visibility)}
+          >
+            <option value="party">Shared when the destination is accessible</option>
+            <option value="dm">DM only</option>
+          </select>
+        </label>
         <Button onClick={begin}>Choose entrance position</Button>
       </CommandForm>
       {connected.links.map((l) => (

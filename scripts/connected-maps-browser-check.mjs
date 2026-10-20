@@ -218,6 +218,23 @@ export async function checkConnectedMaps({ browser, origin, output }) {
       await details.getByRole("button", { name: "Open in map", exact: true }).click();
       await details.getByRole("button", { name: /^Buy / }).click();
       await expect(details).toContainText("Purchase recorded.");
+      await details.getByRole("button", { name: "Edit", exact: true }).click();
+      await details.getByRole("button", { name: "Remove shop", exact: true }).click();
+      const confirmation = page.getByRole("alertdialog", {
+        name: "Remove this shop?",
+        exact: true,
+      });
+      await expect(confirmation).toBeVisible();
+      const cancel = confirmation.getByRole("button", { name: "Cancel", exact: true });
+      assert.ok(
+        await cancel.evaluate((e) => {
+          const r = e.getBoundingClientRect();
+          return e.contains(document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2));
+        }),
+        "Service confirmation belongs to the fullscreen top layer",
+      );
+      await cancel.click();
+      await expect(confirmation).toHaveCount(0);
       await expect(frame).toHaveClass(/map-fullscreen/);
       await details.getByRole("button", { name: "Close details", exact: true }).click();
       await frame.locator('button[title="Map: Watchtower gate"]').click();
@@ -259,6 +276,13 @@ export async function checkConnectedMaps({ browser, origin, output }) {
       await combat.getByRole("button", { name: "Start saved encounter here", exact: true }).click();
       await expect(frame.getByRole("img", { name: "Old Watchtower", exact: true })).toBeVisible();
       await expect(combat).toContainText("The encounter map is open.");
+      await frame.getByRole("button", { name: "Map tools", exact: true }).click();
+      await expect(combat).toHaveCount(0);
+      await expect(
+        frame.getByRole("button", { name: "Encounter grid active", exact: true }),
+      ).toBeDisabled();
+      await frame.getByRole("button", { name: "Open encounter map controls", exact: true }).click();
+      await combat.getByRole("button", { name: "Open encounter tracker", exact: true }).click();
       page.once("dialog", (dialog) => dialog.accept());
       await combat.getByRole("button", { name: "Conclude & review loot", exact: true }).click();
       await expect(combat).toContainText(

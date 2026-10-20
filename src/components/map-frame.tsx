@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState, type ReactNode } from "react";
 import { Maximize, Minimize } from "lucide-react";
 import { Button } from "./ui";
+import { OverlayContainer } from "./overlay-container";
 /** Native modal focus/escape handling, with the same mounted editor/viewport/draft. */
 export function MapFrame({
   children,
@@ -111,7 +112,9 @@ export function MapFrame({
         </Button>
       </div>
       {navigation}
-      {children}
+      <OverlayContainer.Provider value={full ? root.current : null}>
+        {children}
+      </OverlayContainer.Provider>
     </dialog>
   );
 }
