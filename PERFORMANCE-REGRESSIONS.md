@@ -315,6 +315,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Packaged Worker / accounts (balanced v2) / worker-finance | open | 2 | 28s → 48s | +20s | +71.43% |
 | Packaged Worker / accounts (balanced v2) / worker-ships | open | 2 | 33s → 45s | +12s | +36.36% |
 | Packaged Worker / accounts (balanced v2) / worker-map-tiles | open | 3 | 20s → 115s | +95s | +475% |
+| Packaged Worker / interface (balanced v2) / Run actions/upload-artifact@v4 | open | 2 | 3s → 5s | +2s | +66.67% |
 | Development / desktop (balanced v2) / dev-map-tiles | open | 4 | 35s → 169s | +134s | +382.86% |
 | test-apk / Set up job | open | 2 | 1s → 3s | +2s | +200% |
 
@@ -322,6 +323,10 @@ Open trends require investigation. Resolved trends retain their history; each ve
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-20T11:41:39Z | step: Packaged Worker / interface (balanced v2) / Run actions/upload-artifact@v4 | 4s → 5s | +1s | +25% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38936690063/job/117094844399) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39415364147/job/118604240489) |
+| 2026-10-20T11:33:47Z | step: Development / accounts / dev-monitor | 4s → 5s | +1s | +25% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37233368939/job/111527537940) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39415364147/job/118603285828) |
+| 2026-10-20T11:30:35Z | step: native-widget (35) / Run npm ci | 14s → 17s | +3s | +21.43% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39414345683/job/118599589608) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39415364222/job/118602956924) |
+| 2026-10-20T11:30:18Z | step: native-widget (35) / Run android-actions/setup-android@v3 | 10s → 14s | +4s | +40% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39414345683/job/118599589608) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39415364222/job/118602956924) |
 | 2026-10-20T11:16:02Z | job: native-widget (35) | 196s → 379s | +183s | +93.37% | failure | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39412443782/job/118593258468) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39412972974/job/118595030127) |
 | 2026-10-20T11:16:02.000Z | workflow: Android native widget verification | 196s → 380s | +184s | +93.88% | failure | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39412443782) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39412972974) |
 | 2026-10-20T11:15:19Z | job: native-widget (24) | 188s → 337s | +149s | +79.26% | failure | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39412443782/job/118593258095) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39412972974/job/118595029746) |
