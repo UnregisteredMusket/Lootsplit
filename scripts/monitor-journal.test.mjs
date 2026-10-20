@@ -5,6 +5,7 @@ import {
   INTERVAL,
   DEFAULT_CONFIG,
   compareMetric,
+  explanation,
   dayBounds,
   taskView,
   transitionTask,
@@ -49,6 +50,8 @@ test("comparison respects units, windows, zero baselines, unavailable values and
     compareMetric({ ...metric(10), kind: "instant" }, { ...metric(2), kind: "instant" }).change,
     -8,
   );
+  assert.match(explanation([compareMetric(undefined, metric(4))]), /cannot yet be measured/);
+  assert.match(explanation([compareMetric(metric(4), metric(4))]), /No significant changes/);
 });
 test("calendar reports retain New York DST and non-hour offsets", () => {
   for (const [day, hours] of [
@@ -529,6 +532,112 @@ test("historical traffic recovery preserves the original partial observation and
       collector: async () => reading(),
     });
     assert.equal(requests, 1);
+    const report = await generateReport(DB, "2026-10-20", DEFAULT_CONFIG, instant + 86400000);
+    const observed = report.trends.find((trend) => !trend.recovered);
+    const recovered = report.trends.find((trend) => trend.recovered);
+    assert.equal(observed.collectedAt, instant);
+    assert.equal(observed.comparisons.find((metric) => metric.key === "requests").current, null);
+    assert.equal(recovered.collectedAt, instant + 60000);
+    assert.equal(recovered.comparisons.find((metric) => metric.key === "requests").current, 8);
+    assert.ok(
+      report.evidence.some((entry) => /Recovered 8 requests and 0 errors/.test(entry.summary)),
+    );
+  } finally {
+    DB.close();
+  }
+});
+
+test("latest collection/report failures and observed Worker errors override earlier successful checks", async () => {
+  const { monitorSnapshot } = await import("../cloudflare/monitor-journal.mjs");
+  const DB = localAccountDb();
+  try {
+    await initializeMonitor(DB, instant);
+    await DB.prepare(
+      "INSERT INTO owner_monitor_intervals(slot,outcome,collected_at,body) VALUES(?,'complete',?,'{}'),(?,'failed',?,'{}')",
+    )
+      .bind(instant - INTERVAL, instant - INTERVAL, instant, instant)
+      .run();
+    const reportId = "America/New_York:2026-10-19";
+    await DB.prepare("INSERT INTO owner_monitor_reports VALUES(?,?,?,?,?)")
+      .bind(reportId, "2026-10-19", "America/New_York", instant - 1000, "{}")
+      .run();
+    await recordLog(
+      DB,
+      {
+        id: "report-failure-test",
+        source: "reports",
+        observedAt: instant,
+        outcome: "failed",
+        reportId,
+        summary: "Daily report regeneration failed.",
+      },
+      instant,
+    );
+    const snapshot = reading();
+    snapshot.traffic.data.errors = 2;
+    const check = async (now) =>
+      (
+        await monitorSnapshot({ DB }, "owner", {
+          now,
+          force: true,
+          collector: async () => snapshot,
+        })
+      ).diagnostics;
+    let diagnostics = await check(instant + 1);
+    for (const component of ["Scheduled collection", "Daily reporting", "Worker execution errors"])
+      assert.equal(
+        diagnostics.find((entry) => entry.component === component).color,
+        "red",
+        component,
+      );
+    await DB.prepare("UPDATE owner_monitor_intervals SET outcome='collecting' WHERE slot=?")
+      .bind(instant)
+      .run();
+    snapshot.traffic = { state: "unavailable", checkedAt: instant + 2, data: null };
+    diagnostics = await check(instant + 2);
+    assert.equal(
+      diagnostics.find((entry) => entry.component === "Scheduled collection").retainedFailure,
+      true,
+    );
+    assert.equal(
+      diagnostics.find((entry) => entry.component === "Worker execution errors").retainedFailure,
+      true,
+    );
+    await DB.prepare(
+      "INSERT INTO owner_monitor_reports VALUES('unrelated','2026-10-18','America/New_York',?,'{}')",
+    )
+      .bind(instant + 3)
+      .run();
+    diagnostics = await check(instant + 3);
+    assert.equal(
+      diagnostics.find((entry) => entry.component === "Daily reporting").color,
+      "red",
+      "A different report cannot resolve a failed regeneration",
+    );
+    await DB.prepare("UPDATE owner_monitor_intervals SET outcome='complete' WHERE slot=?")
+      .bind(instant)
+      .run();
+    await DB.prepare("UPDATE owner_monitor_reports SET generated_at=? WHERE id=?")
+      .bind(instant + 4, reportId)
+      .run();
+    snapshot.traffic = source({ requests: 10, errors: 0 });
+    diagnostics = await check(instant + 4);
+    for (const component of ["Scheduled collection", "Daily reporting", "Worker execution errors"])
+      assert.equal(
+        diagnostics.find((entry) => entry.component === component).color,
+        "green",
+        component,
+      );
+    await assert.rejects(generateReport(DB, "2026-10-22", DEFAULT_CONFIG, instant));
+    assert.equal(
+      (
+        await DB.prepare(
+          "SELECT COUNT(*) AS n FROM owner_monitor_logs WHERE source='reports' AND json_extract(body,'$.outcome')='failed'",
+        ).first()
+      ).n,
+      1,
+      "Invalid user input is not a failed scheduled report",
+    );
   } finally {
     DB.close();
   }

@@ -77,7 +77,12 @@ export type MonitorReport = {
   gaps: string[];
   recommendations: string[];
   unresolved?: (MonitorDiagnostic & { entryId: string; asOf: number })[];
-  trends?: { scheduledAt: number; comparisons: MonitorEntry["comparisons"] }[];
+  trends?: {
+    scheduledAt: number;
+    collectedAt?: number;
+    recovered?: boolean;
+    comparisons: MonitorEntry["comparisons"];
+  }[];
   development?: {
     task: MonitorTask;
     warning: { message: string; nextAction: string; blocker: string } | null;

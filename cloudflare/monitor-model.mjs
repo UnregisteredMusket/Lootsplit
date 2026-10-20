@@ -158,9 +158,31 @@ export function explanation(comparisons, problems = []) {
             `${c.label}: ${c.previous} → ${c.current} ${c.unit} (${c.change > 0 ? "+" : ""}${c.change}${c.percent === null ? "" : `, ${c.percent.toFixed(1)}%`}).`,
         )
         .join(" ")
-    : "No significant changes in comparable available readings.";
+    : comparisons.some((c) => c.change !== null)
+      ? "No significant changes in comparable available readings."
+      : "No comparable earlier readings are available; change cannot yet be measured.";
   const missing = comparisons.filter((c) => c.current === null).length;
-  return `${summary} ${problems.length ? `${problems.length} component(s) need attention; review diagnostics.` : "No action indicated by the available checks."}${missing ? ` ${missing} readings are unavailable; this is incomplete coverage.` : ""}`;
+  const meaning = [
+    changed.some((c) => c.key.startsWith("active"))
+      ? "Recent sign-in activity changed; this does not count every visitor or prove people are playing now."
+      : "",
+    changed.some((c) =>
+      ["accounts", "campaigns", "backups", "sessions", "transactions"].includes(c.key),
+    )
+      ? "Stored records changed; these totals describe saved account or campaign data."
+      : "",
+    changed.some((c) => c.key === "requests")
+      ? "Request volume measures traffic handled during equal half-hour windows."
+      : "",
+  ]
+    .filter(Boolean)
+    .join(" ");
+  const errors = comparisons.find((c) => c.key === "errors")?.current;
+  const action =
+    errors > 0
+      ? `${errors} Worker errors were observed; inspect invocation logs to identify affected requests and the cause.`
+      : "No action indicated by the available checks.";
+  return `${summary}${meaning ? ` ${meaning}` : ""} ${problems.length ? `${problems.join(", ")} could not be fully verified; review their diagnostics.` : action}${problems.length && errors > 0 ? ` ${action}` : ""}${missing ? ` ${missing} readings are unavailable; this is incomplete coverage.` : ""}`;
 }
 export function taskView(task, now, settings = DEFAULT_CONFIG) {
   if (!task) return { task: null, warning: null, label: "No development task active" };

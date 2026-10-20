@@ -327,6 +327,25 @@ async function updateDiagnostics(db, snapshot, now, settings) {
     );
   }
   const latestRuns = new Map();
+  const traffic = snapshot.traffic;
+  const trafficCurrent = traffic?.state === "ready" && now - traffic.checkedAt <= 6 * 60000;
+  const trafficErrors = trafficCurrent ? traffic.data?.errors : null;
+  add(
+    "Worker execution errors",
+    trafficErrors === null || trafficErrors === undefined
+      ? "unavailable"
+      : trafficErrors > 0
+        ? "error"
+        : "healthy",
+    trafficErrors === null || trafficErrors === undefined
+      ? "The measured Worker error count is unavailable."
+      : `${trafficErrors} Worker error(s) were reported in the measured past-24-hour window.`,
+    "Reported invocation errors may have interrupted requests; the affected requests and cause require log evidence.",
+    trafficErrors > 0
+      ? "Inspect Cloudflare invocation logs for this window and correlate deployments before assigning a cause."
+      : "Review the dated source window; an unavailable count does not establish recovery.",
+    trafficErrors > 0 ? "WORKER_ERRORS_OBSERVED" : null,
+  );
   for (const run of snapshot.development?.data?.runs || []) {
     if (run.status !== "completed" || /performance|failure report/i.test(run.name)) continue;
     const component = `Workflow: ${run.name} (${run.branch})`;
@@ -363,26 +382,49 @@ async function updateDiagnostics(db, snapshot, now, settings) {
       "SELECT slot,collected_at,outcome FROM owner_monitor_intervals WHERE outcome IN ('complete','partial','recovered') ORDER BY slot DESC LIMIT 1",
     )
     .first();
+  const latestInterval = await db
+    .prepare("SELECT slot,outcome FROM owner_monitor_intervals ORDER BY slot DESC LIMIT 1")
+    .first();
+  const collectionFailed = latestInterval?.outcome === "failed";
   add(
     "Scheduled collection",
-    last && now - last.slot <= INTERVAL * 2 ? "healthy" : "unavailable",
-    last
-      ? `Latest collected interval: ${new Date(last.slot).toISOString()} (${last.outcome}).`
-      : "No scheduled collection has completed yet.",
+    collectionFailed
+      ? "error"
+      : last && last.slot === latestInterval?.slot && now - last.slot <= INTERVAL * 2
+        ? "healthy"
+        : "unavailable",
+    collectionFailed
+      ? `Collection for ${new Date(latestInterval.slot).toISOString()} failed; the previous successful entry does not verify this interval.`
+      : last
+        ? `Latest collected interval: ${new Date(last.slot).toISOString()} (${last.outcome}).`
+        : "No scheduled collection has completed yet.",
     "A missing interval leaves a gap in the monitoring history.",
     "Inspect Cron Triggers and missed intervals; the scheduler records catch-up without inventing observations.",
+    collectionFailed ? "COLLECTION_FAILED" : null,
   );
   const report = await db
     .prepare("SELECT generated_at FROM owner_monitor_reports ORDER BY generated_at DESC LIMIT 1")
     .first();
+  const reportFailure = await db
+    .prepare(
+      "SELECT l.observed_at,l.summary FROM owner_monitor_logs l WHERE l.source='reports' AND json_extract(l.body,'$.outcome')='failed' AND NOT EXISTS(SELECT 1 FROM owner_monitor_reports r WHERE r.id=json_extract(l.body,'$.reportId') AND r.generated_at>=l.observed_at) ORDER BY l.observed_at DESC LIMIT 1",
+    )
+    .first();
   add(
     "Daily reporting",
-    report && now - report.generated_at <= 26 * 3600000 ? "healthy" : "unavailable",
-    report
-      ? `Last report generated ${new Date(report.generated_at).toISOString()}.`
-      : "The first calendar-day report is pending.",
+    reportFailure
+      ? "error"
+      : report && now - report.generated_at <= 26 * 3600000
+        ? "healthy"
+        : "unavailable",
+    reportFailure
+      ? reportFailure.summary
+      : report
+        ? `Last report generated ${new Date(report.generated_at).toISOString()}.`
+        : "The first calendar-day report is pending.",
     "Daily coverage is unverified until a report is generated.",
     "Inspect the report schedule and coverage; use Generate previous day to recover.",
+    reportFailure ? "REPORT_GENERATION_FAILED" : null,
   );
   const devices = await rows(
     db,
@@ -867,6 +909,7 @@ export async function generateReport(db, day, settings, now = Date.now()) {
   try {
     return await buildReport(db, day, settings, now);
   } catch (error) {
+    if (error.status && error.status < 500) throw error;
     await recordLog(
       db,
       {
@@ -874,6 +917,7 @@ export async function generateReport(db, day, settings, now = Date.now()) {
         source: "reports",
         observedAt: now,
         outcome: "failed",
+        reportId: `${settings.timezone}:${day}`,
         summary: `Daily report for ${day} (${settings.timezone}) could not be generated. The previous report and source entries are retained. Inspect collector logs and retry; cause is not confirmed.`,
       },
       now,
@@ -958,9 +1002,35 @@ async function buildReport(db, day, settings, now) {
     summary: e.summary,
     ...decode(e),
   }));
-  const trends = intervals
-    .filter((i) => decode(i)?.comparisons)
-    .map((i) => ({ scheduledAt: i.slot, comparisons: decode(i).comparisons }));
+  const trends = intervals.flatMap((interval, index) => {
+    const body = decode(interval);
+    const result = body?.comparisons
+      ? [
+          {
+            scheduledAt: interval.slot,
+            collectedAt: interval.collected_at,
+            comparisons: body.comparisons,
+          },
+        ]
+      : [];
+    if (body?.historicalTraffic?.state === "ready") {
+      const previous = index > 0 ? decode(intervals[index - 1]) : null;
+      const previousMetrics =
+        previous?.historicalTraffic?.state === "ready"
+          ? snapshotMetrics({}, previous.historicalTraffic)
+          : previous?.metrics || [];
+      const recovered = snapshotMetrics({}, body.historicalTraffic).filter((metric) =>
+        ["requests", "errors"].includes(metric.key),
+      );
+      result.push({
+        scheduledAt: interval.slot,
+        collectedAt: body.historyAttemptAt,
+        recovered: true,
+        comparisons: compareMetrics(previousMetrics, recovered),
+      });
+    }
+    return result;
+  });
   const performance = evidence.filter((e) => e.source === "performance" && !e.coverage);
   const incidents = evidence.filter((e) => e.source === "diagnostics" && !e.coverage);
   const tasks = evidence.filter((e) => e.source === "development" && !e.coverage);
@@ -1196,7 +1266,7 @@ export async function scheduledMonitor(env, scheduledAt = Date.now(), options = 
       const original = decode(historical);
       const recoverySummary =
         traffic.state === "ready"
-          ? "Recovered the provider’s historical half-hour traffic totals. Other unavailable source observations remain gaps."
+          ? `Recovered ${traffic.data.requests} requests and ${traffic.data.errors} errors for the half-hour ending ${new Date(historical.slot).toISOString()} from provider history. Other unavailable source observations remain gaps.`
           : "Historical traffic could not be recovered; the original coverage gap remains.";
       const body = {
         ...original,

@@ -169,7 +169,19 @@ public class OwnerWidgetTest {
             assertEquals(old.getLong("checkedAt"), waiting.getJSONObject("snapshot").getLong("checkedAt"));
             render(waiting, true, 350, 480, "refreshing");
             tapRefresh();
-            WidgetRefresh.request(context, true, error -> { assertEquals("", error); done.countDown(); });
+            WidgetRefresh.Task coalesced = WidgetRefresh.request(context, true, error -> { assertEquals("", error); done.countDown(); });
+            // PendingIntent delivery is asynchronous, even after main-thread idle. Confirm the
+            // second real broadcast joined the first request before releasing its fake network.
+            // Otherwise the test itself may release/finish the first request before that tap arrives.
+            long broadcastDeadline = android.os.SystemClock.elapsedRealtime() + 2000;
+            int callbacks = 0;
+            while (android.os.SystemClock.elapsedRealtime() < broadcastDeadline) {
+                synchronized (WidgetRefresh.class) { callbacks = coalesced.completions.size(); }
+                if (callbacks >= 3) break;
+                InstrumentationRegistry.getInstrumentation().waitForIdleSync();
+                android.os.SystemClock.sleep(20);
+            }
+            assertEquals("Both real taps and the explicit completion share one in-flight request", 3, callbacks);
             release.countDown();
             assertTrue(done.await(3, TimeUnit.SECONDS));
             assertEquals("Rapid taps coalesce into one check", 1, requests.get());

@@ -450,15 +450,16 @@ export function MonitorJournal({ data, refresh }: { data: JournalSnapshot; refre
                 <summary>Analytics changes and measurement windows</summary>
                 {report.trends?.map((trend) => (
                   <Entry
-                    key={trend.scheduledAt}
+                    key={`${trend.scheduledAt}:${trend.recovered ? "recovered" : "observed"}`}
                     entry={{
                       id: `trend-${trend.scheduledAt}`,
                       sequence: trend.scheduledAt,
                       source: "monitoring",
                       observedAt: trend.scheduledAt,
-                      collectedAt: report.generatedAt,
-                      summary:
-                        "Comparison with the preceding available monitoring observation. Open measurements for values, changes and reset or missing-data explanations.",
+                      collectedAt: trend.collectedAt || 0,
+                      summary: trend.recovered
+                        ? "Historical traffic recovered after collection. These values do not reconstruct other unobserved services; comparison uses the preceding interval available within this report."
+                        : "Comparison with the preceding available monitoring observation. Open measurements for values, changes and reset or missing-data explanations.",
                       comparisons: trend.comparisons,
                     }}
                   />
