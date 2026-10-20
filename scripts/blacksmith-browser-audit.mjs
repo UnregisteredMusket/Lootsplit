@@ -92,10 +92,18 @@ async function advance(page, days, status) {
     })
     .toBe(true);
   await expect(page.locator("main")).toContainText("Blacksmith commissions");
+  const downtimeId = (await readJournal(page)).finance.downtime.at(-1).id;
   await page.getByRole("button", { name: /^(Play sessions|Session ·)/ }).click();
   await page.getByLabel("Session name", { exact: true }).fill("Approved smith work");
   await page.getByRole("checkbox", { name: /I approve the downtime plan/ }).check();
   await page.getByRole("button", { name: "Approve downtime & start session", exact: true }).click();
+  // Partial work remains "active" before and after approval. Wait for the
+  // command acknowledgement and this exact settlement before leaving the page;
+  // the fallback shop navigation creates a new document and can abort its request.
+  await expect(page.getByLabel("Session name", { exact: true })).toHaveValue("");
+  await expect
+    .poll(async () => (await readJournal(page)).finance.downtime.find((d) => d.id === downtimeId)?.status)
+    .toBe("applied");
   await expect.poll(async () => (await readJournal(page)).blacksmith.orders[0].status).toBe(status);
   await navigateApplication(page, origin + "/shop/forge");
 }
