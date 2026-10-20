@@ -412,25 +412,24 @@ export function MapEmptyWorkspace({ dm, settings }: { dm: boolean; settings: Rea
         </p>
         {dm && <button onClick={() => setOpen(true)}>Open map library</button>}
       </div>
-      {open && (
-        <aside
-          id="map-settings"
-          className="map-settings-drawer map-glass"
-          aria-label="Map settings"
-        >
-          <div className="map-panel-heading">
-            <strong>Settings</strong>
-            <button
-              className="map-icon-button"
-              aria-label="Close settings"
-              onClick={() => setOpen(false)}
-            >
-              <X size={18} />
-            </button>
-          </div>
-          {settings}
-        </aside>
-      )}
+      <aside
+        hidden={!open || hidden}
+        id="map-settings"
+        className="map-settings-drawer map-glass"
+        aria-label="Map settings"
+      >
+        <div className="map-panel-heading">
+          <strong>Settings</strong>
+          <button
+            className="map-icon-button"
+            aria-label="Close settings"
+            onClick={() => setOpen(false)}
+          >
+            <X size={18} />
+          </button>
+        </div>
+        {settings}
+      </aside>
     </MapFrame>
   );
 }

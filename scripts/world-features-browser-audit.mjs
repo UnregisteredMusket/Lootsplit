@@ -482,9 +482,13 @@ try {
     await page.getByLabel("Value per item (copper)", { exact: true }).fill("1000");
     await page.getByRole("button", { name: "Add NPC inventory lot", exact: true }).click();
     await expect(page.getByText("2 × Trade gem", { exact: false })).toBeVisible();
+    await expect(page.getByLabel("Item name", { exact: true })).toHaveValue("");
     await page.getByLabel("Message", { exact: true }).fill("Welcome to Port.");
     await page.getByRole("button", { name: "Send NPC response", exact: true }).click();
     await expect(page.getByText("Welcome to Port.", { exact: false })).toBeVisible();
+    // The canonical message can render before the command acknowledgement clears
+    // the local form. Wait for that visible completion before guarded navigation.
+    await expect(page.getByLabel("Message", { exact: true })).toHaveValue("");
     await fits(page);
     await page.getByRole("link", { name: "Open Trading & Barter", exact: false }).click();
     await page.getByRole("button", { name: "New barter offer", exact: true }).click();

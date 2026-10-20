@@ -99,7 +99,9 @@ jobs:
           mkdir -p test-results
           npm run dev > test-results/dev-server.log 2>&1 &
           for attempt in $(seq 1 60); do
-            if curl --max-time 2 -fsS http://127.0.0.1:8080/ > /dev/null; then exit 0; fi
+            # Root redirects to the home view. A 307 alone does not prove the
+            # page can render; finish server compilation before cold browsers enter.
+            if curl --max-time 10 --location --max-redirs 5 -fsS http://127.0.0.1:8080/ > /dev/null; then exit 0; fi
             sleep 2
           done
           echo "Development server did not become ready" >&2
