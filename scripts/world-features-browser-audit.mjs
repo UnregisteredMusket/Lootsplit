@@ -354,8 +354,8 @@ try {
       await chooseOption(page.getByLabel("Linked location", { exact: true }), "city");
       await page.getByRole("button", { name: "Save location anchor", exact: true }).click();
     }
-    await page.getByRole("button", { name: "Fit map", exact: true }).click();
     await closeMapSettings(page);
+    await page.getByRole("button", { name: "Fit map", exact: true }).click();
     await page.getByRole("button", { name: "Place marker", exact: true }).click();
     const region = page.getByRole("region", { name: "Interactive campaign map" });
     await region.scrollIntoViewIfNeeded();
@@ -430,15 +430,15 @@ try {
     await cdp.send("Input.dispatchTouchEvent", {
       type: "touchStart",
       touchPoints: [
-        { x: r.x + r.width * 0.35, y: r.y + r.height * 0.5 },
-        { x: r.x + r.width * 0.65, y: r.y + r.height * 0.5 },
+        { x: r.x + r.width * 0.35, y: r.y + r.height * 0.38 },
+        { x: r.x + r.width * 0.65, y: r.y + r.height * 0.38 },
       ],
     });
     await cdp.send("Input.dispatchTouchEvent", {
       type: "touchMove",
       touchPoints: [
-        { x: r.x + r.width * 0.25, y: r.y + r.height * 0.5 },
-        { x: r.x + r.width * 0.75, y: r.y + r.height * 0.5 },
+        { x: r.x + r.width * 0.25, y: r.y + r.height * 0.38 },
+        { x: r.x + r.width * 0.75, y: r.y + r.height * 0.38 },
       ],
     });
     await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });

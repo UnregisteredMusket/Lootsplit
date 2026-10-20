@@ -63,6 +63,11 @@ export async function checkMapWorkspace(page, origin, output, width) {
   await chooseOption(parent, "region-map");
   await closeMapSettings(page);
   // Direct tools work without Settings. Freehand notes stay personal and undo/redo works.
+  const moreTools = page.getByRole("button", { name: "More map tools", exact: true });
+  await moreTools.click();
+  await expect(moreTools).toHaveAttribute("aria-expanded", "true");
+  await page.keyboard.press("Escape");
+  await expect(moreTools).toHaveAttribute("aria-expanded", "false");
   await page.getByRole("button", { name: "Fit map", exact: true }).click();
   await page.getByRole("button", { name: "Drawing & annotations", exact: true }).click();
   const box = await canvas.boundingBox();

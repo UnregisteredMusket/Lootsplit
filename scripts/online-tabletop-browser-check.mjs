@@ -88,17 +88,21 @@ export async function checkOnlineTabletop(dm, player, origin, width, output, jou
     "Players’ active scene: Keep map",
   );
   const transform = await player.locator(".map-layer").evaluate((node) => node.style.transform);
+  await closeMapSettings(dm);
   await dm.getByRole("button", { name: "Zoom in", exact: true }).click();
   assert.equal(
     await player.locator(".map-layer").evaluate((node) => node.style.transform),
     transform,
     "DM preparation does not move remote cameras",
   );
+  await openMapSettings(dm);
   await dm.getByRole("button", { name: "Share this view", exact: true }).click();
   await expect
     .poll(() => player.locator(".map-layer").evaluate((node) => node.style.transform))
     .not.toBe(transform);
+  await closeMapSettings(dm);
   await dm.getByRole("button", { name: "Fit map", exact: true }).click();
+  await openMapSettings(dm);
   await dm.getByRole("button", { name: "Exploration & lighting", exact: true }).click();
   await dm.getByRole("button", { name: "Conceal all", exact: true }).click();
   const scene = async () => (await journal(dm)).world.maps.find((map) => map.id === "keep");

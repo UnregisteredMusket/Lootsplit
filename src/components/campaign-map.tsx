@@ -1603,13 +1603,20 @@ function MapViewport({
       if (e.defaultPrevented || (e.target as HTMLElement).closest("dialog")) return;
       if (e.key === "Escape") {
         if (drawerOpen) setDrawerOpen(false);
+        else if (moreTools) setMoreTools(false);
         else if (service || details.length || combatOpen || tools.inspecting) {
           if (!allowContextChange()) return;
           setService(undefined);
           setDetails([]);
           setCombatOpen(false);
           tools.hideInspector();
-        } else if (contextOpen || placing || pinging || sketches.active) {
+        } else if (
+          contextOpen ||
+          placing ||
+          pinging ||
+          sketches.active ||
+          !["pan", "select"].includes(tools.tool)
+        ) {
           if (!allowContextChange()) return;
           tools.cancel();
           sketches.cancel();
