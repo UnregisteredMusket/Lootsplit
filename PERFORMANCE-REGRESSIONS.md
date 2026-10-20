@@ -221,7 +221,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | verify / Development / gameplay / dev-finance | open | 2 | 14s → 27s | +13s | +92.86% |
 | verify / Packaged Worker / interface / worker-theme | open | 2 | 12s → 29s | +17s | +141.67% |
 | verify / Packaged Worker / interface / worker-help | open | 2 | 8s → 58s | +50s | +625% |
-| verify / Development / accounts / dev-character | open | 2 | 11s → 16s | +5s | +45.45% |
+| verify / Development / accounts / dev-character | open | 3 | 11s → 20s | +9s | +81.82% |
 | verify / Packaged Worker / interface / worker-library-navigation | open | 2 | 8s → 34s | +26s | +325% |
 | verify / Packaged Worker / interface / worker-loot | open | 2 | 4s → 6s | +2s | +50% |
 | verify / Packaged Worker / interface | open | 2 | 130s → 761s | +631s | +485.38% |
@@ -237,11 +237,14 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | verify / Development / governance / dev-campaign-governance | open | 2 | 47s → 113s | +66s | +140.43% |
 | verify / Development / governance / dev-help | open | 2 | 10s → 69s | +59s | +590% |
 | verify / Packaged Worker / interface / worker-shop-stock | open | 2 | 9s → 13s | +4s | +44.44% |
+| verify / Development / accounts / dev-owner | open | 2 | 3s → 6s | +3s | +100% |
 | verify / Development / accounts / dev-member | open | 2 | 5s → 7s | +2s | +40% |
+| verify / Development / accounts / dev-bug | open | 2 | 3s → 5s | +2s | +66.67% |
 | verify / Development / governance | open | 2 | 179s → 394s | +215s | +120.11% |
+| verify / Development / accounts / dev-party-sheet | open | 2 | 15s → 24s | +9s | +60% |
 | release-apk / Run actions/setup-node@v4 | open | 2 | 5s → 7s | +2s | +40% |
 | release-apk / Run actions/checkout@v4 | open | 2 | 1s → 3s | +2s | +200% |
-| release-apk / Run npm run typecheck | open | 2 | 12s → 24s | +12s | +100% |
+| release-apk / Run npm run typecheck | open | 3 | 12s → 28s | +16s | +133.33% |
 | backup / Run actions/setup-node@v4 | open | 2 | 3s → 7s | +4s | +133.33% |
 | backup / Run npm ci --ignore-scripts | open | 2 | 7s → 17s | +10s | +142.86% |
 | Development / governance / dev-backup | resolved | 3 | 7s → 23s | +16s | +228.57% |
@@ -346,11 +349,13 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Development / accounts / dev-monitor | open | 3 | 4s → 7s | +3s | +75% |
 | verify / Development / gameplay (balanced v2) / Run actions/setup-node@v4 | open | 2 | 3s → 8s | +5s | +166.67% |
 | verify / Development / gameplay (balanced v2) / Run npx playwright install --with-deps chromium | open | 2 | 19s → 32s | +13s | +68.42% |
-| verify / Development / accounts / dev-monitor | open | 2 | 3s → 5s | +2s | +66.67% |
+| verify / Development / accounts / dev-monitor | open | 3 | 3s → 7s | +4s | +133.33% |
 | verify / Development / desktop (balanced v2) / dev-map-tiles | open | 2 | 33s → 166s | +133s | +403.03% |
+| verify / Development / desktop (balanced v2) / dev-game-analytics | open | 2 | 5s → 7s | +2s | +40% |
 | native-widget (35) / Run actions/setup-node@v4 | open | 2 | 3s → 6s | +3s | +100% |
 | Packaged Worker / interface (balanced v2) / Run actions/download-artifact@v4 | open | 2 | 3s → 5s | +2s | +66.67% |
 | native / native-widget (24) / Run actions/setup-node@v4 | open | 2 | 2s → 7s | +5s | +250% |
+| native / native-widget (24) / Run android-actions/setup-android@v3 | open | 2 | 11s → 15s | +4s | +36.36% |
 | native / native-widget (35) / Run android-actions/setup-android@v3 | open | 2 | 11s → 15s | +4s | +36.36% |
 | verify / Packaged Worker / interface (balanced v2) / Run actions/setup-node@v4 | open | 2 | 3s → 5s | +2s | +66.67% |
 | native-widget (24) / Run android-actions/setup-android@v3 | open | 2 | 15s → 33s | +18s | +120% |
@@ -361,6 +366,25 @@ Open trends require investigation. Resolved trends retain their history; each ve
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-20T22:26:53Z | step: release-apk / Run npm run typecheck | 24s → 28s | +4s | +16.67% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38305743849/job/115004301916) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39506221876/job/118921455273) |
+| 2026-10-20T22:23:54Z | step: verify / Development / desktop (balanced v2) / dev-game-analytics | 6s → 7s | +1s | +16.67% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39417084438/job/118608619206) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39506221876/job/118915694152) |
+| 2026-10-20T22:19:00Z | job: native / native-widget (24) | 333s → 464s | +131s | +39.34% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39417084438/job/118608618381) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39506221876/job/118915694013) |
+| 2026-10-20T22:18:57Z | step: native / native-widget (24) / Run actions/upload-artifact@v4 | 1s → 2s | +1s | +100% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39417084438/job/118608618381) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39506221876/job/118915694013) |
+| 2026-10-20T22:18:55Z | step: native / native-widget (24) / Verify owner isolation, refresh transport and actual RemoteViews layouts | 142s → 222s | +80s | +56.34% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39417084438/job/118608618381) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39506221876/job/118915694013) |
+| 2026-10-20T22:16:55Z | step: native / native-widget (35) / Run actions/upload-artifact@v4 | 1s → 2s | +1s | +100% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39417084438/job/118608618774) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39506221876/job/118915694249) |
+| 2026-10-20T22:16:48Z | step: verify / Packaged Worker / accounts (balanced v2) / worker-monitor | 10s → 13s | +3s | +30% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39421997999/job/118626185488) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39506221876/job/118916819299) |
+| 2026-10-20T22:16:02Z | step: verify / Development / accounts / dev-party-sheet | 20s → 24s | +4s | +20% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37587450064/job/112680783383) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39506221876/job/118915694726) |
+| 2026-10-20T22:15:38Z | step: verify / Development / accounts / dev-character | 16s → 20s | +4s | +25% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37587450064/job/112680783383) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39506221876/job/118915694726) |
+| 2026-10-20T22:15:36Z | step: verify / Development / desktop (balanced v2) / dev-downtime | 46s → 53s | +7s | +15.22% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38305743849/job/114999239552) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39506221876/job/118915694152) |
+| 2026-10-20T22:15:18Z | step: verify / Development / accounts / dev-bug | 4s → 5s | +1s | +25% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37587450064/job/112680783383) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39506221876/job/118915694726) |
+| 2026-10-20T22:15:13Z | step: verify / Development / accounts / dev-monitor | 5s → 7s | +2s | +40% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39421997999/job/118631085791) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39506221876/job/118915694726) |
+| 2026-10-20T22:14:58Z | step: verify / Development / accounts / dev-owner | 5s → 6s | +1s | +20% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37587450064/job/112680783383) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39506221876/job/118915694726) |
+| 2026-10-20T22:14:20Z | step: verify / Packaged Worker / accounts (balanced v2) / Run npm ci | 15s → 18s | +3s | +20% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39417084438/job/118609659409) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39506221876/job/118916819299) |
+| 2026-10-20T22:14:02Z | step: verify / Packaged Worker / accounts (balanced v2) / Run actions/setup-node@v4 | 3s → 4s | +1s | +33.33% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39417084438/job/118609659409) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39506221876/job/118916819299) |
+| 2026-10-20T22:13:58Z | step: verify / Packaged Worker / accounts (balanced v2) / Run actions/checkout@v4 | 1s → 2s | +1s | +100% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39417084438/job/118609659409) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39506221876/job/118916819299) |
+| 2026-10-20T22:12:02Z | step: verify / Development / desktop (balanced v2) / Run npx playwright install --with-deps chromium | 19s → 23s | +4s | +21.05% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38305743849/job/114999239552) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39506221876/job/118915694152) |
+| 2026-10-20T22:11:43Z | step: native / native-widget (24) / Run android-actions/setup-android@v3 | 13s → 15s | +2s | +15.38% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39421997999/job/118625003674) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39506221876/job/118915694013) |
+| 2026-10-20T22:11:21Z | step: native / native-widget (24) / Run actions/checkout@v4 | 1s → 2s | +1s | +100% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39417084438/job/118608618381) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39506221876/job/118915694013) |
 | 2026-10-20T22:20:41Z | step: Development / desktop (balanced v2) / dev-game-analytics | 6s → 7s | +1s | +16.67% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38376270621/job/115225320234) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39506221936/job/118915695014) |
 | 2026-10-20T22:14:37Z | step: Development / accounts / dev-monitor | 6s → 7s | +1s | +16.67% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39421997760/job/118625001679) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39506221936/job/118915695093) |
 | 2026-10-20T22:14:20Z | step: Packaged Worker / interface (balanced v2) / Run npm ci | 17s → 20s | +3s | +17.65% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38376270621/job/115226315634) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39506221936/job/118916784429) |
