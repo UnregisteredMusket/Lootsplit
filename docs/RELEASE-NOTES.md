@@ -1,3 +1,30 @@
+# Lootsplit 1.8.0 — Android candidate
+
+Android version code **11**. The public download remains 1.7.0 until the new signed APK and checksum exist.
+
+## Added
+
+- Owner-only Android home-screen Field monitor in the approved green terminal style, with compact/full sizes, real account identity, service checks, app/game totals and recent GitHub development/deployment metadata.
+- My account controls to connect, request launcher placement, refresh and disconnect the widget.
+- This APK also packages the current Maps workspace, protected media/fog, connected scenes and encounter handoff already verified on the website.
+
+## Improved
+
+- Readings are dated; Android requests periodic checks about every 30 minutes, subject to power/network restrictions. Manual refresh is available. Provider metadata may be five minutes old.
+- Encrypted, backup-excluded widget credentials and snapshots; stale response isolation and immediate device sign-out clearing.
+- Lootsplit’s existing themes, campaign data, owner/staff controls and all game features remain. Reference screenshots are not bundled.
+
+## Fixed
+
+- Includes the verified narrow-phone/landscape Maps toolbar and camera containment fixes since Android 1.7.0.
+- Missing analytics remain unavailable or not connected, never fabricated zeros. Cloudflare traffic requires the separately configured server-only analytics connection.
+
+## Candidate verification
+
+Native API24/API35 compilation/instrumentation, desktop/mobile account controls, complete PR/main preservation, permanent signing-certificate verification and matching live website download are required before publication is complete. Physical-device installation is not claimed here. Install over the permanently signed app; do not uninstall it.
+
+---
+
 # Lootsplit 1.7.0
 
 Android version code 10. This release retains package `com.unregisteredmusket.lootsplit` and the permanent signing certificate.

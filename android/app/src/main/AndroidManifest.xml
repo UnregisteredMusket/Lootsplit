@@ -25,6 +25,14 @@
 
         </activity>
 
+        <receiver android:name=".OwnerWidgetProvider" android:exported="false"
+            android:label="@string/owner_widget_name">
+            <intent-filter><action android:name="android.appwidget.action.APPWIDGET_UPDATE" /></intent-filter>
+            <meta-data android:name="android.appwidget.provider" android:resource="@xml/owner_widget_info" />
+        </receiver>
+        <service android:name=".OwnerWidgetJob" android:exported="true"
+            android:permission="android.permission.BIND_JOB_SERVICE" />
+
         <provider
             android:name="androidx.core.content.FileProvider"
             android:authorities="${applicationId}.fileprovider"
@@ -39,4 +47,5 @@
     <!-- Permissions -->
 
     <uses-permission android:name="android.permission.INTERNET" />
+    <uses-permission android:name="android.permission.ACCESS_NETWORK_STATE" />
 </manifest>

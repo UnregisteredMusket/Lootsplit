@@ -10,6 +10,7 @@ import { blankSheet } from "@/lib/characters/model.mjs";
 import { BugReports } from "@/components/account/bug-reports";
 import { ServerMonitor } from "@/components/account/server-monitor";
 import { OwnerMonitor } from "@/components/account/owner-monitor";
+import { MobileOwnerWidget } from "@/components/account/mobile-owner-widget";
 import { ProfileControls } from "@/components/account/profile-controls";
 import { StaffControls } from "@/components/account/staff-controls";
 import { Campaigns } from "@/components/campaigns";
@@ -571,6 +572,13 @@ function Account() {
             )}
             {(library?.user.role === "owner" || library?.user.role === "admin") && (
               <ServerMonitor />
+            )}
+            {library?.user.role === "owner" && import.meta.env.VITE_MOBILE === "true" && (
+              <MobileOwnerWidget
+                key={library.user.id}
+                name={library.user.name}
+                email={library.user.email}
+              />
             )}
             {library?.user.role === "owner" && <OwnerControls />}
             {library && library.user.role !== "member" && (

@@ -1,0 +1,70 @@
+name: Android native widget verification
+on:
+  workflow_call:
+  workflow_dispatch:
+  push:
+    branches: ["android/field-monitor"]
+  pull_request:
+    paths:
+      - "android/**"
+      - "src/lib/mobile/**"
+      - "src/lib/account/client.ts"
+      - "src/components/account/mobile-owner-widget.tsx"
+      - ".github/workflows/android-widget.yml"
+      - ".github/workflows/android-release.yml"
+permissions:
+  contents: read
+jobs:
+  native-widget:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    strategy:
+      fail-fast: false
+      matrix:
+        api: [24, 35]
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: "21"
+      - uses: android-actions/setup-android@v3
+        with:
+          packages: platform-tools platforms;android-36 build-tools;36.0.0
+      - run: npm ci
+      - run: npm run build:mobile && npx cap sync android
+      - name: Install browser for native account controls
+        if: matrix.api == 35
+        run: npx playwright install --with-deps chromium
+      - name: Verify mobile widget controls
+        if: matrix.api == 35
+        run: node scripts/mobile-owner-widget-browser-audit.mjs
+      - name: Compile native app, instrumentation and lint
+        run: cd android && ./gradlew assembleDebug assembleDebugAndroidTest testDebugUnitTest lintDebug --no-daemon
+      - name: Enable emulator acceleration
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Verify owner isolation, refresh transport and actual RemoteViews layouts
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: ${{ matrix.api }}
+          arch: x86_64
+          target: google_apis
+          disable-animations: true
+          script: bash scripts/android-widget-instrumentation.sh
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: android-widget-verification-${{ matrix.api }}-${{ github.run_attempt }}
+          path: |
+            test-results/android-widget/
+            test-results/android-widget-controls/
+            android/app/build/reports/
+            android/app/build/outputs/androidTest-results/
+          retention-days: 30

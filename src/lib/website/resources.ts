@@ -1,9 +1,34 @@
 /** Add every new third-party content/data resource here when integrating it. */
 export const resources = [
   {
+    name: "Android home-screen widget platform references",
+    description:
+      "Original Lootsplit RemoteViews layouts, encrypted local widget state and launcher controls follow Android’s platform documentation. The owner’s phone images informed the green terminal style; no screenshots, wallpaper, third-party interface code or sample metrics are bundled in the release.",
+    license:
+      "Documentation reference; Android documentation CC BY 4.0 and code samples Apache 2.0. Original implementation, no sample code copied.",
+    links: [
+      {
+        label: "Widget updates",
+        url: "https://developer.android.com/develop/ui/views/appwidgets/advanced",
+      },
+      {
+        label: "Responsive layouts",
+        url: "https://developer.android.com/develop/ui/views/appwidgets/layouts",
+      },
+      {
+        label: "Launcher placement",
+        url: "https://developer.android.com/develop/ui/views/appwidgets/discoverability",
+      },
+      {
+        label: "Android Keystore",
+        url: "https://developer.android.com/privacy-and-security/keystore",
+      },
+    ],
+  },
+  {
     name: "Owner monitoring data and API references",
     description:
-      "The private Field monitor reads this repository’s GitHub workflow and pull-request metadata. Optional Cloudflare analytics uses aggregate Worker requests/errors. The original website widget uses Lootsplit’s existing theme; the owner’s phone screenshots are design references for a separate phone-widget concept and are not bundled in the app.",
+      "The private Field monitor reads this repository’s GitHub workflow and pull-request metadata. Optional Cloudflare analytics uses aggregate Worker requests/errors. The original website widget uses Lootsplit’s existing theme; the owner’s phone screenshots are design references for the separate Android home-screen widget and are not bundled in the app.",
     license: "API data and documentation references; respective provider terms apply",
     links: [
       {

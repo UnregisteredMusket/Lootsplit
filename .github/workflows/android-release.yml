@@ -18,8 +18,10 @@ concurrency:
 jobs:
   verify:
     uses: ./.github/workflows/verify.yml
+  native:
+    uses: ./.github/workflows/android-widget.yml
   release-apk:
-    needs: verify
+    needs: [verify, native]
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:

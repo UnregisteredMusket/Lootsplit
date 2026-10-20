@@ -1,5 +1,6 @@
 import { PlayerDisplayProvider } from "@/components/player-display-controller";
 import { CampaignGate } from "@/components/account/campaign-gate";
+import { MobileOwnerWidgetBridge } from "@/components/account/mobile-owner-widget";
 import { AppNotifications } from "@/components/app-notifications";
 import { RouteLoading } from "@/components/route-loading";
 import { APP_DESCRIPTION } from "@/lib/help/content";
@@ -61,6 +62,7 @@ export const Route = createRootRoute({
         </head>
         <body>
           <PreviewHostBridge />
+          {import.meta.env.VITE_MOBILE === "true" && <MobileOwnerWidgetBridge />}
           {!playerDisplay && <MemberActivity />}
           <RouteLoading />
           {playerDisplay ? (
