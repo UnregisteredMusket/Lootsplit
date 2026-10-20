@@ -213,3 +213,12 @@ export const requestCloudMapAssets = createServerFn({ method: "POST" })
     const { mapAssets } = await import("./map-assets.server.ts");
     return mapAssets(data);
   });
+
+export const readMapCombatPresentation = createServerFn({method:"POST"})
+  .validator((input:{code:string;token:string;mapId:string})=>input)
+  .handler(async({data})=>{
+    const {setResponseHeader}=await import("@tanstack/react-start/server");
+    setResponseHeader("Cache-Control","no-store");
+    const {guardMemberSeat}=await import("./member-access.server.ts");await guardMemberSeat(data);
+    const {mapCombatPresentation}=await import("./cloud.server.ts");return mapCombatPresentation(data);
+  });

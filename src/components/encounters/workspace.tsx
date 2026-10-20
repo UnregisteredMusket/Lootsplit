@@ -1004,7 +1004,7 @@ function EncounterEditor({
               </h3>
               <span>Round {draft.round}</span>
             </div>
-            <AppLink className="settings-link" href="/maps">
+            <AppLink className="settings-link" href={journal.world?.combat?.encounterId === id ? `/maps?map=${encodeURIComponent(journal.world.combat.mapId)}` : "/maps"}>
               Open combat maps →
             </AppLink>
             <p>
@@ -2162,4 +2162,11 @@ function EncounterEditor({
       )}
     </div>
   );
+}
+
+/** Same canonical editor/loot review, hosted inside the map's persistent panel. */
+export function EncounterMapEditor({id}:{id:string}) {
+  const seat=useSeat();
+  if(seat.role!=='dm')return <p>Only the DM can manage this encounter.</p>;
+  return <EncounterEditor id={id} onDirty={()=>{}} onSaved={()=>{}}/>;
 }

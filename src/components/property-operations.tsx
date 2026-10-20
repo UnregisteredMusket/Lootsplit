@@ -26,6 +26,7 @@ import {
   type EstateTemplate,
 } from "@/lib/quire/estate-schema";
 import {
+  canAccessEstate,
   estateCapabilities,
   estateTemplates,
   physicallyHere,
@@ -2542,4 +2543,12 @@ function EstateImporter() {
       )}
     </Fold>
   );
+}
+
+export function MapPostalService() {
+  const table=useEstateTable(), seat=useSeat(), state=readEstate(table.journal?.propertyOperations);
+  const properties=table.holdings.filter(h=>h.kind==="property" && h.quantity>0 && (seat.role==="dm" || seat.purseIds.includes(h.purseId) || canAccessEstate(table,state,h.id,seat)));
+  const [selected,setSelected]=useState("");
+  const property=properties.find(h=>h.id===selected);
+  return <><label>Property correspondence<SearchSelect aria-label="Property correspondence" value={selected} onValueChange={setSelected}><option value="">Choose a property</option>{properties.map(h=><option key={h.id} value={h.id}>{h.name}</option>)}</SearchSelect></label>{property&&<Correspondence key={property.id} holding={property} state={state}/>}</>;
 }

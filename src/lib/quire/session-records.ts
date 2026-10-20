@@ -1,3 +1,4 @@
+import { projectConnectedMaps } from "./connected-maps.ts";
 import { facilityAccess } from "./ships.ts";
 import { readDowntimeActivities } from "./downtime-activities-schema.ts";
 import { readBlacksmith } from "./blacksmith-schema.ts";
@@ -78,6 +79,7 @@ export function projectRecord(
   if (!dm) {
     delete t.journal.resourceLibrary;
     const world = readWorld(t.journal.world);
+    delete world.combat;
     world.maps = world.maps
       .filter((map) => mapAccessible(t, map, seat))
       .map((map) => ({
@@ -103,6 +105,7 @@ export function projectRecord(
         world.tabletop.activeMapId = null;
       if (world.tabletop.camera && !world.maps.some((m) => m.id === world.tabletop!.camera!.mapId))
         world.tabletop.camera = null;
+      if (world.tabletop.presentation && !world.maps.some(m=>m.id===world.tabletop!.presentation!.mapId)) world.tabletop.presentation=null;
       world.tabletop.tvEnabled = false;
     }
     const readableNpcs = new Set(
@@ -259,6 +262,7 @@ export function projectRecord(
             world.maps.flatMap((m) => [
               ...(m.locationId ? [m.locationId] : []),
               ...m.anchors.map((a) => a.locationId),
+              ...(m.connected?.placements??[]).filter(p=>p.visibility==='party'&&p.record.kind==='location').map(p=>p.record.id),
             ]),
             world.npcs.map((n) => n.locationId),
             t.journal.fleet?.facilities.map((f) => f.locationId) ?? [],
@@ -415,6 +419,7 @@ export function projectRecord(
         t.purses.some((p) => p.id === s.purseId && canReadCharacter(t, p, seat)),
     );
   }
+  if (!dm) projectConnectedMaps(t, seat);
   for (const p of t.purses) delete p.editBaseline;
   return t;
 }

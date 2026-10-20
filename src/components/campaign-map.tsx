@@ -1,9 +1,22 @@
+import { MapCombatHud } from "./map-combat-hud";
+import { MapConnectedTools } from "./map-connected-tools";
+import {
+  defaultLocationMap,
+  mapsForLocation,
+  mapAncestry,
+  mapReferenceName,
+} from "@/lib/quire/connected-maps";
+import type { MapRecordReference } from "@/lib/quire/connected-maps-schema";
+import { allowContextChange } from "@/lib/quire/use-draft-guard";
+import { loadHandouts, type Handout } from "@/lib/quire/handouts";
+import { subscribeWorkspaceChanges } from "@/lib/quire/workspace-events";
+import { activeCampaignId } from "@/lib/quire/campaign-context";
 import { GridEditor, PartyPlacement, CombatControls } from "./map-tile-controls";
 import { mapType, partyEnvironment, tilePoint, routePosition } from "@/lib/quire/map-tiles";
 import { canonicalJson } from "@/lib/quire/canonical-json";
 import { characterLocation, characterVisible } from "@/lib/quire/character-position";
 import { SearchSelect } from "@/components/search-select";
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { lazy, Suspense, useEffect, useRef, useState, type ReactNode } from "react";
 import { useSeat } from "@/lib/quire/seat";
 import { readWorld, mapTypes, type CampaignMap } from "@/lib/quire/world-schema";
 import { anchorFor, recognizedAnchors, npcAvailableHere, shopVisible } from "@/lib/quire/world";
@@ -25,7 +38,7 @@ import { LocationOptions, MarketLocationsPanel } from "./market-locations";
 import { Button, Fold } from "./ui";
 import { AppLink } from "./app-link";
 import { libraryRecordHref } from "@/lib/quire/library-records";
-import { useRouterState } from "@tanstack/react-router";
+import { useNavigate, useRouter, useRouterState } from "@tanstack/react-router";
 import {
   Users,
   UserRound,
@@ -49,8 +62,39 @@ import {
 import { useMapPings } from "@/lib/quire/use-map-pings";
 import type { CloudTable } from "@/lib/quire/cloud";
 
+const MapCombatWorkspace = lazy(() =>
+  import("./map-combat-workspace").then((m) => ({ default: m.MapCombatWorkspace })),
+);
+const MapServicePanel = lazy(() =>
+  import("./map-service-panel").then((m) => ({ default: m.MapServicePanel })),
+);
+
 export function CampaignMaps() {
-  const t = useWorldTable(),
+  return <CampaignMapWorkspace key={activeCampaignId()} />;
+}
+function CampaignMapWorkspace() {
+  const [handouts, setHandouts] = useState<Handout[]>([]);
+  useEffect(() => {
+    let cancelled = false;
+    const campaign = activeCampaignId();
+    const load = () =>
+      void loadHandouts()
+        .then((rows) => {
+          if (!cancelled && activeCampaignId() === campaign) setHandouts(rows);
+        })
+        .catch(() => {
+          if (!cancelled) setHandouts([]);
+        });
+    load();
+    const unsubscribe = subscribeWorkspaceChanges((change) => {
+      if (change.kind === "data") load();
+    });
+    return () => {
+      cancelled = true;
+      unsubscribe();
+    };
+  }, []);
+  const t = { ...useWorldTable(), handouts },
     w = readWorld(t.journal.world),
     seat = useSeat(),
     dm = seat.role === "dm",
@@ -58,7 +102,9 @@ export function CampaignMaps() {
     market = readMarketLocations(t.journal.market);
   const [selected, setSelected] = useState(""),
     [editing, setEditing] = useState<CampaignMap | null | undefined>(),
-    [placement, setPlacement] = useState<"" | "anchor" | "marker" | "party" | "token">(""),
+    [placement, setPlacement] = useState<"" | "anchor" | "marker" | "party" | "token" | "record">(
+      "",
+    ),
     [location, setLocation] = useState(""),
     [point, setPoint] = useState<{ x: number; y: number }>(),
     [label, setLabel] = useState(""),
@@ -68,6 +114,44 @@ export function CampaignMaps() {
     [tileMode, setTileMode] = useState(true),
     [selectedToken, setSelectedToken] = useState("");
   const requestedMap = useRouterState({ select: (s) => s.location.search.map });
+  const navigate = useNavigate(),
+    router = useRouter();
+  const [entryCamera, setEntryCamera] = useState<{
+    mapId: string;
+    view: { x: number; y: number; zoom: number };
+    nonce: string;
+  }>();
+  const [history, setHistory] = useState<string[]>([]),
+    lastMap = useRef(""),
+    returningMap = useRef("");
+  useEffect(() => {
+    if (typeof requestedMap === "string") {
+      setSelected(requestedMap);
+      setTypeFilter("");
+    }
+  }, [requestedMap]);
+  function selectMap(
+    id: string,
+    entry?: { x: number; y: number; zoom: number },
+    returning = false,
+  ) {
+    returningMap.current = returning ? id : "";
+    if (entry) setEntryCamera({ mapId: id, view: entry, nonce: crypto.randomUUID() });
+    else setEntryCamera(undefined);
+    if (requestedMap === id) {
+      if (allowContextChange()) {
+        setSelected(id);
+        setTypeFilter("");
+      }
+    } else
+      void navigate({ to: "/maps", search: { map: id } }).then(() => {
+        if (router.state.location.search.map === id) {
+          setSelected(id);
+          setTypeFilter("");
+        }
+      });
+  }
+
   useEffect(() => {
     if (!dm && tabletopSession.activeMapId) {
       setTypeFilter("");
@@ -77,9 +161,15 @@ export function CampaignMaps() {
       setPoint(undefined);
     }
   }, [dm, tabletopSession.activeMapId, tabletopSession.activationId]);
-  const maps = w.maps.filter(
-      (m) => (dm || m.visible) && (!typeFilter || mapType(m, t) === typeFilter),
+  const allMaps = w.maps.filter(
+      (m) =>
+        dm ||
+        (m.visible &&
+          (tabletopSession.playerBrowsing ||
+            !tabletopSession.activeMapId ||
+            tabletopSession.activeMapId === m.id)),
     ),
+    maps = allMaps.filter((m) => !typeFilter || mapType(m, t) === typeFilter),
     best = [...locationPath(market, market.currentLocationId)]
       .reverse()
       .map((l) => maps.find((m) => m.locationId === l.id))
@@ -90,6 +180,26 @@ export function CampaignMaps() {
     best ??
     maps.find((m) => !m.locationId) ??
     maps[0];
+  const combatPresentation =
+    dm && w.combat?.phase === "active" && w.combat.mapId === map?.id
+      ? w.combat.mode
+      : tabletopSession.presentation?.mapId === map?.id
+        ? tabletopSession.presentation?.mode
+        : undefined;
+  const effectiveTileMode =
+    !!map?.grid && (combatPresentation ? combatPresentation === "grid" : tileMode);
+  const viewedMapId = map?.id;
+  useEffect(() => {
+    if (!viewedMapId || lastMap.current === viewedMapId) return;
+    const previous = lastMap.current;
+    lastMap.current = viewedMapId;
+    const returning = returningMap.current === viewedMapId;
+    returningMap.current = "";
+    setHistory((h) => (returning ? h.slice(0, -1) : previous ? [...h, previous].slice(-100) : h));
+    setSelectedToken("");
+    setPlacement("");
+    setPoint(undefined);
+  }, [viewedMapId]);
   const party =
     map &&
     (w.partyPosition?.mapId === map.id &&
@@ -97,7 +207,7 @@ export function CampaignMaps() {
     w.partyPosition.y !== undefined
       ? { x: w.partyPosition.x, y: w.partyPosition.y }
       : anchorFor(map, t, market.currentLocationId));
-  const pins = map
+  const inferredPins = map
     ? [
         ...t.holdings
           .filter(
@@ -182,19 +292,109 @@ export function CampaignMaps() {
           })),
       ].filter((p) => p.point)
     : [];
+  const referenceFor = (p: { id: string; kind: string }): MapRecordReference | undefined => {
+    const kind = (
+      {
+        Property: "property",
+        Shop: "shop",
+        "Black market": "shop",
+        NPC: "npc",
+        Character: "character",
+        "Post office": "shop",
+        Location: "location",
+      } as const
+    )[p.kind as "Property"];
+    return kind ? { kind, id: p.id } : undefined;
+  };
+  const placed = map?.connected?.placements ?? [];
+  const placedRefs = map?.connected?.placedRecords ?? placed.map((p) => p.record);
+  const recordKey = (r: MapRecordReference) => JSON.stringify([r.kind, r.id]);
+  const placedKeys = new Set(placedRefs.map(recordKey));
+  const pins: MapRecord[] = [
+    ...inferredPins.flatMap((p) => {
+      const reference = referenceFor(p);
+      return reference && placedKeys.has(recordKey(reference)) ? [] : [{ ...p, reference }];
+    }),
+    ...placed.flatMap((p) => {
+      const label = p.label ?? mapReferenceName(t, p.record);
+      if (!label) return [];
+      const kind = (
+        {
+          location: "Location",
+          shop: "Shop",
+          npc: "NPC",
+          character: "Character",
+          property: "Property",
+          listing: "Listing",
+          exchange: "Exchange",
+          facility: "Dock",
+          entry: "Journal",
+          handout: "Handout",
+        } as const
+      )[p.record.kind];
+      return [
+        {
+          id: p.record.id,
+          label,
+          kind,
+          point: p,
+          reference: p.record,
+          href: libraryRecordHref(p.record.kind, p.record.id),
+        },
+      ];
+    }),
+    ...(map?.connected?.links ?? []).flatMap((l) =>
+      allMaps.some((m) => m.id === l.targetMapId)
+        ? [
+            {
+              id: l.id,
+              label: l.label,
+              kind: "Map",
+              point: l,
+              targetMapId: l.targetMapId,
+              entry: l.entry,
+            },
+          ]
+        : [],
+    ),
+  ];
+  const navigation = map && (
+    <nav className="map-scene-navigation" aria-label="Connected map navigation">
+      <Button
+        disabled={!history.some((id) => maps.some((m) => m.id === id))}
+        onClick={() => {
+          const id = [...history].reverse().find((id) => maps.some((m) => m.id === id));
+          if (id) selectMap(id, undefined, true);
+        }}
+      >
+        Back to map
+      </Button>
+      <div className="map-breadcrumbs">
+        {mapAncestry(maps, map).map((m) => (
+          <Button
+            key={m.id}
+            aria-current={m.id === map.id ? "page" : undefined}
+            onClick={() => selectMap(m.id)}
+          >
+            {m.name}
+          </Button>
+        ))}
+      </div>
+      <label>
+        Map
+        <SearchSelect aria-label="Map" value={map.id} onValueChange={(id) => selectMap(id)}>
+          {maps.map((m) => (
+            <option key={m.id} value={m.id}>
+              {m.name}
+              {m.visible ? "" : " (DM only)"}
+            </option>
+          ))}
+        </SearchSelect>
+      </label>
+    </nav>
+  );
   return (
     <div className="campaign-maps">
-      <MapSessionBar map={map} />
-      <MapBrowser
-        maps={maps}
-        current={map?.id}
-        select={(id) => {
-          setSelected(id);
-          setSelectedToken("");
-          setPlacement("");
-          setPoint(undefined);
-        }}
-      />
       <p className="text-muted">
         {partyEnvironment(w.partyPosition) || locationLabel(market, market.currentLocationId)} ·{" "}
         {party
@@ -229,26 +429,6 @@ export function CampaignMaps() {
             ))}
           </SearchSelect>
         </label>
-        <label>
-          Map
-          <SearchSelect
-            aria-label="Map"
-            value={map?.id ?? ""}
-            onValueChange={(selectedValue) => {
-              setSelected(selectedValue);
-              setSelectedToken("");
-              setPlacement("");
-              setPoint(undefined);
-            }}
-          >
-            {maps.map((m) => (
-              <option key={m.id} value={m.id}>
-                {m.name}
-                {m.visible ? "" : " (DM only)"}
-              </option>
-            ))}
-          </SearchSelect>
-        </label>
         {dm && (
           <>
             <Button onClick={() => setEditing(null)}>Import map</Button>
@@ -259,11 +439,26 @@ export function CampaignMaps() {
       {map ? (
         <>
           <MapViewport
-            key={`viewport-${map.id}`}
             map={map}
+            navigation={navigation}
+            recordTable={t}
+            entryCamera={entryCamera}
+            selectMap={selectMap}
+            locationMaps={(id) => mapsForLocation(allMaps, id)}
+            openLocation={(id) => {
+              const target = defaultLocationMap(
+                allMaps.filter((m) => m.id !== map.id),
+                id,
+              );
+              if (target) {
+                selectMap(target.id);
+                return true;
+              }
+              return false;
+            }}
             party={party}
             selectedToken={selectedToken}
-            tileMode={tileMode && !!map.grid}
+            tileMode={effectiveTileMode}
             routes={(t.journal.fleet?.voyages ?? [])
               .filter(
                 (v) =>
@@ -281,23 +476,55 @@ export function CampaignMaps() {
             }}
             controls={
               <>
+                <MapSessionBar map={map} />
+                <MapBrowser maps={maps} current={map.id} select={(id) => selectMap(id)} />
+                {dm && (
+                  <MapConnectedTools
+                    key={`connected-${map.id}`}
+                    map={map}
+                    table={t}
+                    point={placement === "record" ? point : undefined}
+                    begin={() => {
+                      setPlacement("record");
+                      setPoint(undefined);
+                    }}
+                    done={() => {
+                      setPlacement("");
+                      setPoint(undefined);
+                    }}
+                  />
+                )}
+
                 {map.grid && (
                   <Button
-                    aria-pressed={tileMode}
+                    aria-pressed={effectiveTileMode}
+                    disabled={!!combatPresentation}
+                    title={
+                      combatPresentation
+                        ? "Return to exploration to change the local grid view."
+                        : undefined
+                    }
                     onClick={() => {
                       setTileMode(!tileMode);
                       setPlacement("");
                       setPoint(undefined);
                     }}
                   >
-                    {tileMode ? "Leave tile mode" : "Enter tile mode"}
+                    {combatPresentation
+                      ? effectiveTileMode
+                        ? "Encounter grid active"
+                        : "Encounter theatre view"
+                      : tileMode
+                        ? "Leave tile mode"
+                        : "Enter tile mode"}
                   </Button>
                 )}
-                {tileMode &&
+                {effectiveTileMode &&
                   map.grid &&
                   (dm ? (
                     <Fold title="Combat tiles" defaultOpen>
                       <CombatControls
+                        key={`combat-${map.id}`}
                         map={map}
                         table={t}
                         point={placement === "token" ? point : undefined}
@@ -333,13 +560,16 @@ export function CampaignMaps() {
             onPlace={setPoint}
             entities={[
               ...pins,
-              ...map.anchors.map((a) => ({
-                id: a.locationId,
-                label: locationLabel(market, a.locationId),
-                kind: "Location",
-                point: a,
-                href: libraryRecordHref("location", a.locationId),
-              })),
+              ...map.anchors
+                .filter((a) => !placedKeys.has(recordKey({ kind: "location", id: a.locationId })))
+                .map((a) => ({
+                  id: a.locationId,
+                  label: locationLabel(market, a.locationId),
+                  kind: "Location",
+                  reference: { kind: "location" as const, id: a.locationId },
+                  point: a,
+                  href: libraryRecordHref("location", a.locationId),
+                })),
             ]}
           />
           <p className="text-sm text-muted">
@@ -547,11 +777,17 @@ export function CampaignMaps() {
                   )}
                 </div>
               ))}
-            {pins.map((p) => (
-              <AppLink key={`${p.kind}-${p.id}`} className="settings-link" href={p.href}>
-                {p.kind} · {p.label} →
-              </AppLink>
-            ))}
+            {pins.map((p) =>
+              p.targetMapId ? (
+                <Button key={p.id} onClick={() => selectMap(p.targetMapId!, p.entry)}>
+                  Open {p.label}
+                </Button>
+              ) : p.href ? (
+                <AppLink key={`${p.kind}-${p.id}`} className="settings-link" href={p.href}>
+                  {p.kind} · {p.label} →
+                </AppLink>
+              ) : null,
+            )}
             {!party && (
               <p>
                 No party position on this map. Link a location anchor or place the party freely.
@@ -867,6 +1103,12 @@ function MapEditor({
 }
 function MapViewport({
   map,
+  navigation,
+  entryCamera,
+  selectMap,
+  locationMaps,
+  openLocation,
+  recordTable,
   party,
   placing,
   point,
@@ -880,6 +1122,12 @@ function MapViewport({
   selectedToken,
 }: {
   map: CampaignMap;
+  navigation: ReactNode;
+  recordTable: CloudTable;
+  entryCamera?: { mapId: string; view: { x: number; y: number; zoom: number }; nonce: string };
+  selectMap: (id: string, entry?: { x: number; y: number; zoom: number }) => void;
+  locationMaps: (id: string) => CampaignMap[];
+  openLocation: (id: string) => boolean;
   party?: { x: number; y: number };
   placing: boolean;
   point?: { x: number; y: number };
@@ -895,10 +1143,30 @@ function MapViewport({
   const [visible, setVisible] = useState<string[]>([...mapRecordKinds]),
     [filtersOpen, setFiltersOpen] = useState(false),
     [details, setDetails] = useState<MapRecord[]>([]),
+    [service, setService] = useState<MapRecordReference>(),
+    [serviceExpanded, setServiceExpanded] = useState(false),
+    [combatOpen, setCombatOpen] = useState(false),
     [pinging, setPinging] = useState(false),
     [color, setColor] = useState<MapPingInput["color"]>("blue"),
     [full, setFull] = useState(false),
     [drawerOpen, setDrawerOpen] = useState(false);
+  const serviceTable = recordTable;
+  const closeService = () => {
+    if (allowContextChange()) {
+      setService(undefined);
+      setServiceExpanded(false);
+    }
+  };
+  useEffect(() => {
+    setDetails([]);
+    setService(undefined);
+    setServiceExpanded(false);
+    setPinging(false);
+    setDrawerOpen(false);
+  }, [map.id]);
+  useEffect(() => {
+    if (placing && full) setDrawerOpen(!!point);
+  }, [placing, point, full]);
   const signals = useMapPings(map.id),
     useDm = useSeat().role === "dm",
     tools = useMapTabletopTools(map, selectedToken, onTokenSelect);
@@ -965,8 +1233,13 @@ function MapViewport({
     observer.observe(el);
     return () => observer.disconnect();
   }, []);
+  const cameras = useRef(new Map<string, { x: number; y: number; zoom: number }>());
   const cameraNonce =
-    !useDm && tools.session.camera?.mapId === map.id ? tools.session.camera.nonce : undefined;
+    entryCamera?.mapId === map.id
+      ? entryCamera.nonce
+      : !useDm && tools.session.camera?.mapId === map.id
+        ? tools.session.camera.nonce
+        : undefined;
   const previousViewport = useRef<
     | {
         mapId: string;
@@ -980,6 +1253,14 @@ function MapViewport({
   >(undefined);
   useEffect(() => {
     const previous = previousViewport.current;
+    if (previous && previous.mapId !== map.id && previous.w > 1 && previous.h > 1) {
+      const v = viewRef.current;
+      cameras.current.set(previous.mapId, {
+        x: (previous.width / 2 - v.x) / (previous.w * v.scale),
+        y: (previous.height / 2 - v.y) / (previous.h * v.scale),
+        zoom: v.scale,
+      });
+    }
     previousViewport.current = {
       mapId: map.id,
       nonce: cameraNonce,
@@ -1005,9 +1286,11 @@ function MapViewport({
       return;
     }
     const camera =
-      !useDm && tools.session.camera?.mapId === map.id
-        ? tools.session.camera.view
-        : map.tabletop?.initialView;
+      entryCamera?.mapId === map.id
+        ? entryCamera.view
+        : !useDm && tools.session.camera?.mapId === map.id
+          ? tools.session.camera.view
+          : (cameras.current.get(map.id) ?? map.tabletop?.initialView);
     setView(
       camera
         ? {
@@ -1061,6 +1344,7 @@ function MapViewport({
   return (
     <MapFrame
       title={map.name}
+      navigation={navigation}
       onFullChange={(next) => {
         setFull(next);
         setDrawerOpen(false);
@@ -1071,7 +1355,13 @@ function MapViewport({
           aria-expanded={drawerOpen}
           aria-controls="fullscreen-map-tools"
           onClick={() => {
+            if (!drawerOpen && (service || combatOpen) && !allowContextChange()) return;
             tools.hideInspector();
+            if (!drawerOpen) {
+              setDetails([]);
+              setService(undefined);
+              setCombatOpen(false);
+            }
             setDrawerOpen((open) => !open);
           }}
         >
@@ -1092,6 +1382,23 @@ function MapViewport({
               Close tools
             </Button>
           </div>
+        )}
+        {useDm && (
+          <Button
+            onClick={() => {
+              if (allowContextChange()) {
+                setCombatOpen(true);
+                setDetails([]);
+                setService(undefined);
+                setDrawerOpen(false);
+                tools.hideInspector();
+              }
+            }}
+          >
+            {recordTable.journal?.world?.combat
+              ? "Open encounter map controls"
+              : "Start encounter here"}
+          </Button>
         )}
         <div
           onClickCapture={() => {
@@ -1189,6 +1496,7 @@ function MapViewport({
           {Math.round(view.scale * 100)}%
         </output>
       </div>
+      <MapCombatHud map={map} />
       <div className="map-feedback">
         {full && (
           <p className="map-active-tool" role="status">
@@ -1431,7 +1739,13 @@ function MapViewport({
                           )
                     }
                     onClick={(event) => {
-                      if (!moved.current && !pinging) {
+                      if (
+                        !moved.current &&
+                        !pinging &&
+                        (!(service || combatOpen) || allowContextChange())
+                      ) {
+                        setService(undefined);
+                        setCombatOpen(false);
                         const token = type.records.find(
                           (r) =>
                             r.kind === "Combatant" ||
@@ -1441,7 +1755,15 @@ function MapViewport({
                           setDetails([]);
                           if (event.detail === 0) tools.choose(token.id, event.shiftKey);
                         } else if (!placing) {
-                          setDetails(type.records);
+                          if (type.records.length === 1 && type.records[0].targetMapId)
+                            selectMap(type.records[0].targetMapId, type.records[0].entry);
+                          else if (
+                            type.records.length === 1 &&
+                            type.records[0].reference?.kind === "location" &&
+                            openLocation(type.records[0].reference.id)
+                          )
+                            setDetails([]);
+                          else setDetails(type.records);
                         }
                       }
                     }}
@@ -1486,14 +1808,55 @@ function MapViewport({
               </span>
             )}
           </div>
+          {combatOpen && useDm && (
+            <section
+              className="map-record-details map-service-open map-combat-panel"
+              aria-label="Encounter map panel"
+            >
+              <div className="world-row">
+                <strong>Encounter</strong>
+                <Button
+                  onClick={() => {
+                    if (allowContextChange()) {
+                      setCombatOpen(false);
+                      root.current?.focus();
+                    }
+                  }}
+                >
+                  Close encounter panel
+                </Button>
+              </div>
+              <Suspense fallback={<p>Opening encounter controls…</p>}>
+                <MapCombatWorkspace map={map} camera={currentCamera} openMap={selectMap} />
+              </Suspense>
+            </section>
+          )}
           {currentDetails.length > 0 && (
-            <section className="map-record-details" aria-label="Map record details">
+            <section
+              className={`map-record-details ${service ? "map-service-open" : ""} ${serviceExpanded ? "map-service-expanded" : ""}`}
+              aria-label="Map record details"
+            >
               <div className="world-row">
                 <strong>
                   {currentDetails[0].kind} · {currentDetails.length}{" "}
                   {currentDetails.length === 1 ? "record" : "records"}
                 </strong>
-                <Button onClick={() => setDetails([])}>Close details</Button>
+                {service && (
+                  <Button onClick={() => setServiceExpanded((v) => !v)}>
+                    {serviceExpanded ? "Collapse service" : "Expand service"}
+                  </Button>
+                )}
+                <Button
+                  onClick={() => {
+                    if (allowContextChange()) {
+                      setDetails([]);
+                      setService(undefined);
+                      root.current?.focus();
+                    }
+                  }}
+                >
+                  Close details
+                </Button>
               </div>
               {currentDetails.map((r) => (
                 <div key={r.id}>
@@ -1504,9 +1867,43 @@ function MapViewport({
                   ) : (
                     <strong>{r.label}</strong>
                   )}
+                  {r.reference && (
+                    <Button
+                      onClick={() => {
+                        if (allowContextChange()) {
+                          setService(r.reference);
+                          setDrawerOpen(false);
+                          tools.hideInspector();
+                        }
+                      }}
+                    >
+                      Open in map
+                    </Button>
+                  )}
+                  {r.targetMapId && (
+                    <Button onClick={() => selectMap(r.targetMapId!, r.entry)}>Open map</Button>
+                  )}
+                  {r.reference?.kind === "location" &&
+                    locationMaps(r.reference.id)
+                      .filter((m) => m.id !== map.id)
+                      .map((m) => (
+                        <Button key={m.id} onClick={() => selectMap(m.id)}>
+                          Open {m.name}
+                        </Button>
+                      ))}
                   {r.description && <p>{r.description}</p>}
                 </div>
               ))}
+              {service && (
+                <Suspense fallback={<p role="status">Opening service…</p>}>
+                  <MapServicePanel
+                    key={`${service.kind}:${service.id}`}
+                    reference={service}
+                    table={serviceTable}
+                    close={closeService}
+                  />
+                </Suspense>
+              )}
             </section>
           )}
         </div>

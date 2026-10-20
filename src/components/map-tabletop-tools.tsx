@@ -112,6 +112,10 @@ export function useMapTabletopTools(
     // The parent also services the preserved exact-position forms.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedToken]);
+  useEffect(() => {
+    cancel(); setSelected([]); setInspector(false); setShowPreview(false); setError(""); setNotice("");
+    // Map changes are guarded by the existing router draft blocker.
+  }, [map.id]);
   async function act(input: CommandInput, done?: () => void) {
     if (disabled) return;
     setBusy(true);

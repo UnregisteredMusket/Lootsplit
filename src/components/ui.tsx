@@ -1,6 +1,8 @@
 import { useRouterState } from "@tanstack/react-router";
+import { OverlayContainer } from "./overlay-container";
 import {
   forwardRef,
+  useContext,
   useEffect,
   useState,
   type ButtonHTMLAttributes,
@@ -280,9 +282,10 @@ export function Modal({
   children: ReactNode;
   returnFocus?: string;
 }) {
+  const container = useContext(OverlayContainer);
   return (
     <Dialog.Root open={open} onOpenChange={onOpenChange}>
-      <Dialog.Portal>
+      <Dialog.Portal container={container ?? undefined}>
         <Dialog.Overlay className="modal-overlay fixed inset-0 z-40" />
         <Dialog.Content
           className="modal-pop rounded-xl border border-border bg-elevated p-4 text-fg"
@@ -329,9 +332,10 @@ export function Confirm({
   confirmLabel: string;
   onConfirm: () => void;
 }) {
+  const container = useContext(OverlayContainer);
   return (
     <AlertDialog.Root open={open} onOpenChange={onOpenChange}>
-      <AlertDialog.Portal>
+      <AlertDialog.Portal container={container ?? undefined}>
         <AlertDialog.Overlay className="modal-overlay fixed inset-0 z-40" />
         <AlertDialog.Content className="modal-pop rounded-xl border border-border bg-elevated p-4 text-fg">
           <AlertDialog.Title className="font-display text-2xl leading-tight tracking-tight">

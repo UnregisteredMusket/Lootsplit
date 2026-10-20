@@ -3,7 +3,7 @@ import { accountRequestOrigin } from "../src/lib/deployment/origins.mjs";
 import { ownerTestMode } from "./test-mode.mjs";
 import { campaignRecords } from "./campaign-records.mjs";
 import { accountMapAsset, validateBackupMapAssets } from "./account-map-assets.mjs";
-import { legacyTabletopTable } from "../src/lib/quire/tabletop-protocol.ts";
+import { tableForProtocol } from "../src/lib/quire/tabletop-protocol.ts";
 import { publicAnalytics, ownerAnalytics } from "./game-analytics.mjs";
 import { handleEncounters } from "./encounters.mjs";
 import { handleCharacterPlay } from "./character-play.mjs";
@@ -346,9 +346,9 @@ export async function handleAccounts(request, env) {
       return cors(json(await accountMapAsset(db, userId, body)));
     if (path === "/api/account/records" && request.method === "GET") {
       const result = await campaignRecords(db, userId);
-      if (request.headers.get("x-lootsplit-tabletop") !== "1")
+      if (request.headers.get("x-lootsplit-tabletop") !== "2")
         for (const report of result.reports)
-          if (report.snapshot) report.snapshot = legacyTabletopTable(report.snapshot);
+          if (report.snapshot) report.snapshot = tableForProtocol(report.snapshot, request.headers.get("x-lootsplit-tabletop") === "1" ? 1 : 0);
       return cors(json(result));
     }
     if (path === "/api/account/library" && request.method === "GET") {
@@ -507,8 +507,8 @@ export async function handleAccounts(request, env) {
       if (!row) fail("Backup not found.", 404);
       const payload = JSON.parse(row.body);
       if (
-        request.headers.get("x-lootsplit-tabletop") !== "1" &&
-        JSON.stringify(legacyTabletopTable(payload)) !== JSON.stringify(payload)
+        request.headers.get("x-lootsplit-tabletop") !== "2" &&
+        JSON.stringify(tableForProtocol(payload, request.headers.get("x-lootsplit-tabletop") === "1" ? 1 : 0)) !== JSON.stringify(payload)
       )
         fail(
           "This backup includes detailed tabletop maps. Restore it on the updated website; the complete backup is retained.",

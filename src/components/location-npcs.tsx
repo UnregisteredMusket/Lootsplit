@@ -572,3 +572,11 @@ function NpcInteraction({ npc, table }: { npc: Npc; table: CloudTable }) {
     </section>
   );
 }
+
+/** Reuses the same dialogue/barter controls without the NPC directory. */
+export function NpcMapService({ npcId }: { npcId: string }) {
+  const table = useWorldTable(), seat = useSeat();
+  const npc = table.journal.world?.npcs.find(n => n.id === npcId);
+  if (!npc || (seat.role !== "dm" && !npcAvailableHere(npc, table))) return <p>This NPC is unavailable here.</p>;
+  return <><p>{npc.description}</p><NpcInteraction key={npc.id} npc={npc} table={table} /></>;
+}

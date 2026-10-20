@@ -870,3 +870,23 @@ export async function manageRoom(input: {
   await updateRoom(next, room.revision);
   return view(next, next.seats.find((s) => s.id === caller.id) ?? caller);
 }
+
+/** Read-only, freshly authorized combat presentation for the map being viewed. */
+export async function mapCombatPresentation(input: {code:string;token:string;mapId:string}) {
+  const initial=await must(input.code), initialSeat=initial.seats.find(s=>s.token===input.token), binding=initial.table.journal?.world?.combat;
+  if(!initialSeat)throw Error("This browser is not seated at that table.");
+  if(!binding || binding.phase!=="active" || binding.mapId!==input.mapId) return null;
+  const db=database();
+  if(!db)return null;
+  const row=await db.prepare("SELECT body,status FROM dm_encounters WHERE id=? AND code=?").bind(binding.encounterId,initial.code).first<{body:string;status:string}>();
+  if(!row)return null;
+  // Recheck revocation, current scene and visibility after the private store read.
+  const room=await must(input.code),seat=room.seats.find(s=>s.token===input.token),current=room.table.journal?.world?.combat;
+  if(!seat)throw Error("This browser is not seated at that table.");
+  if(current?.id!==binding.id || current.encounterId!==binding.encounterId || current.phase!=="active")return null;
+  if(seat.role!=="dm" && (!current.showPlayers || room.table.journal?.world?.tabletop?.presentation?.id!==current.id))return null;
+  const projected=projectRecord({ ...room.table, journal: { ...room.table.journal!, reports: [] } },seat),map=projected.journal?.world?.maps.find(m=>m.id===input.mapId);
+  if(!map)return null;
+  const {projectMapCombat}=await import("./map-combat.ts");
+  return projectMapCombat(map,binding.encounterId,{status:row.status,body:JSON.parse(row.body)});
+}

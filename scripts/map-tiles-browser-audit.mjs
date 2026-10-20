@@ -1,3 +1,4 @@
+import { checkConnectedMaps } from "./connected-maps-browser-check.mjs";
 import { checkFullscreenMap } from "./fullscreen-map-browser-check.mjs";
 import { checkPlayerDisplay } from "./player-display-browser-check.mjs";
 import { checkOnlineTabletop } from "./online-tabletop-browser-check.mjs";
@@ -359,6 +360,7 @@ try {
     await guestContext.close();
     await context.close();
   }
+  await checkConnectedMaps({ browser, origin, output });
   assert.deepEqual(errors, []);
   console.log(
     JSON.stringify({
@@ -366,6 +368,7 @@ try {
       widths: [1280, 390],
       durationMs: Date.now() - started,
       flows: [
+        "connected-navigation-services-placement-encounter-return",
         "legacy-filter",
         "property-grid",
         "free-party-biome",
