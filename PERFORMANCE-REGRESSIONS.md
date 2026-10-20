@@ -286,7 +286,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Player references / development / Run actions/upload-artifact@v4 | open | 2 | 1s → 3s | +2s | +200% |
 | Player references / worker / Run actions/setup-node@v4 | open | 3 | 4s → 9s | +5s | +125% |
 | Development / gameplay / dev-ships | open | 2 | 27s → 54s | +27s | +100% |
-| Focused player references / initial queue | open | 3 | 4s → 124s | +120s | +3000% |
+| Focused player references / initial queue | open | 4 | 4s → 199s | +195s | +4875% |
 | Development / gameplay / dev-ships | open | 2 | 36s → 59s | +23s | +63.89% |
 | Development / desktop / dev-navigation | open | 2 | 39s → 115s | +76s | +194.87% |
 | rehearsal / Run actions/setup-node@v4 | open | 2 | 3s → 6s | +3s | +100% |
@@ -342,6 +342,13 @@ Open trends require investigation. Resolved trends retain their history; each ve
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-20T16:13:21Z | job: native-widget (35) | 350s → 430s | +80s | +22.86% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39414345683/job/118599589608) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39454444495/job/118737466517) |
+| 2026-10-20T16:13:21.000Z | workflow: Android native widget verification | 354s → 431s | +77s | +21.75% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39414345683) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39454444495) |
+| 2026-10-20T16:13:16Z | step: native-widget (35) / Verify owner isolation, refresh transport and actual RemoteViews layouts | 148s → 184s | +36s | +24.32% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39414345683/job/118599589608) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39454444495/job/118737466517) |
+| 2026-10-20T16:10:11Z | step: native-widget (35) / Compile native app, instrumentation and lint | 137s → 173s | +36s | +26.28% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39414345683/job/118599589608) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39454444495/job/118737466517) |
+| 2026-10-20T16:09:26.000Z | queue: Focused player references / initial queue | 124s → 199s | +75s | +60.48% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39328485877) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39454444452) |
+| 2026-10-20T16:06:16Z | step: native-widget (35) / Run npm run build:mobile && npx cap sync android | 7s → 9s | +2s | +28.57% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39414345683/job/118599589608) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39454345394/job/118737125856) |
+| 2026-10-20T16:05:58Z | step: native-widget (24) / Run android-actions/setup-android@v3 | 15s → 18s | +3s | +20% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39414345683/job/118599590044) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39454345394/job/118737126267) |
 | 2026-10-20T13:13:38Z | step: Packaged Worker / accounts (balanced v2) / worker-blacksmith | 41s → 48s | +7s | +17.07% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38376270621/job/115226315645) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39427491199/job/118644874295) |
 | 2026-10-20T13:11:23Z | step: Packaged Worker / accounts (balanced v2) / worker-monitor | 11s → 13s | +2s | +18.18% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39406545850/job/118574661090) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39427491199/job/118644874295) |
 | 2026-10-20T13:07:32Z | step: Code checks and immutable builds / lint | 13s → 15s | +2s | +15.38% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38246253534/job/114800749892) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39427491199/job/118643606921) |
