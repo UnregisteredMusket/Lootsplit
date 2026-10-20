@@ -316,6 +316,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Packaged Worker / interface (balanced v2) / worker-property-operations | open | 2 | 20s → 29s | +9s | +45% |
 | Packaged Worker / accounts (balanced v2) / worker-map-tiles | open | 4 | 17s → 112s | +95s | +558.82% |
 | Development / desktop (balanced v2) / Run npx playwright install --with-deps chromium | open | 2 | 20s → 33s | +13s | +65% |
+| Packaged Worker / accounts (balanced v2) / Run actions/setup-node@v4 | open | 2 | 4s → 9s | +5s | +125% |
 | Packaged Worker / accounts (balanced v2) / Run actions/download-artifact@v4 | open | 2 | 2s → 4s | +2s | +100% |
 | Packaged Worker / interface (balanced v2) / worker-library-navigation | open | 2 | 34s → 46s | +12s | +35.29% |
 | Packaged Worker / interface (balanced v2) / worker-shop-stock | open | 2 | 12s → 17s | +5s | +41.67% |
@@ -333,6 +334,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Packaged Worker / interface (balanced v2) / Run actions/upload-artifact@v4 | open | 2 | 3s → 5s | +2s | +66.67% |
 | Development / desktop (balanced v2) / dev-map-tiles | open | 4 | 35s → 169s | +134s | +382.86% |
 | Packaged Worker / accounts (balanced v2) / Run actions/upload-artifact@v4 | open | 2 | 3s → 7s | +4s | +133.33% |
+| Packaged Worker / accounts (balanced v2) / Run npx playwright install --with-deps chromium | open | 2 | 21s → 32s | +11s | +52.38% |
 | Code checks and immutable builds / Generate current source function inventory | open | 2 | 19s → 28s | +9s | +47.37% |
 | test-apk / Set up job | open | 2 | 1s → 3s | +2s | +200% |
 | Packaged Worker / interface (balanced v2) / worker-library-navigation | open | 2 | 32s → 47s | +15s | +46.88% |
@@ -352,6 +354,9 @@ Open trends require investigation. Resolved trends retain their history; each ve
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-20T19:18:19Z | step: Packaged Worker / accounts (balanced v2) / Run npx playwright install --with-deps chromium | 26s → 32s | +6s | +23.08% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39359402241/job/118422980049) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39481783895/job/118833188604) |
+| 2026-10-20T19:17:35Z | step: Packaged Worker / accounts (balanced v2) / Run actions/setup-node@v4 | 7s → 9s | +2s | +28.57% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38404276239/job/115320597304) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39481783895/job/118833188604) |
+| 2026-10-20T19:17:24Z | step: Packaged Worker / accounts (balanced v2) / Set up job | 2s → 4s | +2s | +100% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38309026871/job/115010777381) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39481783895/job/118833188604) |
 | 2026-10-20T19:13:44Z | step: Packaged Worker / accounts (balanced v2) / worker-world-features | 94s → 110s | +16s | +17.02% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38309026871/job/115010777381) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39479706328/job/118825836861) |
 | 2026-10-20T19:06:24Z | step: Development / governance / dev-help | 67s → 78s | +11s | +16.42% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38131890269/job/114447832375) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39479706328/job/118824755668) |
 | 2026-10-20T18:53:20Z | step: native / native-widget (24) / Run actions/upload-artifact@v4 | 1s → 2s | +1s | +100% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39475576975/job/118810534367) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39475576975/job/118817769990) |
