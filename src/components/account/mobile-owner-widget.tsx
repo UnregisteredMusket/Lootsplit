@@ -104,8 +104,9 @@ export function MobileOwnerWidget({ name, email }: { name: string; email: string
       </p>
       <p className="text-sm text-muted">
         Readings are dated. Android requests background checks about every 30 minutes and may delay
-        them to save battery; tap Refresh when you need a new check. Provider data may be cached for
-        five minutes. Unconnected Cloudflare traffic stays labeled.
+        them to save battery; tap Refresh to check directly from the home screen. Your last dated
+        reading stays visible while refreshing. Provider data may be cached for five minutes.
+        Unconnected Cloudflare traffic stays labeled.
       </p>
       <p className="text-sm text-muted">
         Your name, email and private totals will be visible on your home screen. Signing out,
@@ -169,7 +170,7 @@ export function MobileOwnerWidget({ name, email }: { name: string; email: string
                 void run(async () => {
                   await OwnerWidget.refresh();
                   setMessage(
-                    "Refresh requested. Android will run it when a network connection is available.",
+                    "Widget refreshed. Return to your home screen to see the latest reading.",
                   );
                 })
               }

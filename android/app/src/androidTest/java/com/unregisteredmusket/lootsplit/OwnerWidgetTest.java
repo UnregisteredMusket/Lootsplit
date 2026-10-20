@@ -2,6 +2,13 @@ package com.unregisteredmusket.lootsplit;
 
 import static org.junit.Assert.*;
 import android.content.Context;
+import android.app.job.JobScheduler;
+import androidx.test.runner.lifecycle.ActivityLifecycleMonitorRegistry;
+import androidx.test.runner.lifecycle.Stage;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 import android.graphics.Bitmap;
 import android.graphics.Canvas;
 import android.view.View;
@@ -28,7 +35,10 @@ import javax.net.ssl.HttpsURLConnection;
 @RunWith(AndroidJUnit4.class)
 public class OwnerWidgetTest {
     private final Context context = InstrumentationRegistry.getInstrumentation().getTargetContext();
-    @After public void cleanup() { WidgetStore.clear(context, null); OwnerWidgetJob.cancel(context); }
+    @After public void cleanup() {
+        WidgetStore.clear(context, null); OwnerWidgetJob.cancel(context);
+        WidgetRefresh.fetcher = WidgetClient::fetch;
+    }
 
     private JSONObject fixture() throws Exception {
         long now = System.currentTimeMillis();
@@ -134,6 +144,101 @@ public class OwnerWidgetTest {
         render(state, false, 350, 300, "stale");
     }
 
+    @Test public void launcherRefreshRunsWithoutOpeningAccountAndRetainsReading() throws Exception {
+        String generation = WidgetStore.connect(context, "synthetic-home-refresh");
+        JSONObject old = WidgetData.project(fixture(), System.currentTimeMillis());
+        old.put("checkedAt", System.currentTimeMillis() - 60000);
+        WidgetStore.finish(context, generation, old, "");
+        CountDownLatch started = new CountDownLatch(1), release = new CountDownLatch(1), done = new CountDownLatch(1);
+        AtomicInteger requests = new AtomicInteger();
+        WidgetRefresh.fetcher = token -> {
+            assertEquals("synthetic-home-refresh", token);
+            requests.incrementAndGet(); started.countDown();
+            assertTrue(release.await(5, TimeUnit.SECONDS));
+            JSONObject source = fixture();
+            source.getJSONObject("health").getJSONObject("stats").put("accounts", 129);
+            return WidgetClient.fetch(token, () -> new FakeConnection(200, source.toString()), System.currentTimeMillis());
+        };
+        try {
+            tapRefresh();
+            assertTrue("Home tap must start networking without an activity", started.await(2, TimeUnit.SECONDS));
+            assertNull(context.getSystemService(JobScheduler.class).getPendingJob(OwnerWidgetJob.ID));
+            JSONObject waiting = WidgetStore.read(context);
+            assertEquals("Refreshing…", waiting.getString("message"));
+            assertEquals("Test Owner", waiting.getJSONObject("snapshot").getString("name"));
+            assertEquals(old.getLong("checkedAt"), waiting.getJSONObject("snapshot").getLong("checkedAt"));
+            render(waiting, true, 350, 480, "refreshing");
+            tapRefresh();
+            WidgetRefresh.request(context, true, error -> { assertEquals("", error); done.countDown(); });
+            release.countDown();
+            assertTrue(done.await(3, TimeUnit.SECONDS));
+            assertEquals("Rapid taps coalesce into one check", 1, requests.get());
+            JSONObject refreshed = WidgetStore.read(context);
+            assertEquals("129", refreshed.getJSONObject("snapshot").getString("accounts"));
+            assertEquals("", refreshed.getString("message"));
+            render(refreshed, true, 350, 480, "refreshed");
+        } finally { release.countDown(); }
+    }
+
+    @Test public void failedRefreshKeepsDatedDataButAccessDenialClearsIt() throws Exception {
+        String generation = WidgetStore.connect(context, "synthetic-failure");
+        JSONObject old = WidgetData.project(fixture(), System.currentTimeMillis());
+        WidgetStore.finish(context, generation, old, "");
+        WidgetRefresh.fetcher = token -> { throw new java.io.IOException("synthetic network failure"); };
+        CountDownLatch failed = new CountDownLatch(1);
+        WidgetRefresh.request(context, true, error -> { assertTrue(error.contains("Could not refresh")); failed.countDown(); });
+        assertTrue(failed.await(2, TimeUnit.SECONDS));
+        JSONObject cached = WidgetStore.read(context);
+        assertEquals(old.toString(), cached.getJSONObject("snapshot").toString());
+        render(cached, false, 350, 300, "cached-error-compact");
+        render(cached, true, 350, 480, "cached-error-full");
+        WidgetRefresh.fetcher = token -> { throw new WidgetClient.AccessDenied(); };
+        CountDownLatch denied = new CountDownLatch(1);
+        WidgetRefresh.request(context, true, error -> denied.countDown());
+        assertTrue(denied.await(2, TimeUnit.SECONDS));
+        assertEquals("", WidgetStore.read(context).optString("token"));
+        assertNull(WidgetStore.read(context).optJSONObject("snapshot"));
+    }
+
+    @Test public void deadlineReleasesTapAndLateResponseCannotReplaceNewAccount() throws Exception {
+        String generation = WidgetStore.connect(context, "synthetic-slow");
+        WidgetStore.finish(context, generation, WidgetData.project(fixture(), System.currentTimeMillis()), "");
+        CountDownLatch started = new CountDownLatch(1), release = new CountDownLatch(1), late = new CountDownLatch(1), done = new CountDownLatch(1);
+        AtomicReference<String> errorText = new AtomicReference<>();
+        WidgetRefresh.fetcher = token -> {
+            started.countDown();
+            // Simulate a network stack that ignores interruption until its socket deadline.
+            boolean waiting = true;
+            while (waiting) { try { release.await(); waiting = false; } catch (InterruptedException ignored) { } }
+            late.countDown();
+            throw new WidgetClient.AccessDenied();
+        };
+        try {
+            long start = android.os.SystemClock.elapsedRealtime();
+            tapRefresh();
+            assertTrue(started.await(2, TimeUnit.SECONDS));
+            WidgetRefresh.request(context, true, error -> { errorText.set(error); done.countDown(); });
+            assertTrue("Must finish before the ten-second broadcast limit", done.await(9, TimeUnit.SECONDS));
+            assertTrue(android.os.SystemClock.elapsedRealtime() - start < 9500);
+            assertTrue(errorText.get().contains("timed out"));
+            assertNotNull(WidgetStore.read(context).optJSONObject("snapshot"));
+            String next = WidgetStore.connect(context, "synthetic-new-owner");
+            release.countDown();
+            assertTrue(late.await(2, TimeUnit.SECONDS));
+            assertEquals(next, WidgetStore.read(context).getString("generation"));
+            assertEquals("synthetic-new-owner", WidgetStore.read(context).getString("token"));
+        } finally { release.countDown(); }
+    }
+
+    private void tapRefresh() {
+        InstrumentationRegistry.getInstrumentation().runOnMainSync(() -> {
+            assertTrue("No account activity is open", ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(Stage.RESUMED).isEmpty());
+            View widget = OwnerWidgetProvider.views(context, WidgetStore.read(context), true).apply(context, new FrameLayout(context));
+            assertTrue(widget.findViewById(R.id.monitor_refresh).performClick());
+        });
+        InstrumentationRegistry.getInstrumentation().waitForIdleSync();
+    }
+
     private void render(JSONObject state, boolean expanded, int width, int height, String name) throws Exception {
         final Throwable[] failure = new Throwable[1];
         InstrumentationRegistry.getInstrumentation().runOnMainSync(() -> {
@@ -156,6 +261,14 @@ public class OwnerWidgetTest {
                 assertTrue(view.findViewById(R.id.monitor_refresh).hasOnClickListeners());
                 assertTrue(view.findViewById(R.id.monitor_account).hasOnClickListeners());
                 bounds(view);
+                if (name.equals("refreshing")) {
+                    assertEquals("REFRESHING", ((TextView) view.findViewById(R.id.monitor_health)).getText().toString());
+                    assertTrue(((TextView) view.findViewById(R.id.monitor_checked)).getText().toString().startsWith("Last reading "));
+                }
+                if (name.startsWith("cached-error")) {
+                    assertEquals("LAST KNOWN STATUS", ((TextView) view.findViewById(R.id.monitor_health)).getText().toString());
+                    assertTrue(((TextView) view.findViewById(R.id.monitor_identity)).getText().toString().contains("Test Owner"));
+                }
                 if (name.equals("signed-out") || name.equals("stale") || name.equals("unavailable")) {
                     assertEquals("—", ((TextView) view.findViewById(R.id.monitor_active)).getText().toString());
                     assertFalse(((TextView) view.findViewById(R.id.monitor_identity)).getText().toString().contains("Test Owner"));

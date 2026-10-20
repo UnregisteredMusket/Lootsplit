@@ -6,15 +6,12 @@ import android.app.job.JobScheduler;
 import android.app.job.JobService;
 import android.content.ComponentName;
 import android.content.Context;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
 
-/** Network work stays out of the broadcast receiver; Android controls background timing. */
+/** Automatic checks remain battery-aware; user taps bypass this deferred scheduler. */
 public class OwnerWidgetJob extends JobService {
     static final int ID = 197401;
-    private final ExecutorService executor = Executors.newSingleThreadExecutor();
-    private Future<?> work;
+    private WidgetRefresh.Task work;
+    private volatile boolean stopped;
 
     static void schedule(Context context) {
         if (WidgetStore.read(context).optString("token").isEmpty()) return;
@@ -25,15 +22,15 @@ public class OwnerWidgetJob extends JobService {
     }
     static void cancel(Context context) { context.getSystemService(JobScheduler.class).cancel(ID); }
     @Override public boolean onStartJob(JobParameters params) {
-        work = executor.submit(() -> {
-            WidgetClient.refresh(getApplicationContext());
-            if (!Thread.currentThread().isInterrupted()) jobFinished(params, false);
+        stopped = false;
+        work = WidgetRefresh.request(getApplicationContext(), false, error -> {
+            if (!stopped) jobFinished(params, false);
         });
         return true;
     }
     @Override public boolean onStopJob(JobParameters params) {
-        if (work != null) work.cancel(true);
+        stopped = true;
+        WidgetRefresh.cancelBackground(work);
         return !WidgetStore.read(this).optString("token").isEmpty();
     }
-    @Override public void onDestroy() { executor.shutdownNow(); super.onDestroy(); }
 }

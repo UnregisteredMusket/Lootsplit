@@ -57,8 +57,9 @@ public class OwnerWidgetPlugin extends Plugin {
         call.resolve();
     }
     @PluginMethod public void refresh(PluginCall call) {
-        OwnerWidgetJob.schedule(getContext());
-        call.resolve();
+        WidgetRefresh.request(getContext(), true, error -> {
+            if (error.isEmpty()) call.resolve(); else call.reject(error);
+        });
     }
     @PluginMethod public void pin(PluginCall call) {
         if (Build.VERSION.SDK_INT < 26 || !AppWidgetManager.getInstance(getContext()).isRequestPinAppWidgetSupported()) {

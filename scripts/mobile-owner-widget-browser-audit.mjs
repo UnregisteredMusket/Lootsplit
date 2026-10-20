@@ -14,7 +14,7 @@ const mock = `
   export const OwnerWidget={
     status:async()=>({connected,installed:0,pinSupported:true}),
     pin:async()=>{window.widgetPins=(window.widgetPins||0)+1;return {requested:true};},
-    refresh:async()=>{window.widgetRefreshes=(window.widgetRefreshes||0)+1;},
+    refresh:async()=>{window.widgetRefreshes=(window.widgetRefreshes||0)+1; if(window.widgetRefreshFail) throw Error('Could not refresh · tap Refresh to retry');},
     consumeOpenRequest:async()=>({open:false})
   };
 `;
@@ -97,7 +97,7 @@ try {
   await page.getByText("Confirm Add in Android’s home-screen prompt.", { exact: false }).waitFor();
   assert.equal(await page.evaluate(() => window.widgetPins), 1);
   await page.getByRole("button", { name: "Refresh widget", exact: true }).click();
-  await page.getByText("Refresh requested.", { exact: false }).waitFor();
+  await page.getByText("Widget refreshed.", { exact: false }).waitFor();
   assert.equal(await page.evaluate(() => window.widgetRefreshes), 1);
   for (const width of [320, 390, 1280]) {
     await page.setViewportSize({ width, height: 844 });
@@ -107,6 +107,19 @@ try {
     );
     await page.screenshot({ path: `${output}/account-${width}.png`, fullPage: true });
   }
+  await page.evaluate(() => {
+    window.widgetRefreshFail = true;
+  });
+  await page.getByRole("button", { name: "Refresh widget", exact: true }).click();
+  await page.getByText("Could not refresh · tap Refresh to retry", { exact: true }).waitFor();
+  assert.equal(
+    await page.getByRole("button", { name: "Refresh widget", exact: true }).isEnabled(),
+    true,
+  );
+  await page.getByText("Connected · 0 on home screen", { exact: true }).waitFor();
+  await page.evaluate(() => {
+    window.widgetRefreshFail = false;
+  });
   await page.getByRole("button", { name: "Disconnect widget", exact: true }).click();
   await page.getByText("Not connected · 0 on home screen", { exact: true }).waitFor();
   assert.equal(

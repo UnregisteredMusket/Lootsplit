@@ -269,7 +269,7 @@ export const PLAYER_HELP_GROUPS: HelpGroup[] = [
         id: "permissions",
         title: "Assignment and session access",
         paragraphs: [
-          "Website Field monitor and the Android 1.8.0 home-screen Field monitor are private to the site owner; player or campaign DM access does not grant it. Its aggregate statistics do not publish private campaign records or turn account activity into a count of concurrent players.",
+          "Website Field monitor and the Android home-screen Field monitor (1.8.0 and later) are private to the site owner; player or campaign DM access does not grant it. Its aggregate statistics do not publish private campaign records or turn account activity into a count of concurrent players.",
           "Your room seat controls assigned characters and any expressly permitted party funds. Selecting a sheet does not change those assignments. Full editing and individual field grants come from the DM; they do not transfer ownership of another character.",
           "When the DM closes the room or removes your seat, campaign access ends and saving into that room is blocked. You may leave the room yourself. A room deliberately left online after play permits authorized viewing until play resumes.",
         ],
