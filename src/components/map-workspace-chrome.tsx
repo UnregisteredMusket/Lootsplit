@@ -310,7 +310,7 @@ export function MapWorkspaceChrome({
               )}
             </div>
             <button
-              className="map-glass map-icon-button"
+              className="map-settings-toggle map-glass map-icon-button"
               aria-label="Map settings"
               title="Settings"
               aria-expanded={settingsOpen}

@@ -1,6 +1,15 @@
 import assert from "node:assert/strict";
 import { expect } from "playwright/test";
 
+export function mapMarkerColor(marker) {
+  return marker.evaluate((el) => {
+    const symbol = getComputedStyle(el, "::before");
+    return symbol.content !== "none"
+      ? symbol.backgroundColor
+      : getComputedStyle(el).backgroundColor;
+  });
+}
+
 export async function mapCamera(page) {
   return page.locator(".map-view-frame .map-viewport").evaluate((el) => {
     const viewport = el.getBoundingClientRect(),
@@ -33,6 +42,73 @@ export async function expectMapFillsScreen(page, overlayOpen = false) {
       }, overlayOpen),
     )
     .toBe(true);
+}
+
+/** Phone docks must stay at the edges, with every tool reachable above other controls. */
+export async function checkMobileMapControls(page) {
+  const { width, height } = page.viewportSize();
+  if (width > 650) return;
+  const boxes = await page.evaluate(() => {
+    const box = (selector) => {
+      const r = document.querySelector(selector).getBoundingClientRect();
+      return { top: r.top, bottom: r.bottom, left: r.left, right: r.right, height: r.height };
+    };
+    return {
+      title: box(".map-title-capsule"),
+      search: box(".map-search"),
+      settings: box(".map-settings-toggle"),
+      scenes: box(".map-scene-stepper"),
+      tools: box(".map-hotbar-anchor"),
+      camera: box(".map-navigation"),
+    };
+  });
+  if (height > 550) {
+    assert.ok(boxes.settings.left >= boxes.title.right + 6, "Title leaves room for Settings");
+    assert.ok(boxes.search.top >= boxes.title.bottom + 6, "Search has its own clear row");
+    assert.ok(boxes.scenes.height <= 50, "Phone scene controls form one short row");
+    assert.ok(boxes.camera.height <= 52, "Phone camera controls form one short row");
+    assert.ok(boxes.tools.top >= boxes.camera.bottom + 6, "Camera and tool docks do not overlap");
+    assert.ok(height - boxes.tools.bottom <= 20, "Tools hug the phone's bottom edge");
+  }
+  for (const box of Object.values(boxes)) {
+    assert.ok(
+      box.left >= 0 && box.right <= width + 1 && box.top >= 0 && box.bottom <= height + 1,
+      "Mobile controls remain within the page in portrait and landscape",
+    );
+  }
+  assert.ok(
+    boxes.scenes.right <= boxes.camera.left ||
+      boxes.scenes.left >= boxes.camera.right ||
+      boxes.scenes.bottom <= boxes.camera.top ||
+      boxes.scenes.top >= boxes.camera.bottom,
+    "Scene and camera controls do not overlap in narrow landscape",
+  );
+  const toolbar = page.getByRole("toolbar", { name: "Map tools", exact: true });
+  const unobstructed = (button) =>
+    button.evaluate((el) => {
+      const r = el.getBoundingClientRect();
+      return (
+        r.width >= 44 &&
+        r.height >= 44 &&
+        el.contains(document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2))
+      );
+    });
+  for (const button of await toolbar.getByRole("button").all()) {
+    await button.scrollIntoViewIfNeeded();
+    await expect.poll(() => unobstructed(button)).toBe(true);
+  }
+  const more = page.getByRole("button", { name: "More map tools", exact: true });
+  await more.click();
+  for (const button of await page
+    .getByRole("toolbar", { name: "Additional map tools", exact: true })
+    .getByRole("button")
+    .all()) {
+    await button.scrollIntoViewIfNeeded();
+    await expect.poll(() => unobstructed(button)).toBe(true);
+  }
+  for (const button of await page.locator(".map-navigation").getByRole("button").all())
+    await expect.poll(() => unobstructed(button)).toBe(true);
+  await more.click();
 }
 
 /** Retained viewport/camera/panel preservation checks for the default Maps workspace. */
@@ -98,6 +174,7 @@ export async function checkFullscreenMap(page, output, width) {
   });
   await close.click();
   await expect(region).toBeFocused();
+  await checkMobileMapControls(page);
   await page.screenshot({ path: `${output}/maps-canvas-${width}.png` });
   // The layout never depends on native fullscreen permission or its change events.
   await page.evaluate(() => {
@@ -114,7 +191,13 @@ export async function checkFullscreenMap(page, output, width) {
   await expectMapFillsScreen(page);
   await expect.poll(sameCamera).toBe(true);
   if (width < 600) {
-    for (const next of [{ width: 844, height: 390 }, { width: 320, height: 700 }, viewport]) {
+    for (const next of [
+      { width: 844, height: 390 },
+      { width: 568, height: 320 },
+      { width: 320, height: 700 },
+      { width: 448, height: 824 },
+      viewport,
+    ]) {
       await page.setViewportSize(next);
       await expectMapFillsScreen(page);
       await expect.poll(sameCamera).toBe(true);
@@ -122,6 +205,7 @@ export async function checkFullscreenMap(page, output, width) {
         page.getByRole("button", { name: "Map navigation menu", exact: true }),
       ).toBeInViewport();
       assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1));
+      await checkMobileMapControls(page);
       await page.screenshot({ path: `${output}/maps-${next.width}-${next.height}.png` });
     }
   }
