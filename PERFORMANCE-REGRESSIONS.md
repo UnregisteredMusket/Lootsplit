@@ -326,11 +326,15 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Development / desktop (balanced v2) / dev-map-tiles | open | 4 | 35s → 169s | +134s | +382.86% |
 | test-apk / Set up job | open | 2 | 1s → 3s | +2s | +200% |
 | Packaged Worker / interface (balanced v2) / worker-library-navigation | open | 2 | 32s → 47s | +15s | +46.88% |
+| native-widget (35) / Run android-actions/setup-android@v3 | open | 2 | 10s → 24s | +14s | +140% |
 
 ## Recorded slowdowns
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-20T11:59:29Z | step: native-widget (35) / Run android-actions/setup-android@v3 | 14s → 24s | +10s | +71.43% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39415364222/job/118602956924) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39418831435/job/118614418390) |
+| 2026-10-20T11:59:05Z | step: native-widget (35) / Run actions/setup-node@v4 | 3s → 4s | +1s | +33.33% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39414345683/job/118599589608) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39418831435/job/118614418390) |
+| 2026-10-20T11:58:59Z | step: native-widget (24) / Set up job | 2s → 3s | +1s | +50% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39414345683/job/118599590044) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39418831435/job/118614418073) |
 | 2026-10-20T11:55:15Z | step: Packaged Worker / interface (balanced v2) / worker-library-navigation | 39s → 47s | +8s | +20.51% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39383219852/job/118497700523) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39417084356/job/118609674503) |
 | 2026-10-20T11:54:08Z | step: Development / gameplay (balanced v2) / dev-library-navigation | 51s → 63s | +12s | +23.53% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38310299946/job/115014088792) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39417084356/job/118608618441) |
 | 2026-10-20T11:46:30Z | step: Development / desktop (balanced v2) / dev-ships | 66s → 77s | +11s | +16.67% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38305743510/job/114999237632) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39417084356/job/118608618372) |
