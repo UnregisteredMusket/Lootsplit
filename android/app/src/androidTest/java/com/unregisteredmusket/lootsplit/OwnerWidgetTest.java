@@ -305,6 +305,33 @@ public class OwnerWidgetTest {
             byte[] bytes=new byte[1024];int size;while((size=input.read(bytes))!=-1)out.write(bytes,0,size);return out.toString("UTF-8").trim();
         }
     }
+    @Test public void collectionRowsKeepReadableThemesAndIndependentStatusColors() throws Exception {
+        AtomicReference<Throwable> failure=new AtomicReference<>();
+        for(String theme:new String[]{"terminal","light"}) for(String color:new String[]{"green","yellow","red"}) {
+            CompanionSettings.save(context,103,CompanionSettings.preset("Server Health").put("theme",theme));
+            JSONObject source=journalFixture();source.getJSONArray("diagnostics").getJSONObject(0).put("color",color);
+            org.json.JSONArray rows=WidgetRows.rows(WidgetData.project(source,System.currentTimeMillis()));JSONObject diagnostic=null;
+            for(int i=0;i<rows.length();i++)if("diagnostics".equals(rows.getJSONObject(i).optString("action")) && color.equals(rows.getJSONObject(i).optString("color")))diagnostic=rows.getJSONObject(i);
+            assertNotNull(diagnostic);JSONObject row=diagnostic;
+            InstrumentationRegistry.getInstrumentation().runOnMainSync(()->{try{
+                View view=OwnerWidgetService.rowView(context,row,103).apply(context,new FrameLayout(context));
+                TextView title=view.findViewById(R.id.widget_row_title),detail=view.findViewById(R.id.widget_row_detail);
+                int background=((android.graphics.drawable.ColorDrawable)view.getBackground()).getColor();
+                assertTrue(title.getText().toString().contains(color.toUpperCase(java.util.Locale.ROOT)));
+                assertEquals(OwnerWidgetProvider.color(color,"light".equals(theme)),title.getCurrentTextColor());
+                assertTrue("Status text contrast "+theme+"/"+color,androidx.core.graphics.ColorUtils.calculateContrast(title.getCurrentTextColor(),background)>=4.5);
+                assertTrue("Detail text contrast "+theme,androidx.core.graphics.ColorUtils.calculateContrast(detail.getCurrentTextColor(),background)>=4.5);
+            }catch(Throwable error){failure.set(error);}});
+            if(failure.get()!=null)throw new AssertionError(theme+"/"+color,failure.get());
+        }
+        CompanionSettings.remove(context,103);
+    }
+    private void captureHostedWidget(View view,String name) throws Exception {
+        assertTrue(view.getWidth()>0 && view.getHeight()>0);
+        Bitmap bitmap=Bitmap.createBitmap(view.getWidth(),view.getHeight(),Bitmap.Config.ARGB_8888);view.draw(new Canvas(bitmap));
+        File dir=context.getExternalFilesDir("widget-audit");if(dir!=null)dir.mkdirs();
+        try(FileOutputStream output=new FileOutputStream(new File(dir,name+".png"))){bitmap.compress(Bitmap.CompressFormat.PNG,100,output);}finally{bitmap.recycle();}
+    }
     @Test public void actualFrameworkHostScrollsCollectionAndClearsRevokedRows() throws Exception {
         assertEquals("1",shell("getprop ro.kernel.qemu"));
         shell("appwidget grantbind --package "+context.getPackageName()+" --user 0");
@@ -324,8 +351,24 @@ public class OwnerWidgetTest {
             long deadline=android.os.SystemClock.elapsedRealtime()+8000;AtomicInteger count=new AtomicInteger();
             while(android.os.SystemClock.elapsedRealtime()<deadline){InstrumentationRegistry.getInstrumentation().runOnMainSync(()->{android.widget.ListView list=hosted.get().findViewById(R.id.monitor_list);count.set(list==null?0:list.getCount());});if(count.get()>8)break;android.os.SystemClock.sleep(100);}
             assertTrue("Actual AppWidgetHost receives the collection",count.get()>8);
+            AtomicReference<Throwable> captureFailure=new AtomicReference<>();
+            InstrumentationRegistry.getInstrumentation().runOnMainSync(()->{try{captureHostedWidget(hosted.get(),"hosted-main-terminal");}catch(Throwable error){captureFailure.set(error);}});
+            if(captureFailure.get()!=null)throw new AssertionError("Hosted screenshot",captureFailure.get());
             AtomicInteger first=new AtomicInteger();InstrumentationRegistry.getInstrumentation().runOnMainSync(()->{android.widget.ListView list=hosted.get().findViewById(R.id.monitor_list);list.setSelection(list.getCount()-1);});
             InstrumentationRegistry.getInstrumentation().waitForIdleSync();InstrumentationRegistry.getInstrumentation().runOnMainSync(()->{android.widget.ListView list=hosted.get().findViewById(R.id.monitor_list);first.set(list.getFirstVisiblePosition());});assertTrue(first.get()>0);
+            CompanionSettings.save(context,id,CompanionSettings.preset("Development").put("theme","light"));
+            InstrumentationRegistry.getInstrumentation().runOnMainSync(()->OwnerWidgetProvider.renderAll(context));
+            AtomicInteger lightRows=new AtomicInteger();deadline=android.os.SystemClock.elapsedRealtime()+5000;
+            while(android.os.SystemClock.elapsedRealtime()<deadline){
+                InstrumentationRegistry.getInstrumentation().runOnMainSync(()->{
+                    android.widget.ListView list=hosted.get().findViewById(R.id.monitor_list);View row=list==null?null:list.getChildAt(0);
+                    if(row!=null && row.getBackground() instanceof android.graphics.drawable.ColorDrawable && ((android.graphics.drawable.ColorDrawable)row.getBackground()).getColor()==android.graphics.Color.rgb(247,242,228))lightRows.set(1);
+                });
+                if(lightRows.get()==1)break;android.os.SystemClock.sleep(20);
+            }
+            assertEquals("Actual collection follows the light theme",1,lightRows.get());
+            InstrumentationRegistry.getInstrumentation().runOnMainSync(()->{try{captureHostedWidget(hosted.get(),"hosted-main-light");}catch(Throwable error){captureFailure.set(error);}});
+            if(captureFailure.get()!=null)throw new AssertionError("Light hosted screenshot",captureFailure.get());
             WidgetStore.revoke(context,generation,"Owner authorization rejected. Sign in again.");
             InstrumentationRegistry.getInstrumentation().runOnMainSync(()->OwnerWidgetProvider.renderAll(context));
             deadline=android.os.SystemClock.elapsedRealtime()+5000;
@@ -333,7 +376,7 @@ public class OwnerWidgetTest {
             assertEquals(1,count.get());
         }finally{
             if(activity!=null){WidgetAuditActivity screen=activity;InstrumentationRegistry.getInstrumentation().runOnMainSync(screen::finish);InstrumentationRegistry.getInstrumentation().waitForIdleSync();}
-            host.stopListening();host.deleteHost();shell("appwidget revokebind --package "+context.getPackageName()+" --user 0");
+            host.stopListening();host.deleteHost();CompanionSettings.remove(context,id);shell("appwidget revokebind --package "+context.getPackageName()+" --user 0");
         }
     }
 

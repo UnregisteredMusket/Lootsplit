@@ -33,8 +33,11 @@ public class OwnerWidgetService extends RemoteViewsService {
     }
     static RemoteViews rowView(Context context, JSONObject row, int id) {
         RemoteViews view = new RemoteViews(context.getPackageName(), R.layout.owner_widget_row);
-        int ink=WidgetAppearance.light(context,id)?android.graphics.Color.rgb(32,72,51):android.graphics.Color.rgb(177,214,193);
-        view.setTextColor(R.id.widget_row_title,ink);view.setTextColor(R.id.widget_row_detail,ink);
+        boolean light=WidgetAppearance.light(context,id);
+        int ink=light?android.graphics.Color.rgb(32,72,51):android.graphics.Color.rgb(177,214,193);
+        view.setInt(R.id.widget_row,"setBackgroundColor",light?android.graphics.Color.rgb(247,242,228):android.graphics.Color.rgb(7,23,18));
+        String color=row==null?"":row.optString("color");
+        view.setTextColor(R.id.widget_row_title,color.isEmpty()?ink:OwnerWidgetProvider.color(color,light));view.setTextColor(R.id.widget_row_detail,ink);
         view.setTextViewText(R.id.widget_row_title, row == null ? "Loading…" : row.optString("title"));
         view.setTextViewText(R.id.widget_row_detail, row == null ? "Dated owner information" : row.optString("detail"));
         view.setOnClickFillInIntent(R.id.widget_row, new Intent().putExtra(WidgetActions.DESTINATION, row == null ? "account" : row.optString("action")));

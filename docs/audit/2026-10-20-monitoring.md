@@ -30,6 +30,8 @@ The corrected layout passed the full API24 suite in native run39499647350. API35
 
 Final local focus passes51/51 in6.719s (broader account-file selection), types and focused ESLint pass, and the expanded owner browser audit passes9.294s. These do not replace the complete CI gates.
 
+Native collection visual review found the row XML retained a dark background while light mode supplied dark text, and component status labels shared the ordinary text color. Rows now use their instance theme and actual red/yellow/green diagnostic color with an icon and label. Added instrumentation checks4.5:1 text contrast for both themes/all three states, waits for the actual hosted light rows, and captures the real populated terminal/light AppWidgetHost. This supplements the existing fixed-size render captures and collection scrolling/revocation checks.
+
 ## Performance review
 
 Initial synchronization read1288 retained observations and17 resolutions; capture cursor2026-10-20T19:46:27.634Z, with historical pending run37642398740. No trend was reset. Existing unresolved history remains evidence, not proof of a new monitoring regression. The expanded browser scope adds real task/registry/report scenarios; its9.481s is not an equivalent workload to the earlier7.908s original-only pass. Native initial cold dependency compilation and subsequent lint-inclusive work also have different scope. The final full audit must refresh recorder freshness, analyze new/unresolved comparable results and retain all qualifying≥15% changes before publication. The56.666s full quick run adds journal/security tests and is not the same scope/environment as the previous54.467s download-only release check; neither a qualifying comparable slowdown nor a verified trend reset is claimed.
