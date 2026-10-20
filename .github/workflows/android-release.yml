@@ -50,6 +50,10 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: node scripts/check-android-release.mjs
       - run: npm run build:mobile && npx cap sync android
+      - name: Require current main before signing
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: test "$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq .object.sha)" = "$GITHUB_SHA"
       - name: Sign release with permanent key
         env:
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
@@ -91,6 +95,7 @@ jobs:
         shell: bash
         run: |
           set -euo pipefail
+          test "$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq .object.sha)" = "$GITHUB_SHA"
           version=$(sed -n 's/.*APP_VERSION = "\([^"]*\)".*/\1/p' src/lib/quire/version.ts)
           mkdir -p release
           cp android/app/build/outputs/apk/release/app-release.apk "release/Lootsplit-$version.apk"

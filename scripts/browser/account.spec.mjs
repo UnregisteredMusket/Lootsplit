@@ -71,6 +71,11 @@ test("network-boundary", async ({ devices, baseURL: origin }) => {
 // unchanged per-test and suite budgets rather than the final queue remainder.
 test("ownership", async ({ devices, baseURL: origin }, testInfo) => {
   const dm = devices.page;
+  // This scenario verifies ownership and recovery, with the optional Help offer
+  // already answered on each synthetic device. Dedicated Help audits exercise
+  // the offer itself. Keep real title screens, cold entries and all auth gates.
+  const guidePreference = () => localStorage.setItem("quire.guide.offer.v3", "seen");
+  await devices.context.addInitScript(guidePreference);
   dm.guestAccessAudit = true;
   await visitPage(dm, origin, "/");
   await expect(
@@ -131,8 +136,7 @@ test("ownership", async ({ devices, baseURL: origin }, testInfo) => {
     })
     .click();
   await expect(dm.getByText("Campaign control", { exact: true })).toBeVisible();
-  const guide = dm.getByRole("button", { name: "Not now", exact: true });
-  if (await guide.isVisible()) await guide.click();
+  await waitForDmCampaign(dm);
   // Reload after the explicit legacy claim to prove ownership and bytes persist.
   await visitPage(dm, origin, "/party");
   await expect(dm.getByText("Preserved legacy hero", { exact: true }).first()).toBeVisible();
@@ -150,7 +154,8 @@ test("ownership", async ({ devices, baseURL: origin }, testInfo) => {
   await dm.getByRole("button", { name: "Share join link", exact: true }).click();
   const link = await dm.evaluate(() => window.invitationForTest);
   expect(new URL(link).searchParams.get("session")).toBeTruthy();
-  const { page: guest } = await devices.newDevice(390);
+  const { page: guest, context: guestContext } = await devices.newDevice(390);
+  await guestContext.addInitScript(guidePreference);
   await visitPage(guest, origin, new URL(link).pathname + new URL(link).search);
   await guest.getByRole("button", { name: "Find characters", exact: true }).click();
   await guest.getByPlaceholder("What should the party call you?").fill("Guest adventurer");
@@ -226,10 +231,16 @@ test("ownership", async ({ devices, baseURL: origin }, testInfo) => {
     guest.locator("[data-sonner-toast]").filter({ hasText: "invitation has expired" }),
   ).toBeVisible();
   const returning = credentials();
-  // The returning player's signup and the DM's fresh invitation are independent.
-  // Both must finish before the authenticated player joins the reopened room.
+  const { page: secondPlayer, context: playerContext } = await devices.newDevice();
+  await playerContext.addInitScript(guidePreference);
+  // Returning-player signup/sign-in are ordered, but independent of the DM's
+  // fresh invitation. Finish both before joining; load the second library only
+  // after membership exists. No client modules or campaign data are preloaded.
   await Promise.all([
-    accountPost(guest.context(), origin, "auth/sign-up/email", returning),
+    (async () => {
+      await accountPost(guest.context(), origin, "auth/sign-up/email", returning);
+      await accountPost(playerContext, origin, "auth/sign-in/email", returning);
+    })(),
     (async () => {
       await navigateAccountScenario(dm, origin, "/share");
       await dm.evaluate(() =>
@@ -249,8 +260,6 @@ test("ownership", async ({ devices, baseURL: origin }, testInfo) => {
   await guest.getByPlaceholder("What should the party call you?").fill("Returning player");
   await guest.getByRole("button", { name: "Join room", exact: true }).click();
   await expect(guest.locator(".room-code")).toHaveText(code);
-  const { page: secondPlayer, context: playerContext } = await devices.newDevice();
-  await accountPost(playerContext, origin, "auth/sign-in/email", returning);
   await visitPage(secondPlayer, origin, "/account");
   await secondPlayer.getByRole("button", { name: "Resume", exact: true }).click();
   await secondPlayer.waitForURL((u) => u.pathname === "/");
