@@ -385,7 +385,7 @@ Adds a contextual Maps session bar, searchable scene cards, separate activation/
 
 ### Connected maps (October 20, 2026)
 
-- Persistent fullscreen navigation between existing Regional, Local and Battle purposes, explicit parent/default/entrance relationships, breadcrumbs, Back and per-scene cameras. All original category filters, editor tools, grids, fog, media, token control, pings and standalone pages remain.
+- Persistent Maps workspace navigation between existing Regional, Local and Battle purposes, explicit parent/default/entrance relationships, breadcrumbs, Back and per-scene cameras. All original category filters, editor tools, grids, fog, media, token control, pings and standalone pages remain.
 - DM placement of exact canonical locations, shops, NPCs, characters, holdings/listings, exchanges, docks, journal entries and handouts. Explicit coordinates override inferred anchors; map placement changes no business location. Fog and destination permissions apply to links/pins.
 - Lazy in-map panels reuse shop buying/selling and smith orders, dialogue/barter/training, property storage/projects/staff/reports/post, listing purchases, exchanges and ships. No duplicate stock, wallet, journal or scheduler; all authoritative permission/location/revision/receipt checks remain.
 - Recoverable prepared/active encounter-map binding with reviewed grid/theatre presentation, existing private tracker/loot review and return camera. Player HUD exposes only round/lifecycle and a revealed active token. Browsing, Move party here, Activate for players and encounter start remain explicit operations.
