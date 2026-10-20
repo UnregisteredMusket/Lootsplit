@@ -10,7 +10,7 @@ const ALLOWED = new Set([
   "android-widget.yml",
   "standby-release.yml",
   "verify-live.yml",
-  "monitor-telemetry.yml",
+  "android-test-apk.yml",
 ]);
 const keys = new WeakMap();
 function bytes(value) {
@@ -46,7 +46,10 @@ export async function verifyTelemetryToken(token, env, now = Date.now(), fetcher
     claim.repository_id !== "1398794793" ||
     claim.repository_owner_id !== "336285553" ||
     claim.ref !== "refs/heads/main" ||
-    claim.sub !== `repo:${REPOSITORY}:ref:refs/heads/main` ||
+    !(
+      claim.sub === `repo:${REPOSITORY}:ref:refs/heads/main` ||
+      (name === "website-release.yml" && claim.sub === `repo:${REPOSITORY}:environment:production`)
+    ) ||
     !ALLOWED.has(name) ||
     !["push", "workflow_run", "workflow_dispatch", "schedule"].includes(claim.event_name) ||
     !Number.isFinite(claim.exp) ||
@@ -55,7 +58,8 @@ export async function verifyTelemetryToken(token, env, now = Date.now(), fetcher
     claim.iat * 1000 > now + 30000 ||
     now - claim.iat * 1000 > 10 * 60000 ||
     (claim.nbf && claim.nbf * 1000 > now + 30000) ||
-    !/^\d+$/.test(claim.run_id || "")
+    !/^\d+$/.test(claim.run_id || "") ||
+    !/^\d+$/.test(claim.run_attempt || "")
   )
     fail("This workflow is not authorized to publish owner telemetry.", 403);
   let cached = keys.get(env.DB);

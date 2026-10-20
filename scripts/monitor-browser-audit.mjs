@@ -76,6 +76,91 @@ try {
   await overview
     .getByText("A read-only Cloudflare analytics connection is needed.", { exact: false })
     .waitFor();
+  // New controls use the real disposable owner API and persisted journal, not a response fixture.
+  const detailsNav = overview.getByRole("navigation", { name: "Monitoring details" });
+  await detailsNav.getByRole("link", { name: "Development task", exact: true }).click();
+  await overview
+    .getByText("Publish task start, progress, pause or handoff", { exact: true })
+    .click();
+  await overview.getByLabel("Task identifier", { exact: true }).fill("browser-task");
+  await overview.getByLabel("Title", { exact: true }).fill("Verify synchronized widgets");
+  await overview
+    .getByLabel("Plain-English objective", { exact: true })
+    .fill("Keep owner readings consistent across displays");
+  await overview
+    .getByLabel("Latest meaningful progress", { exact: true })
+    .fill("Real owner API task form exercised");
+  await overview.locator("#monitor-task form button").click();
+  await overview
+    .getByText("Task event saved with its persistent timing history.", { exact: true })
+    .waitFor();
+  const savedTask = await (
+    await context.request.get(origin + "/api/account/owner/monitor/task")
+  ).json();
+  assert.equal(savedTask.task.id, "browser-task");
+  await overview.getByRole("button", { name: "Refresh overview", exact: true }).click();
+  await overview
+    .locator(".monitor-current-task")
+    .getByText("Verify synchronized widgets", { exact: true })
+    .waitFor();
+  const refreshedTask = await (
+    await context.request.get(origin + "/api/account/owner/monitor/task")
+  ).json();
+  assert.equal(refreshedTask.task.startedAt, savedTask.task.startedAt);
+  await detailsNav.getByRole("link", { name: "Log registry & settings", exact: true }).click();
+  await overview.getByLabel("Report timezone", { exact: true }).waitFor();
+  await overview.getByText("Register an external or future log", { exact: true }).click();
+  await overview.getByLabel("Stable log ID", { exact: true }).fill("browser-external");
+  await overview.getByLabel("Name", { exact: true }).fill("Browser external log");
+  await overview
+    .getByLabel("Purpose and source", { exact: true })
+    .fill("Disposable browser coverage evidence");
+  await overview.getByRole("button", { name: "Register log", exact: true }).click();
+  await overview
+    .getByText(
+      "Log registered. It now appears in daily coverage, including when data is missing.",
+      { exact: true },
+    )
+    .waitFor();
+  await overview
+    .getByText("Record an external log entry or coverage check", { exact: true })
+    .click();
+  await overview.getByLabel("Registered log", { exact: true }).selectOption("browser-external");
+  await overview.getByLabel("Persistent entry ID", { exact: true }).fill("browser-observation");
+  await overview
+    .getByLabel("Actual observation time", { exact: true })
+    .fill(new Date().toISOString().slice(0, 16));
+  await overview
+    .getByLabel("Plain-English explanation", { exact: true })
+    .fill("The browser completed the real registration flow.");
+  await overview.getByRole("button", { name: "Record log entry", exact: true }).click();
+  await overview.getByText("Entry recorded.", { exact: false }).waitFor();
+  await detailsNav.getByRole("link", { name: "Monitoring logs", exact: true }).click();
+  await overview
+    .getByText("The browser completed the real registration flow.", { exact: true })
+    .waitFor();
+  await overview.getByLabel("Reduce monitor motion", { exact: true }).check();
+  assert.equal(await overview.getAttribute("data-reduced-motion"), "true");
+  assert.ok(
+    await overview
+      .locator(".owner-monitor-scroll")
+      .evaluate((el) => el.scrollHeight > el.clientHeight && el.clientHeight <= 640),
+  );
+  await detailsNav.getByRole("link", { name: "Daily reports", exact: true }).click();
+  await overview.getByRole("button", { name: "Generate previous day", exact: true }).click();
+  await overview.locator("#monitor-reports h4").first().waitFor();
+  await overview
+    .getByText("Monitoring coverage is incomplete.", { exact: false })
+    .first()
+    .waitFor();
+  await overview.screenshot({ path: output + "/daily-report-390.png" });
+  await detailsNav.getByRole("link", { name: "Diagnostics", exact: true }).click();
+  await overview.locator("#monitor-diagnostics").waitFor();
+  assert.equal(
+    await page.locator(".quire-dawn").count(),
+    0,
+    "Internal monitoring links must not restart the title screen",
+  );
   const snapshot = await (await context.request.get(origin + "/api/account/owner/monitor")).json();
   // Provider fixture exercises UI states only; real provider parsers/permissions have API tests.
   const fixture = {
@@ -148,6 +233,9 @@ try {
   console.log(
     "PASS: admin/owner monitoring, partial failure, refresh, revoked access clears totals, moderator isolation, desktop/mobile layout.",
   );
+} catch (error) {
+  await page.screenshot({ path: output + "/failure.png", fullPage: true }).catch(() => {});
+  throw error;
 } finally {
   if (id) await DB.prepare("DELETE FROM user WHERE id=?").bind(id).run();
   DB.close();

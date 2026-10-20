@@ -4,14 +4,18 @@ export type OwnerWidgetStatus = {
   connected: boolean;
   installed: number;
   pinSupported: boolean;
+  companions?: number[];
+  mainWidgets?: number[];
 };
 export const OwnerWidget = registerPlugin<{
   status(): Promise<OwnerWidgetStatus>;
   connect(options: { token: string }): Promise<void>;
   disconnect(options: { expectedToken?: string }): Promise<void>;
   refresh(): Promise<void>;
-  pin(): Promise<{ requested: boolean }>;
-  consumeOpenRequest(): Promise<{ open: boolean }>;
+  sync(options: { expectedToken: string; snapshot: unknown }): Promise<void>;
+  pin(options?: { kind?: "main" | "companion" }): Promise<{ requested: boolean }>;
+  configure(options: { widgetId: number }): Promise<void>;
+  consumeOpenRequest(): Promise<{ open: boolean; destination?: string }>;
 }>("OwnerWidget");
 
 export function hasOwnerWidget() {

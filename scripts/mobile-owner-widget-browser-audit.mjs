@@ -12,8 +12,9 @@ const mock = `
   export const connectOwnerWidget=async()=>{ if(window.widgetFail) throw Error('Synthetic offline connection'); connected=true; };
   export const disconnectOwnerWidget=async()=>{connected=false;};
   export const OwnerWidget={
-    status:async()=>({connected,installed:0,pinSupported:true}),
-    pin:async()=>{window.widgetPins=(window.widgetPins||0)+1;return {requested:true};},
+    status:async()=>({connected,installed:window.widgetInstances?3:0,pinSupported:true,companions:window.widgetInstances?[101,102]:[],mainWidgets:window.widgetInstances?[201]:[]}),
+    configure:async({widgetId})=>{window.widgetConfigured=widgetId;},
+    pin:async(options)=>{window.widgetPinKind=options?.kind||"main";window.widgetPins=(window.widgetPins||0)+1;return {requested:true};},
     refresh:async()=>{window.widgetRefreshes=(window.widgetRefreshes||0)+1; if(window.widgetRefreshFail) throw Error('Could not refresh · tap Refresh to retry');},
     consumeOpenRequest:async()=>({open:false})
   };
@@ -99,6 +100,19 @@ try {
   await page.getByRole("button", { name: "Refresh widget", exact: true }).click();
   await page.getByText("Widget refreshed.", { exact: false }).waitFor();
   assert.equal(await page.evaluate(() => window.widgetRefreshes), 1);
+  await page.getByRole("button", { name: "Add 4×1 companion", exact: true }).click();
+  assert.equal(await page.evaluate(() => window.widgetPinKind), "companion");
+  await page.evaluate(() => {
+    window.widgetInstances = true;
+  });
+  await page.getByRole("button", { name: "Refresh widget", exact: true }).click();
+  await page.getByText("Connected · 3 on home screen", { exact: true }).waitFor();
+  for (const id of [101, 102]) {
+    await page.getByRole("button", { name: `Configure companion ${id}`, exact: true }).click();
+    assert.equal(await page.evaluate(() => window.widgetConfigured), id);
+  }
+  await page.getByRole("button", { name: "Field monitor 201 appearance", exact: true }).click();
+  assert.equal(await page.evaluate(() => window.widgetConfigured), 201);
   for (const width of [320, 390, 1280]) {
     await page.setViewportSize({ width, height: 844 });
     assert.equal(
@@ -107,6 +121,11 @@ try {
     );
     await page.screenshot({ path: `${output}/account-${width}.png`, fullPage: true });
   }
+  await page.evaluate(() => {
+    window.widgetInstances = false;
+  });
+  await page.getByRole("button", { name: "Refresh widget", exact: true }).click();
+  await page.getByText("Connected · 0 on home screen", { exact: true }).waitFor();
   await page.evaluate(() => {
     window.widgetRefreshFail = true;
   });

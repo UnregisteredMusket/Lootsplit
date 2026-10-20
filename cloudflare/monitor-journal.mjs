@@ -403,7 +403,7 @@ async function updateDiagnostics(db, snapshot, now, settings) {
   const writes = result.map((check) =>
     statement(
       db,
-      "INSERT INTO owner_monitor_incidents VALUES(?,?) ON CONFLICT(component) DO UPDATE SET body=excluded.body",
+      "INSERT INTO owner_monitor_incidents VALUES(?,?) ON CONFLICT(component) DO UPDATE SET body=excluded.body WHERE json_extract(owner_monitor_incidents.body,'$.latestCheckAt')<=json_extract(excluded.body,'$.latestCheckAt')",
       check.component,
       JSON.stringify(check),
     ),
@@ -897,40 +897,42 @@ async function buildReport(db, day, settings, now) {
   );
   const expected = Math.floor(end / INTERVAL) - Math.floor(start / INTERVAL);
   const collected = intervals.filter((i) => ["complete", "partial"].includes(i.outcome)).length;
-  const coverage = registry
-    .map((r) => {
-      const source = decode(r),
-        count = entries.filter((e) => e.source === r.id).length;
-      // A current heartbeat cannot prove yesterday's coverage; use dated observations/attestations.
-      const observations = entries.filter((e) => e.source === r.id);
-      const observedTimes = observations
-        .map((e) => decode(e).sourceFreshAt ?? e.observed_at)
-        .sort((a, b) => a - b);
-      const freshness = observedTimes.length ? observedTimes.at(-1) : null;
-      const coverageStart = Math.max(start, r.registered_at);
-      const widestGap = Math.max(
-        ...[coverageStart, ...observedTimes, end]
-          .slice(1)
-          .map((at, i) => at - [coverageStart, ...observedTimes][i]),
-      );
-      const explicitGap = observations.map((e) => decode(e).coverageGap).find(Boolean);
-      const gap =
-        (r.registered_at >= end ? "This source was registered after this day; earlier coverage is not verified." : null) || explicitGap ||
-        (!count
-          ? "No data or coverage attestation for this day."
-          : source.expectedMs && widestGap > source.expectedMs
-            ? "One or more expected source checks are missing or stale."
-            : null);
-      return {
-        id: r.id,
-        name: source.name,
-        mode: source.mode,
-        entries: count,
-        lastObservationAt: freshness,
-        gap,
-        registrationAt: r.registered_at,
-      };
-    });
+  const coverage = registry.map((r) => {
+    const source = decode(r),
+      count = entries.filter((e) => e.source === r.id).length;
+    // A current heartbeat cannot prove yesterday's coverage; use dated observations/attestations.
+    const observations = entries.filter((e) => e.source === r.id);
+    const observedTimes = observations
+      .map((e) => decode(e).sourceFreshAt ?? e.observed_at)
+      .sort((a, b) => a - b);
+    const freshness = observedTimes.length ? observedTimes.at(-1) : null;
+    const coverageStart = Math.max(start, r.registered_at);
+    const widestGap = Math.max(
+      ...[coverageStart, ...observedTimes, end]
+        .slice(1)
+        .map((at, i) => at - [coverageStart, ...observedTimes][i]),
+    );
+    const explicitGap = observations.map((e) => decode(e).coverageGap).find(Boolean);
+    const gap =
+      (r.registered_at >= end
+        ? "This source was registered after this day; earlier coverage is not verified."
+        : null) ||
+      explicitGap ||
+      (!count
+        ? "No data or coverage attestation for this day."
+        : source.expectedMs && widestGap > source.expectedMs
+          ? "One or more expected source checks are missing or stale."
+          : null);
+    return {
+      id: r.id,
+      name: source.name,
+      mode: source.mode,
+      entries: count,
+      lastObservationAt: freshness,
+      gap,
+      registrationAt: r.registered_at,
+    };
+  });
   const evidence = entries.map((e) => ({
     id: e.id,
     sequence: e.sequence,

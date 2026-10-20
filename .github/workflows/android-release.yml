@@ -9,12 +9,15 @@ on:
       - ".github/workflows/android-release.yml"
 
 permissions:
+  id-token: write
   contents: write
 
 concurrency:
   group: android-release
   cancel-in-progress: false
 
+env:
+  LOOTSPLIT_MONITOR_TELEMETRY: "true"
 jobs:
   verify:
     uses: ./.github/workflows/verify.yml
@@ -74,7 +77,7 @@ jobs:
           done
           printf '%s' "$ANDROID_KEYSTORE_BASE64" | base64 --decode > "$ANDROID_KEYSTORE_PATH"
           cd android
-          ./gradlew assembleRelease
+          node ../scripts/recovery-step.mjs android-signing-build 600 ./gradlew assembleRelease
           certificate_report=$("$ANDROID_HOME/build-tools/36.0.0/apksigner" verify --verbose --print-certs app/build/outputs/apk/release/app-release.apk)
           printf '%s\n' "$certificate_report"
           actual_fingerprint=$(printf '%s\n' "$certificate_report" | sed -n 's/^Signer #1 certificate SHA-256 digest: //p' | tr '[:upper:]' '[:lower:]')
@@ -109,4 +112,4 @@ jobs:
           notes = re.sub(r"The public download remains [0-9.]+ until the new signed APK and checksum exist\. ?", "", notes)
           Path("release/RELEASE-NOTES.md").write_text(notes)
           PY
-          gh release create "android-v$version" "release/Lootsplit-$version.apk" release/SHA256SUMS.txt --target "$GITHUB_SHA" --title "Lootsplit $version for Android" --notes-file release/RELEASE-NOTES.md
+          node scripts/recovery-step.mjs android-publish 180 gh release create "android-v$version" "release/Lootsplit-$version.apk" release/SHA256SUMS.txt --target "$GITHUB_SHA" --title "Lootsplit $version for Android" --notes-file release/RELEASE-NOTES.md

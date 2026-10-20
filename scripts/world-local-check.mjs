@@ -10,7 +10,8 @@ const root = process.cwd(),
   snapshot = await mkdtemp(join(tmpdir(), "lootsplit-world-")),
   output = resolve(`test-results/${auditName}-local`),
   children = [];
-if (!["world-features", "resource-packs"].includes(auditName)) throw Error("Choose world-features or resource-packs.");
+if (!["world-features", "resource-packs", "monitor"].includes(auditName))
+  throw Error("Choose world-features, resource-packs or monitor.");
 await mkdir(output, { recursive: true });
 const stop = () => {
   for (const c of children)

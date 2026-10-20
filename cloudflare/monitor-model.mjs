@@ -24,7 +24,11 @@ export const fail = (message, status = 400) => {
   throw Object.assign(new Error(message), { status });
 };
 export function clean(value, max = 500) {
-  if (typeof value !== "string" || value.length > max || /[\x00-\x08\x0b-\x1f]/.test(value))
+  if (
+    typeof value !== "string" ||
+    value.length > max ||
+    [...value].some((c) => c.charCodeAt(0) < 32 && c !== "\n" && c !== "\t")
+  )
     fail("Check the text length and remove control characters.");
   // Operational inputs are deliberately text-only. Never store bearer credentials.
   if (/\b(?:Bearer\s+\S+|gh[pousr]_[A-Za-z0-9_]+|github_pat_[A-Za-z0-9_]+)\b/i.test(value))

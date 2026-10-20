@@ -50,8 +50,26 @@ test("workflow ingestion verifies real RSA signature, owner/repository IDs, main
       return Response.json({ keys: [jwk] });
     };
   assert.equal((await verifyTelemetryToken(await sign(base), env, now, fetcher)).run_id, "100");
+  assert.equal(
+    (
+      await verifyTelemetryToken(
+        await sign({
+          ...base,
+          workflow_ref:
+            "UnregisteredMusket/Lootsplit/.github/workflows/website-release.yml@refs/heads/main",
+          sub: "repo:UnregisteredMusket/Lootsplit:environment:production",
+        }),
+        env,
+        now,
+        fetcher,
+      )
+    ).run_id,
+    "100",
+  );
   for (const override of [
     { repository_id: "1" },
+    { run_attempt: "" },
+    { sub: "repo:UnregisteredMusket/Lootsplit:environment:production" },
     { repository_owner_id: "1" },
     { ref: "refs/pull/1/merge" },
     { aud: "wrong" },
