@@ -296,6 +296,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Development / gameplay (balanced v2) / dev-trade-economy | open | 2 | 29s → 118s | +89s | +306.9% |
 | Development / desktop (balanced v2) | open | 2 | 472s → 693s | +221s | +46.82% |
 | Development / gameplay (balanced v2) / dev-finance | open | 2 | 36s → 58s | +22s | +61.11% |
+| Development / gameplay (balanced v2) / dev-library-navigation | open | 2 | 42s → 63s | +21s | +50% |
 | Packaged Worker / interface (balanced v2) / Run actions/setup-node@v4 | open | 2 | 2s → 7s | +5s | +250% |
 | Packaged Worker / interface (balanced v2) / Run actions/download-artifact@v4 | open | 2 | 1s → 3s | +2s | +200% |
 | Packaged Worker / accounts (balanced v2) / Start disposable built Worker | open | 2 | 7s → 11s | +4s | +57.14% |
@@ -324,11 +325,15 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Packaged Worker / interface (balanced v2) / Run actions/upload-artifact@v4 | open | 2 | 3s → 5s | +2s | +66.67% |
 | Development / desktop (balanced v2) / dev-map-tiles | open | 4 | 35s → 169s | +134s | +382.86% |
 | test-apk / Set up job | open | 2 | 1s → 3s | +2s | +200% |
+| Packaged Worker / interface (balanced v2) / worker-library-navigation | open | 2 | 32s → 47s | +15s | +46.88% |
 
 ## Recorded slowdowns
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-20T11:55:15Z | step: Packaged Worker / interface (balanced v2) / worker-library-navigation | 39s → 47s | +8s | +20.51% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39383219852/job/118497700523) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39417084356/job/118609674503) |
+| 2026-10-20T11:54:08Z | step: Development / gameplay (balanced v2) / dev-library-navigation | 51s → 63s | +12s | +23.53% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38310299946/job/115014088792) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39417084356/job/118608618441) |
+| 2026-10-20T11:46:30Z | step: Development / desktop (balanced v2) / dev-ships | 66s → 77s | +11s | +16.67% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38305743510/job/114999237632) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39417084356/job/118608618372) |
 | 2026-10-20T11:54:27Z | step: verify / Development / desktop (balanced v2) / dev-game-analytics | 5s → 6s | +1s | +20% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38305743849/job/114999239552) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39417084438/job/118608619206) |
 | 2026-10-20T11:54:04Z | step: verify / Development / gameplay (balanced v2) / dev-library-navigation | 50s → 62s | +12s | +24% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38305743849/job/114999239368) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39417084438/job/118608619098) |
 | 2026-10-20T11:50:05Z | step: verify / Development / desktop (balanced v2) / dev-map-tiles | 33s → 141s | +108s | +327.27% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38305743849/job/114999239552) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39417084438/job/118608619206) |
