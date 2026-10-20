@@ -138,6 +138,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Development / gameplay / dev-finance | open | 5 | 17s → 48s | +31s | +182.35% |
 | Code checks and immutable builds / unit-tests | open | 6 | 11s → 38s | +27s | +245.45% |
 | Packaged Worker / interface / Run npx playwright install --with-deps chromium | open | 2 | 21s → 57s | +36s | +171.43% |
+| Development / accounts / dev-monitor | open | 2 | 3s → 5s | +2s | +66.67% |
 | Packaged Worker / accounts | open | 5 | 94s → 257s | +163s | +173.4% |
 | Development / accounts | open | 3 | 152s → 732s | +580s | +381.58% |
 | production release asset readiness | open | 2 | 2.465s → 27.818s | +25.353s | +1028.52% |
@@ -320,6 +321,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-20T10:32:29Z | step: Development / accounts / dev-monitor | 4s → 5s | +1s | +25% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37270098428/job/111635070946) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39406545850/job/118579206668) |
 | 2026-10-20T10:27:38Z | step: Packaged Worker / accounts (balanced v2) / worker-world-features | 88s → 107s | +19s | +21.59% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38310299946/job/115014983127) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39406545850/job/118574661090) |
 | 2026-10-20T10:23:53Z | step: Development / desktop (balanced v2) / dev-world-features | 120s → 139s | +19s | +15.83% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38305743510/job/114999237632) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39406545850/job/118573751436) |
 | 2026-10-20T10:21:34Z | step: Development / desktop (balanced v2) / dev-map-tiles | 145s → 169s | +24s | +16.55% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39360883040/job/118426536399) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39406545850/job/118573751436) |
