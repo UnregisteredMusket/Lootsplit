@@ -136,6 +136,7 @@ export const mapTabletopSchema = z
   .strict();
 export const tabletopSessionSchema = z
   .object({
+    presentation: z.object({ id, mapId:id, mode:z.enum(["grid","theatre"]) }).strict().nullable().optional(),
     tvEnabled: z.boolean().default(false),
     activeMapId: id.nullable().default(null),
     activationId: id.optional(),

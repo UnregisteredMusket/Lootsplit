@@ -23,9 +23,18 @@ export type MapRecord = {
   kind: string;
   point?: { x: number; y: number };
   href?: string;
+  reference?: import("./connected-maps-schema.ts").MapRecordReference;
+  targetMapId?: string;
+  entry?: { x: number; y: number; zoom: number };
   description?: string;
 };
 export const mapRecordKinds = [
+  "Map",
+  "Listing",
+  "Exchange",
+  "Dock",
+  "Journal",
+  "Handout",
   "Location",
   "Marker",
   "NPC",

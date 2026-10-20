@@ -2163,3 +2163,10 @@ function EncounterEditor({
     </div>
   );
 }
+
+/** Same canonical editor/loot review, hosted inside the map's persistent panel. */
+export function EncounterMapEditor({id}:{id:string}) {
+  const seat=useSeat();
+  if(seat.role!=='dm')return <p>Only the DM can manage this encounter.</p>;
+  return <EncounterEditor id={id} onDirty={()=>{}} onSaved={()=>{}}/>;
+}

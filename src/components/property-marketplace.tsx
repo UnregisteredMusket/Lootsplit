@@ -1085,3 +1085,11 @@ function PropertyListingEditor({
     </form>
   );
 }
+
+export function MapListingService({ listingId }: { listingId: string }) {
+  const { listings, journal, purses } = useEconomy(), seat = useSeat();
+  const listing = listings.find(l => l.id === listingId), mine = purses.filter(p => seat.role === "dm" || seat.purseIds.includes(p.id));
+  const here = !!listing && propertyAvailableHere(listing, readMarketLocations(journal.market), !!journal.world?.partyPosition);
+  if (!listing || (seat.role !== "dm" && (!here || listing.quantity === 0 || listing.status === "withdrawn"))) return <p>This listing is unavailable here.</p>;
+  return <PropertyViewing key={listing.id} listing={listing} initialBuyer={mine[0]?.id??""} purses={mine} available={here} />;
+}

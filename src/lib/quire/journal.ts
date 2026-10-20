@@ -301,6 +301,7 @@ export function preserveJournalMetadata(value: unknown, current: Journal): Journ
           world: {
             ...next.world,
             ...(current.world?.tabletop ? { tabletop: current.world.tabletop } : {}),
+            ...(current.world?.combat ? { combat: current.world.combat } : {}),
             npcs: next.world.npcs.map((n) => {
               const old = current.world?.npcs.find((o) => o.id === n.id);
               return {
@@ -313,6 +314,7 @@ export function preserveJournalMetadata(value: unknown, current: Journal): Journ
             ...(current.world?.partyPosition ? { partyPosition: current.world.partyPosition } : {}),
             maps: next.world.maps.map((map) => {
               const old = current.world?.maps.find((m) => m.id === map.id);
+              if (old?.connected) map.connected = old.connected;
               return {
                 ...map,
                 ...(old?.type ? { type: old.type } : {}),

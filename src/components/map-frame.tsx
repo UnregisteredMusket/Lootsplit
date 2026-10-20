@@ -8,8 +8,10 @@ export function MapFrame({
   title,
   actions,
   onFullChange,
+  navigation,
 }: {
   children: ReactNode;
+  navigation?: ReactNode;
   editor?: boolean;
   title?: string;
   actions?: ReactNode;
@@ -108,6 +110,7 @@ export function MapFrame({
           {full ? "Exit fullscreen" : editor ? "Fullscreen editor" : "Fullscreen map"}
         </Button>
       </div>
+      {navigation}
       {children}
     </dialog>
   );

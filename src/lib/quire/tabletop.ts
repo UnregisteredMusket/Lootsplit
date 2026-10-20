@@ -131,6 +131,11 @@ export function projectTabletopMap(
   return {
     ...map,
     image: masked ? concealedMapImage : map.image,
+    connected: map.connected ? { ...map.connected,
+      placedRecords: map.connected.placements.map(p => p.record),
+      links: map.connected.links.filter(l => l.visibility === "party" && visible(l)),
+      placements: map.connected.placements.filter(p => p.visibility === "party" && visible(p)),
+    } : undefined,
     anchors: map.anchors.filter(visible),
     markers: map.markers.filter((m) => m.visibility === "party" && visible(m)),
     tokens: map.tokens
@@ -167,6 +172,7 @@ export function validateTabletop(table: CloudTable, projected = false) {
     !world.maps.some((m) => m.id === session.camera!.mapId && (projected || m.visible))
   )
     throw Error("A synchronized camera must refer to a shared map.");
+  if (session.presentation && !world.maps.some(m=>m.id===session.presentation!.mapId && (projected||m.visible))) throw Error("Combat presentation requires a shared map.");
   for (const map of world.maps) {
     const settings = readMapTabletop(map);
     for (const [label, values] of [
@@ -202,9 +208,14 @@ export function applyTabletopCommand(
     table.journal!.events.push({ id: command.id + "-event", at, kind: "management", summary });
   if (command.kind === "tabletop-session") {
     dm();
-    if (!same(world.tabletop ?? null, command.before))
+    const previousSession = world.tabletop ? {...world.tabletop} : null;
+    if (previousSession) delete previousSession.presentation;
+    if (!same(world.tabletop ?? null, command.before) && !same(previousSession,command.before))
       throw Error("Tabletop session controls changed. Refresh before saving.");
-    world.tabletop = command.session;
+    const next = {...command.session};
+    if (next.presentation === undefined && world.tabletop?.presentation) next.presentation=world.tabletop.presentation;
+    if (next.presentation && next.presentation.mapId !== next.activeMapId) next.presentation=null;
+    world.tabletop = next;
     validateTabletop(table);
     event("Online tabletop session controls updated");
     return;

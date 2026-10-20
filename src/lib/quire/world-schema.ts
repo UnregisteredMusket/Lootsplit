@@ -1,4 +1,6 @@
 import { z } from "zod";
+import { mapCombatBindingSchema } from "./map-combat-schema.ts";
+import { connectedMapSchema } from "./connected-maps-schema.ts";
 import { artworkSchema } from "./artwork.ts";
 import { mapTabletopSchema, tabletopSessionSchema, tabletopCommands, tokenTabletopFields } from "./tabletop-schema.ts";
 const id = z.string().min(1).max(150),
@@ -132,6 +134,7 @@ export const mapTokenSchema = z
   });
 export const campaignMapSchema = z
   .object({
+    connected: connectedMapSchema.optional(),
     tabletop: mapTabletopSchema.optional(),
     id,
     name,
@@ -243,6 +246,7 @@ const conversationSchema = z
   .strict();
 export const worldSchema = z
   .object({
+    combat: mapCombatBindingSchema.optional(),
     tabletop: tabletopSessionSchema.optional(),
     characterPositions: z.array(characterPositionSchema).max(10000).default([]),
     partyCharacters: z.array(z.object({ id, name }).strict()).max(10000).optional(),
@@ -282,6 +286,7 @@ export type Trade = z.infer<typeof tradeSchema>;
 export const readWorld = (value?: unknown): World => worldSchema.parse(value ?? {});
 export const worldCommands = [
   ...tabletopCommands,
+  z.object({ id, kind: z.literal("map-combat-transition"), before: mapCombatBindingSchema.nullable(), binding: mapCombatBindingSchema.nullable(), beforeSession: tabletopSessionSchema.nullable() }).strict(),
   z.object({
     id,
     kind: z.literal("party-map-position"),

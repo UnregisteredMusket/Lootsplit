@@ -7,6 +7,7 @@ import {
 } from "./world-schema.ts";
 import type { CloudTable, CloudSeat } from "./cloud.ts";
 import type { Holding } from "./types.ts";
+import { validateConnectedMaps } from "./connected-maps.ts";
 import { canonicalJson } from "./canonical-json.ts";
 import { locationPath, readMarketLocations } from "./shop-locations.ts";
 import { assertCarried, assertEstateDisposable } from "./estate.ts";
@@ -15,9 +16,9 @@ import { fromCopper, toCopper } from "./money.ts";
 import { advanceSessionTime } from "./session-time.ts";
 import { applyCharacterPosition } from "./character-position.ts";
 import { readFleet } from "./ships-schema.ts";
-import { applyTabletopCommand, validateTabletop } from "./tabletop.ts";
+import { applyTabletopCommand, validateTabletop, readTabletopSession } from "./tabletop.ts";
 import { tabletopCommands, type TabletopCommand } from "./tabletop-schema.ts";
-import { legacyTabletopMap, legacyTabletopToken } from "./tabletop-protocol.ts";
+import { legacyTabletopMap, legacyTabletopToken, previousTabletopMap } from "./tabletop-protocol.ts";
 
 export function npcAvailableHere(npc: Npc, table: Pick<CloudTable, "journal">) {
   const market = readMarketLocations(table.journal?.market);
@@ -93,6 +94,14 @@ export function validateWorld(t: CloudTable, projected = false) {
     w.timeHistory.map((c) => c.id),
     "time receipt",
   );
+  validateConnectedMaps(t, projected);
+  const combat=w.combat;
+  if (combat) {
+    const scene=w.maps.find(m=>m.id===combat.mapId);
+    if (!scene || !w.maps.some(m=>m.id===combat.returnMapId)) throw Error("Return from the encounter map before removing its scene or return map.");
+    if (combat.mode === "grid" && (!combat.scaleConfirmed || !scene.grid || canonicalJson(scene.grid)!==combat.gridFingerprint)) throw Error("Combat grid changed. Return to exploration and review the calibrated scale before starting again.");
+    if (combat.showPlayers && !scene.visible) throw Error("Return from the shared encounter map before making it private.");
+  }
   for (const map of w.maps) {
     if (map.locationId && !locations.has(map.locationId)) throw Error("Map location is missing.");
     unique(
@@ -339,7 +348,25 @@ export function applyWorldCommand(t: CloudTable, seat: CloudSeat, cmd: WorldComm
       t.holdings.push({ ...item, id: `${npc.id}-item-${i}`, purseId: npc.id, kind: "item" }),
     );
   };
-  if (cmd.kind === "party-map-position") {
+  if (cmd.kind === "map-combat-transition") {
+    dm();
+    if (!same(w.combat ?? null,cmd.before) || !same(w.tabletop ?? null,cmd.beforeSession)) throw Error("The encounter map or active scene changed. Refresh and review the transition.");
+    const binding=cmd.binding, session=readTabletopSession(t);
+    if (binding && w.combat && binding.id !== w.combat.id) throw Error("Finish or return from the current encounter map before starting another transition.");
+    if (binding && w.combat && (binding.encounterId!==w.combat.encounterId || binding.mapId!==w.combat.mapId || binding.returnMapId!==w.combat.returnMapId || (w.combat.phase==='active'&&binding.phase!=='active'))) throw Error("A prepared encounter transition cannot change its identity or destination.");
+    if (binding) {
+      w.combat=binding;
+      if (binding.phase==='active') { const scene=w.maps.find(m=>m.id===binding.mapId); if(scene)scene.encounterId=binding.encounterId; }
+      if (binding.phase==='active' && binding.showPlayers) w.tabletop={...session,activeMapId:binding.mapId,activationId:binding.id,camera:null,presentation:{id:binding.id,mapId:binding.mapId,mode:binding.mode}};
+    } else {
+      if (w.combat && session.presentation?.id===w.combat.id && session.activeMapId===w.combat.mapId) {
+        const destination=w.maps.find(m=>m.id===w.combat!.returnMapId&&m.visible);
+        w.tabletop={...session,activeMapId:destination?.id??null,activationId:cmd.id,camera:null,presentation:null};
+      }
+      delete w.combat;
+    }
+    event(binding?.phase==='active'?"Encounter map opened":binding?"Encounter map transition prepared":"Returned from encounter map");
+  } else if (cmd.kind === "party-map-position") {
     dm();
     const market = readMarketLocations(journal.market);
     if (
@@ -400,7 +427,7 @@ export function applyWorldCommand(t: CloudTable, seat: CloudSeat, cmd: WorldComm
   } else if (cmd.kind === "map-save") {
     dm();
     const current = w.maps.find((m) => m.id === cmd.mapId) ?? null;
-    const legacy = current && cmd.before && !same(current, cmd.before) && same(legacyTabletopMap(current), cmd.before);
+    const legacy = current && cmd.before && !same(current, cmd.before) && (same(legacyTabletopMap(current), cmd.before) || same(previousTabletopMap(current), cmd.before));
     if (!same(current, cmd.before) && !legacy)
       throw Error("This map changed. Reload before saving; your draft is retained.");
     if (cmd.map && cmd.map.id !== cmd.mapId) throw Error("Map identity cannot change.");
@@ -414,6 +441,8 @@ export function applyWorldCommand(t: CloudTable, seat: CloudSeat, cmd: WorldComm
       )
     )
       throw Error("Resolve this map's ongoing ship routes before removing it.");
+    if (cmd.map?.connected) delete cmd.map.connected.placedRecords;
+    if (cmd.map && current?.connected && cmd.map.connected === undefined) cmd.map.connected = current.connected;
     if (cmd.map && current?.tabletop) {
       cmd.map.tabletop = { ...(cmd.map.tabletop ?? current.tabletop), revision: current.tabletop.revision + 1 };
       if (legacy && cmd.map.tokens) cmd.map.tokens = cmd.map.tokens.map(token => {

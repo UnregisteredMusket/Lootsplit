@@ -21,7 +21,7 @@ const labels = { martial: "Martial", academic: "Academic", profession: "Skill / 
 const hours = (minutes: number) =>
   (minutes / 60).toLocaleString(undefined, { maximumFractionDigits: 2 });
 const days = (value: number) => value.toLocaleString(undefined, { maximumFractionDigits: 2 });
-export function DowntimeActivities({ reviewsOnly = false }: { reviewsOnly?: boolean }) {
+export function DowntimeActivities({ reviewsOnly = false, initialNpcId = "" }: { reviewsOnly?: boolean; initialNpcId?: string }) {
   const t = useWorldTable(),
     seat = useSeat(),
     dm = seat.role === "dm";
@@ -38,7 +38,7 @@ export function DowntimeActivities({ reviewsOnly = false }: { reviewsOnly?: bool
     (p) => p.control === "npc" || t.journal.world?.npcs.some((n) => n.id === p.id),
   );
   const [trainerId, setTrainerId] = useState(""),
-    [npcId, setNpcId] = useState("");
+    [npcId, setNpcId] = useState(initialNpcId);
   const [windowId, setWindowId] = useState(""),
     [category, setCategory] = useState<TrainingRequest["category"]>("martial");
   const [topic, setTopic] = useState(""),

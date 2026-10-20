@@ -1387,3 +1387,10 @@ function ManualSeason({ economy }: { economy: TradeEconomy }) {
     </>
   );
 }
+
+export function MapExchangeService({ exchangeId }: { exchangeId: string }) {
+  const table = useWorldTable(), seat = useSeat(), economy = readTradeEconomy(table.journal.tradeEconomy);
+  const exchange = economy.exchanges.find(e => e.id === exchangeId);
+  if (!exchange || (seat.role !== "dm" && (!exchange.visible || !exchangeHere(table, exchange)))) return <p>This exchange is unavailable here.</p>;
+  return <CommodityBoard economy={economy} exchanges={[exchange]} market={readMarketLocations(table.journal.market)} dm={seat.role === "dm"} initialExchange={exchange.id} initialCommodity="" renderTrade={({exchange:e,commodity:c})=>economy.settings.enabled&&e.open&&c.active ? <TradeForm key={exchangeQuoteKey(economy,e,c)} economy={economy} exchange={e} commodity={c}/> : <p>Trading is currently unavailable.</p>} />;
+}

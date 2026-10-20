@@ -21,11 +21,12 @@ import { locationLabel, readMarketLocations } from "@/lib/quire/shop-locations";
 import { EstateWorkshop, PropertyOperations } from "./property-operations";
 import { canAccessEstate } from "@/lib/quire/estate";
 import { readEstate } from "@/lib/quire/estate-schema";
-export function PropertyDetails({ plans = false }: { plans?: boolean }) {
+export function PropertyDetails({ plans = false, propertyId }: { plans?: boolean; propertyId?: string }) {
   const { holdings, purses, journal, ledger } = useEconomy(),
     seat = useSeat();
   const rows = holdings.filter(
     (h) =>
+      (!propertyId || h.id === propertyId) &&
       h.kind === "property" &&
       h.quantity > 0 &&
       (seat.role === "dm" ||
@@ -50,7 +51,7 @@ export function PropertyDetails({ plans = false }: { plans?: boolean }) {
     <section id="campaign-operations">
       <h2 id="owned-properties">Owned properties</h2>
       <p>Edit descriptive details. Ownership, value, revenue and upkeep remain under DM control.</p>
-      <EstateWorkshop />
+      {!propertyId && <EstateWorkshop />}
       {rows.map((h) => (
         <article className="journal-entry" key={h.id} id={`property-${encodeURIComponent(h.id)}`}>
           <div className="owned-property-heading">
