@@ -338,6 +338,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Code checks and immutable builds / Generate current source function inventory | open | 2 | 19s → 28s | +9s | +47.37% |
 | test-apk / Set up job | open | 2 | 1s → 3s | +2s | +200% |
 | Packaged Worker / interface (balanced v2) / worker-library-navigation | open | 2 | 32s → 47s | +15s | +46.88% |
+| Packaged Worker / accounts (balanced v2) / worker-monitor | open | 2 | 7s → 42s | +35s | +500% |
 | native-widget (35) / Run android-actions/setup-android@v3 | open | 2 | 10s → 24s | +14s | +140% |
 | Development / accounts / dev-monitor | open | 2 | 4s → 6s | +2s | +50% |
 | verify / Development / gameplay (balanced v2) / Run actions/setup-node@v4 | open | 2 | 3s → 8s | +5s | +166.67% |
@@ -354,6 +355,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-20T21:11:17Z | step: Packaged Worker / accounts (balanced v2) / worker-monitor | 12s → 42s | +30s | +250% | failure | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39404784795/job/118568710554) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39497595870/job/118887423279) |
 | 2026-10-20T19:37:12Z | step: Development / accounts / dev-party-sheet | 23s → 27s | +4s | +17.39% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38034638067/job/114162429771) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39484296844/job/118840591962) |
 | 2026-10-20T19:18:19Z | step: Packaged Worker / accounts (balanced v2) / Run npx playwright install --with-deps chromium | 26s → 32s | +6s | +23.08% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39359402241/job/118422980049) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39481783895/job/118833188604) |
 | 2026-10-20T19:17:35Z | step: Packaged Worker / accounts (balanced v2) / Run actions/setup-node@v4 | 7s → 9s | +2s | +28.57% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38404276239/job/115320597304) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39481783895/job/118833188604) |
