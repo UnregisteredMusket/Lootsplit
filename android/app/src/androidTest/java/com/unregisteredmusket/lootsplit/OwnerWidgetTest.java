@@ -145,6 +145,12 @@ public class OwnerWidgetTest {
                 int w = Math.round(width * density), h = Math.round(height * density);
                 parent.measure(View.MeasureSpec.makeMeasureSpec(w, View.MeasureSpec.EXACTLY), View.MeasureSpec.makeMeasureSpec(h, View.MeasureSpec.EXACTLY));
                 parent.layout(0, 0, w, h);
+                Bitmap image = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
+                parent.draw(new Canvas(image));
+                File dir = context.getExternalFilesDir("widget-audit");
+                if (dir == null || (!dir.isDirectory() && !dir.mkdirs())) throw new Exception("Missing screenshot directory");
+                try (FileOutputStream output = new FileOutputStream(new File(dir, name + ".png"))) { image.compress(Bitmap.CompressFormat.PNG, 100, output); }
+                image.recycle();
                 assertEquals(expanded ? View.VISIBLE : View.GONE, view.findViewById(R.id.monitor_details).getVisibility());
                 assertTrue(view.findViewById(R.id.monitor_refresh).getHeight() >= 40 * density);
                 assertTrue(view.findViewById(R.id.monitor_refresh).hasOnClickListeners());
@@ -154,12 +160,6 @@ public class OwnerWidgetTest {
                     assertEquals("—", ((TextView) view.findViewById(R.id.monitor_active)).getText().toString());
                     assertFalse(((TextView) view.findViewById(R.id.monitor_identity)).getText().toString().contains("Test Owner"));
                 }
-                Bitmap image = Bitmap.createBitmap(w, h, Bitmap.Config.ARGB_8888);
-                parent.draw(new Canvas(image));
-                File dir = context.getExternalFilesDir("widget-audit");
-                if (dir == null || (!dir.isDirectory() && !dir.mkdirs())) throw new Exception("Missing screenshot directory");
-                try (FileOutputStream output = new FileOutputStream(new File(dir, name + ".png"))) { image.compress(Bitmap.CompressFormat.PNG, 100, output); }
-                image.recycle();
             } catch (Throwable error) { failure[0] = error; }
         });
         if (failure[0] != null) throw new AssertionError(name, failure[0]);
