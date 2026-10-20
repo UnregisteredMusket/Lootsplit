@@ -65,8 +65,8 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Packaged Worker / accounts / Run actions/upload-artifact@v4 | open | 2 | 1s → 3s | +2s | +200% |
 | Publish verified standby / initial queue | open | 3 | 3s → 39s | +36s | +1200% |
 | publish / Run actions/download-artifact@v4 | open | 3 | 1s → 4s | +3s | +300% |
-| Publish verified standby | open | 2 | 10s → 18s | +8s | +80% |
-| publish | open | 2 | 10s → 18s | +8s | +80% |
+| Publish verified standby | open | 3 | 10s → 21s | +11s | +110% |
+| publish | open | 3 | 10s → 21s | +11s | +110% |
 | Deploy verified website / initial queue | open | 2 | 4s → 6780s | +6776s | +169400% |
 | deploy / Run actions/setup-node@v4 | open | 2 | 2s → 7s | +5s | +250% |
 | deploy / Run actions/download-artifact@v4 | open | 3 | 1s → 6s | +5s | +500% |
@@ -313,6 +313,8 @@ Open trends require investigation. Resolved trends retain their history; each ve
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-20T06:10:32Z | job: publish | 18s → 21s | +3s | +16.67% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37263801314/job/111616279480) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39378841141/job/118483019687) |
+| 2026-10-20T06:10:32.000Z | workflow: Publish verified standby | 18s → 21s | +3s | +16.67% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37263801314) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39378841141) |
 | 2026-10-20T06:06:40Z | step: Packaged Worker / accounts (balanced v2) / worker-map-tiles | 95s → 112s | +17s | +17.89% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39266580213/job/118108928948) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39377674059/job/118479828566) |
 | 2026-10-20T06:02:07Z | step: Development / governance / dev-sound | 35s → 42s | +7s | +20% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37889515368/job/113687018218) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39377674059/job/118479368445) |
 | 2026-10-20T05:16:15.830Z | audit: connected-map-navigation-services-combat | 22.786s → 33.259s | +10.473s | +45.96% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/pull/112) · [After](https://github.com/UnregisteredMusket/Lootsplit/commit/f2ed4bb23a647e9191bac4278d57a5b94dc18908) |
