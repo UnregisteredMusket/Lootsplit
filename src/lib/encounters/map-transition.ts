@@ -19,10 +19,14 @@ export async function finishMapEncounter(
     guard: () => void;
   },
 ) {
-  let detail = await operations.read();
-  operations.guard();
-  if (detail.id !== binding.encounterId || detail.code !== code || detail.readOnly)
-    throw Error("This encounter is not writable in the current campaign.");
+  async function read() {
+    const detail = await operations.read();
+    operations.guard();
+    if (detail.id !== binding.encounterId || detail.code !== code || detail.readOnly)
+      throw Error("This encounter is not writable in the current campaign.");
+    return detail;
+  }
+  let detail = await read();
   if (detail.status === "draft") {
     if (detail.revision !== binding.encounterRevision)
       throw Error(
@@ -31,12 +35,10 @@ export async function finishMapEncounter(
     try {
       await operations.start(detail.revision);
     } catch (error) {
-      const confirmed = await operations.read();
-      operations.guard();
+      const confirmed = await read();
       if (confirmed.status !== "active") throw error;
     }
-    detail = await operations.read();
-    operations.guard();
+    detail = await read();
   }
   if (detail.status !== "active")
     throw Error("This encounter is already concluded. Review its loot or return to exploration.");

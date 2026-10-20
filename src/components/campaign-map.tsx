@@ -180,17 +180,18 @@ function CampaignMapWorkspace() {
     best ??
     maps.find((m) => !m.locationId) ??
     maps[0];
+  const viewedMapId = map?.id;
   useEffect(() => {
-    if (!map || lastMap.current === map.id) return;
+    if (!viewedMapId || lastMap.current === viewedMapId) return;
     const previous = lastMap.current;
-    lastMap.current = map.id;
-    const returning = returningMap.current === map.id;
+    lastMap.current = viewedMapId;
+    const returning = returningMap.current === viewedMapId;
     returningMap.current = "";
     setHistory((h) => (returning ? h.slice(0, -1) : previous ? [...h, previous].slice(-100) : h));
     setSelectedToken("");
     setPlacement("");
     setPoint(undefined);
-  }, [map?.id]);
+  }, [viewedMapId]);
   const party =
     map &&
     (w.partyPosition?.mapId === map.id &&
@@ -1719,7 +1720,11 @@ function MapViewport({
                           )
                     }
                     onClick={(event) => {
-                      if (!moved.current && !pinging && (!service || allowContextChange())) {
+                      if (
+                        !moved.current &&
+                        !pinging &&
+                        (!(service || combatOpen) || allowContextChange())
+                      ) {
                         setService(undefined);
                         setCombatOpen(false);
                         const token = type.records.find(

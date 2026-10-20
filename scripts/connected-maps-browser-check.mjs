@@ -270,6 +270,34 @@ export async function checkConnectedMaps({ browser, origin, output }) {
       await expect(frame).toHaveClass(/map-fullscreen/);
       assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1));
       await page.screenshot({ path: `${output}/connected-${width}.png` });
+      if (width === 390) {
+        for (const viewport of [
+          { width: 320, height: 640 },
+          { width: 844, height: 390 },
+        ]) {
+          await page.setViewportSize(viewport);
+          await frame.locator('button[title="Shop: Ash & Anvil"]').click();
+          await frame.getByRole("button", { name: "Open in map", exact: true }).click();
+          const panel = frame.getByRole("region", { name: "Map record details", exact: true });
+          await expect(
+            panel.getByRole("heading", { name: "Ash & Anvil", exact: true }).first(),
+          ).toBeVisible();
+          const close = panel.getByRole("button", { name: "Close details", exact: true });
+          await close.scrollIntoViewIfNeeded();
+          assert.ok(
+            await close.evaluate((e) => {
+              const r = e.getBoundingClientRect();
+              return e.contains(document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2));
+            }),
+            "Service close control remains reachable above the map",
+          );
+          await close.click();
+          await expect(frame).toHaveClass(/map-fullscreen/);
+          assert.ok(
+            await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1),
+          );
+        }
+      }
       assert.deepEqual(errors, []);
       results.push({
         width,

@@ -12,6 +12,8 @@ Fullscreen maps use the full desktop or phone viewport, with floating navigation
 
 The online tabletop adds remote token controls, saved fog/optional vision, reviewed UVTT imports and protected detailed media while retaining the current Maps layout. TV presentation is optional/default-off; each player uses their own invited session. See [scope and release status](docs/audit/2026-10-19-online-tabletop.md).
 
+Connected maps add parent/default/entrance links, persistent fullscreen navigation, exact record pins and in-map canonical services. A saved encounter can open a reviewed battle scene, recover an interrupted handoff and return to exploration. Players see only permitted pins and revealed combat status. See [connected-map implementation](docs/audit/2026-10-20-connected-maps.md) and [map guide](docs/MAP-TILES.md).
+
 Maps support category filters, dungeon/property/ship layouts, free DM party placement with travel environments and wilderness biomes, configurable combat tiles (5 ft by default), saved encounter roster tokens and mapped ship voyages. Tile movement uses authoritative campaign commands; voyages keep the existing approved downtime clock. See [map and tile guide](docs/MAP-TILES.md).
 
 Lootsplit is a shared party ledger and campaign application for web and Android. Production runs on Cloudflare Workers and D1; GitHub Actions verifies and publishes the exact tested artifact from `main`.

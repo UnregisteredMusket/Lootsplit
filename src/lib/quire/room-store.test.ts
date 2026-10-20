@@ -1286,3 +1286,50 @@ test("shared map tiles and travel placement preserve privacy, reject forged move
   assert.equal(final.table.journal!.events.filter((e) => e.id === "free-party-event").length, 1);
   await deleteRoom(host.code, final.revision);
 });
+
+test("connected combat presentation rechecks seats, campaign, fog and scene permission without leaking tracker data", async () => {
+  const { mapCombatPresentation, choosePace } = await import("./cloud.server.ts");
+  const { campaignMapSchema } = await import("./world-schema.ts");
+  const { readJournal } = await import("./journal.ts");
+  const { mapTabletopSchema } = await import("./tabletop-schema.ts");
+  const battle = campaignMapSchema.parse({ id: "hud-battle", name: "Shared battle", image: "data:image/png;base64,YQ==", visible: true, locationId: null, anchors: [], markers: [],
+    grid: { columns: 10, rows: 10, feetPerTile: 5, diagonal: "equal", x: 0, y: 0, width: 1, height: 1 },
+    tokens: [{ id: "known-token", label: "Known scout", kind: "creature", encounterId: "hud-encounter", combatantId: "known", column: 1, row: 1, visibility: "party" },
+      { id: "secret-token", label: "Secret dragon", kind: "creature", encounterId: "hud-encounter", combatantId: "secret", column: 2, row: 2, visibility: "dm" }],
+  });
+  const table = { ...emptyCloudTable(), purses: [{ id: "hud-hero", name: "Hero", kind: "character" as const, coins: emptyCoins() }], journal: readJournal({ world: { maps: [battle] } }) };
+  const host = await openRoom({ name: "HUD DM", table }), guest = await joinRoom({ code: host.code, purseId: "hud-hero", name: "HUD player" });
+  await choosePace({ ...host, live: true });
+  const binding = { id: "hud-transition", encounterId: "hud-encounter", encounterRevision: 0, mapId: battle.id, returnMapId: battle.id, returnCamera: { x: .5, y: .5, zoom: 1 }, mode: "theatre", phase: "active", scaleConfirmed: false, showPlayers: true };
+  const command = { id: "hud-activate", kind: "map-combat-transition", before: null, binding, beforeSession: null };
+  await assert.rejects(submitCommands({ code: host.code, token: guest.token, batchId: "hud-forged", commands: [command] }), /Only the DM/);
+  await submitCommands({ ...host, batchId: "hud-start", commands: [command] });
+  await submitCommands({ ...host, batchId: "hud-retry", commands: [command] });
+  const privateBody = { name: "Private encounter name", round: 3, activeId: "known", notes: "Secret tactics", combatants: [{ id: "known", hp: 27 }], loot: "Secret treasure" };
+  sql.exec("CREATE TABLE IF NOT EXISTS user(id TEXT PRIMARY KEY)");
+  sql.prepare("INSERT OR IGNORE INTO user(id) VALUES (?)").run("synthetic-owner");
+  sql.prepare("INSERT INTO dm_encounters(id,user_id,code,body,status,revision,created_at,updated_at) VALUES (?,?,?,?,'active',1,1,1)").run("hud-encounter", "synthetic-owner", host.code, JSON.stringify(privateBody));
+  const auth = { code: host.code, token: guest.token, mapId: battle.id };
+  assert.deepEqual(await mapCombatPresentation(auth), { mapId: battle.id, status: "active", round: 3, activeTokenId: "known-token" });
+  privateBody.activeId = "secret";
+  sql.prepare("UPDATE dm_encounters SET body=? WHERE id=?").run(JSON.stringify(privateBody), "hud-encounter");
+  assert.deepEqual(await mapCombatPresentation(auth), { mapId: battle.id, status: "active", round: 3 });
+  privateBody.activeId = "known";
+  sql.prepare("UPDATE dm_encounters SET body=? WHERE id=?").run(JSON.stringify(privateBody), "hud-encounter");
+  const before = (await roomState(host)).table.journal!.world!.maps[0];
+  await submitCommands({ ...host, batchId: "hud-fog", commands: [{ id: "hud-fog", kind: "map-save", mapId: battle.id, before, map: { ...before, tabletop: mapTabletopSchema.parse({ fog: { enabled: true, base: "concealed", shapes: [] } }) } }] });
+  assert.deepEqual(await mapCombatPresentation(auth), { mapId: battle.id, status: "active", round: 3 });
+  assert.equal(await mapCombatPresentation({ ...auth, mapId: "other-map" }), null);
+  sql.prepare("UPDATE dm_encounters SET code=? WHERE id=?").run("FOREIGN", "hud-encounter");
+  assert.equal(await mapCombatPresentation(auth), null);
+  sql.prepare("UPDATE dm_encounters SET code=? WHERE id=?").run(host.code, "hud-encounter");
+  const room = (await readRoom(host.code))!;
+  const session = room.table.journal!.world!.tabletop!;
+  session.presentation = null;
+  await updateRoom({ ...room, revision: room.revision + 1 }, room.revision);
+  assert.equal(await mapCombatPresentation(auth), null);
+  await assert.rejects(mapCombatPresentation({ ...auth, token: "revoked-token" }), /not seated/);
+  const saved = (await roomState(host)).table;
+  assert.deepEqual(saved.ledger, []);
+  assert.deepEqual(saved.holdings, []);
+});

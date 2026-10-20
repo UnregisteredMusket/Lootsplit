@@ -115,7 +115,6 @@ export function useMapTabletopTools(
   useEffect(() => {
     cancel(); setSelected([]); setInspector(false); setShowPreview(false); setError(""); setNotice("");
     // Map changes are guarded by the existing router draft blocker.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [map.id]);
   async function act(input: CommandInput, done?: () => void) {
     if (disabled) return;

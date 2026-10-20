@@ -885,7 +885,7 @@ export async function mapCombatPresentation(input: {code:string;token:string;map
   if(!seat)throw Error("This browser is not seated at that table.");
   if(current?.id!==binding.id || current.encounterId!==binding.encounterId || current.phase!=="active")return null;
   if(seat.role!=="dm" && (!current.showPlayers || room.table.journal?.world?.tabletop?.presentation?.id!==current.id))return null;
-  const projected=projectRecord(room.table,seat),map=projected.journal?.world?.maps.find(m=>m.id===input.mapId);
+  const projected=projectRecord({ ...room.table, journal: { ...room.table.journal!, reports: [] } },seat),map=projected.journal?.world?.maps.find(m=>m.id===input.mapId);
   if(!map)return null;
   const {projectMapCombat}=await import("./map-combat.ts");
   return projectMapCombat(map,binding.encounterId,{status:row.status,body:JSON.parse(row.body)});

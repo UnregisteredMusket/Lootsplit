@@ -50,7 +50,9 @@ export function MapCombatWorkspace({
           : undefined) ??
         map.id,
     ),
-    [mode, setMode] = useState<"grid" | "theatre">(map.grid ? "grid" : "theatre"),
+    [mode, setMode] = useState<"grid" | "theatre">(() =>
+      world.maps.find((m) => m.id === target)?.grid ? "grid" : "theatre",
+    ),
     [scale, setScale] = useState(false),
     [showPlayers, setShowPlayers] = useState(true),
     [busy, setBusy] = useState(false),

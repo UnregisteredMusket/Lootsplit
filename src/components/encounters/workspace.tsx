@@ -1004,7 +1004,7 @@ function EncounterEditor({
               </h3>
               <span>Round {draft.round}</span>
             </div>
-            <AppLink className="settings-link" href="/maps">
+            <AppLink className="settings-link" href={journal.world?.combat?.encounterId === id ? `/maps?map=${encodeURIComponent(journal.world.combat.mapId)}` : "/maps"}>
               Open combat maps →
             </AppLink>
             <p>
