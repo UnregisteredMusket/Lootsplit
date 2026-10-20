@@ -17915,5 +17915,20 @@
     "finishedAt": "2026-10-20T02:43:00Z",
     "durationMs": 1000,
     "trendId": "39359402241:1:7f5c66ca83a31830774b3d5a83bb534e0381d30a2bda6a622480dcf7664b2079"
+  },
+  "[\"local\",\"audit\",\"connected-map-navigation-services-combat\",\"node22.23.3/chromium153.0.8010.0/linux-x64/workmode/disposable-dev\",\"v1-desktop-phone-narrow-landscape-confirmation-grid-controls\"]": {
+    "schema": 1,
+    "id": "local:a4c92793-205a-4d20-8db6-f8d74f0fb696",
+    "scope": "[\"local\",\"audit\",\"connected-map-navigation-services-combat\",\"node22.23.3/chromium153.0.8010.0/linux-x64/workmode/disposable-dev\",\"v1-desktop-phone-narrow-landscape-confirmation-grid-controls\"]",
+    "kind": "audit",
+    "name": "connected-map-navigation-services-combat",
+    "environment": "node22.23.3/chromium153.0.8010.0/linux-x64/workmode/disposable-dev",
+    "commit": "2e2231af5e6fc6c02d2fad411052d9a2f09b730f",
+    "url": "https://github.com/UnregisteredMusket/Lootsplit/pull/112",
+    "outcome": "success",
+    "startedAt": "2026-10-20T02:30:07.333Z",
+    "finishedAt": "2026-10-20T02:30:30.119Z",
+    "durationMs": 22786,
+    "trendId": "local:a4c92793-205a-4d20-8db6-f8d74f0fb696"
   }
 }
