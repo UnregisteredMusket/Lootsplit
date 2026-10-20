@@ -350,6 +350,11 @@ test("resume-partial", async ({ devices, baseURL: origin }, testInfo) => {
   const bothPartialOpened = new Promise((resolve) => {
     releasePartial = resolve;
   });
+  const submittedDevices = new Set();
+  let releaseSubmissions;
+  const bothSubmitted = new Promise((resolve) => {
+    releaseSubmissions = resolve;
+  });
   await Promise.all(
     [
       [device, 1360],
@@ -380,9 +385,37 @@ test("resume-partial", async ({ devices, baseURL: origin }, testInfo) => {
       expect(resumed.batchId).not.toBe(queued.batchId);
       await navigateAccountScenario(target, origin, "/share");
       await target.getByRole("button", { name: /^Connection & recovery/ }).click();
-      if (++openedPartial === 2) releasePartial();
-      await bothPartialOpened;
-      await target.getByRole("button", { name: "Retry", exact: true }).click();
+      // Keep both real submissions pending at the transport boundary until both
+      // controls were clicked. Otherwise one receipt can reach the other device
+      // through its normal poll and remove Retry before that click is delivered.
+      let releaseForwarded;
+      const submissionForwarded = new Promise((resolve) => {
+        releaseForwarded = resolve;
+      });
+      const holdSubmission = async (route) => {
+        const body = route.request().postData() || "";
+        const submission = body.includes('"commands"') && body.includes('"audit-remaining-noop"');
+        if (submission) {
+          submittedDevices.add(target);
+          if (submittedDevices.size === 2) releaseSubmissions();
+          await bothSubmitted;
+        }
+        await route.continue();
+        if (submission) releaseForwarded();
+      };
+      const submissionPattern = `${origin}/_serverFn/**`;
+      await target.route(submissionPattern, holdSubmission);
+      try {
+        const retry = target.getByRole("button", { name: "Retry", exact: true });
+        // Scroll the phone control above the fixed bottom tabs, as a user would.
+        await retry.evaluate((button) => button.scrollIntoView({ block: "center" }));
+        if (++openedPartial === 2) releasePartial();
+        await bothPartialOpened;
+        await retry.click();
+        await submissionForwarded;
+      } finally {
+        await target.unroute(submissionPattern, holdSubmission);
+      }
       await expect
         .poll(() =>
           target.evaluate(

@@ -1,6 +1,6 @@
-# Lootsplit 1.8.1 — candidate
+# Lootsplit 1.8.1
 
-Android version code **12**. This candidate retains package `com.unregisteredmusket.lootsplit` and the permanent signing certificate. The public download remains 1.8.0 until the new signed APK and checksum exist.
+Android version code **12**. This release retains package `com.unregisteredmusket.lootsplit` and the permanent signing certificate.
 
 ## Added
 
@@ -17,9 +17,9 @@ Android version code **12**. This candidate retains package `com.unregisteredmus
 - My account’s Refresh widget waits for a completed check and reports failures accurately.
 - Late requests cannot replace another account or undo a sign-out. Rejected owner access still clears private readings.
 
-## Candidate verification
+## Verification
 
-Native API24/API35 transport, actual widget-button, timeout, owner-isolation and layout instrumentation plus all complete PR/main preservation gates are required before signing. Independent APK signature/package/version and checksum inspection and the matching website download follow publication. Physical-device installation is not claimed. Install over the permanently signed app; do not uninstall it.
+All eight native cases passed on API24/API35, including actual widget-button, timeout and owner-isolation checks; complete PR/main preservation gates passed. Signed workflow39475576975 published1.8.1. Independent inspection verifies the permanent certificate, APK-v2 integrity, package/version and matching public/checksum/artifact bytes. The website metadata follow-up retains its complete PR/main and streamed-download gates. Physical-device installation is not claimed. Install over the permanently signed app; do not uninstall it.
 
 ---
 
