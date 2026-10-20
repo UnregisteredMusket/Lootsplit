@@ -299,6 +299,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Packaged Worker / accounts (balanced v2) / worker-map-tiles | open | 4 | 17s → 112s | +95s | +558.82% |
 | Development / desktop (balanced v2) / Run npx playwright install --with-deps chromium | open | 2 | 20s → 33s | +13s | +65% |
 | Packaged Worker / accounts (balanced v2) / Run actions/download-artifact@v4 | open | 2 | 2s → 4s | +2s | +100% |
+| Packaged Worker / interface (balanced v2) / worker-library-navigation | open | 2 | 34s → 46s | +12s | +35.29% |
 | Packaged Worker / interface (balanced v2) / worker-shop-stock | open | 2 | 12s → 17s | +5s | +41.67% |
 | Packaged Worker / interface (balanced v2) / worker-market-locations | open | 2 | 44s → 68s | +24s | +54.55% |
 | Packaged Worker / interface (balanced v2) / worker-properties | open | 2 | 40s → 56s | +16s | +40% |
@@ -318,6 +319,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-20T08:49:03Z | step: Packaged Worker / interface (balanced v2) / worker-library-navigation | 40s → 46s | +6s | +15% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38404276239/job/115320597368) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39394850169/job/118535985677) |
 | 2026-10-20T07:28:29Z | step: Development / governance / dev-campaign-governance | 114s → 138s | +24s | +21.05% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37661353259/job/112929395891) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39386388734/job/118507127846) |
 | 2026-10-20T07:12:01Z | step: Code checks and immutable builds / unit-tests | 37s → 43s | +6s | +16.22% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38139715608/job/114470877114) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39384840390/job/118502107783) |
 | 2026-10-20T07:10:58Z | step: Development / desktop (balanced v2) / Run actions/checkout@v4 | 2s → 3s | +1s | +50% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38301994659/job/114986882289) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39384840390/job/118502107553) |
