@@ -131,8 +131,7 @@ test("ownership", async ({ devices, baseURL: origin }, testInfo) => {
     })
     .click();
   await expect(dm.getByText("Campaign control", { exact: true })).toBeVisible();
-  const guide = dm.getByRole("button", { name: "Not now", exact: true });
-  if (await guide.isVisible()) await guide.click();
+  await waitForDmCampaign(dm);
   // Reload after the explicit legacy claim to prove ownership and bytes persist.
   await visitPage(dm, origin, "/party");
   await expect(dm.getByText("Preserved legacy hero", { exact: true }).first()).toBeVisible();
@@ -177,6 +176,10 @@ test("ownership", async ({ devices, baseURL: origin }, testInfo) => {
       : route.continue();
   await guest.route("**/_serverFn/**", rejectRollPolicy);
   await guest.getByRole("link", { name: "Home", exact: true }).first().click();
+  // Home offers the guide after a short delay. Answer that real first-use
+  // dialog before moving on; otherwise it can hide the recovered sheet.
+  if (await guest.evaluate(() => !localStorage.getItem("quire.guide.offer.v3")))
+    await guest.getByRole("button", { name: "Not now", exact: true }).click();
   await guest.getByRole("link", { name: "Character Sheet", exact: true }).click();
   await expect(
     guest.getByRole("button", { name: "Retry character sheet", exact: true }),
@@ -255,6 +258,8 @@ test("ownership", async ({ devices, baseURL: origin }, testInfo) => {
   await secondPlayer.getByRole("button", { name: "Resume", exact: true }).click();
   await secondPlayer.waitForURL((u) => u.pathname === "/");
   await continueIntoApp(secondPlayer);
+  if (await secondPlayer.evaluate(() => !localStorage.getItem("quire.guide.offer.v3")))
+    await secondPlayer.getByRole("button", { name: "Not now", exact: true }).click();
   // Account resume already entered a fresh player document. Follow the actual
   // player Home link to inspect the resumed room; retain the later cold reload.
   await secondPlayer.evaluate(() => (window.playerResumeDocumentForAudit = "resumed"));

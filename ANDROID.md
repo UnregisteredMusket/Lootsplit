@@ -21,6 +21,8 @@ From a phone:
 
 The permanent signing key is already configured. Use the existing GitHub repository secrets for every update: `ANDROID_KEYSTORE_BASE64`, `ANDROID_KEYSTORE_PASSWORD`, `ANDROID_KEY_ALIAS`, and `ANDROID_KEY_PASSWORD`. Do not generate a replacement key, retrieve secret values, or ask the owner to paste passwords. The owner retains the original private backup.
 
+Signing and publication each recheck the current remote main commit. A superseded candidate must finish verification on the corrected main source; never publish an older run merely because its earlier tests passed.
+
 Do not commit `*.jks`, `*.keystore`, or those passwords. The **Android signed release APK** workflow signs using these four repository secrets. It verifies the APK signature and uploads only the APK, never the keystore. Missing secrets stop the build. The decoded keystore is temporary and removed on exit. Debug builds remain separate and are not release updates.
 
 The permanent keystore was generated on 2026-10-01, downloaded by the owner for backup, and configured through the four repository secrets. Its alias is `lootsplit`. The workflow requires certificate SHA-256 `BA:CA:95:A8:80:D1:4D:0D:8C:42:2C:39:7D:EC:D4:C9:BF:0E:7F:71:0A:3F:D6:A5:BE:1E:47:AB:D3:F7:30:A0` and refuses to upload an APK signed by another key. Keep the keystore and passwords backed up securely. Never generate a fresh key automatically during a build.
