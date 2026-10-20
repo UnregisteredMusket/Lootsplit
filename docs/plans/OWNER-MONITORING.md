@@ -65,6 +65,6 @@ elapsed timer. Web animation respects reduced motion.
 
 ## Release evidence
 
-Implementation and verification are pending. Evolving exact heads/run IDs belong
+PR124 implements the backend/website/native system; independent main, immutable website/standby and signed Android1.9.0/code13 passed. Production schema/Cron and actual interval records were read back. The verified-download and strict GitHub immutable-subject follow-up remains in progress; actual telemetry ingestion and source-gap diagnosis must be checked after it deploys. See `../audit/2026-10-20-monitoring.md` and `../audit/android-monitoring-release-evidence.json`. Evolving exact heads/run IDs belong
 in the review PR and `test-results/recovery/monitoring-journal.json`; no release or
 physical-device verification is claimed by this design checkpoint.

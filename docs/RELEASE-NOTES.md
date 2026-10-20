@@ -1,6 +1,6 @@
-# Lootsplit 1.9.0 candidate
+# Lootsplit 1.9.0
 
-Android version code **13**. This candidate retains package `com.unregisteredmusket.lootsplit` and the permanent signing certificate.
+Android version code **13**. This release retains package `com.unregisteredmusket.lootsplit` and the permanent signing certificate.
 
 ## Added
 
@@ -22,9 +22,9 @@ Android version code **13**. This candidate retains package `com.unregisteredmus
 - Keeps confirmed component failures visible when their source disconnects, preserves incomplete observations during historical recovery, and carries unresolved incidents into subsequent daily reports.
 - Prevents analytics-label clipping in the main widget's fixed header.
 
-## Candidate verification
+## Release verification
 
-The release pipeline requires all preservation gates, API24/API35 framework instrumentation, native lint, permanent-key signing and independent APK/checksum inspection. The public download remains 1.8.1 until the new signed APK and checksum exist. Android background delivery remains subject to OS and launcher restrictions; backend collection runs independently. Continuous custom widget animation is unsupported, so static status and native timers are intentional. Physical OEM launcher, prolonged Doze, reboot delivery and large-font checks require separate device validation. Raw runtime-log ingestion and end-to-end scheduled multiplayer checks are explicit coverage gaps until connected, never fabricated healthy results. Install over the permanently signed app; do not uninstall it.
+Published October 20, 2026 after all nine preservation groups, API24/API35 framework instrumentation, native lint and permanent-key signing passed. The public APK, checksum and extracted signing artifact independently match; v2 signature and the original certificate are verified. See [release evidence](audit/android-monitoring-release-evidence.json). The website manifest follow-up publishes this verified download and corrects GitHub immutable-subject authorization; its deployment status is recorded in the follow-up PR. Android background delivery remains subject to OS and launcher restrictions; backend collection runs independently. Continuous custom widget animation is unsupported, so static status and native timers are intentional. Physical OEM launcher, prolonged Doze, reboot delivery and large-font checks require separate device validation. Raw runtime-log ingestion and end-to-end scheduled multiplayer checks are explicit coverage gaps until connected, never fabricated healthy results. Install over the permanently signed app; do not uninstall it.
 
 ---
 

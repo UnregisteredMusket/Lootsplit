@@ -5,11 +5,28 @@ import { ownerAnalytics } from "./game-analytics.mjs";
 const repository = "UnregisteredMusket/Lootsplit";
 const github = `https://api.github.com/repos/${repository}`;
 const caches = new WeakMap();
+export function providerErrorCode(error) {
+  return /^HTTP_[1-5]\d\d(?:_RATE_LIMITED)?$/.test(error?.providerCode || "")
+    ? error.providerCode
+    : error?.name === "TimeoutError" || error?.name === "AbortError"
+      ? "SOURCE_TIMEOUT"
+      : "SOURCE_UNAVAILABLE";
+}
+export function providerFailure(response) {
+  const limited =
+    response.status === 429 ||
+    (response.status === 403 &&
+      (response.headers.get("x-ratelimit-remaining") === "0" ||
+        response.headers.has("retry-after")));
+  return Object.assign(new Error("Provider unavailable"), {
+    providerCode: `HTTP_${response.status}${limited ? "_RATE_LIMITED" : ""}`,
+  });
+}
 const unavailable = (error) => ({
   state: "unavailable",
   checkedAt: Date.now(),
   data: null,
-  errorCode: error?.providerCode || "SOURCE_UNAVAILABLE",
+  errorCode: providerErrorCode(error),
 });
 const disconnected = () => ({ state: "not-connected", checkedAt: null, data: null });
 const number = (n) => typeof n === "number" && Number.isFinite(n) && n >= 0;
@@ -34,10 +51,7 @@ async function capture(operation) {
 }
 async function json(fetcher, url, options = {}) {
   const response = await fetcher(url, { ...options, signal: AbortSignal.timeout(4500) });
-  if (!response.ok)
-    throw Object.assign(new Error("Provider unavailable"), {
-      providerCode: `HTTP_${response.status}`,
-    });
+  if (!response.ok) throw providerFailure(response);
   return response.json();
 }
 async function cached(env, key, operation) {
@@ -56,6 +70,9 @@ export async function developmentActivity(env, fetcher = fetch) {
     const headers = {
       Accept: "application/vnd.github+json",
       "User-Agent": "Lootsplit-owner-monitor",
+      ...(env.OWNER_MONITOR_GITHUB_TOKEN
+        ? { Authorization: `Bearer ${env.OWNER_MONITOR_GITHUB_TOKEN}` }
+        : {}),
     };
     const [workflows, pulls] = await Promise.all([
       json(fetcher, `${github}/actions/runs?per_page=100`, { headers }),

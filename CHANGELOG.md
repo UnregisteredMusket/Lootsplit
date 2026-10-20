@@ -71,3 +71,7 @@
 - Browser checks cover local persistence, all main routes at mobile/desktop sizes, staged-turn reload and submission, live purchase synchronization, chat, closed-room recovery, and encrypted backup password change/export/restore.
 
 See AUDIT.md for prioritized remaining limitations, configuration needs, and verification gaps.
+
+### Monitoring release verification and GitHub authorization
+
+Android1.9.0/code13 is permanently signed and published; the verified website download follows the independent public APK/checksum inspection. Corrected GitHub workflow authorization for immutable owner/repository subject IDs while preserving all access restrictions. Provider diagnostics distinguish request limits from unexplained access rejection without guessing credential expiry. See `docs/audit/2026-10-20-monitoring.md` for real production checks, framework captures and remaining coverage/device limitations.

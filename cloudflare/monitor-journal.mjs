@@ -1,4 +1,10 @@
-import { authorizeOwner, collectOwnerMonitor, cloudflareTraffic } from "./owner-monitor.mjs";
+import {
+  authorizeOwner,
+  collectOwnerMonitor,
+  cloudflareTraffic,
+  providerFailure,
+  providerErrorCode,
+} from "./owner-monitor.mjs";
 import { staffCommitGuard } from "./members.mjs";
 import {
   INTERVAL,
@@ -305,7 +311,8 @@ async function updateDiagnostics(db, snapshot, now, settings) {
     const source = snapshot[key],
       ready = source?.state === "ready" && now - source.checkedAt <= 6 * 60000,
       code = source?.errorCode;
-    const expired = code === "HTTP_401" || code === "HTTP_403";
+    const unauthorized = code === "HTTP_401";
+    const limited = code?.endsWith("_RATE_LIMITED");
     add(
       name,
       ready ? "healthy" : "unavailable",
@@ -313,15 +320,21 @@ async function updateDiagnostics(db, snapshot, now, settings) {
         ? "The source returned a validated reading."
         : source?.state === "not-connected"
           ? `${name} is not connected.`
-          : expired
-            ? `${name} rejected authorization (${code}).`
-            : `${name} could not be checked.`,
+          : limited
+            ? `${name} reached a provider request limit (${code}).`
+            : unauthorized
+              ? `${name} rejected authorization (${code}).`
+              : code === "HTTP_403"
+                ? `${name} rejected the request (HTTP_403); the response does not establish why.`
+                : `${name} could not be checked.`,
       `The corresponding monitoring information ${ready ? "is available" : "may be out of date"}; this alone does not prove the app failed.`,
       ready
         ? "No action required."
-        : expired
-          ? "Review the integration's authorization and permissions; reconnect if expired."
-          : "Check the connection and provider status, then retry.",
+        : limited
+          ? "Wait for the provider limit to reset; review request volume and integration access."
+          : unauthorized
+            ? "Review the integration's authorization and permissions; reconnect if expired."
+            : "Check the connection, provider status and access permissions, then retry.",
       code || null,
       { sourceCheckedAt: source?.checkedAt || null },
     );
@@ -573,7 +586,7 @@ async function textFetch(url, fetcher) {
     redirect: "error",
     headers: { "User-Agent": "Lootsplit-monitoring", Accept: "application/json" },
   });
-  if (!response.ok) throw Error(`Source HTTP ${response.status}`);
+  if (!response.ok) throw providerFailure(response);
   const reader = response.body.getReader(),
     chunks = [];
   let size = 0;
@@ -828,6 +841,7 @@ export async function collectInterval(
           integrationOutcomes.push({
             source: i === 0 ? "operational" : "performance",
             state: "unavailable",
+            errorCode: providerErrorCode(result.reason),
           });
         } else
           integrationOutcomes.push({
