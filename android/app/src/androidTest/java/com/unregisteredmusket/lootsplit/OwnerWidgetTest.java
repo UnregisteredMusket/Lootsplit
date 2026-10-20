@@ -126,10 +126,10 @@ public class OwnerWidgetTest {
         JSONObject state = new JSONObject().put("token", "synthetic").put("snapshot", snapshot);
         for (int width : new int[]{250, 350, 448}) {
             render(state, false, width, 300, "compact-" + width);
-            render(state, true, width, 540, "full-" + width);
+            render(state, true, width, 480, "full-" + width);
         }
         render(new JSONObject().put("message", "Connect in My account"), false, 350, 300, "signed-out");
-        render(new JSONObject().put("token", "synthetic").put("message", "Offline or unavailable · tap refresh"), true, 350, 540, "unavailable");
+        render(new JSONObject().put("token", "synthetic").put("message", "Offline or unavailable · tap refresh"), true, 350, 480, "unavailable");
         snapshot.put("checkedAt", System.currentTimeMillis() - 3600001);
         render(state, false, 350, 300, "stale");
     }

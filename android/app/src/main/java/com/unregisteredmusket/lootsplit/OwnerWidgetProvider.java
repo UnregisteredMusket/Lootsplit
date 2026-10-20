@@ -32,12 +32,12 @@ public class OwnerWidgetProvider extends AppWidgetProvider {
         if (Build.VERSION.SDK_INT >= 31) {
             Map<SizeF, RemoteViews> layouts = new LinkedHashMap<>();
             layouts.put(new SizeF(250, 300), views(context, state, false));
-            layouts.put(new SizeF(250, 540), views(context, state, true));
+            layouts.put(new SizeF(250, 480), views(context, state, true));
             manager.updateAppWidget(id, new RemoteViews(layouts));
         } else {
             boolean portrait = context.getResources().getConfiguration().orientation != android.content.res.Configuration.ORIENTATION_LANDSCAPE;
-            int height = options.getInt(portrait ? AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT : AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, 540);
-            manager.updateAppWidget(id, views(context, state, height >= 540));
+            int height = options.getInt(portrait ? AppWidgetManager.OPTION_APPWIDGET_MIN_HEIGHT : AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, 480);
+            manager.updateAppWidget(id, views(context, state, height >= 480));
         }
     }
 
