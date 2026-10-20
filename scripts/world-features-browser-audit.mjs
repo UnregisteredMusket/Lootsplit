@@ -5,7 +5,7 @@ import {
   selectMapType,
   openMoreMapTools,
 } from "./map-workspace-browser.mjs";
-import { checkFullscreenMap } from "./fullscreen-map-browser-check.mjs";
+import { checkFullscreenMap, mapMarkerColor } from "./fullscreen-map-browser-check.mjs";
 import { auditCharacterPlacement } from "./character-placement-browser.mjs";
 import { chooseOption } from "./search-select-browser.mjs";
 import assert from "node:assert/strict";
@@ -370,19 +370,16 @@ try {
     await closeMapSettings(page);
     const marker = page.getByRole("button", { name: "Marker: 1 record", exact: true });
     await expect(marker).toBeVisible();
-    const markerColor = await marker.evaluate((el) => getComputedStyle(el).backgroundColor);
+    const markerColor = await mapMarkerColor(marker);
     await marker.click();
     await expect(marker).toHaveAttribute("aria-pressed", "true");
-    assert.notEqual(
-      await marker.evaluate((el) => getComputedStyle(el).backgroundColor),
-      markerColor,
-    );
+    assert.notEqual(await mapMarkerColor(marker), markerColor);
     await expect(page.getByRole("region", { name: "Map record details" })).toContainText(
       "Rendezvous",
     );
     await page.getByRole("button", { name: "Close details", exact: true }).click();
     await expect(marker).toHaveAttribute("aria-pressed", "false");
-    assert.equal(await marker.evaluate((el) => getComputedStyle(el).backgroundColor), markerColor);
+    assert.equal(await mapMarkerColor(marker), markerColor);
     await openMapSettings(page);
     await page.getByRole("button", { name: "Filters", exact: true }).click();
     await page.getByLabel("Marker", { exact: true }).uncheck();

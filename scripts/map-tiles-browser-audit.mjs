@@ -6,7 +6,7 @@ import {
   openMoreMapTools,
 } from "./map-workspace-browser.mjs";
 import { checkConnectedMaps } from "./connected-maps-browser-check.mjs";
-import { checkFullscreenMap } from "./fullscreen-map-browser-check.mjs";
+import { checkFullscreenMap, mapMarkerColor } from "./fullscreen-map-browser-check.mjs";
 import { checkPlayerDisplay } from "./player-display-browser-check.mjs";
 import { checkOnlineTabletop } from "./online-tabletop-browser-check.mjs";
 import assert from "node:assert/strict";
@@ -261,7 +261,7 @@ try {
     const heroIcon = page.getByTitle("Combatant: Tile Hero", { exact: true }),
       guardIcon = page.getByTitle("Combatant: Hidden guard", { exact: true });
     await expect(heroIcon).toHaveAttribute("aria-pressed", "true");
-    const selectedColor = await heroIcon.evaluate((el) => getComputedStyle(el).backgroundColor);
+    const selectedColor = await mapMarkerColor(heroIcon);
     await page.getByRole("button", { name: "Fit map", exact: true }).click();
     // Pan the corner token below the floating navigation, without moving any token.
     await viewport.focus();
@@ -270,10 +270,7 @@ try {
     await guardIcon.click();
     await expect(guardIcon).toHaveAttribute("aria-pressed", "true");
     await expect(heroIcon).toHaveAttribute("aria-pressed", "false");
-    assert.notEqual(
-      await heroIcon.evaluate((el) => getComputedStyle(el).backgroundColor),
-      selectedColor,
-    );
+    assert.notEqual(await mapMarkerColor(heroIcon), selectedColor);
     await openMapSettings(page);
     await chooseOption(controls.getByLabel("Combat token", { exact: true }), token.id);
     await closeMapSettings(page);

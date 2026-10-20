@@ -8,7 +8,7 @@ Blacksmith shops now support [custom weapon and armor commissions](docs/BLACKSMI
 
 Encounter initiative stays in roster order while scores are entered or edited. In **Battle tracker**, press **Sort initiative** to arrange scores highest first, with ties stable and blank scores last. **Next turn** follows the saved order; sorting keeps the active combatant and round.
 
-Maps opens directly into a viewport-filling workspace with personal map/camera restoration, floating search and navigation, a direct tool hotbar, and all setup controls in an overlay Settings panel. Connected maps, shops, encounters and player permissions retain their canonical systems. The layout follows the owner-specified Project Zomboid Map reference; see the [workspace audit](docs/audit/2026-10-20-map-workspace.md) and [map implementation guide](docs/MAP-TILES.md).
+Maps opens directly into a viewport-filling workspace with personal map/camera restoration, floating search and navigation, a direct tool hotbar, and all setup controls in an overlay Settings panel. Phone controls form compact edge rows with a swipeable bottom tool dock and an always-visible More button. Connected maps, shops, encounters and player permissions retain their canonical systems. The layout follows the owner-specified Project Zomboid Map reference; see the [workspace audit](docs/audit/2026-10-20-map-workspace.md) and [map implementation guide](docs/MAP-TILES.md).
 
 The online tabletop adds remote token controls, saved fog/optional vision, reviewed UVTT imports and protected detailed media while retaining the current Maps layout. TV presentation is optional/default-off; each player uses their own invited session. See [scope and release status](docs/audit/2026-10-19-online-tabletop.md).
 

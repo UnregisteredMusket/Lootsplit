@@ -88,6 +88,7 @@ import {
   Maximize,
   X,
   MoreHorizontal,
+  ChevronDown,
   Menu,
 } from "lucide-react";
 import { MapFrame } from "./map-frame";
@@ -1934,97 +1935,101 @@ function MapViewport({
           <div className="map-hotbar-anchor">
             {hotbarOpen && (
               <div className="map-hotbar map-glass" role="toolbar" aria-label="Map tools">
-                <button
-                  className="map-icon-button"
-                  title="Pan (V)"
-                  aria-label="Pan"
-                  aria-pressed={tools.tool === "pan" && !pinging && !placing && !sketches.active}
-                  onClick={() => chooseTool("pan")}
-                >
-                  <Hand size={19} />
-                </button>
-                <button
-                  className="map-icon-button"
-                  title="Select / move (S)"
-                  aria-label="Select / move"
-                  aria-pressed={tools.tool === "select" && !pinging && !placing && !sketches.active}
-                  onClick={() => chooseTool("select")}
-                >
-                  <MousePointer2 size={19} />
-                </button>
-                <button
-                  className="map-icon-button"
-                  title="Ping (P)"
-                  aria-label="Ping"
-                  disabled={signals.viewOnly}
-                  aria-pressed={pinging}
-                  onClick={() => {
-                    if (!allowContextChange()) return;
-                    tools.cancel();
-                    sketches.cancel();
-                    stopPlacing();
-                    setPinging(!pinging);
-                    setContextOpen(false);
-                    setDrawerOpen(false);
-                    root.current?.focus();
-                  }}
-                >
-                  <Crosshair size={19} />
-                </button>
-                <button
-                  className="map-icon-button"
-                  title="Measure (M)"
-                  aria-label="Measure"
-                  aria-pressed={tools.tool === "measure"}
-                  onClick={() => chooseTool("measure")}
-                >
-                  <Ruler size={19} />
-                </button>
-                {tools.playerTemplates && (
+                <div className="map-hotbar-tools">
                   <button
                     className="map-icon-button"
-                    title="Area template (T)"
-                    aria-label="Area template"
-                    aria-pressed={tools.tool === "template"}
-                    onClick={() => chooseTool("template")}
+                    title="Pan (V)"
+                    aria-label="Pan"
+                    aria-pressed={tools.tool === "pan" && !pinging && !placing && !sketches.active}
+                    onClick={() => chooseTool("pan")}
                   >
-                    <Shapes size={19} />
+                    <Hand size={19} />
                   </button>
-                )}
-                {useDm && (
                   <button
                     className="map-icon-button"
-                    title="Place marker"
-                    aria-label="Place marker"
-                    aria-pressed={placementKind === "marker"}
+                    title="Select / move (S)"
+                    aria-label="Select / move"
+                    aria-pressed={
+                      tools.tool === "select" && !pinging && !placing && !sketches.active
+                    }
+                    onClick={() => chooseTool("select")}
+                  >
+                    <MousePointer2 size={19} />
+                  </button>
+                  <button
+                    className="map-icon-button"
+                    title="Ping (P)"
+                    aria-label="Ping"
+                    disabled={signals.viewOnly}
+                    aria-pressed={pinging}
                     onClick={() => {
                       if (!allowContextChange()) return;
                       tools.cancel();
                       sketches.cancel();
-                      setPinging(false);
-                      beginMarker();
-                      setDrawerOpen(false);
+                      stopPlacing();
+                      setPinging(!pinging);
                       setContextOpen(false);
+                      setDrawerOpen(false);
                       root.current?.focus();
                     }}
                   >
-                    <MapPin size={19} />
+                    <Crosshair size={19} />
                   </button>
-                )}
-                <button
-                  className="map-icon-button"
-                  aria-label="Drawing & annotations"
-                  title="Drawing & annotations"
-                  aria-pressed={sketches.active}
-                  onClick={() => {
-                    if (!allowContextChange()) return;
-                    chooseTool("pan");
-                    sketches.setActive(true);
-                    setContextOpen(true);
-                  }}
-                >
-                  <Pencil size={19} />
-                </button>
+                  <button
+                    className="map-icon-button"
+                    title="Measure (M)"
+                    aria-label="Measure"
+                    aria-pressed={tools.tool === "measure"}
+                    onClick={() => chooseTool("measure")}
+                  >
+                    <Ruler size={19} />
+                  </button>
+                  {tools.playerTemplates && (
+                    <button
+                      className="map-icon-button"
+                      title="Area template (T)"
+                      aria-label="Area template"
+                      aria-pressed={tools.tool === "template"}
+                      onClick={() => chooseTool("template")}
+                    >
+                      <Shapes size={19} />
+                    </button>
+                  )}
+                  {useDm && (
+                    <button
+                      className="map-icon-button"
+                      title="Place marker"
+                      aria-label="Place marker"
+                      aria-pressed={placementKind === "marker"}
+                      onClick={() => {
+                        if (!allowContextChange()) return;
+                        tools.cancel();
+                        sketches.cancel();
+                        setPinging(false);
+                        beginMarker();
+                        setDrawerOpen(false);
+                        setContextOpen(false);
+                        root.current?.focus();
+                      }}
+                    >
+                      <MapPin size={19} />
+                    </button>
+                  )}
+                  <button
+                    className="map-icon-button"
+                    aria-label="Drawing & annotations"
+                    title="Drawing & annotations"
+                    aria-pressed={sketches.active}
+                    onClick={() => {
+                      if (!allowContextChange()) return;
+                      chooseTool("pan");
+                      sketches.setActive(true);
+                      setContextOpen(true);
+                    }}
+                  >
+                    <Pencil size={19} />
+                  </button>
+                </div>
                 <button
                   className="map-icon-button"
                   title="More map tools"
@@ -2043,10 +2048,10 @@ function MapViewport({
               className="map-hotbar-toggle map-glass map-icon-button"
               aria-label="Map tools hotbar"
               aria-expanded={hotbarOpen}
-              title="Map tools"
+              title={hotbarOpen ? "Collapse map tools" : "Show map tools"}
               onClick={() => setHotbarOpen(!hotbarOpen)}
             >
-              <Pencil size={20} />
+              {hotbarOpen ? <ChevronDown size={20} /> : <Pencil size={20} />}
             </button>
             {hotbarOpen && moreTools && (
               <div
