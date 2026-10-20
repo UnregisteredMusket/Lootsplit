@@ -40,7 +40,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Development / gameplay / dev-loot | open | 2 | 5s → 9s | +4s | +80% |
 | Packaged Worker / interface / Run actions/upload-artifact@v4 | open | 4 | 1s → 5s | +4s | +400% |
 | verify / Run actions/checkout@v4 | open | 2 | 1s → 3s | +2s | +200% |
-| Code checks and immutable builds / Run actions/checkout@v4 | open | 2 | 1s → 3s | +2s | +200% |
+| Code checks and immutable builds / Run actions/checkout@v4 | open | 3 | 1s → 5s | +4s | +400% |
 | Code checks and immutable builds / Run actions/setup-node@v4 | open | 4 | 2s → 12s | +10s | +500% |
 | Development / governance / Run actions/setup-node@v4 | open | 2 | 3s → 12s | +9s | +300% |
 | Development / governance / Run npm ci | open | 2 | 7s → 17s | +10s | +142.86% |
@@ -55,7 +55,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Packaged Worker / accounts / Run actions/download-artifact@v4 | open | 3 | 1s → 10s | +9s | +900% |
 | Development / governance / dev-help | open | 4 | 6s → 66s | +60s | +1000% |
 | Packaged Worker / interface / worker-help | open | 3 | 6s → 60s | +54s | +900% |
-| Packaged standby / standby-audit | open | 4 | 20s → 91s | +71s | +355% |
+| Packaged standby / standby-audit | open | 5 | 20s → 105s | +85s | +425% |
 | Packaged standby | open | 4 | 62s → 157s | +95s | +153.23% |
 | Development / governance / dev-release | open | 2 | 31s → 44s | +13s | +41.94% |
 | Development / governance / dev-backup | open | 4 | 6s → 21s | +15s | +250% |
@@ -293,6 +293,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Packaged Worker / accounts (balanced v2) / Start disposable built Worker | open | 2 | 7s → 11s | +4s | +57.14% |
 | Packaged Worker / interface (balanced v2) / worker-initiative | open | 2 | 4s → 6s | +2s | +50% |
 | Packaged Worker / accounts (balanced v2) / worker-account | open | 2 | 85s → 117s | +32s | +37.65% |
+| Packaged Worker / accounts (balanced v2) / worker-monitor | open | 2 | 6s → 11s | +5s | +83.33% |
 | Packaged Worker / accounts (balanced v2) / worker-finance | open | 3 | 22s → 41s | +19s | +86.36% |
 | Packaged Worker / accounts (balanced v2) / worker-ships | open | 2 | 27s → 47s | +20s | +74.07% |
 | Packaged Worker / interface (balanced v2) / worker-property-operations | open | 2 | 20s → 29s | +9s | +45% |
@@ -312,13 +313,19 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Packaged Worker / accounts (balanced v2) / worker-finance | open | 2 | 28s → 48s | +20s | +71.43% |
 | Packaged Worker / accounts (balanced v2) / worker-ships | open | 2 | 33s → 45s | +12s | +36.36% |
 | Packaged Worker / accounts (balanced v2) / worker-map-tiles | open | 3 | 20s → 115s | +95s | +475% |
-| Development / desktop (balanced v2) / dev-map-tiles | open | 3 | 35s → 145s | +110s | +314.29% |
+| Development / desktop (balanced v2) / dev-map-tiles | open | 4 | 35s → 169s | +134s | +382.86% |
 | test-apk / Set up job | open | 2 | 1s → 3s | +2s | +200% |
 
 ## Recorded slowdowns
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-20T10:27:38Z | step: Packaged Worker / accounts (balanced v2) / worker-world-features | 88s → 107s | +19s | +21.59% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38310299946/job/115014983127) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39406545850/job/118574661090) |
+| 2026-10-20T10:23:53Z | step: Development / desktop (balanced v2) / dev-world-features | 120s → 139s | +19s | +15.83% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38305743510/job/114999237632) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39406545850/job/118573751436) |
+| 2026-10-20T10:21:34Z | step: Development / desktop (balanced v2) / dev-map-tiles | 145s → 169s | +24s | +16.55% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39360883040/job/118426536399) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39406545850/job/118573751436) |
+| 2026-10-20T10:19:50Z | step: Packaged Worker / accounts (balanced v2) / worker-monitor | 7s → 11s | +4s | +57.14% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38376270621/job/115226315645) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39406545850/job/118574661090) |
+| 2026-10-20T10:19:39Z | step: Packaged standby / standby-audit | 91s → 105s | +14s | +15.38% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37796847170/job/113379277005) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39406545850/job/118574661222) |
+| 2026-10-20T10:14:50Z | step: Code checks and immutable builds / Run actions/checkout@v4 | 3s → 5s | +2s | +66.67% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37573238905/job/112636350047) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39406545850/job/118573751097) |
 | 2026-10-20T10:05:06Z | step: Packaged Worker / accounts (balanced v2) / worker-monitor | 7s → 12s | +5s | +71.43% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38309026871/job/115010777381) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39404784795/job/118568710554) |
 | 2026-10-20T08:55:26Z | step: Packaged Worker / interface (balanced v2) / Set up job | 2s → 3s | +1s | +50% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38310299946/job/115014983235) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39396568402/job/118541738810) |
 | 2026-10-20T08:49:03Z | step: Packaged Worker / interface (balanced v2) / worker-library-navigation | 40s → 46s | +6s | +15% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38404276239/job/115320597368) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39394850169/job/118535985677) |
