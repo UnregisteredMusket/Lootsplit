@@ -97,6 +97,15 @@ final class WidgetStore {
         return true;
     }
 
+    /** Keep the last dated reading during refresh or temporary transport failure. */
+    static synchronized boolean message(Context context, String generation, String message) throws Exception {
+        JSONObject current = read(context);
+        if (!generation.equals(current.optString("generation"))) return false;
+        current.put("message", message);
+        save(context, current);
+        return true;
+    }
+
     static synchronized boolean clear(Context context, String expectedToken) {
         if (expectedToken != null && !expectedToken.equals(read(context).optString("token"))) return false;
         new AtomicFile(file(context)).delete();

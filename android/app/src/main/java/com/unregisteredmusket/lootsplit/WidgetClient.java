@@ -1,6 +1,5 @@
 package com.unregisteredmusket.lootsplit;
 
-import android.content.Context;
 import org.json.JSONObject;
 import java.io.ByteArrayOutputStream;
 import java.io.InputStream;
@@ -45,19 +44,4 @@ final class WidgetClient {
         } finally { connection.disconnect(); }
     }
 
-    static void refresh(Context context) {
-        JSONObject current = WidgetStore.read(context);
-        String token = current.optString("token"), generation = current.optString("generation");
-        if (token.isEmpty()) return;
-        try {
-            JSONObject snapshot = fetch(token);
-            if (!Thread.currentThread().isInterrupted()) WidgetStore.finish(context, generation, snapshot, "");
-        } catch (AccessDenied denied) {
-            WidgetStore.clearGeneration(context, generation);
-        } catch (Exception ignored) {
-            try { WidgetStore.finish(context, generation, null, "Offline or unavailable · tap refresh"); }
-            catch (Exception storageFailure) { /* Storage fails closed. */ }
-        }
-        OwnerWidgetProvider.renderAll(context);
-    }
 }

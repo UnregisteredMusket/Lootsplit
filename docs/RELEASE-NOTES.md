@@ -1,3 +1,28 @@
+# Lootsplit 1.8.1 — candidate
+
+Android version code **12**. This candidate retains package `com.unregisteredmusket.lootsplit` and the permanent signing certificate. The public download remains 1.8.0 until the new signed APK and checksum exist.
+
+## Added
+
+- None in this release.
+
+## Improved
+
+- The last dated Field monitor reading stays visible while a check runs or temporarily fails.
+- Repeated taps share one check; a bounded timeout releases the widget and shows how to retry.
+
+## Fixed
+
+- Home-screen Refresh starts its check directly without opening My account or reconnecting the owner account.
+- My account’s Refresh widget waits for a completed check and reports failures accurately.
+- Late requests cannot replace another account or undo a sign-out. Rejected owner access still clears private readings.
+
+## Candidate verification
+
+Native API24/API35 transport, actual widget-button, timeout, owner-isolation and layout instrumentation plus all complete PR/main preservation gates are required before signing. Independent APK signature/package/version and checksum inspection and the matching website download follow publication. Physical-device installation is not claimed. Install over the permanently signed app; do not uninstall it.
+
+---
+
 # Lootsplit 1.8.0
 
 Android version code **11**. This release retains package `com.unregisteredmusket.lootsplit` and the permanent signing certificate.

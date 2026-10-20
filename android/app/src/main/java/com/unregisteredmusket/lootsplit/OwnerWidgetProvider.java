@@ -52,12 +52,16 @@ public class OwnerWidgetProvider extends AppWidgetProvider {
         // A cached snapshot is explicitly dated; old cache is cleared on the next host render.
         if (snapshot != null && System.currentTimeMillis() - snapshot.optLong("checkedAt") > 3600000) snapshot = null;
         boolean connected = !state.optString("token").isEmpty();
+        String message = state.optString("message");
+        boolean refreshing = connected && "Refreshing…".equals(message);
         if (!connected) snapshot = null;
         text(view, R.id.monitor_identity, snapshot == null ? "OWNER ACCESS" : "OWNER ACCESS  /  " + snapshot.optString("name"));
         text(view, R.id.monitor_email, snapshot == null ? "Tap to open My account" : snapshot.optString("email"));
-        text(view, R.id.monitor_health, snapshot == null ? (connected ? "AWAITING CHECK" : "CONNECT ACCOUNT") : snapshot.optString("health"));
-        view.setTextColor(R.id.monitor_health, snapshot != null && snapshot.optBoolean("healthy") ? Color.rgb(19, 245, 128) : Color.rgb(238, 199, 113));
-        text(view, R.id.monitor_services, snapshot == null ? state.optString("message", "Tap refresh to check") : snapshot.optString("services"));
+        text(view, R.id.monitor_health, refreshing ? "REFRESHING" : snapshot == null
+            ? (connected ? "AWAITING CHECK" : "CONNECT ACCOUNT")
+            : message.isEmpty() ? snapshot.optString("health") : "LAST KNOWN STATUS");
+        view.setTextColor(R.id.monitor_health, snapshot != null && message.isEmpty() && snapshot.optBoolean("healthy") ? Color.rgb(19, 245, 128) : Color.rgb(238, 199, 113));
+        text(view, R.id.monitor_services, !message.isEmpty() ? message : snapshot == null ? "Tap refresh to check" : snapshot.optString("services"));
         text(view, R.id.monitor_active, value(snapshot, "active"));
         text(view, R.id.monitor_totals, "ACCOUNTS " + value(snapshot, "accounts") + "    CAMPAIGNS " + value(snapshot, "campaigns"));
         text(view, R.id.monitor_traffic, snapshot == null ? "Unavailable" : snapshot.optString("traffic"));
@@ -70,7 +74,7 @@ public class OwnerWidgetProvider extends AppWidgetProvider {
         text(view, R.id.monitor_deployment, snapshot == null ? "Deployment unavailable" : snapshot.optString("deployment"));
         text(view, R.id.monitor_development_time, "RECENT GITHUB ACTIVITY" + (snapshot == null ? "" : snapshot.optString("developmentTime")));
         text(view, R.id.monitor_release, "WEB " + value(snapshot, "commit") + "  /  APP " + appVersion(context));
-        text(view, R.id.monitor_checked, snapshot == null ? "No current reading" : "Checked " + WidgetData.time(snapshot.optLong("checkedAt")));
+        text(view, R.id.monitor_checked, snapshot == null ? "No current reading" : (message.isEmpty() ? "Checked " : "Last reading ") + WidgetData.time(snapshot.optLong("checkedAt")));
         Intent open = new Intent(context, MainActivity.class).putExtra(OPEN, true)
             .addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP | Intent.FLAG_ACTIVITY_SINGLE_TOP);
         PendingIntent account = PendingIntent.getActivity(context, 197400, open, PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
@@ -100,11 +104,8 @@ public class OwnerWidgetProvider extends AppWidgetProvider {
     @Override public void onReceive(Context context, Intent intent) {
         super.onReceive(context, intent);
         if (REFRESH.equals(intent.getAction())) {
-            JSONObject state = WidgetStore.read(context);
-            try { WidgetStore.finish(context, state.optString("generation"), null, "Refresh queued · waiting for network"); }
-            catch (Exception ignored) { /* Storage fails closed. */ }
-            renderAll(context);
-            OwnerWidgetJob.schedule(context);
+            PendingResult pending = goAsync();
+            WidgetRefresh.request(context, true, error -> pending.finish());
         }
     }
     @Override public void onDisabled(Context context) {
