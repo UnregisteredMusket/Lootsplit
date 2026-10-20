@@ -1,6 +1,13 @@
 /** Add every new third-party content/data resource here when integrating it. */
 export const resources = [
   {
+    name: "Project Zomboid Map interface reference",
+    description:
+      "The owner selected this interactive map as the explicit layout and interaction reference for Lootsplit Maps: edge-to-edge canvas, floating search/navigation, compact right controls, horizontal tools and overlay options. Lootsplit uses original components and campaign artwork; no game map, branding or third-party interface code is bundled.",
+    license: "Design reference only; original source rights retained",
+    links: [{ label: "Project Zomboid Map", url: "https://projectzomboidmap.com/#10990x9612x14" }],
+  },
+  {
     name: "Universal VTT interchange references",
     description:
       "Original Lootsplit importer follows documented UVTT 0.2/0.3 embedded image, grid, wall, portal and light fields. Exporter-specific behavior is disclosed for DM review. Documentation reference only; no third-party code or map artwork is bundled.",

@@ -62,6 +62,7 @@ export function Fold({
   hint,
   children,
   defaultOpen = false,
+  reveal = false,
   anchorId,
   actions,
 }: {
@@ -69,10 +70,14 @@ export function Fold({
   hint?: string;
   children: ReactNode;
   defaultOpen?: boolean;
+  reveal?: boolean;
   anchorId?: string;
   actions?: ReactNode;
 }) {
   const [open, setOpen] = useState(defaultOpen);
+  useEffect(() => {
+    if (reveal) setOpen(true);
+  }, [reveal]);
   const hash = useRouterState({ select: (s) => s.location.hash });
   useEffect(() => {
     if (anchorId && hash === anchorId) {

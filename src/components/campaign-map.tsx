@@ -1,3 +1,17 @@
+import { SyncStatus } from "./sync-status";
+import { useMapSketches } from "./map-sketch-tools";
+import { MapWorkspaceChrome, MapEmptyWorkspace } from "./map-workspace-chrome";
+import { captureMutationScope } from "@/lib/quire/cloud-client";
+import {
+  mapViewKey,
+  readMapView,
+  saveMapView,
+  accessibleMapId,
+  mapViewStorage,
+  type MapCamera,
+} from "@/lib/quire/map-view-state";
+import { useEconomy } from "@/lib/quire/economy-context";
+import { useSeatKnown } from "@/lib/quire/seat";
 import { MapCombatHud } from "./map-combat-hud";
 import { MapConnectedTools } from "./map-connected-tools";
 import {
@@ -16,7 +30,16 @@ import { mapType, partyEnvironment, tilePoint, routePosition } from "@/lib/quire
 import { canonicalJson } from "@/lib/quire/canonical-json";
 import { characterLocation, characterVisible } from "@/lib/quire/character-position";
 import { SearchSelect } from "@/components/search-select";
-import { lazy, Suspense, useEffect, useRef, useState, type ReactNode } from "react";
+import {
+  lazy,
+  Suspense,
+  useEffect,
+  useCallback,
+  useLayoutEffect,
+  useRef,
+  useState,
+  type ReactNode,
+} from "react";
 import { useSeat } from "@/lib/quire/seat";
 import { readWorld, mapTypes, type CampaignMap } from "@/lib/quire/world-schema";
 import { anchorFor, recognizedAnchors, npcAvailableHere, shopVisible } from "@/lib/quire/world";
@@ -50,6 +73,22 @@ import {
   EyeOff,
   Ship as ShipIcon,
   Swords,
+  Hand,
+  MousePointer2,
+  Ruler,
+  Shapes,
+  Pencil,
+  CloudFog,
+  Sun,
+  PanelRight,
+  Grid3X3,
+  Undo2,
+  Redo2,
+  Crosshair,
+  Maximize,
+  X,
+  MoreHorizontal,
+  Menu,
 } from "lucide-react";
 import { MapFrame } from "./map-frame";
 import {
@@ -70,9 +109,20 @@ const MapServicePanel = lazy(() =>
 );
 
 export function CampaignMaps() {
-  return <CampaignMapWorkspace key={activeCampaignId()} />;
+  const seat = useSeat(),
+    known = useSeatKnown();
+  const { ready } = useEconomy();
+  const scope = captureMutationScope();
+  const key = mapViewKey(scope, seat.role, seat.purseIds);
+  if (!known || !ready)
+    return (
+      <div className="map-workspace-loading" role="status">
+        Opening Maps…
+      </div>
+    );
+  return <CampaignMapWorkspace key={key} viewScope={{ key, ephemeral: scope.ephemeral }} />;
 }
-function CampaignMapWorkspace() {
+function CampaignMapWorkspace({ viewScope }: { viewScope: { key: string; ephemeral: boolean } }) {
   const [handouts, setHandouts] = useState<Handout[]>([]);
   useEffect(() => {
     let cancelled = false;
@@ -100,6 +150,9 @@ function CampaignMapWorkspace() {
     dm = seat.role === "dm",
     tabletopSession = readTabletopSession(t),
     market = readMarketLocations(t.journal.market);
+  const [remembered] = useState(() =>
+    readMapView(viewScope.key, mapViewStorage(viewScope.ephemeral)),
+  );
   const [selected, setSelected] = useState(""),
     [editing, setEditing] = useState<CampaignMap | null | undefined>(),
     [placement, setPlacement] = useState<"" | "anchor" | "marker" | "party" | "token" | "record">(
@@ -152,15 +205,23 @@ function CampaignMapWorkspace() {
       });
   }
 
+  const seenActivation = useRef(tabletopSession.activationId);
   useEffect(() => {
-    if (!dm && tabletopSession.activeMapId) {
+    const changed = seenActivation.current !== tabletopSession.activationId;
+    seenActivation.current = tabletopSession.activationId;
+    if (!dm && tabletopSession.activeMapId && (changed || !tabletopSession.playerBrowsing)) {
       setTypeFilter("");
       setSelected(tabletopSession.activeMapId);
       setSelectedToken("");
       setPlacement("");
       setPoint(undefined);
     }
-  }, [dm, tabletopSession.activeMapId, tabletopSession.activationId]);
+  }, [
+    dm,
+    tabletopSession.activeMapId,
+    tabletopSession.activationId,
+    tabletopSession.playerBrowsing,
+  ]);
   const allMaps = w.maps.filter(
       (m) =>
         dm ||
@@ -175,7 +236,16 @@ function CampaignMapWorkspace() {
       .map((l) => maps.find((m) => m.locationId === l.id))
       .find(Boolean);
   const map =
-    maps.find((m) => m.id === (selected || requestedMap)) ??
+    maps.find(
+      (m) =>
+        m.id ===
+        accessibleMapId(
+          maps.map((m) => m.id),
+          selected || requestedMap || undefined,
+          remembered.lastMapId,
+          tabletopSession.activeMapId || undefined,
+        ),
+    ) ??
     maps.find((m) => m.id === w.partyPosition?.mapId) ??
     best ??
     maps.find((m) => !m.locationId) ??
@@ -193,13 +263,14 @@ function CampaignMapWorkspace() {
     if (!viewedMapId || lastMap.current === viewedMapId) return;
     const previous = lastMap.current;
     lastMap.current = viewedMapId;
+    saveMapView(viewScope.key, viewedMapId, undefined, mapViewStorage(viewScope.ephemeral));
     const returning = returningMap.current === viewedMapId;
     returningMap.current = "";
     setHistory((h) => (returning ? h.slice(0, -1) : previous ? [...h, previous].slice(-100) : h));
     setSelectedToken("");
     setPlacement("");
     setPoint(undefined);
-  }, [viewedMapId]);
+  }, [viewedMapId, viewScope.key, viewScope.ephemeral]);
   const party =
     map &&
     (w.partyPosition?.mapId === map.id &&
@@ -207,157 +278,168 @@ function CampaignMapWorkspace() {
     w.partyPosition.y !== undefined
       ? { x: w.partyPosition.x, y: w.partyPosition.y }
       : anchorFor(map, t, market.currentLocationId));
-  const inferredPins = map
-    ? [
-        ...t.holdings
-          .filter(
-            (h) =>
-              h.kind === "property" &&
-              h.quantity > 0 &&
-              (dm ||
-                seat.purseIds.includes(h.purseId) ||
-                t.journal.propertyOperations?.sites.some((s) => s.propertyId === h.id)),
-          )
-          .map((h) => ({
-            id: h.id,
-            label: h.name,
-            kind: "Property",
-            point: anchorFor(map, t, h.locationId),
-            href: libraryRecordHref("property", h.id),
-          })),
-        ...t.shops
-          .filter((s) => dm || shopVisible(s, t))
-          .map((s) => ({
-            id: s.id,
-            label: s.name,
-            kind: s.blackMarket ? "Black market" : "Shop",
-            point: anchorFor(map, t, s.locationId),
-            href: libraryRecordHref("shop", s.id),
-          })),
-        ...w.npcs
-          .filter((n) => dm || npcAvailableHere(n, t))
-          .map((n) => ({
-            id: n.id,
-            label: n.name,
-            kind: "NPC",
-            point: anchorFor(
-              map,
+  function recordsForMap(map: CampaignMap): MapRecord[] {
+    const inferredPins = [
+      ...t.holdings
+        .filter(
+          (h) =>
+            h.kind === "property" &&
+            h.quantity > 0 &&
+            (dm ||
+              seat.purseIds.includes(h.purseId) ||
+              t.journal.propertyOperations?.sites.some((s) => s.propertyId === h.id)),
+        )
+        .map((h) => ({
+          id: h.id,
+          label: h.name,
+          kind: "Property",
+          point: anchorFor(map, t, h.locationId),
+          href: libraryRecordHref("property", h.id),
+        })),
+      ...t.shops
+        .filter((s) => dm || shopVisible(s, t))
+        .map((s) => ({
+          id: s.id,
+          label: s.name,
+          kind: s.blackMarket ? "Black market" : "Shop",
+          point: anchorFor(map, t, s.locationId),
+          href: libraryRecordHref("shop", s.id),
+        })),
+      ...w.npcs
+        .filter((n) => dm || npcAvailableHere(n, t))
+        .map((n) => ({
+          id: n.id,
+          label: n.name,
+          kind: "NPC",
+          point: anchorFor(
+            map,
+            t,
+            characterLocation(
               t,
-              characterLocation(
-                t,
-                t.purses.find((p) => p.id === n.id)!,
-              ),
+              t.purses.find((p) => p.id === n.id)!,
             ),
-            href: libraryRecordHref("npc", n.id),
-          })),
-        ...t.purses
-          .filter(
-            (p) =>
-              p.kind === "character" &&
-              !w.npcs.some((n) => n.id === p.id) &&
-              (dm || characterVisible(t, p)),
-          )
-          .map((p) => ({
-            id: p.id,
-            label: p.name,
-            kind: p.control === "npc" ? "NPC" : "Character",
-            point: anchorFor(map, t, characterLocation(t, p)),
-            href: libraryRecordHref("character", p.id),
-          })),
-        ...(t.journal.propertyOperations?.postal.offices ?? []).flatMap((p) => {
-          const s = t.shops.find((s) => s.id === p.shopId);
-          return s
-            ? [
-                {
-                  id: s.id,
-                  label: s.name,
-                  kind: "Post office",
-                  point: anchorFor(map, t, s.locationId),
-                  href: libraryRecordHref("shop", s.id),
-                },
-              ]
-            : [];
-        }),
-        ...(t.journal.fleet?.voyages ?? [])
-          .filter(
-            (v) =>
-              v.mapRoute?.mapId === map.id && ["active", "blocked", "arrived"].includes(v.status),
-          )
-          .map((v) => ({
-            id: `voyage-${v.id}`,
-            label: t.holdings.find((h) => h.id === v.propertyId)?.name ?? "Ship voyage",
-            kind: "Ship",
-            point: routePosition(v.mapRoute!, v.elapsedMinutes / v.durationMinutes),
-            href: libraryRecordHref("property", v.propertyId),
-          })),
-      ].filter((p) => p.point)
-    : [];
-  const referenceFor = (p: { id: string; kind: string }): MapRecordReference | undefined => {
-    const kind = (
-      {
-        Property: "property",
-        Shop: "shop",
-        "Black market": "shop",
-        NPC: "npc",
-        Character: "character",
-        "Post office": "shop",
-        Location: "location",
-      } as const
-    )[p.kind as "Property"];
-    return kind ? { kind, id: p.id } : undefined;
-  };
-  const placed = map?.connected?.placements ?? [];
-  const placedRefs = map?.connected?.placedRecords ?? placed.map((p) => p.record);
-  const recordKey = (r: MapRecordReference) => JSON.stringify([r.kind, r.id]);
-  const placedKeys = new Set(placedRefs.map(recordKey));
-  const pins: MapRecord[] = [
-    ...inferredPins.flatMap((p) => {
-      const reference = referenceFor(p);
-      return reference && placedKeys.has(recordKey(reference)) ? [] : [{ ...p, reference }];
-    }),
-    ...placed.flatMap((p) => {
-      const label = p.label ?? mapReferenceName(t, p.record);
-      if (!label) return [];
+          ),
+          href: libraryRecordHref("npc", n.id),
+        })),
+      ...t.purses
+        .filter(
+          (p) =>
+            p.kind === "character" &&
+            !w.npcs.some((n) => n.id === p.id) &&
+            (dm || characterVisible(t, p)),
+        )
+        .map((p) => ({
+          id: p.id,
+          label: p.name,
+          kind: p.control === "npc" ? "NPC" : "Character",
+          point: anchorFor(map, t, characterLocation(t, p)),
+          href: libraryRecordHref("character", p.id),
+        })),
+      ...(t.journal.propertyOperations?.postal.offices ?? []).flatMap((p) => {
+        const s = t.shops.find((s) => s.id === p.shopId);
+        return s
+          ? [
+              {
+                id: s.id,
+                label: s.name,
+                kind: "Post office",
+                point: anchorFor(map, t, s.locationId),
+                href: libraryRecordHref("shop", s.id),
+              },
+            ]
+          : [];
+      }),
+      ...(t.journal.fleet?.voyages ?? [])
+        .filter(
+          (v) =>
+            v.mapRoute?.mapId === map.id && ["active", "blocked", "arrived"].includes(v.status),
+        )
+        .map((v) => ({
+          id: `voyage-${v.id}`,
+          label: t.holdings.find((h) => h.id === v.propertyId)?.name ?? "Ship voyage",
+          kind: "Ship",
+          point: routePosition(v.mapRoute!, v.elapsedMinutes / v.durationMinutes),
+          href: libraryRecordHref("property", v.propertyId),
+        })),
+    ].filter((p) => p.point);
+    const referenceFor = (p: { id: string; kind: string }): MapRecordReference | undefined => {
       const kind = (
         {
-          location: "Location",
-          shop: "Shop",
-          npc: "NPC",
-          character: "Character",
-          property: "Property",
-          listing: "Listing",
-          exchange: "Exchange",
-          facility: "Dock",
-          entry: "Journal",
-          handout: "Handout",
+          Property: "property",
+          Shop: "shop",
+          "Black market": "shop",
+          NPC: "npc",
+          Character: "character",
+          "Post office": "shop",
+          Location: "location",
         } as const
-      )[p.record.kind];
-      return [
-        {
-          id: p.record.id,
-          label,
-          kind,
-          point: p,
-          reference: p.record,
-          href: libraryRecordHref(p.record.kind, p.record.id),
-        },
-      ];
-    }),
-    ...(map?.connected?.links ?? []).flatMap((l) =>
-      allMaps.some((m) => m.id === l.targetMapId)
-        ? [
+      )[p.kind as "Property"];
+      return kind ? { kind, id: p.id } : undefined;
+    };
+    const placed = map?.connected?.placements ?? [];
+    const placedRefs = map?.connected?.placedRecords ?? placed.map((p) => p.record);
+    const recordKey = (r: MapRecordReference) => JSON.stringify([r.kind, r.id]);
+    const placedKeys = new Set(placedRefs.map(recordKey));
+    return [
+      ...inferredPins.flatMap((p) => {
+        const reference = referenceFor(p);
+        return reference && placedKeys.has(recordKey(reference)) ? [] : [{ ...p, reference }];
+      }),
+      ...placed
+        .filter((p) => dm || p.visibility === "party")
+        .flatMap((p) => {
+          const label = p.label ?? mapReferenceName(t, p.record);
+          if (!label) return [];
+          const kind = (
             {
-              id: l.id,
-              label: l.label,
-              kind: "Map",
-              point: l,
-              targetMapId: l.targetMapId,
-              entry: l.entry,
+              location: "Location",
+              shop: "Shop",
+              npc: "NPC",
+              character: "Character",
+              property: "Property",
+              listing: "Listing",
+              exchange: "Exchange",
+              facility: "Dock",
+              entry: "Journal",
+              handout: "Handout",
+            } as const
+          )[p.record.kind];
+          return [
+            {
+              id: p.record.id,
+              label,
+              kind,
+              point: p,
+              reference: p.record,
+              href: libraryRecordHref(p.record.kind, p.record.id),
             },
-          ]
-        : [],
+          ];
+        }),
+      ...(map?.connected?.links ?? [])
+        .filter((p) => dm || p.visibility === "party")
+        .flatMap((l) =>
+          allMaps.some((m) => m.id === l.targetMapId)
+            ? [
+                {
+                  id: l.id,
+                  label: l.label,
+                  kind: "Map",
+                  point: l,
+                  targetMapId: l.targetMapId,
+                  entry: l.entry,
+                },
+              ]
+            : [],
+        ),
+    ];
+  }
+  const pins = map ? recordsForMap(map) : [];
+  const placedKeys = new Set(
+    (map?.connected?.placedRecords ?? map?.connected?.placements.map((p) => p.record) ?? []).map(
+      (r) => JSON.stringify([r.kind, r.id]),
     ),
-  ];
+  );
+  const recordKey = (r: MapRecordReference) => JSON.stringify([r.kind, r.id]);
   const navigation = map && (
     <nav className="map-scene-navigation" aria-label="Connected map navigation">
       <Button
@@ -393,14 +475,16 @@ function CampaignMapWorkspace() {
       </label>
     </nav>
   );
-  return (
-    <div className="campaign-maps">
+  const management = (
+    <>
+      <SyncStatus compact />{" "}
       <p className="text-muted">
         {partyEnvironment(w.partyPosition) || locationLabel(market, market.currentLocationId)} ·{" "}
         {party
           ? "Party position shown"
           : "Choose a map position or link a location to show the party"}
       </p>
+      <MapBrowser maps={maps} current={map?.id} select={(id) => selectMap(id)} />
       <div className="world-toolbar">
         <AppLink className="settings-link" href="/features/npcs">
           People & NPCs →
@@ -436,11 +520,272 @@ function CampaignMapWorkspace() {
           </>
         )}
       </div>
+      {dm && (
+        <Fold title="Manage campaign locations">
+          <MarketLocationsPanel />
+        </Fold>
+      )}
+    </>
+  );
+  const setup = map && (
+    <>
+      {" "}
+      <p className="text-sm text-muted">
+        Drag to pan. Pinch or use the scroll wheel to zoom. Keyboard: arrows, +, − and Home. Markers
+        update through the shared campaign.
+      </p>
+      {dm && (
+        <PartyPlacement
+          key={`party-placement-${map.id}`}
+          map={map}
+          table={t}
+          point={placement === "party" ? point : undefined}
+          begin={() => {
+            setPlacement("party");
+            setPoint(undefined);
+          }}
+          done={() => {
+            setPoint(undefined);
+            setPlacement("");
+          }}
+        />
+      )}
+      {dm && (
+        <Fold
+          title="Place map markers & locations"
+          reveal={placement === "marker" || placement === "anchor"}
+        >
+          <div className="world-toolbar">
+            <Button
+              onClick={() => {
+                setPlacement("marker");
+                setPoint(undefined);
+              }}
+            >
+              Choose marker position
+            </Button>
+            <Button
+              onClick={() => {
+                setPlacement("anchor");
+                setPoint(undefined);
+              }}
+            >
+              Link location
+            </Button>
+            <Button
+              onClick={() => {
+                setPlacement("");
+                setPoint(undefined);
+              }}
+            >
+              Stop placing
+            </Button>
+          </div>
+          {placement && (
+            <p role="status">
+              Tap the map to place{" "}
+              {placement === "anchor"
+                ? "a location anchor"
+                : placement === "party"
+                  ? "the party"
+                  : placement === "token"
+                    ? "a combat token"
+                    : "a marker"}
+              .
+            </p>
+          )}
+          {point && placement === "anchor" && (
+            <CommandForm
+              label="Save location anchor"
+              dirty
+              submit={() => {
+                if (!location) throw Error("Choose an existing location.");
+                return {
+                  kind: "map-save",
+                  mapId: map.id,
+                  before: map,
+                  map: {
+                    ...map,
+                    anchors: [
+                      ...map.anchors.filter((a) => a.locationId !== location),
+                      { locationId: location, ...point },
+                    ],
+                  },
+                };
+              }}
+              onDone={() => {
+                setPoint(undefined);
+                setPlacement("");
+              }}
+            >
+              <label>
+                Linked location
+                <SearchSelect
+                  aria-label="Linked location"
+                  required
+                  value={location}
+                  onValueChange={(selectedValue) => setLocation(selectedValue)}
+                >
+                  <option value="">Choose location</option>
+                  {LocationOptions({ market: market })}
+                </SearchSelect>
+              </label>
+            </CommandForm>
+          )}
+          {point && placement === "marker" && (
+            <CommandForm
+              label="Save live marker"
+              dirty
+              submit={() => {
+                const id = crypto.randomUUID();
+                return {
+                  kind: "map-marker",
+                  mapId: map.id,
+                  markerId: id,
+                  before: null,
+                  marker: {
+                    id,
+                    label,
+                    description,
+                    visibility: secret ? "dm" : "party",
+                    ...point,
+                  },
+                };
+              }}
+              onDone={() => {
+                setPoint(undefined);
+                setPlacement("");
+                setLabel("");
+                setDescription("");
+              }}
+            >
+              <label>
+                Marker name
+                <input
+                  required
+                  maxLength={160}
+                  value={label}
+                  onChange={(e) => setLabel(e.target.value)}
+                />
+              </label>
+              <label>
+                Details
+                <textarea
+                  maxLength={2000}
+                  value={description}
+                  onChange={(e) => setDescription(e.target.value)}
+                />
+              </label>
+              <label>
+                <input
+                  type="checkbox"
+                  checked={secret}
+                  onChange={(e) => setSecret(e.target.checked)}
+                />
+                DM only
+              </label>
+            </CommandForm>
+          )}
+        </Fold>
+      )}
+      <section className="world-register">
+        <h2>Map register</h2>
+        {map.anchors.map((a) => (
+          <div key={a.locationId} className="world-row">
+            <span>
+              <AppLink href={libraryRecordHref("location", a.locationId)}>
+                {locationLabel(market, a.locationId)} →
+              </AppLink>
+              {a.locationId === market.currentLocationId ? " · Party here" : ""}
+            </span>
+            {dm && (
+              <CommandButton
+                input={{
+                  kind: "party-location",
+                  beforePosition: canonicalJson(t.journal.world?.partyPosition ?? null),
+                  before: market.currentLocationId,
+                  locationId: a.locationId,
+                }}
+              >
+                Move party here
+              </CommandButton>
+            )}
+          </div>
+        ))}
+        {map.markers
+          .filter((m) => dm || m.visibility === "party")
+          .map((m) => (
+            <div key={m.id} className="world-row">
+              <span>
+                <strong>
+                  {m.label}
+                  {m.visibility === "dm" ? " · DM only" : ""}
+                </strong>
+                <p>{m.description}</p>
+              </span>
+              {dm && (
+                <CommandButton
+                  input={{
+                    kind: "map-marker",
+                    mapId: map.id,
+                    markerId: m.id,
+                    before: m,
+                    marker: null,
+                  }}
+                >
+                  Remove marker
+                </CommandButton>
+              )}
+            </div>
+          ))}
+        {pins.map((p) =>
+          p.targetMapId ? (
+            <Button key={p.id} onClick={() => selectMap(p.targetMapId!, p.entry)}>
+              Open {p.label}
+            </Button>
+          ) : p.href ? (
+            <AppLink key={`${p.kind}-${p.id}`} className="settings-link" href={p.href}>
+              {p.kind} · {p.label} →
+            </AppLink>
+          ) : null,
+        )}
+        {!party && (
+          <p>No party position on this map. Link a location anchor or place the party freely.</p>
+        )}
+      </section>
+    </>
+  );
+  return (
+    <div className="campaign-maps">
       {map ? (
         <>
           <MapViewport
             map={map}
             navigation={navigation}
+            maps={allMaps}
+            indexedRecords={allMaps.flatMap((m) =>
+              recordsForMap(m).map((record) => ({ mapId: m.id, context: m.name, record })),
+            )}
+            settings={
+              <>
+                {management}
+                {setup}
+              </>
+            }
+            viewScope={viewScope}
+            toggleGrid={() => {
+              if (!combatPresentation) setTileMode(!tileMode);
+            }}
+            gridLocked={!!combatPresentation}
+            beginMarker={() => {
+              setPlacement("marker");
+              setPoint(undefined);
+            }}
+            beginRecord={() => {
+              setPlacement("record");
+              setPoint(undefined);
+            }}
+            placementKind={placement}
             recordTable={t}
             entryCamera={entryCamera}
             selectMap={selectMap}
@@ -477,9 +822,9 @@ function CampaignMapWorkspace() {
             controls={
               <>
                 <MapSessionBar map={map} />
-                <MapBrowser maps={maps} current={map.id} select={(id) => selectMap(id)} />
                 {dm && (
                   <MapConnectedTools
+                    reveal={placement === "record"}
                     key={`connected-${map.id}`}
                     map={map}
                     table={t}
@@ -572,239 +917,9 @@ function CampaignMapWorkspace() {
                 })),
             ]}
           />
-          <p className="text-sm text-muted">
-            Drag to pan. Pinch or use the scroll wheel to zoom. Keyboard: arrows, +, − and Home.
-            Markers update through the shared campaign.
-          </p>
-          {dm && (
-            <PartyPlacement
-              key={`party-placement-${map.id}`}
-              map={map}
-              table={t}
-              point={placement === "party" ? point : undefined}
-              begin={() => {
-                setPlacement("party");
-                setPoint(undefined);
-              }}
-              done={() => {
-                setPoint(undefined);
-                setPlacement("");
-              }}
-            />
-          )}
-          {dm && (
-            <Fold title="Place map markers & locations">
-              <div className="world-toolbar">
-                <Button
-                  onClick={() => {
-                    setPlacement("marker");
-                    setPoint(undefined);
-                  }}
-                >
-                  Place marker
-                </Button>
-                <Button
-                  onClick={() => {
-                    setPlacement("anchor");
-                    setPoint(undefined);
-                  }}
-                >
-                  Link location
-                </Button>
-                <Button
-                  onClick={() => {
-                    setPlacement("");
-                    setPoint(undefined);
-                  }}
-                >
-                  Stop placing
-                </Button>
-              </div>
-              {placement && (
-                <p role="status">
-                  Tap the map to place{" "}
-                  {placement === "anchor"
-                    ? "a location anchor"
-                    : placement === "party"
-                      ? "the party"
-                      : placement === "token"
-                        ? "a combat token"
-                        : "a marker"}
-                  .
-                </p>
-              )}
-              {point && placement === "anchor" && (
-                <CommandForm
-                  label="Save location anchor"
-                  dirty
-                  submit={() => {
-                    if (!location) throw Error("Choose an existing location.");
-                    return {
-                      kind: "map-save",
-                      mapId: map.id,
-                      before: map,
-                      map: {
-                        ...map,
-                        anchors: [
-                          ...map.anchors.filter((a) => a.locationId !== location),
-                          { locationId: location, ...point },
-                        ],
-                      },
-                    };
-                  }}
-                  onDone={() => {
-                    setPoint(undefined);
-                    setPlacement("");
-                  }}
-                >
-                  <label>
-                    Linked location
-                    <SearchSelect
-                      aria-label="Linked location"
-                      required
-                      value={location}
-                      onValueChange={(selectedValue) => setLocation(selectedValue)}
-                    >
-                      <option value="">Choose location</option>
-                      {LocationOptions({ market: market })}
-                    </SearchSelect>
-                  </label>
-                </CommandForm>
-              )}
-              {point && placement === "marker" && (
-                <CommandForm
-                  label="Save live marker"
-                  dirty
-                  submit={() => {
-                    const id = crypto.randomUUID();
-                    return {
-                      kind: "map-marker",
-                      mapId: map.id,
-                      markerId: id,
-                      before: null,
-                      marker: {
-                        id,
-                        label,
-                        description,
-                        visibility: secret ? "dm" : "party",
-                        ...point,
-                      },
-                    };
-                  }}
-                  onDone={() => {
-                    setPoint(undefined);
-                    setPlacement("");
-                    setLabel("");
-                    setDescription("");
-                  }}
-                >
-                  <label>
-                    Marker name
-                    <input
-                      required
-                      maxLength={160}
-                      value={label}
-                      onChange={(e) => setLabel(e.target.value)}
-                    />
-                  </label>
-                  <label>
-                    Details
-                    <textarea
-                      maxLength={2000}
-                      value={description}
-                      onChange={(e) => setDescription(e.target.value)}
-                    />
-                  </label>
-                  <label>
-                    <input
-                      type="checkbox"
-                      checked={secret}
-                      onChange={(e) => setSecret(e.target.checked)}
-                    />
-                    DM only
-                  </label>
-                </CommandForm>
-              )}
-            </Fold>
-          )}
-          <section className="world-register">
-            <h2>Map register</h2>
-            {map.anchors.map((a) => (
-              <div key={a.locationId} className="world-row">
-                <span>
-                  <AppLink href={libraryRecordHref("location", a.locationId)}>
-                    {locationLabel(market, a.locationId)} →
-                  </AppLink>
-                  {a.locationId === market.currentLocationId ? " · Party here" : ""}
-                </span>
-                {dm && (
-                  <CommandButton
-                    input={{
-                      kind: "party-location",
-                      beforePosition: canonicalJson(t.journal.world?.partyPosition ?? null),
-                      before: market.currentLocationId,
-                      locationId: a.locationId,
-                    }}
-                  >
-                    Move party here
-                  </CommandButton>
-                )}
-              </div>
-            ))}
-            {map.markers
-              .filter((m) => dm || m.visibility === "party")
-              .map((m) => (
-                <div key={m.id} className="world-row">
-                  <span>
-                    <strong>
-                      {m.label}
-                      {m.visibility === "dm" ? " · DM only" : ""}
-                    </strong>
-                    <p>{m.description}</p>
-                  </span>
-                  {dm && (
-                    <CommandButton
-                      input={{
-                        kind: "map-marker",
-                        mapId: map.id,
-                        markerId: m.id,
-                        before: m,
-                        marker: null,
-                      }}
-                    >
-                      Remove marker
-                    </CommandButton>
-                  )}
-                </div>
-              ))}
-            {pins.map((p) =>
-              p.targetMapId ? (
-                <Button key={p.id} onClick={() => selectMap(p.targetMapId!, p.entry)}>
-                  Open {p.label}
-                </Button>
-              ) : p.href ? (
-                <AppLink key={`${p.kind}-${p.id}`} className="settings-link" href={p.href}>
-                  {p.kind} · {p.label} →
-                </AppLink>
-              ) : null,
-            )}
-            {!party && (
-              <p>
-                No party position on this map. Link a location anchor or place the party freely.
-              </p>
-            )}
-          </section>
         </>
       ) : (
-        <p>
-          No maps match this view. The DM can import regional, city, dungeon, property, wilderness,
-          battle and ship maps.
-        </p>
-      )}
-      {dm && (
-        <Fold title="Manage campaign locations">
-          <MarketLocationsPanel />
-        </Fold>
+        <MapEmptyWorkspace dm={dm} settings={management} />
       )}
       {editing !== undefined && dm && (
         <MapEditor
@@ -844,7 +959,12 @@ function MapEditor({
     [error, setError] = useState("");
   const market = readMarketLocations(table.journal?.market);
   return (
-    <MapFrame editor>
+    <MapFrame
+      editor
+      onClose={() => {
+        if (allowContextChange()) close();
+      }}
+    >
       <section className="journal-entry">
         <h2>{map ? "Edit map" : "Import a map"}</h2>
         <CommandForm
@@ -1103,6 +1223,15 @@ function MapEditor({
 }
 function MapViewport({
   map,
+  maps,
+  indexedRecords,
+  settings: setupSettings,
+  viewScope,
+  toggleGrid,
+  gridLocked,
+  beginMarker,
+  beginRecord,
+  placementKind,
   navigation,
   entryCamera,
   selectMap,
@@ -1122,6 +1251,15 @@ function MapViewport({
   selectedToken,
 }: {
   map: CampaignMap;
+  maps: CampaignMap[];
+  indexedRecords: { mapId: string; context: string; record: MapRecord }[];
+  settings: ReactNode;
+  viewScope: { key: string; ephemeral: boolean };
+  toggleGrid: () => void;
+  gridLocked: boolean;
+  beginMarker: () => void;
+  beginRecord: () => void;
+  placementKind: string;
   navigation: ReactNode;
   recordTable: CloudTable;
   entryCamera?: { mapId: string; view: { x: number; y: number; zoom: number }; nonce: string };
@@ -1142,14 +1280,20 @@ function MapViewport({
 }) {
   const [visible, setVisible] = useState<string[]>([...mapRecordKinds]),
     [filtersOpen, setFiltersOpen] = useState(false),
+    [gridVisible, setGridVisible] = useState(true),
     [details, setDetails] = useState<MapRecord[]>([]),
     [service, setService] = useState<MapRecordReference>(),
     [serviceExpanded, setServiceExpanded] = useState(false),
     [combatOpen, setCombatOpen] = useState(false),
     [pinging, setPinging] = useState(false),
     [color, setColor] = useState<MapPingInput["color"]>("blue"),
-    [full, setFull] = useState(false),
-    [drawerOpen, setDrawerOpen] = useState(false);
+    [full] = useState(true),
+    [drawerOpen, setDrawerOpen] = useState(false),
+    [interfaceHidden, setInterfaceHidden] = useState(false),
+    [hotbarOpen, setHotbarOpen] = useState(true),
+    [moreTools, setMoreTools] = useState(false),
+    [contextOpen, setContextOpen] = useState(false),
+    [settingsTab, setSettingsTab] = useState<"settings" | "places">("settings");
   const serviceTable = recordTable;
   const closeService = () => {
     if (allowContextChange()) {
@@ -1157,7 +1301,7 @@ function MapViewport({
       setServiceExpanded(false);
     }
   };
-  useEffect(() => {
+  useLayoutEffect(() => {
     setDetails([]);
     setService(undefined);
     setServiceExpanded(false);
@@ -1165,11 +1309,15 @@ function MapViewport({
     setDrawerOpen(false);
   }, [map.id]);
   useEffect(() => {
-    if (placing && full) setDrawerOpen(!!point);
+    if (placing && full) {
+      setDrawerOpen(!!point);
+      if (point) setSettingsTab("settings");
+    }
   }, [placing, point, full]);
   const signals = useMapPings(map.id),
     useDm = useSeat().role === "dm",
     tools = useMapTabletopTools(map, selectedToken, onTokenSelect);
+  const sketches = useMapSketches(viewScope, map.id);
   useEffect(() => {
     if (full && tools.inspecting) setDrawerOpen(false);
   }, [full, tools.inspecting]);
@@ -1199,9 +1347,14 @@ function MapViewport({
     ...(party ? [{ id: "party", label: "Party", kind: "Party", point: party }] : []),
   ];
   const groups = groupMapRecords(records, visible);
-  const currentDetails = details.flatMap((d) =>
-    records.filter((r) => r.id === d.id && r.kind === d.kind),
-  );
+  const currentDetails = details.flatMap((d) => {
+    const match = records.filter((r) => r.id === d.id && r.kind === d.kind);
+    return match.length
+      ? match
+      : d.kind === "Location" && map.anchors.some((a) => a.locationId === d.id)
+        ? [d]
+        : [];
+  });
   useEffect(() => {
     setDetails([]);
   }, [selectedToken]);
@@ -1211,19 +1364,23 @@ function MapViewport({
   }, [placing, signals.viewOnly]);
   const root = useRef<HTMLDivElement>(null),
     toolPointer = useRef<number | undefined>(undefined),
-    [ratio, setRatio] = useState(1),
+    [artwork, setArtwork] = useState({ mapId: "", ratio: 1 }),
     [size, setSize] = useState({ w: 1, h: 1 }),
     [view, setView] = useState({ x: 0, y: 0, scale: 1 }),
     viewRef = useRef(view),
     pointers = useRef(new Map<number, { x: number; y: number }>()),
     moved = useRef(false),
     start = useRef({ x: 0, y: 0 });
+  const ratio = map.tabletop?.media
+    ? map.tabletop.media.width / map.tabletop.media.height
+    : artwork.mapId === map.id
+      ? artwork.ratio
+      : 1;
+  const artworkReady = !!map.tabletop?.media || artwork.mapId === map.id;
   const w = Math.min(size.w, size.h * ratio),
     h = w / ratio;
   const fit = () => setView({ x: (size.w - w) / 2, y: (size.h - h) / 2, scale: 1 });
-  useEffect(() => {
-    viewRef.current = view;
-  }, [view]);
+  viewRef.current = view;
   useEffect(() => {
     const el = root.current!;
     const observer = new ResizeObserver((entries) => {
@@ -1233,7 +1390,12 @@ function MapViewport({
     observer.observe(el);
     return () => observer.disconnect();
   }, []);
-  const cameras = useRef(new Map<string, { x: number; y: number; zoom: number }>());
+  const [cameras] = useState(
+    () =>
+      new Map(
+        Object.entries(readMapView(viewScope.key, mapViewStorage(viewScope.ephemeral)).cameras),
+      ),
+  );
   const cameraNonce =
     entryCamera?.mapId === map.id
       ? entryCamera.nonce
@@ -1251,15 +1413,24 @@ function MapViewport({
       }
     | undefined
   >(undefined);
-  useEffect(() => {
+  useLayoutEffect(() => {
+    if (!artworkReady || size.w <= 1 || size.h <= 1) return;
     const previous = previousViewport.current;
     if (previous && previous.mapId !== map.id && previous.w > 1 && previous.h > 1) {
       const v = viewRef.current;
-      cameras.current.set(previous.mapId, {
+      const previousCamera = {
         x: (previous.width / 2 - v.x) / (previous.w * v.scale),
         y: (previous.height / 2 - v.y) / (previous.h * v.scale),
         zoom: v.scale,
-      });
+        basis: previous.w,
+      };
+      cameras.set(previous.mapId, previousCamera);
+      saveMapView(
+        viewScope.key,
+        previous.mapId,
+        previousCamera,
+        mapViewStorage(viewScope.ephemeral),
+      );
     }
     previousViewport.current = {
       mapId: map.id,
@@ -1276,38 +1447,84 @@ function MapViewport({
       previous.width > 1 &&
       previous.height > 1
     ) {
-      // Opening fullscreen, rotating a phone or resizing the window keeps the
+      // Rotating a phone or resizing the workspace keeps the
       // same world point at the center instead of unexpectedly fitting the map.
-      setView((v) => ({
-        scale: v.scale,
-        x: size.w / 2 - ((previous.width / 2 - v.x) / previous.w) * w,
-        y: size.h / 2 - ((previous.height / 2 - v.y) / previous.h) * h,
-      }));
+      setView((v) => {
+        const scale = Math.min(8, Math.max(0.5, (v.scale * previous.w) / w));
+        return {
+          scale,
+          x: size.w / 2 - ((previous.width / 2 - v.x) * w * scale) / (previous.w * v.scale),
+          y: size.h / 2 - ((previous.height / 2 - v.y) * h * scale) / (previous.h * v.scale),
+        };
+      });
       return;
     }
-    const camera =
+    const camera: MapCamera | undefined =
       entryCamera?.mapId === map.id
         ? entryCamera.view
         : !useDm && tools.session.camera?.mapId === map.id
           ? tools.session.camera.view
-          : (cameras.current.get(map.id) ?? map.tabletop?.initialView);
+          : (cameras.get(map.id) ?? map.tabletop?.initialView);
+    const cover = Math.min(8, Math.max(size.w / w, size.h / h));
+    const restoredScale = camera
+      ? Math.min(8, Math.max(0.5, (camera.zoom * (camera.basis ?? w)) / w))
+      : cover;
     setView(
       camera
         ? {
-            x: size.w / 2 - camera.x * w * camera.zoom,
-            y: size.h / 2 - camera.y * h * camera.zoom,
-            scale: camera.zoom,
+            x: size.w / 2 - camera.x * w * restoredScale,
+            y: size.h / 2 - camera.y * h * restoredScale,
+            scale: restoredScale,
           }
-        : { x: (size.w - w) / 2, y: (size.h - h) / 2, scale: 1 },
+        : { x: (size.w - w * cover) / 2, y: (size.h - h * cover) / 2, scale: cover },
     );
     // A DM camera action applies once. Ordinary room polling never drags a player's camera.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [size.w, size.h, w, h, map.id, cameraNonce]);
-  const currentCamera = () => ({
-    x: Math.max(-5, Math.min(5, (size.w / 2 - view.x) / (w * view.scale))),
-    y: Math.max(-5, Math.min(5, (size.h / 2 - view.y) / (h * view.scale))),
-    zoom: view.scale,
-  });
+  }, [size.w, size.h, w, h, map.id, cameraNonce, artworkReady]);
+  const currentCamera = useCallback(
+    () => ({
+      x: Math.max(-5, Math.min(5, (size.w / 2 - view.x) / (w * view.scale))),
+      y: Math.max(-5, Math.min(5, (size.h / 2 - view.y) / (h * view.scale))),
+      zoom: view.scale,
+    }),
+    [size.w, size.h, view.x, view.y, view.scale, w, h],
+  );
+  const savedView = useRef<{ id: string; camera: MapCamera } | undefined>(undefined);
+  useEffect(() => {
+    if (artworkReady && size.w > 1 && size.h > 1 && previousViewport.current?.mapId === map.id)
+      savedView.current = { id: map.id, camera: { ...currentCamera(), basis: w } };
+    const timer = window.setTimeout(() => {
+      const last = savedView.current;
+      if (last)
+        saveMapView(viewScope.key, last.id, last.camera, mapViewStorage(viewScope.ephemeral));
+    }, 180);
+    return () => window.clearTimeout(timer);
+  }, [
+    map.id,
+    view.x,
+    view.y,
+    view.scale,
+    size.w,
+    size.h,
+    w,
+    h,
+    viewScope.key,
+    viewScope.ephemeral,
+    artworkReady,
+    currentCamera,
+  ]);
+  useEffect(() => {
+    const flush = () => {
+      const last = savedView.current;
+      if (last)
+        saveMapView(viewScope.key, last.id, last.camera, mapViewStorage(viewScope.ephemeral));
+    };
+    window.addEventListener("pagehide", flush);
+    return () => {
+      window.removeEventListener("pagehide", flush);
+      flush();
+    };
+  }, [viewScope.key, viewScope.ephemeral]);
   function zoom(factor: number, x: number, y: number) {
     setView((v) => {
       const scale = Math.min(8, Math.max(0.5, v.scale * factor)),
@@ -1341,166 +1558,701 @@ function MapViewport({
       y: Math.max(0, Math.min(1, (clientY - rect.top - view.y) / (h * view.scale))),
     };
   }
-  return (
-    <MapFrame
-      title={map.name}
-      navigation={navigation}
-      onFullChange={(next) => {
-        setFull(next);
-        setDrawerOpen(false);
-        if (next) tools.hideInspector();
-      }}
-      actions={
-        <Button
-          aria-expanded={drawerOpen}
-          aria-controls="fullscreen-map-tools"
-          onClick={() => {
-            if (!drawerOpen && (service || combatOpen) && !allowContextChange()) return;
-            tools.hideInspector();
-            if (!drawerOpen) {
-              setDetails([]);
-              setService(undefined);
-              setCombatOpen(false);
-            }
-            setDrawerOpen((open) => !open);
-          }}
-        >
-          Map tools
-        </Button>
+  const openSettings = () => {
+    if (!drawerOpen && (tools.inspecting || service || combatOpen) && !allowContextChange()) return;
+    tools.hideInspector();
+    setDetails([]);
+    setService(undefined);
+    setCombatOpen(false);
+    setContextOpen(false);
+    setDrawerOpen(!drawerOpen);
+  };
+  const openCombat = () => {
+    if (!allowContextChange()) return;
+    setCombatOpen(true);
+    setMoreTools(false);
+    setDetails([]);
+    setService(undefined);
+    setDrawerOpen(false);
+    setContextOpen(false);
+    tools.hideInspector();
+  };
+  const chooseTool = (tool: Parameters<typeof tools.activateTool>[0]) => {
+    if (!tools.activateTool(tool)) return;
+    stopPlacing();
+    sketches.cancel();
+    setPinging(false);
+    setMoreTools(false);
+    setDrawerOpen(false);
+    setDetails([]);
+    setService(undefined);
+    setCombatOpen(false);
+    setContextOpen(!["pan", "select"].includes(tool));
+    root.current?.focus();
+  };
+  const focusRecord = (record: MapRecord) => {
+    if (!allowContextChange()) return;
+    if (record.point)
+      setView((v) => ({
+        ...v,
+        x: size.w / 2 - record.point!.x * w * v.scale,
+        y: size.h / 2 - record.point!.y * h * v.scale,
+      }));
+    setDetails([record]);
+    setService(undefined);
+    setDrawerOpen(false);
+    setContextOpen(false);
+    tools.hideInspector();
+  };
+  useEffect(() => {
+    const key = (e: KeyboardEvent) => {
+      if (
+        e.defaultPrevented ||
+        (e.target as HTMLElement).closest(
+          'dialog,[role="dialog"],[role="alertdialog"],.record-select-menu',
+        )
+      )
+        return;
+      if (e.key === "Escape") {
+        if (drawerOpen) setDrawerOpen(false);
+        else if (moreTools) setMoreTools(false);
+        else if (service || details.length || combatOpen || tools.inspecting) {
+          if (!allowContextChange()) return;
+          setService(undefined);
+          setDetails([]);
+          setCombatOpen(false);
+          tools.hideInspector();
+        } else if (
+          contextOpen ||
+          placing ||
+          pinging ||
+          sketches.active ||
+          !["pan", "select"].includes(tools.tool)
+        ) {
+          if (!allowContextChange()) return;
+          tools.cancel();
+          sketches.cancel();
+          stopPlacing();
+          setPinging(false);
+          setContextOpen(false);
+        } else return;
+        e.preventDefault();
+        root.current?.focus();
       }
-    >
-      <div id="fullscreen-map-tools" className="map-tool-drawer" hidden={full && !drawerOpen}>
-        {full && (
-          <div className="world-row map-drawer-heading">
-            <strong>Map tools</strong>
-            <Button
-              onClick={() => {
-                setDrawerOpen(false);
-                root.current?.focus();
-              }}
-            >
-              Close tools
-            </Button>
-          </div>
-        )}
-        {useDm && (
-          <Button
-            onClick={() => {
-              if (allowContextChange()) {
-                setCombatOpen(true);
-                setDetails([]);
-                setService(undefined);
-                setDrawerOpen(false);
-                tools.hideInspector();
-              }
+      if (
+        (e.target as HTMLElement).closest(
+          'input,textarea,select,[contenteditable="true"],.map-viewport',
+        ) ||
+        e.ctrlKey ||
+        e.metaKey ||
+        e.altKey
+      )
+        return;
+      const tool = ({ v: "pan", s: "select", m: "measure", t: "template" } as const)[
+        e.key.toLowerCase() as "v"
+      ];
+      if (
+        e.key.toLowerCase() === "p" &&
+        !signals.viewOnly &&
+        !drawerOpen &&
+        !service &&
+        !combatOpen &&
+        allowContextChange()
+      ) {
+        e.preventDefault();
+        tools.cancel();
+        sketches.cancel();
+        stopPlacing();
+        setPinging(!pinging);
+        root.current?.focus();
+      }
+      if (tool && !drawerOpen && !service && !combatOpen) {
+        e.preventDefault();
+        chooseTool(tool);
+      }
+    };
+    document.addEventListener("keydown", key);
+    return () => document.removeEventListener("keydown", key);
+  });
+  const searchResults = [
+    ...maps.map((m) => ({
+      key: `map:${m.id}`,
+      label: m.name,
+      kind: "Map",
+      context: mapType(m, recordTable),
+      mapId: m.id,
+    })),
+    ...records.map((r) => ({
+      key: `record:${map.id}:${r.kind}:${r.id}`,
+      label: r.label,
+      kind: r.kind,
+      context: map.name,
+      mapId: map.id,
+      record: r,
+    })),
+    ...indexedRecords
+      .filter((row) => row.mapId !== map.id)
+      .map(({ mapId, context, record }) => ({
+        key: `record:${mapId}:${record.kind}:${record.id}`,
+        label: record.label,
+        kind: record.kind,
+        context,
+        mapId,
+        record,
+      })),
+    ...maps.flatMap((m) => [
+      ...m.anchors
+        .filter(
+          (a) =>
+            m.id !== map.id &&
+            !(
+              m.connected?.placedRecords ??
+              m.connected?.placements.map((p) => p.record) ??
+              []
+            ).some((r) => r.kind === "location" && r.id === a.locationId),
+        )
+        .map((a) => ({
+          key: `anchor:${m.id}:${a.locationId}`,
+          label: locationLabel(readMarketLocations(recordTable.journal?.market), a.locationId),
+          kind: "Location",
+          context: m.name,
+          mapId: m.id,
+          record: {
+            id: a.locationId,
+            label: locationLabel(readMarketLocations(recordTable.journal?.market), a.locationId),
+            kind: "Location",
+            point: a,
+            reference: { kind: "location" as const, id: a.locationId },
+          },
+        })),
+      ...(m.id === map.id
+        ? []
+        : m.markers
+            .filter((p) => useDm || p.visibility === "party")
+            .map((p) => ({
+              key: `marker:${m.id}:${p.id}`,
+              label: p.label,
+              kind: "Marker",
+              context: m.name,
+              mapId: m.id,
+              record: { ...p, kind: "Marker", point: p },
+            }))),
+    ]),
+  ];
+  return (
+    <MapFrame title={map.name} interfaceHidden={interfaceHidden}>
+      <MapWorkspaceChrome
+        map={map}
+        maps={maps}
+        navigation={navigation}
+        results={searchResults}
+        selectResult={(result) => {
+          if (!allowContextChange()) return;
+          if (result.mapId === map.id) {
+            if (result.record) focusRecord(result.record);
+          } else
+            selectMap(
+              result.mapId,
+              result.record?.point ? { ...result.record.point, zoom: 1.5 } : undefined,
+            );
+        }}
+        settingsOpen={drawerOpen}
+        toggleSettings={openSettings}
+        hidden={interfaceHidden}
+        setHidden={(hidden) => {
+          if (allowContextChange()) setInterfaceHidden(hidden);
+        }}
+      />
+      <div
+        id="map-settings"
+        className="map-tool-drawer map-settings-drawer map-glass"
+        hidden={!drawerOpen || interfaceHidden}
+        role="region"
+        aria-label="Map settings"
+        onKeyDown={(e) => {
+          if (
+            e.defaultPrevented ||
+            (e.target as HTMLElement).closest(
+              'dialog,[role="dialog"],[role="alertdialog"],.record-select-menu',
+            )
+          )
+            return;
+          if (e.key === "Escape") {
+            e.stopPropagation();
+            setDrawerOpen(false);
+            root.current?.focus();
+          }
+        }}
+      >
+        <div className="map-panel-heading">
+          <div
+            role="tablist"
+            aria-label="Map settings tabs"
+            onKeyDown={(e) => {
+              if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(e.key)) return;
+              e.preventDefault();
+              const next =
+                e.key === "Home"
+                  ? "settings"
+                  : e.key === "End"
+                    ? "places"
+                    : settingsTab === "settings"
+                      ? "places"
+                      : "settings";
+              setSettingsTab(next);
+              e.currentTarget.querySelector<HTMLButtonElement>(`#map-tab-${next}`)?.focus();
             }}
           >
-            {recordTable.journal?.world?.combat
-              ? "Open encounter map controls"
-              : "Start encounter here"}
-          </Button>
-        )}
-        <div
-          onClickCapture={() => {
-            stopPlacing();
-            setPinging(false);
-          }}
-        >
-          {tools.toolControls}
-        </div>
-        <div className="world-toolbar map-controls">
-          <Button aria-expanded={filtersOpen} onClick={() => setFiltersOpen((v) => !v)}>
-            Filters
-          </Button>
-          <label>
-            Ping color
-            <select
-              aria-label="Ping color"
-              value={color}
-              onChange={(e) => setColor(e.target.value as MapPingInput["color"])}
+            <button
+              role="tab"
+              id="map-tab-settings"
+              aria-controls="map-panel-settings"
+              tabIndex={settingsTab === "settings" ? 0 : -1}
+              aria-selected={settingsTab === "settings"}
+              onClick={() => setSettingsTab("settings")}
             >
-              {pingColors.map((c) => (
-                <option key={c} value={c}>
-                  {c[0].toUpperCase() + c.slice(1)}
-                </option>
-              ))}
-            </select>
-          </label>
-          {useDm && (
-            <>
-              <Button
-                disabled={tools.busy || !map.visible}
-                onClick={() => void tools.shareCamera(currentCamera())}
-              >
-                Share this view
-              </Button>
-              <Button
-                disabled={tools.busy}
-                onClick={() => void tools.saveInitialView(currentCamera())}
-              >
-                Save starting view
-              </Button>
-            </>
-          )}
+              Settings
+            </button>
+            <button
+              role="tab"
+              id="map-tab-places"
+              aria-controls="map-panel-places"
+              tabIndex={settingsTab === "places" ? 0 : -1}
+              aria-selected={settingsTab === "places"}
+              onClick={() => setSettingsTab("places")}
+            >
+              Places
+            </button>
+          </div>
+          <button
+            className="map-icon-button"
+            aria-label="Close settings"
+            onClick={() => {
+              setDrawerOpen(false);
+              root.current?.focus();
+            }}
+          >
+            <X size={18} />
+          </button>
         </div>
-        {filtersOpen && (
-          <fieldset className="map-filters">
-            <legend>Show on map</legend>
-            {mapRecordKinds.map((kind) => (
-              <label key={kind}>
-                <input
-                  type="checkbox"
-                  checked={visible.includes(kind)}
-                  onChange={(e) =>
-                    setVisible((v) =>
-                      e.target.checked ? [...v, kind] : v.filter((k) => k !== kind),
-                    )
-                  }
-                />
-                {kind === "NPC" ? "Characters / NPCs" : kind}
-              </label>
-            ))}
-            <Button onClick={() => setVisible([...mapRecordKinds])}>Show all</Button>
-            <Button onClick={() => setVisible([])}>Hide all</Button>
-          </fieldset>
-        )}
-        {useDm && tools.showPreview && <MapPlayerPreview map={map} />}
-        {pinging && (
-          <p className="text-sm text-muted">
-            Keyboard: pan to a point, then press Enter to ping the center crosshair. Escape turns
-            ping mode off.
-          </p>
-        )}
-        <div className="map-tile-control-area">{controls}</div>
-      </div>
-      <div className="world-toolbar map-navigation" aria-label="Map navigation">
-        <Button onClick={() => zoom(1.4, size.w / 2, size.h / 2)} aria-label="Zoom in">
-          +
-        </Button>
-        <Button onClick={() => zoom(1 / 1.4, size.w / 2, size.h / 2)} aria-label="Zoom out">
-          −
-        </Button>
-        <Button onClick={fit}>Fit map</Button>
-        <Button
-          disabled={signals.viewOnly}
-          aria-pressed={pinging}
-          onClick={() => {
-            tools.cancel();
-            stopPlacing();
-            setPinging((v) => !v);
-          }}
+        <div
+          role="tabpanel"
+          id="map-panel-places"
+          aria-labelledby="map-tab-places"
+          hidden={settingsTab !== "places"}
         >
-          Ping
-        </Button>
-        <output aria-label="Map zoom" aria-live="polite">
-          {Math.round(view.scale * 100)}%
-        </output>
+          {records.map((record) => (
+            <button
+              className="map-place-row"
+              key={`${record.kind}:${record.id}`}
+              onClick={() => focusRecord(record)}
+            >
+              <strong>{record.label}</strong>
+              <span>{record.kind}</span>
+            </button>
+          ))}
+        </div>
+        <div
+          role="tabpanel"
+          id="map-panel-settings"
+          aria-labelledby="map-tab-settings"
+          hidden={settingsTab !== "settings"}
+        >
+          {setupSettings}
+          {tools.configurationControls}
+          <button className="settings-link" onClick={() => tools.openInspector()}>
+            Open inspector and object controls
+          </button>
+          <div className="world-toolbar map-controls">
+            <Button aria-expanded={filtersOpen} onClick={() => setFiltersOpen((v) => !v)}>
+              Filters
+            </Button>
+            <label>
+              Ping color
+              <select
+                aria-label="Ping color"
+                value={color}
+                onChange={(e) => setColor(e.target.value as MapPingInput["color"])}
+              >
+                {pingColors.map((c) => (
+                  <option key={c} value={c}>
+                    {c[0].toUpperCase() + c.slice(1)}
+                  </option>
+                ))}
+              </select>
+            </label>
+            {useDm && (
+              <>
+                <Button
+                  disabled={tools.busy || !map.visible}
+                  onClick={() => void tools.shareCamera(currentCamera())}
+                >
+                  Share this view
+                </Button>
+                <Button
+                  disabled={tools.busy}
+                  onClick={() => void tools.saveInitialView(currentCamera())}
+                >
+                  Save starting view
+                </Button>
+              </>
+            )}
+          </div>
+          {filtersOpen && (
+            <fieldset className="map-filters">
+              <legend>Show on map</legend>
+              {mapRecordKinds.map((kind) => (
+                <label key={kind}>
+                  <input
+                    type="checkbox"
+                    checked={visible.includes(kind)}
+                    onChange={(e) =>
+                      setVisible((v) =>
+                        e.target.checked ? [...v, kind] : v.filter((k) => k !== kind),
+                      )
+                    }
+                  />
+                  {kind === "NPC" ? "Characters / NPCs" : kind}
+                </label>
+              ))}
+              <Button onClick={() => setVisible([...mapRecordKinds])}>Show all</Button>
+              <Button onClick={() => setVisible([])}>Hide all</Button>
+            </fieldset>
+          )}
+          {useDm && tools.showPreview && <MapPlayerPreview map={map} />}
+          {pinging && (
+            <p className="text-sm text-muted">
+              Keyboard: pan to a point, then press Enter to ping the center crosshair. Escape turns
+              ping mode off.
+            </p>
+          )}
+          <div className="map-tile-control-area">{controls}</div>
+        </div>
       </div>
-      <MapCombatHud map={map} />
-      <div className="map-feedback">
+      {!interfaceHidden && (
+        <>
+          <div className="map-hotbar-anchor">
+            {hotbarOpen && (
+              <div className="map-hotbar map-glass" role="toolbar" aria-label="Map tools">
+                <button
+                  className="map-icon-button"
+                  title="Pan (V)"
+                  aria-label="Pan"
+                  aria-pressed={tools.tool === "pan" && !pinging && !placing && !sketches.active}
+                  onClick={() => chooseTool("pan")}
+                >
+                  <Hand size={19} />
+                </button>
+                <button
+                  className="map-icon-button"
+                  title="Select / move (S)"
+                  aria-label="Select / move"
+                  aria-pressed={tools.tool === "select" && !pinging && !placing && !sketches.active}
+                  onClick={() => chooseTool("select")}
+                >
+                  <MousePointer2 size={19} />
+                </button>
+                <button
+                  className="map-icon-button"
+                  title="Ping (P)"
+                  aria-label="Ping"
+                  disabled={signals.viewOnly}
+                  aria-pressed={pinging}
+                  onClick={() => {
+                    if (!allowContextChange()) return;
+                    tools.cancel();
+                    sketches.cancel();
+                    stopPlacing();
+                    setPinging(!pinging);
+                    setContextOpen(false);
+                    setDrawerOpen(false);
+                    root.current?.focus();
+                  }}
+                >
+                  <Crosshair size={19} />
+                </button>
+                <button
+                  className="map-icon-button"
+                  title="Measure (M)"
+                  aria-label="Measure"
+                  aria-pressed={tools.tool === "measure"}
+                  onClick={() => chooseTool("measure")}
+                >
+                  <Ruler size={19} />
+                </button>
+                {tools.playerTemplates && (
+                  <button
+                    className="map-icon-button"
+                    title="Area template (T)"
+                    aria-label="Area template"
+                    aria-pressed={tools.tool === "template"}
+                    onClick={() => chooseTool("template")}
+                  >
+                    <Shapes size={19} />
+                  </button>
+                )}
+                {useDm && (
+                  <button
+                    className="map-icon-button"
+                    title="Place marker"
+                    aria-label="Place marker"
+                    aria-pressed={placementKind === "marker"}
+                    onClick={() => {
+                      if (!allowContextChange()) return;
+                      tools.cancel();
+                      sketches.cancel();
+                      setPinging(false);
+                      beginMarker();
+                      setDrawerOpen(false);
+                      setContextOpen(false);
+                      root.current?.focus();
+                    }}
+                  >
+                    <MapPin size={19} />
+                  </button>
+                )}
+                <button
+                  className="map-icon-button"
+                  aria-label="Drawing & annotations"
+                  title="Drawing & annotations"
+                  aria-pressed={sketches.active}
+                  onClick={() => {
+                    if (!allowContextChange()) return;
+                    chooseTool("pan");
+                    sketches.setActive(true);
+                    setContextOpen(true);
+                  }}
+                >
+                  <Pencil size={19} />
+                </button>
+                <button
+                  className="map-icon-button"
+                  title="More map tools"
+                  aria-label="More map tools"
+                  aria-expanded={moreTools}
+                  onClick={() => {
+                    if (!moreTools) setContextOpen(false);
+                    setMoreTools(!moreTools);
+                  }}
+                >
+                  <MoreHorizontal size={20} />
+                </button>
+              </div>
+            )}
+            <button
+              className="map-hotbar-toggle map-glass map-icon-button"
+              aria-label="Map tools hotbar"
+              aria-expanded={hotbarOpen}
+              title="Map tools"
+              onClick={() => setHotbarOpen(!hotbarOpen)}
+            >
+              <Pencil size={20} />
+            </button>
+            {hotbarOpen && moreTools && (
+              <div
+                className="map-hotbar-more map-glass"
+                role="toolbar"
+                aria-label="Additional map tools"
+              >
+                {useDm && (
+                  <>
+                    <button
+                      className="map-icon-button"
+                      title="Fog brush"
+                      aria-label="Fog brush"
+                      aria-pressed={tools.tool === "fog-brush"}
+                      onClick={() => chooseTool("fog-brush")}
+                    >
+                      <CloudFog size={19} />
+                    </button>
+                    <button
+                      className="map-icon-button"
+                      title="Fog rectangle"
+                      aria-label="Fog rectangle"
+                      aria-pressed={tools.tool === "fog-rectangle"}
+                      onClick={() => chooseTool("fog-rectangle")}
+                    >
+                      <Grid3X3 size={19} />
+                    </button>
+                    <button
+                      className="map-icon-button"
+                      title="Fog polygon"
+                      aria-label="Fog polygon"
+                      aria-pressed={tools.tool === "fog-polygon"}
+                      onClick={() => chooseTool("fog-polygon")}
+                    >
+                      <Shapes size={19} />
+                    </button>
+                    <button
+                      className="map-icon-button"
+                      title="Wall / door"
+                      aria-label="Wall / door"
+                      aria-pressed={tools.tool === "wall"}
+                      onClick={() => chooseTool("wall")}
+                    >
+                      <PanelRight size={19} />
+                    </button>
+                    <button
+                      className="map-icon-button"
+                      title="Light"
+                      aria-label="Light"
+                      aria-pressed={tools.tool === "light"}
+                      onClick={() => chooseTool("light")}
+                    >
+                      <Sun size={19} />
+                    </button>
+                    <button
+                      className="map-icon-button"
+                      title="Place existing record"
+                      aria-label="Place existing record"
+                      onClick={() => {
+                        if (!allowContextChange()) return;
+                        tools.cancel();
+                        sketches.cancel();
+                        setPinging(false);
+                        beginRecord();
+                        setDrawerOpen(true);
+                        setSettingsTab("settings");
+                      }}
+                    >
+                      <Store size={19} />
+                    </button>
+                    <button
+                      className="map-icon-button"
+                      title="Start encounter here"
+                      aria-label={
+                        recordTable.journal?.world?.combat
+                          ? "Open encounter map controls"
+                          : "Start encounter here"
+                      }
+                      onClick={openCombat}
+                    >
+                      <Swords size={19} />
+                    </button>
+                    <button
+                      className="map-icon-button"
+                      title="Undo fog"
+                      aria-label="Undo fog"
+                      disabled={!tools.canUndoFog}
+                      onClick={() => void tools.undoFog()}
+                    >
+                      <Undo2 size={19} />
+                    </button>
+                    <button
+                      className="map-icon-button"
+                      title="Redo fog"
+                      aria-label="Redo fog"
+                      disabled={!tools.canRedoFog}
+                      onClick={() => void tools.redoFog()}
+                    >
+                      <Redo2 size={19} />
+                    </button>
+                  </>
+                )}
+                {map.grid && (
+                  <button
+                    className="map-icon-button"
+                    title={gridLocked ? "Encounter controls the grid" : "Grid display"}
+                    aria-label="Grid display"
+                    aria-pressed={tileMode && (gridLocked || gridVisible)}
+                    disabled={gridLocked}
+                    onClick={() => {
+                      if (!tileMode) toggleGrid();
+                      setGridVisible(tileMode ? !gridVisible : true);
+                    }}
+                  >
+                    <Grid3X3 size={19} />
+                  </button>
+                )}
+                <button
+                  className="map-icon-button"
+                  title="Inspector"
+                  aria-label="Inspector"
+                  onClick={() => {
+                    setDrawerOpen(false);
+                    tools.openInspector();
+                  }}
+                >
+                  <Menu size={19} />
+                </button>
+              </div>
+            )}
+          </div>
+          {contextOpen && !drawerOpen && (
+            <aside className="map-tool-context map-glass" aria-label="Tool options">
+              <div className="map-panel-heading">
+                <strong>{sketches.active ? "Drawing & annotations" : tools.toolLabel}</strong>
+                <button
+                  className="map-icon-button"
+                  aria-label="Close tool options"
+                  onClick={() => setContextOpen(false)}
+                >
+                  <X size={16} />
+                </button>
+              </div>
+              {sketches.active ? sketches.controls : tools.contextControls}
+              <button
+                onClick={() => {
+                  if (allowContextChange()) {
+                    tools.cancel();
+                    sketches.cancel();
+                    setContextOpen(false);
+                  }
+                }}
+              >
+                Cancel tool
+              </button>
+            </aside>
+          )}
+          <div className="world-toolbar map-navigation map-glass" aria-label="Map navigation">
+            <Button onClick={() => zoom(1.4, size.w / 2, size.h / 2)} aria-label="Zoom in">
+              +
+            </Button>
+            <Button onClick={() => zoom(1 / 1.4, size.w / 2, size.h / 2)} aria-label="Zoom out">
+              −
+            </Button>
+            <Button onClick={fit} aria-label="Fit map" title="Fit map">
+              <Maximize size={18} />
+            </Button>
+            <button
+              className="map-icon-button"
+              aria-label="Center on party or selection"
+              title="Center on party or selection"
+              disabled={!party && !currentDetails[0]?.point && !selectedToken}
+              onClick={() => {
+                const p =
+                  currentDetails[0]?.point ??
+                  (map.grid && map.tokens?.find((t) => t.id === selectedToken)
+                    ? sceneTokenPoint(
+                        map.grid,
+                        map.tokens!.find((t) => t.id === selectedToken)!,
+                      )
+                    : party);
+                if (p)
+                  setView((v) => ({
+                    ...v,
+                    x: size.w / 2 - p.x * w * v.scale,
+                    y: size.h / 2 - p.y * h * v.scale,
+                  }));
+              }}
+            >
+              <Crosshair size={18} />
+            </button>
+            <output aria-label="Map zoom" aria-live="polite">
+              {Math.round(view.scale * 100)}%
+            </output>
+          </div>
+        </>
+      )}
+      {!interfaceHidden && <MapCombatHud map={map} />}
+      <div className="map-feedback" hidden={interfaceHidden}>
         {full && (
           <p className="map-active-tool" role="status">
-            {pinging ? `Ping · ${color}` : tools.toolLabel}
+            {pinging
+              ? `Ping · ${color}`
+              : sketches.active
+                ? "Personal annotations"
+                : tools.toolLabel}
             {tools.measurement && ` · ${tools.measurement}`}
           </p>
         )}
@@ -1525,6 +2277,26 @@ function MapViewport({
             aria-label="Interactive campaign map"
             tabIndex={0}
             onKeyDown={(e) => {
+              if (!e.ctrlKey && !e.metaKey && !e.altKey) {
+                const shortcut = ({ v: "pan", s: "select", m: "measure", t: "template" } as const)[
+                  e.key.toLowerCase() as "v"
+                ];
+                if (shortcut) {
+                  e.preventDefault();
+                  chooseTool(shortcut);
+                  return;
+                }
+                if (e.key.toLowerCase() === "p" && !signals.viewOnly) {
+                  e.preventDefault();
+                  if (allowContextChange()) {
+                    tools.cancel();
+                    sketches.cancel();
+                    stopPlacing();
+                    setPinging(!pinging);
+                  }
+                  return;
+                }
+              }
               if (
                 tools.keyboard(e, {
                   x: Math.max(0, Math.min(1, (size.w / 2 - view.x) / (w * view.scale))),
@@ -1549,6 +2321,8 @@ function MapViewport({
               }
               if (e.key === "Escape") {
                 setPinging(false);
+                sketches.cancel();
+                setContextOpen(false);
                 stopPlacing();
               }
               if (e.key === "Home") fit();
@@ -1563,11 +2337,18 @@ function MapViewport({
             }}
             onPointerDown={(e) => {
               if (e.button !== 0) return;
+              if (sketches.active) {
+                sketches.down(mapPoint(e.clientX, e.clientY));
+                e.currentTarget.setPointerCapture(e.pointerId);
+                toolPointer.current = e.pointerId;
+                return;
+              }
               const token = (e.target as Element).closest<HTMLElement>("[data-map-token]")?.dataset
                 .mapToken;
               if (
                 !placing &&
                 !pinging &&
+                !sketches.active &&
                 tools.pointerDown(mapPoint(e.clientX, e.clientY), token, e.shiftKey)
               ) {
                 moved.current = false;
@@ -1586,7 +2367,8 @@ function MapViewport({
             onPointerMove={(e) => {
               if (toolPointer.current === e.pointerId) {
                 moved.current = true;
-                tools.pointerMove(mapPoint(e.clientX, e.clientY));
+                if (sketches.active) sketches.move(mapPoint(e.clientX, e.clientY));
+                else tools.pointerMove(mapPoint(e.clientX, e.clientY));
                 return;
               }
               if (!pointers.current.has(e.pointerId)) return;
@@ -1622,13 +2404,14 @@ function MapViewport({
             }}
             onPointerUp={(e) => {
               if (toolPointer.current === e.pointerId) {
-                tools.pointerUp(mapPoint(e.clientX, e.clientY));
+                if (sketches.active) sketches.up(mapPoint(e.clientX, e.clientY));
+                else tools.pointerUp(mapPoint(e.clientX, e.clientY));
                 toolPointer.current = undefined;
                 return;
               }
               if (
                 (placing || pinging) &&
-                !(e.target as Element).closest("button") &&
+                (pinging || !(e.target as Element).closest("button")) &&
                 !moved.current &&
                 pointers.current.has(e.pointerId) &&
                 pointers.current.size === 1
@@ -1651,15 +2434,33 @@ function MapViewport({
               }
             }}
           >
+            {!artworkReady && (
+              <span className="map-loading-artwork" role="status">
+                Opening map…
+              </span>
+            )}
             <div
               className="map-layer"
               style={{
                 width: w,
                 height: h,
+                visibility: artworkReady && size.w > 1 ? "visible" : "hidden",
                 transform: `translate(${view.x}px, ${view.y}px) scale(${view.scale})`,
               }}
             >
-              <MapArtwork map={map} onRatio={setRatio} />
+              <MapArtwork
+                controlsInWorkspace
+                key={map.id}
+                map={map}
+                onRatio={(ratio) =>
+                  setArtwork((current) =>
+                    current.mapId === map.id && current.ratio === ratio
+                      ? current
+                      : { mapId: map.id, ratio },
+                  )
+                }
+              />
+              {sketches.overlay}
               {visible.includes("Ship") && routes.length > 0 && (
                 <svg
                   className="map-route-trails"
@@ -1675,7 +2476,7 @@ function MapViewport({
                   ))}
                 </svg>
               )}
-              {tileMode && map.grid && (
+              {tileMode && (gridLocked || gridVisible) && map.grid && (
                 <svg
                   className="map-tile-grid"
                   viewBox="0 0 1000 1000"
@@ -1742,6 +2543,8 @@ function MapViewport({
                       if (
                         !moved.current &&
                         !pinging &&
+                        !sketches.active &&
+                        ["pan", "select"].includes(tools.tool) &&
                         (!(service || combatOpen) || allowContextChange())
                       ) {
                         setService(undefined);
@@ -1907,7 +2710,7 @@ function MapViewport({
             </section>
           )}
         </div>
-        {tools.panel}
+        <div hidden={interfaceHidden}>{tools.panel}</div>
       </div>
     </MapFrame>
   );

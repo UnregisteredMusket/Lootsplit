@@ -1,3 +1,10 @@
+import {
+  openMapSettings,
+  closeMapSettings,
+  selectWorkspaceMap,
+  selectMapType,
+  openMoreMapTools,
+} from "./map-workspace-browser.mjs";
 import { checkFullscreenMap } from "./fullscreen-map-browser-check.mjs";
 import { auditCharacterPlacement } from "./character-placement-browser.mjs";
 import { chooseOption } from "./search-select-browser.mjs";
@@ -233,6 +240,7 @@ try {
       }
     });
     await reloadApplication(page);
+    await openMapSettings(page);
     await page.getByRole("button", { name: "Import map", exact: true }).click();
     await page.getByLabel("Map name", { exact: true }).fill("Retained draft");
     await page.getByRole("button", { name: "Save map", exact: true }).click();
@@ -307,6 +315,7 @@ try {
     await page.getByLabel("Share this map image with players", { exact: true }).check();
     await page.getByRole("button", { name: "Save map", exact: true }).click();
     await expect(page.getByRole("heading", { name: "Import a map", exact: true })).toHaveCount(0);
+    await openMapSettings(page);
     await expect(page.getByRole("region", { name: "Interactive campaign map" })).toBeVisible();
     await reloadApplication(page);
     await expect(page.getByRole("region", { name: "Interactive campaign map" })).toBeVisible();
@@ -315,13 +324,15 @@ try {
     assert.equal(savedMap.locationId, "city");
     assert.equal(savedMap.visible, true);
     assert.match(savedMap.image, /^data:image\/webp;base64,/);
+    await openMapSettings(page);
     await page.getByRole("button", { name: "Edit map & anchors", exact: true }).click();
-    await page.getByRole("button", { name: "Fullscreen editor", exact: true }).click();
+
     await expect(page.locator(".map-editor-frame")).toHaveClass(/map-fullscreen/);
     await page.getByLabel("Map name", { exact: true }).fill("Port atlas revised");
     await page.screenshot({ path: `${output}/fullscreen-editor-${width}.png` });
+    page.once("dialog", (dialog) => dialog.dismiss());
     await page.keyboard.press("Escape");
-    await expect(page.locator(".map-editor-frame")).not.toHaveClass(/map-fullscreen/);
+    await expect(page.locator(".map-editor-frame")).toHaveClass(/map-fullscreen/);
     await expect(page.getByLabel("Map name", { exact: true })).toHaveValue("Port atlas revised");
     await page.getByRole("button", { name: "Save map", exact: true }).click();
     await expect(page.getByRole("heading", { name: "Edit map", exact: true })).toHaveCount(0);
@@ -331,6 +342,7 @@ try {
     assert.equal(revisedMap.name, "Port atlas revised");
     assert.equal(revisedMap.image, savedMap.image);
     assert.deepEqual(revisedMap.anchors, savedMap.anchors);
+    await openMapSettings(page);
     await page.getByRole("button", { name: "Place map markers & locations", exact: true }).click();
     await expect(page.getByRole("region", { name: "Interactive campaign map" })).toBeVisible();
     if (width === 390) {
@@ -342,6 +354,7 @@ try {
       await chooseOption(page.getByLabel("Linked location", { exact: true }), "city");
       await page.getByRole("button", { name: "Save location anchor", exact: true }).click();
     }
+    await closeMapSettings(page);
     await page.getByRole("button", { name: "Fit map", exact: true }).click();
     await page.getByRole("button", { name: "Place marker", exact: true }).click();
     const region = page.getByRole("region", { name: "Interactive campaign map" });
@@ -354,6 +367,7 @@ try {
     await page.getByLabel("Marker name", { exact: true }).fill("Rendezvous");
     await page.getByLabel("Details", { exact: true }).fill("Meet at the quay");
     await page.getByRole("button", { name: "Save live marker", exact: true }).click();
+    await closeMapSettings(page);
     const marker = page.getByRole("button", { name: "Marker: 1 record", exact: true });
     await expect(marker).toBeVisible();
     const markerColor = await marker.evaluate((el) => getComputedStyle(el).backgroundColor);
@@ -369,6 +383,7 @@ try {
     await page.getByRole("button", { name: "Close details", exact: true }).click();
     await expect(marker).toHaveAttribute("aria-pressed", "false");
     assert.equal(await marker.evaluate((el) => getComputedStyle(el).backgroundColor), markerColor);
+    await openMapSettings(page);
     await page.getByRole("button", { name: "Filters", exact: true }).click();
     await page.getByLabel("Marker", { exact: true }).uncheck();
     await expect(marker).toHaveCount(0);
@@ -376,15 +391,16 @@ try {
     await page.getByRole("button", { name: "Hide all", exact: true }).click();
     await expect(page.locator(".map-record-icon")).toHaveCount(0);
     await page.getByRole("button", { name: "Show all", exact: true }).click();
+    await openMapSettings(page);
     await page.getByRole("button", { name: "Filters", exact: true }).click();
-    await page.getByRole("button", { name: "Fullscreen map", exact: true }).click();
+    await closeMapSettings(page);
     await expect(page.locator(".map-view-frame")).toHaveClass(/map-fullscreen/);
     const full = await page.locator(".map-view-frame").boundingBox();
     assert.ok(full.height >= 949 && full.width >= width - 1);
     await checkFullscreenMap(page, output, width);
-    await page.getByRole("button", { name: "Map tools", exact: true }).click();
+    await openMapSettings(page);
     await chooseOption(page.getByLabel("Ping color", { exact: true }), "red");
-    await page.getByRole("button", { name: "Close tools", exact: true }).click();
+    await closeMapSettings(page);
     await page.getByRole("button", { name: "Ping", exact: true }).click();
     await region.focus();
     await page.keyboard.press("Enter");
@@ -394,7 +410,7 @@ try {
     });
     await page.getByRole("button", { name: "Ping", exact: true }).click();
     await page.screenshot({ path: `${output}/fullscreen-map-${width}.png` });
-    await page.getByRole("button", { name: "Exit fullscreen", exact: true }).click();
+    await closeMapSettings(page);
     await region.hover();
     await page.mouse.wheel(0, -250);
     await expect(page.locator(".world-toolbar [aria-live=polite]")).not.toHaveText("100%");
@@ -414,15 +430,15 @@ try {
     await cdp.send("Input.dispatchTouchEvent", {
       type: "touchStart",
       touchPoints: [
-        { x: r.x + r.width * 0.35, y: r.y + r.height * 0.5 },
-        { x: r.x + r.width * 0.65, y: r.y + r.height * 0.5 },
+        { x: r.x + r.width * 0.35, y: r.y + r.height * 0.38 },
+        { x: r.x + r.width * 0.65, y: r.y + r.height * 0.38 },
       ],
     });
     await cdp.send("Input.dispatchTouchEvent", {
       type: "touchMove",
       touchPoints: [
-        { x: r.x + r.width * 0.25, y: r.y + r.height * 0.5 },
-        { x: r.x + r.width * 0.75, y: r.y + r.height * 0.5 },
+        { x: r.x + r.width * 0.25, y: r.y + r.height * 0.38 },
+        { x: r.x + r.width * 0.75, y: r.y + r.height * 0.38 },
       ],
     });
     await cdp.send("Input.dispatchTouchEvent", { type: "touchEnd", touchPoints: [] });
@@ -430,6 +446,7 @@ try {
     await page.getByRole("button", { name: "Fit map", exact: true }).click();
     await fits(page);
     await page.screenshot({ path: `${output}/maps-${width}.png`, fullPage: true });
+    await openMapSettings(page);
     await page
       .getByRole("link", { name: "People & NPCs", exact: false })
       .filter({ visible: true })
@@ -732,6 +749,7 @@ try {
     // Keep the existing offline gameplay audit, then verify real shared map writes.
     await createAndSaveRoom(page, origin, (p, o, path) => navigateApplication(p, o + path));
     await navigateApplication(page, origin + "/maps");
+    await openMapSettings(page);
     await page.getByRole("button", { name: "Import map", exact: true }).click();
     await holdMapDecode(page);
     await page.getByLabel("Map artwork or video", { exact: true }).setInputFiles({
@@ -748,6 +766,7 @@ try {
     await expect(page.getByRole("button", { name: "Save map", exact: true })).toBeEnabled();
     await page.getByRole("button", { name: "Save map", exact: true }).click();
     await expect(page.getByRole("heading", { name: "Import a map", exact: true })).toHaveCount(0);
+    await openMapSettings(page);
     await expect(
       page
         .getByRole("status")
@@ -762,7 +781,8 @@ try {
     assert.equal(sharedMap.locationId, "area");
     assert.equal(sharedMap.visible, true);
     assert.equal(sharedMap.image, savedMap.image);
-    await chooseOption(page.getByLabel("Map", { exact: true }), sharedMap.id);
+    await selectWorkspaceMap(page, sharedMap.id);
+    await openMapSettings(page);
     await page.getByRole("button", { name: "Edit map & anchors", exact: true }).click();
     await page.getByLabel("Map name", { exact: true }).fill("Shared Port atlas revised");
     await page.getByRole("button", { name: "Save map", exact: true }).click();
@@ -814,14 +834,14 @@ try {
     await guest.getByRole("button", { name: "Join room", exact: true }).click();
     await expect(guest.locator(".room-code")).toBeVisible();
     await navigateApplication(guest, origin + "/maps");
-    await chooseOption(guest.getByLabel("Map", { exact: true }), sharedMap.id);
+    await selectWorkspaceMap(guest, sharedMap.id);
     await navigateApplication(page, origin + "/maps");
-    await chooseOption(page.getByLabel("Map", { exact: true }), sharedMap.id);
-    await guest.getByRole("button", { name: "Fullscreen map", exact: true }).click();
+    await selectWorkspaceMap(page, sharedMap.id);
+    await closeMapSettings(guest);
     await guest.getByRole("button", { name: "Ping", exact: true }).click();
-    await guest.getByRole("button", { name: "Map tools", exact: true }).click();
+    await openMapSettings(guest);
     await chooseOption(guest.getByLabel("Ping color", { exact: true }), "violet");
-    await guest.getByRole("button", { name: "Close tools", exact: true }).click();
+    await closeMapSettings(guest);
     const guestMap = guest.getByRole("region", { name: "Interactive campaign map" });
     await guestMap.scrollIntoViewIfNeeded();
     const touchBox = await guestMap.boundingBox();
@@ -835,7 +855,9 @@ try {
       timeout: 7000,
     });
     await page.getByRole("button", { name: "Ping", exact: true }).click();
+    await openMapSettings(page);
     await chooseOption(page.getByLabel("Ping color", { exact: true }), "green");
+    await closeMapSettings(page);
     await page.getByRole("region", { name: "Interactive campaign map" }).focus();
     await page.keyboard.press("Enter");
     await expect(guest.getByRole("img", { name: "green map ping", exact: true })).toBeVisible();

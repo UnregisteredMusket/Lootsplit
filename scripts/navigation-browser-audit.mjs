@@ -71,6 +71,19 @@ async function destination(page, href, label) {
       [...target.searchParams].every(([key, value]) => url.searchParams.get(key) === value),
   );
   await expect(page.locator("main").first()).toBeVisible();
+  if (target.pathname === "/maps") {
+    const workspace = page.getByRole("region", { name: "Map workspace", exact: true });
+    await expect(workspace).toBeVisible();
+    const bounds = await workspace.boundingBox();
+    const viewport = page.viewportSize();
+    assert.ok(
+      bounds &&
+        viewport &&
+        Math.abs(bounds.width - viewport.width) <= 1 &&
+        Math.abs(bounds.height - viewport.height) <= 1,
+      "Maps fills the viewport after real navigation",
+    );
+  }
   if (target.pathname.startsWith("/features/")) {
     await expect(
       page.getByRole("heading", {
@@ -106,9 +119,9 @@ async function destination(page, href, label) {
         .getByRole("button", { name, exact: true }),
     ).toHaveAttribute("aria-pressed", "true");
     if (target.searchParams.has("kind"))
-      await expect(page.getByRole("combobox", { name: "Reference section", exact: true })).toHaveValue(
-        target.searchParams.get("kind"),
-      );
+      await expect(
+        page.getByRole("combobox", { name: "Reference section", exact: true }),
+      ).toHaveValue(target.searchParams.get("kind"));
   }
   if (target.hash && ["/account", "/settings", "/market", "/library"].includes(target.pathname))
     await expect(page.locator(target.hash)).toBeVisible();
@@ -338,14 +351,15 @@ try {
       if (label === "Review requests")
         await expect(page.getByLabel("Payment account", { exact: true })).toHaveCount(0);
       if (label === "Economy rules")
-        await expect(
-          page.getByRole("slider", { name: /^Inflation amount / }),
-        ).toBeVisible();
+        await expect(page.getByRole("slider", { name: /^Inflation amount / })).toBeVisible();
       await back(page);
       const treasury = page.getByRole("button", { name: /^Campaign treasury/ });
       if ((await treasury.getAttribute("aria-expanded")) !== "true") await treasury.click();
     }
     for (const label of ["Encounters", "Party", "Market", "Library", "Maps", "Desk"]) {
+      const inMaps = new URL(page.url()).pathname === "/maps";
+      if (inMaps)
+        await page.getByRole("button", { name: "Map navigation menu", exact: true }).click();
       const nav = page.locator('nav[aria-label="Sections"]:visible');
       await click(
         page,
@@ -384,6 +398,12 @@ try {
       const nav = page.locator('nav[aria-label="Sections"]:visible');
       const labels = await nav.locator("a").allTextContents();
       for (const label of labels) {
+        if (new URL(page.url()).pathname === "/maps")
+          await click(
+            page,
+            page.getByRole("link", { name: "Back to Lootsplit", exact: true }),
+            `${role} Maps return before desktop feature navigation`,
+          );
         await click(
           page,
           nav.getByRole("link", { name: label.trim(), exact: true }),

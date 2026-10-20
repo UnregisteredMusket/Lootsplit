@@ -1,3 +1,4 @@
+import { ShellMapActions } from "./shell-map-actions";
 import { FeatureCards } from "./feature-navigation";
 import { WorkspaceWindows } from "./workspace-windows";
 import { SubmenuBackdrop } from "./submenu-backdrop";
@@ -148,7 +149,7 @@ export function Shell({
 
   return (
     <div
-      className={`loot-shell concept-shell min-h-dvh bg-bg text-fg ${dm ? "role-dm" : "role-player"}${tradingWorkspace ? " trading-shell" : ""}`}
+      className={`loot-shell concept-shell min-h-dvh bg-bg text-fg ${dm ? "role-dm" : "role-player"}${tradingWorkspace ? " trading-shell" : ""}${pathname === "/maps" ? " maps-shell" : ""}`}
     >
       <div className="lg:grid lg:grid-cols-[15rem_minmax(0,1fr)]">
         <aside className="sticky top-0 z-20 hidden h-dvh flex-col border-r border-lead/40 bg-bg/95 px-3 py-5 lg:flex">
@@ -252,8 +253,22 @@ export function Shell({
                 width === "prose" ? "max-w-3xl" : "max-w-6xl",
               )}
             >
-              {pathname !== "/share" ? <SyncStatus compact /> : null}
-              {children}
+              {pathname !== "/share" && pathname !== "/maps" ? <SyncStatus compact /> : null}
+              <ShellMapActions.Provider
+                value={{
+                  campaignName,
+                  dm,
+                  seatKnown,
+                  unreadCount,
+                  openCampaign: () => {
+                    if (allowContextChange()) setCampaignOpen(true);
+                  },
+                  changeRole: () => void requestRoleChange(),
+                  openManagement: () => setManagement(true),
+                }}
+              >
+                {children}
+              </ShellMapActions.Provider>
             </main>
           </SubmenuBackdrop>
         </div>

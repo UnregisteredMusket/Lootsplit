@@ -1,120 +1,87 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
-import { Maximize, Minimize } from "lucide-react";
-import { Button } from "./ui";
+import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { OverlayContainer } from "./overlay-container";
-/** Native modal focus/escape handling, with the same mounted editor/viewport/draft. */
-export function MapFrame({
-  children,
-  editor = false,
-  title,
-  actions,
-  onFullChange,
-  navigation,
-}: {
+import { Button } from "./ui";
+
+type Props = {
   children: ReactNode;
-  navigation?: ReactNode;
   editor?: boolean;
   title?: string;
   actions?: ReactNode;
-  onFullChange?: (full: boolean) => void;
-}) {
-  const [full, setFull] = useState(false),
-    root = useRef<HTMLDialogElement>(null),
-    toggle = useRef<HTMLButtonElement>(null),
-    ownsFullscreen = useRef(false),
-    active = useRef(false);
-  function changeFull(next: boolean) {
-    active.current = next;
-    setFull(next);
-    onFullChange?.(next);
-  }
-  function exit() {
-    changeFull(false);
-    if (ownsFullscreen.current && document.fullscreenElement) {
-      ownsFullscreen.current = false;
-      void document.exitFullscreen().catch(() => {});
-    }
-    requestAnimationFrame(() => toggle.current?.focus());
-  }
-  function enter() {
-    changeFull(true);
-    // Dialogs cannot themselves request browser fullscreen. The document hosts
-    // the same top-layer dialog; unsupported/embedded browsers keep viewport mode.
-    if (!document.fullscreenElement && document.documentElement.requestFullscreen) {
-      ownsFullscreen.current = true;
-      void document.documentElement.requestFullscreen().then(
-        () => {
-          if (active.current && root.current) {
-            // Browser fullscreen is added to the top layer after our dialog.
-            // Raise the dialog again so the map stays above the document.
-            root.current.close();
-            root.current.showModal();
-          } else if (document.fullscreenElement) void document.exitFullscreen().catch(() => {});
-        },
-        () => {
-          ownsFullscreen.current = false;
-        },
+  navigation?: ReactNode;
+  onClose?: () => void;
+  interfaceHidden?: boolean;
+};
+/** Maps is a route-sized workspace. Native browser fullscreen is optional, never its layout state. */
+export function MapFrame(props: Props) {
+  return props.editor ? <EditorFrame {...props} /> : <WorkspaceFrame {...props} />;
+}
+function WorkspaceFrame({ children, title, actions, navigation, interfaceHidden }: Props) {
+  const [container, setContainer] = useState<HTMLDivElement | null>(null);
+  useEffect(() => {
+    const viewport = window.visualViewport;
+    const resize = () => {
+      container?.style.setProperty(
+        "--map-usable-height",
+        `${viewport?.height ?? window.innerHeight}px`,
       );
-    }
-  }
-  useEffect(() => {
-    const changed = () => {
-      if (ownsFullscreen.current && !document.fullscreenElement) {
-        ownsFullscreen.current = false;
-        exit();
-      }
+      if (container)
+        container.dataset.keyboardOpen = String(
+          window.innerHeight - (viewport?.height ?? window.innerHeight) > 120,
+        );
     };
-    document.addEventListener("fullscreenchange", changed);
-    return () => {
-      active.current = false;
-      document.removeEventListener("fullscreenchange", changed);
-      if (ownsFullscreen.current && document.fullscreenElement)
-        void document.exitFullscreen().catch(() => {});
-    };
-    // The exit callback only notifies this mounted frame's stable consumer.
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+    resize();
+    viewport?.addEventListener("resize", resize);
+    return () => viewport?.removeEventListener("resize", resize);
+  }, [container]);
   useEffect(() => {
-    const dialog = root.current!;
-    dialog.close();
-    if (full) dialog.showModal();
-    else dialog.show();
-    if (!full) return;
     const overflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => {
       document.body.style.overflow = overflow;
-      dialog.close();
     };
-  }, [full]);
+  }, []);
+  return (
+    <div
+      ref={setContainer}
+      className="map-frame map-view-frame map-fullscreen map-workspace"
+      role="region"
+      aria-label="Map workspace"
+      data-interface-hidden={interfaceHidden || undefined}
+    >
+      {title && <h1 className="sr-only">{title}</h1>}
+      {navigation}
+      {actions}
+      <OverlayContainer.Provider value={container}>{children}</OverlayContainer.Provider>
+    </div>
+  );
+}
+function EditorFrame({ children, onClose }: Props) {
+  const root = useRef<HTMLDialogElement>(null);
+  const [container, setContainer] = useState<HTMLDialogElement | null>(null);
+  const attach = useCallback((node: HTMLDialogElement | null) => {
+    root.current = node;
+    setContainer(node);
+  }, []);
+  useEffect(() => {
+    const dialog = root.current!;
+    dialog.showModal();
+    return () => dialog.close();
+  }, []);
   return (
     <dialog
-      ref={root}
-      open
-      className={`map-frame ${editor ? "map-editor-frame" : "map-view-frame"} ${full ? "map-fullscreen" : ""}`}
-      aria-label={editor ? "Map editor" : "Map viewer"}
-      aria-modal={full}
+      ref={attach}
+      className="map-frame map-editor-frame map-fullscreen"
+      aria-label="Map editor"
       onCancel={(e) => {
         e.preventDefault();
-        exit();
+        onClose?.();
       }}
     >
-      <div className="map-frame-bar">
-        {full && title && <strong className="map-frame-title">{title}</strong>}
-        {full && actions}
-        <Button ref={toggle} onClick={() => (full ? exit() : enter())} aria-pressed={full}>
-          {full ? (
-            <Minimize size={16} aria-hidden="true" />
-          ) : (
-            <Maximize size={16} aria-hidden="true" />
-          )}
-          {full ? "Exit fullscreen" : editor ? "Fullscreen editor" : "Fullscreen map"}
-        </Button>
+      <div className="map-editor-header">
+        <strong>Map editor</strong>
+        <Button onClick={onClose}>Close editor</Button>
       </div>
-      {navigation}
-      <OverlayContainer.Provider value={full ? root.current : null}>
-        {children}
-      </OverlayContainer.Provider>
+      <OverlayContainer.Provider value={container}>{children}</OverlayContainer.Provider>
     </dialog>
   );
 }

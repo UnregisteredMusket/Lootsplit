@@ -13,12 +13,14 @@ import { CommandButton, CommandForm } from "./world-tools";
 
 export function MapConnectedTools({
   map,
+  reveal,
   table,
   point,
   begin,
   done,
 }: {
   map: CampaignMap;
+  reveal?: boolean;
   table: CloudTable;
   point?: { x: number; y: number };
   begin: () => void;
@@ -67,7 +69,7 @@ export function MapConnectedTools({
   const record = { kind, id: recordId },
     existing = connected.placements.find((p) => p.record.kind === kind && p.record.id === recordId);
   return (
-    <Fold title="Connected maps & places">
+    <Fold title="Connected maps & places" reveal={reveal}>
       <CommandForm
         label="Save map connections"
         dirty={

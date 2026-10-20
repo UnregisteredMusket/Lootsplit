@@ -363,7 +363,7 @@ try {
     await mapWindow.waitForURL((url) => url.pathname === "/maps");
     await continueIntoApp(mapWindow);
     await expect(
-      mapWindow.getByRole("heading", { name: "Campaign maps", exact: true }),
+      mapWindow.getByRole("region", { name: "Map workspace", exact: true }),
     ).toBeVisible();
     await expect(mapWindow).toHaveTitle("Maps · Lootsplit");
     assert.equal(

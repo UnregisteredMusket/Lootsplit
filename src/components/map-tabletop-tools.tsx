@@ -7,7 +7,7 @@ import { readMapTabletop, readTabletopSession, canMoveMapToken } from "@/lib/qui
 import { sceneDistance, sceneTokenPoint } from "@/lib/quire/tabletop-geometry";
 import { canonicalJson } from "@/lib/quire/canonical-json";
 import { mutationNotice } from "@/lib/quire/mutation-outcome";
-import { useDraftGuard } from "@/lib/quire/use-draft-guard";
+import { allowContextChange, useDraftGuard } from "@/lib/quire/use-draft-guard";
 import { openWorkspaceWindow } from "@/lib/quire/workspace-windows";
 import type { CampaignMap, MapToken } from "@/lib/quire/world-schema";
 import type {
@@ -22,7 +22,7 @@ import { CommandButton } from "./world-tools";
 import { TemplateShape, TokenInspector, SceneConfiguration } from "./map-tabletop-inspector";
 import { AppLink } from "./app-link";
 
-type Tool =
+export type MapTool =
   | "select"
   | "pan"
   | "measure"
@@ -40,7 +40,7 @@ const position = (token: Position): Position => ({
   offsetX: token.offsetX,
   offsetY: token.offsetY,
 });
-const toolNames: Record<Tool, string> = {
+const toolNames: Record<MapTool, string> = {
   select: "Select / move",
   pan: "Pan",
   measure: "Measure",
@@ -64,7 +64,7 @@ export function useMapTabletopTools(
     settings = readMapTabletop(map),
     session = readTabletopSession(table),
     cloud = useSyncExternalStore(subscribeCloudTable, getCloudTable, getServerCloudTable);
-  const [tool, setTool] = useState<Tool>("select"),
+  const [tool, setTool] = useState<MapTool>("select"),
     [selected, setSelected] = useState<string[]>([]),
     [points, setPoints] = useState<ScenePoint[]>([]),
     [cursor, setCursor] = useState<ScenePoint>(),
@@ -107,13 +107,18 @@ export function useMapTabletopTools(
   useEffect(() => {
     if (selectedToken && !selected.includes(selectedToken)) {
       setSelected([selectedToken]);
-      setInspector(true);
+      // Exact-position forms in Settings select without opening another panel.
     }
     // The parent also services the preserved exact-position forms.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [selectedToken]);
   useEffect(() => {
-    cancel(); setSelected([]); setInspector(false); setShowPreview(false); setError(""); setNotice("");
+    cancel();
+    setSelected([]);
+    setInspector(false);
+    setShowPreview(false);
+    setError("");
+    setNotice("");
     // Map changes are guarded by the existing router draft blocker.
   }, [map.id]);
   async function act(input: CommandInput, done?: () => void) {
@@ -175,7 +180,6 @@ export function useMapTabletopTools(
           : [tokenId];
       setSelected(ids);
       selectToken?.(tokenId);
-      setInspector(true);
       gesture.current = {
         point,
         token: !disabled && canMoveMapToken(table, map, token, seat) ? token : undefined,
@@ -283,6 +287,8 @@ export function useMapTabletopTools(
     const current = gesture.current;
     gesture.current = undefined;
     if (!current) return false;
+    // A tap inspects; dragging keeps the map unobstructed until the move ends.
+    if (current.ids?.length && !current.moved) setInspector(true);
     if (current.token) {
       if (current.moved && movePreview.current.length) saveMoves(movePreview.current, current.grid);
       return true;
@@ -397,52 +403,9 @@ export function useMapTabletopTools(
           0,
         ) * settings.unitsPerFoot
       : 0;
-  const toolControls = (
-    <section className="tabletop-tools" aria-label="Tabletop tools">
-      <div className="tabletop-tool-row" role="toolbar" aria-label="Play tools">
-        {(
-          [
-            "select",
-            "pan",
-            "measure",
-            ...(settings.playerTemplates || dm ? ["template"] : []),
-          ] as Tool[]
-        ).map((value) => (
-          <Button
-            key={value}
-            variant="secondary"
-            aria-pressed={tool === value}
-            onClick={() => {
-              cancel();
-              setTool(value);
-            }}
-          >
-            {toolNames[value]}
-          </Button>
-        ))}
-        <Button
-          variant="ghost"
-          aria-expanded={inspector}
-          onClick={() => setInspector((value) => !value)}
-        >
-          Inspector {selected.length > 0 ? `(${selected.length})` : ""}
-        </Button>
-        <Button variant="ghost" onClick={cancel}>
-          Cancel tool
-        </Button>
-      </div>
-      <p className="tabletop-tool-hint" role="status">
-        {toolNames[tool]} ·{" "}
-        {tool === "select"
-          ? "Drag assigned tokens; Shift selects a group. Arrows move selected tokens; Alt + arrows pan."
-          : tool === "measure"
-            ? "Tap waypoints. Measurements are temporary and do not advance time."
-            : tool === "pan"
-              ? "Drag to explore independently."
-              : "Choose a point or draw on the map."}{" "}
-        Keyboard: pan to aim, Enter places at the center; Ctrl + Enter finishes a polygon. Escape
-        cancels.
-      </p>
+  const contextControls = (
+    <div className="map-context-fields">
+      {" "}
       {tool === "measure" && (
         <div className="tabletop-tool-row">
           <output aria-label="Measured distance">
@@ -525,27 +488,8 @@ export function useMapTabletopTools(
         </div>
       )}
       {dm && (
-        <Fold title="Exploration & lighting">
-          <div className="tabletop-tool-row">
-            {(["fog-brush", "fog-rectangle", "fog-polygon", "wall", "light"] as Tool[]).map(
-              (value) => (
-                <Button
-                  key={value}
-                  variant="secondary"
-                  aria-pressed={tool === value}
-                  onClick={() => {
-                    cancel();
-                    setTool(value);
-                  }}
-                >
-                  {toolNames[value]}
-                </Button>
-              ),
-            )}
-            <Button aria-pressed={showPreview} onClick={() => setShowPreview((value) => !value)}>
-              Player-view preview
-            </Button>
-          </div>
+        <>
+          {" "}
           {tool.startsWith("fog-") && (
             <div className="tabletop-tool-settings">
               <label>
@@ -625,6 +569,16 @@ export function useMapTabletopTools(
               </label>
             </div>
           )}
+        </>
+      )}
+    </div>
+  );
+  const configurationControls = (
+    <>
+      {dm && <SceneConfiguration map={map} />}
+      {dm && (
+        <Fold title="Exploration & lighting">
+          {" "}
           <div className="tabletop-tool-row">
             {(
               [
@@ -660,15 +614,22 @@ export function useMapTabletopTools(
               </Button>
             ))}
           </div>
-          <p className="text-sm text-muted">
-            Fog persists in campaign saves. Automatic vision is optional. Sharing, private records
-            and token permissions still apply. Physical miniatures need manual positioning or
-            reveal.
-          </p>
+          <Button aria-pressed={showPreview} onClick={() => setShowPreview(!showPreview)}>
+            Player-view preview
+          </Button>
         </Fold>
       )}
-    </section>
+    </>
   );
+  const activateTool = (next: MapTool) => {
+    if (!allowContextChange()) return false;
+    if (["fog-brush", "fog-rectangle", "fog-polygon", "wall", "light"].includes(next) && !dm)
+      return false;
+    if (next === "template" && !dm && !settings.playerTemplates) return false;
+    cancel();
+    setTool(next);
+    return true;
+  };
   const feedback = (
     <>
       {notice && <p role="status">{notice}</p>}
@@ -989,7 +950,15 @@ export function useMapTabletopTools(
   const saveInitialView = (view: SceneCamera) => configure({ ...settings, initialView: view });
   return {
     tool,
-    toolControls,
+    activateTool,
+    contextControls,
+    configurationControls,
+    playerTemplates: dm || settings.playerTemplates,
+    undoFog: () => act({ kind: "map-fog", mapId: map.id, before: settings.fog, action: "undo" }),
+    redoFog: () => act({ kind: "map-fog", mapId: map.id, before: settings.fog, action: "redo" }),
+    canUndoFog: dm && !disabled && !!settings.fogUndo.length,
+    canRedoFog: dm && !disabled && !!settings.fogRedo.length,
+    openInspector: () => setInspector(true),
     feedback,
     toolLabel: toolNames[tool],
     measurement: tool === "measure" ? `${measured.toFixed(1)} ${settings.unitLabel}` : "",
