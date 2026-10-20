@@ -359,6 +359,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-20T21:45:37Z | step: Packaged Worker / accounts (balanced v2) / worker-downtime | 37s → 43s | +6s | +16.22% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38309026871/job/115010777381) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39501737667/job/118901975639) |
 | 2026-10-20T21:45:50.000Z | workflow: Android native widget verification | 431s → 554s | +123s | +28.54% | failure | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39454444495) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39501737683) |
 | 2026-10-20T21:45:50Z | job: native-widget (24) | 430s → 554s | +124s | +28.84% | failure | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39500945465/job/118897980669) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39501737683/job/118900658741) |
 | 2026-10-20T21:45:47Z | step: native-widget (24) / Verify owner isolation, refresh transport and actual RemoteViews layouts | 145s → 388s | +243s | +167.59% | failure | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39414345683/job/118599590044) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39501737683/job/118900658741) |
