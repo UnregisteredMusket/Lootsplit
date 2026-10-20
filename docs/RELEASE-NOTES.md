@@ -1,6 +1,6 @@
-# Lootsplit 1.8.0 — Android candidate
+# Lootsplit 1.8.0
 
-Android version code **11**. The public download remains 1.7.0 until the new signed APK and checksum exist.
+Android version code **11**. This release retains package `com.unregisteredmusket.lootsplit` and the permanent signing certificate.
 
 ## Added
 
@@ -19,9 +19,9 @@ Android version code **11**. The public download remains 1.7.0 until the new sig
 - Includes the verified narrow-phone/landscape Maps toolbar and camera containment fixes since Android 1.7.0.
 - Missing analytics remain unavailable or not connected, never fabricated zeros. Cloudflare traffic requires the separately configured server-only analytics connection.
 
-## Candidate verification
+## Verification
 
-Native API24/API35 compilation/instrumentation, desktop/mobile account controls, complete PR/main preservation, permanent signing-certificate verification and matching live website download are required before publication is complete. Physical-device installation is not claimed here. Install over the permanently signed app; do not uninstall it.
+Native API24/API35 compilation/instrumentation, desktop/mobile account controls and complete PR/main preservation passed. Independent inspection verifies the permanent signing certificate, APK v2 integrity, package/version, widget components and published checksum. The website publication gate verifies the matching download bytes. See `docs/audit/android-widget-release-evidence.json` for the signed artifact. Physical-device installation is not claimed here. Install over the permanently signed app; do not uninstall it.
 
 ---
 
