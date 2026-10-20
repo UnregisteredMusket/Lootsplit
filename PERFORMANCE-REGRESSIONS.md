@@ -302,6 +302,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Packaged Worker / interface (balanced v2) / Run actions/upload-artifact@v4 | open | 2 | 3s → 6s | +3s | +100% |
 | Packaged Worker / accounts (balanced v2) | open | 2 | 434s → 607s | +173s | +39.86% |
 | backup / Export consistently and encrypt before writing to disk | open | 2 | 3s → 6s | +3s | +100% |
+| Development / gameplay (balanced v2) / dev-finance | open | 2 | 43s → 72s | +29s | +67.44% |
 | Development / desktop (balanced v2) / dev-map-tiles | open | 5 | 35s → 166s | +131s | +374.29% |
 | Packaged Worker / accounts (balanced v2) / worker-finance | open | 2 | 28s → 48s | +20s | +71.43% |
 | Packaged Worker / accounts (balanced v2) / worker-ships | open | 2 | 33s → 45s | +12s | +36.36% |
@@ -313,6 +314,8 @@ Open trends require investigation. Resolved trends retain their history; each ve
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-20T06:45:14Z | step: Development / gameplay (balanced v2) / dev-finance | 59s → 72s | +13s | +22.03% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38936690063/job/117093857666) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39381872810/job/118492589175) |
+| 2026-10-20T06:44:02Z | step: Development / gameplay (balanced v2) / dev-local-encounter | 10s → 12s | +2s | +20% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38301994659/job/114986882408) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39381872810/job/118492589175) |
 | 2026-10-20T06:10:32Z | job: publish | 18s → 21s | +3s | +16.67% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37263801314/job/111616279480) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39378841141/job/118483019687) |
 | 2026-10-20T06:10:32.000Z | workflow: Publish verified standby | 18s → 21s | +3s | +16.67% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37263801314) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39378841141) |
 | 2026-10-20T06:06:40Z | step: Packaged Worker / accounts (balanced v2) / worker-map-tiles | 95s → 112s | +17s | +17.89% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39266580213/job/118108928948) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39377674059/job/118479828566) |
