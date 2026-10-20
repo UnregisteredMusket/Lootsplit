@@ -239,6 +239,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | verify / Development / accounts / dev-member | open | 2 | 5s → 7s | +2s | +40% |
 | verify / Development / governance | open | 2 | 179s → 394s | +215s | +120.11% |
 | release-apk / Run actions/setup-node@v4 | open | 2 | 5s → 7s | +2s | +40% |
+| release-apk / Run actions/checkout@v4 | open | 2 | 1s → 3s | +2s | +200% |
 | release-apk / Run npm run typecheck | open | 2 | 12s → 24s | +12s | +100% |
 | backup / Run actions/setup-node@v4 | open | 2 | 3s → 7s | +4s | +133.33% |
 | backup / Run npm ci --ignore-scripts | open | 2 | 7s → 17s | +10s | +142.86% |
@@ -333,12 +334,17 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | native-widget (35) / Run android-actions/setup-android@v3 | open | 2 | 10s → 24s | +14s | +140% |
 | Development / accounts / dev-monitor | open | 2 | 4s → 6s | +2s | +50% |
 | verify / Development / gameplay (balanced v2) / Run npx playwright install --with-deps chromium | open | 2 | 19s → 32s | +13s | +68.42% |
+| verify / Development / accounts / dev-monitor | open | 2 | 3s → 5s | +2s | +66.67% |
 | native-widget (35) / Run actions/setup-node@v4 | open | 2 | 3s → 6s | +3s | +100% |
 
 ## Recorded slowdowns
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-20T12:46:57.000Z | workflow: Android signed release APK | 668s → 1349s | +681s | +101.95% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37391400899) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39421997999) |
+| 2026-10-20T12:46:54Z | step: release-apk / Publish versioned download and checksum | 3s → 4s | +1s | +33.33% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37391400899/job/112039018014) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39421997999/job/118633072499) |
+| 2026-10-20T12:42:45Z | step: release-apk / Run actions/checkout@v4 | 2s → 3s | +1s | +50% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37599705908/job/112722522266) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39421997999/job/118633072499) |
+| 2026-10-20T12:41:38Z | step: verify / Development / accounts / dev-monitor | 4s → 5s | +1s | +25% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39417084438/job/118608619273) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39421997999/job/118631085791) |
 | 2026-10-20T12:37:42Z | step: publish / Run actions/checkout@v4 | 2s → 3s | +1s | +50% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37263801314/job/111616279480) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39423709494/job/118630811920) |
 | 2026-10-20T12:37:40Z | job: verify / Packaged Worker / accounts (balanced v2) | 151s → 631s | +480s | +317.88% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39417084438/job/118609659409) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39421997999/job/118626185488) |
 | 2026-10-20T12:35:32Z | job: verify / Packaged Worker / interface (balanced v2) | 414s → 503s | +89s | +21.5% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39417084438/job/118609659367) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39421997999/job/118626185584) |
