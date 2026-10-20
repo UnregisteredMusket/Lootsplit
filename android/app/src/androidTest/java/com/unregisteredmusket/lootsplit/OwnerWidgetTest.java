@@ -169,21 +169,15 @@ public class OwnerWidgetTest {
             assertEquals(old.getLong("checkedAt"), waiting.getJSONObject("snapshot").getLong("checkedAt"));
             render(waiting, true, 350, 480, "refreshing");
             tapRefresh();
-            WidgetRefresh.Task coalesced = WidgetRefresh.request(context, true, error -> { assertEquals("", error); done.countDown(); });
-            // PendingIntent delivery is asynchronous, even after main-thread idle. Confirm the
-            // second real broadcast joined the first request before releasing its fake network.
-            // Otherwise the test itself may release/finish the first request before that tap arrives.
-            long broadcastDeadline = android.os.SystemClock.elapsedRealtime() + 2000;
-            int callbacks = 0;
-            while (android.os.SystemClock.elapsedRealtime() < broadcastDeadline) {
-                synchronized (WidgetRefresh.class) { callbacks = coalesced.completions.size(); }
-                if (callbacks >= 3) break;
-                InstrumentationRegistry.getInstrumentation().waitForIdleSync();
-                android.os.SystemClock.sleep(20);
-            }
-            assertEquals("Both real taps and the explicit completion share one in-flight request", 3, callbacks);
+            WidgetRefresh.request(context, true, error -> { assertEquals("", error); done.countDown(); });
             release.countDown();
             assertTrue(done.await(3, TimeUnit.SECONDS));
+            // API35 may deliver the queued second broadcast only after the first finishes.
+            // Also exercise that post-completion arrival deterministically through the same path.
+            CountDownLatch queued = new CountDownLatch(1);
+            assertNull(WidgetRefresh.request(context, true, error -> { assertEquals("", error); queued.countDown(); }));
+            assertTrue(queued.await(1, TimeUnit.SECONDS));
+            InstrumentationRegistry.getInstrumentation().waitForIdleSync();
             assertEquals("Rapid taps coalesce into one check", 1, requests.get());
             JSONObject refreshed = WidgetStore.read(context);
             assertEquals("129", refreshed.getJSONObject("snapshot").getString("accounts"));
