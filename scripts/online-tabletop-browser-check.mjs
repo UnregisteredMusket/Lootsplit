@@ -1,3 +1,4 @@
+import { openMapSettings, closeMapSettings, selectWorkspaceMap, selectMapType, openMoreMapTools } from "./map-workspace-browser.mjs";
 import assert from "node:assert/strict";
 import { expect } from "playwright/test";
 import { navigateApplication, reloadApplication } from "./title-screen-navigation.mjs";
@@ -5,7 +6,8 @@ import { chooseOption } from "./search-select-browser.mjs";
 
 export async function checkOnlineTabletop(dm, player, origin, width, output, journal) {
   await navigateApplication(dm, origin + "/maps");
-  await chooseOption(dm.getByLabel("Map type filter", { exact: true }), "property");
+  await selectMapType(dm, "property");
+  await openMoreMapTools(dm);
   await dm.getByRole("button", { name: "Inspector", exact: true }).click();
   const inspector = dm.getByRole("complementary", { name: "Map inspector" });
   await inspector.getByRole("button", { name: "Scene permissions & vision", exact: true }).click();
@@ -16,6 +18,7 @@ export async function checkOnlineTabletop(dm, player, origin, width, output, jou
     .getByRole("checkbox", { name: "Allow player area templates", exact: true })
     .check();
   await inspector.getByRole("button", { name: "Save scene settings", exact: true }).click();
+  await closeMapSettings(player);
   const ownToken = player.getByTitle("Combatant: Tile Hero", { exact: true });
   await ownToken.click();
   const playerInspector = player.getByRole("complementary", { name: "Map inspector" });
@@ -69,7 +72,9 @@ export async function checkOnlineTabletop(dm, player, origin, width, output, jou
     money,
     "Visual tools do not advance time or create financial events",
   );
+  await openMapSettings(dm);
   await dm.getByRole("button", { name: "Activate for players", exact: true }).click();
+  await openMapSettings(player);
   await expect(player.getByRole("region", { name: "Map session status" })).toContainText(
     "Players’ active scene: Keep map",
   );
@@ -119,6 +124,8 @@ export async function checkOnlineTabletop(dm, player, origin, width, output, jou
     );
   }
   await expect.poll(() => alpha(0.2, 0.2)).toBe(0);
+  await closeMapSettings(player);
+  await openMoreMapTools(dm);
   await dm.getByRole("button", { name: "Fog rectangle", exact: true }).click();
   const dmView = dm.getByRole("region", { name: "Interactive campaign map", exact: true });
   await dmView.scrollIntoViewIfNeeded();
@@ -135,6 +142,7 @@ export async function checkOnlineTabletop(dm, player, origin, width, output, jou
   await expect.poll(() => alpha(0.2, 0.2)).toBe(0);
   await dm.getByRole("button", { name: "Redo fog", exact: true }).click();
   await expect.poll(() => alpha(0.2, 0.2)).toBe(255);
+  await openMapSettings(dm);
   await dm.getByRole("button", { name: "Player-view preview", exact: true }).click();
   await expect(dm.getByRole("img", { name: "Player view of Keep map", exact: true })).toBeVisible();
   await reloadApplication(player);
@@ -201,8 +209,10 @@ export async function checkOnlineTabletop(dm, player, origin, width, output, jou
     true,
   );
   // Import a real embedded raster and reviewed geometry through the production file control.
-  await dm.getByRole("button", { name: "Cancel tool", exact: true }).click();
-  await dm.getByRole("button", { name: "Import map", exact: true }).click();
+  await closeMapSettings(dm);
+  await dm.getByRole("button", { name: "Pan", exact: true }).click();
+  await openMapSettings(dm);
+    await dm.getByRole("button", { name: "Import map", exact: true }).click();
   const editor = dm.getByRole("dialog", { name: "Map editor", exact: true });
   await editor.getByLabel("Map name", { exact: true }).fill("Imported media audit");
   const image = await dm.evaluate(() => {
@@ -259,7 +269,7 @@ export async function checkOnlineTabletop(dm, player, origin, width, output, jou
   assert.equal(importedMap.visible, false);
   assert.equal(importedMap.tabletop.fog.enabled, true);
   await expect(player.locator(".campaign-maps")).not.toContainText("Imported media audit");
-  await chooseOption(dm.getByLabel("Map type filter", { exact: true }), "battle");
+  await selectMapType(dm, "battle");
   await expect(
     dm.getByRole("img", { name: "Imported media audit", exact: true }).first(),
   ).toBeVisible();
@@ -296,7 +306,8 @@ export async function checkOnlineTabletop(dm, player, origin, width, output, jou
       reader.readAsDataURL(new Blob(parts, { type: "video/webm" }));
     });
   });
-  await dm.getByRole("button", { name: "Import map", exact: true }).click();
+  await openMapSettings(dm);
+    await dm.getByRole("button", { name: "Import map", exact: true }).click();
   await editor.getByLabel("Map name", { exact: true }).fill("Animated media audit");
   await editor.getByLabel("Map artwork or video", { exact: true }).setInputFiles({
     name: "animation.webm",
@@ -308,11 +319,11 @@ export async function checkOnlineTabletop(dm, player, origin, width, output, jou
   ).toBeVisible();
   await editor.getByRole("button", { name: "Save map", exact: true }).click();
   await expect(editor).toHaveCount(0);
-  await chooseOption(dm.getByLabel("Map type filter", { exact: true }), "");
+  await selectMapType(dm, "");
   const animated = (await journal(dm)).world.maps.find(
     (map) => map.name === "Animated media audit",
   );
-  await chooseOption(dm.getByLabel("Map", { exact: true }), animated.id);
+  await selectWorkspaceMap(dm, animated.id);
   await expect(dm.getByRole("button", { name: "Play map animation", exact: true })).toBeVisible();
   await expect(dm.locator("video.map-media-detail")).toHaveCount(0);
   await dm.getByRole("button", { name: "Play map animation", exact: true }).click();

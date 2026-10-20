@@ -121,9 +121,9 @@ export function MapBrowser({
     `${map.name} ${mapType(map, table)}`.toLowerCase().includes(query.toLowerCase()),
   );
   return (
-    <section className="tabletop-map-browser" aria-label="Map browser">
+    <section className="tabletop-map-browser" aria-label="Map library">
       <Button variant="secondary" aria-expanded={open} onClick={() => setOpen((value) => !value)}>
-        Browse maps · {maps.length}
+        Map library · {maps.length}
       </Button>
       {open && (
         <div className="tabletop-browser-drawer">

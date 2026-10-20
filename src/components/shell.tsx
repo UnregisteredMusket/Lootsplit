@@ -148,7 +148,7 @@ export function Shell({
 
   return (
     <div
-      className={`loot-shell concept-shell min-h-dvh bg-bg text-fg ${dm ? "role-dm" : "role-player"}${tradingWorkspace ? " trading-shell" : ""}`}
+      className={`loot-shell concept-shell min-h-dvh bg-bg text-fg ${dm ? "role-dm" : "role-player"}${tradingWorkspace ? " trading-shell" : ""}${pathname === "/maps" ? " maps-shell" : ""}`}
     >
       <div className="lg:grid lg:grid-cols-[15rem_minmax(0,1fr)]">
         <aside className="sticky top-0 z-20 hidden h-dvh flex-col border-r border-lead/40 bg-bg/95 px-3 py-5 lg:flex">

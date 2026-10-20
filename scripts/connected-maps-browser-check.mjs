@@ -1,3 +1,11 @@
+import { checkMapWorkspace } from "./map-workspace-browser-check.mjs";
+import {
+  openMapSettings,
+  closeMapSettings,
+  openMapNavigation,
+  mapBack,
+  openMoreMapTools,
+} from "./map-workspace-browser.mjs";
 import assert from "node:assert/strict";
 import { blankEncounter, blankCombatant } from "../src/lib/encounters/model.mjs";
 import { expect } from "playwright/test";
@@ -199,20 +207,22 @@ export async function checkConnectedMaps({ browser, origin, output }) {
         },
       );
       await reloadApplication(page);
+      await openMapNavigation(page);
       await chooseOption(page.getByLabel("Map", { exact: true }), "region-map");
-      await page.getByRole("button", { name: "Fullscreen map", exact: true }).click();
-      const frame = page.getByRole("dialog", { name: "Map viewer", exact: true });
+
+      const frame = page.getByRole("region", { name: "Map workspace", exact: true });
       await expect(frame).toHaveClass(/map-fullscreen/);
       await frame.getByRole("button", { name: "Zoom in", exact: true }).click();
       const camera = await frame.locator(".map-layer").getAttribute("style");
       await frame.getByRole("button", { name: "Location: 1 record", exact: true }).click();
       await expect(frame.getByRole("img", { name: "Brackenford", exact: true })).toBeVisible();
       await expect(frame).toHaveClass(/map-fullscreen/);
-      await frame.getByRole("button", { name: "Back to map", exact: true }).click();
+      await mapBack(page);
       await expect(frame.getByRole("img", { name: "The Green March", exact: true })).toBeVisible();
       await expect(frame.locator(".map-layer")).toHaveAttribute("style", camera);
       await frame.getByRole("button", { name: "Location: 1 record", exact: true }).click();
       await expect(frame.getByRole("img", { name: "Brackenford", exact: true })).toBeVisible();
+      await frame.getByRole("button", { name: "Fit map", exact: true }).click();
       await frame.locator('button[title="Shop: Ash & Anvil"]').click();
       const details = frame.getByRole("region", { name: "Map record details", exact: true });
       await details.getByRole("button", { name: "Open in map", exact: true }).click();
@@ -237,12 +247,13 @@ export async function checkConnectedMaps({ browser, origin, output }) {
       await expect(confirmation).toHaveCount(0);
       await expect(frame).toHaveClass(/map-fullscreen/);
       await details.getByRole("button", { name: "Close details", exact: true }).click();
+      await frame.getByRole("button", { name: "Fit map", exact: true }).click();
       await frame.locator('button[title="Map: Watchtower gate"]').click();
       await expect(frame.getByRole("img", { name: "Old Watchtower", exact: true })).toBeVisible();
       await expect(frame.locator(".map-tile-grid")).toBeVisible();
-      await frame.getByRole("button", { name: "Back to map", exact: true }).click();
+      await mapBack(page);
       await expect(frame.getByRole("img", { name: "Brackenford", exact: true })).toBeVisible();
-      await frame.getByRole("button", { name: "Map tools", exact: true }).click();
+      await openMapSettings(page);
       await frame.getByRole("button", { name: "Connected maps & places", exact: true }).click();
       await chooseOption(frame.getByLabel("Record to place", { exact: true }), "inn");
       await frame.getByRole("button", { name: "Choose record position", exact: true }).click();
@@ -256,14 +267,14 @@ export async function checkConnectedMaps({ browser, origin, output }) {
         },
       });
       await frame.getByRole("button", { name: "Place record on map", exact: true }).click();
-      await expect(frame.locator("#fullscreen-map-tools")).toContainText("Recorded.");
-      await frame.getByRole("button", { name: "Close tools", exact: true }).click();
+      await expect(frame.locator("#map-settings")).toContainText("Recorded.");
+      await closeMapSettings(page);
       const points = await frame
         .locator('button[title="Shop: Ash & Anvil"],button[title="Shop: The Lantern Inn"]')
         .evaluateAll((es) => es.map((e) => e.parentElement.style.cssText));
       assert.equal(points.length, 2);
       assert.notEqual(points[0], points[1]);
-      await frame.getByRole("button", { name: "Map tools", exact: true }).click();
+      await openMoreMapTools(page);
       await frame.getByRole("button", { name: "Start encounter here", exact: true }).click();
       const combat = frame.getByRole("region", { name: "Encounter map panel", exact: true });
       await chooseOption(
@@ -276,11 +287,12 @@ export async function checkConnectedMaps({ browser, origin, output }) {
       await combat.getByRole("button", { name: "Start saved encounter here", exact: true }).click();
       await expect(frame.getByRole("img", { name: "Old Watchtower", exact: true })).toBeVisible();
       await expect(combat).toContainText("The encounter map is open.");
-      await frame.getByRole("button", { name: "Map tools", exact: true }).click();
+      await openMapSettings(page);
       await expect(combat).toHaveCount(0);
       await expect(
         frame.getByRole("button", { name: "Encounter grid active", exact: true }),
       ).toBeDisabled();
+      await openMoreMapTools(page);
       await frame.getByRole("button", { name: "Open encounter map controls", exact: true }).click();
       await combat.getByRole("button", { name: "Open encounter tracker", exact: true }).click();
       page.once("dialog", (dialog) => dialog.accept());
@@ -300,6 +312,7 @@ export async function checkConnectedMaps({ browser, origin, output }) {
           { width: 844, height: 390 },
         ]) {
           await page.setViewportSize(viewport);
+          await frame.getByRole("button", { name: "Fit map", exact: true }).click();
           await frame.locator('button[title="Shop: Ash & Anvil"]').click();
           await frame.getByRole("button", { name: "Open in map", exact: true }).click();
           const panel = frame.getByRole("region", { name: "Map record details", exact: true });
@@ -322,10 +335,13 @@ export async function checkConnectedMaps({ browser, origin, output }) {
           );
         }
       }
+      await page.setViewportSize({ width, height: 900 });
+      const workspaceFlows = await checkMapWorkspace(page, origin, output, width);
       assert.deepEqual(errors, []);
       results.push({
         width,
         flows: [
+          ...workspaceFlows,
           "fullscreen-linked-navigation",
           "camera-return",
           "canonical-shop-purchase",

@@ -1,3 +1,4 @@
+import { openMapSettings, closeMapSettings, selectWorkspaceMap, selectMapType, openMoreMapTools } from "./map-workspace-browser.mjs";
 import { checkConnectedMaps } from "./connected-maps-browser-check.mjs";
 import { checkFullscreenMap } from "./fullscreen-map-browser-check.mjs";
 import { checkPlayerDisplay } from "./player-display-browser-check.mjs";
@@ -179,13 +180,14 @@ try {
       }
     }, encounter);
     await reloadApplication(page);
-    await chooseOption(page.getByLabel("Map type filter", { exact: true }), "city");
+    await selectMapType(page, "city");
     await expect(page.getByRole("img", { name: "Old city map", exact: true })).toBeVisible();
-    await chooseOption(page.getByLabel("Map type filter", { exact: true }), "dungeon");
+    await selectMapType(page, "dungeon");
     await expect(page.getByRole("img", { name: "Keep map", exact: true })).toBeVisible();
     await expect(
       page.getByRole("region", { name: "Interactive campaign map", exact: true }),
     ).toHaveCount(1);
+    await openMapSettings(page);
     await page.getByRole("button", { name: "Edit map & anchors", exact: true }).click();
     const editor = page.getByRole("dialog", { name: "Map editor", exact: true });
     await chooseOption(editor.getByLabel("Map category", { exact: true }), "property");
@@ -196,7 +198,7 @@ try {
     await expect(editor.getByLabel("Feet per tile", { exact: true })).toHaveValue("5");
     await editor.getByRole("button", { name: "Save map", exact: true }).click();
     await expect(editor).toHaveCount(0);
-    await chooseOption(page.getByLabel("Map type filter", { exact: true }), "property");
+    await selectMapType(page, "property");
     await expect(page.getByRole("img", { name: "Keep map", exact: true })).toBeVisible();
     await expect(
       page.getByRole("region", { name: "Interactive campaign map", exact: true }),
@@ -213,7 +215,7 @@ try {
     await expect
       .poll(async () => (await journal(page)).world.partyPosition?.environment)
       .toBe("Wilderness");
-    await expect(page.locator(".campaign-maps > p").first()).toContainText("Forest");
+    await expect(page.locator("#map-settings")).toContainText("Forest");
     // The online workspace starts with its token/grid layer visible; the legacy toggle remains.
     const enterTiles = page.getByRole("button", { name: "Enter tile mode", exact: true });
     if (await enterTiles.count()) await enterTiles.click();
@@ -249,10 +251,15 @@ try {
       .poll(async () => (await journal(page)).world.maps.find((m) => m.id === "keep").tokens.length)
       .toBe(2);
     await expect(controls).toContainText("Keep ambush");
+    await closeMapSettings(page);
     const heroIcon = page.getByTitle("Combatant: Tile Hero", { exact: true }),
       guardIcon = page.getByTitle("Combatant: Hidden guard", { exact: true });
     await expect(heroIcon).toHaveAttribute("aria-pressed", "true");
     const selectedColor = await heroIcon.evaluate((el) => getComputedStyle(el).backgroundColor);
+    // Pan the corner token below the floating navigation, without moving any token.
+    await viewport.focus();
+    await viewport.press("Alt+ArrowUp");
+    await viewport.press("Alt+ArrowUp");
     await guardIcon.click();
     await expect(guardIcon).toHaveAttribute("aria-pressed", "true");
     await expect(heroIcon).toHaveAttribute("aria-pressed", "false");
@@ -260,25 +267,30 @@ try {
       await heroIcon.evaluate((el) => getComputedStyle(el).backgroundColor),
       selectedColor,
     );
+    await openMapSettings(page);
     await chooseOption(controls.getByLabel("Combat token", { exact: true }), token.id);
+    await closeMapSettings(page);
     await expect(heroIcon).toHaveAttribute("aria-pressed", "true");
     await expect(guardIcon).toHaveAttribute("aria-pressed", "false");
     await expect(page.locator('.map-record-icon[aria-pressed="true"]')).toHaveCount(1);
-    await page.getByRole("button", { name: "Fullscreen map", exact: true }).click();
+    await closeMapSettings(page);
     await checkFullscreenMap(page, output, width);
-    await page.getByRole("button", { name: "Map tools", exact: true }).click();
+    await openMapSettings(page);
     await expect(page.getByRole("button", { name: "Save token move", exact: true })).toBeVisible();
     await fits(page);
     await page.screenshot({ path: `${output}/dm-tiles-${width}.png`, fullPage: true });
-    await page.getByRole("button", { name: "Exit fullscreen", exact: true }).click();
+    await closeMapSettings(page);
     await reloadApplication(page);
-    await chooseOption(page.getByLabel("Map type filter", { exact: true }), "property");
+    await selectMapType(page, "property");
     if (await enterTiles.count()) await enterTiles.click();
     await expect(page.getByTitle("Combatant: Tile Hero", { exact: true })).toBeVisible();
     await expect(heroIcon).toHaveAttribute("aria-pressed", "false");
+    await closeMapSettings(page);
     await heroIcon.click();
     await expect(heroIcon).toHaveAttribute("aria-pressed", "true");
+    await openMapSettings(page);
     await chooseOption(controls.getByLabel("Combat token", { exact: true }), "");
+    await closeMapSettings(page);
     await expect(heroIcon).toHaveAttribute("aria-pressed", "false");
     await fits(page);
     const viewer = await checkPlayerDisplay(page, context, width, output);
@@ -322,7 +334,7 @@ try {
     await expect(guest.locator(".room-code")).toBeVisible();
     await guest.waitForURL((u) => u.pathname === "/share" && !u.searchParams.has("join"));
     await navigateApplication(guest, origin + "/maps");
-    await chooseOption(guest.getByLabel("Map type filter", { exact: true }), "property");
+    await selectMapType(guest, "property");
     const guestEnterTiles = guest.getByRole("button", { name: "Enter tile mode", exact: true });
     if (await guestEnterTiles.count()) await guestEnterTiles.click();
     await expect(guest.getByTitle("Combatant: Tile Hero", { exact: true })).toBeVisible();
@@ -333,6 +345,7 @@ try {
       guest.getByRole("button", { name: "Place party on map", exact: true }),
     ).toHaveCount(0);
     await expect(guest.locator(".campaign-maps")).not.toContainText("Hidden guard");
+    await closeMapSettings(guest);
     const sharedIcon = guest.getByTitle("Combatant: Tile Hero", { exact: true });
     await sharedIcon.click();
     await expect(sharedIcon).toHaveAttribute("aria-pressed", "true");

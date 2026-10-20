@@ -1,3 +1,4 @@
+import { openMapSettings, closeMapSettings, selectWorkspaceMap, selectMapType, openMoreMapTools } from "./map-workspace-browser.mjs";
 import { navigateApplication } from "./title-screen-navigation.mjs";
 import { chooseOption } from "./search-select-browser.mjs";
 import assert from "node:assert/strict";
@@ -5,6 +6,7 @@ import { expect } from "playwright/test";
 
 /** Called from the full map audit on development and immutable Worker fixtures. */
 export async function checkPlayerDisplay(page, context, width, output) {
+  await openMapSettings(page);
   await expect(
     page.getByRole("button", { name: "Enable optional TV / player display", exact: true }),
   ).toBeVisible();

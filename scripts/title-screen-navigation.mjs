@@ -87,6 +87,10 @@ export async function prepareDmFixture(page, origin, { useAccountLink = false } 
 export async function navigateApplication(page, destination) {
   const target = new URL(destination);
   if (page.url().startsWith(target.origin)) {
+    if (new URL(page.url()).pathname === "/maps") {
+      const menu = page.getByRole("button", {name:"Map navigation menu",exact:true});
+      if (await menu.isVisible() && await menu.getAttribute("aria-expanded") !== "true") await menu.click();
+    }
     // Read hrefs in one DOM snapshot. Background sync may replace a live list
     // between count/nth/getAttribute and make an unrelated index wait forever.
     const hrefs = await page.locator("a[href]").evaluateAll(nodes => nodes.map(node => node.getAttribute("href")));

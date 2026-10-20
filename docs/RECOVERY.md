@@ -1,3 +1,7 @@
+# Active implementation: reference Maps workspace — October 20, 2026 UTC
+
+Owner explicitly authorizes the Project Zomboid Map reference reorganization through verified release. Branch improvement/map-workspace starts from complete/live9ec0eca1d279cc34cec1d91d00b436e3c98dc617 (PR112, all-nine main39360883040, read-only live39362526313, Worker7e3ade1d-ac81-4f1d-9f10-08eaed48fa21). Do not repeat connected-map publication or account recovery. Maps now needs automatic viewport entry/restoration, reference-style floating search/tools, setup under Settings and all existing campaign behavior. See docs/audit/2026-10-20-map-workspace.md; evolving exact state belongs in PR metadata and test-results/recovery/map-workspace.json. Preserve all nine gates, account limits, privacy/data/financial behavior and performance history. No APK publication.
+
 # Active implementation: connected campaign maps — October 20, 2026 UTC
 
 The owner authorized implementation of `docs/plans/CONNECTED-MAPS.md` with “Start implementation.” Branch `feature/connected-maps` continues the published proposal from current main `25b77d14c40450c4c4b8e70b69395182434274fb`. Fullscreen PR111 is COMPLETE/LIVE: all-nine main39331912265, website39333373176, standby39333373035, Worker `35d00ef7-c93a-412d-bc16-09446f0a38b8`. Readback confirmed remote main and live identity match. Do not repeat that release or owner-account recovery.

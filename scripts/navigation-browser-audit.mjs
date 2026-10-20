@@ -346,10 +346,12 @@ try {
       if ((await treasury.getAttribute("aria-expanded")) !== "true") await treasury.click();
     }
     for (const label of ["Encounters", "Party", "Market", "Library", "Maps", "Desk"]) {
+      const inMaps = new URL(page.url()).pathname === "/maps";
+      if(inMaps) await page.getByRole("button",{name:"Map navigation menu",exact:true}).click();
       const nav = page.locator('nav[aria-label="Sections"]:visible');
       await click(
         page,
-        nav.getByRole("link", { name: label, exact: true }),
+        nav.getByRole("link", { name: inMaps && label === "Desk" ? "Home" : label, exact: true }),
         `DM primary: ${label}`,
       );
     }

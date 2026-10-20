@@ -5,8 +5,7 @@ import { navigateApplication } from "./title-screen-navigation.mjs";
 
 /** Extend the existing world audit using its already authenticated disposable DM/guest pair. */
 export async function auditCharacterPlacement(page, guest, origin, npcId, width, output) {
-  if (await guest.getByRole("button", { name: "Exit fullscreen", exact: true }).isVisible())
-    await guest.getByRole("button", { name: "Exit fullscreen", exact: true }).click();
+
   await navigateApplication(page, origin + "/party");
   const panel = page.getByRole("region", { name: "Character locations and downtime" });
   const select = page.getByLabel("Choose a character or NPC", { exact: true });
