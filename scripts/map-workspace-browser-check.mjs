@@ -87,8 +87,13 @@ export async function checkMapWorkspace(page, origin, output, width) {
   await canvas.press("Escape");
   await page.getByRole("button", { name: "Map navigation menu", exact: true }).click();
   const nav = page.getByRole("region", { name: "Map and application navigation", exact: true });
-  for (const label of ["Home", "Inventory", "Campaign", "Market", "Library", "Maps"])
+  for (const label of ["Desk", "Encounters", "Party", "Market", "Library", "Maps"])
     await expect(nav.getByRole("link", { name: label, exact: true })).toBeVisible();
+  await nav.getByRole("link", { name: "Encounters", exact: true }).click();
+  await expect(page).toHaveURL(origin + "/encounters");
+  await expect(page.locator(".loot-opening")).toHaveCount(0);
+  await navigateApplication(page, origin + "/maps");
+  await page.getByRole("button", { name: "Map navigation menu", exact: true }).click();
   await nav.getByRole("button", { name: "Hide interface", exact: true }).click();
   await expect(page.getByRole("button", { name: "Show interface", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Show interface", exact: true }).click();
@@ -188,6 +193,9 @@ export async function checkMapWorkspace(page, origin, output, width) {
   await expect(page.getByRole("option")).toHaveCount(0);
   await expect(page.getByText("No accessible maps or places found.")).toBeVisible();
   await search.press("Escape");
+  await page.getByRole("button", { name: "Map navigation menu", exact: true }).click();
+  for (const label of ["Home", "Inventory", "Campaign", "Market", "Library", "Maps"])
+    await expect(nav.getByRole("link", { name: label, exact: true })).toBeVisible();
   return [
     "direct-map-entry",
     "last-map-camera-route-refresh",

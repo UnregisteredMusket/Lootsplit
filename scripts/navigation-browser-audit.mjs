@@ -106,9 +106,9 @@ async function destination(page, href, label) {
         .getByRole("button", { name, exact: true }),
     ).toHaveAttribute("aria-pressed", "true");
     if (target.searchParams.has("kind"))
-      await expect(page.getByRole("combobox", { name: "Reference section", exact: true })).toHaveValue(
-        target.searchParams.get("kind"),
-      );
+      await expect(
+        page.getByRole("combobox", { name: "Reference section", exact: true }),
+      ).toHaveValue(target.searchParams.get("kind"));
   }
   if (target.hash && ["/account", "/settings", "/market", "/library"].includes(target.pathname))
     await expect(page.locator(target.hash)).toBeVisible();
@@ -338,20 +338,19 @@ try {
       if (label === "Review requests")
         await expect(page.getByLabel("Payment account", { exact: true })).toHaveCount(0);
       if (label === "Economy rules")
-        await expect(
-          page.getByRole("slider", { name: /^Inflation amount / }),
-        ).toBeVisible();
+        await expect(page.getByRole("slider", { name: /^Inflation amount / })).toBeVisible();
       await back(page);
       const treasury = page.getByRole("button", { name: /^Campaign treasury/ });
       if ((await treasury.getAttribute("aria-expanded")) !== "true") await treasury.click();
     }
     for (const label of ["Encounters", "Party", "Market", "Library", "Maps", "Desk"]) {
       const inMaps = new URL(page.url()).pathname === "/maps";
-      if(inMaps) await page.getByRole("button",{name:"Map navigation menu",exact:true}).click();
+      if (inMaps)
+        await page.getByRole("button", { name: "Map navigation menu", exact: true }).click();
       const nav = page.locator('nav[aria-label="Sections"]:visible');
       await click(
         page,
-        nav.getByRole("link", { name: inMaps && label === "Desk" ? "Home" : label, exact: true }),
+        nav.getByRole("link", { name: label, exact: true }),
         `DM primary: ${label}`,
       );
     }

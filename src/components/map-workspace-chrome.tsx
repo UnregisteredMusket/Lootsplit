@@ -159,9 +159,17 @@ export function MapWorkspaceChrome({
               )}
               <nav aria-label="Sections">
                 {[
-                  ["Home", "/?view=home"],
-                  ["Inventory", "/party"],
-                  ["Campaign", "/share"],
+                  ...(app?.dm
+                    ? [
+                        ["Desk", "/?view=home"],
+                        ["Encounters", "/encounters"],
+                        ["Party", "/party"],
+                      ]
+                    : [
+                        ["Home", "/?view=home"],
+                        ["Inventory", "/party"],
+                        ["Campaign", "/share"],
+                      ]),
                   ["Market", "/market"],
                   ["Library", "/library"],
                   ["Maps", "/maps"],
