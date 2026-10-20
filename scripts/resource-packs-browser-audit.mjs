@@ -369,6 +369,27 @@ try {
     await expect(locationPicker).toHaveText("Imported Region 097 · region");
     await chooseOption(locationPicker, "");
     await expect(locationPicker).toHaveText("All campaign shops · no location set");
+    // Closing the empty-map Settings workspace must retain unfinished setup.
+    await page.getByRole("button", { name: /^Manage regions, cities, towns and areas/ }).click();
+    await page.getByRole("button", { name: "Create location", exact: true }).click();
+    const locationDraft = page.getByRole("form", { name: "Location configuration", exact: true });
+    await locationDraft
+      .getByLabel("Location name", { exact: true })
+      .fill("Unfinished map location");
+    await page.getByRole("button", { name: "Close settings", exact: true }).click();
+    await expect(locationDraft).toBeHidden();
+    await openMapSettings(page);
+    await expect(locationDraft.getByLabel("Location name", { exact: true })).toHaveValue(
+      "Unfinished map location",
+    );
+    await page.getByRole("button", { name: "Close settings", exact: true }).focus();
+    await page.keyboard.press("Escape");
+    await expect(page.locator("#map-settings")).toBeHidden();
+    await openMapSettings(page);
+    await expect(locationDraft.getByLabel("Location name", { exact: true })).toHaveValue(
+      "Unfinished map location",
+    );
+    await locationDraft.getByRole("button", { name: "Cancel", exact: true }).click();
     assert.ok(await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1));
     assert.deepEqual(errors, []);
     await context.close();
