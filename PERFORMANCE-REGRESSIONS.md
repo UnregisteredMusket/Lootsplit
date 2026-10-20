@@ -306,11 +306,13 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Packaged Worker / accounts (balanced v2) / worker-ships | open | 2 | 33s → 45s | +12s | +36.36% |
 | Packaged Worker / accounts (balanced v2) / worker-map-tiles | open | 3 | 20s → 115s | +95s | +475% |
 | Development / desktop (balanced v2) / dev-map-tiles | open | 3 | 35s → 145s | +110s | +314.29% |
+| test-apk / Set up job | open | 2 | 1s → 3s | +2s | +200% |
 
 ## Recorded slowdowns
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-20T05:22:36Z | step: test-apk / Set up job | 2s → 3s | +1s | +50% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39372960413/job/118464699099) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39374548241/job/118469630305) |
 | 2026-10-20T05:21:49Z | step: Packaged Worker / accounts (balanced v2) / Run actions/download-artifact@v4 | 3s → 4s | +1s | +33.33% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38404276239/job/115320597304) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39374213457/job/118469181279) |
 | 2026-10-20T05:05:21Z | step: test-apk / Run android-actions/setup-android@v3 | 14s → 17s | +3s | +21.43% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39370431899/job/118456842972) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39372960413/job/118464699099) |
 | 2026-10-20T05:04:57Z | step: test-apk / Set up job | 1s → 2s | +1s | +100% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39370431899/job/118456842972) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39372960413/job/118464699099) |
