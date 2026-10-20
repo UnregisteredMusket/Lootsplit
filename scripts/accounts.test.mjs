@@ -733,6 +733,58 @@ test("server monitoring is owner/admin only, no-store and exposes aggregates wit
   }
 });
 
+test("owner overview requires current owner session and returns actual account without provider secrets", async () => {
+  const { DB, env, call, signup } = setup();
+  try {
+    const member = await signup("owner-monitor@example.com");
+    const id = member.data.user.id;
+    assert.equal((await call("owner/monitor")).response.status, 401);
+    assert.equal((await call("owner/monitor", undefined, member.cookie)).response.status, 403);
+    await DB.prepare("INSERT INTO site_roles VALUES (?,'admin',?)").bind(id, Date.now()).run();
+    assert.equal((await call("owner/monitor", undefined, member.cookie)).response.status, 403);
+    await DB.prepare("UPDATE site_roles SET role='moderator' WHERE user_id=?").bind(id).run();
+    assert.equal((await call("owner/monitor", undefined, member.cookie)).response.status, 403);
+    await DB.prepare("UPDATE site_roles SET role='owner' WHERE user_id=?").bind(id).run();
+    env.ASSETS = {
+      fetch: async (request) => {
+        assert.equal(request.headers.get("cookie"), null);
+        return new URL(request.url).pathname === "/favicon.svg"
+          ? new Response(null, { headers: { "content-type": "image/svg+xml" } })
+          : Response.json({ commit: "b".repeat(40), private: "DO-NOT-EXPOSE" });
+      },
+    };
+    const result = await call("owner/monitor", undefined, member.cookie);
+    assert.equal(result.response.status, 200);
+    assert.equal(result.response.headers.get("cache-control"), "no-store");
+    assert.deepEqual(result.data.account, { name: "Test DM", email: "owner-monitor@example.com" });
+    assert.equal(result.data.health.stats.accounts, 1);
+    assert.equal(result.data.analytics.data.metrics.sessions, 0);
+    assert.equal(result.data.traffic.state, "not-connected");
+    assert.equal(result.data.development.state, "not-connected");
+    assert.deepEqual(result.data.release.data, { commit: "b".repeat(40) });
+    assert.doesNotMatch(JSON.stringify(result.data), /DO-NOT-EXPOSE|ACCOUNT_SECRET/);
+    assert.equal(
+      (await call("owner/monitor", undefined, member.cookie, "https://evil.example")).response
+        .status,
+      403,
+    );
+    assert.equal((await call("owner/monitor", {}, member.cookie)).response.status, 404);
+    env.ASSETS.fetch = async () => {
+      await DB.prepare("UPDATE site_roles SET role='admin' WHERE user_id=?").bind(id).run();
+      return Response.json({ commit: "b".repeat(40) });
+    };
+    assert.equal((await call("owner/monitor", undefined, member.cookie)).response.status, 403);
+    await DB.prepare("UPDATE site_roles SET role='owner' WHERE user_id=?").bind(id).run();
+    env.ASSETS.fetch = async () => {
+      await DB.prepare("DELETE FROM session WHERE userId=?").bind(id).run();
+      return Response.json({ commit: "b".repeat(40) });
+    };
+    assert.equal((await call("owner/monitor", undefined, member.cookie)).response.status, 401);
+  } finally {
+    DB.close();
+  }
+});
+
 test("server monitoring reports partial failure without leaking database exceptions", async () => {
   const { serverMonitor } = await import("../cloudflare/monitoring.mjs");
   const DB = {

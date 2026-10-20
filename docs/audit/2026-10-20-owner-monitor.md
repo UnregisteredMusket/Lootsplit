@@ -1,0 +1,25 @@
+# Private owner Field monitor
+
+The owner requests the separate terminal-style phone-widget concept also on the website, in Lootsplit’s own theme, with their account next to Owner access. Baseline main/live is `afbacd764fa13747d0bebf02bc3168f0fd5dbb28`. This adds an owner-only overview under My account and preserves the existing detailed server monitor, game analytics and owner/staff controls. Website navy/gold typography and responsive grids are used; no supplied phone screenshot, phone launcher chrome, wallpaper or terminal theme is bundled. The phone concept remains a design, not a native home-screen widget or distributed APK.
+
+## Data and permission contract
+
+- `/api/account/owner/monitor` authenticates the existing session and checks fresh owner role, active account and unexpired session before/after reads. Name/email come from that authenticated account, never a hardcoded preview identity or linked provider account. Responses are no-store. Admin/moderator/member/anonymous and revoked sessions cannot read this endpoint. Original admin monitor remains owner/admin accessible.
+- Health reuses database/ASSETS checks and account, check-in, campaign, membership, backup, character and push totals. Activity is signed-in check-ins (including staff), not concurrent players/guest counts. Stored campaigns are not live sessions. Game statistics reuse the existing current shared-campaign rollup, excluding test rooms; no new campaign collection, migration or mutation exists.
+- GitHub public API reads the latest100 workflow runs and up to100 open pull requests. The UI explicitly labels this bounded recent activity, distinguishes queued/running/completed statuses and links to the source. It cannot see local development or unsubmitted Codex work. A successful workflow is not proof that a candidate is serving; the serving commit comes from the immutable ASSETS identity and Worker metadata.
+- Each external fetch is bounded; independent sources fail separately and never expose raw exceptions, tokens or payloads. Five-minute per-database/isolate cache coalesces simultaneous reads; timestamps reflect provider collection, not a later UI refresh. Missing/unavailable readings are not zero. Browser minute polling only runs while visible, returns refresh on visibility, marks90-second-old snapshots stale and clears private data on errors/account changes. Source age remains visible. Details disclose scope/limits.
+- Cloudflare requests/errors use a dimension-free aggregate Workers Analytics GraphQL query for the prior24h, so a limit does not truncate per-status/time groups. A validated empty result is zero; malformed/error payloads are unavailable. No CPU percentile, memory, billing or uptime is inferred.
+
+## Connections
+
+Production `OWNER_MONITOR_GITHUB=true` enables server-side reads of this public repository; development does not enable external calls by default. GitHub rate/transport failures are labeled unavailable. Optional Cloudflare setup requires `OWNER_MONITOR_CLOUDFLARE_ACCOUNT_ID` and server-only secret `OWNER_MONITOR_CLOUDFLARE_TOKEN`, using an account-scoped Analytics Read token. This is not a deployment credential and is never sent to the browser.
+
+The connected Cloudflare OAuth account can read settings/deployments, but its API-token permission-groups endpoint returns403 because OAuth has no scope for that endpoint. Existing Worker settings contain no runtime telemetry secret. No token creation or alternate-scope bypass was attempted. Traffic therefore displays **Not connected** until a suitably scoped credential is supplied through an authorized secure setup. Live health/app/game totals and serving Worker identity remain available independently. No claim of live traffic is made.
+
+## Preservation and verification
+
+API regressions cover owner-only access, actual identity, no-store, source sanitization, malformed/missing versus valid zero, cache coalescing, origin/method denial and owner/session revocation during reads. The existing complete monitor browser audit retains admin monitoring and adds real owner identity, refresh, optional-source failure, active-development fixture, stale response, transport failure and owner revocation at320/390/1280px. The packaged Worker audit retains all original monitoring/report/character-roll cases and adds owner denial/health/identity. No production account/campaign is a mutation fixture.
+
+Both DM and player Help were reviewed and updated for owner-only website access and accurate scope, without adding player setup links. README, feature inventory, developer/recovery instructions and resource credits are updated. Original gameplay, saved data, finance, privacy, Android signing/version and all-nine release gates remain unchanged. Final source verification and publication evidence are recorded in the exact-state checkpoint and PR.
+
+Performance baseline:1142 observations and17 historical resolutions; latest completed recorder39398431366. Preserve all prior trends and inclusive15% logging. Refresh history and analyze new/unresolved entries after full CI; a faster run alone does not reset any reference.

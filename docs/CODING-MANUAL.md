@@ -100,6 +100,10 @@ The user requests speed improvements as **before → after, absolute time saved,
 
 ## Tooling and scope
 
+### Private owner Field monitor
+
+`/api/account/owner/monitor` reuses server health and canonical aggregate game analytics. Check active account, current owner role and unexpired session before and after bounded provider reads. Return only the authenticated account’s name/email and allowlisted aggregates/release metadata; no-store remains mandatory. The original owner/admin server monitor and owner controls remain intact. Provider snapshots are cached five minutes per database/isolate, with request coalescing and explicit unavailable/disconnected states. GitHub public activity is opt-in through `OWNER_MONITOR_GITHUB=true`; local development leaves it off. Optional Cloudflare traffic uses `OWNER_MONITOR_CLOUDFLARE_ACCOUNT_ID` plus server-only `OWNER_MONITOR_CLOUDFLARE_TOKEN` scoped to Account Analytics Read. Never reuse a deployment token in the client, claim local coding activity from GitHub, infer a serving version from workflow success, or turn missing readings into zero. The website component is excluded from the bundled mobile build. Extend account/provider tests and the existing monitor browser/Worker audits, preserving original scenarios and full release gates. See the owner-monitor audit for credential availability and phone-widget scope.
+
 ### Encounter initiative ordering
 
 The combatant array is the persisted display/turn order for device, account and shared campaign encounters. Initiative entry, draft saves, start and reload never sort it implicitly. Only the DM's **Sort initiative** action calls `sortInitiative`; it keeps the active ID and round, retains tied roster order and puts blanks last. `nextTurn` follows the stored array. Preserve schema/version, IDs, revision checks, read-only/role locks and map roster references. Run encounter model/permission tests and the existing device/account browser audits, including stable multi-digit focus, desktop/mobile explicit sorting, clearing scores, turn traversal and reopened order, plus full release gates.

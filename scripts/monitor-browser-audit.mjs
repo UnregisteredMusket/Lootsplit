@@ -36,6 +36,7 @@ try {
   id = (await signup.json()).user.id;
   await DB.prepare("INSERT INTO site_roles VALUES (?,'admin',?)").bind(id, Date.now()).run();
   await openApplication(page, origin + "/account");
+  assert.equal(await page.locator(".owner-monitor").count(), 0);
   await page.getByRole("button", { name: "Open server monitor", exact: true }).click();
   await page.getByText("Total accounts", { exact: true }).waitFor();
   // Local dev has no ASSETS binding; partial failure must preserve real database counts.
@@ -67,6 +68,82 @@ try {
   await page.getByText("Total accounts", { exact: true }).waitFor();
   await page.getByRole("button", { name: "Close server monitor", exact: true }).click();
   assert.equal(await page.locator("#monitor-panel").count(), 0);
+  const overview = page.locator(".owner-monitor");
+  await overview.getByText("Monitor Audit", { exact: true }).waitFor();
+  await overview.getByText("Owner access", { exact: true }).waitFor();
+  await overview.getByLabel("Auto-refresh every minute").uncheck();
+  await overview.getByRole("button", { name: "Refresh overview", exact: true }).waitFor();
+  await overview
+    .getByText("A read-only Cloudflare analytics connection is needed.", { exact: false })
+    .waitFor();
+  const snapshot = await (await context.request.get(origin + "/api/account/owner/monitor")).json();
+  // Provider fixture exercises UI states only; real provider parsers/permissions have API tests.
+  const fixture = {
+    ...snapshot,
+    development: {
+      state: "ready",
+      checkedAt: Date.now(),
+      data: {
+        scannedRuns: 100,
+        active: [
+          {
+            id: 1,
+            name: "Deploy verified website",
+            status: "in_progress",
+            conclusion: null,
+            branch: "main",
+            commit: "a".repeat(40),
+            url: "https://github.com/UnregisteredMusket/Lootsplit/actions/runs/1",
+            deployment: true,
+          },
+        ],
+        latestDeployment: null,
+        openPulls: [
+          {
+            number: 123,
+            title: "Owner overview and a deliberately long change title for mobile wrapping",
+            draft: true,
+            url: "https://github.com/UnregisteredMusket/Lootsplit/pull/123",
+          },
+        ],
+      },
+    },
+  };
+  await page.route("**/api/account/owner/monitor", (route) => route.fulfill({ json: fixture }));
+  await overview.getByRole("button", { name: "Refresh overview", exact: true }).click();
+  await overview.getByText("1 active workflow in recent activity", { exact: true }).waitFor();
+  for (const width of [320, 390, 1280]) {
+    await page.setViewportSize({ width, height: 900 });
+    await overview.scrollIntoViewIfNeeded();
+    assert.equal(
+      await page.evaluate(() => document.documentElement.scrollWidth > innerWidth),
+      false,
+    );
+    const box = await overview.boundingBox();
+    assert.ok(box.x >= 0 && box.x + box.width <= width);
+    await overview.screenshot({ path: `${output}/owner-${width}.png` });
+  }
+  fixture.checkedAt = Date.now() - 120000;
+  await overview.getByRole("button", { name: "Refresh overview", exact: true }).click();
+  await overview.getByText("Snapshot is stale", { exact: true }).waitFor();
+  await page.unroute("**/api/account/owner/monitor");
+  await page.route("**/api/account/owner/monitor", (route) =>
+    route.fulfill({ status: 503, json: { error: "Temporary outage" } }),
+  );
+  await overview.getByRole("button", { name: "Refresh overview", exact: true }).click();
+  await overview.getByRole("alert").waitFor();
+  assert.equal(await overview.getByText("Active accounts · 5m", { exact: true }).count(), 0);
+  assert.equal(await overview.getByText("Monitor Audit", { exact: true }).count(), 0);
+  await page.unroute("**/api/account/owner/monitor");
+  await overview.getByRole("button", { name: "Refresh overview", exact: true }).click();
+  await overview.getByText("Monitor Audit", { exact: true }).waitFor();
+  await DB.prepare("UPDATE site_roles SET role='admin' WHERE user_id=?").bind(id).run();
+  await overview.getByRole("button", { name: "Refresh overview", exact: true }).click();
+  await overview.getByRole("alert").waitFor();
+  assert.equal(await overview.getByText("Monitor Audit", { exact: true }).count(), 0);
+  await reloadApplication(page);
+  await page.getByRole("button", { name: "Open server monitor", exact: true }).waitFor();
+  assert.equal(await page.locator(".owner-monitor").count(), 0);
   assert.deepEqual(errors, []);
   console.log(
     "PASS: admin/owner monitoring, partial failure, refresh, revoked access clears totals, moderator isolation, desktop/mobile layout.",
