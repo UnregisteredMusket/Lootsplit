@@ -71,7 +71,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | deploy / Run actions/setup-node@v4 | open | 2 | 2s → 7s | +5s | +250% |
 | deploy / Run actions/download-artifact@v4 | open | 3 | 1s → 6s | +5s | +500% |
 | Development / governance / Run actions/checkout@v4 | open | 3 | 1s → 153s | +152s | +15200% |
-| Code checks and immutable builds / Run actions/setup-node@v4 | open | 3 | 3s → 9s | +6s | +200% |
+| Code checks and immutable builds / Run actions/setup-node@v4 | open | 4 | 3s → 16s | +13s | +433.33% |
 | Development / gameplay / dev-bug-edge-cases | open | 3 | 9s → 15s | +6s | +66.67% |
 | Packaged standby / Run actions/setup-node@v4 | open | 3 | 3s → 13s | +10s | +333.33% |
 | Packaged Worker / accounts / Run actions/download-artifact@v4 | open | 3 | 1s → 4s | +3s | +300% |
@@ -366,6 +366,8 @@ Open trends require investigation. Resolved trends retain their history; each ve
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-20T22:41:58Z | step: Code checks and immutable builds / Run actions/setup-node@v4 | 9s → 16s | +7s | +77.78% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37300924028/job/111733696893) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39509944972/job/118928184721) |
+| 2026-10-20T22:41:41Z | step: Development / desktop (balanced v2) / Set up job | 1s → 2s | +1s | +100% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38301994659/job/114986882289) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39509944972/job/118928185091) |
 | 2026-10-20T22:26:53Z | step: release-apk / Run npm run typecheck | 24s → 28s | +4s | +16.67% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38305743849/job/115004301916) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39506221876/job/118921455273) |
 | 2026-10-20T22:23:54Z | step: verify / Development / desktop (balanced v2) / dev-game-analytics | 6s → 7s | +1s | +16.67% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39417084438/job/118608619206) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39506221876/job/118915694152) |
 | 2026-10-20T22:19:00Z | job: native / native-widget (24) | 333s → 464s | +131s | +39.34% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39417084438/job/118608618381) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39506221876/job/118915694013) |
