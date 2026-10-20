@@ -1,7 +1,7 @@
 import { useEffect, useState } from "react";
 import { accountRequest } from "@/lib/account/client";
 
-type MonitorData = {
+export type MonitorData = {
   checkedAt: number;
   durationMs: number;
   status: "healthy" | "degraded";

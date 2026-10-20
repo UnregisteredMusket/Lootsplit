@@ -1,0 +1,268 @@
+.owner-monitor {
+  color: var(--portal-ink);
+  overflow-wrap: anywhere;
+  min-width: 0;
+  border-top: 3px solid var(--portal-gold) !important;
+}
+.owner-monitor-heading,
+.owner-monitor-account,
+.owner-monitor-status,
+.owner-monitor-checks,
+.owner-monitor-release,
+.owner-monitor-footer {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.owner-monitor-heading {
+  justify-content: space-between;
+}
+.ls-site .owner-monitor-heading h2 {
+  margin: 0;
+}
+.owner-monitor-heading .portal-eyebrow {
+  margin: 0 0 5px;
+  font-size: 11px;
+  letter-spacing: 0.14em;
+}
+.owner-monitor-access {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  color: var(--portal-gold);
+  font-size: 13px;
+}
+.owner-monitor-account {
+  margin: 20px 0;
+  padding-bottom: 18px;
+  border-bottom: 1px solid #87928f40;
+}
+.owner-monitor-avatar {
+  display: grid;
+  place-items: center;
+  width: 40px;
+  height: 40px;
+  flex: 0 0 40px;
+  border: 1px solid var(--portal-gold);
+  color: var(--portal-gold);
+  border-radius: 50%;
+  font:
+    24px Georgia,
+    serif;
+}
+.owner-monitor-account > div {
+  flex: 1;
+  min-width: 0;
+}
+.owner-monitor-account strong,
+.owner-monitor-account div span {
+  display: block;
+}
+.owner-monitor-account span,
+.owner-monitor-note,
+.owner-monitor-details,
+.owner-monitor-footer label {
+  font-size: 13px;
+  color: var(--portal-muted);
+}
+.owner-monitor-account strong {
+  font-size: 16px;
+}
+.owner-monitor-status {
+  padding: 12px 0;
+}
+.owner-monitor-status > span {
+  margin-left: auto;
+  font-size: 12px;
+  color: var(--portal-muted);
+}
+.owner-monitor-metrics {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1px;
+  background: #87928f40;
+  border: 1px solid #87928f40;
+  margin: 8px 0 14px;
+}
+.owner-monitor-metrics > div {
+  padding: 18px;
+  background: #152432;
+}
+.owner-monitor-metrics dt {
+  color: var(--portal-muted);
+  font-size: 12px;
+}
+.owner-monitor-metrics dd {
+  margin: 4px 0 0;
+  color: var(--portal-gold);
+  font:
+    600 32px/1.15 "Cormorant Garamond",
+    Georgia,
+    serif;
+  font-variant-numeric: tabular-nums;
+}
+.owner-monitor-checks {
+  font-size: 12px;
+  gap: 8px 20px;
+  color: var(--portal-muted);
+}
+.owner-monitor-checks i {
+  display: inline-block;
+  width: 7px;
+  height: 7px;
+  border-radius: 50%;
+  margin-right: 6px;
+  background: #dfb578;
+}
+.owner-monitor-checks i[data-ok="true"] {
+  background: #96bf9c;
+}
+.owner-monitor-grid {
+  display: grid;
+  grid-template-columns: repeat(2, minmax(0, 1fr));
+  gap: 24px;
+}
+.ls-site .owner-monitor h3 {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 22px;
+  margin: 22px 0 10px;
+}
+.ls-site .owner-monitor h3 > span {
+  margin-left: auto;
+  font:
+    12px "Source Sans 3",
+    sans-serif;
+  color: var(--portal-muted);
+}
+.owner-monitor-list {
+  margin: 0;
+}
+.owner-monitor-list > div {
+  display: flex;
+  justify-content: space-between;
+  gap: 12px;
+  margin: 5px 0;
+  font-size: 14px;
+}
+.owner-monitor-list dt {
+  color: var(--portal-muted);
+}
+.owner-monitor-list dd {
+  margin: 0;
+  font-variant-numeric: tabular-nums;
+}
+.owner-monitor-note {
+  margin: 8px 0;
+}
+.owner-monitor-development,
+.owner-monitor-traffic {
+  border-top: 1px solid #87928f40;
+  margin-top: 18px;
+}
+.owner-monitor-development > p {
+  font-size: 14px;
+}
+.owner-monitor-run {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+  justify-content: space-between;
+  min-height: 48px;
+  padding: 10px 0;
+  text-decoration: none;
+  border-bottom: 1px solid #87928f30;
+  color: var(--portal-ink);
+  font-size: 14px;
+}
+.owner-monitor-run span {
+  min-width: 0;
+}
+.owner-monitor-run small {
+  display: block;
+  color: var(--portal-muted);
+}
+.owner-monitor-run b {
+  color: var(--portal-gold);
+  font-size: 12px;
+  text-align: right;
+}
+.owner-monitor-change {
+  display: block;
+  min-height: 44px;
+  padding: 10px 0;
+  color: var(--portal-gold);
+  font-size: 14px;
+}
+.owner-monitor-release {
+  margin-top: 22px;
+  justify-content: space-between;
+  color: var(--portal-muted);
+  font-size: 12px;
+}
+.owner-monitor-release strong {
+  margin-left: 5px;
+  color: var(--portal-gold);
+  font-family: monospace;
+}
+.owner-monitor-details {
+  margin-top: 12px;
+}
+.owner-monitor-details summary {
+  cursor: pointer;
+  min-height: 44px;
+  padding: 12px 0;
+}
+.owner-monitor-details code {
+  word-break: break-all;
+}
+.owner-monitor-footer {
+  margin-top: 16px;
+  justify-content: space-between;
+}
+.owner-monitor-footer button {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.owner-monitor-footer label {
+  display: flex;
+  align-items: center;
+  gap: 9px;
+  min-height: 44px;
+  cursor: pointer;
+}
+.owner-monitor-footer input {
+  width: 18px;
+  height: 18px;
+  accent-color: var(--portal-gold);
+}
+@media (max-width: 600px) {
+  .owner-monitor-metrics {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+  .owner-monitor-metrics > div {
+    padding: 14px 12px;
+  }
+  .owner-monitor-grid {
+    gap: 14px;
+  }
+  .ls-site .owner-monitor h3 {
+    font-size: 20px;
+  }
+  .owner-monitor-list > div {
+    font-size: 12px;
+  }
+  .owner-monitor-footer .portal-button {
+    width: 100%;
+    justify-content: center;
+  }
+}
+@media (max-width: 360px) {
+  .owner-monitor-grid {
+    grid-template-columns: 1fr;
+    gap: 0;
+  }
+}

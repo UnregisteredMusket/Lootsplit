@@ -127,6 +127,9 @@ Not implemented or promised by this inventory: Google Drive backup integration, 
 
 ### Administrator server monitoring
 
+- Website owners additionally see Field monitor above the existing detailed controls: authenticated name/email beside Owner access, live database/assets checks, recent account activity, app totals, current shared-campaign analytics, recent GitHub development/deployment activity, serving website commit/Worker version and published Android version. No original admin/owner capability is removed.
+- Owner-only API checks fresh role/account/session before and after reads. Errors clear private browser totals; visible-page minute polling, manual refresh, source timestamps, stale and disconnected states remain explicit. GitHub covers its most recent 100 runs/up to 100 open changes, not unsubmitted work. Optional read-only Cloudflare traffic needs a server secret; no token reaches clients. Phone reference art/theme is not bundled and no native widget/APK is installed.
+
 - Owner/admin-only, server-authorized live monitoring panel in My account; members/moderators denied.
 - Read-only database and website-asset health checks, check timing, running Worker version metadata.
 - Aggregate account activity (5 min / 24 hr), stored shared campaigns, memberships, cloud backups,

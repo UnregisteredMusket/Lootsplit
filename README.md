@@ -18,6 +18,10 @@ Maps support category filters, dungeon/property/ship layouts, free DM party plac
 
 Lootsplit is a shared party ledger and campaign application for web and Android. Production runs on Cloudflare Workers and D1; GitHub Actions verifies and publishes the exact tested artifact from `main`.
 
+## Private owner overview
+
+Website **My account → Field monitor** shows the signed-in owner beside **Owner access**, health checks, account/app totals, shared-campaign analytics, recent development and website deployment activity. The serving commit and published Android version remain separate from active builds. Refresh manually or every minute while visible; provider readings are cached up to five minutes. The original detailed server monitor and owner controls remain available. Cloudflare traffic displays **Not connected** until its read-only analytics credential is configured. The terminal-style phone widget remains a separate design; phone screenshots are not embedded in the website or app. See [owner monitor verification and setup](docs/audit/2026-10-20-owner-monitor.md).
+
 ## Tabs and multiple monitors
 
 The app header’s **Tabs & windows** control opens the current screen or another permitted screen in a browser tab or separate window. Move windows between monitors using the operating system. Each window retains its own campaign selection and drafts; saved local changes invalidate other windows and hosted rooms retain the existing authoritative sync/receipts. Child windows keep current permissions and reconnect to the same seat without putting credentials in URLs. A DM window remains private DM UI; use **Player display** for a controlled TV map/tracker, or a player invitation in a separate browser profile/device for a normal player session. Android retains normal navigation and provides desktop guidance. See [verification and preservation](docs/audit/2026-10-16-multi-window.md).

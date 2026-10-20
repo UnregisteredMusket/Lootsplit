@@ -9,6 +9,7 @@ import { DeviceRecovery } from "@/components/account/device-recovery";
 import { blankSheet } from "@/lib/characters/model.mjs";
 import { BugReports } from "@/components/account/bug-reports";
 import { ServerMonitor } from "@/components/account/server-monitor";
+import { OwnerMonitor } from "@/components/account/owner-monitor";
 import { ProfileControls } from "@/components/account/profile-controls";
 import { StaffControls } from "@/components/account/staff-controls";
 import { Campaigns } from "@/components/campaigns";
@@ -565,6 +566,9 @@ function Account() {
             </section>
           )}
           <div id="account-administration">
+            {library?.user.role === "owner" && import.meta.env.VITE_MOBILE !== "true" && (
+              <OwnerMonitor key={library.user.id} />
+            )}
             {(library?.user.role === "owner" || library?.user.role === "admin") && (
               <ServerMonitor />
             )}

@@ -1,6 +1,23 @@
 /** Add every new third-party content/data resource here when integrating it. */
 export const resources = [
   {
+    name: "Owner monitoring data and API references",
+    description:
+      "The private Field monitor reads this repository’s GitHub workflow and pull-request metadata. Optional Cloudflare analytics uses aggregate Worker requests/errors. The original website widget uses Lootsplit’s existing theme; the owner’s phone screenshots are design references for a separate phone-widget concept and are not bundled in the app.",
+    license: "API data and documentation references; respective provider terms apply",
+    links: [
+      {
+        label: "GitHub workflow runs",
+        url: "https://docs.github.com/en/rest/actions/workflow-runs",
+      },
+      { label: "GitHub pull requests", url: "https://docs.github.com/en/rest/pulls/pulls" },
+      {
+        label: "Cloudflare Workers analytics",
+        url: "https://developers.cloudflare.com/analytics/graphql-api/tutorials/querying-workers-metrics/",
+      },
+    ],
+  },
+  {
     name: "Project Zomboid Map interface reference",
     description:
       "The owner selected this interactive map as the explicit layout and interaction reference for Lootsplit Maps: edge-to-edge canvas, floating search/navigation, compact right controls, horizontal tools and overlay options. Lootsplit uses original components and campaign artwork; no game map, branding or third-party interface code is bundled.",
