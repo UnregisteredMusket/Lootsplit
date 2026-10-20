@@ -1,0 +1,29 @@
+{
+  "file": "Lootsplit-1.8.0.apk",
+  "bytes": 28009920,
+  "sha256": "b0bc1b07c65f074318cbb12de6c69a8de13a2d2a19ac56fc79c42013e4556a36",
+  "package": "com.unregisteredmusket.lootsplit",
+  "version": "1.8.0",
+  "versionCode": 11,
+  "certificateSHA256": "baca95a880d14d0d8c422c397decd4c9bf0e7f710a3fd6a5be1e47abd3f730a0",
+  "v2IntegrityVerified": true,
+  "sourceCommit": "eff5978f518bb9404cb8966a59278459d22d7b3c",
+  "sourceTree": "1e0c44c93ea372719756d878b24d8a08d2fcfb27",
+  "workflowRun": 39421997999,
+  "workflowAttempt": 2,
+  "releaseId": 418391129,
+  "assetId": 659315679,
+  "artifactId": 12265630620,
+  "artifactZipSHA256": "487cab3f98f72efc2be4cdc54c3864cad3328f75fbb8612d371c355dcd764dfd",
+  "publishedAt": "2026-10-20T12:46:54Z",
+  "publicAssetDigestMatches": true,
+  "publicAssetBytesIndependentlyVerified": true,
+  "checksumFileMatches": true,
+  "widgetComponentsAndResourcesPresent": true,
+  "syntheticWidgetAccountAbsent": true,
+  "nativeApiLevelsVerified": [
+    24,
+    35
+  ],
+  "physicalDeviceTested": false
+}

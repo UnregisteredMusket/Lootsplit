@@ -95,3 +95,70 @@ The ownership fixture now starts each of its three synthetic devices with the op
 Latest synced history1190 observations/17 resolutions adds successful main ships66→77s(+11/+16.67%), development library51→63s(+12/+23.53%) and Worker library39→47s(+8/+20.51%). These are retained open execution trends, not erased by the timing-fixture correction. Final recorder review must also collect the failed/corrected PR119 attempts.
 
 The final local complete suite passes12/12, zero retries,119.171s execution/125.565s including disposable setup; ownership passes38.932s inside that two-worker run. This is4.28% below the earlier corrected full suite124.502s and3.86% above the last logged comparable114.746s, so neither comparison warrants a new slowdown record or baseline reset. Both native jobs in PR119 run39418831435 pass. Fresh cold CI on the final fixture remains mandatory; local timing alone is not a substitute.
+
+## Release-check correction verified
+
+Final PR119 head `f6004cf89c444781eb2f482aaaab603f2b73f775`, tree `1e0c44c93ea372719756d878b24d8a08d2fcfb27`, passes all nine groups39420205097 and both native matrices39420205092. Both complete development and packaged account suites pass with every original scenario. Development account wrapper reports170.0s; this is a passing bounded run, not evidence of broad performance headroom. No thresholds or deadlines were changed. The merge is `eff5978f518bb9404cb8966a59278459d22d7b3c`; independent main39421997760 and signed39421997999 must complete before final publication proof.
+
+Performance recorder39421876279 succeeds. The latest completed PR snapshot has1200 observations/17 historical resolutions. Five native infrastructure increases since1190: API24 setup2→3s(+1/+50%), API35 Node3→4s(+1/+33.33%) then4→6s(+2/+50%), SDK14→24s(+10/+71.43%), browser install18→21s(+3/+16.67%). Five final PR entries: lint13→15s(+2/+15.38%), source inventory19→22s(+3/+15.79%), monitor5→6s(+1/+20%), party sheet22→26s(+4/+18.18%), packaged account artifact upload4→7s(+3/+75%). Setup/upload are infrastructure timings; source-tool and browser-step variations remain recorded open execution findings. No application/widget latency conclusion or trend reset follows from these rounded CI measurements. Final main/signing/deployment collection remains required.
+
+### Same-source release timing comparison
+
+On unchanged merged eff5978, main development job118625001679 passes all12 accounts in168.702s execution/169.4s wrapper. Signed workflow39421997999/job118625003791 hits the170s aggregate limit with10passed, no failed assertions, and the last DM/shared recovery cases interrupted. This is distinct from the corrected modal/ownership-assertion failures. Both artifacts were independently hash-verified: successful12265140903 SHA256 `2bb64c5b2b8adcdea81c102f13293516d37a5356ac8ce008df094baafbc3c26d`; failed12264201428 SHA256 `9fc705a7f0f4e5f2523b44a322fd1d94240d39dec4d72e6ad662bfded94e2d26`.
+
+The same-source case comparison records ownership58.987→59.716s, partial recovery31.570→32.762s, library24.024→25.756s, portraits46.139→46.849s, campaign choice19.431→20.613s and queue40.392→41.561s. Small runner-duration differences change which worker receives the final cases; no new application assertion failure appears. Main/PR both fully pass this source, but timing headroom remains narrow. One targeted retry of only the failed signed-workflow job is appropriate after diagnosis, retaining successful independent/native jobs and every limit/assertion. GitHub rejected an early retry request solely because the containing workflow was still running; it started no retry. Wait for completion before resubmitting. If the same corrected-source aggregate fails again, stop retries and address the measured queue instead of loosening gates.
+
+## Main/release performance snapshot through1232 observations
+
+The automated history was fetched from performance-history commit2d7541c after the unauthenticated sync CLI returned HTTP403; this is a read of the same persistent history, not a reset. It retains17 resolutions. Main39421997760 passes all nine groups; standby39423709494 succeeds. Signed39421997999 attempt1 has one diagnosed development-account aggregate timeout and all other independent/native jobs pass. Its sole targeted retry is now running. The table retains every new qualifying observation since1200, including infrastructure noise and successful steps inside the failed workflow.
+
+| Run / operation | Prior → current | Added | Increase | Outcome |
+| --- | --- | --- | --- | --- |
+|39421997760 / Packaged Worker / interface (balanced v2) / Run actions/download-artifact@v4|3→4s|1s|33.33%|success→success|
+|39421997760 / Packaged Worker / interface (balanced v2) / worker-initiative|6→7s|1s|16.67%|success→success|
+|39421997760 / Development / accounts / dev-monitor|5→6s|1s|20%|success→success|
+|39421997999 / native / native-widget (24) / Run actions/setup-node@v4|2→5s|3s|150%|success→success|
+|39421997999 / verify / Code checks and immutable builds / Run actions/setup-node@v4|4→5s|1s|25%|success→success|
+|39421997999 / native / native-widget (35) / Run actions/setup-node@v4|3→7s|4s|133.33%|success→success|
+|39421997999 / native / native-widget (24) / Run android-actions/setup-android@v3|11→13s|2s|18.18%|success→success|
+|39421997999 / native / native-widget (35) / Run android-actions/setup-android@v3|11→13s|2s|18.18%|success→success|
+|39421997999 / verify / Development / gameplay (balanced v2) / Run npx playwright install --with-deps chromium|25→32s|7s|28%|success→success|
+|39421997999 / native / native-widget (35) / Verify mobile widget controls|1→6s|5s|500%|success→success|
+|39421997999 / verify / Packaged Worker / interface (balanced v2) / Set up job|1→2s|1s|100%|success→success|
+|39421997999 / verify / Packaged Worker / interface (balanced v2) / Run actions/setup-node@v4|3→4s|1s|33.33%|success→success|
+|39421997999 / verify / Packaged Worker / interface (balanced v2) / Run npm ci|9→15s|6s|66.67%|success→success|
+|39421997999 / verify / Packaged Worker / accounts (balanced v2) / Run npx playwright install --with-deps chromium|19→22s|3s|15.79%|success→success|
+|39421997999 / verify / Packaged Worker / interface (balanced v2) / Run actions/download-artifact@v4|1→2s|1s|100%|success→success|
+|39421997999 / verify / Packaged Worker / interface (balanced v2) / Start disposable built Worker|6→11s|5s|83.33%|success→success|
+|39421997999 / verify / Packaged Worker / interface (balanced v2) / worker-theme|23→29s|6s|26.09%|success→success|
+|39421997999 / verify / Development / gameplay (balanced v2) / dev-properties|57→67s|10s|17.54%|success→success|
+|39421997999 / verify / Packaged Worker / interface (balanced v2) / worker-market-locations|43→52s|9s|20.93%|success→success|
+|39421997999 / verify / Packaged Worker / interface (balanced v2) / worker-properties|38→46s|8s|21.05%|success→success|
+|39421997999 / verify / Packaged Worker / interface (balanced v2) / worker-property-operations|18→26s|8s|44.44%|success→success|
+|39421997999 / verify / Packaged Worker / interface (balanced v2) / worker-sound|20→26s|6s|30%|success→success|
+|39421997999 / verify / Packaged Worker / interface (balanced v2) / worker-help|49→63s|14s|28.57%|success→success|
+|39421997999 / verify / Packaged Worker / interface (balanced v2) / worker-game-analytics|3→4s|1s|33.33%|success→success|
+|39421997999 / verify / Packaged Worker / interface (balanced v2) / worker-website|12→14s|2s|16.67%|success→success|
+|39421997999 / verify / Packaged Worker / interface (balanced v2) / worker-library-navigation|36→47s|11s|30.56%|success→success|
+|39421997999 / verify / Packaged Worker / interface (balanced v2) / worker-loot|4→6s|2s|50%|success→success|
+|39421997999 / verify / Development / gameplay (balanced v2)|544→631s|87s|15.99%|success→success|
+|39421997999 / verify / Packaged Worker / interface (balanced v2) / Run actions/upload-artifact@v4|2→3s|1s|50%|success→success|
+|39421997999 / verify / Packaged Worker / interface (balanced v2)|414→503s|89s|21.5%|success→success|
+|39421997999 / verify / Packaged Worker / accounts (balanced v2)|151→631s|480s|317.88%|failure→success|
+|39423709494 / publish / Run actions/checkout@v4|2→3s|1s|50%|success→success|
+
+SDK, Node, browser installation, artifact transfer and checkout changes are infrastructure measurements. Browser/control/property/Help/Library step increases remain open execution findings: this source changes no corresponding application behavior, and rounded CI durations do not isolate widget latency. The Worker-account job151→631s compares an early failed ownership run with a complete successful suite; retain the failure outcome rather than treating that difference as measured application slowdown. Gameplay544→631s spans the expanded coverage since1.7.0; Worker-interface414→503s is a complete comparable job increase requiring continued observation. Historical map/library/standby trends above remain unresolved. No gate, threshold, worker count, performance reference or retained evidence is weakened. Review the retry/signing/website and metadata-follow-up records before closing publication.
+
+Independent main39421997760 completes all nine groups. Website39423709435 and standby39423709494 succeed on unchanged eff5978. Production Worker `d6b55699-3f5f-4f80-acae-6fab0daf8c2e` serves that source; the live gate matches144 JavaScript/CSS assets and passes read-only desktop/mobile checks. CPU/persistent-log/query-redaction policy is verified. Failure email remains not configured (no delivery claimed). This first website deployment correctly retains the1.7.0 download while1.8.0 signing is pending; the follow-up must verify the new APK bytes after publication.
+
+The single targeted retry of signed-run development accounts succeeds: job118631085791, attempt2, all12 cases,143.2s wrapper. All original checks remain; no source or deadline changed between attempts. Every successful independent/native job is retained with its original execution timestamps, and dependent verify118632995073 passes. Signing118633072499 starts only afterward. This faster unchanged-source run supports the timing-variation diagnosis but does not resolve/reset historical trends or erase the failed170s attempt.
+
+## Signed Android1.8.0 publication
+
+Signed workflow39421997999 attempt2 succeeds from eff5978/tree1e0c44c. Release418391129 (`android-v1.8.0`) publishes at2026-10-20T12:46:54Z. Artifact12265630620 ZIP SHA256 `487cab3f98f72efc2be4cdc54c3864cad3328f75fbb8612d371c355dcd764dfd` was independently downloaded and verified before extraction. The APK is28,009,920bytes, SHA256 `b0bc1b07c65f074318cbb12de6c69a8de13a2d2a19ac56fc79c42013e4556a36`; separately downloaded public asset659315679 and SHA256SUMS.txt match exactly.
+
+Offline apksigner verifies APK v2 signature/content integrity and the permanent certificate `baca95a880d14d0d8c422c397decd4c9bf0e7f710a3fd6a5be1e47abd3f730a0`. aapt verifies package/version1.8.0/code11, widget provider/job declarations and optimized widget layout/provider XML resources. An initial diagnostic expected unoptimized resource paths; the actual release resource table maps them to res/b8.xml and res/iJ.xml, both inspected successfully. This is packaging optimization, not missing widget resources. DEX contains widget/plugin/storage/transport and retained SaveFilePlugin; the production APK excludes the synthetic widget test/account and retains coins/loot/page sounds. No physical-device install is claimed.
+
+The metadata follow-up updates release.json, release instructions and this audit after verification. Both Help guides were reviewed: their already-added owner setup, role restrictions, timestamps and disconnect instructions remain accurate, so no guide text changes are needed. The existing1.8.0 website changelog already covers features, improvements and fixes. Fresh complete PR/main and automatic immutable/read-only live/download verification remain mandatory. Runtime/gameplay/native code and workflows remain unchanged, so this metadata follow-up does not request another signing run.
+
+Final pre-metadata recorder39424966866 succeeds; history4fbd3fb retains1236 observations/17 resolutions and only the longstanding pending37642398740. Four new signed-run entries: monitor4→5s(+1/+25%), signing checkout2→3s(+1/+50%), release publication3→4s(+1/+33.33%), and recorded workflow668→1349s(+681/+101.95%). The long workflow span includes retained original jobs, the failed aggregate attempt, wait before targeted retry and signing; it is not widget runtime latency. Retain this increased user waiting time alongside the account timing diagnosis, without summing overlapping jobs or claiming the faster retry resolved historical trends. The final download/changelog14-test focused set passes; complete quick checks and metadata PR/main/deployment proof follow.
