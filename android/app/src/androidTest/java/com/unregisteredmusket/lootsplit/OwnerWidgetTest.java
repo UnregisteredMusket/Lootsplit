@@ -361,7 +361,7 @@ public class OwnerWidgetTest {
             AtomicInteger lightRows=new AtomicInteger();deadline=android.os.SystemClock.elapsedRealtime()+5000;
             while(android.os.SystemClock.elapsedRealtime()<deadline){
                 InstrumentationRegistry.getInstrumentation().runOnMainSync(()->{
-                    android.widget.ListView list=hosted.get().findViewById(R.id.monitor_list);View row=list==null?null:list.getChildAt(0);
+                    android.widget.ListView list=hosted.get().findViewById(R.id.monitor_list);View child=list==null?null:list.getChildAt(0);View row=child==null?null:child.findViewById(R.id.widget_row);
                     if(row!=null && row.getBackground() instanceof android.graphics.drawable.ColorDrawable && ((android.graphics.drawable.ColorDrawable)row.getBackground()).getColor()==android.graphics.Color.rgb(247,242,228))lightRows.set(1);
                 });
                 if(lightRows.get()==1)break;android.os.SystemClock.sleep(20);
