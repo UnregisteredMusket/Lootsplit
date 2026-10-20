@@ -77,3 +77,45 @@ History f97fc6b7a32a39621030d88a353b05c7372fb91d has1266 observations/17 resolut
 Corrected local trace diagnostic:12/12 pass in116.035s versus130.064s, saving14.029s (10.79%) under the same fresh-copy/cache, Node/browser, two-worker and trace-on setup. The intermediate unguarded init script exposed about:blank storage denial; origin-scoping corrected it, and the full network-boundary/error assertions pass. This is local diagnostic evidence, not a substitute for CI or a performance-reference reset. Recorder39458415961 succeeded.
 
 The full Help/player-reference audit passes at1280/390 in72.336s. The complete map audit passes both widths in160.403s (159.863s inner flow), including the corrected menu, connected services/encounter return, player permissions, overlays, display, reload, guest-memory and pixel-fog scenarios. These ran sequentially after the account diagnostic on the same frozen disposable server; they are not comparable to isolated/cold CI stages. Syntax and whitespace checks pass.
+
+## Resumed release verification and performance review
+
+Main75270080608878abd594ea2c8198b3990fdb58b0 passed all nine groups in39462543939. Immutable website39465165804 and standby39465165939 succeeded; readback matched the serving commit. Signed1.8.1 workflow39475576975 was dispatched on that current main. Evolving publication state stays in PR122 and the download follow-up PR; do not repeat dispatch.
+
+History9ec815bb5caead86c0b6fa962117fa65ee06e64f contains1275 observations and17 resolutions, cursor17:22:31.249Z. Recorder39469134815 succeeded; only historical pending37642398740 remains. All nine new qualifying observations since1266 are retained below. No reference reset or history deletion.
+
+| Operation (main39462543939) | Previous → current | Added | Increase |
+| --- | --- | --- | --- |
+| [Code checks and immutable builds / Run npm ci](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39462543939/job/118765449249) | 19s → 22s | +3s | 15.79% |
+| [Code checks and immutable builds / unit-tests](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39462543939/job/118765449249) | 38s → 54s | +16s | 42.11% |
+| [Code checks and immutable builds / typecheck](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39462543939/job/118765449249) | 27s → 38s | +11s | 40.74% |
+| [Code checks and immutable builds / lint](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39462543939/job/118765449249) | 15s → 20s | +5s | 33.33% |
+| [Code checks and immutable builds / Generate current source function inventory](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39462543939/job/118765449249) | 23s → 28s | +5s | 21.74% |
+| [Code checks and immutable builds / web-build](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39462543939/job/118765449249) | 9s → 12s | +3s | 33.33% |
+| [Code checks and immutable builds / mobile-build](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39462543939/job/118765449249) | 7s → 9s | +2s | 28.57% |
+| [Code checks and immutable builds](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39462543939/job/118765449249) | 140s → 293s | +153s | 109.29% |
+| [Verify preserved functionality](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39462543939) | 917s → 1108s | +191s | 20.83% |
+
+All nine entries have successful current outcomes. The workflow reference917s was a failed historical run, so its20.83% increase is preserved as the recorder comparison, not a successful-run speed claim. Against previous successful main39427491199 at826s, final main1108s is282s slower (+34.14%). Code/build completion took293s; all three dependent packaged runners started275s later, then the longest packaged job took529s. This observed scheduling gap explains275s of elapsed waiting; its infrastructure cause is not proven. The individual unit/type/lint/build increases remain visible and are not explained away by that gap.
+
+Unresolved main trends include unit-tests11→54s (+43s,+390.91%,7 logged increases), typecheck12→38s (+26s,+216.67%,5), lint7→20s (+13s,+185.71%,5), code/build job71→293s (+222s,+312.68%,5), and full verification205→1108s (+903s,+440.49%,4). These spans include earlier coverage growth and variable runners; this metadata release changes no application code or workload. Preserve the account Help-wait diagnosis above and follow repeated same-workload stage increases with profiling. No trend is established as resolved by one faster run.
+
+Documentation review: both DM and player Help remain accurate for direct1.8.1 refresh, dated cache, retry and owner-only access; no instructions or permissions change in the download follow-up. README and the feature inventory now acknowledge the native widget already shipped in1.8.0. The coding manual and Android signing/publication procedure remain accurate.
+
+### Signing-run emulator installation failure
+
+Signed run39475576975 attempt1 API35 passes all eight native cases (11.695s) plus mobile account controls. Its hash-verified artifact12288578489 has ZIP SHA2563caf0164bfbd735bf146e91aae93c61fe77e38d7efacd5563ff90b4296b1ee5d; refreshing, updated totals and cached-error captures were visually reviewed.
+
+API24 job118810534367 compiled/linted successfully but ran zero tests: the emulator console failed to start and Ddmlib could not install-write the debug APK. It provides no widget assertion result. Failed artifact12289926407 is retained and independently SHA256-verified as14d84a44ba7cea392266a86a5831c445bd279542883ab94181964238f99f67b4. This is a device/install-stage failure; no APK incompatibility code or application assertion failure is reported. The same native source passed API24 in PR121 and the earlier signing run. A single targeted fresh-runner retry is appropriate after remaining independent jobs finish; preserve all passed groups and every original deadline/test. Repeated installation failure requires further diagnosis, not a retry loop.
+
+The signing attempt's complete preservation workflow passed all nine groups. API24 alone was retried as job118817769990 in attempt2, retaining API35 and all successful verification. Local follow-up quick checks pass in54.467s:1051 tests passed/four existing skips, types clean, lint0errors/39 existing warnings. No application code changed; the final download manifest receives focused checksum/header/changelog tests after independent APK inspection. This fresh locked-install isolated measurement is retained as an initial local reference; the earlier four-concurrent-check and warm913-test histories remain separate, without a speedup claim or reset.
+
+The single fresh-runner API24 retry passed all eight native cases in9.144s, confirming the pre-test install failure did not recur. Artifact12290296409 independently matches ZIP SHA2567fe1ba85f267ff4bc6dde10f453531b3a07aa2177d386f6b2460bc50f2aab198. Signing job118821230939 then started under the original full/native gates. No emulator requirement, test, application code or timeout was changed.
+
+## Signed APK and download follow-up
+
+Signed run39475576975 attempt2 succeeded and published release418754556/asset660193877 at18:57:02UTC. Independent public-download inspection and signing-artifact12289854015 comparison verify28,012,900bytes and SHA2565a700656ad11aa03a556bf9a392ee0687a3395273887a1b9700e34e01773d755. Artifact ZIP SHA2569a5b35f54ef451c5379ccdf22a26f9248bea80ee7d986072fa1b4059100906e5 matches its declared digest. The separate public checksum file agrees.
+
+Apksigner verifies the permanent certificate and v2 content integrity; aapt verifies package/version/code and registered widget provider. The initial diagnostic assumed original resource ZIP paths; the release optimizer shortens them. Resource-table inspection resolves layout/owner_widget→res/b8.xml and xml/owner_widget_info→res/iJ.xml and confirms both packaged files and manifest registration. DEX inspection retains WidgetRefresh/WidgetStore/provider/plugin/SaveFilePlugin, rejects the obsolete queued message and synthetic test credentials, and retains all three CC0 sounds. This corrects the diagnostic assumption, not the release APK. Physical-device installation is not claimed.
+
+The follow-up changes release.json only after this inspection, retains earlier release history, and removes stale design-only wording from README/inventory. Complete PR/main, immutable website/standby, exact live identity/assets, desktop/mobile and streamed1.8.1 APK checks remain required before declaring the website update complete.

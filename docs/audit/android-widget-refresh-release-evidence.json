@@ -1,0 +1,40 @@
+{
+  "file": "Lootsplit-1.8.1.apk",
+  "bytes": 28012900,
+  "sha256": "5a700656ad11aa03a556bf9a392ee0687a3395273887a1b9700e34e01773d755",
+  "package": "com.unregisteredmusket.lootsplit",
+  "version": "1.8.1",
+  "versionCode": 12,
+  "certificateSHA256": "baca95a880d14d0d8c422c397decd4c9bf0e7f710a3fd6a5be1e47abd3f730a0",
+  "v2IntegrityVerified": true,
+  "widgetRefreshPresent": true,
+  "oldQueuedMessageAbsent": true,
+  "testCredentialAbsent": true,
+  "sounds": [
+    "assets/public/audio/cc0/coins.wav",
+    "assets/public/audio/cc0/loot.wav",
+    "assets/public/audio/cc0/page.wav"
+  ],
+  "physicalDeviceTested": false,
+  "sourceCommit": "75270080608878abd594ea2c8198b3990fdb58b0",
+  "sourceTree": "a5b860d4bc584cfb7fefd8966aac1204078255c7",
+  "workflowRun": 39475576975,
+  "workflowAttempt": 2,
+  "releaseId": 418754556,
+  "assetId": 660193877,
+  "artifactId": 12289854015,
+  "artifactZipSHA256": "9a5b35f54ef451c5379ccdf22a26f9248bea80ee7d986072fa1b4059100906e5",
+  "publishedAt": "2026-10-20T18:57:02Z",
+  "publicAssetBytesIndependentlyVerified": true,
+  "checksumFileMatches": true,
+  "signingArtifactMatchesPublicAPK": true,
+  "widgetProviderAndResourceTableVerified": true,
+  "nativeApiLevelsVerified": [
+    24,
+    35
+  ],
+  "native24ArtifactId": 12290296409,
+  "native24ArtifactSHA256": "7fe1ba85f267ff4bc6dde10f453531b3a07aa2177d386f6b2460bc50f2aab198",
+  "native35ArtifactId": 12288578489,
+  "native35ArtifactSHA256": "3caf0164bfbd735bf146e91aae93c61fe77e38d7efacd5563ff90b4296b1ee5d"
+}

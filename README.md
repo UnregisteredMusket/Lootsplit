@@ -20,7 +20,7 @@ Lootsplit is a shared party ledger and campaign application for web and Android.
 
 ## Private owner overview
 
-Website **My account → Field monitor** shows the signed-in owner beside **Owner access**, health checks, account/app totals, shared-campaign analytics, recent development and website deployment activity. The serving commit and published Android version remain separate from active builds. Refresh manually or every minute while visible; provider readings are cached up to five minutes. The original detailed server monitor and owner controls remain available. Cloudflare traffic displays **Not connected** until its read-only analytics credential is configured. The terminal-style phone widget remains a separate design; phone screenshots are not embedded in the website or app. See [owner monitor verification and setup](docs/audit/2026-10-20-owner-monitor.md).
+Website **My account → Field monitor** shows the signed-in owner beside **Owner access**, health checks, account/app totals, shared-campaign analytics, recent development and website deployment activity. The serving commit and published Android version remain separate from active builds. Refresh manually or every minute while visible; provider readings are cached up to five minutes. The original detailed server monitor and owner controls remain available. Cloudflare traffic displays **Not connected** until its read-only analytics credential is configured. The terminal-style home-screen widget is available in Android1.8.0 and later; Android1.8.1 fixes direct manual refresh. Phone screenshots are not embedded in the website or app. See [owner monitor verification and setup](docs/audit/2026-10-20-owner-monitor.md) and [Android instructions](ANDROID.md).
 
 ## Tabs and multiple monitors
 
