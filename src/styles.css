@@ -3599,7 +3599,7 @@ input,select,textarea { max-width: 100%; }
 .map-panel-heading [role="tab"] { min-height:44px; padding:8px 3px; border-bottom:2px solid transparent; }
 .map-panel-heading [role="tab"][aria-selected="true"] { border-bottom-color:var(--color-accent); font-weight:600; }
 .map-settings-drawer .world-toolbar { flex-wrap:wrap; }
-.map-settings-drawer .world-toolbar > label { min-width:0; }
+.map-settings-drawer .world-toolbar > label { min-width:0; flex:1 1 100%; }
 .map-settings-drawer h2 { font-family:inherit; font-size:16px; }
 .map-settings-drawer .world-register,.map-settings-drawer .map-session-bar { margin-top:14px; }
 .map-settings-drawer .map-session-bar { padding:12px; border-radius:12px; }
@@ -3649,7 +3649,7 @@ input,select,textarea { max-width: 100%; }
 @media(max-height:550px) and (orientation:landscape) {
  .map-title-capsule { max-width:180px; }
  .map-top-controls { top:10px; left:200px; right:72px; width:auto; }
- .map-workspace .map-scene-stepper { top:74px; }
+ .map-workspace .map-scene-stepper { top:74px; flex-direction:row; }
  .map-hotbar-anchor { top:auto; bottom:14px; right:72px; }
  .map-hotbar-more { top:auto; bottom:62px; right:0; }
  .map-tool-context { top:70px; bottom:78px; right:72px; max-height:none; }
@@ -3663,7 +3663,9 @@ input,select,textarea { max-width: 100%; }
 .map-workspace .map-tool-context input { max-width:100%; }
 .map-workspace.map-view-frame .map-navigation button { color:var(--color-fg); }
 .map-workspace :focus-visible { outline:2px solid var(--color-lead); outline-offset:2px; }
-.map-workspace .loot-fold { border:0; border-top:1px solid var(--map-edge); border-radius:0; background:transparent; box-shadow:none; }
+.map-workspace .map-viewport:focus-visible { outline-offset:-3px; }
+.map-workspace .loot-fold,
+:root[data-fantasy-theme]:not([data-fantasy-theme=""]) .map-workspace .loot-fold { border:0; border-top:1px solid var(--map-edge); border-radius:0; background:transparent; box-shadow:none; }
 .map-workspace .loot-fold > div:first-child button { min-height:46px; padding:8px 0; }
 .map-workspace .loot-fold > div:nth-child(2) { padding:10px 0; }
 @media(prefers-reduced-motion:reduce) { .map-workspace *, .map-editor-frame * { animation:none !important; transition:none !important; scroll-behavior:auto !important; } }
@@ -3681,6 +3683,8 @@ input,select,textarea { max-width: 100%; }
 @media(max-width:650px) {
  .map-workspace.map-view-frame .map-settings-drawer { max-height:calc(var(--map-usable-height,100dvh) - 138px); }
  .map-workspace .map-search-results { max-height:calc(var(--map-usable-height,100dvh) - 142px); }
+ .map-workspace .map-app-menu { max-height:calc(var(--map-usable-height,100dvh) - 142px); }
+ .map-workspace[data-keyboard-open="true"] .map-tool-context { top:124px; bottom:auto; max-height:calc(var(--map-usable-height,100dvh) - 138px); }
 }
 .map-app-actions { display:flex; flex-wrap:wrap; gap:6px; border-top:1px solid var(--map-edge); padding-top:8px; }
 .map-app-actions > button,.map-app-actions > a { min-height:44px; padding:8px; }

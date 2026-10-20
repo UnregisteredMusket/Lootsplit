@@ -9,6 +9,7 @@ export async function mapCamera(page) {
       x: (viewport.x + viewport.width / 2 - image.x) / image.width,
       y: (viewport.y + viewport.height / 2 - image.y) / image.height,
       zoom: document.querySelector('[aria-label="Map zoom"]').textContent,
+      renderedWidth: image.width,
     };
   });
 }
@@ -55,7 +56,7 @@ export async function checkFullscreenMap(page, output, width) {
     return (
       Math.abs(after.x - before.x) < 0.001 &&
       Math.abs(after.y - before.y) < 0.001 &&
-      after.zoom === before.zoom
+      Math.abs(after.renderedWidth - before.renderedWidth) < 1
     );
   };
   await page.getByRole("button", { name: "Map settings", exact: true }).click();
@@ -63,6 +64,25 @@ export async function checkFullscreenMap(page, output, width) {
   await expect(drawer).toBeVisible();
   await expectMapFillsScreen(page, true);
   await expect.poll(sameCamera).toBe(true);
+  if (width < 600) {
+    // Mobile keyboards shrink the visual viewport without resizing the map canvas.
+    await page.evaluate(() => {
+      window.mapVisualHeightDescriptor = Object.getOwnPropertyDescriptor(visualViewport, "height");
+      Object.defineProperty(visualViewport, "height", { configurable: true, value: 320 });
+      visualViewport.dispatchEvent(new Event("resize"));
+    });
+    await expect
+      .poll(() => drawer.evaluate((el) => el.getBoundingClientRect().bottom <= 320))
+      .toBe(true);
+    await expectMapFillsScreen(page, true);
+    await expect.poll(sameCamera).toBe(true);
+    await page.evaluate(() => {
+      if (window.mapVisualHeightDescriptor)
+        Object.defineProperty(visualViewport, "height", window.mapVisualHeightDescriptor);
+      else delete visualViewport.height;
+      visualViewport.dispatchEvent(new Event("resize"));
+    });
+  }
   await drawer.evaluate((el) => {
     el.scrollTop = el.scrollHeight;
   });

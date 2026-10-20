@@ -81,4 +81,11 @@ test("corrupt storage and invalid camera values fail safely, guests use memory o
   };
   saveMapView("blocked-test", "town", { x: 0.5, y: 0.5, zoom: 2 }, blocked);
   assert.equal(readMapView("blocked-test", blocked).cameras.town.zoom, 2);
+  const quota = {
+    getItem: () => JSON.stringify({ lastMapId: "old", cameras: {} }),
+    setItem: blocked.setItem,
+  };
+  saveMapView("quota-test", "town", { x: 0.5, y: 0.5, zoom: 2, basis: 390 }, quota);
+  assert.equal(readMapView("quota-test", quota).lastMapId, "town");
+  assert.equal(readMapView("quota-test", quota).cameras.town.basis, 390);
 });

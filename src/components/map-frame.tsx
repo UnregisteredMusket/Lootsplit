@@ -19,11 +19,16 @@ function WorkspaceFrame({ children, title, actions, navigation, interfaceHidden 
   const [container, setContainer] = useState<HTMLDivElement | null>(null);
   useEffect(() => {
     const viewport = window.visualViewport;
-    const resize = () =>
+    const resize = () => {
       container?.style.setProperty(
         "--map-usable-height",
         `${viewport?.height ?? window.innerHeight}px`,
       );
+      if (container)
+        container.dataset.keyboardOpen = String(
+          window.innerHeight - (viewport?.height ?? window.innerHeight) > 120,
+        );
+    };
     resize();
     viewport?.addEventListener("resize", resize);
     return () => viewport?.removeEventListener("resize", resize);

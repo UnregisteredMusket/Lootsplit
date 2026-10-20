@@ -1,5 +1,5 @@
 /** Personal presentation only. Never part of campaign commands or player projection. */
-export type MapCamera = { x: number; y: number; zoom: number };
+export type MapCamera = { x: number; y: number; zoom: number; basis?: number };
 export type MapViewState = { lastMapId?: string; cameras: Record<string, MapCamera> };
 export type ViewStore = Pick<Storage, "getItem" | "setItem">;
 const memory = new Map<string, MapViewState>();
@@ -38,7 +38,8 @@ export function validMapCamera(value: unknown): value is MapCamera {
     Math.abs(c.x) <= 5 &&
     Math.abs(c.y) <= 5 &&
     c.zoom >= 0.5 &&
-    c.zoom <= 8
+    c.zoom <= 8 &&
+    (c.basis === undefined || (Number.isFinite(c.basis) && c.basis >= 1 && c.basis <= 100000))
   );
 }
 export function readMapView(key: string, storage?: ViewStore): MapViewState {

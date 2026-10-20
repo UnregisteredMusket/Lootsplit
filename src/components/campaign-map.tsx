@@ -8,6 +8,7 @@ import {
   saveMapView,
   accessibleMapId,
   mapViewStorage,
+  type MapCamera,
 } from "@/lib/quire/map-view-state";
 import { useEconomy } from "@/lib/quire/economy-context";
 import { useSeatKnown } from "@/lib/quire/seat";
@@ -1421,6 +1422,7 @@ function MapViewport({
         x: (previous.width / 2 - v.x) / (previous.w * v.scale),
         y: (previous.height / 2 - v.y) / (previous.h * v.scale),
         zoom: v.scale,
+        basis: previous.w,
       };
       cameras.set(previous.mapId, previousCamera);
       saveMapView(
@@ -1447,26 +1449,32 @@ function MapViewport({
     ) {
       // Rotating a phone or resizing the workspace keeps the
       // same world point at the center instead of unexpectedly fitting the map.
-      setView((v) => ({
-        scale: v.scale,
-        x: size.w / 2 - ((previous.width / 2 - v.x) / previous.w) * w,
-        y: size.h / 2 - ((previous.height / 2 - v.y) / previous.h) * h,
-      }));
+      setView((v) => {
+        const scale = Math.min(8, Math.max(0.5, (v.scale * previous.w) / w));
+        return {
+          scale,
+          x: size.w / 2 - ((previous.width / 2 - v.x) * w * scale) / (previous.w * v.scale),
+          y: size.h / 2 - ((previous.height / 2 - v.y) * h * scale) / (previous.h * v.scale),
+        };
+      });
       return;
     }
-    const camera =
+    const camera: MapCamera | undefined =
       entryCamera?.mapId === map.id
         ? entryCamera.view
         : !useDm && tools.session.camera?.mapId === map.id
           ? tools.session.camera.view
           : (cameras.get(map.id) ?? map.tabletop?.initialView);
     const cover = Math.min(8, Math.max(size.w / w, size.h / h));
+    const restoredScale = camera
+      ? Math.min(8, Math.max(0.5, (camera.zoom * (camera.basis ?? w)) / w))
+      : cover;
     setView(
       camera
         ? {
-            x: size.w / 2 - camera.x * w * camera.zoom,
-            y: size.h / 2 - camera.y * h * camera.zoom,
-            scale: camera.zoom,
+            x: size.w / 2 - camera.x * w * restoredScale,
+            y: size.h / 2 - camera.y * h * restoredScale,
+            scale: restoredScale,
           }
         : { x: (size.w - w * cover) / 2, y: (size.h - h * cover) / 2, scale: cover },
     );
@@ -1481,12 +1489,10 @@ function MapViewport({
     }),
     [size.w, size.h, view.x, view.y, view.scale, w, h],
   );
-  const savedView = useRef<{ id: string; camera: ReturnType<typeof currentCamera> } | undefined>(
-    undefined,
-  );
+  const savedView = useRef<{ id: string; camera: MapCamera } | undefined>(undefined);
   useEffect(() => {
     if (artworkReady && size.w > 1 && size.h > 1 && previousViewport.current?.mapId === map.id)
-      savedView.current = { id: map.id, camera: currentCamera() };
+      savedView.current = { id: map.id, camera: { ...currentCamera(), basis: w } };
     const timer = window.setTimeout(() => {
       const last = savedView.current;
       if (last)
