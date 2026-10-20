@@ -1,4 +1,6 @@
-import { useEffect, useState } from "react";
+import { createPortal } from "react-dom";
+import { OverlayContainer } from "./overlay-container";
+import { useEffect, useState, useContext } from "react";
 import { useSeat } from "@/lib/quire/seat";
 import { activeCampaignId } from "@/lib/quire/campaign-context";
 import { loadMapAsset, mapAssetBlob } from "@/lib/quire/map-assets";
@@ -10,11 +12,14 @@ export function MapArtwork({
   map,
   onRatio,
   animated = true,
+  controlsInWorkspace = false,
 }: {
   map: CampaignMap;
   onRatio?: (ratio: number) => void;
   animated?: boolean;
+  controlsInWorkspace?: boolean;
 }) {
+  const overlay = useContext(OverlayContainer);
   const seat = useSeat(),
     campaign = activeCampaignId(),
     media = map.tabletop?.media;
@@ -71,52 +76,23 @@ export function MapArtwork({
     video = !!media?.mime.startsWith("video/");
   const imageLoaded = (image: HTMLImageElement) =>
     onRatio?.((media?.width ?? image.naturalWidth) / (media?.height ?? image.naturalHeight));
-  return (
+  const controls = (
     <>
-      <img
-        draggable={false}
-        src={map.image}
-        alt={map.name}
-        onLoad={(event) => imageLoaded(event.currentTarget)}
-      />
-      {!video &&
-        (!media?.animated || (animated && playing)) &&
-        urls.map((url) => (
-          <img
-            className="map-media-detail"
-            key={url}
-            draggable={false}
-            src={url}
-            alt=""
-            aria-hidden="true"
-            onLoad={(event) => imageLoaded(event.currentTarget)}
-          />
-        ))}
       {(video || media?.animated) && animated && urls[0] && (
-        <>
-          {video && playing && (
-            <video
-              className="map-media-detail"
-              src={urls[0]}
-              muted
-              loop
-              playsInline
-              autoPlay
-              onLoadedMetadata={(event) =>
-                onRatio?.(event.currentTarget.videoWidth / event.currentTarget.videoHeight)
-              }
-            />
-          )}
-          <button
-            type="button"
-            className="map-video-toggle"
-            onPointerDown={(event) => event.stopPropagation()}
-            onClick={() => setPlaying((value) => !value)}
-            aria-pressed={playing}
-          >
-            {playing ? "Pause map animation" : "Play map animation"}
-          </button>
-        </>
+        <button
+          type="button"
+          className="map-video-toggle"
+          onPointerDown={(event) => event.stopPropagation()}
+          onClick={() => setPlaying((value) => !value)}
+          aria-pressed={playing}
+        >
+          {playing ? "Pause map animation" : "Play map animation"}
+        </button>
+      )}
+      {error && references.length === 0 && (
+        <span className="map-media-status" role="alert">
+          {error}
+        </span>
       )}
       {references.length > 0 && urls.length === 0 && (
         <span className="map-media-status" role="status">
@@ -137,6 +113,53 @@ export function MapArtwork({
           Waiting for the DM’s current player view. Concealed areas remain hidden.
         </span>
       )}
+    </>
+  );
+  return (
+    <>
+      <img
+        draggable={false}
+        src={map.image}
+        alt={map.name}
+        onLoad={(event) => imageLoaded(event.currentTarget)}
+        onError={() => {
+          onRatio?.(media ? media.width / media.height : 1);
+          setError(
+            seat.role === "dm"
+              ? "Map preview could not load. Review its image in Settings."
+              : "Map preview could not load. Ask the DM to check its artwork.",
+          );
+        }}
+      />
+      {!video &&
+        (!media?.animated || (animated && playing)) &&
+        urls.map((url) => (
+          <img
+            className="map-media-detail"
+            key={url}
+            draggable={false}
+            src={url}
+            alt=""
+            aria-hidden="true"
+            onLoad={(event) => imageLoaded(event.currentTarget)}
+          />
+        ))}
+      {video && animated && playing && urls[0] && (
+        <video
+          className="map-media-detail"
+          src={urls[0]}
+          muted
+          loop
+          playsInline
+          autoPlay
+          onLoadedMetadata={(event) =>
+            onRatio?.(event.currentTarget.videoWidth / event.currentTarget.videoHeight)
+          }
+        />
+      )}
+      {controlsInWorkspace && overlay
+        ? createPortal(<div className="map-media-controls">{controls}</div>, overlay)
+        : controls}
     </>
   );
 }

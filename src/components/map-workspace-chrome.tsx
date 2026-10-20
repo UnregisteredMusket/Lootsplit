@@ -1,4 +1,6 @@
-import { useEffect, useRef, useState, type ReactNode } from "react";
+import { ShellMapActions } from "./shell-map-actions";
+import { WorkspaceWindows } from "./workspace-windows";
+import { useEffect, useRef, useState, useContext, type ReactNode } from "react";
 import {
   ArrowLeft,
   ChevronDown,
@@ -44,6 +46,7 @@ export function MapWorkspaceChrome({
   hidden: boolean;
   setHidden: (hidden: boolean) => void;
 }) {
+  const app = useContext(ShellMapActions);
   const [query, setQuery] = useState(""),
     [searching, setSearching] = useState(false),
     [index, setIndex] = useState(0),
@@ -64,6 +67,10 @@ export function MapWorkspaceChrome({
     setQuery("");
     input.current?.blur();
   };
+  useEffect(() => {
+    if (searching)
+      document.getElementById(`map-result-${index}`)?.scrollIntoView({ block: "nearest" });
+  }, [index, searching]);
   useEffect(() => {
     setMenu(false);
     setSearching(false);
@@ -126,7 +133,9 @@ export function MapWorkspaceChrome({
                     .filter(
                       (m) =>
                         m.connected?.parentMapId === map.id ||
-                        map.connected?.links.some((l) => l.targetMapId === m.id),
+                        map.connected?.links.some(
+                          (l) => l.targetMapId === m.id && (app?.dm || l.visibility === "party"),
+                        ),
                     )
                     .map((m) => (
                       <button
@@ -166,6 +175,27 @@ export function MapWorkspaceChrome({
                   </AppLink>
                 ))}
               </nav>
+              {app && (
+                <div className="map-app-actions">
+                  <button aria-label="Select campaign" onClick={app.openCampaign}>
+                    {app.campaignName}
+                  </button>
+                  <button
+                    aria-label={app.dm ? "Dungeon master. Change role." : "Player. Change role."}
+                    disabled={!app.seatKnown}
+                    onClick={app.changeRole}
+                  >
+                    {app.dm ? "Dungeon Master" : "Player"}
+                  </button>
+                  <WorkspaceWindows />
+                  <AppLink href="/share?chat=1">
+                    Messages{app.unreadCount ? ` (${app.unreadCount})` : ""}
+                  </AppLink>
+                  <button aria-label="Settings & Management" onClick={app.openManagement}>
+                    Settings & Management
+                  </button>
+                </div>
+              )}
               <AppLink href="/account">My account</AppLink>
               <AppLink href="/settings">Application settings</AppLink>
               <button
@@ -195,7 +225,7 @@ export function MapWorkspaceChrome({
                 aria-autocomplete="list"
                 aria-controls="map-search-results"
                 aria-activedescendant={
-                  searching && matches[index] ? `map-result-${index}` : undefined
+                  searching && query.trim() && matches[index] ? `map-result-${index}` : undefined
                 }
                 placeholder="Search maps, places and people"
                 value={query}
@@ -332,6 +362,13 @@ export function MapWorkspaceChrome({
 export function MapEmptyWorkspace({ dm, settings }: { dm: boolean; settings: ReactNode }) {
   const [open, setOpen] = useState(false),
     [hidden, setHidden] = useState(false);
+  useEffect(() => {
+    const key = (e: KeyboardEvent) => {
+      if (e.key === "Escape" && !(e.target as HTMLElement).closest("dialog")) setOpen(false);
+    };
+    document.addEventListener("keydown", key);
+    return () => document.removeEventListener("keydown", key);
+  }, []);
   return (
     <MapFrame title="Maps">
       <MapWorkspaceChrome

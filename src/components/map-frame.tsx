@@ -18,6 +18,17 @@ export function MapFrame(props: Props) {
 function WorkspaceFrame({ children, title, actions, navigation, interfaceHidden }: Props) {
   const [container, setContainer] = useState<HTMLDivElement | null>(null);
   useEffect(() => {
+    const viewport = window.visualViewport;
+    const resize = () =>
+      container?.style.setProperty(
+        "--map-usable-height",
+        `${viewport?.height ?? window.innerHeight}px`,
+      );
+    resize();
+    viewport?.addEventListener("resize", resize);
+    return () => viewport?.removeEventListener("resize", resize);
+  }, [container]);
+  useEffect(() => {
     const overflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";
     return () => {

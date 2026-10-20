@@ -1,3 +1,4 @@
+import { SyncStatus } from "./sync-status";
 import { useMapSketches } from "./map-sketch-tools";
 import { MapWorkspaceChrome, MapEmptyWorkspace } from "./map-workspace-chrome";
 import { captureMutationScope } from "@/lib/quire/cloud-client";
@@ -32,6 +33,7 @@ import {
   lazy,
   Suspense,
   useEffect,
+  useCallback,
   useLayoutEffect,
   useRef,
   useState,
@@ -474,7 +476,7 @@ function CampaignMapWorkspace({ viewScope }: { viewScope: { key: string; ephemer
   );
   const management = (
     <>
-      {" "}
+      <SyncStatus compact />{" "}
       <p className="text-muted">
         {partyEnvironment(w.partyPosition) || locationLabel(market, market.currentLocationId)} ·{" "}
         {party
@@ -1298,7 +1300,7 @@ function MapViewport({
       setServiceExpanded(false);
     }
   };
-  useEffect(() => {
+  useLayoutEffect(() => {
     setDetails([]);
     setService(undefined);
     setServiceExpanded(false);
@@ -1387,10 +1389,11 @@ function MapViewport({
     observer.observe(el);
     return () => observer.disconnect();
   }, []);
-  const cameras = useRef(
-    new Map(
-      Object.entries(readMapView(viewScope.key, mapViewStorage(viewScope.ephemeral)).cameras),
-    ),
+  const [cameras] = useState(
+    () =>
+      new Map(
+        Object.entries(readMapView(viewScope.key, mapViewStorage(viewScope.ephemeral)).cameras),
+      ),
   );
   const cameraNonce =
     entryCamera?.mapId === map.id
@@ -1419,7 +1422,7 @@ function MapViewport({
         y: (previous.height / 2 - v.y) / (previous.h * v.scale),
         zoom: v.scale,
       };
-      cameras.current.set(previous.mapId, previousCamera);
+      cameras.set(previous.mapId, previousCamera);
       saveMapView(
         viewScope.key,
         previous.mapId,
@@ -1456,7 +1459,7 @@ function MapViewport({
         ? entryCamera.view
         : !useDm && tools.session.camera?.mapId === map.id
           ? tools.session.camera.view
-          : (cameras.current.get(map.id) ?? map.tabletop?.initialView);
+          : (cameras.get(map.id) ?? map.tabletop?.initialView);
     const cover = Math.min(8, Math.max(size.w / w, size.h / h));
     setView(
       camera
@@ -1470,11 +1473,14 @@ function MapViewport({
     // A DM camera action applies once. Ordinary room polling never drags a player's camera.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [size.w, size.h, w, h, map.id, cameraNonce, artworkReady]);
-  const currentCamera = () => ({
-    x: Math.max(-5, Math.min(5, (size.w / 2 - view.x) / (w * view.scale))),
-    y: Math.max(-5, Math.min(5, (size.h / 2 - view.y) / (h * view.scale))),
-    zoom: view.scale,
-  });
+  const currentCamera = useCallback(
+    () => ({
+      x: Math.max(-5, Math.min(5, (size.w / 2 - view.x) / (w * view.scale))),
+      y: Math.max(-5, Math.min(5, (size.h / 2 - view.y) / (h * view.scale))),
+      zoom: view.scale,
+    }),
+    [size.w, size.h, view.x, view.y, view.scale, w, h],
+  );
   const savedView = useRef<{ id: string; camera: ReturnType<typeof currentCamera> } | undefined>(
     undefined,
   );
@@ -1499,15 +1505,20 @@ function MapViewport({
     viewScope.key,
     viewScope.ephemeral,
     artworkReady,
+    currentCamera,
   ]);
-  useEffect(
-    () => () => {
+  useEffect(() => {
+    const flush = () => {
       const last = savedView.current;
       if (last)
         saveMapView(viewScope.key, last.id, last.camera, mapViewStorage(viewScope.ephemeral));
-    },
-    [viewScope.key, viewScope.ephemeral],
-  );
+    };
+    window.addEventListener("pagehide", flush);
+    return () => {
+      window.removeEventListener("pagehide", flush);
+      flush();
+    };
+  }, [viewScope.key, viewScope.ephemeral]);
   function zoom(factor: number, x: number, y: number) {
     setView((v) => {
       const scale = Math.min(8, Math.max(0.5, v.scale * factor)),
@@ -1565,6 +1576,7 @@ function MapViewport({
     stopPlacing();
     sketches.cancel();
     setPinging(false);
+    setMoreTools(false);
     setDrawerOpen(false);
     setDetails([]);
     setService(undefined);
@@ -1670,20 +1682,30 @@ function MapViewport({
         record,
       })),
     ...maps.flatMap((m) => [
-      ...m.anchors.map((a) => ({
-        key: `anchor:${m.id}:${a.locationId}`,
-        label: locationLabel(readMarketLocations(recordTable.journal?.market), a.locationId),
-        kind: "Location",
-        context: m.name,
-        mapId: m.id,
-        record: {
-          id: a.locationId,
+      ...m.anchors
+        .filter(
+          (a) =>
+            m.id !== map.id &&
+            !(
+              m.connected?.placedRecords ??
+              m.connected?.placements.map((p) => p.record) ??
+              []
+            ).some((r) => r.kind === "location" && r.id === a.locationId),
+        )
+        .map((a) => ({
+          key: `anchor:${m.id}:${a.locationId}`,
           label: locationLabel(readMarketLocations(recordTable.journal?.market), a.locationId),
           kind: "Location",
-          point: a,
-          reference: { kind: "location" as const, id: a.locationId },
-        },
-      })),
+          context: m.name,
+          mapId: m.id,
+          record: {
+            id: a.locationId,
+            label: locationLabel(readMarketLocations(recordTable.journal?.market), a.locationId),
+            kind: "Location",
+            point: a,
+            reference: { kind: "location" as const, id: a.locationId },
+          },
+        })),
       ...(m.id === map.id
         ? []
         : m.markers
@@ -1729,7 +1751,7 @@ function MapViewport({
         role="region"
         aria-label="Map settings"
         onKeyDown={(e) => {
-          if (e.key === "Escape" && allowContextChange()) {
+          if (e.key === "Escape") {
             e.stopPropagation();
             setDrawerOpen(false);
             root.current?.focus();
@@ -1737,9 +1759,29 @@ function MapViewport({
         }}
       >
         <div className="map-panel-heading">
-          <div role="tablist" aria-label="Map settings tabs">
+          <div
+            role="tablist"
+            aria-label="Map settings tabs"
+            onKeyDown={(e) => {
+              if (!["ArrowLeft", "ArrowRight", "Home", "End"].includes(e.key)) return;
+              e.preventDefault();
+              const next =
+                e.key === "Home"
+                  ? "settings"
+                  : e.key === "End"
+                    ? "places"
+                    : settingsTab === "settings"
+                      ? "places"
+                      : "settings";
+              setSettingsTab(next);
+              e.currentTarget.querySelector<HTMLButtonElement>(`#map-tab-${next}`)?.focus();
+            }}
+          >
             <button
               role="tab"
+              id="map-tab-settings"
+              aria-controls="map-panel-settings"
+              tabIndex={settingsTab === "settings" ? 0 : -1}
               aria-selected={settingsTab === "settings"}
               onClick={() => setSettingsTab("settings")}
             >
@@ -1747,6 +1789,9 @@ function MapViewport({
             </button>
             <button
               role="tab"
+              id="map-tab-places"
+              aria-controls="map-panel-places"
+              tabIndex={settingsTab === "places" ? 0 : -1}
               aria-selected={settingsTab === "places"}
               onClick={() => setSettingsTab("places")}
             >
@@ -1764,7 +1809,12 @@ function MapViewport({
             <X size={18} />
           </button>
         </div>
-        <div role="tabpanel" hidden={settingsTab !== "places"}>
+        <div
+          role="tabpanel"
+          id="map-panel-places"
+          aria-labelledby="map-tab-places"
+          hidden={settingsTab !== "places"}
+        >
           {records.map((record) => (
             <button
               className="map-place-row"
@@ -1776,7 +1826,12 @@ function MapViewport({
             </button>
           ))}
         </div>
-        <div role="tabpanel" hidden={settingsTab !== "settings"}>
+        <div
+          role="tabpanel"
+          id="map-panel-settings"
+          aria-labelledby="map-tab-settings"
+          hidden={settingsTab !== "settings"}
+        >
           {setupSettings}
           {tools.configurationControls}
           <button className="settings-link" onClick={() => tools.openInspector()}>
@@ -1949,7 +2004,10 @@ function MapViewport({
                   title="More map tools"
                   aria-label="More map tools"
                   aria-expanded={moreTools}
-                  onClick={() => setMoreTools(!moreTools)}
+                  onClick={() => {
+                    if (!moreTools) setContextOpen(false);
+                    setMoreTools(!moreTools);
+                  }}
                 >
                   <MoreHorizontal size={20} />
                 </button>
@@ -2327,7 +2385,7 @@ function MapViewport({
               }
               if (
                 (placing || pinging) &&
-                !(e.target as Element).closest("button") &&
+                (pinging || !(e.target as Element).closest("button")) &&
                 !moved.current &&
                 pointers.current.has(e.pointerId) &&
                 pointers.current.size === 1
@@ -2350,6 +2408,11 @@ function MapViewport({
               }
             }}
           >
+            {!artworkReady && (
+              <span className="map-loading-artwork" role="status">
+                Opening map…
+              </span>
+            )}
             <div
               className="map-layer"
               style={{
@@ -2360,6 +2423,7 @@ function MapViewport({
               }}
             >
               <MapArtwork
+                controlsInWorkspace
                 key={map.id}
                 map={map}
                 onRatio={(ratio) =>
@@ -2453,6 +2517,8 @@ function MapViewport({
                       if (
                         !moved.current &&
                         !pinging &&
+                        !sketches.active &&
+                        ["pan", "select"].includes(tools.tool) &&
                         (!(service || combatOpen) || allowContextChange())
                       ) {
                         setService(undefined);

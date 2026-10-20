@@ -1,4 +1,10 @@
-import { openMapSettings, closeMapSettings, selectWorkspaceMap, selectMapType, openMoreMapTools } from "./map-workspace-browser.mjs";
+import {
+  openMapSettings,
+  closeMapSettings,
+  selectWorkspaceMap,
+  selectMapType,
+  openMoreMapTools,
+} from "./map-workspace-browser.mjs";
 import assert from "node:assert/strict";
 import { expect } from "playwright/test";
 import { navigateApplication, reloadApplication } from "./title-screen-navigation.mjs";
@@ -41,6 +47,7 @@ export async function checkOnlineTabletop(dm, player, origin, width, output, jou
   await viewport.focus();
   await viewport.press("ArrowRight");
   await expect.poll(async () => (await hero()).column).toBe(6);
+  await player.getByRole("button", { name: "Close inspector", exact: true }).click();
   await ownToken.scrollIntoViewIfNeeded();
   const start = await ownToken.boundingBox(),
     layer = await player.locator(".map-layer").boundingBox();
@@ -51,6 +58,7 @@ export async function checkOnlineTabletop(dm, player, origin, width, output, jou
   });
   await player.mouse.up();
   await expect.poll(async () => (await hero()).column).toBe(7);
+  await player.getByRole("button", { name: "Close inspector", exact: true }).click();
   await player.getByRole("button", { name: "Measure", exact: true }).click();
   await viewport.scrollIntoViewIfNeeded();
   const box = await viewport.boundingBox();
@@ -59,6 +67,7 @@ export async function checkOnlineTabletop(dm, player, origin, width, output, jou
   await expect(player.getByLabel("Measured distance", { exact: true })).not.toHaveText("0.0 ft");
   await player.getByRole("button", { name: "Cancel tool", exact: true }).click();
   await player.getByRole("button", { name: "Area template", exact: true }).click();
+  await player.getByRole("button", { name: "Close tool options", exact: true }).click();
   await viewport.click({ position: { x: box.width / 2, y: box.height / 2 } });
   await expect
     .poll(
@@ -66,7 +75,7 @@ export async function checkOnlineTabletop(dm, player, origin, width, output, jou
         (await journal(dm)).world.maps.find((map) => map.id === "keep").tabletop.templates.length,
     )
     .toBe(1);
-  await player.getByRole("button", { name: "Cancel tool", exact: true }).click();
+  await player.getByRole("button", { name: "Pan", exact: true }).click();
   assert.deepEqual(
     (await journal(dm)).events.filter((event) => event.kind !== "management"),
     money,
@@ -127,10 +136,11 @@ export async function checkOnlineTabletop(dm, player, origin, width, output, jou
   await closeMapSettings(player);
   await openMoreMapTools(dm);
   await dm.getByRole("button", { name: "Fog rectangle", exact: true }).click();
+  await dm.getByRole("button", { name: "Close tool options", exact: true }).click();
   const dmView = dm.getByRole("region", { name: "Interactive campaign map", exact: true });
   await dmView.scrollIntoViewIfNeeded();
   const rect = await dm.locator(".map-layer").boundingBox();
-  await dm.mouse.move(rect.x + rect.width * 0.05, rect.y + rect.height * 0.05);
+  await dm.mouse.move(rect.x + rect.width * 0.05, rect.y + rect.height * 0.12);
   await dm.mouse.down();
   await dm.mouse.move(rect.x + rect.width * 0.85, rect.y + rect.height * 0.7, { steps: 5 });
   await dm.mouse.up();
@@ -138,6 +148,7 @@ export async function checkOnlineTabletop(dm, player, origin, width, output, jou
   await expect.poll(() => alpha(0.95, 0.95)).toBe(0);
   await expect(ownToken).toBeVisible();
   await expect(player.locator(".campaign-maps")).not.toContainText("Hidden guard");
+  await openMoreMapTools(dm);
   await dm.getByRole("button", { name: "Undo fog", exact: true }).click();
   await expect.poll(() => alpha(0.2, 0.2)).toBe(0);
   await dm.getByRole("button", { name: "Redo fog", exact: true }).click();
@@ -212,7 +223,7 @@ export async function checkOnlineTabletop(dm, player, origin, width, output, jou
   await closeMapSettings(dm);
   await dm.getByRole("button", { name: "Pan", exact: true }).click();
   await openMapSettings(dm);
-    await dm.getByRole("button", { name: "Import map", exact: true }).click();
+  await dm.getByRole("button", { name: "Import map", exact: true }).click();
   const editor = dm.getByRole("dialog", { name: "Map editor", exact: true });
   await editor.getByLabel("Map name", { exact: true }).fill("Imported media audit");
   const image = await dm.evaluate(() => {
@@ -307,7 +318,7 @@ export async function checkOnlineTabletop(dm, player, origin, width, output, jou
     });
   });
   await openMapSettings(dm);
-    await dm.getByRole("button", { name: "Import map", exact: true }).click();
+  await dm.getByRole("button", { name: "Import map", exact: true }).click();
   await editor.getByLabel("Map name", { exact: true }).fill("Animated media audit");
   await editor.getByLabel("Map artwork or video", { exact: true }).setInputFiles({
     name: "animation.webm",

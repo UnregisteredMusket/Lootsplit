@@ -1,4 +1,10 @@
-import { openMapSettings, closeMapSettings, selectWorkspaceMap, selectMapType, openMoreMapTools } from "./map-workspace-browser.mjs";
+import {
+  openMapSettings,
+  closeMapSettings,
+  selectWorkspaceMap,
+  selectMapType,
+  openMoreMapTools,
+} from "./map-workspace-browser.mjs";
 import { checkConnectedMaps } from "./connected-maps-browser-check.mjs";
 import { checkFullscreenMap } from "./fullscreen-map-browser-check.mjs";
 import { checkPlayerDisplay } from "./player-display-browser-check.mjs";
@@ -256,6 +262,7 @@ try {
       guardIcon = page.getByTitle("Combatant: Hidden guard", { exact: true });
     await expect(heroIcon).toHaveAttribute("aria-pressed", "true");
     const selectedColor = await heroIcon.evaluate((el) => getComputedStyle(el).backgroundColor);
+    await page.getByRole("button", { name: "Fit map", exact: true }).click();
     // Pan the corner token below the floating navigation, without moving any token.
     await viewport.focus();
     await viewport.press("Alt+ArrowUp");

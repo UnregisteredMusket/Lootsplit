@@ -3,6 +3,7 @@ export type MapCamera = { x: number; y: number; zoom: number };
 export type MapViewState = { lastMapId?: string; cameras: Record<string, MapCamera> };
 export type ViewStore = Pick<Storage, "getItem" | "setItem">;
 const memory = new Map<string, MapViewState>();
+const failedWrites = new Set<string>();
 export function mapViewKey(
   scope: {
     campaignId: string;
@@ -42,7 +43,10 @@ export function validMapCamera(value: unknown): value is MapCamera {
 }
 export function readMapView(key: string, storage?: ViewStore): MapViewState {
   try {
-    const value = storage ? JSON.parse(storage.getItem(key) || "null") : memory.get(key);
+    const value =
+      storage && !failedWrites.has(key)
+        ? JSON.parse(storage.getItem(key) || "null")
+        : memory.get(key);
     if (!value || typeof value !== "object") return { cameras: {} };
     return {
       lastMapId: typeof value.lastMapId === "string" ? value.lastMapId.slice(0, 150) : undefined,
@@ -67,7 +71,9 @@ export function saveMapView(key: string, mapId: string, camera?: MapCamera, stor
   memory.set(key, next);
   try {
     storage?.setItem(key, JSON.stringify(next));
+    failedWrites.delete(key);
   } catch {
+    failedWrites.add(key);
     /* View remains usable without storage. */
   }
 }

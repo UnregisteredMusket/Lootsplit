@@ -1,4 +1,10 @@
-import { openMapSettings, closeMapSettings, selectWorkspaceMap, selectMapType, openMoreMapTools } from "./map-workspace-browser.mjs";
+import {
+  openMapSettings,
+  closeMapSettings,
+  selectWorkspaceMap,
+  selectMapType,
+  openMoreMapTools,
+} from "./map-workspace-browser.mjs";
 import { checkFullscreenMap } from "./fullscreen-map-browser-check.mjs";
 import { auditCharacterPlacement } from "./character-placement-browser.mjs";
 import { chooseOption } from "./search-select-browser.mjs";
@@ -309,6 +315,7 @@ try {
     await page.getByLabel("Share this map image with players", { exact: true }).check();
     await page.getByRole("button", { name: "Save map", exact: true }).click();
     await expect(page.getByRole("heading", { name: "Import a map", exact: true })).toHaveCount(0);
+    await openMapSettings(page);
     await expect(page.getByRole("region", { name: "Interactive campaign map" })).toBeVisible();
     await reloadApplication(page);
     await expect(page.getByRole("region", { name: "Interactive campaign map" })).toBeVisible();
@@ -323,7 +330,7 @@ try {
     await expect(page.locator(".map-editor-frame")).toHaveClass(/map-fullscreen/);
     await page.getByLabel("Map name", { exact: true }).fill("Port atlas revised");
     await page.screenshot({ path: `${output}/fullscreen-editor-${width}.png` });
-    page.once("dialog", dialog => dialog.dismiss());
+    page.once("dialog", (dialog) => dialog.dismiss());
     await page.keyboard.press("Escape");
     await expect(page.locator(".map-editor-frame")).toHaveClass(/map-fullscreen/);
     await expect(page.getByLabel("Map name", { exact: true })).toHaveValue("Port atlas revised");
@@ -439,6 +446,7 @@ try {
     await page.getByRole("button", { name: "Fit map", exact: true }).click();
     await fits(page);
     await page.screenshot({ path: `${output}/maps-${width}.png`, fullPage: true });
+    await openMapSettings(page);
     await page
       .getByRole("link", { name: "People & NPCs", exact: false })
       .filter({ visible: true })
@@ -758,6 +766,7 @@ try {
     await expect(page.getByRole("button", { name: "Save map", exact: true })).toBeEnabled();
     await page.getByRole("button", { name: "Save map", exact: true }).click();
     await expect(page.getByRole("heading", { name: "Import a map", exact: true })).toHaveCount(0);
+    await openMapSettings(page);
     await expect(
       page
         .getByRole("status")
@@ -846,7 +855,9 @@ try {
       timeout: 7000,
     });
     await page.getByRole("button", { name: "Ping", exact: true }).click();
+    await openMapSettings(page);
     await chooseOption(page.getByLabel("Ping color", { exact: true }), "green");
+    await closeMapSettings(page);
     await page.getByRole("region", { name: "Interactive campaign map" }).focus();
     await page.keyboard.press("Enter");
     await expect(guest.getByRole("img", { name: "green map ping", exact: true })).toBeVisible();

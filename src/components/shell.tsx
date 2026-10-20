@@ -1,3 +1,4 @@
+import { ShellMapActions } from "./shell-map-actions";
 import { FeatureCards } from "./feature-navigation";
 import { WorkspaceWindows } from "./workspace-windows";
 import { SubmenuBackdrop } from "./submenu-backdrop";
@@ -252,8 +253,22 @@ export function Shell({
                 width === "prose" ? "max-w-3xl" : "max-w-6xl",
               )}
             >
-              {pathname !== "/share" ? <SyncStatus compact /> : null}
-              {children}
+              {pathname !== "/share" && pathname !== "/maps" ? <SyncStatus compact /> : null}
+              <ShellMapActions.Provider
+                value={{
+                  campaignName,
+                  dm,
+                  seatKnown,
+                  unreadCount,
+                  openCampaign: () => {
+                    if (allowContextChange()) setCampaignOpen(true);
+                  },
+                  changeRole: () => void requestRoleChange(),
+                  openManagement: () => setManagement(true),
+                }}
+              >
+                {children}
+              </ShellMapActions.Provider>
             </main>
           </SubmenuBackdrop>
         </div>
