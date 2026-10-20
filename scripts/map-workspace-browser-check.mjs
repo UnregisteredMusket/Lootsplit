@@ -93,7 +93,11 @@ export async function checkMapWorkspace(page, origin, output, width) {
   await expect(page).toHaveURL(origin + "/encounters");
   await expect(page.locator(".loot-opening")).toHaveCount(0);
   await navigateApplication(page, origin + "/maps");
-  await page.getByRole("button", { name: "Map navigation menu", exact: true }).click();
+  // Router transitions may retain the map's open menu. Open it deliberately
+  // instead of toggling an already-open menu closed before Hide interface.
+  const menu = page.getByRole("button", { name: "Map navigation menu", exact: true });
+  if ((await menu.getAttribute("aria-expanded")) !== "true") await menu.click();
+  await expect(menu).toHaveAttribute("aria-expanded", "true");
   await nav.getByRole("button", { name: "Hide interface", exact: true }).click();
   await expect(page.getByRole("button", { name: "Show interface", exact: true })).toBeVisible();
   await page.getByRole("button", { name: "Show interface", exact: true }).click();
