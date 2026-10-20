@@ -250,7 +250,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Development / governance / dev-sound | open | 3 | 8s → 40s | +32s | +400% |
 | Cloudflare web build | open | 2 | 8.956s → 16.544s | +7.588s | +84.73% |
 | mobile web build | open | 2 | 6.259s → 12.496s | +6.237s | +99.65% |
-| Development / governance / dev-sound | open | 2 | 8s → 35s | +27s | +337.5% |
+| Development / governance / dev-sound | open | 3 | 8s → 42s | +34s | +425% |
 | property-browser-audit | open | 2 | 32.709s → 99.355s | +66.646s | +203.75% |
 | world features browser audit | open | 2 | 34.352s → 53.675s | +19.323s | +56.25% |
 | Development / gameplay / dev-property-operations | open | 2 | 23s → 33s | +10s | +43.48% |
@@ -295,7 +295,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Packaged Worker / accounts (balanced v2) / worker-account | open | 2 | 85s → 117s | +32s | +37.65% |
 | Packaged Worker / accounts (balanced v2) / worker-finance | open | 3 | 22s → 41s | +19s | +86.36% |
 | Packaged Worker / accounts (balanced v2) / worker-ships | open | 2 | 27s → 47s | +20s | +74.07% |
-| Packaged Worker / accounts (balanced v2) / worker-map-tiles | open | 3 | 17s → 95s | +78s | +458.82% |
+| Packaged Worker / accounts (balanced v2) / worker-map-tiles | open | 4 | 17s → 112s | +95s | +558.82% |
 | Development / desktop (balanced v2) / Run npx playwright install --with-deps chromium | open | 2 | 20s → 33s | +13s | +65% |
 | Packaged Worker / accounts (balanced v2) / Run actions/download-artifact@v4 | open | 2 | 2s → 4s | +2s | +100% |
 | Packaged Worker / interface (balanced v2) / worker-game-analytics | open | 2 | 3s → 5s | +2s | +66.67% |
@@ -313,6 +313,9 @@ Open trends require investigation. Resolved trends retain their history; each ve
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-20T06:06:40Z | step: Packaged Worker / accounts (balanced v2) / worker-map-tiles | 95s → 112s | +17s | +17.89% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39266580213/job/118108928948) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39377674059/job/118479828566) |
+| 2026-10-20T06:02:07Z | step: Development / governance / dev-sound | 35s → 42s | +7s | +20% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37889515368/job/113687018218) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39377674059/job/118479368445) |
+| 2026-10-20T05:16:15.830Z | audit: connected-map-navigation-services-combat | 22.786s → 33.259s | +10.473s | +45.96% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/pull/112) · [After](https://github.com/UnregisteredMusket/Lootsplit/commit/f2ed4bb23a647e9191bac4278d57a5b94dc18908) |
 | 2026-10-20T05:47:12Z | job: test-apk | 161s → 201s | +40s | +24.84% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39370431899/job/118456842972) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39376449380/job/118475557611) |
 | 2026-10-20T05:47:12.000Z | workflow: Android test APK | 161s → 201s | +40s | +24.84% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39370431899) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39376449380) |
 | 2026-10-20T05:47:06Z | step: test-apk / Run npm run build:android | 114s → 153s | +39s | +34.21% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39370431899/job/118456842972) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39376449380/job/118475557611) |
