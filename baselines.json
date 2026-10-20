@@ -21133,5 +21133,20 @@
     "finishedAt": "2026-10-20T16:32:31Z",
     "durationMs": 1000,
     "trendId": "39456470380:1:b19fa79ee57f2a224a161f3202a4eb31addba30a7707b0d42f85b6b78d2a4c58"
+  },
+  "[\"local\",\"audit\",\"full-cold-account-trace-diagnostic\",\"node22.23.3/chromium153.0.8010.0/workspace-ed8684309001/fresh-copy-and-vite-cache/2-workers/trace-on\",\"v1\"]": {
+    "schema": 1,
+    "id": "local:08d640c1-ccf3-4e29-a32c-70d56aae7dde",
+    "scope": "[\"local\",\"audit\",\"full-cold-account-trace-diagnostic\",\"node22.23.3/chromium153.0.8010.0/workspace-ed8684309001/fresh-copy-and-vite-cache/2-workers/trace-on\",\"v1\"]",
+    "kind": "audit",
+    "name": "full-cold-account-trace-diagnostic",
+    "environment": "node22.23.3/chromium153.0.8010.0/workspace-ed8684309001/fresh-copy-and-vite-cache/2-workers/trace-on",
+    "commit": "5986a8326b73fcb332b93655496c0b7910f68ab1",
+    "url": "https://github.com/UnregisteredMusket/Lootsplit/pull/121",
+    "outcome": "success",
+    "startedAt": "2026-10-20T16:33:48.116000+00:00",
+    "finishedAt": "2026-10-20T16:35:58.180147+00:00",
+    "durationMs": 130064,
+    "trendId": "local:08d640c1-ccf3-4e29-a32c-70d56aae7dde"
   }
 }
