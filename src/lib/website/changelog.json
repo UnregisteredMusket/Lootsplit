@@ -4,9 +4,9 @@
     "date": "2026-10-20",
     "summary": "Synchronized owner monitoring, daily reports and configurable Android companion.",
     "features": [
-      "Persistent backend monitoring every30 minutes, daily calendar reports and a central registry that includes future logs.",
+      "Persistent backend monitoring every 30 minutes, daily calendar reports and a central registry that includes future logs.",
       "Shared development tasks, persistent timing, component diagnostics and explicit coverage/stall warnings.",
-      "Independent4\u00d71 companion widgets with per-instance presets, summaries, toolbar actions and themes."
+      "Independent 4\u00d71 companion widgets with per-instance presets, summaries, toolbar actions and themes."
     ],
     "improvements": [
       "Shared website and Android account monitoring, bounded web scrolling and native main-widget collections.",
