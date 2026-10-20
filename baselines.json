@@ -3639,19 +3639,19 @@
   },
   "[\".github/workflows/verify.yml\",\"push\",\"main\",\"step\",\"Development / accounts / dev-party-sheet\",\"ubuntu-latest\",1]": {
     "schema": 1,
-    "id": "38034638067:1:03882eaa1e881dc0c850b56af29f1a810c857276ddf9ef876dffc68bf82912ea",
+    "id": "39484296844:1:03882eaa1e881dc0c850b56af29f1a810c857276ddf9ef876dffc68bf82912ea",
     "scope": "[\".github/workflows/verify.yml\",\"push\",\"main\",\"step\",\"Development / accounts / dev-party-sheet\",\"ubuntu-latest\",1]",
     "kind": "step",
     "name": "Development / accounts / dev-party-sheet",
     "environment": "ubuntu-latest",
-    "commit": "711f631eda66c22b65ca52a80962083a4b373d6d",
-    "runId": 38034638067,
+    "commit": "4f4746c0cf7f866aa16da645fb29982d8dc08d4a",
+    "runId": 39484296844,
     "attempt": 1,
-    "url": "https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38034638067/job/114162429771",
+    "url": "https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39484296844/job/118840591962",
     "outcome": "success",
-    "startedAt": "2026-10-10T07:34:34Z",
-    "finishedAt": "2026-10-10T07:34:57Z",
-    "durationMs": 23000,
+    "startedAt": "2026-10-20T19:36:45Z",
+    "finishedAt": "2026-10-20T19:37:12Z",
+    "durationMs": 27000,
     "trendId": "37233687309:1:03882eaa1e881dc0c850b56af29f1a810c857276ddf9ef876dffc68bf82912ea"
   },
   "[\".github/workflows/verify.yml\",\"push\",\"main\",\"step\",\"Development / accounts / Run actions/upload-artifact@v4\",\"ubuntu-latest\",1]": {
@@ -24225,5 +24225,35 @@
     "finishedAt": "2026-10-20T18:57:06.000Z",
     "durationMs": 1499000,
     "trendId": "39475576975:2:b1c207aacccec12a0e1f5c516b577364a208c0f11f9230d57c8c2fccb677c0e8"
+  },
+  "[\"local\",\"test\",\"android-download-quick\",\"node22.23.3/linux-x64/workmode/fresh-locked-install/isolated\",\"widget-refresh-1055-v1\"]": {
+    "schema": 1,
+    "id": "local:732741b2-993f-4052-89d1-b2bd84449fa7",
+    "scope": "[\"local\",\"test\",\"android-download-quick\",\"node22.23.3/linux-x64/workmode/fresh-locked-install/isolated\",\"widget-refresh-1055-v1\"]",
+    "kind": "test",
+    "name": "android-download-quick",
+    "environment": "node22.23.3/linux-x64/workmode/fresh-locked-install/isolated",
+    "commit": "75270080608878abd594ea2c8198b3990fdb58b0",
+    "url": "https://github.com/UnregisteredMusket/Lootsplit/tree/release/android-widget-refresh-download",
+    "outcome": "success",
+    "startedAt": "2026-10-20T18:46:48.289675+00:00",
+    "finishedAt": "2026-10-20T18:47:42.756628+00:00",
+    "durationMs": 54467,
+    "trendId": "local:732741b2-993f-4052-89d1-b2bd84449fa7"
+  },
+  "[\"local\",\"audit\",\"full-cold-account-suite\",\"node22.23.3/chromium153.0.8010.0/workspace3794adad2f07/fresh-copy-and-vite-cache/2-workers/trace-retain-on-failure/isolated\",\"12-cases-v1\"]": {
+    "schema": 1,
+    "id": "local:dbb96e76-4bed-43b5-8ea2-ba523116e90c",
+    "scope": "[\"local\",\"audit\",\"full-cold-account-suite\",\"node22.23.3/chromium153.0.8010.0/workspace3794adad2f07/fresh-copy-and-vite-cache/2-workers/trace-retain-on-failure/isolated\",\"12-cases-v1\"]",
+    "kind": "audit",
+    "name": "full-cold-account-suite",
+    "environment": "node22.23.3/chromium153.0.8010.0/workspace3794adad2f07/fresh-copy-and-vite-cache/2-workers/trace-retain-on-failure/isolated",
+    "commit": "397b9e7abb48d52bb8459f76a3e706ffcd5da0ac",
+    "url": "https://github.com/UnregisteredMusket/Lootsplit/pull/123",
+    "outcome": "success",
+    "startedAt": "2026-10-20T19:10:48.145Z",
+    "finishedAt": "2026-10-20T19:12:36.557904+00:00",
+    "durationMs": 108413,
+    "trendId": "local:dbb96e76-4bed-43b5-8ea2-ba523116e90c"
   }
 }
