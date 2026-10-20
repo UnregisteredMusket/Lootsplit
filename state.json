@@ -1,8 +1,10 @@
 {
   "schema": 1,
-  "scanAfter": "2026-10-20T16:19:45.003Z",
+  "scanAfter": "2026-10-20T16:20:02.391Z",
   "pending": [
-    37642398740
+    37642398740,
+    39456470233,
+    39456470380
   ],
   "processed": [
     "37233308988:1",
@@ -1137,6 +1139,7 @@
     "local:5dd7e4ff-d255-4e24-8767-4ee9176dec27",
     "local:5e272b42-2796-448b-9b0d-3cc569831f6a",
     "local:5e7aef96-3d9c-4fd0-aa0c-483f0ca04562",
+    "local:5ee8abf0-7bca-4072-b8d5-4dd54a87ac46",
     "local:65ad973f-ad4e-49c7-bc4f-b8801863a6db",
     "local:65e17668-db54-495b-987e-1761fe664522",
     "local:6646f9e0-001c-4c5c-a974-ba1e0a41dcdd",
@@ -1161,6 +1164,7 @@
     "local:861682eb-b175-4973-9cda-0f78082ff314",
     "local:8897ecb2-81f4-46ce-8307-7fa37c2f499c",
     "local:8933c68b-1154-4137-9a4e-0dea38067f6c",
+    "local:895db786-5bf9-4b6c-9a7f-9febbf58459a",
     "local:8cb7f477-6b10-4dcd-94fc-ad6b3122dee5",
     "local:8ccc021d-1ed0-4b2b-b66f-543e9c41b1a4",
     "local:8dc40805-7f72-46dc-b525-8277fae83dde",
@@ -1193,6 +1197,7 @@
     "local:b84beafd-6a61-4e4a-8079-1080e699a34c",
     "local:b9465773-cfe7-4958-a3bc-57ccc92d3086",
     "local:bb56c6c2-7a88-47bb-9118-7f9eac63f397",
+    "local:bc44037c-7f35-41d5-90b3-527f8ae46ed5",
     "local:bd078c6a-6cf6-446f-803f-64cb83cf5a88",
     "local:bee96ac7-c05f-4abe-9168-182892f219d1",
     "local:bfd538b2-bc87-4600-bbc0-b6a7f297776e",
@@ -1205,6 +1210,7 @@
     "local:c9778846-5fb6-42f5-9b41-a66d33098da4",
     "local:ca6fea07-cfb0-4728-bebd-b6cf15cec15c",
     "local:cc22bc70-2976-46d6-900f-cf5bebf49835",
+    "local:ccdc4c7f-75ca-4d68-ab18-2ee67681a517",
     "local:d03c0be0-e46f-4e9b-a57a-1cc1481bdda4",
     "local:d4e835d5-fc5a-4b04-9d13-d50be98820bd",
     "local:d66679e9-b870-4ba8-aa00-998ac58cdaec",
