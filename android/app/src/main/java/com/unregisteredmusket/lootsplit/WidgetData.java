@@ -70,7 +70,7 @@ final class WidgetData {
         String commit = release == null ? "Unavailable" : text(release, "commit");
         if (release != null) commit = commit.matches("[a-f0-9]{40}") ? commit.substring(0, 7) : "Unavailable";
         JSONObject projected = new JSONObject().put("name", name).put("email", email).put("checkedAt", checked)
-            .put("healthy", healthy).put("health", healthy ? "SYSTEMS HEALTHY" : "CHECK SERVICES")
+            .put("healthy", healthy).put("health", "STATUS UNVERIFIED")
             .put("active", count(stats, "active5m")).put("accounts", count(stats, "accounts"))
             .put("campaigns", count(stats, "sharedCampaigns")).put("backups", count(stats, "cloudBackups"))
             .put("traffic", trafficText).put("trafficTime", sourceTime(root, "traffic"))
@@ -85,6 +85,9 @@ final class WidgetData {
         if(overall!=null)projected.put("health","green".equals(text(overall,"color"))?"HEALTHY AT LAST CHECK":"red".equals(text(overall,"color"))?"CONFIRMED ERROR":"STATUS UNVERIFIED");
         JSONObject monitoring=root.optJSONObject("monitoring"),report=root.optJSONObject("dailyReport"),status=root.optJSONObject("developmentStatus");
         projected.put("log",monitoring==null?"No scheduled monitoring entry yet":text(monitoring,"summary"));
+        JSONArray recent=root.optJSONArray("recentEntries"),safeRecent=new JSONArray();
+        if(recent!=null)for(int i=0;i<Math.min(3,recent.length());i++){JSONObject entry=recent.optJSONObject(i);if(entry!=null)safeRecent.put(new JSONObject().put("summary",text(entry,"summary")).put("observedAt",entry.optLong("observedAt")));}
+        projected.put("recentEntries",safeRecent);
         projected.put("report",report==null?"No daily report yet":text(report,"summary"));
         if(status!=null) {
             JSONObject sourceTask=status.optJSONObject("task"),warning=status.optJSONObject("warning");

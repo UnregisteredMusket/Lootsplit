@@ -41,13 +41,30 @@ function EvidenceLinks({ links = [] }: { links?: Evidence[] }) {
 }
 function Entry({ entry }: { entry: MonitorEntry }) {
   return (
-    <article className="monitor-entry" id={`monitor-entry-${entry.sequence}`}>
+    <article className="monitor-entry monitor-change" id={`monitor-entry-${entry.sequence}`}>
       <p className="owner-monitor-note">
         {entry.source} · observed {dated(entry.observedAt)} · collected {dated(entry.collectedAt)}
         {entry.outcome ? ` · ${entry.outcome}` : ""}
       </p>
       <p>{entry.summary}</p>
       <EvidenceLinks links={entry.evidence} />
+      {entry.sources && (
+        <details>
+          <summary>Source freshness at collection</summary>
+          {Object.entries(entry.sources).map(([name, source]) => (
+            <p key={name}>
+              {name}:{" "}
+              {source.state === "ready" &&
+              source.checkedAt &&
+              entry.collectedAt - source.checkedAt > 360000
+                ? "stale"
+                : source.state || "unavailable"}{" "}
+              · checked {dated(source.checkedAt)}
+              {source.errorCode ? ` · ${source.errorCode}` : ""}
+            </p>
+          ))}
+        </details>
+      )}
       {!!entry.comparisons?.length && (
         <details>
           <summary>Measurements and comparison windows</summary>
@@ -105,7 +122,9 @@ export function MonitorTaskSummary({ data, now }: { data: JournalSnapshot; now: 
     task = status?.task;
   return (
     <div className="monitor-current-task">
-      <strong>{status?.label || "No development task active"}</strong>
+      <strong className="monitor-change" key={`${task?.id}:${task?.state}`}>
+        {status?.label || "No development task active"}
+      </strong>
       {task && (
         <>
           <p>
@@ -115,7 +134,9 @@ export function MonitorTaskSummary({ data, now }: { data: JournalSnapshot; now: 
             </span>{" "}
             total elapsed
           </p>
-          <p>{task.progress || task.objective}</p>
+          <p className="monitor-change" key={task.progressAt}>
+            {task.progress || task.objective}
+          </p>
           <small>
             Progress {dated(task.progressAt)} · telemetry {dated(task.heartbeatAt)}
           </small>
@@ -273,6 +294,14 @@ export function MonitorJournal({ data, refresh }: { data: JournalSnapshot; refre
           </small>
         </div>
       )}
+      {!!data.recentEntries?.length && (
+        <details>
+          <summary>Recent monitoring explanations</summary>
+          {data.recentEntries.map((e) => (
+            <Entry key={e.id} entry={e} />
+          ))}
+        </details>
+      )}
       <div className="monitor-entry">
         <strong>Latest daily report</strong>
         <p>
@@ -403,6 +432,20 @@ export function MonitorJournal({ data, refresh }: { data: JournalSnapshot; refre
                   </ul>
                 </details>
               )}
+              {!!report.unresolved?.length && (
+                <details>
+                  <summary>Unresolved component observations at day end</summary>
+                  {report.unresolved.map((d) => (
+                    <p key={d.component}>
+                      <strong>
+                        {d.component} · {d.color === "red" ? "Confirmed failure" : "Unverified"}
+                      </strong>
+                      : {d.symptom} {d.action} Last checked {dated(d.latestCheckAt)}. Evidence:{" "}
+                      {d.entryId}.
+                    </p>
+                  ))}
+                </details>
+              )}
               <details>
                 <summary>Analytics changes and measurement windows</summary>
                 {report.trends?.map((trend) => (
@@ -465,7 +508,24 @@ export function MonitorJournal({ data, refresh }: { data: JournalSnapshot; refre
                 ))}
                 {report.correlations?.map((c) => (
                   <p key={c.entry}>
-                    {c.statement} Entries: {c.entry}; {c.related.join(", ")}
+                    {c.statement}{" "}
+                    {[c.entry, ...c.related].map((id) => {
+                      const linked = report.evidence?.find((e) => e.id === id);
+                      return linked ? (
+                        <button
+                          key={id}
+                          onClick={() =>
+                            document
+                              .getElementById(`monitor-entry-${linked.sequence}`)
+                              ?.scrollIntoView({ block: "nearest" })
+                          }
+                        >
+                          View {linked.source} evidence
+                        </button>
+                      ) : (
+                        <span key={id}> {id}</span>
+                      );
+                    })}
                   </p>
                 ))}
               </details>
@@ -650,7 +710,7 @@ export function MonitorJournal({ data, refresh }: { data: JournalSnapshot; refre
           </p>
           {data.diagnostics?.map((check) => (
             <article key={check.component} className="monitor-entry">
-              <strong>
+              <strong className="monitor-change" key={check.color}>
                 <span className="monitor-light" data-color={check.color} aria-hidden="true">
                   ●
                 </span>{" "}

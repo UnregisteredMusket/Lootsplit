@@ -24,12 +24,12 @@ public class CompanionWidgetProvider extends AppWidgetProvider {
         view.setTextViewText(R.id.companion_identity,snapshot==null?"OWNER · SIGN IN":"OWNER · "+snapshot.optString("name"));
         view.setOnClickPendingIntent(R.id.companion_identity,WidgetActions.pending(context,id,"account",true));
         view.setTextViewText(R.id.companion_light,OwnerWidgetProvider.statusColor(snapshot).equals("red")?"!":OwnerWidgetProvider.statusColor(snapshot).equals("green")?"✓":"?");
-        view.setTextColor(R.id.companion_light,OwnerWidgetProvider.color(OwnerWidgetProvider.statusColor(snapshot)));
+        view.setTextColor(R.id.companion_light,OwnerWidgetProvider.color(OwnerWidgetProvider.statusColor(snapshot),light));
         view.setContentDescription(R.id.companion_light,OwnerWidgetProvider.statusColor(snapshot)+" status; open diagnostics for the reason");
         view.setOnClickPendingIntent(R.id.companion_light,WidgetActions.pending(context,id,"diagnostics",true));
         String first=settings.optString("first","task"),second=settings.optString("second","timer");
         view.setTextViewText(R.id.companion_first,WidgetRows.category(snapshot,first)); view.setTextViewText(R.id.companion_second,WidgetRows.category(snapshot,second));
-        view.setOnClickPendingIntent(R.id.companion_first,WidgetActions.pending(context,id,WidgetRows.action(first),true)); view.setOnClickPendingIntent(R.id.companion_second,WidgetActions.pending(context,id,WidgetRows.action(second),true));
+        view.setOnClickPendingIntent(R.id.companion_first,WidgetActions.pending(context,id,WidgetRows.action(first,snapshot),true)); view.setOnClickPendingIntent(R.id.companion_second,WidgetActions.pending(context,id,WidgetRows.action(second,snapshot),true));
         boolean timer="timer".equals(second)&&task!=null;
         boolean firstTimer="timer".equals(first)&&task!=null;
         view.setViewVisibility(R.id.companion_timer_first,firstTimer?View.VISIBLE:View.GONE); view.setViewVisibility(R.id.companion_first,firstTimer?View.GONE:View.VISIBLE);

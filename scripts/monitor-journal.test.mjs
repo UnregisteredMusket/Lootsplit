@@ -414,3 +414,122 @@ test("an unrelated successful workflow cannot clear a confirmed failure or its d
     DB.close();
   }
 });
+
+test("daily report carries unresolved incidents from earlier days until recovery is observed", async () => {
+  const DB = localAccountDb();
+  try {
+    await initializeMonitor(DB, instant - 2 * 86400000);
+    const error = diagnostic(
+      null,
+      {
+        component: "Storage",
+        state: "error",
+        symptom: "Write failed",
+        action: "Inspect storage errors",
+        required: true,
+      },
+      instant - 86400000,
+    );
+    await recordLog(
+      DB,
+      {
+        id: "prior-storage",
+        source: "diagnostics",
+        observedAt: instant - 86400000,
+        summary: "Storage error",
+        diagnostic: error,
+      },
+      instant - 86400000,
+    );
+    let report = await generateReport(DB, "2026-10-20", DEFAULT_CONFIG, instant + 86400000);
+    assert.equal(report.unresolved[0].component, "Storage");
+    assert.ok(report.recommendations.some((r) => r.includes("Storage")));
+    const recovered = diagnostic(
+      error,
+      {
+        component: "Storage",
+        state: "healthy",
+        symptom: "Storage responded",
+        action: "No action required",
+      },
+      instant,
+    );
+    await recordLog(
+      DB,
+      {
+        id: "storage-recovery",
+        source: "diagnostics",
+        observedAt: instant,
+        summary: "Storage recovered",
+        diagnostic: recovered,
+      },
+      instant,
+    );
+    report = await generateReport(DB, "2026-10-20", DEFAULT_CONFIG, instant + 86400000 + 1);
+    assert.equal(report.unresolved.length, 0);
+    assert.equal(report.incidents[0].id, "storage-recovery");
+  } finally {
+    DB.close();
+  }
+});
+
+test("historical traffic recovery preserves the original partial observation and retries idempotently", async () => {
+  const DB = localAccountDb();
+  try {
+    await initializeMonitor(DB, instant);
+    await DB.prepare(
+      "INSERT INTO user(id,name,email,emailVerified,createdAt,updatedAt) VALUES('partial-owner','Owner','partial@example.invalid',1,?,?)",
+    )
+      .bind(new Date(instant).toISOString(), new Date(instant).toISOString())
+      .run();
+    await DB.prepare("INSERT INTO site_roles VALUES('partial-owner','owner',?)")
+      .bind(instant)
+      .run();
+    await DB.prepare(
+      "INSERT OR IGNORE INTO member_access(user_id,status) VALUES('partial-owner','active')",
+    ).run();
+    await collectInterval({ DB }, "partial-owner", instant, {
+      now: instant,
+      integrations: false,
+      collector: async () => reading(),
+    });
+    const before = await DB.prepare("SELECT body FROM owner_monitor_intervals WHERE slot=?")
+      .bind(instant)
+      .first();
+    let requests = 0;
+    const fetcher = async () => {
+      requests++;
+      return Response.json({
+        data: {
+          viewer: {
+            accounts: [{ workersInvocationsAdaptive: [{ sum: { requests: 8, errors: 0 } }] }],
+          },
+        },
+      });
+    };
+    const env = {
+      DB,
+      OWNER_MONITOR_CLOUDFLARE_TOKEN: "synthetic-read-token",
+      OWNER_MONITOR_CLOUDFLARE_ACCOUNT_ID: "a".repeat(32),
+    };
+    await scheduledMonitor(env, instant + 60000, {
+      now: instant + 60000,
+      fetcher,
+      collector: async () => reading(),
+    });
+    const saved = await DB.prepare("SELECT outcome,body FROM owner_monitor_intervals WHERE slot=?")
+      .bind(instant)
+      .first();
+    assert.equal(saved.outcome, "partial");
+    assert.equal(JSON.parse(saved.body).summary, JSON.parse(before.body).summary);
+    assert.equal(JSON.parse(saved.body).historicalTraffic.data.requests, 8);
+    await scheduledMonitor(env, instant + 120000, {
+      now: instant + 120000,
+      fetcher,
+      collector: async () => reading(),
+    });
+    assert.equal(requests, 1);
+  } finally {
+    DB.close();
+  }
+});

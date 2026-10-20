@@ -101,3 +101,27 @@ test("Cloudflare traffic distinguishes disconnected, failure, real zero and vali
     assert.doesNotMatch(JSON.stringify(result), /SECRET/);
   }
 });
+
+test("adjacent traffic windows use inclusive start and exclusive end without boundary double-counting", async () => {
+  const { cloudflareTraffic } = await import("../cloudflare/owner-monitor.mjs");
+  const end = Date.now(),
+    start = end - 1800000;
+  const value = await cloudflareTraffic(
+    {
+      DB: {},
+      OWNER_MONITOR_CLOUDFLARE_ACCOUNT_ID: "a".repeat(32),
+      OWNER_MONITOR_CLOUDFLARE_TOKEN: "synthetic",
+    },
+    async (_url, options) => {
+      const query = JSON.parse(options.body);
+      assert.match(query.query, /datetime_geq: \$since, datetime_lt: \$until/);
+      assert.equal(Date.parse(query.variables.until) - Date.parse(query.variables.since), 1800000);
+      return Response.json({
+        data: { viewer: { accounts: [{ workersInvocationsAdaptive: [] }] } },
+      });
+    },
+    { start, end },
+  );
+  assert.equal(value.state, "ready");
+  assert.equal(value.data.requests, 0);
+});

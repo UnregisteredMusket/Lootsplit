@@ -142,7 +142,7 @@ export function OwnerMonitor() {
       window.removeEventListener("lootsplit-account-changed", accountChanged);
     };
   }, [automatic, revision]);
-  const stale = !!data && now - data.checkedAt > 90000;
+  const stale = !!data && now - data.checkedAt > 120000;
   const stats = data?.health.stats;
   const development = data?.development.data;
   const games = data?.analytics.data?.metrics;
@@ -221,19 +221,27 @@ export function OwnerMonitor() {
             <dl className="owner-monitor-metrics">
               <div>
                 <dt>Active accounts · 5m</dt>
-                <dd>{count(stats?.active5m)}</dd>
+                <dd className="monitor-change" key={stats?.active5m}>
+                  {count(stats?.active5m)}
+                </dd>
               </div>
               <div>
                 <dt>Active accounts · 24h</dt>
-                <dd>{count(stats?.active24h)}</dd>
+                <dd className="monitor-change" key={stats?.active24h}>
+                  {count(stats?.active24h)}
+                </dd>
               </div>
               <div>
                 <dt>Accounts</dt>
-                <dd>{count(stats?.accounts)}</dd>
+                <dd className="monitor-change" key={stats?.accounts}>
+                  {count(stats?.accounts)}
+                </dd>
               </div>
               <div>
                 <dt>Stored campaigns</dt>
-                <dd>{count(stats?.sharedCampaigns)}</dd>
+                <dd className="monitor-change" key={stats?.sharedCampaigns}>
+                  {count(stats?.sharedCampaigns)}
+                </dd>
               </div>
             </dl>
             <div className="owner-monitor-checks">

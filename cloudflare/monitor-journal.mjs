@@ -424,7 +424,10 @@ async function updateDiagnostics(db, snapshot, now, settings) {
         ),
       );
   await batches(db, writes);
-  return result;
+  return result.sort(
+    (a, b) =>
+      Number(a.component.startsWith("Workflow:")) - Number(b.component.startsWith("Workflow:")),
+  );
 }
 export async function monitorSnapshot(
   env,
@@ -480,6 +483,19 @@ export async function monitorSnapshot(
           }
         : null,
       dailyReport: latestReport,
+      recentEntries: (
+        await rows(
+          db,
+          "SELECT id,sequence,observed_at,collected_at,summary FROM owner_monitor_logs WHERE source='monitoring' ORDER BY observed_at DESC,sequence DESC LIMIT 3",
+        )
+      ).map((r) => ({
+        id: r.id,
+        sequence: r.sequence,
+        source: "monitoring",
+        observedAt: r.observed_at,
+        collectedAt: r.collected_at,
+        summary: r.summary,
+      })),
       settings,
     };
     const result = await run(
@@ -959,6 +975,15 @@ async function buildReport(db, day, settings, now) {
   const development = taskStates
     .map((row) => taskView(decode(row).task, end, settings))
     .filter((view) => view.task.active || view.task.completedAt >= start);
+  const incidentStates = await rows(
+    db,
+    "SELECT id,sequence,observed_at,body FROM owner_monitor_logs WHERE sequence IN (SELECT MAX(sequence) FROM owner_monitor_logs WHERE source='diagnostics' AND observed_at<? AND json_extract(body,'$.diagnostic.component') IS NOT NULL GROUP BY json_extract(body,'$.diagnostic.component'))",
+    end,
+  );
+  const unresolved = incidentStates
+    .map((row) => ({ entryId: row.id, sequence: row.sequence, ...decode(row).diagnostic }))
+    .filter((d) => d.color !== "green")
+    .map((d) => ({ ...d, durationMs: Math.max(0, end - (d.firstOccurredAt || end)), asOf: end }));
   const gaps = coverage.filter((c) => c.gap).map((c) => `${c.name}: ${c.gap}`);
   if (collected < expected)
     gaps.unshift(
@@ -975,9 +1000,10 @@ async function buildReport(db, day, settings, now) {
           "Investigate each >=15% slowdown using its equivalent workload/environment and retain the original trend until a verified fix.",
         ]
       : []),
-    ...(incidents.some((e) => e.diagnostic?.color === "red")
-      ? ["Review confirmed component failures and their recovery evidence."]
-      : []),
+    ...unresolved.map(
+      (d) =>
+        `${d.component}: ${d.action} Last observed check ${new Date(d.latestCheckAt).toISOString()}; ${d.retainedFailure ? "known failure remains unverified" : d.state}.`,
+    ),
     ...(tasks.some((e) => e.task?.state === "blocked")
       ? ["Resolve recorded development blockers or publish the next handoff."]
       : []),
@@ -1010,6 +1036,7 @@ async function buildReport(db, day, settings, now) {
     recommendations,
     trends,
     incidents,
+    unresolved,
     performance,
     taskUpdateCount: tasks.length,
     development,
@@ -1149,7 +1176,7 @@ export async function scheduledMonitor(env, scheduledAt = Date.now(), options = 
   if (options.integrations !== false && env.OWNER_MONITOR_CLOUDFLARE_TOKEN) {
     const historical = await db
       .prepare(
-        "SELECT slot,body FROM owner_monitor_intervals WHERE outcome='missed' AND COALESCE(json_extract(body,'$.historyAttemptAt'),0)<? ORDER BY slot LIMIT 1",
+        "SELECT slot,outcome,body FROM owner_monitor_intervals WHERE (outcome='missed' OR (outcome='partial' AND COALESCE(json_extract(body,'$.sources.traffic.state'),'unavailable')!='ready' AND COALESCE(json_extract(body,'$.historicalTraffic.state'),'unavailable')!='ready')) AND COALESCE(json_extract(body,'$.historyAttemptAt'),0)<? ORDER BY slot LIMIT 1",
       )
       .bind(now - INTERVAL)
       .first();
@@ -1166,22 +1193,30 @@ export async function scheduledMonitor(env, scheduledAt = Date.now(), options = 
               start: historical.slot - INTERVAL,
               end: historical.slot,
             });
+      const original = decode(historical);
+      const recoverySummary =
+        traffic.state === "ready"
+          ? "Recovered the provider’s historical half-hour traffic totals. Other unavailable source observations remain gaps."
+          : "Historical traffic could not be recovered; the original coverage gap remains.";
       const body = {
-        ...decode(historical),
+        ...original,
         historyAttemptAt: now,
         historicalTraffic: traffic,
-        originalObservationAt: null,
-        summary:
-          traffic.state === "ready"
-            ? "Recovered the provider's historical half-hour traffic totals. Database health, device state and task activity at that time remain unobserved."
-            : "Historical traffic could not be recovered. The missed observation remains a coverage gap.",
+        originalObservationAt: original.observedAt || null,
+        recoverySummary,
+        summary: historical.outcome === "partial" ? original.summary : recoverySummary,
       };
       await run(
         db,
-        "UPDATE owner_monitor_intervals SET outcome=?,body=? WHERE slot=? AND outcome='missed'",
-        traffic.state === "ready" ? "recovered" : "missed",
+        "UPDATE owner_monitor_intervals SET outcome=?,body=? WHERE slot=? AND outcome=?",
+        historical.outcome === "partial"
+          ? "partial"
+          : traffic.state === "ready"
+            ? "recovered"
+            : "missed",
         JSON.stringify(body),
         historical.slot,
+        historical.outcome,
       );
       if (traffic.state === "ready") {
         await recordLog(
@@ -1190,7 +1225,7 @@ export async function scheduledMonitor(env, scheduledAt = Date.now(), options = 
             id: `recovered:${historical.slot}`,
             source: "monitoring",
             observedAt: historical.slot,
-            summary: body.summary,
+            summary: recoverySummary,
             recovered: true,
             originalObservationAt: null,
             historicalTraffic: traffic,
@@ -1198,7 +1233,7 @@ export async function scheduledMonitor(env, scheduledAt = Date.now(), options = 
           },
           now,
         );
-        const day = localCalendar(historical.slot, settings.timezone).day;
+        const day = localCalendar(historical.slot - 1, settings.timezone).day;
         if (
           await db
             .prepare("SELECT id FROM owner_monitor_reports WHERE day=? AND timezone=?")

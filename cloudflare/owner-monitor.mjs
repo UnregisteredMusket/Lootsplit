@@ -116,7 +116,7 @@ export async function cloudflareTraffic(env, fetcher = fetch, window = null) {
       body: JSON.stringify({
         query: `query ($account: string, $since: string, $until: string) {
           viewer { accounts(filter: {accountTag: $account}) {
-            workersInvocationsAdaptive(limit: 1, filter: {scriptName: "lootsplit", datetime_geq: $since, datetime_leq: $until}) {
+            workersInvocationsAdaptive(limit: 1, filter: {scriptName: "lootsplit", datetime_geq: $since, datetime_lt: $until}) {
               sum { requests errors }
             }
           } }
@@ -177,10 +177,20 @@ export async function ownerMonitor(env, userId, sessionId, request) {
   const device = request?.headers.get("x-lootsplit-device");
   if (device && /^[a-f0-9-]{36}$/.test(device)) {
     const { monitorApi } = await import("./monitor-journal.mjs");
-    await monitorApi(env, userId, sessionId, new Request(new URL("/api/account/owner/monitor/device", env.ACCOUNT_ORIGIN), { method: "POST" }), {
-      id: device, snapshotId: Number(request.headers.get("x-lootsplit-snapshot")) || 0,
-      version: request.headers.get("x-lootsplit-version") || "unknown", delivery: "Refresh requested; reports the previously received snapshot",
-    });
+    await monitorApi(
+      env,
+      userId,
+      sessionId,
+      new Request(new URL("/api/account/owner/monitor/device", env.ACCOUNT_ORIGIN), {
+        method: "POST",
+      }),
+      {
+        id: device,
+        snapshotId: Number(request.headers.get("x-lootsplit-snapshot")) || 0,
+        version: request.headers.get("x-lootsplit-version") || "unknown",
+        delivery: "Refresh requested; reports the previously received snapshot",
+      },
+    );
   }
   const { monitorSnapshot } = await import("./monitor-journal.mjs");
   const snapshot = await monitorSnapshot(env, userId);

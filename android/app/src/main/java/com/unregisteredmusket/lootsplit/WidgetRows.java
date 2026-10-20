@@ -11,9 +11,11 @@ final class WidgetRows {
         try {
             if (snapshot == null) { add(rows, "No current owner reading", "Sign in or tap Refresh. Backend logging continues independently.", "account"); return rows; }
             JSONObject task = snapshot.optJSONObject("task");
-            add(rows, "Development", task == null ? "No development task active" : task.optString("title") + " · " + task.optString("state") + "\n" + task.optString("phase") + ": " + task.optString("progress"), "task");
+            add(rows, "Development", task == null || !task.optBoolean("active") ? "No development task active" : task.optString("title") + " · " + task.optString("state") + "\n" + task.optString("phase") + ": " + task.optString("progress"), "task");
             if (!snapshot.optString("warning").isEmpty()) add(rows, "⚠ Development warning", snapshot.optString("warning"), "task");
-            add(rows, "Latest monitoring entry", snapshot.optString("log", "No scheduled entry yet"), "logs");
+            JSONArray recent=snapshot.optJSONArray("recentEntries");
+            if(recent==null||recent.length()==0)add(rows, "Latest monitoring entry", snapshot.optString("log", "No scheduled entry yet"), "logs");
+            else for(int i=0;i<recent.length();i++){JSONObject entry=recent.getJSONObject(i);add(rows,"Monitoring · "+WidgetData.time(entry.optLong("observedAt")),entry.optString("summary"),"logs");}
             add(rows, "Daily report", snapshot.optString("report", "No daily report yet"), "report");
             add(rows, "Cloudflare traffic · past 24h", snapshot.optString("traffic") + snapshot.optString("trafficTime"), "logs");
             add(rows, "App statistics", snapshot.optString("games") + "\nBackups " + snapshot.optString("backups") + snapshot.optString("gamesTime"), "logs");
@@ -32,7 +34,7 @@ final class WidgetRows {
         if (snapshot == null) return "Sign in / refresh";
         JSONObject task = snapshot.optJSONObject("task");
         switch (category) {
-            case "task": return task == null ? "No development task active" : task.optString("title") + " · " + task.optString("phase");
+            case "task": return task == null || !task.optBoolean("active") ? "No development task active" : task.optString("title") + " · " + task.optString("phase");
             case "timer": return task == null ? "No active task timer" : "Elapsed since " + WidgetData.time(task.optLong("startedAt"));
             case "analytics": return snapshot.optString("active") + " active · " + snapshot.optString("accounts") + " accounts";
             case "traffic": return snapshot.optString("traffic");
@@ -42,5 +44,5 @@ final class WidgetRows {
             default: return snapshot.optString("health") + " · " + snapshot.optString("overallReason");
         }
     }
-    static String action(String category) { return "report".equals(category) ? "report" : "task".equals(category) || "timer".equals(category) || "warning".equals(category) ? "task" : "health".equals(category) ? "diagnostics" : "logs"; }
+    static String action(String category,JSONObject snapshot) { if("warning".equals(category) && (snapshot==null||snapshot.optString("warning").isEmpty())) return "diagnostics"; return "report".equals(category) ? "report" : "task".equals(category) || "timer".equals(category) || "warning".equals(category) ? "task" : "health".equals(category) ? "diagnostics" : "logs"; }
 }

@@ -47,6 +47,7 @@ export type MonitorEntry = {
   summary: string;
   outcome?: string;
   evidence?: Evidence[];
+  sources?: Record<string, { state: string; checkedAt: number | null; errorCode?: string }>;
   comparisons?: {
     key: string;
     label: string;
@@ -75,6 +76,7 @@ export type MonitorReport = {
   summary: string;
   gaps: string[];
   recommendations: string[];
+  unresolved?: (MonitorDiagnostic & { entryId: string; asOf: number })[];
   trends?: { scheduledAt: number; comparisons: MonitorEntry["comparisons"] }[];
   development?: {
     task: MonitorTask;
@@ -118,6 +120,7 @@ export type JournalSnapshot = {
     comparisons?: MonitorEntry["comparisons"];
   } | null;
   dailyReport?: MonitorReport | null;
+  recentEntries?: MonitorEntry[];
   settings?: MonitorSettings;
   devices?: {
     id: string;

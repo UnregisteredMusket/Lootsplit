@@ -98,6 +98,17 @@
     opacity: 0.55;
   }
 }
+.monitor-change {
+  animation: monitor-value-change 1.2s ease-out;
+}
+@keyframes monitor-value-change {
+  from {
+    background-color: #b79b5330;
+  }
+  to {
+    background-color: transparent;
+  }
+}
 .owner-monitor[data-reduced-motion="true"] * {
   animation: none !important;
   transition: none !important;

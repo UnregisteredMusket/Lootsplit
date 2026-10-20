@@ -120,6 +120,21 @@ try {
   assert.equal(owner.health.status, "healthy");
   assert.ok(owner.health.stats.accounts >= 1);
   assert.equal(owner.traffic.state, "not-connected");
+  assert.equal(
+    owner.overall.color,
+    owner.diagnostics.some((check) => check.color === "red") ? "red" : "yellow",
+    "Unconnected sources cannot report green; observed workflow failures retain red",
+  );
+  for (const component of ["Backend", "Storage", "Authentication"]) {
+    assert.equal(
+      owner.diagnostics.find((check) => check.component === component)?.state,
+      "healthy",
+    );
+  }
+  assert.equal(
+    owner.diagnostics.find((check) => check.component === "Cloudflare analytics")?.state,
+    "unavailable",
+  );
   assert.ok(["ready", "unavailable", "not-connected"].includes(owner.development.state));
   const browser = await chromium.launch({
     executablePath: process.env.CHROMIUM_EXECUTABLE_PATH || undefined,
@@ -139,7 +154,7 @@ try {
     await openApplication(page, origin + "/account");
     const field = page.locator(".owner-monitor");
     await field.getByText("Worker Monitor Audit", { exact: true }).waitFor();
-    await field.getByText("Services responding", { exact: true }).waitFor();
+    await field.getByText(owner.overall.label, { exact: true }).waitFor();
     await mkdir("test-results/monitor-worker", { recursive: true });
     for (const width of [390, 1280]) {
       await page.setViewportSize({ width, height: 844 });

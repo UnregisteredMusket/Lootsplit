@@ -39,6 +39,7 @@ public class OwnerWidgetProvider extends AppWidgetProvider {
         String color=snapshot.optString("statusColor","yellow");
         return "red".equals(color)?"red":System.currentTimeMillis()-snapshot.optLong("checkedAt")>120000?"yellow":color;
     }
+    static int color(String value,boolean light) { return light ? "red".equals(value)?Color.rgb(157,42,42):"green".equals(value)?Color.rgb(21,112,62):Color.rgb(133,91,8) : color(value); }
     static int color(String value) { return "red".equals(value)?Color.rgb(244,114,114):"green".equals(value)?Color.rgb(19,245,128):Color.rgb(238,199,113); }
     static void render(Context context, AppWidgetManager manager, int id, Bundle options) {
         manager.updateAppWidget(id, views(context, WidgetStore.read(context), true, id));
@@ -55,7 +56,7 @@ public class OwnerWidgetProvider extends AppWidgetProvider {
         text(view,R.id.monitor_identity,snapshot==null?"OWNER ACCESS":"OWNER ACCESS / "+snapshot.optString("name"));
         text(view,R.id.monitor_email,snapshot==null?"Tap Sign in to connect your owner account":snapshot.optString("email"));
         text(view,R.id.monitor_health,refreshing?"REFRESHING":snapshot==null?(connected?"AWAITING CHECK":"SIGN IN REQUIRED"):message.isEmpty()?snapshot.optString("health"):"LAST KNOWN STATUS");
-        view.setTextColor(R.id.monitor_health,color(statusColor(snapshot)));
+        view.setTextColor(R.id.monitor_health,color(statusColor(snapshot),light));
         text(view,R.id.monitor_services,!message.isEmpty()?message:snapshot==null?"No current reading":snapshot.optString("overallReason"));
         text(view,R.id.monitor_active,snapshot==null?"—":snapshot.optString("active"));
         text(view,R.id.monitor_totals,snapshot==null?"ACCOUNT ACTIVITY · PAST 5 MINUTES":"ACTIVE · 5 MINUTES   /   ACCOUNTS "+snapshot.optString("accounts")+"   /   CAMPAIGNS "+snapshot.optString("campaigns"));

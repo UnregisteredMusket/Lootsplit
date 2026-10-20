@@ -96,7 +96,7 @@ final class WidgetStore {
         if (snapshot != null && old != null && snapshot.optLong("snapshotId") > 0 && old.optLong("snapshotId") > snapshot.optLong("snapshotId")) return false;
         if (snapshot != null && old != null) {
             JSONObject task = snapshot.optJSONObject("task"), prior = old.optJSONObject("task");
-            if (task != null && prior != null && task.optString("id").equals(prior.optString("id")) && task.optLong("revision") < prior.optLong("revision")) snapshot.put("task", prior);
+            if (task != null && prior != null && task.optString("id").equals(prior.optString("id")) && task.optLong("revision") < prior.optLong("revision")) { snapshot.put("task", prior); snapshot.put("warning",old.optString("warning")); }
         }
         current.put("snapshot", snapshot == null ? JSONObject.NULL : snapshot).put("message", message);
         save(context, current);
