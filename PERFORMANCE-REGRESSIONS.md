@@ -195,7 +195,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | verify / Development / gameplay | open | 2 | 88s → 191s | +103s | +117.05% |
 | Development / gameplay | open | 3 | 145s → 911s | +766s | +528.28% |
 | Development / accounts / dev-character | open | 2 | 13s → 20s | +7s | +53.85% |
-| Code checks and immutable builds / lint | open | 3 | 7s → 13s | +6s | +85.71% |
+| Code checks and immutable builds / lint | open | 4 | 7s → 15s | +8s | +114.29% |
 | Packaged Worker / interface / worker-sound | open | 4 | 6s → 25s | +19s | +316.67% |
 | Development / accounts / dev-party-sheet | open | 2 | 17s → 23s | +6s | +35.29% |
 | Code checks and immutable builds / typecheck | open | 4 | 12s → 27s | +15s | +125% |
@@ -306,9 +306,10 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Packaged Worker / accounts (balanced v2) / Start disposable built Worker | open | 2 | 7s → 11s | +4s | +57.14% |
 | Packaged Worker / interface (balanced v2) / worker-initiative | open | 3 | 4s → 7s | +3s | +75% |
 | Packaged Worker / accounts (balanced v2) / worker-account | open | 2 | 85s → 117s | +32s | +37.65% |
-| Packaged Worker / accounts (balanced v2) / worker-monitor | open | 2 | 6s → 11s | +5s | +83.33% |
+| Packaged Worker / accounts (balanced v2) / worker-monitor | open | 3 | 6s → 13s | +7s | +116.67% |
 | Packaged Worker / accounts (balanced v2) / worker-finance | open | 3 | 22s → 41s | +19s | +86.36% |
 | Packaged Worker / accounts (balanced v2) / worker-ships | open | 2 | 27s → 47s | +20s | +74.07% |
+| Packaged Worker / accounts (balanced v2) / worker-blacksmith | open | 2 | 35s → 48s | +13s | +37.14% |
 | Packaged Worker / interface (balanced v2) / worker-property-operations | open | 2 | 20s → 29s | +9s | +45% |
 | Packaged Worker / accounts (balanced v2) / worker-map-tiles | open | 4 | 17s → 112s | +95s | +558.82% |
 | Development / desktop (balanced v2) / Run npx playwright install --with-deps chromium | open | 2 | 20s → 33s | +13s | +65% |
@@ -341,6 +342,9 @@ Open trends require investigation. Resolved trends retain their history; each ve
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-20T13:13:38Z | step: Packaged Worker / accounts (balanced v2) / worker-blacksmith | 41s → 48s | +7s | +17.07% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38376270621/job/115226315645) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39427491199/job/118644874295) |
+| 2026-10-20T13:11:23Z | step: Packaged Worker / accounts (balanced v2) / worker-monitor | 11s → 13s | +2s | +18.18% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39406545850/job/118574661090) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39427491199/job/118644874295) |
+| 2026-10-20T13:07:32Z | step: Code checks and immutable builds / lint | 13s → 15s | +2s | +15.38% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38246253534/job/114800749892) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39427491199/job/118643606921) |
 | 2026-10-20T12:46:57.000Z | workflow: Android signed release APK | 668s → 1349s | +681s | +101.95% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37391400899) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39421997999) |
 | 2026-10-20T12:46:54Z | step: release-apk / Publish versioned download and checksum | 3s → 4s | +1s | +33.33% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37391400899/job/112039018014) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39421997999/job/118633072499) |
 | 2026-10-20T12:42:45Z | step: release-apk / Run actions/checkout@v4 | 2s → 3s | +1s | +50% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37599705908/job/112722522266) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39421997999/job/118633072499) |
