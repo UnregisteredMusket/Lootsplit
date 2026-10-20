@@ -61,3 +61,13 @@ The website follow-up advances the download/changelog metadata only after the ar
 ## Published account-resume patch — October 7, 2026
 
 Android **1.5.1**, version code **8**, is published as android-v1.5.1 from main66cac4da68d244259f01f86f1e213ae18ea56931. Signed workflow37587450064 and independent downloaded-artifact inspection verify the permanent certificate, APK-v2 signature/content digest, package/version/code and retained sounds. APK SHA256: `abe7432bc731ed0d34169bba172ca8c1e88e0cd3a9d4ce50f066f4000175e181` (21,822,674 bytes). This patch includes account-save acknowledgement reconciliation and exportable device recovery copies. Install over the existing signed app. Physical-device installation has not been tested here. Website download publication requires the metadata follow-up's complete PR/main/deployment and streamed-APK-byte checks; see docs/audit/2026-10-07-account-resume-queue.md.
+
+## Owner home-screen Field monitor — 1.8.0 candidate
+
+Sign in as the site owner, open My account → Home-screen Field monitor and Connect owner account. Add to home screen requests Android’s confirmation; it does not place the widget automatically. Alternatively long-press your home screen, choose Widgets → Lootsplit Field monitor, and drag it into place. Resize vertically for compact or full details. The actual account name/email appears beside Owner access. The home widget uses the approved green terminal style; the app retains its current theme.
+
+Tap Refresh for a new read. Android requests periodic checks about every30minutes, subject to network/power restrictions; provider metadata may be five minutes old. Read timestamps before interpreting health or deployment status. No local/Codex development activity is inferred from GitHub. Optional Cloudflare traffic stays explicitly disconnected until configured on the server.
+
+Disconnect, sign-out and account switching clear the widget on this device. Access revoked remotely clears on its next server check; an offline widget cannot learn about revocation immediately. Removing the last widget disconnects it. Widget credentials/readings are encrypted with Android Keystore and excluded from Android backup. Campaign saves are unchanged.
+
+`android-widget.yml` verifies API24/API35 native compilation, storage, request isolation, bounded transport and real RemoteViews at250/350/448dp widths, including empty/error states. API35 also checks actual account-control clicks and320/390/1280 layouts. These tests and the complete preservation workflow are required before permanent-key signing. See the current audit/checkpoint for actual publication state; the public download remains1.7.0 until independently verified APK metadata is published.

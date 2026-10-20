@@ -1,5 +1,23 @@
 [
   {
+    "version": "1.8.0",
+    "date": "2026-10-20",
+    "summary": "Private Android owner Field monitor and the current mobile Maps workspace.",
+    "features": [
+      "Resizable green terminal home-screen Field monitor for the site owner, showing their authenticated account, service checks, account activity, app analytics and recent development/deployment activity.",
+      "Includes the current Maps workspace, connected scenes, encounter handoff, protected map media, fog and drawing tools."
+    ],
+    "improvements": [
+      "Connect, add, refresh and disconnect the home-screen widget from My account; the in-app and website interfaces retain Lootsplit\u2019s theme.",
+      "Dated readings, explicit unavailable sources and battery-aware background checks make monitoring status clear.",
+      "Packages the current campaign controls, role-specific Help and preserved account recovery flows."
+    ],
+    "fixes": [
+      "Mobile Maps controls fit narrow portrait and landscape screens while preserving accessible tools and camera controls.",
+      "Widget sign-out, account changes and rejected owner access clear private readings; an older in-flight request cannot restore them."
+    ]
+  },
+  {
     "version": "1.7.0",
     "date": "2026-10-12",
     "summary": "Current campaign tools, training bookkeeping and more efficient shared sync.",
@@ -30,9 +48,7 @@
       "Player gameplay, chat, campaign-sheet changes, imports and rolls pause until the DM resumes play.",
       "The existing End session option still closes the room and revokes player access; guest storage, privacy and current account-resume recovery are preserved."
     ],
-    "fixes": [
-      "None in this release."
-    ]
+    "fixes": ["None in this release."]
   },
   {
     "version": "1.5.1",

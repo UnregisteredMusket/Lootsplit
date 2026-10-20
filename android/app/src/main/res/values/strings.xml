@@ -4,4 +4,6 @@
     <string name="title_activity_main">Lootsplit</string>
     <string name="package_name">com.unregisteredmusket.lootsplit</string>
     <string name="custom_url_scheme">com.unregisteredmusket.lootsplit</string>
+    <string name="owner_widget_name">Lootsplit Field monitor</string>
+    <string name="owner_widget_description">Private owner status, analytics and deployment checks. Sign in and connect in My account. Resize for compact or full details.</string>
 </resources>

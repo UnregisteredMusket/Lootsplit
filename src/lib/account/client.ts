@@ -3,6 +3,10 @@ import { announceSheetChange } from "../quire/party-sheet-links";
 import { readAccountResponse } from "./response";
 import { announceWorkspaceChange } from "../quire/workspace-events";
 const native = () => import.meta.env.VITE_MOBILE === "true";
+async function disconnectOwnerWidget(expectedToken?: string) {
+  // Native integration must not add a Capacitor startup dependency to website account reads.
+  if (native()) await (await import("../mobile/owner-widget")).disconnectOwnerWidget(expectedToken);
+}
 const TOKEN = "lootsplit.account.token.v1";
 // Coalesce the startup gate and account controls' identity reads. This is UI
 // state only: every server mutation independently authenticates the request.
@@ -28,6 +32,12 @@ async function accountRequestCore<T>(
   body?: unknown,
   signal?: AbortSignal,
 ): Promise<T> {
+  if (
+    native() &&
+    body !== undefined &&
+    ["auth/sign-out", "auth/sign-in/email", "auth/sign-up/email"].includes(path)
+  )
+    await disconnectOwnerWidget();
   const headers = new Headers();
   headers.set("accept", "application/json");
   headers.set("x-lootsplit-tabletop", "2");
@@ -42,10 +52,20 @@ async function accountRequestCore<T>(
     cache: "no-store",
     ...(body === undefined ? {} : { body: JSON.stringify(body) }),
   });
+  if (native() && token && response.status === 401) await disconnectOwnerWidget(token);
   const result = await readAccountResponse<{
     error?: string | { message?: string };
     message?: string;
+    user?: { role?: string } | null;
   } | null>(response);
+  if (
+    native() &&
+    token &&
+    response.ok &&
+    ((path === "auth/get-session" && !result?.user) ||
+      (path === "library" && result?.user?.role !== "owner"))
+  )
+    await disconnectOwnerWidget(token);
   if (path === "activity" && response.status === 401)
     localStorage.removeItem("lootsplit.account.active");
   if (response.ok && path === "library") localStorage.setItem("lootsplit.account.active", "yes");
