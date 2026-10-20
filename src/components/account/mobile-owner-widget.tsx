@@ -44,6 +44,10 @@ export function MobileOwnerWidget({ name, email }: { name: string; email: string
   const [message, setMessage] = useState("");
   const supported = hasOwnerWidget();
   useEffect(() => {
+    if (window.location.hash === "#home-screen-widget")
+      document.getElementById("home-screen-widget")?.scrollIntoView({ block: "start" });
+  }, []);
+  useEffect(() => {
     if (!supported) return;
     let alive = true;
     const read = () =>
@@ -78,6 +82,7 @@ export function MobileOwnerWidget({ name, email }: { name: string; email: string
     <section
       id="home-screen-widget"
       className="portal-card space-y-3"
+      style={{ scrollMarginTop: "6rem" }}
       aria-labelledby="mobile-widget-title"
     >
       <div className="flex items-start justify-between gap-3">

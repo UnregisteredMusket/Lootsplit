@@ -44,7 +44,7 @@ jobs:
         if: matrix.api == 35
         run: node scripts/mobile-owner-widget-browser-audit.mjs
       - name: Compile native app, instrumentation and lint
-        run: cd android && ./gradlew assembleDebug assembleDebugAndroidTest testDebugUnitTest lintDebug --no-daemon
+        run: cd android && ./gradlew :app:assembleDebug :app:assembleDebugAndroidTest :app:testDebugUnitTest :app:lintDebug --no-daemon
       - name: Enable emulator acceleration
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules

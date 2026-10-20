@@ -258,6 +258,9 @@ function Account() {
               <a href="#account-backups">Backups</a>
               <a href="#account-profile">Profile</a>
               <a href="#account-support">Support</a>
+              {library.user.role === "owner" && import.meta.env.VITE_MOBILE === "true" && (
+                <a href="#home-screen-widget">Home-screen widget</a>
+              )}
               <a href="#account-recovery">Account recovery</a>
               {library.user.role !== "member" && (
                 <a

@@ -10,6 +10,8 @@ export default tseslint.config(
   {
     ignores: [
       "dist/**",
+      "android/app/src/main/assets/**", // Capacitor copies the already-checked mobile build here.
+      "android/**/build/**", // Generated Gradle output; native source has its own Android lint gate.
       "test-results/**", // Generated browser reports and traces, not application source.
       ".output/**",
       ".wrangler/**",

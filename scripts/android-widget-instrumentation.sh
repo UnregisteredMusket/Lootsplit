@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
 set -uo pipefail
-(cd android && ./gradlew connectedDebugAndroidTest --no-daemon)
+(cd android && ./gradlew :app:connectedDebugAndroidTest --no-daemon)
 result=$?
 mkdir -p test-results/android-widget
 adb pull /sdcard/Android/data/com.unregisteredmusket.lootsplit/files/widget-audit test-results/android-widget/

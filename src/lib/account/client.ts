@@ -2,8 +2,11 @@ import { API_ORIGIN } from "../mobile/origin";
 import { announceSheetChange } from "../quire/party-sheet-links";
 import { readAccountResponse } from "./response";
 import { announceWorkspaceChange } from "../quire/workspace-events";
-import { disconnectOwnerWidget } from "../mobile/owner-widget";
 const native = () => import.meta.env.VITE_MOBILE === "true";
+async function disconnectOwnerWidget(expectedToken?: string) {
+  // Native integration must not add a Capacitor startup dependency to website account reads.
+  if (native()) await (await import("../mobile/owner-widget")).disconnectOwnerWidget(expectedToken);
+}
 const TOKEN = "lootsplit.account.token.v1";
 // Coalesce the startup gate and account controls' identity reads. This is UI
 // state only: every server mutation independently authenticates the request.
