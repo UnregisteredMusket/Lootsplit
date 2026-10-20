@@ -296,6 +296,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Packaged Worker / accounts (balanced v2) / worker-ships | open | 2 | 27s → 47s | +20s | +74.07% |
 | Packaged Worker / accounts (balanced v2) / worker-map-tiles | open | 3 | 17s → 95s | +78s | +458.82% |
 | Development / desktop (balanced v2) / Run npx playwright install --with-deps chromium | open | 2 | 20s → 33s | +13s | +65% |
+| Packaged Worker / accounts (balanced v2) / Run actions/download-artifact@v4 | open | 2 | 2s → 4s | +2s | +100% |
 | Packaged Worker / interface (balanced v2) / worker-game-analytics | open | 2 | 3s → 5s | +2s | +66.67% |
 | Packaged Worker / interface (balanced v2) / Run actions/upload-artifact@v4 | open | 2 | 3s → 6s | +3s | +100% |
 | Packaged Worker / accounts (balanced v2) | open | 2 | 434s → 607s | +173s | +39.86% |
@@ -310,6 +311,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-20T05:21:49Z | step: Packaged Worker / accounts (balanced v2) / Run actions/download-artifact@v4 | 3s → 4s | +1s | +33.33% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38404276239/job/115320597304) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39374213457/job/118469181279) |
 | 2026-10-20T05:05:21Z | step: test-apk / Run android-actions/setup-android@v3 | 14s → 17s | +3s | +21.43% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39370431899/job/118456842972) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39372960413/job/118464699099) |
 | 2026-10-20T05:04:57Z | step: test-apk / Set up job | 1s → 2s | +1s | +100% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39370431899/job/118456842972) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39372960413/job/118464699099) |
 | 2026-10-20T02:55:01Z | step: Development / desktop (balanced v2) / dev-map-tiles | 122s → 145s | +23s | +18.85% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39266580213/job/118107614794) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39360883040/job/118426536399) |

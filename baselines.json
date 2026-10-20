@@ -15822,19 +15822,19 @@
   },
   "[\".github/workflows/verify.yml\",\"pull_request\",\"pull-request\",\"step\",\"Packaged Worker / accounts (balanced v2) / Run actions/download-artifact@v4\",\"ubuntu-latest\",1]": {
     "schema": 1,
-    "id": "38404276239:1:3529214b3827b772f9526bb060ef92d21e3ffe37abc8219cc502ebd66e03bac2",
+    "id": "39374213457:1:3529214b3827b772f9526bb060ef92d21e3ffe37abc8219cc502ebd66e03bac2",
     "scope": "[\".github/workflows/verify.yml\",\"pull_request\",\"pull-request\",\"step\",\"Packaged Worker / accounts (balanced v2) / Run actions/download-artifact@v4\",\"ubuntu-latest\",1]",
     "kind": "step",
     "name": "Packaged Worker / accounts (balanced v2) / Run actions/download-artifact@v4",
     "environment": "ubuntu-latest",
-    "commit": "c3493b081109bf42fad606efb057f37dafb5ea6d",
-    "runId": 38404276239,
+    "commit": "4c736061048a6c6d0428d39bb92f028378cc8290",
+    "runId": 39374213457,
     "attempt": 1,
-    "url": "https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38404276239/job/115320597304",
+    "url": "https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39374213457/job/118469181279",
     "outcome": "success",
-    "startedAt": "2026-10-13T13:24:10Z",
-    "finishedAt": "2026-10-13T13:24:13Z",
-    "durationMs": 3000,
+    "startedAt": "2026-10-20T05:21:45Z",
+    "finishedAt": "2026-10-20T05:21:49Z",
+    "durationMs": 4000,
     "trendId": "38309026871:1:3529214b3827b772f9526bb060ef92d21e3ffe37abc8219cc502ebd66e03bac2"
   },
   "[\".github/workflows/verify.yml\",\"pull_request\",\"pull-request\",\"step\",\"Packaged Worker / interface (balanced v2) / Start disposable built Worker\",\"ubuntu-latest\",1]": {
@@ -18355,5 +18355,22 @@
     "finishedAt": "2026-10-20T05:05:04Z",
     "durationMs": 1000,
     "trendId": "39372960413:1:20de4f59e3c4a49e0fb0a6d43d41d8fcdf43204bcb7d69036e3e4b8a3ae35adf"
+  },
+  "[\".github/workflows/verify.yml\",\"pull_request\",\"pull-request\",\"step\",\"Development / desktop (balanced v2) / Summarize measured verification stages\",\"ubuntu-latest\",1]": {
+    "schema": 1,
+    "id": "39374213457:1:5b0d4cd4e859e664bad6c1d770c76251760d784f852f6aac91f498f2212af640",
+    "scope": "[\".github/workflows/verify.yml\",\"pull_request\",\"pull-request\",\"step\",\"Development / desktop (balanced v2) / Summarize measured verification stages\",\"ubuntu-latest\",1]",
+    "kind": "step",
+    "name": "Development / desktop (balanced v2) / Summarize measured verification stages",
+    "environment": "ubuntu-latest",
+    "commit": "4c736061048a6c6d0428d39bb92f028378cc8290",
+    "runId": 39374213457,
+    "attempt": 1,
+    "url": "https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39374213457/job/118468589675",
+    "outcome": "success",
+    "startedAt": "2026-10-20T05:22:47Z",
+    "finishedAt": "2026-10-20T05:22:48Z",
+    "durationMs": 1000,
+    "trendId": "39374213457:1:5b0d4cd4e859e664bad6c1d770c76251760d784f852f6aac91f498f2212af640"
   }
 }
