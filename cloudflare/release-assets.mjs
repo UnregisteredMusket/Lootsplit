@@ -22,5 +22,20 @@ export function releaseResponse(response, env, identity = false) {
     result.headers.set("Cache-Control", "private, no-cache");
   if (env.CF_VERSION_METADATA?.id)
     result.headers.set("X-Lootsplit-Worker-Version", env.CF_VERSION_METADATA.id);
+  for (const [name, value] of Object.entries(SECURITY_HEADERS))
+    if (!result.headers.has(name)) result.headers.set(name, value);
   return result;
 }
+
+/**
+ * Baseline protections for every page and build asset. Framing is limited to Lootsplit itself
+ * (clickjacking of owner/staff controls); no script policy is imposed here because the app loads
+ * OCR workers/WebAssembly and existing integrations that a script policy must be verified against.
+ */
+export const SECURITY_HEADERS = Object.freeze({
+  "Content-Security-Policy": "frame-ancestors 'self'; object-src 'none'; base-uri 'self'",
+  "X-Frame-Options": "SAMEORIGIN",
+  "X-Content-Type-Options": "nosniff",
+  "Referrer-Policy": "strict-origin-when-cross-origin",
+  "Strict-Transport-Security": "max-age=31536000",
+});

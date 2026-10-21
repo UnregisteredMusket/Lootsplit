@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { localAccountDb } from "./account-dev-db.mjs";
-import { handleAccounts } from "../cloudflare/accounts.mjs";
+import { handleAccounts, LIBRARY_LIMITS } from "../cloudflare/accounts.mjs";
 import { closeRoom, roomState } from "../src/lib/quire/cloud.server.ts";
 const origin = "http://localhost:8080";
 function setup() {
@@ -1150,6 +1150,60 @@ test("monitoring writes, logs, reports and device records require the current ow
         (await call("owner/monitor/" + path, undefined, member.cookie)).response.status,
         401,
       );
+  } finally {
+    DB.close();
+  }
+});
+
+test("cloud library storage is bounded per account; edits and removals keep working", async () => {
+  const { DB, call, signup } = setup();
+  try {
+    const a = await signup("limits@example.com");
+    const userId = (await call("library", undefined, a.cookie)).data.user.id;
+    const payload = {
+      kind: "quire",
+      version: 2,
+      purses: [],
+      holdings: [],
+      ledger: [],
+      shops: [],
+      stock: [],
+    };
+    for (let i = 0; i < LIBRARY_LIMITS.backups; i++)
+      await DB.prepare(
+        "INSERT INTO library_backups (id,user_id,name,body,created_at) VALUES (?,?,?,?,?)",
+      )
+        .bind(`existing-${i}`, userId, "Old", "{}", i)
+        .run();
+    const full = await call("backup", { name: "One more", payload }, a.cookie);
+    assert.equal(full.response.status, 413);
+    assert.match(full.data.error, /backup storage is full/);
+    await call("remove", { kind: "backup", id: "existing-0" }, a.cookie);
+    assert.equal((await call("backup", { name: "Fits", payload }, a.cookie)).response.status, 200);
+    await DB.prepare("DELETE FROM library_backups WHERE user_id=?").bind(userId).run();
+    await DB.prepare(
+      "INSERT INTO library_backups (id,user_id,name,body,created_at) VALUES ('big',?,'Big',?,0)",
+    )
+      .bind(userId, "x".repeat(LIBRARY_LIMITS.backupBytes - 10))
+      .run();
+    assert.equal(
+      (await call("backup", { name: "Over bytes", payload }, a.cookie)).response.status,
+      413,
+      "the byte bound includes existing backups",
+    );
+    const saved = await call("character", { name: "Hero" }, a.cookie);
+    assert.equal(saved.response.status, 200);
+    for (let i = 1; i < LIBRARY_LIMITS.characters; i++)
+      await DB.prepare(
+        "INSERT INTO library_characters (id,user_id,body,updated_at) VALUES (?,?,?,0)",
+      )
+        .bind(`c${i}`, userId, JSON.stringify({ name: "x", description: "", portrait: "" }))
+        .run();
+    const extra = await call("character", { name: "Extra" }, a.cookie);
+    assert.equal(extra.response.status, 413);
+    assert.match(extra.data.error, /character storage is full/);
+    const edited = await call("character", { id: saved.data.id, name: "Renamed" }, a.cookie);
+    assert.equal(edited.response.status, 200, "editing an existing character is not blocked");
   } finally {
     DB.close();
   }

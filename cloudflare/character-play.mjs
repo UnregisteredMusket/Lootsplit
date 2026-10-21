@@ -68,6 +68,18 @@ async function character(db, user, id, own = false) {
   }
   return row;
 }
+/** Every character_id under which rolls for these campaign characters are stored. */
+function rollCharacterIds(room, code, purseIds, extra) {
+  const ids = new Set(extra.filter(Boolean));
+  for (const purseId of purseIds) {
+    ids.add(`campaign:${code}:${purseId}`);
+    ids.add(`party:${purseId}`);
+    const purse = room.table.purses.find((p) => p.id === purseId);
+    if (purse?.profileId) ids.add(purse.profileId);
+  }
+  // D1 allows 100 bound parameters per statement; code and the page cursor use two.
+  return [...ids].slice(0, 90);
+}
 async function policy(db, code) {
   return !!(
     await db.prepare("SELECT manual_allowed FROM play_policies WHERE code=?").bind(code).first()
@@ -536,16 +548,44 @@ export async function handleCharacterPlay(db, user, path, body, url, approval = 
   if (path === "sheets/log") {
     const code = text(body.code || "", 16),
       id = text(body.id || "");
-    if (code) await membership(db, user, code);
-    else await character(db, user, id, true);
     const before = body.before === undefined ? Number.MAX_SAFE_INTEGER : body.before;
     if (!Number.isSafeInteger(before) || before < 1) fail("Invalid log page.");
-    const rows = await db
-      .prepare(
-        `SELECT seq,body,created_at FROM play_rolls WHERE ${code ? "code=?" : "character_id=? AND code=''"} AND seq<? ORDER BY seq DESC LIMIT 51`,
-      )
-      .bind(code || id, before)
-      .all();
+    let rows;
+    if (code) {
+      const { room, seat } = await membership(db, user, code);
+      // The DM reads the whole campaign log. Players read only rolls for characters their seat
+      // controls, matching the guest roll log; other players' and hidden NPC rolls stay private.
+      let ids = null;
+      if (id) {
+        const purseId = id.startsWith(`campaign:${code}:`)
+          ? id.slice(`campaign:${code}:`.length)
+          : (
+              await db
+                .prepare("SELECT purse_id FROM play_characters WHERE id=? AND campaign_code=?")
+                .bind(id, code)
+                .first()
+            )?.purse_id;
+        ids =
+          purseId && (seat.role === "dm" || seat.purseIds.includes(purseId))
+            ? rollCharacterIds(room, code, [purseId], [id])
+            : [];
+      } else if (seat.role !== "dm") ids = rollCharacterIds(room, code, seat.purseIds, []);
+      if (ids && !ids.length) return { rolls: [], more: false };
+      rows = await db
+        .prepare(
+          `SELECT seq,body,created_at FROM play_rolls WHERE code=?${ids ? ` AND character_id IN (${ids.map(() => "?").join(",")})` : ""} AND seq<? ORDER BY seq DESC LIMIT 51`,
+        )
+        .bind(code, ...(ids || []), before)
+        .all();
+    } else {
+      await character(db, user, id, true);
+      rows = await db
+        .prepare(
+          "SELECT seq,body,created_at FROM play_rolls WHERE character_id=? AND code='' AND seq<? ORDER BY seq DESC LIMIT 51",
+        )
+        .bind(id, before)
+        .all();
+    }
     return {
       rolls: rows.results
         .slice(0, 50)

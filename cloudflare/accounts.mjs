@@ -43,6 +43,15 @@ import { hashPassword } from "better-auth/crypto";
 import { APIError } from "better-auth/api";
 
 const nativeOrigins = ["https://localhost", "http://localhost", "capacitor://localhost"];
+// Per-account cloud library bounds. Sign-up is open, so without these one account could fill the
+// shared D1 database that every campaign uses. Set well above real usage on 2026-10-21
+// (largest account: 2 backups, 5.4 MB). Device backups remain unlimited.
+export const LIBRARY_LIMITS = Object.freeze({
+  backups: 20,
+  backupBytes: 60_000_000,
+  characters: 100,
+  characterBytes: 30_000_000,
+});
 const json = (data, status = 200) =>
   Response.json(data, { status, headers: { "cache-control": "no-store" } });
 const fail = (message, status = 400) => {
@@ -179,6 +188,7 @@ export async function handleAccounts(request, env) {
     const headers = new Headers(response.headers);
     headers.set("cache-control", "no-store");
     headers.set("vary", "Origin");
+    headers.set("x-content-type-options", "nosniff");
     if (native) {
       headers.set("access-control-allow-origin", origin);
       headers.set("access-control-allow-methods", "GET, POST, OPTIONS");
@@ -499,10 +509,31 @@ export async function handleAccounts(request, env) {
         fail("Private PDFs must stay on your device.");
       await validateBackupMapAssets(db, userId, payload);
       const id = crypto.randomUUID();
-      await db
-        .prepare("INSERT INTO library_backups (id,user_id,name,body,created_at) VALUES (?,?,?,?,?)")
-        .bind(id, userId, text(body.name), JSON.stringify(payload), Date.now())
+      const serialized = JSON.stringify(payload);
+      // Per-account bound so one account cannot fill the shared database. The check is part of
+      // the INSERT, so concurrent uploads cannot each pass a separate pre-check.
+      const saved = await db
+        .prepare(
+          "INSERT INTO library_backups (id,user_id,name,body,created_at) SELECT ?,?,?,?,? WHERE (SELECT COUNT(*) FROM library_backups WHERE user_id=?)<? AND (SELECT COALESCE(SUM(LENGTH(body)),0) FROM library_backups WHERE user_id=?)+?<=?",
+        )
+        .bind(
+          id,
+          userId,
+          text(body.name),
+          serialized,
+          Date.now(),
+          userId,
+          LIBRARY_LIMITS.backups,
+          userId,
+          serialized.length,
+          LIBRARY_LIMITS.backupBytes,
+        )
         .run();
+      if (!saved.meta.changes)
+        fail(
+          `Your account backup storage is full (up to ${LIBRARY_LIMITS.backups} backups or ${LIBRARY_LIMITS.backupBytes / 1_000_000} MB). Remove an older backup from your Library, then save again. Your device data has not changed.`,
+          413,
+        );
       return cors(json({ id }));
     }
     if (path === "/api/account/read-backup" && request.method === "POST") {
@@ -538,12 +569,32 @@ export async function handleAccounts(request, env) {
         profile.portrait = body.portrait;
       }
       const id = body.id ? text(body.id) : crypto.randomUUID();
-      await db
+      const serialized = JSON.stringify(profile);
+      // Counts and bytes exclude the profile being replaced, so editing never hits the limit
+      // unless the edited profile itself makes the account exceed it.
+      const saved = await db
         .prepare(
-          "INSERT INTO library_characters (id,user_id,body,updated_at) VALUES (?,?,?,?) ON CONFLICT(id,user_id) DO UPDATE SET body=excluded.body,updated_at=excluded.updated_at",
+          "INSERT INTO library_characters (id,user_id,body,updated_at) SELECT ?,?,?,? WHERE (SELECT COUNT(*) FROM library_characters WHERE user_id=? AND id<>?)<? AND (SELECT COALESCE(SUM(LENGTH(body)),0) FROM library_characters WHERE user_id=? AND id<>?)+?<=? ON CONFLICT(id,user_id) DO UPDATE SET body=excluded.body,updated_at=excluded.updated_at",
         )
-        .bind(id, userId, JSON.stringify(profile), Date.now())
+        .bind(
+          id,
+          userId,
+          serialized,
+          Date.now(),
+          userId,
+          id,
+          LIBRARY_LIMITS.characters,
+          userId,
+          id,
+          serialized.length,
+          LIBRARY_LIMITS.characterBytes,
+        )
         .run();
+      if (!saved.meta.changes)
+        fail(
+          `Your account character storage is full (up to ${LIBRARY_LIMITS.characters} characters or ${LIBRARY_LIMITS.characterBytes / 1_000_000} MB). Remove a character you no longer need, then save again.`,
+          413,
+        );
       return cors(json({ id }));
     }
     if (path === "/api/account/remove" && request.method === "POST") {

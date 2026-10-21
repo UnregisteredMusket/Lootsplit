@@ -411,3 +411,85 @@ test("account characters enforce ownership, campaign assignments, DM policy, sta
     db.close();
   }
 });
+
+test("campaign roll logs show players only their own characters; the DM reads the whole campaign", async () => {
+  const db = localAccountDb();
+  const call = (user, body) =>
+    handleCharacterPlay(db, user, "sheets/log", body, new URL("http://localhost/"));
+  try {
+    for (const user of ["alice", "bob", "dm"])
+      await db
+        .prepare(
+          "INSERT INTO user(id,name,email,emailVerified,createdAt,updatedAt) VALUES (?,?,?,0,0,0)",
+        )
+        .bind(user, user, user + "@example.com")
+        .run();
+    const purse = (id, extra = {}) => ({ id, kind: "character", name: id, coins: {}, ...extra });
+    const room = {
+      code: "ROLLLOGS",
+      revision: 1,
+      live: true,
+      seats: [
+        { id: "a", token: "ta", role: "player", name: "Alice", purseIds: ["pa"] },
+        { id: "b", token: "tb", role: "player", name: "Bob", purseIds: ["pb"] },
+        { id: "d", token: "td", role: "dm", name: "DM", purseIds: [] },
+      ],
+      table: {
+        ledger: [],
+        sheets: [],
+        holdings: [],
+        purses: [purse("pa", { profileId: "alice-profile" }), purse("pb"), purse("npc")],
+      },
+    };
+    await db
+      .prepare("INSERT INTO campaign_rooms(code,revision,body) VALUES (?,1,?)")
+      .bind(room.code, JSON.stringify(room))
+      .run();
+    for (const [user, seat, token] of [
+      ["alice", "a", "ta"],
+      ["bob", "b", "tb"],
+      ["dm", "d", "td"],
+    ])
+      await db
+        .prepare("INSERT INTO library_members VALUES (?,?,?,?,?,0,0)")
+        .bind(user, room.code, seat, token, "Rolls")
+        .run();
+    let n = 0;
+    for (const characterId of [
+      "campaign:ROLLLOGS:pa",
+      "alice-profile",
+      "party:pa",
+      "campaign:ROLLLOGS:pb",
+      "campaign:ROLLLOGS:npc",
+    ])
+      await db
+        .prepare(
+          "INSERT INTO play_rolls(id,user_id,character_id,code,request_key,body,created_at) VALUES (?,?,?,?,?,?,?)",
+        )
+        .bind(`r${++n}`, null, characterId, room.code, `k${n}`, JSON.stringify({ who: characterId }), n)
+        .run();
+    const seen = async (user, body) =>
+      (await call(user, { code: room.code, ...body })).rolls.map((r) => r.who).sort();
+    assert.deepEqual(await seen("alice", {}), [
+      "alice-profile",
+      "campaign:ROLLLOGS:pa",
+      "party:pa",
+    ]);
+    assert.deepEqual(await seen("bob", {}), ["campaign:ROLLLOGS:pb"]);
+    assert.deepEqual(
+      await seen("alice", { id: "campaign:ROLLLOGS:pb" }),
+      [],
+      "another player's character log stays private",
+    );
+    assert.deepEqual(await seen("alice", { id: "campaign:ROLLLOGS:pa" }), [
+      "alice-profile",
+      "campaign:ROLLLOGS:pa",
+      "party:pa",
+    ]);
+    assert.equal((await seen("dm", {})).length, 5, "the DM reads the whole campaign log");
+    assert.deepEqual(await seen("dm", { id: "campaign:ROLLLOGS:npc" }), ["campaign:ROLLLOGS:npc"]);
+    await assert.rejects(call("alice", { code: "NOTMINE1" }), (e) => e.status === 403);
+  } finally {
+    db.close();
+  }
+});
