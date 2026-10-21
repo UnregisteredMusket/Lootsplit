@@ -14,6 +14,7 @@ Android version code **14**, same package and permanent signing certificate.
 
 ## Fixed
 
+- Prevents the companion identity row from shifting outside its bounds on high-density displays.
 - Provider-list recovery after APK updates and first launch preserves existing widget IDs, settings and campaign data.
 - Release verification now includes both real picker entries, companion binding/configuration, and the actual signed upgrade and Add path without My account.
 

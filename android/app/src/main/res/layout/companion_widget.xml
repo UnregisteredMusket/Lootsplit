@@ -1,7 +1,7 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:id="@+id/companion_root" android:layout_width="match_parent" android:layout_height="match_parent" android:orientation="horizontal" android:padding="4dp" android:background="@drawable/monitor_background" android:baselineAligned="false" android:gravity="center_vertical">
     <LinearLayout android:layout_width="0dp" android:layout_weight="1" android:layout_height="match_parent" android:orientation="vertical" android:gravity="center_vertical">
-        <LinearLayout android:layout_width="match_parent" android:layout_height="10dp" android:orientation="horizontal">
+        <LinearLayout android:layout_width="match_parent" android:layout_height="10dp" android:orientation="horizontal" android:baselineAligned="false">
             <TextView android:id="@+id/companion_light" android:layout_width="16dp" android:layout_height="10dp" android:text="?" android:textSize="10sp" android:includeFontPadding="false" android:textColor="#EEC771" android:gravity="center" />
             <TextView android:id="@+id/companion_identity" android:layout_width="0dp" android:layout_weight="1" android:layout_height="10dp" android:text="OWNER · SIGN IN" android:textSize="9sp" android:includeFontPadding="false" android:textColor="#B1D6C1" android:maxLines="1" android:ellipsize="end" />
         </LinearLayout>

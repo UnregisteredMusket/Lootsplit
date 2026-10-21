@@ -11,6 +11,7 @@
     ],
     "fixes": [
       "Reannounce both widget providers after an app update and on first launch, preserving placed widgets and saved settings.",
+      "Keep the compact companion identity row aligned within its bounds on high-density displays.",
       "Validate both entries in Android’s actual widget picker and the signed APK upgrade/companion installation path before publication."
     ]
   },

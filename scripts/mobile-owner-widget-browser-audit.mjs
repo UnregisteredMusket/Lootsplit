@@ -152,8 +152,14 @@ try {
   await page.getByText("Not connected · 0 on home screen", { exact: true }).waitFor();
   assert.equal(
     await page.getByRole("button", { name: "Add to home screen", exact: true }).isDisabled(),
+    false,
+  );
+  assert.equal(
+    await page.getByRole("button", { name: "Refresh widget", exact: true }).isDisabled(),
     true,
   );
+  await page.getByRole("button", { name: "Add 4×1 companion", exact: true }).click();
+  assert.equal(await page.evaluate(() => window.widgetPinKind), "companion");
   await page.evaluate(() => {
     window.widgetFail = true;
   });

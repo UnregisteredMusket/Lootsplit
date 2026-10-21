@@ -40,6 +40,7 @@ final class WidgetRegistration {
                 }catch(IllegalArgumentException|IllegalStateException e){success=false;}
             }
         }
+        OwnerWidgetProvider.renderAll(context); // Reapply normal cache-age/auth display rules too.
         if(success)preferences.edit().putString("announced-version",version).apply();
         return success;
     }
