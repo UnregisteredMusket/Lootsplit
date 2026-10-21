@@ -326,7 +326,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Packaged Worker / accounts (balanced v2) / worker-map-tiles | open | 4 | 17s → 112s | +95s | +558.82% |
 | Development / desktop (balanced v2) / dev-game-analytics | open | 2 | 5s → 7s | +2s | +40% |
 | Development / desktop (balanced v2) / Run npx playwright install --with-deps chromium | open | 2 | 20s → 33s | +13s | +65% |
-| Packaged Worker / accounts (balanced v2) / Run actions/setup-node@v4 | open | 2 | 4s → 9s | +5s | +125% |
+| Packaged Worker / accounts (balanced v2) / Run actions/setup-node@v4 | open | 3 | 4s → 11s | +7s | +175% |
 | Packaged Worker / accounts (balanced v2) / Run actions/download-artifact@v4 | open | 2 | 2s → 4s | +2s | +100% |
 | Packaged Worker / interface (balanced v2) / Run npx playwright install --with-deps chromium | open | 2 | 20s → 31s | +11s | +55% |
 | Packaged Worker / interface (balanced v2) / worker-library-navigation | open | 2 | 34s → 46s | +12s | +35.29% |
@@ -377,6 +377,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-21T05:27:12Z | step: Packaged Worker / accounts (balanced v2) / Run actions/setup-node@v4 | 9s → 11s | +2s | +22.22% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39481783895/job/118833188604) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39549347612/job/119055533247) |
 | 2026-10-21T05:20:37Z | job: release-apk | 261s → 438s | +177s | +67.82% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37391400899/job/112039018014) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39546976796/job/119051472733) |
 | 2026-10-21T05:20:37.000Z | workflow: Android signed release APK | 1128s → 1305s | +177s | +15.69% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38305743849) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39546976796) |
 | 2026-10-21T05:15:22Z | step: release-apk / Verify release version | 1s → 3s | +2s | +200% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37391400899/job/112039018014) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39546976796/job/119051472733) |
