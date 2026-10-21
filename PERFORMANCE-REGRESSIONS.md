@@ -259,7 +259,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Development / desktop / Run actions/upload-artifact@v4 | open | 2 | 4s → 6s | +2s | +50% |
 | Development / gameplay / dev-shop-stock | open | 2 | 16s → 22s | +6s | +37.5% |
 | Packaged Worker / interface / Start disposable built Worker | open | 2 | 7s → 11s | +4s | +57.14% |
-| Verify preserved functionality | open | 3 | 422s → 1258s | +836s | +198.1% |
+| Verify preserved functionality | open | 4 | 422s → 1548s | +1126s | +266.82% |
 | Development / gameplay / Run actions/upload-artifact@v4 | open | 2 | 3s → 5s | +2s | +66.67% |
 | Packaged Worker / interface / worker-market-locations | open | 3 | 23s → 63s | +40s | +173.91% |
 | Development / gameplay / dev-market-locations | open | 2 | 38s → 68s | +30s | +78.95% |
@@ -389,6 +389,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-21T08:19:14.000Z | workflow: Verify preserved functionality | 1258s → 1548s | +290s | +23.05% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39559744762) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39565175909) |
 | 2026-10-21T08:16:18Z | step: Player references / development / Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 | 2s → 3s | +1s | +50% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39561218713/job/119092688503) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39567409917/job/119112919880) |
 | 2026-10-21T08:11:42Z | step: Player references / development / Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 | 4s → 5s | +1s | +25% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39561218713/job/119092688503) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39567409917/job/119112919880) |
 | 2026-10-21T08:06:28Z | step: Development / accounts / dev-member | 7s → 9s | +2s | +28.57% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37405125361/job/112080868256) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39566149281/job/119109456454) |
