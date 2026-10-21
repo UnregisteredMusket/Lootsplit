@@ -59,8 +59,11 @@ test("an explicit process-env override wins over the file", () => {
   assert.equal(merged.PATH, "/usr/bin");
 });
 
-test("the template ships auth off", () => {
-  assert.deepEqual(readAppEnv(projectRoot()), { VITE_AUTH_ENABLED: "false" });
+test("the project ships auth off and the grok.com extension script disabled", () => {
+  assert.deepEqual(readAppEnv(projectRoot()), {
+    VITE_AUTH_ENABLED: "false",
+    VITE_GROK_EXTENSIONS: "0",
+  });
 });
 
 test("vite loadEnv resolves the wrapped value", () => {
