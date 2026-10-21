@@ -92,7 +92,7 @@ The homepage includes real screenshots with synthetic data and a browser/Android
 
 ## Start here for every coding session
 
-Read [AGENTS.project.md](AGENTS.project.md), then the [Coding session manual](docs/CODING-MANUAL.md). After a timeout or interruption, also read [Recovery](docs/RECOVERY.md) and reconcile the repository, running jobs and live release before repeating an action.
+Read [CLAUDE.md](CLAUDE.md), the developer guide; it lists which detailed documents ([owner decisions](AGENTS.project.md), the [coding manual](docs/CODING-MANUAL.md) and others) to read when a task touches them. After a timeout or interruption, also read [Recovery](docs/RECOVERY.md) and reconcile the repository, running jobs and live release before repeating an action.
 
 The manual applies to human developers and future coding assistants. Repository instructions survive replacement of a chat or workspace. Automated commands enforce selected checks; the documents are not a guarantee that every assistant will obey them.
 
