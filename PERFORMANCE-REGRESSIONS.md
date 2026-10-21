@@ -380,12 +380,15 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Android native widget verification | open | 2 | 354s → 554s | +200s | +56.5% |
 | verify / Packaged Worker / interface (balanced v2) / worker-initiative | open | 2 | 4s → 7s | +3s | +75% |
 | native-widget (24) | open | 2 | 353s → 554s | +201s | +56.94% |
+| native-widget (24) / Run actions/upload-artifact@v4 | open | 2 | 1s → 3s | +2s | +200% |
 | Player references / worker / Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 | open | 2 | 2s → 7s | +5s | +250% |
 
 ## Recorded slowdowns
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-21T08:00:32Z | step: native-widget (35) / Run actions/upload-artifact@v4 | 2s → 3s | +1s | +50% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39414345683/job/118599589608) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39565172502/job/119105605341) |
+| 2026-10-21T08:00:11Z | step: native-widget (24) / Run actions/upload-artifact@v4 | 2s → 3s | +1s | +50% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39539033689/job/119022274561) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39565172502/job/119105605690) |
 | 2026-10-21T07:53:36Z | step: Player references / worker / Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 | 4s → 7s | +3s | +75% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39563475196/job/119100018982) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39565175761/job/119105616325) |
 | 2026-10-21T07:49:20Z | step: verify / Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262 | 1s → 2s | +1s | +100% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39561218697/job/119098190787) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39563475197/job/119104001873) |
 | 2026-10-21T07:39:31Z | step: Development / accounts / Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262 | 1s → 2s | +1s | +100% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39561218697/job/119092688950) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39563475197/job/119100018753) |
