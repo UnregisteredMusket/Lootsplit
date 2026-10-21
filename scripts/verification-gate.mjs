@@ -3,33 +3,70 @@ import { appendFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
-export const requiredJobs = ["build", "development", "worker", "standby"];
+export const requiredJobs = ["changes", "build", "development", "worker", "standby"];
 
-export function assertVerification(results) {
-  for (const job of requiredJobs) {
-    assert.equal(
-      results?.[job]?.result,
-      "success",
-      `${job} must pass; missing/skipped is not success`,
-    );
-  }
+/**
+ * Which groups a run must pass. Main pushes, manual runs and release calls require every group.
+ * Pull requests (owner-approved 2026-10-21) require the change scope, the build job (unit tests,
+ * typecheck, lint, immutable builds) and, when code changed, every development-server audit; the
+ * packaged Worker and standby audits run on main before any deployment. A group that runs must
+ * always succeed: a failed, cancelled or timed-out group is never accepted.
+ */
+export function expectedGroups(event, code) {
+  const pullRequest = event === "pull_request";
+  return {
+    changes: true,
+    build: true,
+    development: !pullRequest || code !== false,
+    worker: !pullRequest,
+    standby: !pullRequest,
+  };
+}
+
+export function assertVerification(results, event = "push") {
   assert.deepEqual(
-    Object.keys(results).sort(),
+    Object.keys(results || {}).sort(),
     [...requiredJobs].sort(),
     "Unexpected gate dependency",
   );
+  assert.equal(results.changes?.result, "success", "changes must pass; missing/skipped is not success");
+  const code = results.changes?.outputs?.code !== "false";
+  const expected = expectedGroups(event, code);
+  for (const job of requiredJobs) {
+    const result = results[job]?.result;
+    if (expected[job])
+      assert.equal(result, "success", `${job} must pass; missing/skipped is not success`);
+    else
+      assert.ok(
+        result === "skipped" || result === "success",
+        `${job} must pass or be skipped for this ${event} run, not ${result}`,
+      );
+  }
+  return expected;
 }
 
 if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
   const results = JSON.parse(process.env.VERIFICATION_RESULTS || "{}");
+  const event = process.env.GITHUB_EVENT_NAME || "push";
+  const code = results.changes?.outputs?.code !== "false";
+  const expected = expectedGroups(event, code);
   if (process.env.GITHUB_STEP_SUMMARY) {
     appendFileSync(
       process.env.GITHUB_STEP_SUMMARY,
-      "| Preservation group | Result |\n| --- | --- |\n" +
-        requiredJobs.map((job) => `| ${job} | ${results[job]?.result || "missing"} |`).join("\n") +
-        "\n\nRelease requires every group. Artifacts are built once and checked before and after packaged audits.\n",
+      "| Preservation group | Required | Result |\n| --- | --- | --- |\n" +
+        requiredJobs
+          .map(
+            (job) =>
+              `| ${job} | ${expected[job] ? "yes" : "main only"} | ${results[job]?.result || "missing"} |`,
+          )
+          .join("\n") +
+        "\n\nMain requires every group before release. Artifacts are built once and checked before and after packaged audits.\n",
     );
   }
-  assertVerification(results);
-  console.log("All preservation groups passed. The verified artifacts may be published.");
+  assertVerification(results, event);
+  console.log(
+    event === "pull_request"
+      ? "Pull-request groups passed. Main verifies every group, including packaged audits, before release."
+      : "All preservation groups passed. The verified artifacts may be published.",
+  );
 }

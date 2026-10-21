@@ -19,6 +19,20 @@ concurrency:
 env:
   LOOTSPLIT_MONITOR_TELEMETRY: "true"
 jobs:
+  changes:
+    name: Change scope
+    runs-on: ubuntu-latest
+    timeout-minutes: 3
+    outputs:
+      code: ${{ steps.scope.outputs.code }}
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          # A pull_request checkout is the merge commit; its first parent is the base branch.
+          fetch-depth: 2
+      - id: scope
+        run: node scripts/change-scope.mjs
+
   build:
     name: Code checks and immutable builds
     runs-on: ubuntu-latest
@@ -86,7 +100,10 @@ jobs:
           retention-days: 30
 
   development:
-    name: Development / ${{ matrix.group }}${{ (matrix.group == 'gameplay' || matrix.group == 'desktop') && ' (balanced v2)' || '' }}
+    name: Development / ${{ matrix.group }}
+    needs: changes
+    # Documentation-only pull requests skip browser audits; main always runs them.
+    if: needs.changes.outputs.code == 'true'
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -94,10 +111,10 @@ jobs:
       id-token: write
     strategy:
       # Preserve independent results when another group fails; allow targeted reruns.
+      # Seven balanced groups run at once; no single group carries the critical path.
       fail-fast: false
-      max-parallel: 4
       matrix:
-        group: [governance, accounts, gameplay, desktop]
+        group: [governance, accounts, accounts-2, gameplay, economy, desktop, world]
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
@@ -139,9 +156,16 @@ jobs:
         env:
           AUDIT_ORIGIN: http://127.0.0.1:8080
         run: node scripts/recovery-step.mjs dev-backup 240 node scripts/backup-browser-audit.mjs
-      - name: dev-account
+      - name: dev-account-1
         if: matrix.group == 'accounts'
-        run: node scripts/recovery-step.mjs dev-account 240 node scripts/account-browser-audit.mjs
+        env:
+          ACCOUNT_SHARD: 1/2
+        run: node scripts/recovery-step.mjs dev-account-1 240 node scripts/account-browser-audit.mjs
+      - name: dev-account-2
+        if: matrix.group == 'accounts-2'
+        env:
+          ACCOUNT_SHARD: 2/2
+        run: node scripts/recovery-step.mjs dev-account-2 240 node scripts/account-browser-audit.mjs
       - name: dev-owner
         if: matrix.group == 'accounts'
         env:
@@ -154,13 +178,13 @@ jobs:
         if: matrix.group == 'accounts'
         run: node scripts/recovery-step.mjs dev-monitor 240 node scripts/monitor-browser-audit.mjs
       - name: dev-bug
-        if: matrix.group == 'accounts'
+        if: matrix.group == 'accounts-2'
         run: node scripts/recovery-step.mjs dev-bug 240 node scripts/bug-browser-audit.mjs
       - name: dev-character
-        if: matrix.group == 'accounts'
+        if: matrix.group == 'accounts-2'
         run: node scripts/recovery-step.mjs dev-character 240 node scripts/character-browser-audit.mjs
       - name: dev-party-sheet
-        if: matrix.group == 'accounts'
+        if: matrix.group == 'accounts-2'
         run: node scripts/recovery-step.mjs dev-party-sheet 240 node scripts/party-sheet-browser-audit.mjs
       - name: dev-bug-edge-cases
         if: matrix.group == 'gameplay'
@@ -196,40 +220,40 @@ jobs:
         if: matrix.group == 'gameplay'
         run: node scripts/recovery-step.mjs dev-shop-stock 240 node scripts/shop-stock-browser-audit.mjs
       - name: dev-market-locations
-        if: matrix.group == 'gameplay'
+        if: matrix.group == 'economy'
         run: node scripts/recovery-step.mjs dev-market-locations 240 node scripts/market-locations-browser-audit.mjs
       - name: dev-properties
-        if: matrix.group == 'gameplay'
+        if: matrix.group == 'economy'
         run: node scripts/recovery-step.mjs dev-properties 240 node scripts/property-browser-audit.mjs
       - name: dev-property-operations
-        if: matrix.group == 'gameplay'
+        if: matrix.group == 'economy'
         run: node scripts/recovery-step.mjs dev-property-operations 240 node scripts/property-operations-browser-audit.mjs
       - name: dev-trade-economy
-        if: matrix.group == 'gameplay'
+        if: matrix.group == 'economy'
         run: node scripts/recovery-step.mjs dev-trade-economy 240 node --experimental-strip-types scripts/trade-economy-browser-audit.mjs
       - name: dev-world-features
-        if: matrix.group == 'desktop'
+        if: matrix.group == 'world'
         run: node scripts/recovery-step.mjs dev-world-features 240 node scripts/world-features-browser-audit.mjs
       - name: dev-control-panel
-        if: matrix.group == 'gameplay'
+        if: matrix.group == 'economy'
         run: node scripts/recovery-step.mjs dev-control-panel 240 node scripts/control-panel-browser-audit.mjs
       - name: dev-library-navigation
-        if: matrix.group == 'gameplay'
+        if: matrix.group == 'economy'
         run: node scripts/recovery-step.mjs dev-library-navigation 240 node scripts/library-navigation-browser-audit.mjs
       - name: dev-loot
-        if: matrix.group == 'gameplay'
+        if: matrix.group == 'economy'
         run: node scripts/recovery-step.mjs dev-loot 240 node scripts/loot-browser-audit.mjs
       - name: dev-desktop
-        if: matrix.group == 'desktop'
+        if: matrix.group == 'world'
         run: node scripts/recovery-step.mjs dev-desktop 240 node scripts/desktop-browser-audit.mjs
       - name: dev-navigation
-        if: matrix.group == 'desktop'
+        if: matrix.group == 'world'
         run: node scripts/recovery-step.mjs dev-navigation 240 node --experimental-strip-types scripts/navigation-browser-audit.mjs
       - name: dev-game-analytics
-        if: matrix.group == 'desktop'
+        if: matrix.group == 'world'
         run: node scripts/recovery-step.mjs dev-game-analytics 240 node scripts/game-analytics-browser-audit.mjs
       - name: dev-website
-        if: matrix.group == 'desktop'
+        if: matrix.group == 'world'
         run: node scripts/recovery-step.mjs dev-website 240 node scripts/website-browser-audit.mjs
       - name: Summarize measured verification stages
         if: always()
@@ -242,13 +266,14 @@ jobs:
           retention-days: 30
 
   worker:
-    name: Packaged Worker / ${{ matrix.group }} (balanced v2)
+    name: Packaged Worker / ${{ matrix.group }}
     needs: build
+    # Packaged-artifact audits gate every main release; pull requests rely on development audits.
+    if: github.event_name != 'pull_request'
     strategy:
       fail-fast: false
-      max-parallel: 2
       matrix:
-        group: [accounts, interface]
+        group: [accounts, features, interface]
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -280,11 +305,18 @@ jobs:
           done
           echo "Built Worker did not become ready" >&2
           exit 1
-      - name: worker-account
+      - name: worker-account-1
         if: matrix.group == 'accounts'
         env:
           ACCOUNT_AUDIT_ORIGIN: http://127.0.0.1:8082
-        run: node scripts/recovery-step.mjs worker-account 180 node scripts/account-browser-audit.mjs
+          ACCOUNT_SHARD: 1/2
+        run: node scripts/recovery-step.mjs worker-account-1 180 node scripts/account-browser-audit.mjs
+      - name: worker-account-2
+        if: matrix.group == 'features'
+        env:
+          ACCOUNT_AUDIT_ORIGIN: http://127.0.0.1:8082
+          ACCOUNT_SHARD: 2/2
+        run: node scripts/recovery-step.mjs worker-account-2 180 node scripts/account-browser-audit.mjs
       - name: worker-monitor
         if: matrix.group == 'accounts'
         run: node scripts/recovery-step.mjs worker-monitor 180 node scripts/monitor-worker-audit.mjs
@@ -299,27 +331,27 @@ jobs:
           AUDIT_ORIGIN: http://127.0.0.1:8082
         run: node scripts/recovery-step.mjs worker-ships 240 node scripts/ships-browser-audit.mjs
       - name: worker-blacksmith
-        if: matrix.group == 'accounts'
+        if: matrix.group == 'features'
         env:
           AUDIT_ORIGIN: http://127.0.0.1:8082
         run: node scripts/recovery-step.mjs worker-blacksmith 240 node --experimental-strip-types scripts/blacksmith-browser-audit.mjs
       - name: worker-downtime
-        if: matrix.group == 'accounts'
+        if: matrix.group == 'features'
         env:
           AUDIT_ORIGIN: http://127.0.0.1:8082
         run: node scripts/recovery-step.mjs worker-downtime 240 node --experimental-strip-types scripts/downtime-browser-audit.mjs
       - name: worker-map-tiles
-        if: matrix.group == 'accounts'
+        if: matrix.group == 'features'
         env:
           AUDIT_ORIGIN: http://127.0.0.1:8082
         run: node scripts/recovery-step.mjs worker-map-tiles 240 node scripts/map-tiles-browser-audit.mjs
       - name: worker-trade-economy
-        if: matrix.group == 'accounts'
+        if: matrix.group == 'features'
         env:
           AUDIT_ORIGIN: http://127.0.0.1:8082
         run: node scripts/recovery-step.mjs worker-trade-economy 240 node --experimental-strip-types scripts/trade-economy-browser-audit.mjs
       - name: worker-world-features
-        if: matrix.group == 'accounts'
+        if: matrix.group == 'features'
         env:
           AUDIT_ORIGIN: http://127.0.0.1:8082
         run: node scripts/recovery-step.mjs worker-world-features 240 node scripts/world-features-browser-audit.mjs
@@ -409,6 +441,7 @@ jobs:
   standby:
     name: Packaged standby
     needs: build
+    if: github.event_name != 'pull_request'
     runs-on: ubuntu-latest
     timeout-minutes: 10
     permissions:
@@ -444,7 +477,7 @@ jobs:
   verify:
     name: verify
     if: always()
-    needs: [build, development, worker, standby]
+    needs: [changes, build, development, worker, standby]
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:
