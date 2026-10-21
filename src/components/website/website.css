@@ -1477,8 +1477,16 @@
     display: none;
   }
   .ls-menu-button span {
-    display: none;
+    /* Icon-only on narrow phones; the label stays the button's accessible name. */
+    position: absolute;
+    width: 1px;
+    height: 1px;
+    overflow: hidden;
+    clip: rect(0 0 0 0);
+    white-space: nowrap;
   }
+}
+@media (max-width: 340px) {
   .ls-footer-nav ul {
     grid-template-columns: minmax(0, 1fr);
   }
