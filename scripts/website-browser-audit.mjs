@@ -19,7 +19,16 @@ try {
   // Phones (320, 390), tablet (768) and desktop: no horizontal page scroll anywhere.
   const widths = [1280, 768, 390, 320];
   for (const width of widths) {
-    const context = await browser.newContext({ viewport: { width, height: 844 } });
+    // Each viewport is its own simulated visitor on disposable local servers, so
+    // 32 public page loads do not spend the shared per-address account limit
+    // that later audit steps rely on. Live audits never send this header.
+    const local = ["localhost", "127.0.0.1", "[::1]"].includes(new URL(origin).hostname);
+    const context = await browser.newContext({
+      viewport: { width, height: 844 },
+      extraHTTPHeaders: local
+        ? { "cf-connecting-ip": `2001:db8:${crypto.randomUUID().slice(0, 4)}:${crypto.randomUUID().slice(0, 4)}::1` }
+        : {},
+    });
     const page = await context.newPage();
     page.setDefaultTimeout(20000);
     page.on("pageerror", (e) => failures.push(e.message));
