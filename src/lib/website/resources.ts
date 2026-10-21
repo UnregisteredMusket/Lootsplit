@@ -317,9 +317,11 @@ export const resources: Resource[] = [
   {
     name: "Typography",
     description:
-      "Cormorant Garamond, Source Sans 3, and Source Serif 4 are distributed with Lootsplit under the SIL Open Font License 1.1.",
+      "Cormorant Garamond (upright and italic), Cormorant SC, Source Sans 3, and Source Serif 4 are distributed with Lootsplit under the SIL Open Font License 1.1. Font files are the Fontsource latin subsets (Cormorant fonts by Christian Thalmann, The Cormorant Project Authors).",
     links: [
       { label: "Cormorant Garamond license", url: "/fonts/cormorant-garamond-LICENSE.txt" },
+      { label: "Cormorant SC license", url: "/fonts/cormorant-sc-LICENSE.txt" },
+      { label: "Cormorant project", url: "https://github.com/CatharsisFonts/Cormorant" },
       { label: "Source Sans 3 license", url: "/fonts/source-sans-3-LICENSE.txt" },
       { label: "Source Serif 4 license", url: "/fonts/source-serif-4-LICENSE.txt" },
     ],

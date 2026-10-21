@@ -374,9 +374,7 @@ export function WelcomePage() {
           <p className="ls-fine ls-center">
             The DM can work offline on an owned device campaign; shared sessions need a
             connection.{" "}
-            <Link to="/help">
-              Explore the application guide <ArrowRight size={14} aria-hidden="true" />
-            </Link>
+            <Link to="/help">Explore the application guide</Link>.
           </p>
         </div>
       </section>

@@ -64,7 +64,11 @@ test("app-owned navigation uses Link/AppLink instead of full-document anchors", 
 test("literal app destinations resolve to an existing page or download", () => {
   const routes = files("src/routes").map((file) => readFileSync(file, "utf8"))
     .flatMap((text) => [...text.matchAll(/createFileRoute\("([^"]+)"\)/g)].map((m) => m[1]));
-  const known = routes.map((route) => new RegExp("^" + route.replace(/\$[^/]+/g, "[^/]+") + "$"));
+  // Index routes such as "/features/" serve "/features" (trailing slash optional).
+  const known = routes.map(
+    (route) =>
+      new RegExp("^" + route.replace(/\$[^/]+/g, "[^/]+").replace(/(.)\/$/, "$1/?") + "$"),
+  );
   const violations = [];
   for (const control of controlInventory()) {
     for (const attribute of ["href", "to"]) {

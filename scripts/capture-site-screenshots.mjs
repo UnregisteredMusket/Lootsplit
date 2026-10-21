@@ -31,9 +31,13 @@ try {
       await openApplication(page, `${origin}/${path}`, { waitUntil: "networkidle" });
       await page.getByRole("heading", { level: 1 }).first().waitFor();
       await page.waitForFunction(() => document.fonts.status === "loaded");
-      // Lazy screenshots load as they scroll into view; load them all first.
+      // Lazy screenshots load as they scroll into view; scroll through, then wait.
       await page.evaluate(async () => {
-        for (const img of document.querySelectorAll("img[loading=lazy]")) img.loading = "eager";
+        for (let y = 0; y < document.body.scrollHeight; y += innerHeight / 2) {
+          scrollTo(0, y);
+          await new Promise((done) => setTimeout(done, 60));
+        }
+        scrollTo(0, 0);
         await Promise.all(
           [...document.images].map((img) =>
             img.complete ? null : new Promise((done) => img.addEventListener("load", done, { once: true })),
