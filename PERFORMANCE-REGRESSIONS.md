@@ -309,6 +309,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Development / gameplay (balanced v2) / dev-trade-economy | open | 2 | 29s → 118s | +89s | +306.9% |
 | Development / desktop (balanced v2) | open | 2 | 472s → 693s | +221s | +46.82% |
 | release-apk / Run npm test | open | 2 | 12s → 46s | +34s | +283.33% |
+| Development / desktop (balanced v2) / dev-game-analytics | open | 2 | 5s → 7s | +2s | +40% |
 | Development / gameplay (balanced v2) / dev-finance | open | 3 | 36s → 67s | +31s | +86.11% |
 | Development / gameplay (balanced v2) / dev-shop-stock | open | 2 | 16s → 23s | +7s | +43.75% |
 | Development / gameplay (balanced v2) / dev-library-navigation | open | 2 | 42s → 63s | +21s | +50% |
@@ -377,6 +378,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-21T07:19:18Z | step: Development / desktop (balanced v2) / dev-game-analytics | 6s → 7s | +1s | +16.67% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38309026871/job/115009957801) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39559744762/job/119087854555) |
 | 2026-10-21T07:07:42Z | step: native-widget (24) / Run actions/setup-node@v4 | 5s → 6s | +1s | +20% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39414345683/job/118599590044) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39559817596/job/119088082358) |
 | 2026-10-21T05:47:12Z | step: Packaged Worker / interface (balanced v2) / worker-game-analytics | 5s → 7s | +2s | +40% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39266580213/job/118108928983) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39550671744/job/119059476486) |
 | 2026-10-21T05:27:12Z | step: Packaged Worker / accounts (balanced v2) / Run actions/setup-node@v4 | 9s → 11s | +2s | +22.22% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39481783895/job/118833188604) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39549347612/job/119055533247) |
