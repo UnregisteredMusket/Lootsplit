@@ -15,12 +15,24 @@ def adb(*args):
 
 
 def snapshot(name):
-    adb("shell", "uiautomator", "dump", "/sdcard/lootsplit-picker.xml")
-    xml = adb("shell", "cat", "/sdcard/lootsplit-picker.xml")
-    (OUT / (name + ".xml")).write_text(xml)
+    # A boot-complete emulator can still have no accessible launcher root.
+    # Poll only for a fresh hierarchy, never reuse the preceding screen's XML.
+    root = None
+    for attempt in range(4):
+        adb("shell", "rm", "-f", "/sdcard/lootsplit-picker.xml")
+        result = adb("shell", "uiautomator", "dump", "/sdcard/lootsplit-picker.xml")
+        (OUT / (name + "-dump-" + str(attempt) + ".txt")).write_text(result)
+        if "UI hierchary dumped" not in result:
+            continue
+        xml = adb("shell", "cat", "/sdcard/lootsplit-picker.xml")
+        (OUT / (name + ".xml")).write_text(xml)
+        root = ET.fromstring(xml)
+        if root.find("node") is not None:
+            break
     with (OUT / (name + ".png")).open("wb") as image:
         subprocess.run(["adb", "exec-out", "screencap", "-p"], stdout=image, check=True, timeout=20)
-    return ET.fromstring(xml)
+    assert root is not None and root.find("node") is not None, "Launcher hierarchy unavailable after four fresh reads; inspect " + name + ".png"
+    return root
 
 
 def label(node):
