@@ -1,3 +1,30 @@
+# Lootsplit 1.9.2
+
+Android version code **15**, same package and permanent signing certificate. Install over the existing app; do not uninstall or clear saved data.
+
+## Added
+
+- **Agent activity** preset for the 4×1 companion: the latest GitHub development activity (workflow runs, pull requests, merges and deploys) with ✓ ! ✕ symbols and ages. While a workflow runs and the screen is on it refreshes about every minute without waking the device; otherwise the usual ~30-minute schedule applies. It shows GitHub activity only, not the development chat.
+- New coin-and-quill app icon and splash screen, including a monochrome themed-icon layer.
+
+## Improved
+
+- Field monitor widget redesign: status symbol and one-line reason, four stat tiles (— means unavailable), a task card with its timer, and a log ordered with attention items first.
+- 4×1 companion redesign with matching symbols, tinted icon actions and 44dp touch targets.
+- Agent activity is the default for new companions; existing companions keep their saved settings and all earlier presets remain.
+- The widget face no longer shows your email.
+
+## Fixed
+
+- Removed the companion’s stray “?” status.
+- Unavailable GitHub activity states its reason (rate limited, denied, timed out, not connected).
+
+## Release verification
+
+To be completed by the signed release workflow (API 24/API 35 widget checks, preservation checks and the signed-APK upgrade gate).
+
+---
+
 # Lootsplit 1.9.1
 
 Android version code **14**, same package and permanent signing certificate.
