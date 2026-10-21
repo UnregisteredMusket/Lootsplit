@@ -4,8 +4,7 @@ package com.unregisteredmusket.lootsplit;
 public class WidgetInstallReceiver extends android.content.BroadcastReceiver {
     @Override public void onReceive(android.content.Context context,android.content.Intent intent) {
         if(android.content.Intent.ACTION_MY_PACKAGE_REPLACED.equals(intent.getAction())) {
-            WidgetRegistration.refresh(context,true);
-            OwnerWidgetProvider.renderAll(context);
+            WidgetRegistration.refresh(context,true); // Also renders every placed widget.
             OwnerWidgetJob.schedule(context);
         }
     }

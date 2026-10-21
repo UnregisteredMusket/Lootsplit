@@ -1,5 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
+<!-- Only the app-owned directories actually handed to other apps through FileProvider:
+     - cache root: Android exports chosen as "Share…" are written with @capacitor/filesystem
+       Directory.Cache (getCacheDir()) and shared by @capacitor/share (src/lib/mobile/files.ts).
+     - Pictures/ under app-specific external files: Capacitor's WebView file chooser writes
+       camera captures to getExternalFilesDir(DIRECTORY_PICTURES) (BridgeWebChromeClient).
+     Shared external storage is not exposed. -->
 <paths xmlns:android="http://schemas.android.com/apk/res/android">
-    <external-path name="my_images" path="." />
+    <external-files-path name="my_images" path="Pictures/" />
     <cache-path name="my_cache_images" path="." />
 </paths>

@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 12+ (API 31+) cloud backup and device-to-device transfer. Same policy as
+     backup_rules.xml: WebView storage (localStorage with the native account bearer token,
+     cookies, IndexedDB) is excluded; other app data keeps its existing backup.
+     noBackupFilesDir is never included. -->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="root" path="app_webview/" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="root" path="app_webview/" />
+    </device-transfer>
+</data-extraction-rules>
