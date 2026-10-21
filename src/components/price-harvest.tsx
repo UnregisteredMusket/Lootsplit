@@ -124,6 +124,7 @@ export function PriceHarvest({ bookId }: { bookId: string }) {
               <li key={hit.id} className="flex items-center gap-3 py-2">
                 <input
                   type="checkbox"
+                  aria-label={`Import ${hit.name || "this item"}`}
                   checked={hit.on}
                   onChange={() =>
                     setHits((current) =>

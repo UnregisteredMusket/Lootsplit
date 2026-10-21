@@ -27,6 +27,8 @@ import { useDraftGuard } from "@/lib/quire/use-draft-guard";
 import { Heart, Shield, Footprints } from "lucide-react";
 import { HpBar } from "@/components/control-panel/readouts";
 import { useEffect, useRef, useState, useSyncExternalStore, useId, type FormEvent } from "react";
+import { NumberInput } from "@/components/number-input";
+import { removeRowKey, syncRowKeys } from "@/lib/quire/row-keys";
 import { getCampaigns, serverCampaigns, subscribeCampaigns } from "@/lib/quire/campaigns";
 import { getCloudTable, getServerCloudTable, subscribeCloudTable } from "@/lib/quire/cloud-client";
 import { useEconomy } from "@/lib/quire/economy-context";
@@ -65,6 +67,7 @@ import { downloadJson } from "@/lib/quire/table";
 
 type Sheet = z.infer<typeof sheetSchema>;
 type Ability = keyof Sheet["scores"];
+type RowList = "attacks" | "resources" | "spells" | "equipment";
 type Row = {
   id: string;
   body: Sheet;
@@ -594,16 +597,31 @@ function CharacterEditor({
         revision: detail.revision,
         before: detail.body,
       });
-      const saved = await accountRequest<Detail>("sheets/detail", { id });
-      setNotice(
-        outcome.status === "pending"
-          ? "Character changes saved in your pending turn. Submit the turn to share them."
-          : id.startsWith("party:")
-            ? "Character saved to this campaign."
-            : "Character saved to your account.",
-      );
-      setDetail(saved);
-      setSheet(saved.body);
+      // The save succeeded. Apply the server's copy (current permissions and revision) as
+      // before. Only if that follow-up read fails, mark the draft saved anyway so a retry does
+      // not conflict; keep whatever permissions/revision the latest read applied (never the
+      // copy captured when this save started, which could reopen fields the DM just locked).
+      let saved: Detail | null = null;
+      try {
+        saved = await accountRequest<Detail>("sheets/detail", { id });
+      } catch {
+        saved = null;
+      }
+      if (saved) {
+        setNotice(
+          outcome.status === "pending"
+            ? "Character changes saved in your pending turn. Submit the turn to share them."
+            : id.startsWith("party:")
+              ? "Character saved to this campaign."
+              : "Character saved to your account.",
+        );
+        setDetail(saved);
+        setSheet(saved.body);
+      } else {
+        setDetail((current) => (current ? { ...current, body: parsed } : current));
+        setSheet(parsed);
+        setNotice("Saved. Refresh to see the latest version.");
+      }
       announceSheetChange();
       changed();
     } catch (e) {
@@ -681,6 +699,15 @@ function CharacterEditor({
       setBusy(false);
     }
   }
+  // Stable client-only keys so open rows and focus follow the right attack/resource/spell/item.
+  const rowKeys = useRef<Record<RowList, string[]>>({
+    attacks: [],
+    resources: [],
+    spells: [],
+    equipment: [],
+  });
+  const keysFor = (list: RowList, length: number) =>
+    syncRowKeys(rowKeys.current[list], length, () => crypto.randomUUID());
   if (!sheet || !detail)
     return (
       <div>
@@ -753,19 +780,18 @@ function CharacterEditor({
           <option value={1}>Proficient</option>
           {group === "skills" && <option value={2}>Expertise</option>}
         </select>
-        <input
+        <NumberInput
           aria-label={`${name} extra bonus`}
-          type="number"
           min={-100}
           max={100}
           disabled={!canEdit(group)}
           value={row.extra}
-          onChange={(e) =>
+          onValue={(extra) =>
             set(group, {
               ...sheet[group],
               [group === "saves" ? a : name]: {
                 ...row,
-                extra: number(e.target.value),
+                extra,
               },
             })
           }
@@ -1187,7 +1213,7 @@ function CharacterEditor({
                       onChange={(v) => set("initiative", v)}
                     />
                     {sheet.attacks.map((a, i) => (
-                      <div className="sheet-row" key={i}>
+                      <div className="sheet-row" key={keysFor("attacks", sheet.attacks.length)[i]}>
                         <Text
                           label={`Attack ${i + 1} name`}
                           value={a.name}
@@ -1240,12 +1266,13 @@ function CharacterEditor({
                           {rollButton(`Roll ${a.name} damage`, "damage", String(i))}
                           {canEdit("attacks") && (
                             <button
-                              onClick={() =>
+                              onClick={() => {
+                                removeRowKey(rowKeys.current.attacks, i);
                                 set(
                                   "attacks",
                                   sheet.attacks.filter((_, j) => j !== i),
-                                )
-                              }
+                                );
+                              }}
                             >
                               Remove attack
                             </button>
@@ -1281,7 +1308,7 @@ function CharacterEditor({
                     onChange={(v) => set("hitDice", v)}
                   />
                   {sheet.resources.map((r, i) => (
-                    <div className="resource-row" key={i}>
+                    <div className="resource-row" key={keysFor("resources", sheet.resources.length)[i]}>
                       <Text
                         label={`Resource ${i + 1} name`}
                         value={r.name}
@@ -1355,12 +1382,13 @@ function CharacterEditor({
                       </button>
                       {canEdit("resources") && (
                         <button
-                          onClick={() =>
+                          onClick={() => {
+                            removeRowKey(rowKeys.current.resources, i);
                             set(
                               "resources",
                               sheet.resources.filter((_, j) => j !== i),
-                            )
-                          }
+                            );
+                          }}
                         >
                           Remove resource
                         </button>
@@ -1571,7 +1599,7 @@ function CharacterEditor({
                   apply effects automatically.
                 </p>
                 {sheet.spells.map((s, i) => (
-                  <details key={i} className="sheet-row">
+                  <details key={keysFor("spells", sheet.spells.length)[i]} className="sheet-row">
                     <summary>
                       <FantasyIcon entry={{ ...s, kind: "spells" }} className="fantasy-inline" />
                       {s.name} · {s.level === 0 ? "Cantrip" : `Level ${s.level}`}{" "}
@@ -1638,12 +1666,13 @@ function CharacterEditor({
                     {s.formula && rollButton(`Roll ${s.name}`, "spell", String(i))}
                     {canEdit("spells") && (
                       <button
-                        onClick={() =>
+                        onClick={() => {
+                          removeRowKey(rowKeys.current.spells, i);
                           set(
                             "spells",
                             sheet.spells.filter((_, j) => j !== i),
-                          )
-                        }
+                          );
+                        }}
                       >
                         Remove spell
                       </button>
@@ -1752,7 +1781,7 @@ function CharacterEditor({
                   inventory permission.
                 </p>
                 {sheet.equipment.map((item, i) => (
-                  <div className="sheet-row" key={i}>
+                  <div className="sheet-row" key={keysFor("equipment", sheet.equipment.length)[i]}>
                     <CampaignInventoryArt item={item} holdings={campaignLedger?.holdings ?? []} />
                     <Text
                       label={`Item ${i + 1} name`}
@@ -1821,12 +1850,13 @@ function CharacterEditor({
                     />
                     {canManageInventory && (
                       <button
-                        onClick={() =>
+                        onClick={() => {
+                          removeRowKey(rowKeys.current.equipment, i);
                           set(
                             "equipment",
                             sheet.equipment.filter((_, j) => j !== i),
-                          )
-                        }
+                          );
+                        }}
                       >
                         Remove item
                       </button>
@@ -2091,15 +2121,14 @@ function Num({
   return (
     <label>
       {label}
-      <input
+      <NumberInput
         aria-label={label}
-        type="number"
         min={min}
         max={max}
         step={step}
         disabled={disabled}
         value={value}
-        onChange={(e) => onChange(number(e.target.value))}
+        onValue={onChange}
       />
     </label>
   );

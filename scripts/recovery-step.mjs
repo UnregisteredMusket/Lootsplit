@@ -9,6 +9,23 @@ export function atomicJson(path, value) {
   renameSync(path + ".tmp", path);
 }
 
+// Terminal color codes, built from the escape character (lint rejects control characters in regex literals).
+const ANSI_COLOR = new RegExp(String.fromCharCode(27) + "\\[[0-9;]*m", "g");
+
+/** A GitHub `::error` workflow command carrying the last output lines of a failed step. */
+export function failureAnnotation(id, status, output) {
+  const lines = String(output)
+    .replace(ANSI_COLOR, "")
+    .split(/\r?\n/)
+    .filter((line) => line.trim())
+    .slice(-40)
+    .join("\n")
+    .slice(-3500);
+  const escape = (value) =>
+    value.replace(/%/g, "%25").replace(/\r/g, "%0D").replace(/\n/g, "%0A");
+  return `::error title=${escape(`${id} ${status}`).replace(/[:,]/g, " ")}::${escape(lines || "(no output)")}`;
+}
+
 // The runner never retries a command. A failed assertion must stay a failure;
 // writes and deployments must be reconciled before anybody repeats them.
 export async function runStep({
@@ -47,7 +64,19 @@ export async function runStep({
   const publish = stepTelemetry({ id, seconds, startedAt: record.startedAt });
   void publish("running");
   console.log(`[recovery] START ${id}, deadline ${seconds}s`);
-  const child = spawn(command, args, { stdio: "inherit", detached: process.platform !== "win32" });
+  // Output is passed through unchanged and its tail is kept, so a failure can be reported as a
+  // GitHub annotation: annotations are readable through the API even where log downloads aren't.
+  const child = spawn(command, args, {
+    stdio: ["inherit", "pipe", "pipe"],
+    detached: process.platform !== "win32",
+  });
+  let tail = "";
+  const keep = (chunk, stream) => {
+    stream.write(chunk);
+    tail = (tail + chunk.toString("utf8")).slice(-6000);
+  };
+  child.stdout?.on("data", (chunk) => keep(chunk, process.stdout));
+  child.stderr?.on("data", (chunk) => keep(chunk, process.stderr));
   let reason, killTimer;
   const signalTree = (signal) => {
     if (!child.pid) return;
@@ -94,6 +123,8 @@ export async function runStep({
     finishedAt: new Date().toISOString(),
   });
   save();
+  if (record.status !== "passed" && process.env.GITHUB_ACTIONS === "true")
+    console.log(failureAnnotation(id, record.status, tail));
   console.log(`[recovery] ${record.status.toUpperCase()} ${id}`);
   await publish(record.status === "passed" ? "success" : record.status);
   return record;

@@ -20,14 +20,23 @@ export function subscribeOnline(listener: () => void): () => void {
     window.addEventListener("offline", off);
   }
   let removeNetwork = () => {};
+  let live = true;
   if (import.meta.env.VITE_MOBILE === "true") {
     void import("@capacitor/network").then(async ({ Network }) => {
-      setOnline((await Network.getStatus()).connected);
+      if (!live) return;
+      const status = await Network.getStatus();
+      if (live) setOnline(status.connected);
       const handle = await Network.addListener("networkStatusChange", (status) => setOnline(status.connected));
+      // An unsubscribe before registration finished must not leak the native listener.
+      if (!live) {
+        void handle.remove();
+        return;
+      }
       removeNetwork = () => void handle.remove();
     });
   }
   return () => {
+    live = false;
     listeners.delete(listener);
     if (typeof window !== "undefined") {
       window.removeEventListener("online", on);

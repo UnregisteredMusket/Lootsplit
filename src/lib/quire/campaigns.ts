@@ -15,6 +15,8 @@ type CampaignState = { campaigns: Campaign[]; activeId: string };
 const listeners = new Set<() => void>();
 let booted = false;
 let deleting = false;
+// The stored intent whose startup retry failed in this tab; it is retried on the next load.
+let failedDeletion: string | null = null;
 let state: CampaignState = { campaigns: [FIRST_CAMPAIGN], activeId: FIRST_CAMPAIGN.id };
 const SERVER_CAMPAIGNS: CampaignState = state;
 
@@ -82,7 +84,7 @@ export function switchCampaign(id: string) {
 
 export async function deleteCampaign(id: string) {
   boot();
-  playersCannotChangeCampaigns();
+  playersCannotChangeCampaigns(false);
   const target = state.campaigns.find((c) => c.id === id);
   if (!target) return;
   const remaining = state.campaigns.filter((c) => c.id !== id);
@@ -107,15 +109,31 @@ export async function deleteCampaign(id: string) {
   completeDeletion(target, next);
 }
 
-function assertNoDeletion() {
-  if (deleting || (typeof window !== "undefined" && window.localStorage.getItem(DELETION)))
+function assertNoDeletion(allowFailedRetry = true) {
+  const pending = typeof window !== "undefined" ? window.localStorage.getItem(DELETION) : null;
+  if (!deleting && pending && pending === failedDeletion) {
+    // A failed retry must not lock this tab out. Starting another deletion would replace the
+    // retained intent, so only that action waits for the retry on the next load.
+    if (allowFailedRetry) return;
+    throw new Error(
+      "An earlier campaign deletion failed. It will retry when Lootsplit is reloaded.",
+    );
+  }
+  if (deleting || pending)
     throw new Error(
       "A campaign deletion is still finishing. Close other Lootsplit tabs if it is waiting.",
     );
 }
 
-function playersCannotChangeCampaigns() {
-  assertNoDeletion();
+export function campaignDeletionFailed() {
+  boot();
+  return failedDeletion !== null && typeof window !== "undefined"
+    ? window.localStorage.getItem(DELETION) === failedDeletion
+    : false;
+}
+
+function playersCannotChangeCampaigns(allowFailedRetry = true) {
+  assertNoDeletion(allowFailedRetry);
   refreshRegistry();
   if (getCloudWatch().joined) throw new Error("Return to Local Mode before changing campaigns.");
   if (getSeat().role === "player")
@@ -150,7 +168,13 @@ function boot() {
         deleting = true;
         void deleteQuireDatabase(intent.target.db)
           .then(() => completeDeletion(intent.target, intent.next))
-          .catch(() => {});
+          .catch(() => {
+            // Keep the durable intent for the next load, but do not lock this tab out.
+            deleting = false;
+            failedDeletion = pending;
+            state = { ...state }; // New snapshot so subscribers re-render and show the notice.
+            publish();
+          });
       }
     } catch {
       /* Retain the existing registry if the intent cannot be read. */

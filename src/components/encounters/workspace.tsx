@@ -128,6 +128,7 @@ function EncounterLibrary({ allowDevice }: { allowDevice: boolean }) {
     [selected, setSelected] = useState(""),
     [refresh, setRefresh] = useState(0),
     [error, setError] = useState(""),
+    [onlineNotice, setOnlineNotice] = useState(""),
     [busy, setBusy] = useState(false);
   const selectedCode = useRef(code);
   selectedCode.current = code;
@@ -168,9 +169,15 @@ function EncounterLibrary({ allowDevice }: { allowDevice: boolean }) {
       }
       return data;
     });
+    let onlineFailed = false;
     Promise.all([
       local,
-      accountRequest<Library>("encounters", undefined, c.signal).catch(() => null),
+      accountRequest<Library>("encounters", undefined, c.signal).catch((e: unknown) => {
+        // Keep the device fallback, but say that online encounters are missing.
+        if (!c.signal.aborted && (e as { name?: string } | null)?.name !== "AbortError")
+          onlineFailed = true;
+        return null;
+      }),
     ])
       .then(([local, cloud]) => ({
         campaigns: [...local.campaigns, ...(cloud?.campaigns || [])],
@@ -179,6 +186,11 @@ function EncounterLibrary({ allowDevice }: { allowDevice: boolean }) {
       .then((data) => {
         if (c.signal.aborted) return;
         setLibrary(data);
+        setOnlineNotice(
+          onlineFailed
+            ? "Online encounters are unavailable right now; showing encounters saved on this device."
+            : "",
+        );
         const current = getCloudTable().code;
         setCode(
           (v) =>
@@ -254,6 +266,11 @@ function EncounterLibrary({ allowDevice }: { allowDevice: boolean }) {
       {error && (
         <p role="alert" className="character-error">
           {error}
+        </p>
+      )}
+      {onlineNotice && (
+        <p role="status" className="encounter-notice">
+          {onlineNotice}
         </p>
       )}
       {!library ? (
@@ -467,10 +484,23 @@ function EncounterEditor({
     commandOutcome,
     reload: reloadEconomy,
   } = useEconomy();
+  // Only the latest detail/log response may apply; local requests ignore the abort signal.
+  const detailRequest = useRef(0),
+    logRequest = useRef(0),
+    discardDraft = useRef(true),
+    loadedId = useRef(id);
   useEffect(() => {
     const c = new AbortController();
+    const request = ++detailRequest.current;
+    // First load, explicit Reload, or a different encounter always replaces the draft.
+    const replace = discardDraft.current || loadedId.current !== id;
+    discardDraft.current = false;
+    loadedId.current = id;
     encounterRequest<Detail>("encounters/detail", { id }, c.signal)
       .then((d) => {
+        if (c.signal.aborted || request !== detailRequest.current) return;
+        // A background refresh must not overwrite edits begun while it was in flight.
+        if (!replace && editing.current) return;
         setDetail(d);
         setDraft(d.body);
         setFilters({
@@ -487,24 +517,27 @@ function EncounterEditor({
         setError("");
       })
       .catch((e) => {
-        if (!c.signal.aborted) setError(message(e));
+        if (!c.signal.aborted && request === detailRequest.current) setError(message(e));
       });
     return () => c.abort();
   }, [id, reload]); // callback only updates parent's ref
   useEffect(() => {
     const c = new AbortController();
+    const request = ++logRequest.current;
     encounterRequest<{ rolls: Roll[]; more: boolean }>("encounters/log", { id }, c.signal)
       .then((r) => {
+        if (c.signal.aborted || request !== logRequest.current) return;
         setRolls(r.rolls);
         setMoreRolls(r.more);
       })
       .catch((e) => {
-        if (!c.signal.aborted) setError(message(e));
+        if (!c.signal.aborted && request === logRequest.current) setError(message(e));
       });
     return () => c.abort();
   }, [id, reload]);
   useDraftGuard(dirty, "encounter");
   function change(next: Encounter) {
+    editing.current = true;
     setDraft(next);
     setDirty(true);
     onDirty(true);
@@ -521,20 +554,39 @@ function EncounterEditor({
         revision: detail.revision,
         ...extra,
       });
-      const saved = await encounterRequest<Detail>("encounters/detail", { id });
-      setDetail(saved);
-      setDraft(saved.body);
+      // The mutation succeeded. Apply the server's copy as before; only if that follow-up read
+      // fails, mark the draft saved anyway so a retry does not conflict.
+      let refreshed = true;
+      try {
+        const saved = await encounterRequest<Detail>("encounters/detail", { id });
+        setDetail(saved);
+        setDraft(saved.body);
+      } catch {
+        refreshed = false;
+        if (path === "save" && extra.encounter) {
+          // A save increments the revision by exactly one on both server and device stores.
+          const body = extra.encounter as Encounter;
+          // Only if no newer copy arrived meanwhile.
+          setDetail((current) =>
+            current && current.revision === detail.revision
+              ? { ...current, body, revision: detail.revision + 1 }
+              : current,
+          );
+        }
+      }
       setDirty(false);
       onDirty(false);
       onSaved();
       if (path === "award" && id.startsWith("local-")) await reloadEconomy();
       if (path === "award") void playSound("loot");
       setNotice(
-        path === "award"
-          ? "Loot transferred. This encounter cannot award loot again."
-          : path === "conclude"
-            ? "Encounter concluded. Review recipients and loot before transferring."
-            : "Encounter saved.",
+        !refreshed
+          ? "Saved. Refresh to see the latest version."
+          : path === "award"
+            ? "Loot transferred. This encounter cannot award loot again."
+            : path === "conclude"
+              ? "Encounter concluded. Review recipients and loot before transferring."
+              : "Encounter saved.",
       );
     } catch (e) {
       setError(message(e));
@@ -826,8 +878,10 @@ function EncounterEditor({
           <button
             disabled={busy}
             onClick={() => {
-              if (!dirty || window.confirm("Discard unsaved changes and reload?"))
+              if (!dirty || window.confirm("Discard unsaved changes and reload?")) {
+                discardDraft.current = true;
                 setReload((v) => v + 1);
+              }
             }}
           >
             Reload
