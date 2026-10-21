@@ -672,3 +672,178 @@ test("latest collection/report failures and observed Worker errors override earl
     DB.close();
   }
 });
+
+// ---- 2026-10-21 reliability audit regressions ----
+const { summarizeReport, monitorSnapshot, SNAPSHOT_CACHE_ROWS, REPORT_BYTE_BUDGET } = await import(
+  "../cloudflare/monitor-journal.mjs"
+);
+async function provisionOwner(DB, at) {
+  await DB.prepare(
+    "INSERT INTO user(id,name,email,emailVerified,createdAt,updatedAt) VALUES('owner','Owner','test@example.com',1,?,?)",
+  )
+    .bind(at, at)
+    .run();
+  await DB.prepare("INSERT INTO site_roles VALUES('owner','owner',?)").bind(at).run();
+  await DB.prepare("INSERT OR IGNORE INTO member_access(user_id,status) VALUES('owner','active')").run();
+}
+
+test("impossible calendar dates are rejected instead of producing a stretched day", () => {
+  assert.throws(() => dayBounds("2026-02-31", "America/New_York"), /calendar date/);
+  assert.throws(() => dayBounds("2026-13-01", "America/New_York"), /calendar date/);
+  const leap = dayBounds("2028-02-29", "America/New_York");
+  assert.equal(leap.end - leap.start, 86400000);
+});
+
+test("only a short tail of provider-cache snapshots is retained; IDs keep increasing", async () => {
+  const DB = localAccountDb();
+  try {
+    let last = 0;
+    for (let i = 0; i < SNAPSHOT_CACHE_ROWS + 15; i++) {
+      const snapshot = await monitorSnapshot({ DB }, "owner", {
+        force: true,
+        now: instant + i * 61000,
+        collector: async () => reading(),
+      });
+      assert.ok(snapshot.snapshotId > last, "snapshot IDs never move backwards");
+      last = snapshot.snapshotId;
+    }
+    const rows = await DB.prepare(
+      "SELECT COUNT(*) AS n, MAX(revision) AS newest FROM owner_monitor_snapshots",
+    ).first();
+    assert.ok(rows.n <= SNAPSHOT_CACHE_ROWS + 1, `retained ${rows.n} cache rows`);
+    assert.equal(rows.newest, last, "the newest snapshot is always kept");
+  } finally {
+    DB.close();
+  }
+});
+
+test("oversized reports summarize long lists explicitly without reducing totals", () => {
+  const item = (i, failed = false) => ({
+    id: `entry-${i}`,
+    source: failed ? "diagnostics" : "workflows",
+    observedAt: instant + i,
+    summary: (failed ? "Workflow failure: " : "Workflow success: ") + "x".repeat(900),
+  });
+  const evidence = Array.from({ length: 3000 }, (_, i) => item(i, i === 7));
+  const report = {
+    id: "America/New_York:2026-10-20",
+    summary: "2026-10-20: totals.",
+    gaps: ["a gap"],
+    recommendations: ["a recommendation"],
+    coverage: [{ id: "workflows", entries: 3000 }],
+    unresolved: [{ component: "Workflow: x", color: "red" }],
+    history: { totalEntries: 3000 },
+    evidence,
+    correlations: [],
+    builds: evidence.slice(0, 400),
+    performance: [],
+    incidents: [],
+    trends: [],
+  };
+  summarizeReport(report, 500_000);
+  assert.ok(new TextEncoder().encode(JSON.stringify(report)).length <= 500_000);
+  assert.equal(report.summarized.sections.evidence.total, 3000);
+  assert.ok(report.summarized.sections.evidence.shown < 3000);
+  assert.ok(
+    report.evidence.some((e) => e.id === "entry-7"),
+    "failures are kept ahead of routine entries",
+  );
+  assert.deepEqual(
+    report.evidence.map((e) => e.observedAt),
+    [...report.evidence.map((e) => e.observedAt)].sort((a, b) => a - b),
+    "summarized lists stay chronological",
+  );
+  assert.equal(report.history.totalEntries, 3000, "totals are never reduced");
+  assert.deepEqual(report.unresolved, [{ component: "Workflow: x", color: "red" }]);
+  assert.match(report.summary, /Long lists are summarized; \d+ more entries are in History/);
+  const small = { summary: "s", evidence: [item(1)], builds: [] };
+  assert.equal(summarizeReport(small).summarized, undefined, "reports within budget are unchanged");
+  assert.ok(REPORT_BYTE_BUDGET < 2_000_000, "budget stays below D1's 2 MB row limit");
+  const stuck = { summary: "s", gaps: ["y".repeat(600_000)], evidence: [] };
+  assert.throws(() => summarizeReport(stuck, 500_000), /too large/);
+});
+
+test("expected intervals start when monitoring began; boundary slots belong to the right day", async () => {
+  const DB = localAccountDb();
+  try {
+    const created = Date.parse("2026-10-20T20:00:00Z"); // 16:00 in New York
+    await initializeMonitor(DB, created);
+    const { start, end } = dayBounds("2026-10-20", "America/New_York");
+    for (const slot of [start, end])
+      await recordLog(DB, {
+        id: `interval:${slot}`,
+        source: "monitoring",
+        observedAt: slot,
+        summary: `slot ${slot}`,
+        outcome: "missed",
+      });
+    const report = await generateReport(DB, "2026-10-20", DEFAULT_CONFIG, end + 600000);
+    assert.match(report.gaps.join("\n"), /0\/16 scheduled half-hour intervals/);
+    assert.match(report.gaps.join("\n"), /Scheduled monitoring began at 2026-10-20T20:00:00\.000Z/);
+    const ids = report.evidence.map((e) => e.id);
+    assert.ok(ids.includes(`interval:${end}`), "the window ending at midnight is this day's");
+    assert.ok(!ids.includes(`interval:${start}`), "the window ending at the day's start is not");
+  } finally {
+    DB.close();
+  }
+});
+
+test("failing daily reports back off, then a failed placeholder unblocks later days", async () => {
+  const base = localAccountDb();
+  let breakReports = true;
+  // Fail every attempt to save a real report, as an oversized or erroring report would.
+  const DB = {
+    ...base,
+    prepare(sql) {
+      const prepared = base.prepare(sql);
+      prepared.sql = sql;
+      return prepared;
+    },
+    async batch(statements) {
+      if (breakReports && statements.some((s) => /INSERT INTO owner_monitor_reports VALUES\(\?,\?,\?,\?,\?\) ON CONFLICT/.test(s.sql)))
+        throw Error("simulated storage failure");
+      return base.batch(statements);
+    },
+  };
+  try {
+    const created = Date.parse("2026-10-20T12:00:00Z");
+    await provisionOwner(DB, created);
+    await initializeMonitor(DB, created);
+    const tick = Date.parse("2026-10-21T05:00:00Z"); // after the 00:10 New York report time
+    const options = { integrations: false, collector: async () => reading() };
+    const failures = async () =>
+      (
+        await DB.prepare(
+          "SELECT COUNT(*) AS n FROM owner_monitor_logs WHERE source='reports' AND id LIKE 'report-failure:%'",
+        ).first()
+      ).n;
+    await scheduledMonitor({ DB }, tick, { ...options, now: tick });
+    assert.equal(await failures(), 1);
+    await scheduledMonitor({ DB }, tick + 30000, { ...options, now: tick + 30000 });
+    assert.equal(await failures(), 1, "no retry inside the backoff window");
+    for (const offset of [60, 180, 420, 900])
+      await scheduledMonitor({ DB }, tick + offset * 1000, { ...options, now: tick + offset * 1000 });
+    assert.equal(await failures(), 5);
+    assert.equal(
+      await DB.prepare("SELECT COUNT(*) AS n FROM owner_monitor_reports").first().then((r) => r.n),
+      0,
+      "no placeholder before the attempt limit",
+    );
+    const last = tick + 1860000;
+    await scheduledMonitor({ DB }, last, { ...options, now: last });
+    const placeholder = await DB.prepare("SELECT * FROM owner_monitor_reports").first();
+    assert.equal(placeholder.day, "2026-10-20");
+    assert.equal(JSON.parse(placeholder.body).failed, true);
+    assert.ok(placeholder.generated_at < last, "Daily reporting stays red until a real report");
+    breakReports = false;
+    const real = await generateReport(DB, "2026-10-20", DEFAULT_CONFIG, last + 60000);
+    assert.equal(real.failed, undefined);
+    assert.equal(
+      JSON.parse((await DB.prepare("SELECT body FROM owner_monitor_reports").first()).body).failed,
+      undefined,
+      "Generate previous day replaces the placeholder",
+    );
+  } finally {
+    base.close();
+  }
+});

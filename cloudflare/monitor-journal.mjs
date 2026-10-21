@@ -25,6 +25,19 @@ import {
 } from "./monitor-model.mjs";
 
 const REPO = "https://github.com/UnregisteredMusket/Lootsplit";
+// Recent provider-cache snapshots retained; older cache rows are deleted (never history).
+export const SNAPSHOT_CACHE_ROWS = 48;
+// D1 rejects any row above 2,000,000 bytes. Reports above this budget summarize long lists.
+export const REPORT_BYTE_BUDGET = 1_500_000;
+// Minimum items kept per summarized section before a report is declared too large.
+const REPORT_SECTION_FLOOR = 25;
+// Failed report generation backs off 1, 2, 4 … 32 minutes; after this many attempts an
+// explicitly failed placeholder lets later days continue. Generate previous day retries it.
+const REPORT_MAX_ATTEMPTS = 6;
+// Custom (non-built-in) registry entries; each adds work to every daily report.
+const REGISTRY_CUSTOM_LIMIT = 50;
+// Log rows stamped with a half-hour slot (window end) rather than an observation instant.
+const SLOT_LOG = "source='monitoring' AND (id LIKE 'interval:%' OR id LIKE 'recovered:%')";
 export const BUILTIN_LOGS = [
   [
     "monitoring",
@@ -565,7 +578,17 @@ export async function monitorSnapshot(
         .prepare("SELECT * FROM owner_monitor_snapshots ORDER BY revision DESC LIMIT 1")
         .first();
       snapshot = { ...decode(newest), snapshotId: newest.revision };
-    } else snapshot.snapshotId = result.meta.last_row_id;
+    } else {
+      snapshot.snapshotId = result.meta.last_row_id;
+      // Snapshots are a provider-read cache: only the newest row is ever served. History lives in
+      // intervals/logs/reports, which are never pruned. Owner-approved 2026-10-21: keep a short
+      // tail of recent snapshots and delete older cache rows. AUTOINCREMENT prevents ID reuse.
+      await run(
+        db,
+        "DELETE FROM owner_monitor_snapshots WHERE revision<=(SELECT revision FROM owner_monitor_snapshots ORDER BY revision DESC LIMIT 1 OFFSET ?)",
+        SNAPSHOT_CACHE_ROWS,
+      );
+    }
   }
   // Every refresh reads task state, even when provider snapshot is reused; the task has its own revision.
   snapshot.developmentStatus = await currentTask(db, now, settings);
@@ -789,14 +812,18 @@ export async function collectInterval(
   );
   const lock = await run(
     db,
-    "UPDATE owner_monitor_intervals SET outcome='collecting',started_at=?,lease=?,lease_until=?,attempts=attempts+1 WHERE slot=? AND outcome NOT IN ('complete','partial','recovered','missed') AND (lease_until IS NULL OR lease_until<?)",
+    // A failed slot retries with exponential backoff (1, 2, 4 … 32 minutes) and at most six
+    // attempts, so a provider outage cannot multiply GitHub/Cloudflare calls every minute.
+    "UPDATE owner_monitor_intervals SET outcome='collecting',started_at=?,lease=?,lease_until=?,attempts=attempts+1 WHERE slot=? AND outcome NOT IN ('complete','partial','recovered','missed') AND (lease_until IS NULL OR lease_until<?) AND (outcome<>'failed' OR (attempts<6 AND ?-COALESCE(collected_at,0)>=60000*(1<<MIN(MAX(attempts-1,0),5))))",
     now,
     lease,
     now + 120000,
     slot,
     now,
+    now,
   );
   if (!lock.meta.changes) return { duplicate: true };
+  let committed;
   try {
     const snapshot = await collector(env, userId);
     const traffic = integrations
@@ -890,9 +917,7 @@ export async function collectInterval(
         lease,
       ),
     ]);
-    await sourceSuccess(db, "monitoring", now);
-    await monitorSnapshot(env, userId, { force: true, now, collector: async () => snapshot });
-    return { outcome, ...body };
+    committed = { outcome, body, snapshot };
   } catch {
     const summary =
       "Scheduled collection failed. No healthy status or zero measurements were substituted. The next scheduler invocation will retry this interval.";
@@ -918,6 +943,83 @@ export async function collectInterval(
     );
     return { outcome: "failed", summary };
   }
+  // The interval is committed. Later bookkeeping must not relabel a saved observation as failed.
+  try {
+    await sourceSuccess(db, "monitoring", now);
+  } catch {
+    /* Freshness is retried on the next successful collection. */
+  }
+  try {
+    await monitorSnapshot(env, userId, {
+      force: true,
+      now,
+      collector: async () => committed.snapshot,
+    });
+  } catch {
+    /* The dashboard snapshot refreshes on its next read; the interval stays as saved. */
+  }
+  return { outcome: committed.outcome, ...committed.body };
+}
+
+const SUMMARIZED_SECTIONS = ["evidence", "correlations", "builds", "performance", "incidents", "trends"];
+const reportBytes = (report) => new TextEncoder().encode(JSON.stringify(report)).length;
+// Failures, errors and regressions are kept first; then the most recent entries.
+const attention = (item) =>
+  /fail|error|regression|red|unavailable|missed/i.test(
+    `${item?.summary ?? ""} ${item?.outcome ?? ""} ${item?.kind ?? ""} ${item?.color ?? ""}`,
+  )
+    ? 1
+    : 0;
+function keepImportant(items, count) {
+  return items
+    .map((item, index) => ({ item, index }))
+    .sort(
+      (a, b) =>
+        attention(b.item) - attention(a.item) ||
+        (b.item?.observedAt ?? b.item?.scheduledAt ?? 0) -
+          (a.item?.observedAt ?? a.item?.scheduledAt ?? 0) ||
+        a.index - b.index,
+    )
+    .slice(0, count)
+    .sort((a, b) => a.index - b.index)
+    .map(({ item }) => item);
+}
+/**
+ * Keeps a report under D1's row limit (owner-approved 2026-10-21). Counts, coverage, gaps,
+ * recommendations and unresolved diagnostics are never reduced; long lists keep their most
+ * important entries and record exactly how many were shown. Every source entry remains in
+ * paginated history, which the report points to. Throws (explicit failure) if it cannot fit.
+ */
+export function summarizeReport(report, budget = REPORT_BYTE_BUDGET) {
+  if (reportBytes(report) <= budget) return report;
+  const original = Object.fromEntries(SUMMARIZED_SECTIONS.map((s) => [s, report[s] || []]));
+  const caps = Object.fromEntries(SUMMARIZED_SECTIONS.map((s) => [s, original[s].length]));
+  for (const section of SUMMARIZED_SECTIONS) {
+    while (caps[section] > REPORT_SECTION_FLOOR && reportBytes(report) > budget) {
+      caps[section] = Math.max(REPORT_SECTION_FLOOR, Math.floor(caps[section] / 2));
+      report[section] = keepImportant(original[section], caps[section]);
+    }
+    if (reportBytes(report) <= budget) break;
+  }
+  const sections = Object.fromEntries(
+    SUMMARIZED_SECTIONS.filter((s) => (report[s] || []).length < original[s].length).map((s) => [
+      s,
+      { shown: report[s].length, total: original[s].length },
+    ]),
+  );
+  const hidden = Object.values(sections).reduce((sum, s) => sum + s.total - s.shown, 0);
+  report.summarized = {
+    budgetBytes: budget,
+    sections,
+    note: "Long lists were summarized to fit storage limits: failures, errors and regressions first, then the most recent entries. Every entry remains in History for this day.",
+  };
+  report.summary += ` Long lists are summarized; ${hidden} more entries are in History for this day.`;
+  if (reportBytes(report) > budget)
+    fail(
+      "Daily report remains too large after summarizing long lists; export and review the day's source logs.",
+      503,
+    );
+  return report;
 }
 
 export async function generateReport(db, day, settings, now = Date.now()) {
@@ -948,9 +1050,14 @@ async function buildReport(db, day, settings, now) {
   let sequence = 0;
   // Bounded pages, without truncating the report. A failed page leaves the previous report intact.
   for (;;) {
+    // Interval logs are stamped with their slot (the window END). The window ending at the day's
+    // start belongs to the previous day and the one ending at the day's end belongs to this day,
+    // matching the interval query below.
     const page = await rows(
       db,
-      "SELECT * FROM owner_monitor_logs WHERE observed_at>=? AND observed_at<? AND sequence>? ORDER BY sequence LIMIT 200",
+      `SELECT * FROM owner_monitor_logs WHERE ((observed_at>=? AND observed_at<? AND NOT (observed_at=? AND ${SLOT_LOG})) OR (observed_at=? AND ${SLOT_LOG})) AND sequence>? ORDER BY sequence LIMIT 200`,
+      start,
+      end,
       start,
       end,
       sequence,
@@ -970,8 +1077,15 @@ async function buildReport(db, day, settings, now) {
     start,
     end,
   );
-  const expected = Math.floor(end / INTERVAL) - Math.floor(start / INTERVAL);
-  const collected = intervals.filter((i) => ["complete", "partial"].includes(i.outcome)).length;
+  // Slots before monitoring was installed were never scheduled; count only slots after it began.
+  const monitorCreated =
+    (await db.prepare("SELECT created_at FROM owner_monitor_config WHERE id=1").first())
+      ?.created_at ?? start;
+  const scheduledFrom = Math.min(end, Math.max(start, monitorCreated));
+  const expected = Math.floor(end / INTERVAL) - Math.floor(scheduledFrom / INTERVAL);
+  const collected = intervals.filter(
+    (i) => i.slot > scheduledFrom && ["complete", "partial"].includes(i.outcome),
+  ).length;
   const coverage = registry.map((r) => {
     const source = decode(r),
       count = entries.filter((e) => e.source === r.id).length;
@@ -1074,6 +1188,10 @@ async function buildReport(db, day, settings, now) {
     gaps.unshift(
       `${collected}/${expected} scheduled half-hour intervals have actual observations; ${expected - collected} are missing, failed or historical recovery only.`,
     );
+  if (scheduledFrom > start)
+    gaps.unshift(
+      `Scheduled monitoring began at ${new Date(scheduledFrom).toISOString()}; the earlier part of this day was not monitored and is not counted as missed.`,
+    );
   const recommendations = [
     ...(gaps.length
       ? [
@@ -1146,6 +1264,7 @@ async function buildReport(db, day, settings, now) {
         evidence: e.evidence || [],
       })),
   };
+  summarizeReport(report);
   await db.batch([
     statement(
       db,
@@ -1325,7 +1444,11 @@ export async function scheduledMonitor(env, scheduledAt = Date.now(), options = 
             .bind(day, settings.timezone)
             .first()
         )
-          await generateReport(db, day, settings, now);
+          try {
+            await generateReport(db, day, settings, now);
+          } catch {
+            /* Logged by generateReport; the recovered log already queued this report's refresh. */
+          }
       }
     }
   }
@@ -1340,15 +1463,111 @@ export async function scheduledMonitor(env, scheduledAt = Date.now(), options = 
     const due = last
       ? new Date(Date.parse(last.day + "T12:00:00Z") + 86400000).toISOString().slice(0, 10)
       : firstDay;
-    if (due <= previousDay(calendar.day)) await generateReport(db, due, settings, now);
+    if (due <= previousDay(calendar.day)) {
+      const reportId = `${settings.timezone}:${due}`;
+      const failures = await reportFailures(db, reportId, now);
+      if (failures.ready)
+        try {
+          await generateReport(db, due, settings, now);
+        } catch (error) {
+          // Never retry every minute, and never block later days behind one failing day.
+          if ((error.status && error.status < 500) || failures.attempts + 1 >= REPORT_MAX_ATTEMPTS)
+            await storeFailedReport(db, due, settings, now, failures.attempts + 1);
+        }
+    }
   }
   const dirty = await db
     .prepare(
-      "SELECT r.day,r.timezone FROM owner_monitor_report_refresh q JOIN owner_monitor_reports r ON r.id=q.report_id ORDER BY q.requested_at LIMIT 1",
+      "SELECT r.id,r.day,r.timezone FROM owner_monitor_report_refresh q JOIN owner_monitor_reports r ON r.id=q.report_id WHERE q.requested_at<=? ORDER BY q.requested_at LIMIT 1",
     )
+    .bind(now)
     .first();
-  if (dirty) await generateReport(db, dirty.day, { ...settings, timezone: dirty.timezone }, now);
+  if (dirty)
+    try {
+      await generateReport(db, dirty.day, { ...settings, timezone: dirty.timezone }, now);
+    } catch {
+      // Keep the queued refresh but defer it, so one failing day cannot starve the queue.
+      const failures = await reportFailures(db, dirty.id, now);
+      await run(
+        db,
+        "UPDATE owner_monitor_report_refresh SET requested_at=? WHERE report_id=?",
+        now + failures.waitMs,
+        dirty.id,
+      );
+    }
   return { slot, checkedAt: now };
+}
+
+/** Recorded generation failures for one report and whether its backoff has elapsed. */
+async function reportFailures(db, reportId, now) {
+  const row = await db
+    .prepare(
+      "SELECT COUNT(*) AS attempts, MAX(observed_at) AS last FROM owner_monitor_logs WHERE source='reports' AND id LIKE ?",
+    )
+    .bind(`report-failure:${reportId}:%`)
+    .first();
+  const attempts = Number(row?.attempts || 0);
+  const waitMs = 60000 * 2 ** Math.min(Math.max(attempts - 1, 0), 5);
+  return { attempts, waitMs, ready: !attempts || now - Number(row.last) >= waitMs };
+}
+
+/**
+ * After repeated failures, records an explicitly failed report for the day so later days can be
+ * generated. It never replaces an existing report and contains no substituted measurements.
+ * A queued refresh or Generate previous day replaces it once generation succeeds.
+ */
+async function storeFailedReport(db, day, settings, now, attempts) {
+  const { start, end } = dayBounds(day, settings.timezone);
+  const id = `${settings.timezone}:${day}`;
+  const summary = `${day}: the daily report could not be generated after ${attempts} attempts. All source entries for this day remain in History. Use Generate previous day to retry; the cause is not confirmed.`;
+  const report = {
+    id,
+    day,
+    timezone: settings.timezone,
+    start,
+    end,
+    generatedAt: now,
+    failed: true,
+    summary,
+    coverage: [],
+    gaps: [summary],
+    recommendations: [
+      "Inspect the day's report failure entries and source logs, then use Generate previous day.",
+    ],
+    trends: [],
+    incidents: [],
+    unresolved: [],
+    performance: [],
+    taskUpdateCount: 0,
+    development: [],
+    builds: [],
+    correlations: [],
+    history: {
+      since: start,
+      until: end,
+      totalEntries: null,
+      description: "All source entries for this window remain in paginated history.",
+    },
+    evidence: [],
+  };
+  await db.batch([
+    statement(
+      db,
+      "INSERT OR IGNORE INTO owner_monitor_reports VALUES(?,?,?,?,?)",
+      id,
+      day,
+      settings.timezone,
+      // One millisecond before its failure entry, so Daily reporting stays red until a real
+      // report for this day is generated (the diagnostic compares generated_at with failures).
+      now - 1,
+      JSON.stringify(report),
+    ),
+    logStatement(
+      db,
+      { id: `report-failed:${id}`, source: "reports", observedAt: now, outcome: "failed", reportId: id, summary },
+      now,
+    ),
+  ]);
 }
 
 export async function monitorHistory(db, url) {
@@ -1505,6 +1724,23 @@ export async function monitorApi(env, userId, sessionId, request, body) {
         builtin: false,
         url: links(body.evidence || [])[0]?.url || null,
       };
+      // Every registered source adds work to each daily report; bound new custom entries.
+      const existing = await db
+        .prepare("SELECT id FROM owner_monitor_registry WHERE id=?")
+        .bind(id)
+        .first();
+      if (!existing) {
+        const custom = await db
+          .prepare(
+            "SELECT COUNT(*) AS n FROM owner_monitor_registry WHERE json_extract(body,'$.builtin')=0",
+          )
+          .first();
+        if (Number(custom?.n || 0) >= REGISTRY_CUSTOM_LIMIT)
+          fail(
+            `The log registry already has ${REGISTRY_CUSTOM_LIMIT} custom sources. Update an existing source instead of adding another.`,
+            409,
+          );
+      }
       const changed = await run(
         db,
         `INSERT INTO owner_monitor_registry(id,body,registered_at) SELECT ?,?,? WHERE ${guard.sql} ON CONFLICT(id) DO UPDATE SET body=excluded.body WHERE json_extract(owner_monitor_registry.body,'$.builtin')=0`,
