@@ -1,5 +1,24 @@
 [
   {
+    "version": "1.9.2",
+    "date": "2026-10-21",
+    "summary": "Redesigned Android widgets, Agent activity on the 4\u00d71 companion and a new app icon.",
+    "features": [
+      "Agent activity preset for the 4\u00d71 companion: the latest GitHub development activity (runs, pull requests, merges and deploys) with a status symbol and age, refreshed about every minute while a workflow runs and the screen is on.",
+      "New Lootsplit coin-and-quill app icon and splash screen, with a monochrome layer for themed icons."
+    ],
+    "improvements": [
+      "Redesigned Field monitor widget: one status symbol and reason, four stat tiles, a task card with its timer, and a log that lists items needing attention first.",
+      "Redesigned 4\u00d71 companion with the same status symbols, icon actions and larger touch targets.",
+      "Agent activity is the default for newly placed companions; existing companions keep their saved preset and every earlier preset remains available.",
+      "Your email is no longer shown on the home-screen widget; it stays in My account."
+    ],
+    "fixes": [
+      "The companion no longer shows a stray \u201c?\u201d status.",
+      "Unavailable GitHub activity is labeled with its reason instead of appearing empty."
+    ]
+  },
+  {
     "version": "1.9.1",
     "date": "2026-10-21",
     "summary": "Android companion widget discovery and installation recovery.",
