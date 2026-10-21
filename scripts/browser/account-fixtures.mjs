@@ -254,7 +254,7 @@ export async function signedInDevices(devices, origin, { deferPrimaryLibrary = f
   return { ...user, other: other.page };
 }
 
-export async function createAndSaveRoom(page, origin, visitFn = visit) {
+export async function createRoom(page, origin, visitFn = visit) {
   await visitFn(page, origin, "/share");
   const skip = page.getByRole("button", { name: "Not now", exact: true });
   if (await skip.isVisible()) await skip.click();
@@ -272,6 +272,9 @@ export async function createAndSaveRoom(page, origin, visitFn = visit) {
   if (await error.isVisible()) throw new Error(`Room creation: ${await error.innerText()}`);
   await expect(ready).toBeVisible();
   await expect(page.locator('.multiplayer-hub[aria-busy="false"]')).toBeVisible();
+}
+
+export async function saveCurrentMembership(page, origin, visitFn = visit) {
   await visitFn(page, origin, "/account");
   await page.getByRole("button", { name: "Save current membership", exact: true }).click();
   await expect(
@@ -280,6 +283,11 @@ export async function createAndSaveRoom(page, origin, visitFn = visit) {
   const library = await page.context().request.get(`${origin}/api/account/library`);
   expect(library.ok()).toBeTruthy();
   return (await library.json()).members;
+}
+
+export async function createAndSaveRoom(page, origin, visitFn = visit) {
+  await createRoom(page, origin, visitFn);
+  return saveCurrentMembership(page, origin, visitFn);
 }
 
 export async function endSession(page, origin, visitFn = visit) {

@@ -11,6 +11,7 @@ on:
 permissions:
   id-token: write
   contents: write
+  actions: read
 
 concurrency:
   group: android-release
@@ -23,8 +24,21 @@ jobs:
     uses: ./.github/workflows/verify.yml
   native:
     uses: ./.github/workflows/android-widget.yml
-  release-apk:
+  main-verification:
     needs: [verify, native]
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+      - name: Require successful independent main preservation checks
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: node scripts/recovery-step.mjs android-main-verification 660 node scripts/android-main-verification.mjs
+  release-apk:
+    needs: [verify, native, main-verification]
     runs-on: ubuntu-latest
     timeout-minutes: 20
     steps:

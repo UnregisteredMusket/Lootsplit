@@ -123,7 +123,7 @@ Use Node 22 (`nvm use`, or the included development container).
 | `npm run performance:resolve -- resolution.json` | Record a verified resolution and reset request while preserving the previous trend     |
 | `npm run recover:status`                         | Inspect saved checkpoints and remote release state                                     |
 
-Focused scenario names: `network-boundary`, `ownership`, `layout`, `library`, `dm-resume`, `resume-queue`, `recovery`, `portrait-resume`, `campaign-choice`, `invitations`, `shared-recovery`; use `accounts` for all eleven. Focused checks include current uncommitted source edits and exclude local databases, secrets and browser profiles. They do not deploy or replace the running development server.
+Focused scenario names: `network-boundary`, `ownership`, `layout`, `library`, `dm-resume`, `resume-partial`, `resume-queue`, `recovery`, `portrait-resume`, `campaign-choice`, `invitations`, `shared-recovery`; use `accounts` for all twelve. Focused checks include current uncommitted source edits and exclude local databases, secrets and browser profiles. They do not deploy or replace the running development server.
 
 [Development and CI details](docs/DEVELOPMENT.md) · [Feature preservation inventory](docs/FEATURE-INVENTORY.md) · [Android releases](ANDROID.md)
 
