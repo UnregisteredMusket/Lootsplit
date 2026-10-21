@@ -43,6 +43,11 @@ final class WidgetRefresh {
     }
 
     static synchronized Task request(Context context, boolean manual, Completion completion) {
+        return request(context, manual, false, completion);
+    }
+
+    /** {@code quiet}: an Agent activity tick keeps the last reading on screen instead of showing "Refreshing…". */
+    static synchronized Task request(Context context, boolean manual, boolean quiet, Completion completion) {
         Context app = context.getApplicationContext();
         WidgetClient.initialize(app);
         JSONObject state = WidgetStore.read(app);
@@ -66,8 +71,10 @@ final class WidgetRefresh {
         task.completions.add(completion);
         active = task;
         try {
-            WidgetStore.message(app, generation, "Refreshing…");
-            OwnerWidgetProvider.renderAll(app);
+            if (!quiet) {
+                WidgetStore.message(app, generation, "Refreshing…");
+                OwnerWidgetProvider.renderAll(app);
+            }
         } catch (Exception ignored) {
             finish(task, null, "Widget storage unavailable. Reconnect in My account.", false);
             return task;
@@ -137,7 +144,7 @@ final class WidgetRefresh {
         android.os.PowerManager power = context.getSystemService(android.os.PowerManager.class);
         if (power != null && !power.isInteractive()) { scheduleActivity(context); return false; }
         // A coalesced or signed-out request renders nothing, so re-evaluate the cadence here.
-        if (request(context, false, completion) == null) scheduleActivity(context);
+        if (request(context, false, true, completion) == null) scheduleActivity(context);
         return true;
     }
 
