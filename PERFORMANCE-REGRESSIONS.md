@@ -365,6 +365,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | verify / Packaged Worker / interface (balanced v2) / worker-loot | open | 2 | 4s → 7s | +3s | +75% |
 | verify / Packaged Worker / interface (balanced v2) / Run actions/upload-artifact@v4 | open | 2 | 2s → 4s | +2s | +100% |
 | native-widget (24) / Run android-actions/setup-android@v3 | open | 2 | 15s → 33s | +18s | +120% |
+| native-widget (35) / Verify owner isolation, refresh transport and actual RemoteViews layouts | open | 2 | 148s → 212s | +64s | +43.24% |
 | Android native widget verification | open | 2 | 354s → 554s | +200s | +56.5% |
 | verify / Packaged Worker / interface (balanced v2) / worker-initiative | open | 2 | 4s → 7s | +3s | +75% |
 | native-widget (24) | open | 2 | 353s → 554s | +201s | +56.94% |
@@ -373,6 +374,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-21T04:52:32Z | step: native-widget (35) / Verify owner isolation, refresh transport and actual RemoteViews layouts | 184s → 212s | +28s | +15.22% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39454444495/job/118737466517) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39545769379/job/119043475801) |
 | 2026-10-21T04:37:00Z | step: verify / Packaged Worker / accounts (balanced v2) / worker-trade-economy | 69s → 82s | +13s | +18.84% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39421997999/job/118626185488) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39543917155/job/119038447472) |
 | 2026-10-21T04:36:51Z | step: verify / Packaged Worker / interface (balanced v2) / Run actions/upload-artifact@v4 | 3s → 4s | +1s | +33.33% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39421997999/job/118626185584) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39543917155/job/119038447460) |
 | 2026-10-21T04:36:21Z | step: verify / Packaged Worker / interface (balanced v2) / worker-loot | 6s → 7s | +1s | +16.67% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39421997999/job/118626185584) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39543917155/job/119038447460) |
