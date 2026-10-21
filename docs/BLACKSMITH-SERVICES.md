@@ -44,3 +44,13 @@ Completed orders wait at the original forge. **Collect crafted item** rechecks t
 ## Verification
 
 Run `blacksmith.test.ts`, shared `room-store.test.ts`, finance/estate/world/ship regressions and `npm run verify:quick`. `scripts/blacksmith-browser-audit.mjs` exercises actual DM setup, NPC permission, custom extra parts, armor/weapon choices, magical approval, player contribution, review/payment, partial/full downtime, provenance, collection, reload and guest memory at 1280/390 pixels. Development and immutable Worker checks are required by the unchanged nine-group release suite; all prior checks remain. Complete exact-head PR/main verification and immutable publishers/read-only live verification before declaring a release.
+
+## Development and verification rules
+
+Moved verbatim from `docs/CODING-MANUAL.md` on 2026-10-21 so each feature's rules live with the feature. They still apply whenever this area changes.
+
+### Blacksmith commissions
+
+Read `docs/BLACKSMITH-SERVICES.md`. Use `smith-profile`, `smith-order`, `smith-control` and `smith-claim` commands, canonical material keys/holdings, NPC service permission and the existing approved finance downtime quote. Profiles and immutable accepted orders are optional journal metadata, retained across older journal writes. Smith work advances only in between-session downtime, never session hours or wall time. Payments/material consumption and collection use existing authoritative receipt/CAS protection. Recheck finite supplies, contribution custody/ownership/combined quantity, physical presence, funds, magical forge, skill and DM approval; expose no other player's orders or unapproved enchantment drafts. Original completion day/time and maker/specifications survive later edits. Resolve open commissions before deleting referenced customers/locations/profiles. Refunds/salvage remain explicit recorded DM adjustments.
+
+Run smith unit/shared-room/finance/estate/world/ship checks, quick verification, both Help reviews and web/mobile builds. Require the added desktop/phone development and immutable Worker smith browser audits alongside every existing all-nine PR/main/immutable/live gate. Diagnose retained failures; never replace those flows with database-only assertions or weaken account limits/network isolation. No schema migration or APK distribution is required by this feature.

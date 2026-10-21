@@ -96,9 +96,9 @@ Read [CLAUDE.md](CLAUDE.md), the developer guide; it lists which detailed docume
 
 The manual applies to human developers and future coding assistants. Repository instructions survive replacement of a chat or workspace. Automated commands enforce selected checks; the documents are not a guarantee that every assistant will obey them.
 
-## Performance regression log — required during every full audit
+## Performance regression log and weekly speed summary
 
-Record any measured test, function, deployment, action or audit that takes **15% or above longer than the last logged comparable duration**, including exactly 15%. Faster runs and increases below 15% are not logged and do not change the reference. CI timings are checked automatically in this repository's persistent [performance regression log](https://github.com/UnregisteredMusket/Lootsplit/blob/performance-history/PERFORMANCE-REGRESSIONS.md). Local measurements must be recorded and committed using the [performance history procedure](docs/PERFORMANCE.md).
+Record any measured test, function, deployment, action or audit that takes **15% or above longer than the last logged comparable duration**, including exactly 15%. Faster runs and increases below 15% are not logged and do not change the reference. CI timings are checked automatically in this repository's persistent [performance regression log](https://github.com/UnregisteredMusket/Lootsplit/blob/performance-history/PERFORMANCE-REGRESSIONS.md). The weekly development speed summary reports verification time and the steps that slowed by 15% or more; act on its "Needs attention" list ([procedure](docs/PERFORMANCE.md)).
 
 **Every full audit must fetch and analyze this log**, review new and unresolved slowdowns, check comparison validity and recorder freshness, and report before/after duration, added time, percentage increase, evidence, cause and follow-up action. Repeated rises in the logged threshold are a performance trend requiring investigation. Report the original reference → latest logged duration, cumulative added time and percentage increase, number of increases, affected operations, and whether total workflow time also worsened. Preserve every qualifying entry so an increasing threshold cannot hide the accumulated slowdown. Preserve the history for future analysis; do not treat an unavailable or stale log as a pass.
 
@@ -129,9 +129,9 @@ Focused scenario names: `network-boundary`, `ownership`, `layout`, `library`, `d
 
 ## Faster development without changing the application
 
-Account scenarios run on two Playwright workers with independent accounts, rooms, storage and client identities. Every scenario remains required; retries stay disabled. Focused checks still isolate their server and database, and complete PR/main checks still gate publication.
+Account scenarios run as two parallel CI shards, each on two Playwright workers, with independent accounts, rooms, storage and client identities. Every scenario remains required; retries stay disabled. Focused checks still isolate their server and database, and complete PR/main checks still gate publication.
 
-For recurring aggregate timeouts, follow "Prevent repeated account-suite timeouts" in the coding manual: diagnose the worker timeline and resource-interception overhead, retain the 60s/170s limits, and verify native/fallback network isolation. Interrupted chats resume persisted checkpoints; they do not restart completed releases.
+For recurring aggregate timeouts, follow "Prevent repeated account-suite timeouts" in `docs/WEBSITE-ACCOUNTS.md`: diagnose the worker timeline and resource-interception overhead, retain the 60s/170s limits per shard, and verify native/fallback network isolation. Interrupted chats resume persisted checkpoints; they do not restart completed releases.
 
 The existing `.devcontainer/devcontainer.json` provides Node22 and runs the locked dependency/browser setup. Use that container where supported, or `nvm use` then `npm run dev:setup`. `dev:doctor` reports the actual Chromium version and path; a custom browser launching successfully does not prove it supports every PDF/import feature. Do not substitute an older browser for release verification.
 

@@ -75,3 +75,15 @@ Optional journal fleet data needs no database migration. Old saves without it re
 ## Development verification
 
 Run `ships.test.ts`, `room-store.test.ts`, estate/finance/character-position/trade regressions, then full quick checks and both builds. `scripts/ships-browser-audit.mjs` exercises real desktop/mobile setup, damage, berthing, repair approval/time, boarding, voyage progress, teleport, shared player access/privacy and memory-only guests. The complete preservation workflow requires it in development and the independently packaged Worker. Preserve every existing account scenario, deadline, retry limit and release gate. Update both role Help guides, this document, feature inventory and the coding manual whenever these behaviors change.
+
+## Development and verification rules
+
+Moved verbatim from `docs/CODING-MANUAL.md` on 2026-10-21 so each feature's rules live with the feature. They still apply whenever this area changes.
+
+### Ships, shipyards and voyages
+
+Read `docs/SHIPS.md`. Ships remain single owned property holdings; cargo uses estate custody, crews use staff contracts, and repairs/upgrades use ordinary reviewed projects. Fleet data is optional journal metadata; aboard membership lives there while character location stays canonical. Do not persist the derived ship identity fields into character-position records: older clients must retain their existing readable placement shape. Legacy journal replacements preserve authoritative fleet metadata. Never create another wallet, scheduler or stored cargo copy.
+
+Use stale-checked ship commands and existing room receipts. DM-only configuration, damage, boarding reviews and teleport must remain enforced on the server. Players propose only their own payer/workers/boarding characters. Presence, berth slots/length, cargo weights/capacity, critical components, minimum crew, wage arrears, current access and travel/manager budgets are rechecked. Voyage progress is between-session downtime only; session-hour advances settle maintenance without voyage progress. Teleport moves ship and all aboard positions atomically with no time/cost, closes ongoing voyages and pauses former-yard work. Ship expenses retain remainders/arrears; upgrade completion preserves damage and applies once.
+
+Run `ships.test.ts`, shared `room-store.test.ts`, estate/finance/character-position/trade tests, full quick checks and web/mobile builds. The unchanged full nine-group PR/main workflow additionally requires `scripts/ships-browser-audit.mjs` in development and the immutable Worker at desktop/mobile widths. Preserve every prior gate, account/network bound, guest-memory/privacy rule and signed Android release requirement. Tile routing remains future work using the same clock. Update DM/player Help, SHIPS, README and feature inventory in each affected change.
