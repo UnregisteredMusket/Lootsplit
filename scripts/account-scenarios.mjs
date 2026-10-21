@@ -24,6 +24,16 @@ export function selectAccountScenario(args, ci = process.env.CI) {
   return args[1];
 }
 
+/** "1/2" or "2/2": the half of the complete suite this CI job runs. Empty runs everything. */
+export const ACCOUNT_SHARDS = 2;
+export function accountShard(value) {
+  if (!value) return null;
+  const match = /^([1-9])\/([1-9])$/.exec(value);
+  if (!match || Number(match[2]) !== ACCOUNT_SHARDS || Number(match[1]) > ACCOUNT_SHARDS)
+    throw new Error(`ACCOUNT_SHARD must be 1/${ACCOUNT_SHARDS} … ${ACCOUNT_SHARDS}/${ACCOUNT_SHARDS}.`);
+  return value;
+}
+
 export function localAuditOrigin(value) {
   const url = new URL(value);
   if (

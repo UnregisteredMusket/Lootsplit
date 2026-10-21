@@ -84,12 +84,12 @@ test("packaged Worker checks all belong to one required isolated group", () => {
       /- name: (worker-[\w-]+|Verify title screen on the built artifact)\n\s+if: matrix.group == '([^']+)'/g,
     ),
   ];
-  assert.equal(assignments.length, 23);
+  assert.equal(assignments.length, 24);
   assert.ok(
-    assignments.some(([, name, group]) => name === "worker-downtime" && group === "accounts"),
+    assignments.some(([, name, group]) => name === "worker-downtime" && group === "features"),
   );
   assert.ok(
-    assignments.some(([, name, group]) => name === "worker-blacksmith" && group === "accounts"),
+    assignments.some(([, name, group]) => name === "worker-blacksmith" && group === "features"),
   );
   assert.ok(
     assignments.some(([, name, group]) => name === "worker-navigation" && group === "interface"),
@@ -98,17 +98,17 @@ test("packaged Worker checks all belong to one required isolated group", () => {
     assignments.some(([, name, group]) => name === "worker-initiative" && group === "interface"),
   );
   assert.ok(
-    assignments.some(([, name, group]) => name === "worker-map-tiles" && group === "accounts"),
+    assignments.some(([, name, group]) => name === "worker-map-tiles" && group === "features"),
   );
   assert.ok(
     assignments.some(([, name, group]) => name === "worker-ships" && group === "accounts"),
   );
   assert.ok(
-    assignments.some(([, name, group]) => name === "worker-trade-economy" && group === "accounts"),
+    assignments.some(([, name, group]) => name === "worker-trade-economy" && group === "features"),
   );
   assert.ok(
     assignments.some(
-      ([, name, group]) => name === "worker-world-features" && group === "accounts",
+      ([, name, group]) => name === "worker-world-features" && group === "features",
     ),
   );
   assert.ok(
@@ -127,12 +127,13 @@ test("packaged Worker checks all belong to one required isolated group", () => {
       ([, name, group]) => name === "worker-market-locations" && group === "interface",
     ),
   );
-  assert.equal(new Set(assignments.map((m) => m[1])).size, 23);
+  assert.equal(new Set(assignments.map((m) => m[1])).size, 24);
   assert.ok(
     assignments.some(([, name, group]) => name === "worker-sound" && group === "interface"),
   );
-  for (const [, , group] of assignments) assert.ok(["accounts", "interface"].includes(group));
-  assert.match(workflow, /group: \[accounts, interface\]/);
+  for (const [, , group] of assignments)
+    assert.ok(["accounts", "features", "interface"].includes(group));
+  assert.match(workflow, /group: \[accounts, features, interface\]/);
   assert.match(workflow, /fail-fast: false/);
   assert.match(workflow, /browser-audit-worker-\$\{\{ matrix.group \}\}/);
 });

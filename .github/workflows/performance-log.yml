@@ -1,22 +1,8 @@
 name: Record performance regressions
 on:
-  workflow_run:
-    workflows:
-      [
-        Verify preserved functionality,
-        Focused player references,
-        Deploy verified website,
-        Verify existing live website (read only),
-        Publish verified standby,
-        Android signed release APK,
-        Android test APK,
-        Encrypted offsite database backup,
-        Verify remote standby recovery,
-        Report workflow failure,
-      ]
-    types: [completed]
   workflow_dispatch:
-  # Catch up if GitHub replaced a pending workflow_run or an API outage interrupted it.
+  # Hourly collection (owner-approved 2026-10-21). It reads every completed run since its cursor,
+  # so no data is lost; it no longer starts a workflow after every other workflow finishes.
   schedule:
     - cron: "17 * * * *"
 permissions:
