@@ -109,10 +109,19 @@ if "--add-companion" in sys.argv:
                 and "4×1 companion" in n.get("content-desc", "")), None)
     assert add is not None, "Launcher Add action missing; inspect companion-preview.png"
     tap(add)
-    home = snapshot("companion-added")
-    assert any("OWNER" in label(n) and "SIGN IN" in label(n) for n in home.iter("node")), "Added companion must show its signed-out state on the home screen"
+    snapshot("companion-added-resizing")
+    # Pixel Launcher enters resize mode and announces a temporary settings toast.
+    # Close that mode, then await the real widget's accessible signed-out text.
+    adb("shell", "input", "keyevent", "KEYCODE_BACK")
+    signed_out = False
+    for attempt in range(4):
+        home = snapshot("companion-added-" + str(attempt))
+        signed_out = any("OWNER" in label(n) and "SIGN IN" in label(n) for n in home.iter("node"))
+        if signed_out:
+            break
     providers = adb("shell", "dumpsys", "appwidget")
     (OUT / "providers-after-add.txt").write_text(providers)
+    assert signed_out, "Added companion must show its signed-out state on the home screen"
     widgets = providers.split("Widgets:", 1)[1].split("Hosts:", 1)[0]
     assert "CompanionWidgetProvider" in widgets, "Launcher must bind an actual companion instance"
     print("PASS: Companion added from the launcher picker without My account or sign-in")
