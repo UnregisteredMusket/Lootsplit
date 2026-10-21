@@ -18,30 +18,71 @@ public class CompanionWidgetProvider extends AppWidgetProvider {
         RemoteViews view=new RemoteViews(context.getPackageName(),R.layout.companion_widget);
         JSONObject snapshot=OwnerWidgetProvider.current(state), task=snapshot==null?null:snapshot.optJSONObject("task");
         String theme=settings.optString("theme","terminal"); boolean light="light".equals(theme)||"system".equals(theme)&&(context.getResources().getConfiguration().uiMode&android.content.res.Configuration.UI_MODE_NIGHT_MASK)!=android.content.res.Configuration.UI_MODE_NIGHT_YES;
-        int ink=light?Color.rgb(32,53,46):Color.rgb(230,248,236);
+        int ink=light?Color.rgb(32,53,46):Color.rgb(230,248,236), muted=light?Color.rgb(32,53,46):Color.rgb(177,214,193), tint=light?Color.rgb(32,72,51):Color.rgb(19,245,128);
         view.setInt(R.id.companion_root,"setBackgroundColor",light?Color.rgb(247,242,228):Color.rgb(7,23,18));
-        view.setTextColor(R.id.companion_identity,ink); view.setTextColor(R.id.companion_first,ink); view.setTextColor(R.id.companion_second,ink); view.setTextColor(R.id.companion_timer,ink); view.setTextColor(R.id.companion_age,ink);
-        view.setTextViewText(R.id.companion_identity,snapshot==null?"OWNER · SIGN IN":"OWNER · "+snapshot.optString("name"));
-        view.setOnClickPendingIntent(R.id.companion_identity,WidgetActions.pending(context,id,"account",true));
-        view.setTextViewText(R.id.companion_light,OwnerWidgetProvider.statusColor(snapshot).equals("red")?"!":OwnerWidgetProvider.statusColor(snapshot).equals("green")?"✓":"?");
-        view.setTextColor(R.id.companion_light,OwnerWidgetProvider.color(OwnerWidgetProvider.statusColor(snapshot),light));
-        view.setContentDescription(R.id.companion_light,OwnerWidgetProvider.statusColor(snapshot)+" status; open diagnostics for the reason");
-        view.setOnClickPendingIntent(R.id.companion_light,WidgetActions.pending(context,id,"diagnostics",true));
+        boolean connected=!state.optString("token").isEmpty(); String message=state.optString("message");
+        String status=OwnerWidgetProvider.statusColor(snapshot);
         String first=settings.optString("first","task"),second=settings.optString("second","timer");
-        view.setTextViewText(R.id.companion_first,WidgetRows.category(snapshot,first)); view.setTextViewText(R.id.companion_second,WidgetRows.category(snapshot,second));
-        view.setOnClickPendingIntent(R.id.companion_first,WidgetActions.pending(context,id,WidgetRows.action(first,snapshot),true)); view.setOnClickPendingIntent(R.id.companion_second,WidgetActions.pending(context,id,WidgetRows.action(second,snapshot),true));
-        boolean timer="timer".equals(second)&&task!=null;
-        boolean firstTimer="timer".equals(first)&&task!=null;
-        view.setViewVisibility(R.id.companion_timer_first,firstTimer?View.VISIBLE:View.GONE); view.setViewVisibility(R.id.companion_first,firstTimer?View.GONE:View.VISIBLE);
-        view.setViewVisibility(R.id.companion_timer,timer?View.VISIBLE:View.GONE); view.setViewVisibility(R.id.companion_second,timer?View.GONE:View.VISIBLE);
-        if(timer) { long start=task.optLong("startedAt"), end=task.optLong("completedAt",0); boolean running=end==0&&task.optBoolean("active"); view.setChronometer(R.id.companion_timer,SystemClock.elapsedRealtime()-Math.max(0,(end>0?end:System.currentTimeMillis())-start),"Elapsed %s",running); }
-        if(firstTimer) { long start=task.optLong("startedAt"), end=task.optLong("completedAt",0); boolean running=end==0&&task.optBoolean("active"); view.setChronometer(R.id.companion_timer_first,SystemClock.elapsedRealtime()-Math.max(0,(end>0?end:System.currentTimeMillis())-start),"Elapsed %s",running); }
-        view.setTextColor(R.id.companion_timer_first,ink);
-        view.setOnClickPendingIntent(R.id.companion_timer_first,WidgetActions.pending(context,id,"task",true));
+        // Status glyph: same rules as the main widget; filled ✓ when healthy, muted "–" when signed out.
+        OwnerWidgetProvider.glyph(view,R.id.companion_light,snapshot==null&&!connected?"":status,light,true);
+        view.setContentDescription(R.id.companion_light,snapshot==null&&!connected?"Owner sign-in needed. Open My account":WidgetRows.statusWord(status)+" status; open diagnostics for the reason");
+        view.setOnClickPendingIntent(R.id.companion_light,WidgetActions.pending(context,id,snapshot==null&&!connected?"account":"diagnostics",true));
+        boolean firstTimer="timer".equals(first)&&task!=null, secondTimer="timer".equals(second)&&task!=null;
+        String warning=snapshot==null?"":snapshot.optString("warning");
+        if(snapshot==null) {
+            // Signed out or awaiting a reading: both lines lead to My account.
+            view.setTextViewText(R.id.companion_first,connected?"Awaiting owner reading":"Owner sign-in needed");
+            view.setTextColor(R.id.companion_first,ink);
+            String detail=connected?(message.isEmpty()?"Tap Refresh to check now":message):(message.isEmpty()||"Connect in My account".equals(message)?"Tap to connect in My account":message);
+            view.setTextViewText(R.id.companion_second,detail);
+            view.setTextColor(R.id.companion_second,!message.isEmpty()&&!"Connect in My account".equals(message)?OwnerWidgetProvider.color("yellow",light):muted);
+            view.setOnClickPendingIntent(R.id.companion_first,WidgetActions.pending(context,id,"account",true));
+            view.setOnClickPendingIntent(R.id.companion_second,WidgetActions.pending(context,id,"account",true));
+            view.setContentDescription(R.id.companion_first,"OWNER · SIGN IN. "+(connected?"Awaiting owner reading":"Owner sign-in needed"));
+            view.setContentDescription(R.id.companion_second,detail);
+            view.setViewVisibility(R.id.companion_timer,View.GONE);
+        } else {
+            String primary=WidgetRows.category(snapshot,first);
+            view.setTextViewText(R.id.companion_first,primary);
+            view.setTextColor(R.id.companion_first,"health".equals(first)?OwnerWidgetProvider.color(status,light):ink);
+            view.setContentDescription(R.id.companion_first,"OWNER · "+snapshot.optString("name")+". "+primary);
+            view.setOnClickPendingIntent(R.id.companion_first,WidgetActions.pending(context,id,WidgetRows.action(first,snapshot),true));
+            // With the timer on line 1, line 2 carries the warning when there is one.
+            boolean warningLine=secondTimer&&!warning.isEmpty();
+            String secondary=warningLine?warning:WidgetRows.category(snapshot,second);
+            boolean amber=warningLine||"warning".equals(second)&&(!warning.isEmpty()||!"green".equals(snapshot.optString("statusColor")));
+            String reading=(message.isEmpty()?"":"Last reading ")+WidgetRows.clock(snapshot.optLong("checkedAt"));
+            view.setTextViewText(R.id.companion_second,secondary+" · "+reading);
+            view.setTextColor(R.id.companion_second,amber?OwnerWidgetProvider.color("yellow",light):muted);
+            view.setContentDescription(R.id.companion_second,(amber?"Warning: ":"")+secondary+". As of "+WidgetData.time(snapshot.optLong("checkedAt")));
+            view.setOnClickPendingIntent(R.id.companion_second,WidgetActions.pending(context,id,warningLine?"task":WidgetRows.action(second,snapshot),true));
+            view.setViewVisibility(R.id.companion_timer,firstTimer||secondTimer?View.VISIBLE:View.GONE);
+            if(firstTimer||secondTimer) {
+                long start=task.optLong("startedAt"), end=task.optLong("completedAt",0); boolean running=end==0&&task.optBoolean("active");
+                view.setChronometer(R.id.companion_timer,SystemClock.elapsedRealtime()-Math.max(0,(end>0?end:System.currentTimeMillis())-start),"%s",running);
+                view.setContentDescription(R.id.companion_timer,"Elapsed since "+WidgetData.time(start));
+                view.setTextColor(R.id.companion_timer,light?ink:Color.rgb(19,245,128));
+            }
+        }
         view.setOnClickPendingIntent(R.id.companion_timer,WidgetActions.pending(context,id,"task",true));
-        view.setTextViewText(R.id.companion_age,snapshot==null?state.optString("message","Connect in My account"):"As of "+WidgetData.time(snapshot.optLong("checkedAt")));
-        for(int i=1;i<=2;i++) { String action=settings.optString("action"+i,i==1?"refresh":"settings"); int target=i==1?R.id.companion_action1:R.id.companion_action2; view.setTextViewText(target,WidgetActions.label(action));view.setTextColor(target,ink);view.setContentDescription(target,WidgetActions.label(action));view.setOnClickPendingIntent(target,WidgetActions.pending(context,id,action,true)); }
+        for(int i=1;i<=2;i++) {
+            String action=settings.optString("action"+i,i==1?"refresh":"settings"); int target=i==1?R.id.companion_action1:R.id.companion_action2;
+            view.setImageViewResource(target,icon(action));view.setInt(target,"setColorFilter",tint);
+            view.setContentDescription(target,WidgetActions.label(action));view.setOnClickPendingIntent(target,WidgetActions.pending(context,id,action,true));
+        }
         return view;
+    }
+    static int icon(String action) {
+        switch (action == null ? "" : action) {
+            case "refresh": return R.drawable.ic_widget_refresh;
+            case "logs": return R.drawable.ic_widget_logs;
+            case "report": return R.drawable.ic_widget_report;
+            case "task": return R.drawable.ic_widget_task;
+            case "diagnostics": return R.drawable.ic_widget_diagnostics;
+            case "website": return R.drawable.ic_widget_website;
+            case "settings": return R.drawable.ic_widget_settings;
+            default: return R.drawable.ic_widget_account;
+        }
     }
     @Override public void onUpdate(Context context,AppWidgetManager manager,int[] ids){ renderAll(context);OwnerWidgetJob.schedule(context); }
     @Override public void onAppWidgetOptionsChanged(Context context,AppWidgetManager manager,int id,Bundle options){ renderAll(context); }

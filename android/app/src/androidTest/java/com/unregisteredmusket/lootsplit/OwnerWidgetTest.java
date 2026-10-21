@@ -288,7 +288,17 @@ public class OwnerWidgetTest {
             float density=context.getResources().getDisplayMetrics().density;int w=Math.round(width*density),h=Math.round(height*density);
             parent.measure(View.MeasureSpec.makeMeasureSpec(w,View.MeasureSpec.EXACTLY),View.MeasureSpec.makeMeasureSpec(h,View.MeasureSpec.EXACTLY));parent.layout(0,0,w,h);bounds(view);
             assertTrue(view.findViewById(R.id.companion_action1).getWidth()>=44*density);assertTrue(view.findViewById(R.id.companion_action1).getHeight()>=44*density);
+            assertTrue(view.findViewById(R.id.companion_action2).getWidth()>=44*density);assertTrue(view.findViewById(R.id.companion_action2).getHeight()>=44*density);
+            assertTrue(view.findViewById(R.id.companion_action1).hasOnClickListeners());
             assertTrue(view.findViewById(R.id.companion_action2).hasOnClickListeners());
+            for(int i=1;i<=2;i++){
+                android.widget.ImageView action=view.findViewById(i==1?R.id.companion_action1:R.id.companion_action2);
+                assertEquals("Icon action keeps its accessible label",WidgetActions.label(settings.optString("action"+i)),String.valueOf(action.getContentDescription()));
+                assertNotNull(action.getDrawable());
+            }
+            String glyph=((TextView)view.findViewById(R.id.companion_light)).getText().toString();
+            assertFalse("No stray ? glyph",glyph.contains("?"));
+            assertTrue(glyph,java.util.Arrays.asList("✓","!","✕","–").contains(glyph));
             Bitmap bitmap=Bitmap.createBitmap(w,h,Bitmap.Config.ARGB_8888);parent.draw(new Canvas(bitmap));
             File dir=context.getExternalFilesDir("widget-audit");if(dir!=null)dir.mkdirs();try(FileOutputStream out=new FileOutputStream(new File(dir,name+".png"))){bitmap.compress(Bitmap.CompressFormat.PNG,100,out);}bitmap.recycle();
         }catch(Throwable error){failure.set(error);} });
@@ -309,15 +319,29 @@ public class OwnerWidgetTest {
             assertNotNull(diagnostic);JSONObject row=diagnostic;
             InstrumentationRegistry.getInstrumentation().runOnMainSync(()->{try{
                 View view=OwnerWidgetService.rowView(context,row,103).apply(context,new FrameLayout(context));
-                TextView title=view.findViewById(R.id.widget_row_title),detail=view.findViewById(R.id.widget_row_detail);
+                TextView glyph=view.findViewById(R.id.widget_row_glyph),title=view.findViewById(R.id.widget_row_title),detail=view.findViewById(R.id.widget_row_detail);
                 int background=((android.graphics.drawable.ColorDrawable)view.getBackground()).getColor();
-                assertTrue(title.getText().toString().contains(color.toUpperCase(java.util.Locale.ROOT)));
-                assertEquals(OwnerWidgetProvider.color(color,"light".equals(theme)),title.getCurrentTextColor());
-                assertTrue("Status text contrast "+theme+"/"+color,androidx.core.graphics.ColorUtils.calculateContrast(title.getCurrentTextColor(),background)>=4.5);
+                // Status is carried by a distinct glyph shape plus color, and spoken in the row description.
+                assertEquals("red".equals(color)?"✕":"green".equals(color)?"✓":"!",glyph.getText().toString());
+                assertEquals(OwnerWidgetProvider.color(color,"light".equals(theme)),glyph.getCurrentTextColor());
+                assertTrue(view.getContentDescription().toString().startsWith(WidgetRows.statusWord(color)));
+                assertEquals("GitHub",title.getText().toString());
+                assertTrue("Full detail stays available",view.getContentDescription().toString().contains("Check the integration connection."));
+                assertEquals(1,detail.getMaxLines());
+                assertTrue("Status glyph contrast "+theme+"/"+color,androidx.core.graphics.ColorUtils.calculateContrast(glyph.getCurrentTextColor(),background)>=4.5);
+                assertTrue("Title text contrast "+theme,androidx.core.graphics.ColorUtils.calculateContrast(title.getCurrentTextColor(),background)>=4.5);
                 assertTrue("Detail text contrast "+theme,androidx.core.graphics.ColorUtils.calculateContrast(detail.getCurrentTextColor(),background)>=4.5);
             }catch(Throwable error){failure.set(error);}});
             if(failure.get()!=null)throw new AssertionError(theme+"/"+color,failure.get());
         }
+        JSONObject neutral=new JSONObject().put("title","Daily report").put("detail","48 intervals\nsecond line").put("action","report").put("color","");
+        InstrumentationRegistry.getInstrumentation().runOnMainSync(()->{try{
+            View view=OwnerWidgetService.rowView(context,neutral,103).apply(context,new FrameLayout(context));
+            assertEquals("•",((TextView)view.findViewById(R.id.widget_row_glyph)).getText().toString());
+            assertEquals("48 intervals · second line",((TextView)view.findViewById(R.id.widget_row_detail)).getText().toString());
+            assertEquals(View.GONE,view.findViewById(R.id.widget_row_time).getVisibility());
+        }catch(Throwable error){failure.set(error);}});
+        if(failure.get()!=null)throw new AssertionError("neutral row",failure.get());
         CompanionSettings.remove(context,103);
     }
     private void captureHostedWidget(View view,String name) throws Exception {
@@ -325,6 +349,13 @@ public class OwnerWidgetTest {
         Bitmap bitmap=Bitmap.createBitmap(view.getWidth(),view.getHeight(),Bitmap.Config.ARGB_8888);view.draw(new Canvas(bitmap));
         File dir=context.getExternalFilesDir("widget-audit");if(dir!=null)dir.mkdirs();
         try(FileOutputStream output=new FileOutputStream(new File(dir,name+".png"))){bitmap.compress(Bitmap.CompressFormat.PNG,100,output);}finally{bitmap.recycle();}
+    }
+    private View textContaining(View view, String text) {
+        if (view instanceof TextView && ((TextView)view).getText().toString().contains(text)) return view;
+        if (view instanceof ViewGroup) for (int i=0;i<((ViewGroup)view).getChildCount();i++) {
+            View found=textContaining(((ViewGroup)view).getChildAt(i),text);if(found!=null)return found;
+        }
+        return null;
     }
     private View textView(View view, String text) {
         if (view instanceof TextView && text.contentEquals(((TextView)view).getText())) return view;
@@ -401,10 +432,13 @@ public class OwnerWidgetTest {
             });
             AtomicReference<String> identity=new AtomicReference<>("");deadline=android.os.SystemClock.elapsedRealtime()+5000;
             while(android.os.SystemClock.elapsedRealtime()<deadline){
-                instrumentation.runOnMainSync(()->{TextView text=hosted.get().findViewById(R.id.companion_identity);identity.set(text==null?"":text.getText().toString());});
-                if(identity.get().equals("OWNER · SIGN IN"))break;android.os.SystemClock.sleep(20);
+                instrumentation.runOnMainSync(()->{TextView text=hosted.get().findViewById(R.id.companion_first);identity.set(text==null||text.getContentDescription()==null?"":text.getText()+"|"+text.getContentDescription());});
+                if(identity.get().startsWith("Owner sign-in needed|OWNER · SIGN IN"))break;android.os.SystemClock.sleep(20);
             }
-            assertEquals("OWNER · SIGN IN",identity.get());
+            assertTrue(identity.get(),identity.get().startsWith("Owner sign-in needed|OWNER · SIGN IN"));
+            AtomicReference<String> signedOutGlyph=new AtomicReference<>("");
+            instrumentation.runOnMainSync(()->signedOutGlyph.set(((TextView)hosted.get().findViewById(R.id.companion_light)).getText().toString()));
+            assertEquals("Signed-out glyph is a neutral dash, never ?","–",signedOutGlyph.get());
             AtomicReference<Throwable> failure=new AtomicReference<>();
             instrumentation.runOnMainSync(()->{try{captureHostedWidget(hosted.get(),"hosted-companion-signed-out");}catch(Throwable e){failure.set(e);}});
             if(failure.get()!=null)throw new AssertionError("Companion framework capture",failure.get());
@@ -467,6 +501,70 @@ public class OwnerWidgetTest {
         }
     }
 
+    private View mainFace(JSONObject snapshot) throws Exception {
+        JSONObject state=new JSONObject().put("token","synthetic").put("snapshot",snapshot);
+        AtomicReference<View> out=new AtomicReference<>();AtomicReference<Throwable> failure=new AtomicReference<>();
+        InstrumentationRegistry.getInstrumentation().runOnMainSync(()->{try{
+            float density=context.getResources().getDisplayMetrics().density;FrameLayout parent=new FrameLayout(context);
+            View view=OwnerWidgetProvider.views(context,state,true).apply(context,parent);parent.addView(view);
+            int w=Math.round(350*density),h=Math.round(480*density);
+            parent.measure(View.MeasureSpec.makeMeasureSpec(w,View.MeasureSpec.EXACTLY),View.MeasureSpec.makeMeasureSpec(h,View.MeasureSpec.EXACTLY));parent.layout(0,0,w,h);bounds(view);out.set(view);
+        }catch(Throwable error){failure.set(error);}});
+        if(failure.get()!=null)throw new AssertionError("main face",failure.get());
+        return out.get();
+    }
+    private String text(View view,int id){ return ((TextView)view.findViewById(id)).getText().toString(); }
+    @Test public void mainFaceGlyphsReasonStatsAndAttentionOrdering() throws Exception {
+        java.util.Set<String> glyphs=new java.util.HashSet<>();
+        for(String color:new String[]{"green","yellow","red"}) {
+            JSONObject source=journalFixture();
+            source.put("overall",new JSONObject().put("color",color).put("reason","green".equals(color)?"All required checks passed.":"GitHub"));
+            source.getJSONArray("diagnostics").getJSONObject(0).put("color",color);
+            JSONObject snapshot=WidgetData.project(source,System.currentTimeMillis());
+            View view=mainFace(snapshot);
+            String glyph=text(view,R.id.monitor_glyph);glyphs.add(glyph);
+            assertEquals("red".equals(color)?"✕":"green".equals(color)?"✓":"!",glyph);
+            assertEquals("red".equals(color)?"FAILURE":"green".equals(color)?"HEALTHY":"UNVERIFIED",text(view,R.id.monitor_health));
+            assertEquals(OwnerWidgetProvider.color(color,false),((TextView)view.findViewById(R.id.monitor_health)).getCurrentTextColor());
+            if(!"green".equals(color)) {
+                assertEquals("Single component names itself with its symptom","GitHub · The source did not respond.",text(view,R.id.monitor_services));
+                assertEquals("NEEDS ATTENTION FIRST",text(view,R.id.monitor_list_label));
+                assertEquals(color,WidgetRows.rows(snapshot).getJSONObject(0).getString("color"));
+            } else assertEquals("LOG",text(view,R.id.monitor_list_label));
+            assertEquals("12",text(view,R.id.monitor_active));assertEquals("128",text(view,R.id.monitor_accounts));assertEquals("24",text(view,R.id.monitor_campaigns));
+            assertEquals("Traffic not connected stays unavailable, never 0","—",text(view,R.id.monitor_requests));
+            assertEquals("OWNER · Test Owner · #42",text(view,R.id.monitor_identity));
+            assertTrue(text(view,R.id.monitor_development).startsWith("▶ TESTING"));
+            assertEquals(View.VISIBLE,view.findViewById(R.id.monitor_timer).getVisibility());
+        }
+        assertEquals("Glyph shapes differ per state, not only color",3,glyphs.size());
+        // Several components: a count on the face, the full list kept in the description and rows.
+        JSONObject source=journalFixture();
+        source.put("overall",new JSONObject().put("color","red").put("reason","Database, Worker errors, GitHub"));
+        source.put("traffic",new JSONObject().put("state","ready").put("data",new JSONObject().put("requests",11734).put("errors",42)));
+        JSONObject snapshot=WidgetData.project(source,System.currentTimeMillis());
+        View view=mainFace(snapshot);
+        assertEquals("3 checks failed · tap for details",text(view,R.id.monitor_services));
+        assertTrue(view.findViewById(R.id.monitor_services).getContentDescription().toString().contains("Database, Worker errors, GitHub"));
+        assertEquals("11.7k",text(view,R.id.monitor_requests));
+        assertEquals("REQ · 42 ERR",text(view,R.id.monitor_requests_label));
+        assertEquals("Request tile turns red when errors exist",OwnerWidgetProvider.color("red",false),((TextView)view.findViewById(R.id.monitor_requests)).getCurrentTextColor());
+        // Every row is kept when attention rows move first.
+        source.put("diagnostics",new org.json.JSONArray().put(new JSONObject().put("component","Database").put("color","green").put("symptom","Responding").put("action","None"))
+            .put(new JSONObject().put("component","Worker errors").put("color","red").put("symptom","42 errors").put("action","Review deployment")));
+        snapshot=WidgetData.project(source,System.currentTimeMillis());
+        org.json.JSONArray rows=WidgetRows.rows(snapshot);
+        assertEquals("Worker errors",rows.getJSONObject(0).getString("title"));
+        int diagnostics=0;for(int i=0;i<rows.length();i++)if("diagnostics".equals(rows.getJSONObject(i).optString("action"))&&!rows.getJSONObject(i).optString("color").isEmpty())diagnostics++;
+        assertEquals(2,diagnostics);
+        assertEquals("Other rows keep their original order","Development",rows.getJSONObject(1).getString("title"));
+        assertEquals(WidgetRows.rows(WidgetData.project(source.put("diagnostics",new org.json.JSONArray()),System.currentTimeMillis())).length()+2,rows.length());
+        // Missing statistics render as "—" on every tile, never 0.
+        JSONObject missing=journalFixture();missing.getJSONObject("health").remove("stats");
+        view=mainFace(WidgetData.project(missing,System.currentTimeMillis()));
+        for(int id:new int[]{R.id.monitor_active,R.id.monitor_accounts,R.id.monitor_campaigns,R.id.monitor_requests})assertEquals("—",text(view,id));
+    }
+
     private void tapRefresh() {
         InstrumentationRegistry.getInstrumentation().runOnMainSync(() -> {
             assertTrue("No account activity is open", ActivityLifecycleMonitorRegistry.getInstance().getActivitiesInStage(Stage.RESUMED).isEmpty());
@@ -501,14 +599,22 @@ public class OwnerWidgetTest {
                 bounds(view);
                 if (name.equals("refreshing")) {
                     assertEquals("REFRESHING", ((TextView) view.findViewById(R.id.monitor_health)).getText().toString());
-                    assertTrue(((TextView) view.findViewById(R.id.monitor_checked)).getText().toString().startsWith("Last reading "));
+                    assertTrue(view.findViewById(R.id.monitor_checked).getContentDescription().toString().startsWith("Last reading "));
                 }
                 if (name.startsWith("cached-error")) {
                     assertEquals("LAST KNOWN STATUS", ((TextView) view.findViewById(R.id.monitor_health)).getText().toString());
                     assertTrue(((TextView) view.findViewById(R.id.monitor_identity)).getText().toString().contains("Test Owner"));
                 }
+                assertNull("Owner email is not shown on the widget face", textContaining(view, "widget@example.invalid"));
+                assertTrue(view.findViewById(R.id.monitor_open).hasOnClickListeners());
+                assertTrue(view.findViewById(R.id.monitor_open).getHeight() >= 44 * density);
+                assertTrue(view.findViewById(R.id.monitor_refresh).getHeight() >= 44 * density);
+                assertEquals(1, ((TextView) view.findViewById(R.id.monitor_services)).getMaxLines());
                 if (name.equals("signed-out") || name.equals("stale") || name.equals("unavailable")) {
                     assertEquals("—", ((TextView) view.findViewById(R.id.monitor_active)).getText().toString());
+                    assertEquals("—", ((TextView) view.findViewById(R.id.monitor_accounts)).getText().toString());
+                    assertEquals("—", ((TextView) view.findViewById(R.id.monitor_campaigns)).getText().toString());
+                    assertEquals("—", ((TextView) view.findViewById(R.id.monitor_requests)).getText().toString());
                     assertFalse(((TextView) view.findViewById(R.id.monitor_identity)).getText().toString().contains("Test Owner"));
                 }
             } catch (Throwable error) { failure[0] = error; }

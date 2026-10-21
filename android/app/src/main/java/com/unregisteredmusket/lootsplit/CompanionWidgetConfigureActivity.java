@@ -46,6 +46,6 @@ public class CompanionWidgetConfigureActivity extends Activity {
         });
         label(root,"More actions");
         for(String action: WidgetActions.ACTIONS) if(!action.equals("settings")) { Button button=new Button(this); button.setText(WidgetActions.label(action)); root.addView(button); button.setOnClickListener(v -> { try { WidgetActions.pending(this,widgetId,action,true).send(); } catch(Exception ignored) { Toast.makeText(this,"Action unavailable. Open Lootsplit from your launcher.",Toast.LENGTH_LONG).show(); } }); }
-        label(root,"Timers show elapsed wall time, not measured effort. Launcher widgets use static status lights; continuous flashing is intentionally unsupported. Android may delay background delivery. Logging continues on the backend.");
+        label(root,"Timers show elapsed wall time, not measured effort. Launcher widgets use static status symbols (✓ healthy, ! attention, ✕ failure); continuous flashing is intentionally unsupported. Android may delay background delivery. Logging continues on the backend.");
     }
 }

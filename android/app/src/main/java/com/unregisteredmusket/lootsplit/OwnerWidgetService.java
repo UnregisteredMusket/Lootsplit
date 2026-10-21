@@ -34,12 +34,24 @@ public class OwnerWidgetService extends RemoteViewsService {
     static RemoteViews rowView(Context context, JSONObject row, int id) {
         RemoteViews view = new RemoteViews(context.getPackageName(), R.layout.owner_widget_row);
         boolean light=WidgetAppearance.light(context,id);
-        int ink=light?android.graphics.Color.rgb(32,72,51):android.graphics.Color.rgb(177,214,193);
+        int ink=android.graphics.Color.rgb(32,72,51);
+        int text=light?ink:android.graphics.Color.rgb(230,248,236), muted=light?ink:android.graphics.Color.rgb(177,214,193);
         view.setInt(R.id.widget_row,"setBackgroundColor",light?android.graphics.Color.rgb(247,242,228):android.graphics.Color.rgb(7,23,18));
         String color=row==null?"":row.optString("color");
-        view.setTextColor(R.id.widget_row_title,color.isEmpty()?ink:OwnerWidgetProvider.color(color,light));view.setTextColor(R.id.widget_row_detail,ink);
-        view.setTextViewText(R.id.widget_row_title, row == null ? "Loading…" : row.optString("title"));
-        view.setTextViewText(R.id.widget_row_detail, row == null ? "Dated owner information" : row.optString("detail"));
+        boolean status="red".equals(color)||"yellow".equals(color)||"green".equals(color);
+        String title=row == null ? "Loading…" : row.optString("title");
+        String detail=row == null ? "Dated owner information" : row.optString("detail");
+        String time=row == null ? "" : row.optString("time");
+        // Status glyph column: ✓ ! ✕ in the row's color, a neutral dot when the row has no status.
+        view.setTextViewText(R.id.widget_row_glyph,WidgetRows.glyph(status?color:""));
+        view.setTextColor(R.id.widget_row_glyph,status?OwnerWidgetProvider.color(color,light):muted);
+        view.setContentDescription(R.id.widget_row_glyph,WidgetRows.statusWord(status?color:""));
+        view.setTextViewText(R.id.widget_row_title,title);view.setTextColor(R.id.widget_row_title,text);
+        view.setViewVisibility(R.id.widget_row_time,time.isEmpty()?android.view.View.GONE:android.view.View.VISIBLE);
+        view.setTextViewText(R.id.widget_row_time,time);view.setTextColor(R.id.widget_row_time,muted);
+        // One visible line; the complete text remains in the row description and in the app on tap.
+        view.setTextViewText(R.id.widget_row_detail,detail.replace("\n"," · "));view.setTextColor(R.id.widget_row_detail,muted);
+        view.setContentDescription(R.id.widget_row,(status?WidgetRows.statusWord(color)+". ":"")+title+(time.isEmpty()?"":", "+time)+". "+detail.replace("\n",". "));
         view.setOnClickFillInIntent(R.id.widget_row, new Intent().putExtra(WidgetActions.DESTINATION, row == null ? "account" : row.optString("action")));
         return view;
     }
