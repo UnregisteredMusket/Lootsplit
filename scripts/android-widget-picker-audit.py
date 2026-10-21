@@ -3,9 +3,10 @@
 import pathlib
 import re
 import subprocess
+import sys
 import xml.etree.ElementTree as ET
 
-OUT = pathlib.Path("test-results/android-widget/picker")
+OUT = pathlib.Path("test-results/android-widget") / ("picker-installed" if "--add-companion" in sys.argv else "picker")
 OUT.mkdir(parents=True, exist_ok=True)
 
 
@@ -53,13 +54,15 @@ if search is not None:
     adb("shell", "input", "keyevent", "KEYCODE_BACK")
 
 seen = set()
+expanded = False
 for attempt in range(12):
     picker = snapshot("picker-" + str(attempt))
     labels = {label(n) for n in picker.iter("node")}
     seen.update(labels)
     group = next((n for n in picker.iter("node") if label(n) == "Lootsplit"), None)
-    if group is not None and not any("Field monitor" in s or "companion" in s for s in labels):
+    if group is not None and not expanded:
         tap(group)
+        expanded = True
         continue
     if any("Field monitor" in s for s in seen) and any("4×1 companion" in s for s in seen):
         break
@@ -73,3 +76,28 @@ assert "CompanionWidgetProvider" in providers, "Android did not register the com
 assert any("Field monitor" in s for s in seen), "Main widget missing from actual launcher picker"
 assert any("4×1 companion" in s for s in seen), "Companion missing from actual launcher picker"
 print("PASS: Android's real launcher picker exposes both Lootsplit widgets")
+
+if "--add-companion" in sys.argv:
+    # Android 15 Pixel Launcher exposes an Add action after tapping a preview.
+    # Older hosts are tested through AppWidgetHost's real bind/configure/result flow.
+    assert int(adb("shell", "getprop", "ro.build.version.sdk")) >= 35
+    companion = None
+    for attempt in range(6):
+        companion = next((n for n in picker.iter("node") if "4×1 companion" in label(n) and n.get("resource-id", "").endswith("/widget_name")), None)
+        if companion is not None:
+            break
+        adb("shell", "input", "swipe", str(width // 2), str(height * 77 // 100), str(width // 2), str(height * 32 // 100), "400")
+        picker = snapshot("picker-add-" + str(attempt))
+    assert companion is not None, "Companion preview must be visible before adding"
+    tap(companion)
+    preview = snapshot("companion-preview")
+    add = next((n for n in preview.iter("node") if label(n).lower() == "add"), None)
+    assert add is not None, "Launcher Add action missing; inspect companion-preview.png"
+    tap(add)
+    home = snapshot("companion-added")
+    assert any("OWNER" in label(n) and "SIGN IN" in label(n) for n in home.iter("node")), "Added companion must show its signed-out state on the home screen"
+    providers = adb("shell", "dumpsys", "appwidget")
+    (OUT / "providers-after-add.txt").write_text(providers)
+    widgets = providers.split("Widgets:", 1)[1].split("Hosts:", 1)[0]
+    assert "CompanionWidgetProvider" in widgets, "Launcher must bind an actual companion instance"
+    print("PASS: Companion added from the launcher picker without My account or sign-in")

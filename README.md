@@ -20,6 +20,8 @@ Maps support category filters, dungeon/property/ship layouts, free DM party plac
 
 Lootsplit is a shared party ledger and campaign application for web and Android. Production runs on Cloudflare Workers and D1; GitHub Actions verifies and publishes the exact tested artifact from `main`.
 
+Android1.9.1 prepares a widget-discovery recovery update. Both types are reannounced after upgrade; **Widgets → Lootsplit → Lootsplit 4×1 companion** places the compact widget, with customization available from its Settings action. **My account → Refresh widget list** safely requests a fresh list. See the [picker investigation and release status](docs/audit/2026-10-21-widget-picker.md).
+
 ## Private owner overview
 
 Website **My account → Field monitor** shows the signed-in owner beside **Owner access**, health checks, account/app totals, shared-campaign analytics, recent development and website deployment activity. The serving commit and published Android version remain separate from active builds. Refresh manually or every minute while visible; provider readings are cached up to five minutes. The original detailed server monitor and owner controls remain available. Cloudflare traffic displays **Not connected** until its read-only analytics credential is configured. The terminal-style home-screen widget is available in Android1.8.0 and later; Android1.8.1 fixes direct manual refresh. Phone screenshots are not embedded in the website or app. See [owner monitor verification and setup](docs/audit/2026-10-20-owner-monitor.md) and [Android instructions](ANDROID.md).

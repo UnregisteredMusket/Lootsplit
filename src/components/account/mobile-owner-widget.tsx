@@ -148,7 +148,7 @@ export function MobileOwnerWidget({ name, email }: { name: string; email: string
             <button
               type="button"
               className="portal-button secondary"
-              disabled={busy || !status?.connected}
+              disabled={busy}
               onClick={() =>
                 void run(async () => {
                   if (status?.pinSupported) {
@@ -170,14 +170,14 @@ export function MobileOwnerWidget({ name, email }: { name: string; email: string
             <button
               type="button"
               className="portal-button secondary"
-              disabled={busy || !status?.connected}
+              disabled={busy}
               onClick={() =>
                 void run(async () => {
                   if (status?.pinSupported) {
                     const result = await OwnerWidget.pin({ kind: "companion" });
                     setMessage(
                       result.requested
-                        ? "Confirm Add, then choose this companion’s summaries and actions."
+                        ? "Confirm Add to place the 4×1 companion. Tap its Settings action to choose summaries and controls. Owner access is only needed for private readings."
                         : "Add Lootsplit 4×1 companion from your launcher’s Widgets menu.",
                     );
                   } else
@@ -188,6 +188,23 @@ export function MobileOwnerWidget({ name, email }: { name: string; email: string
               }
             >
               Add 4×1 companion
+            </button>
+            <button
+              type="button"
+              className="portal-button secondary"
+              disabled={busy}
+              onClick={() =>
+                void run(async () => {
+                  const result = await OwnerWidget.refreshRegistration();
+                  setMessage(
+                    result.mainAvailable && result.companionAvailable
+                      ? "Android detects both Lootsplit widgets. Close and reopen your home screen’s Widgets menu. You can also use Add 4×1 companion here."
+                      : "Android has not detected both widget types yet. Open Lootsplit again after the update finishes, then retry. Your saved data and placed widgets are preserved.",
+                  );
+                })
+              }
+            >
+              Refresh widget list
             </button>
             {status?.mainWidgets?.map((id) => (
               <button

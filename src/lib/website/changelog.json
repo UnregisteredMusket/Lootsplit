@@ -1,5 +1,20 @@
 [
   {
+    "version": "1.9.1",
+    "date": "2026-10-21",
+    "summary": "Android companion widget discovery and installation recovery.",
+    "features": ["None in this release."],
+    "improvements": [
+      "Add the 4×1 companion with its default Development preset and customize it from Settings after placement.",
+      "Add either widget before connecting owner access; private readings still require authorization.",
+      "Refresh widget list provides a safe recovery action and reports whether Android detects both types."
+    ],
+    "fixes": [
+      "Reannounce both widget providers after an app update and on first launch, preserving placed widgets and saved settings.",
+      "Validate both entries in Android’s actual widget picker and the signed APK upgrade/companion installation path before publication."
+    ]
+  },
+  {
     "version": "1.9.0",
     "date": "2026-10-20",
     "summary": "Synchronized owner monitoring, daily reports and configurable Android companion.",

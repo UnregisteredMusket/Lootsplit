@@ -14,6 +14,7 @@ const mock = `
   export const OwnerWidget={
     status:async()=>({connected,installed:window.widgetInstances?3:0,pinSupported:true,companions:window.widgetInstances?[101,102]:[],mainWidgets:window.widgetInstances?[201]:[]}),
     configure:async({widgetId})=>{window.widgetConfigured=widgetId;},
+    refreshRegistration:async()=>({mainAvailable:true,companionAvailable:true}),
     pin:async(options)=>{window.widgetPinKind=options?.kind||"main";window.widgetPins=(window.widgetPins||0)+1;return {requested:true};},
     refresh:async()=>{window.widgetRefreshes=(window.widgetRefreshes||0)+1; if(window.widgetRefreshFail) throw Error('Could not refresh · tap Refresh to retry');},
     consumeOpenRequest:async()=>({open:false})
@@ -92,11 +93,19 @@ try {
   page.on("pageerror", (error) => errors.push(error.message));
   await page.goto(origin);
   await page.getByText("Not connected · 0 on home screen", { exact: true }).waitFor();
+  assert.equal(
+    await page.getByRole("button", { name: "Refresh widget", exact: true }).isEnabled(),
+    false,
+  );
+  await page.getByRole("button", { name: "Add 4×1 companion", exact: true }).click();
+  assert.equal(await page.evaluate(() => window.widgetPinKind), "companion");
+  await page.getByRole("button", { name: "Refresh widget list", exact: true }).click();
+  await page.getByText("Android detects both Lootsplit widgets.", { exact: false }).waitFor();
   await page.getByRole("button", { name: "Connect owner account", exact: true }).click();
   await page.getByText("Connected · 0 on home screen", { exact: true }).waitFor();
   await page.getByRole("button", { name: "Add to home screen", exact: true }).click();
   await page.getByText("Confirm Add in Android’s home-screen prompt.", { exact: false }).waitFor();
-  assert.equal(await page.evaluate(() => window.widgetPins), 1);
+  assert.equal(await page.evaluate(() => window.widgetPins), 2);
   await page.getByRole("button", { name: "Refresh widget", exact: true }).click();
   await page.getByText("Widget refreshed.", { exact: false }).waitFor();
   assert.equal(await page.evaluate(() => window.widgetRefreshes), 1);

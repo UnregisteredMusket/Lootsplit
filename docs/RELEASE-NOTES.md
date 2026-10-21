@@ -1,3 +1,28 @@
+# Lootsplit 1.9.1 — candidate
+
+Android version code **14**, same package and permanent signing certificate.
+
+## Added
+
+- None in this release.
+
+## Improved
+
+- Add the4×1 companion with its default Development preset, then choose summaries, actions and theme from Settings.
+- Place either widget before connecting owner access; private readings still require authorization.
+- Refresh widget list safely reannounces both types and reports Android’s detection state.
+
+## Fixed
+
+- Provider-list recovery after APK updates and first launch preserves existing widget IDs, settings and campaign data.
+- Release verification now includes both real picker entries, companion binding/configuration, and the actual signed upgrade and Add path without My account.
+
+## Release verification
+
+Not yet published. API24/API35, complete PR/main preservation checks and the signed-APK upgrade gate must pass. The exact cause on the reported physical launcher has not been confirmed; emulator evidence and the defensive recovery behavior must not be presented as physical-device verification. Install over the existing signed app; do not uninstall or clear saved data. See [picker investigation](audit/2026-10-21-widget-picker.md).
+
+---
+
 # Lootsplit 1.9.0
 
 Android version code **13**. This release retains package `com.unregisteredmusket.lootsplit` and the permanent signing certificate.

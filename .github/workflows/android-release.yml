@@ -86,6 +86,27 @@ jobs:
             echo "::error::APK certificate does not match Lootsplit's permanent signing key"
             exit 1
           fi
+      - name: Enable emulator acceleration for signed upgrade verification
+        run: |
+          echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
+          sudo udevadm control --reload-rules
+          sudo udevadm trigger --name-match=kvm
+      - name: Verify signed upgrade and actual companion installation from Widgets
+        uses: reactivecircus/android-emulator-runner@v2
+        with:
+          api-level: 35
+          arch: x86_64
+          target: google_apis
+          profile: pixel_6
+          disable-animations: true
+          script: python3 scripts/android-widget-upgrade-audit.py
+      - name: Preserve signed upgrade and picker evidence
+        uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: android-signed-widget-upgrade
+          path: test-results/android-widget/
+          retention-days: 30
       - name: Upload signed APK only
         uses: actions/upload-artifact@v4
         with:

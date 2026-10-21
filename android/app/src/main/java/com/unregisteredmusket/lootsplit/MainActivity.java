@@ -9,6 +9,7 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(SaveFilePlugin.class);
         registerPlugin(OwnerWidgetPlugin.class);
         super.onCreate(savedInstanceState);
+        WidgetRegistration.refresh(this,false);
     }
     @Override protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);
