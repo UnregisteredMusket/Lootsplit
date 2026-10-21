@@ -1,6 +1,8 @@
 import assert from "node:assert/strict";
 import test from "node:test";
 import "fake-indexeddb/auto";
+// Load the command engine first, as the other estate tests do: it fixes the module cycle order.
+import "./commands.ts";
 import { estateImportFingerprint } from "./estate-import.ts";
 import { storageWeight } from "./estate.ts";
 
