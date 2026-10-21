@@ -15,6 +15,10 @@ const deniesAccess = (failure: unknown) => {
   const status = (failure as { status?: unknown } | null)?.status;
   return status === 401 || status === 403;
 };
+const summarizedCounts = (sections: Record<string, { shown: number; total: number }>) =>
+  Object.keys(sections)
+    .map((section) => `${section}: ${sections[section].shown} of ${sections[section].total}`)
+    .join(" · ");
 const tabs = ["history", "reports", "task", "diagnostics", "registry"] as const;
 type Tab = (typeof tabs)[number];
 type Registry = {
@@ -430,9 +434,7 @@ export function MonitorJournal({ data, refresh }: { data: JournalSnapshot; refre
               {report.summarized && (
                 <p className="owner-monitor-note">
                   {report.summarized.note}{" "}
-                  {Object.entries(report.summarized.sections)
-                    .map(([section, count]) => `${section}: ${count.shown} of ${count.total}`)
-                    .join(" · ")}
+                  {summarizedCounts(report.summarized.sections)}
                 </p>
               )}
               <ul>
