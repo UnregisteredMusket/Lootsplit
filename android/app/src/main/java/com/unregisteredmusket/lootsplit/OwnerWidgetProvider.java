@@ -26,6 +26,7 @@ public class OwnerWidgetProvider extends AppWidgetProvider {
         for (int id : ids(context)) render(context, manager, id, manager.getAppWidgetOptions(id));
         CompanionWidgetProvider.renderAll(context);
         manager.notifyAppWidgetViewDataChanged(ids(context), R.id.monitor_list);
+        WidgetRefresh.scheduleActivity(context); // Arms or cancels the Agent activity fast cadence.
     }
     static JSONObject current(JSONObject state) {
         JSONObject snapshot = state.optJSONObject("snapshot");
@@ -168,12 +169,17 @@ public class OwnerWidgetProvider extends AppWidgetProvider {
         if (REFRESH.equals(intent.getAction())) {
             PendingResult pending = goAsync();
             WidgetRefresh.request(context, true, error -> pending.finish());
+        } else if (WidgetRefresh.ACTIVITY_TICK.equals(intent.getAction())) {
+            // Background (not manual) check: the same coalescing, deadline and account checks apply.
+            PendingResult pending = goAsync();
+            if (!WidgetRefresh.activityTick(context, error -> pending.finish())) pending.finish();
         }
     }
     @Override public void onDeleted(Context context,int[] ids){ for(int id:ids)CompanionSettings.remove(context,id); }
     @Override public void onDisabled(Context context) {
         if (CompanionWidgetProvider.ids(context).length == 0) {
             OwnerWidgetJob.cancel(context);
+            WidgetRefresh.cancelActivity(context);
             WidgetStore.clear(context, null);
         }
     }

@@ -191,12 +191,38 @@ try {
             url: "https://github.com/UnregisteredMusket/Lootsplit/pull/123",
           },
         ],
+        events: [
+          {
+            id: "run:2:completed:failure",
+            kind: "run-failed",
+            state: "fail",
+            text: "Verify failed on #123",
+            pr: 123,
+            title: "Owner overview",
+            at: Date.now() - 60000,
+            url: "https://github.com/UnregisteredMusket/Lootsplit/actions/runs/2",
+          },
+          {
+            id: "pr:122:merged",
+            kind: "pr-merged",
+            state: "ok",
+            text: "Merged #122",
+            pr: 122,
+            title:
+              "A deliberately long merged change title that must wrap on a narrow phone screen",
+            at: Date.now() - 120000,
+            url: "https://github.com/UnregisteredMusket/Lootsplit/pull/122",
+          },
+        ],
       },
     },
   };
   await page.route("**/api/account/owner/monitor", (route) => route.fulfill({ json: fixture }));
   await overview.getByRole("button", { name: "Refresh overview", exact: true }).click();
   await overview.getByText("1 active workflow in recent activity", { exact: true }).waitFor();
+  // Agent activity companion destination: the same section lists recent GitHub events.
+  await overview.getByText("Recent GitHub activity", { exact: true }).waitFor();
+  await overview.locator(".owner-monitor-activity li").nth(1).waitFor();
   for (const width of [320, 390, 1280]) {
     await page.setViewportSize({ width, height: 900 });
     await overview.scrollIntoViewIfNeeded();

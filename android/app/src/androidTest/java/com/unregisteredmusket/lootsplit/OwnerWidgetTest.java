@@ -38,7 +38,9 @@ public class OwnerWidgetTest {
     @After public void cleanup() {
         WidgetStore.clear(context, null); OwnerWidgetJob.cancel(context);
         WidgetRefresh.fetcher = WidgetClient::fetch;
+        WidgetRefresh.alarm = DEFAULT_ALARM; WidgetRefresh.cancelActivity(context);
     }
+    private static final WidgetRefresh.ActivityAlarm DEFAULT_ALARM = WidgetRefresh.alarm;
 
     private JSONObject fixture() throws Exception {
         long now = System.currentTimeMillis();
@@ -281,10 +283,10 @@ public class OwnerWidgetTest {
         });
         assertTrue(refreshed.await(2,TimeUnit.SECONDS));
     }
-    private void renderCompanion(JSONObject state,JSONObject settings,int width,int height,String name) throws Exception {
-        AtomicReference<Throwable> failure=new AtomicReference<>();
+    private View renderCompanion(JSONObject state,JSONObject settings,int width,int height,String name) throws Exception {
+        AtomicReference<Throwable> failure=new AtomicReference<>();AtomicReference<View> rendered=new AtomicReference<>();
         InstrumentationRegistry.getInstrumentation().runOnMainSync(()->{ try {
-            FrameLayout parent=new FrameLayout(context);View view=CompanionWidgetProvider.views(context,state,settings,101).apply(context,parent);parent.addView(view);
+            FrameLayout parent=new FrameLayout(context);View view=CompanionWidgetProvider.views(context,state,settings,101).apply(context,parent);parent.addView(view);rendered.set(view);
             float density=context.getResources().getDisplayMetrics().density;int w=Math.round(width*density),h=Math.round(height*density);
             parent.measure(View.MeasureSpec.makeMeasureSpec(w,View.MeasureSpec.EXACTLY),View.MeasureSpec.makeMeasureSpec(h,View.MeasureSpec.EXACTLY));parent.layout(0,0,w,h);bounds(view);
             assertTrue(view.findViewById(R.id.companion_action1).getWidth()>=44*density);assertTrue(view.findViewById(R.id.companion_action1).getHeight()>=44*density);
@@ -303,6 +305,7 @@ public class OwnerWidgetTest {
             File dir=context.getExternalFilesDir("widget-audit");if(dir!=null)dir.mkdirs();try(FileOutputStream out=new FileOutputStream(new File(dir,name+".png"))){bitmap.compress(Bitmap.CompressFormat.PNG,100,out);}bitmap.recycle();
         }catch(Throwable error){failure.set(error);} });
         if(failure.get()!=null)throw new AssertionError(name,failure.get());
+        return rendered.get();
     }
     private String shell(String command) throws Exception {
         try(android.os.ParcelFileDescriptor fd=InstrumentationRegistry.getInstrumentation().getUiAutomation().executeShellCommand(command);InputStream input=new android.os.ParcelFileDescriptor.AutoCloseInputStream(fd);ByteArrayOutputStream out=new ByteArrayOutputStream()){
@@ -367,6 +370,8 @@ public class OwnerWidgetTest {
     @Test public void companionIsDiscoverableAndConfiguresThroughFrameworkWithoutAccount() throws Exception {
         assertEquals("1",shell("getprop ro.kernel.qemu"));
         WidgetStore.clear(context,null);
+        // Record the one-time legacy-default check as already done so the new instances below are "new".
+        CompanionSettings.preserveLegacyDefaults(context,new int[0],false);
         android.appwidget.AppWidgetManager manager=android.appwidget.AppWidgetManager.getInstance(context);
         android.content.ComponentName component=new android.content.ComponentName(context,CompanionWidgetProvider.class);
         android.appwidget.AppWidgetProviderInfo info=null;
@@ -399,7 +404,12 @@ public class OwnerWidgetTest {
             assertNotNull("Launcher configuration must open for the bound companion",configuration);
             instrumentation.waitForIdleSync();
             CompanionWidgetConfigureActivity settings=configuration;
-            instrumentation.runOnMainSync(()->settings.choices.get("preset").setSelection(1));
+            instrumentation.runOnMainSync(()->{
+                // A new companion opens on the Agent activity default; every earlier preset is still listed.
+                assertEquals(CompanionSettings.DEFAULT_PRESET,settings.choices.get("preset").getSelectedItem().toString());
+                assertEquals("activity",settings.choices.get("first").getSelectedItem().toString());
+                settings.choices.get("preset").setSelection(java.util.Arrays.asList(CompanionSettings.PRESETS).indexOf("Server Health"));
+            });
             instrumentation.waitForIdleSync();
             instrumentation.runOnMainSync(()->assertTrue(textView(settings.getWindow().getDecorView(),"Apply preset").performClick()));
             instrumentation.waitForIdleSync();
@@ -410,7 +420,7 @@ public class OwnerWidgetTest {
             assertEquals(android.app.Activity.RESULT_OK,screen.configurationResult);
             assertEquals(id,screen.configuredWidget);
             assertEquals("health",CompanionSettings.read(context,id).getString("first"));
-            assertEquals("task",CompanionSettings.read(context,second).getString("first"));
+            assertEquals("A fresh, unconfigured companion uses Agent activity","activity",CompanionSettings.read(context,second).getString("first"));
             assertTrue("Adding/configuring must not create authorization",WidgetStore.read(context).optString("token").isEmpty());
             String preserved=WidgetStore.connect(context,"synthetic-registration-preservation");
             if(android.os.Build.VERSION.SDK_INT>=28) {
@@ -563,6 +573,152 @@ public class OwnerWidgetTest {
         JSONObject missing=journalFixture();missing.getJSONObject("health").remove("stats");
         view=mainFace(WidgetData.project(missing,System.currentTimeMillis()));
         for(int id:new int[]{R.id.monitor_active,R.id.monitor_accounts,R.id.monitor_campaigns,R.id.monitor_requests})assertEquals("—",text(view,id));
+    }
+
+    private JSONObject activityEvent(String kind,String state,String text,String title,int pr,double minutesAgo) throws Exception {
+        return new JSONObject().put("id",kind+pr).put("kind",kind).put("state",state).put("text",text).put("title",title).put("pr",pr)
+            .put("at",System.currentTimeMillis()-(long)(minutesAgo*60000)).put("url","https://github.com/UnregisteredMusket/Lootsplit/pull/"+pr);
+    }
+    private JSONObject activityFixture(org.json.JSONArray events,int active) throws Exception {
+        JSONObject source=journalFixture();
+        source.getJSONObject("development").put("checkedAt",System.currentTimeMillis()).getJSONObject("data").put("events",events).put("activeActivity",active);
+        return source;
+    }
+    private JSONObject activityState(JSONObject source,String message) throws Exception {
+        return new JSONObject().put("token","synthetic").put("message",message).put("snapshot",WidgetData.project(source,System.currentTimeMillis()));
+    }
+    @Test public void agentActivityPresetIsDefaultAndEarlierPresetsAndSettingsStay() throws Exception {
+        java.util.List<String> presets=java.util.Arrays.asList(CompanionSettings.PRESETS);
+        assertEquals("Agent activity",presets.get(0));assertEquals("Agent activity",CompanionSettings.DEFAULT_PRESET);
+        for(String kept:new String[]{"Development","Server Health","Analytics","Quick Actions"})assertTrue(kept+" remains selectable",presets.contains(kept));
+        for(String category:new String[]{"health","analytics","traffic","task","timer","log","warning","report","activity"})assertTrue(category,java.util.Arrays.asList(CompanionSettings.CATEGORIES).contains(category));
+        CompanionSettings.remove(context,104);
+        assertEquals("activity",CompanionSettings.read(context,104).getString("first"));
+        assertEquals("activity",CompanionSettings.read(context,104).getString("second"));
+        assertEquals("refresh",CompanionSettings.read(context,104).getString("action1"));
+        // Saved settings are never rewritten.
+        CompanionSettings.save(context,104,CompanionSettings.preset("Analytics").put("theme","light"));
+        assertEquals("analytics",CompanionSettings.read(context,104).getString("first"));
+        // Upgrade: companions already placed without saved settings keep the earlier Development default.
+        android.content.SharedPreferences presentation=context.getSharedPreferences("widget-presentation",Context.MODE_PRIVATE);
+        presentation.edit().remove("defaults-v2").remove("instance-105").commit();
+        CompanionSettings.preserveLegacyDefaults(context,new int[]{104,105},true);
+        assertEquals("task",CompanionSettings.read(context,105).getString("first"));
+        assertEquals("timer",CompanionSettings.read(context,105).getString("second"));
+        assertEquals("Saved choices are untouched","analytics",CompanionSettings.read(context,104).getString("first"));
+        CompanionSettings.remove(context,105);
+        CompanionSettings.preserveLegacyDefaults(context,new int[]{105},true);
+        assertEquals("The check runs once; later companions are new","activity",CompanionSettings.read(context,105).getString("first"));
+        // Fresh install: nothing to preserve.
+        presentation.edit().remove("defaults-v2").commit();
+        CompanionSettings.preserveLegacyDefaults(context,new int[]{105},false);
+        assertEquals("activity",CompanionSettings.read(context,105).getString("first"));
+        CompanionSettings.remove(context,104);CompanionSettings.remove(context,105);
+    }
+    @Test public void agentActivityCompanionShowsGlyphTextAgeAndExplicitUnavailableState() throws Exception {
+        JSONObject preset=CompanionSettings.preset("Agent activity");
+        org.json.JSONArray events=new org.json.JSONArray()
+            .put(activityEvent("pr-merged","ok","Merged #138","Widget redesign",138,2))
+            .put(activityEvent("pr-opened","ok","Opened #140","Agent activity",140,3))
+            .put(activityEvent("run-started","active","Verify running on #138","Widget redesign",138,4));
+        for(String theme:new String[]{"terminal","light"}) {
+            View view=renderCompanion(activityState(activityFixture(events,1),""),new JSONObject(preset.toString()).put("theme",theme),250,56,"companion-agent-activity-merged-"+theme);
+            assertEquals("✓",text(view,R.id.companion_light));
+            assertEquals("Merged #138 · Widget redesign · 2m",text(view,R.id.companion_first));
+            assertEquals("The running workflow is the next most relevant item","! Verify running on #138 · 4m",text(view,R.id.companion_second));
+            assertTrue(view.findViewById(R.id.companion_first).getContentDescription().toString().contains("GitHub activity"));
+            assertTrue(view.findViewById(R.id.companion_first).hasOnClickListeners());
+            assertTrue(view.findViewById(R.id.companion_second).hasOnClickListeners());
+            assertTrue(view.findViewById(R.id.companion_light).hasOnClickListeners());
+        }
+        org.json.JSONArray failed=new org.json.JSONArray().put(activityEvent("run-failed","fail","Verify failed on #138","Widget redesign",138,1)).put(activityEvent("pr-merged","ok","Merged #137","Icons",137,30));
+        View view=renderCompanion(activityState(activityFixture(failed,0),""),preset,350,72,"companion-agent-activity-failed");
+        assertEquals("✕",text(view,R.id.companion_light));
+        assertEquals("Verify failed on #138 · 1m",text(view,R.id.companion_first));
+        assertEquals("✓ Merged #137 · Icons · 30m",text(view,R.id.companion_second));
+        org.json.JSONArray running=new org.json.JSONArray().put(activityEvent("run-started","active","Verify running on #138","",138,4));
+        view=renderCompanion(activityState(activityFixture(running,1),""),preset,350,72,"companion-agent-activity-running");
+        assertEquals("!",text(view,R.id.companion_light));
+        assertEquals("Verify running on #138 · 4m",text(view,R.id.companion_first));
+        assertTrue(text(view,R.id.companion_second).startsWith("GitHub activity · checked "));
+        // A successful empty read is real; an unavailable source is never shown as "no activity".
+        view=renderCompanion(activityState(activityFixture(new org.json.JSONArray(),0),""),preset,350,72,"companion-agent-activity-empty");
+        assertEquals("–",text(view,R.id.companion_light));assertEquals("No recent GitHub activity",text(view,R.id.companion_first));
+        String[][] unavailable={{"HTTP_403_RATE_LIMITED","rate limited"},{"HTTP_401","access denied"},{"SOURCE_TIMEOUT","timed out"}};
+        for(String[] item:unavailable) {
+            JSONObject source=journalFixture();
+            source.put("development",new JSONObject().put("state","unavailable").put("checkedAt",System.currentTimeMillis()).put("data",JSONObject.NULL).put("errorCode",item[0]));
+            view=renderCompanion(activityState(source,""),preset,250,56,"companion-agent-activity-unavailable-"+item[1].replace(" ","-"));
+            assertEquals("!",text(view,R.id.companion_light));
+            assertEquals("GitHub activity unavailable · "+item[1],text(view,R.id.companion_first));
+            assertFalse(text(view,R.id.companion_first).contains("No recent"));
+        }
+        JSONObject disconnected=journalFixture();disconnected.put("development",new JSONObject().put("state","not-connected").put("data",JSONObject.NULL));
+        view=renderCompanion(activityState(disconnected,""),preset,250,56,"companion-agent-activity-not-connected");
+        assertEquals("GitHub activity not connected",text(view,R.id.companion_first));
+        // A server without events (older Worker) is unavailable, not empty.
+        view=renderCompanion(activityState(journalFixture(),""),preset,250,56,"companion-agent-activity-no-events");
+        assertEquals("GitHub activity unavailable · not provided by server",text(view,R.id.companion_first));
+        // A failed refresh keeps the dated reading and says so.
+        view=renderCompanion(activityState(activityFixture(events,1),"Could not refresh · tap Refresh to retry"),preset,350,72,"companion-agent-activity-refresh-failed");
+        assertEquals("Merged #138 · Widget redesign · 2m",text(view,R.id.companion_first));
+        assertTrue(text(view,R.id.companion_second).startsWith("Could not refresh · tap Refresh to retry · as of "));
+        // Signed out stays the existing sign-in state.
+        view=renderCompanion(new JSONObject().put("message","Connect in My account"),preset,250,56,"companion-agent-activity-signed-out");
+        assertEquals("–",text(view,R.id.companion_light));assertEquals("Owner sign-in needed",text(view,R.id.companion_first));
+        assertEquals("field-development",WidgetActions.destination("activity"));
+    }
+    @Test public void agentActivityFastRefreshIsNonWakeupAndOnlyWhileActive() throws Exception {
+        JSONObject[] activity={CompanionSettings.preset("Agent activity")},other={CompanionSettings.preset("Development"),CompanionSettings.preset("Server Health")};
+        org.json.JSONArray events=new org.json.JSONArray().put(activityEvent("run-started","active","Verify running on #138","",138,1));
+        JSONObject active=activityState(activityFixture(events,1),""),idle=activityState(activityFixture(events,0),"");
+        long now=System.currentTimeMillis();
+        assertTrue(WidgetRefresh.activityFast(active,activity,now));
+        assertFalse("Only with an Agent activity companion",WidgetRefresh.activityFast(active,other,now));
+        assertFalse("Nothing running",WidgetRefresh.activityFast(idle,activity,now));
+        assertFalse("Signed out",WidgetRefresh.activityFast(new JSONObject().put("snapshot",active.getJSONObject("snapshot")),activity,now));
+        assertFalse("Stale reading hands back to the periodic job",WidgetRefresh.activityFast(active,activity,now+WidgetRefresh.ACTIVITY_MAX_AGE_MILLIS+1));
+        JSONObject broken=journalFixture();broken.put("development",new JSONObject().put("state","unavailable").put("errorCode","HTTP_403_RATE_LIMITED"));
+        assertFalse("Unavailable GitHub never polls fast",WidgetRefresh.activityFast(activityState(broken,""),activity,now));
+        // Through the real provider lifecycle with a placed companion.
+        assertEquals("1",shell("getprop ro.kernel.qemu"));
+        shell("appwidget grantbind --package "+context.getPackageName()+" --user 0");
+        android.appwidget.AppWidgetHost host=new android.appwidget.AppWidgetHost(context,197411);
+        android.appwidget.AppWidgetManager manager=android.appwidget.AppWidgetManager.getInstance(context);
+        int id=host.allocateAppWidgetId();
+        java.util.List<String> calls=java.util.Collections.synchronizedList(new java.util.ArrayList<>());
+        WidgetRefresh.alarm=new WidgetRefresh.ActivityAlarm(){
+            @Override public void set(Context c,int type,long at,android.app.PendingIntent tick){calls.add("set:"+type+":"+(at-System.currentTimeMillis()));}
+            @Override public void cancel(Context c,android.app.PendingIntent tick){calls.add("cancel");}
+        };
+        WidgetRefresh.fetcher=token->{throw new java.io.IOException("No network in this check");};
+        try {
+            assertTrue(manager.bindAppWidgetIdIfAllowed(id,new android.content.ComponentName(context,CompanionWidgetProvider.class)));
+            CompanionSettings.save(context,id,CompanionSettings.preset("Agent activity"));
+            String generation=WidgetStore.connect(context,"synthetic-activity");
+            assertTrue(WidgetStore.finish(context,generation,active.getJSONObject("snapshot"),""));
+            calls.clear();InstrumentationRegistry.getInstrumentation().runOnMainSync(()->OwnerWidgetProvider.renderAll(context));
+            String armed=calls.get(calls.size()-1);
+            assertTrue(armed,armed.startsWith("set:"+android.app.AlarmManager.RTC+":"));
+            assertNotEquals("Never RTC_WAKEUP",android.app.AlarmManager.RTC_WAKEUP,android.app.AlarmManager.RTC);
+            long delay=Long.parseLong(armed.substring(armed.lastIndexOf(':')+1));
+            assertTrue("About a minute: "+delay,delay>50000&&delay<=60000);
+            assertNotNull("The periodic job remains the background cadence",context.getSystemService(JobScheduler.class));
+            CompanionSettings.save(context,id,CompanionSettings.preset("Development"));
+            calls.clear();InstrumentationRegistry.getInstrumentation().runOnMainSync(()->OwnerWidgetProvider.renderAll(context));
+            assertEquals("Cancelled when no companion shows Agent activity","cancel",calls.get(calls.size()-1));
+            CompanionSettings.save(context,id,CompanionSettings.preset("Agent activity"));
+            assertTrue(WidgetStore.finish(context,generation,idle.getJSONObject("snapshot"),""));
+            calls.clear();InstrumentationRegistry.getInstrumentation().runOnMainSync(()->OwnerWidgetProvider.renderAll(context));
+            assertEquals("Cancelled when nothing is running","cancel",calls.get(calls.size()-1));
+            assertTrue(WidgetStore.finish(context,generation,active.getJSONObject("snapshot"),""));
+            WidgetStore.clear(context,null);
+            calls.clear();InstrumentationRegistry.getInstrumentation().runOnMainSync(()->OwnerWidgetProvider.renderAll(context));
+            assertEquals("Cancelled when signed out","cancel",calls.get(calls.size()-1));
+        } finally {
+            host.deleteHost();CompanionSettings.remove(context,id);
+            shell("appwidget revokebind --package "+context.getPackageName()+" --user 0");
+        }
     }
 
     private void tapRefresh() {
