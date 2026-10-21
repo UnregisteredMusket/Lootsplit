@@ -3,7 +3,7 @@ on:
   workflow_call:
   workflow_dispatch:
   push:
-    branches: ["android/field-monitor"]
+    branches: ["android/field-monitor", "fix/companion-picker"]
   pull_request:
     paths:
       - "android/**"
@@ -60,7 +60,11 @@ jobs:
           arch: x86_64
           target: google_apis
           disable-animations: true
-          script: bash scripts/android-widget-instrumentation.sh
+          script: |
+            set -e
+            adb install -r android/app/build/outputs/apk/debug/app-debug.apk
+            python3 scripts/android-widget-picker-audit.py
+            bash scripts/android-widget-instrumentation.sh
       - uses: actions/upload-artifact@v4
         if: always()
         with:
