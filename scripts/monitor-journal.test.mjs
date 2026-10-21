@@ -418,6 +418,36 @@ test("an unrelated successful workflow cannot clear a confirmed failure or its d
   }
 });
 
+test("provider rejection does not invent expired authorization and rate limits have specific actions", async () => {
+  const { monitorSnapshot } = await import("../cloudflare/monitor-journal.mjs");
+  const DB = localAccountDb();
+  try {
+    for (const code of ["HTTP_403", "HTTP_403_RATE_LIMITED"]) {
+      const snapshot = reading();
+      snapshot.development = {
+        state: "unavailable",
+        checkedAt: instant,
+        data: null,
+        errorCode: code,
+      };
+      const result = await monitorSnapshot({ DB }, "owner", {
+        force: true,
+        now: instant,
+        collector: async () => snapshot,
+      });
+      const entry = result.diagnostics.find((d) => d.component === "GitHub workflows");
+      assert.equal(entry.color, "yellow");
+      assert.doesNotMatch(entry.symptom, /expired|rejected authorization/);
+      assert.match(
+        entry.symptom,
+        code.endsWith("LIMITED") ? /request limit/ : /does not establish why/,
+      );
+    }
+  } finally {
+    DB.close();
+  }
+});
+
 test("daily report carries unresolved incidents from earlier days until recovery is observed", async () => {
   const DB = localAccountDb();
   try {

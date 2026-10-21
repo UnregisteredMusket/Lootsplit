@@ -50,6 +50,34 @@ test("workflow ingestion verifies real RSA signature, owner/repository IDs, main
       return Response.json({ keys: [jwk] });
     };
   assert.equal((await verifyTelemetryToken(await sign(base), env, now, fetcher)).run_id, "100");
+  const immutable = "repo:UnregisteredMusket@336285553/Lootsplit@1398794793";
+  assert.equal(
+    (
+      await verifyTelemetryToken(
+        await sign({ ...base, sub: `${immutable}:ref:refs/heads/main` }),
+        env,
+        now,
+        fetcher,
+      )
+    ).run_id,
+    "100",
+  );
+  assert.equal(
+    (
+      await verifyTelemetryToken(
+        await sign({
+          ...base,
+          sub: `${immutable}:environment:production`,
+          workflow_ref:
+            "UnregisteredMusket/Lootsplit/.github/workflows/website-release.yml@refs/heads/main",
+        }),
+        env,
+        now,
+        fetcher,
+      )
+    ).run_id,
+    "100",
+  );
   assert.equal(
     (
       await verifyTelemetryToken(
@@ -74,6 +102,10 @@ test("workflow ingestion verifies real RSA signature, owner/repository IDs, main
     { ref: "refs/pull/1/merge" },
     { aud: "wrong" },
     { sub: "repo:other/other:ref:refs/heads/main" },
+    { sub: "repo:UnregisteredMusket@1/Lootsplit@1398794793:ref:refs/heads/main" },
+    { sub: "repo:UnregisteredMusket@336285553/Lootsplit@1:ref:refs/heads/main" },
+    { sub: `${immutable}:ref:refs/heads/other` },
+    { sub: `${immutable}:environment:production` },
     { exp: now / 1000 - 1 },
     { event_name: "pull_request" },
     { workflow_ref: "UnregisteredMusket/Lootsplit/.github/workflows/evil.yml@refs/heads/main" },

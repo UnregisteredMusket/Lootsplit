@@ -102,6 +102,28 @@ test("Cloudflare traffic distinguishes disconnected, failure, real zero and vali
   }
 });
 
+test("GitHub diagnostics distinguish request limits from unexplained rejection and keep optional credentials private", async () => {
+  for (const [status, headers, expected] of [
+    [403, {}, "HTTP_403"],
+    [401, {}, "HTTP_401"],
+    [403, { "x-ratelimit-remaining": "0" }, "HTTP_403_RATE_LIMITED"],
+    [403, { "retry-after": "60" }, "HTTP_403_RATE_LIMITED"],
+    [429, {}, "HTTP_429_RATE_LIMITED"],
+  ]) {
+    const result = await developmentActivity(
+      { DB: {}, OWNER_MONITOR_GITHUB: "true", OWNER_MONITOR_GITHUB_TOKEN: "PRIVATE_TOKEN" },
+      async (url, options) => {
+        assert.match(url, /^https:\/\/api.github.com\/repos\/UnregisteredMusket\/Lootsplit\//);
+        assert.equal(options.headers.Authorization, "Bearer PRIVATE_TOKEN");
+        return new Response("PRIVATE_PROVIDER_BODY", { status, headers });
+      },
+    );
+    assert.equal(result.state, "unavailable");
+    assert.equal(result.errorCode, expected);
+    assert.doesNotMatch(JSON.stringify(result), /PRIVATE/);
+  }
+});
+
 test("adjacent traffic windows use inclusive start and exclusive end without boundary double-counting", async () => {
   const { cloudflareTraffic } = await import("../cloudflare/owner-monitor.mjs");
   const end = Date.now(),

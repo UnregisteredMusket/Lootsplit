@@ -1,0 +1,54 @@
+{
+  "sourceCommit": "6934e5c3da52dd0dc9cf76be1b3acde81c6e3c05",
+  "sourceTree": "cdce84d70201e1fd046699cead157d0803277f8d",
+  "version": "1.9.0",
+  "versionCode": 13,
+  "package": "com.unregisteredmusket.lootsplit",
+  "minSdk": 24,
+  "targetSdk": 36,
+  "apkUrl": "https://github.com/UnregisteredMusket/Lootsplit/releases/download/android-v1.9.0/Lootsplit-1.9.0.apk",
+  "releaseUrl": "https://github.com/UnregisteredMusket/Lootsplit/releases/tag/android-v1.9.0",
+  "sha256": "bdc4023d220bc64a255061952c50babdaadd808686336ca6991dbd59c021685b",
+  "bytes": 28038088,
+  "certificateSha256": "baca95a880d14d0d8c422c397decd4c9bf0e7f710a3fd6a5be1e47abd3f730a0",
+  "v2SignatureVerified": true,
+  "publicApkMatchesChecksumAndSigningArtifact": true,
+  "releaseDebugAuditActivityAbsent": true,
+  "releaseBindAppwidgetPermissionAbsent": true,
+  "mainVerification": 39506221936,
+  "signedWorkflow": 39506221876,
+  "signedArtifact": {
+    "id": 12304233420,
+    "sha256": "372af20682b8d1a4ed4f893a9b46be899d860f5bd131a2a52f9f6c1ae898e95e"
+  },
+  "nativeFrameworkVerification": {
+    "run": 39503564845,
+    "api24": {
+      "tests": 12,
+      "failures": 0,
+      "skips": 0,
+      "seconds": 11.204
+    },
+    "api35": {
+      "tests": 12,
+      "failures": 0,
+      "skips": 0,
+      "seconds": 16.262
+    }
+  },
+  "initialWebsiteDeployment": {
+    "run": 39507810885,
+    "worker": "55c7f667-5006-4f9c-9003-2b26389f993c",
+    "deployment": "79e487b4-138d-4efa-9784-7b21cf405a89",
+    "cron": "* * * * *",
+    "schema": "0016 applied once"
+  },
+  "limitations": [
+    "Physical OEM launchers, prolonged Doze, reboot delivery and large-font accessibility not verified.",
+    "Production owner dashboard browser session not authenticated; real disposable-owner browser and native synthetic-host checks passed.",
+    "Initial production GitHub OIDC subject rejected; strict immutable-ID correction requires follow-up deployment and actual ingestion verification.",
+    "Public GitHub collectors unavailable during initial production checks; GitHub safe provider diagnosis and a confirmed performance/JWKS unsupported-redirect correction are included in follow-up.",
+    "First scheduled daily report is not due until 2026-10-21T04:10:00Z.",
+    "Raw runtime-log feed and full scheduled multiplayer round-trip remain explicit coverage gaps."
+  ]
+}

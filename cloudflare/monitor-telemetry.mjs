@@ -3,6 +3,12 @@ import { clean, fail } from "./monitor-model.mjs";
 
 const ISSUER = "https://token.actions.githubusercontent.com";
 const REPOSITORY = "UnregisteredMusket/Lootsplit";
+// GitHub repositories created after July 15, 2026 use immutable subject IDs.
+// Both exact forms retain the independent signed owner/repository ID checks below.
+const SUBJECT_REPOSITORIES = [
+  `repo:${REPOSITORY}`,
+  "repo:UnregisteredMusket@336285553/Lootsplit@1398794793",
+];
 const ALLOWED = new Set([
   "verify.yml",
   "website-release.yml",
@@ -46,9 +52,10 @@ export async function verifyTelemetryToken(token, env, now = Date.now(), fetcher
     claim.repository_id !== "1398794793" ||
     claim.repository_owner_id !== "336285553" ||
     claim.ref !== "refs/heads/main" ||
-    !(
-      claim.sub === `repo:${REPOSITORY}:ref:refs/heads/main` ||
-      (name === "website-release.yml" && claim.sub === `repo:${REPOSITORY}:environment:production`)
+    !SUBJECT_REPOSITORIES.some(
+      (subject) =>
+        claim.sub === `${subject}:ref:refs/heads/main` ||
+        (name === "website-release.yml" && claim.sub === `${subject}:environment:production`),
     ) ||
     !ALLOWED.has(name) ||
     !["push", "workflow_run", "workflow_dispatch", "schedule"].includes(claim.event_name) ||
@@ -66,7 +73,7 @@ export async function verifyTelemetryToken(token, env, now = Date.now(), fetcher
   if (!cached || cached.until < now || !cached.value.some((k) => k.kid === header.kid)) {
     const response = await fetcher(`${ISSUER}/.well-known/jwks`, {
       signal: AbortSignal.timeout(4000),
-      redirect: "error",
+      redirect: "manual",
     });
     if (!response.ok || Number(response.headers.get("content-length")) > 65536)
       fail("Workflow signing keys unavailable.", 503);
