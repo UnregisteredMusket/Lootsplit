@@ -9,7 +9,10 @@ public class MainActivity extends BridgeActivity {
         registerPlugin(SaveFilePlugin.class);
         registerPlugin(OwnerWidgetPlugin.class);
         super.onCreate(savedInstanceState);
-        WidgetRegistration.refresh(this,false);
+        // PackageManager/AppWidgetManager work and renderAll stay off the UI thread.
+        // refresh is synchronized and catches its own failures; use the application context.
+        final android.content.Context appContext = getApplicationContext();
+        new Thread(() -> WidgetRegistration.refresh(appContext,false), "lootsplit-widget-registration").start();
     }
     @Override protected void onNewIntent(Intent intent) {
         super.onNewIntent(intent);

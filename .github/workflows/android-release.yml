@@ -8,9 +8,10 @@ on:
       - "src/lib/quire/version.ts"
       - ".github/workflows/android-release.yml"
 
+# Least privilege by default. Each job below grants only what its own steps use; a job's
+# permissions replace these defaults and cap any reusable workflow it calls.
 permissions:
-  id-token: write
-  contents: write
+  contents: read
   actions: read
 
 concurrency:
@@ -22,15 +23,27 @@ env:
 jobs:
   verify:
     uses: ./.github/workflows/verify.yml
+    permissions:
+      contents: read
+      # verify.yml's recovery steps publish main-push OIDC development telemetry.
+      id-token: write
   native:
     uses: ./.github/workflows/android-widget.yml
+    permissions:
+      contents: read
   main-verification:
     needs: [verify, native]
     runs-on: ubuntu-latest
+    permissions:
+      contents: read
+      # Reads the independent verify.yml main-push run and its jobs.
+      actions: read
+      # recovery-step.mjs telemetry (main pushes only).
+      id-token: write
     timeout-minutes: 12
     steps:
-      - uses: actions/checkout@v4
-      - uses: actions/setup-node@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version: 22
       - name: Require successful independent main preservation checks
@@ -41,21 +54,28 @@ jobs:
     needs: [verify, native, main-verification]
     runs-on: ubuntu-latest
     timeout-minutes: 20
+    # Signing and publication share this job: the signed APK built here is the exact file the
+    # upgrade gate tests and the release publishes. Only this job can write releases.
+    permissions:
+      # gh release create.
+      contents: write
+      # recovery-step.mjs telemetry for android-signing-build/android-publish (main pushes only).
+      id-token: write
     steps:
       - name: Require main release source
         run: test "$GITHUB_REF" = refs/heads/main
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
           fetch-depth: 0
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
+          # No shared npm cache is restored into the job that decodes the signing keystore.
           node-version: 22
-          cache: npm
-      - uses: actions/setup-java@v4
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4.9.1
         with:
           distribution: temurin
           java-version: "21"
-      - uses: android-actions/setup-android@v3
+      - uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407 # v3.2.2
         with:
           packages: platform-tools platforms;android-36 build-tools;36.0.0
       - run: npm ci
@@ -63,15 +83,21 @@ jobs:
       - run: npm run typecheck
       - run: npm run build:cloudflare
       - name: Verify release version
+        id: release-check
         env:
           GH_TOKEN: ${{ github.token }}
-        run: node scripts/check-android-release.mjs
+        # A push that leaves APP_VERSION unchanged (e.g. a workflow-only edit) on an already
+        # released version ends successfully without signing; any other case still fails.
+        run: node scripts/check-android-release.mjs --skip-released-unchanged
       - run: npm run build:mobile && npx cap sync android
+        if: steps.release-check.outputs.skip != 'true'
       - name: Require current main before signing
+        if: steps.release-check.outputs.skip != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         run: test "$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq .object.sha)" = "$GITHUB_SHA"
       - name: Sign release with permanent key
+        if: steps.release-check.outputs.skip != 'true'
         env:
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
           ANDROID_KEYSTORE_PASSWORD: ${{ secrets.ANDROID_KEYSTORE_PASSWORD }}
@@ -101,12 +127,14 @@ jobs:
             exit 1
           fi
       - name: Enable emulator acceleration for signed upgrade verification
+        if: steps.release-check.outputs.skip != 'true'
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
       - name: Verify signed upgrade and actual companion installation from Widgets
-        uses: reactivecircus/android-emulator-runner@v2
+        if: steps.release-check.outputs.skip != 'true'
+        uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
         with:
           api-level: 35
           arch: x86_64
@@ -115,19 +143,21 @@ jobs:
           disable-animations: true
           script: python3 scripts/android-widget-upgrade-audit.py
       - name: Preserve signed upgrade and picker evidence
-        uses: actions/upload-artifact@v4
-        if: always()
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always() && steps.release-check.outputs.skip != 'true'
         with:
           name: android-signed-widget-upgrade
           path: test-results/android-widget/
           retention-days: 30
       - name: Upload signed APK only
-        uses: actions/upload-artifact@v4
+        if: steps.release-check.outputs.skip != 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: lootsplit-release-apk
           path: android/app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
       - name: Publish versioned download and checksum
+        if: steps.release-check.outputs.skip != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash
@@ -145,6 +175,7 @@ jobs:
           notes = re.sub(r"^(# Lootsplit [0-9.]+).*", r"\1", notes, count=1)
           notes = notes.replace("This candidate retains", "This release retains").replace("## Candidate verification", "## Verification")
           notes = notes.replace("Not yet published. API24/API35, complete PR/main preservation checks and the signed-APK upgrade gate must pass.", "Published after API24/API35, complete PR/main preservation checks and the signed-APK upgrade gate passed.")
+          notes = notes.replace("Not yet published. API 24/API 35, complete PR/main preservation checks and the signed-APK upgrade gate must pass.", "Published after API 24/API 35, complete PR/main preservation checks and the signed-APK upgrade gate passed.")
           notes = re.sub(r"The public download remains [0-9.]+ until the new signed APK and checksum exist\. ?", "", notes)
           Path("release/RELEASE-NOTES.md").write_text(notes)
           PY
