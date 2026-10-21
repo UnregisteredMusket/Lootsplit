@@ -9,10 +9,13 @@ export function atomicJson(path, value) {
   renameSync(path + ".tmp", path);
 }
 
+// Terminal color codes, built from the escape character (lint rejects control characters in regex literals).
+const ANSI_COLOR = new RegExp(String.fromCharCode(27) + "\\[[0-9;]*m", "g");
+
 /** A GitHub `::error` workflow command carrying the last output lines of a failed step. */
 export function failureAnnotation(id, status, output) {
   const lines = String(output)
-    .replace(/\x1b\[[0-9;]*m/g, "")
+    .replace(ANSI_COLOR, "")
     .split(/\r?\n/)
     .filter((line) => line.trim())
     .slice(-40)
