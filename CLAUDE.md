@@ -24,9 +24,9 @@ This file is the required reading. Everything under "Read on demand" is consulte
 1. Branch from `main` (`fix/…`, `feature/…`, `dev/…`). One topic per branch.
 2. Reproduce first where practical: a failing unit/API test for logic and permissions, a browser audit for what people click.
 3. Open a PR. **The PR description is the checkpoint**: what changed, why, how it was verified, what is left. No separate recovery entry.
-4. `verify.yml` runs the preservation groups (dev server, packaged Worker, standby). Do not use CI as the edit loop; push when local checks pass.
+4. `verify.yml`: PRs run the build job (unit tests, typecheck, lint, immutable builds) and every development-server audit; documentation-only PRs run the build job only. Main runs every group, including packaged Worker and standby audits, before deploying. The account suite runs as two parallel shards. Do not use CI as the edit loop, and **do not push to a PR while its run is in progress** (it cancels and restarts). A failed step's last output lines are a GitHub annotation on the job; read them via the API before re-running.
 5. A transient infrastructure failure (runner/browser install, emulator start) on unchanged code: re-run only the failed jobs. A test failure: diagnose before re-running.
-6. Merge when green (the owner approved merging green PRs, 2026-10-21). Merging deploys: main verify → `website-release.yml` → read-only live audit. Confirm the live identity before calling it released.
+6. Merge when green (owner's standing approval while actively working on Lootsplit, 2026-10-21). Merging deploys: main verify → `website-release.yml` → read-only live audit. Confirm the live identity before calling it released.
 
 ## Rules that are not negotiable
 
@@ -45,18 +45,19 @@ This file is the required reading. Everything under "Read on demand" is consulte
 
 - Every log designated for Lootsplit is registered in `BUILTIN_LOGS` (`cloudflare/monitor-journal.mjs`) or the owner registry, and appears in the daily report; missing data stays an explicit gap, never zero.
 - Development task status is published with `scripts/development-status.mjs` when an owner token is provided in the environment; otherwise say telemetry is unavailable. Never invent heartbeats.
-- Performance: every ≥15% comparable slowdown is logged automatically; investigate the ones flagged for review (see `docs/PERFORMANCE.md`).
+- Performance: ≥15% slowdowns are logged automatically (hourly). Act on the weekly development speed summary's "Needs attention" list (`docs/PERFORMANCE.md`); no per-change reporting.
 
 ## Read on demand
 
 | Topic | Read |
 | --- | --- |
 | Interrupted work, failure emails | `docs/RECOVERY.md` |
-| Detailed testing/release procedures, account-suite rules | `docs/CODING-MANUAL.md` |
+| Detailed testing/release procedures | `docs/CODING-MANUAL.md` |
+| Account suite scenarios and timeout procedure | `docs/WEBSITE-ACCOUNTS.md` |
 | Owner authorizations and product decisions | `AGENTS.project.md` |
 | Owner monitoring, widgets, daily reports | `docs/OWNER-MONITORING.md` |
 | What features exist (preservation baseline) | `docs/FEATURE-INVENTORY.md`, `docs/REDESIGN.md` |
-| Feature specifics | `docs/<FEATURE>.md` (ships, trade, properties, encounters, blacksmith, downtime, maps…) |
+| Feature specifics and their development rules | `docs/<FEATURE>.md` (ships, trade, properties, encounters, blacksmith, downtime, maps, world features…), `ANDROID.md` |
 | Performance log rules | `docs/PERFORMANCE.md` |
 | Past audits and evidence | `docs/audit/` (newest: `2026-10-21-code-audit.md`) |
 | Historical checkpoints | `docs/archive/recovery-checkpoints-2026-10.md` |

@@ -1,6 +1,6 @@
 # Persistent performance history
 
-The user requires every **measured slowdown of 15% or above**, including exactly 15%, against the last logged comparable duration to be recorded on GitHub. A full audit must read and analyze this history.
+Every **measured slowdown of 15% or above**, including exactly 15%, against the last logged comparable duration is recorded on GitHub automatically (hourly). Owner decision 2026-10-21: instead of a per-change reporting duty, the **weekly development speed summary** (`performance-summary.yml`, Mondays) reports verification time, job and step medians, failures and steps that slowed by 15% or more week over week; act on its "Needs attention" list. Use `performance:resolve` only after a diagnosed fix is confirmed by a successful comparable run; never reset a trend because one run was faster. History is never deleted.
 
 ## Where the evidence lives
 

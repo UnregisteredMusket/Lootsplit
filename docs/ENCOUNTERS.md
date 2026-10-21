@@ -31,3 +31,11 @@ The browser audit uses disposable local DM/player accounts and campaign data, ex
 - The same full browser flow also passed against the production-built interface, using a test-only local proxy to the real account handler and disposable SQLite data. Production Worker deployment itself remains unperformed.
 - The generic anonymous-page smoke script rendered both sizes without overflow or page exceptions, but flags the expected unauthenticated 401 and this environment's blocked external template-branding certificate. The authenticated encounter audit reported no uncaught page errors.
 - Publication is pending explicit user permission after automatic approval review rejected the GitHub push access check. No production data, deployment or real user campaigns were changed.
+
+## Development and verification rules
+
+Moved verbatim from `docs/CODING-MANUAL.md` on 2026-10-21 so each feature's rules live with the feature. They still apply whenever this area changes.
+
+### Encounter initiative ordering
+
+The combatant array is the persisted display/turn order for device, account and shared campaign encounters. Initiative entry, draft saves, start and reload never sort it implicitly. Only the DM's **Sort initiative** action calls `sortInitiative`; it keeps the active ID and round, retains tied roster order and puts blanks last. `nextTurn` follows the stored array. Preserve schema/version, IDs, revision checks, read-only/role locks and map roster references. Run encounter model/permission tests and the existing device/account browser audits, including stable multi-digit focus, desktop/mobile explicit sorting, clearing scores, turn traversal and reopened order, plus full release gates.

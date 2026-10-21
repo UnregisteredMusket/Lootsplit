@@ -75,3 +75,11 @@ Supported ordinary shop purchases also return the exact purchased goods and fini
 Trade receipts are available in pages of 50 and seasonal settlements in pages of 20, with first/previous/next/last controls at both ends. Paging changes only the visible records. All records remain in campaign backups and authorized archives. Players receive only their own trade receipts; seasonal history, internal settlement snapshots and other owners' transactions remain private to the DM.
 
 Each seasonal record shows **Before**, **Proposed** and **Applied** values separately. Before comes from the original saved preview, including the original commodity name/unit, quotes, stock, indices and realm conditions. Proposed retains the original calculation and recorded rolls; Applied shows the approved result, including any DM override. Later configuration changes cannot rewrite these displays. If an older record lacks a readable baseline, the view says so and still displays its saved proposal and result. It does not fill the gap with today's values.
+
+## Development and verification rules
+
+Moved verbatim from `docs/CODING-MANUAL.md` on 2026-10-21 so each feature's rules live with the feature. They still apply whenever this area changes.
+
+### Seasonal campaign trade economies
+
+Read `docs/TRADE-ECONOMY.md` and `docs/plans/SEASONAL-TRADE-ECONOMY.md`. Economy state is optional campaign journal data; never share exchange balances, seasonal draws or feedback across campaigns. Reuse canonical inventory/purses, location hierarchy, property manager budgets/postal orders and the atomic stored downtime approval. Price quotes stay fixed for the season; current transactions feed the next automatic proposal. Rolls are authoritative and retained across cancellation/retry, including server CAS retries. Classic preserves exact DM values and every mode supports recorded overrides. Within-session clock advances never settle seasons. Preserve older saves, immutable archives, recovery drafts, all existing release gates and the independent packaged Worker checks. Run `trade-economy.test.ts`, shared `room-store.test.ts`, and the complete desktop/mobile trade-economy audit in both environments.
