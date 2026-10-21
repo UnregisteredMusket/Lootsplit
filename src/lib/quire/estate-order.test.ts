@@ -1,5 +1,6 @@
 import assert from "node:assert/strict";
 import test from "node:test";
+import "fake-indexeddb/auto";
 import { estateImportFingerprint } from "./estate-import.ts";
 import { storageWeight } from "./estate.ts";
 
