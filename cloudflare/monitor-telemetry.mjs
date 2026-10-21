@@ -70,7 +70,13 @@ export async function verifyTelemetryToken(token, env, now = Date.now(), fetcher
   )
     fail("This workflow is not authorized to publish owner telemetry.", 403);
   let cached = keys.get(env.DB);
-  if (!cached || cached.until < now || !cached.value.some((k) => k.kid === header.kid)) {
+  // Claims are unsigned until verified, so a forged token can name any key ID. Refetch for an
+  // unknown key at most once a minute; GitHub key rotation is far slower than that.
+  if (
+    !cached ||
+    cached.until < now ||
+    (!cached.value.some((k) => k.kid === header.kid) && now - cached.fetchedAt >= 60000)
+  ) {
     const response = await fetcher(`${ISSUER}/.well-known/jwks`, {
       signal: AbortSignal.timeout(4000),
       redirect: "manual",
@@ -81,7 +87,7 @@ export async function verifyTelemetryToken(token, env, now = Date.now(), fetcher
     if (text.length > 65536) fail("Invalid signing keys.", 503);
     const value = JSON.parse(text).keys;
     if (!Array.isArray(value) || value.length > 20) fail("Invalid signing keys.", 503);
-    cached = { value, until: now + 3600000 };
+    cached = { value, until: now + 3600000, fetchedAt: now };
     keys.set(env.DB, cached);
   }
   const jwk = cached.value.find(

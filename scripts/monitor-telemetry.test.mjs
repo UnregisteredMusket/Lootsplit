@@ -122,3 +122,38 @@ test("workflow ingestion verifies real RSA signature, owner/repository IDs, main
   parts[1] = encoded({ ...base, run_id: "101" });
   await assert.rejects(() => verifyTelemetryToken(parts.join("."), env, now, fetcher), /signature/);
 });
+
+test("forged key IDs cannot force a signing-key download on every request", async () => {
+  const now = Date.now();
+  const claims = {
+    iss: "https://token.actions.githubusercontent.com",
+    aud: "https://lootsplit.oliverstorie2017.workers.dev/monitoring",
+    repository: "UnregisteredMusket/Lootsplit",
+    repository_id: "1398794793",
+    repository_owner_id: "336285553",
+    ref: "refs/heads/main",
+    sub: "repo:UnregisteredMusket/Lootsplit:ref:refs/heads/main",
+    workflow_ref: "UnregisteredMusket/Lootsplit/.github/workflows/verify.yml@refs/heads/main",
+    event_name: "push",
+    run_id: "200",
+    run_attempt: "1",
+    iat: Math.floor(now / 1000),
+    exp: Math.floor(now / 1000) + 300,
+  };
+  const forged = (kid) =>
+    `${encoded({ alg: "RS256", typ: "JWT", kid })}.${encoded(claims)}.${encoded("not-a-signature")}`;
+  let downloads = 0;
+  const env = { DB: {} },
+    fetcher = async () => {
+      downloads++;
+      return Response.json({ keys: [{ kid: "real", kty: "RSA", n: "AQAB", e: "AQAB" }] });
+    };
+  for (let i = 0; i < 5; i++)
+    await assert.rejects(
+      verifyTelemetryToken(forged(`random-${i}`), env, now + i * 1000, fetcher),
+      (e) => e.status === 401,
+    );
+  assert.equal(downloads, 1, "unknown key IDs reuse the cached key set within a minute");
+  await assert.rejects(verifyTelemetryToken(forged("later"), env, now + 61000, fetcher));
+  assert.equal(downloads, 2, "a rotated key can still be fetched after the minute passes");
+});

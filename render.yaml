@@ -14,6 +14,8 @@ services:
         value: '22'
       - key: NODE_ENV
         value: production
+      - key: VITE_GROK_EXTENSIONS
+        value: '0'
       - key: STANDBY_MODE
         value: locked
       - key: STANDBY_RELEASE_SHA

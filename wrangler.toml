@@ -55,6 +55,9 @@ simple = { limit = 60, period = 60 }
 
 [vars]
 OWNER_MONITOR_GITHUB = "true"
+# The Grok app-builder extension script (grok.com) would run with signed-in sessions; disabled
+# for every Lootsplit deployment (owner-approved 2026-10-21). Builds read .grok/app-env.json.
+VITE_GROK_EXTENSIONS = "0"
 ACCOUNT_ORIGIN = "https://lootsplit.oliverstorie2017.workers.dev"
 # ACCOUNT_SECRET is a Worker secret, never committed. Guest play does not depend on it.
 
