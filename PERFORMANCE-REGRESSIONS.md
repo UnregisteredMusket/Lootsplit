@@ -346,6 +346,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Packaged Worker / accounts (balanced v2) / worker-map-tiles | open | 3 | 20s → 115s | +95s | +475% |
 | Packaged Worker / interface (balanced v2) / Run actions/upload-artifact@v4 | open | 2 | 3s → 5s | +2s | +66.67% |
 | Development / desktop (balanced v2) / dev-map-tiles | open | 4 | 35s → 169s | +134s | +382.86% |
+| Packaged Worker / accounts (balanced v2) | open | 2 | 497s → 702s | +205s | +41.25% |
 | Packaged Worker / accounts (balanced v2) / Run actions/upload-artifact@v4 | open | 2 | 3s → 7s | +4s | +133.33% |
 | Packaged Worker / accounts (balanced v2) / Run npx playwright install --with-deps chromium | open | 2 | 21s → 32s | +11s | +52.38% |
 | Code checks and immutable builds / Generate current source function inventory | open | 2 | 19s → 28s | +9s | +47.37% |
@@ -379,6 +380,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-21T07:34:21Z | job: Packaged Worker / accounts (balanced v2) | 609s → 702s | +93s | +15.27% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39262626961/job/118094990974) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39561218697/job/119093701353) |
 | 2026-10-21T07:30:57Z | step: Development / governance / dev-theme | 45s → 52s | +7s | +15.56% | cancelled | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37884489066/job/113671305297) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39562045100/job/119095372242) |
 | 2026-10-21T07:30:51Z | step: Development / accounts / dev-owner | 6s → 7s | +1s | +16.67% | cancelled | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37763435596/job/113265181532) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39562045100/job/119095372090) |
 | 2026-10-21T07:30:42Z | step: Packaged Worker / accounts (balanced v2) / Run npx playwright install --with-deps chromium | 23s → 27s | +4s | +17.39% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38310299946/job/115014983127) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39562045100/job/119096442096) |
