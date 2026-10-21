@@ -290,12 +290,14 @@ export function FeaturesPage() {
             <div className={`ls-wrap ls-feature-area${index % 2 ? " is-flip" : ""}`}>
               <Shot name={area.shot} tone={tone} />
               <div className="ls-stack">
-                <Kicker>
-                  {area.numeral} · {area.kicker}
-                </Kicker>
-                <h2 id={`${area.id}-title`} className="ls-display">
-                  {area.title}
-                </h2>
+                <div className="ls-area-head">
+                  <Kicker>
+                    {area.numeral} · {area.kicker}
+                  </Kicker>
+                  <h2 id={`${area.id}-title`} className="ls-display">
+                    {area.title}
+                  </h2>
+                </div>
                 <p className="ls-lead">{area.lead}</p>
                 <FeatureList items={area.items} />
                 {area.insets && (
