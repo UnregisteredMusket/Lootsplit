@@ -89,7 +89,12 @@ export function previousDay(day) {
   return new Date(Date.parse(day + "T12:00:00Z") - 86400000).toISOString().slice(0, 10);
 }
 export function dayBounds(day, timezone) {
-  if (!/^\d{4}-\d{2}-\d{2}$/.test(day) || Number.isNaN(Date.parse(day)))
+  // Date.parse accepts impossible dates such as 2026-02-31; require an exact round trip.
+  if (
+    !/^\d{4}-\d{2}-\d{2}$/.test(day) ||
+    Number.isNaN(Date.parse(day)) ||
+    new Date(day + "T00:00:00Z").toISOString().slice(0, 10) !== day
+  )
     fail("Use a calendar date, YYYY-MM-DD.");
   // Binary search local calendar boundaries: 23/25-hour days and non-hour offsets are preserved.
   const center = Date.parse(day + "T12:00:00Z");

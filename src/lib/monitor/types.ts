@@ -76,6 +76,14 @@ export type MonitorReport = {
   summary: string;
   gaps: string[];
   recommendations: string[];
+  /** Placeholder stored after repeated generation failures; contains no measurements. */
+  failed?: boolean;
+  /** Present when long lists were summarized to fit storage; totals are never reduced. */
+  summarized?: {
+    budgetBytes: number;
+    sections: Record<string, { shown: number; total: number }>;
+    note: string;
+  };
   unresolved?: (MonitorDiagnostic & { entryId: string; asOf: number })[];
   trends?: {
     scheduledAt: number;
