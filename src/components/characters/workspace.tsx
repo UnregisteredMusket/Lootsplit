@@ -597,15 +597,17 @@ function CharacterEditor({
         revision: detail.revision,
         before: detail.body,
       });
-      // The save succeeded: mark the draft saved before the follow-up read so a failed
-      // refresh cannot leave it dirty (a retry would then conflict). The save response has
-      // no revision, so the refresh below (or the automatic refresh) supplies it.
-      setDetail({ ...detail, body: parsed });
-      setSheet(parsed);
-      announceSheetChange();
-      changed();
+      // The save succeeded. Apply the server's copy (current permissions and revision) as
+      // before. Only if that follow-up read fails, mark the draft saved anyway so a retry does
+      // not conflict; keep whatever permissions/revision the latest read applied (never the
+      // copy captured when this save started, which could reopen fields the DM just locked).
+      let saved: Detail | null = null;
       try {
-        const saved = await accountRequest<Detail>("sheets/detail", { id });
+        saved = await accountRequest<Detail>("sheets/detail", { id });
+      } catch {
+        saved = null;
+      }
+      if (saved) {
         setNotice(
           outcome.status === "pending"
             ? "Character changes saved in your pending turn. Submit the turn to share them."
@@ -615,9 +617,13 @@ function CharacterEditor({
         );
         setDetail(saved);
         setSheet(saved.body);
-      } catch {
+      } else {
+        setDetail((current) => (current ? { ...current, body: parsed } : current));
+        setSheet(parsed);
         setNotice("Saved. Refresh to see the latest version.");
       }
+      announceSheetChange();
+      changed();
     } catch (e) {
       setError(errorText(e));
     } finally {

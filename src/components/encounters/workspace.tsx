@@ -554,15 +554,8 @@ function EncounterEditor({
         revision: detail.revision,
         ...extra,
       });
-      // The mutation succeeded: never leave the draft dirty, or a retry would conflict.
-      setDirty(false);
-      onDirty(false);
-      onSaved();
-      if (path === "save" && extra.encounter) {
-        // A save increments the revision by exactly one on both server and device stores.
-        const body = extra.encounter as Encounter;
-        setDetail({ ...detail, body, revision: detail.revision + 1 });
-      }
+      // The mutation succeeded. Apply the server's copy as before; only if that follow-up read
+      // fails, mark the draft saved anyway so a retry does not conflict.
       let refreshed = true;
       try {
         const saved = await encounterRequest<Detail>("encounters/detail", { id });
@@ -570,7 +563,20 @@ function EncounterEditor({
         setDraft(saved.body);
       } catch {
         refreshed = false;
+        if (path === "save" && extra.encounter) {
+          // A save increments the revision by exactly one on both server and device stores.
+          const body = extra.encounter as Encounter;
+          // Only if no newer copy arrived meanwhile.
+          setDetail((current) =>
+            current && current.revision === detail.revision
+              ? { ...current, body, revision: detail.revision + 1 }
+              : current,
+          );
+        }
       }
+      setDirty(false);
+      onDirty(false);
+      onSaved();
       if (path === "award" && id.startsWith("local-")) await reloadEconomy();
       if (path === "award") void playSound("loot");
       setNotice(
