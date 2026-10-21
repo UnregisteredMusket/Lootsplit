@@ -12,7 +12,7 @@ test("failed steps report their last output lines as a single GitHub error annot
   assert.equal(annotation.split("\n").length, 1, "one workflow command line");
   assert.match(annotation, /line 59 100%25$/);
   assert.doesNotMatch(annotation, /line 19 /, "only the last 40 lines");
-  assert.doesNotMatch(annotation, /\x1b/);
+  assert.ok(!annotation.includes("\x1b"), "color codes removed");
   assert.match(failureAnnotation("x", "timed_out", ""), /\(no output\)$/);
 });
 
