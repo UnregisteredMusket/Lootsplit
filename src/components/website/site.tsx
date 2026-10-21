@@ -255,11 +255,11 @@ export function WelcomePage() {
       <section className="ls-paper" aria-label="At a glance">
         <div className="ls-wrap ls-ledger">
           <div className="ls-ledger-entry">
-            <p className="ls-sc ls-entry-no">Entry No. 1</p>
+            <p className="ls-sc ls-entry-no">The treasury</p>
             <GoldSpentCounter />
           </div>
           <div className="ls-ledger-entry">
-            <p className="ls-sc ls-entry-no">Entry No. 2</p>
+            <p className="ls-sc ls-entry-no">At the table</p>
             <p className="ls-ledger-title">Three ways to play</p>
             <p className="ls-ledger-note">
               Local at one table, Turn-based between sessions, or Live online. One party, a shared
@@ -267,7 +267,7 @@ export function WelcomePage() {
             </p>
           </div>
           <div className="ls-ledger-entry">
-            <p className="ls-sc ls-entry-no">Entry No. 3</p>
+            <p className="ls-sc ls-entry-no">Behind the screen</p>
             <p className="ls-ledger-title">The DM keeps the keys</p>
             <p className="ls-ledger-note">
               Access, permissions and anything that needs a ruling. Built for the table.
