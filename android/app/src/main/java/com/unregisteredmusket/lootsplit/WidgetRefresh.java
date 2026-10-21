@@ -1,6 +1,9 @@
 package com.unregisteredmusket.lootsplit;
 
+import android.app.AlarmManager;
+import android.app.PendingIntent;
 import android.content.Context;
+import android.content.Intent;
 import org.json.JSONObject;
 import java.util.ArrayList;
 import java.util.List;
@@ -40,6 +43,11 @@ final class WidgetRefresh {
     }
 
     static synchronized Task request(Context context, boolean manual, Completion completion) {
+        return request(context, manual, false, completion);
+    }
+
+    /** {@code quiet}: an Agent activity tick keeps the last reading on screen instead of showing "Refreshing…". */
+    static synchronized Task request(Context context, boolean manual, boolean quiet, Completion completion) {
         Context app = context.getApplicationContext();
         WidgetClient.initialize(app);
         JSONObject state = WidgetStore.read(app);
@@ -63,8 +71,10 @@ final class WidgetRefresh {
         task.completions.add(completion);
         active = task;
         try {
-            WidgetStore.message(app, generation, "Refreshing…");
-            OwnerWidgetProvider.renderAll(app);
+            if (!quiet) {
+                WidgetStore.message(app, generation, "Refreshing…");
+                OwnerWidgetProvider.renderAll(app);
+            }
         } catch (Exception ignored) {
             finish(task, null, "Widget storage unavailable. Reconnect in My account.", false);
             return task;
@@ -84,6 +94,58 @@ final class WidgetRefresh {
             }
         });
         return task;
+    }
+
+    // Agent activity: while a GitHub workflow runs and an Agent activity companion is placed, check
+    // about once a minute. The alarm is RTC (never RTC_WAKEUP) and inexact, so it never wakes the
+    // device; a tick arriving while the screen is off only re-arms. Otherwise the persisted ~30 minute
+    // OwnerWidgetJob remains the only background cadence.
+    static final String ACTIVITY_TICK = "com.unregisteredmusket.lootsplit.ACTIVITY_REFRESH";
+    static final long ACTIVITY_INTERVAL_MILLIS = 60000;
+    /** A reading older than this stops the fast cadence; the periodic job takes over. */
+    static final long ACTIVITY_MAX_AGE_MILLIS = 1800000;
+    static boolean activityFast(JSONObject state, JSONObject[] companions, long now) {
+        if (state == null || state.optString("token").isEmpty()) return false;
+        JSONObject snapshot = state.optJSONObject("snapshot");
+        if (snapshot == null || now - snapshot.optLong("checkedAt") > ACTIVITY_MAX_AGE_MILLIS) return false;
+        JSONObject activity = snapshot.optJSONObject("activity");
+        if (activity == null || !"ready".equals(activity.optString("state")) || activity.optInt("active") <= 0) return false;
+        for (JSONObject settings : companions) if (CompanionSettings.showsActivity(settings)) return true;
+        return false;
+    }
+    /** Package-private seam so instrumentation can observe alarm type/cancellation; never app or JS input. */
+    interface ActivityAlarm { void set(Context context, int type, long at, PendingIntent tick); void cancel(Context context, PendingIntent tick); }
+    static volatile ActivityAlarm alarm = new ActivityAlarm() {
+        @Override public void set(Context context, int type, long at, PendingIntent tick) { context.getSystemService(AlarmManager.class).set(type, at, tick); }
+        @Override public void cancel(Context context, PendingIntent tick) { context.getSystemService(AlarmManager.class).cancel(tick); }
+    };
+    static PendingIntent activityIntent(Context context) {
+        return PendingIntent.getBroadcast(context, 197402, new Intent(context, OwnerWidgetProvider.class).setAction(ACTIVITY_TICK),
+            PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE);
+    }
+    /** Re-evaluated after every render: arms the next tick, or cancels it when nothing is active. */
+    static void scheduleActivity(Context context) {
+        try {
+            int[] ids = CompanionWidgetProvider.ids(context);
+            JSONObject[] companions = new JSONObject[ids.length];
+            for (int i = 0; i < ids.length; i++) companions[i] = CompanionSettings.read(context, ids[i]);
+            // RTC, never RTC_WAKEUP; set() is inexact, so Android may batch it with other alarms.
+            if (activityFast(WidgetStore.read(context), companions, System.currentTimeMillis()))
+                alarm.set(context, AlarmManager.RTC, System.currentTimeMillis() + ACTIVITY_INTERVAL_MILLIS, activityIntent(context));
+            else alarm.cancel(context, activityIntent(context));
+        } catch (RuntimeException ignored) { /* The periodic job remains; a widget render never fails here. */ }
+    }
+    static void cancelActivity(Context context) {
+        try { alarm.cancel(context, activityIntent(context)); }
+        catch (RuntimeException ignored) { }
+    }
+    /** Tick from the non-wakeup alarm: refresh only while the screen is on; otherwise just re-arm. */
+    static boolean activityTick(Context context, Completion completion) {
+        android.os.PowerManager power = context.getSystemService(android.os.PowerManager.class);
+        if (power != null && !power.isInteractive()) { scheduleActivity(context); return false; }
+        // A coalesced or signed-out request renders nothing, so re-evaluate the cadence here.
+        if (request(context, false, true, completion) == null) scheduleActivity(context);
+        return true;
     }
 
     static synchronized void cancelBackground(Task task) {

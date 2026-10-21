@@ -16,6 +16,8 @@ final class WidgetActions {
             case "report": return "monitor-reports";
             case "task": return "monitor-task";
             case "diagnostics": return "monitor-diagnostics";
+            // Agent activity: My account → Field monitor → Development & deployments (GitHub events).
+            case "activity": return "field-development";
             case "account": return "account-sign-in";
             default: return "home-screen-widget";
         }

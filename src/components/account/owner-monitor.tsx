@@ -27,6 +27,23 @@ type Run = {
   url: string;
   deployment: boolean;
 };
+type ActivityEvent = {
+  id: string;
+  kind: string;
+  state: "ok" | "active" | "attention" | "fail";
+  text: string;
+  pr: number | null;
+  title: string;
+  at: number;
+  url: string;
+};
+const activityGlyph = { ok: "✓", active: "!", attention: "!", fail: "✕" } as const;
+const activityWord = {
+  ok: "Succeeded",
+  active: "In progress",
+  attention: "Needs attention",
+  fail: "Failed",
+} as const;
 type Snapshot = JournalSnapshot & {
   checkedAt: number;
   account: { name: string; email: string };
@@ -37,6 +54,8 @@ type Snapshot = JournalSnapshot & {
     active: Run[];
     latestDeployment: Run | null;
     openPulls: { number: number; title: string; draft: boolean; url: string }[];
+    /** Newest-first GitHub workflow/pull request events (also shown by the Agent activity companion). */
+    events?: ActivityEvent[];
   }>;
   traffic: Source<{ requests: number; errors: number; since: string; until: string }>;
   release: Source<{ commit: string }>;
@@ -142,6 +161,22 @@ export function OwnerMonitor() {
       window.removeEventListener("lootsplit-account-changed", accountChanged);
     };
   }, [automatic, revision]);
+  const hasData = !!data;
+  useEffect(() => {
+    // The Agent activity companion opens My account#field-development once the section exists.
+    if (!hasData) return;
+    const reveal = () => {
+      if (window.location.hash === "#field-development")
+        document.getElementById("field-development")?.scrollIntoView({ block: "start" });
+    };
+    reveal();
+    window.addEventListener("lootsplit-monitor-destination", reveal);
+    window.addEventListener("hashchange", reveal);
+    return () => {
+      window.removeEventListener("lootsplit-monitor-destination", reveal);
+      window.removeEventListener("hashchange", reveal);
+    };
+  }, [hasData]);
   const stale = !!data && now - data.checkedAt > 120000;
   const stats = data?.health.stats;
   const development = data?.development.data;
@@ -412,6 +447,40 @@ export function OwnerMonitor() {
                       </b>
                     </a>
                   )}
+                  {development.events && (
+                    <>
+                      <h4 id="field-activity">Recent GitHub activity</h4>
+                      {development.events.length ? (
+                        <ol className="owner-monitor-activity" aria-labelledby="field-activity">
+                          {development.events.map((event) => (
+                            <li key={event.id}>
+                              <a
+                                className="owner-monitor-run"
+                                data-state={event.state}
+                                href={event.url}
+                                target="_blank"
+                                rel="noreferrer"
+                              >
+                                <span>
+                                  <b aria-hidden="true">{activityGlyph[event.state]}</b>{" "}
+                                  <span className="sr-only">{activityWord[event.state]}: </span>
+                                  {event.text}
+                                  {event.title && event.kind.startsWith("pr-")
+                                    ? ` · ${event.title}`
+                                    : ""}
+                                  <small>{age(event.at, now)}</small>
+                                </span>
+                              </a>
+                            </li>
+                          ))}
+                        </ol>
+                      ) : (
+                        <p className="owner-monitor-note">
+                          No recent workflow runs or pull request changes.
+                        </p>
+                      )}
+                    </>
+                  )}
                 </>
               ) : (
                 <p className="owner-monitor-note">
@@ -438,10 +507,12 @@ export function OwnerMonitor() {
               </p>
               <p>
                 Provider readings are cached for up to five minutes. GitHub activity covers the
-                latest {development?.scannedRuns ?? "100"} workflow runs and up to 100 open changes;
-                local development and unsubmitted work are not visible. Deployment workflow results
-                are separate from the website version serving this request. Service checks cover the
-                database and website assets, not global uptime.
+                latest {development?.scannedRuns ?? "100"} workflow runs, up to 100 open changes and
+                the 20 most recently updated closed changes; local development, unsubmitted work and
+                the development chat are not visible. While a workflow runs, GitHub readings refresh
+                about every minute. Deployment workflow results are separate from the website
+                version serving this request. Service checks cover the database and website assets,
+                not global uptime.
               </p>
               <p>
                 Cloudflare Worker:{" "}

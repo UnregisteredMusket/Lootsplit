@@ -442,3 +442,16 @@
     gap: 0;
   }
 }
+
+.owner-monitor-activity {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+}
+.owner-monitor-activity .owner-monitor-run[data-state="fail"] b {
+  color: #e16464;
+}
+.owner-monitor-activity .owner-monitor-run[data-state="active"] b,
+.owner-monitor-activity .owner-monitor-run[data-state="attention"] b {
+  color: #c79a42;
+}

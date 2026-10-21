@@ -35,6 +35,52 @@ final class WidgetData {
         long at = source == null ? 0 : source.optLong("checkedAt", 0);
         return at > 0 ? " · " + time(at) : "";
     }
+    static final int ACTIVITY_EVENTS = 6;
+    /** Short, honest reason for an unavailable GitHub reading; never phrased as "no activity". */
+    static String activityReason(JSONObject source) {
+        if (source == null) return "GitHub activity unavailable · no reading";
+        if ("not-connected".equals(text(source, "state"))) return "GitHub activity not connected";
+        String code = text(source, "errorCode");
+        String reason = code.endsWith("_RATE_LIMITED") ? "rate limited"
+            : code.equals("HTTP_401") || code.equals("HTTP_403") ? "access denied"
+            : code.matches("HTTP_[1-5][0-9][0-9]") ? "GitHub error " + code.substring(5)
+            : code.equals("SOURCE_TIMEOUT") ? "timed out" : "no response";
+        return "GitHub activity unavailable · " + reason;
+    }
+    /**
+     * GitHub workflow and pull request events for the Agent activity companion. A source that is
+     * unavailable, disconnected or from a server without events stays an explicit unavailable state.
+     */
+    static JSONObject activity(JSONObject root, long now) throws Exception {
+        JSONObject source = root.optJSONObject("development"), out = new JSONObject();
+        JSONObject data = ready(root, "development");
+        JSONArray events = data == null ? null : data.optJSONArray("events");
+        long checked = source == null ? 0 : source.optLong("checkedAt", 0);
+        out.put("checkedAt", checked > 0 && checked <= now + 60000 ? checked : 0);
+        if (data == null || events == null) {
+            out.put("state", source != null && "not-connected".equals(text(source, "state")) ? "not-connected" : "unavailable");
+            out.put("reason", data != null ? "GitHub activity unavailable · not provided by server" : activityReason(source));
+            return out.put("active", 0).put("events", new JSONArray());
+        }
+        JSONArray safe = new JSONArray();
+        for (int i = 0; i < events.length() && safe.length() < ACTIVITY_EVENTS; i++) {
+            JSONObject event = events.optJSONObject(i);
+            if (event == null) continue;
+            String text = text(event, "text"), state = text(event, "state");
+            long at = event.optLong("at", 0);
+            if (text.isEmpty() || at <= 0) continue;
+            if (text.length() > 120) text = text.substring(0, 119) + "…";
+            String title = text(event, "title");
+            if (title.length() > 80) title = title.substring(0, 79) + "…";
+            Object pr = event.opt("pr");
+            safe.put(new JSONObject().put("kind", text(event, "kind")).put("text", text).put("title", title)
+                .put("state", java.util.Arrays.asList("ok", "active", "attention", "fail").contains(state) ? state : "attention")
+                .put("pr", pr instanceof Number && ((Number) pr).longValue() > 0 ? ((Number) pr).longValue() : 0)
+                .put("at", at));
+        }
+        int active = data.optInt("activeActivity", 0);
+        return out.put("state", "ready").put("reason", "").put("active", Math.max(0, active)).put("events", safe);
+    }
     static JSONObject project(JSONObject root, long now) throws Exception {
         JSONObject account = root.getJSONObject("account");
         String name = text(account, "name"), email = text(account, "email");
@@ -78,6 +124,7 @@ final class WidgetData {
             .put("developmentTime", sourceTime(root, "development"))
             .put("games", games).put("gamesTime", sourceTime(root, "analytics"))
             .put("commit", commit);
+        projected.put("activity", activity(root, now));
         projected.put("snapshotId", root.optLong("snapshotId",0));
         JSONObject overall=root.optJSONObject("overall");
         projected.put("statusColor",overall==null?"yellow":text(overall,"color"));

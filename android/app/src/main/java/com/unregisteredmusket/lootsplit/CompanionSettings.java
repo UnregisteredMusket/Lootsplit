@@ -1,25 +1,62 @@
 package com.unregisteredmusket.lootsplit;
 import android.content.Context;
+import android.content.SharedPreferences;
 import org.json.JSONObject;
 
 /** Presentation preferences only: no identity, credential or private snapshot is stored here. */
 final class CompanionSettings {
-    static final String[] CATEGORIES = {"health", "analytics", "traffic", "task", "timer", "log", "warning", "report"};
-    static final String[] PRESETS = {"Development", "Server Health", "Analytics", "Quick Actions"};
+    static final String[] CATEGORIES = {"health", "analytics", "traffic", "task", "timer", "log", "warning", "report", "activity"};
+    /** Agent activity is the default for new companions; every earlier preset stays selectable. */
+    static final String[] PRESETS = {"Agent activity", "Development", "Server Health", "Analytics", "Quick Actions"};
+    static final String DEFAULT_PRESET = "Agent activity";
+    /** Unsaved companions placed before Agent activity existed keep rendering this earlier default. */
+    static final String LEGACY_DEFAULT = "Development";
     static final String[] THEMES = {"terminal", "light", "dark", "system"};
+    private static final String FILE = "widget-presentation", DEFAULTS_V2 = "defaults-v2";
     static JSONObject preset(String name) {
         JSONObject out = new JSONObject();
         try {
-            out.put("first", "Development".equals(name) ? "task" : "Analytics".equals(name) ? "analytics" : "health");
-            out.put("second", "Development".equals(name) ? "timer" : "Analytics".equals(name) ? "traffic" : "Server Health".equals(name) ? "warning" : "report");
+            if ("Agent activity".equals(name)) {
+                // Line 1: latest GitHub action; line 2: the running workflow or the previous event.
+                out.put("first", "activity").put("second", "activity");
+            } else {
+                out.put("first", "Development".equals(name) ? "task" : "Analytics".equals(name) ? "analytics" : "health");
+                out.put("second", "Development".equals(name) ? "timer" : "Analytics".equals(name) ? "traffic" : "Server Health".equals(name) ? "warning" : "report");
+            }
             out.put("action1", "refresh").put("action2", "Quick Actions".equals(name) ? "account" : "settings").put("theme", "terminal");
         } catch (Exception ignored) { }
         return out;
     }
+    private static SharedPreferences preferences(Context context) { return context.getSharedPreferences(FILE, Context.MODE_PRIVATE); }
     static JSONObject read(Context context, int id) {
-        try { return new JSONObject(context.getSharedPreferences("widget-presentation", Context.MODE_PRIVATE).getString("instance-"+id, preset("Development").toString())); }
-        catch (Exception ignored) { return preset("Development"); }
+        try { return new JSONObject(preferences(context).getString("instance-"+id, preset(DEFAULT_PRESET).toString())); }
+        catch (Exception ignored) { return preset(DEFAULT_PRESET); }
     }
-    static void save(Context context, int id, JSONObject value) { context.getSharedPreferences("widget-presentation", Context.MODE_PRIVATE).edit().putString("instance-"+id, value.toString()).commit(); }
-    static void remove(Context context, int id) { context.getSharedPreferences("widget-presentation", Context.MODE_PRIVATE).edit().remove("instance-"+id).apply(); }
+    static void save(Context context, int id, JSONObject value) { preferences(context).edit().putString("instance-"+id, value.toString()).commit(); }
+    static void remove(Context context, int id) { preferences(context).edit().remove("instance-"+id).apply(); }
+    static boolean showsActivity(JSONObject settings) {
+        return settings != null && ("activity".equals(settings.optString("first")) || "activity".equals(settings.optString("second")));
+    }
+    /**
+     * One-time, upgrade-only: companions already placed without saved settings were showing the
+     * Development default, so that choice is written down for them instead of silently switching
+     * them to Agent activity. A fresh install has no earlier companions and saves nothing.
+     */
+    static void preserveLegacyDefaults(Context context) {
+        if (preferences(context).getBoolean(DEFAULTS_V2, false)) return;
+        boolean upgraded;
+        try {
+            android.content.pm.PackageInfo info = context.getPackageManager().getPackageInfo(context.getPackageName(), 0);
+            upgraded = info.lastUpdateTime > info.firstInstallTime;
+        } catch (Exception ignored) { upgraded = true; }
+        preserveLegacyDefaults(context, CompanionWidgetProvider.ids(context), upgraded);
+    }
+    static synchronized void preserveLegacyDefaults(Context context, int[] placed, boolean upgraded) {
+        SharedPreferences preferences = preferences(context);
+        if (preferences.getBoolean(DEFAULTS_V2, false)) return;
+        SharedPreferences.Editor edit = preferences.edit();
+        if (upgraded) for (int id : placed)
+            if (!preferences.contains("instance-"+id)) edit.putString("instance-"+id, preset(LEGACY_DEFAULT).toString());
+        edit.putBoolean(DEFAULTS_V2, true).commit();
+    }
 }

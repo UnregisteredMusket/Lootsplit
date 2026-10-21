@@ -42,7 +42,7 @@ test("owner development source is opt-in, bounded, cached and returns only safe 
     developmentActivity(env, fetcher),
   ]);
   assert.deepEqual(first, second);
-  assert.equal(calls, 2);
+  assert.equal(calls, 3); // Runs, open pull requests and recently closed pull requests.
   assert.equal(first.data.active[0].deployment, true);
   assert.equal(first.data.latestDeployment.status, "in_progress");
   assert.equal(

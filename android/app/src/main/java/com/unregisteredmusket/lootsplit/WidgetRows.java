@@ -124,10 +124,57 @@ final class WidgetRows {
             default: return health.isEmpty() ? "UNVERIFIED" : health;
         }
     }
+    /** Compact relative age for the 4×1 face: now, 4m, 3h, 2d. Future clock skew reads as now. */
+    static String age(long timestamp, long now) {
+        long minutes = Math.max(0, now - timestamp) / 60000;
+        return minutes < 1 ? "now" : minutes < 60 ? minutes + "m" : minutes < 1440 ? (minutes / 60) + "h" : (minutes / 1440) + "d";
+    }
+    /** Activity glyph colour: ✓ ok, ! running or needing attention, ✕ failure (same rules as status). */
+    static String activityColor(JSONObject event) {
+        String state = event == null ? "" : event.optString("state");
+        return "ok".equals(state) ? "green" : "fail".equals(state) ? "red" : "yellow";
+    }
+    static String activityWord(JSONObject event) {
+        String state = event == null ? "" : event.optString("state");
+        return "ok".equals(state) ? "Succeeded" : "fail".equals(state) ? "Failed" : "active".equals(state) ? "In progress" : "Needs attention";
+    }
+    /** "Merged #138 · Widget redesign · 2m" or "Verify running on #138 · 4m". */
+    static String activityLine(JSONObject event, long now) {
+        if (event == null) return "";
+        String title = event.optString("title");
+        boolean pull = event.optString("kind").startsWith("pr-");
+        return event.optString("text") + (pull && !title.isEmpty() ? " · " + title : "") + " · " + age(event.optLong("at"), now);
+    }
+    static JSONArray activityEvents(JSONObject snapshot) {
+        JSONObject activity = snapshot == null ? null : snapshot.optJSONObject("activity");
+        return activity == null || !"ready".equals(activity.optString("state")) ? null : activity.optJSONArray("events");
+    }
+    static JSONObject latestActivity(JSONObject snapshot) {
+        JSONArray events = activityEvents(snapshot);
+        return events == null ? null : events.optJSONObject(0);
+    }
+    /** Second line: a running workflow other than the latest event, otherwise the previous event. */
+    static JSONObject nextActivity(JSONObject snapshot) {
+        JSONArray events = activityEvents(snapshot);
+        if (events == null || events.length() < 2) return null;
+        for (int i = 1; i < events.length(); i++) {
+            JSONObject event = events.optJSONObject(i);
+            if (event != null && "active".equals(event.optString("state"))) return event;
+        }
+        return events.optJSONObject(1);
+    }
+    /** Explicit text when there is no event to show: unavailable/disconnected, or a ready empty list. */
+    static String activityStatus(JSONObject snapshot) {
+        JSONObject activity = snapshot == null ? null : snapshot.optJSONObject("activity");
+        if (activity == null) return "GitHub activity unavailable · tap Refresh";
+        if (!"ready".equals(activity.optString("state"))) return activity.optString("reason", "GitHub activity unavailable");
+        return "No recent GitHub activity";
+    }
     static String category(JSONObject snapshot, String category) {
         if (snapshot == null) return "Sign in / refresh";
         JSONObject task = snapshot.optJSONObject("task");
         switch (category) {
+            case "activity": { JSONObject latest = latestActivity(snapshot); return latest == null ? activityStatus(snapshot) : WidgetRows.glyph(activityColor(latest)) + " " + activityLine(latest, System.currentTimeMillis()); }
             case "task": return task == null || !task.optBoolean("active") ? "No development task active" : task.optString("title") + " · " + task.optString("phase");
             case "timer": return task == null ? "No active task timer" : "Elapsed since " + WidgetData.time(task.optLong("startedAt"));
             case "analytics": return snapshot.optString("active") + " active · " + snapshot.optString("accounts") + " accounts · " + snapshot.optString("campaigns") + " campaigns";
@@ -138,5 +185,5 @@ final class WidgetRows {
             default: return status(snapshot) + " · " + ("green".equals(snapshot.optString("statusColor")) ? "all checks" : reason(snapshot)[0]);
         }
     }
-    static String action(String category,JSONObject snapshot) { if("warning".equals(category) && (snapshot==null||snapshot.optString("warning").isEmpty())) return "diagnostics"; return "report".equals(category) ? "report" : "task".equals(category) || "timer".equals(category) || "warning".equals(category) ? "task" : "health".equals(category) ? "diagnostics" : "logs"; }
+    static String action(String category,JSONObject snapshot) { if("activity".equals(category)) return "activity"; if("warning".equals(category) && (snapshot==null||snapshot.optString("warning").isEmpty())) return "diagnostics"; return "report".equals(category) ? "report" : "task".equals(category) || "timer".equals(category) || "warning".equals(category) ? "task" : "health".equals(category) ? "diagnostics" : "logs"; }
 }

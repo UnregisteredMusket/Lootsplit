@@ -30,7 +30,8 @@ public class CompanionWidgetConfigureActivity extends Activity {
         if (companion) {
         label(root,"Lootsplit 4×1 companion · instance "+widgetId);
         label(root,"Choose two summaries in top-to-bottom order and two toolbar actions. Tap a summary for its full detail. Each widget has independent settings.");
-        Spinner presets=choose(root,"preset","Preset",CompanionSettings.PRESETS,"Development");
+        label(root,"Agent activity (the default for new companions) shows GitHub workflow runs and pull requests: ✓ succeeded or merged, ! running or needs attention, ✕ failed. It checks about once a minute while a workflow runs and the screen is on, without waking the phone. The development chat is not shown.");
+        Spinner presets=choose(root,"preset","Preset",CompanionSettings.PRESETS,CompanionSettings.DEFAULT_PRESET);
         Button apply=new Button(this); apply.setText("Apply preset"); root.addView(apply);
         choose(root,"first","First summary",CompanionSettings.CATEGORIES,settings.optString("first"));
         choose(root,"second","Second summary",CompanionSettings.CATEGORIES,settings.optString("second"));

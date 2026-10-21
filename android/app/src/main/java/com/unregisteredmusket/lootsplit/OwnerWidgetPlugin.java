@@ -62,6 +62,7 @@ public class OwnerWidgetPlugin extends Plugin {
     @PluginMethod public void disconnect(PluginCall call) {
         if (WidgetStore.clear(getContext(), call.getString("expectedToken"))) {
             OwnerWidgetJob.cancel(getContext());
+            WidgetRefresh.cancelActivity(getContext());
             OwnerWidgetProvider.renderAll(getContext());
         }
         call.resolve();
