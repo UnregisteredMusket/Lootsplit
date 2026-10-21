@@ -86,7 +86,8 @@ export function storageWeight(t: Pick<Table, "holdings">, propertyId: string) {
     (h) => h.custody?.kind === "property" && h.custody.propertyId === propertyId,
   );
   return {
-    weight: items.reduce((n, h) => n + (h.weight ?? 0) * h.quantity, 0),
+    // Fractional item weights (0.05 lb arrows) would otherwise show float noise.
+    weight: Math.round(items.reduce((n, h) => n + (h.weight ?? 0) * h.quantity, 0) * 1000) / 1000,
     unknown: items.some((h) => h.weight === undefined),
   };
 }
