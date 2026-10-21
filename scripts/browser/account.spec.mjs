@@ -11,6 +11,8 @@ import {
   credentials,
   signedInDevices,
   accountPost,
+  createRoom,
+  saveCurrentMembership,
   createAndSaveRoom,
   endSession,
   waitForDmCampaign,
@@ -140,9 +142,7 @@ test("ownership", async ({ devices, baseURL: origin }, testInfo) => {
   // Reload after the explicit legacy claim to prove ownership and bytes persist.
   await visitPage(dm, origin, "/party");
   await expect(dm.getByText("Preserved legacy hero", { exact: true }).first()).toBeVisible();
-  const members = await createAndSaveRoom(dm, origin, navigateAccountScenario);
-  const code = members[0].code;
-  await navigateAccountScenario(dm, origin, "/share");
+  await createRoom(dm, origin, navigateAccountScenario);
   await dm.evaluate(() =>
     Object.defineProperty(navigator, "share", {
       configurable: true,
@@ -154,9 +154,23 @@ test("ownership", async ({ devices, baseURL: origin }, testInfo) => {
   await dm.getByRole("button", { name: "Share join link", exact: true }).click();
   const link = await dm.evaluate(() => window.invitationForTest);
   expect(new URL(link).searchParams.get("session")).toBeTruthy();
-  const { page: guest, context: guestContext } = await devices.newDevice(390);
-  await guestContext.addInitScript(guidePreference);
-  await visitPage(guest, origin, new URL(link).pathname + new URL(link).search);
+  // The real invitation already exists. Its anonymous cold read is independent
+  // of the DM saving membership; await both before the guest joins. Keep every
+  // real Save/navigation assertion and do not preload any browser modules.
+  const [members, { page: guest }] = await Promise.all([
+    (async () => {
+      const saved = await saveCurrentMembership(dm, origin, navigateAccountScenario);
+      await navigateAccountScenario(dm, origin, "/share");
+      return saved;
+    })(),
+    (async () => {
+      const device = await devices.newDevice(390);
+      await device.context.addInitScript(guidePreference);
+      await visitPage(device.page, origin, new URL(link).pathname + new URL(link).search);
+      return device;
+    })(),
+  ]);
+  const code = members[0].code;
   await guest.getByRole("button", { name: "Find characters", exact: true }).click();
   await guest.getByPlaceholder("What should the party call you?").fill("Guest adventurer");
   await guest.getByRole("button", { name: "Join room", exact: true }).click();
@@ -224,24 +238,19 @@ test("ownership", async ({ devices, baseURL: origin }, testInfo) => {
   ]);
   await dm.getByRole("button", { name: "Reopen as DM", exact: true }).click();
   await dm.waitForURL((u) => u.pathname === "/");
-  await continueIntoApp(dm);
-  await visitPage(guest, origin, new URL(link).pathname + new URL(link).search);
-  await guest.getByRole("button", { name: "Find characters", exact: true }).click();
-  await expect(
-    guest.locator("[data-sonner-toast]").filter({ hasText: "invitation has expired" }),
-  ).toBeVisible();
-  const returning = credentials();
-  const { page: secondPlayer, context: playerContext } = await devices.newDevice();
-  await playerContext.addInitScript(guidePreference);
-  // Returning-player signup/sign-in are ordered, but independent of the DM's
-  // fresh invitation. Finish both before joining; load the second library only
-  // after membership exists. No client modules or campaign data are preloaded.
+  // Reopen has acknowledged the new session. The old anonymous invitation read
+  // and the DM's fresh invitation read can run together. Finish expiry proof
+  // before signing up the guest, and keep all cold entries/title checks.
   await Promise.all([
     (async () => {
-      await accountPost(guest.context(), origin, "auth/sign-up/email", returning);
-      await accountPost(playerContext, origin, "auth/sign-in/email", returning);
+      await visitPage(guest, origin, new URL(link).pathname + new URL(link).search);
+      await guest.getByRole("button", { name: "Find characters", exact: true }).click();
+      await expect(
+        guest.locator("[data-sonner-toast]").filter({ hasText: "invitation has expired" }),
+      ).toBeVisible();
     })(),
     (async () => {
+      await continueIntoApp(dm);
       await navigateAccountScenario(dm, origin, "/share");
       await dm.evaluate(() =>
         Object.defineProperty(navigator, "share", {
@@ -254,6 +263,11 @@ test("ownership", async ({ devices, baseURL: origin }, testInfo) => {
       await dm.getByRole("button", { name: "Share join link", exact: true }).click();
     })(),
   ]);
+  const returning = credentials();
+  const { page: secondPlayer, context: playerContext } = await devices.newDevice();
+  await playerContext.addInitScript(guidePreference);
+  await accountPost(guest.context(), origin, "auth/sign-up/email", returning);
+  await accountPost(playerContext, origin, "auth/sign-in/email", returning);
   const freshLink = new URL(await dm.evaluate(() => window.invitationForTest));
   await visitPage(guest, origin, freshLink.pathname + freshLink.search);
   await guest.getByRole("button", { name: "Find characters", exact: true }).click();
