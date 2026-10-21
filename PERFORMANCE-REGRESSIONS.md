@@ -380,6 +380,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-21T07:34:51.000Z | queue: Android native widget verification / initial queue | 4s → 5s | +1s | +25% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39414345683) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39562971214) |
 | 2026-10-21T07:34:21Z | job: Packaged Worker / accounts (balanced v2) | 609s → 702s | +93s | +15.27% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39262626961/job/118094990974) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39561218697/job/119093701353) |
 | 2026-10-21T07:30:57Z | step: Development / governance / dev-theme | 45s → 52s | +7s | +15.56% | cancelled | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37884489066/job/113671305297) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39562045100/job/119095372242) |
 | 2026-10-21T07:30:51Z | step: Development / accounts / dev-owner | 6s → 7s | +1s | +16.67% | cancelled | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37763435596/job/113265181532) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39562045100/job/119095372090) |

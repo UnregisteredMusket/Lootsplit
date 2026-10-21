@@ -19138,19 +19138,19 @@
   },
   "[\".github/workflows/android-widget.yml\",\"pull_request\",\"pull-request\",\"queue\",\"Android native widget verification / initial queue\",\"ubuntu-latest\",\"full\"]": {
     "schema": 1,
-    "id": "39414345683:1:c497b3edc159ff943fe9bb1c35488ce7ae8ee850d0fafa3dae165040e185b0fc",
+    "id": "39562971214:1:c497b3edc159ff943fe9bb1c35488ce7ae8ee850d0fafa3dae165040e185b0fc",
     "scope": "[\".github/workflows/android-widget.yml\",\"pull_request\",\"pull-request\",\"queue\",\"Android native widget verification / initial queue\",\"ubuntu-latest\",\"full\"]",
     "kind": "queue",
     "name": "Android native widget verification / initial queue",
     "environment": "ubuntu-latest",
-    "commit": "4e9f935d6225c923327b335a411a32c18d57ca3b",
-    "runId": 39414345683,
+    "commit": "7c7624174e4d95e194f98ea81f43b51a591e30ae",
+    "runId": 39562971214,
     "attempt": 1,
-    "url": "https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39414345683",
-    "outcome": "failure",
-    "startedAt": "2026-10-20T11:21:16Z",
-    "finishedAt": "2026-10-20T11:21:20.000Z",
-    "durationMs": 4000,
+    "url": "https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39562971214",
+    "outcome": "success",
+    "startedAt": "2026-10-21T07:34:46Z",
+    "finishedAt": "2026-10-21T07:34:51.000Z",
+    "durationMs": 5000,
     "trendId": "39414345683:1:c497b3edc159ff943fe9bb1c35488ce7ae8ee850d0fafa3dae165040e185b0fc"
   },
   "[\".github/workflows/android-widget.yml\",\"pull_request\",\"pull-request\",\"step\",\"native-widget (24) / Set up job\",\"ubuntu-latest\",1]": {
@@ -25800,5 +25800,22 @@
     "finishedAt": "2026-10-21T07:34:26Z",
     "durationMs": 1000,
     "trendId": "39561218697:1:b500e9aae6576fc0fda02cb7741a9d49137586e1a3daca55b17b0ed2b6f19b41"
+  },
+  "[\".github/workflows/android-widget.yml\",\"pull_request\",\"pull-request\",\"step\",\"native-widget (24) / Post Run actions/setup-node@v4\",\"ubuntu-latest\",1]": {
+    "schema": 1,
+    "id": "39562971214:1:7b5099467dc7bc3a3cc4fc93b304ae407ffb35465bddffd3c2ad4728bbf306b4",
+    "scope": "[\".github/workflows/android-widget.yml\",\"pull_request\",\"pull-request\",\"step\",\"native-widget (24) / Post Run actions/setup-node@v4\",\"ubuntu-latest\",1]",
+    "kind": "step",
+    "name": "native-widget (24) / Post Run actions/setup-node@v4",
+    "environment": "ubuntu-latest",
+    "commit": "7c7624174e4d95e194f98ea81f43b51a591e30ae",
+    "runId": 39562971214,
+    "attempt": 1,
+    "url": "https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39562971214/job/119098356730",
+    "outcome": "success",
+    "startedAt": "2026-10-21T07:41:43Z",
+    "finishedAt": "2026-10-21T07:41:44Z",
+    "durationMs": 1000,
+    "trendId": "39562971214:1:7b5099467dc7bc3a3cc4fc93b304ae407ffb35465bddffd3c2ad4728bbf306b4"
   }
 }
