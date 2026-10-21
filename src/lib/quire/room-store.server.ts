@@ -31,6 +31,16 @@ const STORED_BODY = Symbol("authoritative-room-body");
 export function roomStorageBody(room: CloudRoom): string {
   return (room as CloudRoom & { [STORED_BODY]?: string })[STORED_BODY] ?? JSON.stringify(room);
 }
+/**
+ * Derived views of a read room (for example `{ ...room, drafts }`) must keep the authoritative
+ * stored body: object spread drops this non-enumerable property, and a guard would otherwise
+ * compare against the hydrated JSON (with inline images/resources) and never match.
+ */
+export function keepStoredBody<T extends CloudRoom>(source: CloudRoom, derived: T): T {
+  const stored = (source as CloudRoom & { [STORED_BODY]?: string })[STORED_BODY];
+  if (stored !== undefined) Object.defineProperty(derived, STORED_BODY, { value: stored });
+  return derived;
+}
 export type RoomAccess = Pick<CloudRoom, "code" | "revision" | "ownerId" | "sessionId" | "closed" | "seats">;
 /** Read authorization/revision only, without private campaign/media hydration. */
 export async function readRoomAccess(code: string): Promise<RoomAccess | null> {
