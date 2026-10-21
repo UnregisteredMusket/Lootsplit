@@ -91,7 +91,10 @@ if "--add-companion" in sys.argv:
     assert companion is not None, "Companion preview must be visible before adding"
     tap(companion)
     preview = snapshot("companion-preview")
-    add = next((n for n in preview.iter("node") if label(n).lower() == "add"), None)
+    add = next((n for n in preview.iter("node")
+                if n.get("resource-id", "").endswith("/widget_add_button")
+                and n.get("text", "").lower() == "add"
+                and "4×1 companion" in n.get("content-desc", "")), None)
     assert add is not None, "Launcher Add action missing; inspect companion-preview.png"
     tap(add)
     home = snapshot("companion-added")
