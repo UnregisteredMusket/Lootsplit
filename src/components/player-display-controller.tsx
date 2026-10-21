@@ -87,7 +87,8 @@ function DisplaySession({ dm }: { dm: boolean }) {
     [encounters, setEncounters] = useState<Array<{ id: string; code: string; name: string }>>([]),
     [error, setError] = useState(""),
     [connected, setConnected] = useState(false),
-    [detailError, setDetailError] = useState("");
+    [detailError, setDetailError] = useState(""),
+    [onlineNotice, setOnlineNotice] = useState("");
   const [artwork, setArtwork] = useState({ key: "", image: "" }),
     [mapError, setMapError] = useState("");
   const channel = useRef<BroadcastChannel | null>(null),
@@ -144,13 +145,24 @@ function DisplaySession({ dm }: { dm: boolean }) {
     if (!enabled || !open) return;
     let cancelled = false;
     type Library = { encounters: Array<{ id: string; code: string; name: string }> };
+    let onlineFailed = false;
     Promise.all([
       localEncounterRequest<Library>("encounters"),
-      accountRequest<Library>("encounters").catch(() => ({ encounters: [] })),
+      accountRequest<Library>("encounters").catch((e: unknown): Library => {
+        // Keep the device fallback, but say that online encounters are missing.
+        if ((e as { name?: string } | null)?.name !== "AbortError") onlineFailed = true;
+        return { encounters: [] };
+      }),
     ])
       .then((rows) => {
-        if (!cancelled)
+        if (!cancelled) {
           setEncounters(rows.flatMap((r) => r.encounters).filter((e) => e.code === code));
+          setOnlineNotice(
+            onlineFailed
+              ? "Online encounters are unavailable right now; showing encounters saved on this device."
+              : "",
+          );
+        }
       })
       .catch((e) => {
         if (!cancelled) setError(String(e.message));
@@ -193,15 +205,22 @@ function DisplaySession({ dm }: { dm: boolean }) {
       }
     };
     void load();
+    // Like the other pollers, do not poll for the hidden settings panel; catch up on return.
+    // A launched display (often a separate tab, which hides this one) still needs updates.
     const timer = window.setInterval(() => {
-      if (channel.current || open) void load();
+      if (channel.current || (open && document.visibilityState !== "hidden")) void load();
     }, 2000);
+    const visible = () => {
+      if (document.visibilityState !== "hidden" && (channel.current || open)) void load();
+    };
+    document.addEventListener("visibilitychange", visible);
     const unsubscribe = subscribeWorkspaceChanges(() => {
       void load();
     });
     return () => {
       cancelled = true;
       clearInterval(timer);
+      document.removeEventListener("visibilitychange", visible);
       unsubscribe();
     };
   }, [settings.encounterId, campaignId, code, enabled, open]);
@@ -353,6 +372,7 @@ function DisplaySession({ dm }: { dm: boolean }) {
                 ))}
               </Select>
             </Field>
+            {onlineNotice && <p role="status">{onlineNotice}</p>}
             {detailError && <p role="alert">{detailError}</p>}
             {mapError && <p role="alert">{mapError}</p>}
             {detail && detail.code === code && (

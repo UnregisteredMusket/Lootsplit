@@ -124,17 +124,23 @@ export function CampaignMaps() {
   return <CampaignMapWorkspace key={key} viewScope={{ key, ephemeral: scope.ephemeral }} />;
 }
 function CampaignMapWorkspace({ viewScope }: { viewScope: { key: string; ephemeral: boolean } }) {
-  const [handouts, setHandouts] = useState<Handout[]>([]);
+  const [handouts, setHandouts] = useState<Handout[]>([]),
+    [handoutError, setHandoutError] = useState("");
   useEffect(() => {
     let cancelled = false;
     const campaign = activeCampaignId();
     const load = () =>
       void loadHandouts()
         .then((rows) => {
-          if (!cancelled && activeCampaignId() === campaign) setHandouts(rows);
+          if (!cancelled && activeCampaignId() === campaign) {
+            setHandouts(rows);
+            setHandoutError("");
+          }
         })
         .catch(() => {
-          if (!cancelled) setHandouts([]);
+          // Handouts are read from this device; keep the last list on a transient failure.
+          if (!cancelled && activeCampaignId() === campaign)
+            setHandoutError("Handouts could not be refreshed. Showing the last loaded handouts.");
         });
     load();
     const unsubscribe = subscribeWorkspaceChanges((change) => {
@@ -758,6 +764,7 @@ function CampaignMapWorkspace({ viewScope }: { viewScope: { key: string; ephemer
   );
   return (
     <div className="campaign-maps">
+      {handoutError && <p role="alert">{handoutError}</p>}
       {map ? (
         <>
           <MapViewport

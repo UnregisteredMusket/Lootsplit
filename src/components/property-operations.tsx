@@ -10,6 +10,7 @@ import { useEconomy } from "@/lib/quire/economy-context";
 import { useSeat } from "@/lib/quire/seat";
 import { getCloudTable, getServerCloudTable, subscribeCloudTable } from "@/lib/quire/cloud-client";
 import { useDraftGuard } from "@/lib/quire/use-draft-guard";
+import { useNumberDraft } from "@/lib/quire/use-number-draft";
 import { mutationNotice, type EconomyMutationOutcome } from "@/lib/quire/mutation-outcome";
 import { canonicalJson } from "@/lib/quire/canonical-json";
 import { formatCopper } from "@/lib/quire/money";
@@ -154,6 +155,8 @@ export function NumberField({
   max?: number;
   step?: number;
 }) {
+  // Keep partial text such as "" or "-" while typing; only parsed numbers are saved.
+  const draft = useNumberDraft(value, set);
   return (
     <Field label={label}>
       <TextInput
@@ -162,8 +165,7 @@ export function NumberField({
         min={min}
         max={max}
         step={step}
-        value={value}
-        onChange={(e) => set(Number(e.target.value))}
+        {...draft}
       />
     </Field>
   );
