@@ -151,8 +151,9 @@ export function estateImportFingerprint(
     // row order. Compare the same reviewed identities and fields in ID order.
     purses: t.purses.map((p) => ({ id: p.id, name: p.name, kind: p.kind }))
       .sort((a, b) => a.id === b.id ? 0 : a.id < b.id ? -1 : 1),
-    holdings: t.holdings,
-    listings: t.listings,
+    // Holdings and listings likewise: the property screen sorts holdings by name.
+    holdings: [...t.holdings].sort((a, b) => (a.id === b.id ? 0 : a.id < b.id ? -1 : 1)),
+    listings: [...t.listings].sort((a, b) => (a.id === b.id ? 0 : a.id < b.id ? -1 : 1)),
     market: t.journal?.market,
     estate: t.journal?.propertyOperations,
   });

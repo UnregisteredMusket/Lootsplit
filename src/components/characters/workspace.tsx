@@ -2513,7 +2513,7 @@ export function RollLog({
               <p>
                 {r.source === "manual"
                   ? "MANUAL RESULT"
-                  : `SERVER ROLL · [${r.dice.join(", ")}] ${signed(r.modifier)}`}{" "}
+                  : `${r.source === "device" ? "DEVICE ROLL" : "SERVER ROLL"} · [${r.dice.join(", ")}] ${signed(r.modifier)}`}{" "}
                 · {r.formula} · {r.mode}
               </p>
               <small>
