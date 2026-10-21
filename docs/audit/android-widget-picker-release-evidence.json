@@ -1,0 +1,61 @@
+{
+  "sourceCommit": "43906256b19f64d4634b596cd9f980e7f57c11f0",
+  "sourceTree": "9e14b388fc3871b8cbe8fb7410663504499dca4d",
+  "version": "1.9.1",
+  "versionCode": 14,
+  "package": "com.unregisteredmusket.lootsplit",
+  "minSdk": 24,
+  "targetSdk": 36,
+  "apkUrl": "https://github.com/UnregisteredMusket/Lootsplit/releases/download/android-v1.9.1/Lootsplit-1.9.1.apk",
+  "releaseUrl": "https://github.com/UnregisteredMusket/Lootsplit/releases/tag/android-v1.9.1",
+  "sha256": "dd9a0d04bfacee4e67645a3ff1e0ca1aeeb538d08e6837e4754353fdc324c79c",
+  "bytes": 28040276,
+  "certificateSha256": "baca95a880d14d0d8c422c397decd4c9bf0e7f710a3fd6a5be1e47abd3f730a0",
+  "v2SignatureVerified": true,
+  "publicApkMatchesChecksumAndSigningArtifact": true,
+  "releaseDebugAuditActivityAbsent": true,
+  "releaseBindAppwidgetPermissionAbsent": true,
+  "bothWidgetProvidersPresent": true,
+  "companionTargetCells": [
+    4,
+    1
+  ],
+  "widgetFeatures": 5,
+  "mainVerification": 39546976583,
+  "signedWorkflow": 39546976796,
+  "independentMainGuardPassed": true,
+  "signedArtifact": {
+    "id": 12322867790,
+    "sha256": "769a0a5832fadc12843d33baf8f1b7ea72f096103ba3087bc389f46ba97efc51"
+  },
+  "nativeFrameworkVerification": {
+    "prRun": 39545769379,
+    "signedRun": 39546976796,
+    "api24Tests": 13,
+    "api35Tests": 13,
+    "failures": 0,
+    "skips": 0
+  },
+  "signedUpgrade": {
+    "previousVersion": "1.9.0",
+    "previousVersionCode": 13,
+    "api": 35,
+    "profile": "pixel_6",
+    "inPlaceInstall": true,
+    "mainActivityAndMyAccountNotOpened": true,
+    "bothRealPickerEntries": true,
+    "companionAddedFromPicker": true,
+    "actualLauncherBindingVerified": true,
+    "screenshotsIndependentlyInspected": true,
+    "artifact": {
+      "id": 12322793065,
+      "sha256": "840eb58126a8c2269de8fa3f04883998d620cd2e85976dade8cf40e081389d31"
+    }
+  },
+  "websitePublication": "Manifest follow-up requires its own exact-head PR/main/deployment and live streamed-byte checks; final run evidence is recorded in the publication PR.",
+  "limitations": [
+    "Physical phone/OEM picker behavior, prolonged Doze, reboot delivery and large-font accessibility are not independently verified.",
+    "Private production monitoring remains unverified: the Cloudflare connector errors and the authorized read-only dashboard opens a sign-in wall. No owner task publication or private backend reading is claimed.",
+    "All twelve signed-workflow account scenarios pass, but the163.7s measured stage remains close to the unchanged170s aggregate deadline; retained in the performance audit."
+  ]
+}

@@ -1,3 +1,9 @@
+# Active recovery: verified Android1.9.1 website publication — October21,2026
+
+Android1.9.1/code14 is published from4390625, with independent main39546976583 and signed39546976796 fully successful. Public APK SHA256 `dd9a0d04bfacee4e67645a3ff1e0ca1aeeb538d08e6837e4754353fdc324c79c`,28,040,276bytes, matches the signing artifact/checksum. Permanent-certificate/APK-v2 integrity and package/widget resources are independently verified. The actual signed1.9.0→1.9.1 in-place upgrade, real picker discovery and companion placement passed on API35 without opening My account. See `docs/audit/android-widget-picker-release-evidence.json`.
+
+Branch `release/android-1.9.1-download` advances only the website release manifest and verification/recovery documentation. Complete exact-head PR/main checks, automatic website/standby release and actual live streamed APK/download/changelog checks are required before completion; final run evidence belongs in its PR and ignored checkpoint, not source-only CI churn. No Android version bump or duplicate signing is needed. Preserve all twelve account scenarios and60s/170s/two-worker/zero-retry limits. Signed account stage163.7s passes with narrow margin; original performance trends remain retained. Physical phone/OEM behavior and private production telemetry are explicit gaps; Cloudflare connector errors and the authorized read-only dashboard redirects to sign-in. No backend owner task publication is claimed. Earlier entries below are dated history superseded by this checkpoint.
+
 # Active recovery: Android1.9.1 release account deadline — October21,2026
 
 PR126 is merged as e2fd48bb14efa1e4b7798fe3f186fd1b884eb889. Independent main39543917158 passed all nine groups; signed39543917155 failed the development ownership case at its final cold reload and then the170s aggregate. Both native targets passed. No1.9.1 APK exists; do not resend1.9.0 as the fix or rerun unchanged failing source.

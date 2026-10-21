@@ -1,4 +1,4 @@
-# Lootsplit 1.9.1 — candidate
+# Lootsplit 1.9.1
 
 Android version code **14**, same package and permanent signing certificate.
 
@@ -20,7 +20,7 @@ Android version code **14**, same package and permanent signing certificate.
 
 ## Release verification
 
-Not yet published. API24/API35, complete PR/main preservation checks and the signed-APK upgrade gate must pass. The exact cause on the reported physical launcher has not been confirmed; emulator evidence and the defensive recovery behavior must not be presented as physical-device verification. Install over the existing signed app; do not uninstall or clear saved data. See [picker investigation](audit/2026-10-21-widget-picker.md).
+Published October21,2026 after API24/API35, complete PR/main preservation checks and the signed-APK upgrade gate passed. The public APK matches the signing artifact and checksum; independent inspection confirms the permanent certificate, package, version1.9.1/code14 and both widget providers. See [signed release evidence](audit/android-widget-picker-release-evidence.json). The exact cause on the reported physical launcher has not been confirmed; emulator evidence and the defensive recovery behavior must not be presented as physical-device verification. Install over the existing signed app; do not uninstall or clear saved data. See [picker investigation](audit/2026-10-21-widget-picker.md).
 
 ---
 
