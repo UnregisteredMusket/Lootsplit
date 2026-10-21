@@ -4,6 +4,7 @@ import pathlib
 import re
 import subprocess
 import sys
+import time
 import xml.etree.ElementTree as ET
 
 OUT = pathlib.Path("test-results/android-widget") / ("picker-installed" if "--add-companion" in sys.argv else "picker")
@@ -47,16 +48,26 @@ def tap(node):
 assert adb("shell", "getprop", "ro.kernel.qemu") == "1", "Emulator only"
 package = adb("shell", "dumpsys", "package", "com.unregisteredmusket.lootsplit")
 (OUT / "package.txt").write_text(package)
-adb("shell", "input", "keyevent", "KEYCODE_HOME")
-home = snapshot("home")
-bounds = home.find("node").get("bounds")
-_, _, width, height = map(int, re.findall(r"\d+", bounds))
-# The fresh emulator's middle workspace is empty; do not clear launcher data.
-x, y = str(width // 2), str(height * 45 // 100)
-adb("shell", "input", "swipe", x, y, x, y, "1300")
-menu = snapshot("home-menu")
-widgets = next((n for n in menu.iter("node") if label(n).lower() == "widgets"), None)
-assert widgets is not None, "Launcher did not expose its Widgets action; inspect home-menu.png"
+# A just-booted launcher can ignore the first long-press (still loading the workspace, or a
+# first-run overlay); retry from a fresh Home a few times before calling it a failure.
+widgets = None
+for attempt in range(4):
+    adb("shell", "input", "keyevent", "KEYCODE_HOME")
+    if attempt:
+        time.sleep(3)
+    home = snapshot("home" if attempt == 0 else "home-retry-" + str(attempt))
+    bounds = home.find("node").get("bounds")
+    _, _, width, height = map(int, re.findall(r"\d+", bounds))
+    # The fresh emulator's middle workspace is empty; do not clear launcher data.
+    x, y = str(width // 2), str(height * 45 // 100)
+    adb("shell", "input", "swipe", x, y, x, y, "1300")
+    menu = snapshot("home-menu" if attempt == 0 else "home-menu-retry-" + str(attempt))
+    widgets = next((n for n in menu.iter("node") if label(n).lower() == "widgets"), None)
+    if widgets is not None:
+        break
+    seen_menu = sorted({label(n) for n in menu.iter("node") if label(n)})[:20]
+    print("Long-press attempt", attempt + 1, "showed no Widgets action; labels:", seen_menu, flush=True)
+assert widgets is not None, "Launcher did not expose its Widgets action after four long-presses; inspect home-menu*.png"
 tap(widgets)
 picker = snapshot("picker-open")
 search = next((n for n in picker.iter("node") if n.get("class") == "android.widget.EditText"), None)
