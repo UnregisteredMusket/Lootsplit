@@ -1,6 +1,7 @@
 // Existing workflow audits enter through the same title screen as a user.
 const publicPaths = new Set([
   "/welcome",
+  "/features",
   "/downloads",
   "/updates",
   "/help",
@@ -59,7 +60,7 @@ export async function prepareDmFixture(page, origin, { useAccountLink = false } 
   // Other gameplay fixtures keep their original cold entry/identity refresh.
   const fromAccount = useAccountLink && page.url().startsWith(origin) &&
     new URL(page.url()).pathname === "/account";
-  const appLink = page.getByRole("link", { name: "Open app", exact: true });
+  const appLink = page.getByRole("link", { name: "Open the app", exact: true }).first();
   let navigationMarker;
   if (fromAccount && await appLink.isVisible()) {
     navigationMarker = crypto.randomUUID();

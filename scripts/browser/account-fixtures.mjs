@@ -129,7 +129,7 @@ export async function navigateAccountScenario(page, origin, path) {
   const marker = randomUUID();
   await page.evaluate((value) => (window.accountNavigationAudit = value), marker);
   if (target.pathname !== "/account") {
-    const openApp = page.getByRole("link", { name: "Open app", exact: true });
+    const openApp = page.getByRole("link", { name: "Open the app", exact: true }).first();
     if (await openApp.isVisible()) {
       await openApp.click();
       await page.waitForURL((url) => url.pathname === "/");

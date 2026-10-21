@@ -34,6 +34,7 @@ import { Route as DownloadAndroidRouteImport } from './routes/download.android'
 import { Route as FeaturesFeatureRouteImport } from './routes/features.$feature'
 import { Route as ReadArticleIdRouteImport } from './routes/read.$articleId'
 import { Route as ShopShopIdRouteImport } from './routes/shop.$shopId'
+import { Route as FeaturesIndexRouteImport } from './routes/features.index'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -160,6 +161,11 @@ const ShopShopIdRoute = ShopShopIdRouteImport.update({
   path: '/shop/$shopId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const FeaturesIndexRoute = FeaturesIndexRouteImport.update({
+  id: '/features/',
+  path: '/features/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -187,6 +193,7 @@ export interface FileRoutesByFullPath {
   '/features/$feature': typeof FeaturesFeatureRoute
   '/read/$articleId': typeof ReadArticleIdRoute
   '/shop/$shopId': typeof ShopShopIdRoute
+  '/features/': typeof FeaturesIndexRoute
 }
 export interface FileRoutesByTo {
   '/': typeof IndexRoute
@@ -214,6 +221,7 @@ export interface FileRoutesByTo {
   '/features/$feature': typeof FeaturesFeatureRoute
   '/read/$articleId': typeof ReadArticleIdRoute
   '/shop/$shopId': typeof ShopShopIdRoute
+  '/features': typeof FeaturesIndexRoute
 }
 export interface FileRoutesById {
   __root__: typeof rootRouteImport
@@ -242,6 +250,7 @@ export interface FileRoutesById {
   '/features/$feature': typeof FeaturesFeatureRoute
   '/read/$articleId': typeof ReadArticleIdRoute
   '/shop/$shopId': typeof ShopShopIdRoute
+  '/features/': typeof FeaturesIndexRoute
 }
 export interface FileRouteTypes {
   fileRoutesByFullPath: FileRoutesByFullPath
@@ -271,6 +280,7 @@ export interface FileRouteTypes {
     | '/features/$feature'
     | '/read/$articleId'
     | '/shop/$shopId'
+    | '/features/'
   fileRoutesByTo: FileRoutesByTo
   to:
     | '/'
@@ -298,6 +308,7 @@ export interface FileRouteTypes {
     | '/features/$feature'
     | '/read/$articleId'
     | '/shop/$shopId'
+    | '/features'
   id:
     | '__root__'
     | '/'
@@ -325,6 +336,7 @@ export interface FileRouteTypes {
     | '/features/$feature'
     | '/read/$articleId'
     | '/shop/$shopId'
+    | '/features/'
   fileRoutesById: FileRoutesById
 }
 export interface RootRouteChildren {
@@ -353,6 +365,7 @@ export interface RootRouteChildren {
   FeaturesFeatureRoute: typeof FeaturesFeatureRoute
   ReadArticleIdRoute: typeof ReadArticleIdRoute
   ShopShopIdRoute: typeof ShopShopIdRoute
+  FeaturesIndexRoute: typeof FeaturesIndexRoute
 }
 
 declare module '@tanstack/react-router' {
@@ -532,6 +545,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ShopShopIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/features/': {
+      id: '/features/'
+      path: '/features/'
+      fullPath: '/features/'
+      preLoaderRoute: typeof FeaturesIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -561,6 +581,7 @@ const rootRouteChildren: RootRouteChildren = {
   FeaturesFeatureRoute: FeaturesFeatureRoute,
   ReadArticleIdRoute: ReadArticleIdRoute,
   ShopShopIdRoute: ShopShopIdRoute,
+  FeaturesIndexRoute: FeaturesIndexRoute,
 }
 export const routeTree = rootRouteImport
   ._addFileChildren(rootRouteChildren)

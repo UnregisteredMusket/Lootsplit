@@ -1,54 +1,63 @@
-.ls-about dl {
-  display: grid;
-  gap: 18px;
-  margin: 0 0 20px;
+/* About this app & releases (Downloads → Release details) and the home gold counter. */
+.ls-about {
+  display: flex;
+  flex-direction: column;
+  gap: 16px;
+  margin-top: 12px;
+  padding-top: 24px;
+  border-top: 3px double var(--rule, #9a7434);
 }
-.ls-about dt {
-  color: #f3ecdc;
-  font-weight: 600;
+.ls-about > p {
+  color: var(--on-ink-3, #c9cfd2);
+  font-size: 15px;
 }
-.ls-about dd {
-  margin: 4px 0 0;
-  overflow-wrap: anywhere;
+.ls-about code {
+  font-size: 13px;
 }
 .ls-about button {
   min-height: 44px;
   padding: 8px 12px;
+  border: 1px solid var(--gold-deep, #6d5a35);
+  border-radius: 4px;
+  background: transparent;
   color: inherit;
-  text-decoration: underline;
+  cursor: pointer;
+}
+.ls-about-links a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
 }
 .ls-spending-total {
   display: flex;
-  align-items: flex-start;
-  gap: 12px;
-  max-width: 360px;
-  color: #c4c9c9;
-  font-size: 14px;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
 }
-.ls-spending-total > svg {
-  margin-top: 3px;
-  flex-shrink: 0;
+.ls-spending-total [role="status"] {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 0 8px;
 }
-.ls-spending-total small {
-  display: block;
-  font-size: 0.8em;
+.ls-spending-pending {
+  font: 700 clamp(24px, 1vw + 20px, 28px) / 1.2 var(--serif, "Cormorant Garamond", serif);
+  color: var(--paper-ink, #1d1622);
 }
 .ls-spending-total details {
-  margin-top: 5px;
+  margin-top: 2px;
 }
 .ls-spending-total summary {
+  display: list-item;
   cursor: pointer;
   min-height: 44px;
-  display: list-item;
-  align-content: center;
-  color: #e0cc9f;
+  padding-top: 10px;
+  color: var(--paper-link, #7c3224);
+  font-weight: 600;
+  font-size: 15px;
 }
-.ls-spending-total p {
+.ls-spending-total details p {
   margin: 8px 0;
-}
-.ls-spending-total summary:focus-visible,
-.ls-about summary:focus-visible,
-.ls-about button:focus-visible {
-  outline: 2px solid #dfbb78;
-  outline-offset: 3px;
+  font-size: 15px;
+  color: var(--paper-muted-2, #3f362c);
 }

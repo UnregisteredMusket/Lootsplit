@@ -1,0 +1,99 @@
+name: Product screenshots
+# Captures real UI screenshots with the synthetic "Wayfarers" campaign against a
+# disposable development server, then commits the PNGs back to the same
+# screenshots/* branch. Disposable local accounts only; never production or its D1.
+# Branches named screenshots/site-* (or capture: site) instead capture the public
+# website pages at phone, tablet and desktop widths for visual review.
+on:
+  push:
+    branches: ["screenshots/**"]
+  workflow_dispatch:
+    inputs:
+      shots:
+        description: Comma-separated shot names to capture (blank captures all)
+        required: false
+        default: ""
+      capture:
+        description: What to capture
+        required: false
+        default: product
+        type: choice
+        options: [product, site]
+permissions:
+  contents: read
+concurrency:
+  group: product-screenshots-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  capture:
+    name: Capture product screenshots
+    runs-on: ubuntu-latest
+    timeout-minutes: 30
+    permissions:
+      # Only to commit the captured images back to this screenshots branch.
+      contents: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Start disposable development server
+        timeout-minutes: 3
+        run: |
+          mkdir -p test-results
+          npm run dev > test-results/dev-server.log 2>&1 &
+          for attempt in $(seq 1 60); do
+            # Finish server compilation before the first cold browser enters.
+            if curl --max-time 10 --location --max-redirs 5 -fsS http://127.0.0.1:8080/ > /dev/null; then exit 0; fi
+            sleep 2
+          done
+          echo "Development server did not become ready" >&2
+          exit 1
+      - name: Choose capture
+        id: kind
+        run: |
+          if [ "${{ inputs.capture }}" = "site" ] || [[ "${GITHUB_REF_NAME}" == screenshots/site-* ]]; then
+            echo "kind=site" >> "$GITHUB_OUTPUT"
+          else
+            echo "kind=product" >> "$GITHUB_OUTPUT"
+          fi
+      - name: Capture website pages
+        if: steps.kind.outputs.kind == 'site'
+        timeout-minutes: 15
+        env:
+          SITE_SCREENSHOTS: docs/site-screenshots
+        run: |
+          set -o pipefail
+          node scripts/capture-site-screenshots.mjs 2>&1 | tee test-results/product-screenshots.log
+      - name: Capture screenshots
+        if: steps.kind.outputs.kind == 'product'
+        timeout-minutes: 20
+        env:
+          PRODUCT_SCREENSHOTS: docs/product-screenshots
+          PRODUCT_SCREENSHOT_SHOTS: ${{ inputs.shots }}
+        run: |
+          set -o pipefail
+          node --experimental-strip-types scripts/capture-product-screenshots.mjs 2>&1 | tee test-results/product-screenshots.log
+      - name: Report capture failures
+        if: failure()
+        run: |
+          {
+            tail -n 25 test-results/product-screenshots.log 2>/dev/null || echo "No capture output."
+            echo "--- development server ---"
+            tail -n 8 test-results/dev-server.log 2>/dev/null || true
+          } > test-results/annotation.txt
+          message=$(sed -e 's/%/%25/g' -e 's/\r/%0D/g' test-results/annotation.txt | sed ':a;N;$!ba;s/\n/%0A/g')
+          echo "::error title=Product screenshot capture::${message}"
+      - name: Commit captured screenshots
+        if: always() && github.ref_type == 'branch' && startsWith(github.ref_name, 'screenshots/')
+        run: |
+          [ -d docs/product-screenshots ] || [ -d docs/site-screenshots ] || exit 0
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+          git add docs/product-screenshots docs/site-screenshots 2>/dev/null || git add docs/*-screenshots
+          if git diff --cached --quiet; then echo "No screenshot changes."; exit 0; fi
+          git commit -m "Capture product screenshots [skip ci]"
+          git push origin "HEAD:${GITHUB_REF_NAME}"

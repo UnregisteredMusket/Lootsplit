@@ -154,7 +154,7 @@ export const HELP_GROUPS: HelpGroup[] = [
           "The DM adds characters and shared party funds in Party → Funds & inventory. Mark each character as Player or NPC; only player characters can be assigned to players. To join a shared game, open Campaign, enter the room code and choose an available character. An account is optional for guest room play. Everyone needs access to the website or a compatible app.",
         ],
         links: [
-          ["Open app", "/?view=home"],
+          ["Open the app", "/?view=home"],
           ["Party & funds", "/party?section=funds"],
           ["Join or host a room", "/share"],
         ],
@@ -490,7 +490,7 @@ export const HELP_GROUPS: HelpGroup[] = [
         paragraphs: [
           "Export and verify a backup first. Use Downloads → Download for Android and open the APK in your phone’s file manager or Downloads. If prompted, allow that browser or file manager to install apps, then return to the installer. Install over the permanently signed Lootsplit app to preserve its data.",
           "An old debug-signed app cannot update in place to the permanent signing key. Export and verify a backup before uninstalling that older build, then install and restore. Do not uninstall a working app just to troubleshoot a download. GitHub and the earlier Google Drive download remain available on Downloads.",
-          "The website receives updates independently of the published APK. Website-only improvements become bundled Android features with a future signed APK release; see the published version and changelog on Downloads.",
+          "The website receives updates independently of the published APK. Website-only improvements become bundled Android features with a future signed APK release; see the published version and changelog on Downloads. Downloads → Release details and verification lists the APK checksum, your client, the hosted web release and the published Android version; every website page links there from its footer.",
         ],
         links: [
           ["Downloads & release details", "/downloads"],
@@ -505,7 +505,7 @@ export const HELP_GROUPS: HelpGroup[] = [
           "Use the same browser profile and website address for device-local campaigns. Clearing browser storage can remove them. Use shared rooms or an exported backup to move between devices; optional accounts do not automatically upload all local data.",
         ],
         links: [
-          ["Open browser app", "/?view=home"],
+          ["Open the app", "/?view=home"],
           ["Downloads", "/downloads"],
         ],
       },

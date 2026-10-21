@@ -182,7 +182,7 @@ try {
       await (discardProfile ? d.accept() : d.dismiss());
     };
     page.on("dialog", profileDialog);
-    await page.getByRole("link", { name: "Open app", exact: true }).click();
+    await page.getByRole("link", { name: "Open the app", exact: true }).first().click();
     await expect.poll(() => profileDialogs.length).toBe(1);
     await expect(introduction).toHaveValue("An unsaved account introduction");
     await page.goBack();
@@ -190,7 +190,7 @@ try {
     await expect(introduction).toHaveValue("An unsaved account introduction");
     await stillOpen();
     discardProfile = true;
-    await page.getByRole("link", { name: "Open app", exact: true }).click();
+    await page.getByRole("link", { name: "Open the app", exact: true }).first().click();
     await page.locator(".information-strip").waitFor();
     assert.equal(profileDialogs.length, 3);
     page.off("dialog", profileDialog);

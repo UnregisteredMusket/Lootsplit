@@ -47,6 +47,7 @@ export const Route = createRootRoute({
     const pathname = useRouterState({ select: (state) => state.location.pathname });
     const publicPage = [
       "/welcome",
+      "/features",
       "/downloads",
       "/updates",
       "/help",
