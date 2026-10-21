@@ -27,7 +27,7 @@ export function DonatePage() {
     };
   }, [attempt]);
   return (
-    <Website>
+    <Website footer="ink">
       <PageHero kicker="A little support goes a long way" title="Support Lootsplit">
         <p className="ls-lead ls-measure">
           Enjoying your party’s ledger? Donations are an optional way to support ongoing development

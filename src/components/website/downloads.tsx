@@ -137,6 +137,9 @@ export function DownloadsPage() {
               conveniences; campaign rules and server permissions stay shared.
             </p>
           </div>
+          <p className="ls-fine ls-scroll-hint" aria-hidden="true">
+            Scroll the table sideways to compare →
+          </p>
           <div
             className="ls-table-wrap ls-paper"
             role="region"

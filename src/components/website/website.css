@@ -596,7 +596,7 @@
     0 12px 24px rgba(0, 0, 0, 0.35);
 }
 .ls-frame-phone {
-  max-width: 340px;
+  max-width: 300px;
   justify-self: center;
   border-radius: 18px;
   padding: 10px;
@@ -978,6 +978,15 @@
   overflow-x: auto;
   border: 1px solid var(--rule);
   -webkit-overflow-scrolling: touch;
+}
+.ls-scroll-hint {
+  display: none;
+}
+@media (max-width: 700px) {
+  .ls-scroll-hint {
+    display: block;
+    margin-bottom: -16px;
+  }
 }
 .ls-compare {
   width: 100%;
@@ -1380,6 +1389,7 @@
   .ls-change-lists,
   .ls-changelog-notes,
   .ls-credit-grid,
+  .ls-entry,
   .ls-ledger {
     grid-template-columns: minmax(0, 1fr);
   }
