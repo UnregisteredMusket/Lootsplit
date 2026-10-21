@@ -377,6 +377,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-21T07:07:42Z | step: native-widget (24) / Run actions/setup-node@v4 | 5s → 6s | +1s | +20% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39414345683/job/118599590044) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39559817596/job/119088082358) |
 | 2026-10-21T05:47:12Z | step: Packaged Worker / interface (balanced v2) / worker-game-analytics | 5s → 7s | +2s | +40% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39266580213/job/118108928983) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39550671744/job/119059476486) |
 | 2026-10-21T05:27:12Z | step: Packaged Worker / accounts (balanced v2) / Run actions/setup-node@v4 | 9s → 11s | +2s | +22.22% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39481783895/job/118833188604) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39549347612/job/119055533247) |
 | 2026-10-21T05:20:37Z | job: release-apk | 261s → 438s | +177s | +67.82% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37391400899/job/112039018014) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39546976796/job/119051472733) |
