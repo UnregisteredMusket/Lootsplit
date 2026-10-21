@@ -5,6 +5,7 @@ import {
   createRoom,
   updateRoom,
   roomStorageBody,
+  keepStoredBody,
 } from "./room-store.server.ts";
 import { syncTimer } from "./sync-timing.server.ts";
 import {
@@ -483,7 +484,7 @@ async function must(code: string): Promise<CloudRoom> {
   // Older clients may have staged a delayed copy of a committed action. Such a
   // receipt is never pending work and must not block session/turn transitions.
   const acknowledged = new Set(room.commands ?? []);
-  return {
+  return keepStoredBody(room, {
     ...room,
     drafts: Object.fromEntries(
       Object.entries(room.drafts ?? {}).map(([seatId, commands]) => [
@@ -491,7 +492,7 @@ async function must(code: string): Promise<CloudRoom> {
         commands.filter((command) => !acknowledged.has(seatId + ":" + command.id)),
       ]),
     ),
-  };
+  });
 }
 
 async function view(room: CloudRoom, seat: CloudSeat): Promise<RoomView> {
