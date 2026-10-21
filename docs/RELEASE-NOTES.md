@@ -21,7 +21,7 @@ Android version code **15**, same package and permanent signing certificate. Ins
 
 ## Release verification
 
-To be completed by the signed release workflow (API 24/API 35 widget checks, preservation checks and the signed-APK upgrade gate).
+Published October 21, 2026 by `android-release.yml` from main `0932e34` after full preservation checks, the API 24/API 35 widget and picker checks and the signed-APK upgrade gate passed. The public APK's SHA-256 is `3d782a1ac574899347025d925f4f4f6a3b54681a68376b48ab539c989c510ce3`, matching SHA256SUMS.txt. Independent inspection of its v2 signing block confirms the permanent certificate (`baca95a8…f730a0`, unchanged from 1.9.1). Two earlier attempts stopped before signing on an emulator launcher timing issue in the picker audit, which was fixed in #142; nothing was published from them. Physical-device behavior has not been verified.
 
 ---
 
