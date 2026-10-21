@@ -64,7 +64,8 @@ jobs:
           script: |
             set -e
             adb install -r android/app/build/outputs/apk/debug/app-debug.apk
-            python3 scripts/android-widget-picker-audit.py ${{ matrix.api == 35 && '--add-companion' || '' }}
+            python3 scripts/android-widget-picker-audit.py ${{ matrix.api == 35 && '--add-companion' || '' }} > picker-audit.log 2>&1 || { cat picker-audit.log; echo "::error title=Widget picker audit failed::$(tail -n 15 picker-audit.log | tr '\n' ' ' | cut -c1-900)"; exit 1; }
+            cat picker-audit.log
             adb uninstall com.unregisteredmusket.lootsplit
             bash scripts/android-widget-instrumentation.sh
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
