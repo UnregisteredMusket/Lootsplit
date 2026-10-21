@@ -4,7 +4,7 @@ Read this at the start of every task, including a new chat, recovered workspace,
 
 ## 1. Recover the actual state before editing
 
-1. Read `AGENTS.project.md`, this manual, and `docs/RECOVERY.md` after any interruption. Consult `docs/FEATURE-INVENTORY.md` for affected behavior.
+1. `CLAUDE.md` is the required reading. Use this manual for testing and release detail, `AGENTS.project.md` for owner decisions, `docs/RECOVERY.md` after an interruption, and `docs/FEATURE-INVENTORY.md` for the behavior a change affects.
 2. Inspect `git status --short --branch`, the recent log, current remote main and the relevant PR. Preserve uncommitted work. Use an isolated branch/worktree if another task is active; do not overwrite or stop its processes.
 3. Check existing verification/deployment runs and the production release identity. A successful merge is not a successful release. An interrupted chat is not proof that a merge or deployment failed.
 4. Reuse completed authorized work. Do not automatically rerun tests, deployments, campaign actions or other mutations after an uncertain response. Identify the actual failed stage first.
@@ -100,7 +100,7 @@ The user requests speed improvements as **before → after, absolute time saved,
 - Confirm the deployment job, expected live commit, and read-only production desktop/mobile audit before saying it is live. Never run destructive browser fixtures against production.
 - The live audit first checks the expected identity, every packaged JavaScript/CSS file's content type and SHA-256, and HTML bundle references. Only those read-only readiness probes may repeat within a bounded deadline; browser assertions still run once. Inspect `live-release/readiness.json` for asset URLs, HTTP status, edge ray and Worker version before diagnosing a rollout failure. A matching identity alone is insufficient.
 - If upload succeeded but its live check failed, use **Verify existing live website (read only)** with the deployed SHA and its successful main verification run ID. It downloads the original artifact and performs no deploy, rebuild, database write or campaign action. Do not rerun the deployment job merely to repeat its audit.
-- Before a handoff/interruption, record branch/PR, latest commit, tests and their environment, run links, remaining failure and next action in the PR or `docs/RECOVERY.md`. Push useful completed checkpoints so temporary workspace loss does not erase them.
+- Before a handoff/interruption, record branch/PR, latest commit, tests and their environment, run links, remaining failure and next action in the PR description (the PR is the checkpoint; do not add dated entries to `docs/RECOVERY.md`). Push useful completed checkpoints so temporary workspace loss does not erase them.
 
 ## Tooling and scope
 
