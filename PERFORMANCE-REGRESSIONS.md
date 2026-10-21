@@ -353,7 +353,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | verify / Development / accounts / dev-monitor | open | 3 | 3s → 7s | +4s | +133.33% |
 | verify / Development / desktop (balanced v2) / dev-map-tiles | open | 2 | 33s → 166s | +133s | +403.03% |
 | verify / Development / desktop (balanced v2) / dev-game-analytics | open | 2 | 5s → 7s | +2s | +40% |
-| native-widget (35) / Run actions/setup-node@v4 | open | 2 | 3s → 6s | +3s | +100% |
+| native-widget (35) / Run actions/setup-node@v4 | open | 3 | 3s → 7s | +4s | +133.33% |
 | Packaged Worker / interface (balanced v2) / Run actions/download-artifact@v4 | open | 2 | 3s → 5s | +2s | +66.67% |
 | native / native-widget (24) / Run actions/setup-node@v4 | open | 2 | 2s → 7s | +5s | +250% |
 | native / native-widget (24) / Run android-actions/setup-android@v3 | open | 2 | 11s → 15s | +4s | +36.36% |
@@ -367,6 +367,8 @@ Open trends require investigation. Resolved trends retain their history; each ve
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-21T03:37:30Z | step: native-widget (24) / Run actions/upload-artifact@v4 | 1s → 2s | +1s | +100% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39414345683/job/118599590044) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39539033689/job/119022274561) |
+| 2026-10-21T03:31:37Z | step: native-widget (35) / Run actions/setup-node@v4 | 6s → 7s | +1s | +16.67% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39420205092/job/118618969025) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39539033689/job/119022274912) |
 | 2026-10-21T01:24:31Z | step: Development / gameplay (balanced v2) / dev-shop-stock | 20s → 23s | +3s | +15% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38310299946/job/115014088792) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39526763732/job/118983135858) |
 | 2026-10-20T22:41:58Z | step: Code checks and immutable builds / Run actions/setup-node@v4 | 9s → 16s | +7s | +77.78% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37300924028/job/111733696893) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39509944972/job/118928184721) |
 | 2026-10-20T22:41:41Z | step: Development / desktop (balanced v2) / Set up job | 1s → 2s | +1s | +100% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38301994659/job/114986882289) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39509944972/job/118928185091) |
