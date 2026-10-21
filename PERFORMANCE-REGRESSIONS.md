@@ -257,7 +257,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Development / desktop / Run actions/upload-artifact@v4 | open | 2 | 4s → 6s | +2s | +50% |
 | Development / gameplay / dev-shop-stock | open | 2 | 16s → 22s | +6s | +37.5% |
 | Packaged Worker / interface / Start disposable built Worker | open | 2 | 7s → 11s | +4s | +57.14% |
-| Verify preserved functionality | open | 2 | 422s → 1036s | +614s | +145.5% |
+| Verify preserved functionality | open | 3 | 422s → 1258s | +836s | +198.1% |
 | Development / gameplay / Run actions/upload-artifact@v4 | open | 2 | 3s → 5s | +2s | +66.67% |
 | Packaged Worker / interface / worker-market-locations | open | 3 | 23s → 63s | +40s | +173.91% |
 | Development / gameplay / dev-market-locations | open | 2 | 38s → 68s | +30s | +78.95% |
@@ -378,6 +378,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-21T07:27:52.000Z | workflow: Verify preserved functionality | 1036s → 1258s | +222s | +21.43% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38147843248) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39559744762) |
 | 2026-10-21T07:19:18Z | step: Development / desktop (balanced v2) / dev-game-analytics | 6s → 7s | +1s | +16.67% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38309026871/job/115009957801) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39559744762/job/119087854555) |
 | 2026-10-21T07:07:42Z | step: native-widget (24) / Run actions/setup-node@v4 | 5s → 6s | +1s | +20% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39414345683/job/118599590044) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39559817596/job/119088082358) |
 | 2026-10-21T05:47:12Z | step: Packaged Worker / interface (balanced v2) / worker-game-analytics | 5s → 7s | +2s | +40% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39266580213/job/118108928983) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39550671744/job/119059476486) |
