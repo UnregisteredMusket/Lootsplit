@@ -3,7 +3,7 @@ import assert from "node:assert/strict";
 import { mkdtempSync } from "node:fs";
 import { tmpdir } from "node:os";
 import { join } from "node:path";
-import { failureAnnotation, runStep } from "./recovery-step.mjs";
+import { failureAnnotation, failureCollector, runStep } from "./recovery-step.mjs";
 
 test("failed steps report their last output lines as a single GitHub error annotation", () => {
   const output = Array.from({ length: 60 }, (_, i) => `line ${i} 100%`).join("\n");
@@ -27,4 +27,16 @@ test("output still reaches the log and a failing command stays failed", async ()
   });
   assert.equal(record.status, "failed");
   assert.equal(record.code, 3);
+});
+
+test("failing test names are listed first even when they scrolled out of the tail", () => {
+  const collector = failureCollector();
+  collector.push("ok 1 - fine\n# Subtest: broken\nnot ok 2 - property imp");
+  collector.push("orts stay fresh\n  ---\n  error: 'Expected values to be strictly equal'\n  location: 'x.test.ts:9:3'\n  ...\n");
+  for (let i = 3; i < 200; i += 1) collector.push(`ok ${i} - passing ${i}\n`);
+  assert.deepEqual(collector.failures.slice(0, 1), ["not ok 2 - property imports stay fresh"]);
+  assert.ok(collector.failures.some((line) => line.includes("Expected values to be strictly equal")));
+  const annotation = failureAnnotation("unit-tests", "failed", "ok 199 - passing 199", collector.failures);
+  assert.match(annotation, /::Failed tests:%0Anot ok 2 - property imports stay fresh/);
+  assert.equal(annotation.split("\n").length, 1);
 });

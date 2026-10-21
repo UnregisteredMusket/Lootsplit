@@ -13,8 +13,32 @@ export function atomicJson(path, value) {
 const ANSI_COLOR = new RegExp(String.fromCharCode(27) + "\\[[0-9;]*m", "g");
 
 /** A GitHub `::error` workflow command carrying the last output lines of a failed step. */
-export function failureAnnotation(id, status, output) {
-  const lines = String(output)
+/** Collects failing node:test/TAP cases ("not ok N - name" and a few detail lines) from a stream. */
+export function failureCollector(limit = 12) {
+  const failures = [];
+  let partial = "",
+    detail = 0;
+  return {
+    failures,
+    push(text) {
+      const lines = (partial + String(text).replace(ANSI_COLOR, "")).split(/\r?\n/);
+      partial = lines.pop();
+      for (const line of lines) {
+        if (/^\s*not ok \d+ - /.test(line) && failures.length < limit) {
+          failures.push(line.trim());
+          detail = 6;
+        } else if (detail > 0 && line.trim()) {
+          detail -= 1;
+          if (/error|expected|actual|message|location/i.test(line)) failures.push("    " + line.trim().slice(0, 240));
+        }
+      }
+    },
+  };
+}
+
+export function failureAnnotation(id, status, output, failures = []) {
+  const failed = failures.length ? "Failed tests:\n" + failures.join("\n") + "\n---\n" : "";
+  const lines = failed + String(output)
     .replace(ANSI_COLOR, "")
     .split(/\r?\n/)
     .filter((line) => line.trim())
@@ -71,9 +95,12 @@ export async function runStep({
     detached: process.platform !== "win32",
   });
   let tail = "";
+  const collector = failureCollector();
   const keep = (chunk, stream) => {
     stream.write(chunk);
-    tail = (tail + chunk.toString("utf8")).slice(-6000);
+    const text = chunk.toString("utf8");
+    tail = (tail + text).slice(-6000);
+    collector.push(text);
   };
   child.stdout?.on("data", (chunk) => keep(chunk, process.stdout));
   child.stderr?.on("data", (chunk) => keep(chunk, process.stderr));
@@ -124,7 +151,7 @@ export async function runStep({
   });
   save();
   if (record.status !== "passed" && process.env.GITHUB_ACTIONS === "true")
-    console.log(failureAnnotation(id, record.status, tail));
+    console.log(failureAnnotation(id, record.status, tail, collector.failures));
   console.log(`[recovery] ${record.status.toUpperCase()} ${id}`);
   await publish(record.status === "passed" ? "success" : record.status);
   return record;
