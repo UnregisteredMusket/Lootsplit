@@ -10,7 +10,11 @@ adb pull /sdcard/Android/data/com.unregisteredmusket.lootsplit/files/widget-audi
 screenshots=$?
 adb uninstall com.unregisteredmusket.lootsplit.test >/dev/null 2>&1 || true
 adb uninstall com.unregisteredmusket.lootsplit >/dev/null 2>&1 || true
-if [ "$result" -ne 0 ]; then exit "$result"; fi
+if [ "$result" -ne 0 ]; then
+  # Job logs and artifacts are not readable from the development sandbox; annotations are.
+  python3 scripts/android-test-annotations.py android/app/build/outputs/androidTest-results || true
+  exit "$result"
+fi
 if [ "$screenshots" -ne 0 ]; then exit "$screenshots"; fi
 test -f test-results/android-widget/widget-audit/full-350.png
 test -f test-results/android-widget/widget-audit/compact-250.png
