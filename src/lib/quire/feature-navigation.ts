@@ -27,7 +27,7 @@ export function safeReturn(value: unknown): string {
   const url = new URL(value, "https://lootsplit.invalid");
   if (url.origin !== "https://lootsplit.invalid") return "/?view=home";
   if (
-    !/^\/(?:party|maps|market|share|settings|characters|library|encounters|account|books|catalog|favorites|welcome|help|resources|donate|downloads|updates|(?:shop|book|read)\/[^/]+|features\/(?:economy|bank|finances|downtime|financial|properties|reports|review|journal|shops|music|npcs|trading|time))?$/.test(
+    !/^\/(?:party|maps|market|share|settings|characters|library|encounters|account|books|catalog|favorites|welcome|features|help|resources|donate|downloads|updates|(?:shop|book|read)\/[^/]+|features\/(?:economy|bank|finances|downtime|financial|properties|reports|review|journal|shops|music|npcs|trading|time))?$/.test(
       url.pathname,
     )
   )
@@ -79,6 +79,7 @@ export function screenName(href: string, dm: boolean) {
         "/catalog": "Catalog",
         "/favorites": "Favorites",
         "/welcome": "Website",
+        "/features": "Features",
         "/help": "Help",
         "/resources": "Resources",
         "/donate": "Donate",

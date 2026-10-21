@@ -16,10 +16,12 @@ export function SiteAnnouncement() {
   }, []);
   if (!announcement) return null;
   return (
-    <aside className="ls-wrap ls-announcement" aria-label="Site announcement">
-      <p className="ls-eyebrow">FROM THE OWNER</p>
-      <h2>{announcement.title}</h2>
-      <p>{announcement.message}</p>
+    <aside className="ls-announcement" aria-label="Site announcement">
+      <div className="ls-wrap">
+        <p className="ls-sc">From the owner</p>
+        <h2>{announcement.title}</h2>
+        <p>{announcement.message}</p>
+      </div>
     </aside>
   );
 }

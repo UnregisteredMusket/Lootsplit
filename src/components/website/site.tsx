@@ -1,413 +1,474 @@
 import { AppLink } from "@/components/app-link";
 import { HelpContent } from "../help-content";
-import { APP_DESCRIPTION } from "@/lib/help/content";
 import { GoldSpentCounter } from "./gold-counter";
 import { SiteAnnouncement } from "./announcement";
-import { AboutLootsplit } from "./about";
-import { WebReleaseHistory } from "./web-history";
+import { Kicker, PageHero, Shot } from "./parts";
+import { useReleaseIdentity } from "./release-identity";
 import { Link, useRouterState } from "@tanstack/react-router";
-import {
-  ArrowDownToLine,
-  ArrowRight,
-  BookOpen,
-  Coins,
-  Monitor,
-  ShieldCheck,
-  Smartphone,
-  Store,
-  Users,
-} from "lucide-react";
-import type { ReactNode } from "react";
+import { ArrowRight, Menu, X } from "lucide-react";
+import { useEffect, useId, useState, type ReactNode } from "react";
+import type { ProductShot } from "@/lib/website/product-shots";
 import release from "@/lib/website/release.json";
-import changelog from "@/lib/website/changelog.json";
+import { OPEN_APP } from "@/lib/website/labels";
 import "./website.css";
 
-const publishedChangelog = changelog
-  .filter(
-    (entry) => entry.version.localeCompare(release.version, undefined, { numeric: true }) <= 0,
-  )
-  .sort((a, b) => b.version.localeCompare(a.version, undefined, { numeric: true }));
-const currentChanges = publishedChangelog.find((entry) => entry.version === release.version)!;
-const changeCategories = [
-  ["features", "Added features"],
-  ["improvements", "Improvements"],
-  ["fixes", "Bug fixes"],
+/** One order and one set of labels for the header and the footer. */
+const siteLinks = [
+  ["/features", "Features"],
+  ["/downloads", "Downloads"],
+  ["/updates", "Changelog"],
+  ["/help", "Help"],
+  ["/resources", "Resources"],
+  ["/donate", "Donate"],
 ] as const;
 
-export function Website({ children }: { children: ReactNode }) {
-  const path = useRouterState({ select: (s) => s.location.pathname });
+export function Website({
+  children,
+  footer = "paper",
+}: {
+  children: ReactNode;
+  /** Contrast the footer with the page's last section. */
+  footer?: "paper" | "ink";
+}) {
+  const path = useRouterState({ select: (s) => s.location.pathname }).replace(/\/$/, "");
+  const [menuOpen, setMenuOpen] = useState(false);
+  const navId = useId();
+  useEffect(() => setMenuOpen(false), [path]);
+  useEffect(() => {
+    if (!menuOpen) return;
+    const close = (event: KeyboardEvent) => {
+      if (event.key === "Escape") setMenuOpen(false);
+    };
+    window.addEventListener("keydown", close);
+    return () => window.removeEventListener("keydown", close);
+  }, [menuOpen]);
+  const current = (to: string) => (path === to ? ("page" as const) : undefined);
   return (
     <div className="ls-site">
       <a className="ls-skip" href="#main">
         Skip to content
       </a>
-      <header className="ls-header ls-wrap">
-        <Link className="ls-brand" to="/welcome">
-          <img src="/favicon.svg" alt="" width="34" height="34" />
-          Lootsplit<span>THE PARTY LEDGER</span>
-        </Link>
-        <nav aria-label="Website">
-          <Link to="/account" aria-current={path === "/account" ? "page" : undefined}>
-            My account
+      <header className="ls-header">
+        <div className="ls-wrap ls-header-row">
+          <Link className="ls-brand" to="/welcome" aria-label="Lootsplit home">
+            <img src="/favicon.svg" alt="" width="34" height="34" />
+            <span className="ls-brand-text">
+              <span className="ls-brand-name">Lootsplit</span>
+              <span className="ls-brand-tag">The Party Ledger</span>
+            </span>
           </Link>
-          <Link to="/resources" aria-current={path === "/resources" ? "page" : undefined}>
-            Resources
-          </Link>
-          <Link to="/donate" aria-current={path === "/donate" ? "page" : undefined}>
-            Donate
-          </Link>
-          <Link to="/downloads" aria-current={path === "/downloads" ? "page" : undefined}>
-            Downloads
-          </Link>
-          <Link to="/updates" aria-current={path === "/updates" ? "page" : undefined}>
-            Changelog
-          </Link>
-          <Link to="/help" aria-current={path === "/help" ? "page" : undefined}>
-            Help
-          </Link>
-        </nav>
-        <AppLink className="ls-button ls-small" href="/">
-          Open app <ArrowRight size={16} />
-        </AppLink>
+          <nav
+            id={navId}
+            aria-label="Website"
+            className="ls-nav"
+            data-open={menuOpen ? "true" : "false"}
+          >
+            <ul>
+              {siteLinks.map(([to, label]) => (
+                <li key={to}>
+                  <Link to={to} aria-current={current(to)}>
+                    {label}
+                  </Link>
+                </li>
+              ))}
+            </ul>
+            <Link className="ls-nav-account" to="/account" aria-current={current("/account")}>
+              My account
+            </Link>
+          </nav>
+          <AppLink className="ls-btn ls-btn-gold ls-btn-small ls-header-cta" href="/">
+            {OPEN_APP}
+          </AppLink>
+          <button
+            type="button"
+            className="ls-menu-button"
+            aria-expanded={menuOpen}
+            aria-controls={navId}
+            onClick={() => setMenuOpen((open) => !open)}
+          >
+            {menuOpen ? <X size={20} aria-hidden="true" /> : <Menu size={20} aria-hidden="true" />}
+            <span>Menu</span>
+          </button>
+        </div>
       </header>
-      <main id="main">
-        {children}
-        <AboutLootsplit />
-      </main>
-      <footer className="ls-footer ls-wrap">
-        <div>
-          <Link className="ls-brand" to="/welcome">
-            Lootsplit
-          </Link>
-          <p>Keep the books. Tell the story.</p>
-        </div>
-        <div>
-          <Link to="/downloads">Downloads</Link>
-          <Link to="/updates">Changelog</Link>
-          <Link to="/help">Help & backups</Link>
-          <Link to="/resources">Resources</Link>
-          <Link to="/donate">Donate</Link>
-          <a href={release.historyUrl}>GitHub releases ↗</a>
-        </div>
-        <p>
-          A companion for your tabletop adventures.
-          <br />
-          DMs need an account. Players can join as guests with a current session invitation.
-        </p>
-      </footer>
+      <main id="main">{children}</main>
+      <SiteFooter tone={footer} current={current} />
     </div>
   );
 }
+
+function SiteFooter({
+  tone,
+  current,
+}: {
+  tone: "paper" | "ink";
+  current: (to: string) => "page" | undefined;
+}) {
+  const { state } = useReleaseIdentity();
+  const web =
+    state.status === "ready"
+      ? state.identity.commit.slice(0, 7)
+      : state.status === "development"
+        ? "development preview"
+        : state.status === "failed"
+          ? "release unavailable"
+          : "checking…";
+  return (
+    <footer className={`ls-footer ${tone === "paper" ? "ls-paper ls-paper-open" : "ls-footer-ink"}`}>
+      <div className="ls-wrap ls-footer-inner">
+        <div className="ls-footcols">
+          <div className="ls-footer-brand">
+            <Link className="ls-footer-name" to="/welcome">
+              Lootsplit
+            </Link>
+            <p className="ls-footer-motto">Keep the books. Tell the story.</p>
+            <p>
+              A companion for your tabletop adventures. DMs need an account. Players can join as
+              guests with a current session invitation.
+            </p>
+          </div>
+          <nav aria-label="Website footer" className="ls-footer-nav">
+            <ul>
+              {siteLinks.map(([to, label]) => (
+                <li key={to}>
+                  <Link to={to} aria-current={current(to)}>
+                    {label}
+                  </Link>
+                </li>
+              ))}
+              <li>
+                <Link to="/account" aria-current={current("/account")}>
+                  My account
+                </Link>
+              </li>
+              <li>
+                <AppLink href="/">{OPEN_APP}</AppLink>
+              </li>
+              <li>
+                <a href={release.historyUrl}>GitHub releases ↗</a>
+              </li>
+            </ul>
+          </nav>
+        </div>
+        <div className="ls-footer-bottom">
+          <Link to="/downloads" hash="release-details" className="ls-footer-identity">
+            Web {web} · Android {release.version} (code {release.versionCode})
+          </Link>
+          <Link to="/downloads" hash="release-details">
+            Release details and verification
+          </Link>
+        </div>
+      </div>
+    </footer>
+  );
+}
+
+const areas: [ProductShot, string, string, string][] = [
+  [
+    "character",
+    "characters",
+    "Characters & party",
+    "Full sheets, dice, imports from PDF or scans, shared purses.",
+  ],
+  [
+    "market",
+    "markets",
+    "Shops, trade & barter",
+    "Merchants with stock, commodity exchanges, player trades.",
+  ],
+  [
+    "maps",
+    "encounters",
+    "Maps & tabletop",
+    "Linked scenes, tokens, fog of war, pings and a player display.",
+  ],
+  [
+    "encounter",
+    "encounters",
+    "Encounters",
+    "SRD creatures, generator, initiative tracker, loot tables.",
+  ],
+  [
+    "properties",
+    "world",
+    "NPCs, property & ships",
+    "Locations, NPC inventories, deeds, staff, cargo and voyages.",
+  ],
+  [
+    "downtime",
+    "downtime",
+    "Downtime & finances",
+    "Banks and loans, training, recurring income, DM approval.",
+  ],
+  [
+    "room",
+    "together",
+    "Play together",
+    "Live and Turn-based rooms, invitations, guests, party chat.",
+  ],
+  [
+    "journal",
+    "library",
+    "Journal & library",
+    "Session reports, SRD lookups, your private PDF books.",
+  ],
+];
 
 export function WelcomePage() {
   return (
     <Website>
       <SiteAnnouncement />
-      <section className="ls-hero">
+      <section className="ls-hero" aria-labelledby="welcome-title">
         <img className="ls-hero-art" src="/art/landscape.webp" alt="" />
         <div className="ls-hero-shade" />
-        <div className="ls-wrap ls-hero-content">
-          <Link className="ls-release-label" to="/updates">
-            <span /> Android {release.version} is here <ArrowRight size={14} />
-          </Link>
-          <p className="ls-eyebrow">FOR DUNGEON MASTERS & THEIR PARTIES</p>
-          <h1>
-            More adventure.
-            <br />
-            <em>Less bookkeeping.</em>
-          </h1>
-          <p className="ls-intro">{APP_DESCRIPTION}</p>
-          <div className="ls-actions">
-            <AppLink className="ls-button" href="/">
-              Open browser app <ArrowRight size={18} />
-            </AppLink>
-            <Link className="ls-button ls-secondary" to="/downloads">
-              <ArrowDownToLine size={18} /> Get Lootsplit
+        <div className="ls-wrap ls-hero-grid">
+          <div className="ls-stack ls-hero-copy">
+            <Link className="ls-release-pill" to="/updates" hash={`android-${release.version}`}>
+              <span className="ls-sc">New</span> Android {release.version} is here{" "}
+              <ArrowRight size={14} aria-hidden="true" />
             </Link>
-          </div>
-          <p className="ls-hero-note">
-            Browser & Android · Guest access · Local and shared campaigns
-          </p>
-        </div>
-        <span className="ls-hero-caption">YOUR NEXT CHAPTER STARTS HERE</span>
-      </section>
-      <div className="ls-strip">
-        <GoldSpentCounter />
-        <span>
-          <Users size={18} /> One party, a shared ledger
-        </span>
-        <span>
-          <BookOpen size={18} /> Built for the table
-        </span>
-      </div>
-      <section className="ls-wrap ls-section ls-feature">
-        <div>
-          <p className="ls-eyebrow">THE COMPANION BETWEEN ADVENTURES</p>
-          <h2>
-            The loot is legendary.
-            <br />
-            The admin shouldn’t be.
-          </h2>
-          <p className="ls-copy">
-            From the first copper piece to a dragon’s hoard, give your campaign’s economy a home.
-            Keep money, inventory, merchants, and the story behind every purchase together.
-          </p>
-          <AppLink className="ls-text-link" href="/">
-            Start your ledger <ArrowRight size={17} />
-          </AppLink>
-        </div>
-        <div className="ls-feature-list">
-          {[
-            [
-              Coins,
-              "Follow the money",
-              "Manage character purses and party funds, record transfers, and look back through the transaction ledger.",
-            ],
-            [
-              Store,
-              "Bring your markets to life",
-              "Create shops, manage stock and prices, and let players buy and sell for their characters.",
-            ],
-            [
-              Users,
-              "Play your way",
-              "Run locally, share files manually, or bring the party together in Live or Turn-based rooms.",
-            ],
-          ].map(([Icon, title, text]) => {
-            const Glyph = Icon as typeof Coins;
-            return (
-              <article key={String(title)}>
-                <Glyph size={23} />
-                <div>
-                  <h3>{String(title)}</h3>
-                  <p>{String(text)}</p>
-                </div>
-              </article>
-            );
-          })}
-        </div>
-      </section>
-      <section className="ls-wrap ls-section" aria-labelledby="product-tour">
-        <p className="ls-eyebrow">SEE YOUR CAMPAIGN IN ACTION</p>
-        <h2 id="product-tour">One adventure. Connected records.</h2>
-        <p className="ls-copy">Keep character sheets, shared funds, inventory and purchases together. The DM controls access and approves changes that need a ruling.</p>
-        <figure className="ls-product-shot">
-          <img src="/product/party.png" alt="Lootsplit’s Party screen showing three example adventurers, their health, armor and sheet controls" width="1280" height="800" loading="lazy" decoding="async" />
-          <figcaption>Party overview: follow health and armor, open a character sheet, and manage player editing permissions. Screenshots use example campaign data.</figcaption>
-        </figure>
-        <figure className="ls-product-shot">
-          <img src="/product/market.png" alt="Lootsplit’s shop management screen with merchants and inventory controls" width="1280" height="800" loading="lazy" decoding="async" />
-          <figcaption>Bring merchants into your campaign. Purchases connect stock, character inventory, money and transaction history.</figcaption>
-        </figure>
-        <div className="ls-feature-list">
-          <article><BookOpen size={23} /><div><h3>Prepare, play, pick up next time</h3><p>Create an account to host a campaign. Invite players into a Live or Turn-based session; guests can join without an account. End the session to close access and keep the campaign with its DM.</p></div></article>
-          <article><Coins size={23} /><div><h3>Make downtime count</h3><p>Review loan interest, recurring revenue and expenses before settlement. Property plans and shop schedules follow the campaign’s in-game days, with DM approval.</p></div></article>
-          <article><Users size={23} /><div><h3>Choose how your table plays</h3><p>Use physical dice with permitted manual results, or virtual rolls with recorded outcomes. The DM can work offline on an owned device campaign; shared sessions need a connection.</p></div></article>
-        </div>
-        <Link className="ls-text-link" to="/help">Explore the application guide <ArrowRight size={17} /></Link>
-      </section>
-      <section className="ls-wrap ls-callout">
-        <div>
-          <p className="ls-eyebrow">YOUR CAMPAIGNS, CLOSE AT HAND</p>
-          <h2>A place for your adventures.</h2>
-          <p>
-            Sign in to save memberships, reusable character profiles, and private cloud backups when
-            you choose. Guest play stays available.
-          </p>
-        </div>
-        <Link className="ls-button ls-secondary" to="/account">
-          My campaign library <ArrowRight size={18} />
-        </Link>
-      </section>
-      <section className="ls-wrap ls-section" aria-labelledby="platform-comparison">
-        <h2 id="platform-comparison">Browser or Android?</h2>
-        <p className="ls-copy">Choose the version that fits your table. Android provides native device conveniences; campaign rules and server permissions stay shared.</p>
-        <table className="ls-platform-comparison">
-          <thead><tr><th scope="col">Capability</th><th scope="col">Browser</th><th scope="col">Android app</th></tr></thead>
-          <tbody>
-            <tr><th scope="row">Getting started</th><td>Open the website</td><td>Install the signed APK</td></tr>
-            <tr><th scope="row">Updates</th><td>Latest published web release</td><td>Install each published APK update</td></tr>
-            <tr><th scope="row">Campaign play</th><td>Live, Turn-based and owned DM local play</td><td>Same supported play modes; shared sessions require internet</td></tr>
-            <tr><th scope="row">Files and sharing</th><td>Browser downloads and supported share controls</td><td>Native file saving and Android share sheet</td></tr>
-            <tr><th scope="row">Device integration</th><td>Browser navigation and storage</td><td>Bundled client, Android back-button and network handling</td></tr>
-            <tr><th scope="row">Notifications</th><td>In-app alerts; browser notifications where supported and permitted</td><td>In-app alerts; native push is not included</td></tr>
-          </tbody>
-        </table>
-        <p className="ls-small-copy">Web and Android releases have separate schedules. Features shown on this page may reach the website before the next APK. Keep exported backups outside either application’s storage.</p>
-      </section>
-      <section className="ls-wrap ls-callout">
-        <div>
-          <p className="ls-eyebrow">AT THE TABLE. ON THE GO.</p>
-          <h2>Your ledger, within reach.</h2>
-          <p>Open in your PC’s browser or take the Android app to your next session.</p>
-        </div>
-        <Link className="ls-button" to="/downloads">
-          Choose your platform <ArrowRight size={18} />
-        </Link>
-      </section>
-    </Website>
-  );
-}
-
-export function DownloadsPage() {
-  return (
-    <Website>
-      <section className="ls-wrap ls-section">
-        <p className="ls-eyebrow">TAKE LOOTSPLIT TO YOUR TABLE</p>
-        <h1>One party. Your platform.</h1>
-        <p className="ls-intro">
-          Play in your browser or download the Android app. Sign in to host, or join the DM’s current invitation as a guest.
-        </p>
-        <div className="ls-platforms">
-          <article className="ls-platform ls-android">
-            <Smartphone size={30} />
-            <span className="ls-tag">SIGNED RELEASE</span>
-            <h2>Android</h2>
-            <p>
-              The app on your phone, with native file saving and sharing. Browser updates and the
-              published APK have separate release schedules. Use the website for the latest tools;
-              shared rooms connect when you’re online.
+            <Kicker>The party ledger for tabletop campaigns</Kicker>
+            <h1 id="welcome-title" className="ls-display ls-display-hero">
+              Split the loot. <em>Run the whole campaign.</em>
+            </h1>
+            <p className="ls-lead">
+              Every coin, item and purchase lands in one shared ledger. Around it: character
+              sheets, shops and trade, maps, encounters, downtime and live rooms for the whole
+              party.
             </p>
-            <div className="ls-version">
-              Version {release.version} <span>Android 7.0+ · APK</span>
-            </div>
-            <a className="ls-button" href="/download/android">
-              <ArrowDownToLine size={18} /> Download for Android
-            </a>
-            <p className="ls-small-copy">
-              Having trouble? <a href={release.apkUrl}>Download from GitHub</a> or open this page in
-              Chrome.{" "}
-              <a href="https://drive.google.com/file/d/1MT4by-7mNe7-7PANKbTwcbBOcd2CSKrr/view">
-                Earlier Android release on Google Drive
-              </a>
-              .
-            </p>
-            <Link className="ls-text-link" to="/help" hash="android">
-              Installation & update guide <ArrowRight size={16} />
-            </Link>
-          </article>
-          <article className="ls-platform">
-            <Monitor size={30} />
-            <span className="ls-tag">NO DOWNLOAD NEEDED</span>
-            <h2>Browser & PC</h2>
-            <p>
-              Use Lootsplit on Windows, macOS, Linux, or your phone. Open the web app and keep
-              playing at its existing address.
-            </p>
-            <div className="ls-version">
-              Always the deployed web version<span>Desktop & mobile browsers</span>
-            </div>
-            <AppLink className="ls-button ls-secondary" href="/">
-              Open browser app <ArrowRight size={18} />
-            </AppLink>
-            <p className="ls-small-copy">
-              A native Windows or macOS installer is not available yet.
-            </p>
-            <Link className="ls-text-link" to="/help" hash="desktop">
-              Using Lootsplit on your PC <ArrowRight size={16} />
-            </Link>
-          </article>
-        </div>
-        <aside className="ls-notice">
-          <ShieldCheck size={25} />
-          <div>
-            <h3>Keep your campaign safe when you update.</h3>
-            <p>
-              Export a backup first. Install this APK over the permanently signed 1.3.0 or 1.3.1
-              app; keep your existing app installed. Browser and Android saves are separate unless
-              you use a shared room or transfer a backup.
-            </p>
-          </div>
-        </aside>
-        <details className="ls-details">
-          <summary>Release details & file verification</summary>
-          <div>
-            <p>
-              Published {release.date}. Permanently signed Android release, version code{" "}
-              {release.versionCode}.
-            </p>
-            <p>SHA-256 for {release.filename}:</p>
-            <code className="ls-hash">{release.sha256}</code>
-            <p>
-              <a href={release.checksumUrl}>Download checksum file ↗</a> ·{" "}
-              <a href={release.releaseUrl}>View this release on GitHub ↗</a>
-            </p>
-          </div>
-        </details>
-        <div className="ls-section-heading">
-          <h2>What’s new in {release.version}?</h2>
-          <Link className="ls-text-link" to="/updates">
-            Read the changelog <ArrowRight size={16} />
-          </Link>
-        </div>
-        <p className="ls-copy">{currentChanges.summary}</p>
-      </section>
-    </Website>
-  );
-}
-
-export function UpdatesPage() {
-  return (
-    <Website>
-      <section className="ls-wrap ls-section ls-reading">
-        <p className="ls-eyebrow">FROM THE LOOTSPLIT LEDGER</p>
-        <h1>Changelog</h1>
-        <p className="ls-intro">
-          New releases, practical improvements, and what changed at the table.
-        </p>
-        <p className="ls-small-copy">
-          <a href="#web-backend">Web & backend</a> · <a href="#android-releases">Android releases</a>
-        </p>
-        <WebReleaseHistory />
-        <h2 id="android-releases">Android releases</h2>
-        <p className="ls-copy">
-          These notes describe the separately published APKs. All earlier release notes and
-          downloads remain available.
-        </p>
-        {publishedChangelog.map((entry) => (
-          <article className="ls-release" key={entry.version} id={`android-${entry.version}`}>
-            <div className="ls-release-meta">
-              <span className="ls-tag">
-                {entry.version === release.version ? "LATEST ANDROID RELEASE" : "ANDROID RELEASE"}
-              </span>
-              <time dateTime={entry.date}>
-                {new Date(`${entry.date}T00:00:00Z`).toLocaleDateString("en-US", {
-                  month: "long",
-                  day: "numeric",
-                  year: "numeric",
-                  timeZone: "UTC",
-                })}
-              </time>
-            </div>
-            <h2>Version {entry.version}</h2>
-            <p className="ls-copy">{entry.summary}</p>
-            {changeCategories.map(([category, heading]) => (
-              <div key={category}>
-                <h3>{heading}</h3>
-                <ul>
-                  {entry[category].map((item) => (
-                    <li key={item}>{item}</li>
-                  ))}
-                </ul>
-              </div>
-            ))}
-            {entry.version === release.version ? (
-              <Link className="ls-button" to="/downloads">
-                Get version {entry.version} <ArrowDownToLine size={17} />
+            <div className="ls-actions">
+              <AppLink className="ls-btn ls-btn-gold" href="/">
+                {OPEN_APP}
+              </AppLink>
+              <Link className="ls-btn ls-btn-ghost" to="/features">
+                Tour the features
               </Link>
-            ) : (
-              <a
-                className="ls-text-link"
-                href={`https://github.com/UnregisteredMusket/Lootsplit/releases/tag/android-v${entry.version}`}
-              >
-                View this release on GitHub <ArrowRight size={17} />
-              </a>
-            )}
-          </article>
-        ))}
-        <a className="ls-text-link" href={release.historyUrl}>
-          Browse earlier releases on GitHub <ArrowRight size={17} />
-        </a>
+            </div>
+            <p className="ls-fine">
+              Browser & Android · Guest access · Local and shared campaigns
+            </p>
+          </div>
+          <Shot name="ledger" tone="ink" className="ls-hero-shot" />
+        </div>
+      </section>
+
+      <section className="ls-paper" aria-label="At a glance">
+        <div className="ls-wrap ls-ledger">
+          <div className="ls-ledger-entry">
+            <p className="ls-sc ls-entry-no">Entry No. 1</p>
+            <GoldSpentCounter />
+          </div>
+          <div className="ls-ledger-entry">
+            <p className="ls-sc ls-entry-no">Entry No. 2</p>
+            <p className="ls-ledger-title">Three ways to play</p>
+            <p className="ls-ledger-note">
+              Local at one table, Turn-based between sessions, or Live online. One party, a shared
+              ledger.
+            </p>
+          </div>
+          <div className="ls-ledger-entry">
+            <p className="ls-sc ls-entry-no">Entry No. 3</p>
+            <p className="ls-ledger-title">The DM keeps the keys</p>
+            <p className="ls-ledger-note">
+              Access, permissions and anything that needs a ruling. Built for the table.
+            </p>
+          </div>
+        </div>
+      </section>
+
+      <section className="ls-ink ls-section" aria-labelledby="loot">
+        <div className="ls-wrap ls-split">
+          <div className="ls-stack">
+            <Kicker ornament>Where it all began</Kicker>
+            <h2 id="loot" className="ls-display">
+              Loot, settled <em>fairly.</em>
+            </h2>
+            <p className="ls-lead">
+              Award the hoard after a fight, review it, and send it once to the characters or the
+              party fund. From the first copper piece to a dragon’s hoard, every coin is recorded.
+            </p>
+            <ul className="ls-ticks">
+              <li>Five coin denominations with conversion, payments and transfers</li>
+              <li>Guaranteed items and weighted loot tables per encounter</li>
+              <li>A review step before the one-time transfer, so nothing is paid twice</li>
+              <li>Character purses, party funds and a full activity ledger with voiding</li>
+            </ul>
+          </div>
+          <Shot name="loot" tone="ink" />
+        </div>
+      </section>
+
+      <section className="ls-paper ls-section" aria-labelledby="areas">
+        <div className="ls-wrap ls-stack ls-gap-xl">
+          <div className="ls-stack ls-measure">
+            <Kicker>Everything around the ledger</Kicker>
+            <h2 id="areas" className="ls-display">
+              Your campaign has grown. <span className="ls-block">So has Lootsplit.</span>
+            </h2>
+            <p className="ls-lead">
+              Eight connected parts, one campaign. Purchases, voyages, property income and loot all
+              post to the same ledger.
+            </p>
+          </div>
+          <ul className="ls-areas">
+            {areas.map(([shot, anchor, title, text]) => (
+              <li key={title}>
+                <Link className="ls-area" to="/features" hash={anchor}>
+                  <Shot name={shot} size="inset" />
+                  <h3>{title}</h3>
+                  <p>{text}</p>
+                </Link>
+              </li>
+            ))}
+          </ul>
+          <Link className="ls-btn ls-btn-ink ls-self-center" to="/features">
+            See every feature
+          </Link>
+        </div>
+      </section>
+
+      <section className="ls-ink ls-section" aria-labelledby="flow">
+        <div className="ls-wrap ls-stack ls-gap-xl">
+          <div className="ls-stack ls-center">
+            <Kicker ornament>How a campaign flows</Kicker>
+            <h2 id="flow" className="ls-display">
+              Prepare. Play. <em>Pick up next time.</em>
+            </h2>
+          </div>
+          <div className="ls-cols3">
+            <article className="ls-step">
+              <p className="ls-numeral" aria-hidden="true">
+                I
+              </p>
+              <h3>Prepare</h3>
+              <p>
+                Create an account to host a campaign. Add characters and party funds, build
+                locations, shops and maps, place NPCs, and stock encounters with loot tables.
+              </p>
+            </article>
+            <article className="ls-step">
+              <p className="ls-numeral" aria-hidden="true">
+                II
+              </p>
+              <h3>Play</h3>
+              <p>
+                Invite players into a Live or Turn-based room; guests can join without an account.
+                Run initiative, show the map on a TV, roll and chat, then award loot and shop at
+                the market. Use physical dice with permitted manual results, or virtual rolls with
+                recorded outcomes.
+              </p>
+            </article>
+            <article className="ls-step">
+              <p className="ls-numeral" aria-hidden="true">
+                III
+              </p>
+              <h3>Between sessions</h3>
+              <p>
+                End the session to close access and keep the campaign with its DM, or keep the room
+                online. Review loan interest, recurring revenue and expenses before settlement;
+                property plans and shop schedules follow in-game days, with DM approval. The
+                Journal keeps the story.
+              </p>
+            </article>
+          </div>
+          <p className="ls-fine ls-center">
+            The DM can work offline on an owned device campaign; shared sessions need a
+            connection.{" "}
+            <Link to="/help">
+              Explore the application guide <ArrowRight size={14} aria-hidden="true" />
+            </Link>
+          </p>
+        </div>
+      </section>
+
+      <section className="ls-paper ls-section" aria-labelledby="roles">
+        <div className="ls-wrap ls-stack ls-gap-xl">
+          <h2 id="roles" className="ls-display ls-center">
+            One app, two seats at the table
+          </h2>
+          <div className="ls-cols2">
+            <div className="ls-card">
+              <Kicker>For Dungeon Masters</Kicker>
+              <h3>Run the world, not the spreadsheet</h3>
+              <ul className="ls-ticks">
+                <li>Review Inbox for payments, loans, imports and training</li>
+                <li>Shops, exchanges, black markets and blacksmith commissions</li>
+                <li>Encounter builder, initiative tracker and player display</li>
+                <li>Permissions per character field, room and scene</li>
+              </ul>
+              <Link className="ls-btn ls-btn-ink ls-self-start" to="/account">
+                Start a campaign
+              </Link>
+            </div>
+            <div className="ls-card">
+              <Kicker>For players</Kicker>
+              <h3>Your character, your coin</h3>
+              <ul className="ls-ticks">
+                <li>Join from an invitation link, no account needed</li>
+                <li>Character sheet with dice and roll history</li>
+                <li>Bank, finances, properties and your own journal</li>
+                <li>Barter with the party and chat in private</li>
+              </ul>
+              <Link className="ls-btn ls-btn-ink ls-self-start" to="/help" hash="first-campaign">
+                How joining works
+              </Link>
+            </div>
+          </div>
+        </div>
+      </section>
+
+      <section className="ls-ink ls-section" aria-labelledby="platforms">
+        <div className="ls-wrap ls-stack ls-gap-lg">
+          <div className="ls-stack ls-center">
+            <Kicker ornament>Your ledger, within reach</Kicker>
+            <h2 id="platforms" className="ls-display">
+              Start in the browser, <em>or take it with you.</em>
+            </h2>
+          </div>
+          <div className="ls-cols2">
+            <div className="ls-card ls-card-ink">
+              <Kicker>Browser · no download</Kicker>
+              <h3>Always the latest version</h3>
+              <p>
+                Open Lootsplit in your PC’s or phone’s browser. Open screens in separate windows
+                across monitors, or cast the player display to a TV.
+              </p>
+              <AppLink className="ls-btn ls-btn-gold ls-self-start" href="/">
+                {OPEN_APP}
+              </AppLink>
+            </div>
+            <div className="ls-card ls-card-ink">
+              <Kicker>Android 7.0+ · signed APK</Kicker>
+              <h3>Version {release.version}</h3>
+              <p>
+                Take the Android app to your next session: device campaigns that work offline,
+                native sharing and file saving.
+              </p>
+              <Link className="ls-btn ls-btn-gold ls-self-start" to="/downloads">
+                Download for Android
+              </Link>
+            </div>
+          </div>
+          <div className="ls-band">
+            <div>
+              <Kicker>Your campaigns, close at hand</Kicker>
+              <p>
+                Sign in to save memberships, reusable character profiles, and private cloud
+                backups when you choose. Guest play stays available.
+              </p>
+            </div>
+            <Link className="ls-btn ls-btn-ghost" to="/account">
+              My campaign library
+            </Link>
+          </div>
+          <p className="ls-fine ls-center">
+            Comparing the browser and Android apps?{" "}
+            <Link to="/downloads" hash="platform-comparison">
+              See Browser or Android
+            </Link>
+            .
+          </p>
+        </div>
       </section>
     </Website>
   );
@@ -416,14 +477,16 @@ export function UpdatesPage() {
 export function HelpPage() {
   return (
     <Website>
-      <section className="ls-wrap ls-section ls-reading">
-        <p className="ls-eyebrow">THE LOOTSPLIT FIELD GUIDE</p>
-        <h1>A little help, adventurer.</h1>
-        <p className="ls-intro">
+      <PageHero kicker="The Lootsplit field guide" title="A little help, adventurer.">
+        <p className="ls-lead ls-measure">
           Menus, money, encounters and recovery. Find a topic and jump straight to the tool you
           need.
         </p>
-        <HelpContent />
+      </PageHero>
+      <section className="ls-ink ls-section ls-section-tight">
+        <div className="ls-wrap ls-reading">
+          <HelpContent />
+        </div>
       </section>
     </Website>
   );

@@ -1,7 +1,20 @@
-/** Add every new third-party content/data resource here when integrating it. */
-export const resources = [
+/**
+ * Add every new third-party content/data resource here when integrating it.
+ * `kind: "reference"` marks engineering and design references (documentation,
+ * APIs, layout inspiration) with nothing bundled; everything else is a credit.
+ */
+export type Resource = {
+  name: string;
+  kind?: "credit" | "reference";
+  description: string;
+  license?: string;
+  links: { label: string; url: string }[];
+};
+
+export const resources: Resource[] = [
   {
     name: "Android home-screen widget platform references",
+    kind: "reference",
     description:
       "Original Lootsplit RemoteViews layouts, encrypted local widget state and launcher controls follow Android’s platform documentation. The owner’s phone images informed the green terminal style; no screenshots, wallpaper, third-party interface code or sample metrics are bundled in the release.",
     license:
@@ -35,6 +48,7 @@ export const resources = [
   },
   {
     name: "Owner monitoring data and API references",
+    kind: "reference",
     description:
       "The private Field monitor reads this repository’s GitHub workflow and pull-request metadata. Optional Cloudflare analytics uses aggregate Worker requests/errors. The original website widget uses Lootsplit’s existing theme; the owner’s phone screenshots are design references for the separate Android home-screen widget and are not bundled in the app.",
     license: "API data and documentation references; respective provider terms apply",
@@ -52,6 +66,7 @@ export const resources = [
   },
   {
     name: "Project Zomboid Map interface reference",
+    kind: "reference",
     description:
       "The owner selected this interactive map as the explicit layout and interaction reference for Lootsplit Maps: edge-to-edge canvas, floating search/navigation, compact right controls, horizontal tools and overlay options. Lootsplit uses original components and campaign artwork; no game map, branding or third-party interface code is bundled.",
     license: "Design reference only; original source rights retained",
@@ -59,6 +74,7 @@ export const resources = [
   },
   {
     name: "Universal VTT interchange references",
+    kind: "reference",
     description:
       "Original Lootsplit importer follows documented UVTT 0.2/0.3 embedded image, grid, wall, portal and light fields. Exporter-specific behavior is disclosed for DM review. Documentation reference only; no third-party code or map artwork is bundled.",
     license: "Documentation reference; source site rights retained",
@@ -75,6 +91,7 @@ export const resources = [
   },
   {
     name: "Player display references",
+    kind: "reference",
     description:
       "Original Lootsplit presentation UI informed by the owner’s digital map-case reference. No video footage, map art, or third-party interface code is bundled. Browser fullscreen and casting behavior follows the linked platform documentation.",
     links: [
@@ -88,6 +105,7 @@ export const resources = [
   },
   {
     name: "Multiple-window web platform references",
+    kind: "reference",
     description:
       "Lootsplit’s original window controls and synchronization use standard browser APIs. Mozilla’s MDN documentation informed window opening, per-tab session storage, Web Locks and privacy-safe invalidation messages. No third-party interface assets or example code are bundled.",
     links: [
@@ -108,6 +126,7 @@ export const resources = [
   },
   {
     name: "Ship vehicle bookkeeping references",
+    kind: "reference",
     description:
       "Component-based ship statistics were informed by Wizards of the Coast’s 2018 Ships and the Sea Unearthed Arcana playtest and the 2014 Basic Rules object damage-threshold guidance. These are references, not bundled stat blocks or adopted official prices. Lootsplit’s editable demonstration ships, upgrades and economic defaults are original; mental abilities are omitted as requested.",
     links: [
@@ -123,6 +142,7 @@ export const resources = [
   },
   {
     name: "Reviewed resource-pack imports",
+    kind: "reference",
     description:
       "Lootsplit’s import schema and synthetic example are original. User-imported books retain their supplied attribution, copyright and source-page references in the private DM library. Book contents and artwork are not bundled with the application. Campaign-private immutable document storage follows Cloudflare’s D1 limits and atomic batch documentation; importing grants no redistribution license.",
     links: [
@@ -149,6 +169,7 @@ export const resources = [
   },
   {
     name: "Property marketplace design references",
+    kind: "reference",
     description:
       "First-party Zillow and Redfin product guidance informed location-first search, asking-price filters, image listings and side-by-side comparison. Lootsplit's fantasy interface and deed template are original; no listings, logos, photographs or proprietary app assets are copied.",
     links: [

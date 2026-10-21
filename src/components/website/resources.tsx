@@ -1,28 +1,71 @@
 import { Website } from "./site";
-import { resources } from "@/lib/website/resources";
+import { PageHero } from "./parts";
+import { resources, type Resource } from "@/lib/website/resources";
+
+const credits = resources.filter((resource) => resource.kind !== "reference");
+const references = resources.filter((resource) => resource.kind === "reference");
+
+function ResourceEntry({ resource }: { resource: Resource }) {
+  return (
+    <article className="ls-credit">
+      <h3>{resource.name}</h3>
+      <p>{resource.description}</p>
+      {resource.license && <p className="ls-credit-license">{resource.license}</p>}
+      <ul className="ls-resource-links">
+        {resource.links.map((link) => (
+          <li key={link.url}>
+            <a href={link.url}>{link.label} ↗</a>
+          </li>
+        ))}
+      </ul>
+    </article>
+  );
+}
+
 export function ResourcesPage() {
   return (
     <Website>
-      <section className="ls-wrap ls-section ls-reading">
-        <p className="ls-eyebrow">THE SOURCES BEHIND THE ADVENTURE</p>
-        <h1>Resources & credits</h1>
-        <p className="ls-intro">
+      <PageHero kicker="The sources behind the adventure" title="Resources & credits">
+        <p className="ls-lead ls-measure">
           Thank you to the projects and creators that help make Lootsplit possible. This list grows
           as new resources join the app.
         </p>
-        {resources.map((resource) => (
-          <article className="ls-help-block" key={resource.name}>
-            <h2>{resource.name}</h2>
-            <p>{resource.description}</p>
-            <div className="ls-resource-links">
-              {resource.links.map((link) => (
-                <a key={link.url} href={link.url}>
-                  {link.label} ↗
-                </a>
+      </PageHero>
+      <section className="ls-paper ls-section ls-section-tight" aria-labelledby="credits">
+        <div className="ls-wrap ls-stack ls-gap-lg">
+          <div className="ls-stack">
+            <h2 id="credits" className="ls-display">
+              Credits
+            </h2>
+            <p className="ls-lead">
+              Content, data, libraries and typefaces that ship with Lootsplit or that it reads,
+              with their creators and licenses.
+            </p>
+          </div>
+          <div className="ls-credit-grid">
+            {credits.map((resource) => (
+              <ResourceEntry key={resource.name} resource={resource} />
+            ))}
+          </div>
+        </div>
+      </section>
+      <section className="ls-ink ls-section ls-section-tight" aria-labelledby="technical">
+        <div className="ls-wrap">
+          <details className="ls-card ls-card-ink ls-disclosure">
+            <summary>
+              <h2 id="technical">Technical references</h2>
+              <span>
+                Platform documentation, APIs and design references used while building Lootsplit.
+                Nothing from these is bundled. {references.length} entries.
+              </span>
+            </summary>
+            <div className="ls-credit-grid ls-credit-grid-ink">
+              {references.map((resource) => (
+                <ResourceEntry key={resource.name} resource={resource} />
               ))}
             </div>
-          </article>
-        ))}
+          </details>
+        </div>
       </section>
     </Website>
   );

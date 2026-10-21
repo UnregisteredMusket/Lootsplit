@@ -24,6 +24,7 @@ import { roomLifecycleLabels } from "@/lib/quire/room-state";
 
 const publicPaths = new Set([
   "/welcome",
+  "/features",
   "/downloads",
   "/updates",
   "/help",
