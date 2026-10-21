@@ -23,6 +23,14 @@ export const resources = [
         label: "Android Keystore",
         url: "https://developer.android.com/privacy-and-security/keystore",
       },
+      {
+        label: "Widget provider metadata refresh",
+        url: "https://developer.android.com/reference/android/appwidget/AppWidgetManager#updateAppWidgetProviderInfo(android.content.ComponentName,java.lang.String)",
+      },
+      {
+        label: "Android launcher widget filtering (AOSP, Apache 2.0)",
+        url: "https://android.googlesource.com/platform/packages/apps/Launcher3/+/64cdbf5c770ec63f50d44bd7c0c2f03dcac11310/src_shortcuts_overrides/com/android/launcher3/model/WidgetsModel.java",
+      },
     ],
   },
   {

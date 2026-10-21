@@ -1,4 +1,9 @@
 <?xml version="1.0" encoding="utf-8"?>
 <manifest xmlns:android="http://schemas.android.com/apk/res/android">
-    <application><activity android:name=".WidgetAuditActivity" android:exported="false" android:theme="@android:style/Theme.Material.NoActionBar" /></application>
+    <application>
+        <activity android:name=".WidgetAuditActivity" android:exported="false" android:theme="@android:style/Theme.Material.NoActionBar" />
+        <receiver android:name=".CompanionWidgetProvider">
+            <meta-data android:name="lootsplit.audit.stale-provider" android:resource="@xml/companion_widget_stale_audit" />
+        </receiver>
+    </application>
 </manifest>

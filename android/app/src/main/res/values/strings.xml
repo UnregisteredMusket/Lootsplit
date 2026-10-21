@@ -5,5 +5,7 @@
     <string name="package_name">com.unregisteredmusket.lootsplit</string>
     <string name="custom_url_scheme">com.unregisteredmusket.lootsplit</string>
     <string name="owner_widget_name">Lootsplit Field monitor</string>
+    <string name="companion_widget_name">Lootsplit 4×1 companion</string>
+    <string name="companion_widget_description">Compact owner health, development, analytics or daily report. Add now; choose summaries and actions in widget settings. Sign in to show private readings.</string>
     <string name="owner_widget_description">Private owner status, analytics and deployment checks. Sign in and connect in My account. Resize for compact or full details.</string>
 </resources>

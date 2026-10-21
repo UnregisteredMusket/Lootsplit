@@ -20,6 +20,8 @@ public class OwnerWidgetPlugin extends Plugin {
         JSONObject state = WidgetStore.read(getContext());
         JSObject result = new JSObject();
         result.put("connected", !state.optString("token").isEmpty());
+        result.put("mainAvailable", WidgetRegistration.available(getContext(),OwnerWidgetProvider.class));
+        result.put("companionAvailable", WidgetRegistration.available(getContext(),CompanionWidgetProvider.class));
         result.put("installed", OwnerWidgetProvider.ids(getContext()).length + CompanionWidgetProvider.ids(getContext()).length);
         org.json.JSONArray companions = new org.json.JSONArray();
         for (int id : CompanionWidgetProvider.ids(getContext())) companions.put(id);
@@ -82,12 +84,17 @@ public class OwnerWidgetPlugin extends Plugin {
         }catch(Exception ignored){call.reject("Monitor snapshot could not be synchronized.");}
     }
     @PluginMethod public void pin(PluginCall call) {
+        WidgetRegistration.refresh(getContext(),true);
         if (Build.VERSION.SDK_INT < 26 || !AppWidgetManager.getInstance(getContext()).isRequestPinAppWidgetSupported()) {
             call.reject("Long-press your home screen, choose Widgets, then Lootsplit Field monitor."); return;
         }
         boolean requested = AppWidgetManager.getInstance(getContext()).requestPinAppWidget(
             new ComponentName(getContext(), "companion".equals(call.getString("kind")) ? CompanionWidgetProvider.class : OwnerWidgetProvider.class), null, null);
         JSObject result = new JSObject(); result.put("requested", requested); call.resolve(result);
+    }
+    @PluginMethod public void refreshRegistration(PluginCall call) {
+        WidgetRegistration.refresh(getContext(),true);
+        status(call);
     }
     @PluginMethod public void consumeOpenRequest(PluginCall call) {
         boolean open = getActivity().getIntent().getBooleanExtra(OwnerWidgetProvider.OPEN, false);

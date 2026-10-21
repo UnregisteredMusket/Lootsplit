@@ -59,8 +59,14 @@ jobs:
           api-level: ${{ matrix.api }}
           arch: x86_64
           target: google_apis
+          profile: pixel_6
           disable-animations: true
-          script: bash scripts/android-widget-instrumentation.sh
+          script: |
+            set -e
+            adb install -r android/app/build/outputs/apk/debug/app-debug.apk
+            python3 scripts/android-widget-picker-audit.py ${{ matrix.api == 35 && '--add-companion' || '' }}
+            adb uninstall com.unregisteredmusket.lootsplit
+            bash scripts/android-widget-instrumentation.sh
       - uses: actions/upload-artifact@v4
         if: always()
         with:

@@ -6,9 +6,12 @@ export type OwnerWidgetStatus = {
   pinSupported: boolean;
   companions?: number[];
   mainWidgets?: number[];
+  mainAvailable?: boolean;
+  companionAvailable?: boolean;
 };
 export const OwnerWidget = registerPlugin<{
   status(): Promise<OwnerWidgetStatus>;
+  refreshRegistration(): Promise<OwnerWidgetStatus>;
   connect(options: { token: string }): Promise<void>;
   disconnect(options: { expectedToken?: string }): Promise<void>;
   refresh(): Promise<void>;

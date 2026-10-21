@@ -326,6 +326,97 @@ public class OwnerWidgetTest {
         File dir=context.getExternalFilesDir("widget-audit");if(dir!=null)dir.mkdirs();
         try(FileOutputStream output=new FileOutputStream(new File(dir,name+".png"))){bitmap.compress(Bitmap.CompressFormat.PNG,100,output);}finally{bitmap.recycle();}
     }
+    private View textView(View view, String text) {
+        if (view instanceof TextView && text.contentEquals(((TextView)view).getText())) return view;
+        if (view instanceof ViewGroup) for (int i=0;i<((ViewGroup)view).getChildCount();i++) {
+            View found=textView(((ViewGroup)view).getChildAt(i),text);if(found!=null)return found;
+        }
+        return null;
+    }
+    @Test public void companionIsDiscoverableAndConfiguresThroughFrameworkWithoutAccount() throws Exception {
+        assertEquals("1",shell("getprop ro.kernel.qemu"));
+        WidgetStore.clear(context,null);
+        android.appwidget.AppWidgetManager manager=android.appwidget.AppWidgetManager.getInstance(context);
+        android.content.ComponentName component=new android.content.ComponentName(context,CompanionWidgetProvider.class);
+        android.appwidget.AppWidgetProviderInfo info=null;
+        int providers=0;
+        for(android.appwidget.AppWidgetProviderInfo candidate:manager.getInstalledProviders()) {
+            if(context.getPackageName().equals(candidate.provider.getPackageName()))providers++;
+            if(component.equals(candidate.provider))info=candidate;
+        }
+        assertEquals("Android must discover both independent widget providers",2,providers);
+        assertNotNull("Companion must be installed before any account activity opens",info);
+        assertEquals("Lootsplit 4×1 companion",info.loadLabel(context.getPackageManager()));
+        assertEquals(android.appwidget.AppWidgetProviderInfo.WIDGET_CATEGORY_HOME_SCREEN,info.widgetCategory);
+        if(android.os.Build.VERSION.SDK_INT>=28)assertEquals(0,info.widgetFeatures & android.appwidget.AppWidgetProviderInfo.WIDGET_FEATURE_HIDE_FROM_PICKER);
+        if(android.os.Build.VERSION.SDK_INT>=31){assertEquals(4,info.targetCellWidth);assertEquals(1,info.targetCellHeight);}
+        assertNotNull(info.configure);
+        shell("appwidget grantbind --package "+context.getPackageName()+" --user 0");
+        android.appwidget.AppWidgetHost host=new android.appwidget.AppWidgetHost(context,197410);
+        int id=host.allocateAppWidgetId(),second=host.allocateAppWidgetId();
+        WidgetAuditActivity activity=null;
+        android.app.Instrumentation instrumentation=InstrumentationRegistry.getInstrumentation();
+        android.app.Instrumentation.ActivityMonitor monitor=instrumentation.addMonitor(CompanionWidgetConfigureActivity.class.getName(),null,false);
+        CompanionWidgetConfigureActivity configuration=null;
+        try {
+            assertTrue(manager.bindAppWidgetIdIfAllowed(id,component));
+            assertTrue(manager.bindAppWidgetIdIfAllowed(second,component));
+            activity=(WidgetAuditActivity)instrumentation.startActivitySync(new android.content.Intent(context,WidgetAuditActivity.class).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK));
+            WidgetAuditActivity screen=activity;
+            instrumentation.runOnMainSync(()->host.startAppWidgetConfigureActivityForResult(screen,id,0,901,null));
+            configuration=(CompanionWidgetConfigureActivity)monitor.waitForActivityWithTimeout(5000);
+            assertNotNull("Launcher configuration must open for the bound companion",configuration);
+            instrumentation.waitForIdleSync();
+            CompanionWidgetConfigureActivity settings=configuration;
+            instrumentation.runOnMainSync(()->settings.choices.get("preset").setSelection(1));
+            instrumentation.waitForIdleSync();
+            instrumentation.runOnMainSync(()->assertTrue(textView(settings.getWindow().getDecorView(),"Apply preset").performClick()));
+            instrumentation.waitForIdleSync();
+            androidx.test.espresso.Espresso.onView(androidx.test.espresso.matcher.ViewMatchers.withText("Save widget"))
+                .perform(androidx.test.espresso.action.ViewActions.scrollTo(),androidx.test.espresso.action.ViewActions.click());
+            long deadline=android.os.SystemClock.elapsedRealtime()+5000;
+            while(screen.configurationResult==Integer.MIN_VALUE&&android.os.SystemClock.elapsedRealtime()<deadline)android.os.SystemClock.sleep(20);
+            assertEquals(android.app.Activity.RESULT_OK,screen.configurationResult);
+            assertEquals(id,screen.configuredWidget);
+            assertEquals("health",CompanionSettings.read(context,id).getString("first"));
+            assertEquals("task",CompanionSettings.read(context,second).getString("first"));
+            assertTrue("Adding/configuring must not create authorization",WidgetStore.read(context).optString("token").isEmpty());
+            String preserved=WidgetStore.connect(context,"synthetic-registration-preservation");
+            if(android.os.Build.VERSION.SDK_INT>=28) {
+                manager.updateAppWidgetProviderInfo(component,"lootsplit.audit.stale-provider");
+                assertNotEquals(0,manager.getAppWidgetInfo(id).widgetFeatures & android.appwidget.AppWidgetProviderInfo.WIDGET_FEATURE_HIDE_FROM_PICKER);
+            }
+            assertTrue("Upgrade registration refresh succeeds",WidgetRegistration.refresh(context,true));
+            assertEquals("Both placed companion IDs survive registration refresh",2,manager.getAppWidgetIds(component).length);
+            assertEquals("Instance preferences survive", "health",CompanionSettings.read(context,id).getString("first"));
+            assertEquals("Owner connection survives metadata refresh",preserved,WidgetStore.read(context).getString("generation"));
+            WidgetStore.clear(context,null);
+            if(android.os.Build.VERSION.SDK_INT>=28)assertEquals(0,manager.getAppWidgetInfo(id).widgetFeatures & android.appwidget.AppWidgetProviderInfo.WIDGET_FEATURE_HIDE_FROM_PICKER);
+            AtomicReference<android.appwidget.AppWidgetHostView> hosted=new AtomicReference<>();
+            instrumentation.runOnMainSync(()->{
+                host.startListening();android.appwidget.AppWidgetHostView view=host.createView(screen,id,manager.getAppWidgetInfo(id));
+                android.graphics.Rect padding=android.appwidget.AppWidgetHostView.getDefaultPaddingForWidget(context,component,null);
+                int height=Math.round(56*context.getResources().getDisplayMetrics().density)+padding.top+padding.bottom;
+                screen.setContentView(view,new ViewGroup.LayoutParams(-1,height));hosted.set(view);CompanionWidgetProvider.renderAll(context);
+            });
+            AtomicReference<String> identity=new AtomicReference<>("");deadline=android.os.SystemClock.elapsedRealtime()+5000;
+            while(android.os.SystemClock.elapsedRealtime()<deadline){
+                instrumentation.runOnMainSync(()->{TextView text=hosted.get().findViewById(R.id.companion_identity);identity.set(text==null?"":text.getText().toString());});
+                if(identity.get().equals("OWNER · SIGN IN"))break;android.os.SystemClock.sleep(20);
+            }
+            assertEquals("OWNER · SIGN IN",identity.get());
+            AtomicReference<Throwable> failure=new AtomicReference<>();
+            instrumentation.runOnMainSync(()->{try{captureHostedWidget(hosted.get(),"hosted-companion-signed-out");}catch(Throwable e){failure.set(e);}});
+            if(failure.get()!=null)throw new AssertionError("Companion framework capture",failure.get());
+            assertTrue("Adding/configuring must not create account authorization",WidgetStore.read(context).optString("token").isEmpty());
+        } finally {
+            if(configuration!=null){CompanionWidgetConfigureActivity settings=configuration;instrumentation.runOnMainSync(settings::finish);}
+            if(activity!=null){WidgetAuditActivity screen=activity;instrumentation.runOnMainSync(screen::finish);}
+            instrumentation.waitForIdleSync();instrumentation.removeMonitor(monitor);
+            host.stopListening();host.deleteHost();CompanionSettings.remove(context,id);CompanionSettings.remove(context,second);
+            shell("appwidget revokebind --package "+context.getPackageName()+" --user 0");
+        }
+    }
     @Test public void actualFrameworkHostScrollsCollectionAndClearsRevokedRows() throws Exception {
         assertEquals("1",shell("getprop ro.kernel.qemu"));
         shell("appwidget grantbind --package "+context.getPackageName()+" --user 0");
@@ -339,7 +430,9 @@ public class OwnerWidgetTest {
             activity=(WidgetAuditActivity)InstrumentationRegistry.getInstrumentation().startActivitySync(new android.content.Intent(context,WidgetAuditActivity.class).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK));
             WidgetAuditActivity screen=activity;AtomicReference<android.appwidget.AppWidgetHostView> hosted=new AtomicReference<>();
             InstrumentationRegistry.getInstrumentation().runOnMainSync(()->{
-                host.startListening();android.appwidget.AppWidgetHostView view=host.createView(screen,id,manager.getAppWidgetInfo(id));screen.setContentView(view);hosted.set(view);
+                host.startListening();android.appwidget.AppWidgetHostView view=host.createView(screen,id,manager.getAppWidgetInfo(id));
+                float density=context.getResources().getDisplayMetrics().density;
+                screen.setContentView(view,new ViewGroup.LayoutParams(Math.round(350*density),Math.round(400*density)));hosted.set(view);
                 OwnerWidgetProvider.renderAll(context);
             });
             long deadline=android.os.SystemClock.elapsedRealtime()+8000;AtomicInteger count=new AtomicInteger();
