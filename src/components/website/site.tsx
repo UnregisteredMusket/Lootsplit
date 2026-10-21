@@ -314,8 +314,8 @@ export function WelcomePage() {
             {areas.map(([shot, anchor, title, text]) => (
               <li key={title}>
                 <Link className="ls-area" to="/features" hash={anchor}>
-                  <Shot name={shot} size="inset" />
                   <h3>{title}</h3>
+                  <Shot name={shot} size="inset" />
                   <p>{text}</p>
                 </Link>
               </li>

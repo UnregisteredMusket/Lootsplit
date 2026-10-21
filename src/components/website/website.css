@@ -946,6 +946,11 @@
 .ls-feature-area.is-flip > .ls-frame {
   order: 2;
 }
+.ls-area-head {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
 .ls-feature-area h2 {
   font-size: clamp(38px, 3.4vw + 16px, 60px);
 }
@@ -1393,8 +1398,19 @@
   .ls-ledger {
     grid-template-columns: minmax(0, 1fr);
   }
-  .ls-feature-area.is-flip > .ls-frame {
+  /* Stacked: the section's title sits above its screenshot, then the description and list. */
+  .ls-feature-area > .ls-stack {
+    display: contents;
+  }
+  .ls-feature-area > .ls-stack > .ls-area-head {
     order: 0;
+  }
+  .ls-feature-area > .ls-frame,
+  .ls-feature-area.is-flip > .ls-frame {
+    order: 1;
+  }
+  .ls-feature-area > .ls-stack > :not(.ls-area-head) {
+    order: 2;
   }
   .ls-ledger-entry,
   .ls-ledger-entry:first-child {
