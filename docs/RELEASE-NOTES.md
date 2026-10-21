@@ -8,7 +8,7 @@ Android version code **14**, same package and permanent signing certificate.
 
 ## Improved
 
-- Add the4×1 companion with its default Development preset, then choose summaries, actions and theme from Settings.
+- Add the 4×1 companion with its default Development preset, then choose summaries, actions and theme from Settings.
 - Place either widget before connecting owner access; private readings still require authorization.
 - Refresh widget list safely reannounces both types and reports Android’s detection state.
 
@@ -20,7 +20,7 @@ Android version code **14**, same package and permanent signing certificate.
 
 ## Release verification
 
-Published October21,2026 after API24/API35, complete PR/main preservation checks and the signed-APK upgrade gate passed. The public APK matches the signing artifact and checksum; independent inspection confirms the permanent certificate, package, version1.9.1/code14 and both widget providers. See [signed release evidence](audit/android-widget-picker-release-evidence.json). The exact cause on the reported physical launcher has not been confirmed; emulator evidence and the defensive recovery behavior must not be presented as physical-device verification. Install over the existing signed app; do not uninstall or clear saved data. See [picker investigation](audit/2026-10-21-widget-picker.md).
+Published October 21, 2026 after API 24/API 35, complete PR/main preservation checks and the signed-APK upgrade gate passed. The public APK matches the signing artifact and checksum; independent inspection confirms the permanent certificate, package, version 1.9.1/code 14 and both widget providers. See [signed release evidence](audit/android-widget-picker-release-evidence.json). The exact cause on the reported physical launcher has not been confirmed; emulator evidence and the defensive recovery behavior must not be presented as physical-device verification. Install over the existing signed app; do not uninstall or clear saved data. See [picker investigation](audit/2026-10-21-widget-picker.md).
 
 ---
 
