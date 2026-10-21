@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Field monitor root during a confirmed failure: the same opaque terminal fill the code applies, with a red border. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android">
+    <solid android:color="#071712" />
+    <corners android:radius="24dp" />
+    <stroke android:width="2dp" android:color="#8CF47272" />
+</shape>

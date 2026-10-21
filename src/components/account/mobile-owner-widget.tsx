@@ -114,9 +114,9 @@ export function MobileOwnerWidget({ name, email }: { name: string; email: string
         Unconnected Cloudflare traffic stays labeled.
       </p>
       <p className="text-sm text-muted">
-        Your name, email and private totals will be visible on your home screen. Signing out,
-        switching accounts or disconnecting clears this device’s widget. Server-revoked access
-        clears on its next server check. Removing the final widget disconnects it.
+        Your name and private totals will be visible on your home screen. Signing out, switching
+        accounts or disconnecting clears this device’s widget. Server-revoked access clears on its
+        next server check. Removing the final widget disconnects it.
       </p>
       {!supported ? (
         <p className="text-sm">
