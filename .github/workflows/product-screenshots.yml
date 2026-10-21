@@ -40,6 +40,22 @@ jobs:
           cache: npm
       - run: npm ci
       - run: npx playwright install --with-deps chromium
+      - name: Fetch Cormorant italic and Cormorant SC (review branch only)
+        run: |
+          mkdir -p docs/site-fonts && cd docs/site-fonts
+          npm pack @fontsource/cormorant-garamond@5 @fontsource/cormorant-sc@5
+          for f in *.tgz; do mkdir "${f%.tgz}"; tar xzf "$f" -C "${f%.tgz}"; done
+          cp fontsource-cormorant-garamond-*/package/files/cormorant-garamond-latin-600-italic.woff2 .
+          cp fontsource-cormorant-garamond-*/package/files/cormorant-garamond-latin-700-italic.woff2 .
+          cp fontsource-cormorant-garamond-*/package/files/cormorant-garamond-latin-700-normal.woff2 ./compare-700-normal.woff2
+          cp fontsource-cormorant-sc-*/package/files/cormorant-sc-latin-600-normal.woff2 .
+          cp fontsource-cormorant-sc-*/package/files/cormorant-sc-latin-700-normal.woff2 .
+          cp fontsource-cormorant-sc-*/package/LICENSE cormorant-sc-LICENSE.txt
+          cp fontsource-cormorant-garamond-*/package/LICENSE cormorant-garamond-fontsource-LICENSE.txt
+          cat fontsource-*/package/package.json | grep -E '"(name|version|license)"' > versions.txt
+          rm -rf fontsource-* *.tgz
+          cp cormorant-*.woff2 ../../public/fonts/
+          ls -la
       - name: Start disposable development server
         timeout-minutes: 3
         run: |
@@ -93,7 +109,7 @@ jobs:
           [ -d docs/product-screenshots ] || [ -d docs/site-screenshots ] || exit 0
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add docs/product-screenshots docs/site-screenshots 2>/dev/null || git add docs/*-screenshots
+          git add docs/*-screenshots docs/site-fonts
           if git diff --cached --quiet; then echo "No screenshot changes."; exit 0; fi
           git commit -m "Capture product screenshots [skip ci]"
           git push origin "HEAD:${GITHUB_REF_NAME}"
