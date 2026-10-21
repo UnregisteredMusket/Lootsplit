@@ -175,7 +175,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Development / accounts / dev-character | open | 3 | 12s → 23s | +11s | +91.67% |
 | Verify preserved functionality | open | 4 | 205s → 1108s | +903s | +440.49% |
 | Packaged Worker / interface / worker-help | open | 3 | 6s → 57s | +51s | +850% |
-| Verify preserved functionality / initial queue | open | 2 | 3s → 70s | +67s | +2233.33% |
+| Verify preserved functionality / initial queue | open | 3 | 3s → 104s | +101s | +3366.67% |
 | Development / governance / Run actions/checkout@v4 | open | 2 | 1s → 3s | +2s | +200% |
 | Development / desktop / Run npx playwright install --with-deps chromium | open | 2 | 21s → 42s | +21s | +100% |
 | Development / gameplay / dev-bug-data-integrity | open | 2 | 5s → 7s | +2s | +40% |
@@ -195,6 +195,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | verify / Development / gameplay / Run actions/setup-node@v4 | open | 2 | 2s → 5s | +3s | +150% |
 | verify / Development / gameplay | open | 2 | 88s → 191s | +103s | +117.05% |
 | Development / gameplay | open | 3 | 145s → 911s | +766s | +528.28% |
+| Development / accounts / dev-member | open | 2 | 6s → 9s | +3s | +50% |
 | Development / accounts / dev-character | open | 2 | 13s → 20s | +7s | +53.85% |
 | Code checks and immutable builds / lint | open | 5 | 7s → 20s | +13s | +185.71% |
 | Packaged Worker / interface / worker-sound | open | 4 | 6s → 25s | +19s | +316.67% |
@@ -349,6 +350,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Packaged Worker / accounts (balanced v2) / worker-ships | open | 2 | 33s → 45s | +12s | +36.36% |
 | Packaged Worker / accounts (balanced v2) / worker-map-tiles | open | 3 | 20s → 115s | +95s | +475% |
 | Packaged Worker / interface (balanced v2) / Run actions/upload-artifact@v4 | open | 2 | 3s → 5s | +2s | +66.67% |
+| Development / gameplay (balanced v2) / Set up job | open | 2 | 1s → 3s | +2s | +200% |
 | Development / desktop (balanced v2) / dev-map-tiles | open | 4 | 35s → 169s | +134s | +382.86% |
 | Packaged Worker / accounts (balanced v2) | open | 2 | 497s → 702s | +205s | +41.25% |
 | Packaged Worker / accounts (balanced v2) / Run actions/upload-artifact@v4 | open | 2 | 3s → 7s | +4s | +133.33% |
@@ -387,6 +389,9 @@ Open trends require investigation. Resolved trends retain their history; each ve
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-21T08:06:28Z | step: Development / accounts / dev-member | 7s → 9s | +2s | +28.57% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37405125361/job/112080868256) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39566149281/job/119109456454) |
+| 2026-10-21T08:03:06Z | step: Development / gameplay (balanced v2) / Set up job | 2s → 3s | +1s | +50% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38938272606/job/117099144147) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39566149281/job/119109456029) |
+| 2026-10-21T08:03:03.000Z | queue: Verify preserved functionality / initial queue | 70s → 104s | +34s | +48.57% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39562466407) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39566149281) |
 | 2026-10-21T08:06:27Z | step: Development / governance / Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 | 2s → 3s | +1s | +50% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39561218697/job/119092688822) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39565860808/job/119107905255) |
 | 2026-10-21T08:03:35Z | step: Development / gameplay / dev-finance | 48s → 67s | +19s | +39.58% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38146215202/job/114490112399) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39565860808/job/119107905130) |
 | 2026-10-21T08:00:20Z | step: Development / governance / Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262 | 1s → 2s | +1s | +100% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39561218697/job/119092688822) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39565860808/job/119107905255) |
