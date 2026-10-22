@@ -132,6 +132,10 @@ final class WidgetData {
         }
         JSONObject month = data.optJSONObject("windows") == null ? null : data.optJSONObject("windows").optJSONObject("month");
         String elapsed = month == null ? "—" : percent(month.opt("elapsedPercent"));
+        // Servers since 2026-10-22 send the billing cycle ("Cycle since Oct 11"); older ones the calendar month.
+        String cycleLabel = month == null ? "" : text(month, "label");
+        boolean billingCycle = month != null && "billing-cycle".equals(text(month, "basis")) && cycleLabel.matches("[A-Za-z0-9 ]{1,32}");
+        String windowName = billingCycle ? cycleLabel : "Month";
         for (int i = 0; i < metrics.length() && rows.length() < USAGE_ROWS; i++) {
             JSONObject metric = metrics.optJSONObject(i);
             if (metric == null) continue;
@@ -143,7 +147,7 @@ final class WidgetData {
                     .put("detail", "No reading" + (code.matches("[A-Z0-9_]{1,40}") ? " (" + code + ")" : "") + "; not counted as zero"));
                 continue;
             }
-            // Month to date at or above 80% of the allowance (or over it) is amber; never red: overage is billed, not an outage.
+            // Billing cycle to date at or above 80% of the allowance (or over it) is amber; never red: overage is billed, not an outage.
             String color = "attention".equals(level) || "over".equals(level) ? "yellow" : "";
             if ("bytes".equals(unit)) {
                 Object databases = metric.opt("databases");
@@ -156,11 +160,11 @@ final class WidgetData {
             rows.put(new JSONObject().put("color", color)
                 .put("title", label + " today " + amount(part(metric, "day", "value"), unit))
                 .put("detail", percent(part(metric, "day", "percent")) + " of daily share\n7d " + amount(part(metric, "week", "value"), unit)
-                    + " (" + percent(part(metric, "week", "percent")) + " of weekly share)\nMonth " + amount(part(metric, "month", "value"), unit)
+                    + " (" + percent(part(metric, "week", "percent")) + " of weekly share)\n" + windowName + " " + amount(part(metric, "month", "value"), unit)
                     + " (" + percent(part(metric, "month", "percent")) + " of " + allowance(metric.opt("monthlyAllowance"), unit) + ")"));
         }
         return out.put("state", "ready").put("reason", "").put("rows", rows)
-            .put("summary", "Workers Paid allowance · account-wide, UTC · " + elapsed + " of month elapsed");
+            .put("summary", "Workers Paid allowance · account-wide, UTC · " + elapsed + " of " + (billingCycle ? "billing cycle elapsed · " + Character.toLowerCase(cycleLabel.charAt(0)) + cycleLabel.substring(1) : "month elapsed"));
     }
     /** healthy, attention (a recent problem, not current), unverified or failure; older servers send only a colour. */
     static String statusKind(JSONObject overall) {

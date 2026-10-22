@@ -136,7 +136,7 @@ export const BUILTIN_LOGS = [
     "Cloudflare plan usage",
     "interval",
     2 * USAGE_HOUR,
-    "Hourly account-wide Worker requests and CPU time and D1 rows read, rows written and storage against the Workers Paid included allowance (daily and weekly shares and month to date). An unavailable metric is an explicit gap, never zero.",
+    "Hourly account-wide Worker requests and CPU time and D1 rows read, rows written and storage against the Workers Paid included allowance (daily and weekly shares and billing cycle to date, from the renewal day). An unavailable metric is an explicit gap, never zero.",
   ],
   [
     "room-storage",
@@ -1728,7 +1728,7 @@ async function buildReport(db, day, settings, now) {
   const cloudflareUsage = {
     readings: usageEntries.length,
     available: usageEntries.filter((e) => e.usage.state === "ready").length,
-    // The newest reading of the day (its month to date covers the day); null stays a gap.
+    // The newest reading of the day (its billing cycle to date covers the day); null stays a gap.
     latest: lastUsage
       ? { observedAt: lastUsage.observedAt, summary: lastUsage.summary, usage: lastUsage.usage }
       : null,
