@@ -18,7 +18,26 @@ import javax.crypto.spec.GCMParameterSpec;
 /** Private, backup-excluded widget state. Never return its credential to JavaScript or a host. */
 final class WidgetStore {
     private static final String KEY = "lootsplit.owner.widget.v1";
+    /** Set on the copy {@link #read} returns while Keystore/IO is temporarily unavailable. */
+    static final String UNAVAILABLE = "storageUnavailable";
     private static JSONObject state;
+    /** Package-private seam so instrumentation can simulate a busy Keystore; never app or JS input. */
+    interface KeySource { SecretKey key() throws Exception; }
+    static volatile KeySource keys = WidgetStore::key;
+
+    /** Thrown only when the stored file can never be read again (corrupt, restored, key invalidated). */
+    static final class Corrupt extends Exception { Corrupt(String message) { super(message); } }
+
+    /** Only these failures prove the credential is unrecoverable; anything else may succeed on retry. */
+    static boolean permanent(Throwable failure) {
+        return failure instanceof Corrupt
+            // AEADBadTagException (tag mismatch: tampered file, or a key that is not the one that wrote it).
+            // A Keystore daemon failure inside doFinal surfaces as IllegalBlockSizeException: transient.
+            || failure instanceof javax.crypto.BadPaddingException
+            || failure instanceof org.json.JSONException
+            || failure instanceof android.security.keystore.KeyPermanentlyInvalidatedException
+            || failure instanceof java.security.UnrecoverableKeyException;
+    }
 
     static File file(Context context) {
         return new File(context.getNoBackupFilesDir(), "owner-widget.enc");
@@ -43,33 +62,54 @@ final class WidgetStore {
             .put("message", "Connect in My account");
     }
 
-    static synchronized JSONObject read(Context context) {
-        try {
-            if (state == null) {
-                AtomicFile file = new AtomicFile(file(context));
-                if (file.getBaseFile().exists()) {
-                    byte[] bytes = file.readFully();
-                    if (bytes.length < 29 || bytes.length > 262144) throw new Exception("Invalid storage");
-                    Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
-                    cipher.init(Cipher.DECRYPT_MODE, key(), new GCMParameterSpec(128, bytes, 0, 12));
-                    state = new JSONObject(new String(cipher.doFinal(bytes, 12, bytes.length - 12), StandardCharsets.UTF_8));
-                } else state = empty();
-            }
-            return new JSONObject(state.toString());
-        } catch (Exception ignored) {
-            // A restored/corrupt file or invalidated key cannot restore owner access.
-            new AtomicFile(file(context)).delete();
-            try { state = empty(); } catch (Exception impossible) { state = new JSONObject(); }
-            return new JSONObject();
-        }
+    private static JSONObject load(Context context) throws Exception {
+        AtomicFile file = new AtomicFile(file(context));
+        if (!file.getBaseFile().exists()) return empty();
+        byte[] bytes = file.readFully();
+        if (bytes.length < 29 || bytes.length > 262144) throw new Corrupt("Invalid storage");
+        Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
+        SecretKey key = keys.key();
+        if (key == null) throw new java.security.KeyStoreException("Key unavailable");
+        cipher.init(Cipher.DECRYPT_MODE, key, new GCMParameterSpec(128, bytes, 0, 12));
+        return new JSONObject(new String(cipher.doFinal(bytes, 12, bytes.length - 12), StandardCharsets.UTF_8));
     }
+
+    static synchronized JSONObject read(Context context) {
+        if (state == null) {
+            Exception failure = null;
+            // One immediate retry absorbs a momentarily busy Keystore daemon.
+            for (int attempt = 0; attempt < 2 && state == null; attempt++) {
+                try { state = load(context); failure = null; }
+                catch (Exception error) { failure = error; if (permanent(error)) break; }
+            }
+            if (state == null) {
+                if (failure != null && permanent(failure)) {
+                    // A restored/corrupt file or invalidated key cannot restore owner access.
+                    new AtomicFile(file(context)).delete();
+                    try { state = empty(); } catch (Exception impossible) { state = new JSONObject(); }
+                    return new JSONObject();
+                }
+                // Transient Keystore/IO error: keep the encrypted connection and report it, uncached,
+                // so the next read tries again. No token is returned, and the generation never matches.
+                try { return new JSONObject().put(UNAVAILABLE, true).put("message", WidgetRefresh.STORAGE_BUSY); }
+                catch (org.json.JSONException impossible) { return new JSONObject(); }
+            }
+        }
+        try { return new JSONObject(state.toString()); }
+        catch (org.json.JSONException impossible) { return new JSONObject(); }
+    }
+
+    /** Instrumentation only: drop the in-memory copy, as a new process would. */
+    static synchronized void forgetCache() { state = null; }
 
     private static void save(Context context, JSONObject next) throws Exception {
         AtomicFile file = new AtomicFile(file(context));
         FileOutputStream stream = null;
         try {
             Cipher cipher = Cipher.getInstance("AES/GCM/NoPadding");
-            cipher.init(Cipher.ENCRYPT_MODE, key());
+            SecretKey key = keys.key();
+            if (key == null) throw new java.security.KeyStoreException("Key unavailable");
+            cipher.init(Cipher.ENCRYPT_MODE, key);
             byte[] encrypted = cipher.doFinal(next.toString().getBytes(StandardCharsets.UTF_8));
             stream = file.startWrite();
             stream.write(cipher.getIV());
@@ -78,7 +118,8 @@ final class WidgetStore {
             state = next;
         } catch (Exception failure) {
             if (stream != null) file.failWrite(stream);
-            clear(context, null);
+            // failWrite keeps the previous file; only an unusable key also ends the connection.
+            if (permanent(failure)) clear(context, null);
             throw failure;
         }
     }
@@ -113,7 +154,9 @@ final class WidgetStore {
     }
 
     static synchronized boolean clear(Context context, String expectedToken) {
-        if (expectedToken != null && !expectedToken.equals(read(context).optString("token"))) return false;
+        JSONObject current = expectedToken == null ? null : read(context);
+        // Sign-out wins when the stored token cannot be compared: the connection is removed.
+        if (current != null && !current.optBoolean(UNAVAILABLE) && !expectedToken.equals(current.optString("token"))) return false;
         new AtomicFile(file(context)).delete();
         try { state = empty(); } catch (Exception ignored) { state = new JSONObject(); }
         return true;

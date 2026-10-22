@@ -19,10 +19,18 @@ export const OwnerWidget = registerPlugin<{
   pin(options?: { kind?: "main" | "companion" }): Promise<{ requested: boolean }>;
   configure(options: { widgetId: number }): Promise<void>;
   consumeOpenRequest(): Promise<{ open: boolean; destination?: string }>;
+  installId(): Promise<{ id: string }>;
 }>("OwnerWidget");
 
 export function hasOwnerWidget() {
   return import.meta.env.VITE_MOBILE === "true" && Capacitor.isPluginAvailable("OwnerWidget");
+}
+
+/** This installation's id from native no-backup storage; "" when unknown. */
+export async function readInstallId(): Promise<string> {
+  if (!hasOwnerWidget()) return "";
+  const { id } = await OwnerWidget.installId();
+  return typeof id === "string" ? id : "";
 }
 
 /** Called before account switches/sign-out; no widget credential survives that transition. */

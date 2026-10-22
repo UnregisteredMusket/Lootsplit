@@ -67,6 +67,13 @@ public class OwnerWidgetPlugin extends Plugin {
         }
         call.resolve();
     }
+    /** Random per-installation id from no-backup storage (never a credential); binds the WebView account token. */
+    @PluginMethod public void installId(PluginCall call) {
+        // Plugin calls already run off the UI thread; the id is one small private file.
+        JSObject result = new JSObject();
+        result.put("id", WidgetStore.deviceId(getContext()));
+        call.resolve(result);
+    }
     @PluginMethod public void refresh(PluginCall call) {
         WidgetRefresh.request(getContext(), true, error -> {
             if (error.isEmpty()) call.resolve(); else call.reject(error);

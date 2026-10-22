@@ -14,18 +14,28 @@ final class WidgetClient {
     // closed pull requests, device reports), keeping the response far below the 256 KiB bound.
     static final String ENDPOINT = "https://lootsplit.oliverstorie2017.workers.dev/api/account/owner/monitor?view=widget";
     static final class AccessDenied extends Exception { }
+    // Every HTTP limit ends inside WidgetRefresh's task deadline, so a slow server or network
+    // releases the fetch thread instead of holding it past the tap/job that started it.
+    static final int CONNECT_TIMEOUT_MILLIS = 3000, READ_TIMEOUT_MILLIS = 3000;
+    static final long TOTAL_TIMEOUT_MILLIS = 6000;
+    // Disconnecting from another thread aborts a blocked connect/read that the per-call socket
+    // timeouts alone cannot bound (a slow trickle, or a read already waiting when the total expires).
+    private static final java.util.concurrent.ScheduledExecutorService WATCHDOG =
+        java.util.concurrent.Executors.newSingleThreadScheduledExecutor();
     interface ConnectionFactory { HttpsURLConnection open() throws Exception; }
 
     static JSONObject fetch(String token) throws Exception {
         return fetch(token, () -> (HttpsURLConnection) new URL(ENDPOINT).openConnection(), System.currentTimeMillis());
     }
     static JSONObject fetch(String token, ConnectionFactory factory, long now) throws Exception {
-        long deadline = System.nanoTime() + 20000000000L;
+        long deadline = System.nanoTime() + TOTAL_TIMEOUT_MILLIS * 1000000L;
         HttpsURLConnection connection = factory.open();
+        java.util.concurrent.ScheduledFuture<?> watchdog = WATCHDOG.schedule(connection::disconnect,
+            TOTAL_TIMEOUT_MILLIS, java.util.concurrent.TimeUnit.MILLISECONDS);
         try {
             connection.setInstanceFollowRedirects(false);
-            connection.setConnectTimeout(10000);
-            connection.setReadTimeout(12000);
+            connection.setConnectTimeout(CONNECT_TIMEOUT_MILLIS);
+            connection.setReadTimeout(READ_TIMEOUT_MILLIS);
             connection.setUseCaches(false);
             connection.setRequestProperty("Authorization", "Bearer " + token);
             connection.setRequestProperty("Accept", "application/json");
@@ -51,7 +61,7 @@ final class WidgetClient {
                 }
                 return WidgetData.project(new JSONObject(output.toString(StandardCharsets.UTF_8.name())), now);
             }
-        } finally { connection.disconnect(); }
+        } finally { watchdog.cancel(false); connection.disconnect(); }
     }
 
 }

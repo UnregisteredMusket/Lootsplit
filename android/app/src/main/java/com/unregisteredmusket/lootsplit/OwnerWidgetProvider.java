@@ -57,7 +57,8 @@ public class OwnerWidgetProvider extends AppWidgetProvider {
         boolean light=WidgetAppearance.light(context,id);
         int ink=Color.rgb(32,72,51), text=light?ink:Color.rgb(230,248,236), muted=light?ink:Color.rgb(177,214,193), accent=light?ink:Color.rgb(19,245,128);
         JSONObject snapshot=current(state),task=snapshot==null?null:snapshot.optJSONObject("task");
-        boolean connected=!state.optString("token").isEmpty(); String message=state.optString("message");
+        // A busy Keystore keeps the saved connection: show Refresh/retry, not Sign in.
+        boolean connected=!state.optString("token").isEmpty()||state.optBoolean(WidgetStore.UNAVAILABLE); String message=state.optString("message");
         boolean refreshing=connected&&"Refreshing…".equals(message);
         String status=statusColor(snapshot); boolean failure=snapshot!=null&&"red".equals(status);
         org.json.JSONArray rows=WidgetRows.rows(snapshot);

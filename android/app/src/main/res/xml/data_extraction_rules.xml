@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 12 and later (dataExtractionRules). Same exclusions as backup_rules.xml for both cloud
+     backup and device-to-device transfer; campaign saves stay included. -->
+<data-extraction-rules>
+    <cloud-backup>
+        <exclude domain="root" path="app_webview/Default/Session Storage/" />
+        <exclude domain="root" path="app_webview/Default/Cookies" />
+        <exclude domain="root" path="app_webview/Default/Cookies-journal" />
+        <exclude domain="root" path="app_webview/Cookies" />
+        <exclude domain="root" path="app_webview/Cookies-journal" />
+    </cloud-backup>
+    <device-transfer>
+        <exclude domain="root" path="app_webview/Default/Session Storage/" />
+        <exclude domain="root" path="app_webview/Default/Cookies" />
+        <exclude domain="root" path="app_webview/Default/Cookies-journal" />
+        <exclude domain="root" path="app_webview/Cookies" />
+        <exclude domain="root" path="app_webview/Cookies-journal" />
+    </device-transfer>
+</data-extraction-rules>

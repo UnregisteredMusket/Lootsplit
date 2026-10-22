@@ -20,7 +20,8 @@ public class CompanionWidgetProvider extends AppWidgetProvider {
         String theme=settings.optString("theme","terminal"); boolean light="light".equals(theme)||"system".equals(theme)&&(context.getResources().getConfiguration().uiMode&android.content.res.Configuration.UI_MODE_NIGHT_MASK)!=android.content.res.Configuration.UI_MODE_NIGHT_YES;
         int ink=light?Color.rgb(32,53,46):Color.rgb(230,248,236), muted=light?Color.rgb(32,53,46):Color.rgb(177,214,193), tint=light?Color.rgb(32,72,51):Color.rgb(19,245,128);
         view.setInt(R.id.companion_root,"setBackgroundColor",light?Color.rgb(247,242,228):Color.rgb(7,23,18));
-        boolean connected=!state.optString("token").isEmpty(); String message=state.optString("message");
+        // A busy Keystore keeps the saved connection: show Refresh/retry, not Sign in.
+        boolean connected=!state.optString("token").isEmpty()||state.optBoolean(WidgetStore.UNAVAILABLE); String message=state.optString("message");
         String status=OwnerWidgetProvider.statusColor(snapshot);
         String first=settings.optString("first","task"),second=settings.optString("second","timer");
         long now=System.currentTimeMillis();

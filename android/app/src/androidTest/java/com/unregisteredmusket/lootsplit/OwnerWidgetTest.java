@@ -39,7 +39,9 @@ public class OwnerWidgetTest {
         WidgetStore.clear(context, null); OwnerWidgetJob.cancel(context);
         WidgetRefresh.fetcher = WidgetClient::fetch;
         WidgetRefresh.alarm = DEFAULT_ALARM; WidgetRefresh.cancelActivity(context);
+        WidgetStore.keys = DEFAULT_KEYS; WidgetStore.forgetCache();
     }
+    private static final WidgetStore.KeySource DEFAULT_KEYS = WidgetStore.keys;
     private static final WidgetRefresh.ActivityAlarm DEFAULT_ALARM = WidgetRefresh.alarm;
 
     private JSONObject fixture() throws Exception {
@@ -236,6 +238,138 @@ public class OwnerWidgetTest {
             assertEquals(next, WidgetStore.read(context).getString("generation"));
             assertEquals("synthetic-new-owner", WidgetStore.read(context).getString("token"));
         } finally { release.countDown(); }
+    }
+
+    @Test public void transientKeystoreErrorKeepsConnectionButCorruptionClearsIt() throws Exception {
+        String generation = WidgetStore.connect(context, "synthetic-keystore");
+        JSONObject old = WidgetData.project(fixture(), System.currentTimeMillis());
+        assertTrue(WidgetStore.finish(context, generation, old, ""));
+        // A busy Keystore while a new process first reads the file: report it, keep the file.
+        WidgetStore.keys = () -> { throw new java.security.KeyStoreException("synthetic busy keystore"); };
+        WidgetStore.forgetCache();
+        JSONObject busy = WidgetStore.read(context);
+        assertTrue(busy.optBoolean(WidgetStore.UNAVAILABLE));
+        assertEquals("", busy.optString("token"));
+        assertTrue("Transient errors must not delete the credential", WidgetStore.file(context).exists());
+        CountDownLatch refused = new CountDownLatch(1);
+        AtomicReference<String> errorText = new AtomicReference<>();
+        assertNull(WidgetRefresh.request(context, true, error -> { errorText.set(error); refused.countDown(); }));
+        assertTrue(refused.await(1, TimeUnit.SECONDS));
+        assertEquals(WidgetRefresh.STORAGE_BUSY, errorText.get());
+        assertTrue(WidgetRefresh.transientFailure(errorText.get()));
+        View widget = OwnerWidgetProvider.views(context, busy, true).apply(context, new FrameLayout(context));
+        assertEquals("Busy storage offers Refresh, not Sign in", "LOGS", ((TextView) widget.findViewById(R.id.monitor_open)).getText().toString());
+        WidgetStore.keys = DEFAULT_KEYS;
+        assertEquals("synthetic-keystore", WidgetStore.read(context).getString("token"));
+        assertEquals(generation, WidgetStore.read(context).getString("generation"));
+        // A busy Keystore during a write keeps the previous file and connection.
+        WidgetStore.keys = () -> { throw new java.security.ProviderException("synthetic busy keystore"); };
+        try { WidgetStore.message(context, generation, "Refreshing…"); fail("Write must report the failure"); }
+        catch (Exception expected) { assertFalse(WidgetStore.permanent(expected)); }
+        assertEquals(WidgetRefresh.STORAGE_BUSY, WidgetRefresh.storageError(new java.security.ProviderException("busy")));
+        WidgetStore.keys = DEFAULT_KEYS; WidgetStore.forgetCache();
+        assertEquals("synthetic-keystore", WidgetStore.read(context).getString("token"));
+        assertEquals(old.toString(), WidgetStore.read(context).getJSONObject("snapshot").toString());
+        // Sign-out still removes a credential it cannot compare while storage is busy.
+        WidgetStore.keys = () -> { throw new java.security.KeyStoreException("synthetic busy keystore"); };
+        WidgetStore.forgetCache();
+        assertTrue(WidgetStore.clear(context, "synthetic-keystore"));
+        assertFalse(WidgetStore.file(context).exists());
+        WidgetStore.keys = DEFAULT_KEYS; WidgetStore.forgetCache();
+        // Confirmed corruption (bad tag / invalid length) still clears the stored connection.
+        WidgetStore.connect(context, "synthetic-corrupt");
+        byte[] garbage = new byte[64];
+        new java.util.Random(7).nextBytes(garbage);
+        try (FileOutputStream output = new FileOutputStream(WidgetStore.file(context))) { output.write(garbage); }
+        WidgetStore.forgetCache();
+        assertEquals("", WidgetStore.read(context).optString("token"));
+        assertFalse(WidgetStore.read(context).optBoolean(WidgetStore.UNAVAILABLE));
+        assertFalse(WidgetStore.file(context).exists());
+        try (FileOutputStream output = new FileOutputStream(WidgetStore.file(context))) { output.write(new byte[3]); }
+        WidgetStore.forgetCache();
+        assertEquals("", WidgetStore.read(context).optString("token"));
+        assertFalse(WidgetStore.file(context).exists());
+    }
+
+    @Test public void httpLimitsEndInsideTaskDeadlineAndWatchdogAbortsHungReads() throws Exception {
+        assertTrue(WidgetClient.CONNECT_TIMEOUT_MILLIS + WidgetClient.READ_TIMEOUT_MILLIS <= WidgetClient.TOTAL_TIMEOUT_MILLIS);
+        assertTrue("HTTP must give up before the task deadline", WidgetClient.TOTAL_TIMEOUT_MILLIS < WidgetRefresh.TASK_DEADLINE_MILLIS);
+        assertTrue(WidgetRefresh.TASK_DEADLINE_MILLIS < 10000);
+        HangingConnection hung = new HangingConnection();
+        long start = android.os.SystemClock.elapsedRealtime();
+        try { WidgetClient.fetch("synthetic", () -> hung, System.currentTimeMillis()); fail("A hung response must fail"); }
+        catch (Exception expected) { }
+        long elapsed = android.os.SystemClock.elapsedRealtime() - start;
+        assertTrue("Watchdog disconnects at the total limit (" + elapsed + " ms)", elapsed >= WidgetClient.TOTAL_TIMEOUT_MILLIS - 100 && elapsed < WidgetRefresh.TASK_DEADLINE_MILLIS);
+        assertTrue(hung.aborted);
+        assertEquals(WidgetClient.CONNECT_TIMEOUT_MILLIS, hung.getConnectTimeout());
+        assertEquals(WidgetClient.READ_TIMEOUT_MILLIS, hung.getReadTimeout());
+    }
+
+    @Test public void tapsAfterATimedOutFetchJoinItInsteadOfStackingAnother() throws Exception {
+        String generation = WidgetStore.connect(context, "synthetic-stacked");
+        WidgetStore.finish(context, generation, WidgetData.project(fixture(), System.currentTimeMillis() - 60000), "");
+        CountDownLatch started = new CountDownLatch(1), release = new CountDownLatch(1), timedOut = new CountDownLatch(1), adopted = new CountDownLatch(1);
+        AtomicInteger fetches = new AtomicInteger();
+        AtomicReference<String> second = new AtomicReference<>();
+        WidgetRefresh.fetcher = token -> {
+            fetches.incrementAndGet(); started.countDown();
+            // A network stack that ignores interruption past the task deadline.
+            boolean waiting = true;
+            while (waiting) { try { release.await(); waiting = false; } catch (InterruptedException ignored) { } }
+            JSONObject source = fixture();
+            source.getJSONObject("health").getJSONObject("stats").put("accounts", 130);
+            return WidgetData.project(source, System.currentTimeMillis());
+        };
+        try {
+            assertNotNull(WidgetRefresh.request(context, true, error -> { assertTrue(error.contains("timed out")); timedOut.countDown(); }));
+            assertTrue(started.await(2, TimeUnit.SECONDS));
+            assertTrue(timedOut.await(WidgetRefresh.TASK_DEADLINE_MILLIS + 2000, TimeUnit.MILLISECONDS));
+            // Repeated taps while that fetch still runs: no new fetch is queued behind it.
+            assertNotNull(WidgetRefresh.request(context, true, error -> { second.set(error); adopted.countDown(); }));
+            WidgetRefresh.request(context, true, error -> { });
+            assertEquals("One fetch per account at a time", 1, fetches.get());
+            release.countDown();
+            assertTrue(adopted.await(3, TimeUnit.SECONDS));
+            assertEquals("", second.get());
+            assertEquals(1, fetches.get());
+            assertEquals("130", WidgetStore.read(context).getJSONObject("snapshot").getString("accounts"));
+            assertEquals("", WidgetStore.read(context).getString("message"));
+        } finally { release.countDown(); }
+    }
+
+    @Test public void upgradeReceiverReturnsAtOnceAndFinishesWorkInBackground() throws Exception {
+        WidgetStore.connect(context, "synthetic-upgrade");
+        OwnerWidgetJob.cancel(context);
+        AtomicReference<Long> spent = new AtomicReference<>();
+        InstrumentationRegistry.getInstrumentation().runOnMainSync(() -> {
+            long start = android.os.SystemClock.elapsedRealtime();
+            new WidgetInstallReceiver().onReceive(context, new android.content.Intent(android.content.Intent.ACTION_MY_PACKAGE_REPLACED));
+            spent.set(android.os.SystemClock.elapsedRealtime() - start);
+        });
+        assertTrue("Receiver must not run registration on the main thread (" + spent.get() + " ms)", spent.get() < 200);
+        long deadline = android.os.SystemClock.elapsedRealtime() + 5000;
+        while (context.getSystemService(JobScheduler.class).getPendingJob(OwnerWidgetJob.ID) == null && android.os.SystemClock.elapsedRealtime() < deadline)
+            android.os.SystemClock.sleep(50);
+        assertNotNull("Background work still schedules the periodic check", context.getSystemService(JobScheduler.class).getPendingJob(OwnerWidgetJob.ID));
+    }
+
+    private static final class HangingConnection extends HttpsURLConnection {
+        final CountDownLatch disconnected = new CountDownLatch(1); volatile boolean aborted;
+        HangingConnection() throws Exception { super(new URL(WidgetClient.ENDPOINT)); }
+        @Override public int getResponseCode() throws java.io.IOException {
+            try { if (disconnected.await(30, TimeUnit.SECONDS)) { aborted = true; throw new java.net.SocketException("Socket closed"); } }
+            catch (InterruptedException interrupted) { throw new java.io.InterruptedIOException(); }
+            return 200;
+        }
+        @Override public String getContentType() { return "application/json"; }
+        @Override public InputStream getInputStream() { return new ByteArrayInputStream(new byte[0]); }
+        @Override public void disconnect() { disconnected.countDown(); }
+        @Override public boolean usingProxy() { return false; }
+        @Override public void connect() { }
+        @Override public String getCipherSuite() { return "test"; }
+        @Override public Certificate[] getLocalCertificates() { return null; }
+        @Override public Certificate[] getServerCertificates() { return null; }
     }
 
     private JSONObject journalFixture() throws Exception {

@@ -23,6 +23,12 @@ final class WidgetRefresh {
     private static final ExecutorService NETWORK = Executors.newFixedThreadPool(2);
     private static final ScheduledExecutorService DEADLINES = Executors.newSingleThreadScheduledExecutor();
     private static Task active;
+    /** Ends every tap/job inside the ten-second broadcast lifetime; HTTP limits are shorter. */
+    static final long TASK_DEADLINE_MILLIS = 8000;
+    // At most one network fetch per account generation. A fetch that outlived its task deadline
+    // (e.g. DNS that ignores interruption) keeps running; later taps wait for that fetch instead of
+    // queueing another one behind it on the small NETWORK pool.
+    private static Task fetching;
     // Modern Android may serialize broadcasts until the first goAsync result finishes.
     // A queued double-tap can therefore arrive just after the shared request completes.
     private static String lastSuccessfulGeneration = "";
@@ -34,6 +40,7 @@ final class WidgetRefresh {
         final String generation;
         final List<Completion> completions = new ArrayList<>();
         boolean manual, done;
+        Task successor;
         Thread worker;
         Future<?> work;
         ScheduledFuture<?> deadline;
@@ -52,6 +59,11 @@ final class WidgetRefresh {
         WidgetClient.initialize(app);
         JSONObject state = WidgetStore.read(app);
         String token = state.optString("token"), generation = state.optString("generation");
+        if (state.optBoolean(WidgetStore.UNAVAILABLE)) {
+            // Transient Keystore/IO failure: the saved connection is kept; retry later.
+            completion.finish(STORAGE_BUSY);
+            return null;
+        }
         if (token.isEmpty()) {
             completion.finish("Connect your owner account in My account.");
             return null;
@@ -75,25 +87,51 @@ final class WidgetRefresh {
                 WidgetStore.message(app, generation, "Refreshing…");
                 OwnerWidgetProvider.renderAll(app);
             }
-        } catch (Exception ignored) {
-            finish(task, null, "Widget storage unavailable. Reconnect in My account.", false);
+        } catch (Exception failure) {
+            finish(task, null, storageError(failure), false);
             return task;
         }
         // Finish the broadcast even if a DNS/socket implementation ignores interruption.
         // A timed-out operation can never commit a late response or clear a newer account.
         task.deadline = DEADLINES.schedule(() ->
-            finish(task, null, TIMED_OUT, false), 8, TimeUnit.SECONDS);
+            finish(task, null, TIMED_OUT, false), TASK_DEADLINE_MILLIS, TimeUnit.MILLISECONDS);
+        if (fetching != null && fetching.generation.equals(generation)) {
+            // Its result (same account generation) completes this task too, or the deadline does.
+            fetching.successor = task;
+            return task;
+        }
+        fetching = task;
         Fetcher source = fetcher;
         task.work = NETWORK.submit(() -> {
             synchronized (WidgetRefresh.class) { task.worker = Thread.currentThread(); }
-            try { finish(task, source.fetch(token), "", false); }
+            JSONObject snapshot = null; String error = ""; boolean denied = false;
+            try { snapshot = source.fetch(token); }
             catch (WidgetClient.AccessDenied ignored) {
-                finish(task, null, "Owner session expired. Sign in again in My account.", true);
+                error = "Owner session expired. Sign in again in My account."; denied = true;
             } catch (Exception ignored) {
-                finish(task, null, FAILED, false);
+                error = FAILED;
             }
+            Task waiting;
+            synchronized (WidgetRefresh.class) {
+                if (fetching == task) fetching = null;
+                waiting = task.successor;
+                task.successor = null;
+            }
+            finish(task, snapshot, error, denied);
+            // A newer tap for the same generation adopts this result; a changed account never does
+            // (the successor shares this generation, and WidgetStore rechecks it before committing).
+            if (waiting != null) finish(waiting, snapshot == null ? null : copy(snapshot), error, denied);
         });
         return task;
+    }
+
+    /** A transient Keystore/IO write failure keeps the connection; only a lost key needs reconnecting. */
+    static String storageError(Exception failure) {
+        return WidgetStore.permanent(failure) ? "Widget storage unavailable. Reconnect in My account." : STORAGE_BUSY;
+    }
+
+    private static JSONObject copy(JSONObject value) {
+        try { return new JSONObject(value.toString()); } catch (org.json.JSONException impossible) { return value; }
     }
 
     // Agent activity: while a GitHub workflow runs and an Agent activity companion is placed, check
@@ -148,9 +186,10 @@ final class WidgetRefresh {
         return true;
     }
 
-    static final String FAILED = "Could not refresh · tap Refresh to retry", TIMED_OUT = "Refresh timed out · tap Refresh to retry";
-    /** Transport failures worth a background retry; authorization, account and storage errors are not. */
-    static boolean transientFailure(String error) { return FAILED.equals(error) || TIMED_OUT.equals(error); }
+    static final String FAILED = "Could not refresh · tap Refresh to retry", TIMED_OUT = "Refresh timed out · tap Refresh to retry",
+        STORAGE_BUSY = "Widget storage busy · tap Refresh to retry";
+    /** Transport and transient storage failures are worth a background retry; authorization and account errors are not. */
+    static boolean transientFailure(String error) { return FAILED.equals(error) || TIMED_OUT.equals(error) || STORAGE_BUSY.equals(error); }
 
     static synchronized void cancelBackground(Task task) {
         if (task != null && !task.manual)
@@ -175,7 +214,7 @@ final class WidgetRefresh {
                     lastSuccessfulGeneration = task.generation;
                     lastSuccessfulAt = android.os.SystemClock.elapsedRealtime();
                 }
-            } catch (Exception ignored) { error = "Widget storage unavailable. Reconnect in My account."; }
+            } catch (Exception failure) { error = storageError(failure); }
             callbacks = new ArrayList<>(task.completions);
             task.completions.clear();
         }
