@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import {
+  adoptProvisionalChatComposer,
   chatComposer,
   chatOutboxKey,
   legacyChatOutbox,
@@ -231,4 +232,59 @@ test("unreadable account outboxes remain untouched and are reported instead of p
   assert.equal(restoreAccountChatOutboxes("account-a", device).unreadable, 1);
   assert.equal(device.getItem(chatOutboxKey(owner)), raw);
   assert.deepEqual(chatComposer(owner).outbox, []);
+});
+
+test("a draft or message from before the room session is confirmed moves to the confirmed scope", () => {
+  const confirmed = scope(),
+    provisional = { ...confirmed, sessionId: "" },
+    item = message();
+  setChatDraft(provisional, "party", "Typed while the room was reconnecting");
+  setChatDraft(provisional, "dm", "Private draft");
+  updateChatOutbox(provisional, [item]);
+  setChatDraft(confirmed, "dm", "Newer private draft");
+  assert.equal(adoptProvisionalChatComposer(provisional, confirmed), true);
+  const adopted = chatComposer(confirmed);
+  assert.equal(adopted.drafts.party, "Typed while the room was reconnecting");
+  assert.equal(adopted.drafts.dm, "Newer private draft", "A draft in the confirmed scope wins");
+  assert.deepEqual(adopted.outbox.map((m) => m.command.id), [item.command.id]);
+  // Nothing is left behind as a phantom recovery that emptied the composer.
+  assert.deepEqual(
+    chatRecoveries("", confirmed).filter((r) => r.scope.code === confirmed.code),
+    [],
+  );
+  assert.equal(adoptProvisionalChatComposer(provisional, confirmed), false, "Idempotent");
+  assert.deepEqual(chatComposer(confirmed).outbox.map((m) => m.command.id), [item.command.id]);
+  discardChatRecovery(confirmed);
+});
+
+test("only an unknown session ID is adopted; other rooms, seats, accounts and sessions stay separate", () => {
+  const base = scope("account"),
+    provisional = { ...base, sessionId: "" };
+  const others: ChatScope[] = [
+    { ...base, accountId: "other-account" },
+    { ...base, accountId: "" },
+    { ...base, code: crypto.randomUUID() },
+    { ...base, seatId: "other-seat" },
+  ];
+  for (const to of others) {
+    setChatDraft(provisional, "party", "Stay with the original seat");
+    assert.equal(adoptProvisionalChatComposer(provisional, to), false);
+    assert.equal(chatComposer(to).drafts.party, undefined);
+  }
+  const known = { ...base, sessionId: "first" };
+  setChatDraft(known, "party", "From a known earlier session");
+  assert.equal(adoptProvisionalChatComposer(known, base), false);
+  assert.equal(chatComposer(base).drafts.party, undefined);
+  assert.equal(adoptProvisionalChatComposer(base, provisional), false, "Never downgrade");
+  for (const s of [provisional, known, base, ...others]) discardChatRecovery(s);
+});
+
+test("adoption keeps a guest's moved messages in memory only", () => {
+  const confirmed = scope(),
+    provisional = { ...confirmed, sessionId: "" };
+  updateChatOutbox(provisional, [message()]);
+  adoptProvisionalChatComposer(provisional, confirmed);
+  assert.throws(() => chatOutboxKey(confirmed), /memory only/);
+  assert.equal(chatComposer(confirmed).outbox.length, 1);
+  discardChatRecovery(confirmed);
 });

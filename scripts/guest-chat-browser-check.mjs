@@ -75,6 +75,21 @@ async function seed(page, table) {
     }
   }, table);
 }
+const sessionOf = (page) =>
+  page.evaluate(async () => (await import("/src/lib/quire/cloud-client.ts")).getCloudTable().sessionId);
+/** Reload with the room's first responses held back, so the composer is used
+ * before the server confirms the room session (the window that lost drafts). */
+async function reloadWithSlowRoom(page, context) {
+  const hold = async (route) => {
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+    await route.continue().catch(() => {});
+  };
+  await context.route("**/_serverFn/**", hold);
+  await openApplication(page, origin + "/share?tab=chat");
+  await expect(page.locator("#chat-message")).toBeEnabled();
+  assert.equal(await sessionOf(page), "", "The room session is not yet confirmed");
+  return () => context.unroute("**/_serverFn/**", hold);
+}
 const chat = (page) => page.getByRole("region", { name: "Live party chat", exact: true });
 async function openChat(page) {
   await navigateApplication(page, origin + "/share?tab=chat");
@@ -143,6 +158,27 @@ try {
   await openChat(dm.page);
   await expect(chat(dm.page).getByText("Guest check two: disarming it now.", { exact: true })).toBeVisible();
   await sendAndExpect("guest party message after DM reload", guest.page, [dm.page], "Guest check three: after the DM reloaded.", "submit");
+
+  // A draft typed straight after a page load must survive the room session
+  // being confirmed (it used to move to a hidden recovery and empty the composer).
+  let release = await reloadWithSlowRoom(guest.page, guest.context);
+  await guest.page.locator("#chat-message").fill("Guest check early: typed while reconnecting.");
+  await release();
+  await expect.poll(() => sessionOf(guest.page), { timeout: delivery }).not.toBe("");
+  await expect(guest.page.locator("#chat-message")).toHaveValue("Guest check early: typed while reconnecting.");
+  await expect(guest.page.getByRole("region", { name: "Unsent chat recovery", exact: true })).toHaveCount(0);
+  await sendAndExpect("guest draft typed before the session was confirmed", guest.page, [dm.page], "Guest check early: typed while reconnecting.", "keyboard");
+  // A message sent in that window is confirmed in place, not left as a phantom recovery.
+  release = await reloadWithSlowRoom(dm.page, dm.context);
+  await dm.page.locator("#chat-message").fill("DM check early: sent while reconnecting.");
+  await dm.page.locator(".chat-composer").evaluate((f) => f.requestSubmit());
+  await release();
+  await expect(chat(dm.page).getByText("DM check early: sent while reconnecting.", { exact: true })).toBeVisible({ timeout: delivery });
+  await expect.poll(() => sessionOf(dm.page), { timeout: delivery }).not.toBe("");
+  await expect(chat(dm.page).getByText("Failed — not confirmed", { exact: true })).toHaveCount(0, { timeout: delivery });
+  await expect(chat(guest.page).getByText("DM check early: sent while reconnecting.", { exact: true })).toBeVisible({ timeout: delivery });
+  await expect(dm.page.getByRole("region", { name: "Unsent chat recovery", exact: true })).toHaveCount(0);
+  console.log("  early drafts and sends survive the room session being confirmed");
 
   // 2. A signed-in player joins the same room and every party member sees every message.
   const member = await device("member");
