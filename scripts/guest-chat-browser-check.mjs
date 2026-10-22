@@ -191,6 +191,9 @@ try {
   await dm.page.screenshot({ path: output + "/dm-chat-desktop.png", fullPage: true });
   assert.deepEqual(errors, []);
   console.log("Guest chat check passed");
+  console.log("FINAL guest", await guest.page.evaluate(() => window.__scopes));
+  console.log("FINAL member", await member.page.evaluate(() => window.__scopes));
+  process.exitCode = 1;
 } catch (error) {
   for (const [label, page] of pages) {
     const region = await chat(page).innerText({ timeout: 2000 }).catch(() => "(no chat region)");
