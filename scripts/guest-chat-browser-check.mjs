@@ -75,19 +75,20 @@ async function seed(page, table) {
     }
   }, table);
 }
-async function probeScopes(page) {
-  await page.evaluate(async () => {
-    const m = await import("/src/lib/quire/cloud-client.ts");
-    window.__scopes = [];
-    let last = "";
-    const rec = () => {
-      const v = m.getCloudTable();
-      const k = JSON.stringify([sessionStorage.getItem("lootsplit.verified-account") || "", v.code, v.seatId, v.sessionId, v.joined]);
-      if (k !== last) { window.__scopes.push(Date.now() % 100000 + " " + k); last = k; }
-    };
-    rec();
-    setInterval(rec, 50);
-  });
+const sessionOf = (page) =>
+  page.evaluate(async () => (await import("/src/lib/quire/cloud-client.ts")).getCloudTable().sessionId);
+/** Reload with the room's first responses held back, so the composer is used
+ * before the server confirms the room session (the window that lost drafts). */
+async function reloadWithSlowRoom(page, context) {
+  const hold = async (route) => {
+    await new Promise((resolve) => setTimeout(resolve, 2000));
+    await route.continue().catch(() => {});
+  };
+  await context.route("**/_serverFn/**", hold);
+  await openApplication(page, origin + "/share?tab=chat");
+  await expect(page.locator("#chat-message")).toBeEnabled();
+  assert.equal(await sessionOf(page), "", "The room session is not yet confirmed");
+  return () => context.unroute("**/_serverFn/**", hold);
 }
 const chat = (page) => page.getByRole("region", { name: "Live party chat", exact: true });
 async function openChat(page) {
@@ -138,12 +139,6 @@ try {
   await guest.page.getByRole("combobox", { name: "Choose your character", exact: true }).selectOption("hero");
   await guest.page.getByRole("button", { name: "Join room", exact: true }).click();
   await guest.page.getByText("You joined as a player", { exact: true }).waitFor();
-  await openApplication(guest.page, origin + "/share?tab=chat");
-  await probeScopes(guest.page);
-  await guest.page.locator("#chat-message").fill("Typed right after load");
-  await guest.page.waitForTimeout(3000);
-  console.log("guest scopes", await guest.page.evaluate(() => window.__scopes));
-  console.log("guest draft after hydrate:", await guest.page.locator("#chat-message").inputValue().catch(e=>e.message));
   await openChat(guest.page);
   await openChat(dm.page);
   await sendAndExpect("guest party message (Send)", guest.page, [dm.page], "Guest check one: the door is trapped.", "click");
@@ -164,6 +159,27 @@ try {
   await expect(chat(dm.page).getByText("Guest check two: disarming it now.", { exact: true })).toBeVisible();
   await sendAndExpect("guest party message after DM reload", guest.page, [dm.page], "Guest check three: after the DM reloaded.", "submit");
 
+  // A draft typed straight after a page load must survive the room session
+  // being confirmed (it used to move to a hidden recovery and empty the composer).
+  let release = await reloadWithSlowRoom(guest.page, guest.context);
+  await guest.page.locator("#chat-message").fill("Guest check early: typed while reconnecting.");
+  await release();
+  await expect.poll(() => sessionOf(guest.page), { timeout: delivery }).not.toBe("");
+  await expect(guest.page.locator("#chat-message")).toHaveValue("Guest check early: typed while reconnecting.");
+  await expect(guest.page.getByRole("region", { name: "Unsent chat recovery", exact: true })).toHaveCount(0);
+  await sendAndExpect("guest draft typed before the session was confirmed", guest.page, [dm.page], "Guest check early: typed while reconnecting.", "keyboard");
+  // A message sent in that window is confirmed in place, not left as a phantom recovery.
+  release = await reloadWithSlowRoom(dm.page, dm.context);
+  await dm.page.locator("#chat-message").fill("DM check early: sent while reconnecting.");
+  await dm.page.locator(".chat-composer").evaluate((f) => f.requestSubmit());
+  await release();
+  await expect(chat(dm.page).getByText("DM check early: sent while reconnecting.", { exact: true })).toBeVisible({ timeout: delivery });
+  await expect.poll(() => sessionOf(dm.page), { timeout: delivery }).not.toBe("");
+  await expect(chat(dm.page).getByText("Failed — not confirmed", { exact: true })).toHaveCount(0, { timeout: delivery });
+  await expect(chat(guest.page).getByText("DM check early: sent while reconnecting.", { exact: true })).toBeVisible({ timeout: delivery });
+  await expect(dm.page.getByRole("region", { name: "Unsent chat recovery", exact: true })).toHaveCount(0);
+  console.log("  early drafts and sends survive the room session being confirmed");
+
   // 2. A signed-in player joins the same room and every party member sees every message.
   const member = await device("member");
   const signUp = await member.context.request.post(origin + "/api/account/auth/sign-up/email", {
@@ -181,19 +197,13 @@ try {
   await member.page.getByRole("combobox", { name: "Choose your character", exact: true }).selectOption("other");
   await member.page.getByRole("button", { name: "Join room", exact: true }).click();
   await member.page.getByText("You joined as a player", { exact: true }).waitFor();
-  await probeScopes(member.page);
   await openChat(member.page);
-  await member.page.waitForTimeout(3000);
-  console.log("member scopes", await member.page.evaluate(() => window.__scopes));
   await sendAndExpect("signed-in player party message", member.page, [dm.page, guest.page], "Member check: I keep watch.", "click");
   await sendAndExpect("guest party message with a second player", guest.page, [dm.page, member.page], "Guest check four: thanks for watching.", "click");
   await guest.page.screenshot({ path: output + "/guest-chat-mobile.png", fullPage: true });
   await dm.page.screenshot({ path: output + "/dm-chat-desktop.png", fullPage: true });
   assert.deepEqual(errors, []);
   console.log("Guest chat check passed");
-  console.log("FINAL guest", await guest.page.evaluate(() => window.__scopes));
-  console.log("FINAL member", await member.page.evaluate(() => window.__scopes));
-  process.exitCode = 1;
 } catch (error) {
   for (const [label, page] of pages) {
     const region = await chat(page).innerText({ timeout: 2000 }).catch(() => "(no chat region)");
