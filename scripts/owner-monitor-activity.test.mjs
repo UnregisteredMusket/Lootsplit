@@ -124,7 +124,23 @@ test("activity events are newest-first, link runs to pull requests and distingui
     "Scheduled housekeeping does not drive the fast refresh",
   );
   assert.equal(result.data.active.length, 2, "The existing active list is unchanged");
-  assert.deepEqual(Object.keys(result.data.openPulls[0]), ["number", "title", "draft", "url"]);
+  // The head branch is added so workflow diagnostics can retire finished branches; the list
+  // still carries no timestamps or other pull request detail.
+  assert.deepEqual(Object.keys(result.data.openPulls[0]), [
+    "number",
+    "title",
+    "draft",
+    "url",
+    "headRef",
+  ]);
+  assert.equal(result.data.openPulls[0].headRef, "feature/change-140");
+  assert.deepEqual(
+    result.data.closedPulls.map((pr) => [pr.number, pr.headRef, Boolean(pr.mergedAt)]),
+    [
+      [138, "feature/widget-redesign", true],
+      [137, "feature/change-137", false],
+    ],
+  );
   assert.equal(result.data.scannedClosedPulls, 2);
 });
 

@@ -189,8 +189,90 @@ export function explanation(comparisons, problems = []) {
       : "No action indicated by the available checks.";
   return `${summary}${meaning ? ` ${meaning}` : ""} ${problems.length ? `${problems.join(", ")} could not be fully verified; review their diagnostics.` : action}${problems.length && errors > 0 ? ` ${action}` : ""}${missing ? ` ${missing} readings are unavailable; this is incomplete coverage.` : ""}`;
 }
+// Read-time only: a stored workflow step whose run is known to have ended without the step
+// reporting a result. The stored row is never rewritten; `storedState` keeps what it recorded.
+export const INTERRUPTED = "interrupted";
+// A workflow step older than this, outside the scanned GitHub runs and followed by a newer
+// finished step on its branch, is treated as superseded rather than as live development.
+export const WORKFLOW_ORPHAN_MS = 6 * 3600000;
+export function workflowTaskRun(task) {
+  const match = /^run:(\d+):(\d+):/.exec(task?.id || "");
+  return task?.source === "workflow" && match
+    ? { runId: Number(match[1]), attempt: Number(match[2]) }
+    : null;
+}
+/**
+ * Whether GitHub evidence shows that a non-terminal workflow step can no longer report.
+ * Returns null (no evidence: keep the stored state and its warnings) or the reason it ended.
+ * `development` is the owner monitor's GitHub source; unavailable data never ends a task.
+ * `newestFinishedOnBranch` maps branch -> the newest heartbeat of a finished workflow step.
+ */
+export function workflowTaskEnded(task, development, now, newestFinishedOnBranch = null) {
+  if (!task || TERMINAL.includes(task.state)) return null;
+  const ref = workflowTaskRun(task);
+  if (!ref || development?.state !== "ready" || !Array.isArray(development.data?.runs)) return null;
+  const run = development.data.runs.find((r) => r.id === ref.runId);
+  if (run) {
+    if (Number.isSafeInteger(run.attempt) && run.attempt > ref.attempt)
+      return {
+        reason: "rerun",
+        runId: run.id,
+        conclusion: null,
+        url: run.url || null,
+        at: run.startedAt || null,
+        progress: `Run attempt ${ref.attempt} was replaced by attempt ${run.attempt} before this step reported a result.`,
+      };
+    if (run.status !== "completed") return null;
+    return {
+      reason: "run-completed",
+      runId: run.id,
+      conclusion: run.conclusion || null,
+      url: run.url || null,
+      at: run.updatedAt || null,
+      progress:
+        run.conclusion === "cancelled"
+          ? "Run cancelled before this step reported a result."
+          : `Run ended (${run.conclusion || "no conclusion"}) before this step reported a result.`,
+    };
+  }
+  // Outside the scanned run window: only a stale step with a newer finished step is superseded.
+  const newer = newestFinishedOnBranch?.get?.(task.branch || "");
+  if (now - task.heartbeatAt > WORKFLOW_ORPHAN_MS && newer > task.heartbeatAt)
+    return {
+      reason: "superseded",
+      runId: ref.runId,
+      conclusion: null,
+      url: null,
+      at: null,
+      progress:
+        "Superseded: no result was reported, the run is older than the scanned GitHub runs, and a newer workflow step on this branch has since finished.",
+    };
+  return null;
+}
+/** The presented (not stored) form of a workflow step that GitHub shows has ended. */
+export function interruptedTask(task, ended) {
+  return {
+    ...task,
+    state: INTERRUPTED,
+    storedState: task.state,
+    progress: ended.progress,
+    completedAt: ended.at && ended.at >= task.startedAt ? ended.at : task.heartbeatAt,
+    expectedUntil: null,
+    endedBy: {
+      reason: ended.reason,
+      runId: ended.runId,
+      conclusion: ended.conclusion,
+      url: ended.url,
+    },
+    nextAction:
+      ended.reason === "run-completed" && ended.conclusion === "cancelled"
+        ? "No action needed if a newer run replaced it; otherwise re-run the workflow."
+        : "Check the linked workflow run for the step's result.",
+  };
+}
 export function taskView(task, now, settings = DEFAULT_CONFIG) {
   if (!task) return { task: null, warning: null, label: "No development task active" };
+  const ended = TERMINAL.includes(task.state) || task.state === INTERRUPTED;
   const active = WORKING.includes(task.state);
   const heartbeatAge = now - task.heartbeatAt,
     progressAge = now - task.progressAt;
@@ -223,10 +305,10 @@ export function taskView(task, now, settings = DEFAULT_CONFIG) {
     task: {
       ...task,
       totalElapsedMs: Math.max(0, (task.completedAt || now) - task.startedAt),
-      active: !TERMINAL.includes(task.state),
+      active: !ended,
     },
     warning,
-    label: TERMINAL.includes(task.state) ? "No development task active" : task.title,
+    label: ended ? "No development task active" : task.title,
   };
 }
 export function transitionTask(previous, input, now, settings = DEFAULT_CONFIG) {
@@ -299,9 +381,13 @@ export function transitionTask(previous, input, now, settings = DEFAULT_CONFIG) 
     revision: (previous?.revision || 0) + 1,
   };
 }
+// Neither a success nor a gap: a skipped/superseded result, or a component retired because its
+// branch finished. Shown green so it is not attention; it never records a success.
+export const NOT_ATTENTION = ["not-applicable", "retired"];
 export function diagnostic(previous, check, now) {
   const failed = check.state === "error";
-  const unknown = !["healthy", "error"].includes(check.state);
+  const settled = NOT_ATTENTION.includes(check.state);
+  const unknown = !settled && !["healthy", "error"].includes(check.state);
   const preserveFailure = unknown && previous?.confirmedFailure === true;
   const bad = failed || unknown;
   return {

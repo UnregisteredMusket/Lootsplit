@@ -239,6 +239,9 @@ export async function developmentActivity(env, fetcher = fetch) {
           name: label(run.name),
           status: run.status,
           conclusion: label(run.conclusion) || null,
+          // A re-run reuses the run id; its attempt tells which step telemetry it supersedes.
+          attempt:
+            Number.isSafeInteger(run.run_attempt) && run.run_attempt > 0 ? run.run_attempt : null,
           branch: label(run.head_branch),
           event: label(run.event).slice(0, 40),
           commit: /^[a-f0-9]{40}$/.test(run.head_sha) ? run.head_sha : null,
@@ -260,7 +263,20 @@ export async function developmentActivity(env, fetcher = fetch) {
         // Running development workflows (not scheduled housekeeping) drive the fast refresh.
         activeActivity: active.filter((run) => run.event !== "schedule").length,
         latestDeployment: runs.find((run) => run.deployment) || null,
-        openPulls: open.map(({ number, title, draft, url }) => ({ number, title, draft, url })),
+        // headRef lets diagnostics tell a branch with an open pull request from a finished one.
+        openPulls: open.map(({ number, title, draft, url, headRef }) => ({
+          number,
+          title,
+          draft,
+          url,
+          headRef,
+        })),
+        closedPulls: recent.map(({ number, headRef, closedAt, mergedAt }) => ({
+          number,
+          headRef,
+          closedAt,
+          mergedAt,
+        })),
         events: activityEvents(runs, open, recent),
       };
     },
