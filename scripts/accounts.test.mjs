@@ -277,6 +277,46 @@ test("accounts enforce owner isolation, CSRF, durable sessions, and revoked memb
     DB.close();
   }
 });
+test("failed sign-ins slow one email down, the same way for unknown emails, and never lock it", async () => {
+  const { DB, env, call, signup } = setup();
+  globalThis.__env__ = env;
+  try {
+    await signup("throttle@example.com");
+    const tries = async (email, password = "not the right password at all") => {
+      const r = await call("auth/sign-in/email", { email, password });
+      return {
+        status: r.response.status,
+        data: r.data,
+        retry: r.response.headers.get("retry-after"),
+      };
+    };
+    const known = [],
+      unknown = [];
+    for (let i = 0; i < 6; i++) {
+      known.push(await tries("throttle@example.com"));
+      unknown.push(await tries("no-such-account@example.com"));
+    }
+    assert.deepEqual(
+      known.map((r) => r.status),
+      [401, 401, 401, 401, 401, 429],
+    );
+    // No enumeration signal: identical statuses, bodies and waits for a registered address.
+    assert.deepEqual(unknown, known);
+    // The right password waits too, but only until the wait ends.
+    assert.equal((await tries("throttle@example.com", "a long unique test password")).status, 429);
+    await DB.prepare("UPDATE signin_throttle SET blocked_until=0").run();
+    const ok = await tries("throttle@example.com", "a long unique test password");
+    assert.equal(ok.status, 200, JSON.stringify(ok.data));
+    assert.equal(
+      (await DB.prepare("SELECT count(*) AS n FROM signin_throttle").first()).n,
+      1,
+      "only the unknown address keeps its count",
+    );
+  } finally {
+    delete globalThis.__env__;
+    DB.close();
+  }
+});
 test("recovery rotates the key, revokes sessions and rejects replay", async () => {
   const { DB, call, signup } = setup();
   try {

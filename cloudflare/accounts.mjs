@@ -16,6 +16,7 @@ import {
 import { serverMonitor } from "./monitoring.mjs";
 import { ownerMonitor } from "./owner-monitor.mjs";
 import { monitorApi } from "./monitor-journal.mjs";
+import { throttledSignin } from "./signin-throttle.mjs";
 import {
   assertActive,
   touchMember,
@@ -271,6 +272,11 @@ export async function handleAccounts(request, env) {
           headers: request.headers,
           body: JSON.stringify(body),
         });
+        // Per-account throttle on top of the per-IP limits (audit S05).
+        if (path === "/api/account/auth/sign-in/email") {
+          const signIn = request;
+          return cors(await throttledSignin(env.DB, body?.email, () => auth.handler(signIn)));
+        }
       }
       return cors(await auth.handler(request));
     }
