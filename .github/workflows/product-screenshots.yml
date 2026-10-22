@@ -77,6 +77,12 @@ jobs:
         run: |
           set -o pipefail
           node --experimental-strip-types scripts/capture-product-screenshots.mjs 2>&1 | tee test-results/product-screenshots.log
+      - name: Split view audit (screenshots branch only)
+        if: always()
+        timeout-minutes: 8
+        run: |
+          set -o pipefail
+          node --experimental-strip-types scripts/split-view-browser-audit.mjs 2>&1 | tee test-results/split-audit.log || { tail -n 30 test-results/split-audit.log > test-results/annotation.txt; message=$(sed -e 's/%/%25/g' test-results/annotation.txt | sed ':a;N;$!ba;s/\n/%0A/g'); echo "::error title=Split audit::${message}"; exit 1; }
       - name: Report capture failures
         if: failure()
         run: |
