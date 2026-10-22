@@ -7,6 +7,8 @@ import { waitForRelease } from "./release-readiness.mjs";
 import { grokScriptAssetReferences, grokScriptReferences, isGrokScriptUrl } from "./grok-script-check.mjs";
 import { SCRIPT_POLICY } from "../cloudflare/release-assets.mjs";
 const origin = process.env.AUDIT_ORIGIN || "http://127.0.0.1:8082";
+// Additional audited origins (scripts/live-audit-origins.mjs) write to their own folder.
+const results = process.env.LIVE_RELEASE_RESULTS || "test-results/live-release";
 // Disposable Worker audits share a server with gameplay fixtures. Anonymous
 // title clients need their own quota too; real production requests stay unchanged.
 const fixtureHeaders = () =>
@@ -17,12 +19,12 @@ const fixtureHeaders = () =>
     : undefined;
 const expected = process.env.EXPECTED_RELEASE_SHA;
 assert.match(expected || "", /^[a-f0-9]{40}$/);
-await mkdir("test-results/live-release", { recursive: true });
+await mkdir(results, { recursive: true });
 const readiness = await waitForRelease({
   origin,
   manifest: verifyArtifact("dist/website-release", expected),
   onReport: (report) =>
-    writeFile("test-results/live-release/readiness.json", JSON.stringify(report, null, 2)),
+    writeFile(`${results}/readiness.json`, JSON.stringify(report, null, 2)),
 });
 console.log(
   `Release assets ready: ${readiness.attempts.at(-1).assetCount} matching JavaScript/CSS files in ${readiness.durationMs}ms (${readiness.attempts.length} probes).`,
@@ -93,7 +95,7 @@ const browser = await chromium.launch({
   args: ["--no-sandbox"],
 });
 const errors = [];
-await mkdir("test-results/live-release", { recursive: true });
+await mkdir(results, { recursive: true });
 try {
   for (const width of [1280, 390]) {
     const context = await browser.newContext({
@@ -154,7 +156,7 @@ try {
       await page.evaluate(() => document.documentElement.scrollWidth > innerWidth),
       false,
     );
-    await page.screenshot({ path: `test-results/live-release/title-${width}.png` });
+    await page.screenshot({ path: `${results}/title-${width}.png` });
     await page.waitForFunction(() => {
       const time = Number(
         document.querySelector(".loot-loader-track")?.getAttribute("data-loop-time"),
@@ -170,13 +172,13 @@ try {
       "Mounted hunter follows at a distance behind the rogue",
     );
     await page.locator(".hunter-map").waitFor();
-    await page.screenshot({ path: `test-results/live-release/mounted-hunter-${width}.png` });
+    await page.screenshot({ path: `${results}/mounted-hunter-${width}.png` });
     await title.click();
     await title.waitFor({ state: "detached" });
     await page.getByRole("link", { name: "Create an account or sign in", exact: true }).waitFor();
     assert.equal(await page.evaluate(async () => (await indexedDB.databases()).length), 0);
     await checkViolations(page, `title ${width}`);
-    await page.screenshot({ path: `test-results/live-release/app-${width}.png` });
+    await page.screenshot({ path: `${results}/app-${width}.png` });
     await context.close();
   }
   const reduced = await browser.newContext({
@@ -207,7 +209,7 @@ try {
   );
 } catch (error) {
   await writeFile(
-    "test-results/live-release/failure.json",
+    `${results}/failure.json`,
     JSON.stringify(
       {
         message: error instanceof Error ? error.message : "Live release check failed",
@@ -220,7 +222,7 @@ try {
   for (const [index, context] of browser.contexts().entries()) {
     for (const [pageIndex, page] of context.pages().entries()) {
       await page
-        .screenshot({ path: `test-results/live-release/failure-${index}-${pageIndex}.png` })
+        .screenshot({ path: `${results}/failure-${index}-${pageIndex}.png` })
         .catch(() => undefined);
     }
   }

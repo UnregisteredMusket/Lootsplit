@@ -4,6 +4,14 @@ export const deploymentOrigins = Object.freeze({
   nativeApi: "https://lootsplit.oliverstorie2017.workers.dev",
   legacy: Object.freeze(["https://lootsplit.oliverstorie2017.workers.dev"]),
 });
+/** The reviewed origins the live Worker served before the latest origin change (equal to
+ * `deploymentOrigins` while nothing has changed). Release preflight accepts these as the live
+ * ACCOUNT_ORIGIN/ACCOUNT_LEGACY_ORIGINS bindings only when the new `legacy` list still keeps the
+ * previous website, so the release that moves the website can deploy its own bindings. */
+export const previousDeploymentOrigins = Object.freeze({
+  website: "https://lootsplit.oliverstorie2017.workers.dev",
+  legacy: Object.freeze(["https://lootsplit.oliverstorie2017.workers.dev"]),
+});
 /** @param {unknown} value @param {boolean} [allowLoopback] */
 export function validateOrigin(value, allowLoopback = false) {
   if (typeof value !== "string") throw Error("An explicit origin is required.");
@@ -12,6 +20,16 @@ export function validateOrigin(value, allowLoopback = false) {
   if (value !== u.origin || u.username || u.password || (u.protocol !== "https:" && !(allowLoopback && loopback && u.protocol === "http:")) || u.hostname.includes("*") || (!allowLoopback && loopback))
     throw Error("Use an exact HTTPS origin without credentials, path, query or fragment.");
   return u.origin;
+}
+/** Comma-separated origin list (ACCOUNT_LEGACY_ORIGINS, AUDIT_LEGACY_ORIGINS); blanks are ignored.
+ * @param {string | undefined | null} value */
+export function parseOriginList(value) {
+  return (value || "").split(",").map((v) => v.trim()).filter(Boolean);
+}
+/** Origins served besides the website, sorted: exactly what ACCOUNT_LEGACY_ORIGINS must list.
+ * @param {{website: string, legacy: readonly string[]}} [origins] */
+export function accountLegacyOrigins(origins = deploymentOrigins) {
+  return [...new Set(origins.legacy.filter((o) => o !== origins.website))].sort();
 }
 /** Explicitly configured hosts only; forwarded headers never select the auth origin.
  * @param {{ACCOUNT_ORIGIN?: unknown, ACCOUNT_LEGACY_ORIGINS?: unknown}} env
@@ -26,4 +44,4 @@ export function accountRequestOrigin(env, requestUrl) {
   if (![primary, ...legacy].includes(origin)) throw Error("Account request host is not approved.");
   return origin;
 }
-for (const value of [deploymentOrigins.website, deploymentOrigins.nativeApi, ...deploymentOrigins.legacy]) validateOrigin(value);
+for (const value of [deploymentOrigins.website, deploymentOrigins.nativeApi, ...deploymentOrigins.legacy, previousDeploymentOrigins.website, ...previousDeploymentOrigins.legacy]) validateOrigin(value);
