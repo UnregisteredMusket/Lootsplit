@@ -39,6 +39,8 @@ async function device(label, width = 1280) {
   const page = await context.newPage();
   page.setDefaultTimeout(25000);
   page.on("pageerror", (e) => errors.push(`${label}: ${e.message}`));
+  page.diagLog = [];
+  page.on("console", (m) => page.diagLog.push(`${m.type()}: ${m.text().slice(0, 160)}`));
   page.on("console", (m) => {
     if (m.type() === "error") console.log(`  [${label} console] ${m.text().slice(0, 300)}`);
   });
@@ -102,6 +104,21 @@ async function sendAndExpect(label, sender, readers, text, how) {
   if (how === "keyboard") await sender.locator("#chat-message").press("Control+Enter");
   else if (how === "submit") await sender.locator(".chat-composer").evaluate((f) => f.requestSubmit());
   else await chat(sender).getByRole("button", { name: "Send", exact: true }).click();
+  const seen = new Set();
+  const t0 = Date.now();
+  while (Date.now() - t0 < 2500 && (await sender.locator("#chat-message").inputValue()) !== "") {
+    for (const t of await sender.locator("[data-sonner-toast]").allInnerTexts().catch(() => [])) seen.add(t);
+    await sender.waitForTimeout(100);
+  }
+  if ((await sender.locator("#chat-message").inputValue()) !== "") {
+    const state = await sender.evaluate(async () => {
+      const t = await import("/src/lib/quire/table.ts");
+      const c = await import("/src/lib/quire/cloud-client.ts");
+      const room = c.getCloudTable();
+      return { seat: t.getSeat(), room: { joined: room.joined, code: room.code, seatId: room.seatId, sessionId: room.sessionId, status: room.status, viewOnly: room.viewOnly, role: room.role }, acct: sessionStorage.getItem("lootsplit.verified-account"), btn: document.querySelector(".chat-composer button[type=submit]")?.outerHTML.slice(0, 200) };
+    }).catch((e) => String(e));
+    console.log(`REPRO ${label}: toasts=${JSON.stringify([...seen])} state=${JSON.stringify(state)} log=${JSON.stringify((sender.diagLog || []).slice(-8))}`);
+  }
   await expect(sender.locator("#chat-message")).toHaveValue("");
   const started = Date.now();
   await expect(
