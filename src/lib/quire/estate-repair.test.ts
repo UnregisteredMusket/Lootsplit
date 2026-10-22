@@ -278,12 +278,12 @@ test("ship and shipyard setup creates the same site and fleet record as a fresh 
     const need = estateSetupNeeds(table, dm).find((n) => n.holding.id === holding.id)!;
     assert.ok(need, `${key}: the legacy purchase is flagged`);
     // Ship templates need their fleet record: estate-site alone is not offered for them.
-    const input = {
+    const input: CommandInput = {
       kind: "estate-ship-setup",
       propertyId: holding.id,
       templateKey: key,
       attachments: [],
-    } as const;
+    };
     const repaired = command(table, input);
     assert.deepEqual(siteOf(repaired, holding.id), siteOf(fresh.table, fresh.holding.id));
     const fleet = (t: CloudTable, id: string) => ({
