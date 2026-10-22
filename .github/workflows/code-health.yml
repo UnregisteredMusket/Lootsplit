@@ -83,3 +83,39 @@ jobs:
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
           GITLEAKS_ENABLE_COMMENTS: "false"
+
+  a11y:
+    name: Accessibility (axe-core)
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - name: Start disposable development server
+        timeout-minutes: 3
+        run: |
+          mkdir -p test-results
+          npm run dev > test-results/dev-server.log 2>&1 &
+          for attempt in $(seq 1 60); do
+            if curl --max-time 10 --location --max-redirs 5 -fsS http://127.0.0.1:8080/ > /dev/null; then exit 0; fi
+            sleep 2
+          done
+          echo "Development server did not become ready" >&2
+          exit 1
+      # Report-only: findings go to the job summary and artifact. Set A11Y_FAIL_IMPACT here to
+      # make a level blocking once existing findings are fixed.
+      - name: Check public and DM screens at 1280 and 390 px
+        run: node scripts/a11y-browser-audit.mjs
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: a11y-${{ github.run_attempt }}
+          path: test-results/a11y/
+          retention-days: 30
