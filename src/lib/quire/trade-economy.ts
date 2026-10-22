@@ -5,7 +5,7 @@ import { canonicalJson } from "./canonical-json.ts";
 import { fromCopper, toCopper } from "./money.ts";
 import { clampRealm, pressureFor, scalePrice, SEASON_NAMES } from "./scale.ts";
 import { globalMarketCity, locationPath, readMarketLocations } from "./shop-locations.ts";
-import { canAccessEstate, physicallyHere, storageWeight } from "./estate.ts";
+import { canAccessEstate, physicallyHere, storageWeight, weightFits } from "./estate.ts";
 import { readEstate } from "./estate-schema.ts";
 import { readTradeSettlementHolding } from "./ledger-reversal.ts";
 import { commodityImportFingerprint, previewCommodityImport } from "./commodity-import.ts";
@@ -477,7 +477,8 @@ export function executeExchange(
       const used = storageWeight(table, input.propertyId);
       if (
         site.capacityWeight !== null &&
-        (used.unknown || used.weight + commodity.weight * input.quantity > site.capacityWeight)
+        (used.unknown ||
+          !weightFits(used.weight, commodity.weight, input.quantity, site.capacityWeight))
       )
         throw Error("The purchase exceeds storage capacity, or stored weights need DM review.");
     }

@@ -333,6 +333,15 @@ test("permissions, physical custody, capacity, finite stock/cash and stale quote
   );
 });
 
+test("exchange purchases into storage accept an exact fit of fractional weights", () => {
+  const t = tradeFixture();
+  economy(t).commodities[0].weight = 0.1;
+  t.journal!.propertyOperations!.sites[0].capacityWeight = 0.3;
+  // 0.1 * 3 is 0.30000000000000004 in floating point; it must still fit 0.3 lb.
+  const bought = buy(t, 3, "warehouse");
+  assert.equal(bought.holdings.find((h) => h.commodityId)!.quantity, 3);
+  assert.throws(() => buy(t, 4, "warehouse"), /capacity/);
+});
 test("campaign economies are separate and activity changes only the next automatic season", () => {
   const untouched = tradeFixture(),
     control = season(tradeFixture()),

@@ -362,6 +362,23 @@ test("finite storage refuses unknown weights, excess capacity and unauthorized c
     /permission/,
   );
 });
+test("finite storage accepts an exact fit of fractional weights and still refuses a real excess", () => {
+  let t = fixture();
+  t.holdings.find((h) => h.id === "timber")!.weight = 0.1;
+  const site = t.journal!.propertyOperations!.sites[0];
+  t = command(t, { kind: "estate-site", before: site, site: { ...site, capacityWeight: 0.3 } });
+  // 0.1 * 3 is 0.30000000000000004 in floating point; it must still fit 0.3 lb.
+  assert.equal(stored(t, 3).holdings.filter((h) => h.custody?.kind === "property").length, 1);
+  // Filling in steps (0.1 then 0.2) also fits exactly, and nothing more fits after.
+  const full = stored(stored(t, 1), 2);
+  const lots = full.holdings.filter((h) => h.custody?.kind === "property");
+  assert.equal(
+    lots.reduce((n, h) => n + h.quantity, 0),
+    3,
+  );
+  assert.throws(() => stored(full, 1), /capacity/);
+  assert.throws(() => stored(t, 4), /capacity/);
+});
 test("player sheet editing preserves stored lots and rejects forged carried references", () => {
   const t = stored(),
     p = t.purses.find((p) => p.id === "hero")!;
