@@ -147,11 +147,72 @@ export async function readRoom(code: string): Promise<CloudRoom | null> {
   if (room) ensureCityExchanges(room.table);
   return room;
 }
+/**
+ * D1 rejects rows above 2,000,000 bytes with an opaque error. Room bodies (after images, resource
+ * packs and archived session snapshots move to their own tables) and each archived snapshot row are
+ * refused below that with a clear message, and the refusal is logged to the owner monitor
+ * (`room-storage`, registered in BUILTIN_LOGS). The stored campaign is never changed by a refusal.
+ */
+export const ROOM_BODY_LIMIT = 1_800_000;
+type Encoded = Awaited<ReturnType<typeof encodeRoomImages>>;
+const utf8 = (text: string) => new TextEncoder().encode(text).length;
+async function guardRoomSize(db: Database, room: CloudRoom, encoded: Encoded) {
+  const bytes = utf8(encoded.body);
+  const largestReport = Math.max(0, ...encoded.reports.map((r) => utf8(r.body)));
+  if (bytes <= ROOM_BODY_LIMIT && largestReport <= ROOM_BODY_LIMIT) return;
+  const now = Date.now();
+  try {
+    const stored = JSON.parse(encoded.body) as CloudRoom;
+    const size = (value: unknown) => (value === undefined ? 0 : utf8(JSON.stringify(value)));
+    const { initializeMonitor, recordLog } = await import("../../../cloudflare/monitor-journal.mjs");
+    // Log rows reference the registry; a refusal before the first collection after a deploy
+    // must still be recorded, so the built-in sources are registered first (idempotent).
+    await initializeMonitor(db, now);
+    const digest = await crypto.subtle.digest("SHA-256", new TextEncoder().encode(room.code));
+    // A one-way room tag correlates repeated refusals without storing the join code.
+    const tag = Array.from(new Uint8Array(digest).slice(0, 6), (b) => b.toString(16).padStart(2, "0")).join("");
+    await recordLog(
+      db,
+      {
+        id: `room-storage:${tag}:${Math.floor(now / 1_800_000)}`,
+        source: "room-storage",
+        observedAt: now,
+        summary: `A shared room write was refused before reaching D1: ${bytes} bytes (largest archived snapshot ${largestReport} bytes) exceeds the ${ROOM_BODY_LIMIT}-byte budget. The stored campaign was not changed. Later refusals for this room in the same half-hour share this entry.`,
+        room: tag,
+        revision: room.revision,
+        bytes,
+        largestReport,
+        limit: ROOM_BODY_LIMIT,
+        parts: {
+          notes: size(stored.table?.notes),
+          ledger: size(stored.table?.ledger),
+          purses: size(stored.table?.purses),
+          holdings: size(stored.table?.holdings),
+          journal: size(stored.table?.journal),
+          reportReferences: size(stored.table?.journal?.reports),
+          receipts:
+            size(stored.commands) + size(stored.commandHashes) + size(stored.batches) + size(stored.batchHashes),
+          drafts: size(stored.drafts),
+        },
+      },
+      now,
+    );
+  } catch (error) {
+    console.warn("The room size refusal could not be logged to monitoring.", error);
+  }
+  throw Object.assign(
+    Error(
+      `This campaign is too large to save online (${(Math.max(bytes, largestReport) / 1e6).toFixed(2)} MB; the limit is ${(ROOM_BODY_LIMIT / 1e6).toFixed(1)} MB). Nothing was changed and pending actions are preserved. The DM can end the session to archive the current messages and ledger, or export the campaign.`,
+    ),
+    { status: 413 },
+  );
+}
 export async function createRoom(room: CloudRoom): Promise<void> {
   ensureCityExchanges(room.table);
   const db = database();
   if (db) {
     const encoded = await encodeRoomImages(room);
+    await guardRoomSize(db, room, encoded);
     const insert = db
       .prepare("INSERT INTO campaign_rooms (code, revision, body) VALUES (?, ?, ?)")
       .bind(room.code, room.revision, encoded.body);
@@ -171,6 +232,7 @@ export async function updateRoom(room: CloudRoom, baseRevision: number): Promise
   const db = database();
   if (db) {
     const encoded = await encodeRoomImages(room);
+    await guardRoomSize(db, room, encoded);
     const update = db
       .prepare("UPDATE campaign_rooms SET revision = ?, body = ? WHERE code = ? AND revision = ?")
       .bind(room.revision, encoded.body, room.code, baseRevision);

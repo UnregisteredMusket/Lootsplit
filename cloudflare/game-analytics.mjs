@@ -7,6 +7,7 @@ import {
   publicGameMetrics,
 } from "../src/lib/quire/analytics.ts";
 import { roleOf } from "./members.mjs";
+import { hydrateRoomReports } from "./room-reports.mjs";
 
 // Bound repeated homepage reads per database/isolate; failures are never cached as zero.
 const snapshots = new WeakMap();
@@ -47,7 +48,9 @@ async function collect(db) {
           ledger: JSON.parse(row.ledger || "[]"),
           purses: JSON.parse(row.purses || "[]"),
           holdings: JSON.parse(row.holdings || "[]"),
-          journal: JSON.parse(row.journal || "null"),
+          // Archived session snapshots are stored beside the room row (room-reports.mjs).
+          journal: (await hydrateRoomReports(db, row.code, { journal: JSON.parse(row.journal || "null") }))
+            .journal,
         }),
       );
       sharedCampaigns++;

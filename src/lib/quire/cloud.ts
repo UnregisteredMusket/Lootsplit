@@ -70,6 +70,8 @@ export type CloudRoom = {
   invitations?: Record<string, string>;
   blockedUsers?: Record<string, "kicked" | "banned">;
   drafts?: Record<string, import("./commands.ts").Command[]>;
+  /** Server-only per-seat submit budget (room-submit-limit.ts); never projected to clients. */
+  submitAllowance?: Record<string, import("./room-submit-limit.ts").SubmitAllowance>;
 };
 
 import { validateShopLocations } from "./shop-locations.ts";

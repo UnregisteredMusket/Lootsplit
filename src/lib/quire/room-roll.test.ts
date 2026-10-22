@@ -12,6 +12,7 @@ for (const name of [
   "0007_character_play.sql",
   "0012_campaign_room_images.sql",
   "0013_campaign_resource_documents.sql",
+  "0019_campaign_room_reports.sql",
 ])
   sql.exec(readFileSync(new URL(`../../../cloudflare/migrations/${name}`, import.meta.url), "utf8"));
 (globalThis as { __env__?: unknown }).__env__ = {

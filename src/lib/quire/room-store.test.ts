@@ -427,13 +427,15 @@ test("large exact snapshots retain metadata and leave shared state intact when b
   await deleteRoom(host.code, before!.revision);
 
   const nearLimit = tradeFixture();
-  nearLimit.holdings.push(...Array.from({ length: 4 }, (_, index) => ({ ...lot, id: "near-limit-" + index })));
+  nearLimit.holdings.push(...Array.from({ length: 2 }, (_, index) => ({ ...lot, id: "near-limit-" + index })));
   const bounded = await openRoom({ name: "Backing write DM", table: nearLimit });
   const saved = await readRoom(bounded.code);
-  // The production account snapshot path reserves a 1.9 MB D1 row budget.
   // Disposable SQLite models a backing size rejection at the actual UPDATE,
   // after the command has built its full candidate, without changing product limits.
-  sql.exec("CREATE TEMP TRIGGER market_test_row_budget BEFORE UPDATE ON campaign_rooms WHEN length(CAST(NEW.body AS BLOB)) > 1900000 BEGIN SELECT RAISE(ABORT, 'market test row storage budget'); END");
+  // The budget sits below ROOM_BODY_LIMIT (1.8 MB) so the application size guard,
+  // covered in scripts/room-row-growth.test.mjs, does not refuse the write first:
+  // the sale's receipt copies the 450 KB lot, taking the row from ~0.9 MB to ~1.35 MB.
+  sql.exec("CREATE TEMP TRIGGER market_test_row_budget BEFORE UPDATE ON campaign_rooms WHEN length(CAST(NEW.body AS BLOB)) > 1000000 BEGIN SELECT RAISE(ABORT, 'market test row storage budget'); END");
   try {
     await assert.rejects(submitCommands({ ...bounded, batchId: "row-budget-sale", commands: [{ ...sale, id: "row-budget-sale", holdingId: "near-limit-0" }] }), /row storage budget/);
     assert.deepEqual(await readRoom(bounded.code), saved);
@@ -568,6 +570,7 @@ sql.exec(
 sql.exec(readFileSync(new URL("../../../cloudflare/migrations/0012_campaign_room_images.sql",import.meta.url),"utf8"));
 sql.exec(readFileSync(new URL("../../../cloudflare/migrations/0013_campaign_resource_documents.sql",import.meta.url),"utf8"));
 sql.exec(readFileSync(new URL("../../../cloudflare/migrations/0014_campaign_map_pings.sql",import.meta.url),"utf8"));
+sql.exec(readFileSync(new URL("../../../cloudflare/migrations/0019_campaign_room_reports.sql",import.meta.url),"utf8"));
 (globalThis as any).__env__ = {
   DB: {
     async batch(statements: {run:()=>Promise<unknown>}[]) {
@@ -1037,10 +1040,16 @@ test("map storage leaves raw character portraits and non-map inventory recovery 
   const raw=JSON.parse(encoded.body);
   assert.equal(raw.table.purses[0].portrait,portrait);
   assert.equal(raw.table.holdings[0].image,portrait);
-  assert.ok(raw.table.journal.reports[0].snapshot.includes(portrait));
+  // Archived snapshots are stored beside the room row (room-reports.mjs), byte for byte.
+  assert.equal(raw.table.journal.reports[0].snapshot,undefined);
+  assert.equal(encoded.reports.length,1);
+  assert.equal(raw.table.journal.reports[0].snapshotReference,encoded.reports[0].reference);
+  assert.ok(encoded.reports[0].body.includes(portrait));
   assert.equal(raw.table.journal.world.maps[1].image,portrait);
   assert.equal(raw.drafts.dm[0].map.image,encoded.assets[0].reference);
-  assert.equal(encoded.body.split(encoded.assets[0].reference).join(encoded.assets[0].image),JSON.stringify({table,drafts:{dm:[{kind:"map-save",map:makeMap("queued",mapImage),before:null}]}}));
+  const {snapshotReference:_reference,...report}=raw.table.journal.reports[0];
+  raw.table.journal.reports[0]={...report,snapshot:encoded.reports[0].body};
+  assert.equal(JSON.stringify(raw).split(encoded.assets[0].reference).join(encoded.assets[0].image),JSON.stringify({table,drafts:{dm:[{kind:"map-save",map:makeMap("queued",mapImage),before:null}]}}));
 });
 
 test("large resource packs deduplicate across archives, hydrate complete bytes and remain campaign-scoped and CAS-atomic", async () => {

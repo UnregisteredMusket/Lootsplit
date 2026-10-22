@@ -301,7 +301,7 @@ export const PLAYER_HELP_GROUPS: HelpGroup[] = [
         id: "recovery",
         title: "Recover a connection or pending action",
         paragraphs: [
-          "Check Campaign → Connection & recovery before retrying, leaving or discarding an action. Export pending actions when offered and retain the original campaign and request identity. A lost response does not prove a purchase or trade failed; inspect sync and receipts before trying again.",
+          "Check Campaign → Connection & recovery before retrying, leaving or discarding an action. Export pending actions when offered and retain the original campaign and request identity. A lost response does not prove a purchase or trade failed; inspect sync and receipts before trying again. If the room says you are sending changes too quickly, wait a minute and send again; your pending actions are kept.",
           "Use a current invitation to reconnect. If your character is occupied or the room has closed, ask the DM to resolve the seat or provide the new invitation. Do not clear storage as a first recovery step.",
           "In the Android app, if Android restores Lootsplit from a device backup onto a new phone or a reinstall, your saved data returns but you sign in to your account again.",
         ],

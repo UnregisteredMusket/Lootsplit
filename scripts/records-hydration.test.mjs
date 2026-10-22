@@ -44,7 +44,9 @@ test("damaged stored archives do not block shared messages, money, journal edits
   ]};
   const room={code:"BROKEN",revision:1,live:true,turn:0,table,
     seats:[{id:"dm",token:"dm-token",name:"DM",role:"dm",purseIds:[]}],seen:{gifts:[],sales:[]}};
-  const read=async()=>JSON.parse((await db.prepare("SELECT body FROM campaign_rooms WHERE code=?").bind(room.code).first()).body);
+  const {hydrateRoomReports}=await import("../cloudflare/room-reports.mjs");
+  // Archived snapshots move to campaign_room_reports on the next write; restore them byte for byte.
+  const read=async()=>hydrateRoomReports(db,room.code,JSON.parse((await db.prepare("SELECT body FROM campaign_rooms WHERE code=?").bind(room.code).first()).body));
   const send=commands=>submitCommands({code:room.code,token:"dm-token",batchId:crypto.randomUUID(),commands});
   try {
     await db.prepare("INSERT INTO campaign_rooms VALUES (?,1,?)").bind(room.code,JSON.stringify(room)).run();
