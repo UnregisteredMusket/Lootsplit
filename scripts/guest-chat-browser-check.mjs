@@ -219,6 +219,17 @@ try {
   await member.page.getByText("You joined as a player", { exact: true }).waitFor();
   await openChat(member.page);
   await sendAndExpect("signed-in player party message", member.page, [dm.page, guest.page], "Member check: I keep watch.", "click");
+  // A reloaded player who sends before the room answers sends as their character (the
+  // seat used to start empty until the first response: "Your character is no longer assigned").
+  release = await reloadWithSlowRoom(member.page, member.context);
+  await member.page.locator("#chat-message").fill("Member check early: sent while reconnecting.");
+  await chat(member.page).getByRole("button", { name: "Send", exact: true }).click();
+  await expect(member.page.locator("#chat-message")).toHaveValue("");
+  await release();
+  await expect(chat(member.page).getByText("Failed — not confirmed", { exact: true })).toHaveCount(0, { timeout: delivery });
+  for (const reader of [dm.page, guest.page])
+    await expect(chat(reader).getByText("Member check early: sent while reconnecting.", { exact: true })).toBeVisible({ timeout: delivery });
+  console.log("  a reloaded player can send before the room session is confirmed");
   await sendAndExpect("guest party message with a second player", guest.page, [dm.page, member.page], "Guest check four: thanks for watching.", "click");
   await guest.page.screenshot({ path: output + "/guest-chat-mobile.png", fullPage: true });
   await dm.page.screenshot({ path: output + "/dm-chat-desktop.png", fullPage: true });
