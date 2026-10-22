@@ -139,6 +139,9 @@ jobs:
       - name: dev-campaign-governance
         if: matrix.group == 'governance'
         run: node scripts/recovery-step.mjs dev-campaign-governance 240 node scripts/campaign-governance-browser-audit.mjs
+      - name: dev-guest-chat
+        if: matrix.group == 'governance'
+        run: node scripts/recovery-step.mjs dev-guest-chat 180 node --experimental-strip-types scripts/guest-chat-browser-check.mjs
       - name: dev-theme
         if: matrix.group == 'governance'
         run: node scripts/recovery-step.mjs dev-theme 240 node scripts/theme-browser-audit.mjs
