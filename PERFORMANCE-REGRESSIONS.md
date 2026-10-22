@@ -141,7 +141,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Packaged standby / Run actions/checkout@v4 | open | 2 | 1s → 3s | +2s | +200% |
 | Development / governance | open | 5 | 160s → 921s | +761s | +475.63% |
 | Development / gameplay / dev-finance | open | 6 | 17s → 67s | +50s | +294.12% |
-| Code checks and immutable builds / unit-tests | open | 7 | 11s → 54s | +43s | +390.91% |
+| Code checks and immutable builds / unit-tests | open | 8 | 11s → 63s | +52s | +472.73% |
 | Packaged Worker / interface / Run npx playwright install --with-deps chromium | open | 5 | 21s → 421s | +400s | +1904.76% |
 | Development / accounts / dev-monitor | open | 5 | 3s → 9s | +6s | +200% |
 | Packaged Worker / accounts | open | 7 | 94s → 920s | +826s | +878.72% |
@@ -179,7 +179,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Development / accounts / dev-character | open | 3 | 12s → 23s | +11s | +91.67% |
 | Verify preserved functionality | open | 5 | 205s → 1334s | +1129s | +550.73% |
 | Packaged Worker / interface / worker-help | open | 3 | 6s → 57s | +51s | +850% |
-| Verify preserved functionality / initial queue | open | 6 | 3s → 615s | +612s | +20400% |
+| Verify preserved functionality / initial queue | open | 7 | 3s → 858s | +855s | +28500% |
 | Development / governance / Run actions/checkout@v4 | open | 2 | 1s → 3s | +2s | +200% |
 | Development / desktop / Run npx playwright install --with-deps chromium | open | 4 | 21s → 492s | +471s | +2242.86% |
 | Development / gameplay / dev-bug-data-integrity | open | 3 | 5s → 9s | +4s | +80% |
@@ -435,7 +435,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Development / governance / Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262 | open | 2 | 1s → 3s | +2s | +200% |
 | Player references / development / Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 | open | 3 | 4s → 7s | +3s | +75% |
 | Change scope | open | 3 | 4s → 9s | +5s | +125% |
-| Development / world / Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 | open | 3 | 2s → 7s | +5s | +250% |
+| Development / world / Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 | open | 4 | 2s → 9s | +7s | +350% |
 | Development / governance / Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 | open | 2 | 4s → 7s | +3s | +75% |
 | Development / accounts-2 / Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262 | open | 3 | 1s → 4s | +3s | +300% |
 | Development / accounts-2 / Run npm ci | open | 3 | 10s → 183s | +173s | +1730% |
@@ -468,11 +468,12 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Development / accounts-2 / Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 | open | 3 | 2s → 7s | +5s | +250% |
 | Development / gameplay / Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 | open | 3 | 1s → 4s | +3s | +300% |
 | Development / gameplay / Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262 | open | 2 | 1s → 4s | +3s | +300% |
-| Development / gameplay / Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 | open | 2 | 4s → 9s | +5s | +125% |
+| Development / gameplay / Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 | open | 3 | 4s → 17s | +13s | +325% |
 | Development / desktop / dev-ships | open | 2 | 55s → 80s | +25s | +45.45% |
 | Code checks and immutable builds / Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 | open | 2 | 3s → 5s | +2s | +66.67% |
 | Packaged standby / Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 | open | 2 | 4s → 9s | +5s | +125% |
 | Packaged standby / Run actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 | open | 2 | 2s → 4s | +2s | +100% |
+| Packaged standby / Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 | open | 2 | 2s → 9s | +7s | +350% |
 | Development / desktop / dev-map-tiles | open | 2 | 133s → 176s | +43s | +32.33% |
 | deploy / Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 | open | 3 | 4s → 17s | +13s | +325% |
 | Change scope / Run node scripts/change-scope.mjs | open | 2 | 1s → 4s | +3s | +300% |
@@ -514,8 +515,8 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Development / governance / Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 | open | 2 | 2s → 6s | +4s | +200% |
 | Development / world / Run npm ci | open | 2 | 18s → 402s | +384s | +2133.33% |
 | Development / accounts-2 | open | 4 | 204s → 795s | +591s | +289.71% |
-| Change scope / Run node scripts/change-scope.mjs | open | 2 | 1s → 3s | +2s | +200% |
-| Packaged Worker / library / Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 | open | 5 | 3s → 11s | +8s | +266.67% |
+| Change scope / Run node scripts/change-scope.mjs | open | 3 | 1s → 7s | +6s | +600% |
+| Packaged Worker / library / Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 | open | 6 | 3s → 16s | +13s | +433.33% |
 | Packaged Worker / library / Run actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 | open | 3 | 1s → 4s | +3s | +300% |
 | Packaged Worker / world / Set up job | open | 2 | 1s → 3s | +2s | +200% |
 | Packaged Worker / library / Set up job | open | 2 | 1s → 3s | +2s | +200% |
@@ -532,6 +533,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Packaged Worker / world / Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 | open | 3 | 3s → 12s | +9s | +300% |
 | Packaged Worker / world / Run actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 | open | 2 | 2s → 4s | +2s | +100% |
 | Packaged Worker / economy / Run actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 | open | 2 | 2s → 4s | +2s | +100% |
+| Packaged Worker / economy / worker-game-analytics | open | 2 | 4s → 7s | +3s | +75% |
 | Packaged Worker / library / Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 | open | 3 | 2s → 7s | +5s | +250% |
 | Verify preserved functionality | open | 2 | 438s → 815s | +377s | +86.07% |
 | Dependency vulnerabilities (OSV-Scanner) / osv-scan / Run scanner | open | 3 | 1s → 7s | +6s | +600% |
@@ -552,7 +554,8 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | GitHub Actions security (zizmor) / Set up job | open | 2 | 1s → 3s | +2s | +200% |
 | Code health and security scans | open | 4 | 183s → 1072s | +889s | +485.79% |
 | Committed secrets (gitleaks) / Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262 | open | 2 | 4s → 7s | +3s | +75% |
-| Code health and security scans | open | 2 | 210s → 533s | +323s | +153.81% |
+| Committed secrets (gitleaks) / Run gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 | open | 2 | 4s → 9s | +5s | +125% |
+| Code health and security scans | open | 3 | 210s → 768s | +558s | +265.71% |
 | Packaged Worker / world / Run npx playwright install --with-deps chromium | open | 2 | 27s → 576s | +549s | +2033.33% |
 | Committed secrets (gitleaks) | open | 2 | 13s → 18s | +5s | +38.46% |
 | Packaged Worker / world | open | 2 | 239s → 784s | +545s | +228.03% |
@@ -578,6 +581,8 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Packaged Worker / pull request / Start disposable built Worker | open | 2 | 7s → 13s | +6s | +85.71% |
 | Packaged Worker / pull request / pr-worker-csp | open | 2 | 4s → 9s | +5s | +125% |
 | Packaged Worker / economy | open | 3 | 219s → 606s | +387s | +176.71% |
+| Packaged Worker / economy / worker-trade-economy | open | 2 | 78s → 109s | +31s | +39.74% |
+| Packaged Worker / pull request / Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 | open | 2 | 1s → 8s | +7s | +700% |
 | Packaged Worker / pull request / Run npx playwright install --with-deps chromium | open | 2 | 258s → 583s | +325s | +125.97% |
 | Packaged Worker / pull request | open | 2 | 295s → 626s | +331s | +112.2% |
 | Accessibility (axe-core) / Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262 | open | 2 | 1s → 3s | +2s | +200% |
@@ -589,32 +594,72 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | verify / Development / economy / Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 | open | 2 | 4s → 21s | +17s | +425% |
 | verify / Packaged Worker / accounts / Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 | open | 2 | 4s → 9s | +5s | +125% |
 | verify / Packaged Worker / features / Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 | open | 2 | 3s → 9s | +6s | +200% |
+| Accessibility (axe-core) / Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262 | open | 2 | 1s → 3s | +2s | +200% |
 | Accessibility (axe-core) / Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 | open | 2 | 1s → 9s | +8s | +800% |
-| Accessibility (axe-core) / Run npx playwright install --with-deps chromium | open | 2 | 24s → 460s | +436s | +1816.67% |
-| Accessibility (axe-core) | open | 2 | 120s → 532s | +412s | +343.33% |
+| Accessibility (axe-core) / Run npx playwright install --with-deps chromium | open | 3 | 24s → 658s | +634s | +2641.67% |
+| Accessibility (axe-core) | open | 3 | 120s → 739s | +619s | +515.83% |
 | Player references / worker / account shard 1 / Install Chromium for Playwright | open | 2 | 6s → 145s | +139s | +2316.67% |
-| Player references / worker / account shard 2 / Install Chromium for Playwright | open | 2 | 4s → 128s | +124s | +3100% |
+| Player references / worker / account shard 2 / Install Chromium for Playwright | open | 3 | 4s → 475s | +471s | +11775% |
 | Player references / development / account shard 1 / Install Chromium for Playwright | open | 2 | 4s → 376s | +372s | +9300% |
 | Development / gameplay / Install Chromium for Playwright | open | 3 | 3s → 429s | +426s | +14200% |
 | Development / desktop / Install Chromium for Playwright | open | 5 | 3s → 384s | +381s | +12700% |
-| Development / economy / Install Chromium for Playwright | open | 2 | 4s → 439s | +435s | +10875% |
+| Development / economy / Install Chromium for Playwright | open | 3 | 4s → 526s | +522s | +13050% |
 | Development / accounts-2 / Install Chromium for Playwright | open | 2 | 4s → 365s | +361s | +9025% |
 | Development / governance / Install Chromium for Playwright | open | 2 | 6s → 541s | +535s | +8916.67% |
-| Player references / worker / account shard 2 | open | 2 | 28s → 131s | +103s | +367.86% |
+| Player references / worker / account shard 2 | open | 3 | 28s → 573s | +545s | +1946.43% |
 | Development / accounts / Install Chromium for Playwright | open | 2 | 5s → 640s | +635s | +12700% |
 | Player references / worker / account shard 1 | open | 2 | 29s → 301s | +272s | +937.93% |
-| Packaged Worker / pull request / Install Chromium for Playwright | open | 3 | 3s → 311s | +308s | +10266.67% |
+| Packaged Worker / pull request / Install Chromium for Playwright | open | 4 | 3s → 493s | +490s | +16333.33% |
 | Player references / development / account shard 1 | open | 3 | 29s → 557s | +528s | +1820.69% |
-| Player references / development / account shard 2 | open | 2 | 31s → 472s | +441s | +1422.58% |
+| Development / world / Install Chromium for Playwright | open | 2 | 6s → 454s | +448s | +7466.67% |
+| Player references / development / account shard 2 / Install Chromium for Playwright | open | 2 | 6s → 463s | +457s | +7616.67% |
+| Player references / development / account shard 2 | open | 3 | 31s → 599s | +568s | +1832.26% |
+| Player references / worker / account shard 1 / Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 | open | 2 | 4s → 6s | +2s | +50% |
 | Player references / worker / account shard 2 / Verify complete account fixtures | open | 2 | 39s → 61s | +22s | +56.41% |
 | Player references / development / account shard 1 / Verify complete account fixtures | open | 2 | 61s → 95s | +34s | +55.74% |
 | Player references / worker / account shard 1 / Build and start disposable immutable Worker | open | 2 | 14s → 38s | +24s | +171.43% |
+| Code checks and immutable builds / Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 | open | 2 | 7s → 11s | +4s | +57.14% |
 | Development / desktop / Install Chromium for Playwright | open | 2 | 23s → 442s | +419s | +1821.74% |
+| Packaged Worker / features / Install Chromium for Playwright | open | 2 | 15s → 33s | +18s | +120% |
 
 ## Recorded slowdowns
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-22T16:47:02Z | step: Committed secrets (gitleaks) / Run gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 | 5s → 9s | +4s | +80% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39740454452/job/119696446838) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39816809074/job/119957326216) |
+| 2026-10-22T16:40:28Z | job: Player references / development / account shard 2 | 472s → 599s | +127s | +26.91% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39785535151/job/119847609497) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39814634582/job/119949789430) |
+| 2026-10-22T16:38:37Z | step: Player references / development / account shard 2 / Install Chromium for Playwright | 317s → 463s | +146s | +46.06% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39784147984/job/119842740641) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39814634582/job/119949789430) |
+| 2026-10-22T16:38:14Z | step: Packaged Worker / library / worker-library-navigation | 45s → 52s | +7s | +15.56% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39704913242/job/119583443854) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39811679477/job/119948129051) |
+| 2026-10-22T16:36:17Z | step: Packaged Worker / pull request / Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 | 2s → 8s | +6s | +300% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39756511344/job/119751305551) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39814635106/job/119951182441) |
+| 2026-10-22T16:36:01Z | step: Packaged Worker / library / worker-blacksmith | 49s → 60s | +11s | +22.45% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39704913242/job/119583443854) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39811679477/job/119948129051) |
+| 2026-10-22T16:31:31Z | step: Packaged standby / Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 | 3s → 9s | +6s | +200% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39577338607/job/119147294692) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39811679477/job/119948128816) |
+| 2026-10-22T16:30:39Z | step: Player references / worker / account shard 1 / Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 | 5s → 6s | +1s | +20% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39785535151/job/119847609395) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39814634582/job/119949789639) |
+| 2026-10-22T16:30:39Z | step: Player references / worker / account shard 2 / Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 | 5s → 7s | +2s | +40% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39782773421/job/119838003027) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39814634582/job/119949789684) |
+| 2026-10-22T16:30:31Z | step: Player references / worker / account shard 1 / Set up job | 1s → 2s | +1s | +100% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39782773421/job/119838002917) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39814634582/job/119949789639) |
+| 2026-10-22T16:24:43Z | step: Change scope / Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262 | 2s → 3s | +1s | +50% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39572072052/job/119129048641) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39811679477/job/119946854319) |
+| 2026-10-22T16:24:39.000Z | queue: Verify preserved functionality / initial queue | 615s → 858s | +243s | +39.51% | failure | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39742806285) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39811679477) |
+| 2026-10-22T16:13:39Z | step: Packaged Worker / library / Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 | 11s → 16s | +5s | +45.45% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39802895266/job/119909609171) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39811659447/job/119940880886) |
+| 2026-10-22T16:11:42Z | step: Code checks and immutable builds / unit-tests | 54s → 63s | +9s | +16.67% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39462543939/job/118765449249) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39811659447/job/119939244683) |
+| 2026-10-22T16:10:48Z | step: Development / gameplay / Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 | 9s → 17s | +8s | +88.89% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39748949709/job/119726651868) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39811659447/job/119939337754) |
+| 2026-10-22T16:08:50Z | job: Player references / worker / account shard 2 | 131s → 573s | +442s | +337.4% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39799299919/job/119895101796) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39809941958/job/119933169900) |
+| 2026-10-22T16:07:35Z | step: Player references / worker / account shard 2 / Install Chromium for Playwright | 128s → 475s | +347s | +271.09% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39796166509/job/119883830001) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39809941958/job/119933169900) |
+| 2026-10-22T16:06:00.000Z | workflow: Code health and security scans | 533s → 768s | +235s | +44.09% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39782773548) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39808894877) |
+| 2026-10-22T16:06:00Z | job: Accessibility (axe-core) | 532s → 739s | +207s | +38.91% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39782773548/job/119838002794) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39808894877/job/119929447230) |
+| 2026-10-22T16:05:08Z | step: Packaged Worker / pull request / Install Chromium for Playwright | 311s → 493s | +182s | +58.52% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39799299824/job/119896430773) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39808900401/job/119930830040) |
+| 2026-10-22T16:05:03Z | step: Accessibility (axe-core) / Run npx playwright install --with-deps chromium | 460s → 658s | +198s | +43.04% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39782773548/job/119838002794) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39808894877/job/119929447230) |
+| 2026-10-22T16:03:12Z | step: Development / economy / Install Chromium for Playwright | 439s → 526s | +87s | +19.82% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39785535152/job/119847674718) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39808900401/job/119930280596) |
+| 2026-10-22T15:59:20Z | step: Player references / development / account shard 2 / Set up job | 1s → 2s | +1s | +100% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39782773421/job/119838002602) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39809941958/job/119933170713) |
+| 2026-10-22T15:57:09Z | step: Packaged Worker / economy / worker-game-analytics | 5s → 7s | +2s | +40% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39717569613/job/119623823807) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39808146364/job/119928608026) |
+| 2026-10-22T15:56:09Z | step: Development / accounts / Install Chromium for Playwright | 128s → 461s | +333s | +260.16% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39788045942/job/119856393370) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39808146364/job/119926940869) |
+| 2026-10-22T15:55:47Z | step: Development / world / Install Chromium for Playwright | 315s → 454s | +139s | +44.13% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39784148014/job/119842840881) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39808131254/job/119926839912) |
+| 2026-10-22T15:55:35Z | step: Packaged Worker / economy / worker-trade-economy | 90s → 109s | +19s | +21.11% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39751538072/job/119735749998) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39808146364/job/119928608026) |
+| 2026-10-22T15:53:46Z | step: Accessibility (axe-core) / Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262 | 2s → 3s | +1s | +50% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39774261204/job/119809127794) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39808894877/job/119929447230) |
+| 2026-10-22T15:53:46Z | step: Packaged Worker / economy / Start disposable built Worker | 11s → 13s | +2s | +18.18% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39704913242/job/119583443765) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39808146364/job/119928608026) |
+| 2026-10-22T15:53:27Z | step: Packaged Worker / features / Install Chromium for Playwright | 24s → 33s | +9s | +37.5% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39799996576/job/119899799505) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39808146364/job/119928608148) |
+| 2026-10-22T15:53:16Z | step: Code checks and immutable builds / Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 | 9s → 11s | +2s | +22.22% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39796459499/job/119884755653) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39808900401/job/119929464342) |
+| 2026-10-22T15:53:02Z | step: Packaged Worker / economy / Run npm ci | 14s → 22s | +8s | +57.14% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39704913242/job/119583443765) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39808146364/job/119928608026) |
+| 2026-10-22T15:47:58Z | step: Development / world / Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 | 7s → 9s | +2s | +28.57% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39679792265/job/119499029896) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39808131254/job/119926839912) |
+| 2026-10-22T15:47:52Z | step: Change scope / Run node scripts/change-scope.mjs | 3s → 7s | +4s | +133.33% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39742806285/job/119707000623) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39808146364/job/119926804586) |
 | 2026-10-22T15:48:02Z | step: Unused files, exports and dependencies (knip) / Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 | 12s → 17s | +5s | +41.67% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39789178662/job/119861116459) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39808146924/job/119926804246) |
 | 2026-10-22T15:47:50Z | step: Accessibility (axe-core) / Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 | 7s → 9s | +2s | +28.57% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39774261204/job/119809127794) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39808132598/job/119926768034) |
 | 2026-10-22T15:44:22Z | step: Packaged Worker / pull request / Start disposable built Worker | 11s → 13s | +2s | +18.18% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39749763098/job/119728258914) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39806825537/job/119923870517) |
