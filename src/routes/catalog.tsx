@@ -3,6 +3,7 @@ import { FantasyIcon } from "@/components/fantasy-icon";
 import { createFileRoute, useRouterState } from "@tanstack/react-router";
 import { Dices } from "lucide-react";
 import { useEffect, useMemo, useRef, useState, type FormEvent } from "react";
+import { toast } from "sonner";
 import { Open5eBrowser } from "@/components/open5e-browser";
 import { NameGenerator } from "@/components/name-generator";
 import { BookHarvest } from "@/components/book-harvest";
@@ -136,12 +137,17 @@ function GoodsPane() {
       origin: "hand",
       service: false,
     };
-    void addGoods([item]).then((added) => {
-      if (added > 0) {
-        setName("");
-        setPrice("");
-      }
-    });
+    // Fields clear only once the item is saved; an error keeps them for a retry.
+    void addGoods([item]).then(
+      (added) => {
+        if (added > 0) {
+          setName("");
+          setPrice("");
+        }
+      },
+      (error: unknown) =>
+        toast.error(error instanceof Error ? error.message : "That item could not be added."),
+    );
   }
 
   return (

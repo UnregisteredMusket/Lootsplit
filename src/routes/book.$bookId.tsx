@@ -1,5 +1,6 @@
 import { createFileRoute, Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState } from "react";
+import { toast } from "sonner";
 import { articlesForBook, getBook } from "@/lib/quire/db";
 import { useLibrary } from "@/lib/quire/library";
 import type { Article, Book } from "@/lib/quire/types";
@@ -110,7 +111,14 @@ function BookPage() {
             body="The entries made from it are deleted from this device. The original file on your computer is not deleted."
             confirmLabel="Remove"
             onConfirm={() => {
-              void remove(book.id).then(() => navigate({ to: "/books", search: { q: "" } }));
+              // Leave the page only once the PDF is removed; a failure stays here.
+              void remove(book.id).then(
+                () => navigate({ to: "/books", search: { q: "" } }),
+                (error: unknown) =>
+                  toast.error(
+                    error instanceof Error ? error.message : "That PDF could not be removed.",
+                  ),
+              );
             }}
           />
         </section>

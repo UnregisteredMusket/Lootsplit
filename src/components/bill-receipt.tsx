@@ -8,9 +8,20 @@ export function BillReceipt() {
   const receipt = useSyncExternalStore(subscribeReceipt, getReceipt, () => null);
   const { decideLoan, voidLine } = useEconomy();
   const [settled, setSettled] = useState<Record<string, "approved" | "denied">>({});
+  // The loan whose decision is being saved. A refused decision is shown as a
+  // toast and leaves the buttons in place so the DM can try again.
+  const [deciding, setDeciding] = useState<string | null>(null);
   if (!receipt) return null;
   const who = receipt.who.length > 0 ? receipt.who.join(", ") : "This player";
   const loans = receipt.loans.filter((loan) => loan.status === "pending" || settled[loan.id]);
+  const decide = async (id: string, status: "approved" | "denied") => {
+    setDeciding(id);
+    try {
+      if (await decideLoan(id, status)) setSettled((current) => ({ ...current, [id]: status }));
+    } finally {
+      setDeciding(null);
+    }
+  };
   return (
     <Modal open onOpenChange={(open) => { if (!open) dismissReceipt(); }} title="From this player">
       <div className="flex flex-col gap-4">
@@ -54,18 +65,13 @@ export function BillReceipt() {
                     <p className="mt-1 text-sm text-muted">{loan.note}</p>
                     {status ? <p className="mt-2 text-sm">{status === "approved" ? "Approved." : "Denied."}</p> : (
                       <div className="mt-2 flex flex-wrap gap-2">
-                        <Button
-                          onClick={() => {
-                            void decideLoan(loan.id, "approved").then(() => setSettled((current) => ({ ...current, [loan.id]: "approved" })));
-                          }}
-                        >
+                        <Button disabled={deciding !== null} onClick={() => void decide(loan.id, "approved")}>
                           Approve
                         </Button>
                         <Button
                           variant="secondary"
-                          onClick={() => {
-                            void decideLoan(loan.id, "denied").then(() => setSettled((current) => ({ ...current, [loan.id]: "denied" })));
-                          }}
+                          disabled={deciding !== null}
+                          onClick={() => void decide(loan.id, "denied")}
                         >
                           Deny
                         </Button>

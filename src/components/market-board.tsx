@@ -409,6 +409,17 @@ export function LoanAskForm() {
 
 export function LoanQueue() {
   const { loans, decideLoan } = useEconomy();
+  // Disabled while a decision is saving; a refused decision is shown as a toast
+  // and the request stays in the queue for another try.
+  const [busy, setBusy] = useState(false);
+  const decide = async (id: string, status: "approved" | "denied") => {
+    setBusy(true);
+    try {
+      await decideLoan(id, status);
+    } finally {
+      setBusy(false);
+    }
+  };
   const waiting = loans.filter((loan) => loan.status === "pending");
   const answered = loans
     .filter((loan) => loan.status !== "pending")
@@ -429,8 +440,14 @@ export function LoanQueue() {
             </p>
             <p className="mt-1 text-sm text-muted">{loan.note}</p>
             <div className="mt-2 flex flex-wrap gap-2">
-              <Button onClick={() => void decideLoan(loan.id, "approved")}>Approve</Button>
-              <Button variant="secondary" onClick={() => void decideLoan(loan.id, "denied")}>
+              <Button disabled={busy} onClick={() => void decide(loan.id, "approved")}>
+                Approve
+              </Button>
+              <Button
+                disabled={busy}
+                variant="secondary"
+                onClick={() => void decide(loan.id, "denied")}
+              >
                 Deny
               </Button>
             </div>
