@@ -60,7 +60,8 @@ test("local and shared transfers preserve complete item metadata and total asset
     () => applyCommand(initial(), { ...actor, purseIds: ["B"] }, command),
     /permission/,
   );
-  await assert.rejects(giveToPlayer({ ...move, quantity: 99 }), /many/);
+  // Device transfers run the shared give command, so they share its error text (review P3c).
+  await assert.rejects(giveToPlayer({ ...move, quantity: 99 }), /Not enough items to transfer/);
   assertItems((await economySnapshot()) as ReturnType<typeof initial>, 1);
 });
 test("multiple manual transfers survive export/import with metadata and cannot be applied twice", async () => {

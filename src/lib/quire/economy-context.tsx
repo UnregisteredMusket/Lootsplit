@@ -14,7 +14,8 @@ import { playSound } from "./sound.ts";
 import { rememberSave, listSaves } from "./saves.ts";
 import { subscribeSheetChanges, readPartySheetLinks } from "./party-sheet-links.ts";
 import { type Journal } from "./journal.ts";
-import { type CommandInput } from "./commands.ts";
+import { type CommandRequest } from "./commands.ts";
+import { newCommandId, type CommandOptions } from "./command-id.ts";
 import { canonicalJson } from "./canonical-json.ts";
 import { economyView, executeLocalCommand, executeFinanceCommand } from "./economy.ts";
 import { loadSeatLock, passwordMatches } from "./lock.ts";
@@ -115,9 +116,10 @@ import type {
 
 type EconomyApi = {
   journal: Journal;
-  command: (input: CommandInput) => Promise<void>;
+  /** Pass `input.id` (see command-id.ts) to make a retry of the same action a no-op. */
+  command: (input: CommandRequest) => Promise<void>;
   commandOutcome: (
-    input: CommandInput,
+    input: CommandRequest,
     expected?: import("./cloud-client.ts").ExpectedMutationScope,
   ) => Promise<EconomyMutationOutcome>;
   ready: boolean;
@@ -177,17 +179,32 @@ type EconomyApi = {
     metadata?: Pick<Holding, "notes" | "category">,
   ) => Promise<void>;
   deleteHolding: (id: string) => Promise<void>;
-  buy: (stockId: string, purseId: string, quantity: number) => Promise<EconomyMutationOutcome>;
-  sell: (holdingId: string, shopId: string, quantity: number) => Promise<EconomyMutationOutcome>;
-  setPurseCoins: (purseId: string, coins: Coins) => Promise<void>;
-  post: (purseId: string, copper: number, summary: string) => Promise<void>;
-  give: (input: {
-    fromId: string;
-    toId: string;
-    copper: number;
-    holdingId: string | null;
-    quantity: number;
-  }) => Promise<void>;
+  // Money and item actions take `{ commandId }`: one ID per user action, reused
+  // on retry, so a repeated submit is applied once (see command-id.ts).
+  buy: (
+    stockId: string,
+    purseId: string,
+    quantity: number,
+    options?: CommandOptions,
+  ) => Promise<EconomyMutationOutcome>;
+  sell: (
+    holdingId: string,
+    shopId: string,
+    quantity: number,
+    options?: CommandOptions,
+  ) => Promise<EconomyMutationOutcome>;
+  setPurseCoins: (purseId: string, coins: Coins, options?: CommandOptions) => Promise<void>;
+  post: (purseId: string, copper: number, summary: string, options?: CommandOptions) => Promise<void>;
+  give: (
+    input: {
+      fromId: string;
+      toId: string;
+      copper: number;
+      holdingId: string | null;
+      quantity: number;
+    },
+    options?: CommandOptions,
+  ) => Promise<void>;
   listings: Listing[];
   loans: LoanAsk[];
   addListing: (input: {
@@ -202,6 +219,7 @@ type EconomyApi = {
     listingId: string,
     purseId: string,
     quantity: number,
+    options?: CommandOptions,
   ) => Promise<EconomyMutationOutcome>;
   askLoan: (purseId: string, copper: number, note: string) => Promise<EconomyMutationOutcome>;
   decideLoan: (id: string, status: LoanStatus) => Promise<void>;
@@ -229,6 +247,33 @@ type EconomyApi = {
 };
 
 const EconomyContext = createContext<EconomyApi | null>(null);
+
+/** A command's caller-supplied ID, when there is one. */
+function idOf(options: CommandOptions): { id?: string } {
+  return options.commandId ? { id: options.commandId } : {};
+}
+
+/**
+ * One command ID for the action a component is preparing (see command-id.ts).
+ * Pass `commandId` to the economy action on every attempt and call `renew()`
+ * once the action was accepted. `inputs` names what the action does (for
+ * example `${purseId}|${quantity}`): when it changes, so does the ID, because
+ * an ID identifies one exact action and is refused for a different one.
+ */
+export function useCommandId(inputs = ""): { commandId: string; renew: () => void } {
+  const [state, setState] = useState(() => ({ inputs, commandId: newCommandId() }));
+  const renew = useCallback(
+    () => setState((current) => ({ inputs: current.inputs, commandId: newCommandId() })),
+    [],
+  );
+  if (state.inputs !== inputs) {
+    // Derived state: adopt the new action's ID during this render.
+    const next = { inputs, commandId: newCommandId() };
+    setState(next);
+    return { commandId: next.commandId, renew };
+  }
+  return { commandId: state.commandId, renew };
+}
 
 function fault(error: unknown, fallback: string) {
   toast.error(error instanceof Error ? error.message : fallback);
@@ -466,7 +511,7 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
       if (sitting.role === "player" && !sitting.shopIds.includes(shopId))
         throw new Error("That shop was not included in your link.");
     };
-    const shared = async (command: import("./commands.ts").CommandInput) => {
+    const shared = async (command: CommandRequest) => {
       try {
         await queueCommand(command);
         await reload();
@@ -511,7 +556,7 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
       return outcome;
     };
     const acceptCommand = async (
-      input: CommandInput,
+      input: CommandRequest,
       expected?: ExpectedMutationScope,
     ): Promise<EconomyMutationOutcome> => {
       const invoked = captureMutationScope();
@@ -719,16 +764,16 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
           dmOnly();
           await removeHolding(id);
         }),
-      buy: (stockId, purseId, quantity) =>
+      buy: (stockId, purseId, quantity, options = {}) =>
         getCloudWatch().joined
-          ? acceptCommand({ kind: "buy", stockId, purseId, quantity })
+          ? acceptCommand({ kind: "buy", stockId, purseId, quantity, ...idOf(options) })
           : accept(async () => {
               ownPurse(purseId);
               const line = stock.find((item) => item.id === stockId);
               if (line) ownShop(line.shopId);
-              await buyFromShop({ stockId, purseId, quantity });
+              await buyFromShop({ stockId, purseId, quantity }, options);
             }, "Purchase recorded."),
-      sell: (holdingId, shopId, quantity) =>
+      sell: (holdingId, shopId, quantity, options = {}) =>
         getCloudWatch().joined ||
         holdings.some(
           (h) =>
@@ -737,26 +782,28 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
               h.reservedFor ||
               journal.propertyOperations?.sites.some((s) => s.propertyId === h.id)),
         )
-          ? acceptCommand({ kind: "sell", holdingId, shopId, quantity })
+          ? acceptCommand({ kind: "sell", holdingId, shopId, quantity, ...idOf(options) })
           : accept(async () => {
               ownShop(shopId);
               const holding = holdings.find((item) => item.id === holdingId);
               if (holding) ownPurse(holding.purseId);
-              await sellToShop({ holdingId, shopId, quantity });
+              await sellToShop({ holdingId, shopId, quantity }, options);
             }, "Sale recorded."),
-      setPurseCoins: (purseId, coins) =>
+      // A shared room records these as a reviewed table patch; the device
+      // receipt only guards offline retries, so the ID is used offline only.
+      setPurseCoins: (purseId, coins, options = {}) =>
         run(async () => {
           dmOnly();
-          await setCoins(purseId, coins);
+          await setCoins(purseId, coins, undefined, getCloudWatch().joined ? {} : options);
         }, "Coin updated."),
-      post: (purseId, copper, summary) =>
+      post: (purseId, copper, summary, options = {}) =>
         run(async () => {
           dmOnly();
-          await postCopper(purseId, copper, summary);
+          await postCopper(purseId, copper, summary, getCloudWatch().joined ? {} : options);
         }, "Ledger updated."),
-      give: (input) =>
+      give: (input, options = {}) =>
         getCloudWatch().joined
-          ? shared({ kind: "give", ...input })
+          ? shared({ kind: "give", ...input, ...idOf(options) })
           : holdings.some(
                 (h) =>
                   h.id === input.holdingId &&
@@ -764,10 +811,10 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
                     h.reservedFor ||
                     journal.propertyOperations?.sites.some((s) => s.propertyId === h.id)),
               )
-            ? acceptCommand({ kind: "give", ...input }).then(() => {})
+            ? acceptCommand({ kind: "give", ...input, ...idOf(options) }).then(() => {})
             : run(async () => {
                 ownPurse(input.fromId);
-                await giveToPlayer(input);
+                await giveToPlayer(input, options);
               }, "Transfer recorded and added to party messages."),
       addListing: (input) =>
         accept(async (guard) => {
@@ -779,12 +826,12 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
           dmOnly();
           await removeListing(id);
         }, "Listing removed."),
-      buyListing: (listingId, purseId, quantity) =>
+      buyListing: (listingId, purseId, quantity, options = {}) =>
         getCloudWatch().joined || listings.some((l) => l.id === listingId && l.estateTemplateKey)
-          ? acceptCommand({ kind: "listing", listingId, purseId, quantity })
+          ? acceptCommand({ kind: "listing", listingId, purseId, quantity, ...idOf(options) })
           : accept(async () => {
               ownPurse(purseId);
-              await buyListing({ listingId, purseId, quantity });
+              await buyListing({ listingId, purseId, quantity }, options);
             }, "Purchase recorded."),
       askLoan: (purseId, copper, note) =>
         getCloudWatch().joined

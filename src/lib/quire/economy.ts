@@ -1,6 +1,6 @@
 import { mapAssetReferences } from "./map-assets-references.ts";
 import { activeCampaignId } from "./campaign-context.ts";
-import { validateFleet } from "./ships.ts";
+import { assertShipTradingHere, validateFleet } from "./ships.ts";
 import { validateBlacksmith } from "./blacksmith-validation.ts";
 import { projectRecord } from "./session-records.ts";
 import { shopVisible, shopAsking, validateWorld } from "./world.ts";
@@ -8,7 +8,8 @@ import { randomTradeRoll, recordShopTrade, validateTradeEconomy } from "./trade-
 import { captureDeviceMutationScope, assertDeviceMutationScope } from "./mutation-scope.ts";
 import { isEphemeralCampaign } from "./guest-storage.ts";
 import { assertMerchantSale, isService, stockCategory } from "./merchant.ts";
-import { applyCommand, type CommandInput } from "./commands.ts";
+import { applyCommand, commandSchema, type CommandRequest } from "./commands.ts";
+import { actionDigest, commandIdentity } from "./command-identity.ts";
 import { ensureCityExchanges } from "./city-exchanges.ts";
 import { canonicalJson } from "./canonical-json.ts";
 import { validateShopLocations } from "./shop-locations.ts";
@@ -1142,15 +1143,97 @@ async function atomic<T>(stores: string[], work: (tx: IDBTransaction) => Promise
   }
 }
 
-export async function buyFromShop(input: {
-  stockId: string;
-  purseId: string;
-  quantity: number;
-}): Promise<void> {
-  const quantity = Math.floor(input.quantity);
+/**
+ * Device receipts of caller-supplied command IDs (review P3c). A retried user
+ * action reuses its command ID; the device then applies it at most once, as a
+ * shared room does with its seen command IDs. Only the most recent receipts are
+ * kept: they guard retries of recent actions and are not campaign history.
+ */
+const RECEIPTS = "commandReceipts";
+const RECEIPT_LIMIT = 1000;
+type LocalReceipt = { id: string; hash: string; at: number };
+type ActionReceipt = { id: string; hash: string };
+
+function readReceipts(row: unknown): LocalReceipt[] {
+  const list = (row as { receipts?: unknown } | undefined)?.receipts;
+  return Array.isArray(list)
+    ? list.filter(
+        (r): r is LocalReceipt =>
+          !!r && typeof r.id === "string" && typeof r.hash === "string" && typeof r.at === "number",
+      )
+    : [];
+}
+
+/** Fingerprint a caller-identified action before its transaction opens. */
+async function actionReceipt(id: string | undefined, identity: () => string): Promise<ActionReceipt | null> {
+  return id ? { id, hash: await actionDigest(identity()) } : null;
+}
+
+/**
+ * Inside the action's transaction: true when this command ID was already
+ * applied on this device (the retry is a no-op), an error when the ID was used
+ * for a different action, false when the action is new. A new action's receipt
+ * is written by the same transaction, so it commits or aborts with the action.
+ */
+async function alreadyApplied(tx: IDBTransaction, receipt: ActionReceipt | null): Promise<boolean> {
+  if (!receipt) return false;
+  const meta = tx.objectStore("meta");
+  const receipts = readReceipts(await request(meta.get(RECEIPTS)));
+  const prior = receipts.find((r) => r.id === receipt.id);
+  if (prior) {
+    if (prior.hash !== receipt.hash)
+      throw Error("This action ID was already used for a different action. Refresh before retrying.");
+    return true;
+  }
+  meta.put({
+    id: RECEIPTS,
+    receipts: [...receipts, { ...receipt, at: Date.now() }].slice(-RECEIPT_LIMIT),
+  });
+  return false;
+}
+
+const MAX_QUANTITY = 100000;
+/** The shared command's quantity rules (positive whole number, at most 100,000). */
+function tradeQuantity(value: number): number {
+  const quantity = Math.floor(value);
   if (!Number.isSafeInteger(quantity) || quantity < 1)
     throw new Error("Choose a valid quantity of at least one.");
+  if (quantity > MAX_QUANTITY) throw new Error("Choose a quantity of at most 100,000.");
+  return quantity;
+}
+
+/** Offline player-link trades keep their device-only records but pass the shared checks. */
+async function assertPlayerTrade(tx: IDBTransaction, purseId: string, journal?: Journal) {
+  const seat = getSeat();
+  if (seat.role !== "player") return;
+  if (!seat.purseIds.includes(purseId)) throw Error("That character is not yours at this table.");
+  journal ??= readJournal(
+    (await request<{ value?: unknown } | undefined>(tx.objectStore("meta").get("journal")))?.value,
+  );
+  assertShipTradingHere({ ...emptyCloudTable(), journal }, purseId);
+}
+
+export type TradeOptions = { commandId?: string };
+
+export async function buyFromShop(
+  input: {
+    stockId: string;
+    purseId: string;
+    quantity: number;
+  },
+  options: TradeOptions = {},
+): Promise<void> {
+  const quantity = tradeQuantity(input.quantity);
+  const command = { kind: "buy" as const, stockId: input.stockId, purseId: input.purseId, quantity };
+  // Device campaigns run the authoritative shared command (review P3c).
+  if (getSeat().role !== "player")
+    return executeLocalCommand({ ...command, ...(options.commandId ? { id: options.commandId } : {}) });
+  const id = options.commandId || crypto.randomUUID();
+  commandSchema.parse({ ...command, id });
+  const receipt = await actionReceipt(options.commandId, () => commandIdentity({ ...command, id }));
   await atomic(["purses", "holdings", "stock", "shops", "ledger", "meta"], async (tx) => {
+    if (await alreadyApplied(tx, receipt)) return;
+    await assertPlayerTrade(tx, input.purseId);
     const stock = await request<StockLine | undefined>(tx.objectStore("stock").get(input.stockId));
     if (!stock) throw new Error("That item is no longer in the shop.");
     const shop = await request<Shop | undefined>(tx.objectStore("shops").get(stock.shopId));
@@ -1177,7 +1260,7 @@ export async function buyFromShop(input: {
     const holding: Holding | null = isService(stock)
       ? null
       : {
-          id: crypto.randomUUID(),
+          id: id + "-item",
           purseId: purse.id,
           name: stock.name,
           category: stockCategory(stock, shop),
@@ -1214,6 +1297,7 @@ export async function buyFromShop(input: {
       (percent ? `, Charisma ${score}, ${percent}% off` : "");
     const entry: LedgerLine = {
       ...logLine(purse.id, shop.id, summary, -cost, "purchase"),
+      id,
       purchase: { stockId: stock.id, quantity, holding },
     };
     if (stock.tradeExchangeId) {
@@ -1236,15 +1320,24 @@ export async function buyFromShop(input: {
   });
 }
 
-export async function sellToShop(input: {
-  holdingId: string;
-  shopId: string;
-  quantity: number;
-}): Promise<void> {
-  const quantity = Math.floor(input.quantity);
-  if (!Number.isSafeInteger(quantity) || quantity < 1)
-    throw new Error("Choose a valid quantity of at least one.");
+export async function sellToShop(
+  input: {
+    holdingId: string;
+    shopId: string;
+    quantity: number;
+  },
+  options: TradeOptions = {},
+): Promise<void> {
+  const quantity = tradeQuantity(input.quantity);
+  const command = { kind: "sell" as const, holdingId: input.holdingId, shopId: input.shopId, quantity };
+  // Device campaigns run the authoritative shared command (review P3c).
+  if (getSeat().role !== "player")
+    return executeLocalCommand({ ...command, ...(options.commandId ? { id: options.commandId } : {}) });
+  const id = options.commandId || crypto.randomUUID();
+  commandSchema.parse({ ...command, id });
+  const receipt = await actionReceipt(options.commandId, () => commandIdentity({ ...command, id }));
   await atomic(["purses", "holdings", "shops", "stock", "ledger", "meta"], async (tx) => {
+    if (await alreadyApplied(tx, receipt)) return;
     const holding = await request<Holding | undefined>(
       tx.objectStore("holdings").get(input.holdingId),
     );
@@ -1254,6 +1347,7 @@ export async function sellToShop(input: {
     const journal = readJournal(
       (await request<{ value: unknown } | undefined>(tx.objectStore("meta").get("journal")))?.value,
     );
+    await assertPlayerTrade(tx, holding.purseId, journal);
     if (
       (shop.blackMarket && !journal.world?.blackMarketActive) ||
       (getSeat().role === "player" && !shopVisible(shop, { journal }))
@@ -1280,19 +1374,17 @@ export async function sellToShop(input: {
     tx.objectStore("purses").put({ ...purse, coins: gain(purse.coins, paid) });
     if (holding.quantity === quantity) tx.objectStore("holdings").delete(holding.id);
     else tx.objectStore("holdings").put({ ...holding, quantity: holding.quantity - quantity });
-    const entry = logLine(
-      purse.id,
-      shop.id,
-      `Sold ${quantity} ${holding.name} to ${shop.name}`,
-      paid,
-      "sale",
-    );
+    const entry = {
+      ...logLine(purse.id, shop.id, `Sold ${quantity} ${holding.name} to ${shop.name}`, paid, "sale"),
+      id,
+    };
     tx.objectStore("ledger").put(entry);
     if (holding.commodityId) {
       const lines = await request<StockLine[]>(
         tx.objectStore("stock").index("shopId").getAll(shop.id),
       );
-      const linked = lines.find((s) => s.commodityId === holding.commodityId && s.tradeExchangeId);
+      // The shared sell links the shop's first line of this commodity.
+      const linked = lines.find((s) => s.commodityId === holding.commodityId);
       if (linked) {
         const receipt = recordShopTrade(
           { ...emptyCloudTable(), journal, stock: [linked] },
@@ -1348,26 +1440,48 @@ function tidy(coins: Coins): Coins {
   };
 }
 
-export async function giveToPlayer(input: {
-  fromId: string;
-  toId: string;
-  copper: number;
-  holdingId: string | null;
-  quantity: number;
-}): Promise<void> {
+export async function giveToPlayer(
+  input: {
+    fromId: string;
+    toId: string;
+    copper: number;
+    holdingId: string | null;
+    quantity: number;
+  },
+  options: TradeOptions = {},
+): Promise<void> {
+  const command = {
+    kind: "give" as const,
+    fromId: input.fromId,
+    toId: input.toId,
+    copper: input.copper,
+    holdingId: input.holdingId,
+    quantity: input.quantity,
+  };
+  // Device campaigns run the authoritative shared command (review P3c). A
+  // player link keeps its pending gift for the DM's activity report, because
+  // the recipient's account is not on the player's device.
+  if (getSeat().role !== "player")
+    return executeLocalCommand({ ...command, ...(options.commandId ? { id: options.commandId } : {}) });
+  const giftId = options.commandId || crypto.randomUUID();
+  const receipt = await actionReceipt(options.commandId, () => canonicalJson({ ...command, id: giftId }));
   const copper = Math.max(0, Math.round(input.copper));
   if (!Number.isSafeInteger(copper)) throw new Error("Enter a valid coin amount.");
   if (input.fromId === input.toId) throw new Error("Choose another player.");
+  commandSchema.parse({
+    ...command,
+    id: giftId,
+    copper,
+    quantity: input.holdingId ? Math.floor(input.quantity) : 0,
+  });
   const db = await quireDb();
   const purses = await request<Purse[]>(db.transaction("purses").objectStore("purses").getAll());
   const from = purses.find((purse) => purse.id === input.fromId);
   if (!from) throw new Error("This account no longer exists.");
-  const sitting = getSeat();
-  const roster = sitting.role === "player" ? await loadRoster() : [];
+  const roster = await loadRoster();
   const to = purses.find((purse) => purse.id === input.toId);
-  const known =
-    sitting.role === "player" ? roster.some((person) => person.id === input.toId) : Boolean(to);
-  if (!known) throw new Error("That player is not on this link.");
+  if (!roster.some((person) => person.id === input.toId))
+    throw new Error("That player is not on this link.");
   const toName =
     to?.name ?? roster.find((person) => person.id === input.toId)?.name ?? "Another player";
   const holdingRow = input.holdingId
@@ -1388,7 +1502,7 @@ export async function giveToPlayer(input: {
   const nextCoins = copper > 0 ? spendCoins(from.coins, copper) : from.coins;
   if (!nextCoins) throw new Error("Insufficient funds.");
   const gift: PlayerGift = {
-    id: crypto.randomUUID(),
+    id: giftId,
     at: Date.now(),
     fromId: from.id,
     toId: input.toId,
@@ -1397,7 +1511,8 @@ export async function giveToPlayer(input: {
     copper,
     holding: moved,
   };
-  await atomic(["purses", "holdings", "ledger", "meta"], async (tx) => {
+  const applied = await atomic(["purses", "holdings", "ledger", "meta"], async (tx) => {
+    if (await alreadyApplied(tx, receipt)) return false;
     const from = await request<Purse | undefined>(tx.objectStore("purses").get(input.fromId));
     const to = await request<Purse | undefined>(tx.objectStore("purses").get(input.toId));
     if (!from) throw new Error("This account no longer exists.");
@@ -1432,10 +1547,8 @@ export async function giveToPlayer(input: {
           gift.at,
         );
     }
-    const pendingRow =
-      sitting.role === "player" ? await request(tx.objectStore("meta").get("gifts")) : null;
-    const pending =
-      sitting.role === "player" ? [...readGifts(pendingRow?.gifts ?? pendingRow), gift] : null;
+    const pendingRow = await request(tx.objectStore("meta").get("gifts"));
+    const pending = [...readGifts(pendingRow?.gifts ?? pendingRow), gift];
     tx.objectStore("purses").put({ ...from, coins: nextCoins });
     if (holdingRow && moved) {
       if (holdingRow.quantity === moved.quantity) tx.objectStore("holdings").delete(holdingRow.id);
@@ -1445,34 +1558,16 @@ export async function giveToPlayer(input: {
           quantity: holdingRow.quantity - moved.quantity,
         });
     }
-    if (sitting.role !== "player" && to) {
-      tx.objectStore("purses").put({
-        ...to,
-        coins: copper > 0 ? gain(to.coins, copper) : to.coins,
-      });
-      if (moved) {
-        tx.objectStore("holdings").put({
-          id: crypto.randomUUID(),
-          purseId: to.id,
-          ...moved,
-          notes: moved.notes ?? "",
-        });
-      }
-    }
-    if (sitting.role !== "player" && to)
-      tx.objectStore("ledger").put(logLine(to.id, null, "Transfer received", copper, "transfer"));
-    if (pending) tx.objectStore("meta").put({ id: "gifts", gifts: pending });
-    tx.objectStore("ledger").put(
-      logLine(
-        from.id,
-        null,
-        sitting.role !== "player" && to ? "Transfer sent" : `Gave ${toName} ${giftParts(gift)}`,
-        copper > 0 ? -copper : 0,
-        "transfer",
-      ),
-    );
+    // The recipient is credited when the DM approves the player's activity report.
+    tx.objectStore("meta").put({ id: "gifts", gifts: pending });
+    tx.objectStore("ledger").put({
+      ...logLine(from.id, null, `Gave ${toName} ${giftParts(gift)}`, copper > 0 ? -copper : 0, "transfer"),
+      id: gift.id,
+    });
+    return true;
   });
-  await postNotes([{ from: "player", to: "party", purseId: from.id, text: giftSummary(gift) }]);
+  if (applied)
+    await postNotes([{ from: "player", to: "party", purseId: from.id, text: giftSummary(gift) }]);
 }
 
 export async function addListing(
@@ -1516,32 +1611,38 @@ export async function removeListing(id: string): Promise<void> {
   await saveListings((await loadListings()).filter((listing) => listing.id !== id));
 }
 
-export async function buyListing(input: {
-  listingId: string;
-  purseId: string;
-  quantity: number;
-}): Promise<void> {
-  const quantity = Math.floor(input.quantity);
-  if (!Number.isSafeInteger(quantity) || quantity < 1)
-    throw new Error("Choose a valid quantity of at least one.");
+export async function buyListing(
+  input: {
+    listingId: string;
+    purseId: string;
+    quantity: number;
+  },
+  options: TradeOptions = {},
+): Promise<void> {
+  const quantity = tradeQuantity(input.quantity);
+  const command = { kind: "listing" as const, listingId: input.listingId, purseId: input.purseId, quantity };
+  const shared = { ...command, ...(options.commandId ? { id: options.commandId } : {}) };
+  // Device campaigns run the authoritative shared command (review P3c); so do
+  // imported estate listings, which need their operating record.
+  if (getSeat().role !== "player") return executeLocalCommand(shared);
   const currentListing = (await economySnapshot()).listings.find((l) => l.id === input.listingId);
-  if (currentListing?.estateTemplateKey) {
-    await executeLocalCommand({ kind: "listing", ...input, quantity });
-    return;
-  }
+  if (currentListing?.estateTemplateKey) return executeLocalCommand(shared);
+  const receiptId = options.commandId || crypto.randomUUID();
+  commandSchema.parse({ ...command, id: receiptId });
+  const receipt = await actionReceipt(options.commandId, () => commandIdentity({ ...command, id: receiptId }));
   await atomic(["purses", "holdings", "ledger", "meta"], async (tx) => {
+    if (await alreadyApplied(tx, receipt)) return;
     const listings = readListings(await request(tx.objectStore("meta").get("listings")));
     const listing = listings.find((item) => item.id === input.listingId);
     if (!listing) throw new Error("That listing is gone.");
     if (listing.status && listing.status !== "available")
       throw Error("This property is not currently for sale.");
-    if (getSeat().role === "player") {
-      if (!getSeat().purseIds.includes(input.purseId))
-        throw Error("That character is not yours at this table.");
+    {
       const journal = readJournal(
         (await request<{ value?: unknown } | undefined>(tx.objectStore("meta").get("journal")))
           ?.value,
       );
+      await assertPlayerTrade(tx, input.purseId, journal);
       if (
         !propertyAvailableHere(
           listing,
@@ -1559,19 +1660,15 @@ export async function buyListing(input: {
     const cost = priceAfterCharisma(listing.copper, score) * quantity;
     const coins = spendCoins(purse.coins, cost);
     if (!coins) throw new Error("Insufficient funds.");
-    const sales =
-      getSeat().role === "player"
-        ? readSales(await request(tx.objectStore("meta").get("sales")))
-        : null;
+    const sales = readSales(await request(tx.objectStore("meta").get("sales")));
     tx.objectStore("purses").put({ ...purse, coins });
-    const receiptId = crypto.randomUUID(),
-      purchasedAt = Date.now();
+    const purchasedAt = Date.now();
     const journal = readJournal(
       (await request<{ value?: unknown } | undefined>(tx.objectStore("meta").get("journal")))
         ?.value,
     );
     const holding: Holding = {
-      id: crypto.randomUUID(),
+      id: receiptId + "-item",
       purseId: purse.id,
       name: listing.name,
       kind: listing.kind,
@@ -1615,13 +1712,12 @@ export async function buyListing(input: {
           : { ...item, quantity: item.quantity - quantity },
       ),
     });
-    if (sales)
-      tx.objectStore("meta").put({
+    tx.objectStore("meta").put({
         id: "sales",
         sales: [
           ...sales,
           {
-            id: crypto.randomUUID(),
+            id: receiptId + "-sale",
             at: Date.now(),
             listingId: listing.id,
             quantity,
@@ -1843,13 +1939,22 @@ export async function voidLedgerLine(id: string, reason = "DM ledger correction.
   });
 }
 
-export async function setCoins(purseId: string, coins: Coins, summary?: string): Promise<void> {
+export async function setCoins(
+  purseId: string,
+  coins: Coins,
+  summary?: string,
+  options: TradeOptions = {},
+): Promise<void> {
   if (!coinsSchema.safeParse(coins).success)
     throw new Error(
       "Coin balances must be nonnegative whole numbers with an exactly representable total. Export oversized original saves before repairing them.",
     );
   const next = tidy(coins);
-  await atomic(["purses", "ledger"], async (tx) => {
+  const receipt = await actionReceipt(options.commandId, () =>
+    canonicalJson({ kind: "set-coins", id: options.commandId, purseId, coins: next, summary: summary ?? "" }),
+  );
+  await atomic(["purses", "ledger", "meta"], async (tx) => {
+    if (await alreadyApplied(tx, receipt)) return;
     const purse = await request<Purse | undefined>(tx.objectStore("purses").get(purseId));
     if (!purse) throw new Error("This account no longer exists.");
     if (!coinsSchema.safeParse(purse.coins).success)
@@ -1863,17 +1968,27 @@ export async function setCoins(purseId: string, coins: Coins, summary?: string):
       );
     tx.objectStore("purses").put({ ...purse, coins: next });
     if (delta !== 0)
-      tx.objectStore("ledger").put(
-        logLine(purse.id, null, summary?.trim() || `Adjusted coin in ${purse.name}`, delta),
-      );
+      tx.objectStore("ledger").put({
+        ...logLine(purse.id, null, summary?.trim() || `Adjusted coin in ${purse.name}`, delta),
+        ...(options.commandId ? { id: options.commandId } : {}),
+      });
   });
 }
 
-export async function postCopper(purseId: string, copper: number, summary: string): Promise<void> {
+export async function postCopper(
+  purseId: string,
+  copper: number,
+  summary: string,
+  options: TradeOptions = {},
+): Promise<void> {
   if (!summary.trim()) throw new Error("Write what the money was for.");
   if (!Number.isSafeInteger(copper) || copper === 0)
     throw new Error("Enter a valid amount in whole copper.");
-  await atomic(["purses", "ledger"], async (tx) => {
+  const receipt = await actionReceipt(options.commandId, () =>
+    canonicalJson({ kind: "post", id: options.commandId, purseId, copper, summary: summary.trim() }),
+  );
+  await atomic(["purses", "ledger", "meta"], async (tx) => {
+    if (await alreadyApplied(tx, receipt)) return;
     const purse = await request<Purse | undefined>(tx.objectStore("purses").get(purseId));
     if (!purse) throw new Error("This account no longer exists.");
     if (!coinsSchema.safeParse(purse.coins).success)
@@ -1886,7 +2001,10 @@ export async function postCopper(purseId: string, copper: number, summary: strin
       ...purse,
       coins: copper < 0 ? spendCoins(purse.coins, -copper)! : gain(purse.coins, copper),
     });
-    tx.objectStore("ledger").put(logLine(purse.id, null, summary.trim(), copper, "payment"));
+    tx.objectStore("ledger").put({
+      ...logLine(purse.id, null, summary.trim(), copper, "payment"),
+      ...(options.commandId ? { id: options.commandId } : {}),
+    });
   });
 }
 
@@ -2576,9 +2694,35 @@ async function audit(
   store.put({ id: "journal", value: journal });
 }
 
-/** Execute a local command against the latest campaign under one write lock. */
+/** The device's seat as the shared engine sees it (its name signs transfer notes). */
+function localSeat() {
+  const seat = getSeat();
+  return {
+    id: "local",
+    token: "",
+    name: seat.role === "dm" ? "Dungeon master" : "Player",
+    role: seat.role,
+    purseIds: seat.purseIds,
+  };
+}
+
+/**
+ * Give a command its ID and, when the caller supplied one, the fingerprint
+ * that lets a retry of the same action be recognized on this device.
+ */
+async function identify(input: CommandRequest) {
+  const command = { ...input, id: input.id || crypto.randomUUID() } as Parameters<typeof applyCommand>[2];
+  const receipt = await actionReceipt(input.id, () => commandIdentity(command));
+  return { command, receipt };
+}
+
+/**
+ * Execute a local command against the latest campaign under one write lock.
+ * Pass `input.id` (one command ID per user action, reused on retry) to make a
+ * retry a no-op instead of a second charge.
+ */
 export async function executeLocalCommand(
-  input: CommandInput,
+  input: CommandRequest,
   assertScope?: () => void,
 ): Promise<void> {
   const invoked = captureDeviceMutationScope();
@@ -2587,23 +2731,17 @@ export async function executeLocalCommand(
     assertScope?.();
   };
   guard();
+  const { command, receipt } = await identify(input);
+  guard();
   let changedChat = false;
   await atomic([...ECONOMY], async (tx) => {
+    if (await alreadyApplied(tx, receipt)) return;
     const source = await readEconomyTransaction(tx);
     guard();
-    const seat = getSeat();
-    const next = applyCommand(
-      source,
-      {
-        id: "local",
-        token: "",
-        name: "Local",
-        role: seat.role,
-        purseIds: seat.purseIds,
-      },
-      { ...input, id: crypto.randomUUID() },
-      { source: "local", random: randomTradeRoll },
-    );
+    const next = applyCommand(source, localSeat(), command, {
+      source: "local",
+      random: randomTradeRoll,
+    });
     for (const store of ["purses", "holdings", "shops", "stock", "ledger"] as const) {
       const prior = new Map(source[store].map((row) => [row.id, JSON.stringify(row)]));
       const retained = new Set(next[store].map((row) => row.id));
@@ -2628,7 +2766,7 @@ export async function executeLocalCommand(
 
 /** Read, calculate and commit campaign finances under one IndexedDB write lock. */
 export async function executeFinanceCommand(
-  input: CommandInput,
+  input: CommandRequest,
   assertScope?: () => void,
 ): Promise<void> {
   const invoked = captureDeviceMutationScope();
@@ -2651,25 +2789,21 @@ export async function executeFinanceCommand(
   // applyCommand runs the shared validators (a smith profile needs its shop).
   // Unchanged shop and stock rows are not rewritten below.
   const stores: Parameters<typeof atomic>[0] = ["purses", "holdings", "shops", "stock", "ledger", "meta"];
+  const { command, receipt } = await identify(input);
+  guard();
+  let applied = false;
   await atomic(stores, async (tx) => {
+    if (await alreadyApplied(tx, receipt)) return;
+    applied = true;
     const source: CloudTable = await readEconomyTransaction(
       tx,
       input.kind === "session" || input.kind === "downtime-apply",
     );
     guard();
-    const seat = getSeat();
-    const next = applyCommand(
-      source,
-      {
-        id: "local",
-        token: "",
-        name: "Local",
-        role: seat.role,
-        purseIds: seat.purseIds,
-      },
-      { ...input, id: crypto.randomUUID() },
-      { source: "local", random: randomTradeRoll },
-    );
+    const next = applyCommand(source, localSeat(), command, {
+      source: "local",
+      random: randomTradeRoll,
+    });
     const priorShops = new Map(source.shops.map((s) => [s.id, JSON.stringify(s)]));
     const priorStock = new Map(source.stock.map((s) => [s.id, s.quantity]));
     for (const shop of next.shops)
@@ -2695,5 +2829,5 @@ export async function executeFinanceCommand(
       tx.objectStore("meta").put({ id: "settings", ...clampRealm(next.realm) });
     tx.objectStore("meta").put({ id: "journal", value: next.journal });
   });
-  if (input.kind === "session" || input.kind === "downtime-apply") await refreshChat();
+  if (applied && (input.kind === "session" || input.kind === "downtime-apply")) await refreshChat();
 }

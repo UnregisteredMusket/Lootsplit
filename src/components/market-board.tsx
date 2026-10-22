@@ -3,7 +3,7 @@ import { useDraftGuard } from "@/lib/quire/use-draft-guard";
 import { FeatureLink } from "./feature-navigation";
 import { FantasyIcon } from "@/components/fantasy-icon";
 import { useEffect, useState, type FormEvent } from "react";
-import { useEconomy } from "@/lib/quire/economy-context";
+import { useCommandId, useEconomy } from "@/lib/quire/economy-context";
 import {
   formatCopper,
   toCopper,
@@ -77,7 +77,9 @@ function Listings() {
               <BuyListing
                 listing={listing}
                 purses={mine}
-                onBuy={(purseId, quantity) => buyListing(listing.id, purseId, quantity)}
+                onBuy={(purseId, quantity, commandId) =>
+                  buyListing(listing.id, purseId, quantity, { commandId })
+                }
               />
             )}
           </li>
@@ -95,10 +97,12 @@ function BuyListing({
 }: {
   listing: Listing;
   purses: { id: string; name: string; coins: import("@/lib/quire/types").Coins }[];
-  onBuy: (purseId: string, quantity: number) => Promise<EconomyMutationOutcome>;
+  onBuy: (purseId: string, quantity: number, commandId: string) => Promise<EconomyMutationOutcome>;
 }) {
   const [purseId, setPurseId] = useState(purses[0]?.id ?? "");
   const [qty, setQty] = useState("1");
+  // One command ID per purchase, reused if the same purchase is retried.
+  const action = useCommandId(`${purseId}|${qty}`);
   const [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
     [notice, setNotice] = useState("");
@@ -126,7 +130,8 @@ function BuyListing({
         setError("");
         setNotice("");
         try {
-          const result = await onBuy(purseId, asked);
+          const result = await onBuy(purseId, asked, action.commandId);
+          action.renew();
           setNotice(mutationNotice(result, "Purchase recorded."));
         } catch (e) {
           setError(e instanceof Error ? e.message : "Purchase failed.");

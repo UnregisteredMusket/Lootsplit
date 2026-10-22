@@ -1,7 +1,7 @@
 import { activeCampaignId } from "./campaign-context.ts";
 import type { EconomyMutationOutcome } from "./mutation-outcome.ts";
 import { captureDeviceMutationScope, type DeviceMutationScope } from "./mutation-scope.ts";
-import { emptyCloudTable } from "./cloud.ts";
+import { emptyCloudTable, type CloudTable } from "./cloud.ts";
 import { reloadCampaignContext } from "./navigation-launch.ts";
 import { rememberSave } from "./saves.ts";
 import { loadSeatLock } from "./lock.ts";
@@ -26,7 +26,7 @@ import {
   commandSchema,
   tablePatch,
   type Command,
-  type CommandInput,
+  type CommandRequest,
 } from "./commands.ts";
 import type { RoomView } from "./cloud.server.ts";
 import { rememberIncoming } from "./chat.ts";
@@ -836,7 +836,7 @@ export function discardPending() {
   });
 }
 export async function queueCommand(
-  input: CommandInput,
+  input: CommandRequest,
   expected?: ExpectedMutationScope,
 ): Promise<EconomyMutationOutcome> {
   const invoked = captureMutationScope();
@@ -851,7 +851,15 @@ export async function queueCommand(
       throw Error("The session has ended. This room is view-only until the DM resumes play.");
     if (input.kind !== "message" && !view.mine) throw new Error(`It is ${view.who}'s turn.`);
     if (s.pending.length >= 100) throw new Error("Submit your pending actions before adding more.");
-    const command = commandSchema.parse({ ...input, id: crypto.randomUUID() });
+    // A caller-supplied ID identifies one user action across retries: an action
+    // already queued is not queued twice, and the room skips IDs it has applied.
+    const command = commandSchema.parse({ ...input, id: input.id || crypto.randomUUID() });
+    const queued = s.pending.find((c) => c.id === command.id);
+    if (queued) {
+      if (!sameCommand(queued, command))
+        throw Error("This action ID was already used for a different action. Refresh before retrying.");
+      return { status: "pending" };
+    }
     const seasonalPlan =
       input.kind === "trade-season-plan" || (input.kind === "downtime-plan" && input.advanceSeason);
     if (seasonalPlan && s.pending.length)
@@ -877,6 +885,9 @@ export async function queueCommand(
     const current = requireSession(),
       before = await economySnapshot();
     guard();
+    // The room already committed this caller-identified action (its records
+    // carry the command ID): a retry must not preview or submit it again.
+    if (input.id && carriesCommand(before, command.id)) return { status: "committed" };
     const after = applyCommand(
       before,
       {
@@ -915,6 +926,16 @@ export async function queueCommand(
         : "committed",
     };
   });
+}
+/** True when the table holds records the shared engine keys by this command ID. */
+function carriesCommand(table: CloudTable, id: string): boolean {
+  const ours = (rowId: string) => rowId === id || rowId.startsWith(id + "-");
+  return (
+    table.ledger.some((l) => ours(l.id)) ||
+    table.holdings.some((h) => ours(h.id)) ||
+    table.notes.some((n) => ours(n.id)) ||
+    (table.journal?.events ?? []).some((e) => e.id.startsWith(id + "-event-"))
+  );
 }
 export function runSharedMutation(
   work: () => Promise<unknown>,
