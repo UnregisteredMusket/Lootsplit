@@ -23,7 +23,7 @@ export function WorkspaceWindows() {
   const title = split.open ? paneTitle(titleHref, dm) : screenName(href, dm);
   useEffect(() => {
     const previous = document.title;
-    document.title = `${title} · Lootsplit`;
+    document.title = `${title} · Lootsplitter`;
     return () => {
       document.title = previous;
     };
@@ -79,13 +79,13 @@ export function WorkspaceWindows() {
       <Modal open={open} onOpenChange={setOpen} title="Tabs & windows">
         <div className="space-y-4">
           <p>
-            Keep different Lootsplit screens open side by side. Move a separate window to another
+            Keep different Lootsplitter screens open side by side. Move a separate window to another
             monitor using your computer’s window controls. On a wide screen, Split view in the
             header shows two screens in this window instead.
           </p>
           {native ? (
             <p role="status">
-              Use the Lootsplit website in your desktop browser for separate windows and multiple
+              Use the Lootsplitter website in your desktop browser for separate windows and multiple
               monitors. On a tablet in landscape (at least 1024 pixels wide), Split view in the
               header shows two screens side by side in this app; narrower screens keep their
               current navigation.

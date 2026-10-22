@@ -28,7 +28,7 @@ export function DonatePage() {
   }, [attempt]);
   return (
     <Website footer="ink">
-      <PageHero kicker="A little support goes a long way" title="Support Lootsplit">
+      <PageHero kicker="A little support goes a long way" title="Support Lootsplitter">
         <p className="ls-lead ls-measure">
           Enjoying your party’s ledger? Donations are an optional way to support ongoing development
           and hosting.
@@ -40,7 +40,7 @@ export function DonatePage() {
             <Heart size={32} aria-hidden="true" className="ls-card-icon" />
             <h2 id="donate-title">Keep the adventure going.</h2>
             <p>
-              You can keep using Lootsplit without donating. Thank you for being part of the
+              You can keep using Lootsplitter without donating. Thank you for being part of the
               adventure.
             </p>
             {loading ? (

@@ -81,7 +81,7 @@ async function database(): Promise<IDBDatabase> {
     };
     open.onblocked = () => {
       opening = null;
-      reject(new Error("Close other Lootsplit tabs, then reload."));
+      reject(new Error("Close other Lootsplitter tabs, then reload."));
     };
     open.onsuccess = () => {
       const db = open.result;

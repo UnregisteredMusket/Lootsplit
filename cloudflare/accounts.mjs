@@ -75,7 +75,7 @@ export function accountAuth(env) {
   if (!env.DB || !env.ACCOUNT_SECRET || !env.ACCOUNT_ORIGIN)
     fail("Accounts are not configured on this server yet. Guest play is still available.", 503);
   return betterAuth({
-    appName: "Lootsplit",
+    appName: "Lootsplitter",
     baseURL: env.ACCOUNT_ORIGIN,
     basePath: "/api/account/auth",
     secret: env.ACCOUNT_SECRET,

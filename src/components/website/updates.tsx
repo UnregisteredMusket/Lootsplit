@@ -188,7 +188,7 @@ export function UpdatesPage() {
   const shown = entries.filter((item) => filter === "all" || item.kind === filter);
   return (
     <Website footer="ink">
-      <PageHero kicker="From the Lootsplit ledger" title="Changelog">
+      <PageHero kicker="From the Lootsplitter ledger" title="Changelog">
         <p className="ls-lead ls-measure">
           New releases, practical improvements, and what changed at the table. Every published
           website and Android release, newest first.

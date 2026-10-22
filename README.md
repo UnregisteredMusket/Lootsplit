@@ -1,6 +1,6 @@
 [Report foundation improvements](docs/audit/2026-10-12-report-followup.md) add authenticated compact unchanged sync reads, less cloning in atomic command batches, reproducible Cloudflare CPU/log policy, clearer time units, complete NPC/category training counters and explicitly reviewed historical bookkeeping. Existing saves, features and permissions remain. The broader UI redesign is a separate next phase.
 
-# Lootsplit
+# Lootsplitter
 
 [Owner monitoring](docs/OWNER-MONITORING.md) connects the website, Android account dashboard, scrollable Field monitor and configurable4×1 companion to a private half-hour journal, daily reports, diagnostics and explicit development status. Logging continues on the backend while devices sleep; dated Android delivery is separate. New and external logs must register for daily-report coverage. See the [implementation/release audit](docs/audit/2026-10-20-monitoring.md) for verified versus pending status.
 
@@ -18,7 +18,7 @@ Connected maps add parent/default/entrance links, persistent fullscreen navigati
 
 Maps support category filters, dungeon/property/ship layouts, free DM party placement with travel environments and wilderness biomes, configurable combat tiles (5 ft by default), saved encounter roster tokens and mapped ship voyages. Tile movement uses authoritative campaign commands; voyages keep the existing approved downtime clock. See [map and tile guide](docs/MAP-TILES.md).
 
-Lootsplit is a shared party ledger and campaign application for web and Android. Production runs on Cloudflare Workers and D1; GitHub Actions verifies and publishes the exact tested artifact from `main`.
+Lootsplitter (formerly Lootsplit) is a shared party ledger and campaign application for web and Android. Production runs on Cloudflare Workers and D1; GitHub Actions verifies and publishes the exact tested artifact from `main`.
 
 Android1.9.1 is published with widget-discovery recovery. Both types are reannounced after upgrade; **Widgets → Lootsplit → Lootsplit 4×1 companion** places the compact widget, with customization available from its Settings action. **My account → Refresh widget list** safely requests a fresh list. See the [picker investigation and release status](docs/audit/2026-10-21-widget-picker.md).
 

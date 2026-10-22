@@ -63,7 +63,7 @@ export function ProfileControls({
       </p>
       <p className="portal-subtle">
         Profile details are visible to site staff. Your sign-in email stays private to account
-        administration. A messaging email opens your email app; Lootsplit does not send messages
+        administration. A messaging email opens your email app; Lootsplitter does not send messages
         from it.
       </p>
       {error && (

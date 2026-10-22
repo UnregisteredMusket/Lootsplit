@@ -105,7 +105,7 @@ export function propertyDeedSvg(deed: PropertyDeed, quantity = deed.purchasedQua
     <style>.label{font:14px sans-serif;letter-spacing:2px;fill:#795438}.value{font:21px Georgia,serif;fill:#352315}</style>
     <rect width="820" height="${height}" fill="#efe1bd"/><rect x="24" y="24" width="772" height="${height - 48}" fill="none" stroke="#946931" stroke-width="3"/>
     <rect x="36" y="36" width="748" height="${height - 72}" fill="none" stroke="#ad8851"/>
-    <path d="M64 98h692M64 210h692" stroke="#ad8851"/><text x="410" y="78" text-anchor="middle" class="label">LOOTSPLIT · REGISTER OF ESTATES</text>
+    <path d="M64 98h692M64 210h692" stroke="#ad8851"/><text x="410" y="78" text-anchor="middle" class="label">LOOTSPLITTER · REGISTER OF ESTATES</text>
     <text x="410" y="151" text-anchor="middle" font-family="Georgia,serif" font-size="48" fill="#6e2922">Deed of Ownership</text>
     <text x="410" y="185" text-anchor="middle" class="label">BE IT RECORDED IN THE CAMPAIGN LEDGER</text>
     ${sections.join("")}

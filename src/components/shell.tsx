@@ -184,7 +184,7 @@ function WindowShell({ children, width = "wide" }: ShellProps) {
               split.navigatePane("secondary", url.pathname + url.search + url.hash);
             }}
           >
-            <Link to="/" search={{ view: "home" }} aria-label="Lootsplit home" className="split-rail-mark">
+            <Link to="/" search={{ view: "home" }} aria-label="Lootsplitter home" className="split-rail-mark">
               <QuillMark />
             </Link>
             <nav className="split-rail-nav" aria-label="Sections">
@@ -226,7 +226,7 @@ function WindowShell({ children, width = "wide" }: ShellProps) {
             className="inline-flex items-center gap-2 px-2 font-display text-3xl leading-none tracking-tight"
           >
             <QuillMark />
-            Lootsplit
+            Lootsplitter
           </Link>
           <p className="rail-caption">Your campaign companion</p>
           <nav

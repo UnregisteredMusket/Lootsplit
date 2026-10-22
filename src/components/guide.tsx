@@ -63,10 +63,10 @@ export function Guide() {
           </div>
         </div>
       </Modal>
-      <Modal open={open} onOpenChange={setOpen} title="How Lootsplit works">
+      <Modal open={open} onOpenChange={setOpen} title="How Lootsplitter works">
         <div className="flex flex-col gap-4">
           <p className="text-sm text-muted">
-            Lootsplit {APP_VERSION} ·{" "}
+            Lootsplitter {APP_VERSION} ·{" "}
             {seat.role === "player" ? PLAYER_DESCRIPTION : APP_DESCRIPTION}
           </p>
           <HelpContent embedded onNavigate={() => setOpen(false)} />

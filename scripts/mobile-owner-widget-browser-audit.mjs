@@ -100,7 +100,7 @@ try {
   await page.getByRole("button", { name: "Add 4×1 companion", exact: true }).click();
   assert.equal(await page.evaluate(() => window.widgetPinKind), "companion");
   await page.getByRole("button", { name: "Refresh widget list", exact: true }).click();
-  await page.getByText("Android detects both Lootsplit widgets.", { exact: false }).waitFor();
+  await page.getByText("Android detects both Lootsplitter widgets.", { exact: false }).waitFor();
   await page.getByRole("button", { name: "Connect owner account", exact: true }).click();
   await page.getByText("Connected · 0 on home screen", { exact: true }).waitFor();
   await page.getByRole("button", { name: "Add to home screen", exact: true }).click();

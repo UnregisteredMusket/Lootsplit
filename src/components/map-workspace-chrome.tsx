@@ -119,7 +119,7 @@ export function MapWorkspaceChrome({
       ) : (
         <>
           <div className="map-title-capsule">
-            <AppLink href="/?view=home" aria-label="Back to Lootsplit" title="Back to Lootsplit">
+            <AppLink href="/?view=home" aria-label="Back to Lootsplitter" title="Back to Lootsplitter">
               <ArrowLeft size={18} />
             </AppLink>
             <button

@@ -103,7 +103,7 @@ export function CommodityCatalogImport({ economy }: { economy: TradeEconomy }) {
         <summary>Built-in fantasy commodity catalogue · {STARTER_COMMODITIES.length} goods</summary>
         <section aria-label="Built-in commodity catalogue">
           <p className="commodity-caption">
-            Original Lootsplit trade goods, including grain, metals, textiles, herbs and rare
+            Original Lootsplitter trade goods, including grain, metals, textiles, herbs and rare
             fantasy materials. Prices and weights are editable homebrew references. These
             definitions do not create inventory, exchange stock, funds or magical effects.
           </p>

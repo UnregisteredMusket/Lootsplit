@@ -2,7 +2,7 @@ import type { CapacitorConfig } from "@capacitor/cli";
 
 const config: CapacitorConfig = {
   appId: "com.unregisteredmusket.lootsplit",
-  appName: "Lootsplit",
+  appName: "Lootsplitter",
   webDir: "dist/mobile",
   android: {
     allowMixedContent: false,

@@ -1,6 +1,6 @@
-# Lootsplit — developer guide
+# Lootsplitter — developer guide
 
-Lootsplit is a tabletop RPG campaign manager: character sheets, shared purses, inventory, shops, trade, properties, ships, encounters, maps and DM-approved downtime finances, played offline (device), turn-based or live in shared rooms, with optional accounts. Live site: https://lootsplit.oliverstorie2017.workers.dev. Android app: Capacitor, package `com.unregisteredmusket.lootsplit`, with two home-screen widgets.
+Lootsplitter (formerly Lootsplit; renamed 2026-10-22 — repository, package and internal identifiers keep `lootsplit`) is a tabletop RPG campaign manager: character sheets, shared purses, inventory, shops, trade, properties, ships, encounters, maps and DM-approved downtime finances, played offline (device), turn-based or live in shared rooms, with optional accounts. Live site: https://lootsplit.oliverstorie2017.workers.dev. Android app: Capacitor, package `com.unregisteredmusket.lootsplit`, with two home-screen widgets.
 
 This file is the required reading. Everything under "Read on demand" is consulted only when a task touches that area.
 

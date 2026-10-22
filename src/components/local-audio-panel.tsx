@@ -45,7 +45,7 @@ function TrackCredits({ track }: { track: LocalTrack }) {
       )}
       {track.notes && <p>{track.notes}</p>}
       {!track.bundled && (
-        <small>License details recorded by you. Lootsplit does not verify permission.</small>
+        <small>License details recorded by you. Lootsplitter does not verify permission.</small>
       )}
     </details>
   );

@@ -1,4 +1,4 @@
-# Property operations in Lootsplit
+# Property operations in Lootsplitter
 
 Open **Market → Property Management**. The estate register, deeds, eight broad property types and shop location hierarchy stay in place. Owned properties now have expandable settings, storage, projects, staff, rental, delivery and correspondence sections. The DM estate workshop contains 24 building presets and custom template controls. Presets set capabilities and proposed roles; the DM defines prices, wages, work, tools, checks and yields.
 

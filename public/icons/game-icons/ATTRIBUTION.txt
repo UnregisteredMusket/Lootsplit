@@ -7,7 +7,7 @@ with Zeromancer icons provided under CC0 as identified upstream.
 https://creativecommons.org/licenses/by/3.0/
 https://creativecommons.org/publicdomain/zero/1.0/
 
-Adaptations by Lootsplit: removed the solid square background for transparent
+Adaptations by Lootsplitter: removed the solid square background for transparent
 mask rendering; applied category colors and consistent UI framing. Original
 icon geometry is preserved.
 
@@ -19,5 +19,5 @@ Open5e names, categories and metadata in the cross-reference originate from
 SRD 5.1 and SRD 5.2 by Wizards of the Coast LLC, retrieved through the official
 Open5e source repository. SRDs: https://www.dndbeyond.com/srd
 Licensed under CC BY 4.0: https://creativecommons.org/licenses/by/4.0/
-Mapping presentation and metadata have been adapted for Lootsplit.
+Mapping presentation and metadata have been adapted for Lootsplitter.
 Preserve the existing application's full edition-specific SRD attribution.

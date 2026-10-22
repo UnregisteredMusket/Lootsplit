@@ -156,11 +156,11 @@ export function MobileOwnerWidget({ name, email }: { name: string; email: string
                     setMessage(
                       result.requested
                         ? "Confirm Add in Android’s home-screen prompt. This does not place it automatically."
-                        : "Your launcher did not accept the request. Add Lootsplit Field monitor from its Widgets menu.",
+                        : "Your launcher did not accept the request. Add Lootsplitter Field monitor from its Widgets menu.",
                     );
                   } else
                     setMessage(
-                      "Long-press your home screen, choose Widgets, then Lootsplit Field monitor. Drag it into place.",
+                      "Long-press your home screen, choose Widgets, then Lootsplitter Field monitor. Drag it into place.",
                     );
                 })
               }
@@ -178,11 +178,11 @@ export function MobileOwnerWidget({ name, email }: { name: string; email: string
                     setMessage(
                       result.requested
                         ? "Confirm Add to place the 4×1 companion. Tap its Settings action to choose summaries and controls. Owner access is only needed for private readings."
-                        : "Add Lootsplit 4×1 companion from your launcher’s Widgets menu.",
+                        : "Add Lootsplitter 4×1 companion from your launcher’s Widgets menu.",
                     );
                   } else
                     setMessage(
-                      "Long-press your home screen, choose Widgets, then Lootsplit 4×1 companion. Configure its summaries and actions after placing it.",
+                      "Long-press your home screen, choose Widgets, then Lootsplitter 4×1 companion. Configure its summaries and actions after placing it.",
                     );
                 })
               }
@@ -198,8 +198,8 @@ export function MobileOwnerWidget({ name, email }: { name: string; email: string
                   const result = await OwnerWidget.refreshRegistration();
                   setMessage(
                     result.mainAvailable && result.companionAvailable
-                      ? "Android detects both Lootsplit widgets. Close and reopen your home screen’s Widgets menu. You can also use Add 4×1 companion here."
-                      : "Android has not detected both widget types yet. Open Lootsplit again after the update finishes, then retry. Your saved data and placed widgets are preserved.",
+                      ? "Android detects both Lootsplitter widgets. Close and reopen your home screen’s Widgets menu. You can also use Add 4×1 companion here."
+                      : "Android has not detected both widget types yet. Open Lootsplitter again after the update finishes, then retry. Your saved data and placed widgets are preserved.",
                   );
                 })
               }

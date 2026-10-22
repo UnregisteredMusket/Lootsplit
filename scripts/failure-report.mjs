@@ -28,7 +28,7 @@ export function buildReport(run, jobs, liveCommit = "unconfirmed") {
     failedJobs: failed.map(({ id, name, conclusion }) => ({ id, name, conclusion })),
     failedSteps: steps,
     text: [
-      `Lootsplit failure report`,
+      `Lootsplitter failure report`,
       `Workflow: ${run.name}`,
       `Result: ${run.conclusion}`,
       `Commit: ${run.head_sha}`,
@@ -68,7 +68,7 @@ export async function emailReport(report, env = process.env, request = requestJs
     body: JSON.stringify({
       from: env.FAILURE_REPORT_FROM,
       to: [env.FAILURE_REPORT_EMAIL],
-      subject: `Lootsplit: ${report.result} — ${report.workflow}`,
+      subject: `Lootsplitter: ${report.result} — ${report.workflow}`,
       text: report.text,
     }),
   });

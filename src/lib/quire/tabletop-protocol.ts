@@ -93,7 +93,7 @@ export function tabletopResponse<T extends { table: CloudTable; draft: string }>
     })
   )
     throw Error(
-      "This session has unfinished map actions from an updated Lootsplit client. Finish or resolve those actions on the updated website before resuming this older app. Your saved campaign and pending work are retained.",
+      "This session has unfinished map actions from an updated Lootsplitter client. Finish or resolve those actions on the updated website before resuming this older app. Your saved campaign and pending work are retained.",
     );
   return { ...value, table: tableForProtocol(value.table, protocol) };
 }

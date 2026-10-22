@@ -105,7 +105,7 @@ export function BugReports({ userId, role }: { userId?: string; role?: string })
   }
   return (
     <section id="bug-reports" className="portal-card bug-reports" aria-labelledby="bug-title">
-      <p className="portal-eyebrow">HELP IMPROVE LOOTSPLIT</p>
+      <p className="portal-eyebrow">HELP IMPROVE LOOTSPLITTER</p>
       <h2 id="bug-title">Bug reports</h2>
       <p>
         Tell us what went wrong. Reports are private to you, the owner and administrators. Check

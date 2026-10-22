@@ -401,7 +401,7 @@ try {
         if (new URL(page.url()).pathname === "/maps")
           await click(
             page,
-            page.getByRole("link", { name: "Back to Lootsplit", exact: true }),
+            page.getByRole("link", { name: "Back to Lootsplitter", exact: true }),
             `${role} Maps return before desktop feature navigation`,
           );
         await click(

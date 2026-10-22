@@ -56,7 +56,7 @@ try {
     await page.getByRole("dialog", { name: "Settings & Management", exact: true }).waitFor();
     await page.keyboard.press("Escape");
     await page.getByRole("button", { name: "Help", exact: true }).click();
-    const guide = page.getByRole("dialog", { name: "How Lootsplit works", exact: true });
+    const guide = page.getByRole("dialog", { name: "How Lootsplitter works", exact: true });
     await guide.getByRole("searchbox").fill("encounter");
     await guide.locator("#guide-encounters > summary").waitFor();
     await guide.getByRole("link", { name: "Encounter builder & tracker", exact: false }).click();

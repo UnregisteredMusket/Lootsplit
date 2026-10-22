@@ -33,9 +33,9 @@ export function OpeningDawn({ children, bypass = false }: { children: ReactNode;
       type="button"
       className="quire-dawn loot-opening"
       onClick={enter}
-      aria-label="Lootsplit. Click to continue"
+      aria-label="Lootsplitter. Click to continue"
     >
-      <span className="quire-dawn-name">Lootsplit</span>
+      <span className="quire-dawn-name">Lootsplitter</span>
       <span className="loot-opening-scene">
         <OpeningLandscape />
         <LootLoader />

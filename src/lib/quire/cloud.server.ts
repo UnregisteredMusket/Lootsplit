@@ -394,7 +394,7 @@ export async function publishTurn(_input: {
   bill?: BillFile;
 }): Promise<RoomView> {
   throw new Error(
-    "This client uses an older sharing protocol. Reload Lootsplit before submitting changes.",
+    "This client uses an older sharing protocol. Reload Lootsplitter before submitting changes.",
   );
 }
 

@@ -7,7 +7,7 @@ import { Switch, Button } from "@/components/ui";
 export function Notices() {
   const [on, setOn] = useState(false);
   const [hint, setHint] = useState(
-    "Receive notifications for messages, mode changes, and turns while Lootsplit is running. Browser permission is required.",
+    "Receive notifications for messages, mode changes, and turns while Lootsplitter is running. Browser permission is required.",
   );
 
   useEffect(() => setOn(noticesOn()), []);

@@ -64,7 +64,7 @@ test("the grok.com extension script is disabled for every Lootsplit build and de
   try {
     const html = injectGrokPwaHead(
       '<html><head><script src="https://grok.com/grok-app-builder/extensions.js"></script></head></html>',
-      { appName: "Lootsplit" },
+      { appName: "Lootsplitter" },
     );
     assert.doesNotMatch(html, /grok\.com\/grok-app-builder\/extensions\.js/);
   } finally {

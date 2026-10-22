@@ -220,13 +220,13 @@ export async function checkLocalAudio(page, context, width) {
     fullPage: true,
   });
   await page.reload();
-  await page.getByRole("button", { name: "Lootsplit. Click to continue", exact: true }).waitFor();
+  await page.getByRole("button", { name: "Lootsplitter. Click to continue", exact: true }).waitFor();
   assert.equal(
     await page.locator(".local-audio-mini").count(),
     0,
     "A fresh document does not autoplay local playlists",
   );
-  await page.getByRole("button", { name: "Lootsplit. Click to continue", exact: true }).click();
+  await page.getByRole("button", { name: "Lootsplitter. Click to continue", exact: true }).click();
   await panel.getByRole("button", { name: "Road music 1 tracks", exact: true }).click();
   await expect(player.locator(".local-audio-tracks li")).toContainText("Road Theme");
   await expect(player.getByLabel("Playlist music volume", { exact: true })).toHaveValue("23");
@@ -271,7 +271,7 @@ export async function checkLocalAudio(page, context, width) {
       const guest = await anonymous.newPage();
       await guest.goto(origin + "/features/music");
       const title = guest.getByRole("button", {
-        name: "Lootsplit. Click to continue",
+        name: "Lootsplitter. Click to continue",
         exact: true,
       });
       await title.waitFor({ state: "visible" });

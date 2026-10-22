@@ -43,7 +43,7 @@
         <receiver android:name=".WidgetInstallReceiver" android:exported="false">
             <intent-filter><action android:name="android.intent.action.MY_PACKAGE_REPLACED" /></intent-filter>
         </receiver>
-        <activity android:name=".CompanionWidgetConfigureActivity" android:exported="true" android:label="Lootsplit widget settings" android:theme="@android:style/Theme.Material.NoActionBar">
+        <activity android:name=".CompanionWidgetConfigureActivity" android:exported="true" android:label="Lootsplitter widget settings" android:theme="@android:style/Theme.Material.NoActionBar">
             <intent-filter><action android:name="android.appwidget.action.APPWIDGET_CONFIGURE" /></intent-filter>
         </activity>
 

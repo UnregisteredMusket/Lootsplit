@@ -116,12 +116,12 @@ function assertNoDeletion(allowFailedRetry = true) {
     // retained intent, so only that action waits for the retry on the next load.
     if (allowFailedRetry) return;
     throw new Error(
-      "An earlier campaign deletion failed. It will retry when Lootsplit is reloaded.",
+      "An earlier campaign deletion failed. It will retry when Lootsplitter is reloaded.",
     );
   }
   if (deleting || pending)
     throw new Error(
-      "A campaign deletion is still finishing. Close other Lootsplit tabs if it is waiting.",
+      "A campaign deletion is still finishing. Close other Lootsplitter tabs if it is waiting.",
     );
 }
 

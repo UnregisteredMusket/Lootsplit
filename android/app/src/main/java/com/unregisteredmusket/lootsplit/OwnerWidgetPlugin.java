@@ -94,7 +94,7 @@ public class OwnerWidgetPlugin extends Plugin {
     @PluginMethod public void pin(PluginCall call) {
         WidgetRegistration.refresh(getContext(),true);
         if (Build.VERSION.SDK_INT < 26 || !AppWidgetManager.getInstance(getContext()).isRequestPinAppWidgetSupported()) {
-            call.reject("Long-press your home screen, choose Widgets, then Lootsplit Field monitor."); return;
+            call.reject("Long-press your home screen, choose Widgets, then Lootsplitter Field monitor."); return;
         }
         boolean requested = AppWidgetManager.getInstance(getContext()).requestPinAppWidget(
             new ComponentName(getContext(), "companion".equals(call.getString("kind")) ? CompanionWidgetProvider.class : OwnerWidgetProvider.class), null, null);

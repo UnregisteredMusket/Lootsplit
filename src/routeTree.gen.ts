@@ -31,10 +31,10 @@ import { Route as UpdatesRouteImport } from './routes/updates'
 import { Route as WelcomeRouteImport } from './routes/welcome'
 import { Route as BookBookIdRouteImport } from './routes/book.$bookId'
 import { Route as DownloadAndroidRouteImport } from './routes/download.android'
+import { Route as FeaturesIndexRouteImport } from './routes/features.index'
 import { Route as FeaturesFeatureRouteImport } from './routes/features.$feature'
 import { Route as ReadArticleIdRouteImport } from './routes/read.$articleId'
 import { Route as ShopShopIdRouteImport } from './routes/shop.$shopId'
-import { Route as FeaturesIndexRouteImport } from './routes/features.index'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -146,6 +146,11 @@ const DownloadAndroidRoute = DownloadAndroidRouteImport.update({
   path: '/download/android',
   getParentRoute: () => rootRouteImport,
 } as any)
+const FeaturesIndexRoute = FeaturesIndexRouteImport.update({
+  id: '/features/',
+  path: '/features/',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const FeaturesFeatureRoute = FeaturesFeatureRouteImport.update({
   id: '/features/$feature',
   path: '/features/$feature',
@@ -159,11 +164,6 @@ const ReadArticleIdRoute = ReadArticleIdRouteImport.update({
 const ShopShopIdRoute = ShopShopIdRouteImport.update({
   id: '/shop/$shopId',
   path: '/shop/$shopId',
-  getParentRoute: () => rootRouteImport,
-} as any)
-const FeaturesIndexRoute = FeaturesIndexRouteImport.update({
-  id: '/features/',
-  path: '/features/',
   getParentRoute: () => rootRouteImport,
 } as any)
 
@@ -524,6 +524,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof DownloadAndroidRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/features/': {
+      id: '/features/'
+      path: '/features'
+      fullPath: '/features/'
+      preLoaderRoute: typeof FeaturesIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/features/$feature': {
       id: '/features/$feature'
       path: '/features/$feature'
@@ -543,13 +550,6 @@ declare module '@tanstack/react-router' {
       path: '/shop/$shopId'
       fullPath: '/shop/$shopId'
       preLoaderRoute: typeof ShopShopIdRouteImport
-      parentRoute: typeof rootRouteImport
-    }
-    '/features/': {
-      id: '/features/'
-      path: '/features/'
-      fullPath: '/features/'
-      preLoaderRoute: typeof FeaturesIndexRouteImport
       parentRoute: typeof rootRouteImport
     }
   }

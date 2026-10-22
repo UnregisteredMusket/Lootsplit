@@ -3,7 +3,7 @@ import { useRouterState } from "@tanstack/react-router";
 
 export function LogoLoading() {
   return (
-    <div className="loot-route-loading" role="status" aria-label="Loading Lootsplit">
+    <div className="loot-route-loading" role="status" aria-label="Loading Lootsplitter">
       <img src="/favicon.svg" width="56" height="56" alt="" />
     </div>
   );

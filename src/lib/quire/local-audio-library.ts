@@ -182,7 +182,7 @@ export class AudioLibraryStorage {
         }
       };
       const timer = setTimeout(
-        () => fail("Audio storage did not open. Close other Lootsplit tabs and retry."),
+        () => fail("Audio storage did not open. Close other Lootsplitter tabs and retry."),
         5000,
       );
       request.onupgradeneeded = () => {
@@ -195,7 +195,7 @@ export class AudioLibraryStorage {
       };
       request.onblocked = () => {
         clearTimeout(timer);
-        fail("Close other Lootsplit tabs and retry audio storage.");
+        fail("Close other Lootsplitter tabs and retry audio storage.");
       };
       request.onsuccess = () => {
         clearTimeout(timer);

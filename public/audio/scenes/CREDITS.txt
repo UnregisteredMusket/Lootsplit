@@ -1,4 +1,4 @@
-Lootsplit menu music and ambience
+Lootsplitter menu music and ambience
 
 town.mp3: Town Theme RPG by cynicmusic
 Source: https://opengameart.org/content/town-theme-rpg

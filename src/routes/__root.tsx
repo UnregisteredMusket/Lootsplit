@@ -24,7 +24,7 @@ import { SplitViewProvider, usePane } from "@/components/split-view";
 import { retainBeside } from "@/lib/quire/split-view";
 import appCss from "../styles.css?url";
 
-const APP_NAME = "Lootsplit";
+const APP_NAME = "Lootsplitter";
 
 export const Route = createRootRoute({
   // Navigation in the main (left) pane keeps the split-view pane beside it.

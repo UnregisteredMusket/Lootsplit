@@ -306,7 +306,7 @@ try {
     );
     await openApplication(page, origin + "/?view=home");
     await page.getByRole("button", { name: "Help", exact: true }).click();
-    const guide = page.getByRole("dialog", { name: "How Lootsplit works", exact: true });
+    const guide = page.getByRole("dialog", { name: "How Lootsplitter works", exact: true });
     await expect(guide.getByRole("heading", { name: "Player guide", exact: true })).toBeVisible();
     await guide.getByRole("searchbox").fill("lookup");
     await expect(guide.locator("#guide-references[open]")).toBeVisible();

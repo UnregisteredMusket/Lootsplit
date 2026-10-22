@@ -9,7 +9,7 @@ export async function recoveryGuard(request, env) {
       headers: { "Cache-Control": "no-store" },
     });
   }
-  if (fenced) return new Response("Lootsplit is undergoing recovery. Please use the recovery address provided by the host.", {
+  if (fenced) return new Response("Lootsplitter is undergoing recovery. Please use the recovery address provided by the host.", {
     status: 503, headers: { "Cache-Control": "no-store", "Retry-After": "60" },
   });
   return null;

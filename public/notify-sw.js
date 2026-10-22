@@ -1,5 +1,5 @@
 self.addEventListener("push", (event) => {
-  event.waitUntil(self.registration.showNotification("New Lootsplit message", {
+  event.waitUntil(self.registration.showNotification("New Lootsplitter message", {
     body: "Open Multiplayer to read your party’s messages.",
     icon: "/favicon.svg",
     tag: "lootsplit-chat",

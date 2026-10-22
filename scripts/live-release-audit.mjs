@@ -114,7 +114,7 @@ try {
         errors.push(`${response.status()} ${path}`);
     });
     await page.goto(origin, { waitUntil: "networkidle" });
-    const title = page.getByRole("button", { name: "Lootsplit. Click to continue", exact: true });
+    const title = page.getByRole("button", { name: "Lootsplitter. Click to continue", exact: true });
     await title.waitFor();
     await page.waitForFunction(() => {
       const button = document.querySelector(".loot-opening");
@@ -186,7 +186,7 @@ try {
   await reduced.addInitScript(recordViolations);
   const page = await reduced.newPage();
   await page.goto(origin, { waitUntil: "networkidle" });
-  const title = page.getByRole("button", { name: "Lootsplit. Click to continue", exact: true });
+  const title = page.getByRole("button", { name: "Lootsplitter. Click to continue", exact: true });
   await title.waitFor();
   assert.equal(
     await page.locator(".quire-dawn-name").evaluate((el) => getComputedStyle(el).animationName),

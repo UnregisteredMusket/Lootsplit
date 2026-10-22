@@ -516,7 +516,7 @@ public class OwnerWidgetTest {
         }
         assertEquals("Android must discover both independent widget providers",2,providers);
         assertNotNull("Companion must be installed before any account activity opens",info);
-        assertEquals("Lootsplit 4×1 companion",info.loadLabel(context.getPackageManager()));
+        assertEquals("Lootsplitter 4×1 companion",info.loadLabel(context.getPackageManager()));
         assertEquals(android.appwidget.AppWidgetProviderInfo.WIDGET_CATEGORY_HOME_SCREEN,info.widgetCategory);
         if(android.os.Build.VERSION.SDK_INT>=28)assertEquals(0,info.widgetFeatures & android.appwidget.AppWidgetProviderInfo.WIDGET_FEATURE_HIDE_FROM_PICKER);
         if(android.os.Build.VERSION.SDK_INT>=31){assertEquals(4,info.targetCellWidth);assertEquals(1,info.targetCellHeight);}

@@ -577,6 +577,6 @@
     "properties"
   ],
   "additionalProperties": false,
-  "title": "Lootsplit property operations import v1",
+  "title": "Lootsplitter property operations import v1",
   "description": "Strict structural format. The application additionally checks keys, references, hierarchy, ownership mappings and campaign revisions."
 }

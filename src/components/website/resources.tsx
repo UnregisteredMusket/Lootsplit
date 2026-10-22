@@ -27,7 +27,7 @@ export function ResourcesPage() {
     <Website>
       <PageHero kicker="The sources behind the adventure" title="Resources & credits">
         <p className="ls-lead ls-measure">
-          Thank you to the projects and creators that help make Lootsplit possible. This list grows
+          Thank you to the projects and creators that help make Lootsplitter possible. This list grows
           as new resources join the app.
         </p>
       </PageHero>
@@ -38,7 +38,7 @@ export function ResourcesPage() {
               Credits
             </h2>
             <p className="ls-lead">
-              Content, data, libraries and typefaces that ship with Lootsplit or that it reads,
+              Content, data, libraries and typefaces that ship with Lootsplitter or that it reads,
               with their creators and licenses.
             </p>
           </div>
@@ -55,7 +55,7 @@ export function ResourcesPage() {
             <summary>
               <h2 id="technical">Technical references</h2>
               <span>
-                Platform documentation, APIs and design references used while building Lootsplit.
+                Platform documentation, APIs and design references used while building Lootsplitter.
                 Nothing from these is bundled. {references.length} entries.
               </span>
             </summary>

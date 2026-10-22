@@ -50,10 +50,10 @@ export function Website({
       </a>
       <header className="ls-header">
         <div className="ls-wrap ls-header-row">
-          <Link className="ls-brand" to="/welcome" aria-label="Lootsplit home">
+          <Link className="ls-brand" to="/welcome" aria-label="Lootsplitter home">
             <img src="/favicon.svg" alt="" width="34" height="34" />
             <span className="ls-brand-text">
-              <span className="ls-brand-name">Lootsplit</span>
+              <span className="ls-brand-name">Lootsplitter</span>
               <span className="ls-brand-tag">The Party Ledger</span>
             </span>
           </Link>
@@ -119,7 +119,7 @@ function SiteFooter({
         <div className="ls-footcols">
           <div className="ls-footer-brand">
             <Link className="ls-footer-name" to="/welcome">
-              Lootsplit
+              Lootsplitter
             </Link>
             <p className="ls-footer-motto">Keep the books. Tell the story.</p>
             <p>
@@ -303,7 +303,7 @@ export function WelcomePage() {
           <div className="ls-stack ls-measure">
             <Kicker>Everything around the ledger</Kicker>
             <h2 id="areas" className="ls-display">
-              Your campaign has grown. <span className="ls-block">So has Lootsplit.</span>
+              Your campaign has grown. <span className="ls-block">So has Lootsplitter.</span>
             </h2>
             <p className="ls-lead">
               Eight connected parts, one campaign. Purchases, voyages, property income and loot all
@@ -428,7 +428,7 @@ export function WelcomePage() {
               <Kicker>Browser · no download</Kicker>
               <h3>Always the latest version</h3>
               <p>
-                Open Lootsplit in your PC’s or phone’s browser. Open screens in separate windows
+                Open Lootsplitter in your PC’s or phone’s browser. Open screens in separate windows
                 across monitors, or cast the player display to a TV.
               </p>
               <AppLink className="ls-btn ls-btn-gold ls-self-start" href="/">
@@ -475,7 +475,7 @@ export function WelcomePage() {
 export function HelpPage() {
   return (
     <Website>
-      <PageHero kicker="The Lootsplit field guide" title="A little help, adventurer.">
+      <PageHero kicker="The Lootsplitter field guide" title="A little help, adventurer.">
         <p className="ls-lead ls-measure">
           Menus, money, encounters and recovery. Find a topic and jump straight to the tool you
           need.
