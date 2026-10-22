@@ -245,7 +245,7 @@ export const PLAYER_HELP_GROUPS: HelpGroup[] = [
         id: "barter",
         title: "Offer goods, coins or property deeds",
         paragraphs: [
-          "Trading & Barter exchanges existing coins, carried goods and eligible deeds through reviewed offers and counteroffers. The recipient accepts or declines; either participant can cancel. A nearby NPC needs barter permission and consent from its DM/controller.",
+          "Trading & Barter exchanges existing coins, carried goods and eligible deeds through reviewed offers and counteroffers. The recipient accepts or declines; either participant can cancel. A nearby NPC needs barter permission and consent from its DM/controller. NPC funds are private unless you are its assigned controller; the trade checks them when it is accepted.",
           "Acceptance checks both sides' funds, ownership, location and current offer before an atomic exchange. Stored, reserved, travelling or service items cannot be offered. Other inventories remain private until included in an offer. Review the accepted history before repeating a trade.",
         ],
         links: [["Trading & Barter", "/features/trading"]],
