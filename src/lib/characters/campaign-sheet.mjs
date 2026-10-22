@@ -333,7 +333,16 @@ export function editCharacter(table, seat, input, receipt, at = Date.now()) {
       const id = old?.id || `${receipt}-item-${i}`;
       if (ids.has(id)) throw Error("Duplicate inventory item.");
       ids.add(id);
-      return {
+      // A value or quantity a player sets has no reference price (NPC barter,
+      // docs/NPC-BARTER.md). A DM edit confirms it again.
+      const valueChanged =
+        !old ||
+        old.name !== item.name ||
+        (old.kind || "item") !== (item.kind || "item") ||
+        (old.unitCopper || 0) !== (item.unitCopper || 0) ||
+        item.quantity > old.quantity;
+      const valueSource = valueChanged ? (seat.role === "dm" ? undefined : "player") : old?.valueSource;
+      const row = {
         ...old,
         ...item,
         id,
@@ -341,6 +350,9 @@ export function editCharacter(table, seat, input, receipt, at = Date.now()) {
         kind: item.kind || "item",
         unitCopper: item.unitCopper || 0,
       };
+      if (valueSource) row.valueSource = valueSource;
+      else delete row.valueSource;
+      return row;
     });
     table.holdings = [...table.holdings.filter((h) => h.purseId !== p.id || h.custody || h.reservedFor), ...updated];
   }

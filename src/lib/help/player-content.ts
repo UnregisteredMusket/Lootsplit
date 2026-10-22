@@ -250,6 +250,19 @@ export const PLAYER_HELP_GROUPS: HelpGroup[] = [
         ],
         links: [["Trading & Barter", "/features/trading"]],
       },
+      {
+        id: "npc-barter",
+        title: "Barter with an NPC in conversation",
+        paragraphs: [
+          "Some nearby NPCs answer offers themselves. In People & NPCs choose View & interact, then Barter (press 1, or tap). Add your goods and coins and what you want in the drawer. Each numbered reply says what will happen, for example [PERSUASION · DC 13 · Likely ~70% · Advantage], [Offer · no roll needed] or [Too low · refused without a roll]. The bar shows how fair the NPC finds the deal.",
+          "The room rolls your Charisma (Persuasion) check: your sheet's bonus, with advantage at Charisma 16 or more and disadvantage at 8 or less. Sending the same offer again never rolls again. A narrow miss brings a counter-offer you can accept or decline. After a refusal, the same or a worse offer is locked for a while; make it clearly better or wait. Choose [DM decides] to let the Dungeon Master judge the deal instead.",
+          "Your conversations stay under NPC conversations on Trading & Barter. The NPC's purse and how it values your goods stay private; the trade checks them when it happens.",
+        ],
+        links: [
+          ["People & NPCs", "/features/npcs"],
+          ["Trading & Barter", "/features/trading"],
+        ],
+      },
     ],
   },
   {

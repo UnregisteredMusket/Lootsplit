@@ -2,6 +2,7 @@ import { z } from "zod";
 import { mapCombatBindingSchema } from "./map-combat-schema.ts";
 import { connectedMapSchema } from "./connected-maps-schema.ts";
 import { artworkSchema } from "./artwork.ts";
+import { npcBarterConfigSchema, npcBarterStateSchema } from "./npc-barter-schema.ts";
 import { mapTabletopSchema, tabletopSessionSchema, tabletopCommands, tokenTabletopFields } from "./tabletop-schema.ts";
 const id = z.string().min(1).max(150),
   name = z.string().trim().min(1).max(160);
@@ -161,6 +162,8 @@ export const npcSchema = z
     barterAllowed: z.boolean(),
     controllerPurseId: id.nullable(),
     portrait: artworkSchema.optional(),
+    /** NPC barter answers (docs/NPC-BARTER.md). Missing follows the campaign rules. */
+    barter: npcBarterConfigSchema.optional(),
   })
   .strict();
 export const npcItemSchema = z
@@ -255,6 +258,7 @@ export const worldSchema = z
     npcs: z.array(npcSchema).max(500).default([]),
     trades: z.array(tradeSchema).default([]),
     conversations: z.array(conversationSchema).default([]),
+    npcBarter: npcBarterStateSchema.optional(),
     blackMarketActive: z.boolean().default(false),
     /** DM setting: party players can read the coins of visible NPCs travelling with the party. Off when absent. */
     companionFundsVisible: z.boolean().optional(),

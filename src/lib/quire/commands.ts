@@ -6,6 +6,8 @@ import { applyShipCommand, validateFleet, assertShipTradingHere } from "./ships.
 import { characterVisible, canReadCharacter } from "./character-position.ts";
 import { ensureCityExchanges, removeUnusedCityExchange, renameUnusedCityExchange } from "./city-exchanges.ts";
 import { worldCommands, type WorldCommand } from "./world-schema.ts";
+import { npcBarterCommands, npcBarterKinds, type NpcBarterCommand } from "./npc-barter-schema.ts";
+import { applyNpcBarterCommand, validateNpcBarter } from "./npc-barter.ts";
 import { resourcePackSchema, resourceFingerprint, previewResourcePack } from "./resource-packs.ts";
 import { tradeCommands, type TradeCommand, type TradeExecution } from "./trade-economy-schema.ts";
 import { applyTradeCommand, prepareTradeSeason, recordShopTrade, validateTradeEconomy } from "./trade-economy.ts";
@@ -63,6 +65,7 @@ export const commandSchema = z.discriminatedUnion("kind", [
   ledgerVoidCommandSchema,
   ...tradeCommands,
   ...worldCommands,
+  ...npcBarterCommands,
   ...estateCommands,
   ...shipCommands,
   ...smithCommands,
@@ -353,6 +356,8 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
     applyDowntimeActivity(t, seat, cmd as DowntimeActivityCommand, at, execution.preview === true);
   } else if (tradeCommands.some((schema) => schema.shape.kind.value === cmd.kind)) {
     applyTradeCommand(t, seat, cmd as TradeCommand, at, execution);
+  } else if (npcBarterKinds.has(cmd.kind)) {
+    applyNpcBarterCommand(t, seat, cmd as NpcBarterCommand, at, execution);
   } else if (worldCommands.some((schema) => schema.shape.kind.value === cmd.kind)) {
     applyWorldCommand(t, seat, cmd as WorldCommand, at);
   } else if (cmd.kind === "estate-import") {
@@ -1173,6 +1178,7 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
     }
   }
   validateWorld(t);
+  validateNpcBarter(t);
   validateFleet(t);
   validateBlacksmith(t);
   validateDowntimeActivities(t, execution.preview === true);

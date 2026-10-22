@@ -44,6 +44,10 @@ Each acceptance rechecks participants, NPC presence/bartering permission, exact 
 
 Services, stored/in-transit/reserved lots and properties with active contents, projects, staff, tenants, financial agreements, orders or arrears cannot be bartered until resolved. Use Property Management's explicit DM handover when obligations must accompany an ownership change. A clean deed transfer updates its owner/image information, retains the original purchase receipt and removes the old owner's transferred lot. No second deed inventory asset or duplicate wealth is created.
 
+### NPCs who barter on their own
+
+NPCs with **Bartering allowed** and no player controller also answer offers in a conversation under **View & interact**: numbered replies show the Charisma (Persuasion) DC and odds, the room server rolls, and the NPC accepts, counters or refuses in its own (DM-editable) voice. The DM's **NPC barter rules** choose DM decides (default), Server rolls, DM confirms, or Automatic. The trading table above is unchanged and remains the flow for controlled NPCs. See [NPC-BARTER.md](NPC-BARTER.md).
+
 ## Black market
 
 DMs use the Market **Black market** toggle during play to reveal or hide designated vendors. In a shop, open **Black-market vendor rules**, enable the flag and set a premium greater than 1 (default 1.5). Configure names, goods, quantities, rarities, illegal-goods descriptions, locations and schedules through the normal shop/stock tools. The premium multiplies the ordinary asking price before its existing Charisma adjustment. Finite/unlimited stock and ordinary receipts remain unchanged.

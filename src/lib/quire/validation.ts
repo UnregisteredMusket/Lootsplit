@@ -34,6 +34,7 @@ const purse = z.object({
   control: z.enum(["player", "npc"]).optional(),
 });
 export const holdingSchema = z.object({
+  valueSource: z.literal("player").optional(),
   commodityId: estateKey.optional(),
   custody: custodySchema.optional(),
   materialKey: estateKey.optional(),

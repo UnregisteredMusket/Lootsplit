@@ -263,6 +263,10 @@ function participant(t: CloudTable, seat: CloudSeat, id: string) {
     throw Error("Only this participant or the DM can decide their side of the trade.");
   return p;
 }
+/** Rechecks both sides of a barter: participants, NPC presence, exact lots, custody and deeds. */
+export function barterEligible(t: CloudTable, trade: Pick<Trade, "left" | "right">) {
+  eligible(t, trade);
+}
 function eligible(t: CloudTable, trade: Pick<Trade, "left" | "right">) {
   const w = readWorld(t.journal?.world);
   for (const side of [trade.left, trade.right]) {
@@ -306,6 +310,44 @@ function moveItems(t: CloudTable, side: Trade["left"], toId: string, receipt: st
     }
   }
   t.holdings = t.holdings.filter((h) => h.quantity > 0);
+}
+/**
+ * One atomic barter exchange: rechecks both sides, moves the net coins and the
+ * exact lots, and writes one ledger line per participant keyed by `receipt`.
+ */
+export function settleExchange(
+  t: CloudTable,
+  leftSide: Trade["left"],
+  rightSide: Trade["right"],
+  receipt: string,
+  at: number,
+) {
+  eligible(t, { left: leftSide, right: rightSide });
+  const left = t.purses.find((p) => p.id === leftSide.purseId)!,
+    right = t.purses.find((p) => p.id === rightSide.purseId)!;
+  if (toCopper(left.coins) < leftSide.copper || toCopper(right.coins) < rightSide.copper)
+    throw Error("A participant cannot afford their offered coins. Review a counteroffer.");
+  const delta = rightSide.copper - leftSide.copper;
+  for (const [p, change] of [
+    [left, delta],
+    [right, -delta],
+  ] as const) {
+    const balance = toCopper(p.coins) + change;
+    if (!Number.isSafeInteger(balance) || balance > 1e12)
+      throw Error("The resulting coin balance is too large.");
+    p.coins = fromCopper(balance);
+    t.ledger.push({
+      id: receipt + "-" + p.id,
+      at,
+      purseId: p.id,
+      shopId: null,
+      summary: `Barter completed with ${p.id === left.id ? right.name : left.name}`,
+      copper: change,
+      transactionType: "transfer",
+    });
+  }
+  moveItems(t, leftSide, right.id, receipt + "-left", at);
+  moveItems(t, rightSide, left.id, receipt + "-right", at);
 }
 export function applyWorldCommand(t: CloudTable, seat: CloudSeat, cmd: WorldCommand, at: number) {
   const journal = t.journal!,
@@ -621,34 +663,7 @@ export function applyWorldCommand(t: CloudTable, seat: CloudSeat, cmd: WorldComm
       throw Error("Only a participant can decide this offer.");
     if (cmd.decision !== "cancelled" && offer.awaitingId !== cmd.actorId)
       throw Error("Only the recipient can accept or decline this offer.");
-    if (cmd.decision === "accepted") {
-      eligible(t, offer);
-      const left = t.purses.find((p) => p.id === offer.left.purseId)!,
-        right = t.purses.find((p) => p.id === offer.right.purseId)!;
-      if (toCopper(left.coins) < offer.left.copper || toCopper(right.coins) < offer.right.copper)
-        throw Error("A participant cannot afford their offered coins. Review a counteroffer.");
-      const delta = offer.right.copper - offer.left.copper;
-      for (const [p, change] of [
-        [left, delta],
-        [right, -delta],
-      ] as const) {
-        const balance = toCopper(p.coins) + change;
-        if (!Number.isSafeInteger(balance) || balance > 1e12)
-          throw Error("The resulting coin balance is too large.");
-        p.coins = fromCopper(balance);
-        t.ledger.push({
-          id: cmd.id + "-" + p.id,
-          at,
-          purseId: p.id,
-          shopId: null,
-          summary: `Barter completed with ${p.id === left.id ? right.name : left.name}`,
-          copper: change,
-          transactionType: "transfer",
-        });
-      }
-      moveItems(t, offer.left, right.id, cmd.id + "-left", at);
-      moveItems(t, offer.right, left.id, cmd.id + "-right", at);
-    }
+    if (cmd.decision === "accepted") settleExchange(t, offer.left, offer.right, cmd.id, at);
     offer.status = cmd.decision;
     offer.decidedAt = at;
     offer.revision++;

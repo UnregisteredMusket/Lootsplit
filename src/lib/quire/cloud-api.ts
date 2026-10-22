@@ -222,3 +222,13 @@ export const readMapCombatPresentation = createServerFn({method:"POST"})
     const {guardMemberSeat}=await import("./member-access.server.ts");await guardMemberSeat(data);
     const {mapCombatPresentation}=await import("./cloud.server.ts");return mapCombatPresentation(data);
   });
+
+/** Read-only NPC barter quote for a seat; players receive no valuation (docs/NPC-BARTER.md). */
+export const quoteCloudNpcBarter = createServerFn({ method: "POST" })
+  .validator((input: { code: string; token: string; [key: string]: unknown }) => input)
+  .handler(async ({ data }) => {
+    const { guardMemberSeat } = await import("./member-access.server.ts");
+    await guardMemberSeat(data);
+    const { npcBarterQuote } = await import("./cloud.server.ts");
+    return npcBarterQuote(data);
+  });

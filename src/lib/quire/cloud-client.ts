@@ -866,7 +866,12 @@ export async function queueCommand(
       throw Error(
         "Submit or resolve pending actions before preparing authoritative seasonal rolls.",
       );
-    if (input.kind === "message" || seasonalPlan) {
+    // NPC barter is rolled and answered by the room server, so it is submitted directly
+    // instead of being previewed on this device (docs/NPC-BARTER.md).
+    const npcBarter = input.kind.startsWith("npc-barter-");
+    if (npcBarter && s.pending.length)
+      throw Error("Submit or discard your pending actions before bartering with an NPC.");
+    if (input.kind === "message" || seasonalPlan || npcBarter) {
       // Chat is independent of transaction turns; retain a failed message in the editor.
       const remote = await submitCloudCommands({
         data: {
@@ -1180,6 +1185,12 @@ export function sendRoomMessage(command: Extract<Command, { kind: "message" }>) 
     });
     await accept(remote);
   });
+}
+/** A player's NPC barter quote comes from the room server: the NPC's rules and purse stay there. */
+export async function requestNpcBarterQuote(input: import("./npc-barter.ts").BarterOfferInput) {
+  const s = requireSession();
+  const { quoteCloudNpcBarter } = await import("./cloud-api");
+  return quoteCloudNpcBarter({ data: { ...input, code: s.code, token: s.token } });
 }
 export function roomCredentials() {
   const s = requireSession();

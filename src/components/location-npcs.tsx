@@ -17,6 +17,9 @@ import { CommandForm, CommandButton } from "./world-tools";
 import { Button, Fold } from "./ui";
 import { AppLink } from "./app-link";
 import type { CloudTable } from "@/lib/quire/cloud";
+import { NpcConversation } from "./npc-conversation";
+import { NpcBarterConfigForm } from "./npc-barter-desk";
+import { npcAnswersBarter } from "@/lib/quire/npc-barter";
 
 export function LocationNpcs() {
   const t = useWorldTable(),
@@ -226,6 +229,9 @@ export function LocationNpcs() {
                 ))}
               {dm && t.journal.blacksmith?.profiles.some((p) => p.npcId === n.id) && (
                 <NpcSmithToggle npc={n} />
+              )}
+              {dm && n.barterAllowed && (
+                <NpcBarterConfigForm key={JSON.stringify(n.barter ?? null)} npc={n} table={t} />
               )}
             </details>
           </article>
@@ -438,6 +444,7 @@ function NpcInteraction({ npc, table }: { npc: Npc; table: CloudTable }) {
   return (
     <section className="world-card">
       <h2>{npc.name} · interaction</h2>
+      {npcAnswersBarter(npc) && near && <NpcConversation key={npc.id} npc={npc} table={table} />}
       <h3>Inventory</h3>
       {table.holdings
         .filter((h) => h.purseId === npc.id && h.quantity > 0 && !h.custody && !h.reservedFor)
@@ -543,7 +550,9 @@ function NpcInteraction({ npc, table }: { npc: Npc; table: CloudTable }) {
           Propose a barter with {npc.name} →
         </AppLink>
       )}
-      <h3>Conversation</h3>
+      <h3 id="npc-messages" style={{ scrollMarginTop: "6rem" }}>
+        Conversation
+      </h3>
       <label>
         Speaking character
         <SearchSelect
