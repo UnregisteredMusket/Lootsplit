@@ -140,7 +140,7 @@ final class WidgetRows {
             case "STATUS UNVERIFIED": return "UNVERIFIED";
             // A confirmed recent problem that is not current (for example one old Worker error).
             case "NEEDS ATTENTION": return "ATTENTION";
-            // A green reading older than two minutes is shown amber with its original qualifier.
+            // A green reading older than OwnerWidgetProvider.STALE_AFTER_MILLIS (35 minutes) is shown amber with its original qualifier.
             case "HEALTHY AT LAST CHECK": return "green".equals(OwnerWidgetProvider.statusColor(snapshot)) ? "HEALTHY" : health;
             default: return health.isEmpty() ? "UNVERIFIED" : health;
         }

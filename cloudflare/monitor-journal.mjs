@@ -598,6 +598,40 @@ async function workflowDiagnostics(db, development, previous, now, add) {
       { retiredAt: now },
     );
 }
+/**
+ * Widget synchronization (owner decision 2026-10-22): only installations that reported within
+ * DEVICE_ACTIVE_MS count toward the check, so a retired phone cannot keep it amber forever. Older
+ * installations are listed as inactive (information, not attention) and count again as soon as they
+ * report. Device rows and their history are never deleted.
+ */
+export const DEVICE_ACTIVE_MS = 7 * 86400000;
+export function widgetSyncCheck(devices, now, freshMs) {
+  const active = devices.filter((d) => now - d.reported_at <= DEVICE_ACTIVE_MS);
+  const inactive = devices
+    .filter((d) => now - d.reported_at > DEVICE_ACTIVE_MS)
+    .map((d) => ({ id: d.id ?? null, lastReportAt: d.reported_at }));
+  const date = (at) => new Date(at).toISOString().slice(0, 10);
+  const inactiveText = inactive.length
+    ? ` ${inactive.length} inactive device(s) not counted: ${inactive
+        .slice(0, 5)
+        .map((d) => `inactive since ${date(d.lastReportAt)}`)
+        .join("; ")}${inactive.length > 5 ? `; ${inactive.length - 5} more` : ""}.`
+    : "";
+  const late = active.filter((d) => now - d.reported_at > freshMs);
+  const symptom = active.length
+    ? `${active.length} active device(s); oldest report ${new Date(Math.min(...active.map((d) => d.reported_at))).toISOString()}${late.length ? `; ${late.length} not reported within ${Math.round(freshMs / 60000)} minutes` : ""}.${inactiveText}`
+    : devices.length
+      ? `No Android installation has reported in the last 7 days.${inactiveText}`
+      : "No Android installation has reported yet.";
+  return [
+    active.length && !late.length ? "healthy" : "unavailable",
+    symptom,
+    "Android may delay delivery while asleep, offline or battery restricted. Backend collection continues.",
+    "Open widget diagnostics, check connectivity and tap Refresh. Sign in only if authorization was rejected.",
+    null,
+    { activeDevices: active.length, inactiveDevices: inactive },
+  ];
+}
 async function updateDiagnostics(db, snapshot, now, settings) {
   const previous = new Map(
     (await rows(db, "SELECT component,body FROM owner_monitor_incidents")).map((r) => [
@@ -763,19 +797,9 @@ async function updateDiagnostics(db, snapshot, now, settings) {
   );
   const devices = await rows(
     db,
-    "SELECT reported_at,body FROM owner_monitor_devices ORDER BY reported_at DESC LIMIT 100",
+    "SELECT id,reported_at,body FROM owner_monitor_devices ORDER BY reported_at DESC LIMIT 100",
   );
-  add(
-    "Widget synchronization",
-    devices.length && devices.every((d) => now - d.reported_at <= settings.deviceFreshMs)
-      ? "healthy"
-      : "unavailable",
-    devices.length
-      ? `${devices.length} registered device(s); oldest report ${new Date(Math.min(...devices.map((d) => d.reported_at))).toISOString()}.`
-      : "No Android installation has reported yet.",
-    "Android may delay delivery while asleep, offline or battery restricted. Backend collection continues.",
-    "Open widget diagnostics, check connectivity and tap Refresh. Sign in only if authorization was rejected.",
-  );
+  add("Widget synchronization", ...widgetSyncCheck(devices, now, settings.deviceFreshMs));
   const result = checks.map((check) => diagnostic(previous.get(check.component), check, now));
   const writes = result.map((check) =>
     statement(
