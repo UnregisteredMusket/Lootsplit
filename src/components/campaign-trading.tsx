@@ -3,6 +3,7 @@ import { useState } from "react";
 import { useSeat } from "@/lib/quire/seat";
 import { readWorld, type Trade } from "@/lib/quire/world-schema";
 import { npcAvailableHere, npcController } from "@/lib/quire/world";
+import { companionFundsReadable } from "@/lib/quire/character-position";
 import { canonicalJson } from "@/lib/quire/canonical-json";
 import { formatCopper } from "@/lib/quire/money";
 import type { Holding, Purse } from "@/lib/quire/types";
@@ -613,6 +614,15 @@ function Participant({
     person = purse ?? world.partyCharacters?.find((p) => p.id === id),
     npc = world.npcs.find((n) => n.id === id),
     portrait = purse?.portrait || purse?.sheet?.portrait || npc?.portrait;
+  const seat = useSeat(),
+    // DM setting "Party can see companion NPC funds": a read-only balance for party players.
+    companionFunds =
+      large &&
+      !showBalance &&
+      !!purse &&
+      !!npc &&
+      seat.role !== "dm" &&
+      companionFundsReadable(table, purse, seat);
   return (
     <header className={`barter-participant${large ? " barter-participant-large" : ""}`}>
       <div className="barter-portrait">
@@ -639,7 +649,14 @@ function Participant({
           <small>available funds</small>
         </div>
       )}
-      {large && !showBalance && npc && (
+      {companionFunds && purse && (
+        <div className="barter-wallet">
+          <Coins size={16} aria-hidden="true" />
+          {formatCopper(toCopper(purse.coins))}
+          <small>party companion funds (read-only)</small>
+        </div>
+      )}
+      {large && !showBalance && !companionFunds && npc && (
         <div className="barter-wallet">
           <small>NPC funds are private. The trade checks them when accepted.</small>
         </div>

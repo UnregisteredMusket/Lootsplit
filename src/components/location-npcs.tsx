@@ -128,6 +128,29 @@ export function LocationNpcs() {
             </CommandForm>
             {importError && <p role="alert">{importError}</p>}
           </Fold>
+          <Fold
+            title="Party companion funds"
+            hint={`Party ${world.companionFundsVisible ? "can" : "cannot"} see companion NPC funds.`}
+          >
+            <p>
+              A companion is a visible NPC travelling with the party. When this is on, players with
+              a character in the party can read each companion's coins and coin history, read-only.
+              Hidden NPCs, NPCs elsewhere and exchange treasuries stay private, and an assigned
+              controller always sees its NPC's funds.
+            </p>
+            <p>Party can see companion NPC funds: {world.companionFundsVisible ? "on" : "off"}.</p>
+            <CommandButton
+              input={{
+                kind: "companion-funds-visibility",
+                before: world.companionFundsVisible ?? false,
+                visible: !world.companionFundsVisible,
+              }}
+            >
+              {world.companionFundsVisible
+                ? "Keep companion funds private"
+                : "Show companion funds to the party"}
+            </CommandButton>
+          </Fold>
         </>
       )}
       <label className="block mt-3">
