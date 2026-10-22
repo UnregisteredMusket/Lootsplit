@@ -21,6 +21,13 @@ const summarizedCounts = (sections: Record<string, { shown: number; total: numbe
     .join(" · ");
 const tabs = ["history", "reports", "task", "diagnostics", "registry"] as const;
 type Tab = (typeof tabs)[number];
+type RetiredSpan = {
+  retiredAt: number;
+  retiredBy: { id: string; name: string };
+  reason?: string;
+  reinstatedAt?: number | null;
+  reinstatedBy?: { id: string; name: string } | null;
+};
 type Registry = {
   id: string;
   name: string;
@@ -28,6 +35,12 @@ type Registry = {
   mode: string;
   expectedMs: number;
   lastSuccessAt: number | null;
+  builtin?: boolean;
+  revision?: number;
+  /** Present while the owner has retired this custom log; its history is kept. */
+  retired?: RetiredSpan | null;
+  /** Closed retired spans, oldest first. */
+  retirements?: RetiredSpan[];
 };
 const currentTab = (): Tab | null => {
   if (typeof window === "undefined") return null;
@@ -171,6 +184,7 @@ export function MonitorJournal({ data, refresh }: { data: JournalSnapshot; refre
     [error, setError] = useState(""),
     [message, setMessage] = useState("");
   const [settings, setSettings] = useState<MonitorSettings | undefined>(data.settings);
+  const [confirmRetire, setConfirmRetire] = useState<string | null>(null);
   const [reduced, setReduced] = useState(
     () => localStorage.getItem("lootsplit.monitor.reduced-motion") === "true",
   );
@@ -204,6 +218,24 @@ export function MonitorJournal({ data, refresh }: { data: JournalSnapshot; refre
     } finally {
       setBusy(false);
     }
+  }
+  function changeStatus(log: Registry, change: "retire" | "reinstate", reason = "") {
+    void action(async () => {
+      await accountRequest(`owner/monitor/registry/${change}`, {
+        id: log.id,
+        revision: log.revision ?? 0,
+        eventId: crypto.randomUUID(),
+        reason,
+      });
+      const result = await accountRequest<{ logs: Registry[] }>("owner/monitor/registry");
+      setRegistry(result.logs);
+      setConfirmRetire(null);
+      setMessage(
+        change === "retire"
+          ? `${log.name} retired. Its history stays in Monitoring logs and exports; daily reports list it under Retired logs instead of reporting missing data.`
+          : `${log.name} reinstated. Daily coverage resumes now; the retired span is shown as retired, not as a gap.`,
+      );
+    });
   }
   async function loadHistory(more = false) {
     const parameters = new URLSearchParams({ q: query, source });
@@ -512,6 +544,27 @@ export function MonitorJournal({ data, refresh }: { data: JournalSnapshot; refre
                   <p>No task was active or completed in the available records for this day.</p>
                 )}
               </details>
+              {!!report.retiredLogs?.length && (
+                <details>
+                  <summary>Retired logs ({report.retiredLogs.length})</summary>
+                  <p className="owner-monitor-note">
+                    Retired spans are not active coverage and are not counted as missing data.
+                    Their stored entries remain in History.
+                  </p>
+                  <ul>
+                    {report.retiredLogs.map((r) => (
+                      <li key={`${r.id}:${r.retiredAt}`}>
+                        <strong>{r.name}</strong> · retired {dated(r.retiredAt)} by{" "}
+                        {r.retiredBy?.name || "owner"}
+                        {r.reason ? ` (${r.reason})` : ""} ·{" "}
+                        {r.reinstatedAt
+                          ? `reinstated ${dated(r.reinstatedAt)} by ${r.reinstatedBy?.name || "owner"}`
+                          : "still retired at day end"}
+                      </li>
+                    ))}
+                  </ul>
+                </details>
+              )}
               <details>
                 <summary>Registered sources and evidence</summary>
                 {report.coverage?.map((c) => (
@@ -522,6 +575,7 @@ export function MonitorJournal({ data, refresh }: { data: JournalSnapshot; refre
                         ? "No events recorded; no active work is inferred."
                         : "Coverage checked")}{" "}
                     · latest {dated(c.lastObservationAt)}
+                    {c.retiredSpans?.length ? " · retired for part of this day" : ""}
                   </p>
                 ))}
                 {report.evidence?.map((e) => (
@@ -788,9 +842,10 @@ export function MonitorJournal({ data, refresh }: { data: JournalSnapshot; refre
             registered source remains a coverage gap.
           </p>
           {registry.map((log) => (
-            <details key={log.id}>
+            <details key={log.id} className="monitor-registry-log">
               <summary>
                 {log.name} · {log.id}
+                {log.retired ? " · retired" : ""}
               </summary>
               <p>{log.description}</p>
               <p>
@@ -798,6 +853,75 @@ export function MonitorJournal({ data, refresh }: { data: JournalSnapshot; refre
                 {log.expectedMs ? duration(log.expectedMs) : "event driven"} · last successful check{" "}
                 {dated(log.lastSuccessAt)}
               </p>
+              {log.retired && (
+                <p>
+                  <strong>Retired</strong> {dated(log.retired.retiredAt)} by{" "}
+                  {log.retired.retiredBy.name}
+                  {log.retired.reason ? `: ${log.retired.reason}` : "."} No missing-data gaps are
+                  reported while retired; all stored entries stay in Monitoring logs and exports.
+                </p>
+              )}
+              {!!log.retirements?.length && (
+                <ul aria-label={`Earlier retired spans of ${log.name}`}>
+                  {log.retirements.map((span) => (
+                    <li key={span.retiredAt}>
+                      Retired {dated(span.retiredAt)} by {span.retiredBy.name} · reinstated{" "}
+                      {dated(span.reinstatedAt ?? null)} by {span.reinstatedBy?.name || "owner"}
+                    </li>
+                  ))}
+                </ul>
+              )}
+              {log.builtin ? (
+                <p className="owner-monitor-note">
+                  Built-in log maintained in code; it cannot be retired.
+                </p>
+              ) : log.retired ? (
+                <button
+                  type="button"
+                  disabled={busy}
+                  onClick={() => changeStatus(log, "reinstate")}
+                >
+                  Reinstate {log.name}
+                </button>
+              ) : confirmRetire === log.id ? (
+                <form
+                  className="monitor-form monitor-retire-confirm"
+                  aria-labelledby={`retire-${log.id}-title`}
+                  aria-describedby={`retire-${log.id}-detail`}
+                  onSubmit={(e) => {
+                    e.preventDefault();
+                    changeStatus(
+                      log,
+                      "retire",
+                      String(new FormData(e.currentTarget).get("reason") || ""),
+                    );
+                  }}
+                >
+                  <p id={`retire-${log.id}-title`}>
+                    <strong>Retire {log.name}?</strong>
+                  </p>
+                  <p id={`retire-${log.id}-detail`}>
+                    Nothing is deleted: every stored entry stays readable and exportable, and the
+                    change is recorded in this log&apos;s history. From now on daily reports stop
+                    reporting missing data for it and list it under Retired logs. You can reinstate
+                    it at any time.
+                  </p>
+                  <label>
+                    Reason (optional)
+                    <input name="reason" maxLength={500} autoFocus />
+                  </label>
+                  <div className="monitor-retire-actions">
+                    <button disabled={busy}>Retire log</button>
+                    <button type="button" onClick={() => setConfirmRetire(null)}>
+                      Cancel
+                    </button>
+                  </div>
+                </form>
+              ) : (
+                <button type="button" disabled={busy} onClick={() => setConfirmRetire(log.id)}>
+                  Retire {log.name}…
+                </button>
+              )}
             </details>
           ))}
           {settings && (
@@ -943,6 +1067,7 @@ export function MonitorJournal({ data, refresh }: { data: JournalSnapshot; refre
                   {registry.map((log) => (
                     <option key={log.id} value={log.id}>
                       {log.name}
+                      {log.retired ? " (retired)" : ""}
                     </option>
                   ))}
                 </select>

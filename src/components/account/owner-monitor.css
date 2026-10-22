@@ -150,6 +150,23 @@
 .monitor-form textarea {
   min-height: 80px;
 }
+.monitor-retire-confirm {
+  grid-template-columns: 1fr;
+  padding: 12px;
+  border: 1px solid #c79a4280;
+  border-radius: 6px;
+}
+.monitor-retire-confirm p {
+  margin: 0;
+}
+.monitor-retire-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+}
+.monitor-registry-log > button {
+  margin: 4px 0 12px;
+}
 .monitor-motion {
   display: inline-flex;
   align-items: center;
