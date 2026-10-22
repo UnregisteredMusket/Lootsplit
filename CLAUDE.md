@@ -18,6 +18,7 @@ This file is the required reading. Everything under "Read on demand" is consulte
 - `npm run verify:focus -- SCENARIO` — one browser audit against a disposable dev server (needs Playwright Chromium).
 - `npm run dev` (port 8080), `npm run build:cloudflare`, `npm run build:mobile`.
 - Without `node_modules` (sandboxes with no npm registry): many tests still run with `node --experimental-strip-types --test FILE` plus a loader that stubs missing packages; TypeScript can be diffed against `main` with any local `tsc`. Say what could not run; CI is then the gate.
+- Claude Code project hooks (`.claude/settings.json`) install dependencies at session start, block edits to applied migrations and signing files, block remote D1 writes, manual deploys and pushes to `main`, and report ESLint errors on edited files. Skills `/money-command` and `/ship-pr` and the `privacy-reviewer` subagent support the rules below. See `docs/AGENT-TOOLING.md`.
 
 ## How a change ships
 
@@ -59,5 +60,5 @@ This file is the required reading. Everything under "Read on demand" is consulte
 | What features exist (preservation baseline) | `docs/FEATURE-INVENTORY.md`, `docs/REDESIGN.md` |
 | Feature specifics and their development rules | `docs/<FEATURE>.md` (ships, trade, properties, encounters, blacksmith, downtime, maps, world features…), `ANDROID.md` |
 | Performance log rules | `docs/PERFORMANCE.md` |
-| Past audits and evidence | `docs/audit/` (newest: `2026-10-21-code-audit.md`) |
+| Agent hooks, skills, MCP servers, cloud environment setup | `docs/AGENT-TOOLING.md` || Past audits and evidence | `docs/audit/` (newest: `2026-10-21-code-audit.md`) |
 | Historical checkpoints | `docs/archive/recovery-checkpoints-2026-10.md` |
