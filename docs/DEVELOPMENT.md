@@ -21,8 +21,8 @@ Pull requests run the complete `Verify preserved functionality` workflow. Featur
 | Development / accounts | Account shard 1/2 first, then owner, member and monitoring, library navigation, loot, downtime and sound |
 | Development / accounts-2 | Account shard 2/2 first, then bug reports, character/party sheets, release, backups and ships |
 | Development / gameplay | Edge cases, data integrity, transfers, encounters, finance, shop stock, control panel and market locations |
-| Development / economy | Properties, property operations, trade economy and game analytics |
-| Development / desktop | Map tiles, blacksmith, desktop layout and website |
+| Development / economy | Properties, property operations, trade economy, game analytics and website |
+| Development / desktop | Map tiles, blacksmith and desktop layout |
 | Development / world | World features and navigation |
 | Packaged Worker / accounts | Account shard 1/2 first, then monitoring, finance, ships and themes |
 | Packaged Worker / features | Account shard 2/2 first, then map tiles and website |
