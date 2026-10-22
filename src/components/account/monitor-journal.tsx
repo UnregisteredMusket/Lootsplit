@@ -477,6 +477,28 @@ export function MonitorJournal({ data, refresh }: { data: JournalSnapshot; refre
               </h4>
               <p>{report.summary}</p>
               <p className="owner-monitor-note">Generated {dated(report.generatedAt)}</p>
+              {report.refreshStopped && (
+                <p className="owner-monitor-note">
+                  Out of date: automatic refresh stopped {dated(report.refreshStopped.at)} after{" "}
+                  {report.refreshStopped.attempts} failed attempts. Last error:{" "}
+                  {report.refreshStopped.error}{" "}
+                  <button
+                    disabled={busy}
+                    onClick={() =>
+                      void action(async () => {
+                        const fresh = await accountRequest<MonitorReport>("owner/monitor/report", {
+                          day: report.day,
+                          timezone: report.timezone,
+                        });
+                        setReports((old) => old.map((r) => (r.id === fresh.id ? fresh : r)));
+                        refresh();
+                      })
+                    }
+                  >
+                    Retry refresh
+                  </button>
+                </p>
+              )}
               {report.summarized && (
                 <p className="owner-monitor-note">
                   {report.summarized.note} {summarizedCounts(report.summarized.sections)}

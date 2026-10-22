@@ -1221,3 +1221,148 @@ test("a day of thousands of CI tasks summarizes development instead of failing e
   assert.ok(kept("run:2399:1:step"), "newest tasks are kept");
   assert.equal(report.taskUpdateCount, 9000, "totals are never reduced");
 });
+
+// Same cap as the first-generation placeholder path (REPORT_MAX_ATTEMPTS in monitor-journal.mjs).
+const REPORT_MAX_ATTEMPTS_FOR_TEST = 6;
+test("a queued refresh that keeps failing stops at the attempt cap, records the gap and clears on success", async () => {
+  const base = localAccountDb();
+  let breakReports = false;
+  // Fail every attempt to save a real report, as an over-budget report would on every retry.
+  const DB = {
+    ...base,
+    prepare(sql) {
+      const prepared = base.prepare(sql);
+      prepared.sql = sql;
+      return prepared;
+    },
+    async batch(statements) {
+      if (
+        breakReports &&
+        statements.some((s) =>
+          /INSERT INTO owner_monitor_reports VALUES\(\?,\?,\?,\?,\?\) ON CONFLICT/.test(s.sql),
+        )
+      )
+        throw Error("Daily report remains too large after summarizing long lists (simulated).");
+      return base.batch(statements);
+    },
+  };
+  try {
+    const created = Date.parse("2026-10-20T12:00:00Z");
+    const call = await ownerSession(DB, "owner");
+    await DB.prepare(
+      "INSERT OR IGNORE INTO member_access(user_id,status) VALUES('owner','active')",
+    ).run();
+    await initializeMonitor(DB, created);
+    const tick = Date.parse("2026-10-21T05:00:00Z");
+    const options = { integrations: false, collector: async () => reading() };
+    const reportId = "America/New_York:2026-10-20";
+    const first = await generateReport(DB, "2026-10-20", DEFAULT_CONFIG, tick);
+    assert.equal(first.id, reportId);
+    const stored = async () =>
+      await DB.prepare("SELECT * FROM owner_monitor_reports WHERE id=?").bind(reportId).first();
+    const failures = async () =>
+      (
+        await DB.prepare(
+          "SELECT COUNT(*) AS n FROM owner_monitor_logs WHERE id LIKE 'report-failure:America/New_York:2026-10-20:%'",
+        ).first()
+      ).n;
+    const stops = () =>
+      DB.prepare(
+        "SELECT * FROM owner_monitor_logs WHERE id LIKE 'report-refresh-stopped:%' ORDER BY sequence",
+      )
+        .all()
+        .then((r) => r.results);
+    const daily = async (now) =>
+      (
+        await monitorSnapshot({ DB }, "owner", {
+          now,
+          force: true,
+          collector: async () => reading(),
+        })
+      ).diagnostics.find((d) => d.component === "Daily reporting");
+    const late = (id, at) =>
+      recordLog(
+        DB,
+        { id, source: "development", observedAt: instant, summary: "Late evidence" },
+        at,
+      );
+
+    // A late observation queues the refresh; every attempt now fails.
+    await late("late-1", tick + 1000);
+    breakReports = true;
+    for (let minute = 1; minute <= 90; minute++)
+      await scheduledMonitor({ DB }, tick + minute * 60000, {
+        ...options,
+        now: tick + minute * 60000,
+      });
+    assert.equal(await failures(), REPORT_MAX_ATTEMPTS_FOR_TEST, "attempts stop at the cap");
+    const [stop] = await stops();
+    assert.ok(stop, "the stop is recorded in monitoring history");
+    const stopBody = JSON.parse(stop.body);
+    assert.equal(stopBody.outcome, "failed");
+    assert.equal(stopBody.reportId, reportId);
+    assert.match(stopBody.error, /too large/);
+    assert.match(stop.summary, /out of date.*too large/);
+    let row = await stored();
+    assert.equal(row.generated_at, tick, "the stored report is kept, not replaced or deleted");
+    let body = JSON.parse(row.body);
+    assert.equal(body.refreshStopped.attempts, REPORT_MAX_ATTEMPTS_FOR_TEST);
+    assert.match(body.gaps[0], /out of date.*too large.*Retry refresh/);
+    assert.ok(
+      await DB.prepare("SELECT 1 FROM owner_monitor_report_refresh WHERE report_id=?")
+        .bind(reportId)
+        .first(),
+      "the queued refresh is kept, only paused",
+    );
+    const after = tick + 91 * 60000;
+    const red = await daily(after);
+    assert.equal(red.color, "red", "Daily reporting (and the widgets) show the stopped refresh");
+    assert.match(JSON.stringify(red), /out of date/);
+    // Further late observations and ticks make no more attempts.
+    await late("late-2", after);
+    for (let minute = 92; minute <= 160; minute += 4)
+      await scheduledMonitor({ DB }, tick + minute * 60000, {
+        ...options,
+        now: tick + minute * 60000,
+      });
+    assert.equal(await failures(), REPORT_MAX_ATTEMPTS_FOR_TEST, "no retries after the cap");
+    assert.equal((await stops()).length, 1);
+
+    // Retry refresh through the owner route, still failing: explicit error, state unchanged.
+    await assert.rejects(call("report", { day: "2026-10-20", timezone: "America/New_York" }));
+    assert.equal((await stored()).generated_at, tick);
+
+    // A later success clears the gap, the queue and the red diagnostic; history is kept.
+    breakReports = false;
+    const fresh = await call("report", { day: "2026-10-20", timezone: "America/New_York" });
+    assert.equal(fresh.id, reportId);
+    assert.equal(fresh.refreshStopped, undefined);
+    assert.ok(!fresh.gaps.some((g) => /out of date/.test(g)));
+    row = await stored();
+    assert.ok(row.generated_at > tick);
+    assert.equal(JSON.parse(row.body).refreshStopped, undefined);
+    assert.equal(
+      await DB.prepare("SELECT 1 FROM owner_monitor_report_refresh WHERE report_id=?")
+        .bind(reportId)
+        .first(),
+      null,
+    );
+    assert.notEqual((await daily(Date.now() + 1000)).color, "red");
+    assert.equal((await stops()).length, 1, "the stop entry stays in history");
+
+    // The count restarts after a success: a new failing refresh gets its full set of attempts.
+    const before = await failures();
+    await late("late-3", Date.now());
+    breakReports = true;
+    const restart = Date.now() + 60000;
+    await scheduledMonitor({ DB }, restart, { ...options, now: restart });
+    assert.equal(await failures(), before + 1);
+    assert.equal(
+      (await stops()).length,
+      1,
+      "one failure after a success does not stop the refresh",
+    );
+  } finally {
+    base.close();
+  }
+});

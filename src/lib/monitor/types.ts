@@ -91,6 +91,11 @@ export type MonitorReport = {
   recommendations: string[];
   /** Placeholder stored after repeated generation failures; contains no measurements. */
   failed?: boolean;
+  /**
+   * Automatic refresh with later observations stopped after repeated failures; the stored
+   * report is out of date (also listed first in gaps) until a refresh succeeds.
+   */
+  refreshStopped?: { at: number; attempts: number; error: string };
   /** Present when long lists were summarized to fit storage; totals are never reduced. */
   summarized?: {
     budgetBytes: number;

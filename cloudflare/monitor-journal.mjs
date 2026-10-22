@@ -2083,35 +2083,97 @@ export async function scheduledMonitor(env, scheduledAt = Date.now(), options = 
         }
     }
   }
+  // A refresh stopped at the attempt cap stays queued (so it is never lost) but is skipped until
+  // the stored report changes: a successful generation or the owner's Retry refresh.
   const dirty = await db
     .prepare(
-      "SELECT r.id,r.day,r.timezone FROM owner_monitor_report_refresh q JOIN owner_monitor_reports r ON r.id=q.report_id WHERE q.requested_at<=? ORDER BY q.requested_at LIMIT 1",
+      `SELECT r.id,r.day,r.timezone,r.generated_at FROM owner_monitor_report_refresh q JOIN owner_monitor_reports r ON r.id=q.report_id WHERE q.requested_at<=? AND NOT EXISTS(SELECT 1 FROM owner_monitor_logs l WHERE l.id='${REFRESH_STOPPED}'||r.id||':'||r.generated_at) ORDER BY q.requested_at LIMIT 1`,
     )
     .bind(now)
     .first();
   if (dirty)
     try {
       await generateReport(db, dirty.day, { ...settings, timezone: dirty.timezone }, now);
-    } catch {
-      // Keep the queued refresh but defer it, so one failing day cannot starve the queue.
-      const failures = await reportFailures(db, dirty.id, now);
-      await run(
-        db,
-        "UPDATE owner_monitor_report_refresh SET requested_at=? WHERE report_id=?",
-        now + failures.waitMs,
-        dirty.id,
-      );
+    } catch (error) {
+      // Count only failures since this report was last stored, so an old failure never shortens
+      // a later refresh's attempts and a success starts the count again.
+      const failures = await reportFailures(db, dirty.id, now, dirty.generated_at);
+      if ((error.status && error.status < 500) || failures.attempts >= REPORT_MAX_ATTEMPTS)
+        await stopReportRefresh(db, dirty, now, failures.attempts, error);
+      // Otherwise keep the queued refresh but defer it, so one failing day cannot starve the queue.
+      else
+        await run(
+          db,
+          "UPDATE owner_monitor_report_refresh SET requested_at=? WHERE report_id=?",
+          now + failures.waitMs,
+          dirty.id,
+        );
     }
   return { slot, checkedAt: now };
 }
 
-/** Recorded generation failures for one report and whether its backoff has elapsed. */
-async function reportFailures(db, reportId, now) {
+const REFRESH_STOPPED = "report-refresh-stopped:";
+/**
+ * Stops retrying a queued refresh that keeps failing (for example a report over the size
+ * budget, which retrying cannot fix). The stored report stays, now marked out of date in its
+ * own coverage gaps, and a failed `reports` entry carries the error so Daily reporting (and the
+ * widgets' diagnostics) stay red until a real report for that day is generated. Nothing is
+ * deleted: the queue row is kept and the next successful generation clears it.
+ */
+async function stopReportRefresh(db, report, now, attempts, error) {
+  const message = String(error?.message ?? error).slice(0, 500);
+  const gap = `This report is out of date: refreshing it with later observations failed ${attempts} ${attempts === 1 ? "time" : "times"} and automatic retries stopped on ${new Date(now).toISOString()}. Last error: ${message} All source entries for ${report.day} remain in History. Use Retry refresh on this report to try again.`;
+  const stored = await db
+    .prepare("SELECT body FROM owner_monitor_reports WHERE id=? AND generated_at=?")
+    .bind(report.id, report.generated_at)
+    .first();
+  let body = null;
+  try {
+    body = stored && JSON.parse(stored.body);
+  } catch {
+    /* An unreadable body is left as it is; the failure entry below still records the gap. */
+  }
+  const statements = [];
+  if (body && typeof body === "object") {
+    body.refreshStopped = { at: now, attempts, error: message };
+    body.gaps = [gap, ...(Array.isArray(body.gaps) ? body.gaps : [])];
+    // generated_at is unchanged: the stored report still reflects that generation only.
+    statements.push(
+      statement(
+        db,
+        "UPDATE owner_monitor_reports SET body=? WHERE id=? AND generated_at=?",
+        JSON.stringify(body),
+        report.id,
+        report.generated_at,
+      ),
+    );
+  }
+  statements.push(
+    logStatement(
+      db,
+      {
+        id: `${REFRESH_STOPPED}${report.id}:${report.generated_at}`,
+        source: "reports",
+        observedAt: now,
+        outcome: "failed",
+        reportId: report.id,
+        attempts,
+        error: message,
+        summary: `Daily report for ${report.day} (${report.timezone}) is out of date: automatic refresh stopped after ${attempts} failed ${attempts === 1 ? "attempt" : "attempts"}. Last error: ${message} Use Retry refresh on the report.`,
+      },
+      now,
+    ),
+  );
+  await db.batch(statements);
+}
+
+/** Recorded generation failures for one report (optionally since a time) and its backoff. */
+async function reportFailures(db, reportId, now, since = -1) {
   const row = await db
     .prepare(
-      "SELECT COUNT(*) AS attempts, MAX(observed_at) AS last FROM owner_monitor_logs WHERE source='reports' AND id LIKE ?",
+      "SELECT COUNT(*) AS attempts, MAX(observed_at) AS last FROM owner_monitor_logs WHERE source='reports' AND id LIKE ? AND observed_at>?",
     )
-    .bind(`report-failure:${reportId}:%`)
+    .bind(`report-failure:${reportId}:%`, since)
     .first();
   const attempts = Number(row?.attempts || 0);
   const waitMs = 60000 * 2 ** Math.min(Math.max(attempts - 1, 0), 5);
@@ -2536,14 +2598,25 @@ export async function monitorApi(env, userId, sessionId, request, body) {
         now,
       );
       result = { reportedAt: now };
-    } else if (route === "report")
+    } else if (route === "report") {
+      // Retry refresh names a stored report (day + its own timezone); Generate previous day
+      // sends nothing and uses the configured timezone.
+      let timezone = settings.timezone;
+      if (body.timezone && body.timezone !== settings.timezone) {
+        const stored = await db
+          .prepare("SELECT timezone FROM owner_monitor_reports WHERE day=? AND timezone=?")
+          .bind(clean(body.day || "", 10), clean(body.timezone, 80))
+          .first();
+        if (!stored) fail("No stored report exists for that day and timezone.");
+        timezone = stored.timezone;
+      }
       result = await generateReport(
         db,
-        body.day || previousDay(localCalendar(now, settings.timezone).day),
-        settings,
+        body.day || previousDay(localCalendar(now, timezone).day),
+        { ...settings, timezone },
         now,
       );
-    else fail("Monitoring route not found.", 404);
+    } else fail("Monitoring route not found.", 404);
   } else fail("Method not allowed.", 405);
   await authorizeOwner(env, userId, sessionId);
   return result;
