@@ -2,6 +2,10 @@ name = "lootsplit"
 main = "cloudflare/worker.mjs"
 compatibility_date = "2026-10-01"
 compatibility_flags = ["nodejs_compat"]
+# Keep the workers.dev host explicitly on. Without this key, adding routes or a custom domain
+# makes Wrangler turn workers.dev off on the next deploy, breaking installed APKs, widgets and old
+# invitations (domain audit P1-1). npm run migration:check and the release artifact enforce it.
+workers_dev = true
 
 # Minute dispatcher; actual measurement slots are half-hourly. Calendar reports use the stored IANA timezone.
 [triggers]
@@ -59,6 +63,9 @@ OWNER_MONITOR_GITHUB = "true"
 # for every Lootsplit deployment (owner-approved 2026-10-21). Builds read .grok/app-env.json.
 VITE_GROK_EXTENSIONS = "0"
 ACCOUNT_ORIGIN = "https://lootsplit.oliverstorie2017.workers.dev"
+# Other approved account hosts, comma-separated: exactly origins.mjs `legacy` minus `website`
+# (empty while workers.dev is the website). migration:check and release preflight enforce it.
+ACCOUNT_LEGACY_ORIGINS = ""
 # ACCOUNT_SECRET is a Worker secret, never committed. Guest play does not depend on it.
 
 # Read-only release identity for the administrator server monitor.

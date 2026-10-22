@@ -399,6 +399,9 @@ Wrong identity or asset hashes on either host; sign-in, recovery or invitation f
 }
 ```
 
-This check confirms that the source, Wrangler and live-audit origins agree today. It doesn't yet check `workers_dev` or `ACCOUNT_LEGACY_ORIGINS` (P1-1, P1-3), and it doesn't prove live readiness.
+This check confirms that the source, Wrangler and live-audit origins agree today. At the time it didn't check `workers_dev` or `ACCOUNT_LEGACY_ORIGINS` (P1-1, P1-3); `fix/domain-cutover-guards` added both checks (see Status updates). It doesn't prove live readiness.
 
-**Status updates:** 2026-10-22 `fix/origin-constants`: fixed P1-4, P1-5, P1-7, P2-2, P2-3 (forwarded host no longer trusted; `og:url` + canonical on public pages), P2-7 (POST targets; OIDC audience kept), P2-8, P3-1, P3-2.
+## Status updates
+
+- 2026-10-22, PR `fix/domain-cutover-guards` (PR-A, without P1-7, which is a separate PR): **P1-1** `workers_dev = true` is set and asserted by `migration:check`, the release artifact config and preflight. **P1-3** `ACCOUNT_LEGACY_ORIGINS = ""` is in `[vars]` and asserted to equal `legacy − website`. **P1-2** preflight accepts the reviewed transition (`previousDeploymentOrigins` in `origins.mjs`) only when the new legacy list keeps the old website. **P1-6** both live-audit workflows declare `AUDIT_LEGACY_ORIGINS` and run each audit once per origin via `scripts/live-audit-origins.mjs`. The live origin is unchanged.
+- 2026-10-22 `fix/origin-constants`: fixed P1-4, P1-5, P1-7, P2-2, P2-3 (forwarded host no longer trusted; `og:url` + canonical on public pages), P2-7 (POST targets; OIDC audience kept), P2-8, P3-1, P3-2.

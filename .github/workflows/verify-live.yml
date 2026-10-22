@@ -24,6 +24,8 @@ jobs:
       EXPECTED_RELEASE_SHA: ${{ inputs.release_sha }}
       RELEASE_SHA: ${{ inputs.release_sha }}
       AUDIT_ORIGIN: https://lootsplit.oliverstorie2017.workers.dev
+      # Other approved origins (origins.mjs legacy minus website); empty while there are none.
+      AUDIT_LEGACY_ORIGINS: ""
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
@@ -48,8 +50,8 @@ jobs:
       - run: npx playwright install --with-deps chromium
       - name: Verify identity, asset bytes and desktop/mobile behavior without deploying
         run: |
-          node scripts/live-release-audit.mjs
-          node scripts/website-browser-audit.mjs
+          node scripts/live-audit-origins.mjs scripts/live-release-audit.mjs
+          node scripts/live-audit-origins.mjs scripts/website-browser-audit.mjs
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: always()
         with:
