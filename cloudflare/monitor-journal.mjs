@@ -1474,23 +1474,36 @@ const SUMMARIZED_SECTIONS = [
   "performance",
   "incidents",
   "trends",
+  // Development task views (one per task active or finished that day). A CI step is a task, so a
+  // busy day holds thousands; on 2026-10-21 they alone were about 1.8 MB, above the budget.
+  "development",
 ];
 const reportBytes = (report) => new TextEncoder().encode(JSON.stringify(report)).length;
-// Failures, errors and regressions are kept first; then the most recent entries.
+// Failures, errors and regressions are kept first; then the most recent entries. A development
+// task view needs attention when it failed, is blocked or carries a telemetry warning.
 const attention = (item) =>
-  /fail|error|regression|red|unavailable|missed/i.test(
-    `${item?.summary ?? ""} ${item?.outcome ?? ""} ${item?.kind ?? ""} ${item?.color ?? ""}`,
-  )
-    ? 1
-    : 0;
+  item?.task
+    ? ["failed", "blocked"].includes(item.task.state) || item.warning
+      ? 1
+      : 0
+    : /fail|error|regression|red|unavailable|missed/i.test(
+          `${item?.summary ?? ""} ${item?.outcome ?? ""} ${item?.kind ?? ""} ${item?.color ?? ""}`,
+        )
+      ? 1
+      : 0;
+const itemTime = (item) =>
+  item?.observedAt ??
+  item?.scheduledAt ??
+  item?.task?.completedAt ??
+  item?.task?.heartbeatAt ??
+  0;
 function keepImportant(items, count) {
   return items
     .map((item, index) => ({ item, index }))
     .sort(
       (a, b) =>
         attention(b.item) - attention(a.item) ||
-        (b.item?.observedAt ?? b.item?.scheduledAt ?? 0) -
-          (a.item?.observedAt ?? a.item?.scheduledAt ?? 0) ||
+        itemTime(b.item) - itemTime(a.item) ||
         a.index - b.index,
     )
     .slice(0, count)
@@ -1548,6 +1561,8 @@ export async function generateReport(db, day, settings, now = Date.now()) {
         observedAt: now,
         outcome: "failed",
         reportId: `${settings.timezone}:${day}`,
+        // The thrown message (no stack) so a repeating failure can be diagnosed from History.
+        error: String(error?.message ?? error).slice(0, 500),
         summary: `Daily report for ${day} (${settings.timezone}) could not be generated. The previous report and source entries are retained. Inspect collector logs and retry; cause is not confirmed.`,
       },
       now,
@@ -1560,30 +1575,37 @@ async function buildReport(db, day, settings, now) {
   if (end > now) fail("Generate a report only after that calendar day has ended.");
   const registry = await rows(db, "SELECT * FROM owner_monitor_registry ORDER BY id");
   const entries = [];
-  let sequence = 0;
   // Bounded pages, without truncating the report. A failed page leaves the previous report intact.
+  // Interval logs are stamped with their slot (the window END). The window ending at the day's
+  // start belongs to the previous day and the one ending at the day's end belongs to this day,
+  // matching the interval query below.
+  // Pages follow the chronology index (observed_at, sequence) from a keyset cursor, so each page
+  // reads about 200 rows. Paging by sequence alone made every page scan and sort the whole day
+  // (about 20,000 rows read per page on 2026-10-22, about 1M per report attempt).
+  let cursor = [start, -1];
   for (;;) {
-    // Interval logs are stamped with their slot (the window END). The window ending at the day's
-    // start belongs to the previous day and the one ending at the day's end belongs to this day,
-    // matching the interval query below.
     const page = await rows(
       db,
-      `SELECT * FROM owner_monitor_logs WHERE ((observed_at>=? AND observed_at<? AND NOT (observed_at=? AND ${SLOT_LOG})) OR (observed_at=? AND ${SLOT_LOG})) AND sequence>? ORDER BY sequence LIMIT 200`,
-      start,
+      `SELECT * FROM owner_monitor_logs WHERE (observed_at,sequence)>(?,?) AND observed_at<? AND NOT (observed_at=? AND ${SLOT_LOG}) ORDER BY observed_at,sequence LIMIT 200`,
+      cursor[0],
+      cursor[1],
       end,
       start,
-      end,
-      sequence,
     );
     entries.push(...page);
     if (page.length < 200) break;
-    sequence = page.at(-1).sequence;
+    cursor = [page.at(-1).observed_at, page.at(-1).sequence];
     if (entries.length > 20000)
       fail(
         "Daily report exceeds the safe aggregation bound; export and review the day's source logs.",
         503,
       );
   }
+  entries.push(
+    ...(await rows(db, `SELECT * FROM owner_monitor_logs WHERE observed_at=? AND ${SLOT_LOG}`, end)),
+  );
+  // Same order as before: insertion (sequence) order.
+  entries.sort((a, b) => a.sequence - b.sequence);
   const intervals = await rows(
     db,
     "SELECT slot,outcome,collected_at,body FROM owner_monitor_intervals WHERE slot>? AND slot<=? ORDER BY slot",
