@@ -3,6 +3,7 @@ import {
   hydrateRoomResources,
   roomResourceStatements,
 } from "./room-resources.mjs";
+import { encodeRoomReports, hydrateRoomReports, roomReportStatements } from "./room-reports.mjs";
 /** Campaign-scoped immutable raster bytes; references are internal storage only. */
 const raster = /data:image\/(?:png|jpeg|webp);base64,[A-Za-z0-9+/=]{8000,}/g;
 const reference = /\/art\/room-image-[a-f0-9]{64}\.webp/g;
@@ -56,12 +57,17 @@ export async function encodeRoomImages(value) {
     }),
   );
   for (const asset of assets) body = body.split(asset.image).join(asset.reference);
-  return { body, assets, documents: resources.documents };
+  // Archived session snapshots (already image-encoded above) move to campaign_room_reports.
+  const reports = await encodeRoomReports(JSON.parse(body));
+  if (reports.reports.length) body = JSON.stringify(reports.value);
+  return { body, assets, documents: resources.documents, reports: reports.reports };
 }
 /** Never fetch by hash alone: identical/guessed references confer no cross-campaign access.
  * @template T @param {NonNullable<ReturnType<typeof import('../src/lib/quire/room-store.server.ts').database>>} db
  * @param {string} code @param {T} value @returns {Promise<T>} */
 export async function hydrateRoomImages(db, code, value) {
+  // Snapshots first: they may contain image and resource references of their own.
+  value = await hydrateRoomReports(db, code, value);
   let body = JSON.stringify(value);
   const refs = [...new Set(body.match(reference) || [])];
   if (!refs.length) return hydrateRoomResources(db, code, value);
@@ -88,9 +94,12 @@ export async function hydrateRoomImages(db, code, value) {
 }
 /** Writes follow the room CAS in the same atomic D1 batch; a losing writer creates no assets.
  * @param {NonNullable<ReturnType<typeof import('../src/lib/quire/room-store.server.ts').database>>} db
- * @param {{code:string;revision:number}} room @param {{body:string;assets:{reference:string;image:string}[]}} encoded */
+ * @param {{code:string;revision:number}} room @param {{body:string;assets:{reference:string;image:string}[];documents?:{reference:string;body:string}[];reports?:{reference:string;body:string}[]}} encoded */
 export async function roomImageStatements(db, room, encoded) {
-  const documents = await roomResourceStatements(db, room, encoded);
+  const documents = [
+    ...(await roomReportStatements(db, room, encoded)),
+    ...(await roomResourceStatements(db, room, encoded)),
+  ];
   if (!encoded.assets.length) return documents;
   const present = await db
     .prepare("SELECT reference FROM campaign_room_images WHERE code=?")

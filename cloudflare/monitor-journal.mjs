@@ -139,6 +139,13 @@ export const BUILTIN_LOGS = [
     "Hourly account-wide Worker requests and CPU time and D1 rows read, rows written and storage against the Workers Paid included allowance (daily and weekly shares and month to date). An unavailable metric is an explicit gap, never zero.",
   ],
   [
+    "room-storage",
+    "Shared room size refusals",
+    "event",
+    0,
+    "Room writes refused before D1's row limit (one entry per room per half-hour, with a size breakdown); silence means no refusal was recorded, checked every half-hour.",
+  ],
+  [
     "runtime",
     "Worker invocation and application timing logs",
     "external",
@@ -1180,7 +1187,7 @@ export async function collectPerformance(db, now, fetcher = fetch) {
 }
 async function collectOtherLogs(env, snapshot, now) {
   const db = env.DB;
-  for (const id of ["development", "diagnostics", "devices"])
+  for (const id of ["development", "diagnostics", "devices", "room-storage"])
     await attest(
       db,
       id,

@@ -23,6 +23,9 @@ sql.exec("CREATE TABLE library_members(user_id TEXT, code TEXT, seat_id TEXT, to
 sql.exec(
   readFileSync(new URL("../../../cloudflare/migrations/0001_campaign_rooms.sql", import.meta.url), "utf8"),
 );
+sql.exec(
+  readFileSync(new URL("../../../cloudflare/migrations/0019_campaign_room_reports.sql", import.meta.url), "utf8"),
+);
 (globalThis as any).__env__ = {
   DB: {
     prepare(query: string) {
@@ -43,6 +46,19 @@ sql.exec(
           return { meta: { changes: Number(sql.prepare(query).run(...args).changes) } };
         },
       };
+    },
+    // D1 batches run atomically; archived session reports are written beside the room update.
+    async batch(statements: { run(): Promise<{ meta: { changes: number } }> }[]) {
+      sql.exec("BEGIN");
+      try {
+        const results = [];
+        for (const statement of statements) results.push(await statement.run());
+        sql.exec("COMMIT");
+        return results;
+      } catch (error) {
+        sql.exec("ROLLBACK");
+        throw error;
+      }
     },
   },
 };
