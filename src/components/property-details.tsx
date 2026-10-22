@@ -19,10 +19,10 @@ import { PropertyFacts, OwnedPropertyProfile } from "./property-profile";
 import { LedgerArt } from "./ledger-art";
 import { locationLabel, readMarketLocations } from "@/lib/quire/shop-locations";
 import { EstateWorkshop, PropertyOperations } from "./property-operations";
-import { canAccessEstate } from "@/lib/quire/estate";
+import { canAccessEstate, estateSetupNeeds } from "@/lib/quire/estate";
 import { readEstate } from "@/lib/quire/estate-schema";
 export function PropertyDetails({ plans = false, propertyId }: { plans?: boolean; propertyId?: string }) {
-  const { holdings, purses, journal, ledger } = useEconomy(),
+  const { holdings, purses, journal, ledger, listings } = useEconomy(),
     seat = useSeat();
   const rows = holdings.filter(
     (h) =>
@@ -39,7 +39,10 @@ export function PropertyDetails({ plans = false, propertyId }: { plans?: boolean
         )),
   );
   const finance = readFinance(journal.finance),
-    archiveSeat = useArchiveReaderSeat(seat);
+    archiveSeat = useArchiveReaderSeat(seat),
+    setup = estateSetupNeeds({ holdings, listings, ledger, journal }, seat).filter((n) =>
+      rows.some((h) => h.id === n.holding.id),
+    );
   const records = [...ledger];
   let unavailable = 0;
   for (const report of journal.reports || []) {
@@ -52,6 +55,13 @@ export function PropertyDetails({ plans = false, propertyId }: { plans?: boolean
       <h2 id="owned-properties">Owned properties</h2>
       <p>Edit descriptive details. Ownership, value, revenue and upkeep remain under DM control.</p>
       {!propertyId && <EstateWorkshop />}
+      {setup.length > 0 && (
+        <p role="status" className="estate-setup-summary">
+          {setup.length === 1 ? "1 bought property needs" : `${setup.length} bought properties need`}{" "}
+          operations set up: {setup.map((n) => n.holding.name).join(", ")}. Open “Set up
+          operations” under each property.
+        </p>
+      )}
       {rows.map((h) => (
         <article className="journal-entry" key={h.id} id={`property-${encodeURIComponent(h.id)}`}>
           <div className="owned-property-heading">

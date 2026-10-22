@@ -43,6 +43,29 @@ async function journal(page) {
     }
   });
 }
+async function partyPurse(page) {
+  return page.evaluate(async () => {
+    const active = localStorage.getItem("quire.campaign.v1"),
+      name =
+        JSON.parse(localStorage.getItem("quire.campaigns.v1") || "[]").find(
+          (row) => row.id === active,
+        )?.db || "quire";
+    const db = await new Promise((resolve, reject) => {
+      const open = indexedDB.open(name);
+      open.onsuccess = () => resolve(open.result);
+      open.onerror = () => reject(open.error);
+    });
+    try {
+      return await new Promise((resolve, reject) => {
+        const r = db.transaction("purses").objectStore("purses").get("party");
+        r.onsuccess = () => resolve(r.result);
+        r.onerror = () => reject(r.error);
+      });
+    } finally {
+      db.close();
+    }
+  });
+}
 async function noOverflow(page) {
   assert.ok(
     await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1),
@@ -105,6 +128,35 @@ try {
             unitCopper: 100,
             weight: 2,
             notes: "Material prerequisite",
+          });
+          // A property bought from an imported estate listing before PR #165: deed, no operating
+          // record. The DM-only "Set up operations" repair is exercised at the end.
+          tx.objectStore("holdings").put({
+            id: "legacy-cottage",
+            purseId: "party",
+            name: "Old Lantern Cottage",
+            kind: "property",
+            quantity: 1,
+            unitCopper: 80000,
+            notes: "Bought before estate listings kept their template",
+            locationId: "area",
+            property: { type: "residence", condition: "ready" },
+            deed: {
+              id: "legacy-receipt-deed",
+              transactionId: "legacy-receipt",
+              listingId: "legacy-import-property-1",
+              propertyName: "Old Lantern Cottage",
+              location: "Dock Ward",
+              buyerId: "party",
+              buyerName: "Party treasury",
+              ownerId: "party",
+              ownerName: "Party treasury",
+              purchasedAt: 1,
+              campaignDay: 0,
+              unitCopper: 80000,
+              totalCopper: 80000,
+              purchasedQuantity: 1,
+            },
           });
           tx.objectStore("shops").put({
             id: "post",
@@ -297,6 +349,27 @@ try {
     await reloadApplication(page);
     await page.getByRole("heading", { name: "Harbor Storehouse", exact: true }).first().waitFor();
     assert.equal((await journal(page)).propertyOperations.letters.length, 1);
+    // Repair: the DM sets up the missing operating record; no coins move and the deed stays.
+    const cottage = page
+      .locator("article.journal-entry")
+      .filter({ has: page.getByRole("heading", { name: "Old Lantern Cottage", exact: true }) })
+      .first();
+    await expect(page.locator(".estate-setup-summary")).toContainText("Old Lantern Cottage");
+    const setup = cottage.getByRole("form", { name: "Set up operations", exact: true });
+    await expect(setup.getByLabel("Operations template for this property")).toHaveValue("house");
+    const treasuryBefore = await partyPurse(page);
+    await setup.getByRole("button", { name: "Set up operations", exact: true }).click();
+    await expect(cottage).toContainText("Operations enabled");
+    await expect(cottage.getByRole("form", { name: "Set up operations", exact: true })).toHaveCount(
+      0,
+    );
+    await expect(page.locator(".estate-setup-summary")).toHaveCount(0);
+    const repaired = (await journal(page)).propertyOperations.sites.find(
+      (s) => s.propertyId === "legacy-cottage",
+    );
+    assert.equal(repaired?.templateKey, "house");
+    assert.equal(repaired?.enabled, true);
+    assert.deepEqual((await partyPurse(page)).coins, treasuryBefore.coins, "setup charges nothing");
     await context.close();
   }
   assert.deepEqual(errors, []);
@@ -315,6 +388,7 @@ try {
       "approved-downtime",
       "reload",
       "dark-light-layout",
+      "legacy-purchase-setup",
     ],
   };
   await writeFile(`${output}/result.json`, JSON.stringify(result, null, 2));
