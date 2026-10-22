@@ -1065,3 +1065,159 @@ test("daily reports list retired spans separately and never report them as missi
     DB.close();
   }
 });
+
+// D1 bills rows read. Every monitor read on a dashboard serve or a daily report must use an index:
+// the task table gains a row per CI step and the log table a row per event.
+function planRecorder(DB) {
+  const statements = new Set();
+  const original = DB.prepare.bind(DB);
+  return {
+    db: { ...DB, prepare: (sql) => (statements.add(sql), original(sql)), batch: DB.batch },
+    async plans() {
+      const out = [];
+      for (const sql of statements) {
+        if (!/^\s*SELECT/i.test(sql) || !/owner_monitor_(tasks|logs)\b/.test(sql)) continue;
+        const binds = Array((sql.match(/\?/g) || []).length).fill(0);
+        const plan = await original("EXPLAIN QUERY PLAN " + sql)
+          .bind(...binds)
+          .all();
+        out.push({ sql, plan: plan.results.map((r) => r.detail).join(" | ") });
+      }
+      return out;
+    },
+  };
+}
+
+test("task and report reads use indexes instead of scanning monitor tables", async () => {
+  const DB = localAccountDb();
+  try {
+    await provisionOwner(DB, instant - 1000);
+    await initializeMonitor(DB, instant - 1000);
+    for (let i = 0; i < 30; i++)
+      await updateTask(
+        DB,
+        {
+          id: `run:${i}:1:step`,
+          eventId: `run-${i}`,
+          revision: 0,
+          title: `step ${i}`,
+          objective: "Run a step.",
+          state: i % 3 ? "completed" : "testing",
+          source: "workflow",
+          branch: "main",
+        },
+        instant + i,
+        DEFAULT_CONFIG,
+      ).catch(() => {});
+    const recorder = planRecorder(DB);
+    const snapshot = reading();
+    snapshot.development.data.runs = [];
+    await monitorSnapshot({ DB: recorder.db }, "owner", {
+      force: true,
+      now: instant + 3600000,
+      collector: async () => snapshot,
+    });
+    await generateReport(recorder.db, "2026-10-20", DEFAULT_CONFIG, instant + 86400000);
+    const plans = await recorder.plans();
+    assert.ok(
+      plans.some((p) => /owner_monitor_tasks/.test(p.sql)),
+      "task reads were exercised",
+    );
+    for (const { sql, plan } of plans)
+      assert.doesNotMatch(
+        plan,
+        /SCAN owner_monitor_(tasks|logs)(?! USING (COVERING )?INDEX)/,
+        `full table scan: ${sql}\n${plan}`,
+      );
+    const page = plans.find((p) => /observed_at,sequence\)>/.test(p.sql));
+    assert.ok(page, "report pages use the keyset cursor");
+    assert.doesNotMatch(page.plan, /TEMP B-TREE/, "report pages read in index order");
+  } finally {
+    DB.close();
+  }
+});
+
+test("report pages keep sequence order when observation times interleave", async () => {
+  const DB = localAccountDb();
+  try {
+    await provisionOwner(DB, instant - 86400000);
+    await initializeMonitor(DB, instant - 86400000);
+    const { start, end } = dayBounds("2026-10-20", "America/New_York");
+    // 650 entries (four pages) inserted out of observation order, with ties on observed_at.
+    for (let i = 0; i < 650; i++)
+      await recordLog(
+        DB,
+        {
+          id: `perf-${i}`,
+          source: "performance",
+          observedAt: start + 1 + ((i * 7919) % 400) * 1000,
+          summary: `Measurement ${i}`,
+        },
+        instant,
+      );
+    // Slot logs: the window ending at the day's start belongs to the previous day; the one ending
+    // at the day's end belongs to this day.
+    for (const [at, summary] of [
+      [start, "previous"],
+      [end, "last"],
+    ])
+      await recordLog(
+        DB,
+        { id: `interval:${at}`, source: "monitoring", observedAt: at, summary },
+        instant,
+      );
+    const report = await generateReport(DB, "2026-10-20", DEFAULT_CONFIG, end + 1);
+    assert.equal(report.history.totalEntries, 651);
+    const ids = report.evidence.map((e) => e.id);
+    assert.ok(ids.includes(`interval:${end}`) && !ids.includes(`interval:${start}`));
+    const sequences = report.evidence.map((e) => e.sequence);
+    assert.deepEqual(sequences, [...sequences].sort((a, b) => a - b));
+    assert.equal(new Set(ids).size, ids.length, "no entry is read twice across pages");
+  } finally {
+    DB.close();
+  }
+});
+
+test("a day of thousands of CI tasks summarizes development instead of failing every retry", () => {
+  const view = (i, state = "completed") => ({
+    task: {
+      id: `run:${i}:1:step`,
+      title: `step ${i}`,
+      state,
+      phase: "step",
+      progress: "p".repeat(600),
+      heartbeatAt: instant + i,
+      completedAt: instant + i,
+      links: [],
+    },
+    warning: null,
+    label: "No development task active",
+  });
+  const development = Array.from({ length: 2400 }, (_, i) =>
+    view(i, i === 11 ? "failed" : "completed"),
+  );
+  const report = {
+    summary: "2026-10-21: totals.",
+    gaps: [],
+    recommendations: [],
+    coverage: [],
+    unresolved: [],
+    taskUpdateCount: 9000,
+    history: { totalEntries: 10000 },
+    evidence: [],
+    correlations: [],
+    builds: [],
+    performance: [],
+    incidents: [],
+    trends: [],
+    development,
+  };
+  assert.ok(new TextEncoder().encode(JSON.stringify(report)).length > REPORT_BYTE_BUDGET);
+  summarizeReport(report);
+  assert.ok(new TextEncoder().encode(JSON.stringify(report)).length <= REPORT_BYTE_BUDGET);
+  assert.equal(report.summarized.sections.development.total, 2400);
+  const kept = (id) => report.development.some((v) => v.task.id === id);
+  assert.ok(kept("run:11:1:step"), "failed tasks are kept");
+  assert.ok(kept("run:2399:1:step"), "newest tasks are kept");
+  assert.equal(report.taskUpdateCount, 9000, "totals are never reduced");
+});
