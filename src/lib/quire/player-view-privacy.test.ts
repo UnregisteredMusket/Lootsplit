@@ -9,8 +9,12 @@ import {
   pollRoom,
   submitCommands,
   choosePace,
+  npcBarterQuote,
   type RoomView,
 } from "./cloud.server.ts";
+import { readNpcBarter } from "./npc-barter.ts";
+import { defaultBarterRules } from "./npc-barter-schema.ts";
+import { canonicalJson } from "./canonical-json.ts";
 import { tradeFixture } from "./test-fixtures/trade-economy.ts";
 import { exchangeQuoteKey } from "./trade-economy.ts";
 import { toCopper } from "./money.ts";
@@ -310,4 +314,59 @@ test("DM toggle: party companion NPC funds are private when off, readable by par
   assert.equal(coins(onC, "near-npc"), 123500);
   // The DM's view is unchanged.
   assert.equal(coins(await roomState(dm), "hidden-npc"), 55600);
+
+test("NPC barter: players receive only their own attempts and a public quote; a retried offer is never rolled twice", async () => {
+  const { dm, a, b } = await privacyRoom();
+  await submitCommands({
+    ...dm,
+    batchId: "barter-setup",
+    commands: [
+      { id: "barter-rules", kind: "npc-barter-rules", revision: 0, rules: { ...defaultBarterRules(), mode: "auto", receivePercent: 37, stance: "shrewd" } },
+      { id: "barter-item", kind: "npc-item", npcId: "near-npc", item: { name: "Lantern", quantity: 3, unitCopper: 500, notes: "" } },
+    ],
+  });
+  const host = (await roomState(dm)).table;
+  const lantern = host.holdings.find((h) => h.purseId === "near-npc" && h.name === "Lantern")!;
+  const offerFor = (purseId: string, id: string) => ({
+    id,
+    kind: "npc-barter-offer",
+    npcId: "near-npc",
+    purseId,
+    give: { purseId, copper: 400, items: [] },
+    ask: { purseId: "near-npc", copper: 0, items: [{ holdingId: lantern.id, quantity: 1, before: canonicalJson(lantern) }] },
+    reply: "persuade",
+  });
+  const aAuth = { code: dm.code, token: a.token },
+    bAuth = { code: dm.code, token: b.token };
+  // The public quote has the DC and odds, never the NPC's valuation.
+  const quote = await npcBarterQuote({ ...aAuth, ...offerFor("a", "q") });
+  assert.equal("received" in quote || "given" in quote || "ratio" in quote, false);
+  assert.equal(quote.kind, "check");
+  assert.equal(quote.dc, 17, "400 for 500 is 80%: DC 15, Shrewd +2");
+  await assert.rejects(npcBarterQuote({ ...bAuth, ...offerFor("a", "q") }), /Only this character's player/);
+  // Staged (turn draft) barter is refused: the room answers it directly.
+  await assert.rejects(submitCommands({ ...aAuth, batchId: "a-stage", commands: [offerFor("a", "a-staged")], stage: true }), /answered by the room directly/);
+  await submitCommands({ ...aAuth, batchId: "a-barter", commands: [offerFor("a", "a-offer")] });
+  const first = readNpcBarter((await roomState(dm)).table.journal!.world!).attempts;
+  assert.equal(first.length, 1);
+  assert.ok(first[0].roll, "the room server rolled");
+  // A retry of the same action (a fresh batch after a lost response) changes nothing.
+  await submitCommands({ ...aAuth, batchId: "a-barter-retry", commands: [offerFor("a", "a-offer")] });
+  const again = readNpcBarter((await roomState(dm)).table.journal!.world!).attempts;
+  assert.equal(again.length, 1);
+  assert.deepEqual(again[0].roll, first[0].roll);
+  await submitCommands({ ...bAuth, batchId: "b-barter", commands: [offerFor("b", "b-offer")] }).catch(() => undefined);
+  const aView = (await roomState(aAuth)).table,
+    bView = (await roomState(bAuth)).table;
+  const aState = readNpcBarter(aView.journal!.world!);
+  assert.deepEqual(aState.attempts.map((x) => x.purseId), ["a"]);
+  assert.equal(aState.attempts[0].quote.received + aState.attempts[0].quote.given + aState.attempts[0].quote.ratio, 0);
+  assert.equal(aState.rules.receivePercent, 50, "the DM's rules never reach players");
+  assert.ok(readNpcBarter(bView.journal!.world!).attempts.every((x) => x.purseId === "b"));
+  const json = JSON.stringify(aView);
+  assert.doesNotMatch(json, /user-a"|"receivePercent":37|"stance":"shrewd"/);
+  const near = aView.journal!.world!.npcs.find((n) => n.id === "near-npc")!;
+  assert.deepEqual(Object.keys(near.barter ?? {}), ["lines"]);
+  // The DM still sees the valuation.
+  assert.ok(readNpcBarter((await roomState(dm)).table.journal!.world!).attempts[0].quote.given > 0);
 });

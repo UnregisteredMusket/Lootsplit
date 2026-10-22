@@ -679,6 +679,8 @@ export async function submitCommands(input: {
     c.kind === "trade-season-plan" || (c.kind === "downtime-plan" && c.advanceSeason);
   if (input.stage && commands.some(seasonalPlan))
     throw Error("Seasonal previews must be prepared directly by the DM authority.");
+  if (input.stage && commands.some((c) => c.kind.startsWith("npc-barter-")))
+    throw Error("NPC barter is answered by the room directly. Send the offer again.");
   const { randomTradeRoll } = await import("./trade-economy.ts");
   const seasonalRolls = new Map<string, number>();
   const digest = async (value: string) => {
@@ -848,6 +850,32 @@ export async function submitCommands(input: {
     }
   }
   throw new Error("The campaign is busy. Retry your saved pending actions.");
+}
+
+/** NPC barter quote for one seat. Players get the public quote only: no valuation or rules. */
+export async function npcBarterQuote(input: {
+  code: string;
+  token: string;
+  [key: string]: unknown;
+}): Promise<import("./npc-barter.ts").PublicBarterQuote | import("./npc-barter.ts").BarterQuote> {
+  const { quoteNpcBarter, publicQuote } = await import("./npc-barter.ts");
+  const { barterSideSchema } = await import("./npc-barter-schema.ts");
+  const { z } = await import("zod");
+  const offer = z
+    .object({
+      npcId: z.string().min(1).max(150),
+      purseId: z.string().min(1).max(150),
+      give: barterSideSchema,
+      ask: barterSideSchema,
+    })
+    .parse({ npcId: input.npcId, purseId: input.purseId, give: input.give, ask: input.ask });
+  const room = await must(input.code),
+    seat = room.seats.find((s) => s.token === input.token);
+  if (!seat) throw new Error("This session is no longer assigned.");
+  if (seat.role !== "dm" && !seat.purseIds.includes(offer.purseId))
+    throw Error("Only this character's player or the DM can see these odds.");
+  const quote = quoteNpcBarter(room.table, seat, offer);
+  return seat.role === "dm" ? quote : publicQuote(quote);
 }
 
 export async function manageRoom(input: {
