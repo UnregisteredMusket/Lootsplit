@@ -39,6 +39,8 @@ export function characterControl(purse: Purse): "player" | "npc" | null {
 }
 
 export type Holding = {
+  /** "player": a player set this value through a sheet edit, so NPC barter treats it as unreferenced. */
+  valueSource?: "player";
   commodityId?: string;
   custody?: import("./estate-schema.ts").zCustody;
   materialKey?: string;

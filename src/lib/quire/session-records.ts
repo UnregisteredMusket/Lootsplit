@@ -12,6 +12,7 @@ import { readWorld } from "./world-schema.ts";
 import { exchangeHere } from "./trade-economy.ts";
 import { readTradeEconomy } from "./trade-economy-schema.ts";
 import { npcAvailableHere, npcController, shopVisible } from "./world.ts";
+import { projectNpcBarter } from "./npc-barter.ts";
 import type { CloudTable, CloudSeat } from "./cloud.ts";
 import { canReadNote } from "./chat-visibility.ts";
 import { characterSheet } from "../characters/campaign-sheet.mjs";
@@ -139,6 +140,7 @@ export function projectRecord(
       delete world.partyPosition.y;
     }
     world.npcs = world.npcs.filter((npc) => readableNpcs.has(npc.id));
+    projectNpcBarter(world, seat);
     if (t.journal.downtimeActivities) {
       const activities = readDowntimeActivities(t.journal.downtimeActivities);
       activities.windows = activities.windows.map((w) => ({
