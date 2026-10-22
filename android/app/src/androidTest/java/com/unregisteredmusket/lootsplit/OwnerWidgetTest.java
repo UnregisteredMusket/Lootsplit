@@ -645,6 +645,136 @@ public class OwnerWidgetTest {
         }
     }
 
+    private JSONObject usageSource(long requestsToday) throws Exception {
+        JSONObject source=journalFixture();
+        org.json.JSONArray metrics=new org.json.JSONArray().put(new JSONObject().put("key","requests").put("label","Worker requests").put("unit","count").put("state","ready").put("level","ok").put("monthlyAllowance",10000000L)
+            .put("day",usagePart(requestsToday,322580.645,3.8)).put("week",usagePart(80000,2258064.516,3.5)).put("month",usagePart(300000,10000000,3)));
+        return source.put("usage",new JSONObject().put("state","ready").put("checkedAt",System.currentTimeMillis())
+            .put("data",new JSONObject().put("metrics",metrics).put("windows",new JSONObject().put("month",new JSONObject().put("elapsedPercent",50)))));
+    }
+    private static JSONObject rowTitled(org.json.JSONArray rows,String prefix) throws Exception {
+        for(int i=0;i<rows.length();i++)if(rows.getJSONObject(i).getString("title").startsWith(prefix))return rows.getJSONObject(i);
+        return null;
+    }
+    @Test public void logRowsHaveStableIdsAndExpandToFullTextAndPrune() throws Exception {
+        long now=System.currentTimeMillis();
+        org.json.JSONArray first=WidgetRows.rows(WidgetData.project(usageSource(12345),now)),second=WidgetRows.rows(WidgetData.project(usageSource(22345),now));
+        java.util.Set<String> ids=new java.util.HashSet<>();
+        for(int i=0;i<first.length();i++){String id=first.getJSONObject(i).getString("id");assertFalse("Row ID present",id.isEmpty());assertTrue("Row IDs are unique: "+id,ids.add(id));}
+        // A refreshed reading changes the value in the title, not the row ID.
+        assertEquals("usage:Worker requests",rowTitled(first,"Worker requests today 12,345").getString("id"));
+        assertEquals("usage:Worker requests",rowTitled(second,"Worker requests today 22,345").getString("id"));
+        assertEquals("snapshot",rowTitled(first,"Shared snapshot").getString("id"));
+        assertEquals("Fixed titles are their own ID","Daily report",rowTitled(first,"Daily report").getString("id"));
+        assertEquals(1,WidgetRows.rows(null).length());assertFalse(WidgetRows.rows(null).getJSONObject(0).getString("id").isEmpty());
+
+        // Toggle, survive a refresh with the same IDs, prune IDs that are gone.
+        WidgetRowState.remove(context,104);
+        assertTrue(WidgetRowState.toggle(context,104,"usage:Worker requests"));
+        assertTrue(WidgetRowState.toggle(context,104,"diagnostic:Removed component"));
+        assertEquals(java.util.Collections.singleton("usage:Worker requests"),WidgetRowState.prune(context,104,second));
+        assertEquals("Pruned IDs are saved",java.util.Collections.singleton("usage:Worker requests"),WidgetRowState.expanded(context,104));
+        assertFalse(WidgetRowState.toggle(context,104,"usage:Worker requests"));
+        assertTrue(WidgetRowState.expanded(context,104).isEmpty());
+
+        // Compact row: one ellipsized line and ▾. Expanded row: full title and every detail line, ▴ and OPEN.
+        JSONObject row=new JSONObject(rowTitled(first,"Worker requests today").toString()).put("title","Worker requests today 12,345 with a deliberately long title that cannot fit on one line");
+        AtomicReference<Throwable> failure=new AtomicReference<>();
+        InstrumentationRegistry.getInstrumentation().runOnMainSync(()->{try{
+            View compact=OwnerWidgetService.rowView(context,row,104,false).apply(context,new FrameLayout(context));
+            assertEquals(1,((TextView)compact.findViewById(R.id.widget_row_detail)).getMaxLines());
+            assertEquals(1,((TextView)compact.findViewById(R.id.widget_row_title)).getMaxLines());
+            assertEquals("▾",text(compact,R.id.widget_row_chevron));
+            assertNull("Compact rows have no OPEN button",compact.findViewById(R.id.widget_row_open));
+            assertFalse(text(compact,R.id.widget_row_detail).contains("\n"));
+            assertTrue(compact.getContentDescription().toString().endsWith("Tap to expand."));
+            View expanded=OwnerWidgetService.rowView(context,row,104,true).apply(context,new FrameLayout(context));
+            assertTrue(((TextView)expanded.findViewById(R.id.widget_row_detail)).getMaxLines()>4);
+            assertTrue(((TextView)expanded.findViewById(R.id.widget_row_title)).getMaxLines()>1);
+            assertEquals(row.getString("title"),text(expanded,R.id.widget_row_title));
+            assertEquals(row.getString("detail"),text(expanded,R.id.widget_row_detail));
+            assertEquals("▴",text(expanded,R.id.widget_row_chevron));
+            assertEquals("OPEN LOGS ›",text(expanded,R.id.widget_row_open));
+            assertEquals(View.VISIBLE,expanded.findViewById(R.id.widget_row_open).getVisibility());
+            assertTrue(expanded.getContentDescription().toString().endsWith("Expanded; tap to collapse."));
+            // Measured at the narrow 250dp width, the expanded row is taller than the compact one.
+            int width=Math.round(250*context.getResources().getDisplayMetrics().density);
+            compact.measure(View.MeasureSpec.makeMeasureSpec(width,View.MeasureSpec.EXACTLY),View.MeasureSpec.makeMeasureSpec(0,View.MeasureSpec.UNSPECIFIED));
+            expanded.measure(View.MeasureSpec.makeMeasureSpec(width,View.MeasureSpec.EXACTLY),View.MeasureSpec.makeMeasureSpec(0,View.MeasureSpec.UNSPECIFIED));
+            assertTrue("Expanded row shows more lines",expanded.getMeasuredHeight()>compact.getMeasuredHeight()+20);
+        }catch(Throwable error){failure.set(error);}});
+        if(failure.get()!=null)throw new AssertionError("row variants",failure.get());
+        WidgetRowState.remove(context,104);
+    }
+    /** Polls the hosted collection's first row until it shows the expected state. */
+    private boolean firstRowExpanded(AtomicReference<android.appwidget.AppWidgetHostView> hosted,boolean expected) {
+        long deadline=android.os.SystemClock.elapsedRealtime()+8000;AtomicInteger state=new AtomicInteger(-1);
+        while(android.os.SystemClock.elapsedRealtime()<deadline){
+            InstrumentationRegistry.getInstrumentation().runOnMainSync(()->{
+                android.widget.ListView list=hosted.get().findViewById(R.id.monitor_list);View child=list==null?null:list.getChildAt(0);
+                TextView chevron=child==null?null:child.findViewById(R.id.widget_row_chevron);TextView detail=child==null?null:child.findViewById(R.id.widget_row_detail);
+                View open=child==null?null:child.findViewById(R.id.widget_row_open);
+                if(chevron==null||detail==null){state.set(-1);return;}
+                boolean isExpanded="▴".contentEquals(chevron.getText())&&detail.getMaxLines()>1&&open!=null&&open.getVisibility()==View.VISIBLE&&open.hasOnClickListeners();
+                boolean isCompact="▾".contentEquals(chevron.getText())&&detail.getMaxLines()==1&&open==null;
+                state.set(isExpanded?1:isCompact?0:-1);
+            });
+            if(state.get()==(expected?1:0))return true;android.os.SystemClock.sleep(100);
+        }
+        return false;
+    }
+    private void tapFirstRow(AtomicReference<android.appwidget.AppWidgetHostView> hosted) {
+        InstrumentationRegistry.getInstrumentation().runOnMainSync(()->{
+            // A collection item's root fill-in is delivered by the list's item click, as a real tap is.
+            android.widget.ListView list=hosted.get().findViewById(R.id.monitor_list);View child=list.getChildAt(0);
+            assertTrue("Row tap reaches the host's click handler",list.performItemClick(child,list.getFirstVisiblePosition(),list.getItemIdAtPosition(list.getFirstVisiblePosition())));
+        });
+    }
+    @Test public void actualFrameworkHostExpandsAndCollapsesRowOnTap() throws Exception {
+        assertEquals("1",shell("getprop ro.kernel.qemu"));
+        shell("appwidget grantbind --package "+context.getPackageName()+" --user 0");
+        String generation=WidgetStore.connect(context,"synthetic-expand");
+        JSONObject snapshot=WidgetData.project(journalFixture(),System.currentTimeMillis());
+        WidgetStore.finish(context,generation,snapshot,"");
+        String firstId=WidgetRows.rows(snapshot).getJSONObject(0).getString("id");
+        android.appwidget.AppWidgetHost host=new android.appwidget.AppWidgetHost(context,197410);
+        android.appwidget.AppWidgetManager manager=android.appwidget.AppWidgetManager.getInstance(context);
+        int id=host.allocateAppWidgetId();
+        WidgetAuditActivity activity=null;
+        try {
+            WidgetRowState.remove(context,id);
+            assertTrue(manager.bindAppWidgetIdIfAllowed(id,new android.content.ComponentName(context,OwnerWidgetProvider.class)));
+            activity=(WidgetAuditActivity)InstrumentationRegistry.getInstrumentation().startActivitySync(new android.content.Intent(context,WidgetAuditActivity.class).addFlags(android.content.Intent.FLAG_ACTIVITY_NEW_TASK));
+            WidgetAuditActivity screen=activity;AtomicReference<android.appwidget.AppWidgetHostView> hosted=new AtomicReference<>();
+            InstrumentationRegistry.getInstrumentation().runOnMainSync(()->{
+                host.startListening();android.appwidget.AppWidgetHostView view=host.createView(screen,id,manager.getAppWidgetInfo(id));
+                float density=context.getResources().getDisplayMetrics().density;
+                screen.setContentView(view,new ViewGroup.LayoutParams(Math.round(350*density),Math.round(480*density)));hosted.set(view);
+                OwnerWidgetProvider.renderAll(context);
+            });
+            assertTrue("Rows start compact",firstRowExpanded(hosted,false));
+            // Tap: the real host sends the row's fill-in through the broadcast template; the row expands in place.
+            tapFirstRow(hosted);
+            assertTrue("Tapped row expands",firstRowExpanded(hosted,true));
+            assertEquals(java.util.Collections.singleton(firstId),WidgetRowState.expanded(context,id));
+            AtomicReference<Throwable> captureFailure=new AtomicReference<>();
+            InstrumentationRegistry.getInstrumentation().runOnMainSync(()->{try{captureHostedWidget(hosted.get(),"hosted-main-row-expanded");}catch(Throwable error){captureFailure.set(error);}});
+            if(captureFailure.get()!=null)throw new AssertionError("Expanded screenshot",captureFailure.get());
+            // A newer reading with the same rows keeps the row expanded.
+            assertTrue(WidgetStore.finish(context,generation,new JSONObject(snapshot.toString()).put("snapshotId",43).put("checkedAt",System.currentTimeMillis()),""));
+            InstrumentationRegistry.getInstrumentation().runOnMainSync(()->OwnerWidgetProvider.renderAll(context));
+            android.os.SystemClock.sleep(500);
+            assertTrue("Expanded state survives a refresh",firstRowExpanded(hosted,true));
+            // Tap again: collapses.
+            tapFirstRow(hosted);
+            assertTrue("Second tap collapses",firstRowExpanded(hosted,false));
+            assertTrue(WidgetRowState.expanded(context,id).isEmpty());
+        }finally{
+            if(activity!=null){WidgetAuditActivity screen=activity;InstrumentationRegistry.getInstrumentation().runOnMainSync(screen::finish);InstrumentationRegistry.getInstrumentation().waitForIdleSync();}
+            host.stopListening();host.deleteHost();WidgetRowState.remove(context,id);CompanionSettings.remove(context,id);shell("appwidget revokebind --package "+context.getPackageName()+" --user 0");
+        }
+    }
+
     private View mainFace(JSONObject snapshot) throws Exception {
         JSONObject state=new JSONObject().put("token","synthetic").put("snapshot",snapshot);
         AtomicReference<View> out=new AtomicReference<>();AtomicReference<Throwable> failure=new AtomicReference<>();

@@ -22,6 +22,20 @@ final class WidgetActions {
             default: return "home-screen-widget";
         }
     }
+    /** Destinations a log row may open (the same in-app screens as before rows expanded). */
+    static final String[] ROW_ACTIONS = {"logs", "report", "task", "diagnostics", "account", "activity"};
+    static String rowAction(String action) { for (String known : ROW_ACTIONS) if (known.equals(action)) return known; return "logs"; }
+    /** Short name of a row's destination for its OPEN button: "logs", "daily report", "task", "diagnostics", "My account". */
+    static String rowLabel(String action) {
+        switch (rowAction(action)) {
+            case "report": return "daily report";
+            case "task": return "task";
+            case "diagnostics": return "diagnostics";
+            case "account": return "My account";
+            case "activity": return "activity";
+            default: return "logs";
+        }
+    }
     static String label(String action) { for (int i=0;i<ACTIONS.length;i++) if (ACTIONS[i].equals(action)) return LABELS[i]; return "Account"; }
     static PendingIntent pending(Context context, int id, String action, boolean companion) {
         int flags = PendingIntent.FLAG_UPDATE_CURRENT | PendingIntent.FLAG_IMMUTABLE;
