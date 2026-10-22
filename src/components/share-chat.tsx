@@ -12,6 +12,7 @@ import { useEconomy } from "@/lib/quire/economy-context";
 import { useSeat } from "@/lib/quire/seat";
 import { accountRequest, type AccountLibrary } from "@/lib/account/client";
 import {
+  adoptProvisionalChatComposer,
   chatComposer,
   chatScopeKey,
   legacyChatOutbox,
@@ -44,6 +45,14 @@ export function ShareChat() {
     () => ({ code: room.code, seatId: room.seatId, sessionId: room.sessionId, accountId }),
     [room.code, room.seatId, room.sessionId, accountId],
   );
+  // A reload publishes the saved seat before the server confirms the room's
+  // session ID. Carry what was typed or sent meanwhile into the confirmed scope
+  // before LiveChat remounts under it, so the composer is not emptied.
+  const previousScope = useRef(scope);
+  if (previousScope.current !== scope) {
+    adoptProvisionalChatComposer(previousScope.current, scope);
+    previousScope.current = scope;
+  }
   useEffect(() => {
     setLibrary(null);
     if (!accountId) return;

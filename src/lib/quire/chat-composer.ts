@@ -54,6 +54,49 @@ export function chatComposer(scope: ChatScope): Composer {
   }
   return composer;
 }
+/**
+ * After a page load the room view is published from the saved session before
+ * the first server response supplies the room's session ID. A draft typed, or
+ * a message sent, in that window belongs to the same seat in the same room, so
+ * it moves to the confirmed scope instead of becoming an orphaned "recovery"
+ * (which emptied the composer). Only an unknown session ID is ever adopted:
+ * a different account, room, seat or known session is never merged. Memory
+ * only; any device copy saved under the provisional key is left untouched.
+ * Returns true when content moved. It does not notify subscribers, so it is
+ * safe to call while rendering: the unsent content (and so the closing
+ * warning) is unchanged in total, only its scope moved.
+ */
+export function adoptProvisionalChatComposer(from: ChatScope, to: ChatScope) {
+  if (
+    from.sessionId !== "" ||
+    to.sessionId === "" ||
+    from.accountId !== to.accountId ||
+    from.code !== to.code ||
+    from.seatId !== to.seatId
+  )
+    return false;
+  const fromKey = chatScopeKey(from);
+  const provisional = composers.get(fromKey);
+  if (!provisional) return false;
+  const target = chatComposer(to);
+  const drafts = { ...target.drafts };
+  for (const [thread, text] of Object.entries(provisional.drafts))
+    if (text && !drafts[thread]) drafts[thread] = text;
+  target.drafts = drafts;
+  target.outbox = [
+    ...target.outbox,
+    ...provisional.outbox.filter(
+      (m) => !target.outbox.some((old) => old.command.id === m.command.id),
+    ),
+  ];
+  if (provisional.outbox.length) durable.delete(chatScopeKey(to));
+  const error = storageErrors.get(fromKey);
+  if (error && !storageErrors.has(chatScopeKey(to))) storageErrors.set(chatScopeKey(to), error);
+  composers.delete(fromKey);
+  durable.delete(fromKey);
+  storageErrors.delete(fromKey);
+  return true;
+}
 export function setChatDraft(scope: ChatScope, thread: string, text: string) {
   const composer = chatComposer(scope);
   composer.drafts = { ...composer.drafts, [thread]: text };
