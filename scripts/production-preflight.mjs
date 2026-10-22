@@ -9,7 +9,7 @@ export function assertCurrentMain(sha, head) {
 }
 export function assertMigrations(expected, applied) {
   assert.deepEqual([...applied].sort(), [...expected].sort(),
-    "Production migrations differ. Review and apply migrations separately before website deployment.");
+    "Production migrations differ from this release. The release job applies pending additive migrations first; read its production-migrations step.");
 }
 export async function cfRequest(path, body) {
   const response = await fetch(`https://api.cloudflare.com/client/v4/accounts/${process.env.CLOUDFLARE_ACCOUNT_ID}/${path}`, {

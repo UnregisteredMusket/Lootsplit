@@ -22,8 +22,9 @@ existing `ACCOUNT_SECRET`. Never recreate the Worker or database to release code
    `website-release-<commit>` artifact (30-day retention).
 5. `Deploy verified website` accepts only successful **push** verification runs from
    this repository's `main`. PRs, forks and Android workflow calls cannot publish.
-   It downloads the artifact from that precise run, validates hashes/commit, checks
-   current `main`, existing production bindings and the D1 migration ledger, and runs
+   It downloads the artifact from that precise run, validates hashes/commit, applies the
+   artifact's pending additive D1 migrations (below), checks current `main`, existing
+   production bindings and that the D1 migration ledger exactly matches the artifact, and runs
    `wrangler deploy --no-bundle --keep-vars` against the artifact's config. There is
    no Vite build or Worker bundling in the deploy job; secrets are preserved by Wrangler.
 6. Production checks match `/assets/release-identity.json` to the source commit, exercise
@@ -51,12 +52,15 @@ In GitHub repository **Settings → Environments → production**, limit deploym
 | --- | --- |
 | `CLOUDFLARE_ACCOUNT_ID` | The existing Lootsplit Cloudflare account ID |
 | `CLOUDFLARE_API_TOKEN` | A dedicated Cloudflare API token for GitHub website releases |
+| `CLOUDFLARE_D1_MIGRATION_TOKEN` | Optional. A separate token with **Account / D1 / Edit** used only by the migration step; without it, that step uses `CLOUDFLARE_API_TOKEN`, which then needs D1 Edit |
 
 Create the token under Cloudflare **My Profile → API Tokens → Create Custom Token**.
 Restrict Account Resources to **only the existing Lootsplit account**. Grant only
-**Account / Workers Scripts / Edit** and **Account / D1 / Read**. The latter permits
-reading the migration ledger, not schema changes. No DNS, zone, account administration,
-API-token management, D1 write or build-management permissions are needed. Workers
+**Account / Workers Scripts / Edit** and **Account / D1 / Read** (the ledger and preflight
+reads). Applying migrations needs **Account / D1 / Edit**: grant it on the separate
+`CLOUDFLARE_D1_MIGRATION_TOKEN` (preferred; passed only to the migration step) or on this
+token. A release with nothing pending makes no D1 write and needs no Edit permission. No DNS,
+zone, account administration, API-token management or build-management permissions are needed. Workers
 Scripts permissions are account-scoped, not a promise of per-Worker isolation. Use an
 expiration and rotate before it expires. Do not use a Global API Key, an Android key,
 or `ACCOUNT_SECRET`. Never paste token values in issues, source, logs or chat.
@@ -69,28 +73,43 @@ References: [Cloudflare GitHub Actions](https://developers.cloudflare.com/worker
 [Wrangler commands](https://developers.cloudflare.com/workers/wrangler/commands/workers/),
 [D1 query permissions](https://developers.cloudflare.com/api/resources/d1/subresources/database/methods/query/).
 
-## Database migrations: explicit, separate and reviewed
+## Database migrations: additive, applied by the release job
 
-Website CI **does not apply remote SQL**. Its token needs only D1 Read. Pending,
-missing or extra migration-ledger entries stop deployment. Keep applied migration
-files immutable. A database change requires its own reviewed migration and recovery
-plan; a filename ledger alone cannot detect someone modifying already-applied SQL.
+Owner decision 2026-10-21: migrations ship in the PR that needs them and the release job
+applies them; nobody hand-applies SQL to production. In `Deploy verified website`, after the
+artifact's hashes are verified and before preflight and upload,
+`scripts/production-migrations.mjs` (wrapped by `recovery-step.mjs`, so a failure is a job
+annotation):
 
-Before a future schema release:
+1. Refuses to run outside `UnregisteredMusket/Lootsplit` `refs/heads/main`, re-checks that the
+   release commit is still current main, and confirms the artifact config targets the
+   production database and the artifact's own `migrations/` directory.
+2. Reads the ledger (`SELECT name FROM d1_migrations`, D1 Read). Ledger entries missing from
+   the artifact, malformed or duplicate numbers, or a pending migration numbered below the
+   newest applied one stop the release. With nothing pending it writes nothing.
+3. Statically checks every pending file. Each statement must be `CREATE TABLE`,
+   `CREATE [UNIQUE] INDEX`, `ALTER TABLE … ADD [COLUMN]`, or `INSERT [OR IGNORE] … VALUES`
+   into a table created (without `IF NOT EXISTS`) earlier in that file. DROP, DELETE, UPDATE,
+   RENAME, REPLACE, SELECT/AS/WITH, triggers, views, virtual/temp tables, PRAGMA, ATTACH,
+   VACUUM, REINDEX and transaction statements are rejected (comments, string literals and
+   quoted identifiers are masked first). Migrations 0005 (rename/drop) and 0016 (trigger)
+   would have been stopped; such a change needs an owner-approved, separately reviewed
+   procedure, never a bypass of this check.
+4. Records the D1 Time Travel bookmark, runs
+   `wrangler d1 migrations apply lootsplit --remote --config dist/website-release/wrangler.toml`,
+   reads the ledger back (also after a failure, so a partial apply is visible) and requires it
+   to equal the artifact's migrations. `test-results/production-migrations.json` (Actions
+   artifact) keeps before/pending/applied/after and the bookmark; it holds no data rows.
 
-1. Review SQL and compatibility with the currently running and rollback versions.
-   Prefer additive expand/contract migrations; defer destructive steps to a separate
-   maintenance change. Test all migrations on local D1 with the complete release suite.
-2. Capture the current D1 Time Travel bookmark and timestamp, and export a database
-   backup to secure owner-controlled storage. Treat exports as private account/campaign
-   data: **never** upload them as public repository or Actions artifacts.
-3. With a separate, short-lived account-scoped **D1 Edit** operator credential,
-   list pending migrations using `npx wrangler d1 migrations list DB --remote`.
-   Review the exact list; apply only the approved changes with
-   `npx wrangler d1 migrations apply DB --remote`. Run from the reviewed commit and
-   root config. Record applied names, hashes, bookmark and results privately.
-4. Recheck the ledger and application compatibility. Rerun the current-main verification
-   job to initiate the website release. Revoke the temporary migration credential.
+Preflight then repeats the exact-equality check. Any failure stops the job before
+`wrangler deploy`: the running Worker keeps serving, and because applied SQL is additive it
+stays compatible with that Worker. Fix forward with a new migration; rerun the release only
+after reading the annotation and `production-migrations.json`. The `lootsplit-production`
+concurrency group (shared with the standby backup) serializes this with every other
+production writer; PR and verification runs only ever use local D1.
+
+Keep applied migration files immutable: a filename ledger cannot detect someone modifying
+already-applied SQL. Test all migrations on local D1 with the complete release suite (CI does).
 
 This release-process migration adds no SQL. The eight migrations through
 `0008_encounters.sql` were confirmed applied on 2026-10-03.

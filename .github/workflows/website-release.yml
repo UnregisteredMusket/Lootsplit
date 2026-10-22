@@ -48,6 +48,15 @@ jobs:
       - name: Validate the exact verified artifact
         run: node scripts/release-artifact.mjs verify
       - run: npx playwright install --with-deps chromium
+      # Additive-only SQL from the verified artifact; anything else, or a failed apply, stops the
+      # release here and the current Worker keeps serving. Never apply migrations by hand.
+      - name: Apply pending additive D1 migrations and read back the ledger
+        env:
+          GH_TOKEN: ${{ github.token }}
+          CLOUDFLARE_ACCOUNT_ID: ${{ secrets.CLOUDFLARE_ACCOUNT_ID }}
+          CLOUDFLARE_API_TOKEN: ${{ secrets.CLOUDFLARE_API_TOKEN }}
+          CLOUDFLARE_D1_MIGRATION_TOKEN: ${{ secrets.CLOUDFLARE_D1_MIGRATION_TOKEN }}
+        run: node scripts/recovery-step.mjs production-migrations 300 node scripts/production-migrations.mjs
       - name: Check current main, existing bindings and applied migrations; deploy without rebuild
         env:
           GH_TOKEN: ${{ github.token }}
