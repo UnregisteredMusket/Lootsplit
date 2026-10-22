@@ -658,6 +658,13 @@ export function applyWorldCommand(t: CloudTable, seat: CloudSeat, cmd: WorldComm
       throw Error("Black-market availability changed. Refresh before toggling.");
     w.blackMarketActive = cmd.active;
     event(`Black market ${cmd.active ? "available" : "hidden"}`);
+  } else if (cmd.kind === "companion-funds-visibility") {
+    dm();
+    if ((w.companionFundsVisible ?? false) !== cmd.before)
+      throw Error("Companion funds visibility changed. Refresh before toggling.");
+    if (cmd.visible) w.companionFundsVisible = true;
+    else delete w.companionFundsVisible;
+    event(`Party companion NPC funds ${cmd.visible ? "shown to the party" : "kept private"}`);
   } else if (cmd.kind === "shop-black-market") {
     dm();
     const shop = t.shops.find((s) => s.id === cmd.shopId);

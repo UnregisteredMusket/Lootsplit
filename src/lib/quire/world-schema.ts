@@ -256,6 +256,8 @@ export const worldSchema = z
     trades: z.array(tradeSchema).default([]),
     conversations: z.array(conversationSchema).default([]),
     blackMarketActive: z.boolean().default(false),
+    /** DM setting: party players can read the coins of visible NPCs travelling with the party. Off when absent. */
+    companionFundsVisible: z.boolean().optional(),
     timeHistory: z
       .array(
         z
@@ -389,6 +391,12 @@ export const worldCommands = [
     decision: z.enum(["accepted", "declined", "cancelled"]),
   }),
   z.object({ id, kind: z.literal("black-market"), before: z.boolean(), active: z.boolean() }),
+  z.object({
+    id,
+    kind: z.literal("companion-funds-visibility"),
+    before: z.boolean(),
+    visible: z.boolean(),
+  }),
   z.object({
     id,
     kind: z.literal("shop-black-market"),

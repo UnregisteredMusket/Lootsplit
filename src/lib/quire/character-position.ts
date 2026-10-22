@@ -27,6 +27,40 @@ export function characterLocation(t: Table, p: Purse) {
 export function characterVisible(t: Table, p: Purse) {
   return characterPosition(t, p).visible;
 }
+/**
+ * A party companion is a visible NPC character travelling with the party. When the DM turns on
+ * "Party can see companion NPC funds", party players may read its coins and ledger lines.
+ * Hidden NPCs, NPCs elsewhere and exchange treasuries never qualify.
+ */
+export function companionFundsShared(t: Table, p: Purse) {
+  if (t.journal?.world?.companionFundsVisible !== true) return false;
+  if (p.kind !== "character" || p.control !== "npc") return false;
+  if (t.journal?.tradeEconomy?.exchanges?.some((e) => e.purseId === p.id)) return false;
+  const npc = t.journal?.world?.npcs?.find((n) => n.id === p.id);
+  const s = characterPosition(t, p);
+  return s.visible && (npc?.visible ?? true) && s.inParty && !s.downtime;
+}
+/** True when `seat` (a player) may read this companion's coins and ledger lines. The DM always can. */
+export function companionFundsReadable(
+  t: Table,
+  p: Purse,
+  seat: Pick<CloudSeat, "role" | "purseIds">,
+) {
+  if (seat.role === "dm") return true;
+  if (!companionFundsShared(t, p)) return false;
+  // Only seats with a visible character travelling with the party; non-party players do not.
+  return seat.purseIds.some((id) => {
+    const own = t.purses.find((o) => o.id === id);
+    return (
+      !!own &&
+      own.id !== p.id &&
+      own.kind === "character" &&
+      own.control !== "npc" &&
+      characterVisible(t, own) &&
+      inParty(t, own)
+    );
+  });
+}
 export function canReadCharacter(t: Table, p: Purse, seat: Pick<CloudSeat, "role" | "purseIds">) {
   if (seat.role === "dm") return true;
   const s = characterPosition(t, p);

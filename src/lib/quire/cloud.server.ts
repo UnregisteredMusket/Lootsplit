@@ -1,4 +1,8 @@
-import { characterVisible, canReadCharacter } from "./character-position.ts";
+import {
+  characterVisible,
+  canReadCharacter,
+  companionFundsReadable,
+} from "./character-position.ts";
 import {
   readRoom,
   readRoomAccess,
@@ -579,7 +583,8 @@ async function view(room: CloudRoom, seat: CloudSeat): Promise<RoomView> {
  * Player projection on top of `projectRecord`. Owner decision (2026-10-22): other visible
  * party players' balances and ledger lines stay readable, as before. NPC, hidden-NPC,
  * exchange-treasury and non-party balances and ledger lines are never projected, and
- * purses the seat does not control never carry editing permissions.
+ * purses the seat does not control never carry editing permissions. Owner decision (2026-10-22):
+ * the DM may share party companion NPC funds with party players (off by default).
  */
 function playerTable(table: CloudTable, record: CloudTable, seat: CloudSeat): CloudTable {
   const npcs = table.journal?.world?.npcs ?? [];
@@ -599,13 +604,16 @@ function playerTable(table: CloudTable, record: CloudTable, seat: CloudSeat): Cl
     !npcIds.has(p.id) &&
     !treasuries.has(p.id) &&
     (p.kind === "party" || characterControl(p) === "player");
+  // DM setting "Party can see companion NPC funds": a visible NPC travelling with the party is
+  // readable (coins and ledger lines, never permissions) by seats with a visible party character.
+  const companion = (p: Purse) => companionFundsReadable(table, p, seat);
   const byId = new Map(table.purses.map((p) => [p.id, p]));
   return {
     ...record,
     ledger: table.ledger.filter((l) => {
       if (controlled.has(l.purseId)) return true;
       const p = byId.get(l.purseId);
-      return !!p && sharedBalance(p);
+      return !!p && (sharedBalance(p) || companion(p));
     }),
     purses: record.purses.map((projected) => {
       const p = byId.get(projected.id)!;
@@ -629,7 +637,7 @@ function playerTable(table: CloudTable, record: CloudTable, seat: CloudSeat): Cl
       return {
         ...projected,
         ...(portrait ? { portrait } : {}),
-        ...(sharedBalance(p) || controlled.has(p.id) ? { coins: p.coins } : {}),
+        ...(sharedBalance(p) || companion(p) || controlled.has(p.id) ? { coins: p.coins } : {}),
       };
     }),
   };

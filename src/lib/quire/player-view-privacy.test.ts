@@ -14,6 +14,7 @@ import {
 import { tradeFixture } from "./test-fixtures/trade-economy.ts";
 import { exchangeQuoteKey } from "./trade-economy.ts";
 import { toCopper } from "./money.ts";
+import { characterPosition } from "./character-position.ts";
 
 // Disposable in-memory D1 stand-in; never a real campaign.
 const sql = new DatabaseSync(":memory:");
@@ -206,4 +207,107 @@ test("owner decision: party players' balances and ledger lines stay visible; the
   const dmView = (await roomState(dm)).table;
   assert.equal(coins(dmView, "far-npc"), 777800);
   assert.ok(dmView.ledger.some((l) => l.id === "far-funds"));
+});
+
+test("DM toggle: party companion NPC funds are private when off, readable by party players when on, never for hidden NPCs", async () => {
+  const { dm, a, b, c } = await privacyRoom();
+  const auth = (seat: { token: string }) => ({ code: dm.code, token: seat.token });
+  const place = async (purseId: string, inParty: boolean, visible = true) => {
+    const host = (await roomState(dm)).table;
+    const before = characterPosition(host, host.purses.find((p) => p.id === purseId)!);
+    await submitCommands({
+      ...dm,
+      batchId: `place-${purseId}`,
+      commands: [
+        {
+          id: `place-${purseId}`,
+          kind: "character-position",
+          purseId,
+          before,
+          inParty,
+          locationId: inParty ? null : "dock",
+          visible,
+          sheetVisible: visible,
+        },
+      ],
+    });
+  };
+  // Companions: a visible NPC, C's delegated NPC and a hidden NPC travel with the party; B stays behind.
+  await place("near-npc", true);
+  await place("agent-npc", true);
+  await place("hidden-npc", true, false);
+  await place("b", false);
+  const coins = (v: RoomView, id: string) => {
+    const p = v.table.purses.find((p) => p.id === id);
+    return p ? toCopper(p.coins) : undefined;
+  };
+  const lines = (v: RoomView, id: string) => v.table.ledger.filter((l) => l.purseId === id).length;
+
+  // Off (default): today's behaviour.
+  const offA = await roomState(auth(a));
+  assertPrivate(offA, ["a"], (await roomState(dm)).table, "setting off, A");
+  assert.equal(coins(offA, "near-npc"), 0);
+  assert.equal(lines(offA, "near-npc"), 0);
+  // The controller keeps its NPC's funds readout either way, without permissions.
+  const offC = await roomState(auth(c));
+  assert.equal(coins(offC, "agent-npc"), 32100);
+  assert.equal("permissions" in offC.table.purses.find((p) => p.id === "agent-npc")!, false);
+
+  // Only the DM may change the setting; the server refuses players and guests.
+  for (const seat of [a, b, c])
+    await assert.rejects(
+      submitCommands({
+        ...auth(seat),
+        batchId: `toggle-${seat.token}`,
+        commands: [
+          {
+            id: `toggle-${seat.token}`,
+            kind: "companion-funds-visibility",
+            before: false,
+            visible: true,
+          },
+        ],
+      }),
+      /Only the DM/,
+    );
+  assert.equal((await roomState(dm)).table.journal!.world!.companionFundsVisible, undefined);
+  await submitCommands({
+    ...dm,
+    batchId: "companions-on",
+    commands: [
+      { id: "companions-on", kind: "companion-funds-visibility", before: false, visible: true },
+    ],
+  });
+
+  // On: party player A reads visible companions' coins and ledger lines, read-only.
+  for (const view of [
+    await roomState(auth(a)),
+    (await pollRoom({ ...auth(a), knownRevision: -1, knownSeatId: "" })) as RoomView,
+    await submitCommands({ ...auth(a), batchId: "a-noop-on", commands: [] }),
+  ]) {
+    assert.equal(coins(view, "near-npc"), 123500);
+    assert.equal(coins(view, "agent-npc"), 32100);
+    assert.ok(view.table.ledger.some((l) => l.id === "near-funds"));
+    for (const id of ["near-npc", "agent-npc"]) {
+      const p = view.table.purses.find((p) => p.id === id)!;
+      assert.equal("permissions" in p || "editingAllowed" in p || "editBaseline" in p, false, id);
+    }
+    // Hidden companion, NPCs elsewhere and treasuries stay private.
+    assert.equal(JSON.stringify(view.table).includes("hidden-npc"), false, "hidden NPC leaked");
+    assert.equal(coins(view, "far-npc") ?? 0, 0);
+    assert.equal(lines(view, "far-npc"), 0);
+    assert.equal(coins(view, "exchange-treasury") ?? 0, 0);
+    assert.equal(lines(view, "exchange-treasury"), 0);
+  }
+  // A player whose character is not with the party does not get companions' funds.
+  const onB = await roomState(auth(b));
+  assert.equal(coins(onB, "near-npc") ?? 0, 0);
+  assert.equal(lines(onB, "near-npc"), 0);
+  assert.equal(JSON.stringify(onB.table).includes("hidden-npc"), false);
+  // The controller still sees its NPC, and now the other companion too.
+  const onC = await roomState(auth(c));
+  assert.equal(coins(onC, "agent-npc"), 32100);
+  assert.equal(coins(onC, "near-npc"), 123500);
+  // The DM's view is unchanged.
+  assert.equal(coins(await roomState(dm), "hidden-npc"), 55600);
 });

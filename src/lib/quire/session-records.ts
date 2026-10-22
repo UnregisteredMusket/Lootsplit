@@ -2,7 +2,12 @@ import { projectConnectedMaps } from "./connected-maps.ts";
 import { facilityAccess } from "./ships.ts";
 import { readDowntimeActivities } from "./downtime-activities-schema.ts";
 import { readBlacksmith } from "./blacksmith-schema.ts";
-import { characterVisible, canReadCharacter, inParty } from "./character-position.ts";
+import {
+  characterVisible,
+  canReadCharacter,
+  companionFundsReadable,
+  inParty,
+} from "./character-position.ts";
 import { readWorld } from "./world-schema.ts";
 import { exchangeHere } from "./trade-economy.ts";
 import { readTradeEconomy } from "./trade-economy-schema.ts";
@@ -282,7 +287,13 @@ export function projectRecord(
           ),
         !!world.partyPosition,
       );
-    t.ledger = t.ledger.filter((l) => seat.purseIds.includes(l.purseId));
+    // DM setting: party companions' funds are readable by party players (decided on the unprojected table).
+    const companions = new Set(
+      table.purses.filter((p) => companionFundsReadable(table, p, seat)).map((p) => p.id),
+    );
+    t.ledger = t.ledger.filter(
+      (l) => seat.purseIds.includes(l.purseId) || companions.has(l.purseId),
+    );
     t.holdings = t.holdings.filter(
       (h) =>
         seat.purseIds.includes(h.purseId) ||
@@ -377,7 +388,7 @@ export function projectRecord(
               ...(canReadCharacter(t, p, seat)
                 ? { sheet: p.sheet, portrait: p.portrait, sheetRevision: p.sheetRevision }
                 : {}),
-              coins: { cp: 0, sp: 0, ep: 0, gp: 0, pp: 0 },
+              coins: companions.has(p.id) ? p.coins : { cp: 0, sp: 0, ep: 0, gp: 0, pp: 0 },
             },
       );
     world.characterPositions = world.characterPositions
