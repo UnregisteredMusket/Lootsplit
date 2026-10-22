@@ -3813,3 +3813,6 @@ input,select,textarea { max-width: 100%; }
   .split-pane-body .ability-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
   .split-pane-body .play-surface > div:has(> .play-action-row) { display: block; }
 }
+/* Split controls exist only from 1024px; hide them in the same frame a window narrows,
+   before React re-renders on the media change, so narrow layouts never overflow. */
+@media (max-width: 1023.98px) { .split-open-beside, .split-layout-toggle { display: none !important; } }

@@ -13,6 +13,7 @@ import {
   discardChatRecovery,
   chatStorageError,
   restoreAccountChatOutboxes,
+  chatSenderPurseId,
   type ChatScope,
   type OutgoingMessage,
 } from "./chat-composer.ts";
@@ -287,4 +288,18 @@ test("adoption keeps a guest's moved messages in memory only", () => {
   assert.throws(() => chatOutboxKey(confirmed), /memory only/);
   assert.equal(chatComposer(confirmed).outbox.length, 1);
   discardChatRecovery(confirmed);
+});
+
+test("a player can send while the room's purses are still loading after a page load", () => {
+  const hero = { id: "hero", kind: "character" };
+  const other = { id: "other", kind: "character" };
+  // Seat restored, purses not yet hydrated: send as the assigned (loading) character.
+  assert.equal(chatSenderPurseId(["other"], []), "other");
+  assert.equal(chatSenderPurseId(["other"], [hero]), "other");
+  // Loaded: the assigned character.
+  assert.equal(chatSenderPurseId(["other"], [hero, other]), "other");
+  // Unassigned, or the assigned purse is loaded but not a player character: no sender.
+  assert.equal(chatSenderPurseId([], [hero, other]), "");
+  assert.equal(chatSenderPurseId(["party"], [{ id: "party", kind: "party" }]), "");
+  assert.equal(chatSenderPurseId(["npc"], [{ id: "npc", kind: "character", control: "npc" }]), "");
 });

@@ -253,3 +253,19 @@ export function legacyChatOutbox(scope: ChatScope, storage?: Storage) {
     JSON.parse(storage.getItem(`lootsplit.chat.outbox.${scope.code}.${scope.seatId}`) || "[]"),
   );
 }
+
+/**
+ * The character a player sends as. Right after a page load the seat is restored before
+ * the room's purses arrive; then the assigned purse that is still loading is used (the
+ * server checks it belongs to this seat and is a character). Returns "" when the seat
+ * has no character, or its only assigned purses are loaded but are not player characters.
+ */
+export function chatSenderPurseId(
+  purseIds: readonly string[],
+  purses: readonly { id: string; kind: string; control?: string }[],
+) {
+  const loaded = purseIds.find((id) =>
+    purses.some((p) => p.id === id && p.kind === "character" && p.control !== "npc"),
+  );
+  return loaded ?? purseIds.find((id) => !purses.some((p) => p.id === id)) ?? "";
+}
