@@ -67,3 +67,19 @@ test("project settings wire every hook", () => {
   for (const server of Object.values(mcp.mcpServers))
     for (const arg of server.args ?? []) assert.doesNotMatch(arg, /@latest$/, "pin MCP server versions");
 });
+
+test("the install hook retries through the HTTPS proxy without touching other no-proxy hosts", async () => {
+  const { viaProxyEnv } = await import("../.claude/hooks/session-start.mjs");
+  const env = {
+    HTTPS_PROXY: "http://127.0.0.1:9",
+    NO_PROXY: "localhost,registry.npmjs.org,api.anthropic.com",
+    no_proxy: "localhost,registry.npmjs.org",
+    npm_config_noproxy: "registry.npmjs.org",
+  };
+  const next = viaProxyEnv(env);
+  assert.equal(next.NO_PROXY, "localhost,api.anthropic.com");
+  assert.equal(next.no_proxy, "localhost");
+  assert.equal(next.npm_config_noproxy, "");
+  assert.equal(viaProxyEnv({ NO_PROXY: "registry.npmjs.org" }), null, "no proxy configured");
+  assert.equal(viaProxyEnv({ HTTPS_PROXY: "http://x", NO_PROXY: "localhost" }), null, "nothing to change");
+});
