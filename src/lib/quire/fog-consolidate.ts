@@ -395,19 +395,20 @@ function mergeOutlines(outlines: Point[][]): Point[][] | undefined {
     // Boundary edges with the filled side on the left, keyed by their start vertex.
     const edges = new Map<number, number[]>();
     const key = (i: number, j: number) => j * (nx + 1) + i;
+    let count = 0;
     const add = (from: number, to: number) => {
+      count++;
       const list = edges.get(from);
       if (list) list.push(to);
       else edges.set(from, [to]);
     };
-    let count = 0;
     for (const index of cells) {
       const i = index % nx,
         j = (index - i) / nx;
-      if (!mine(i, j - 1)) (add(key(i + 1, j), key(i, j)), count++);
-      if (!mine(i - 1, j)) (add(key(i, j), key(i, j + 1)), count++);
-      if (!mine(i, j + 1)) (add(key(i, j + 1), key(i + 1, j + 1)), count++);
-      if (!mine(i + 1, j)) (add(key(i + 1, j + 1), key(i + 1, j)), count++);
+      if (!mine(i, j - 1)) add(key(i + 1, j), key(i, j));
+      if (!mine(i - 1, j)) add(key(i, j), key(i, j + 1));
+      if (!mine(i, j + 1)) add(key(i, j + 1), key(i + 1, j + 1));
+      if (!mine(i + 1, j)) add(key(i + 1, j + 1), key(i + 1, j));
     }
     const first = edges.keys().next().value!;
     const loop: number[] = [first];
