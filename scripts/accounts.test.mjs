@@ -634,10 +634,16 @@ test("campaign deletion requires linked DM, confirmation and current revision; s
       { id: "party", to: "party", text: "party message" },
     ];
     room.table.realm = { scale: 2 };
+    // Each link bumps the room revision (one per linked seat).
+    const { revision } = await DB.prepare("SELECT revision FROM campaign_rooms WHERE code=?")
+      .bind(room.code)
+      .first();
+    assert.equal(revision, 3);
+    room.revision = revision;
     await DB.prepare("UPDATE campaign_rooms SET body=? WHERE code=?")
       .bind(JSON.stringify(room), room.code)
       .run();
-    const body = { code: room.code, action: "delete", confirm: room.code, revision: 1 };
+    const body = { code: room.code, action: "delete", confirm: room.code, revision };
     assert.equal((await call("campaign", body, player.cookie)).response.status, 403);
     assert.equal(
       (await call("campaign", { ...body, confirm: "wrong" }, dm.cookie)).response.status,
