@@ -1,0 +1,14 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Android 11 and earlier (fullBackupContent). Campaign saves, device backups and settings stay in
+     Auto Backup. Excluded: WebView session storage and cookies (account session state). The owner
+     widget credential lives in getNoBackupFilesDir(), which Android never backs up. The account
+     token in WebView localStorage is device-bound instead (src/lib/mobile/token-binding.ts), because
+     that file also holds campaign data that must stay backed up. Keep in sync with
+     data_extraction_rules.xml. -->
+<full-backup-content>
+    <exclude domain="root" path="app_webview/Default/Session Storage/" />
+    <exclude domain="root" path="app_webview/Default/Cookies" />
+    <exclude domain="root" path="app_webview/Default/Cookies-journal" />
+    <exclude domain="root" path="app_webview/Cookies" />
+    <exclude domain="root" path="app_webview/Cookies-journal" />
+</full-backup-content>

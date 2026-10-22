@@ -35,6 +35,7 @@ public class OwnerWidgetJob extends JobService {
     @Override public boolean onStopJob(JobParameters params) {
         stopped = true;
         WidgetRefresh.cancelBackground(work);
-        return !WidgetStore.read(this).optString("token").isEmpty();
+        org.json.JSONObject state = WidgetStore.read(this);
+        return !state.optString("token").isEmpty() || state.optBoolean(WidgetStore.UNAVAILABLE);
     }
 }

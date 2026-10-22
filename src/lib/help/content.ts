@@ -506,6 +506,7 @@ export const HELP_GROUPS: HelpGroup[] = [
           "Export and verify a backup first. Use Downloads → Download for Android and open the APK in your phone’s file manager or Downloads. If prompted, allow that browser or file manager to install apps, then return to the installer. Install over the permanently signed Lootsplit app to preserve its data.",
           "An old debug-signed app cannot update in place to the permanent signing key. Export and verify a backup before uninstalling that older build, then install and restore. Do not uninstall a working app just to troubleshoot a download. GitHub and the earlier Google Drive download remain available on Downloads.",
           "The website receives updates independently of the published APK. Website-only improvements become bundled Android features with a future signed APK release; see the published version and changelog on Downloads. Downloads → Release details and verification lists the APK checksum, your client, the hosted web release and the published Android version; every website page links there from its footer.",
+          "If Android restores Lootsplit from a device backup onto a new phone or a reinstall, your saved campaigns and settings return but you sign in to your account again: the account session and the home-screen widget connection are never restored from a backup. Export a backup as well; Android’s own backup is not guaranteed.",
         ],
         links: [
           ["Downloads & release details", "/downloads"],

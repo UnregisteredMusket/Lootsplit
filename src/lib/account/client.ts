@@ -1,6 +1,7 @@
 import { API_ORIGIN } from "../mobile/origin";
 import { announceSheetChange } from "../quire/party-sheet-links";
 import { readAccountResponse } from "./response";
+import { accountTokenReady, accountTokenSettled } from "../mobile/token-binding";
 import { announceWorkspaceChange } from "../quire/workspace-events";
 const native = () => import.meta.env.VITE_MOBILE === "true";
 async function disconnectOwnerWidget(expectedToken?: string) {
@@ -42,6 +43,8 @@ async function accountRequestCore<T>(
   headers.set("accept", "application/json");
   headers.set("x-lootsplit-tabletop", "2");
   if (body !== undefined) headers.set("content-type", "application/json");
+  // Once per page: drop a token restored from another installation before it is ever sent.
+  if (native() && !accountTokenSettled()) await accountTokenReady();
   const token = native() ? localStorage.getItem(TOKEN) : null;
   if (token) headers.set("authorization", `Bearer ${token}`);
   const response = await fetch(`${native() ? API_ORIGIN : ""}/api/account/${path}`, {
