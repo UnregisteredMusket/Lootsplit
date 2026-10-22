@@ -40,6 +40,7 @@
   "node scripts/recovery-step.mjs worker-shop-stock 180 node scripts/shop-stock-browser-audit.mjs",
   "node scripts/recovery-step.mjs worker-help 180 node scripts/help-browser-audit.mjs",
   "node scripts/recovery-step.mjs worker-csp 240 node scripts/csp-browser-audit.mjs",
+  "node scripts/recovery-step.mjs pr-worker-csp 240 node scripts/csp-browser-audit.mjs",
   "node scripts/recovery-step.mjs worker-game-analytics 180 node scripts/game-analytics-browser-audit.mjs",
   "node scripts/recovery-step.mjs worker-website 180 node scripts/website-browser-audit.mjs",
   "node scripts/recovery-step.mjs worker-library-navigation 180 node scripts/library-navigation-browser-audit.mjs",

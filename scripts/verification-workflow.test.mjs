@@ -9,8 +9,10 @@ test("the aggregate release gate refuses failure, timeout, cancellation, skipped
   good.changes.outputs = { code: "true" };
   assertVerification(good);
   for (const job of requiredJobs) {
+    // pr-worker runs on pull requests only; a main run skips it but never accepts a failure.
+    const event = job === "pr-worker" ? "pull_request" : "push";
     for (const result of ["failure", "cancelled", "skipped", "timed_out", undefined]) {
-      assert.throws(() => assertVerification({ ...good, [job]: { result } }), new RegExp(job));
+      assert.throws(() => assertVerification({ ...good, [job]: { result } }, event), new RegExp(job));
     }
     const missing = { ...good };
     delete missing[job];
@@ -27,7 +29,7 @@ test("parallel workflow preserves every bounded release check exactly once", () 
   assert.equal(new Set(actual).size, actual.length, "No duplicate preservation check");
   for (const command of baseline) assert.ok(actual.includes(command), `Missing gate: ${command}`);
   assert.match(workflow, /fail-fast: false/);
-  assert.match(workflow, /if: always\(\)\n {4}needs: \[changes, build, development, worker, standby\]/);
+  assert.match(workflow, /if: always\(\)\n {4}needs: \[changes, build, development, worker, pr-worker, standby\]/);
   assert.match(workflow, /artifact-ids: \$\{\{ needs\.build\.outputs\.website_artifact \}\}/);
   assert.match(workflow, /artifact-ids: \$\{\{ needs\.build\.outputs\.standby_artifact \}\}/);
   assert.doesNotMatch(workflow, /continue-on-error: true/);
@@ -124,24 +126,33 @@ test("both account shards run in development and packaged Worker groups, each in
 });
 
 test("pull requests skip packaged audits; main and manual runs require every group", () => {
-  const all = (code, worker = "success", development = "success") => ({
+  const all = (code, worker = "success", development = "success", prWorker = "skipped") => ({
     changes: { result: "success", outputs: { code } },
     build: { result: "success" },
     development: { result: development },
     worker: { result: worker },
+    "pr-worker": { result: prWorker },
     standby: { result: worker },
   });
-  assertVerification(all("true", "skipped"), "pull_request");
+  assertVerification(all("true", "skipped", "success", "success"), "pull_request");
   assertVerification(all("false", "skipped", "skipped"), "pull_request");
-  assert.throws(() => assertVerification(all("true", "skipped", "skipped"), "pull_request"), /development/);
-  assert.throws(() => assertVerification(all("true", "failure"), "pull_request"), /worker/);
+  assert.throws(() => assertVerification(all("true", "skipped", "skipped", "success"), "pull_request"), /development/);
+  assert.throws(() => assertVerification(all("true", "failure", "success", "success"), "pull_request"), /worker/);
+  // Code pull requests must run the packaged script-policy audit on their own built Worker.
+  for (const result of ["skipped", "failure", "cancelled"])
+    assert.throws(() => assertVerification(all("true", "skipped", "success", result), "pull_request"), /pr-worker/);
   for (const event of ["push", "workflow_dispatch", "workflow_call"]) {
     assert.throws(() => assertVerification(all("true", "skipped"), event), /worker/);
     assert.throws(() => assertVerification(all("false", "success", "skipped"), event), /development/);
+    assert.throws(() => assertVerification(all("true", "success", "success", "failure"), event), /pr-worker/);
     assertVerification(all("true"), event);
   }
   const workflow = readFileSync(".github/workflows/verify.yml", "utf8");
   assert.equal((workflow.match(/if: github\.event_name != 'pull_request'/g) || []).length, 2);
+  assert.match(
+    workflow,
+    /pr-worker:\n(?:.*\n)*?\s+if: github\.event_name == 'pull_request' && needs\.changes\.outputs\.code == 'true'\n(?:.*\n)*?\s+run: node scripts\/recovery-step\.mjs pr-worker-csp 240 node scripts\/csp-browser-audit\.mjs/,
+  );
 });
 
 test("documentation-only changes are recognized; anything else, or nothing, counts as code", () => {

@@ -456,6 +456,59 @@ jobs:
           path: test-results/
           retention-days: 30
 
+  pr-worker:
+    name: Packaged Worker / pull request
+    needs: [changes, build]
+    # Pull requests skip the full packaged groups (main runs them before release), so a check that
+    # only the built Worker can exercise once reached main untested (worker-csp, 2026-10-22). This
+    # job serves the PR's own built artifact and runs the header/script-policy audit on it: the
+    # Worker-only response headers, hydration under them, the account page and OCR workers.
+    if: github.event_name == 'pull_request' && needs.changes.outputs.code == 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 12
+    permissions:
+      contents: read
+      id-token: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci
+      - run: npx playwright install --with-deps chromium
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          artifact-ids: ${{ needs.build.outputs.website_artifact }}
+          path: dist/website-release
+          merge-multiple: true
+      - run: node scripts/release-artifact.mjs verify
+      - name: Start disposable built Worker
+        timeout-minutes: 3
+        run: |
+          mkdir -p test-results
+          npx wrangler d1 migrations apply DB --local
+          npx wrangler dev --config dist/website-release/wrangler.toml --no-bundle --persist-to .wrangler/state --local --port 8082 --var ACCOUNT_ORIGIN:http://127.0.0.1:8082 --var ACCOUNT_SECRET:disposable-ci-only-account-secret-123456789 > test-results/worker-server.log 2>&1 &
+          for attempt in $(seq 1 45); do
+            if curl --max-time 2 -fsS http://127.0.0.1:8082/welcome > /dev/null; then exit 0; fi
+            sleep 2
+          done
+          echo "Built Worker did not become ready" >&2
+          exit 1
+      - name: pr-worker-csp
+        env:
+          AUDIT_ORIGIN: http://127.0.0.1:8082
+        run: node scripts/recovery-step.mjs pr-worker-csp 240 node scripts/csp-browser-audit.mjs
+      - name: Summarize measured verification stages
+        if: always()
+        run: node scripts/verification-timing.mjs
+      - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        if: always()
+        with:
+          name: browser-audit-pr-worker-${{ github.run_attempt }}
+          path: test-results/
+          retention-days: 30
+
   standby:
     name: Packaged standby
     needs: build
@@ -495,7 +548,7 @@ jobs:
   verify:
     name: verify
     if: always()
-    needs: [changes, build, development, worker, standby]
+    needs: [changes, build, development, worker, pr-worker, standby]
     runs-on: ubuntu-latest
     timeout-minutes: 2
     steps:
