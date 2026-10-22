@@ -80,13 +80,17 @@ public class OwnerWidgetProvider extends AppWidgetProvider {
         tile(view,R.id.monitor_accounts,snapshot==null?"—":snapshot.optString("accounts","—"),"Accounts");
         tile(view,R.id.monitor_campaigns,snapshot==null?"—":snapshot.optString("campaigns","—"),"Shared campaigns");
         long[] traffic=WidgetRows.traffic(snapshot);
-        boolean errors=traffic!=null&&traffic[1]>0;
+        // The error tile follows the Worker errors check: red only for current/unexplained errors,
+        // amber for a recent error that has stopped. Older servers without the check keep "any error = red".
+        String errorsState=snapshot==null?"":snapshot.optString("errorsState");
+        boolean recentErrors=traffic!=null&&traffic[1]>0&&"warning".equals(errorsState);
+        boolean errors=traffic!=null&&traffic[1]>0&&!recentErrors&&!"healthy".equals(errorsState);
         view.setTextViewText(R.id.monitor_requests,traffic==null?"—":WidgetRows.compact(traffic[0]));
         view.setTextViewText(R.id.monitor_requests_label,traffic==null?"REQ · — ERR":"REQ · "+WidgetRows.compact(traffic[1])+" ERR");
-        view.setContentDescription(R.id.monitor_requests,traffic==null?"Requests in the past 24 hours: "+(snapshot==null?"no current reading":snapshot.optString("traffic")):"Requests in the past 24 hours: "+traffic[0]+", errors: "+traffic[1]);
+        view.setContentDescription(R.id.monitor_requests,traffic==null?"Requests in the past 24 hours: "+(snapshot==null?"no current reading":snapshot.optString("traffic")):"Requests in the past 24 hours: "+traffic[0]+", errors: "+traffic[1]+(recentErrors?", none in the latest half-hour":""));
         view.setInt(R.id.monitor_tile_requests,"setBackgroundResource",errors?R.drawable.stat_tile_alert:R.drawable.stat_tile);
         view.setTextColor(R.id.monitor_requests,errors?color("red",light):accent);
-        view.setTextColor(R.id.monitor_requests_label,errors&&!light?text:muted);
+        view.setTextColor(R.id.monitor_requests_label,errors&&!light?text:recentErrors?color("yellow",light):muted);
         view.setOnClickPendingIntent(R.id.monitor_tile_requests,WidgetActions.pending(context,id,"logs",false));
 
         // 4. Task strip.
@@ -99,7 +103,8 @@ public class OwnerWidgetProvider extends AppWidgetProvider {
         } else view.setTextViewText(R.id.monitor_development,"No development task active");
         view.setTextColor(R.id.monitor_development,active?text:muted);
         view.setContentDescription(R.id.monitor_development,active?task.optString("title")+" · "+task.optString("phase")+" · "+task.optString("state"):"No development task active");
-        String detail=!warning.isEmpty()?"! "+warning:active?task.optString("title")+" · "+task.optString("progress"):"";
+        // Idle: name the last task and how it ended (completed, failed, interrupted) with its time.
+        String detail=!warning.isEmpty()?"! "+warning:active?task.optString("title")+" · "+task.optString("progress"):WidgetRows.lastTask(task,"Last: ");
         view.setViewVisibility(R.id.monitor_task_detail,detail.isEmpty()?View.GONE:View.VISIBLE);
         view.setTextViewText(R.id.monitor_task_detail,detail);
         view.setContentDescription(R.id.monitor_task_detail,!warning.isEmpty()?"Warning: "+warning:detail);

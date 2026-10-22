@@ -56,7 +56,7 @@ public class CompanionWidgetProvider extends AppWidgetProvider {
             view.setViewVisibility(R.id.companion_timer,View.GONE);
         } else {
             if(firstActivity) {
-                String primary=latest==null?WidgetRows.activityStatus(snapshot):WidgetRows.activityLine(latest,now);
+                String primary=latest==null?WidgetRows.activityStatus(snapshot):WidgetRows.activityLine(latest,now,WidgetRows.activityLive(snapshot,now));
                 view.setTextViewText(R.id.companion_first,primary);
                 view.setTextColor(R.id.companion_first,latest==null&&WidgetRows.activityEvents(snapshot)==null?OwnerWidgetProvider.color("yellow",light):ink);
                 view.setContentDescription(R.id.companion_first,"OWNER · "+snapshot.optString("name")+". GitHub activity. "+(latest==null?primary:WidgetRows.activityWord(latest)+": "+primary+". At "+WidgetData.time(latest.optLong("at"))));
@@ -111,8 +111,9 @@ public class CompanionWidgetProvider extends AppWidgetProvider {
             description="Warning: "+message+". GitHub activity as of "+WidgetData.time(checked);
             colour=OwnerWidgetProvider.color("yellow",light);
         } else if(event!=null) {
-            line=WidgetRows.glyph(WidgetRows.activityColor(event))+" "+WidgetRows.activityLine(event,now);
-            description=WidgetRows.activityWord(event)+": "+WidgetRows.activityLine(event,now)+". At "+WidgetData.time(event.optLong("at"))+". GitHub activity checked "+WidgetData.time(checked);
+            boolean live=WidgetRows.activityLive(snapshot,now);
+            line=WidgetRows.glyph(WidgetRows.activityColor(event))+" "+WidgetRows.activityLine(event,now,live);
+            description=WidgetRows.activityWord(event)+": "+WidgetRows.activityLine(event,now,live)+". At "+WidgetData.time(event.optLong("at"))+". GitHub activity checked "+WidgetData.time(checked);
             colour="fail".equals(event.optString("state"))?OwnerWidgetProvider.color("red",light):muted;
         } else {
             boolean available=WidgetRows.activityEvents(snapshot)!=null;

@@ -381,5 +381,35 @@ export async function ownerMonitor(env, userId, sessionId, request) {
     .bind(userId)
     .first();
   if (!account) throw Object.assign(new Error("Sign in again."), { status: 401 });
-  return { ...snapshot, account };
+  const view = request?.url ? new URL(request.url).searchParams.get("view") : null;
+  return view === "widget" ? widgetSnapshot({ ...snapshot, account }) : { ...snapshot, account };
+}
+/**
+ * The compact form the Android widgets request (`?view=widget`). It drops only bulky lists the
+ * widgets never read: the 100 scanned workflow runs (their derived events, running workflows,
+ * open pull requests and latest deployment stay), closed pull requests and other devices' reports.
+ * Each omission is stated with its count, so nothing reads as zero. The full snapshot, history
+ * and dashboard are unchanged.
+ */
+export function widgetSnapshot(snapshot) {
+  const out = { ...snapshot, view: "widget" };
+  const data = snapshot.development?.data;
+  if (data && typeof data === "object") {
+    const { runs, closedPulls, ...kept } = data;
+    out.development = {
+      ...snapshot.development,
+      data: {
+        ...kept,
+        omitted: {
+          runs: Array.isArray(runs) ? runs.length : 0,
+          closedPulls: Array.isArray(closedPulls) ? closedPulls.length : 0,
+        },
+      },
+    };
+  }
+  if (Array.isArray(snapshot.devices)) {
+    delete out.devices;
+    out.omitted = { devices: snapshot.devices.length };
+  }
+  return out;
 }

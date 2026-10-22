@@ -6,6 +6,7 @@ import {
   duration,
   type Evidence,
   type JournalSnapshot,
+  type MonitorDiagnostic,
   type MonitorEntry,
   type MonitorReport,
   type MonitorSettings,
@@ -19,6 +20,17 @@ const summarizedCounts = (sections: Record<string, { shown: number; total: numbe
   Object.keys(sections)
     .map((section) => `${section}: ${sections[section].shown} of ${sections[section].total}`)
     .join(" · ");
+/** Same meanings as the Android widgets: a coverage limit or recent warning is not a failure. */
+const diagnosticLabel = (check: Pick<MonitorDiagnostic, "color" | "state" | "coverageLimit">) =>
+  check.color === "red"
+    ? "Confirmed failure"
+    : check.color === "green"
+      ? "Current and healthy"
+      : check.coverageLimit
+        ? "Coverage limit (not measured by design)"
+        : check.state === "warning"
+          ? "Recent problem, not current"
+          : "Unverified or stale";
 const tabs = ["history", "reports", "task", "diagnostics", "registry"] as const;
 type Tab = (typeof tabs)[number];
 type RetiredSpan = {
@@ -465,8 +477,7 @@ export function MonitorJournal({ data, refresh }: { data: JournalSnapshot; refre
               <p className="owner-monitor-note">Generated {dated(report.generatedAt)}</p>
               {report.summarized && (
                 <p className="owner-monitor-note">
-                  {report.summarized.note}{" "}
-                  {summarizedCounts(report.summarized.sections)}
+                  {report.summarized.note} {summarizedCounts(report.summarized.sections)}
                 </p>
               )}
               <ul>
@@ -490,7 +501,7 @@ export function MonitorJournal({ data, refresh }: { data: JournalSnapshot; refre
                   {report.unresolved.map((d) => (
                     <p key={d.component}>
                       <strong>
-                        {d.component} · {d.color === "red" ? "Confirmed failure" : "Unverified"}
+                        {d.component} · {diagnosticLabel(d)}
                       </strong>
                       : {d.symptom} {d.action} Last checked {dated(d.latestCheckAt)}. Evidence:{" "}
                       {d.entryId}.
@@ -548,8 +559,8 @@ export function MonitorJournal({ data, refresh }: { data: JournalSnapshot; refre
                 <details>
                   <summary>Retired logs ({report.retiredLogs.length})</summary>
                   <p className="owner-monitor-note">
-                    Retired spans are not active coverage and are not counted as missing data.
-                    Their stored entries remain in History.
+                    Retired spans are not active coverage and are not counted as missing data. Their
+                    stored entries remain in History.
                   </p>
                   <ul>
                     {report.retiredLogs.map((r) => (
@@ -789,14 +800,14 @@ export function MonitorJournal({ data, refresh }: { data: JournalSnapshot; refre
                 <span className="monitor-light" data-color={check.color} aria-hidden="true">
                   ●
                 </span>{" "}
-                {check.component} ·{" "}
-                {check.color === "red"
-                  ? "Confirmed failure"
-                  : check.color === "green"
-                    ? "Current and healthy"
-                    : "Unverified or stale"}
+                {check.component} · {diagnosticLabel(check)}
               </strong>
               <p>{check.symptom}</p>
+              {check.lastAt ? (
+                <p>
+                  {check.brief ? `${check.brief} · ` : ""}last {dated(check.lastAt)}
+                </p>
+              ) : null}
               <p>
                 {check.impact} {check.action}
               </p>

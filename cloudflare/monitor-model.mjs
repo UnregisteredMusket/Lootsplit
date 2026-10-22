@@ -210,7 +210,35 @@ export function workflowTaskRun(task) {
 export function workflowTaskEnded(task, development, now, newestFinishedOnBranch = null) {
   if (!task || TERMINAL.includes(task.state)) return null;
   const ref = workflowTaskRun(task);
-  if (!ref || development?.state !== "ready" || !Array.isArray(development.data?.runs)) return null;
+  if (!ref) return null;
+  return (
+    workflowRunEnded(task, ref, development, now, newestFinishedOnBranch) ??
+    stepDeadlinePassed(task, ref, now)
+  );
+}
+// A workflow step's runner (scripts/recovery-step.mjs) kills its command at the declared deadline
+// and reports the result. A step past that deadline, with no heartbeat for this long, can no
+// longer be running even when GitHub data is unavailable or the run is older than the scan.
+export const STEP_DEADLINE_GRACE_MS = 15 * 60000;
+function stepDeadlinePassed(task, ref, now) {
+  const deadline = task.expectedUntil;
+  if (
+    !Number.isSafeInteger(deadline) ||
+    now - deadline <= STEP_DEADLINE_GRACE_MS ||
+    now - task.heartbeatAt <= STEP_DEADLINE_GRACE_MS
+  )
+    return null;
+  return {
+    reason: "deadline-passed",
+    runId: ref.runId,
+    conclusion: null,
+    url: null,
+    at: null,
+    progress: `The step's declared deadline (${new Date(deadline).toISOString()}) passed without a reported result; its runner stops the step at that deadline, so it is no longer running. Telemetry last arrived ${new Date(task.heartbeatAt).toISOString()}.`,
+  };
+}
+function workflowRunEnded(task, ref, development, now, newestFinishedOnBranch) {
+  if (development?.state !== "ready" || !Array.isArray(development.data?.runs)) return null;
   const run = development.data.runs.find((r) => r.id === ref.runId);
   if (run) {
     if (Number.isSafeInteger(run.attempt) && run.attempt > ref.attempt)
@@ -384,15 +412,19 @@ export function transitionTask(previous, input, now, settings = DEFAULT_CONFIG) 
 // Neither a success nor a gap: a skipped/superseded result, or a component retired because its
 // branch finished. Shown green so it is not attention; it never records a success.
 export const NOT_ATTENTION = ["not-applicable", "retired"];
+// A confirmed, current reading of a recent problem that is no longer occurring (for example Worker
+// errors earlier in the 24-hour window but none in the latest half-hour). Amber, not a failure.
+export const WARNING = "warning";
 export function diagnostic(previous, check, now) {
   const failed = check.state === "error";
   const settled = NOT_ATTENTION.includes(check.state);
-  const unknown = !settled && !["healthy", "error"].includes(check.state);
+  const warning = check.state === WARNING;
+  const unknown = !settled && !warning && !["healthy", "error"].includes(check.state);
   const preserveFailure = unknown && previous?.confirmedFailure === true;
-  const bad = failed || unknown;
+  const bad = failed || unknown || warning;
   return {
     ...check,
-    color: failed || preserveFailure ? "red" : unknown ? "yellow" : "green",
+    color: failed || preserveFailure ? "red" : unknown || warning ? "yellow" : "green",
     confirmedFailure: failed || preserveFailure,
     firstOccurredAt: bad ? previous?.firstOccurredAt || now : null,
     latestCheckAt: now,
@@ -407,25 +439,125 @@ export function diagnostic(previous, check, now) {
       : check.symptom,
   };
 }
+/**
+ * Overall status from the required checks. `status` separates the two amber meanings:
+ * "attention" (only confirmed recent problems that are not current) and "unverified" (a required
+ * check could not be verified). Checks with `required: false` are coverage limits: they never decide
+ * the status, are named in `notes` and the reason, and stay listed in the diagnostics.
+ */
 export function overall(checks) {
   const required = checks.filter((c) => c.required !== false);
+  const notes = checks
+    .filter((c) => c.required === false && c.color !== "green")
+    .map((c) => c.component);
   const color = required.some((c) => c.color === "red")
     ? "red"
     : !required.length || required.some((c) => c.color !== "green")
       ? "yellow"
       : "green";
+  const status =
+    color === "red"
+      ? "failure"
+      : color === "green"
+        ? "healthy"
+        : required.length &&
+            required.every(
+              (c) => c.color === "green" || (c.color === "yellow" && c.state === WARNING),
+            )
+          ? "attention"
+          : "unverified";
+  const note = notes.length ? ` Coverage limit noted (not a failure): ${notes.join(", ")}.` : "";
   return {
     color,
+    status,
     label:
-      color === "green"
+      status === "healthy"
         ? "Required checks current and healthy"
-        : color === "red"
+        : status === "failure"
           ? "Confirmed error needs attention"
-          : "Current status cannot be fully verified",
+          : status === "attention"
+            ? "Recent problem needs review; current checks pass"
+            : "Current status cannot be fully verified",
     reason:
-      required
+      (required
         .filter((c) => c.color === color && color !== "green")
         .map((c) => c.component)
-        .join(", ") || "All required checks passed.",
+        .join(", ") || "All required checks passed.") + (color === "green" ? note : ""),
+    notes,
+  };
+}
+/** An error rate at or above this (1%) over the 24-hour window is a failure even if errors stopped. */
+export const WORKER_ERROR_RATE_FAILURE = 0.01;
+const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
+/**
+ * Rate- and recency-aware Worker error check. `traffic` is the rolling 24-hour reading
+ * ({requests, errors, since, until}) or null; `intervals` are scheduled half-hour readings
+ * ({slot, errors}, window [slot-30m, slot), errors null when unmeasured).
+ * - error (red): errors in the newest measured half-hour, errors that no measured half-hour accounts
+ *   for (recency not established, e.g. the minutes since the last scheduled collection), or a
+ *   24-hour error rate of at least 1%.
+ * - warning (amber): every error is in an earlier measured half-hour and none since.
+ * Raw counts, rate and the last error window are kept on the check for details and history.
+ */
+export function workerErrorCheck(traffic, intervals = []) {
+  const errors = traffic?.errors,
+    requests = traffic?.requests;
+  if (!Number.isSafeInteger(errors) || errors < 0)
+    return { state: "unavailable", symptom: "The measured Worker error count is unavailable." };
+  const base = `${errors} Worker error(s) were reported in the measured past-24-hour window`;
+  const fields = {
+    errorCount: errors,
+    requestCount: Number.isSafeInteger(requests) ? requests : null,
+    errorRate: Number.isSafeInteger(requests) && requests > 0 ? errors / requests : null,
+    brief: `${plural(errors, "error")} in 24h`,
+  };
+  if (errors === 0)
+    return {
+      state: "healthy",
+      symptom: `${base}${fields.requestCount === null ? "" : ` (${fields.requestCount} requests)`}.`,
+      ...fields,
+      lastAt: null,
+    };
+  const start = Date.parse(traffic.since),
+    end = Date.parse(traffic.until);
+  const overlapping = (Number.isFinite(start) && Number.isFinite(end) ? intervals : [])
+    .filter((i) => Number.isSafeInteger(i?.slot) && i.slot > start && i.slot - INTERVAL < end)
+    .sort((a, b) => b.slot - a.slot);
+  const measured = overlapping.filter((i) => Number.isSafeInteger(i.errors) && i.errors >= 0);
+  const attributed = measured.reduce((sum, i) => sum + i.errors, 0);
+  const newest = overlapping[0];
+  const lastError = measured.find((i) => i.errors > 0) || null;
+  const lastErrorWindow = lastError
+    ? { start: lastError.slot - INTERVAL, end: lastError.slot }
+    : null;
+  const unattributed = Math.max(0, errors - attributed);
+  const rate = fields.errorRate;
+  const ratio =
+    rate === null
+      ? ""
+      : ` (${(rate * 100).toFixed(rate < 0.001 ? 3 : 1)}% of ${fields.requestCount} requests)`;
+  const iso = (at) => new Date(at).toISOString();
+  const windowText = lastErrorWindow
+    ? ` Last half-hour with errors: ${iso(lastErrorWindow.start)}–${iso(lastErrorWindow.end)} (${lastError.errors}).`
+    : "";
+  const reasons = [];
+  if (newest && Number.isSafeInteger(newest.errors) && newest.errors > 0)
+    reasons.push(`errors occurred in the newest measured half-hour (ending ${iso(newest.slot)})`);
+  if (unattributed > 0)
+    reasons.push(
+      `${plural(unattributed, "error")} ${unattributed === 1 ? "is" : "are"} not in any measured half-hour, so ${unattributed === 1 ? "it" : "they"} may be current`,
+    );
+  if (rate !== null && rate >= WORKER_ERROR_RATE_FAILURE)
+    reasons.push(`the error rate is at least ${WORKER_ERROR_RATE_FAILURE * 100}%`);
+  if (rate === null) reasons.push("the request count is unavailable, so the error rate is unknown");
+  const later = lastError ? measured.filter((i) => i.slot > lastError.slot).length : 0;
+  return {
+    state: reasons.length ? "error" : WARNING,
+    symptom: reasons.length
+      ? `${base}${ratio}; ${reasons.join("; ")}.${windowText}`
+      : `${base}${ratio}. None since: ${later ? `the ${plural(later, "later measured half-hour")} through ${iso(measured[0].slot)} had no errors` : "the 24-hour total is fully accounted for by earlier measured half-hours"}.${windowText}`,
+    ...fields,
+    lastAt: lastErrorWindow?.end ?? null,
+    lastErrorWindow,
   };
 }

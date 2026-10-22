@@ -634,8 +634,9 @@ public class OwnerWidgetTest {
         org.json.JSONArray failed=new org.json.JSONArray().put(activityEvent("run-failed","fail","Verify failed on #138","Widget redesign",138,1)).put(activityEvent("pr-merged","ok","Merged #137","Icons",137,30));
         View view=renderCompanion(activityState(activityFixture(failed,0),""),preset,350,72,"companion-agent-activity-failed");
         assertEquals("✕",text(view,R.id.companion_light));
-        assertEquals("Verify failed on #138 · 1m",text(view,R.id.companion_first));
-        assertEquals("✓ Merged #137 · Icons · 30m",text(view,R.id.companion_second));
+        // Nothing is running, so the face is not re-rendered every minute: clock times, not ages that would go stale.
+        assertEquals("Verify failed on #138 · "+WidgetRows.clock(failed.getJSONObject(0).getLong("at")),text(view,R.id.companion_first));
+        assertEquals("✓ Merged #137 · Icons · "+WidgetRows.clock(failed.getJSONObject(1).getLong("at")),text(view,R.id.companion_second));
         org.json.JSONArray running=new org.json.JSONArray().put(activityEvent("run-started","active","Verify running on #138","",138,4));
         view=renderCompanion(activityState(activityFixture(running,1),""),preset,350,72,"companion-agent-activity-running");
         assertEquals("!",text(view,R.id.companion_light));
@@ -667,6 +668,109 @@ public class OwnerWidgetTest {
         view=renderCompanion(new JSONObject().put("message","Connect in My account"),preset,250,56,"companion-agent-activity-signed-out");
         assertEquals("–",text(view,R.id.companion_light));assertEquals("Owner sign-in needed",text(view,R.id.companion_first));
         assertEquals("field-development",WidgetActions.destination("activity"));
+    }
+    /** The owner's production reading of 2026-10-22: one old Worker error, Multiplayer's by-design gap, an ended step. */
+    private JSONObject productionFixture(long errorAt) throws Exception {
+        JSONObject source=journalFixture(); long now=System.currentTimeMillis();
+        source.put("overall",new JSONObject().put("color","yellow").put("status","attention").put("label","Recent problem needs review; current checks pass")
+                .put("reason","Worker execution errors").put("notes",new org.json.JSONArray().put("Multiplayer")))
+            .put("traffic",new JSONObject().put("state","ready").put("checkedAt",now).put("data",new JSONObject().put("requests",23674).put("errors",1)))
+            .put("diagnostics",new org.json.JSONArray()
+                .put(new JSONObject().put("component","Storage").put("color","green").put("state","healthy").put("symptom","Database responded in 4 ms.").put("action","No action required."))
+                .put(new JSONObject().put("component","Multiplayer").put("color","yellow").put("state","unavailable").put("required",false).put("coverageLimit",true)
+                    .put("brief","not measured by design").put("symptom","Storage was checked; no synthetic player session was created.").put("action","Check the existing room connection indicator."))
+                .put(new JSONObject().put("component","Worker execution errors").put("color","yellow").put("state","warning").put("brief","1 error in 24h").put("lastAt",errorAt)
+                    .put("symptom","1 Worker error(s) were reported in the measured past-24-hour window. None since.").put("action","Inspect Cloudflare invocation logs.")))
+            .put("developmentStatus",new JSONObject().put("label","No development task active").put("warning",JSONObject.NULL).put("task",new JSONObject()
+                .put("id","run:1:1:deploy:website-live-audit").put("revision",4).put("title","website-live-audit").put("objective","Live audit").put("phase","website-live-audit")
+                .put("progress","Runner result: success.").put("state","completed").put("active",false).put("startedAt",now-3600000).put("heartbeatAt",now-600000).put("progressAt",now-600000).put("completedAt",now-600000)));
+        return source;
+    }
+    @Test public void attentionCoverageLimitsRecentErrorsAndLastTaskAreDistinct() throws Exception {
+        long errorAt=System.currentTimeMillis()-2*3600000L;
+        JSONObject snapshot=WidgetData.project(productionFixture(errorAt),System.currentTimeMillis());
+        assertEquals("attention",snapshot.getString("statusKind"));
+        View view=mainFace(snapshot);
+        assertEquals("!",text(view,R.id.monitor_glyph));
+        assertEquals("A recent error that stopped is attention, not a failure","ATTENTION",text(view,R.id.monitor_health));
+        assertEquals("Worker execution errors · 1 error in 24h · last "+WidgetRows.clock(errorAt),text(view,R.id.monitor_services));
+        // The error tile is amber, not red, and the count is unchanged.
+        assertEquals("REQ · 1 ERR",text(view,R.id.monitor_requests_label));
+        assertEquals(OwnerWidgetProvider.color("yellow",false),((TextView)view.findViewById(R.id.monitor_requests_label)).getCurrentTextColor());
+        assertNotEquals(OwnerWidgetProvider.color("red",false),((TextView)view.findViewById(R.id.monitor_requests)).getCurrentTextColor());
+        assertTrue(view.findViewById(R.id.monitor_requests).getContentDescription().toString().contains("errors: 1, none in the latest half-hour"));
+        // Idle task card names the last task and how it ended instead of a bare "no task".
+        assertEquals("No development task active",text(view,R.id.monitor_development));
+        assertEquals(View.VISIBLE,view.findViewById(R.id.monitor_task_detail).getVisibility());
+        assertTrue(text(view,R.id.monitor_task_detail),text(view,R.id.monitor_task_detail).startsWith("Last: website-live-audit · completed "));
+        // Rows: the recent error first; Multiplayer kept, as information, never as attention.
+        org.json.JSONArray rows=WidgetRows.rows(snapshot);
+        assertEquals("Worker execution errors",rows.getJSONObject(0).getString("title"));
+        assertEquals("yellow",rows.getJSONObject(0).getString("color"));
+        assertEquals(WidgetRows.clock(errorAt),rows.getJSONObject(0).getString("time"));
+        assertEquals(1,WidgetRows.attention(rows));
+        boolean limit=false;
+        for(int i=0;i<rows.length();i++){JSONObject row=rows.getJSONObject(i);if(row.getString("title").equals("Multiplayer · coverage limit")){limit=true;assertEquals("",row.getString("color"));assertTrue(row.getString("detail").contains("no synthetic player session"));}}
+        assertTrue("The coverage limit stays listed",limit);
+        assertTrue(WidgetRows.rows(snapshot).getJSONObject(1).getString("detail").length()>0);
+        // Healthy with the same coverage limit reads HEALTHY with a short note; the limit is named in the description.
+        JSONObject healthySource=productionFixture(errorAt);
+        healthySource.put("overall",new JSONObject().put("color","green").put("status","healthy").put("label","Required checks current and healthy")
+            .put("reason","All required checks passed. Coverage limit noted (not a failure): Multiplayer.").put("notes",new org.json.JSONArray().put("Multiplayer")));
+        healthySource.getJSONArray("diagnostics").getJSONObject(2).put("color","green").put("state","healthy").put("brief","0 errors in 24h").put("lastAt",0);
+        healthySource.getJSONObject("traffic").getJSONObject("data").put("errors",0);
+        JSONObject healthy=WidgetData.project(healthySource,System.currentTimeMillis());
+        view=mainFace(healthy);
+        assertEquals("✓",text(view,R.id.monitor_glyph));
+        assertEquals("HEALTHY",text(view,R.id.monitor_health));
+        assertEquals("All checks passed · 1 coverage limit",text(view,R.id.monitor_services));
+        assertTrue(view.findViewById(R.id.monitor_services).getContentDescription().toString().contains("Multiplayer"));
+        assertEquals("LOG",text(view,R.id.monitor_list_label));
+        assertEquals("HEALTHY · all checks",WidgetRows.category(healthy,"health"));
+        // A current Worker error keeps the red tile.
+        JSONObject failing=productionFixture(errorAt);
+        failing.put("overall",new JSONObject().put("color","red").put("status","failure").put("reason","Worker execution errors"));
+        failing.getJSONArray("diagnostics").getJSONObject(2).put("color","red").put("state","error");
+        view=mainFace(WidgetData.project(failing,System.currentTimeMillis()));
+        assertEquals("FAILURE",text(view,R.id.monitor_health));
+        assertEquals(OwnerWidgetProvider.color("red",false),((TextView)view.findViewById(R.id.monitor_requests)).getCurrentTextColor());
+        // Older servers (colour only) and inconsistent statuses fall back to the colour.
+        assertEquals("unverified",WidgetData.statusKind(new JSONObject().put("color","yellow")));
+        assertEquals("failure",WidgetData.statusKind(new JSONObject().put("color","red").put("status","healthy")));
+        assertEquals("healthy",WidgetData.statusKind(new JSONObject().put("color","green")));
+        assertEquals("unverified",WidgetData.statusKind(null));
+    }
+    @Test public void compactPayloadAgesAndBackgroundRetryRules() throws Exception {
+        assertTrue("Widgets request the compact view",WidgetClient.ENDPOINT.endsWith("/api/account/owner/monitor?view=widget"));
+        // The compact view has no scanned runs; everything the widgets show still projects.
+        JSONObject compact=journalFixture();
+        compact.getJSONObject("development").getJSONObject("data").put("omitted",new JSONObject().put("runs",100).put("closedPulls",20));
+        JSONObject snapshot=WidgetData.project(compact,System.currentTimeMillis());
+        assertEquals("1 running · 1 open PRs",snapshot.getString("development"));
+        assertEquals("Deploy: in_progress",snapshot.getString("deployment"));
+        // Relative ages only while the fast cadence re-renders; otherwise the clock time.
+        long now=System.currentTimeMillis();
+        JSONObject event=activityEvent("pr-merged","ok","Merged #138","Widget redesign",138,2);
+        assertEquals("Merged #138 · Widget redesign · 2m",WidgetRows.activityLine(event,now,true));
+        assertEquals("Merged #138 · Widget redesign · "+WidgetRows.clock(event.getLong("at")),WidgetRows.activityLine(event,now,false));
+        org.json.JSONArray events=new org.json.JSONArray().put(event);
+        assertTrue(WidgetRows.activityLive(WidgetData.project(activityFixture(events,1),now),now));
+        assertFalse(WidgetRows.activityLive(WidgetData.project(activityFixture(events,0),now),now));
+        assertFalse(WidgetRows.activityLive(WidgetData.project(activityFixture(events,1),now),now+WidgetRefresh.ACTIVITY_MAX_AGE_MILLIS+1));
+        // Background retries with backoff only after transport failures.
+        assertTrue(WidgetRefresh.transientFailure(WidgetRefresh.FAILED));
+        assertTrue(WidgetRefresh.transientFailure(WidgetRefresh.TIMED_OUT));
+        for(String final_:new String[]{"","Connect your owner account in My account.","Owner session expired. Sign in again in My account.","Account changed. Refresh the current account.","Widget storage unavailable. Reconnect in My account."})
+            assertFalse(final_,WidgetRefresh.transientFailure(final_));
+        String generation=WidgetStore.connect(context,"synthetic-backoff");
+        assertNotNull(generation);
+        context.getSystemService(JobScheduler.class).cancel(OwnerWidgetJob.ID);
+        OwnerWidgetJob.schedule(context);
+        android.app.job.JobInfo job=context.getSystemService(JobScheduler.class).getPendingJob(OwnerWidgetJob.ID);
+        assertNotNull(job);
+        assertEquals(android.app.job.JobInfo.BACKOFF_POLICY_EXPONENTIAL,job.getBackoffPolicy());
+        assertEquals(60000,job.getInitialBackoffMillis());
+        assertEquals(1800000,job.getIntervalMillis());
     }
     @Test public void agentActivityFastRefreshIsNonWakeupAndOnlyWhileActive() throws Exception {
         JSONObject[] activity={CompanionSettings.preset("Agent activity")},other={CompanionSettings.preset("Development"),CompanionSettings.preset("Server Health")};

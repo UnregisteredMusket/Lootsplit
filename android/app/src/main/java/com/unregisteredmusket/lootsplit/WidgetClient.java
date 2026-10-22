@@ -10,7 +10,9 @@ import javax.net.ssl.HttpsURLConnection;
 final class WidgetClient {
     private static android.content.Context appContext;
     static void initialize(android.content.Context context) { appContext = context.getApplicationContext(); }
-    static final String ENDPOINT = "https://lootsplit.oliverstorie2017.workers.dev/api/account/owner/monitor";
+    // The compact widget view omits only lists the widgets never read (the 100 scanned workflow runs,
+    // closed pull requests, device reports), keeping the response far below the 256 KiB bound.
+    static final String ENDPOINT = "https://lootsplit.oliverstorie2017.workers.dev/api/account/owner/monitor?view=widget";
     static final class AccessDenied extends Exception { }
     interface ConnectionFactory { HttpsURLConnection open() throws Exception; }
 
