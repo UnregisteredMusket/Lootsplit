@@ -172,7 +172,7 @@ async function roomSeat(db, code, token) {
 }
 
 /**
- * Links a campaign seat to the signed-in account. The room write bumps the revision so
+ * Links a campaign seat to the signed-in account. A room write bumps the revision so
  * pollers see it and a request that loaded the room earlier cannot overwrite it.
  */
 export async function linkAccountSeat(db, userId, body) {
@@ -190,33 +190,32 @@ export async function linkAccountSeat(db, userId, body) {
     .first();
   if (owner && owner.user_id !== userId) fail("This seat is linked to another account.", 409);
   const prior = JSON.stringify(room);
-  seat.userId = userId;
-  if (seat.role === "dm") room.ownerId = userId;
-  // Same conditional write as character-play: the body comparison detects a concurrent
-  // change, and the revision bump invalidates revision-only CAS writers (updateRoom) and
-  // tells knownRevision pollers that the room changed.
-  room.revision = (Number.isSafeInteger(room.revision) ? room.revision : 0) + 1;
-  const updated = await db.batch([
-    db
-      .prepare("UPDATE campaign_rooms SET body=?,revision=? WHERE code=? AND body=?")
-      .bind(JSON.stringify(room), room.revision, code, prior),
+  const changes = seat.userId !== userId || (seat.role === "dm" && room.ownerId !== userId);
+  const statements = [];
+  if (changes) {
+    seat.userId = userId;
+    if (seat.role === "dm") room.ownerId = userId;
+    // Same conditional write as character-play: the body comparison detects a concurrent
+    // change, and the revision bump invalidates revision-only CAS writers (updateRoom) and
+    // tells knownRevision pollers that the room changed.
+    room.revision = (Number.isSafeInteger(room.revision) ? room.revision : 0) + 1;
+    statements.push(
+      db
+        .prepare("UPDATE campaign_rooms SET body=?,revision=? WHERE code=? AND body=?")
+        .bind(JSON.stringify(room), room.revision, code, prior),
+    );
+  }
+  // An already linked seat leaves the room untouched (no revision bump); the membership
+  // row is still refreshed, and only while the room is exactly as read.
+  statements.push(
     db
       .prepare(
         "INSERT INTO library_members (user_id,code,seat_id,token,name,archived,updated_at) SELECT ?,?,?,?,?,0,? WHERE EXISTS (SELECT 1 FROM campaign_rooms WHERE code=? AND body=?) ON CONFLICT(user_id,code) DO UPDATE SET seat_id=excluded.seat_id,token=excluded.token,name=excluded.name,archived=0,updated_at=excluded.updated_at",
       )
-      .bind(
-        userId,
-        code,
-        seat.id,
-        token,
-        text(body.name),
-        Date.now(),
-        code,
-        JSON.stringify(room),
-      ),
-  ]);
-  if (!updated[0].meta.changes)
-    fail("The campaign changed. Retry saving this membership.", 409);
+      .bind(userId, code, seat.id, token, text(body.name), Date.now(), code, JSON.stringify(room)),
+  );
+  const updated = await db.batch(statements);
+  if (!updated[0].meta.changes) fail("The campaign changed. Retry saving this membership.", 409);
 }
 
 export async function handleAccounts(request, env) {

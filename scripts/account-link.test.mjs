@@ -123,3 +123,53 @@ test("a link that races another room write fails cleanly instead of overwriting 
     );
   });
 });
+
+test("relinking an already linked seat refreshes the membership without a room write", async () => {
+  const code = "RELINK12";
+  await withRoom(code, async (DB) => {
+    const token = `${code}-player-token`;
+    await linkAccountSeat(DB, "player-user", { code, token, name: "Game" });
+    const linked = await DB.prepare("SELECT revision,body FROM campaign_rooms WHERE code=?")
+      .bind(code)
+      .first();
+    assert.equal(linked.revision, 2);
+    await linkAccountSeat(DB, "player-user", { code, token, name: "Renamed game" });
+    const relinked = await DB.prepare("SELECT revision,body FROM campaign_rooms WHERE code=?")
+      .bind(code)
+      .first();
+    assert.deepEqual(relinked, linked, "a no-op link must not change the room or its revision");
+    const member = await DB.prepare("SELECT name FROM library_members WHERE user_id=? AND code=?")
+      .bind("player-user", code)
+      .first();
+    assert.equal(member.name, "Renamed game");
+    // Another account still cannot take the linked seat.
+    await assert.rejects(
+      linkAccountSeat(DB, "dm-user", { code, token, name: "Game" }),
+      (e) => e.status === 409,
+    );
+    // A no-op relink that races a room change still refuses to write the membership.
+    const original = DB.prepare.bind(DB);
+    let raced = false;
+    DB.prepare = (sql) => {
+      if (!raced && /^INSERT INTO library_members/.test(sql)) {
+        raced = true;
+        const r = JSON.parse(linked.body);
+        r.revision = 3;
+        r.turn = 1;
+        original("UPDATE campaign_rooms SET revision=3,body=? WHERE code=?")
+          .bind(JSON.stringify(r), code)
+          .run();
+      }
+      return original(sql);
+    };
+    await assert.rejects(
+      linkAccountSeat(DB, "player-user", { code, token, name: "Raced name" }),
+      (e) => e.status === 409,
+    );
+    DB.prepare = original;
+    const after = await DB.prepare("SELECT name FROM library_members WHERE user_id=? AND code=?")
+      .bind("player-user", code)
+      .first();
+    assert.equal(after.name, "Renamed game");
+  });
+});
