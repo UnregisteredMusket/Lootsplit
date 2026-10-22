@@ -81,6 +81,14 @@ final class WidgetData {
         int active = data.optInt("activeActivity", 0);
         return out.put("state", "ready").put("reason", "").put("active", Math.max(0, active)).put("events", safe);
     }
+    /** healthy, attention (a recent problem, not current), unverified or failure; older servers send only a colour. */
+    static String statusKind(JSONObject overall) {
+        if (overall == null) return "unverified";
+        String status = text(overall, "status"), color = text(overall, "color");
+        if (java.util.Arrays.asList("healthy", "attention", "unverified", "failure").contains(status)
+                && ("failure".equals(status) == "red".equals(color)) && ("healthy".equals(status) == "green".equals(color))) return status;
+        return "green".equals(color) ? "healthy" : "red".equals(color) ? "failure" : "unverified";
+    }
     static JSONObject project(JSONObject root, long now) throws Exception {
         JSONObject account = root.getJSONObject("account");
         String name = text(account, "name"), email = text(account, "email");
@@ -129,7 +137,13 @@ final class WidgetData {
         JSONObject overall=root.optJSONObject("overall");
         projected.put("statusColor",overall==null?"yellow":text(overall,"color"));
         projected.put("overallReason",overall==null?"Component coverage unavailable":text(overall,"reason"));
-        if(overall!=null)projected.put("health","green".equals(text(overall,"color"))?"HEALTHY AT LAST CHECK":"red".equals(text(overall,"color"))?"CONFIRMED ERROR":"STATUS UNVERIFIED");
+        String kind=statusKind(overall);
+        projected.put("statusKind",kind);
+        if(overall!=null)projected.put("health","healthy".equals(kind)?"HEALTHY AT LAST CHECK":"failure".equals(kind)?"CONFIRMED ERROR":"attention".equals(kind)?"NEEDS ATTENTION":"STATUS UNVERIFIED");
+        // Coverage limits (by-design gaps) are named for information; they never decide the status.
+        JSONArray notes=overall==null?null:overall.optJSONArray("notes"),safeNotes=new JSONArray();
+        if(notes!=null)for(int i=0;i<Math.min(5,notes.length());i++){String note=notes.optString(i,"").replaceAll("[\\p{Cntrl}]"," ").trim();if(!note.isEmpty())safeNotes.put(note.length()>80?note.substring(0,79)+"…":note);}
+        projected.put("overallNotes",safeNotes);
         JSONObject monitoring=root.optJSONObject("monitoring"),report=root.optJSONObject("dailyReport"),status=root.optJSONObject("developmentStatus");
         projected.put("log",monitoring==null?"No scheduled monitoring entry yet":text(monitoring,"summary"));
         JSONArray recent=root.optJSONArray("recentEntries"),safeRecent=new JSONArray();
@@ -149,7 +163,11 @@ final class WidgetData {
         JSONArray diagnostics=root.optJSONArray("diagnostics"),safe=new JSONArray();
         if(diagnostics!=null)for(int i=0;i<Math.min(30,diagnostics.length());i++) {
             JSONObject source=diagnostics.optJSONObject(i);if(source==null)continue;JSONObject entry=new JSONObject();
-            for(String field:new String[]{"component","color","state","symptom","impact","action","errorCode"})entry.put(field,text(source,field));
+            for(String field:new String[]{"component","color","state","symptom","impact","action","errorCode","brief"})entry.put(field,text(source,field));
+            long lastAt=source.optLong("lastAt",0);
+            entry.put("lastAt",lastAt>0&&lastAt<=now+60000?lastAt:0);
+            entry.put("required",source.optBoolean("required",true)).put("coverageLimit",source.optBoolean("coverageLimit",false));
+            if("Worker execution errors".equals(text(source,"component")))projected.put("errorsColor",text(source,"color")).put("errorsState",text(source,"state"));
             safe.put(entry);
         }
         projected.put("diagnostics",safe);

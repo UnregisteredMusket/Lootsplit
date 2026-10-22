@@ -37,6 +37,12 @@ export type MonitorDiagnostic = {
   confirmedCause: string | null;
   suspectedCause: string | null;
   retainedFailure: boolean;
+  /** false: a coverage limit that never decides the overall status (still listed). */
+  required?: boolean;
+  coverageLimit?: boolean;
+  /** Short face text (no times) and the instant it refers to, formatted locally. */
+  brief?: string;
+  lastAt?: number | null;
 };
 export type MonitorEntry = {
   id: string;
@@ -122,7 +128,15 @@ export type JournalSnapshot = {
   snapshotId?: number;
   checkedAt: number;
   servedAt?: number;
-  overall?: { color: string; label: string; reason: string };
+  overall?: {
+    color: string;
+    label: string;
+    reason: string;
+    /** healthy | attention (recent, not current) | unverified | failure; absent on older snapshots. */
+    status?: string;
+    /** Coverage limits named for information; they never decide the status. */
+    notes?: string[];
+  };
   diagnostics?: MonitorDiagnostic[];
   developmentStatus?: {
     task: MonitorTask | null;

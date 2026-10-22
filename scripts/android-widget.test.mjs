@@ -9,7 +9,11 @@ test("native owner widget shares only the canonical HTTPS endpoint", () => {
     "android/app/src/main/java/com/unregisteredmusket/lootsplit/WidgetClient.java",
     "utf8",
   );
-  assert.ok(source.includes(`"${deploymentOrigins.nativeApi}/api/account/owner/monitor"`));
+  // The widgets request the compact owner view; the origin and path stay the canonical endpoint.
+  assert.ok(
+    source.includes(`"${deploymentOrigins.nativeApi}/api/account/owner/monitor?view=widget"`),
+  );
+  assert.equal(source.match(/https:\/\/[^"]+/g).length, 1, "Only one native endpoint");
 });
 
 test("native account changes clear widget state before requests and scope late failures to their old token", async () => {

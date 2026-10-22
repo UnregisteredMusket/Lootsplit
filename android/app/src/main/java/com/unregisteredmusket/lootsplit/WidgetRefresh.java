@@ -82,7 +82,7 @@ final class WidgetRefresh {
         // Finish the broadcast even if a DNS/socket implementation ignores interruption.
         // A timed-out operation can never commit a late response or clear a newer account.
         task.deadline = DEADLINES.schedule(() ->
-            finish(task, null, "Refresh timed out · tap Refresh to retry", false), 8, TimeUnit.SECONDS);
+            finish(task, null, TIMED_OUT, false), 8, TimeUnit.SECONDS);
         Fetcher source = fetcher;
         task.work = NETWORK.submit(() -> {
             synchronized (WidgetRefresh.class) { task.worker = Thread.currentThread(); }
@@ -90,7 +90,7 @@ final class WidgetRefresh {
             catch (WidgetClient.AccessDenied ignored) {
                 finish(task, null, "Owner session expired. Sign in again in My account.", true);
             } catch (Exception ignored) {
-                finish(task, null, "Could not refresh · tap Refresh to retry", false);
+                finish(task, null, FAILED, false);
             }
         });
         return task;
@@ -147,6 +147,10 @@ final class WidgetRefresh {
         if (request(context, false, true, completion) == null) scheduleActivity(context);
         return true;
     }
+
+    static final String FAILED = "Could not refresh · tap Refresh to retry", TIMED_OUT = "Refresh timed out · tap Refresh to retry";
+    /** Transport failures worth a background retry; authorization, account and storage errors are not. */
+    static boolean transientFailure(String error) { return FAILED.equals(error) || TIMED_OUT.equals(error); }
 
     static synchronized void cancelBackground(Task task) {
         if (task != null && !task.manual)

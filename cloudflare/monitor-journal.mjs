@@ -26,6 +26,7 @@ import {
   workflowTaskEnded,
   interruptedTask,
   WORKFLOW_ORPHAN_MS,
+  workerErrorCheck,
 } from "./monitor-model.mjs";
 
 const REPO = "https://github.com/UnregisteredMusket/Lootsplit";
@@ -635,12 +636,16 @@ async function updateDiagnostics(db, snapshot, now, settings) {
     "Every owner API request also checks its own live session.",
     "Sign in again if your device reports an expired session.",
   );
+  // A permanent, by-design coverage limit rather than a problem: it stays listed (amber, with its
+  // explanation) but never decides the overall status. See overall() notes.
   add(
     "Multiplayer",
     "unavailable",
     "Storage was checked; no synthetic player session was created.",
     "End-to-end live room connectivity is not directly measured by this collector.",
     "Check the existing room connection indicator and recent multiplayer audit.",
+    null,
+    { required: false, coverageLimit: true, brief: "not measured by design" },
   );
   for (const [key, name] of [
     ["development", "GitHub workflows"],
@@ -681,22 +686,30 @@ async function updateDiagnostics(db, snapshot, now, settings) {
   }
   const traffic = snapshot.traffic;
   const trafficCurrent = traffic?.state === "ready" && now - traffic.checkedAt <= 6 * 60000;
-  const trafficErrors = trafficCurrent ? traffic.data?.errors : null;
+  // Half-hour readings let one old error read as a recent warning instead of a current failure.
+  const intervals = trafficCurrent
+    ? (
+        await rows(
+          db,
+          "SELECT slot,(SELECT json_extract(m.value,'$.value') FROM json_each(json_extract(body,'$.metrics')) m WHERE json_extract(m.value,'$.key')='errors') AS errors FROM owner_monitor_intervals WHERE slot>? AND slot<=? AND body IS NOT NULL ORDER BY slot DESC LIMIT 60",
+          now - 86400000 - INTERVAL,
+          now + INTERVAL,
+        )
+      ).map((r) => ({ slot: r.slot, errors: r.errors === null ? null : Number(r.errors) }))
+    : [];
+  const errorCheck = workerErrorCheck(trafficCurrent ? traffic.data : null, intervals);
   add(
     "Worker execution errors",
-    trafficErrors === null || trafficErrors === undefined
-      ? "unavailable"
-      : trafficErrors > 0
-        ? "error"
-        : "healthy",
-    trafficErrors === null || trafficErrors === undefined
-      ? "The measured Worker error count is unavailable."
-      : `${trafficErrors} Worker error(s) were reported in the measured past-24-hour window.`,
+    errorCheck.state,
+    errorCheck.symptom,
     "Reported invocation errors may have interrupted requests; the affected requests and cause require log evidence.",
-    trafficErrors > 0
+    errorCheck.state === "error" || errorCheck.state === "warning"
       ? "Inspect Cloudflare invocation logs for this window and correlate deployments before assigning a cause."
       : "Review the dated source window; an unavailable count does not establish recovery.",
-    trafficErrors > 0 ? "WORKER_ERRORS_OBSERVED" : null,
+    errorCheck.errorCount > 0 ? "WORKER_ERRORS_OBSERVED" : null,
+    Object.fromEntries(
+      Object.entries(errorCheck).filter(([key]) => !["state", "symptom"].includes(key)),
+    ),
   );
   await workflowDiagnostics(db, snapshot.development, previous, now, add);
   const last = await db
