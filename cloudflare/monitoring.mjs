@@ -1,3 +1,4 @@
+import { notProbeRoom } from "./probe-namespace.mjs";
 import { roleOf } from "./members.mjs";
 
 // Read-only aggregate diagnostics. Never return identities, room bodies, keys or endpoints.
@@ -30,7 +31,7 @@ export async function serverMonitor(env, userId) {
         (SELECT COUNT(*) FROM user) AS accounts,
         (SELECT COUNT(*) FROM member_profiles WHERE last_online >= ?) AS active5m,
         (SELECT COUNT(*) FROM member_profiles WHERE last_online >= ?) AS active24h,
-        (SELECT COUNT(*) FROM campaign_rooms) AS sharedCampaigns,
+        (SELECT COUNT(*) FROM campaign_rooms WHERE ${notProbeRoom()}) AS sharedCampaigns,
         (SELECT COUNT(*) FROM library_members) AS savedMemberships,
         (SELECT COUNT(*) FROM library_backups) AS cloudBackups,
         (SELECT COUNT(*) FROM library_characters) AS characterProfiles,

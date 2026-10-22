@@ -1,3 +1,4 @@
+import { notProbeRoom } from "./probe-namespace.mjs";
 const reject = (message, status = 400) => {
   throw Object.assign(new Error(message), { status });
 };
@@ -15,7 +16,7 @@ export async function ownerOverview(db, userId) {
     .prepare(
       `SELECT
     (SELECT COUNT(*) FROM user) AS accounts,
-    (SELECT COUNT(*) FROM campaign_rooms) AS sharedCampaigns,
+    (SELECT COUNT(*) FROM campaign_rooms WHERE ${notProbeRoom()}) AS sharedCampaigns,
     (SELECT COUNT(*) FROM library_members) AS savedMemberships,
     (SELECT COUNT(*) FROM library_backups) AS cloudBackups,
     (SELECT COUNT(*) FROM library_characters) AS characterProfiles`,

@@ -405,6 +405,7 @@ export function MonitorJournal({ data, refresh }: { data: JournalSnapshot; refre
                 "diagnostics",
                 "workflows",
                 "devices",
+                "multiplayer",
                 "reports",
                 "recovery",
               ].map((s) => (

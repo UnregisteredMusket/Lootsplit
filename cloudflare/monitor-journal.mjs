@@ -6,6 +6,7 @@ import {
   providerErrorCode,
 } from "./owner-monitor.mjs";
 import { staffCommitGuard } from "./members.mjs";
+import { PROBE_FRESH_MS, runMultiplayerProbe } from "./multiplayer-probe.mjs";
 import {
   INTERVAL,
   DEFAULT_CONFIG,
@@ -113,6 +114,13 @@ export const BUILTIN_LOGS = [
     "poll",
     INTERVAL * 2,
     "GitHub recovery/failure workflows; their linked artifacts remain the original evidence.",
+  ],
+  [
+    "multiplayer",
+    "Multiplayer round-trip probe",
+    "interval",
+    INTERVAL * 2,
+    "Synthetic open/join/message/read-back/cleanup through the real room path, once per half-hour collection; probe rooms are isolated from campaigns and totals.",
   ],
   [
     "runtime",
@@ -632,6 +640,71 @@ export function widgetSyncCheck(devices, now, freshMs) {
     { activeDevices: active.length, inactiveDevices: inactive },
   ];
 }
+async function latestProbe(db) {
+  return db
+    .prepare(
+      "SELECT observed_at,summary,body FROM owner_monitor_logs WHERE source='multiplayer' ORDER BY observed_at DESC,sequence DESC LIMIT 1",
+    )
+    .first();
+}
+/**
+ * Multiplayer is a real, required check (owner-approved 2026-10-22): the newest synthetic round
+ * trip decides it. A failed probe stays red until a newer probe passes; no probe, or only an old
+ * pass, is unverified (amber), never healthy.
+ */
+export function multiplayerCheck(latest, now) {
+  const impact = "Players may be unable to open, join or synchronize shared campaigns.";
+  if (!latest)
+    return [
+      "unavailable",
+      "No multiplayer round-trip probe has run yet; it runs with each half-hour collection.",
+      impact,
+      "Wait for the next scheduled collection; check Cron Triggers if none arrives.",
+    ];
+  const body = decode(latest),
+    at = latest.observed_at,
+    when = new Date(at).toISOString();
+  if (body.outcome === "failed")
+    return [
+      "error",
+      `${latest.summary} Probe at ${when}.`,
+      impact,
+      "Open a shared campaign to confirm, inspect Worker errors and D1 health, then wait for the next probe; the failure stays until a newer probe passes.",
+      body.errorCode || "MULTIPLAYER_PROBE_FAILED",
+      {
+        brief: "round trip failed",
+        lastAt: at,
+        probe: { at, failedStep: body.failedStep ?? null },
+      },
+    ];
+  if (now - at > PROBE_FRESH_MS)
+    return [
+      "unavailable",
+      `The last multiplayer probe passed at ${when}; no newer probe has run.`,
+      impact,
+      "Check that half-hour collections are completing; the probe runs with each one.",
+    ];
+  return [
+    "healthy",
+    `${latest.summary} Probe at ${when}.`,
+    "Opening, joining, messaging and polling a shared room worked end to end.",
+    "No action required.",
+    null,
+    { probe: { at, durationMs: body.durationMs ?? null } },
+  ];
+}
+/** Stores one probe result as history (one entry per slot) and marks the source as reporting. */
+export async function recordProbe(db, result, now) {
+  if (!result || result.outcome === "skipped") return false;
+  const { summary, ...body } = result;
+  await recordLog(
+    db,
+    { id: `multiplayer:${result.slot}`, source: "multiplayer", observedAt: now, summary, ...body },
+    now,
+  );
+  await sourceSuccess(db, "multiplayer", now);
+  return true;
+}
 async function updateDiagnostics(db, snapshot, now, settings) {
   const previous = new Map(
     (await rows(db, "SELECT component,body FROM owner_monitor_incidents")).map((r) => [
@@ -670,17 +743,7 @@ async function updateDiagnostics(db, snapshot, now, settings) {
     "Every owner API request also checks its own live session.",
     "Sign in again if your device reports an expired session.",
   );
-  // A permanent, by-design coverage limit rather than a problem: it stays listed (amber, with its
-  // explanation) but never decides the overall status. See overall() notes.
-  add(
-    "Multiplayer",
-    "unavailable",
-    "Storage was checked; no synthetic player session was created.",
-    "End-to-end live room connectivity is not directly measured by this collector.",
-    "Check the existing room connection indicator and recent multiplayer audit.",
-    null,
-    { required: false, coverageLimit: true, brief: "not measured by design" },
-  );
+  add("Multiplayer", ...multiplayerCheck(await latestProbe(db), now));
   for (const [key, name] of [
     ["development", "GitHub workflows"],
     ["traffic", "Cloudflare analytics"],
@@ -1133,7 +1196,14 @@ export async function collectInterval(
   env,
   userId,
   slot,
-  { now = Date.now(), collector = collectOwnerMonitor, fetcher = fetch, integrations = true } = {},
+  {
+    now = Date.now(),
+    collector = collectOwnerMonitor,
+    fetcher = fetch,
+    integrations = true,
+    // The deployed Worker (ASSETS bound) probes by default; tests and tools opt in explicitly.
+    multiplayerProbe = env.ASSETS ? runMultiplayerProbe : null,
+  } = {},
 ) {
   const db = env.DB;
   await initializeMonitor(db, now);
@@ -1282,6 +1352,14 @@ export async function collectInterval(
   } catch {
     /* Freshness is retried on the next successful collection. */
   }
+  // Runs once per committed slot: a committed slot is never collected again, so the probe can
+  // never run concurrently with itself. It is bounded (PROBE_TIMEOUT_MS) and never throws.
+  if (multiplayerProbe)
+    try {
+      await recordProbe(db, await multiplayerProbe(env, slot), now);
+    } catch {
+      /* A missing probe result stays an explicit coverage gap; the interval stays as saved. */
+    }
   try {
     await monitorSnapshot(env, userId, {
       force: true,
