@@ -27,6 +27,7 @@ import { makeCampaignRoll } from "../characters/campaign-roll.mjs";
 import { manualCharacterRolls, database } from "./room-store.server.ts";
 import { referenceAccess, referenceSection } from "./reference-access.ts";
 import { isProbeRoomCode } from "../../../cloudflare/probe-namespace.mjs";
+import { SUBMIT_LIMIT_MESSAGE, takeSubmitAllowance } from "./room-submit-limit.ts";
 
 /**
  * Server-only options. Client server functions pass a single `data` argument, so a browser can never
@@ -729,6 +730,18 @@ export async function submitCommands(input: {
     if (!room.viewOnly && !messagesOnly && !room.live && room.seats[room.turn]?.id !== seat.id)
       throw new Error("It is not your turn. Your pending actions have been preserved.");
     const seen = new Set(room.commands ?? []);
+    // Per-seat flood protection, messages included (room-submit-limit.ts). Message text is
+    // counted once: staged or already committed messages do not count again.
+    const alreadyStaged = new Set((room.drafts?.[seat.id] ?? []).map((c) => c.id));
+    const messageChars = commands.reduce(
+      (total, c) =>
+        c.kind === "message" && !seen.has(seat.id + ":" + c.id) && !alreadyStaged.has(c.id)
+          ? total + c.text.length
+          : total,
+      0,
+    );
+    const allowance = takeSubmitAllowance(room.submitAllowance?.[seat.id], Date.now(), messageChars);
+    if (!allowance) throw Object.assign(Error(SUBMIT_LIMIT_MESSAGE), { status: 429 });
     const drafts = { ...(room.drafts ?? {}) };
     if (input.stage) {
       const pending = [...(drafts[seat.id] ?? [])];
@@ -785,6 +798,14 @@ export async function submitCommands(input: {
           ? false
           : room.viewOnly,
       drafts,
+      submitAllowance: {
+        ...Object.fromEntries(
+          Object.entries(room.submitAllowance ?? {}).filter(([id]) =>
+            room.seats.some((s) => s.id === id),
+          ),
+        ),
+        [seat.id]: allowance,
+      },
       revision: room.revision + 1,
       commands: input.stage ? room.commands : [...seen],
       commandHashes: input.stage ? room.commandHashes : commandHashes,
