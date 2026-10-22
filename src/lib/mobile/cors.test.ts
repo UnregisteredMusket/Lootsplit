@@ -30,3 +30,17 @@ test("unapproved origins and normal pages receive no CORS grant", async () => {
     assert.equal(response.headers.get("access-control-allow-origin"), null);
   }
 });
+
+test("the room image GET answers the app's preflight and exposes its ETag", async () => {
+  const path = "/api/room-image/ABCD2345/" + "a".repeat(64);
+  const preflight = (await mobileCors(event("https://localhost", "OPTIONS", path), () => {
+    throw new Error("called");
+  })) as Response;
+  assert.equal(preflight.status, 204);
+  const result = (await mobileCors(event("https://localhost", "GET", path), () =>
+    new Response("data:image/png;base64,AA==", { headers: { etag: '"a"' } }),
+  )) as Response;
+  assert.equal(result.headers.get("access-control-allow-origin"), "https://localhost");
+  assert.ok(result.headers.get("access-control-expose-headers")!.includes("etag"));
+  assert.equal(result.headers.get("etag"), '"a"');
+});

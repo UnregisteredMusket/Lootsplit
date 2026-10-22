@@ -1,12 +1,13 @@
 import { createPortal } from "react-dom";
 import { OverlayContainer } from "./overlay-container";
-import { useEffect, useState, useContext } from "react";
+import { useEffect, useState, useContext, useSyncExternalStore } from "react";
 import { useSeat } from "@/lib/quire/seat";
 import { activeCampaignId } from "@/lib/quire/campaign-context";
 import { loadMapAsset, mapAssetBlob } from "@/lib/quire/map-assets";
 import type { CampaignMap } from "@/lib/quire/world-schema";
 import type { MapMediaReference } from "@/lib/quire/map-assets-schema";
 import { concealedMapImage } from "@/lib/quire/tabletop";
+import { roomArtworkLoading, subscribeRoomArtwork } from "@/lib/quire/room-image-cache";
 
 export function MapArtwork({
   map,
@@ -41,6 +42,8 @@ export function MapArtwork({
     [error, setError] = useState(""),
     [playing, setPlaying] = useState(false),
     [retry, setRetry] = useState(0);
+  // Shared map images (tabletop protocol 4) still downloading for this room revision.
+  const artworkLoading = useSyncExternalStore(subscribeRoomArtwork, roomArtworkLoading, () => 0);
   useEffect(() => {
     const preference = window.matchMedia("(prefers-reduced-motion: reduce)");
     const pause = () => {
@@ -106,6 +109,11 @@ export function MapArtwork({
               Retry map artwork
             </button>
           )}
+        </span>
+      )}
+      {artworkLoading > 0 && (
+        <span className="map-media-status" role="status">
+          Loading map artwork…
         </span>
       )}
       {map.image === concealedMapImage && references.length === 0 && (

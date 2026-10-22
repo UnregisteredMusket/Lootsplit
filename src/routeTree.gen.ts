@@ -35,6 +35,7 @@ import { Route as FeaturesIndexRouteImport } from './routes/features.index'
 import { Route as FeaturesFeatureRouteImport } from './routes/features.$feature'
 import { Route as ReadArticleIdRouteImport } from './routes/read.$articleId'
 import { Route as ShopShopIdRouteImport } from './routes/shop.$shopId'
+import { Route as ApiRoomImageCodeHashRouteImport } from './routes/api.room-image.$code.$hash'
 
 const IndexRoute = IndexRouteImport.update({
   id: '/',
@@ -166,6 +167,11 @@ const ShopShopIdRoute = ShopShopIdRouteImport.update({
   path: '/shop/$shopId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const ApiRoomImageCodeHashRoute = ApiRoomImageCodeHashRouteImport.update({
+  id: '/api/room-image/$code/$hash',
+  path: '/api/room-image/$code/$hash',
+  getParentRoute: () => rootRouteImport,
+} as any)
 
 export interface FileRoutesByFullPath {
   '/': typeof IndexRoute
@@ -193,6 +199,7 @@ export interface FileRoutesByFullPath {
   '/features/$feature': typeof FeaturesFeatureRoute
   '/read/$articleId': typeof ReadArticleIdRoute
   '/shop/$shopId': typeof ShopShopIdRoute
+  '/api/room-image/$code/$hash': typeof ApiRoomImageCodeHashRoute
   '/features/': typeof FeaturesIndexRoute
 }
 export interface FileRoutesByTo {
@@ -221,6 +228,7 @@ export interface FileRoutesByTo {
   '/features/$feature': typeof FeaturesFeatureRoute
   '/read/$articleId': typeof ReadArticleIdRoute
   '/shop/$shopId': typeof ShopShopIdRoute
+  '/api/room-image/$code/$hash': typeof ApiRoomImageCodeHashRoute
   '/features': typeof FeaturesIndexRoute
 }
 export interface FileRoutesById {
@@ -250,6 +258,7 @@ export interface FileRoutesById {
   '/features/$feature': typeof FeaturesFeatureRoute
   '/read/$articleId': typeof ReadArticleIdRoute
   '/shop/$shopId': typeof ShopShopIdRoute
+  '/api/room-image/$code/$hash': typeof ApiRoomImageCodeHashRoute
   '/features/': typeof FeaturesIndexRoute
 }
 export interface FileRouteTypes {
@@ -280,6 +289,7 @@ export interface FileRouteTypes {
     | '/features/$feature'
     | '/read/$articleId'
     | '/shop/$shopId'
+    | '/api/room-image/$code/$hash'
     | '/features/'
   fileRoutesByTo: FileRoutesByTo
   to:
@@ -308,6 +318,7 @@ export interface FileRouteTypes {
     | '/features/$feature'
     | '/read/$articleId'
     | '/shop/$shopId'
+    | '/api/room-image/$code/$hash'
     | '/features'
   id:
     | '__root__'
@@ -336,6 +347,7 @@ export interface FileRouteTypes {
     | '/features/$feature'
     | '/read/$articleId'
     | '/shop/$shopId'
+    | '/api/room-image/$code/$hash'
     | '/features/'
   fileRoutesById: FileRoutesById
 }
@@ -365,6 +377,7 @@ export interface RootRouteChildren {
   FeaturesFeatureRoute: typeof FeaturesFeatureRoute
   ReadArticleIdRoute: typeof ReadArticleIdRoute
   ShopShopIdRoute: typeof ShopShopIdRoute
+  ApiRoomImageCodeHashRoute: typeof ApiRoomImageCodeHashRoute
   FeaturesIndexRoute: typeof FeaturesIndexRoute
 }
 
@@ -552,6 +565,13 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof ShopShopIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/api/room-image/$code/$hash': {
+      id: '/api/room-image/$code/$hash'
+      path: '/api/room-image/$code/$hash'
+      fullPath: '/api/room-image/$code/$hash'
+      preLoaderRoute: typeof ApiRoomImageCodeHashRouteImport
+      parentRoute: typeof rootRouteImport
+    }
   }
 }
 
@@ -581,6 +601,7 @@ const rootRouteChildren: RootRouteChildren = {
   FeaturesFeatureRoute: FeaturesFeatureRoute,
   ReadArticleIdRoute: ReadArticleIdRoute,
   ShopShopIdRoute: ShopShopIdRoute,
+  ApiRoomImageCodeHashRoute: ApiRoomImageCodeHashRoute,
   FeaturesIndexRoute: FeaturesIndexRoute,
 }
 export const routeTree = rootRouteImport

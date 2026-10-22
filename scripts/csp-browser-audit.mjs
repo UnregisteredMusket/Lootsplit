@@ -1,6 +1,7 @@
 // Packaged-Worker check that the script Content-Security-Policy (audit S04) blocks nothing the
 // app needs: the title screen and app hydrate, the account page renders, and OCR (blob: worker,
-// same-origin importScripts, WebAssembly) reads a synthetic statblock. Disposable servers only.
+// same-origin importScripts, WebAssembly) reads a synthetic statblock. The room image GET keeps the
+// headers and answers the Android app's preflight. Disposable servers only.
 import assert from "node:assert/strict";
 import { mkdir } from "node:fs/promises";
 import { chromium } from "playwright";
@@ -23,6 +24,32 @@ for (const path of ["/", "/welcome", "/account", "/encounters", "/ocr/v7/worker.
     response.headers.get("content-security-policy")?.includes(SCRIPT_POLICY),
     `${path} lacks the script policy: ${response.headers.get("content-security-policy")}`,
   );
+}
+
+// Seat-authorized room image GET (tabletop protocol 4): refusals carry the security headers and
+// are never cached, and the Android app's WebView origin may call it (CORS preflight).
+{
+  const imagePath = `/api/room-image/AAAAAAAA/${"0".repeat(64)}`;
+  const refused = await fetch(origin + imagePath, { headers: { "cf-connecting-ip": ip() } });
+  assert.equal(refused.status, 403, `${imagePath} without a seat`);
+  assert.equal(refused.headers.get("cache-control"), "no-store");
+  assert.ok(refused.headers.get("content-security-policy")?.includes(SCRIPT_POLICY));
+  const unknown = await fetch(origin + imagePath, {
+    headers: { "cf-connecting-ip": ip(), "x-lootsplit-seat": "not-a-seat" },
+  });
+  assert.equal(unknown.status, 404, `${imagePath} for an unknown room`);
+  const preflight = await fetch(origin + imagePath, {
+    method: "OPTIONS",
+    headers: {
+      "cf-connecting-ip": ip(),
+      origin: "https://localhost",
+      "access-control-request-method": "GET",
+      "access-control-request-headers": "x-lootsplit-seat, authorization",
+    },
+  });
+  assert.equal(preflight.status, 204);
+  assert.equal(preflight.headers.get("access-control-allow-origin"), "https://localhost");
+  assert.match(preflight.headers.get("access-control-allow-headers") || "", /x-lootsplit-seat/);
 }
 
 const browser = await chromium.launch({

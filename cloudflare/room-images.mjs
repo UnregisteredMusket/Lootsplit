@@ -77,15 +77,47 @@ export async function encodeRoomImages(value) {
   if (reports.reports.length) body = JSON.stringify(reports.value);
   return { body, assets, documents: resources.documents, reports: reports.reports };
 }
-/** Never fetch by hash alone: identical/guessed references confer no cross-campaign access.
+/** Exact stored map image reference (`/art/room-image-<sha256>.webp`). */
+export const ROOM_IMAGE_REFERENCE = /^\/art\/room-image-([a-f0-9]{64})\.webp$/;
+/**
+ * Non-enumerable reference->image map on a hydrated room: which inline images came from this
+ * room's own `campaign_room_images` rows. It never serializes, so it never reaches a stored body.
+ */
+export const ROOM_IMAGE_SOURCES = Symbol.for("lootsplit.room-image-sources");
+/** @param {any} value @returns {any[] | undefined} */
+function liveMaps(value) {
+  const maps = value?.table?.journal?.world?.maps;
+  return Array.isArray(maps) ? maps : undefined;
+}
+/**
+ * Never fetch by hash alone: identical/guessed references confer no cross-campaign access.
+ *
+ * `keepMapImageReferences` (tabletop protocol 4 reads only): the current maps' own
+ * `table.journal.world.maps[].image` references stay as references, so those rasters are neither
+ * read from D1 nor sent on the wire. Everything else (drafts, archived snapshots, resource packs)
+ * is hydrated exactly as before. Exports, backups, recovery, account records, writes and older
+ * protocols never pass this option.
  * @template T @param {NonNullable<ReturnType<typeof import('../src/lib/quire/room-store.server.ts').database>>} db
- * @param {string} code @param {T} value @returns {Promise<T>} */
-export async function hydrateRoomImages(db, code, value) {
+ * @param {string} code @param {T} value @param {{keepMapImageReferences?: boolean}} [options]
+ * @returns {Promise<T>} */
+export async function hydrateRoomImages(db, code, value, options = {}) {
   // Snapshots first: they may contain image and resource references of their own.
   value = await hydrateRoomReports(db, code, value);
+  /** @type {(string | undefined)[]} */
+  let kept = [];
+  if (options.keepMapImageReferences && liveMaps(value)) {
+    value = structuredClone(value);
+    kept = /** @type {any[]} */ (liveMaps(value)).map((map) => {
+      if (!map || typeof map.image !== "string" || !ROOM_IMAGE_REFERENCE.test(map.image)) return undefined;
+      const image = map.image;
+      delete map.image;
+      return image;
+    });
+  }
   let body = JSON.stringify(value);
   const refs = [...new Set(body.match(reference) || [])];
-  if (!refs.length) return hydrateRoomResources(db, code, value);
+  /** @type {Map<string,string>} */
+  const sources = new Map();
   // Fetch only needed references, in bounded parameter groups. No public image endpoint.
   for (let offset = 0; offset < refs.length; offset += 80) {
     const wanted = refs.slice(offset, offset + 80);
@@ -102,10 +134,34 @@ export async function hydrateRoomImages(db, code, value) {
         throw Error(
           "A campaign image is missing. Keep the original recovery export; the campaign was not changed.",
         );
+      sources.set(ref, image);
       body = body.split(ref).join(image);
     }
   }
-  return hydrateRoomResources(db, code, JSON.parse(body));
+  const result = refs.length ? JSON.parse(body) : value;
+  if (kept.some(Boolean)) {
+    const maps = /** @type {any[]} */ (liveMaps(result));
+    kept.forEach((image, index) => {
+      if (image && maps[index]) maps[index].image = image;
+    });
+  }
+  const hydrated = await hydrateRoomResources(db, code, result);
+  if (hydrated && typeof hydrated === "object")
+    Object.defineProperty(hydrated, ROOM_IMAGE_SOURCES, { value: sources, configurable: true });
+  return hydrated;
+}
+/**
+ * One stored map image, only from this room's own rows (never by hash alone). Callers authorize
+ * the seat against the projected room first (cloud.server.ts `authorizedRoomImage`).
+ * @param {NonNullable<ReturnType<typeof import('../src/lib/quire/room-store.server.ts').database>>} db
+ * @param {string} code @param {string} ref @returns {Promise<string | null>} */
+export async function readRoomImage(db, code, ref) {
+  if (!ROOM_IMAGE_REFERENCE.test(ref)) return null;
+  const row = await db
+    .prepare("SELECT image FROM campaign_room_images WHERE code=? AND reference=?")
+    .bind(code, ref)
+    .first();
+  return typeof row?.image === "string" ? row.image : null;
 }
 /** Writes follow the room CAS in the same atomic D1 batch; a losing writer creates no assets.
  * @param {NonNullable<ReturnType<typeof import('../src/lib/quire/room-store.server.ts').database>>} db

@@ -21,3 +21,12 @@ test("server function calls leave the webview and other requests do not", () => 
   assert.equal(rewriteServerFnUrl("/party", "https://localhost"), null);
   assert.equal(rewriteServerFnUrl("https://localhost/assets/app.js", "https://localhost"), null);
 });
+
+test("the room image GET also reaches the Worker, with the same account bearer as server functions", () => {
+  assert.equal(
+    rewriteServerFnUrl("/api/room-image/ABCD2345/" + "a".repeat(64), "https://localhost"),
+    "https://lootsplit.oliverstorie2017.workers.dev/api/room-image/ABCD2345/" + "a".repeat(64),
+  );
+  assert.equal(rewriteServerFnUrl("/api/account/library", "https://localhost"), null);
+  assert.equal(rewriteServerFnUrl("/art/room-image-" + "a".repeat(64) + ".webp", "https://localhost"), null);
+});

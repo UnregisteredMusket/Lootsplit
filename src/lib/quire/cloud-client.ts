@@ -36,6 +36,7 @@ import { closeQuireDb } from "./db.ts";
 import { reconcileAccountResume } from "./account-resume.ts";
 import { sameCommand } from "./command-identity.ts";
 import { readRoomResponse, readUnchangedRoom } from "./room-response.ts";
+import { forgetRoomImages, restoreRoomImages, roomImageReferences } from "./room-image-cache.ts";
 import {
   rememberRevokedRecovery,
   recoveryVisibility,
@@ -429,6 +430,7 @@ function start() {
   schedule();
 }
 async function accept(value: RoomView, committed = false) {
+  value = await withRoomImages(value);
   const { remote, draft: incomingDraft } = readRoomResponse(value);
   const s = requireSession();
   if (remote.code !== s.code || remote.seatId !== s.seatId)
@@ -572,6 +574,35 @@ async function accept(value: RoomView, committed = false) {
   );
   start();
 }
+/**
+ * Tabletop protocol 4 responses carry shared map images as references. Restore them before the
+ * table is read, so device storage, previews, backups and commands keep inline images exactly as
+ * before. If any image cannot be loaded, read the same room once more as a protocol 3 client,
+ * which receives the full inline envelope. (4 = IMAGE_REFERENCE_PROTOCOL in tabletop-protocol.ts.)
+ */
+async function withRoomImages(value: RoomView): Promise<RoomView> {
+  const table = (value as { table?: import("./cloud.ts").CloudTable } | null)?.table;
+  // Most responses (and every older-protocol one) carry no references: return before any work.
+  if (!table?.journal?.world?.maps?.some((map) => map.image?.startsWith("/art/room-image-")))
+    return value;
+  if (!roomImageReferences(table).length) return value;
+  const s = requireSession();
+  try {
+    return {
+      ...value,
+      table: await restoreRoomImages(table, {
+        campaignKey: key(),
+        code: s.code,
+        token: s.token,
+        ephemeral: isEphemeralCampaign(),
+      }),
+    };
+  } catch {
+    return pullCloudTable({
+      data: { tabletopProtocol: 3, code: s.code, token: s.token },
+    });
+  }
+}
 async function refresh(conditional = false) {
   const s = session();
   if (!s) return;
@@ -593,7 +624,7 @@ async function refresh(conditional = false) {
       try {
         remote = await pollCloudTable({
           data: {
-            tabletopProtocol: 3,
+            tabletopProtocol: 4,
             code: s.code,
             token: s.token,
             knownRevision,
@@ -604,12 +635,12 @@ async function refresh(conditional = false) {
         // One bounded readonly fallback supports an older edge/client protocol.
         // Full reads recheck the same credentials; errors still retain all pending work.
         remote = await pullCloudTable({
-          data: { tabletopProtocol: 3, code: s.code, token: s.token },
+          data: { tabletopProtocol: 4, code: s.code, token: s.token },
         });
       }
     } else
       remote = await pullCloudTable({
-        data: { tabletopProtocol: 3, code: s.code, token: s.token },
+        data: { tabletopProtocol: 4, code: s.code, token: s.token },
       });
   } catch (error) {
     if (key() !== campaignKey || session()?.token !== s.token) return;
@@ -739,7 +770,7 @@ async function flush(endTurn = false) {
   try {
     const remote = await submitCloudCommands({
       data: {
-        tabletopProtocol: 3,
+        tabletopProtocol: 4,
         code: s.code,
         token: s.token,
         batchId: s.batchId,
@@ -759,7 +790,7 @@ async function stage(rethrow = false) {
   try {
     const remote = await submitCloudCommands({
       data: {
-        tabletopProtocol: 3,
+        tabletopProtocol: 4,
         code: s.code,
         token: s.token,
         batchId: s.batchId,
@@ -825,7 +856,7 @@ export function discardPending() {
     const s = requireSession();
     const remote = await manageCloudRoom({
       data: {
-        tabletopProtocol: 3,
+        tabletopProtocol: 4,
         code: s.code,
         token: s.token,
         action: "discard",
@@ -875,7 +906,7 @@ export async function queueCommand(
       // Chat is independent of transaction turns; retain a failed message in the editor.
       const remote = await submitCloudCommands({
         data: {
-          tabletopProtocol: 3,
+          tabletopProtocol: 4,
           code: s.code,
           token: s.token,
           batchId: command.id,
@@ -1017,7 +1048,7 @@ export function chooseTableMode(mode: "local" | "turns" | "live") {
       const s = requireSession();
       await accept(
         await setCloudPace({
-          data: { tabletopProtocol: 3, code: s.code, token: s.token, live: mode === "live" },
+          data: { tabletopProtocol: 4, code: s.code, token: s.token, live: mode === "live" },
         }),
       );
     }
@@ -1045,7 +1076,7 @@ export function skipTableTurn() {
   return serial(async () => {
     const s = requireSession();
     await accept(
-      await skipCloudTurn({ data: { tabletopProtocol: 3, code: s.code, token: s.token } }),
+      await skipCloudTurn({ data: { tabletopProtocol: 4, code: s.code, token: s.token } }),
     );
   });
 }
@@ -1058,7 +1089,7 @@ export function manageParticipant(
     const s = requireSession();
     await accept(
       await manageCloudRoom({
-        data: { tabletopProtocol: 3, code: s.code, token: s.token, action, seatId, allowParty },
+        data: { tabletopProtocol: 4, code: s.code, token: s.token, action, seatId, allowParty },
       }),
     );
   });
@@ -1080,6 +1111,7 @@ async function detachTable(clearPlayerCopy: boolean) {
     playerSession = null;
     sessionStorage.removeItem(PLAYER_TICKET);
   } else if (typeof localStorage !== "undefined") localStorage.removeItem(key());
+  forgetRoomImages();
   stopPolling();
   publish({ ...initialView });
 }
@@ -1091,7 +1123,7 @@ export async function leaveTable() {
   if (s)
     await manageCloudRoom({
       data: {
-        tabletopProtocol: 3,
+        tabletopProtocol: 4,
         code: s.code,
         token: s.token,
         action: "leave",
@@ -1181,7 +1213,7 @@ export function sendRoomMessage(command: Extract<Command, { kind: "message" }>) 
     const s = requireSession();
     const remote = await submitCloudCommands({
       data: {
-        tabletopProtocol: 3,
+        tabletopProtocol: 4,
         code: s.code,
         token: s.token,
         batchId: command.id,
@@ -1239,7 +1271,7 @@ export async function resumeAccountMembership(
       throw new Error("Export your unsynced player changes in Multiplayer before changing seats.");
     const { remote, draft } = readRoomResponse(
       await pullCloudTable({
-        data: { tabletopProtocol: 3, code: member.code, token: member.token },
+        data: { tabletopProtocol: 4, code: member.code, token: member.token },
       }),
     );
     const role = remote.seats.find((s) => s.id === remote.seatId)?.role;
