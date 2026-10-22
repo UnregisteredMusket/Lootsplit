@@ -133,6 +133,21 @@ export const HELP_GROUPS: HelpGroup[] = [
         ],
       },
       {
+        id: "npc-barter",
+        title: "NPCs who barter on their own",
+        audience: "DM / Players",
+        paragraphs: [
+          "An NPC with Bartering allowed and no player controller answers offers in a conversation. In People & NPCs choose View & interact, then Barter. The player builds an offer in the drawer and sees a numbered reply such as [PERSUASION · DC 13 · Very likely ~88% · Advantage] before sending it. NPCs with a controller keep the trading table below, unchanged.",
+          "NPC barter rules on Trading & Barter choose who answers: DM decides (the default; offers wait in your NPC barter queue), Server rolls, DM confirms, or Automatic. The NPC values goods it receives at 50% of their recorded value and its own at full value; fairness (received ÷ given) sets the DC: 10 + 25 × (1 − fairness), with Generous −2 and Shrewd +2. At 110% or more it accepts without a roll; below 60% it refuses without one. Every number is adjustable.",
+          "The room server (or the DM's device offline) rolls Charisma (Persuasion): the sheet's bonus, advantage at Charisma 16 or more, disadvantage at 8 or less, no automatic 20. A miss by 3 or less brings a counter-offer for a little more coin. A failed try locks equal or worse offers for one in-game hour and adds +2 to later tries that day; after 3 failures, offers come to your queue. Trades with the same NPC in 24 in-game hours are judged together, and large deals (over 50 gp, or 200 gp a day), more than 5 units of one good, unwanted categories and player-set item values go to you or count for nothing.",
+          "In each NPC's Barter answers you can set its mode, stance, wanted goods and its ten dialogue lines; empty lines use the stance defaults. Your queue shows what the player saw, the NPC's valuation, and buttons to roll, accept, counter, decline, confirm or overrule with a reason. NPC barter activity keeps every attempt; Clear wait lifts a cooldown. Players never receive the rules, the NPC's valuation or purse, or other players' attempts.",
+        ],
+        links: [
+          ["People & NPCs", "/features/npcs"],
+          ["Trading & Barter", "/features/trading"],
+        ],
+      },
+      {
         id: "black-market",
         title: "Reveal hidden black-market vendors",
         audience: "DM",
