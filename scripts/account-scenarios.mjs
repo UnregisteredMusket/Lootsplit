@@ -9,6 +9,7 @@ export const accountScenarios = [
   "library",
   "portrait-resume",
   "recovery",
+  "returning-player",
   "campaign-choice",
   "layout",
   "resume-queue",

@@ -73,6 +73,13 @@ test("network-boundary", async ({ devices, baseURL: origin }) => {
 // unchanged per-test and suite budgets rather than the final queue remainder.
 test("ownership", async ({ devices, baseURL: origin }, testInfo) => {
   const dm = devices.page;
+  // Elapsed-time marks for the per-case duration annotation (account-durations.mjs).
+  const started = Date.now();
+  const phase = (name) =>
+    testInfo.annotations.push({
+      type: "phase",
+      description: `${name} ${((Date.now() - started) / 1000).toFixed(1)}s`,
+    });
   // This scenario verifies ownership and recovery, with the optional Help offer
   // already answered on each synthetic device. Dedicated Help audits exercise
   // the offer itself. Keep real title screens, cold entries and all auth gates.
@@ -142,7 +149,9 @@ test("ownership", async ({ devices, baseURL: origin }, testInfo) => {
   // Reload after the explicit legacy claim to prove ownership and bytes persist.
   await visitPage(dm, origin, "/party");
   await expect(dm.getByText("Preserved legacy hero", { exact: true }).first()).toBeVisible();
+  phase("legacy claimed");
   await createRoom(dm, origin, navigateAccountScenario);
+  phase("room created");
   await dm.evaluate(() =>
     Object.defineProperty(navigator, "share", {
       configurable: true,
@@ -176,6 +185,7 @@ test("ownership", async ({ devices, baseURL: origin }, testInfo) => {
   await guest.getByRole("button", { name: "Join room", exact: true }).click();
   await expect(guest.locator(".room-code")).toHaveText(code);
   expect(await guest.evaluate(async () => (await indexedDB.databases()).length)).toBe(0);
+  phase("guest joined");
   expect(
     await guest.evaluate(() => Object.keys(localStorage).some((k) => k.startsWith("quire.cloud"))),
   ).toBe(false);
@@ -213,6 +223,7 @@ test("ownership", async ({ devices, baseURL: origin }, testInfo) => {
   // pattern; remove this handler before later cold guest reloads and account resumes.
   // The fixture's independent external-network boundary remains in place.
   await guest.unroute("**/_serverFn/**", rejectRollPolicy);
+  phase("policy retried");
   await guest.getByRole("link", { name: "Home", exact: true }).first().click();
   await guest
     .getByRole("link", { name: "Campaign, messages & session status →", exact: true })
@@ -224,6 +235,7 @@ test("ownership", async ({ devices, baseURL: origin }, testInfo) => {
     path: testInfo.outputPath("guest-memory-mobile.png"),
     fullPage: true,
   });
+  phase("guest reloaded");
   await endSession(dm, origin, navigateAccountScenario);
   // Closing is acknowledged before either read. The DM can open its library
   // while the guest observes revocation; both finish before the room is reopened.
@@ -236,64 +248,7 @@ test("ownership", async ({ devices, baseURL: origin }, testInfo) => {
     })(),
     navigateAccountScenario(dm, origin, "/account"),
   ]);
-  await dm.getByRole("button", { name: "Reopen as DM", exact: true }).click();
-  await dm.waitForURL((u) => u.pathname === "/");
-  // Reopen has acknowledged the new session. The old anonymous invitation read
-  // and the DM's fresh invitation read can run together. Finish expiry proof
-  // before signing up the guest, and keep all cold entries/title checks.
-  await Promise.all([
-    (async () => {
-      await visitPage(guest, origin, new URL(link).pathname + new URL(link).search);
-      await guest.getByRole("button", { name: "Find characters", exact: true }).click();
-      await expect(
-        guest.locator("[data-sonner-toast]").filter({ hasText: "invitation has expired" }),
-      ).toBeVisible();
-    })(),
-    (async () => {
-      await continueIntoApp(dm);
-      await navigateAccountScenario(dm, origin, "/share");
-      await dm.evaluate(() =>
-        Object.defineProperty(navigator, "share", {
-          configurable: true,
-          value: async (data) => {
-            window.invitationForTest = data.url;
-          },
-        }),
-      );
-      await dm.getByRole("button", { name: "Share join link", exact: true }).click();
-    })(),
-  ]);
-  const returning = credentials();
-  const { page: secondPlayer, context: playerContext } = await devices.newDevice();
-  await playerContext.addInitScript(guidePreference);
-  await accountPost(guest.context(), origin, "auth/sign-up/email", returning);
-  await accountPost(playerContext, origin, "auth/sign-in/email", returning);
-  const freshLink = new URL(await dm.evaluate(() => window.invitationForTest));
-  await visitPage(guest, origin, freshLink.pathname + freshLink.search);
-  await guest.getByRole("button", { name: "Find characters", exact: true }).click();
-  await guest.getByPlaceholder("What should the party call you?").fill("Returning player");
-  await guest.getByRole("button", { name: "Join room", exact: true }).click();
-  await expect(guest.locator(".room-code")).toHaveText(code);
-  await visitPage(secondPlayer, origin, "/account");
-  await secondPlayer.getByRole("button", { name: "Resume", exact: true }).click();
-  await secondPlayer.waitForURL((u) => u.pathname === "/");
-  await continueIntoApp(secondPlayer);
-  // Account resume already entered a fresh player document. Follow the actual
-  // player Home link to inspect the resumed room; retain the later cold reload.
-  await secondPlayer.evaluate(() => (window.playerResumeDocumentForAudit = "resumed"));
-  await secondPlayer
-    .getByRole("link", { name: "Campaign, messages & session status →", exact: true })
-    .click();
-  await secondPlayer.waitForURL((url) => url.pathname === "/share");
-  expect(await secondPlayer.evaluate(() => window.playerResumeDocumentForAudit)).toBe("resumed");
-  await expect(secondPlayer.locator(".loot-opening")).toHaveCount(0);
-  await expect(secondPlayer.locator(".room-code")).toHaveText(code);
-  expect(await secondPlayer.evaluate(async () => (await indexedDB.databases()).length)).toBe(0);
-  // Closing the DM's tab is not End session; a fresh player reload still reconnects.
-  await dm.close();
-  await secondPlayer.reload();
-  await continueIntoApp(secondPlayer);
-  await expect(secondPlayer.locator(".room-code")).toHaveText(code);
+  phase("session ended");
 });
 
 test("resume-partial", async ({ devices, baseURL: origin }, testInfo) => {
@@ -882,6 +837,138 @@ test("recovery", async ({ devices, baseURL: origin }) => {
   await page.getByRole("status").filter({ hasText: "Password changed" }).waitFor();
   await visit(other, "/account");
   await other.getByRole("button", { name: "Sign in", exact: true }).last().waitFor();
+});
+
+// Split from ownership, which had reached 59s of its 60s case limit on CI (2026-10-22).
+// Ownership keeps the legacy claim, anonymous guest memory, policy retry and revocation.
+// This case keeps the rest of that journey unchanged: a revoked anonymous guest device,
+// the reopened room's expired invitation, the same device returning with an account,
+// account resume on a second device, and a cold reload after the DM's tab closes.
+// It runs first in the second shard so it has the full suite budget.
+test("returning-player", async ({ devices, baseURL: origin }, testInfo) => {
+  const dm = devices.page;
+  // Elapsed-time marks for the per-case duration annotation (account-durations.mjs).
+  const started = Date.now();
+  const phase = (name) =>
+    testInfo.annotations.push({
+      type: "phase",
+      description: `${name} ${((Date.now() - started) / 1000).toFixed(1)}s`,
+    });
+  const guidePreference = () => localStorage.setItem("quire.guide.offer.v3", "seen");
+  await devices.context.addInitScript(guidePreference);
+  // A signed-in DM with a saved room: real cold account entry, app link and room creation.
+  await accountPost(devices.context, origin, "auth/sign-up/email", credentials());
+  await visitPage(dm, origin, "/account");
+  await expect(dm.getByRole("button", { name: "Sign out", exact: true })).toBeVisible();
+  await prepareDmFixture(dm, origin, { useAccountLink: true });
+  await createRoom(dm, origin, navigateAccountScenario);
+  phase("room created");
+  await dm.evaluate(() =>
+    Object.defineProperty(navigator, "share", {
+      configurable: true,
+      value: async (data) => {
+        window.invitationForTest = data.url;
+      },
+    }),
+  );
+  await dm.getByRole("button", { name: "Share join link", exact: true }).click();
+  const link = await dm.evaluate(() => window.invitationForTest);
+  expect(new URL(link).searchParams.get("session")).toBeTruthy();
+  // As in ownership: the anonymous cold read runs beside the DM's membership save.
+  const [members, { page: guest }] = await Promise.all([
+    (async () => {
+      const saved = await saveCurrentMembership(dm, origin, navigateAccountScenario);
+      await navigateAccountScenario(dm, origin, "/share");
+      return saved;
+    })(),
+    (async () => {
+      const device = await devices.newDevice(390);
+      await device.context.addInitScript(guidePreference);
+      await visitPage(device.page, origin, new URL(link).pathname + new URL(link).search);
+      return device;
+    })(),
+  ]);
+  const code = members[0].code;
+  await guest.getByRole("button", { name: "Find characters", exact: true }).click();
+  await guest.getByPlaceholder("What should the party call you?").fill("Guest adventurer");
+  await guest.getByRole("button", { name: "Join room", exact: true }).click();
+  await expect(guest.locator(".room-code")).toHaveText(code);
+  expect(await guest.evaluate(async () => (await indexedDB.databases()).length)).toBe(0);
+  phase("guest joined");
+  await endSession(dm, origin, navigateAccountScenario);
+  await Promise.all([
+    (async () => {
+      await expect(guest.locator(".room-code")).toBeHidden();
+      expect(
+        await guest.evaluate(() => sessionStorage.getItem("lootsplit.player.reconnect.v1")),
+      ).toBeNull();
+    })(),
+    navigateAccountScenario(dm, origin, "/account"),
+  ]);
+  phase("session ended");
+  await dm.getByRole("button", { name: "Reopen as DM", exact: true }).click();
+  await dm.waitForURL((u) => u.pathname === "/");
+  // Reopen has acknowledged the new session. The old anonymous invitation read
+  // and the DM's fresh invitation read can run together. Finish expiry proof
+  // before signing up the guest, and keep all cold entries/title checks.
+  await Promise.all([
+    (async () => {
+      await visitPage(guest, origin, new URL(link).pathname + new URL(link).search);
+      await guest.getByRole("button", { name: "Find characters", exact: true }).click();
+      await expect(
+        guest.locator("[data-sonner-toast]").filter({ hasText: "invitation has expired" }),
+      ).toBeVisible();
+    })(),
+    (async () => {
+      await continueIntoApp(dm);
+      await navigateAccountScenario(dm, origin, "/share");
+      await dm.evaluate(() =>
+        Object.defineProperty(navigator, "share", {
+          configurable: true,
+          value: async (data) => {
+            window.invitationForTest = data.url;
+          },
+        }),
+      );
+      await dm.getByRole("button", { name: "Share join link", exact: true }).click();
+    })(),
+  ]);
+  phase("reopened");
+  const returning = credentials();
+  const { page: secondPlayer, context: playerContext } = await devices.newDevice();
+  await playerContext.addInitScript(guidePreference);
+  await accountPost(guest.context(), origin, "auth/sign-up/email", returning);
+  await accountPost(playerContext, origin, "auth/sign-in/email", returning);
+  phase("accounts ready");
+  const freshLink = new URL(await dm.evaluate(() => window.invitationForTest));
+  await visitPage(guest, origin, freshLink.pathname + freshLink.search);
+  await guest.getByRole("button", { name: "Find characters", exact: true }).click();
+  await guest.getByPlaceholder("What should the party call you?").fill("Returning player");
+  await guest.getByRole("button", { name: "Join room", exact: true }).click();
+  await expect(guest.locator(".room-code")).toHaveText(code);
+  phase("returning joined");
+  await visitPage(secondPlayer, origin, "/account");
+  await secondPlayer.getByRole("button", { name: "Resume", exact: true }).click();
+  await secondPlayer.waitForURL((u) => u.pathname === "/");
+  await continueIntoApp(secondPlayer);
+  // Account resume already entered a fresh player document. Follow the actual
+  // player Home link to inspect the resumed room; retain the later cold reload.
+  await secondPlayer.evaluate(() => (window.playerResumeDocumentForAudit = "resumed"));
+  await secondPlayer
+    .getByRole("link", { name: "Campaign, messages & session status →", exact: true })
+    .click();
+  await secondPlayer.waitForURL((url) => url.pathname === "/share");
+  expect(await secondPlayer.evaluate(() => window.playerResumeDocumentForAudit)).toBe("resumed");
+  await expect(secondPlayer.locator(".loot-opening")).toHaveCount(0);
+  await expect(secondPlayer.locator(".room-code")).toHaveText(code);
+  expect(await secondPlayer.evaluate(async () => (await indexedDB.databases()).length)).toBe(0);
+  phase("resumed");
+  // Closing the DM's tab is not End session; a fresh player reload still reconnects.
+  await dm.close();
+  await secondPlayer.reload();
+  phase("reload started");
+  await continueIntoApp(secondPlayer);
+  await expect(secondPlayer.locator(".room-code")).toHaveText(code);
 });
 
 test("campaign-choice", async ({ devices, baseURL: origin }, testInfo) => {

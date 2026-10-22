@@ -44,7 +44,8 @@ export function failureAnnotation(id, status, output, failures = []) {
     String(output)
       .replace(ANSI_COLOR, "")
       .split(/\r?\n/)
-      .filter((line) => line.trim())
+      // Workflow commands (::notice etc.) are already annotations; keep the tail for output.
+      .filter((line) => line.trim() && !line.trimStart().startsWith("::"))
       .slice(-40)
       .join("\n")
       .slice(-3500);
