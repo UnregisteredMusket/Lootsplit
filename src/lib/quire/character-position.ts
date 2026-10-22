@@ -49,11 +49,25 @@ export function companionFundsReadable(
   if (seat.role === "dm") return true;
   if (!companionFundsShared(t, p)) return false;
   // Only seats with a visible character travelling with the party; non-party players do not.
+  return seatInParty(t, seat, p.id);
+}
+/**
+ * True when a player seat controls a visible, player-controlled character travelling with the
+ * party (not elsewhere, not on downtime). Party-only readouts (other party players' balances and
+ * ledger lines, shared companion funds) require this; a non-party player gets only their own data.
+ * `except` ignores one purse, so a controlled companion does not qualify its own controller.
+ */
+export function seatInParty(
+  t: Table,
+  seat: Pick<CloudSeat, "role" | "purseIds">,
+  except?: string,
+) {
+  if (seat.role === "dm") return true;
   return seat.purseIds.some((id) => {
     const own = t.purses.find((o) => o.id === id);
     return (
       !!own &&
-      own.id !== p.id &&
+      own.id !== except &&
       own.kind === "character" &&
       own.control !== "npc" &&
       characterVisible(t, own) &&
