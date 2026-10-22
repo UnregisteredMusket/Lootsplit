@@ -1,3 +1,4 @@
+import "./commands.ts";
 import assert from "node:assert/strict";
 import test from "node:test";
 import { DatabaseSync } from "node:sqlite";
@@ -19,6 +20,7 @@ import { tradeFixture } from "./test-fixtures/trade-economy.ts";
 import { exchangeQuoteKey } from "./trade-economy.ts";
 import { toCopper } from "./money.ts";
 import { characterPosition } from "./character-position.ts";
+import { projectRecord } from "./session-records.ts";
 
 // Disposable in-memory D1 stand-in; never a real campaign.
 const sql = new DatabaseSync(":memory:");
@@ -370,4 +372,158 @@ test("NPC barter: players receive only their own attempts and a public quote; a 
   assert.deepEqual(Object.keys(near.barter ?? {}), ["lines"]);
   // The DM still sees the valuation.
   assert.ok(readNpcBarter((await roomState(dm)).table.journal!.world!).attempts[0].quote.given > 0);
+});
+
+test("party balances and ledger lines reach only party players; a non-party player keeps their own", async () => {
+  const { dm, a, b, c } = await privacyRoom();
+  const auth = (seat: { token: string }) => ({ code: dm.code, token: seat.token });
+  // A (account seat) buys too, so A has a ledger line of its own.
+  const e = (await roomState(dm)).table.journal!.tradeEconomy!;
+  await submitCommands({
+    ...auth(a),
+    batchId: "a-buys",
+    commands: [
+      {
+        id: "a-trade",
+        kind: "trade-buy",
+        exchangeId: "harbor",
+        commodityId: "timber",
+        purseId: "a",
+        quantity: 1,
+        before: exchangeQuoteKey(e, e.exchanges[0], e.commodities[0]),
+      },
+    ],
+  });
+  // Guest B's character leaves the party (DM placement); A (account) and guest C stay with it.
+  let host = (await roomState(dm)).table;
+  await submitCommands({
+    ...dm,
+    batchId: "b-leaves",
+    commands: [
+      {
+        id: "b-leaves",
+        kind: "character-position",
+        purseId: "b",
+        before: characterPosition(host, host.purses.find((p) => p.id === "b")!),
+        inParty: false,
+        locationId: "dock",
+        visible: true,
+        sheetVisible: true,
+      },
+    ],
+  });
+  host = (await roomState(dm)).table;
+  const hostCoins = (id: string) => toCopper(host.purses.find((p) => p.id === id)!.coins);
+  assert.ok(hostCoins("a") > 0 && hostCoins("c") > 0 && hostCoins("party") > 0);
+  assert.ok(host.ledger.some((l) => l.purseId === "a"));
+  const coins = (t: RoomView["table"], id: string) => {
+    const p = t.purses.find((p) => p.id === id);
+    return p ? toCopper(p.coins) : 0;
+  };
+  const lines = (t: RoomView["table"], id: string) => t.ledger.filter((l) => l.purseId === id);
+  const views = async (seat: { token: string }, label: string) => [
+    { label: `${label} roomState`, t: (await roomState(auth(seat))).table },
+    {
+      label: `${label} pollRoom`,
+      t: ((await pollRoom({ ...auth(seat), knownRevision: -1, knownSeatId: "" })) as RoomView).table,
+    },
+    {
+      label: `${label} submitCommands`,
+      t: (await submitCommands({ ...auth(seat), batchId: `${label}-noop`, commands: [] })).table,
+    },
+  ];
+
+  // Party viewers (account seat A, guest seat C) see each other's balances and ledger lines,
+  // exactly as before. (The party treasury is only sent to seats the DM lets use it.)
+  for (const { label, t } of [...(await views(a, "A")), ...(await views(c, "C"))]) {
+    for (const id of ["a", "c"]) assert.equal(coins(t, id), hostCoins(id), `${label}: ${id}`);
+    assert.ok(lines(t, "a").length > 0, `${label}: A's ledger lines`);
+  }
+
+  // Non-party viewer B (guest) receives no party balances or ledger lines in the raw payload...
+  for (const { label, t } of await views(b, "B")) {
+    for (const id of ["a", "c", "party"]) {
+      assert.equal(coins(t, id), 0, `${label}: ${id} balance sent to a non-party player`);
+      assert.equal(lines(t, id).length, 0, `${label}: ${id} ledger lines sent to a non-party player`);
+    }
+    // ...but always its own purse, exactly as stored, and its own ledger lines.
+    assert.deepEqual(t.purses.find((p) => p.id === "b"), host.purses.find((p) => p.id === "b"), label);
+    assert.deepEqual(
+      lines(t, "b").map((l) => l.id),
+      lines(host, "b").map((l) => l.id),
+      `${label}: own ledger`,
+    );
+    assert.ok(lines(t, "b").length > 0, `${label}: own ledger lines`);
+  }
+  // A player outside the party is not a party player: party members no longer receive B's balance.
+  for (const { label, t } of await views(a, "A-after")) {
+    assert.equal(coins(t, "b"), 0, `${label}: non-party B's balance`);
+    assert.equal(lines(t, "b").length, 0, `${label}: non-party B's ledger lines`);
+  }
+
+  // B rejoins the party: B again sees party balances and the party again sees B's.
+  host = (await roomState(dm)).table;
+  await submitCommands({
+    ...dm,
+    batchId: "b-returns",
+    commands: [
+      {
+        id: "b-returns",
+        kind: "character-position",
+        purseId: "b",
+        before: characterPosition(host, host.purses.find((p) => p.id === "b")!),
+        inParty: true,
+        locationId: null,
+        visible: true,
+        sheetVisible: true,
+      },
+    ],
+  });
+  host = (await roomState(dm)).table;
+  const back = (await roomState(auth(b))).table;
+  for (const id of ["a", "c"]) assert.equal(coins(back, id), hostCoins(id), `B back: ${id}`);
+  assert.equal(coins((await roomState(auth(a))).table, "b"), hostCoins("b"));
+
+  // The DM is unaffected.
+  const dmView = (await roomState(dm)).table;
+  for (const id of ["a", "b", "c", "party"]) assert.equal(coins(dmView, id), hostCoins(id), `DM ${id}`);
+});
+
+test("device projection: a non-party player gets only their own balance and ledger lines", async () => {
+  const { dm, b } = await privacyRoom();
+  let host = (await roomState(dm)).table;
+  await submitCommands({
+    ...dm,
+    batchId: "b-leaves",
+    commands: [
+      {
+        id: "b-leaves",
+        kind: "character-position",
+        purseId: "b",
+        before: characterPosition(host, host.purses.find((p) => p.id === "b")!),
+        inParty: false,
+        locationId: "dock",
+        visible: true,
+        sheetVisible: true,
+      },
+    ],
+  });
+  host = (await roomState(dm)).table;
+  // The offline/device player projection (economyView) and the projection of the payload B receives.
+  const raw = (await roomState({ code: dm.code, token: b.token })).table;
+  for (const [label, source] of [
+    ["host table", host],
+    ["B's room payload", raw],
+  ] as const) {
+    const t = projectRecord(source, { role: "player", purseIds: ["b"] }, { directory: true });
+    for (const p of t.purses.filter((p) => p.id !== "b"))
+      assert.equal(toCopper(p.coins), 0, `${label}: ${p.id} balance`);
+    assert.equal(t.ledger.every((l) => l.purseId === "b"), true, `${label}: ledger`);
+    assert.equal(
+      toCopper(t.purses.find((p) => p.id === "b")!.coins),
+      toCopper(host.purses.find((p) => p.id === "b")!.coins),
+      `${label}: own balance`,
+    );
+    assert.ok(t.ledger.some((l) => l.purseId === "b"), `${label}: own ledger`);
+  }
 });

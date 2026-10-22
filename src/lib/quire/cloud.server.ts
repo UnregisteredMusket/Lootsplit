@@ -2,6 +2,8 @@ import {
   characterVisible,
   canReadCharacter,
   companionFundsReadable,
+  inParty,
+  seatInParty,
 } from "./character-position.ts";
 import {
   readRoom,
@@ -581,7 +583,8 @@ async function view(room: CloudRoom, seat: CloudSeat): Promise<RoomView> {
 
 /**
  * Player projection on top of `projectRecord`. Owner decision (2026-10-22): other visible
- * party players' balances and ledger lines stay readable, as before. NPC, hidden-NPC,
+ * party players' balances and ledger lines stay readable to party players, as before; a player
+ * whose character is not with the party does not receive them. NPC, hidden-NPC,
  * exchange-treasury and non-party balances and ledger lines are never projected, and
  * purses the seat does not control never carry editing permissions. Owner decision (2026-10-22):
  * the DM may share party companion NPC funds with party players (off by default).
@@ -598,12 +601,17 @@ function playerTable(table: CloudTable, record: CloudTable, seat: CloudSeat): Cl
   const treasuries = new Set(
     (table.journal?.tradeEconomy?.exchanges ?? []).map((e) => e.purseId),
   );
-  const sharedBalance = (p: Purse) =>
+  const partyPlayer = (p: Purse) =>
     characterVisible(table, p) &&
     !p.nonParty &&
     !npcIds.has(p.id) &&
     !treasuries.has(p.id) &&
     (p.kind === "party" || characterControl(p) === "player");
+  // Party balances and ledger lines are shared only among the party: the viewer needs a visible
+  // character travelling with the party (as for companion funds), and the account must be in the
+  // party too. A player outside the party receives only their own (and delegated) data.
+  const viewerInParty = seatInParty(table, seat);
+  const sharedBalance = (p: Purse) => viewerInParty && partyPlayer(p) && inParty(table, p);
   // DM setting "Party can see companion NPC funds": a visible NPC travelling with the party is
   // readable (coins and ledger lines, never permissions) by seats with a visible party character.
   const companion = (p: Purse) => companionFundsReadable(table, p, seat);
@@ -633,7 +641,7 @@ function playerTable(table: CloudTable, record: CloudTable, seat: CloudSeat): Cl
       // Not controlled by this seat: the projected public fields only.
       const portrait =
         projected.portrait ??
-        (p.portrait && (sharedBalance(p) || readableNpcs.has(p.id)) ? p.portrait : undefined);
+        (p.portrait && (partyPlayer(p) || readableNpcs.has(p.id)) ? p.portrait : undefined);
       return {
         ...projected,
         ...(portrait ? { portrait } : {}),
