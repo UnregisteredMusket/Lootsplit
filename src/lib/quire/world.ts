@@ -18,7 +18,8 @@ import { applyCharacterPosition } from "./character-position.ts";
 import { readFleet } from "./ships-schema.ts";
 import { applyTabletopCommand, validateTabletop, readTabletopSession } from "./tabletop.ts";
 import { tabletopCommands, type TabletopCommand } from "./tabletop-schema.ts";
-import { legacyTabletopMap, legacyTabletopToken, previousTabletopMap } from "./tabletop-protocol.ts";
+import { fogSnapshotMap, legacyTabletopMap, legacyTabletopToken, previousTabletopMap } from "./tabletop-protocol.ts";
+import { compactTabletopHistory } from "./fog-history.ts";
 
 export function npcAvailableHere(npc: Npc, table: Pick<CloudTable, "journal">) {
   const market = readMarketLocations(table.journal?.market);
@@ -469,7 +470,9 @@ export function applyWorldCommand(t: CloudTable, seat: CloudSeat, cmd: WorldComm
   } else if (cmd.kind === "map-save") {
     dm();
     const current = w.maps.find((m) => m.id === cmd.mapId) ?? null;
-    const legacy = current && cmd.before && !same(current, cmd.before) && (same(legacyTabletopMap(current), cmd.before) || same(previousTabletopMap(current), cmd.before));
+    // Older apps (tabletop protocol 2 or earlier) saw full-snapshot fog history.
+    const expanded = current && fogSnapshotMap(current);
+    const legacy = current && cmd.before && !same(current, cmd.before) && (same(expanded, cmd.before) || same(legacyTabletopMap(current), cmd.before) || same(previousTabletopMap(expanded!), cmd.before));
     if (!same(current, cmd.before) && !legacy)
       throw Error("This map changed. Reload before saving; your draft is retained.");
     if (cmd.map && cmd.map.id !== cmd.mapId) throw Error("Map identity cannot change.");
@@ -486,7 +489,12 @@ export function applyWorldCommand(t: CloudTable, seat: CloudSeat, cmd: WorldComm
     if (cmd.map?.connected) delete cmd.map.connected.placedRecords;
     if (cmd.map && current?.connected && cmd.map.connected === undefined) cmd.map.connected = current.connected;
     if (cmd.map && current?.tabletop) {
-      cmd.map.tabletop = { ...(cmd.map.tabletop ?? current.tabletop), revision: current.tabletop.revision + 1 };
+      cmd.map.tabletop = {
+        ...(cmd.map.tabletop
+          ? compactTabletopHistory(cmd.map.tabletop, cmd.before?.tabletop?.fog ?? current.tabletop.fog)
+          : current.tabletop),
+        revision: current.tabletop.revision + 1,
+      };
       if (legacy && cmd.map.tokens) cmd.map.tokens = cmd.map.tokens.map(token => {
         const old = current.tokens?.find(t => t.id === token.id);
         if (!old) return token;

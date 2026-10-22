@@ -4,6 +4,12 @@ import { ownerTestMode } from "./test-mode.mjs";
 import { campaignRecords } from "./campaign-records.mjs";
 import { accountMapAsset, validateBackupMapAssets } from "./account-map-assets.mjs";
 import { tableForProtocol } from "../src/lib/quire/tabletop-protocol.ts";
+
+/** Tabletop protocol the account client declared: 0 (none) to 3 (current). */
+const tabletopHeader = (request) => {
+  const value = Number(request.headers.get("x-lootsplit-tabletop"));
+  return Number.isInteger(value) && value >= 0 ? Math.min(value, 3) : 0;
+};
 import { publicAnalytics, ownerAnalytics } from "./game-analytics.mjs";
 import { handleEncounters } from "./encounters.mjs";
 import { handleCharacterPlay } from "./character-play.mjs";
@@ -415,9 +421,10 @@ export async function handleAccounts(request, env) {
       return cors(json(await accountMapAsset(db, userId, body)));
     if (path === "/api/account/records" && request.method === "GET") {
       const result = await campaignRecords(db, userId);
-      if (request.headers.get("x-lootsplit-tabletop") !== "2")
+      const protocol = tabletopHeader(request);
+      if (protocol < 3)
         for (const report of result.reports)
-          if (report.snapshot) report.snapshot = tableForProtocol(report.snapshot, request.headers.get("x-lootsplit-tabletop") === "1" ? 1 : 0);
+          if (report.snapshot) report.snapshot = tableForProtocol(report.snapshot, protocol);
       return cors(json(result));
     }
     if (path === "/api/account/library" && request.method === "GET") {
@@ -559,10 +566,13 @@ export async function handleAccounts(request, env) {
         .bind(text(body.id), userId)
         .first();
       if (!row) fail("Backup not found.", 404);
-      const payload = JSON.parse(row.body);
+      const stored = JSON.parse(row.body);
+      const protocol = tabletopHeader(request);
+      // Protocol 2 differs only by compact fog history, which expands losslessly.
+      const payload = protocol === 2 ? tableForProtocol(stored, 2) : stored;
       if (
-        request.headers.get("x-lootsplit-tabletop") !== "2" &&
-        JSON.stringify(tableForProtocol(payload, request.headers.get("x-lootsplit-tabletop") === "1" ? 1 : 0)) !== JSON.stringify(payload)
+        protocol < 2 &&
+        JSON.stringify(tableForProtocol(stored, protocol)) !== JSON.stringify(stored)
       )
         fail(
           "This backup includes detailed tabletop maps. Restore it on the updated website; the complete backup is retained.",

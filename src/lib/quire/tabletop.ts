@@ -13,6 +13,14 @@ import {
   sceneTokenPoint,
   type VisionSource,
 } from "./tabletop-geometry.ts";
+import {
+  FOG_HISTORY_DEPTH,
+  applyFogEntry,
+  compactFogHistory,
+  compactTabletopHistory,
+  expandTabletopHistory,
+  fogDiff,
+} from "./fog-history.ts";
 import type { CloudSeat, CloudTable } from "./cloud.ts";
 import type { CampaignMap, MapToken } from "./world-schema.ts";
 
@@ -131,11 +139,16 @@ export function projectTabletopMap(
   return {
     ...map,
     image: masked ? concealedMapImage : map.image,
-    connected: map.connected ? { ...map.connected,
-      placedRecords: map.connected.placements.map(p => p.record),
-      links: map.connected.links.filter(l => l.visibility === "party" && visible(l)),
-      placements: map.connected.placements.filter(p => p.visibility === "party" && visible(p)),
-    } : undefined,
+    connected: map.connected
+      ? {
+          ...map.connected,
+          placedRecords: map.connected.placements.map((p) => p.record),
+          links: map.connected.links.filter((l) => l.visibility === "party" && visible(l)),
+          placements: map.connected.placements.filter(
+            (p) => p.visibility === "party" && visible(p),
+          ),
+        }
+      : undefined,
     anchors: map.anchors.filter(visible),
     markers: map.markers.filter((m) => m.visibility === "party" && visible(m)),
     tokens: map.tokens
@@ -172,7 +185,11 @@ export function validateTabletop(table: CloudTable, projected = false) {
     !world.maps.some((m) => m.id === session.camera!.mapId && (projected || m.visible))
   )
     throw Error("A synchronized camera must refer to a shared map.");
-  if (session.presentation && !world.maps.some(m=>m.id===session.presentation!.mapId && (projected||m.visible))) throw Error("Combat presentation requires a shared map.");
+  if (
+    session.presentation &&
+    !world.maps.some((m) => m.id === session.presentation!.mapId && (projected || m.visible))
+  )
+    throw Error("Combat presentation requires a shared map.");
   for (const map of world.maps) {
     const settings = readMapTabletop(map);
     for (const [label, values] of [
@@ -208,13 +225,14 @@ export function applyTabletopCommand(
     table.journal!.events.push({ id: command.id + "-event", at, kind: "management", summary });
   if (command.kind === "tabletop-session") {
     dm();
-    const previousSession = world.tabletop ? {...world.tabletop} : null;
+    const previousSession = world.tabletop ? { ...world.tabletop } : null;
     if (previousSession) delete previousSession.presentation;
-    if (!same(world.tabletop ?? null, command.before) && !same(previousSession,command.before))
+    if (!same(world.tabletop ?? null, command.before) && !same(previousSession, command.before))
       throw Error("Tabletop session controls changed. Refresh before saving.");
-    const next = {...command.session};
-    if (next.presentation === undefined && world.tabletop?.presentation) next.presentation=world.tabletop.presentation;
-    if (next.presentation && next.presentation.mapId !== next.activeMapId) next.presentation=null;
+    const next = { ...command.session };
+    if (next.presentation === undefined && world.tabletop?.presentation)
+      next.presentation = world.tabletop.presentation;
+    if (next.presentation && next.presentation.mapId !== next.activeMapId) next.presentation = null;
     world.tabletop = next;
     validateTabletop(table);
     event("Online tabletop session controls updated");
@@ -245,44 +263,61 @@ export function applyTabletopCommand(
     map.tabletop = settings;
   } else if (command.kind === "map-tabletop") {
     dm();
-    if (!same(map.tabletop ?? null, command.before))
+    if (
+      !same(map.tabletop ?? null, command.before) &&
+      !(map.tabletop && same(expandTabletopHistory(map.tabletop), command.before))
+    )
       throw Error("Map configuration changed. Your draft is retained; refresh before saving.");
-    map.tabletop = { ...command.settings, revision: settings.revision + 1 };
+    // Supplied history was read relative to the fog the client last saw.
+    map.tabletop = {
+      ...compactTabletopHistory(command.settings, command.before?.fog ?? settings.fog),
+      revision: settings.revision + 1,
+    };
     event("Map tabletop configuration updated");
   } else if (command.kind === "map-fog") {
     dm();
     if (!same(settings.fog, command.before))
       throw Error("Exploration changed. Refresh before revealing or concealing an area.");
     const prior = structuredClone(settings.fog);
+    // Older rooms may hold full-snapshot history; it is converted here, exactly, to diffs.
+    settings.fogUndo = compactFogHistory(prior, settings.fogUndo);
+    settings.fogRedo = compactFogHistory(prior, settings.fogRedo);
     if (command.action === "undo" || command.action === "redo") {
       const source = command.action === "undo" ? settings.fogUndo : settings.fogRedo;
       const target = command.action === "undo" ? settings.fogRedo : settings.fogUndo;
-      const next = source.pop();
-      if (!next) throw Error("There is no exploration change to " + command.action + ".");
-      target.push(prior);
-      if (target.length > 20) target.shift();
+      const entry = source.pop();
+      if (!entry) throw Error("There is no exploration change to " + command.action + ".");
+      const next = applyFogEntry(prior, entry);
+      target.push(fogDiff(next, prior));
+      if (target.length > FOG_HISTORY_DEPTH) target.shift();
       settings.fog = next;
     } else {
-      settings.fogUndo = [...settings.fogUndo.slice(-19), prior];
-      settings.fogRedo = [];
       if (command.action === "shape") {
+        const shapes = command.shape ? [command.shape, ...(command.continued ?? [])] : [];
         if (
-          !command.shape ||
-          settings.fog.shapes.length >= 500 ||
-          settings.fog.shapes.some((s) => s.id === command.shape!.id)
+          !shapes.length ||
+          settings.fog.shapes.length + shapes.length > 500 ||
+          new Set(shapes.map((s) => s.id)).size !== shapes.length ||
+          settings.fog.shapes.some((s) => shapes.some((shape) => shape.id === s.id))
         )
           throw Error(
             "Choose a new valid exploration shape; consolidate or reset a full fog history.",
           );
         settings.fog.enabled = true;
-        settings.fog.shapes.push(command.shape);
-      } else if (command.action === "reveal-all" || command.action === "conceal-all") {
+        settings.fog.shapes.push(...shapes);
+      } else if (command.continued) throw Error("Only a brush stroke can continue across shapes.");
+      else if (command.action === "reveal-all" || command.action === "conceal-all") {
         settings.fog = {
           enabled: true,
           base: command.action === "reveal-all" ? "revealed" : "concealed",
           shapes: [],
         };
       } else settings.fog.enabled = command.action === "enable";
+      settings.fogUndo = [
+        ...settings.fogUndo.slice(-(FOG_HISTORY_DEPTH - 1)),
+        fogDiff(settings.fog, prior),
+      ];
+      settings.fogRedo = [];
     }
     settings.revision++;
     map.tabletop = settings;

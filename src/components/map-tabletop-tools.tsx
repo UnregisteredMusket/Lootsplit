@@ -6,6 +6,13 @@ import { getCloudTable, getServerCloudTable, subscribeCloudTable } from "@/lib/q
 import { readMapTabletop, readTabletopSession, canMoveMapToken } from "@/lib/quire/tabletop";
 import { sceneDistance, sceneTokenPoint } from "@/lib/quire/tabletop-geometry";
 import { canonicalJson } from "@/lib/quire/canonical-json";
+import { fogStorageBytes } from "@/lib/quire/fog-history";
+import {
+  extendStroke,
+  finishStroke,
+  roundScenePoint,
+  type StrokeDraft,
+} from "@/lib/quire/fog-stroke";
 import { mutationNotice } from "@/lib/quire/mutation-outcome";
 import { allowContextChange, useDraftGuard } from "@/lib/quire/use-draft-guard";
 import { openWorkspaceWindow } from "@/lib/quire/workspace-windows";
@@ -91,6 +98,7 @@ export function useMapTabletopTools(
       | undefined
     >(undefined),
     movePreview = useRef<Move[]>([]),
+    stroke = useRef<StrokeDraft>({ points: [], frozen: 0 }),
     keyboardAnchor = useRef<ScenePoint | undefined>(undefined);
   const disabled = busy || cloud.viewOnly || (cloud.joined && !cloud.mine);
   const selectedTokens = (map.tokens ?? []).filter((token) => selected.includes(token.id));
@@ -98,6 +106,7 @@ export function useMapTabletopTools(
     gesture.current = undefined;
     movePreview.current = [];
     keyboardAnchor.current = undefined;
+    stroke.current = { points: [], frozen: 0 };
     setMoves([]);
     setPoints([]);
     setCursor(undefined);
@@ -192,6 +201,7 @@ export function useMapTabletopTools(
     if (tool === "pan" || tool === "select") return false;
     gesture.current = { point, moved: false };
     if (["fog-brush", "fog-rectangle", "wall"].includes(tool)) setPoints([point]);
+    if (tool === "fog-brush") stroke.current = { points: [point], frozen: 0 };
     return true;
   }
   function pointerMove(point: ScenePoint) {
@@ -238,9 +248,18 @@ export function useMapTabletopTools(
         });
       movePreview.current = preview;
       setMoves(preview);
-    } else if (tool === "fog-brush")
-      setPoints((values) => (values.length < 200 ? [...values, point] : values));
-    else if (tool === "fog-rectangle" || tool === "wall") setPoints([current.point, point]);
+    } else if (tool === "fog-brush") {
+      // Long strokes are simplified as they grow and saved as continued shapes, not cut off.
+      const next = extendStroke(stroke.current, point, radius);
+      if (next.full)
+        setNotice(
+          "This brush stroke is at its maximum length. Release to save it, then keep painting.",
+        );
+      else {
+        stroke.current = { points: next.points, frozen: next.frozen };
+        setPoints(next.points);
+      }
+    } else if (tool === "fog-rectangle" || tool === "wall") setPoints([current.point, point]);
     return true;
   }
   function saveMoves(next: Move[], grid = canonicalJson(map.grid)) {
@@ -268,16 +287,40 @@ export function useMapTabletopTools(
     );
   }
   function applyShape(values = points) {
-    const common = { id: crypto.randomUUID(), reveal };
-    const shape =
+    const common = () => ({ id: crypto.randomUUID(), reveal });
+    const [shape, ...continued] =
       tool === "fog-brush"
-        ? { ...common, kind: "brush" as const, points: values, radius }
+        ? finishStroke(
+            stroke.current.points.length ? stroke.current : { points: values, frozen: 0 },
+            radius,
+          ).map((segment) => ({ ...common(), kind: "brush" as const, points: segment, radius }))
         : tool === "fog-polygon"
-          ? { ...common, kind: "polygon" as const, points: values }
-          : { ...common, kind: "rectangle" as const, a: values[0], b: values[values.length - 1] };
+          ? [{ ...common(), kind: "polygon" as const, points: values.map(roundScenePoint) }]
+          : [
+              {
+                ...common(),
+                kind: "rectangle" as const,
+                a: roundScenePoint(values[0]),
+                b: roundScenePoint(values[values.length - 1]),
+              },
+            ];
+    if (settings.fog.shapes.length + 1 + continued.length > 500) {
+      setError(
+        `This map already has ${settings.fog.shapes.length} of 500 fog shapes${continued.length ? ` and this stroke needs ${continued.length + 1}` : ""}. This stroke was not saved and your fog is unchanged; Reveal all or Conceal all starts a fresh fog layer.`,
+      );
+      return;
+    }
     void act(
-      { kind: "map-fog", mapId: map.id, before: settings.fog, action: "shape", shape },
+      {
+        kind: "map-fog",
+        mapId: map.id,
+        before: settings.fog,
+        action: "shape",
+        shape,
+        ...(continued.length ? { continued } : {}),
+      },
       () => {
+        stroke.current = { points: [], frozen: 0 };
         setPoints([]);
         setCursor(undefined);
       },
@@ -573,6 +616,8 @@ export function useMapTabletopTools(
       )}
     </div>
   );
+  const fogBytes = dm ? fogStorageBytes(settings) : 0,
+    fogLarge = fogBytes >= 400_000 || settings.fog.shapes.length >= 450;
   const configurationControls = (
     <>
       {dm && <SceneConfiguration map={map} />}
@@ -614,6 +659,12 @@ export function useMapTabletopTools(
               </Button>
             ))}
           </div>
+          <p role={fogLarge ? "alert" : "status"} data-fog-storage={fogBytes}>
+            Fog storage: {settings.fog.shapes.length} of 500 shapes ·{" "}
+            {Math.max(1, Math.round(fogBytes / 1000))} KB including undo history
+            {fogLarge &&
+              ". This map's fog is getting large; a shared campaign stops saving above 1.8 MB in total. Prefer rectangles, polygons or a larger brush for big areas."}
+          </p>
           <Button aria-pressed={showPreview} onClick={() => setShowPreview(!showPreview)}>
             Player-view preview
           </Button>
