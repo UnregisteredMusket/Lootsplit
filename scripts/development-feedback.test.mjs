@@ -86,16 +86,16 @@ test("packaged Worker checks all belong to one required isolated group", () => {
   ];
   assert.equal(assignments.length, 24);
   assert.ok(
-    assignments.some(([, name, group]) => name === "worker-downtime" && group === "features"),
+    assignments.some(([, name, group]) => name === "worker-downtime" && group === "world"),
   );
   assert.ok(
-    assignments.some(([, name, group]) => name === "worker-blacksmith" && group === "features"),
+    assignments.some(([, name, group]) => name === "worker-blacksmith" && group === "library"),
   );
   assert.ok(
     assignments.some(([, name, group]) => name === "worker-navigation" && group === "interface"),
   );
   assert.ok(
-    assignments.some(([, name, group]) => name === "worker-initiative" && group === "interface"),
+    assignments.some(([, name, group]) => name === "worker-initiative" && group === "world"),
   );
   assert.ok(
     assignments.some(([, name, group]) => name === "worker-map-tiles" && group === "features"),
@@ -104,36 +104,36 @@ test("packaged Worker checks all belong to one required isolated group", () => {
     assignments.some(([, name, group]) => name === "worker-ships" && group === "accounts"),
   );
   assert.ok(
-    assignments.some(([, name, group]) => name === "worker-trade-economy" && group === "features"),
+    assignments.some(([, name, group]) => name === "worker-trade-economy" && group === "economy"),
   );
   assert.ok(
     assignments.some(
-      ([, name, group]) => name === "worker-world-features" && group === "features",
+      ([, name, group]) => name === "worker-world-features" && group === "world",
     ),
   );
   assert.ok(
     assignments.some(
-      ([, name, group]) => name === "worker-property-operations" && group === "interface",
+      ([, name, group]) => name === "worker-property-operations" && group === "economy",
     ),
   );
   assert.ok(
-    assignments.some(([, name, group]) => name === "worker-properties" && group === "interface"),
+    assignments.some(([, name, group]) => name === "worker-properties" && group === "economy"),
   );
   assert.ok(
-    assignments.some(([, name, group]) => name === "worker-shop-stock" && group === "interface"),
+    assignments.some(([, name, group]) => name === "worker-shop-stock" && group === "world"),
   );
   assert.ok(
     assignments.some(
-      ([, name, group]) => name === "worker-market-locations" && group === "interface",
+      ([, name, group]) => name === "worker-market-locations" && group === "library",
     ),
   );
   assert.equal(new Set(assignments.map((m) => m[1])).size, 24);
   assert.ok(
-    assignments.some(([, name, group]) => name === "worker-sound" && group === "interface"),
+    assignments.some(([, name, group]) => name === "worker-sound" && group === "library"),
   );
   for (const [, , group] of assignments)
-    assert.ok(["accounts", "features", "interface"].includes(group));
-  assert.match(workflow, /group: \[accounts, features, interface\]/);
+    assert.ok(["accounts", "features", "world", "economy", "library", "interface"].includes(group));
+  assert.match(workflow, /group: \[accounts, features, world, economy, library, interface\]/);
   assert.match(workflow, /fail-fast: false/);
   assert.match(workflow, /browser-audit-worker-\$\{\{ matrix.group \}\}/);
 });

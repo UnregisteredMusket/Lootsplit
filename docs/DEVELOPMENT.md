@@ -17,20 +17,27 @@ Pull requests run the complete `Verify preserved functionality` workflow. Featur
 | Job | Coverage |
 | --- | --- |
 | Code checks and immutable builds | Unit tests, types, lint, web and mobile builds, one website artifact and its portable standby |
-| Development / governance | Campaign permissions, owner Test mode, themes, help, multiplayer recovery and backups |
-| Development / accounts | Accounts, roles, moderation, monitoring, bug reports and character/party sheets |
-| Development / gameplay | Data integrity, transfers, encounters, finance, controls, navigation and loot |
-| Development / desktop | Desktop/mobile layout, public analytics and website |
-| Packaged Worker / accounts | Existing Worker account, monitoring and finance checks |
-| Packaged Worker / interface | Existing Worker theme, help, analytics, website, navigation, loot and title checks |
+| Development / governance | Campaign permissions, guest chat, themes and help |
+| Development / accounts | Account shard 1/2 first, then owner, member and monitoring, library navigation, loot, downtime and sound |
+| Development / accounts-2 | Account shard 2/2 first, then bug reports, character/party sheets, release, backups and ships |
+| Development / gameplay | Edge cases, data integrity, transfers, encounters, finance, shop stock, control panel and market locations |
+| Development / economy | Properties, property operations, trade economy, game analytics and website |
+| Development / desktop | Map tiles, blacksmith and desktop layout |
+| Development / world | World features and navigation |
+| Packaged Worker / accounts | Account shard 1/2 first, then monitoring, finance, ships and themes |
+| Packaged Worker / features | Account shard 2/2 first, then map tiles and website |
+| Packaged Worker / world | Downtime, world features, initiative and shop stock |
+| Packaged Worker / economy | Trade economy, properties, property operations, game analytics and loot |
+| Packaged Worker / library | Blacksmith, market locations, sound and library navigation |
+| Packaged Worker / interface | Navigation, help and the built title-screen/release-identity check |
 | Packaged standby | Locked transport and disposable account/library browser verification |
 | verify | Fails unless every required job succeeded; skipped/missing/cancelled is a failure |
 
-The four development groups start alongside the build. Each has its own runner, local SQLite data, browser profiles and server. Packaged checks download the build job's exact artifact IDs and verify every file hash before and after their audits. They never rebuild application code. Website/standby publishers still require the entire main-push workflow to succeed; candidate artifact existence alone never authorizes publication. Main-only publishing, stale-commit rejection, serialized deployment, migration checks, signing and production read-only audits are retained.
+The seven development groups start alongside the build; group membership is balanced by measured median audit step time, not by feature area; account shards run first in their jobs. Each has its own runner, local SQLite data, browser profiles and server. Packaged checks download the build job's exact artifact IDs and verify every file hash before and after their audits. They never rebuild application code. Website/standby publishers still require the entire main-push workflow to succeed; candidate artifact existence alone never authorizes publication. Main-only publishing, stale-commit rejection, serialized deployment, migration checks, signing and production read-only audits are retained.
 
 Every original bounded check is listed in `scripts/verification-baseline.json`; the regression test rejects omissions and duplicate commands. Extend coverage when adding a feature. Do not remove entries to accommodate a failed audit.
 
-Both packaged Worker groups use separate runners/databases and the same verified artifact ID. Matrix failure aggregation remains required by `verify`. `npm run verify:timings` reads existing step checkpoints and writes sorted JSON/Markdown stage timings. CI includes this report in every job's summary and diagnostic artifact, including failed jobs. Compare elapsed pipeline time separately from summed runner time.
+The six packaged Worker groups use separate runners/databases and the same verified artifact ID. Matrix failure aggregation remains required by `verify`. `npm run verify:timings` reads existing step checkpoints and writes sorted JSON/Markdown stage timings. CI includes this report in every job's summary and diagnostic artifact, including failed jobs. Compare elapsed pipeline time separately from summed runner time.
 
 ## Failed groups and recovery
 

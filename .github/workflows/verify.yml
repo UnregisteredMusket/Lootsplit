@@ -111,7 +111,9 @@ jobs:
       id-token: write
     strategy:
       # Preserve independent results when another group fails; allow targeted reruns.
-      # Seven balanced groups run at once; no single group carries the critical path.
+      # Seven groups balanced by measured median audit time run at once (account shards first
+      # in their jobs); no single group carries the critical path. Rebalance by timing, never by
+      # dropping an audit.
       fail-fast: false
       matrix:
         group: [governance, accounts, accounts-2, gameplay, economy, desktop, world]
@@ -145,30 +147,14 @@ jobs:
       - name: dev-theme
         if: matrix.group == 'governance'
         run: node scripts/recovery-step.mjs dev-theme 240 node scripts/theme-browser-audit.mjs
-      - name: dev-sound
-        if: matrix.group == 'governance'
-        run: node scripts/recovery-step.mjs dev-sound 180 node scripts/sound-browser-audit.mjs
       - name: dev-help
         if: matrix.group == 'governance'
         run: node scripts/recovery-step.mjs dev-help 240 node scripts/help-browser-audit.mjs
-      - name: dev-release
-        if: matrix.group == 'governance'
-        run: node scripts/recovery-step.mjs dev-release 240 node scripts/release-browser-audit.mjs
-      - name: dev-backup
-        if: matrix.group == 'governance'
-        env:
-          AUDIT_ORIGIN: http://127.0.0.1:8080
-        run: node scripts/recovery-step.mjs dev-backup 240 node scripts/backup-browser-audit.mjs
       - name: dev-account-1
         if: matrix.group == 'accounts'
         env:
           ACCOUNT_SHARD: 1/2
         run: node scripts/recovery-step.mjs dev-account-1 240 node scripts/account-browser-audit.mjs
-      - name: dev-account-2
-        if: matrix.group == 'accounts-2'
-        env:
-          ACCOUNT_SHARD: 2/2
-        run: node scripts/recovery-step.mjs dev-account-2 240 node scripts/account-browser-audit.mjs
       - name: dev-owner
         if: matrix.group == 'accounts'
         env:
@@ -180,6 +166,23 @@ jobs:
       - name: dev-monitor
         if: matrix.group == 'accounts'
         run: node scripts/recovery-step.mjs dev-monitor 240 node scripts/monitor-browser-audit.mjs
+      - name: dev-library-navigation
+        if: matrix.group == 'accounts'
+        run: node scripts/recovery-step.mjs dev-library-navigation 240 node scripts/library-navigation-browser-audit.mjs
+      - name: dev-loot
+        if: matrix.group == 'accounts'
+        run: node scripts/recovery-step.mjs dev-loot 240 node scripts/loot-browser-audit.mjs
+      - name: dev-downtime
+        if: matrix.group == 'accounts'
+        run: node scripts/recovery-step.mjs dev-downtime 240 node --experimental-strip-types scripts/downtime-browser-audit.mjs
+      - name: dev-sound
+        if: matrix.group == 'accounts'
+        run: node scripts/recovery-step.mjs dev-sound 180 node scripts/sound-browser-audit.mjs
+      - name: dev-account-2
+        if: matrix.group == 'accounts-2'
+        env:
+          ACCOUNT_SHARD: 2/2
+        run: node scripts/recovery-step.mjs dev-account-2 240 node scripts/account-browser-audit.mjs
       - name: dev-bug
         if: matrix.group == 'accounts-2'
         run: node scripts/recovery-step.mjs dev-bug 240 node scripts/bug-browser-audit.mjs
@@ -189,6 +192,17 @@ jobs:
       - name: dev-party-sheet
         if: matrix.group == 'accounts-2'
         run: node scripts/recovery-step.mjs dev-party-sheet 240 node scripts/party-sheet-browser-audit.mjs
+      - name: dev-release
+        if: matrix.group == 'accounts-2'
+        run: node scripts/recovery-step.mjs dev-release 240 node scripts/release-browser-audit.mjs
+      - name: dev-backup
+        if: matrix.group == 'accounts-2'
+        env:
+          AUDIT_ORIGIN: http://127.0.0.1:8080
+        run: node scripts/recovery-step.mjs dev-backup 240 node scripts/backup-browser-audit.mjs
+      - name: dev-ships
+        if: matrix.group == 'accounts-2'
+        run: node scripts/recovery-step.mjs dev-ships 240 node scripts/ships-browser-audit.mjs
       - name: dev-bug-edge-cases
         if: matrix.group == 'gameplay'
         run: node scripts/recovery-step.mjs dev-bug-edge-cases 240 node scripts/bug-audit-edge-cases.mjs
@@ -198,18 +212,6 @@ jobs:
       - name: dev-bug-permission-transfers
         if: matrix.group == 'gameplay'
         run: node scripts/recovery-step.mjs dev-bug-permission-transfers 240 node --experimental-strip-types scripts/bug-audit-permission-transfers.mjs
-      - name: dev-ships
-        if: matrix.group == 'desktop'
-        run: node scripts/recovery-step.mjs dev-ships 240 node scripts/ships-browser-audit.mjs
-      - name: dev-blacksmith
-        if: matrix.group == 'desktop'
-        run: node scripts/recovery-step.mjs dev-blacksmith 240 node --experimental-strip-types scripts/blacksmith-browser-audit.mjs
-      - name: dev-downtime
-        if: matrix.group == 'desktop'
-        run: node scripts/recovery-step.mjs dev-downtime 240 node --experimental-strip-types scripts/downtime-browser-audit.mjs
-      - name: dev-map-tiles
-        if: matrix.group == 'desktop'
-        run: node scripts/recovery-step.mjs dev-map-tiles 240 node scripts/map-tiles-browser-audit.mjs
       - name: dev-encounter
         if: matrix.group == 'gameplay'
         run: node scripts/recovery-step.mjs dev-encounter 240 node scripts/encounter-browser-audit.mjs
@@ -222,8 +224,11 @@ jobs:
       - name: dev-shop-stock
         if: matrix.group == 'gameplay'
         run: node scripts/recovery-step.mjs dev-shop-stock 240 node scripts/shop-stock-browser-audit.mjs
+      - name: dev-control-panel
+        if: matrix.group == 'gameplay'
+        run: node scripts/recovery-step.mjs dev-control-panel 240 node scripts/control-panel-browser-audit.mjs
       - name: dev-market-locations
-        if: matrix.group == 'economy'
+        if: matrix.group == 'gameplay'
         run: node scripts/recovery-step.mjs dev-market-locations 240 node scripts/market-locations-browser-audit.mjs
       - name: dev-properties
         if: matrix.group == 'economy'
@@ -234,30 +239,27 @@ jobs:
       - name: dev-trade-economy
         if: matrix.group == 'economy'
         run: node scripts/recovery-step.mjs dev-trade-economy 240 node --experimental-strip-types scripts/trade-economy-browser-audit.mjs
+      - name: dev-game-analytics
+        if: matrix.group == 'economy'
+        run: node scripts/recovery-step.mjs dev-game-analytics 240 node scripts/game-analytics-browser-audit.mjs
+      - name: dev-website
+        if: matrix.group == 'economy'
+        run: node scripts/recovery-step.mjs dev-website 240 node scripts/website-browser-audit.mjs
+      - name: dev-map-tiles
+        if: matrix.group == 'desktop'
+        run: node scripts/recovery-step.mjs dev-map-tiles 240 node scripts/map-tiles-browser-audit.mjs
+      - name: dev-blacksmith
+        if: matrix.group == 'desktop'
+        run: node scripts/recovery-step.mjs dev-blacksmith 240 node --experimental-strip-types scripts/blacksmith-browser-audit.mjs
+      - name: dev-desktop
+        if: matrix.group == 'desktop'
+        run: node scripts/recovery-step.mjs dev-desktop 240 node scripts/desktop-browser-audit.mjs
       - name: dev-world-features
         if: matrix.group == 'world'
         run: node scripts/recovery-step.mjs dev-world-features 240 node scripts/world-features-browser-audit.mjs
-      - name: dev-control-panel
-        if: matrix.group == 'economy'
-        run: node scripts/recovery-step.mjs dev-control-panel 240 node scripts/control-panel-browser-audit.mjs
-      - name: dev-library-navigation
-        if: matrix.group == 'economy'
-        run: node scripts/recovery-step.mjs dev-library-navigation 240 node scripts/library-navigation-browser-audit.mjs
-      - name: dev-loot
-        if: matrix.group == 'economy'
-        run: node scripts/recovery-step.mjs dev-loot 240 node scripts/loot-browser-audit.mjs
-      - name: dev-desktop
-        if: matrix.group == 'world'
-        run: node scripts/recovery-step.mjs dev-desktop 240 node scripts/desktop-browser-audit.mjs
       - name: dev-navigation
         if: matrix.group == 'world'
         run: node scripts/recovery-step.mjs dev-navigation 240 node --experimental-strip-types scripts/navigation-browser-audit.mjs
-      - name: dev-game-analytics
-        if: matrix.group == 'world'
-        run: node scripts/recovery-step.mjs dev-game-analytics 240 node scripts/game-analytics-browser-audit.mjs
-      - name: dev-website
-        if: matrix.group == 'world'
-        run: node scripts/recovery-step.mjs dev-website 240 node scripts/website-browser-audit.mjs
       - name: Summarize measured verification stages
         if: always()
         run: node scripts/verification-timing.mjs
@@ -272,11 +274,12 @@ jobs:
     name: Packaged Worker / ${{ matrix.group }}
     needs: build
     # Packaged-artifact audits gate every main release; pull requests rely on development audits.
+    # Six groups balanced by measured median audit time keep this off the main critical path.
     if: github.event_name != 'pull_request'
     strategy:
       fail-fast: false
       matrix:
-        group: [accounts, features, interface]
+        group: [accounts, features, world, economy, library, interface]
     runs-on: ubuntu-latest
     timeout-minutes: 15
     permissions:
@@ -314,12 +317,6 @@ jobs:
           ACCOUNT_AUDIT_ORIGIN: http://127.0.0.1:8082
           ACCOUNT_SHARD: 1/2
         run: node scripts/recovery-step.mjs worker-account-1 180 node scripts/account-browser-audit.mjs
-      - name: worker-account-2
-        if: matrix.group == 'features'
-        env:
-          ACCOUNT_AUDIT_ORIGIN: http://127.0.0.1:8082
-          ACCOUNT_SHARD: 2/2
-        run: node scripts/recovery-step.mjs worker-account-2 180 node scripts/account-browser-audit.mjs
       - name: worker-monitor
         if: matrix.group == 'accounts'
         run: node scripts/recovery-step.mjs worker-monitor 180 node scripts/monitor-worker-audit.mjs
@@ -333,96 +330,102 @@ jobs:
         env:
           AUDIT_ORIGIN: http://127.0.0.1:8082
         run: node scripts/recovery-step.mjs worker-ships 240 node scripts/ships-browser-audit.mjs
-      - name: worker-blacksmith
-        if: matrix.group == 'features'
+      - name: worker-theme
+        if: matrix.group == 'accounts'
         env:
           AUDIT_ORIGIN: http://127.0.0.1:8082
-        run: node scripts/recovery-step.mjs worker-blacksmith 240 node --experimental-strip-types scripts/blacksmith-browser-audit.mjs
-      - name: worker-downtime
+        run: node scripts/recovery-step.mjs worker-theme 180 node scripts/theme-browser-audit.mjs
+      - name: worker-account-2
         if: matrix.group == 'features'
         env:
-          AUDIT_ORIGIN: http://127.0.0.1:8082
-        run: node scripts/recovery-step.mjs worker-downtime 240 node --experimental-strip-types scripts/downtime-browser-audit.mjs
+          ACCOUNT_AUDIT_ORIGIN: http://127.0.0.1:8082
+          ACCOUNT_SHARD: 2/2
+        run: node scripts/recovery-step.mjs worker-account-2 180 node scripts/account-browser-audit.mjs
       - name: worker-map-tiles
         if: matrix.group == 'features'
         env:
           AUDIT_ORIGIN: http://127.0.0.1:8082
         run: node scripts/recovery-step.mjs worker-map-tiles 240 node scripts/map-tiles-browser-audit.mjs
-      - name: worker-trade-economy
+      - name: worker-website
         if: matrix.group == 'features'
         env:
           AUDIT_ORIGIN: http://127.0.0.1:8082
-        run: node scripts/recovery-step.mjs worker-trade-economy 240 node --experimental-strip-types scripts/trade-economy-browser-audit.mjs
+        run: node scripts/recovery-step.mjs worker-website 180 node scripts/website-browser-audit.mjs
+      - name: worker-downtime
+        if: matrix.group == 'world'
+        env:
+          AUDIT_ORIGIN: http://127.0.0.1:8082
+        run: node scripts/recovery-step.mjs worker-downtime 240 node --experimental-strip-types scripts/downtime-browser-audit.mjs
       - name: worker-world-features
-        if: matrix.group == 'features'
+        if: matrix.group == 'world'
         env:
           AUDIT_ORIGIN: http://127.0.0.1:8082
         run: node scripts/recovery-step.mjs worker-world-features 240 node scripts/world-features-browser-audit.mjs
       - name: worker-initiative
-        if: matrix.group == 'interface'
+        if: matrix.group == 'world'
         env:
           AUDIT_ORIGIN: http://127.0.0.1:8082
         run: node scripts/recovery-step.mjs worker-initiative 180 node scripts/initiative-browser-audit.mjs
+      - name: worker-shop-stock
+        if: matrix.group == 'world'
+        env:
+          AUDIT_ORIGIN: http://127.0.0.1:8082
+        run: node scripts/recovery-step.mjs worker-shop-stock 180 node scripts/shop-stock-browser-audit.mjs
+      - name: worker-trade-economy
+        if: matrix.group == 'economy'
+        env:
+          AUDIT_ORIGIN: http://127.0.0.1:8082
+        run: node scripts/recovery-step.mjs worker-trade-economy 240 node --experimental-strip-types scripts/trade-economy-browser-audit.mjs
+      - name: worker-properties
+        if: matrix.group == 'economy'
+        env:
+          AUDIT_ORIGIN: http://127.0.0.1:8082
+        run: node scripts/recovery-step.mjs worker-properties 180 node scripts/property-browser-audit.mjs
+      - name: worker-property-operations
+        if: matrix.group == 'economy'
+        env:
+          AUDIT_ORIGIN: http://127.0.0.1:8082
+        run: node scripts/recovery-step.mjs worker-property-operations 180 node scripts/property-operations-browser-audit.mjs
+      - name: worker-game-analytics
+        if: matrix.group == 'economy'
+        env:
+          AUDIT_ORIGIN: http://127.0.0.1:8082
+        run: node scripts/recovery-step.mjs worker-game-analytics 180 node scripts/game-analytics-browser-audit.mjs
+      - name: worker-loot
+        if: matrix.group == 'economy'
+        env:
+          AUDIT_ORIGIN: http://127.0.0.1:8082
+        run: node scripts/recovery-step.mjs worker-loot 180 node scripts/loot-browser-audit.mjs
+      - name: worker-blacksmith
+        if: matrix.group == 'library'
+        env:
+          AUDIT_ORIGIN: http://127.0.0.1:8082
+        run: node scripts/recovery-step.mjs worker-blacksmith 240 node --experimental-strip-types scripts/blacksmith-browser-audit.mjs
+      - name: worker-market-locations
+        if: matrix.group == 'library'
+        env:
+          AUDIT_ORIGIN: http://127.0.0.1:8082
+        run: node scripts/recovery-step.mjs worker-market-locations 180 node scripts/market-locations-browser-audit.mjs
+      - name: worker-sound
+        if: matrix.group == 'library'
+        env:
+          AUDIT_ORIGIN: http://127.0.0.1:8082
+        run: node scripts/recovery-step.mjs worker-sound 180 node scripts/sound-browser-audit.mjs
+      - name: worker-library-navigation
+        if: matrix.group == 'library'
+        env:
+          AUDIT_ORIGIN: http://127.0.0.1:8082
+        run: node scripts/recovery-step.mjs worker-library-navigation 180 node scripts/library-navigation-browser-audit.mjs
       - name: worker-navigation
         if: matrix.group == 'interface'
         env:
           AUDIT_ORIGIN: http://127.0.0.1:8082
         run: node scripts/recovery-step.mjs worker-navigation 240 node --experimental-strip-types scripts/navigation-browser-audit.mjs
-      - name: worker-theme
-        if: matrix.group == 'interface'
-        env:
-          AUDIT_ORIGIN: http://127.0.0.1:8082
-        run: node scripts/recovery-step.mjs worker-theme 180 node scripts/theme-browser-audit.mjs
-      - name: worker-shop-stock
-        if: matrix.group == 'interface'
-        env:
-          AUDIT_ORIGIN: http://127.0.0.1:8082
-        run: node scripts/recovery-step.mjs worker-shop-stock 180 node scripts/shop-stock-browser-audit.mjs
-      - name: worker-market-locations
-        if: matrix.group == 'interface'
-        env:
-          AUDIT_ORIGIN: http://127.0.0.1:8082
-        run: node scripts/recovery-step.mjs worker-market-locations 180 node scripts/market-locations-browser-audit.mjs
-      - name: worker-properties
-        if: matrix.group == 'interface'
-        env:
-          AUDIT_ORIGIN: http://127.0.0.1:8082
-        run: node scripts/recovery-step.mjs worker-properties 180 node scripts/property-browser-audit.mjs
-      - name: worker-property-operations
-        if: matrix.group == 'interface'
-        env:
-          AUDIT_ORIGIN: http://127.0.0.1:8082
-        run: node scripts/recovery-step.mjs worker-property-operations 180 node scripts/property-operations-browser-audit.mjs
-      - name: worker-sound
-        if: matrix.group == 'interface'
-        env:
-          AUDIT_ORIGIN: http://127.0.0.1:8082
-        run: node scripts/recovery-step.mjs worker-sound 180 node scripts/sound-browser-audit.mjs
       - name: worker-help
         if: matrix.group == 'interface'
         env:
           AUDIT_ORIGIN: http://127.0.0.1:8082
         run: node scripts/recovery-step.mjs worker-help 180 node scripts/help-browser-audit.mjs
-      - name: worker-game-analytics
-        if: matrix.group == 'interface'
-        env:
-          AUDIT_ORIGIN: http://127.0.0.1:8082
-        run: node scripts/recovery-step.mjs worker-game-analytics 180 node scripts/game-analytics-browser-audit.mjs
-      - name: worker-website
-        if: matrix.group == 'interface'
-        env:
-          AUDIT_ORIGIN: http://127.0.0.1:8082
-        run: node scripts/recovery-step.mjs worker-website 180 node scripts/website-browser-audit.mjs
-      - name: worker-library-navigation
-        if: matrix.group == 'interface'
-        env:
-          AUDIT_ORIGIN: http://127.0.0.1:8082
-        run: node scripts/recovery-step.mjs worker-library-navigation 180 node scripts/library-navigation-browser-audit.mjs
-      - name: worker-loot
-        if: matrix.group == 'interface'
-        env:
-          AUDIT_ORIGIN: http://127.0.0.1:8082
-        run: node scripts/recovery-step.mjs worker-loot 180 node scripts/loot-browser-audit.mjs
       - name: Verify title screen on the built artifact
         if: matrix.group == 'interface'
         env:
