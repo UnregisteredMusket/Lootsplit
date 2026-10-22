@@ -550,7 +550,7 @@ try {
       scroll("primary", ".character-title, .character-heading", 12);
       const shop = document.querySelector('[data-split-scroll="secondary"]');
       if (shop) shop.scrollTop = 0;
-      scroll("secondary", "h1", 12);
+      scroll("secondary", "h1", 44);
     });
   };
   await shot("split-player", { width: 1440, height: 900 }, async (page) => {
@@ -590,6 +590,12 @@ try {
     await page.getByRole("img", { name: "Smugglers' cove beneath the lighthouse", exact: true }).waitFor();
     await page.getByRole("button", { name: "Fit map", exact: true }).click();
     await page.locator(".encounter-combatant.is-active").first().waitFor();
+    await page.evaluate(() => {
+      const pane = document.querySelector('[data-split-scroll="secondary"]');
+      const active = pane?.querySelector(".encounter-combatant");
+      if (pane && active)
+        pane.scrollTop += active.getBoundingClientRect().top - pane.getBoundingClientRect().top - 150;
+    });
   });
 } finally {
   await browser.close();

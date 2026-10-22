@@ -3797,3 +3797,6 @@ input,select,textarea { max-width: 100%; }
 @media (prefers-reduced-motion: reduce) { .split-pane, .split-divider-grip { transition: none; } }
 @media print { .split-pane-head, .split-divider, .split-rail { display: none !important; } }
 .split-on .app-column > header > div:first-child { max-width: none; padding-inline: 18px; }
+/* A map in a pane uses the existing narrow-window arrangement of its floating controls. */
+.split-on .map-title-capsule { max-width: 230px; }
+.split-on .map-top-controls { left: auto; right: 14px; transform: none; width: calc(100% - 272px); max-width: 508px; }
