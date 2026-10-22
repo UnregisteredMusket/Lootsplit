@@ -139,7 +139,7 @@ export type UsageMetric = {
   unit: "count" | "ms" | "bytes";
   state: "ready" | "unavailable";
   errorCode: string | null;
-  /** ok, attention (month to date at or above 80% of the allowance), over, unavailable. */
+  /** ok, attention (billing cycle to date at or above 80% of the allowance), over, unavailable. */
   level: "ok" | "attention" | "over" | "unavailable";
   monthlyAllowance?: number;
   day?: UsagePart;
@@ -164,7 +164,17 @@ export type CloudflareUsage = {
       end: number;
       day: { start: number; end: number };
       week: { start: number; end: number; days: number };
-      month: { start: number; end: number; days: number; elapsedPercent: number };
+      /** The current billing cycle so far (from the renewal day); older readings lack basis/label. */
+      month: {
+        start: number;
+        end: number;
+        days: number;
+        elapsedPercent: number;
+        basis?: "billing-cycle";
+        renewalDay?: number;
+        resetsAt?: number;
+        label?: string;
+      };
     };
     metrics: UsageMetric[];
     complete: boolean;

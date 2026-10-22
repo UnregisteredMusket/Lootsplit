@@ -17,7 +17,18 @@ export function formatUsage(value: number | null | undefined, unit: UsageMetric[
   const text = Math.round(value).toLocaleString("en-US");
   return unit === "ms" ? `${text} ms` : text;
 }
-/** Rows for the owner page: label, then today / 7 days / month (or current storage) cells. */
+/** 1st, 2nd, 3rd, 4th … 11th, 12th, 13th … 21st, 22nd, 31st. */
+export function ordinal(n: number) {
+  const tens = n % 100;
+  const suffix = tens >= 11 && tens <= 13 ? "th" : (["th", "st", "nd", "rd"][n % 10] ?? "th");
+  return `${n}${suffix}`;
+}
+type UsageWindows = NonNullable<CloudflareUsage["data"]>["windows"];
+/** "cycle since Oct 11" mid-sentence; "the month" for readings stored before the billing cycle. */
+export function cycleName(month: UsageWindows["month"]) {
+  return month.label ? month.label.charAt(0).toLowerCase() + month.label.slice(1) : "the month";
+}
+/** Rows for the owner page: label, then today / 7 days / billing cycle (or current storage) cells. */
 export function usageRows(usage: CloudflareUsage | undefined) {
   if (!usage?.data) return [];
   return usage.data.metrics.map((m) => {
@@ -60,7 +71,7 @@ export function usageRows(usage: CloudflareUsage | undefined) {
           share: `${formatPercent(m.week?.percent)} of weekly share`,
         },
         {
-          window: "Month",
+          window: usage.data?.windows.month.label || "Month",
           value: formatUsage(m.month?.value, m.unit),
           share: `${formatPercent(m.month?.percent)} of ${formatUsage(m.monthlyAllowance, m.unit)}`,
         },

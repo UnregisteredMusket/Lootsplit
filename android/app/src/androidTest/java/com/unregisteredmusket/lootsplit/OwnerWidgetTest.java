@@ -746,19 +746,26 @@ public class OwnerWidgetTest {
                 .put("current",new JSONObject().put("value",12000000L).put("allowance",5000000000L).put("percent",0.24)).put("databases",1));
         JSONObject source=journalFixture();
         source.put("usage",new JSONObject().put("state","ready").put("checkedAt",now)
-            .put("data",new JSONObject().put("metrics",metrics).put("windows",new JSONObject().put("month",new JSONObject().put("elapsedPercent",69.355)))));
+            .put("data",new JSONObject().put("metrics",metrics).put("windows",new JSONObject().put("month",new JSONObject().put("elapsedPercent",37.097).put("basis","billing-cycle").put("renewalDay",11).put("label","Cycle since Oct 11")))));
         org.json.JSONArray rows=WidgetRows.rows(WidgetData.project(source,now));
         java.util.Map<String,JSONObject> byTitle=new java.util.HashMap<>();
         for(int i=0;i<rows.length();i++)byTitle.put(rows.getJSONObject(i).getString("title"),rows.getJSONObject(i));
         JSONObject requests=byTitle.get("Worker requests today 12,345");
         assertNotNull("Value in the title",requests);
-        assertTrue(requests.getString("detail").startsWith("3.8% of daily share\n7d 80,000 (3.5% of weekly share)\nMonth 300,000 (3.0% of 10M)"));
+        assertTrue(requests.getString("detail").startsWith("3.8% of daily share\n7d 80,000 (3.5% of weekly share)\nCycle since Oct 11 300,000 (3.0% of 10M)"));
         assertEquals("",requests.getString("color"));
-        assertEquals("Month to date at 80% or more is amber","yellow",byTitle.get("D1 rows read today 1,000").getString("color"));
+        assertEquals("Billing cycle to date at 80% or more is amber","yellow",byTitle.get("D1 rows read today 1,000").getString("color"));
         assertTrue(byTitle.get("D1 rows read today 1,000").getString("detail").startsWith("<0.01% of daily share"));
         assertTrue("A failed metric is not zero",byTitle.get("Worker CPU time · unavailable").getString("detail").contains("not counted as zero"));
         assertTrue(byTitle.get("D1 storage 12.0 MB").getString("detail").startsWith("0.24% of 5 GB included"));
-        assertTrue(byTitle.get("Cloudflare plan usage").getString("detail").contains("69% of month elapsed"));
+        assertTrue(byTitle.get("Cloudflare plan usage").getString("detail").contains("37% of billing cycle elapsed · cycle since Oct 11"));
+        // A server from before the billing cycle (no basis/label) keeps the calendar-month wording.
+        JSONObject legacy=new JSONObject(source.toString());
+        legacy.getJSONObject("usage").getJSONObject("data").put("windows",new JSONObject().put("month",new JSONObject().put("elapsedPercent",69.355)));
+        org.json.JSONArray legacyRows=WidgetRows.rows(WidgetData.project(legacy,now));
+        for(int i=0;i<legacyRows.length();i++){JSONObject r=legacyRows.getJSONObject(i);
+            if(r.getString("title").equals("Worker requests today 12,345"))assertTrue(r.getString("detail").contains("\nMonth 300,000 (3.0% of 10M)"));
+            if(r.getString("title").equals("Cloudflare plan usage"))assertTrue(r.getString("detail").contains("69% of month elapsed"));}
         // Missing, stale or disconnected readings are one explicit row, without numbers.
         for(String[] c:new String[][]{{"not-connected","","not connected"},{"unavailable","STALE_READING","over 2 hours old"},{"unavailable","NOT_COLLECTED","first hourly reading pending"}}) {
             source.put("usage",new JSONObject().put("state",c[0]).put("errorCode",c[1]).put("checkedAt",now).put("data",JSONObject.NULL));

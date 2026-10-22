@@ -1,6 +1,13 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { formatPercent, formatUsage, usageRows, usageUnavailableText } from "./usage-format.ts";
+import {
+  cycleName,
+  formatPercent,
+  formatUsage,
+  ordinal,
+  usageRows,
+  usageUnavailableText,
+} from "./usage-format.ts";
 import type { CloudflareUsage } from "./types.ts";
 
 const usage: CloudflareUsage = {
@@ -86,4 +93,33 @@ test("unavailable usage explains why instead of showing numbers", () => {
     }),
     /more than two hours old/,
   );
+});
+
+test("the billing-cycle window is labeled by its start; older readings say month", () => {
+  const cycle: CloudflareUsage = structuredClone(usage);
+  cycle.data!.windows.month = {
+    ...cycle.data!.windows.month,
+    basis: "billing-cycle",
+    renewalDay: 11,
+    resetsAt: Date.parse("2026-11-11T00:00:00Z"),
+    label: "Cycle since Oct 11",
+  };
+  const [requests] = usageRows(cycle);
+  assert.equal(requests.cells[2].window, "Cycle since Oct 11");
+  assert.equal(cycleName(cycle.data!.windows.month), "cycle since Oct 11");
+  assert.equal(usageRows(usage)[0].cells[2].window, "Month");
+  assert.equal(cycleName(usage.data!.windows.month), "the month");
+  assert.deepEqual([1, 2, 3, 4, 11, 12, 13, 21, 22, 23, 31].map(ordinal), [
+    "1st",
+    "2nd",
+    "3rd",
+    "4th",
+    "11th",
+    "12th",
+    "13th",
+    "21st",
+    "22nd",
+    "23rd",
+    "31st",
+  ]);
 });

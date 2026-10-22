@@ -11,7 +11,13 @@ import "./owner-monitor.css";
 import { MonitorJournal, MonitorTaskSummary } from "./monitor-journal";
 import type { JournalSnapshot } from "@/lib/monitor/types";
 import { AppLink } from "@/components/app-link";
-import { formatPercent, usageRows, usageUnavailableText } from "@/lib/monitor/usage-format";
+import {
+  cycleName,
+  formatPercent,
+  ordinal,
+  usageRows,
+  usageUnavailableText,
+} from "@/lib/monitor/usage-format";
 
 type Source<T> = {
   state: "ready" | "unavailable" | "not-connected";
@@ -407,13 +413,18 @@ export function OwnerMonitor() {
                     ))}
                   </div>
                   <p className="owner-monitor-note">
-                    Account-wide, UTC. Today and 7 days compare with the monthly allowance divided
-                    by the days in this month (daily share) and seven daily shares (weekly share);
-                    month to date compares with the full allowance,{" "}
-                    {formatPercent(data.usage.data.windows.month.elapsedPercent)} of the month has
-                    elapsed. Cloudflare resets included usage on your billing renewal date, which
-                    may differ from the calendar month. Allowances verified{" "}
-                    {data.usage.data.allowancesVerifiedOn} ·{" "}
+                    Account-wide, UTC. Included usage resets on your Cloudflare billing renewal day
+                    {data.usage.data.windows.month.renewalDay
+                      ? ` (the ${ordinal(data.usage.data.windows.month.renewalDay)} of each month)`
+                      : ""}
+                    . Today and 7 days compare with the monthly allowance divided by the days in
+                    this billing cycle (daily share) and seven daily shares (weekly share);{" "}
+                    {cycleName(data.usage.data.windows.month)} compares with the full allowance,{" "}
+                    {formatPercent(data.usage.data.windows.month.elapsedPercent)} of the{" "}
+                    {data.usage.data.windows.month.basis === "billing-cycle"
+                      ? "billing cycle"
+                      : "month"}{" "}
+                    has elapsed. Allowances verified {data.usage.data.allowancesVerifiedOn} ·{" "}
                     {data.usage.checkedAt
                       ? `checked ${age(data.usage.checkedAt, now)}`
                       : "check time unavailable"}{" "}

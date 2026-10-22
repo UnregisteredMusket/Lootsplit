@@ -26,7 +26,7 @@ export const CLOUDFLARE_PAID_ALLOWANCES = Object.freeze({
   d1RowsWritten: 50_000_000,
   d1StorageBytes: 5_000_000_000,
 });
-/** Month-to-date use at or above this share of the monthly allowance is shown amber. */
+/** Billing-cycle-to-date use at or above this share of the monthly allowance is shown amber. */
 export const USAGE_ATTENTION_PERCENT = 80;
 /** Collected hourly; a reading older than this is an explicit gap, not a current value. */
 export const USAGE_STALE_MS = 2 * 3600000 + 5 * 60000;
@@ -42,29 +42,81 @@ export const USAGE_METRICS = Object.freeze([
 ]);
 
 /**
- * UTC windows (Cloudflare's analytics and usage pages use UTC):
- * day = today so far, week = today plus the six preceding days, month = calendar month so far.
- * The daily share is the monthly allowance divided by the days in this month, so the daily shares
- * of a month add up to exactly its allowance; the weekly share is seven daily shares.
+ * Day of the month on which the Cloudflare subscription renews and included usage resets. The owner
+ * supplied the 11th on 2026-10-22 (next renewal 2026-11-11), so a billing cycle runs from the 11th
+ * through the 10th of the following month. The Analytics token cannot read the renewal date, so it
+ * is configured here; the Worker var OWNER_MONITOR_CLOUDFLARE_BILLING_DAY (1–31) overrides it.
  */
-export function usageWindows(now) {
+export const CLOUDFLARE_BILLING_RENEWAL_DAY = 11;
+/** The configured renewal day: a valid Worker var override (whole number 1–31) or the default. */
+export function billingRenewalDay(env) {
+  const raw = env?.OWNER_MONITOR_CLOUDFLARE_BILLING_DAY;
+  const text = typeof raw === "number" ? String(raw) : typeof raw === "string" ? raw.trim() : "";
+  const day = /^\d{1,2}$/.test(text) ? Number(text) : NaN;
+  return day >= 1 && day <= 31 ? day : CLOUDFLARE_BILLING_RENEWAL_DAY;
+}
+const MONTH_NAMES = [
+  "Jan",
+  "Feb",
+  "Mar",
+  "Apr",
+  "May",
+  "Jun",
+  "Jul",
+  "Aug",
+  "Sep",
+  "Oct",
+  "Nov",
+  "Dec",
+];
+/** UTC midnight of the renewal in that month; a day the month lacks clamps to its last day. */
+function renewalIn(year, month, day) {
+  const last = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+  return Date.UTC(year, month, Math.min(day, last));
+}
+/** The billing cycle containing `now`: [start, next renewal), in UTC. */
+export function billingCycle(now, renewalDay = CLOUDFLARE_BILLING_RENEWAL_DAY) {
   const at = new Date(now);
   const year = at.getUTCFullYear(),
     month = at.getUTCMonth();
-  const dayStart = Date.UTC(year, month, at.getUTCDate());
-  const monthStart = Date.UTC(year, month, 1);
-  const days = new Date(Date.UTC(year, month + 1, 0)).getUTCDate();
+  const thisMonth = renewalIn(year, month, renewalDay);
+  const start = now >= thisMonth ? thisMonth : renewalIn(year, month - 1, renewalDay);
+  const startDate = new Date(start);
+  const next = renewalIn(startDate.getUTCFullYear(), startDate.getUTCMonth() + 1, renewalDay);
+  return {
+    start,
+    next,
+    days: Math.round((next - start) / DAY),
+    label: `Cycle since ${MONTH_NAMES[startDate.getUTCMonth()]} ${startDate.getUTCDate()}`,
+  };
+}
+
+/**
+ * UTC windows (Cloudflare's analytics and usage pages use UTC):
+ * day = today so far, week = today plus the six preceding days, month = the current billing cycle
+ * so far (from the last renewal day; see CLOUDFLARE_BILLING_RENEWAL_DAY). The daily share is the
+ * monthly allowance divided by the days in this billing cycle, so the daily shares of a cycle add
+ * up to exactly its allowance; the weekly share is seven daily shares.
+ */
+export function usageWindows(now, renewalDay = CLOUDFLARE_BILLING_RENEWAL_DAY) {
+  const at = new Date(now);
+  const dayStart = Date.UTC(at.getUTCFullYear(), at.getUTCMonth(), at.getUTCDate());
+  const cycle = billingCycle(now, renewalDay);
   return {
     timezone: "UTC",
     end: now,
     day: { start: dayStart, end: now },
     week: { start: dayStart - 6 * DAY, end: now, days: 7 },
     month: {
-      start: monthStart,
+      start: cycle.start,
       end: now,
-      days,
-      // Share of the month already elapsed: the pace month-to-date use can be compared against.
-      elapsedPercent: round(((now - monthStart) / (days * DAY)) * 100),
+      days: cycle.days,
+      // Share of the billing cycle already elapsed: the pace cycle-to-date use can be compared against.
+      elapsedPercent: round(((now - cycle.start) / (cycle.days * DAY)) * 100),
+      basis: "billing-cycle",
+      renewalDay,
+      resetsAt: cycle.next,
+      label: cycle.label,
     },
   };
 }
@@ -257,7 +309,7 @@ export async function cloudflareUsage(env, fetcher = fetch, now = Date.now()) {
     !/^[a-f0-9]{32}$/.test(env.OWNER_MONITOR_CLOUDFLARE_ACCOUNT_ID || "")
   )
     return { state: "not-connected", checkedAt: null, data: null };
-  const windows = usageWindows(now);
+  const windows = usageWindows(now, billingRenewalDay(env));
   const [requests, cpu, d1, storage] = await Promise.allSettled([
     workerSums(env, fetcher, windows, "requests"),
     workerSums(env, fetcher, windows, "cpuTimeUs"),
@@ -286,6 +338,9 @@ export function formatUsage(value, unit) {
   }
   return unit === "ms" ? `${grouped(value)} ms` : grouped(value);
 }
+/** "cycle since Oct 11" for billing-cycle readings; "month" for readings stored before 2026-10-22. */
+const cycleWord = (month) =>
+  month?.label ? month.label.charAt(0).toLowerCase() + month.label.slice(1) : "month";
 /** One line per metric, e.g. "Worker requests: today 12,345 (3.8% of daily share) · …". */
 export function usageLines(usage) {
   if (usage?.state !== "ready")
@@ -298,12 +353,13 @@ export function usageLines(usage) {
     if (m.state !== "ready") return `${m.label}: unavailable (${m.errorCode}).`;
     if (m.unit === "bytes")
       return `${m.label}: ${formatUsage(m.current.value, "bytes")} (${formatPercent(m.current.percent)} of ${formatUsage(m.allowance, "bytes")} included).`;
-    return `${m.label}: today ${formatUsage(m.day.value, m.unit)} (${formatPercent(m.day.percent)} of daily share) · 7 days ${formatUsage(m.week.value, m.unit)} (${formatPercent(m.week.percent)} of weekly share) · month ${formatUsage(m.month.value, m.unit)} (${formatPercent(m.month.percent)} of ${formatUsage(m.monthlyAllowance, m.unit)}).`;
+    return `${m.label}: today ${formatUsage(m.day.value, m.unit)} (${formatPercent(m.day.percent)} of daily share) · 7 days ${formatUsage(m.week.value, m.unit)} (${formatPercent(m.week.percent)} of weekly share) · ${cycleWord(usage.data.windows.month)} ${formatUsage(m.month.value, m.unit)} (${formatPercent(m.month.percent)} of ${formatUsage(m.monthlyAllowance, m.unit)}).`;
   });
 }
 export function usageSummary(usage) {
   const lines = usageLines(usage);
   if (usage?.state !== "ready") return lines[0];
-  const pace = usage.data.windows.month.elapsedPercent;
-  return `Cloudflare plan usage (account-wide, UTC; ${formatPercent(pace)} of the month elapsed): ${lines.join(" ")}`;
+  const month = usage.data.windows.month;
+  const cycle = month.basis === "billing-cycle" ? "billing cycle" : "month";
+  return `Cloudflare plan usage (account-wide, UTC; ${formatPercent(month.elapsedPercent)} of the ${cycle} elapsed): ${lines.join(" ")}`;
 }
