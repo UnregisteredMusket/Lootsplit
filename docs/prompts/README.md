@@ -4,12 +4,12 @@ Ready-to-use prompts for future Lootsplit development sessions. Copy a prompt (G
 
 Findings and line numbers age as `main` moves. Every prompt tells the agent to re-check each item against current code before changing it. When a prompt's work is done, update its status here rather than deleting it, so the record stays.
 
-| # | Prompt | Source | Status (2026-10-22) |
+| # | Prompt | Source | Status (updated 2026-10-22) |
 | --- | --- | --- | --- |
-| 1 | [Fix the bugs from the October 22 review](#1-fix-the-bugs-from-the-october-22-review) | Read-only code review of `main` at `5d77d25`, re-checked at `b325758` | Not started |
-| 2 | [Make Lootsplit split loot, then expand the item and session tools](#2-make-lootsplit-split-loot-then-expand-the-item-and-session-tools) | Feature analysis of the same review | Not started; depends on prompt 1's P1 and P2 |
+| 1 | [Fix the bugs from the October 22 review](#1-fix-the-bugs-from-the-october-22-review) | Read-only code review of `main` at `5d77d25`, re-checked at `b325758` | Done: P1–P10 merged in #160–#185 (2026-10-22), including the estate repair #171 and P10 follow-ups #185 |
+| 2 | [Make Lootsplit split loot, then expand the item and session tools](#2-make-lootsplit-split-loot-then-expand-the-item-and-session-tools) | Feature analysis of the same review | Not started. Its prerequisites, P1 (#166) and P2 (#177), are merged |
 
-Run prompt 1 before prompt 2. Prompt 2's new loot data must not land in the leaky player projection (P1) or the oversized room row (P2).
+Prompt 1 is complete, so prompt 2 can start. It's kept below as the record of what was asked; line numbers in it refer to `5d77d25`.
 
 ## 1. Fix the bugs from the October 22 review
 

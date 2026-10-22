@@ -61,5 +61,6 @@ This file is the required reading. Everything under "Read on demand" is consulte
 | Feature specifics and their development rules | `docs/<FEATURE>.md` (ships, trade, properties, encounters, blacksmith, downtime, maps, world features…), `ANDROID.md` |
 | Performance log rules | `docs/PERFORMANCE.md` |
 | Agent hooks, skills, MCP servers, cloud environment setup | `docs/AGENT-TOOLING.md` |
+| Ready-to-use prompts for future work, with status | `docs/prompts/README.md` |
 | Past audits and evidence | `docs/audit/` (newest: `2026-10-21-code-audit.md`) |
 | Historical checkpoints | `docs/archive/recovery-checkpoints-2026-10.md` |
