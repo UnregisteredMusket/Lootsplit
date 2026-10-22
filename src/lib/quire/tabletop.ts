@@ -21,6 +21,8 @@ import {
   expandTabletopHistory,
   fogDiff,
 } from "./fog-history.ts";
+import { consolidateFog } from "./fog-consolidate.ts";
+import { legacyDiagonals } from "./tabletop-protocol.ts";
 import type { CloudSeat, CloudTable } from "./cloud.ts";
 import type { CampaignMap, MapToken } from "./world-schema.ts";
 
@@ -278,6 +280,8 @@ export function applyTabletopCommand(
     dm();
     if (!same(settings.fog, command.before))
       throw Error("Exploration changed. Refresh before revealing or concealing an area.");
+    if (command.result && command.action !== "consolidate")
+      throw Error("Only fog consolidation supplies a resulting fog.");
     const prior = structuredClone(settings.fog);
     // Older rooms may hold full-snapshot history; it is converted here, exactly, to diffs.
     settings.fogUndo = compactFogHistory(prior, settings.fogUndo);
@@ -306,7 +310,14 @@ export function applyTabletopCommand(
         settings.fog.enabled = true;
         settings.fog.shapes.push(...shapes);
       } else if (command.continued) throw Error("Only a brush stroke can continue across shapes.");
-      else if (command.action === "reveal-all" || command.action === "conceal-all") {
+      else if (command.action === "consolidate") {
+        // Recomputed here: the stored fog changes only when the server reaches the same result.
+        const consolidated = consolidateFog(prior).fog;
+        if (same(consolidated, prior)) throw Error("This map's fog is already consolidated.");
+        if (!command.result || !same(consolidated, command.result))
+          throw Error("Exploration changed. Refresh before consolidating fog.");
+        settings.fog = consolidated;
+      } else if (command.action === "reveal-all" || command.action === "conceal-all") {
         settings.fog = {
           enabled: true,
           base: command.action === "reveal-all" ? "revealed" : "concealed",
@@ -362,7 +373,10 @@ export function applyTabletopCommand(
     event("Map area template updated");
   } else if (command.kind === "map-token-move") {
     if (!map.grid) throw Error("Configure a combat grid before moving tokens.");
-    if (canonicalJson(map.grid) !== command.grid)
+    if (
+      canonicalJson(map.grid) !== command.grid &&
+      canonicalJson(legacyDiagonals(map.grid)) !== command.grid
+    )
       throw Error("The combat grid changed. Refresh before moving tokens.");
     if (command.ignoreWalls && seat.role !== "dm")
       throw Error("Only the DM can override configured map barriers.");

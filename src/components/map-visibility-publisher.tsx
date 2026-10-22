@@ -19,6 +19,23 @@ import {
 import { mapMediaReference } from "@/lib/quire/map-assets-schema";
 import { renderMapVisibility } from "@/lib/quire/map-visibility-render";
 import { mapNeedsMask, readMapTabletop, sceneViewers } from "@/lib/quire/tabletop";
+import {
+  missingPlayerViews,
+  renderDelay,
+  renderReducer,
+  renderStatusStore,
+  type RenderEvent,
+} from "@/lib/quire/map-render-status";
+
+const dispatch = (event: RenderEvent) =>
+  renderStatusStore.set(renderReducer(renderStatusStore.get(), event));
+const missingViews = (table: ReturnType<typeof useWorldTable>, role: string) =>
+  role === "dm"
+    ? (table.journal.world?.maps ?? []).reduce(
+        (sum, map) => sum + missingPlayerViews(table, map).length,
+        0,
+      )
+    : 0;
 
 /** DM preparation remains separate from player activation; current views publish in every workspace. */
 export function MapVisibilityPublisher() {
@@ -33,6 +50,17 @@ export function MapVisibilityPublisher() {
   const latest = useRef({ table, economy, seat, campaign }),
     published = useRef(new Set<string>());
   latest.current = { table, economy, seat, campaign };
+  useEffect(() => {
+    renderStatusStore.onRetry(() => {
+      dispatch({ type: "retry", at: Date.now() });
+      setRetry((value) => value + 1);
+    });
+    return () => {
+      renderStatusStore.onRetry(undefined);
+      renderStatusStore.set({ phase: "idle" });
+    };
+    // The store is module-wide; one publisher is mounted per signed-in DM workspace.
+  }, []);
   const signature = JSON.stringify(
     (table.journal.world?.maps ?? []).map((map) => [
       map.id,
@@ -141,22 +169,43 @@ export function MapVisibilityPublisher() {
         }
       }
       setFailure("");
+      if (!cancelled)
+        dispatch({
+          type: "done",
+          at: Date.now(),
+          missing: missingViews(latest.current.table, latest.current.seat.role),
+        });
     };
+    // Visibility changes (each token move with vision on) restart a short debounce, bounded by a
+    // maximum wait so continuous dragging still updates players.
+    const now = Date.now(),
+      pending = missingViews(latest.current.table, latest.current.seat.role);
+    dispatch({ type: "change", at: now, missing: pending });
+    const delay = pending ? (renderDelay(renderStatusStore.get(), now) ?? 0) : 200;
     const timer = setTimeout(() => {
+      if (pending) dispatch({ type: "start", at: Date.now() });
       const run = navigator.locks
         ? navigator.locks.request(
             "lootsplit-map-views:" + campaign,
             { ifAvailable: true },
-            (lock) => (lock ? work() : undefined),
+            (lock) =>
+              lock
+                ? work()
+                : dispatch({
+                    type: "done",
+                    at: Date.now(),
+                    missing: missingViews(latest.current.table, latest.current.seat.role),
+                  }),
           )
         : work();
       void run.catch((error) => {
-        if (!cancelled)
-          setFailure(
-            error instanceof Error ? error.message : "Player visibility could not update.",
-          );
+        if (cancelled) return;
+        const message =
+          error instanceof Error ? error.message : "Player visibility could not update.";
+        setFailure(message);
+        dispatch({ type: "fail", at: Date.now(), error: message });
       });
-    }, 200);
+    }, delay);
     return () => {
       cancelled = true;
       clearTimeout(timer);

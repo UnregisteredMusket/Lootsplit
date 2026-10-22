@@ -100,6 +100,10 @@ import {
   type MapPingInput,
 } from "@/lib/quire/map-signals";
 import { useMapPings } from "@/lib/quire/use-map-pings";
+import { MapRenderBadge } from "./map-render-badge";
+import { MapAnnouncer } from "./map-announcer";
+import { PingGlyph } from "./ping-glyph";
+import { pingShapes } from "@/lib/quire/map-announcements";
 import type { CloudTable } from "@/lib/quire/cloud";
 
 const MapCombatWorkspace = lazy(() =>
@@ -318,14 +322,7 @@ function CampaignMapWorkspace({ viewScope }: { viewScope: { key: string; ephemer
           id: n.id,
           label: n.name,
           kind: "NPC",
-          point: anchorFor(
-            map,
-            t,
-            characterLocation(
-              t,
-              t.purses.find((p) => p.id === n.id)!,
-            ),
-          ),
+          point: anchorFor(map, t, characterLocation(t, t.purses.find((p) => p.id === n.id)!)),
           href: libraryRecordHref("npc", n.id),
         })),
       ...t.purses
@@ -1884,7 +1881,7 @@ function MapViewport({
               >
                 {pingColors.map((c) => (
                   <option key={c} value={c}>
-                    {c[0].toUpperCase() + c.slice(1)}
+                    {c[0].toUpperCase() + c.slice(1)} ({pingShapes[c]})
                   </option>
                 ))}
               </select>
@@ -2235,10 +2232,7 @@ function MapViewport({
                 const p =
                   currentDetails[0]?.point ??
                   (map.grid && map.tokens?.find((t) => t.id === selectedToken)
-                    ? sceneTokenPoint(
-                        map.grid,
-                        map.tokens!.find((t) => t.id === selectedToken)!,
-                      )
+                    ? sceneTokenPoint(map.grid, map.tokens!.find((t) => t.id === selectedToken)!)
                     : party);
                 if (p)
                   setView((v) => ({
@@ -2257,11 +2251,13 @@ function MapViewport({
         </>
       )}
       {!interfaceHidden && <MapCombatHud map={map} />}
+      <MapAnnouncer map={map} pings={signals.pings} />
       <div className="map-feedback" hidden={interfaceHidden}>
+        <MapRenderBadge />
         {full && (
           <p className="map-active-tool" role="status">
             {pinging
-              ? `Ping · ${color}`
+              ? `Ping · ${color} ${pingShapes[color]}`
               : sketches.active
                 ? "Personal annotations"
                 : tools.toolLabel}
@@ -2271,7 +2267,7 @@ function MapViewport({
         {tools.feedback}
         {pinging && (
           <p role="status">
-            Tap the map to ping in {color}.{" "}
+            Tap the map to ping in {color} ({pingShapes[color]}).{" "}
             {signals.joined
               ? "Everyone viewing this map in the room will see it for five seconds."
               : "Offline preview; join a room to share pings."}
@@ -2612,10 +2608,13 @@ function MapViewport({
               <span
                 key={p.id}
                 className={`map-ping map-ping-${p.color}`}
+                data-shape={pingShapes[p.color]}
                 style={{ left: view.x + p.x * w * view.scale, top: view.y + p.y * h * view.scale }}
                 role="img"
-                aria-label={`${p.color} map ping`}
-              />
+                aria-label={`${p.color} ${pingShapes[p.color]} map ping`}
+              >
+                <PingGlyph color={p.color} />
+              </span>
             ))}
             {pinging && (
               <span className="map-ping-crosshair" aria-hidden="true">

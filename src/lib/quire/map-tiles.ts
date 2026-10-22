@@ -1,6 +1,7 @@
 import type { CampaignMap, MapGrid, PartyMapPosition } from "./world-schema.ts";
 import type { CloudTable } from "./cloud.ts";
 import { readMarketLocations } from "./shop-locations.ts";
+import { diagonalTiles } from "./tabletop-geometry.ts";
 
 export function mapType(map: CampaignMap, table: Pick<CloudTable, "journal">) {
   if (map.type) return map.type;
@@ -34,31 +35,40 @@ export function tileDistance(
   a: { column: number; row: number },
   b: { column: number; row: number },
 ) {
-  const x = Math.abs(a.column - b.column),
-    y = Math.abs(a.row - b.row);
   return (
     grid.feetPerTile *
-    (grid.diagonal === "euclidean"
-      ? Math.hypot(x, y)
-      : grid.diagonal === "orthogonal"
-        ? x + y
-        : Math.max(x, y))
+    diagonalTiles(a.column - b.column, a.row - b.row, grid.diagonal ?? "equal").tiles
   );
 }
+/** Leg lengths along a route; the alternating diagonal count carries across waypoints. */
+export function routeLegs(grid: MapGrid, points: { column: number; row: number }[]) {
+  let carry = 0;
+  return points.slice(1).map((p, i) => {
+    const leg = diagonalTiles(
+      p.column - points[i].column,
+      p.row - points[i].row,
+      grid.diagonal ?? "equal",
+      carry,
+    );
+    carry = leg.carry;
+    return grid.feetPerTile * leg.tiles;
+  });
+}
 export function routeDistance(grid: MapGrid, points: { column: number; row: number }[]) {
-  return points.reduce((sum, p, i) => sum + (i ? tileDistance(grid, points[i - 1], p) : 0), 0);
+  return routeLegs(grid, points).reduce((sum, leg) => sum + leg, 0);
 }
 /** Uses the existing voyage clock; it never advances time, spending or physical locations. */
 export function routePosition(
   route: { grid: MapGrid; points: { column: number; row: number }[] },
   progress: number,
 ) {
-  const total = routeDistance(route.grid, route.points);
+  const legs = routeLegs(route.grid, route.points),
+    total = legs.reduce((sum, leg) => sum + leg, 0);
   let remaining = total * Math.max(0, Math.min(1, progress));
   for (let i = 1; i < route.points.length; i++) {
     const a = route.points[i - 1],
       b = route.points[i],
-      length = tileDistance(route.grid, a, b);
+      length = legs[i - 1];
     if (remaining <= length && length > 0) {
       const start = tilePoint(route.grid, a),
         end = tilePoint(route.grid, b),

@@ -209,6 +209,8 @@ try {
     await editor.getByLabel("Grid columns", { exact: true }).fill("10");
     await editor.getByLabel("Grid rows", { exact: true }).fill("10");
     await expect(editor.getByLabel("Feet per tile", { exact: true })).toHaveValue("5");
+    // The additive alternating 5/10/5 diagonal rule sits beside the existing ones.
+    await chooseOption(editor.getByLabel("Diagonal distance", { exact: true }), "alternating");
     await editor.getByRole("button", { name: "Save map", exact: true }).click();
     await expect(editor).toHaveCount(0);
     await selectMapType(page, "property");
@@ -249,6 +251,13 @@ try {
     const token = (await journal(page)).world.maps.find((m) => m.id === "keep").tokens[0];
     await chooseOption(controls.getByLabel("Combat token", { exact: true }), token.id);
     await controls.getByLabel("Token column", { exact: true }).fill("5");
+    await expect(controls.getByRole("status").first()).toContainText("15 ft");
+    // Three diagonal and three straight steps: 5 + 10 + 5 + 15 = 35 ft (one-tile rule: 30 ft).
+    await controls.getByLabel("Token column", { exact: true }).fill("8");
+    await controls.getByLabel("Token row", { exact: true }).fill("6");
+    await expect(controls.getByRole("status").first()).toContainText("35 ft");
+    await controls.getByLabel("Token column", { exact: true }).fill("5");
+    await controls.getByLabel("Token row", { exact: true }).fill("3");
     await expect(controls.getByRole("status").first()).toContainText("15 ft");
     await controls.getByRole("button", { name: "Save token move", exact: true }).click();
     await expect

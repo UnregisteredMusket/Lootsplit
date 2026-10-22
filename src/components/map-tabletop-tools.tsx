@@ -4,9 +4,10 @@ import { useWorldTable } from "@/lib/quire/use-world-table";
 import { useEconomy } from "@/lib/quire/economy-context";
 import { getCloudTable, getServerCloudTable, subscribeCloudTable } from "@/lib/quire/cloud-client";
 import { readMapTabletop, readTabletopSession, canMoveMapToken } from "@/lib/quire/tabletop";
-import { sceneDistance, sceneTokenPoint } from "@/lib/quire/tabletop-geometry";
+import { sceneDistance, sceneRouteDistance, sceneTokenPoint } from "@/lib/quire/tabletop-geometry";
 import { canonicalJson } from "@/lib/quire/canonical-json";
-import { fogStorageBytes } from "@/lib/quire/fog-history";
+import { fogStorageBytes, fogDiff } from "@/lib/quire/fog-history";
+import { consolidateFog, type FogConsolidation } from "@/lib/quire/fog-consolidate";
 import {
   extendStroke,
   finishStroke,
@@ -19,6 +20,7 @@ import { openWorkspaceWindow } from "@/lib/quire/workspace-windows";
 import type { CampaignMap, MapToken } from "@/lib/quire/world-schema";
 import type {
   MapTabletop,
+  FogState,
   ScenePoint,
   AreaTemplate,
   SceneCamera,
@@ -92,7 +94,10 @@ export function useMapTabletopTools(
     [lightColor, setLightColor] = useState("#ffcf80"),
     [lightRadius, setLightRadius] = useState(30),
     [ignoreWalls, setIgnoreWalls] = useState(false),
-    [showPreview, setShowPreview] = useState(false);
+    [showPreview, setShowPreview] = useState(false),
+    [consolidation, setConsolidation] = useState<
+      (FogConsolidation & { from: FogState; bytes: number }) | null
+    >(null);
   const gesture = useRef<
       | { point: ScenePoint; token?: MapToken; ids?: string[]; grid?: string; moved: boolean }
       | undefined
@@ -126,6 +131,7 @@ export function useMapTabletopTools(
     setSelected([]);
     setInspector(false);
     setShowPreview(false);
+    setConsolidation(null);
     setError("");
     setNotice("");
     // Map changes are guarded by the existing router draft blocker.
@@ -306,7 +312,7 @@ export function useMapTabletopTools(
             ];
     if (settings.fog.shapes.length + 1 + continued.length > 500) {
       setError(
-        `This map already has ${settings.fog.shapes.length} of 500 fog shapes${continued.length ? ` and this stroke needs ${continued.length + 1}` : ""}. This stroke was not saved and your fog is unchanged; Reveal all or Conceal all starts a fresh fog layer.`,
+        `This map already has ${settings.fog.shapes.length} of 500 fog shapes${continued.length ? ` and this stroke needs ${continued.length + 1}` : ""}. This stroke was not saved and your fog is unchanged. Consolidate fog in Exploration & lighting may free shapes; Reveal all or Conceal all starts a fresh fog layer.`,
       );
       return;
     }
@@ -440,12 +446,7 @@ export function useMapTabletopTools(
     return false;
   }
   const measurePoints = [...points, ...(tool === "measure" && cursor ? [cursor] : [])],
-    measured = map.grid
-      ? measurePoints.reduce(
-          (sum, point, i) => sum + (i ? sceneDistance(map.grid!, measurePoints[i - 1], point) : 0),
-          0,
-        ) * settings.unitsPerFoot
-      : 0;
+    measured = map.grid ? sceneRouteDistance(map.grid, measurePoints) * settings.unitsPerFoot : 0;
   const contextControls = (
     <div className="map-context-fields">
       {" "}
@@ -616,6 +617,12 @@ export function useMapTabletopTools(
       )}
     </div>
   );
+  const shapeCount = (n: number) => `${n} ${n === 1 ? "shape" : "shapes"}`;
+  // A proposal is shown only while the fog it was computed from is still current.
+  const consolidationProposal =
+    consolidation && canonicalJson(consolidation.from) === canonicalJson(settings.fog)
+      ? consolidation
+      : null;
   const fogBytes = dm ? fogStorageBytes(settings) : 0,
     fogLarge = fogBytes >= 400_000 || settings.fog.shapes.length >= 450;
   const configurationControls = (
@@ -663,8 +670,87 @@ export function useMapTabletopTools(
             Fog storage: {settings.fog.shapes.length} of 500 shapes ·{" "}
             {Math.max(1, Math.round(fogBytes / 1000))} KB including undo history
             {fogLarge &&
-              ". This map's fog is getting large; a shared campaign stops saving above 1.8 MB in total. Prefer rectangles, polygons or a larger brush for big areas."}
+              ". This map's fog is getting large; a shared campaign stops saving above 1.8 MB in total. Consolidate fog, or prefer rectangles, polygons or a larger brush for big areas."}
           </p>
+          {consolidationProposal ? (
+            <div
+              className="fog-consolidate-confirm"
+              role="group"
+              aria-labelledby="fog-consolidate-title"
+            >
+              <p id="fog-consolidate-title">
+                <strong>
+                  Consolidate fog: {shapeCount(consolidationProposal.before)} →{" "}
+                  {shapeCount(consolidationProposal.after)}
+                </strong>
+              </p>
+              <p>
+                {consolidationProposal.removed} with no visible effect removed
+                {consolidationProposal.merged
+                  ? `, ${consolidationProposal.merged} fewer after merging rectangles`
+                  : ""}
+                . What players see stays exactly the same. Brush strokes, ellipses and freehand
+                polygons that still show are kept as they are. Afterwards fog storage is about{" "}
+                {Math.max(1, Math.round(consolidationProposal.bytes / 1000))} KB including undo
+                history.
+              </p>
+              <p>
+                One Undo fog restores the separate shapes. Earlier undo steps stay unchanged (as
+                with any fog change, the oldest is dropped once 20 are saved), and Redo fog is
+                cleared.
+              </p>
+              <div className="tabletop-tool-row">
+                <Button
+                  disabled={disabled}
+                  onClick={() =>
+                    void act(
+                      {
+                        kind: "map-fog",
+                        mapId: map.id,
+                        before: consolidationProposal.from,
+                        action: "consolidate",
+                        result: consolidationProposal.fog,
+                      },
+                      () => setConsolidation(null),
+                    )
+                  }
+                >
+                  Consolidate to {shapeCount(consolidationProposal.after)}
+                </Button>
+                <Button variant="secondary" onClick={() => setConsolidation(null)}>
+                  Cancel
+                </Button>
+              </div>
+            </div>
+          ) : (
+            <Button
+              variant="secondary"
+              disabled={disabled || !settings.fog.shapes.length}
+              onClick={() => {
+                setError("");
+                const proposal = consolidateFog(settings.fog);
+                if (canonicalJson(proposal.fog) === canonicalJson(settings.fog)) {
+                  setConsolidation(null);
+                  setNotice(
+                    `Fog is already consolidated: none of its ${settings.fog.shapes.length} shapes can be merged or removed without changing what players see.`,
+                  );
+                  return;
+                }
+                setNotice("");
+                setConsolidation({
+                  ...proposal,
+                  from: structuredClone(settings.fog),
+                  bytes: fogStorageBytes({
+                    fog: proposal.fog,
+                    fogUndo: [...settings.fogUndo.slice(-19), fogDiff(proposal.fog, settings.fog)],
+                    fogRedo: [],
+                  }),
+                });
+              }}
+            >
+              Consolidate fog…
+            </Button>
+          )}
           <Button aria-pressed={showPreview} onClick={() => setShowPreview(!showPreview)}>
             Player-view preview
           </Button>

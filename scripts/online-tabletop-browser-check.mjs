@@ -171,6 +171,37 @@ export async function checkOnlineTabletop(dm, player, origin, width, output, jou
   await expect(
     dm.getByText(/Fog storage: 1 of 500 shapes · \d+ KB including undo history/),
   ).toBeVisible();
+  // Consolidate fog: nothing to merge yet, then a shape painted over inside the first is removed
+  // after confirmation, as one undo step, without changing the player's pixels.
+  await dm.getByRole("button", { name: "Consolidate fog…", exact: true }).click();
+  await expect(dm.getByText(/Fog is already consolidated/)).toBeVisible();
+  await closeMapSettings(dm);
+  await openMoreMapTools(dm);
+  await dm.getByRole("button", { name: "Fog rectangle", exact: true }).click();
+  await dm.getByRole("button", { name: "Close tool options", exact: true }).click();
+  await dm.mouse.move(rect.x + rect.width * 0.15, rect.y + rect.height * 0.2);
+  await dm.mouse.down();
+  await dm.mouse.move(rect.x + rect.width * 0.3, rect.y + rect.height * 0.4, { steps: 5 });
+  await dm.mouse.up();
+  await expect.poll(async () => (await scene()).tabletop.fog.shapes.length).toBe(2);
+  await openMapSettings(dm);
+  await dm.getByRole("button", { name: "Consolidate fog…", exact: true }).click();
+  const consolidation = dm.getByRole("group", { name: /Consolidate fog: 2 shapes → 1 shape/ });
+  await expect(consolidation).toBeVisible();
+  await consolidation.getByRole("button", { name: "Consolidate to 1 shape", exact: true }).click();
+  await expect.poll(async () => (await scene()).tabletop.fog.shapes.length).toBe(1);
+  await expect(
+    dm.getByText(/Fog storage: 1 of 500 shapes · \d+ KB including undo history/),
+  ).toBeVisible();
+  await expect.poll(() => alpha(0.2, 0.2)).toBe(255);
+  await expect.poll(() => alpha(0.95, 0.95)).toBe(0);
+  await closeMapSettings(dm);
+  await openMoreMapTools(dm);
+  await dm.getByRole("button", { name: "Undo fog", exact: true }).click();
+  await expect.poll(async () => (await scene()).tabletop.fog.shapes.length).toBe(2);
+  await dm.getByRole("button", { name: "Redo fog", exact: true }).click();
+  await expect.poll(async () => (await scene()).tabletop.fog.shapes.length).toBe(1);
+  await openMapSettings(dm);
   await dm.getByRole("button", { name: "Player-view preview", exact: true }).click();
   await expect(dm.getByRole("img", { name: "Player view of Keep map", exact: true })).toBeVisible();
   await reloadApplication(player);
