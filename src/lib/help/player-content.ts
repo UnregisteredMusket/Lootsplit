@@ -131,7 +131,7 @@ export const PLAYER_HELP_GROUPS: HelpGroup[] = [
         title: "Coins, purchases and transfers",
         paragraphs: [
           "10 cp = 1 sp; 5 sp = 1 ep; 2 ep = 1 gp; 10 gp = 1 pp. Dollar estimates are a display preference. Choose a controlled purse when buying or selling; the app rechecks funds, stock and location, on a player link as in a shared room. One purchase or sale is 1 to 100,000 units. Pressing Buy or Sell again after an error or a lost response applies that same purchase at most once; changing the purse, item or quantity makes it a new one. Your recorded Charisma reduces shop purchase prices by 1% per point above 10, capped at 20%; shared party funds receive no discount.",
-          "Give transfers existing coins or possessions. Bank lets you request an expense or loan and follow its decision or repayment. Approved spending deducts your coins once; it is not a payment to the DM. My Finances shows your permitted loans, recurring income and expenses, and reports. It does not show another character's private debts.",
+          "Give transfers existing coins or possessions. If a Give is refused, for example because funds are short or it is not your turn, the error is shown and the form keeps what you entered; pressing Give again applies that same transfer at most once. Bank lets you request an expense or loan and follow its decision or repayment. Approved spending deducts your coins once; it is not a payment to the DM. My Finances shows your permitted loans, recurring income and expenses, and reports. It does not show another character's private debts.",
         ],
         links: [
           ["Bank", "/features/bank"],

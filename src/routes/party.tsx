@@ -11,7 +11,7 @@ import { LedgerArt, PortraitPicker, InventoryList } from "@/components/ledger-ar
 import { getCloudTable } from "@/lib/quire/cloud-client";
 import { createFileRoute, useRouterState } from "@tanstack/react-router";
 import { useEffect, useState, type FormEvent } from "react";
-import { useEconomy } from "@/lib/quire/economy-context";
+import { useCommandId, useEconomy } from "@/lib/quire/economy-context";
 import { loadRoster, type RosterPerson } from "@/lib/quire/gift";
 import {
   carryUpTo,
@@ -842,15 +842,37 @@ function GiveToPlayer({ purses }: { purses: Purse[] }) {
   const { give, holdings, purses: everyone } = useEconomy();
   const seat = useSeat();
   const [roster, setRoster] = useState<RosterPerson[]>([]);
+  const [rosterError, setRosterError] = useState("");
   const [fromId, setFromId] = useState(purses[0]?.id ?? "");
   const [toId, setToId] = useState("");
   const [amount, setAmount] = useState("");
   const [holdingId, setHoldingId] = useState("");
   const [qty, setQty] = useState("1");
+  const [busy, setBusy] = useState(false);
+  // One command ID per transfer, reused if the same transfer is retried.
+  const action = useCommandId(`${fromId}|${toId}|${amount.trim()}|${holdingId}|${qty}`);
 
   useEffect(() => {
     if (seat.role !== "player") return;
-    void loadRoster().then(setRoster);
+    let cancelled = false;
+    loadRoster().then(
+      (people) => {
+        if (cancelled) return;
+        setRoster(people);
+        setRosterError("");
+      },
+      (error: unknown) => {
+        if (cancelled) return;
+        setRosterError(
+          error instanceof Error && error.message
+            ? `The player list on this device could not be read: ${error.message}`
+            : "The player list on this device could not be read.",
+        );
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
   }, [seat.role, purses]);
 
   const recipients =
@@ -885,20 +907,33 @@ function GiveToPlayer({ purses }: { purses: Purse[] }) {
     if (holdingId && !mine.some((holding) => holding.id === holdingId)) setHoldingId("");
   }, [mine, holdingId]);
 
-  function submit(event: FormEvent) {
+  async function submit(event: FormEvent) {
     event.preventDefault();
+    if (busy) return;
     const copper = amount.trim() ? parsePrice(amount) : 0;
     if (copper === null || copper < 0 || !fromId || !toId) return;
-    void give({
-      fromId,
-      toId,
-      copper,
-      holdingId: holdingId || null,
-      quantity: Math.max(1, Math.floor(Number(qty) || 1)),
-    });
-    setAmount("");
-    setHoldingId("");
-    setQty("1");
+    setBusy(true);
+    try {
+      // The fields clear only once the transfer is accepted; a refusal is
+      // shown as a toast and keeps the input for a retry with the same ID.
+      const accepted = await give(
+        {
+          fromId,
+          toId,
+          copper,
+          holdingId: holdingId || null,
+          quantity: Math.max(1, Math.floor(Number(qty) || 1)),
+        },
+        { commandId: action.commandId },
+      );
+      if (!accepted) return;
+      action.renew();
+      setAmount("");
+      setHoldingId("");
+      setQty("1");
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (
@@ -908,14 +943,18 @@ function GiveToPlayer({ purses }: { purses: Purse[] }) {
         Coins, items, or property deeds move to another character. A property and its deed transfer together. The party chat shows it, and the dungeon
         master's activity report lists it.
       </p>
-      {recipients.length === 0 ? (
+      {rosterError && recipients.length === 0 ? (
+        <p className="mt-3 text-sm" role="alert">
+          {rosterError}
+        </p>
+      ) : recipients.length === 0 ? (
         <p className="mt-3 text-sm text-muted">
           {seat.role === "player"
             ? "No other players are on this link. They are included the next time the dungeon master copies it."
             : "Add another character before giving something across the party."}
         </p>
       ) : (
-        <form className="mt-3 flex flex-col gap-2" onSubmit={submit}>
+        <form className="mt-3 flex flex-col gap-2" onSubmit={(event) => void submit(event)}>
           <select
             value={fromId}
             onChange={(event) => setFromId(event.target.value)}
@@ -966,8 +1005,8 @@ function GiveToPlayer({ purses }: { purses: Purse[] }) {
               aria-label="Quantity to give"
             />
           ) : null}
-          <Button type="submit" variant="secondary">
-            Give
+          <Button type="submit" variant="secondary" disabled={busy}>
+            {busy ? "Giving…" : "Give"}
           </Button>
         </form>
       )}
@@ -982,18 +1021,33 @@ function Payment({ purses }: { purses: Purse[] }) {
   );
   const [amount, setAmount] = useState("");
   const [note, setNote] = useState("");
+  const [busy, setBusy] = useState(false);
+  // One command ID per payment direction, reused if the same payment is retried.
+  const inputs = `${purseId}|${amount.trim()}|${note.trim()}`;
+  const paying = useCommandId(`pay|${inputs}`);
+  const receiving = useCommandId(`receive|${inputs}`);
 
   useEffect(() => {
     if (!purses.some((purse) => purse.id === purseId))
       setPurseId(purses.find((purse) => purse.kind === "party")?.id ?? purses[0]?.id ?? "");
   }, [purses, purseId]);
 
-  function send(sign: 1 | -1) {
+  async function send(sign: 1 | -1) {
+    if (busy) return;
     const copper = parsePrice(amount);
     if (!purseId || copper === null || copper === 0 || !note.trim()) return;
-    void post(purseId, copper * sign, note.trim());
-    setAmount("");
-    setNote("");
+    const action = sign < 0 ? paying : receiving;
+    setBusy(true);
+    try {
+      // Clear only once the payment is recorded; a refusal keeps the input.
+      if (!(await post(purseId, copper * sign, note.trim(), { commandId: action.commandId })))
+        return;
+      action.renew();
+      setAmount("");
+      setNote("");
+    } finally {
+      setBusy(false);
+    }
   }
 
   return (
@@ -1025,10 +1079,10 @@ function Payment({ purses }: { purses: Purse[] }) {
           aria-label="Payment note"
         />
         <div className="flex flex-wrap gap-2">
-          <Button variant="secondary" onClick={() => send(-1)}>
+          <Button variant="secondary" disabled={busy} onClick={() => void send(-1)}>
             Pay funds
           </Button>
-          <Button variant="secondary" onClick={() => send(1)}>
+          <Button variant="secondary" disabled={busy} onClick={() => void send(1)}>
             Receive funds
           </Button>
         </div>

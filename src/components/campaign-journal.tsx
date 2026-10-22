@@ -176,7 +176,7 @@ export function CampaignJournal({
   const [approveDowntime, setApproveDowntime] = useState("");
   const active = journal.sessions.find((x) => !x.endedAt);
   const accounts = dm ? purses : purses.filter((x) => seat.purseIds.includes(x.id));
-  const run = async (work: () => Promise<void>) => {
+  const run = async (work: () => Promise<unknown>) => {
     setBusy(true);
     try {
       await work();

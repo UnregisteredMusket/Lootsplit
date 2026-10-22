@@ -193,8 +193,16 @@ type EconomyApi = {
     quantity: number,
     options?: CommandOptions,
   ) => Promise<EconomyMutationOutcome>;
-  setPurseCoins: (purseId: string, coins: Coins, options?: CommandOptions) => Promise<void>;
-  post: (purseId: string, copper: number, summary: string, options?: CommandOptions) => Promise<void>;
+  // These resolve to `true` once the change is accepted and `false` when it
+  // was refused (the error is already shown as a toast), so a form can keep
+  // its input for a retry instead of clearing it on failure.
+  setPurseCoins: (purseId: string, coins: Coins, options?: CommandOptions) => Promise<boolean>;
+  post: (
+    purseId: string,
+    copper: number,
+    summary: string,
+    options?: CommandOptions,
+  ) => Promise<boolean>;
   give: (
     input: {
       fromId: string;
@@ -204,7 +212,7 @@ type EconomyApi = {
       quantity: number;
     },
     options?: CommandOptions,
-  ) => Promise<void>;
+  ) => Promise<boolean>;
   listings: Listing[];
   loans: LoanAsk[];
   addListing: (input: {
@@ -222,10 +230,12 @@ type EconomyApi = {
     options?: CommandOptions,
   ) => Promise<EconomyMutationOutcome>;
   askLoan: (purseId: string, copper: number, note: string) => Promise<EconomyMutationOutcome>;
-  decideLoan: (id: string, status: LoanStatus) => Promise<void>;
+  /** Resolves `true` when the decision was recorded; `false` after a shown error. */
+  decideLoan: (id: string, status: LoanStatus) => Promise<boolean>;
   sheets: CharacterSheet[];
-  importSheet: (purseId: string, file: File) => Promise<void>;
-  updateSheet: (sheet: CharacterSheet, before?: CharacterSheet) => Promise<void>;
+  /** Resolves `true` when imported; `false` after a shown error. */
+  importSheet: (purseId: string, file: File) => Promise<boolean>;
+  updateSheet: (sheet: CharacterSheet, before?: CharacterSheet) => Promise<boolean>;
   voidLine: (id: string) => Promise<void>;
   setRealm: (settings: RealmSettings, options?: { reprice?: boolean }) => Promise<void>;
   addGoods: (
@@ -460,13 +470,15 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
     [reload],
   );
 
-  const run = useCallback(
-    async (work: () => Promise<unknown>, ok?: string, rethrow = false) => {
+  const attempt = useCallback(
+    // Resolves `true` when the work was accepted and `false` when it was
+    // refused and the error shown (unless `rethrow`, which throws instead).
+    async (work: () => Promise<unknown>, ok?: string, rethrow = false): Promise<boolean> => {
       const gate = getCloudWatch();
       if (gate.joined && !gate.mine) {
         if (rethrow) throw new Error(`It is ${gate.who}'s turn.`);
         toast.error(`It is ${gate.who}'s turn.`);
-        return;
+        return false;
       }
       try {
         if (gate.joined) await runSharedMutation(work);
@@ -489,15 +501,21 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
           toast.success(
             gate.joined && hasPendingChanges() ? "Action saved as pending. Check sync status." : ok,
           );
+        return true;
       } catch (error) {
         if (rethrow) throw error;
         fault(error, "That change could not be saved.");
+        return false;
       }
     },
     [reload],
   );
 
   const api = useMemo<EconomyApi>(() => {
+    // For actions whose callers only need the toast, not the outcome.
+    const run = async (work: () => Promise<unknown>, ok?: string, rethrow = false) => {
+      await attempt(work, ok, rethrow);
+    };
     const dmOnly = () => {
       if (getSeat().role === "player") throw new Error("Only the DM can change this setting.");
     };
@@ -511,14 +529,16 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
       if (sitting.role === "player" && !sitting.shopIds.includes(shopId))
         throw new Error("That shop was not included in your link.");
     };
-    const shared = async (command: CommandRequest) => {
+    const shared = async (command: CommandRequest): Promise<boolean> => {
       try {
         await queueCommand(command);
         await reload();
         if (!hasPendingChanges() && ["buy", "sell", "listing", "give"].includes(command.kind))
           void playSound("coins");
+        return true;
       } catch (error) {
         fault(error, "Action failed. Check sync status.");
+        return false;
       }
     };
     const refreshAccepted = async () => {
@@ -792,12 +812,12 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
       // A shared room records these as a reviewed table patch; the device
       // receipt only guards offline retries, so the ID is used offline only.
       setPurseCoins: (purseId, coins, options = {}) =>
-        run(async () => {
+        attempt(async () => {
           dmOnly();
           await setCoins(purseId, coins, undefined, getCloudWatch().joined ? {} : options);
         }, "Coin updated."),
       post: (purseId, copper, summary, options = {}) =>
-        run(async () => {
+        attempt(async () => {
           dmOnly();
           await postCopper(purseId, copper, summary, getCloudWatch().joined ? {} : options);
         }, "Ledger updated."),
@@ -811,8 +831,19 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
                     h.reservedFor ||
                     journal.propertyOperations?.sites.some((s) => s.propertyId === h.id)),
               )
-            ? acceptCommand({ kind: "give", ...input, ...idOf(options) }).then(() => {})
-            : run(async () => {
+            ? acceptCommand({ kind: "give", ...input, ...idOf(options) }).then(
+                (outcome) => {
+                  toast.success(
+                    mutationNotice(outcome, "Transfer recorded and added to party messages."),
+                  );
+                  return true;
+                },
+                (error: unknown) => {
+                  fault(error, "That transfer could not be saved.");
+                  return false;
+                },
+              )
+            : attempt(async () => {
                 ownPurse(input.fromId);
                 await giveToPlayer(input, options);
               }, "Transfer recorded and added to party messages."),
@@ -843,9 +874,9 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
       decideLoan: (id, status) =>
         getCloudWatch().joined
           ? status === "pending"
-            ? Promise.resolve()
+            ? Promise.resolve(true)
             : shared({ kind: "decision", loanId: id, status })
-          : run(
+          : attempt(
               async () => {
                 dmOnly();
                 await answerLoan(id, status);
@@ -853,19 +884,25 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
               status === "approved" ? "Loan approved." : "Loan denied.",
             ),
       importSheet: async (purseId, file) => {
-        ownPurse(purseId);
-        const gaps = await mutation(() => importCharacterSheet(purseId, file));
-        await reload();
-        toast.success(
-          gaps.length > 0
-            ? `Imported. Still blank: ${gaps.join(", ")}.`
-            : "Character sheet imported.",
-        );
+        try {
+          ownPurse(purseId);
+          const gaps = await mutation(() => importCharacterSheet(purseId, file));
+          await reload();
+          toast.success(
+            gaps.length > 0
+              ? `Imported. Still blank: ${gaps.join(", ")}.`
+              : "Character sheet imported.",
+          );
+          return true;
+        } catch (error) {
+          fault(error, "That character sheet could not be imported.");
+          return false;
+        }
       },
       updateSheet: (sheet, before) =>
         getCloudWatch().joined
           ? shared({ kind: "sheet", sheet, before })
-          : run(async () => {
+          : attempt(async () => {
               ownPurse(sheet.purseId);
               await updateCharacterSheet(sheet, before);
             }),
@@ -1045,7 +1082,7 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
     loans,
     sheets,
     reload,
-    run,
+    attempt,
   ]);
 
   return <EconomyContext.Provider value={api}>{children}</EconomyContext.Provider>;
