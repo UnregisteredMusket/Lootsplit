@@ -18,6 +18,7 @@ import { loadGifts } from "@/lib/quire/gift";
 import { loadLoans, loadSales } from "@/lib/quire/market";
 import { loadSheets } from "@/lib/quire/sheet";
 import { buildBill, copyText, encodeLinkPayload, seatHref } from "@/lib/quire/table";
+import { publicLinkOrigin } from "@/lib/quire/invitation-url";
 import { useEconomy } from "@/lib/quire/economy-context";
 import { useSeat } from "@/lib/quire/seat";
 import { characterControl } from "@/lib/quire/types";
@@ -257,7 +258,7 @@ export function ManualChat() {
                   seat,
                 );
                 const payload = await encodeLinkPayload(bill);
-                const url = seatHref("dm", payload, window.location.origin);
+                const url = seatHref("dm", payload, publicLinkOrigin({ origin: window.location.origin, native: import.meta.env.VITE_MOBILE === "true" }));
                 if (url.length > 48000)
                   throw new Error(
                     "This activity report is too long for a link. Download it from Share.",

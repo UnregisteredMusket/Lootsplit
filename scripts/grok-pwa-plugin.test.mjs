@@ -507,3 +507,56 @@ test("vite plugin bakes og identity as a virtual module", () => {
   assert.match(plugin, /snapshotOgIdentity/);
 });
 
+
+test("share cards, manifest and install page ignore Host and X-Forwarded-Host; public pages get a canonical URL", async () => {
+  const { grokPwaPlugin } = await import("./grok-pwa-plugin.mjs");
+  const { deploymentOrigins } = await import("../src/lib/deployment/origins.mjs");
+  const { canonicalPublicUrl } = await import("../src/lib/deployment/public-urls.mjs");
+  const handlers = [];
+  const plugin = grokPwaPlugin();
+  plugin.configResolved({ root: EMPTY_FIXTURE_ROOT });
+  plugin.configureServer({ middlewares: { use: (fn) => handlers.push(fn) } });
+  const evil = { host: "evil.example", "x-forwarded-host": "evil.example", accept: "text/html" };
+  const run = (url, html) =>
+    new Promise((resolve) => {
+      let body = "";
+      const headers = {};
+      const res = {
+        statusCode: 200,
+        headersSent: false,
+        setHeader: (k, v) => (headers[k.toLowerCase()] = v),
+        getHeader: (k) => headers[k.toLowerCase()],
+        removeHeader: (k) => delete headers[k.toLowerCase()],
+        write: (chunk) => ((body += String(chunk)), true),
+        end: (chunk) => {
+          if (chunk) body += String(chunk);
+          resolve(body);
+        },
+      };
+      const req = { url, method: "GET", headers: evil };
+      let i = 0;
+      const next = () => {
+        const handler = handlers[i++];
+        if (handler) return handler(req, res, next);
+        res.setHeader("content-type", "text/html");
+        res.end(html);
+      };
+      next();
+    });
+  const page = "<html><head><title>Lootsplit</title><link rel=\"canonical\" href=\"https://evil.example/\"></head><body></body></html>";
+  const website = new URL("/welcome", deploymentOrigins.website).href;
+  const welcome = await run("/welcome", page);
+  assert.doesNotMatch(welcome, /evil\.example/);
+  assert.match(welcome, new RegExp(`<meta property="og:url" content="${website}">`));
+  assert.match(welcome, new RegExp(`<link rel="canonical" href="${website}">`));
+  const app = await run("/characters", page.replace(/<link[^>]*>/, ""));
+  assert.doesNotMatch(app, /evil\.example|og:url|rel="canonical"/);
+  assert.doesNotMatch(await run("/__grok/manifest.webmanifest", ""), /evil/);
+  assert.doesNotMatch(await run("/welcome?install=1&platform=ios", ""), /evil/);
+  for (const path of ["/welcome", "/features", "/features/ships", "/downloads", "/updates", "/help", "/resources", "/donate", "/help/"])
+    assert.ok(canonicalPublicUrl(path).startsWith(deploymentOrigins.website + "/"), path);
+  for (const path of ["/", "/account", "/share", "/characters", "/api/account/library", "/features/../account", "/download/android"])
+    assert.equal(canonicalPublicUrl(path), "", path);
+  const middleware = readFileSync(join(TEMPLATE_ROOT, "server/middleware/grok-pwa.ts"), "utf8");
+  assert.doesNotMatch(middleware, /headers\.get\("(x-forwarded-host|host)"\)|event\.url\.host\b/i);
+});

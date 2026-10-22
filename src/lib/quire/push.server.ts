@@ -3,6 +3,7 @@ import { noteIsForSeat } from "./notify.ts";
 import type { CloudRoom } from "./cloud.ts";
 import type { ChatNote } from "./chat.ts";
 import { SignJWT, importJWK } from "jose";
+import { deploymentOrigins } from "../deployment/origins.mjs";
 
 type Statement = {
   bind(...args: unknown[]): Statement;
@@ -128,7 +129,7 @@ export async function pushAuthorization(endpoint: string, k: Keys): Promise<stri
     .setProtectedHeader({ typ: "JWT", alg: "ES256" })
     .setAudience(new URL(endpoint).origin)
     .setExpirationTime(Math.floor(Date.now() / 1000) + 3600)
-    .setSubject("https://lootsplit.oliverstorie2017.workers.dev")
+    .setSubject(deploymentOrigins.website)
     .sign(privateKey);
   return `vapid t=${jwt}, k=${k.publicKey}`;
 }

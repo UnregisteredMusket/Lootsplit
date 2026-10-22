@@ -1,4 +1,15 @@
 /** Pure, shared operational semantics. All durations are milliseconds, all instants UTC epoch ms. */
+import { deploymentOrigins } from "../src/lib/deployment/origins.mjs";
+/** Evidence links may point at any Lootsplit origin (website, native API, legacy hosts keep stored links valid), GitHub or Cloudflare. */
+export const EVIDENCE_HOSTS = Object.freeze([
+  "github.com",
+  "dash.cloudflare.com",
+  ...new Set(
+    [deploymentOrigins.website, deploymentOrigins.nativeApi, ...deploymentOrigins.legacy].map(
+      (origin) => new URL(origin).hostname,
+    ),
+  ),
+]);
 export const INTERVAL = 30 * 60 * 1000;
 export const DEFAULT_CONFIG = Object.freeze({
   timezone: "America/New_York",
@@ -45,9 +56,7 @@ export function links(value = []) {
       url.password ||
       url.search ||
       url.hash ||
-      !["github.com", "dash.cloudflare.com", "lootsplit.oliverstorie2017.workers.dev"].includes(
-        url.hostname,
-      )
+      !EVIDENCE_HOSTS.includes(url.hostname)
     )
       fail("Use a credential-free Lootsplit, GitHub or Cloudflare evidence URL.");
     return { label: clean(item.label, 100), url: url.href };

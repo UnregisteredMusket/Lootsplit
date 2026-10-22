@@ -1,3 +1,4 @@
+import { deploymentOrigins } from "../src/lib/deployment/origins.mjs";
 /** Called by the actual bounded job runner. No credentials are printed or persisted. */
 export function stepTelemetry({ id, seconds, startedAt }) {
   const enabled =
@@ -42,7 +43,7 @@ export function stepTelemetry({ id, seconds, startedAt }) {
               ? "completed"
               : "failed";
         const response = await fetch(
-          "https://lootsplit.oliverstorie2017.workers.dev/api/owner-telemetry",
+          new URL("/api/owner-telemetry", deploymentOrigins.website),
           {
             method: "POST",
             headers: { Authorization: `Bearer ${token}`, "Content-Type": "application/json" },

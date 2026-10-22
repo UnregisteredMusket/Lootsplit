@@ -658,7 +658,7 @@ export function CloudTable() {
                     <Button disabled={unavailable} variant="secondary" onClick={() => run(() => manageParticipant("invite", item.id))}>Create fresh invitation</Button>
                   )}
                 {item.invitation && (
-                    <Button variant="secondary" onClick={() => { const url = new URL("/share", location.origin); url.searchParams.set("join", cloud.code); url.searchParams.set("session", cloud.sessionId); url.searchParams.set("invitation", item.invitation!); void navigator.clipboard.writeText(url.href).then(() => toast.success("Fresh invitation copied"), () => window.prompt("Copy fresh invitation", url.href)); }}>Copy fresh invitation</Button>
+                    <Button variant="secondary" onClick={() => { const url = invitationUrl({ origin: window.location.origin, native: import.meta.env.VITE_MOBILE === "true", code: cloud.code, session: cloud.sessionId, invitation: item.invitation! }); void navigator.clipboard.writeText(url).then(() => toast.success("Fresh invitation copied"), () => window.prompt("Copy fresh invitation", url)); }}>Copy fresh invitation</Button>
                   )}
               </div>
               ))}

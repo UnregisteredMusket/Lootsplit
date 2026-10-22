@@ -2,7 +2,7 @@ import { useEffect, useState } from "react";
 import { Link } from "@tanstack/react-router";
 import { Capacitor } from "@capacitor/core";
 import { APP_VERSION } from "@/lib/quire/version";
-import { API_ORIGIN } from "@/lib/mobile/origin";
+import { deploymentOrigins } from "@/lib/deployment/origins.mjs";
 import { describeClient } from "@/lib/website/client-presentation";
 import release from "@/lib/website/release.json";
 import { useReleaseIdentity } from "./release-identity";
@@ -117,7 +117,7 @@ export function AboutLootsplit() {
         {client?.kind === "android-native" && (
           <>
             {" "}
-            · <a href={`${API_ORIGIN}/welcome`}>Open the website</a>
+            · <a href={`${deploymentOrigins.website}/welcome`}>Open the website</a>
           </>
         )}
       </p>

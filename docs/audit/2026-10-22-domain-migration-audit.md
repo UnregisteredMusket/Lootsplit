@@ -400,3 +400,5 @@ Wrong identity or asset hashes on either host; sign-in, recovery or invitation f
 ```
 
 This check confirms that the source, Wrangler and live-audit origins agree today. It doesn't yet check `workers_dev` or `ACCOUNT_LEGACY_ORIGINS` (P1-1, P1-3), and it doesn't prove live readiness.
+
+**Status updates:** 2026-10-22 `fix/origin-constants`: fixed P1-4, P1-5, P1-7, P2-2, P2-3 (forwarded host no longer trusted; `og:url` + canonical on public pages), P2-7 (POST targets; OIDC audience kept), P2-8, P3-1, P3-2.

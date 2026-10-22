@@ -16,6 +16,7 @@
  */
 import installPageTemplate from "../../scripts/install-page.html?raw";
 import { grokOgIdentity } from "virtual:grok-og-identity";
+import { canonicalPublicUrl, publicShareHost } from "../../src/lib/deployment/public-urls.mjs";
 import {
   acceptsHtml,
   createHeadInjector,
@@ -30,15 +31,11 @@ interface GrokPwaEvent {
   req: { method: string; headers: Headers };
 }
 
-function requestHost(event: GrokPwaEvent): string {
-  return (
-    event.req.headers.get("x-forwarded-host") ?? event.req.headers.get("host") ?? event.url.host
-  );
-}
-
-function injectHeadStreaming(response: Response, host: string): Response {
+/** Absolute URLs come from the shared deployment config, never Host or X-Forwarded-Host (audit P2-3). */
+function injectHeadStreaming(response: Response, path: string): Response {
   const injector = createHeadInjector({
-    host,
+    host: publicShareHost(),
+    canonical: canonicalPublicUrl(path),
     site: grokOgIdentity.site,
   });
   const transformed = response.body!.pipeThrough(
@@ -71,7 +68,7 @@ export default async function grokPwaMiddleware(
   const urlWithQuery = path + event.url.search;
 
   if (path === "/__grok/manifest.webmanifest" || path === "/__grok/manifest.json") {
-    return new Response(renderWebManifest(requestHost(event)), {
+    return new Response(renderWebManifest(publicShareHost()), {
       headers: {
         "content-type": "application/manifest+json; charset=utf-8",
         "cache-control": "no-cache",
@@ -85,7 +82,7 @@ export default async function grokPwaMiddleware(
     acceptsHtml(event.req.headers.get("accept"))
   ) {
     const html = renderInstallPageHtml(installPageTemplate, {
-      host: requestHost(event),
+      host: publicShareHost(),
       url: urlWithQuery,
     });
     return new Response(html, {
@@ -105,7 +102,7 @@ export default async function grokPwaMiddleware(
     String(result.headers.get("content-type") ?? "").includes("text/html") &&
     !result.headers.get("content-encoding")
   ) {
-    return injectHeadStreaming(result, requestHost(event));
+    return injectHeadStreaming(result, path);
   }
   return result;
 }

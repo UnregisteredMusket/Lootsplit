@@ -345,6 +345,7 @@ export function grokOgHeadTags({
   site = {},
   documentTitle = "",
   cwd = process.cwd(),
+  canonical = "",
 } = {}) {
   const title = resolveOgTitle(site, appName, host, documentTitle);
   const publicHost = resolvePublicHost(host);
@@ -358,6 +359,10 @@ export function grokOgHeadTags({
   }
   if (String(site.type ?? "").toLowerCase() === "x:game") {
     tags.push(`<meta property="og:type" content="x:game">`);
+  }
+  if (canonical) {
+    tags.push(`<meta property="og:url" content="${escapeHtml(canonical)}">`);
+    tags.push(`<link rel="canonical" href="${escapeHtml(canonical)}">`);
   }
   if (publicHost) {
     const asset = resolveOgCardAsset(site, cwd);
@@ -430,6 +435,7 @@ export function normalizeHeadContext(ctx = {}) {
     creator: ctx.creator ?? readXCreator(),
     creatorId: ctx.creatorId ?? readXCreatorId(),
     host: ctx.host ?? "",
+    canonical: ctx.canonical ?? "",
     cwd,
     site,
   };
@@ -437,7 +443,7 @@ export function normalizeHeadContext(ctx = {}) {
 
 export function injectGrokPwaHead(html, ctx = {}) {
   if (typeof html !== "string") return html;
-  const { site, projectId, creator, creatorId, host, cwd } = normalizeHeadContext(ctx);
+  const { site, projectId, creator, creatorId, host, cwd, canonical } = normalizeHeadContext(ctx);
   const documentTitle = titleFromDocument(html);
   const appName = resolveOgTitle(
     site,
@@ -446,6 +452,7 @@ export function injectGrokPwaHead(html, ctx = {}) {
     documentTitle,
   );
   let next = stripShareMetaTags(html);
+  if (canonical) next = next.replace(/<link\b[^>]*\brel\s*=\s*["']canonical["'][^>]*>/gi, "");
   if (!readGrokExtensionsEnabled()) next = stripGrokExtensionsScript(next);
 
   const missing = grokPwaHeadTags(appName)
@@ -458,7 +465,7 @@ export function injectGrokPwaHead(html, ctx = {}) {
 
   next = insertAfterHeadOpen(
     next,
-    grokOgHeadTags({ host, appName, site, documentTitle, cwd }).join(""),
+    grokOgHeadTags({ host, appName, site, documentTitle, cwd, canonical }).join(""),
   );
 
   if (readGrokExtensionsEnabled() && !next.includes("/grok-app-builder/extensions.js")) {
@@ -510,6 +517,7 @@ export function createHeadInjector(ctx = {}) {
       creator: normalized.creator,
       creatorId: normalized.creatorId,
       host: normalized.host,
+      canonical: normalized.canonical,
       cwd: normalized.cwd,
       site: normalized.site,
     });
