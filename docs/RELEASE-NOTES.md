@@ -17,7 +17,7 @@ Android version code **17**, same package and permanent signing certificate. Ins
 
 ## Release verification
 
-To be completed by the signed release workflow (API 24/API 35 widget checks, preservation checks and the signed-APK upgrade gate).
+Published October 22, 2026 by `android-release.yml` (run 39859111167) from main `f548d7e` after full preservation checks, the API 24/API 35 widget and picker checks and the signed-APK upgrade gate passed. The public APK's SHA-256 is `83f5841e550ced47196e6467d9a1a0827c217712e0457a7147334d25df0cf456` (28,152,525 bytes), matching SHA256SUMS.txt and the GitHub asset digest. Independent inspection of its v2 signing block confirms the permanent certificate (`baca95a8…f730a0`, unchanged from 1.9.3); the manifest keeps package `com.unregisteredmusket.lootsplit` and carries version 1.10.0 and the Lootsplitter label. The first attempt (run 39802895414) stopped in the upgrade gate before publishing, because the widget-picker audit searched for the new name while the installed 1.9.3 app is still named Lootsplit; #205 fixed the audit. Physical-device behavior has not been verified.
 
 ---
 
