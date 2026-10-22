@@ -2647,31 +2647,15 @@ export async function executeFinanceCommand(
     input.kind === "session"
   ))
     throw Error("Not a finance command.");
-  const market =
-    input.kind === "shop-schedule" ||
-    input.kind.startsWith("downtime-") ||
-    input.kind === "session";
-  const stores: Parameters<typeof atomic>[0] = ["purses", "holdings", "ledger", "meta"];
-  if (market) stores.push("shops", "stock");
+  // Every finance command reads the real shops and stock, as a shared room does:
+  // applyCommand runs the shared validators (a smith profile needs its shop).
+  // Unchanged shop and stock rows are not rewritten below.
+  const stores: Parameters<typeof atomic>[0] = ["purses", "holdings", "shops", "stock", "ledger", "meta"];
   await atomic(stores, async (tx) => {
-    const source: CloudTable = market
-      ? await readEconomyTransaction(
-          tx,
-          input.kind === "session" || input.kind === "downtime-apply",
-        )
-      : await Promise.all([
-          request<Purse[]>(tx.objectStore("purses").getAll()),
-          request<Holding[]>(tx.objectStore("holdings").getAll()),
-          request<LedgerLine[]>(tx.objectStore("ledger").getAll()),
-          readCampaignMetadata(tx, false),
-        ]).then(([purses, holdings, ledger, metadata]) => ({
-          purses,
-          holdings,
-          ledger,
-          shops: [],
-          stock: [],
-          ...metadata,
-        }));
+    const source: CloudTable = await readEconomyTransaction(
+      tx,
+      input.kind === "session" || input.kind === "downtime-apply",
+    );
     guard();
     const seat = getSeat();
     const next = applyCommand(
