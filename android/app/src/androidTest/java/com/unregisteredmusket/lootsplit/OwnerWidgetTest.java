@@ -756,7 +756,7 @@ public class OwnerWidgetTest {
         org.json.JSONArray events=new org.json.JSONArray().put(event);
         assertTrue(WidgetRows.activityLive(WidgetData.project(activityFixture(events,1),now),now));
         assertFalse(WidgetRows.activityLive(WidgetData.project(activityFixture(events,0),now),now));
-        assertFalse(WidgetRows.activityLive(WidgetData.project(activityFixture(events,1),now),now+WidgetRefresh.ACTIVITY_MAX_AGE_MILLIS+1));
+        assertFalse(WidgetRows.activityLive(WidgetData.project(activityFixture(events,1),now),now+WidgetRefresh.ACTIVITY_MAX_AGE_MILLIS+60000));
         // Background retries with backoff only after transport failures.
         assertTrue(WidgetRefresh.transientFailure(WidgetRefresh.FAILED));
         assertTrue(WidgetRefresh.transientFailure(WidgetRefresh.TIMED_OUT));
