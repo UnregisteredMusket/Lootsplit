@@ -22,5 +22,5 @@
   },
   "note": "Includes nested callbacks and test/build functions. Excludes declarations/generated routes/dependencies. Static registration/call evidence is not dynamic coverage or formal correctness proof.",
   "snapshot": "October 12 verified report release follow-up; full exact-source CSV/summary are regenerated in each verification artifact.",
-  "index": "The checked-in function-inventory.csv is historical. Current complete CSV and summary are in the build verification artifact under function-inventory/."
+  "index": "The historical function-inventory.csv was removed from the repository (audit B03; recover it from git history before chore/template-cleanup). Current complete CSV and summary are in the build verification artifact under function-inventory/."
 }

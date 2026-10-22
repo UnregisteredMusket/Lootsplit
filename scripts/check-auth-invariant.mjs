@@ -27,7 +27,7 @@ import { isMainModule, mergeAppEnv, projectRoot, readAppEnv } from "./with-app-e
 
 const DEFAULT_DEV_URL = "http://127.0.0.1:8080";
 
-/** The predicate `src/lib/auth/{client,server}.ts` apply to the flag. */
+/** How a resolved `VITE_AUTH_ENABLED` value reads as on/off (template auth flag). */
 export function authEnabledFromEnvValue(value) {
   return value !== "false";
 }

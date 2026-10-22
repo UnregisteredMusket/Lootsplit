@@ -5,10 +5,10 @@ import type { ReactNode } from "react";
  *
  *   <AuthProvider><Outlet /></AuthProvider>
  *
- * Better Auth's React client (`@/lib/auth/client`) needs NO context provider —
- * its `useSession()` works standalone — so this is a passthrough today. It's
- * kept as the single, stable mount point for any future client-side providers
- * (e.g. a toast or theme provider) without churning the root shell.
+ * A passthrough today (accounts are served by the Worker's Better Auth in
+ * `cloudflare/accounts.mjs` and need no client context). It's kept as the
+ * single, stable mount point for any future client-side providers (e.g. a
+ * toast or theme provider) without churning the root shell.
  */
 export function AuthProvider({ children }: { children: ReactNode }) {
   return <>{children}</>;

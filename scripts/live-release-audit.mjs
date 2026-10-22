@@ -4,6 +4,7 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { chromium } from "playwright";
 import { verifyArtifact } from "./release-artifact.mjs";
 import { waitForRelease } from "./release-readiness.mjs";
+import { grokScriptAssetReferences, grokScriptReferences, isGrokScriptUrl } from "./grok-script-check.mjs";
 const origin = process.env.AUDIT_ORIGIN || "http://127.0.0.1:8082";
 // Disposable Worker audits share a server with gameplay fixtures. Anonymous
 // title clients need their own quota too; real production requests stay unchanged.
@@ -25,6 +26,25 @@ const readiness = await waitForRelease({
 console.log(
   `Release assets ready: ${readiness.attempts.at(-1).assetCount} matching JavaScript/CSS files in ${readiness.durationMs}ms (${readiness.attempts.length} probes).`,
 );
+// The Grok App Builder extension script must never ship: not in the verified
+// client assets, not in any served HTML (the runtime head injector reads
+// VITE_GROK_EXTENSIONS), and never requested by the browser (checked below).
+assert.deepEqual(
+  grokScriptAssetReferences("dist/website-release/assets"),
+  [],
+  "Release assets reference the Grok extension script",
+);
+for (const path of ["/", "/?install=1"]) {
+  const html = await fetch(`${origin}${path}`, {
+    headers: fixtureHeaders(),
+    signal: AbortSignal.timeout(15000),
+  });
+  assert.deepEqual(
+    grokScriptReferences(await html.text()),
+    [],
+    `${path} serves a Grok extension script tag`,
+  );
+}
 // Confirm the account service is configured and private data remains protected.
 const session = await fetch(`${origin}/api/account/auth/get-session`, {
   headers: fixtureHeaders(),
@@ -56,6 +76,9 @@ try {
     });
     const page = await context.newPage();
     page.on("pageerror", (error) => errors.push(error.message));
+    page.on("request", (request) => {
+      if (isGrokScriptUrl(request.url())) errors.push(`Grok script request ${request.url()}`);
+    });
     page.on("response", (response) => {
       const path = new URL(response.url()).pathname;
       // Anonymous app startup probes account sheets; denial is the required policy.

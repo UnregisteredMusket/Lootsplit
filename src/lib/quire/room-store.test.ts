@@ -557,7 +557,7 @@ test("independent player room reads follow DM location changes and reject hidden
   await deleteRoom(host.code, moved.revision);
 });
 sql.exec(
-  readFileSync(new URL("../../../drizzle/0000_mysterious_lord_tyger.sql", import.meta.url), "utf8"),
+  readFileSync(new URL("../../../cloudflare/migrations/0001_campaign_rooms.sql", import.meta.url), "utf8"),
 );
 sql.exec(
   readFileSync(
