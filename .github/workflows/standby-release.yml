@@ -4,10 +4,9 @@ on:
     workflows: [Verify preserved functionality]
     types: [completed]
     branches: [main]
+# Least privilege by default; the publish job adds only the write and OIDC access its steps use.
 permissions:
-  id-token: write
-  contents: write
-  actions: read
+  contents: read
 concurrency:
   group: lootsplit-standby-publish
   cancel-in-progress: false
@@ -23,6 +22,14 @@ jobs:
       github.repository == 'UnregisteredMusket/Lootsplit'
     runs-on: ubuntu-latest
     timeout-minutes: 5
+    # A job's permissions replace the workflow defaults, so list everything this job uses.
+    permissions:
+      # gh release create.
+      contents: write
+      # download-artifact from the verification run.
+      actions: read
+      # recovery-step.mjs telemetry (standby-publish) authenticates with a GitHub OIDC token.
+      id-token: write
     env:
       RELEASE_SHA: ${{ github.event.workflow_run.head_sha }}
       GH_TOKEN: ${{ github.token }}
