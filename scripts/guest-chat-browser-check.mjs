@@ -169,13 +169,18 @@ try {
   assert.deepEqual(errors, []);
   console.log("Guest chat check passed");
 } catch (error) {
-  console.error(error);
   for (const [label, page] of pages) {
     const region = await chat(page).innerText({ timeout: 2000 }).catch(() => "(no chat region)");
-    console.log(`--- ${label} ${page.url()}\n${region.slice(0, 1200)}`);
+    const notices = await page
+      .locator("[data-sonner-toast], [role=alert], [aria-label='Unsent chat recovery']")
+      .allInnerTexts()
+      .catch(() => []);
+    console.log(`--- ${label} ${page.url()}\n${region.replace(/\s+/g, " ").slice(-500)}`);
+    if (notices.length) console.log(`  notices: ${notices.join(" | ").replace(/\s+/g, " ")}`);
     await page.screenshot({ path: `${output}/failure-${label}.png`, fullPage: true }).catch(() => {});
   }
   if (errors.length) console.log("Page errors:", errors);
+  console.error(String(error?.stack || error).split("\n").slice(0, 12).join("\n"));
   process.exitCode = 1;
 } finally {
   await browser.close();
