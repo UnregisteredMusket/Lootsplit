@@ -40,10 +40,10 @@ export function accountDurationSummary(report) {
   const rows = accountCaseTimings(report);
   if (!rows.length) return "No account cases were reported (results.json had no results).";
   const first = Math.min(...rows.map((r) => r.start).filter(Number.isFinite));
-  const lines = rows.map(
-    (r) =>
-      `${r.title} ${r.status} ${seconds(r.duration)}s w${r.worker ?? "?"} +${seconds(r.start - first)}s`,
-  );
+  const lines = rows.map((r) => {
+    const offset = seconds(r.start - first);
+    return `${r.title} ${r.status} ${seconds(r.duration)}s w${r.worker ?? "?"} +${offset}s`;
+  });
   for (const r of rows)
     if (r.phases.length) lines.push(`${r.title} phases: ${r.phases.join(", ")}`);
   return lines.join("\n");
