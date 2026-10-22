@@ -4,8 +4,8 @@ on:
     workflows: [Verify preserved functionality]
     types: [completed]
     branches: [main]
+# Least privilege by default; the deploy job adds only the OIDC token its own steps use.
 permissions:
-  id-token: write
   contents: read
   actions: read
 # All website publishers must use this group. Never cancel an active upload.
@@ -25,6 +25,14 @@ jobs:
     runs-on: ubuntu-latest
     environment: production
     timeout-minutes: 15
+    # A job's permissions replace the workflow defaults, so list everything this job uses.
+    permissions:
+      contents: read
+      # download-artifact from the verification run.
+      actions: read
+      # recovery-step.mjs telemetry (production-migrations, production-preflight, website-deploy,
+      # website-live-audit) authenticates with a GitHub OIDC token.
+      id-token: write
     env:
       RELEASE_SHA: ${{ github.event.workflow_run.head_sha }}
       WRANGLER_SEND_METRICS: 'false'

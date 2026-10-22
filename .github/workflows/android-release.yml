@@ -54,13 +54,16 @@ jobs:
     needs: [verify, native, main-verification]
     runs-on: ubuntu-latest
     timeout-minutes: 20
-    # Signing and publication share this job: the signed APK built here is the exact file the
-    # upgrade gate tests and the release publishes. Only this job can write releases.
+    # Builds and signs only. The signing keystore never shares a job with the emulator runner or
+    # with a release-writing token: upgrade-gate tests and publish-apk publishes this exact file,
+    # pinned by the SHA-256 this job outputs after checking the permanent certificate.
     permissions:
-      # gh release create.
-      contents: write
-      # recovery-step.mjs telemetry for android-signing-build/android-publish (main pushes only).
+      contents: read
+      # recovery-step.mjs telemetry for android-signing-build (main pushes only).
       id-token: write
+    outputs:
+      skip: ${{ steps.release-check.outputs.skip }}
+      apk-sha256: ${{ steps.sign.outputs.apk-sha256 }}
     steps:
       - name: Require main release source
         run: test "$GITHUB_REF" = refs/heads/main
@@ -97,6 +100,7 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: test "$(gh api "repos/$GITHUB_REPOSITORY/git/ref/heads/main" --jq .object.sha)" = "$GITHUB_SHA"
       - name: Sign release with permanent key
+        id: sign
         if: steps.release-check.outputs.skip != 'true'
         env:
           ANDROID_KEYSTORE_BASE64: ${{ secrets.ANDROID_KEYSTORE_BASE64 }}
@@ -126,14 +130,57 @@ jobs:
             echo "::error::APK certificate does not match Lootsplit's permanent signing key"
             exit 1
           fi
-      - name: Enable emulator acceleration for signed upgrade verification
+          apk_sha256=$(sha256sum app/build/outputs/apk/release/app-release.apk | cut -d ' ' -f 1)
+          echo "Signed APK SHA-256: $apk_sha256"
+          echo "apk-sha256=$apk_sha256" >> "$GITHUB_OUTPUT"
+      - name: Hand the signed APK to the upgrade gate and publisher
         if: steps.release-check.outputs.skip != 'true'
+        uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
+        with:
+          # Not the public secondary download: lootsplit-release-apk is uploaded only after the
+          # upgrade gate passes, as before.
+          name: lootsplit-signed-apk-candidate
+          path: android/app/build/outputs/apk/release/app-release.apk
+          if-no-files-found: error
+          retention-days: 1
+  upgrade-gate:
+    needs: [release-apk]
+    if: needs.release-apk.outputs.skip != 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    # No secrets and no write access: installs the previous public release, then upgrades it in
+    # place with the exact signed APK from release-apk.
+    permissions:
+      contents: read
+    steps:
+      - name: Require main release source
+        run: test "$GITHUB_REF" = refs/heads/main
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-java@cf277c60eb25467037889841efdb72551f06f6c3 # v4.9.1
+        with:
+          distribution: temurin
+          java-version: "21"
+      - uses: android-actions/setup-android@9fc6c4e9069bf8d3d10b2204b1fb8f6ef7065407 # v3.2.2
+        with:
+          packages: platform-tools platforms;android-36 build-tools;36.0.0
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: lootsplit-signed-apk-candidate
+          path: android/app/build/outputs/apk/release
+      - name: Require the exact signed APK
+        env:
+          EXPECTED_APK_SHA256: ${{ needs.release-apk.outputs.apk-sha256 }}
+        run: |
+          test -n "$EXPECTED_APK_SHA256"
+          echo "$EXPECTED_APK_SHA256  android/app/build/outputs/apk/release/app-release.apk" | sha256sum --check --strict
+      - name: Enable emulator acceleration for signed upgrade verification
         run: |
           echo 'KERNEL=="kvm", GROUP="kvm", MODE="0666", OPTIONS+="static_node=kvm"' | sudo tee /etc/udev/rules.d/99-kvm4all.rules
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
       - name: Verify signed upgrade and actual companion installation from Widgets
-        if: steps.release-check.outputs.skip != 'true'
         uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
         with:
           api-level: 35
@@ -144,20 +191,49 @@ jobs:
           script: python3 scripts/android-widget-upgrade-audit.py
       - name: Preserve signed upgrade and picker evidence
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
-        if: always() && steps.release-check.outputs.skip != 'true'
+        if: always()
         with:
           name: android-signed-widget-upgrade
           path: test-results/android-widget/
           retention-days: 30
+  publish-apk:
+    needs: [release-apk, upgrade-gate]
+    if: needs.release-apk.outputs.skip != 'true'
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # The only job that can write releases. No Android SDK, emulator, npm install or signing key:
+    # it publishes the file whose SHA-256 release-apk recorded after the certificate check.
+    permissions:
+      # gh release create.
+      contents: write
+      # recovery-step.mjs telemetry for android-publish (main pushes only).
+      id-token: write
+    steps:
+      - name: Require main release source
+        run: test "$GITHUB_REF" = refs/heads/main
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version: 22
+      - uses: actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 # v4.3.0
+        with:
+          name: lootsplit-signed-apk-candidate
+          path: android/app/build/outputs/apk/release
+      - name: Require the exact signed APK that passed the upgrade gate
+        env:
+          EXPECTED_APK_SHA256: ${{ needs.release-apk.outputs.apk-sha256 }}
+        run: |
+          test -n "$EXPECTED_APK_SHA256"
+          echo "$EXPECTED_APK_SHA256  android/app/build/outputs/apk/release/app-release.apk" | sha256sum --check --strict
       - name: Upload signed APK only
-        if: steps.release-check.outputs.skip != 'true'
         uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         with:
           name: lootsplit-release-apk
           path: android/app/build/outputs/apk/release/app-release.apk
           if-no-files-found: error
       - name: Publish versioned download and checksum
-        if: steps.release-check.outputs.skip != 'true'
         env:
           GH_TOKEN: ${{ github.token }}
         shell: bash

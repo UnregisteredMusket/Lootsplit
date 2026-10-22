@@ -8,8 +8,9 @@ on:
       verification_run_id:
         description: Successful main verification run containing its immutable website artifact
         required: true
+# No OIDC token: no step here runs through scripts/recovery-step.mjs, the only telemetry
+# publisher. If a step is wrapped in it later, grant `id-token: write` on that job only.
 permissions:
-  id-token: write
   contents: read
   actions: read
 env:
