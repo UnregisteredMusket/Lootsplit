@@ -160,7 +160,17 @@ export async function checkOnlineTabletop(dm, player, origin, width, output, jou
   await expect.poll(() => alpha(0.2, 0.2)).toBe(0);
   await dm.getByRole("button", { name: "Redo fog", exact: true }).click();
   await expect.poll(() => alpha(0.2, 0.2)).toBe(255);
+  // Fog history is stored as compact diffs (tabletop protocol 3), and the DM sees its size.
+  await expect
+    .poll(async () => {
+      const { fogUndo, fogRedo } = (await scene()).tabletop;
+      return fogUndo.length > 0 && [...fogUndo, ...fogRedo].every((e) => e.kind === "fog-diff");
+    })
+    .toBe(true);
   await openMapSettings(dm);
+  await expect(
+    dm.getByText(/Fog storage: 1 of 500 shapes · \d+ KB including undo history/),
+  ).toBeVisible();
   await dm.getByRole("button", { name: "Player-view preview", exact: true }).click();
   await expect(dm.getByRole("img", { name: "Player view of Keep map", exact: true })).toBeVisible();
   await reloadApplication(player);

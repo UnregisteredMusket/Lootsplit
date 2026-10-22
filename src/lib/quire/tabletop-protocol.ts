@@ -1,5 +1,9 @@
 import type { CloudTable } from "./cloud.ts";
 import type { CampaignMap, MapToken } from "./world-schema.ts";
+import { expandTabletopHistory, tabletopHasFogDiffs } from "./fog-history.ts";
+
+/** The current tabletop protocol; 3 added compact fog history and continued brush strokes. */
+export const TABLETOP_PROTOCOL = 3;
 
 const commands = new Set([
   "tabletop-session",
@@ -19,6 +23,11 @@ export function legacyTabletopToken(token: MapToken): MapToken {
   delete result.vision;
   return result;
 }
+/** Protocol 2: fog undo/redo history as full snapshots instead of compact diffs. */
+export function fogSnapshotMap(map: CampaignMap): CampaignMap {
+  if (!map.tabletop || !tabletopHasFogDiffs(map.tabletop)) return map;
+  return { ...map, tabletop: expandTabletopHistory(map.tabletop) };
+}
 export function previousTabletopMap(map: CampaignMap): CampaignMap {
   const result = { ...map };
   delete result.connected;
@@ -35,14 +44,37 @@ export function legacyTabletopTable(table: CloudTable): CloudTable {
   return tableForProtocol(table, 0);
 }
 export function tableForProtocol(table: CloudTable, protocol = 0): CloudTable {
-  if (protocol >= 2) return table;
+  if (protocol >= TABLETOP_PROTOCOL) return table;
+  if (protocol === 2) {
+    if (
+      !table.journal?.world?.maps.some(
+        (map) => map.tabletop && tabletopHasFogDiffs(map.tabletop),
+      ) &&
+      !table.journal?.reports?.some((report) => report.snapshot.includes('"fog-diff"'))
+    )
+      return table;
+    const result = structuredClone(table),
+      world = result.journal?.world;
+    if (world) world.maps = world.maps.map(fogSnapshotMap);
+    for (const report of result.journal?.reports ?? []) {
+      if (!report.snapshot.includes('"fog-diff"')) continue;
+      try {
+        report.snapshot = JSON.stringify(tableForProtocol(JSON.parse(report.snapshot), protocol));
+      } catch {
+        /* Preserve existing unreadable-archive evidence for the recovery reader. */
+      }
+    }
+    return result;
+  }
   const result = structuredClone(table),
     world = result.journal?.world;
   if (world) {
     delete world.combat;
     if (world.tabletop) delete world.tabletop.presentation;
     if (protocol < 1) delete world.tabletop;
-    world.maps = world.maps.map(protocol === 1 ? previousTabletopMap : legacyTabletopMap);
+    world.maps = world.maps
+      .map(fogSnapshotMap)
+      .map(protocol === 1 ? previousTabletopMap : legacyTabletopMap);
   }
   for (const report of result.journal?.reports ?? []) {
     if (
@@ -65,12 +97,16 @@ export function tabletopResponse<T extends { table: CloudTable; draft: string }>
   value: T,
   protocol?: number,
 ): T {
-  if (protocol && protocol >= 2) return value;
+  if (protocol && protocol >= TABLETOP_PROTOCOL) return value;
   const draft: unknown = JSON.parse(value.draft);
   if (
     Array.isArray(draft) &&
     draft.some((c) => {
       if (!c || typeof c !== "object") return false;
+      // Protocol 3 fog forms (compact history, continued strokes) fail older strict schemas.
+      if ((c.kind === "map-fog" && c.continued) || JSON.stringify(c).includes('"fog-diff"'))
+        return true;
+      if (protocol === 2) return false;
       if (
         c.kind === "map-combat-transition" ||
         (c.kind === "tabletop-session" && (c.session?.presentation || c.before?.presentation)) ||

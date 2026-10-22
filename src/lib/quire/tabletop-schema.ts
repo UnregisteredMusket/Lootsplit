@@ -57,6 +57,22 @@ export const fogStateSchema = z
     shapes: z.array(fogShapeSchema).max(500).default([]),
   })
   .strict();
+/**
+ * Compact fog history entry (tabletop protocol 3): the state it restores is the current fog's
+ * first `keep` shapes followed by `add`, with `enabled`/`base` replaced. Entries are relative to
+ * the state above them on their stack (the top one to the current fog). Older rooms may still hold
+ * full `fogStateSchema` snapshots, which stay readable and are converted on the next fog write.
+ */
+export const fogDiffSchema = z
+  .object({
+    kind: z.literal("fog-diff"),
+    keep: z.number().int().min(0).max(500),
+    add: z.array(fogShapeSchema).max(500),
+    enabled: z.boolean(),
+    base: z.enum(["revealed", "concealed"]),
+  })
+  .strict();
+export const fogHistoryEntrySchema = z.union([fogDiffSchema, fogStateSchema]);
 export const wallSchema = z
   .object({
     id,
@@ -125,8 +141,8 @@ export const mapTabletopSchema = z
     media: mapMediaReferenceSchema.optional(),
     frames: z.array(mapRenderedFrameSchema).max(201).default([]),
     fog: fogStateSchema.default({ enabled: false, base: "concealed", shapes: [] }),
-    fogUndo: z.array(fogStateSchema).max(20).default([]),
-    fogRedo: z.array(fogStateSchema).max(20).default([]),
+    fogUndo: z.array(fogHistoryEntrySchema).max(20).default([]),
+    fogRedo: z.array(fogHistoryEntrySchema).max(20).default([]),
     vision: z.enum(["off", "party", "individual"]).default("off"),
     ambientLight: z.boolean().default(true),
     walls: z.array(wallSchema).max(1000).default([]),
@@ -136,7 +152,11 @@ export const mapTabletopSchema = z
   .strict();
 export const tabletopSessionSchema = z
   .object({
-    presentation: z.object({ id, mapId:id, mode:z.enum(["grid","theatre"]) }).strict().nullable().optional(),
+    presentation: z
+      .object({ id, mapId: id, mode: z.enum(["grid", "theatre"]) })
+      .strict()
+      .nullable()
+      .optional(),
     tvEnabled: z.boolean().default(false),
     activeMapId: id.nullable().default(null),
     activationId: id.optional(),
@@ -205,6 +225,8 @@ export const tabletopCommands = [
       before: fogStateSchema,
       action: z.enum(["shape", "undo", "redo", "reveal-all", "conceal-all", "enable", "disable"]),
       shape: fogShapeSchema.optional(),
+      /** Continued segments of one long brush stroke, added in the same undo step (protocol 3). */
+      continued: z.array(fogShapeSchema).min(1).max(19).optional(),
     })
     .strict(),
   z
@@ -222,6 +244,8 @@ export type ScenePoint = z.infer<typeof scenePointSchema>;
 export type SceneCamera = z.infer<typeof sceneCameraSchema>;
 export type FogShape = z.infer<typeof fogShapeSchema>;
 export type FogState = z.infer<typeof fogStateSchema>;
+export type FogDiff = z.infer<typeof fogDiffSchema>;
+export type FogHistoryEntry = z.infer<typeof fogHistoryEntrySchema>;
 export type SceneWall = z.infer<typeof wallSchema>;
 export type SceneLight = z.infer<typeof sceneLightSchema>;
 export type AreaTemplate = z.infer<typeof areaTemplateSchema>;

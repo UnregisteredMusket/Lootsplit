@@ -593,7 +593,7 @@ async function refresh(conditional = false) {
       try {
         remote = await pollCloudTable({
           data: {
-            tabletopProtocol: 2,
+            tabletopProtocol: 3,
             code: s.code,
             token: s.token,
             knownRevision,
@@ -604,12 +604,12 @@ async function refresh(conditional = false) {
         // One bounded readonly fallback supports an older edge/client protocol.
         // Full reads recheck the same credentials; errors still retain all pending work.
         remote = await pullCloudTable({
-          data: { tabletopProtocol: 2, code: s.code, token: s.token },
+          data: { tabletopProtocol: 3, code: s.code, token: s.token },
         });
       }
     } else
       remote = await pullCloudTable({
-        data: { tabletopProtocol: 2, code: s.code, token: s.token },
+        data: { tabletopProtocol: 3, code: s.code, token: s.token },
       });
   } catch (error) {
     if (key() !== campaignKey || session()?.token !== s.token) return;
@@ -739,7 +739,7 @@ async function flush(endTurn = false) {
   try {
     const remote = await submitCloudCommands({
       data: {
-        tabletopProtocol: 2,
+        tabletopProtocol: 3,
         code: s.code,
         token: s.token,
         batchId: s.batchId,
@@ -759,7 +759,7 @@ async function stage(rethrow = false) {
   try {
     const remote = await submitCloudCommands({
       data: {
-        tabletopProtocol: 2,
+        tabletopProtocol: 3,
         code: s.code,
         token: s.token,
         batchId: s.batchId,
@@ -825,7 +825,7 @@ export function discardPending() {
     const s = requireSession();
     const remote = await manageCloudRoom({
       data: {
-        tabletopProtocol: 2,
+        tabletopProtocol: 3,
         code: s.code,
         token: s.token,
         action: "discard",
@@ -875,7 +875,7 @@ export async function queueCommand(
       // Chat is independent of transaction turns; retain a failed message in the editor.
       const remote = await submitCloudCommands({
         data: {
-          tabletopProtocol: 2,
+          tabletopProtocol: 3,
           code: s.code,
           token: s.token,
           batchId: command.id,
@@ -1017,7 +1017,7 @@ export function chooseTableMode(mode: "local" | "turns" | "live") {
       const s = requireSession();
       await accept(
         await setCloudPace({
-          data: { tabletopProtocol: 2, code: s.code, token: s.token, live: mode === "live" },
+          data: { tabletopProtocol: 3, code: s.code, token: s.token, live: mode === "live" },
         }),
       );
     }
@@ -1045,7 +1045,7 @@ export function skipTableTurn() {
   return serial(async () => {
     const s = requireSession();
     await accept(
-      await skipCloudTurn({ data: { tabletopProtocol: 2, code: s.code, token: s.token } }),
+      await skipCloudTurn({ data: { tabletopProtocol: 3, code: s.code, token: s.token } }),
     );
   });
 }
@@ -1058,7 +1058,7 @@ export function manageParticipant(
     const s = requireSession();
     await accept(
       await manageCloudRoom({
-        data: { tabletopProtocol: 2, code: s.code, token: s.token, action, seatId, allowParty },
+        data: { tabletopProtocol: 3, code: s.code, token: s.token, action, seatId, allowParty },
       }),
     );
   });
@@ -1091,7 +1091,7 @@ export async function leaveTable() {
   if (s)
     await manageCloudRoom({
       data: {
-        tabletopProtocol: 2,
+        tabletopProtocol: 3,
         code: s.code,
         token: s.token,
         action: "leave",
@@ -1181,7 +1181,7 @@ export function sendRoomMessage(command: Extract<Command, { kind: "message" }>) 
     const s = requireSession();
     const remote = await submitCloudCommands({
       data: {
-        tabletopProtocol: 2,
+        tabletopProtocol: 3,
         code: s.code,
         token: s.token,
         batchId: command.id,
@@ -1239,7 +1239,7 @@ export async function resumeAccountMembership(
       throw new Error("Export your unsynced player changes in Multiplayer before changing seats.");
     const { remote, draft } = readRoomResponse(
       await pullCloudTable({
-        data: { tabletopProtocol: 2, code: member.code, token: member.token },
+        data: { tabletopProtocol: 3, code: member.code, token: member.token },
       }),
     );
     const role = remote.seats.find((s) => s.id === remote.seatId)?.role;
