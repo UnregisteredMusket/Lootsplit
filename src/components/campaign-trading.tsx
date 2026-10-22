@@ -274,7 +274,7 @@ function TradeEditor({
                 large
                 table={table}
                 id={leftId}
-                showBalance={dm || canAct(leftId) || world.npcs.some((n) => n.id === leftId)}
+                showBalance={dm || canAct(leftId)}
               />
               <label>
                 {offer ? "First participant" : "Your offering account"}
@@ -318,7 +318,7 @@ function TradeEditor({
                 large
                 table={table}
                 id={rightId}
-                showBalance={dm || canAct(rightId) || world.npcs.some((n) => n.id === rightId)}
+                showBalance={dm || canAct(rightId)}
               />
               <label>
                 Other participant
@@ -637,6 +637,11 @@ function Participant({
           <Coins size={16} aria-hidden="true" />
           {formatCopper(toCopper(purse.coins))}
           <small>available funds</small>
+        </div>
+      )}
+      {large && !showBalance && npc && (
+        <div className="barter-wallet">
+          <small>NPC funds are private. The trade checks them when accepted.</small>
         </div>
       )}
     </header>

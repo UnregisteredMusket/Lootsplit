@@ -124,7 +124,7 @@ export const HELP_GROUPS: HelpGroup[] = [
         title: "Barter goods and property deeds",
         audience: "DM / Players",
         paragraphs: [
-          "Trading & Barter uses bilateral offers and counteroffers for coins, carried goods and clean property deeds. The current recipient accepts or declines; either participant may cancel. Another player's inventory remains private until they offer it. Nearby NPCs require the DM's Bartering allowed flag, and their DM/controller supplies consent.",
+          "Trading & Barter uses bilateral offers and counteroffers for coins, carried goods and clean property deeds. The current recipient accepts or declines; either participant may cancel. Another player's inventory remains private until they offer it. Nearby NPCs require the DM's Bartering allowed flag, and their DM/controller supplies consent. Players never receive NPC or exchange-treasury balances or ledger lines; an assigned NPC controller still sees that NPC's funds.",
           "Acceptance rechecks funds, lots, ownership and location, then exchanges both sides atomically. Stored, reserved, transit or service items cannot be offered. Resolve property obligations or use the existing DM handover. Deeds retain their original receipt and update their owner; accepted history is retained.",
         ],
         links: [
