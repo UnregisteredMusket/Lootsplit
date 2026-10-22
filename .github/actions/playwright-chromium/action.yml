@@ -1,0 +1,27 @@
+name: Playwright Chromium
+description: >
+  Installs the Chromium headless shell every browser audit launches, from a cache keyed on the
+  Playwright version and runner image, and only the system libraries the runner is missing.
+  Callers give this step its own timeout-minutes so installation never consumes test budgets.
+runs:
+  using: composite
+  steps:
+    - id: version
+      shell: bash
+      run: echo "playwright=$(node -p "require('playwright-core/package.json').version")" >> "$GITHUB_OUTPUT"
+    - id: cache
+      uses: actions/cache/restore@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+      with:
+        path: ~/.cache/ms-playwright
+        key: playwright-headless-shell-${{ runner.os }}-${{ runner.arch }}-${{ env.ImageOS }}-${{ steps.version.outputs.playwright }}
+    - shell: bash
+      env:
+        CHROMIUM_CACHE_HIT: ${{ steps.cache.outputs.cache-hit }}
+      run: node scripts/ci-chromium-install.mjs
+    # Saved right after installation (not in a post step), so a later test failure still leaves a
+    # cache for the next job. Concurrent jobs racing to save the same key only log a warning.
+    - if: steps.cache.outputs.cache-hit != 'true'
+      uses: actions/cache/save@0057852bfaa89a56745cba8c7296529d2fc39830 # v4.3.0
+      with:
+        path: ~/.cache/ms-playwright
+        key: playwright-headless-shell-${{ runner.os }}-${{ runner.arch }}-${{ env.ImageOS }}-${{ steps.version.outputs.playwright }}

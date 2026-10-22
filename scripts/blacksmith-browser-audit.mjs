@@ -26,6 +26,11 @@ const browser = await chromium.launch({
   args: ["--no-sandbox"],
 });
 let currentPage;
+// Room sync (src/lib/quire/cloud-client.ts) polls every 2 s and, after failed polls, doubles the
+// delay up to 30 s. A change made on another device must arrive within one poll at the longest
+// backoff plus the request itself; anything slower is a real sync failure, not a slow runner.
+const ROOM_SYNC_MAX_POLL_MS = 30000;
+const ROOM_SYNC_WAIT_MS = ROOM_SYNC_MAX_POLL_MS + 10000;
 async function readJournal(page) {
   return page.evaluate(async () => {
     const active = localStorage.getItem("quire.campaign.v1"),
@@ -321,8 +326,17 @@ try {
     await expect(
       gs.getByRole("heading", { name: "Moonward · claimed", exact: true }),
     ).toBeVisible();
+    // The guest shows its claim at once; the room confirms it, and the DM's device only reads it
+    // on its next room poll. Wait for each step separately so a failure names the one that stalled.
+    await expect(
+      guest.getByRole("status").filter({ hasText: /Saved to room/ }).first(),
+      "The guest's claim reaches the room",
+    ).toBeVisible({ timeout: ROOM_SYNC_WAIT_MS });
     await expect
-      .poll(async () => (await readJournal(page)).blacksmith.orders[0].status)
+      .poll(async () => (await readJournal(page)).blacksmith.orders[0].status, {
+        message: "The DM's journal receives the claim on a later room poll",
+        timeout: ROOM_SYNC_WAIT_MS,
+      })
       .toBe("claimed");
     await reloadApplication(guest);
     await expect(

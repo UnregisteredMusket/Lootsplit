@@ -103,8 +103,18 @@ test("balanced Worker groups retain every complete audit and run account isolati
   // The script Content-Security-Policy is checked in a browser against the built artifact.
   assert.ok(inGroup("interface").includes("worker-csp"));
   assert.match(workflow, /- name: Verify title screen on the built artifact\n\s+if: matrix.group == 'interface'/);
-  assert.match(workflow, /timeout-minutes: 15/);
+  // 15 minutes of audits plus the browser install step's own 12-minute bound.
+  assert.match(workflow, /timeout-minutes: 27/);
   assert.doesNotMatch(workflow, /continue-on-error: true/);
+});
+
+test("focused player references run the complete account suite as the two CI shards", () => {
+  const workflow = readFileSync(".github/workflows/player-reference-audit.yml", "utf8");
+  assert.match(workflow, /runtime: \[development, worker\]\n\s+shard: \[1, 2\]/);
+  assert.match(workflow, /ACCOUNT_SHARD: \$\{\{ matrix\.shard \}\}\/2\n\s+run: node scripts\/recovery-step\.mjs focused-account-fixtures-\$\{\{ matrix\.shard \}\} 180 node scripts\/account-browser-audit\.mjs/);
+  // The player-reference audit runs once per runtime, in shard 1.
+  assert.match(workflow, /- name: Verify player references and Help\n\s+if: matrix\.shard == 1\n/);
+  assert.doesNotMatch(workflow, /continue-on-error: true|max-parallel/);
 });
 
 test("development account shards run first in their jobs, before campaign fixtures", () => {
@@ -162,4 +172,12 @@ test("documentation-only changes are recognized; anything else, or nothing, coun
   assert.equal(changesCode(["docs/a.md", "src/routes/index.tsx"]), true);
   assert.equal(changesCode(["scripts/verification-gate.mjs"]), true);
   assert.equal(changesCode([]), true);
+});
+
+test("the blacksmith audit waits for cross-device sync as long as the room poll can back off", () => {
+  const client = readFileSync("src/lib/quire/cloud-client.ts", "utf8");
+  const audit = readFileSync("scripts/blacksmith-browser-audit.mjs", "utf8");
+  const longest = Number(/Math\.min\((\d+), 2000 \* 2 \*\* pollFailures\)/.exec(client)?.[1]);
+  assert.equal(longest, Number(/const ROOM_SYNC_MAX_POLL_MS = (\d+);/.exec(audit)?.[1]));
+  assert.match(audit, /timeout: ROOM_SYNC_WAIT_MS,\n\s+\}\)\n\s+\.toBe\("claimed"\)/);
 });

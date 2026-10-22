@@ -3,6 +3,7 @@ on:
   pull_request:
     paths:
       - .github/workflows/player-reference-audit.yml
+      - .github/actions/playwright-chromium/**
       - scripts/player-reference-browser-audit.mjs
       - scripts/browser/account-fixtures.mjs
       - src/lib/quire/reference-access.ts
@@ -19,13 +20,20 @@ concurrency:
   cancel-in-progress: true
 jobs:
   focused:
-    name: Player references / ${{ matrix.runtime }}
+    name: Player references / ${{ matrix.runtime }} / account shard ${{ matrix.shard }}
     runs-on: ubuntu-latest
-    timeout-minutes: 10
+    # 10 minutes for the checks after browser installation, plus the install step's own bound.
+    timeout-minutes: 22
     strategy:
       fail-fast: false
+      # The complete account suite runs as the same two shards verify.yml uses (owner-approved
+      # 2026-10-21), each with the unchanged 60s case / 170s suite deadlines, two workers and zero
+      # retries. Unsharded, its 13 scenarios needed 163-171s of the 170s deadline on development
+      # runners after #189, so #188, #190 and #193 stopped with 12 of 13 passed. Shard 1 also runs
+      # the player-reference audit, so every check still runs once per runtime.
       matrix:
         runtime: [development, worker]
+        shard: [1, 2]
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:
@@ -35,7 +43,9 @@ jobs:
           node-version-file: .nvmrc
           cache: npm
       - run: npm ci
-      - run: npx playwright install --with-deps chromium
+      - name: Install Chromium for Playwright
+        timeout-minutes: 12
+        uses: ./.github/actions/playwright-chromium
       - name: Start disposable development server
         id: development
         if: matrix.runtime == 'development'
@@ -63,6 +73,7 @@ jobs:
           done
           exit 1
       - name: Verify player references and Help
+        if: matrix.shard == 1
         env:
           AUDIT_ORIGIN: ${{ matrix.runtime == 'worker' && 'http://127.0.0.1:8082' || 'http://127.0.0.1:8080' }}
         run: node scripts/recovery-step.mjs focused-player-references 180 node scripts/player-reference-browser-audit.mjs
@@ -70,10 +81,11 @@ jobs:
         if: always() && (steps.development.outcome == 'success' || steps.worker.outcome == 'success')
         env:
           ACCOUNT_AUDIT_ORIGIN: ${{ matrix.runtime == 'worker' && 'http://127.0.0.1:8082' || 'http://127.0.0.1:8080' }}
-        run: node scripts/recovery-step.mjs focused-account-fixtures 180 node scripts/account-browser-audit.mjs
+          ACCOUNT_SHARD: ${{ matrix.shard }}/2
+        run: node scripts/recovery-step.mjs focused-account-fixtures-${{ matrix.shard }} 180 node scripts/account-browser-audit.mjs
       - uses: actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 # v4.6.2
         if: always()
         with:
-          name: focused-player-references-${{ matrix.runtime }}-${{ github.run_attempt }}
+          name: focused-player-references-${{ matrix.runtime }}-${{ matrix.shard }}-${{ github.run_attempt }}
           path: test-results/
           retention-days: 30
