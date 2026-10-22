@@ -1,8 +1,8 @@
 # Connected maps implementation — October 20, 2026
 
-Status: implementation in progress, not released. Authorized plan: [Connected maps](../plans/CONNECTED-MAPS.md).
+Status: released. Connected maps shipped on the website and in Android 1.8.0 (see `docs/FEATURE-INVENTORY.md` → Connected maps and the 1.8.0 changelog). The checkpoints below are the historical implementation record. Authorized plan: [Connected maps](../plans/CONNECTED-MAPS.md).
 
-Baseline: main25b77d14c40450c4c4b8e70b69395182434274fb; remote/live readback matches. Earlier fullscreen release is complete. Android1.7.0/code10 remains unchanged.
+Baseline: main 25b77d14c40450c4c4b8e70b69395182434274fb; remote/live readback matches. Earlier fullscreen release is complete. Android 1.7.0/code 10 remains unchanged.
 
 Acceptance flow: regional settlement → local map → separately placed forge → canonical commission → close to unchanged camera → linked encounter/battle map → review loot → return to local map. Validate desktop/phone, role/fog restrictions, legacy envelopes, stable IDs/revisions and retry receipts. No browsing action moves the party, spends resources or advances time.
 

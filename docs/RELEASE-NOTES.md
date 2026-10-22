@@ -102,7 +102,7 @@ Android version code **12**. This release retains package `com.unregisteredmuske
 
 ## Verification
 
-All eight native cases passed on API24/API35, including actual widget-button, timeout and owner-isolation checks; complete PR/main preservation gates passed. Signed workflow39475576975 published1.8.1. Independent inspection verifies the permanent certificate, APK-v2 integrity, package/version and matching public/checksum/artifact bytes. The website metadata follow-up retains its complete PR/main and streamed-download gates. Physical-device installation is not claimed. Install over the permanently signed app; do not uninstall it.
+All eight native cases passed on API24/API35, including actual widget-button, timeout and owner-isolation checks; complete PR/main preservation gates passed. Signed workflow 39475576975 published 1.8.1. Independent inspection verifies the permanent certificate, APK-v2 integrity, package/version and matching public/checksum/artifact bytes. The website metadata follow-up retains its complete PR/main and streamed-download gates. Physical-device installation is not claimed. Install over the permanently signed app; do not uninstall it.
 
 ---
 
@@ -157,7 +157,7 @@ Android version code 10. This release retains package `com.unregisteredmusket.lo
 
 ## Verification
 
-PR #105 all-nine verification 38303829968 and independent main38305743510 passed. Signed release38305743849 passed its own all-nine verification and published Android 1.7.0/code10 from main 2b4abca6. The actual APK manifest, permanent certificate and v2 signed-data/content integrity were independently checked; SHA256 matches the published GitHub asset digest. See `docs/audit/report-android-release-evidence.json`. Website download metadata is updated through the separately verified release follow-up. Physical-device installation, file-picker and force-close remain untested. The broader UI redesign follows this functional release.
+PR #105 all-nine verification 38303829968 and independent main 38305743510 passed. Signed release 38305743849 passed its own all-nine verification and published Android 1.7.0/code10 from main 2b4abca6. The actual APK manifest, permanent certificate and v2 signed-data/content integrity were independently checked; SHA256 matches the published GitHub asset digest. See `docs/audit/report-android-release-evidence.json`. Website download metadata is updated through the separately verified release follow-up. Physical-device installation, file-picker and force-close remain untested. The broader UI redesign follows this functional release.
 
 ---
 
