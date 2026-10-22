@@ -98,20 +98,58 @@ export type GridGeometry = {
   y: number;
   width: number;
   height: number;
-  diagonal?: "equal" | "euclidean" | "orthogonal";
+  diagonal?: "equal" | "euclidean" | "orthogonal" | "alternating";
 };
+/** Distances below this are float noise when counting whole diagonal steps. */
+const STEP_EPSILON = 1e-9;
+/**
+ * Grid distance in tiles for a leg of dx by dy tiles. `alternating` (5/10/5) counts every second
+ * diagonal step as two tiles; `carry` is the number of diagonal steps already taken on this route
+ * so the alternation continues across waypoints. Returns the leg length and the new carry.
+ */
+export function diagonalTiles(
+  dx: number,
+  dy: number,
+  diagonal: NonNullable<GridGeometry["diagonal"]>,
+  carry = 0,
+) {
+  const x = Math.abs(dx),
+    y = Math.abs(dy);
+  if (diagonal === "equal") return { tiles: Math.max(x, y), carry };
+  if (diagonal === "orthogonal") return { tiles: x + y, carry };
+  if (diagonal === "euclidean") return { tiles: Math.hypot(x, y), carry };
+  const diagonals = Math.min(x, y),
+    whole = (n: number) => Math.floor(n + STEP_EPSILON),
+    extra = whole((carry + diagonals) / 2) - whole(carry / 2);
+  return { tiles: Math.max(x, y) + extra, carry: carry + diagonals };
+}
 export function sceneDistance(
   grid: GridGeometry,
   a: ScenePoint,
   b: ScenePoint,
   diagonal = grid.diagonal ?? "euclidean",
 ) {
-  const x = (Math.abs(b.x - a.x) * grid.columns) / grid.width,
-    y = (Math.abs(b.y - a.y) * grid.rows) / grid.height;
-  return (
-    grid.feetPerTile *
-    (diagonal === "equal" ? Math.max(x, y) : diagonal === "orthogonal" ? x + y : Math.hypot(x, y))
-  );
+  return sceneRouteDistance(grid, [a, b], diagonal);
+}
+/** Total distance along waypoints; the alternating rule carries its count across waypoints. */
+export function sceneRouteDistance(
+  grid: GridGeometry,
+  points: readonly ScenePoint[],
+  diagonal = grid.diagonal ?? "euclidean",
+) {
+  let carry = 0,
+    total = 0;
+  for (let i = 1; i < points.length; i++) {
+    const leg = diagonalTiles(
+      ((points[i].x - points[i - 1].x) * grid.columns) / grid.width,
+      ((points[i].y - points[i - 1].y) * grid.rows) / grid.height,
+      diagonal,
+      carry,
+    );
+    carry = leg.carry;
+    total += leg.tiles;
+  }
+  return grid.feetPerTile * total;
 }
 export function sceneTokenPoint(
   grid: GridGeometry,

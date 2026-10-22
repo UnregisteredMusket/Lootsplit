@@ -111,7 +111,7 @@ Limits per map: 500 fog shapes, 200 tokens, 1,000 walls, 200 lights, 200 area te
 - **Older apps.** Tabletop protocol 3 marks clients that read diffs. Protocol 2 clients (Android 1.10.0 and earlier) receive full snapshots (`tableForProtocol`), and their whole-tabletop saves still pass the compare-and-set check against the expanded form. Pending protocol-3 fog commands are not handed to them.
 - **Size.** Before this change, 100 freehand strokes stored about 17 MB of fog and history (20 full copies), far above the 1.8 MB room guard, which then refused every write to the room. They now store about 75 KB. The DM sees "Fog storage: N of 500 shapes · K KB including undo history" in Exploration & lighting, with a warning from 450 shapes or 400 KB.
 - **Projection** is unchanged: players receive no fog geometry or history.
-- **Owner decision (not built):** a "Consolidate fog" control that merges shapes into one polygon set.
+- **Consolidate fog** (owner-approved 2026-10-22). Exploration & lighting → **Consolidate fog…** computes a proposal on the DM's device and asks for confirmation with the shape count before and after and the resulting storage size. The rewrite is exact, never approximate: (1) a shape is removed only when every part of it is proven, by recursive cells with conservative inside/outside tests, to be painted over by a later shape or already in the shape's own state; a shape whose proof does not finish within its fixed budget is kept; a leading shape covering the whole map becomes the base state. (2) Same-kind rectangles (and earlier merged rectangular outlines) that can move together in the paint order (past same-kind shapes, or opposite shapes whose bounds they do not touch) merge into one outline per connected area using only their existing coordinates; areas with holes or more than 200 corners become exact rectangles. Brush strokes, ellipses and freehand polygons that still show are kept unchanged because polygons cannot reproduce their curves. Coverage is tested identical by rasterising before and after at several resolutions (pixel centres and exact edge points) under both the server rule (`manuallyVisible`, even–odd) and the renderer rule (non-zero), including random mixed fog and 500-shape fog. It is the `map-fog` action `consolidate`: the client sends `before` and its `result`; the server recomputes deterministically and refuses a mismatch, an unchanged fog, or a non-DM seat. The merge is one undo step (a compact diff); earlier undo entries are kept byte-for-byte (the oldest is dropped once 20 are stored, as for any fog change) and redo is cleared. Pending consolidations are not handed to protocol 2 apps. Logic: `src/lib/quire/fog-consolidate.ts`; tests: `fog-consolidate.test.ts`.
 
 ## Map images on the wire (tabletop protocol 4)
 
@@ -124,3 +124,22 @@ Shared map images (`table.journal.world.maps[].image`, inline `data:image/...` r
 - **Offline/device play** never sees references.
 - **Measured** (`room-image-references.test.ts`; 10 shared maps plus 1 private, about 300 KB each, after a token move): DM response 3,302,875 → 3,568 bytes; player 3,002,756 → 3,386 bytes. Each image then downloads once per device (or document, for guests).
 - **No migration**, and no new Cloudflare service: images stay in D1.
+
+## Protected player view: render wait
+
+With fog or vision on, every visibility change (each token move with vision, each fog change) bumps the map's tabletop revision and invalidates the previous player frames; players fail closed until the DM's device renders and publishes the current frame for each audience (`party`, or one per character with individual vision). `src/lib/quire/map-render-status.ts` holds the pure parts:
+
+- **Debounce.** The publisher (`map-visibility-publisher.tsx`) waits 600 ms after the last change before rendering, but never more than 2 s after the first unrendered change, so rapid moves render once and continuous dragging still updates. A change during a render supersedes it. A failure stays reported until a render succeeds; the next change retries automatically, and **Retry player view** restarts at once.
+- **Players** see "Waiting for the DM's device to update the map…" instead of a silently concealed map. The state is derived from projected data only: the placeholder image and the absence of a current-revision frame (`awaitingPlayerView`). No fog geometry is sent.
+- **The DM** sees a badge on the map workspace when a render has been pending for 1.5 s (players are waiting) or has failed (with Retry player view), in shared rooms.
+
+## Alternating diagonal (5/10/5)
+
+Grids have a fourth diagonal rule, `alternating`: straight steps cost one tile, and every second diagonal step costs two (5, 15, 20, 30 ft for 1–4 diagonals on 5-ft tiles). The alternation carries across waypoints, so measuring through waypoints, voyage route distances and route progress (`routeLegs`) count it continuously. Token move readouts (tile form and drag preview), measuring and voyage route planning use the grid rule; vision, light ranges and area templates keep straight-line geometry. The schema enum is additive; old grids keep their rule and missing values still default to `equal`. Tabletop protocol 2 and older apps (Android 1.10.0 and earlier) see an alternating grid as `equal` (`legacyDiagonals`); their unchanged saves keep `alternating`, their token moves and combat starts are accepted against the grid fingerprint they can see, and pending commands containing the new rule are not handed to them. Logic: `tabletop-geometry.ts` (`diagonalTiles`, `sceneRouteDistance`) and `map-tiles.ts`; tests: `map-diagonal.test.ts`.
+
+## Map accessibility
+
+- A visually hidden polite live region (`map-announcer.tsx`, logic in `src/lib/quire/map-announcements.ts`) announces token moves (up to three, then a count), pings with their colour, shape and the nearest visible label and direction, the DM activating a scene for players, and the waiting/updated state of the protected view.
+- Announcements use only the map the viewer already receives (the server's player projection for players), so hidden tokens, DM-only markers and fog geometry are never named.
+- Pings differ by shape as well as colour: red circle, amber square, green triangle, blue diamond, violet star. The picker and the active-tool label name the shape.
+

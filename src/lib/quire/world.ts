@@ -18,7 +18,7 @@ import { applyCharacterPosition } from "./character-position.ts";
 import { readFleet } from "./ships-schema.ts";
 import { applyTabletopCommand, validateTabletop, readTabletopSession } from "./tabletop.ts";
 import { tabletopCommands, type TabletopCommand } from "./tabletop-schema.ts";
-import { fogSnapshotMap, legacyTabletopMap, legacyTabletopToken, previousTabletopMap } from "./tabletop-protocol.ts";
+import { fogSnapshotMap, legacyDiagonals, legacyTabletopMap, legacyTabletopToken, previousTabletopMap } from "./tabletop-protocol.ts";
 import { compactTabletopHistory } from "./fog-history.ts";
 
 export function npcAvailableHere(npc: Npc, table: Pick<CloudTable, "journal">) {
@@ -100,7 +100,7 @@ export function validateWorld(t: CloudTable, projected = false) {
   if (combat) {
     const scene=w.maps.find(m=>m.id===combat.mapId);
     if (!scene || !w.maps.some(m=>m.id===combat.returnMapId)) throw Error("Return from the encounter map before removing its scene or return map.");
-    if (combat.mode === "grid" && (!combat.scaleConfirmed || !scene.grid || canonicalJson(scene.grid)!==combat.gridFingerprint)) throw Error("Combat grid changed. Return to exploration and review the calibrated scale before starting again.");
+    if (combat.mode === "grid" && (!combat.scaleConfirmed || !scene.grid || (canonicalJson(scene.grid)!==combat.gridFingerprint && canonicalJson(legacyDiagonals(scene.grid))!==combat.gridFingerprint))) throw Error("Combat grid changed. Return to exploration and review the calibrated scale before starting again.");
     if (combat.showPlayers && !scene.visible) throw Error("Return from the shared encounter map before making it private.");
   }
   for (const map of w.maps) {
@@ -471,8 +471,12 @@ export function applyWorldCommand(t: CloudTable, seat: CloudSeat, cmd: WorldComm
     dm();
     const current = w.maps.find((m) => m.id === cmd.mapId) ?? null;
     // Older apps (tabletop protocol 2 or earlier) saw full-snapshot fog history.
-    const expanded = current && fogSnapshotMap(current);
-    const legacy = current && cmd.before && !same(current, cmd.before) && (same(expanded, cmd.before) || same(legacyTabletopMap(current), cmd.before) || same(previousTabletopMap(expanded!), cmd.before));
+    // They also see an alternating diagonal grid as "equal" (legacyDiagonals).
+    const expanded = current && legacyDiagonals(fogSnapshotMap(current));
+    const legacy = current && cmd.before && !same(current, cmd.before) && (same(expanded, cmd.before) || same(legacyDiagonals(legacyTabletopMap(current)), cmd.before) || same(previousTabletopMap(expanded!), cmd.before));
+    // An older app saving the map unchanged keeps the alternating rule it cannot display.
+    if (legacy && cmd.map?.grid && current?.grid?.diagonal === "alternating" && cmd.before?.grid?.diagonal === "equal" && cmd.map.grid.diagonal === "equal")
+      cmd.map.grid = { ...cmd.map.grid, diagonal: "alternating" };
     if (!same(current, cmd.before) && !legacy)
       throw Error("This map changed. Reload before saving; your draft is retained.");
     if (cmd.map && cmd.map.id !== cmd.mapId) throw Error("Map identity cannot change.");

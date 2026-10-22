@@ -3,7 +3,8 @@ import type { CampaignMap, MapToken } from "./world-schema.ts";
 import { expandTabletopHistory, tabletopHasFogDiffs } from "./fog-history.ts";
 
 /**
- * The current tabletop table shape; 3 added compact fog history and continued brush strokes.
+ * The current tabletop table shape; 3 added compact fog history, continued brush strokes, fog
+ * consolidation and the alternating diagonal (whose pending commands older apps cannot read).
  * Every client at protocol 3 or later reads that shape, so this stays 3.
  */
 export const TABLETOP_PROTOCOL = 3;
@@ -26,6 +27,30 @@ const commands = new Set([
   "map-template",
   "map-render",
 ]);
+/**
+ * Tabletop protocol 2 and older apps (Android 1.10.0 and earlier) have no `alternating` diagonal
+ * rule; they see such grids as "One tile per diagonal step" (`equal`). Stored grids are unchanged,
+ * and their saves and token moves are accepted against this form (see world.ts / tabletop.ts).
+ */
+export function legacyDiagonals<T>(value: T): T {
+  if (!value || typeof value !== "object" || !JSON.stringify(value).includes('"alternating"'))
+    return value;
+  const walk = (item: unknown): unknown => {
+    if (Array.isArray(item)) return item.map(walk);
+    if (!item || typeof item !== "object") return item;
+    const record = Object.fromEntries(
+      Object.entries(item).map(([key, entry]) => [key, walk(entry)]),
+    );
+    if (
+      record.diagonal === "alternating" &&
+      typeof record.columns === "number" &&
+      typeof record.rows === "number"
+    )
+      record.diagonal = "equal";
+    return record;
+  };
+  return walk(value) as T;
+}
 export function legacyTabletopToken(token: MapToken): MapToken {
   const result = { ...token };
   delete result.locked;
@@ -58,6 +83,7 @@ export function legacyTabletopTable(table: CloudTable): CloudTable {
 }
 export function tableForProtocol(table: CloudTable, protocol = 0): CloudTable {
   if (protocol >= TABLETOP_PROTOCOL) return table;
+  table = legacyDiagonalTable(table);
   if (protocol === 2) {
     if (
       !table.journal?.world?.maps.some(
@@ -106,6 +132,19 @@ export function tableForProtocol(table: CloudTable, protocol = 0): CloudTable {
   }
   return result;
 }
+function legacyDiagonalTable(table: CloudTable): CloudTable {
+  const result = legacyDiagonals(table);
+  if (result === table) return table;
+  for (const report of result.journal?.reports ?? []) {
+    if (!report.snapshot.includes('"alternating"')) continue;
+    try {
+      report.snapshot = JSON.stringify(legacyDiagonals(JSON.parse(report.snapshot)));
+    } catch {
+      /* Preserve existing unreadable-archive evidence for the recovery reader. */
+    }
+  }
+  return result;
+}
 export function tabletopResponse<T extends { table: CloudTable; draft: string }>(
   value: T,
   protocol?: number,
@@ -117,8 +156,13 @@ export function tabletopResponse<T extends { table: CloudTable; draft: string }>
     Array.isArray(draft) &&
     draft.some((c) => {
       if (!c || typeof c !== "object") return false;
-      // Protocol 3 fog forms (compact history, continued strokes) fail older strict schemas.
-      if ((c.kind === "map-fog" && c.continued) || JSON.stringify(c).includes('"fog-diff"'))
+      // Protocol 3 forms (compact history, continued strokes, consolidation, the alternating
+      // diagonal) fail older strict schemas.
+      if (
+        (c.kind === "map-fog" && (c.continued || c.action === "consolidate")) ||
+        JSON.stringify(c).includes('"fog-diff"') ||
+        JSON.stringify(c).includes('"diagonal":"alternating"')
+      )
         return true;
       if (protocol === 2) return false;
       if (

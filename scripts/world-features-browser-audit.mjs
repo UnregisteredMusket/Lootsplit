@@ -401,10 +401,15 @@ try {
     await page.getByRole("button", { name: "Ping", exact: true }).click();
     await region.focus();
     await page.keyboard.press("Enter");
-    await expect(page.getByRole("img", { name: "red map ping", exact: true })).toBeVisible();
-    await expect(page.getByRole("img", { name: "red map ping", exact: true })).toHaveCount(0, {
-      timeout: 7000,
-    });
+    await expect(page.getByRole("img", { name: "red circle map ping", exact: true })).toBeVisible();
+    // Pings are announced politely with their shape (accessibility).
+    await expect(page.locator('[data-map-announcer="true"]')).toContainText("Red circle ping");
+    await expect(page.getByRole("img", { name: "red circle map ping", exact: true })).toHaveCount(
+      0,
+      {
+        timeout: 7000,
+      },
+    );
     await page.getByRole("button", { name: "Ping", exact: true }).click();
     await page.screenshot({ path: `${output}/fullscreen-map-${width}.png` });
     await closeMapSettings(page);
@@ -850,19 +855,31 @@ try {
       touchBox.x + touchBox.width * 0.5,
       touchBox.y + touchBox.height * 0.5,
     );
-    await expect(guest.getByRole("img", { name: "violet map ping", exact: true })).toBeVisible();
-    await expect(page.getByRole("img", { name: "violet map ping", exact: true })).toBeVisible();
-    await expect(page.getByRole("img", { name: "violet map ping", exact: true })).toHaveCount(0, {
-      timeout: 7000,
-    });
+    await expect(
+      guest.getByRole("img", { name: "violet star map ping", exact: true }),
+    ).toBeVisible();
+    await expect(
+      page.getByRole("img", { name: "violet star map ping", exact: true }),
+    ).toBeVisible();
+    await expect(page.locator('[data-map-announcer="true"]')).toContainText("Violet star ping");
+    await expect(page.getByRole("img", { name: "violet star map ping", exact: true })).toHaveCount(
+      0,
+      {
+        timeout: 7000,
+      },
+    );
     await page.getByRole("button", { name: "Ping", exact: true }).click();
     await openMapSettings(page);
     await chooseOption(page.getByLabel("Ping color", { exact: true }), "green");
     await closeMapSettings(page);
     await page.getByRole("region", { name: "Interactive campaign map" }).focus();
     await page.keyboard.press("Enter");
-    await expect(guest.getByRole("img", { name: "green map ping", exact: true })).toBeVisible();
-    await expect(guest.getByRole("img", { name: "green map ping", exact: true })).toHaveCount(0, {
+    await expect(
+      guest.getByRole("img", { name: "green triangle map ping", exact: true }),
+    ).toBeVisible();
+    await expect(
+      guest.getByRole("img", { name: "green triangle map ping", exact: true }),
+    ).toHaveCount(0, {
       timeout: 7000,
     });
     assert.equal(

@@ -223,8 +223,19 @@ export const tabletopCommands = [
       kind: z.literal("map-fog"),
       mapId: id,
       before: fogStateSchema,
-      action: z.enum(["shape", "undo", "redo", "reveal-all", "conceal-all", "enable", "disable"]),
+      action: z.enum([
+        "shape",
+        "undo",
+        "redo",
+        "reveal-all",
+        "conceal-all",
+        "enable",
+        "disable",
+        "consolidate",
+      ]),
       shape: fogShapeSchema.optional(),
+      /** Consolidate: the fog the DM's device computed and confirmed; the server must agree. */
+      result: fogStateSchema.optional(),
       /** Continued segments of one long brush stroke, added in the same undo step (protocol 3). */
       continued: z.array(fogShapeSchema).min(1).max(19).optional(),
     })

@@ -6,8 +6,8 @@ import { activeCampaignId } from "@/lib/quire/campaign-context";
 import { loadMapAsset, mapAssetBlob } from "@/lib/quire/map-assets";
 import type { CampaignMap } from "@/lib/quire/world-schema";
 import type { MapMediaReference } from "@/lib/quire/map-assets-schema";
-import { concealedMapImage } from "@/lib/quire/tabletop";
 import { roomArtworkLoading, subscribeRoomArtwork } from "@/lib/quire/room-image-cache";
+import { awaitingPlayerView, PLAYER_RENDER_WAIT_MESSAGE } from "@/lib/quire/map-render-status";
 
 export function MapArtwork({
   map,
@@ -116,9 +116,9 @@ export function MapArtwork({
           Loading map artwork…
         </span>
       )}
-      {map.image === concealedMapImage && references.length === 0 && (
-        <span className="map-media-status" role="status">
-          Waiting for the DM’s current player view. Concealed areas remain hidden.
+      {awaitingPlayerView(map) && references.length === 0 && (
+        <span className="map-media-status" role="status" data-awaiting-render="true">
+          {PLAYER_RENDER_WAIT_MESSAGE}
         </span>
       )}
     </>

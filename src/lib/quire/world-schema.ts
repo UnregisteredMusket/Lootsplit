@@ -102,7 +102,8 @@ export const mapGridSchema = z
     columns: z.number().int().min(1).max(200),
     rows: z.number().int().min(1).max(200),
     feetPerTile: z.number().finite().min(0.1).max(1000000).default(5),
-    diagonal: z.enum(["equal", "euclidean", "orthogonal"]).default("equal"),
+    /** `alternating`: 5/10/5 — every second diagonal step costs two tiles (tabletop protocol 3+). */
+    diagonal: z.enum(["equal", "euclidean", "orthogonal", "alternating"]).default("equal"),
     x: z.number().min(0).max(1).default(0),
     y: z.number().min(0).max(1).default(0),
     width: z.number().min(0.01).max(1).default(1),

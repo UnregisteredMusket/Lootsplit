@@ -71,6 +71,9 @@ export function GridEditor({ map, set }: { map: CampaignMap; set: (map: Campaign
                 <option value="equal">One tile per diagonal step</option>
                 <option value="euclidean">Straight-line distance</option>
                 <option value="orthogonal">Horizontal + vertical distance</option>
+                <option value="alternating">
+                  Alternating 5/10/5 (every second diagonal costs double)
+                </option>
               </SearchSelect>
             </label>
           </div>
