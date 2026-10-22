@@ -18,7 +18,7 @@ export const HELP_GROUPS: HelpGroup[] = [
         title: "Open screens side by side",
         audience: "DM / Players",
         paragraphs: [
-          "Choose Tabs & windows in the app header, select Current screen or another permitted screen, then Open new tab or Open separate window. Move a separate window to another monitor using your computer’s window controls. Your browser may require pop-up permission or choose how a new window opens. Complete the title screen in each new document. The website supports these controls; the Android app keeps its existing navigation and points you to the desktop website for multiple monitors.",
+          "Choose Tabs & windows in the app header, select Current screen or another permitted screen, then Open new tab or Open separate window. Move a separate window to another monitor using your computer’s window controls. Your browser may require pop-up permission or choose how a new window opens. Complete the title screen in each new document. The website supports these controls; the Android app keeps its existing navigation and points you to the desktop website for multiple monitors. To show two screens in one window instead, use split view (below), which also works on Android tablets in landscape.",
           "Each window keeps its own screen, scroll position, form entries and selected campaign. Opening a new window preserves the current one. Saved changes refresh other windows viewing the same campaign; shared campaign updates still use the authoritative server and normal Live/Turn-based rules. Pending changes remain pending until submitted. Closing a window does not end the hosted session; retain or export unsent guest work before closing its document. Private PDFs remain on the same device and browser profile.",
           "Another window retains the current role and character permissions. A second DM window contains DM information; it is not automatically a safe player display. For a normal player session, open a current player invitation in a separate browser profile or device. For a TV map or tracker, use the dedicated Player display control. Guests keep campaign contents in document memory, while the new window reconnects to the same authorized seat. Finish or resolve existing drafts before intentionally changing seats or accounts. Sign-in and sign-out affect the browser profile’s account across its windows.",
           "Edit separate records where practical. Saving stale versions of protected records may require a refresh and review; the app does not silently overwrite an unfinished character or encounter form. Tab titles name their screens. Music remains device-local; use browser tab mute when only one window should produce audio. Browsers may throttle minimized or background tabs; restore the window to refresh it.",
@@ -26,6 +26,21 @@ export const HELP_GROUPS: HelpGroup[] = [
         links: [
           ["Open campaign", "/?view=home"],
           ["Campaign sync & pending changes", "/share"],
+        ],
+      },
+      {
+        id: "split-view",
+        title: "Two screens in one window (split view)",
+        audience: "DM / Players",
+        paragraphs: [
+          "On a computer, or an Android tablet in landscape, at least 1024 pixels wide, choose Split view in the header’s Layout control or Open beside, then pick a screen. The current screen stays in the left pane and your choice opens in the right pane. Open beside lists the main screens and your tools, marks the screen you used last and offers Open in a separate window… for another monitor. Each pane has its own screen menu plus Swap panes, Show this pane full width and Close this pane. Single screen returns to one screen.",
+          "Drag the divider between the panes, or focus it and use the arrow keys (Shift for small steps, Home and End for the limits, Enter or a double-click for 50/50; 60/40 is two steps from the middle). Each pane stays at least 380 pixels wide. Links inside a pane change only that pane; the side menu opens screens in the focused pane. Click a pane or press F6 to focus it: the focused pane is outlined and names the browser tab.",
+          "Both panes use this window’s campaign, seat and connection. A purchase, award, encounter turn or map change in one pane appears in the other immediately, and every change is still sent once through the normal authoritative commands. The screen beside is kept in the address, so reloading or sharing the link to yourself restores it; this device remembers the divider position and last screen for the layout toggle. A link without it opens a single screen as before. Narrower windows show only the left screen and bring the right one back when there is room again.",
+          "Each pane shows only what your seat could open on its own, and server permissions are unchanged. A DM layout such as Maps beside Encounters is DM-private; use Player display for a TV. Unsaved character or encounter edits ask before a pane closes, swaps or changes screen.",
+        ],
+        links: [
+          ["Open campaign", "/?view=home"],
+          ["Maps", "/maps"],
         ],
       },
       {

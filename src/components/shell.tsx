@@ -9,8 +9,15 @@ import { useChatUnread } from "@/lib/quire/use-chat-unread";
 import { ManagementPanel, CampaignPanel } from "./control-panel/settings";
 import { getCampaigns, subscribeCampaigns, serverCampaigns } from "@/lib/quire/campaigns";
 import { SyncStatus } from "./sync-status";
+import {
+  SplitHeaderControls,
+  SplitWorkspace,
+  paneFrameClass,
+  usePane,
+  useSplitView,
+} from "./split-view";
 import { Link, useNavigate, useRouterState } from "@tanstack/react-router";
-import { ChevronDown, Search } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight, Search } from "lucide-react";
 import {
   useEffect,
   useRef,
@@ -49,25 +56,31 @@ type Dest =
   | "/share"
   | "/settings";
 
-export function Shell({
-  children,
-  width = "wide",
-}: {
+type ShellProps = {
   children: ReactNode;
   width?: "wide" | "prose";
-}) {
+};
+
+/** One app frame per window; a screen in the right split-view pane renders content only. */
+export function Shell(props: ShellProps) {
+  const pane = usePane();
+  if (pane?.side === "secondary") return <PaneShell {...props} />;
+  return <WindowShell {...props} />;
+}
+
+function WindowShell({ children, width = "wide" }: ShellProps) {
   const testRoom = useSyncExternalStore(subscribeCloudTable, getCloudTable, getServerCloudTable);
   const { job } = useLibrary();
   const seat = useSeat();
   const { count: unreadCount } = useChatUnread();
   const seatKnown = useSeatKnown();
-  const navigate = useNavigate();
   const pathname = useRouterState({
     select: (state) => state.location.pathname,
   });
   const search = useRouterState({ select: (state) => state.location.search });
-  const query = searchString(search);
-  const [draft, setDraft] = useState(query);
+  const split = useSplitView();
+  const splitOn = split.open;
+  const [railOpen, setRailOpen] = useState(false);
   const [switching, setSwitching] = useState(false);
   const [leaving, setLeaving] = useState(false);
   const [management, setManagement] = useState(false);
@@ -78,7 +91,6 @@ export function Shell({
   const overlayRef = useRef(false);
   overlayRef.current = management || campaignOpen;
   const [blocked, setBlocked] = useState<string | null>(null);
-  const dirty = useRef(false);
 
   const destinationHash = useRouterState({ select: (state) => state.location.hash });
   useEffect(() => {
@@ -123,35 +135,90 @@ export function Shell({
     };
   }, []);
 
+  // The right pane borrows this frame's campaign, role and settings dialogs.
   useEffect(() => {
-    setDraft(query);
-  }, [query]);
-
+    split.registerActions({
+      openCampaign: () => {
+        if (allowContextChange()) setCampaignOpen(true);
+      },
+      changeRole: () => void requestRoleChange(),
+      openManagement: () => setManagement(true),
+    });
+    return () => split.registerActions(null);
+  });
   useEffect(() => {
-    if (!dirty.current) return;
-    const handle = window.setTimeout(() => {
-      dirty.current = false;
-      void navigate({ to: "/books", search: { q: draft.trim() } });
-    }, 180);
-    return () => window.clearTimeout(handle);
-  }, [draft, navigate]);
+    if (!splitOn) setRailOpen(false);
+  }, [splitOn]);
 
   const inBooks =
     pathname === "/books" || pathname.startsWith("/book/") || pathname.startsWith("/read/");
   const tradingWorkspace = ["/market", "/features/economy", "/features/trading"].includes(pathname);
   const dm = seat.role === "dm";
-
-  function onSubmit(event: FormEvent) {
-    event.preventDefault();
-    dirty.current = false;
-    void navigate({ to: "/books", search: { q: draft.trim() } });
-  }
+  const secondaryUrl =
+    splitOn && split.secondaryHref ? new URL(split.secondaryHref, "https://lootsplit.invalid") : null;
 
   return (
     <div
-      className={`loot-shell concept-shell min-h-dvh bg-bg text-fg ${dm ? "role-dm" : "role-player"}${tradingWorkspace ? " trading-shell" : ""}${pathname === "/maps" ? " maps-shell" : ""}`}
+      className={cn(
+        "loot-shell concept-shell min-h-dvh bg-bg text-fg",
+        dm ? "role-dm" : "role-player",
+        splitOn ? "split-on" : [tradingWorkspace && "trading-shell", pathname === "/maps" && "maps-shell"],
+      )}
     >
       <div className="lg:grid lg:grid-cols-[15rem_minmax(0,1fr)]">
+        {splitOn ? (
+          <aside
+            className="split-rail sticky top-0 z-30 hidden h-dvh flex-col items-center border-r border-lead/40 bg-bg/95 py-4 lg:flex"
+            onClickCapture={(event) => {
+              const anchor = (event.target as HTMLElement).closest("a[href]");
+              if (!anchor || event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey)
+                return;
+              setRailOpen(false);
+              // Rail destinations open in the focused pane.
+              if (split.focused !== "secondary") return;
+              const href = anchor.getAttribute("href") || "";
+              const url = new URL(href, window.location.href);
+              if (url.origin !== window.location.origin) return;
+              event.preventDefault();
+              event.stopPropagation();
+              split.navigatePane("secondary", url.pathname + url.search + url.hash);
+            }}
+          >
+            <Link to="/" search={{ view: "home" }} aria-label="Lootsplit home" className="split-rail-mark">
+              <QuillMark />
+            </Link>
+            <nav className="split-rail-nav" aria-label="Sections">
+              {navLinks("compact")}
+            </nav>
+            <button
+              type="button"
+              className="split-rail-toggle"
+              aria-label={railOpen ? "Collapse menu" : "Expand menu"}
+              aria-expanded={railOpen}
+              aria-controls="split-rail-panel"
+              onClick={() => setRailOpen((open) => !open)}
+            >
+              {railOpen ? <ChevronLeft size={22} /> : <ChevronRight size={22} />}
+            </button>
+            {railOpen && (
+              <div
+                id="split-rail-panel"
+                className="split-rail-panel"
+                onKeyDown={(event) => {
+                  if (event.key === "Escape") setRailOpen(false);
+                }}
+              >
+                <p className="rail-caption">Your campaign companion</p>
+                <nav className="flex min-h-0 flex-1 flex-col gap-2 overflow-y-auto overscroll-contain" aria-label="All sections">
+                  {navLinks("rail")}
+                </nav>
+                <AppLink href="/welcome" className="mt-3 inline-flex min-h-11 items-center px-3 text-sm text-lead">
+                  Website & downloads ↗
+                </AppLink>
+              </div>
+            )}
+          </aside>
+        ) : (
         <aside className="sticky top-0 z-20 hidden h-dvh flex-col border-r border-lead/40 bg-bg/95 px-3 py-5 lg:flex">
           <Link
             to="/"
@@ -176,7 +243,8 @@ export function Shell({
             </AppLink>
           </div>
         </aside>
-        <div className="min-w-0">
+        )}
+        <div className="app-column min-w-0">
           <header className="sticky top-0 z-20 border-b border-lead/50 bg-bg/90 pt-[env(safe-area-inset-top)] backdrop-blur-sm">
             <div className="mx-auto flex w-full max-w-6xl items-center gap-3 px-4 py-3 lg:px-8">
               <button
@@ -200,6 +268,7 @@ export function Shell({
                 {testRoom.testMode && <span className="ml-2 text-negative">Test mode</span>}
               </button>
               <div className="header-actions">
+                <SplitHeaderControls />
                 <WorkspaceWindows />
                 <AppLink
                   className="header-icon"
@@ -222,11 +291,7 @@ export function Shell({
                 </button>
               </div>
             </div>
-            {inBooks ? (
-              <form onSubmit={onSubmit} className="mx-auto w-full max-w-6xl px-4 pb-3">
-                <SearchField />
-              </form>
-            ) : null}
+            {inBooks ? <BooksSearch className="mx-auto w-full max-w-6xl px-4 pb-3" /> : null}
             {job ? (
               <div className="mx-auto w-full max-w-6xl px-4 pb-3 lg:px-8">
                 <p className="text-sm text-muted">
@@ -246,6 +311,12 @@ export function Shell({
             ) : null}
           </header>
           <OfflineNote />
+          <SplitWorkspace
+            primaryClassName={cn(
+              tradingWorkspace && "trading-shell",
+              pathname === "/maps" && "pane-maps",
+            )}
+          >
           <SubmenuBackdrop pathname={pathname}>
             <main
               className={cn(
@@ -271,6 +342,7 @@ export function Shell({
               </ShellMapActions.Provider>
             </main>
           </SubmenuBackdrop>
+          </SplitWorkspace>
         </div>
       </div>
       <ManagementPanel
@@ -347,88 +419,30 @@ export function Shell({
     return reason;
   }
 
-  function navLinks(layout: "tab" | "rail") {
-    const library =
-      pathname === "/library" || pathname === "/catalog" || inBooks || pathname === "/favorites";
-    const links = dm
-      ? [
-          {
-            to: "/",
-            label: "Desk",
-            icon: "Desk",
-            active: pathname === "/",
-            search: { view: "home" },
-          },
-          {
-            to: "/encounters",
-            label: "Encounters",
-            icon: "Encounters",
-            active: pathname === "/encounters",
-          },
-          {
-            to: "/party",
-            label: "Party",
-            icon: "Party",
-            active: pathname === "/party" || pathname === "/characters",
-          },
-          {
-            to: "/market",
-            label: "Market",
-            icon: "Market",
-            active: pathname === "/market" || pathname.startsWith("/shop/"),
-            search: { book: "" },
-          },
-          { to: "/library", label: "Library", icon: "Library", active: library },
-          { to: "/maps", label: "Maps", icon: "Maps", active: pathname === "/maps" },
-        ]
-      : [
-          {
-            to: "/",
-            label: "Home",
-            icon: "Desk",
-            active:
-              (pathname === "/" && (search as { view?: string }).view !== "overview") ||
-              pathname === "/characters",
-            search: { view: "home" },
-          },
-          {
-            to: "/party",
-            label: "Inventory",
-            icon: "Inventory",
-            active: pathname === "/party",
-          },
-          {
-            to: "/share",
-            label: "Campaign",
-            icon: "Campaign",
-            active:
-              pathname === "/share" ||
-              (pathname === "/" && (search as { view?: string }).view === "overview"),
-          },
-          {
-            to: "/market",
-            label: "Market",
-            icon: "Market",
-            active: pathname === "/market" || pathname.startsWith("/shop/"),
-            search: { book: "" },
-          },
-          { to: "/library", label: "Library", icon: "Library", active: library },
-          { to: "/maps", label: "Maps", icon: "Maps", active: pathname === "/maps" },
-        ];
+  function navLinks(layout: "tab" | "rail" | "compact") {
+    const primary = navItems(dm, pathname, search as unknown as Record<string, unknown>);
+    const secondary = secondaryUrl
+      ? navItems(dm, secondaryUrl.pathname, Object.fromEntries(secondaryUrl.searchParams))
+      : null;
     return (
       <>
-        {links.map((link) => (
-          <NavLink
-            key={link.label}
-            layout={layout}
-            to={link.to as Dest}
-            search={link.search as never}
-            active={link.active}
-            icon={<FantasyIcon ui={link.icon} size={26} />}
-            label={link.label}
-            badge={link.to === "/share" ? unreadCount : 0}
-          />
-        ))}
+        {primary.map((link, index) => {
+          const right = !!secondary?.[index].active;
+          return (
+            <NavLink
+              key={link.label}
+              layout={layout}
+              to={link.to as Dest}
+              search={link.search as never}
+              active={link.active || right}
+              current={splitOn ? (split.focused === "secondary" ? right : link.active) : link.active}
+              note={splitOn && right && !link.active ? "open in right pane" : ""}
+              icon={<FantasyIcon ui={link.icon} size={layout === "compact" ? 24 : 26} />}
+              label={link.label}
+              badge={link.to === "/share" ? unreadCount : 0}
+            />
+          );
+        })}
         {layout === "rail" && <FeatureCards desktop />}
         {layout === "rail" && (
           <button className="rail-settings" onClick={() => setManagement(true)}>
@@ -453,23 +467,6 @@ export function Shell({
     );
   }
 
-  function SearchField() {
-    return (
-      <label className="relative block">
-        <span className="sr-only">Search entries</span>
-        <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-faint" />
-        <input
-          value={draft}
-          onChange={(event) => {
-            dirty.current = true;
-            setDraft(event.target.value);
-          }}
-          placeholder="Search the library"
-          className="min-h-11 w-full rounded-sm border border-border bg-subtle pr-3 pl-10 text-base text-fg outline-none placeholder:text-faint"
-        />
-      </label>
-    );
-  }
 }
 
 export function KeptByDm() {
@@ -513,10 +510,89 @@ function QuillMark() {
   );
 }
 
+type NavItem = {
+  to: string;
+  label: string;
+  icon: string;
+  active: boolean;
+  search?: Record<string, string>;
+};
+
+/** The six main destinations for a role, marked active for one location. */
+function navItems(dm: boolean, pathname: string, search: Record<string, unknown>): NavItem[] {
+  const inBooks =
+    pathname === "/books" || pathname.startsWith("/book/") || pathname.startsWith("/read/");
+  const library =
+    pathname === "/library" || pathname === "/catalog" || inBooks || pathname === "/favorites";
+  return dm
+    ? [
+        {
+          to: "/",
+          label: "Desk",
+          icon: "Desk",
+          active: pathname === "/",
+          search: { view: "home" },
+        },
+        {
+          to: "/encounters",
+          label: "Encounters",
+          icon: "Encounters",
+          active: pathname === "/encounters",
+        },
+        {
+          to: "/party",
+          label: "Party",
+          icon: "Party",
+          active: pathname === "/party" || pathname === "/characters",
+        },
+        {
+          to: "/market",
+          label: "Market",
+          icon: "Market",
+          active: pathname === "/market" || pathname.startsWith("/shop/"),
+          search: { book: "" },
+        },
+        { to: "/library", label: "Library", icon: "Library", active: library },
+        { to: "/maps", label: "Maps", icon: "Maps", active: pathname === "/maps" },
+      ]
+    : [
+        {
+          to: "/",
+          label: "Home",
+          icon: "Desk",
+          active: (pathname === "/" && search.view !== "overview") || pathname === "/characters",
+          search: { view: "home" },
+        },
+        {
+          to: "/party",
+          label: "Inventory",
+          icon: "Inventory",
+          active: pathname === "/party",
+        },
+        {
+          to: "/share",
+          label: "Campaign",
+          icon: "Campaign",
+          active: pathname === "/share" || (pathname === "/" && search.view === "overview"),
+        },
+        {
+          to: "/market",
+          label: "Market",
+          icon: "Market",
+          active: pathname === "/market" || pathname.startsWith("/shop/"),
+          search: { book: "" },
+        },
+        { to: "/library", label: "Library", icon: "Library", active: library },
+        { to: "/maps", label: "Maps", icon: "Maps", active: pathname === "/maps" },
+      ];
+}
+
 function NavLink({
   to,
   search,
   active,
+  current = active,
+  note = "",
   icon,
   label,
   layout,
@@ -525,23 +601,32 @@ function NavLink({
   to: Dest;
   search?: { book: string } | { q: string } | { view: "home" | "sheet" };
   active: boolean;
+  /** The destination shown in the focused pane (or the only screen). */
+  current?: boolean;
+  /** Extra context for assistive technology, e.g. "open in right pane". */
+  note?: string;
   icon: ReactNode;
   label: string;
   badge?: number;
-  layout: "tab" | "rail";
+  layout: "tab" | "rail" | "compact";
 }) {
   return (
     <Link
       to={to}
-      aria-current={active ? "page" : undefined}
+      aria-current={current ? "page" : undefined}
+      aria-label={layout === "compact" || note ? `${label}${note ? ` (${note})` : ""}` : undefined}
+      title={layout === "compact" ? label : undefined}
       search={search as never}
       className={cn(
         "font-medium",
         layout === "tab"
           ? "loot-nav-tab inline-flex min-h-16 flex-col items-center justify-center gap-1 px-0.5 text-center text-sm leading-tight"
-          : "inline-flex min-h-11 items-center gap-3 rounded-sm px-3 text-sm",
+          : layout === "compact"
+            ? "split-rail-link"
+            : "inline-flex min-h-11 items-center gap-3 rounded-sm px-3 text-sm",
         active ? "text-lead" : "text-faint",
         layout === "rail" && active && "bg-subtle",
+        layout === "compact" && active && "is-active",
       )}
     >
       <span className="relative">
@@ -552,8 +637,92 @@ function NavLink({
           </span>
         ) : null}
       </span>
-      {label}
+      {layout === "compact" ? null : label}
     </Link>
+  );
+}
+
+/** Library search; it searches within the pane (or window) that shows it. */
+function BooksSearch({ className }: { className: string }) {
+  const navigate = useNavigate();
+  const search = useRouterState({ select: (state) => state.location.search });
+  const query = searchString(search);
+  const [draft, setDraft] = useState(query);
+  const dirty = useRef(false);
+  useEffect(() => {
+    setDraft(query);
+  }, [query]);
+  useEffect(() => {
+    if (!dirty.current) return;
+    const handle = window.setTimeout(() => {
+      dirty.current = false;
+      void navigate({ to: "/books", search: { q: draft.trim() } });
+    }, 180);
+    return () => window.clearTimeout(handle);
+  }, [draft, navigate]);
+  function onSubmit(event: FormEvent) {
+    event.preventDefault();
+    dirty.current = false;
+    void navigate({ to: "/books", search: { q: draft.trim() } });
+  }
+  return (
+    <form onSubmit={onSubmit} className={className}>
+      <label className="relative block">
+        <span className="sr-only">Search entries</span>
+        <Search className="pointer-events-none absolute top-1/2 left-3 size-4 -translate-y-1/2 text-faint" />
+        <input
+          value={draft}
+          onChange={(event) => {
+            dirty.current = true;
+            setDraft(event.target.value);
+          }}
+          placeholder="Search the library"
+          className="min-h-11 w-full rounded-sm border border-border bg-subtle pr-3 pl-10 text-base text-fg outline-none placeholder:text-faint"
+        />
+      </label>
+    </form>
+  );
+}
+
+/**
+ * A screen shown in the right split-view pane: its content and screen-specific status only.
+ * The rail, header, global dialogs and device listeners exist once, in the window frame.
+ */
+function PaneShell({ children, width = "wide" }: ShellProps) {
+  const pathname = useRouterState({ select: (state) => state.location.pathname });
+  const seat = useSeat();
+  const seatKnown = useSeatKnown();
+  const dm = seat.role === "dm";
+  const { count: unreadCount } = useChatUnread();
+  const campaigns = useSyncExternalStore(subscribeCampaigns, getCampaigns, serverCampaigns);
+  const campaignName =
+    campaigns.campaigns.find((c) => c.id === campaigns.activeId)?.name || "Campaign";
+  const { actions } = useSplitView();
+  const inBooks =
+    pathname === "/books" || pathname.startsWith("/book/") || pathname.startsWith("/read/");
+  return (
+    <div
+      className={cn(
+        "pane-shell",
+        paneFrameClass(pathname, dm),
+        pathname === "/maps" && "pane-maps",
+      )}
+    >
+      {inBooks ? <BooksSearch className="pane-books-search" /> : null}
+      <SubmenuBackdrop pathname={pathname}>
+        <main
+          className={cn(
+            "concept-main mx-auto w-full px-4 pt-6 pb-12",
+            width === "prose" ? "max-w-3xl" : "max-w-6xl",
+          )}
+        >
+          {pathname !== "/share" && pathname !== "/maps" ? <SyncStatus compact /> : null}
+          <ShellMapActions.Provider value={{ campaignName, dm, seatKnown, unreadCount, ...actions }}>
+            {children}
+          </ShellMapActions.Provider>
+        </main>
+      </SubmenuBackdrop>
+    </div>
   );
 }
 

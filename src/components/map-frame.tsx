@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useRef, useState, type ReactNode } from "react";
 import { OverlayContainer } from "./overlay-container";
+import { usePane } from "./split-view";
 import { Button } from "./ui";
 
 type Props = {
@@ -17,12 +18,18 @@ export function MapFrame(props: Props) {
 }
 function WorkspaceFrame({ children, title, actions, navigation, interfaceHidden }: Props) {
   const [container, setContainer] = useState<HTMLDivElement | null>(null);
+  const inPane = !!usePane();
   useEffect(() => {
     const viewport = window.visualViewport;
+    // In split view the workspace fills its pane rather than the whole window.
+    const observer =
+      inPane && container && typeof ResizeObserver !== "undefined"
+        ? new ResizeObserver(() => resize())
+        : undefined;
     const resize = () => {
       container?.style.setProperty(
         "--map-usable-height",
-        `${viewport?.height ?? window.innerHeight}px`,
+        `${inPane && container ? container.clientHeight : (viewport?.height ?? window.innerHeight)}px`,
       );
       if (container)
         container.dataset.keyboardOpen = String(
@@ -30,9 +37,13 @@ function WorkspaceFrame({ children, title, actions, navigation, interfaceHidden 
         );
     };
     resize();
+    if (container) observer?.observe(container);
     viewport?.addEventListener("resize", resize);
-    return () => viewport?.removeEventListener("resize", resize);
-  }, [container]);
+    return () => {
+      observer?.disconnect();
+      viewport?.removeEventListener("resize", resize);
+    };
+  }, [container, inPane]);
   useEffect(() => {
     const overflow = document.body.style.overflow;
     document.body.style.overflow = "hidden";

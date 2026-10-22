@@ -2,6 +2,7 @@ import { accountRequest } from "@/lib/account/client";
 import { AppLink } from "@/components/app-link";
 import { FantasyIcon } from "@/components/fantasy-icon";
 import { useEffect, useState } from "react";
+import { useRouter } from "@tanstack/react-router";
 import { ArrowUp, ArrowDown } from "lucide-react";
 import { toast } from "sonner";
 import { Button, Modal } from "@/components/ui";
@@ -43,6 +44,8 @@ export function Shortcuts({
     [saving, setSaving] = useState(false),
     [error, setError] = useState("");
   const destinations = destinationsFor(role);
+  // The router's location (not the window's) so a split-view pane reads its own address.
+  const router = useRouter();
   const key = `lootsplit.shortcuts.v1.${campaignId}`;
   const [items, setItems] = useState<Shortcut[]>(defaultShortcuts),
     [draft, setDraft] = useState<Shortcut[]>(defaultShortcuts),
@@ -80,7 +83,7 @@ export function Shortcuts({
         setRevision(data.revision);
         setLoaded(true);
         cacheShortcuts(session.user.id, role, next);
-        if (new URLSearchParams(location.search).get("customize") === "1") {
+        if (new URLSearchParams(router.state.location.searchStr).get("customize") === "1") {
           setDraft(next.map((x) => ({ ...x })));
           setOpen(true);
         }

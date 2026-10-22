@@ -254,6 +254,9 @@ jobs:
       - name: dev-desktop
         if: matrix.group == 'desktop'
         run: node scripts/recovery-step.mjs dev-desktop 240 node scripts/desktop-browser-audit.mjs
+      - name: dev-split-view
+        if: matrix.group == 'desktop'
+        run: node scripts/recovery-step.mjs dev-split-view 240 node --experimental-strip-types scripts/split-view-browser-audit.mjs
       - name: dev-world-features
         if: matrix.group == 'world'
         run: node scripts/recovery-step.mjs dev-world-features 240 node scripts/world-features-browser-audit.mjs

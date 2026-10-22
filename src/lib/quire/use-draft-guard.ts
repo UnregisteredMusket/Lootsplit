@@ -1,5 +1,6 @@
 import { useEffect } from "react";
 import { useBlocker } from "@tanstack/react-router";
+import { onPaneClose, usePane } from "@/components/split-view";
 
 const CONTEXT_CHANGE = "lootsplit:before-context-change";
 export function allowContextChange() {
@@ -15,14 +16,23 @@ export function useDraftGuard(dirty: boolean, subject: string) {
     enableBeforeUnload: dirty,
     shouldBlockFn: ({ current, next }) => {
       // Hash-only scrolling and links to this same view do not discard its draft.
+      // Opening, resizing or closing the split-view pane beside this view is not leaving it.
       if (
         current.pathname === next.pathname &&
-        JSON.stringify(current.search) === JSON.stringify(next.search)
+        JSON.stringify(withoutPane(current.search)) === JSON.stringify(withoutPane(next.search))
       )
         return false;
       return !window.confirm(`Discard unsaved ${subject} changes and leave this view?`);
     },
   });
+  const pane = usePane()?.side;
+  useEffect(() => {
+    // Closing, swapping or replacing a split-view pane asks before discarding its draft.
+    if (!dirty || !pane) return;
+    return onPaneClose(pane, (e) => {
+      if (!window.confirm(`Discard unsaved ${subject} changes and leave this view?`)) e.preventDefault();
+    });
+  }, [dirty, subject, pane]);
   useEffect(() => {
     if (!dirty) return;
     const confirm = () => window.confirm(`Discard unsaved ${subject} changes and leave this view?`);
@@ -34,4 +44,11 @@ export function useDraftGuard(dirty: boolean, subject: string) {
       window.removeEventListener(CONTEXT_CHANGE, context);
     };
   }, [dirty, subject]);
+}
+
+function withoutPane(search: unknown) {
+  if (!search || typeof search !== "object") return search;
+  const rest = { ...(search as Record<string, unknown>) };
+  delete rest.beside;
+  return rest;
 }

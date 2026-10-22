@@ -33,6 +33,8 @@ export function safeReturn(value: unknown): string {
   )
     return "/?view=home";
   url.searchParams.delete("from");
+  // A split-view pane belongs to the window layout, not to a return destination.
+  url.searchParams.delete("beside");
   return url.pathname + url.search + url.hash;
 }
 

@@ -29,6 +29,7 @@
   "node scripts/recovery-step.mjs dev-library-navigation 240 node scripts/library-navigation-browser-audit.mjs",
   "node scripts/recovery-step.mjs dev-loot 240 node scripts/loot-browser-audit.mjs",
   "node scripts/recovery-step.mjs dev-desktop 240 node scripts/desktop-browser-audit.mjs",
+  "node scripts/recovery-step.mjs dev-split-view 240 node --experimental-strip-types scripts/split-view-browser-audit.mjs",
   "node scripts/recovery-step.mjs dev-game-analytics 240 node scripts/game-analytics-browser-audit.mjs",
   "node scripts/recovery-step.mjs dev-website 240 node scripts/website-browser-audit.mjs",
   "node scripts/recovery-step.mjs worker-account-1 180 node scripts/account-browser-audit.mjs",

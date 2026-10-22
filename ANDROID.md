@@ -97,6 +97,10 @@ Version1.9.1/code14 preserves the package, permanent certificate and all local d
 
 The native gate now uses a Pixel6 profile for its API24/API35 launchers, requires both picker entries, adds the companion through the API35 picker, and separately binds/configures it through a real AppWidgetHost while signed out. Synthetic stale-provider metadata is debug-only. The signed release gate upgrades the previous public, checksum-verified APK to the new signed candidate without opening My account and adds the companion from Widgets before publishing. Evidence and limitations are in [the investigation](docs/audit/2026-10-21-widget-picker.md). Version1.9.1/code14 is published from main43906256b19f64d4634b596cd9f980e7f57c11f0 after signed workflow39546976796 passed. Its actual signed1.9.0→1.9.1 upgrade and companion placement passed on the API35 Pixel6 emulator. The public APK matches the signing artifact and SHA256 `dd9a0d04bfacee4e67645a3ff1e0ca1aeeb538d08e6837e4754353fdc324c79c` (28,040,276bytes), with the permanent certificate and valid APK-v2 integrity. See [release evidence](docs/audit/android-widget-picker-release-evidence.json). Physical-device/OEM verification remains separate. Website publication is completed through its own full PR/main/deployment and streamed-byte gates.
 
+## Tablets in landscape: split view
+
+The app shows the same split view as the website when the WebView is at least 1024 CSS pixels wide (most 10–11" tablets in landscape). Rotating to portrait or a narrower window shows only the left screen; the right one returns when the tablet is turned back (the activity already handles orientation/size changes without restarting). The feature ships in the bundled web build, so it reaches installed apps only with the next signed APK release. See `docs/SPLIT-VIEW.md`.
+
 ## Development and verification rules
 
 Moved verbatim from `docs/CODING-MANUAL.md` on 2026-10-21 so each feature's rules live with the feature. They still apply whenever this area changes.

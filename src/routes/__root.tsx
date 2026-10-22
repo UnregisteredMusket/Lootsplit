@@ -20,11 +20,15 @@ import { EconomyProvider } from "@/lib/quire/economy-context";
 import { PrefsProvider } from "@/lib/quire/prefs";
 import { MenuAudioBridge } from "@/components/menu-audio-bridge";
 import { installMobileApi } from "@/lib/mobile/boot";
+import { SplitViewProvider, usePane } from "@/components/split-view";
+import { retainBeside } from "@/lib/quire/split-view";
 import appCss from "../styles.css?url";
 
 const APP_NAME = "Lootsplit";
 
 export const Route = createRootRoute({
+  // Navigation in the main (left) pane keeps the split-view pane beside it.
+  search: { middlewares: [retainBeside] },
   head: () => ({
     meta: [
       { charSet: "utf-8" },
@@ -43,56 +47,63 @@ export const Route = createRootRoute({
       { rel: "apple-touch-icon", href: "/__grok/icon-180.png" },
     ],
   }),
-  component: function RootDocument() {
-    const pathname = useRouterState({ select: (state) => state.location.pathname });
-    const publicPage = [
-      "/welcome",
-      "/features",
-      "/downloads",
-      "/updates",
-      "/help",
-      "/resources",
-      "/donate",
-    ].includes(pathname.replace(/\/$/, ""));
-    const playerDisplay = pathname.replace(/\/$/, "") === "/player-display";
-    installMobileApi();
-    return (
-      <html lang="en" suppressHydrationWarning>
-        <head>
-          <HeadContent />
-        </head>
-        <body>
-          <PreviewHostBridge />
-          {import.meta.env.VITE_MOBILE === "true" && <MobileOwnerWidgetBridge />}
-          {!playerDisplay && <MemberActivity />}
-          <RouteLoading />
-          {playerDisplay ? (
-            <Outlet />
-          ) : (
-            <OpeningGate publicPage={publicPage}>
-              <AuthProvider>
-                <CampaignGate>
-                  <LibraryProvider>
-                    <PrefsProvider>
-                      <MenuAudioBridge />
-                      <EconomyProvider>
-                        <PlayerDisplayProvider>
-                          <AppNotifications />
-                          <Outlet />
-                        </PlayerDisplayProvider>
-                      </EconomyProvider>
-                    </PrefsProvider>
-                  </LibraryProvider>
-                </CampaignGate>
-              </AuthProvider>
-            </OpeningGate>
-          )}
-          <Scripts />
-        </body>
-      </html>
-    );
+  component: function RootComponent() {
+    // The right split-view pane renders this route tree inside the existing document.
+    return usePane() ? <Outlet /> : <RootDocument />;
   },
 });
+
+function RootDocument() {
+  const pathname = useRouterState({ select: (state) => state.location.pathname });
+  const publicPage = [
+    "/welcome",
+    "/features",
+    "/downloads",
+    "/updates",
+    "/help",
+    "/resources",
+    "/donate",
+  ].includes(pathname.replace(/\/$/, ""));
+  const playerDisplay = pathname.replace(/\/$/, "") === "/player-display";
+  installMobileApi();
+  return (
+    <html lang="en" suppressHydrationWarning>
+      <head>
+        <HeadContent />
+      </head>
+      <body>
+        <PreviewHostBridge />
+        {import.meta.env.VITE_MOBILE === "true" && <MobileOwnerWidgetBridge />}
+        {!playerDisplay && <MemberActivity />}
+        <RouteLoading />
+        {playerDisplay ? (
+          <Outlet />
+        ) : (
+          <OpeningGate publicPage={publicPage}>
+            <AuthProvider>
+              <CampaignGate>
+                <LibraryProvider>
+                  <PrefsProvider>
+                    <MenuAudioBridge />
+                    <EconomyProvider>
+                      <PlayerDisplayProvider>
+                        <AppNotifications />
+                        <SplitViewProvider>
+                          <Outlet />
+                        </SplitViewProvider>
+                      </PlayerDisplayProvider>
+                    </EconomyProvider>
+                  </PrefsProvider>
+                </LibraryProvider>
+              </CampaignGate>
+            </AuthProvider>
+          </OpeningGate>
+        )}
+        <Scripts />
+      </body>
+    </html>
+  );
+}
 
 function OpeningGate({ publicPage, children }: { publicPage: boolean; children: React.ReactNode }) {
   return <OpeningDawn bypass={publicPage}>{children}</OpeningDawn>;
