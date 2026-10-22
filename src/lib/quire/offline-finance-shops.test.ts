@@ -11,6 +11,8 @@ import { applyCloudTable, economySnapshot, executeFinanceCommand } from "./econo
 import { smithDm, smithFixture } from "./test-fixtures/blacksmith.ts";
 
 type FinanceInput = CommandInput; // every case below is a finance command kind
+// CommandInput omits `id` from the whole union; the shared engine takes it with one.
+type SharedCommand = Parameters<typeof applyCommand>[2];
 
 function buildCampaign(): CloudTable {
   let t = smithFixture();
@@ -141,11 +143,11 @@ for (const [kind, input] of cases) {
     const shared = applyCommand(structuredClone(base), smithDm, {
       ...input,
       id: commandId,
-    } as CommandInput);
+    } as unknown as SharedCommand);
     const original = crypto.randomUUID;
     crypto.randomUUID = (() => commandId) as typeof crypto.randomUUID;
     try {
-      await executeFinanceCommand(input as CommandInput);
+      await executeFinanceCommand(input);
     } finally {
       crypto.randomUUID = original;
     }
