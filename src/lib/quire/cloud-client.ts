@@ -20,7 +20,7 @@ import {
 } from "./cloud-api.ts";
 import { setCloudWatch } from "./cloud-turn.ts";
 import { applyCloudTable, economySnapshot, snapshot } from "./economy.ts";
-import { getSeat, setSeat, downloadJson } from "./table.ts";
+import { getSeat, setSeat, downloadJson, resumedPlayerSeat } from "./table.ts";
 import {
   applyCommand,
   commandSchema,
@@ -1119,6 +1119,11 @@ export function resumeTable() {
   sessionKey = key();
   const saved = session();
   if (!saved) return;
+  // A reloaded player document starts with an empty seat (campaign gate). Restore this
+  // seat's characters from the saved session before the room is shown as joined, so the
+  // composer and sheets do not treat the player as unassigned until the first response.
+  const seat = resumedPlayerSeat(getSeat(), saved);
+  if (seat) setSeat(seat);
   publish({
     joined: true,
     code: saved.code,

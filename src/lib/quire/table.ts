@@ -122,6 +122,29 @@ export function normalizeSeat(input: Partial<Seat> | null | undefined): Seat {
   };
 }
 
+/**
+ * The seat a resumed player session starts with. The campaign gate starts every player
+ * document with no characters, and the room's first response can take seconds; the saved
+ * session already holds this seat's purse IDs from the server, so the player is not shown
+ * as unassigned meanwhile (party chat refused "Your character is no longer assigned").
+ * The first room response still replaces them, and the server authorizes every write.
+ */
+export function resumedPlayerSeat(
+  current: Seat,
+  saved: { role?: unknown; purseIds?: unknown } | null | undefined,
+): Seat | null {
+  if (saved?.role !== "player") return null;
+  const purseIds = strings(saved.purseIds);
+  if (!purseIds.length) return null;
+  if (
+    current.role === "player" &&
+    current.purseIds.length === purseIds.length &&
+    current.purseIds.every((id, i) => id === purseIds[i])
+  )
+    return null;
+  return { ...current, role: "player", purseIds, elevated: false };
+}
+
 export function buildTable(input: {
   realm: RealmSettings;
   shops: Shop[];
