@@ -731,6 +731,47 @@ public class OwnerWidgetTest {
         for(int id:new int[]{R.id.monitor_active,R.id.monitor_accounts,R.id.monitor_campaigns,R.id.monitor_requests})assertEquals("—",text(view,id));
     }
 
+    private static JSONObject usagePart(long value,double share,double percent) throws Exception {
+        return new JSONObject().put("value",value).put("share",share).put("percent",percent);
+    }
+    @Test public void cloudflareUsageRowsShowValueAndShareAndKeepGapsExplicit() throws Exception {
+        long now=System.currentTimeMillis();
+        org.json.JSONArray metrics=new org.json.JSONArray()
+            .put(new JSONObject().put("key","requests").put("label","Worker requests").put("unit","count").put("state","ready").put("level","ok").put("monthlyAllowance",10000000L)
+                .put("day",usagePart(12345,322580.645,3.827)).put("week",usagePart(80000,2258064.516,3.543)).put("month",usagePart(300000,10000000,3)))
+            .put(new JSONObject().put("key","cpuMs").put("label","Worker CPU time").put("unit","ms").put("state","unavailable").put("errorCode","HTTP_400").put("level","unavailable"))
+            .put(new JSONObject().put("key","d1RowsRead").put("label","D1 rows read").put("unit","count").put("state","ready").put("level","attention").put("monthlyAllowance",25000000000L)
+                .put("day",usagePart(1000,806451612.9,0.0001)).put("week",usagePart(7000,5645161290.3,0.0001)).put("month",usagePart(21000000000L,25000000000L,84)))
+            .put(new JSONObject().put("key","d1StorageBytes").put("label","D1 storage").put("unit","bytes").put("state","ready").put("level","ok").put("allowance",5000000000L)
+                .put("current",new JSONObject().put("value",12000000L).put("allowance",5000000000L).put("percent",0.24)).put("databases",1));
+        JSONObject source=journalFixture();
+        source.put("usage",new JSONObject().put("state","ready").put("checkedAt",now)
+            .put("data",new JSONObject().put("metrics",metrics).put("windows",new JSONObject().put("month",new JSONObject().put("elapsedPercent",69.355)))));
+        org.json.JSONArray rows=WidgetRows.rows(WidgetData.project(source,now));
+        java.util.Map<String,JSONObject> byTitle=new java.util.HashMap<>();
+        for(int i=0;i<rows.length();i++)byTitle.put(rows.getJSONObject(i).getString("title"),rows.getJSONObject(i));
+        JSONObject requests=byTitle.get("Worker requests today 12,345");
+        assertNotNull("Value in the title",requests);
+        assertTrue(requests.getString("detail").startsWith("3.8% of daily share\n7d 80,000 (3.5% of weekly share)\nMonth 300,000 (3.0% of 10M)"));
+        assertEquals("",requests.getString("color"));
+        assertEquals("Month to date at 80% or more is amber","yellow",byTitle.get("D1 rows read today 1,000").getString("color"));
+        assertTrue(byTitle.get("D1 rows read today 1,000").getString("detail").startsWith("<0.01% of daily share"));
+        assertTrue("A failed metric is not zero",byTitle.get("Worker CPU time · unavailable").getString("detail").contains("not counted as zero"));
+        assertTrue(byTitle.get("D1 storage 12.0 MB").getString("detail").startsWith("0.24% of 5 GB included"));
+        assertTrue(byTitle.get("Cloudflare plan usage").getString("detail").contains("69% of month elapsed"));
+        // Missing, stale or disconnected readings are one explicit row, without numbers.
+        for(String[] c:new String[][]{{"not-connected","","not connected"},{"unavailable","STALE_READING","over 2 hours old"},{"unavailable","NOT_COLLECTED","first hourly reading pending"}}) {
+            source.put("usage",new JSONObject().put("state",c[0]).put("errorCode",c[1]).put("checkedAt",now).put("data",JSONObject.NULL));
+            rows=WidgetRows.rows(WidgetData.project(source,now));
+            int usageRows=0;String detail="";
+            for(int i=0;i<rows.length();i++){String title=rows.getJSONObject(i).getString("title");if(title.startsWith("Cloudflare plan usage")){usageRows++;detail=rows.getJSONObject(i).getString("detail");}if(title.contains(" today "))fail("No metric rows without a reading");}
+            assertEquals(1,usageRows);assertTrue(detail,detail.contains(c[2]));
+        }
+        source.remove("usage");
+        rows=WidgetRows.rows(WidgetData.project(source,now));
+        boolean older=false;for(int i=0;i<rows.length();i++)older|=rows.getJSONObject(i).getString("detail").contains("not provided by server");
+        assertTrue("An older server states the gap",older);
+    }
     private JSONObject activityEvent(String kind,String state,String text,String title,int pr,double minutesAgo) throws Exception {
         return new JSONObject().put("id",kind+pr).put("kind",kind).put("state",state).put("text",text).put("title",title).put("pr",pr)
             .put("at",System.currentTimeMillis()-(long)(minutesAgo*60000)).put("url","https://github.com/UnregisteredMusket/Lootsplit/pull/"+pr);

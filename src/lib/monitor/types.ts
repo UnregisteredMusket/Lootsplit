@@ -118,12 +118,61 @@ export type MonitorReport = {
     /** Retired spans overlapping this day; that time is not counted as missing data. */
     retiredSpans?: MonitorRetiredSpan[];
   }[];
+  /** Workers Paid allowance use for the day; absent on reports generated before it existed. */
+  cloudflareUsage?: {
+    readings: number;
+    available: number;
+    latest: { observedAt: number; summary: string; usage: CloudflareUsage } | null;
+    latestAttempt: { observedAt: number; state: string; errorCode: string | null } | null;
+    lines: string[];
+  };
   /** Registry entries retired for some or all of this day; listed instead of reported as gaps. */
   retiredLogs?: (MonitorRetiredSpan & { id: string; name: string })[];
   evidence?: MonitorEntry[];
   correlations?: { entry: string; related: string[]; statement: string }[];
 };
+/** One usage window: the value (null when unavailable), its allowance share and the percentage. */
+export type UsagePart = { value: number | null; share: number; percent: number | null };
+export type UsageMetric = {
+  key: "requests" | "cpuMs" | "d1RowsRead" | "d1RowsWritten" | "d1StorageBytes";
+  label: string;
+  unit: "count" | "ms" | "bytes";
+  state: "ready" | "unavailable";
+  errorCode: string | null;
+  /** ok, attention (month to date at or above 80% of the allowance), over, unavailable. */
+  level: "ok" | "attention" | "over" | "unavailable";
+  monthlyAllowance?: number;
+  day?: UsagePart;
+  week?: UsagePart;
+  month?: UsagePart;
+  allowance?: number;
+  current?: { value: number | null; allowance: number; percent: number | null };
+  databases?: number | null;
+};
+/** Hourly Cloudflare plan usage against the Workers Paid included allowance (account-wide, UTC). */
+export type CloudflareUsage = {
+  state: "ready" | "unavailable" | "not-connected";
+  checkedAt: number | null;
+  errorCode?: string | null;
+  data: {
+    scope: "account";
+    plan: string;
+    allowancesVerifiedOn: string;
+    sources: string[];
+    windows: {
+      timezone: "UTC";
+      end: number;
+      day: { start: number; end: number };
+      week: { start: number; end: number; days: number };
+      month: { start: number; end: number; days: number; elapsedPercent: number };
+    };
+    metrics: UsageMetric[];
+    complete: boolean;
+  } | null;
+};
 export type JournalSnapshot = {
+  /** Newest hourly Cloudflare plan usage reading; older servers omit it. */
+  usage?: CloudflareUsage;
   schemaVersion?: number;
   snapshotId?: number;
   checkedAt: number;

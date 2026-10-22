@@ -30,6 +30,7 @@ final class WidgetRows {
             else for(int i=0;i<recent.length();i++){JSONObject entry=recent.getJSONObject(i);add(rows,"Monitoring",entry.optString("summary"),"logs","",clock(entry.optLong("observedAt")));}
             add(rows, "Daily report", snapshot.optString("report", "No daily report yet"), "report");
             add(rows, "Cloudflare traffic · past 24h", snapshot.optString("traffic") + snapshot.optString("trafficTime"), "logs");
+            usageRows(rows, snapshot.optJSONObject("usage"));
             add(rows, "App statistics", snapshot.optString("games") + "\nBackups " + snapshot.optString("backups") + snapshot.optString("gamesTime"), "logs");
             JSONArray diagnostics = snapshot.optJSONArray("diagnostics");
             if (diagnostics != null) for (int i=0; i<diagnostics.length(); i++) {
@@ -44,6 +45,21 @@ final class WidgetRows {
             add(rows, "Full history, search and export", "Open private monitoring logs and detailed reports in Lootsplit.", "logs");
         } catch (Exception ignored) { }
         return attentionFirst(rows);
+    }
+    /**
+     * Cloudflare plan usage: a heading row with the reading time, then one row per metric
+     * ("Worker requests today 12,345" / "3.8% of daily share · 7d … · Month …"). A reading cached
+     * by an older app version has no usage object and says so.
+     */
+    static void usageRows(JSONArray rows, JSONObject usage) throws Exception {
+        if (usage == null) { add(rows, "Cloudflare plan usage", "Unavailable in this reading · tap Refresh", "logs"); return; }
+        boolean ready = "ready".equals(usage.optString("state"));
+        add(rows, "Cloudflare plan usage", ready ? usage.optString("summary") : usage.optString("reason", "Cloudflare usage unavailable"), "logs", "", clock(usage.optLong("checkedAt", 0)));
+        JSONArray metrics = usage.optJSONArray("rows");
+        if (ready && metrics != null) for (int i = 0; i < metrics.length(); i++) {
+            JSONObject metric = metrics.optJSONObject(i);
+            if (metric != null) add(rows, metric.optString("title"), metric.optString("detail"), "logs", metric.optString("color"));
+        }
     }
     /** Stable reorder: red rows, then yellow rows, then everything else in its original order. Nothing is dropped. */
     static JSONArray attentionFirst(JSONArray rows) {

@@ -11,6 +11,7 @@ import "./owner-monitor.css";
 import { MonitorJournal, MonitorTaskSummary } from "./monitor-journal";
 import type { JournalSnapshot } from "@/lib/monitor/types";
 import { AppLink } from "@/components/app-link";
+import { formatPercent, usageRows, usageUnavailableText } from "@/lib/monitor/usage-format";
 
 type Source<T> = {
   state: "ready" | "unavailable" | "not-connected";
@@ -371,6 +372,57 @@ export function OwnerMonitor() {
                   {data.traffic.state === "not-connected"
                     ? "A read-only Cloudflare analytics connection is needed."
                     : "Cloudflare did not return a current reading."}
+                </p>
+              )}
+            </section>
+            <section className="owner-monitor-traffic" aria-labelledby="field-usage">
+              <h3 id="field-usage">
+                <Cloud size={17} aria-hidden="true" /> Cloudflare plan usage{" "}
+                <span>Workers Paid allowance</span>
+              </h3>
+              {data.usage?.state === "ready" && data.usage.data ? (
+                <>
+                  <div className="owner-monitor-usage">
+                    {usageRows(data.usage).map((row) => (
+                      <div key={row.key} data-level={row.level}>
+                        <strong>
+                          {row.level === "attention" || row.level === "over" ? "! " : ""}
+                          {row.label}
+                        </strong>
+                        {row.unavailable ? (
+                          <p>Unavailable ({row.unavailable}); not counted as zero.</p>
+                        ) : (
+                          <dl className="owner-monitor-list">
+                            {row.cells.map((cell) => (
+                              <div key={cell.window}>
+                                <dt>{cell.window}</dt>
+                                <dd>
+                                  {cell.value} <small>({cell.share})</small>
+                                </dd>
+                              </div>
+                            ))}
+                          </dl>
+                        )}
+                      </div>
+                    ))}
+                  </div>
+                  <p className="owner-monitor-note">
+                    Account-wide, UTC. Today and 7 days compare with the monthly allowance divided
+                    by the days in this month (daily share) and seven daily shares (weekly share);
+                    month to date compares with the full allowance,{" "}
+                    {formatPercent(data.usage.data.windows.month.elapsedPercent)} of the month has
+                    elapsed. Cloudflare resets included usage on your billing renewal date, which
+                    may differ from the calendar month. Allowances verified{" "}
+                    {data.usage.data.allowancesVerifiedOn} ·{" "}
+                    {data.usage.checkedAt
+                      ? `checked ${age(data.usage.checkedAt, now)}`
+                      : "check time unavailable"}{" "}
+                    · collected hourly
+                  </p>
+                </>
+              ) : (
+                <p className="owner-monitor-note">
+                  <strong>{usageUnavailableText(data.usage)}</strong>
                 </p>
               )}
             </section>
