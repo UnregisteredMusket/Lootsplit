@@ -541,6 +541,52 @@ try {
     "stored private corrupted bytes",
   );
   await page.screenshot({ path: output + "/session-name-handoff.png" });
+  // Address-change guide: pending shared work in a campaign that is not open is listed,
+  // device-only data is named, and reading the guide changes no stored data.
+  const readinessSeed = await page.evaluate(() => {
+    const registry = JSON.parse(localStorage.getItem("quire.campaigns.v1") || "[]");
+    registry.push({ id: "readiness-other", name: "Readiness other", db: "quire-readiness-other" });
+    localStorage.setItem("quire.campaigns.v1", JSON.stringify(registry));
+    localStorage.setItem(
+      "quire.cloud.v2.readiness-other",
+      JSON.stringify({
+        token: "t",
+        code: "AUDIT",
+        seatId: "s",
+        role: "player",
+        purseIds: [],
+        revision: 3,
+        pending: [{ id: "a" }, { id: "b" }],
+        batchId: "b",
+      }),
+    );
+    return JSON.stringify(Object.entries(localStorage).sort());
+  });
+  await navigateApplication(page, origin + "/settings");
+  const readiness = page.locator("#migration-readiness");
+  await readiness.locator("summary").click();
+  await expect(
+    readiness.getByRole("list", { name: "Other campaigns with unfinished work" }),
+  ).toContainText("Readiness other: 2 pending changes");
+  await expect(readiness.getByRole("list", { name: "Device-only data" })).toContainText(
+    "The local audio library",
+  );
+  assert.equal(
+    await page.evaluate(() => JSON.stringify(Object.entries(localStorage).sort())),
+    readinessSeed,
+    "Reading the address-change guide must not change stored data",
+  );
+  await page.evaluate(() => {
+    localStorage.removeItem("quire.cloud.v2.readiness-other");
+    localStorage.setItem(
+      "quire.campaigns.v1",
+      JSON.stringify(
+        JSON.parse(localStorage.getItem("quire.campaigns.v1") || "[]").filter(
+          (c) => c.id !== "readiness-other",
+        ),
+      ),
+    );
+  });
   assert.deepEqual(errors, []);
   console.log(
     JSON.stringify({
@@ -553,6 +599,7 @@ try {
         "journal attachment opens full authorized archive and Return preserves its selection/search",
         "archive/session filters do not erase original saved report bytes",
         "session name survives cancelled navigation and explicit downtime handoff in this document",
+        "address-change guide lists pending work in campaigns that are not open and names device-only data without changing storage",
         "create protected backup",
         "plain import and unlocked encrypted load previews show contents and destination before commit",
         "cancel and read-only contents preview preserve all native data and exact encrypted saved files",
