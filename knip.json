@@ -1,0 +1,22 @@
+{
+  "$schema": "https://unpkg.com/knip@6/schema.json",
+  "entry": [
+    "cloudflare/worker.mjs",
+    "standby/server.mjs",
+    "src/start.ts",
+    "src/router.tsx",
+    "src/routes/**/*.{ts,tsx}",
+    "src/**/*.test.ts",
+    "scripts/*.mjs",
+    "scripts/browser/*.mjs",
+    "public/*.js"
+  ],
+  "project": [
+    "src/**/*.{ts,tsx,js,mjs}",
+    "cloudflare/**/*.mjs",
+    "standby/**/*.mjs",
+    "server/**/*.{ts,mjs}",
+    "scripts/**/*.{mjs,js}"
+  ],
+  "ignore": ["src/routeTree.gen.ts", "public/ocr/**", "android/**"]
+}
