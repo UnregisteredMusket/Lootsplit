@@ -236,14 +236,14 @@ function Account() {
               <h2>Keep this recovery key somewhere safe</h2>
               <p>
                 This key can reset your password. It replaces any previous key. Email reset is not
-                enabled; save this key outside Lootsplit.
+                enabled; save this key outside Lootsplitter.
               </p>
               <code>{key}</code>
               <div className="portal-actions">
                 <button
                   className="portal-button secondary"
                   onClick={action(async () => {
-                    await downloadJson("Lootsplit-account-recovery.json", {
+                    await downloadJson("Lootsplitter-account-recovery.json", {
                       email: library?.user.email || email,
                       recoveryKey: key,
                     });
@@ -425,7 +425,7 @@ function Account() {
                               const records = await accountRequest("recovery-records", {
                                 code: m.code,
                               });
-                              await downloadJson(`Lootsplit-recovery-${m.code}.json`, records);
+                              await downloadJson(`Lootsplitter-recovery-${m.code}.json`, records);
                             })}
                           >
                             Download recovery records
@@ -853,7 +853,7 @@ function Account() {
                             }>("read-backup", {
                               id: b.id,
                             });
-                            await downloadJson(`Lootsplit-cloud-${b.id}.json`, r.payload);
+                            await downloadJson(`Lootsplitter-cloud-${b.id}.json`, r.payload);
                           })}
                         >
                           <Download size={18} />

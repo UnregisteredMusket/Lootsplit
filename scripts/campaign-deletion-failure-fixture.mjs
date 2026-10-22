@@ -28,6 +28,6 @@ assert.equal(getCampaigns().activeId,"survivor");
 createCampaign("After failure");
 assert.equal(getCampaigns().campaigns.length,3);
 // A second deletion would replace the retained intent, so it waits for the reload retry.
-await assert.rejects(deleteCampaign("survivor"),/deletion failed\. It will retry when Lootsplit is reloaded/);
+await assert.rejects(deleteCampaign("survivor"),/deletion failed\. It will retry when Lootsplitter is reloaded/);
 assert.equal(storage.getItem("quire.deletion.v1"),intent);
 console.log("Failed deletion retry unlocks campaign changes and keeps the intent for reload.");

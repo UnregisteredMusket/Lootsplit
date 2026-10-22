@@ -9,6 +9,14 @@ export const PLAYER_HELP_GROUPS: HelpGroup[] = [
     title: "Join & find your way",
     topics: [
       {
+        id: "new-name",
+        title: "Lootsplit is now Lootsplitter",
+        paragraphs: [
+          "Lootsplit has a new name: Lootsplitter. It is the same app: your character, saved memberships, settings and account stay as they were, and invitations from your DM keep working. On Android, version 1.10.0 and later shows the new name on the home screen; install the update over the existing app.",
+        ],
+        links: [["Campaign connection", "/share"]],
+      },
+      {
         id: "first-campaign",
         title: "Join your party",
         paragraphs: [
@@ -223,7 +231,7 @@ export const PLAYER_HELP_GROUPS: HelpGroup[] = [
         paragraphs: [
           "Join with the DM's current invitation and open Maps on your own device. Online play needs no TV, casting device or shared room. The session status in Settings shows your viewed scene, the active player scene, connection status and whether play is view only. Scene access, token control and current transaction turns still apply.",
           "Your camera is independent until the DM explicitly shares a view. You can pan/zoom afterward. Settings → Map library shows the scenes available to you; the DM may direct the active scene or restrict browsing. Select / move opens a token's Inspector, including its shared linked record. Close inspector clears selection. Shift selects a group; Alt + arrows pans. Pan mode lets you drag without moving a token. Measure adds temporary waypoints. If area templates are enabled, place a circle, cone, line or rectangle; this applies no damage or other rules. Close tool options hides the controls while keeping the tool active. Cancel tool or Escape stops the tool.",
-          "Maps opens directly across the available desktop or phone page. Your permitted map and camera are remembered for this campaign and participant; guest views stay in memory for the current document. If access changes, Maps uses a permitted scene. Search maps and places (/) focuses accessible records or linked maps. Settings contains your map library, filters, ping color and permitted options; it scrolls above the canvas. On phones, scene and camera controls use compact rows, and the tool dock sits along the bottom edge. Swipe the tool row to reach every tool; More map tools and the collapse button stay visible. Map markers keep full touch targets around smaller symbols. The hotbar directly provides Pan (V), Select / move (S), Ping (P), Measure (M), allowed templates (T) and personal drawing/text with undo/redo. Drawing notes are yours on this device, not shared campaign markers. Zoom, Fit map and Center on party or selection change only your camera. Escape closes a panel or cancels a tool. Use the upper-left map menu for all six main destinations or Back to Lootsplit for Home. Hide interface (H), Show interface and phone rotation preserve your camera. Some browsers retain their address bar; Maps does not require native fullscreen permission.",
+          "Maps opens directly across the available desktop or phone page. Your permitted map and camera are remembered for this campaign and participant; guest views stay in memory for the current document. If access changes, Maps uses a permitted scene. Search maps and places (/) focuses accessible records or linked maps. Settings contains your map library, filters, ping color and permitted options; it scrolls above the canvas. On phones, scene and camera controls use compact rows, and the tool dock sits along the bottom edge. Swipe the tool row to reach every tool; More map tools and the collapse button stay visible. Map markers keep full touch targets around smaller symbols. The hotbar directly provides Pan (V), Select / move (S), Ping (P), Measure (M), allowed templates (T) and personal drawing/text with undo/redo. Drawing notes are yours on this device, not shared campaign markers. Zoom, Fit map and Center on party or selection change only your camera. Escape closes a panel or cancels a tool. Use the upper-left map menu for all six main destinations or Back to Lootsplitter for Home. Hide interface (H), Show interface and phone rotation preserve your camera. Some browsers retain their address bar; Maps does not require native fullscreen permission.",
           "Hidden map pixels, private markers and DM geometry do not arrive behind a removable overlay. When visibility changes, the scene stays concealed until its current protected view is ready. Keep the room open and use Retry map artwork or the existing sync/retry controls if connection is interrupted. Tokens and area previews change no money, inventory, boarding or travel time. Guest contents and pending actions stay in memory; refresh reconnects only while the invitation remains valid.",
           "Animated PNG/WebP and MP4/WebM map animation starts paused and has play/pause controls. Concealed animated scenes use a still view. The updated website receives these controls first; an installed Android app retains its bundled controls until a separately signed update is distributed.",
         ],
@@ -317,7 +325,7 @@ export const PLAYER_HELP_GROUPS: HelpGroup[] = [
         paragraphs: [
           "Check Campaign → Connection & recovery before retrying, leaving or discarding an action. Export pending actions when offered and retain the original campaign and request identity. A lost response does not prove a purchase or trade failed; inspect sync and receipts before trying again. If the room says you are sending changes too quickly, wait a minute and send again; your pending actions are kept.",
           "Use a current invitation to reconnect. If your character is occupied or the room has closed, ask the DM to resolve the seat or provide the new invitation. Do not clear storage as a first recovery step.",
-          "In the Android app, if Android restores Lootsplit from a device backup onto a new phone or a reinstall, your saved data returns but you sign in to your account again.",
+          "In the Android app, if Android restores Lootsplitter from a device backup onto a new phone or a reinstall, your saved data returns but you sign in to your account again.",
         ],
         links: [["Connection & recovery", "/share#connection-recovery"]],
       },

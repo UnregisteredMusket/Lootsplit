@@ -43,7 +43,7 @@ try {
       ["updates", "Changelog"],
       ["help", "A little help, adventurer."],
       ["resources", "Resources & credits"],
-      ["donate", "Support Lootsplit"],
+      ["donate", "Support Lootsplitter"],
       ["account", "Welcome to your next chapter."],
     ]) {
       const response = await openApplication(page, `${origin}/${path}`, {

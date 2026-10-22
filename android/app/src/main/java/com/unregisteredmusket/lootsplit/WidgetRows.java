@@ -44,7 +44,7 @@ final class WidgetRows {
             add(rows, "Builds and deployments", snapshot.optString("development") + "\n" + snapshot.optString("deployment") + snapshot.optString("developmentTime"), "task");
             add(rows, "Shared snapshot " + snapshot.optLong("snapshotId"), "Data collected " + WidgetData.time(snapshot.optLong("checkedAt")) + ". Android delivery may be delayed. Web " + snapshot.optString("commit"), "diagnostics","",clock(snapshot.optLong("checkedAt")));
             id(rows, "snapshot");
-            add(rows, "Full history, search and export", "Open private monitoring logs and detailed reports in Lootsplit.", "logs");
+            add(rows, "Full history, search and export", "Open private monitoring logs and detailed reports in Lootsplitter.", "logs");
         } catch (Exception ignored) { }
         return attentionFirst(identify(rows));
     }

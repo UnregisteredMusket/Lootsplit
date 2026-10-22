@@ -73,7 +73,7 @@ picker = snapshot("picker-open")
 search = next((n for n in picker.iter("node") if n.get("class") == "android.widget.EditText"), None)
 if search is not None:
     tap(search)
-    adb("shell", "input", "text", "Lootsplit")
+    adb("shell", "input", "text", "Lootsplitter")
     adb("shell", "input", "keyevent", "KEYCODE_BACK")
 
 seen = set()
@@ -82,7 +82,7 @@ for attempt in range(12):
     picker = snapshot("picker-" + str(attempt))
     labels = {label(n) for n in picker.iter("node")}
     seen.update(labels)
-    group = next((n for n in picker.iter("node") if label(n) == "Lootsplit"), None)
+    group = next((n for n in picker.iter("node") if label(n) == "Lootsplitter"), None)
     if group is not None and not expanded:
         tap(group)
         expanded = True
@@ -98,7 +98,7 @@ assert "OwnerWidgetProvider" in providers, "Android did not register the main pr
 assert "CompanionWidgetProvider" in providers, "Android did not register the companion provider"
 assert any("Field monitor" in s for s in seen), "Main widget missing from actual launcher picker"
 assert any("4×1 companion" in s for s in seen), "Companion missing from actual launcher picker"
-print("PASS: Android's real launcher picker exposes both Lootsplit widgets")
+print("PASS: Android's real launcher picker exposes both Lootsplitter widgets")
 
 if "--add-companion" in sys.argv:
     # Android 15 Pixel Launcher exposes an Add action after tapping a preview.

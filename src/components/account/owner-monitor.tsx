@@ -192,7 +192,7 @@ export function OwnerMonitor() {
     <section className="portal-card owner-monitor" aria-labelledby="owner-monitor-title">
       <header className="owner-monitor-heading">
         <div>
-          <p className="portal-eyebrow">LOOTSPLIT · PRIVATE OVERVIEW</p>
+          <p className="portal-eyebrow">LOOTSPLITTER · PRIVATE OVERVIEW</p>
           <h2 id="owner-monitor-title">Field monitor</h2>
         </div>
         <span className="owner-monitor-access">

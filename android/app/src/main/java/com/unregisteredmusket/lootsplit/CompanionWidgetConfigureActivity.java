@@ -28,7 +28,7 @@ public class CompanionWidgetConfigureActivity extends Activity {
         ScrollView scroll=new ScrollView(this); LinearLayout root=new LinearLayout(this); root.setOrientation(LinearLayout.VERTICAL); root.setPadding(dp(20),dp(16),dp(20),dp(24)); scroll.addView(root); setContentView(scroll);
         boolean companion=info.provider.getClassName().equals(CompanionWidgetProvider.class.getName());
         if (companion) {
-        label(root,"Lootsplit 4×1 companion · instance "+widgetId);
+        label(root,"Lootsplitter 4×1 companion · instance "+widgetId);
         label(root,"Choose two summaries in top-to-bottom order and two toolbar actions. Tap a summary for its full detail. Each widget has independent settings.");
         label(root,"Agent activity (the default for new companions) shows GitHub workflow runs and pull requests: ✓ succeeded or merged, ! running or needs attention, ✕ failed. It checks about once a minute while a workflow runs and the screen is on, without waking the phone. The development chat is not shown.");
         Spinner presets=choose(root,"preset","Preset",CompanionSettings.PRESETS,CompanionSettings.DEFAULT_PRESET);
@@ -38,7 +38,7 @@ public class CompanionWidgetConfigureActivity extends Activity {
         choose(root,"action1","First toolbar action",WidgetActions.ACTIONS,settings.optString("action1"));
         choose(root,"action2","Second toolbar action",WidgetActions.ACTIONS,settings.optString("action2"));
         apply.setOnClickListener(v -> { JSONObject preset=CompanionSettings.preset(presets.getSelectedItem().toString()); for(String key: new String[]{"first","second","action1","action2"}) { Spinner spinner=choices.get(key); for(int i=0;i<spinner.getCount();i++) if(spinner.getItemAtPosition(i).equals(preset.optString(key))) spinner.setSelection(i); } });
-        } else label(root,"Lootsplit Field monitor · instance "+widgetId);
+        } else label(root,"Lootsplitter Field monitor · instance "+widgetId);
         choose(root,"theme","Appearance",CompanionSettings.THEMES,settings.optString("theme"));
         Button save=new Button(this); save.setText("Save widget"); root.addView(save); save.setOnClickListener(v -> {
             JSONObject next=new JSONObject(); try { for(Map.Entry<String,Spinner> entry: choices.entrySet()) if(!entry.getKey().equals("preset")) next.put(entry.getKey(),entry.getValue().getSelectedItem().toString()); } catch(Exception ignored) { return; }
@@ -46,7 +46,7 @@ public class CompanionWidgetConfigureActivity extends Activity {
             setResult(RESULT_OK,new Intent().putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID,widgetId)); finish();
         });
         label(root,"More actions");
-        for(String action: WidgetActions.ACTIONS) if(!action.equals("settings")) { Button button=new Button(this); button.setText(WidgetActions.label(action)); root.addView(button); button.setOnClickListener(v -> { try { WidgetActions.pending(this,widgetId,action,true).send(); } catch(Exception ignored) { Toast.makeText(this,"Action unavailable. Open Lootsplit from your launcher.",Toast.LENGTH_LONG).show(); } }); }
+        for(String action: WidgetActions.ACTIONS) if(!action.equals("settings")) { Button button=new Button(this); button.setText(WidgetActions.label(action)); root.addView(button); button.setOnClickListener(v -> { try { WidgetActions.pending(this,widgetId,action,true).send(); } catch(Exception ignored) { Toast.makeText(this,"Action unavailable. Open Lootsplitter from your launcher.",Toast.LENGTH_LONG).show(); } }); }
         label(root,"Timers show elapsed wall time, not measured effort. Launcher widgets use static status symbols (✓ healthy, ! attention, ✕ failure); continuous flashing is intentionally unsupported. Android may delay background delivery. Logging continues on the backend.");
     }
 }

@@ -1,4 +1,4 @@
-# Lootsplit Android
+# Lootsplitter Android
 
 The installable app is a packaged copy of the interface. Campaign files, device backups, and local mode stay on the phone. Shared rooms still use the existing Cloudflare Worker at `https://lootsplit.oliverstorie2017.workers.dev`. The APK does not contain the D1 database id, Worker secrets, or server source.
 
@@ -100,6 +100,10 @@ Version1.9.0/code13 was published with the existing permanent signing key. Its a
 Version1.9.1/code14 preserves the package, permanent certificate and all local data. Install over the existing signed app. Both providers are reannounced after package replacement and once on app launch. Do not uninstall or clear launcher/app storage to refresh the list. Long-press home, open Widgets → Lootsplit, then add Lootsplit 4×1 companion. It starts with the existing Development preset; Settings changes each instance independently. Placing either widget does not require a connected owner session, but private readings still do. My account includes Add 4×1 companion and Refresh widget list, which reports actual framework discovery without claiming the launcher refreshed immediately.
 
 The native gate now uses a Pixel6 profile for its API24/API35 launchers, requires both picker entries, adds the companion through the API35 picker, and separately binds/configures it through a real AppWidgetHost while signed out. Synthetic stale-provider metadata is debug-only. The signed release gate upgrades the previous public, checksum-verified APK to the new signed candidate without opening My account and adds the companion from Widgets before publishing. Evidence and limitations are in [the investigation](docs/audit/2026-10-21-widget-picker.md). Version1.9.1/code14 is published from main43906256b19f64d4634b596cd9f980e7f57c11f0 after signed workflow39546976796 passed. Its actual signed1.9.0→1.9.1 upgrade and companion placement passed on the API35 Pixel6 emulator. The public APK matches the signing artifact and SHA256 `dd9a0d04bfacee4e67645a3ff1e0ca1aeeb538d08e6837e4754353fdc324c79c` (28,040,276bytes), with the permanent certificate and valid APK-v2 integrity. See [release evidence](docs/audit/android-widget-picker-release-evidence.json). Physical-device/OEM verification remains separate. Website publication is completed through its own full PR/main/deployment and streamed-byte gates.
+
+## Rename to Lootsplitter — 1.10.0
+
+Version 1.10.0/code 17 changes only the user-visible name: `app_name`, `title_activity_main`, `capacitor.config.ts` `appName`, both widget labels (Lootsplitter Field monitor, Lootsplitter 4×1 companion) and the widget settings activity label. The package/appId `com.unregisteredmusket.lootsplit`, Java package and class names, the permanent signing key, storage keys, `X-Lootsplit-*` request headers and the native API origin are unchanged, so the update installs over 1.9.3 and keeps local data, sign-in and placed widgets. The GitHub release asset keeps the `Lootsplit-VERSION.apk` filename that the website download proxy and checks rely on; the release title uses the new name.
 
 ## Tablets in landscape: split view
 

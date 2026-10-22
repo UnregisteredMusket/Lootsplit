@@ -1,3 +1,26 @@
+# Lootsplitter 1.10.0
+
+Android version code **17**, same package and permanent signing certificate. Install over the existing app; do not uninstall or clear saved data.
+
+## Added
+
+- **Lootsplit is now Lootsplitter.** The app, the website, the home-screen widgets and Help use the new name. It is the same app with the same data: this update installs over the existing app, and your campaigns, characters, settings, account sign-in and placed widgets carry over unchanged.
+
+## Improved
+
+- Help explains the new name. Backups and campaign copies saved under the old name still import, and the website address is unchanged for now.
+- Website pages, browser tab titles, notifications and the installed web app use the Lootsplitter name.
+
+## Fixed
+
+- The installed web app (Add to home screen) is now named Lootsplitter instead of a generic placeholder name.
+
+## Release verification
+
+To be completed by the signed release workflow (API 24/API 35 widget checks, preservation checks and the signed-APK upgrade gate).
+
+---
+
 # Lootsplit 1.9.3
 
 Android version code **16**, same package and permanent signing certificate. Install over the existing app; do not uninstall or clear saved data.

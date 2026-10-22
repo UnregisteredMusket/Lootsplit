@@ -98,13 +98,13 @@ try {
     );
     await page.screenshot({ path: `test-results/sound/menu-audio-${width}.png`, fullPage: true });
     await page.reload();
-    await page.getByRole("button", { name: "Lootsplit. Click to continue", exact: true }).waitFor();
+    await page.getByRole("button", { name: "Lootsplitter. Click to continue", exact: true }).waitFor();
     assert.equal(
       await page.evaluate(() => window.__audioStarts),
       0,
       "Saved-on preferences do not autoplay a fresh document",
     );
-    await page.getByRole("button", { name: "Lootsplit. Click to continue", exact: true }).click();
+    await page.getByRole("button", { name: "Lootsplitter. Click to continue", exact: true }).click();
     await page.getByText("Sound effects", { exact: true }).click();
     await expect(menus.getByLabel("Enable menu music")).toBeChecked();
     await expect(menus.getByLabel("Enable ambient sound")).toBeChecked();
@@ -117,7 +117,7 @@ try {
       .click();
     await page.waitForFunction(() => window.__loops.size === 0);
     await page.reload();
-    await page.getByRole("button", { name: "Lootsplit. Click to continue", exact: true }).click();
+    await page.getByRole("button", { name: "Lootsplitter. Click to continue", exact: true }).click();
     assert.equal(await page.evaluate(() => window.__loopStarts), 0);
     await page.evaluate(() => (window.soundNavigationMarker = "same-document"));
     await page
@@ -200,7 +200,7 @@ try {
     assert.equal(await page.evaluate(() => window.__loops.size), 0);
     // A new document retains preferences but never starts audio by itself.
     await page.goto(origin + "/settings");
-    await page.getByRole("button", { name: "Lootsplit. Click to continue", exact: true }).waitFor();
+    await page.getByRole("button", { name: "Lootsplitter. Click to continue", exact: true }).waitFor();
     assert.equal(await page.evaluate(() => window.__audioStarts), 0);
     await openApplication(page, origin + "/settings");
     await page.getByText("Sound effects", { exact: true }).click();

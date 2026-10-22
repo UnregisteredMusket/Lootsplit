@@ -83,7 +83,7 @@ export function normalizeOpenPage(payload: unknown, q: OpenQuery): OpenPage {
     }
     if (doc.key !== q.edition || !text(r.key) || !text(r.name)) return [];
     const version = q.edition === "srd-2014" ? "5.1" : "5.2";
-    const attribution = `This work includes material from the System Reference Document ${version} (“SRD ${version}”) by Wizards of the Coast LLC, available at https://www.dndbeyond.com/srd. The SRD ${version} is licensed under the Creative Commons Attribution 4.0 International License, available at https://creativecommons.org/licenses/by/4.0/legalcode. Retrieved through Open5e; formatting adapted. Prices and categories may be customized in Lootsplit.`;
+    const attribution = `This work includes material from the System Reference Document ${version} (“SRD ${version}”) by Wizards of the Coast LLC, available at https://www.dndbeyond.com/srd. The SRD ${version} is licensed under the Creative Commons Attribution 4.0 International License, available at https://creativecommons.org/licenses/by/4.0/legalcode. Retrieved through Open5e; formatting adapted. Prices and categories may be customized in Lootsplitter.`;
     const categoryName = name(r.category).toLowerCase();
     const category: ItemCategory = /weapon|armor/.test(categoryName)
       ? "smith"

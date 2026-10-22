@@ -19,10 +19,10 @@ export function PlayerDisplay() {
   const [size, setSize] = useState({ width: 1, height: 1 }),
     [image, setImage] = useState({ width: 1, height: 1 });
   useEffect(() => {
-    document.title = "Player display · Lootsplit";
+    document.title = "Player display · Lootsplitter";
     const id = location.hash.slice(1);
     if (!validDisplayId(id)) {
-      setError("Open a player display from your DM’s Lootsplit window.");
+      setError("Open a player display from your DM’s Lootsplitter window.");
       return;
     }
     let channel: BroadcastChannel;
@@ -88,7 +88,7 @@ export function PlayerDisplay() {
     <main className="player-display" onPointerMove={() => setControls(true)}>
       {controls && (
         <div className="player-display-tools">
-          <strong>Lootsplit · Player display</strong>
+          <strong>Lootsplitter · Player display</strong>
           <button onClick={() => void fullscreen()}>Fullscreen</button>
           <button onClick={() => setControls(false)}>Hide controls</button>
         </div>

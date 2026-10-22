@@ -11,7 +11,7 @@ const publicPaths = new Set([
 export async function continueIntoApp(page) {
   const path = new URL(page.url()).pathname.replace(/\/$/, "") || "/";
   if (publicPaths.has(path)) return;
-  const title = page.getByRole("button", { name: "Lootsplit. Click to continue", exact: true });
+  const title = page.getByRole("button", { name: "Lootsplitter. Click to continue", exact: true });
   await page.waitForFunction(() =>
     document.querySelector(".loot-opening") ||
     document.querySelector("main"),

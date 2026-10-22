@@ -21,7 +21,7 @@ export function openWorkspaceWindow(href: string, mode: "tab" | "window") {
   );
   if (!child)
     throw Error(
-      "Your browser blocked the new workspace. Allow pop-ups for Lootsplit, then try again.",
+      "Your browser blocked the new workspace. Allow pop-ups for Lootsplitter, then try again.",
     );
   try {
     prepareWindowContext(child.sessionStorage);

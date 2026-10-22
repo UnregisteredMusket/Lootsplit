@@ -73,7 +73,7 @@ public class OwnerWidgetService extends RemoteViewsService {
             String label=WidgetActions.rowLabel(action);
             view.setTextViewText(R.id.widget_row_open,"OPEN "+label.toUpperCase(java.util.Locale.ROOT)+" ›");
             view.setTextColor(R.id.widget_row_open,light?ink:android.graphics.Color.rgb(19,245,128));
-            view.setContentDescription(R.id.widget_row_open,"Open "+label+" in Lootsplit");
+            view.setContentDescription(R.id.widget_row_open,"Open "+label+" in Lootsplitter");
             view.setOnClickFillInIntent(R.id.widget_row_open, new Intent().putExtra(WidgetActions.DESTINATION, action));
         }
         return view;

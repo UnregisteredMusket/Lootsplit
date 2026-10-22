@@ -1,6 +1,6 @@
 import { commoditySchema, type Commodity } from "./trade-economy-schema.ts";
 
-// Original Lootsplit homebrew templates. Prices are editable references, not official D&D prices.
+// Original Lootsplitter homebrew templates. Prices are editable references, not official D&D prices.
 const goods: [string, string, Commodity["category"], number, number, string][] = [
   ["wheat", "Wheat", "provisions", 100, 50, "50 lb sack"],
   ["barley", "Barley", "provisions", 80, 50, "50 lb sack"],
@@ -74,6 +74,6 @@ export const STARTER_COMMODITIES: Commodity[] = goods.map(
       weight,
       unit,
       active: true,
-      description: `Trade goods supplied as one ${unit}. Lootsplit homebrew reference value; the DM defines availability, quality and any special properties.`,
+      description: `Trade goods supplied as one ${unit}. Lootsplitter homebrew reference value; the DM defines availability, quality and any special properties.`,
     }),
 );

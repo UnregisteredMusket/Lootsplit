@@ -31,7 +31,7 @@ const server = createServer({ requestTimeout: 60000, headersTimeout: 15000, maxH
       return;
     }
     if (mode !== "active") {
-      await sendResponse(new Response("Lootsplit standby is locked. Use the main website until the host announces recovery.", { status: 503, headers: { "Cache-Control": "no-store", "Retry-After": "60" } }), outgoing);
+      await sendResponse(new Response("Lootsplitter standby is locked. Use the main website until the host announces recovery.", { status: 503, headers: { "Cache-Control": "no-store", "Retry-After": "60" } }), outgoing);
       return;
     }
     const request = incomingRequest(incoming, env.ACCOUNT_ORIGIN, config.RENDER === "true");

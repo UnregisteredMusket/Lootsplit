@@ -16,7 +16,7 @@ export const resources: Resource[] = [
     name: "Android home-screen widget platform references",
     kind: "reference",
     description:
-      "Original Lootsplit RemoteViews layouts, encrypted local widget state and launcher controls follow Android’s platform documentation. The owner’s phone images informed the green terminal style; no screenshots, wallpaper, third-party interface code or sample metrics are bundled in the release.",
+      "Original Lootsplitter RemoteViews layouts, encrypted local widget state and launcher controls follow Android’s platform documentation. The owner’s phone images informed the green terminal style; no screenshots, wallpaper, third-party interface code or sample metrics are bundled in the release.",
     license:
       "Documentation reference; Android documentation CC BY 4.0 and code samples Apache 2.0. Original implementation, no sample code copied.",
     links: [
@@ -50,7 +50,7 @@ export const resources: Resource[] = [
     name: "Owner monitoring data and API references",
     kind: "reference",
     description:
-      "The private Field monitor reads this repository’s GitHub workflow and pull-request metadata. Optional Cloudflare analytics uses aggregate Worker requests/errors. The original website widget uses Lootsplit’s existing theme; the owner’s phone screenshots are design references for the separate Android home-screen widget and are not bundled in the app.",
+      "The private Field monitor reads this repository’s GitHub workflow and pull-request metadata. Optional Cloudflare analytics uses aggregate Worker requests/errors. The original website widget uses Lootsplitter’s existing theme; the owner’s phone screenshots are design references for the separate Android home-screen widget and are not bundled in the app.",
     license: "API data and documentation references; respective provider terms apply",
     links: [
       {
@@ -68,7 +68,7 @@ export const resources: Resource[] = [
     name: "Project Zomboid Map interface reference",
     kind: "reference",
     description:
-      "The owner selected this interactive map as the explicit layout and interaction reference for Lootsplit Maps: edge-to-edge canvas, floating search/navigation, compact right controls, horizontal tools and overlay options. Lootsplit uses original components and campaign artwork; no game map, branding or third-party interface code is bundled.",
+      "The owner selected this interactive map as the explicit layout and interaction reference for Lootsplitter Maps: edge-to-edge canvas, floating search/navigation, compact right controls, horizontal tools and overlay options. Lootsplitter uses original components and campaign artwork; no game map, branding or third-party interface code is bundled.",
     license: "Design reference only; original source rights retained",
     links: [{ label: "Project Zomboid Map", url: "https://projectzomboidmap.com/#10990x9612x14" }],
   },
@@ -76,7 +76,7 @@ export const resources: Resource[] = [
     name: "Universal VTT interchange references",
     kind: "reference",
     description:
-      "Original Lootsplit importer follows documented UVTT 0.2/0.3 embedded image, grid, wall, portal and light fields. Exporter-specific behavior is disclosed for DM review. Documentation reference only; no third-party code or map artwork is bundled.",
+      "Original Lootsplitter importer follows documented UVTT 0.2/0.3 embedded image, grid, wall, portal and light fields. Exporter-specific behavior is disclosed for DM review. Documentation reference only; no third-party code or map artwork is bundled.",
     license: "Documentation reference; source site rights retained",
     links: [
       {
@@ -93,7 +93,7 @@ export const resources: Resource[] = [
     name: "Player display references",
     kind: "reference",
     description:
-      "Original Lootsplit presentation UI informed by the owner’s digital map-case reference. No video footage, map art, or third-party interface code is bundled. Browser fullscreen and casting behavior follows the linked platform documentation.",
+      "Original Lootsplitter presentation UI informed by the owner’s digital map-case reference. No video footage, map art, or third-party interface code is bundled. Browser fullscreen and casting behavior follows the linked platform documentation.",
     links: [
       { label: "Digital map-case reference", url: "https://youtube.com/shorts/lw6zef9PVMk" },
       {
@@ -107,7 +107,7 @@ export const resources: Resource[] = [
     name: "Multiple-window web platform references",
     kind: "reference",
     description:
-      "Lootsplit’s original window controls and synchronization use standard browser APIs. Mozilla’s MDN documentation informed window opening, per-tab session storage, Web Locks and privacy-safe invalidation messages. No third-party interface assets or example code are bundled.",
+      "Lootsplitter’s original window controls and synchronization use standard browser APIs. Mozilla’s MDN documentation informed window opening, per-tab session storage, Web Locks and privacy-safe invalidation messages. No third-party interface assets or example code are bundled.",
     links: [
       { label: "Window.open", url: "https://developer.mozilla.org/en-US/docs/Web/API/Window/open" },
       {
@@ -128,7 +128,7 @@ export const resources: Resource[] = [
     name: "Ship vehicle bookkeeping references",
     kind: "reference",
     description:
-      "Component-based ship statistics were informed by Wizards of the Coast’s 2018 Ships and the Sea Unearthed Arcana playtest and the 2014 Basic Rules object damage-threshold guidance. These are references, not bundled stat blocks or adopted official prices. Lootsplit’s editable demonstration ships, upgrades and economic defaults are original; mental abilities are omitted as requested.",
+      "Component-based ship statistics were informed by Wizards of the Coast’s 2018 Ships and the Sea Unearthed Arcana playtest and the 2014 Basic Rules object damage-threshold guidance. These are references, not bundled stat blocks or adopted official prices. Lootsplitter’s editable demonstration ships, upgrades and economic defaults are original; mental abilities are omitted as requested.",
     links: [
       {
         label: "Ships and the Sea (2018 playtest)",
@@ -144,7 +144,7 @@ export const resources: Resource[] = [
     name: "Reviewed resource-pack imports",
     kind: "reference",
     description:
-      "Lootsplit’s import schema and synthetic example are original. User-imported books retain their supplied attribution, copyright and source-page references in the private DM library. Book contents and artwork are not bundled with the application. Campaign-private immutable document storage follows Cloudflare’s D1 limits and atomic batch documentation; importing grants no redistribution license.",
+      "Lootsplitter’s import schema and synthetic example are original. User-imported books retain their supplied attribution, copyright and source-page references in the private DM library. Book contents and artwork are not bundled with the application. Campaign-private immutable document storage follows Cloudflare’s D1 limits and atomic batch documentation; importing grants no redistribution license.",
     links: [
       { label: "D1 limits", url: "https://developers.cloudflare.com/d1/platform/limits/" },
       {
@@ -156,7 +156,7 @@ export const resources: Resource[] = [
   {
     name: "Campaign map text recognition",
     description:
-      "Map labels use the existing locally bundled Tesseract.js 7 engine (Apache-2.0) and English trained data. Lootsplit's reviewed anchors, markers, fantasy controls and deed/barter integration are original. Cloudflare's official D1 limits and transaction documentation informed campaign-private deduplicated image storage; no third-party maps or artwork are supplied.",
+      "Map labels use the existing locally bundled Tesseract.js 7 engine (Apache-2.0) and English trained data. Lootsplitter's reviewed anchors, markers, fantasy controls and deed/barter integration are original. Cloudflare's official D1 limits and transaction documentation informed campaign-private deduplicated image storage; no third-party maps or artwork are supplied.",
     links: [
       { label: "Tesseract.js source and license", url: "https://github.com/naptha/tesseract.js" },
       { label: "English trained data", url: "https://github.com/tesseract-ocr/tessdata" },
@@ -171,7 +171,7 @@ export const resources: Resource[] = [
     name: "Property marketplace design references",
     kind: "reference",
     description:
-      "First-party Zillow and Redfin product guidance informed location-first search, asking-price filters, image listings and side-by-side comparison. Lootsplit's fantasy interface and deed template are original; no listings, logos, photographs or proprietary app assets are copied.",
+      "First-party Zillow and Redfin product guidance informed location-first search, asking-price filters, image listings and side-by-side comparison. Lootsplitter's fantasy interface and deed template are original; no listings, logos, photographs or proprietary app assets are copied.",
     links: [
       {
         label: "Zillow saved searches and homes",
@@ -249,13 +249,13 @@ export const resources: Resource[] = [
   {
     name: "In-memory player storage",
     description:
-      "fake-indexeddb implements the IndexedDB API in JavaScript memory (Apache License 2.0). Lootsplit uses it for player sessions so campaign contents are not written to persistent browser databases.",
+      "fake-indexeddb implements the IndexedDB API in JavaScript memory (Apache License 2.0). Lootsplitter uses it for player sessions so campaign contents are not written to persistent browser databases.",
     links: [{ label: "Source and license", url: "https://github.com/dumbmatter/fakeIndexedDB" }],
   },
   {
     name: "Tesseract.js local OCR",
     description:
-      "Tesseract.js and Tesseract (Apache License 2.0), with the MIT-licensed English data package read scanned PDFs and statblock pictures on your device. Lootsplit bundles the worker, recognition models and compatible WASM cores; private files are not sent to an OCR service.",
+      "Tesseract.js and Tesseract (Apache License 2.0), with the MIT-licensed English data package read scanned PDFs and statblock pictures on your device. Lootsplitter bundles the worker, recognition models and compatible WASM cores; private files are not sent to an OCR service.",
     links: [
       { label: "Tesseract.js source", url: "https://github.com/naptha/tesseract.js" },
       { label: "English language data", url: "https://github.com/naptha/tessdata" },
@@ -265,7 +265,7 @@ export const resources: Resource[] = [
   {
     name: "Game-icons.net fantasy icons",
     description:
-      "Icons made by Lorc, Delapouite, Carl Olsen, Caro Asercion, Cathelineau, DarkZaitzev, Faithtoken, Lucas, Sbed, SeregaCthtuf, Skoll, Willdabeast and Zeromancer. Licensed under CC BY 3.0 (Zeromancer: CC0). Lootsplit removes the square backgrounds and applies category colors and framing. Icons are bundled locally; existing custom artwork is preserved.",
+      "Icons made by Lorc, Delapouite, Carl Olsen, Caro Asercion, Cathelineau, DarkZaitzev, Faithtoken, Lucas, Sbed, SeregaCthtuf, Skoll, Willdabeast and Zeromancer. Licensed under CC BY 3.0 (Zeromancer: CC0). Lootsplitter removes the square backgrounds and applies category colors and framing. Icons are bundled locally; existing custom artwork is preserved.",
     links: [
       { label: "Game-icons.net", url: "https://game-icons.net/" },
       { label: "CC BY 3.0 license", url: "https://creativecommons.org/licenses/by/3.0/" },
@@ -300,7 +300,7 @@ export const resources: Resource[] = [
   {
     name: "Open5e",
     description:
-      "Lootsplit uses Open5e to retrieve SRD equipment, spells, SRD creatures for encounter generation, and other supported reference entries. Imported entries keep their individual source credits.",
+      "Lootsplitter uses Open5e to retrieve SRD equipment, spells, SRD creatures for encounter generation, and other supported reference entries. Imported entries keep their individual source credits.",
     links: [
       { label: "Visit Open5e", url: "https://open5e.com" },
       { label: "Open5e licensing", url: "https://open5e.com/legal" },
@@ -308,7 +308,7 @@ export const resources: Resource[] = [
   },
   ...["5.1", "5.2"].map((version) => ({
     name: `System Reference Document ${version}`,
-    description: `This work includes material from the System Reference Document ${version} (“SRD ${version}”) by Wizards of the Coast LLC, available at https://www.dndbeyond.com/srd. The SRD ${version} is licensed under the Creative Commons Attribution 4.0 International License. Retrieved through Open5e; formatting adapted. Prices and categories may be customized in Lootsplit.`,
+    description: `This work includes material from the System Reference Document ${version} (“SRD ${version}”) by Wizards of the Coast LLC, available at https://www.dndbeyond.com/srd. The SRD ${version} is licensed under the Creative Commons Attribution 4.0 International License. Retrieved through Open5e; formatting adapted. Prices and categories may be customized in Lootsplitter.`,
     links: [
       { label: "Original SRD", url: "https://www.dndbeyond.com/srd" },
       { label: "CC BY 4.0 license", url: "https://creativecommons.org/licenses/by/4.0/legalcode" },
@@ -317,7 +317,7 @@ export const resources: Resource[] = [
   {
     name: "Typography",
     description:
-      "Cormorant Garamond (upright and italic), Cormorant SC, Source Sans 3, and Source Serif 4 are distributed with Lootsplit under the SIL Open Font License 1.1. Font files are the Fontsource latin subsets (Cormorant fonts by Christian Thalmann, The Cormorant Project Authors).",
+      "Cormorant Garamond (upright and italic), Cormorant SC, Source Sans 3, and Source Serif 4 are distributed with Lootsplitter under the SIL Open Font License 1.1. Font files are the Fontsource latin subsets (Cormorant fonts by Christian Thalmann, The Cormorant Project Authors).",
     links: [
       { label: "Cormorant Garamond license", url: "/fonts/cormorant-garamond-LICENSE.txt" },
       { label: "Cormorant SC license", url: "/fonts/cormorant-sc-LICENSE.txt" },

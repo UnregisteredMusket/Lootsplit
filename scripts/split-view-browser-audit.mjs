@@ -197,7 +197,7 @@ try {
   await page.locator('[data-split-pane="primary"]').focus();
   await page.keyboard.press("F6");
   await expect(page.locator('[data-split-pane="secondary"]')).toHaveAttribute("data-focused", "true");
-  await expect(page).toHaveTitle(/^Shop · Lootsplit/);
+  await expect(page).toHaveTitle(/^Shop · Lootsplitter/);
   await page.keyboard.press("F6");
   await expect(page.locator('[data-split-pane="primary"]')).toHaveAttribute("data-focused", "true");
 

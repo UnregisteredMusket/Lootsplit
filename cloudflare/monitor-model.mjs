@@ -58,7 +58,7 @@ export function links(value = []) {
       url.hash ||
       !EVIDENCE_HOSTS.includes(url.hostname)
     )
-      fail("Use a credential-free Lootsplit, GitHub or Cloudflare evidence URL.");
+      fail("Use a credential-free Lootsplitter, GitHub or Cloudflare evidence URL.");
     return { label: clean(item.label, 100), url: url.href };
   });
 }

@@ -109,13 +109,13 @@ export function Campaigns() {
       </div>
       {busy ? (
         <p role="status" className="mt-3 text-muted">
-          Deleting from this device… Close other Lootsplit tabs if this is waiting. The campaign
+          Deleting from this device… Close other Lootsplitter tabs if this is waiting. The campaign
           remains listed until storage deletion succeeds.
         </p>
       ) : campaignDeletionFailed() ? (
         <p role="alert" className="mt-3 text-muted">
-          An earlier campaign deletion could not finish. It will retry when Lootsplit is reloaded.
-          Close other Lootsplit tabs first if it keeps failing.
+          An earlier campaign deletion could not finish. It will retry when Lootsplitter is reloaded.
+          Close other Lootsplitter tabs first if it keeps failing.
         </p>
       ) : null}
       <form

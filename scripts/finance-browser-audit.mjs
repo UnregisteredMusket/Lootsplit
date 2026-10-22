@@ -308,7 +308,7 @@ try {
     assert.equal(await other.evaluate(() => window.opener), null);
     await page.keyboard.press("Escape");
     await other.locator("#campaign-finance").waitFor();
-    await expect(other).toHaveTitle("Bank · Lootsplit");
+    await expect(other).toHaveTitle("Bank · Lootsplitter");
     const drafts = [
       [page, "First tab expense", "100"],
       [other, "Second tab expense", "200"],
@@ -365,7 +365,7 @@ try {
     await expect(
       mapWindow.getByRole("region", { name: "Map workspace", exact: true }),
     ).toBeVisible();
-    await expect(mapWindow).toHaveTitle("Maps · Lootsplit");
+    await expect(mapWindow).toHaveTitle("Maps · Lootsplitter");
     assert.equal(
       await mapWindow.evaluate(() => sessionStorage.getItem("lootsplit.window.campaign.v1")),
       parentCampaign,

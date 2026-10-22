@@ -221,7 +221,7 @@ export const validDisplayId = (id: string) => /^[a-f0-9-]{36}$/.test(id);
 export function openPlayerDisplay(id: string, tab = false) {
   if (!validDisplayId(id)) throw Error("Invalid display session.");
   const child = window.open("about:blank", "_blank", tab ? "" : "popup,width=1280,height=800");
-  if (!child) throw Error("Allow pop-ups for Lootsplit, then open the player display again.");
+  if (!child) throw Error("Allow pop-ups for Lootsplitter, then open the player display again.");
   try {
     child.sessionStorage.clear();
     child.opener = null;

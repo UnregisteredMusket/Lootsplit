@@ -2350,10 +2350,10 @@ export async function applySeatLink(): Promise<"player" | "dm" | "bill" | null> 
 
 export function readQuireFile(value: unknown): QuireFile {
   if (typeof value !== "object" || value === null)
-    throw new Error("That file is not a Lootsplit copy.");
+    throw new Error("That file is not a Lootsplitter copy.");
   const file = value as Partial<QuireFile>;
   if (file.kind !== "quire" || (file.version !== 1 && file.version !== 2))
-    throw new Error("That file is not a Lootsplit copy.");
+    throw new Error("That file is not a Lootsplitter copy.");
   for (const key of [
     "books",
     "articles",

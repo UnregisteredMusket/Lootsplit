@@ -1,6 +1,6 @@
 {
   "$schema": "https://json-schema.org/draft/2020-12/schema",
-  "title": "Lootsplit commodity definitions, version 1",
+  "title": "Lootsplitter commodity definitions, version 1",
   "type": "object",
   "additionalProperties": false,
   "required": ["version", "commodities"],

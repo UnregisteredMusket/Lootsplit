@@ -169,17 +169,17 @@ export function CloudTable() {
 
   async function invitePlayers() {
     const url = invitationUrl({ origin: window.location.origin, native: import.meta.env.VITE_MOBILE === "true", code: cloud.code, session: cloud.sessionId });
-    const text = `Join my Lootsplit room. Code: ${cloud.code}${cloud.sessionId ? "." + cloud.sessionId : ""}`;
+    const text = `Join my Lootsplitter room. Code: ${cloud.code}${cloud.sessionId ? "." + cloud.sessionId : ""}`;
     if (import.meta.env.VITE_MOBILE === "true") {
       const { Share } = await import("@capacitor/share");
       try {
-        await Share.share({ title: "Join Lootsplit", text, url });
+        await Share.share({ title: "Join Lootsplitter", text, url });
       } catch (error) {
         if (!/cancel|dismiss/i.test(String(error))) throw error;
       }
     } else if (navigator.share) {
       try {
-        await navigator.share({ title: "Join Lootsplit", text, url });
+        await navigator.share({ title: "Join Lootsplitter", text, url });
       } catch (error) {
         if (!(error instanceof DOMException && error.name === "AbortError")) throw error;
       }

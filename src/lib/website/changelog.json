@@ -1,5 +1,20 @@
 [
   {
+    "version": "1.10.0",
+    "date": "2026-10-22",
+    "summary": "Lootsplit is now Lootsplitter: same app, same data. The update installs over the existing app.",
+    "features": [
+      "Lootsplit is now called Lootsplitter across the app, website, home-screen widgets and Help. Your campaigns, characters, settings, sign-in and placed widgets carry over unchanged."
+    ],
+    "improvements": [
+      "Help explains the new name; backups and campaign copies saved under the old name still import.",
+      "Website pages, browser tab titles, notifications and the installed web app use the Lootsplitter name."
+    ],
+    "fixes": [
+      "The installed web app (Add to home screen) is now named Lootsplitter instead of a generic placeholder name."
+    ]
+  },
+  {
     "version": "1.9.3",
     "date": "2026-10-22",
     "summary": "Split view on tablets, NPC barter conversations, expandable widget rows with Cloudflare usage, and more reliable widgets and backups.",

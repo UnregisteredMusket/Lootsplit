@@ -1,3 +1,7 @@
+# Lootsplit is now Lootsplitter (Android 1.10.0, owner decision 2026-10-22)
+
+- **Product rename.** Every user-visible "Lootsplit" in the app, website, page titles, title screen, PWA manifest (previously the template name "Grok App"), notifications, Android launcher name, both widget labels, Help, credits wording and export file names now reads "Lootsplitter". DM and player Help each have a "Lootsplit is now Lootsplitter" topic. No feature, permission or saved data changed: package/appId, storage keys (`quire.*`, `lootsplit.*`), cookie prefix, D1 schema, backup/import format identifiers (`kind: "quire"`, `lootsplit-` save prefixes), request headers, OIDC audience, URLs, the repository name and past changelog/release-note entries are kept, and old backups still import. Domain cutover to lootsplitter.com is separate.
+
 # October 22, 2026 review fixes (P1–P10)
 
 The October 22 review of `main` at `5d77d25` changed behaviour without removing any feature, permission or saved data. Open follow-ups are listed in [the code audit](audit/2026-10-21-code-audit.md#open-follow-ups-2026-10-22).

@@ -178,7 +178,7 @@ export function CampaignGate({ children }: { children: ReactNode }) {
   }
   return (
     <main className="mx-auto max-w-xl space-y-4 p-6">
-      <h1 className="text-3xl">{library ? "Choose your campaign" : "Welcome to Lootsplit"}</h1>
+      <h1 className="text-3xl">{library ? "Choose your campaign" : "Welcome to Lootsplitter"}</h1>
       {!library ? (
         <>
           <p>Create an account or sign in to proceed as a Dungeon Master in your own campaign</p>

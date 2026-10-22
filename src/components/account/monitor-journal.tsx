@@ -875,7 +875,7 @@ export function MonitorJournal({ data, refresh }: { data: JournalSnapshot; refre
         <section id="monitor-registry">
           <h3>Log registry & schedule</h3>
           <p>
-            Every future log explicitly requested or designated for Lootsplit must automatically
+            Every future log explicitly requested or designated for Lootsplitter must automatically
             become part of the daily report. Register it before its first entry; an unavailable
             registered source remains a coverage gap.
           </p>

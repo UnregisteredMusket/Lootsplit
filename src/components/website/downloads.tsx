@@ -41,7 +41,7 @@ const comparison: [string, string, string][] = [
 export function DownloadsPage() {
   return (
     <Website>
-      <PageHero kicker="Take Lootsplit to your table" title="One party." accent="Your platform.">
+      <PageHero kicker="Take Lootsplitter to your table" title="One party." accent="Your platform.">
         <p className="ls-lead ls-measure">
           Play in your browser or download the Android app. Sign in to host, or join the DM’s
           current invitation as a guest.
@@ -87,7 +87,7 @@ export function DownloadsPage() {
               </div>
               <h2>Always current</h2>
               <p>
-                Use Lootsplit on Windows, macOS, Linux, or your phone. Open the web app and keep
+                Use Lootsplitter on Windows, macOS, Linux, or your phone. Open the web app and keep
                 playing at its existing address.
               </p>
               <p className="ls-card-summary">
@@ -98,7 +98,7 @@ export function DownloadsPage() {
               </AppLink>
               <p className="ls-fine">A native Windows or macOS installer is not available yet.</p>
               <Link className="ls-text-link" to="/help" hash="desktop">
-                Using Lootsplit on your PC <ArrowRight size={16} aria-hidden="true" />
+                Using Lootsplitter on your PC <ArrowRight size={16} aria-hidden="true" />
               </Link>
             </article>
           </div>
@@ -108,7 +108,7 @@ export function DownloadsPage() {
               <h2 id="update-safety">Keep your campaign safe when you update.</h2>
               <p>
                 Export a backup first. Install each new APK over your existing, permanently signed
-                Lootsplit app; keep that app installed and don’t clear its data, because device
+                Lootsplitter app; keep that app installed and don’t clear its data, because device
                 campaigns live inside it. Every release is signed with the same permanent key, so
                 Android accepts it as an update. Very early test builds that weren’t permanently
                 signed can’t update in place; the installation guide explains how to move from
