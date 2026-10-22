@@ -105,3 +105,11 @@ test("the release job applies migrations after verifying the artifact and before
   }
   assert.doesNotMatch(readFileSync("scripts/production-preflight.mjs", "utf8"), /migrations apply/);
 });
+
+test("the repository's migrations would pass the release check (unique numbers, valid names)", () => {
+  const names = readdirSync(new URL("../cloudflare/migrations/", import.meta.url)).filter((n) =>
+    n.endsWith(".sql"),
+  );
+  assert.ok(names.length > 0);
+  assert.deepEqual(pendingMigrations(names, []), [...names].sort());
+});
