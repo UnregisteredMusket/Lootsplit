@@ -81,13 +81,18 @@ export function canAccessEstate(
     (site.access === "selected" && site.accessPurseIds.some((id) => seat.purseIds.includes(id)))
   );
 }
+/** Rounds a weight to 0.001 lb, the precision storage totals are kept at. */
+export const roundWeight = (lb: number) => Math.round(lb * 1000) / 1000;
+/** Whether `count` more units of `unitWeight` fit beside `used` under `capacity`, compared at 0.001 lb. */
+export const weightFits = (used: number, unitWeight: number, count: number, capacity: number) =>
+  roundWeight(used + unitWeight * count) <= capacity;
 export function storageWeight(t: Pick<Table, "holdings">, propertyId: string) {
   const items = t.holdings.filter(
     (h) => h.custody?.kind === "property" && h.custody.propertyId === propertyId,
   );
   return {
     // Fractional item weights (0.05 lb arrows) would otherwise show float noise.
-    weight: Math.round(items.reduce((n, h) => n + (h.weight ?? 0) * h.quantity, 0) * 1000) / 1000,
+    weight: roundWeight(items.reduce((n, h) => n + (h.weight ?? 0) * h.quantity, 0)),
     unknown: items.some((h) => h.weight === undefined),
   };
 }
@@ -96,7 +101,7 @@ function capacity(t: Pick<Table, "holdings">, site: EstateSite, item: Holding, c
   const used = storageWeight(t, site.propertyId);
   if (used.unknown || item.weight === undefined)
     throw Error("The DM must set the missing item weights before using weight-limited storage.");
-  if (used.weight + item.weight * count > site.capacityWeight)
+  if (!weightFits(used.weight, item.weight, count, site.capacityWeight))
     throw Error("This storage has insufficient remaining capacity.");
 }
 export { assertCarried } from "./custody.ts";
