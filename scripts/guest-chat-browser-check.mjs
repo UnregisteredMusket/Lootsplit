@@ -75,6 +75,20 @@ async function seed(page, table) {
     }
   }, table);
 }
+async function probeScopes(page) {
+  await page.evaluate(async () => {
+    const m = await import("/src/lib/quire/cloud-client.ts");
+    window.__scopes = [];
+    let last = "";
+    const rec = () => {
+      const v = m.getCloudTable();
+      const k = JSON.stringify([sessionStorage.getItem("lootsplit.verified-account") || "", v.code, v.seatId, v.sessionId, v.joined]);
+      if (k !== last) { window.__scopes.push(Date.now() % 100000 + " " + k); last = k; }
+    };
+    rec();
+    setInterval(rec, 50);
+  });
+}
 const chat = (page) => page.getByRole("region", { name: "Live party chat", exact: true });
 async function openChat(page) {
   await navigateApplication(page, origin + "/share?tab=chat");
@@ -124,6 +138,12 @@ try {
   await guest.page.getByRole("combobox", { name: "Choose your character", exact: true }).selectOption("hero");
   await guest.page.getByRole("button", { name: "Join room", exact: true }).click();
   await guest.page.getByText("You joined as a player", { exact: true }).waitFor();
+  await openApplication(guest.page, origin + "/share?tab=chat");
+  await probeScopes(guest.page);
+  await guest.page.locator("#chat-message").fill("Typed right after load");
+  await guest.page.waitForTimeout(3000);
+  console.log("guest scopes", await guest.page.evaluate(() => window.__scopes));
+  console.log("guest draft after hydrate:", await guest.page.locator("#chat-message").inputValue().catch(e=>e.message));
   await openChat(guest.page);
   await openChat(dm.page);
   await sendAndExpect("guest party message (Send)", guest.page, [dm.page], "Guest check one: the door is trapped.", "click");
@@ -161,7 +181,10 @@ try {
   await member.page.getByRole("combobox", { name: "Choose your character", exact: true }).selectOption("other");
   await member.page.getByRole("button", { name: "Join room", exact: true }).click();
   await member.page.getByText("You joined as a player", { exact: true }).waitFor();
+  await probeScopes(member.page);
   await openChat(member.page);
+  await member.page.waitForTimeout(3000);
+  console.log("member scopes", await member.page.evaluate(() => window.__scopes));
   await sendAndExpect("signed-in player party message", member.page, [dm.page, guest.page], "Member check: I keep watch.", "click");
   await sendAndExpect("guest party message with a second player", guest.page, [dm.page, member.page], "Guest check four: thanks for watching.", "click");
   await guest.page.screenshot({ path: output + "/guest-chat-mobile.png", fullPage: true });
