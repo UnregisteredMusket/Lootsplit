@@ -1,12 +1,14 @@
 /** Owner-authorized local sessions: LOOTSPLIT_OWNER_TOKEN is supplied securely, never echoed. */
 import { readFileSync } from "node:fs";
+import { deploymentOrigins } from "../src/lib/deployment/origins.mjs";
 const input = JSON.parse(readFileSync(process.argv[2], "utf8"));
 if (!process.env.LOOTSPLIT_OWNER_TOKEN)
   throw Error(
     "Supply the current owner session through LOOTSPLIT_OWNER_TOKEN, or use My account → Field monitor → Development task.",
   );
+// The Origin must equal the host that receives the request (accounts.mjs), so both come from one value.
 const response = await fetch(
-  "https://lootsplit.oliverstorie2017.workers.dev/api/account/owner/monitor/task",
+  new URL("/api/account/owner/monitor/task", deploymentOrigins.website),
   {
     method: "POST",
     redirect: "error",
@@ -14,7 +16,7 @@ const response = await fetch(
     headers: {
       Authorization: `Bearer ${process.env.LOOTSPLIT_OWNER_TOKEN}`,
       "Content-Type": "application/json",
-      Origin: "https://lootsplit.oliverstorie2017.workers.dev",
+      Origin: deploymentOrigins.website,
     },
     body: JSON.stringify(input),
   },

@@ -39,6 +39,8 @@ export type GrokHeadContext = {
   creator?: string;
   creatorId?: string;
   host?: string | null;
+  /** Absolute canonical URL; emits og:url and rel=canonical when set. */
+  canonical?: string;
   cwd?: string;
   site?: OgSite;
 };
@@ -63,6 +65,7 @@ export declare function grokOgHeadTags(ctx?: {
   site?: OgSite;
   documentTitle?: string;
   cwd?: string;
+  canonical?: string;
 }): string[];
 export declare function stripShareMetaTags(html: string): string;
 export declare function normalizeHeadContext(ctx?: GrokHeadContext): {
@@ -71,6 +74,7 @@ export declare function normalizeHeadContext(ctx?: GrokHeadContext): {
   creator: string;
   creatorId: string;
   host: string;
+  canonical: string;
   cwd: string;
   site: OgSite;
 };

@@ -4,7 +4,7 @@ import { readFile } from "node:fs/promises";
 import { createClient } from "@libsql/client/http";
 import { d1Database } from "./database.mjs";
 import { incomingRequest, sendResponse, staticAssets, roomEntryLimit } from "./http.mjs";
-import { validateActivation } from "./state.mjs";
+import { standbyOrigin, validateActivation } from "./state.mjs";
 
 const config = process.env;
 const mode = config.STANDBY_MODE || "locked";
@@ -12,8 +12,7 @@ if (!["active", "locked"].includes(mode)) throw new Error("Invalid standby mode"
 const manifest = JSON.parse(await readFile(new URL("../manifest.json", import.meta.url), "utf8"));
 let worker, env;
 if (mode === "active") {
-  const origin = new URL(config.ACCOUNT_ORIGIN).origin;
-  if (!origin.startsWith("https://") || origin === "https://lootsplit.oliverstorie2017.workers.dev") throw new Error("Set the HTTPS standby origin");
+  const origin = standbyOrigin(config.ACCOUNT_ORIGIN);
   if (!config.ACCOUNT_SECRET || config.ACCOUNT_SECRET.length < 32) throw new Error("Standby signing secret is missing");
   const url = new URL(config.TURSO_DATABASE_URL);
   if (!["https:", "libsql:"].includes(url.protocol) || !url.hostname.endsWith(".turso.io") || !config.TURSO_AUTH_TOKEN) throw new Error("A durable Turso database is required");

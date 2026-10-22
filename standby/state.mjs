@@ -1,4 +1,13 @@
 import assert from "node:assert/strict";
+import { deploymentOrigins } from "../src/lib/deployment/origins.mjs";
+
+/** The standby must never claim the primary website, native API or a legacy host as its own origin. */
+export function standbyOrigin(value) {
+  const origin = new URL(value).origin;
+  const refused = [deploymentOrigins.website, deploymentOrigins.nativeApi, ...deploymentOrigins.legacy];
+  if (!origin.startsWith("https://") || refused.includes(origin)) throw new Error("Set the HTTPS standby origin");
+  return origin;
+}
 
 export async function validateActivation(client, config, manifest) {
   assert.match(config.STANDBY_SNAPSHOT_ID || "", /^[a-f0-9]{32}$/);

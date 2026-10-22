@@ -27,8 +27,24 @@ export async function currentAccountId(): Promise<string | undefined> {
   const env = (globalThis as typeof globalThis & { __env__?: any }).__env__;
   if (!env?.DB || !env?.ACCOUNT_SECRET || !env?.ACCOUNT_ORIGIN) return undefined;
   const { getRequest } = await import("@tanstack/react-start/server");
+  return accountIdForRequest(env, getRequest());
+}
+
+/** Session lookup for the host this request reached: the primary origin or an approved legacy origin
+ * (ACCOUNT_LEGACY_ORIGINS). Any other host, including one named only by forwarded headers, resolves no account. */
+export async function accountIdForRequest(
+  env: { DB: any; ACCOUNT_SECRET: string; ACCOUNT_ORIGIN: string; ACCOUNT_LEGACY_ORIGINS?: string },
+  request: { url: string; headers: Headers },
+): Promise<string | undefined> {
+  const { accountRequestOrigin } = await import("../deployment/origins.mjs");
+  let origin: string;
+  try {
+    origin = accountRequestOrigin(env, request.url);
+  } catch {
+    return undefined;
+  }
   const { accountAuth } = await import("../../../cloudflare/accounts.mjs");
-  const session = await accountAuth(env).api.getSession({ headers: getRequest().headers });
+  const session = await accountAuth({ ...env, ACCOUNT_ORIGIN: origin }).api.getSession({ headers: request.headers });
   if (!session) return undefined;
   const row = await env.DB.prepare("SELECT status,ban_until FROM member_access WHERE user_id=?")
     .bind(session.user.id)

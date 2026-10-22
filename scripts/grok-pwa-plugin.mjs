@@ -17,16 +17,14 @@ import {
   renderWebManifest,
   snapshotOgIdentity,
 } from "./grok-pwa-shared.mjs";
+import { canonicalPublicUrl, publicShareHost } from "../src/lib/deployment/public-urls.mjs";
 
 export const GROK_OG_IDENTITY_ID = "virtual:grok-og-identity";
 
 const INSTALL_PAGE_PATH = join(dirname(fileURLToPath(import.meta.url)), "install-page.html");
 
-function requestHost(req) {
-  const forwarded = req.headers["x-forwarded-host"];
-  const host = forwarded ?? req.headers.host ?? req.headers[":authority"];
-  return Array.isArray(host) ? host[0] : host;
-}
+/** Same rule as the deployed middleware: Host and X-Forwarded-Host never pick absolute URLs. */
+const requestHost = () => publicShareHost();
 
 export function renderInstallPage(hostHeader, url = "/") {
   const template = readFileSync(INSTALL_PAGE_PATH, "utf8");
@@ -53,7 +51,7 @@ function serveGrokPwa(middlewares) {
     }
 
     if (pathOnly === "/__grok/manifest.webmanifest" || pathOnly === "/__grok/manifest.json") {
-      const body = Buffer.from(renderWebManifest(requestHost(req)), "utf8");
+      const body = Buffer.from(renderWebManifest(requestHost()), "utf8");
       res.statusCode = 200;
       res.setHeader("content-type", "application/manifest+json; charset=utf-8");
       res.setHeader("cache-control", "no-cache");
@@ -64,7 +62,7 @@ function serveGrokPwa(middlewares) {
 
     if (isInstallQuery(rawUrl) && isDocumentPath(pathOnly) && acceptsHtml(req.headers.accept)) {
       try {
-        sendHtml(res, renderInstallPage(requestHost(req), rawUrl));
+        sendHtml(res, renderInstallPage(requestHost(), rawUrl));
       } catch (err) {
         console.error("[app-builder] install page missing:", err);
         res.statusCode = 500;
@@ -101,9 +99,9 @@ function wrapHtmlResponses(middlewares, cwd) {
 
     const originalWrite = res.write.bind(res);
     const originalEnd = res.end.bind(res);
-    const host = requestHost(req);
     const injector = createHeadInjector({
-      host,
+      host: requestHost(),
+      canonical: canonicalPublicUrl(pathOnly),
       cwd,
     });
     let mode = null; // null = undecided, "inject" | "passthrough"

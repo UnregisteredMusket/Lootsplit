@@ -2,6 +2,7 @@ import assert from "node:assert/strict";
 import test from "node:test";
 import { DatabaseSync } from "node:sqlite";
 import { smithFixture, smithDesign } from "./test-fixtures/blacksmith.ts";
+import { deploymentOrigins } from "../deployment/origins.mjs";
 import { smithQuote } from "./blacksmith.ts";
 import { readFileSync } from "node:fs";
 import { createRoom, readRoom, readRoomAccess, updateRoom, deleteRoom } from "./room-store.server.ts";
@@ -830,7 +831,7 @@ test("push subscriptions require membership and preserve stable signing keys", a
   const verified = await jwtVerify(jwt, await importJWK(jwk, "ES256"), {
     audience: "https://fcm.googleapis.com",
   });
-  assert.equal(verified.payload.sub, "https://lootsplit.oliverstorie2017.workers.dev");
+  assert.equal(verified.payload.sub, deploymentOrigins.website);
   const originalFetch = globalThis.fetch;
   let sends = 0;
   globalThis.fetch = async (url, init) => {
