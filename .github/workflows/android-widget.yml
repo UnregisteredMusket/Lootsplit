@@ -57,6 +57,10 @@ jobs:
           sudo udevadm control --reload-rules
           sudo udevadm trigger --name-match=kvm
           # Without hardware acceleration the x86_64 emulator boots too slowly to be reliable.
+          # `udevadm trigger` applies the rule asynchronously; wait for it instead of racing it.
+          sudo udevadm settle --timeout=30 || true
+          for _ in $(seq 1 30); do test -r /dev/kvm -a -w /dev/kvm && break; sleep 1; done
+          ls -l /dev/kvm || true
           test -r /dev/kvm -a -w /dev/kvm || { echo "::error title=Emulator acceleration unavailable::/dev/kvm is missing or not accessible on runner $RUNNER_NAME"; exit 1; }
       - name: Verify owner isolation, refresh transport and actual RemoteViews layouts
         uses: reactivecircus/android-emulator-runner@a421e43855164a8197daf9d8d40fe71c6996bb0d # v2.38.0
