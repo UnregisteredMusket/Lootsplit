@@ -917,6 +917,38 @@ test("changed Live payloads use fresh receipts while unchanged retries preserve 
   assert.equal(toCopper(h.authoritative().purses[1]!.coins), 200);
   assert.equal(h.authoritative().ledger.length, 4);
 });
+test("a retried user action with its command ID is queued and applied once (review P3c)", async () => {
+  const give = {
+    kind: "give" as const,
+    fromId: "hero",
+    toId: "other",
+    copper: 100,
+    holdingId: null,
+    quantity: 0,
+    id: "user-action-1",
+  };
+  // Turn-based: the staged action is not queued (or previewed) twice.
+  const staged = outcomeHarness({ live: false });
+  assert.deepEqual(await staged.queueCommand(give), { status: "pending" });
+  assert.deepEqual(await staged.queueCommand(give), { status: "pending" });
+  assert.equal(staged.session().pending.length, 1);
+  assert.equal(staged.session().pending[0].id, "user-action-1");
+  assert.equal(toCopper(staged.local().purses[1]!.coins), 100);
+  // Live with a lost response: the retry is the same pending action, not a second transfer.
+  const lost = outcomeHarness({ lostResponse: true });
+  await lost.queueCommand(give);
+  assert.deepEqual(await lost.queueCommand(give), { status: "pending" });
+  assert.equal(lost.session().pending.length, 1);
+  assert.equal(toCopper(lost.authoritative().purses[1]!.coins), 100);
+  // The same ID for different content is refused, leaving the queue as it was.
+  await assert.rejects(lost.queueCommand({ ...give, copper: 150 }), /already used for a different action/);
+  assert.equal(lost.session().pending.length, 1);
+  // Once committed, the room skips the seen ID if the action is retried.
+  const live = outcomeHarness();
+  assert.deepEqual(await live.queueCommand(give), { status: "committed" });
+  await live.queueCommand(give);
+  assert.equal(toCopper(live.authoritative().purses[1]!.coins), 100);
+});
 test("manual Retry stops after the read acknowledges every action", async () => {
   const h = outcomeHarness({ lostResponse: true });
   await h.queueCommand({

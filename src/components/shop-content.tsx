@@ -16,7 +16,7 @@ import { Link, useNavigate } from "@tanstack/react-router";
 import { useEffect, useState, useSyncExternalStore } from "react";
 import { getCloudTable, subscribeCloudTable } from "@/lib/quire/cloud-client";
 import { toast } from "sonner";
-import { useEconomy } from "@/lib/quire/economy-context";
+import { useCommandId, useEconomy } from "@/lib/quire/economy-context";
 import { SHOP_KINDS, WEALTHS } from "@/lib/quire/labels";
 import {
   charismaOffPercent,
@@ -460,6 +460,8 @@ function StockRow({
   const { buy, updateStock, deleteStock, purses } = useEconomy();
   const dollars = useDollarText();
   const [qty, setQty] = useState("1");
+  // One command ID per purchase, reused if the same purchase is retried.
+  const action = useCommandId(`${purseId}|${qty}`);
   const asked = Number(qty);
   const [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
@@ -512,7 +514,8 @@ function StockRow({
             setError("");
             setNotice("");
             try {
-              const outcome = await buy(line.id, purseId, asked);
+              const outcome = await buy(line.id, purseId, asked, { commandId: action.commandId });
+              action.renew();
               setNotice(mutationNotice(outcome, "Purchase recorded."));
             } catch (e) {
               setError(e instanceof Error ? e.message : "Purchase failed.");
@@ -659,6 +662,8 @@ function SellBox({ shopId }: { shopId: string }) {
       : holdings;
   const [holdingId, setHoldingId] = useState(mine[0]?.id ?? "");
   const [qty, setQty] = useState("1");
+  // One command ID per sale, reused if the same sale is retried.
+  const action = useCommandId(`${holdingId}|${qty}`);
   const holding = mine.find((item) => item.id === holdingId),
     shop = shops.find((s) => s.id === shopId);
   const [busy, setBusy] = useState(false),
@@ -694,7 +699,8 @@ function SellBox({ shopId }: { shopId: string }) {
         setError("");
         setNotice("");
         try {
-          const result = await sell(holding.id, shopId, asked);
+          const result = await sell(holding.id, shopId, asked, { commandId: action.commandId });
+          action.renew();
           setNotice(mutationNotice(result, "Sale recorded."));
         } catch (e) {
           setError(e instanceof Error ? e.message : "Sale failed.");

@@ -1,7 +1,7 @@
 import { SearchSelect } from "@/components/search-select";
 import { useEffect, useId, useRef, useState } from "react";
 import { Building2, MapPin, ScrollText, Search, Scale, KeyRound } from "lucide-react";
-import { useEconomy } from "@/lib/quire/economy-context";
+import { useCommandId, useEconomy } from "@/lib/quire/economy-context";
 import { useSeat } from "@/lib/quire/seat";
 import { useDraftGuard } from "@/lib/quire/use-draft-guard";
 import { useFinanceReadiness } from "@/lib/quire/use-finance-readiness";
@@ -536,6 +536,8 @@ function PropertyViewing({
     [busy, setBusy] = useState(false),
     [error, setError] = useState(""),
     [notice, setNotice] = useState("");
+  // One command ID per purchase, reused if the same purchase is retried.
+  const action = useCommandId(`${buyer}|${quantity}|${review ? JSON.stringify(review) : ""}`);
   const { locked, reason } = useFinanceReadiness();
   useEffect(() => {
     if (!purses.some((purse) => purse.id === buyer)) setBuyer(purses[0]?.id ?? "");
@@ -629,7 +631,9 @@ function PropertyViewing({
               purseId: buyer,
               quantity: units,
               before: review,
+              id: action.commandId,
             });
+            action.renew();
             setNotice(
               mutationNotice(result, "Property purchased. Your deed and receipt are recorded."),
             );
