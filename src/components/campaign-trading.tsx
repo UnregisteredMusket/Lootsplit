@@ -15,6 +15,7 @@ import { AppLink } from "./app-link";
 import { FantasyIcon } from "./fantasy-icon";
 import { ArrowLeftRight, Coins, PackageOpen, Search, UserRound, X } from "lucide-react";
 import { toCopper } from "@/lib/quire/money";
+import { NpcBarterDesk } from "./npc-barter-desk";
 export function CampaignTrading() {
   const t = useWorldTable(),
     world = readWorld(t.journal.world),
@@ -53,6 +54,7 @@ export function CampaignTrading() {
       <AppLink className="settings-link" href="/features/npcs">
         Find nearby NPCs →
       </AppLink>
+      <NpcBarterDesk table={t as unknown as CloudTable} />
       {editing !== undefined && (
         <TradeEditor
           key={editing?.id ?? "new"}
