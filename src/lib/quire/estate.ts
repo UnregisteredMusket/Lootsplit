@@ -131,6 +131,42 @@ export function assertEstateDisposable(t: Table, propertyId: string) {
       "Resolve stored goods, work, staff, tenants, orders and unpaid expenses before selling or giving this property. The DM can record an explicit handover that keeps its contents and agreements.",
     );
 }
+/** The operating record a fresh purchase of a `template` listing creates for `propertyId`. */
+export function purchaseSite(
+  template: EstateTemplate,
+  propertyId: string,
+  attachments: string[] = [],
+): EstateSite {
+  return {
+    propertyId,
+    templateKey: template.key,
+    enabled: true,
+    access: template.storage?.defaultAccess ?? "owner",
+    accessPurseIds: [],
+    capacityWeight: template.ship?.stats.cargoWeight ?? template.storage?.capacityWeight ?? null,
+    completedTemplates: [...attachments],
+    notes: "",
+  };
+}
+function addPurchaseSite(
+  t: CloudTable,
+  s: Estate,
+  holding: Holding,
+  templateKey: string,
+  attachments: string[],
+) {
+  if (holding.quantity !== 1)
+    throw Error(
+      "Acquire an operating property's legal parcel one at a time. Each parcel receives its own deed and operating record.",
+    );
+  const template = s.templates.find((x) => x.key === templateKey);
+  if (!template)
+    throw Error(
+      "This listing's property template is missing; ask the DM to repair it before purchase.",
+    );
+  s.sites.push(purchaseSite(template, holding.id, attachments));
+  initializeShipPurchase(t, holding, template);
+}
 export function initializeEstatePurchase(
   t: CloudTable,
   holding: Holding,
@@ -138,29 +174,72 @@ export function initializeEstatePurchase(
   attachments: string[] = [],
 ) {
   if (!templateKey) return;
-  if (holding.quantity !== 1)
-    throw Error(
-      "Acquire an operating property's legal parcel one at a time. Each parcel receives its own deed and operating record.",
-    );
-  const s = readEstate(t.journal?.propertyOperations),
-    template = s.templates.find((x) => x.key === templateKey);
-  if (!template)
-    throw Error(
-      "This listing's property template is missing; ask the DM to repair it before purchase.",
-    );
-  s.sites.push({
-    propertyId: holding.id,
-    templateKey,
-    enabled: true,
-    access: template.storage?.defaultAccess ?? "owner",
-    accessPurseIds: [],
-    capacityWeight: template.ship?.stats.cargoWeight ?? template.storage?.capacityWeight ?? null,
-    completedTemplates: attachments,
-    notes: "",
-  });
+  const s = readEstate(t.journal?.propertyOperations);
+  addPurchaseSite(t, s, holding, templateKey, attachments);
   t.journal!.propertyOperations = s;
-  initializeShipPurchase(t, holding, template);
 }
+/** Imported estate listings are numbered `${receipt}-property-${index}` (estate-import.ts). */
+const IMPORTED_LISTING = /-property-\d+$/;
+export const isImportedEstateListingId = (id: string) => IMPORTED_LISTING.test(id);
+export type EstateSetupNeed = {
+  holding: Holding;
+  listingId: string;
+  /** Pre-selected template, when the listing still names one or one template matches the type. */
+  templateKey?: string;
+  attachments: string[];
+  /** Whether the purchase receipt is still in the open ledger (sessions archive older lines). */
+  receipt: boolean;
+};
+/**
+ * Read-only detection of deeded properties bought from an estate listing before P3a was fixed:
+ * the purchase wrote the deed but no operating record. Nothing is changed automatically; the
+ * DM confirms a template and applies it with `estate-site` or `estate-ship-setup`.
+ * Players never receive these prompts.
+ */
+export function estateSetupNeeds(
+  t: Pick<CloudTable, "holdings" | "listings" | "ledger" | "journal">,
+  seat: Pick<CloudSeat, "role">,
+): EstateSetupNeed[] {
+  if (seat.role !== "dm") return [];
+  const s = readEstate(t.journal?.propertyOperations),
+    fleet = t.journal?.fleet;
+  const templates = new Set(s.templates.map((x) => x.key));
+  const needs: EstateSetupNeed[] = [];
+  for (const h of t.holdings) {
+    const listingId = h.deed?.listingId;
+    if (h.kind !== "property" || h.quantity < 1 || !listingId) continue;
+    if (
+      s.sites.some((x) => x.propertyId === h.id) ||
+      fleet?.vessels.some((v) => v.propertyId === h.id) ||
+      fleet?.facilities.some((y) => y.propertyId === h.id)
+    )
+      continue;
+    const listing = t.listings.find((l) => l.id === listingId);
+    if (!listing?.estateTemplateKey && !IMPORTED_LISTING.test(listingId)) continue;
+    const typed = s.templates.filter((x) => h.property?.type && x.propertyType === h.property.type);
+    const templateKey =
+      listing?.estateTemplateKey && templates.has(listing.estateTemplateKey)
+        ? listing.estateTemplateKey
+        : typed.length === 1
+          ? typed[0].key
+          : undefined;
+    needs.push({
+      holding: h,
+      listingId,
+      ...(templateKey ? { templateKey } : {}),
+      attachments:
+        listing && templateKey && templateKey === listing.estateTemplateKey
+          ? (listing.estateAttachments ?? []).filter((key) => templates.has(key))
+          : [],
+      receipt: t.ledger.some(
+        (l) => l.listingPurchase?.listingId === listingId && l.listingPurchase?.holding.id === h.id,
+      ),
+    });
+  }
+  return needs;
+}
+/** Ship and shipyard templates also need their fleet record, so they use `estate-ship-setup`. */
+export const setupNeedsFleet = (template: EstateTemplate) => !!(template.ship || template.shipyard);
 export function removeEstateSite(t: CloudTable, propertyId: string) {
   removeShip(t, propertyId);
   if (!t.journal?.propertyOperations) return;
@@ -638,6 +717,23 @@ export function applyEstateCommand(t: CloudTable, seat: CloudSeat, cmd: EstateCo
         throw Error("Review unknown weights or remove excess goods before limiting storage.");
     }
     state.sites = [...state.sites.filter((x) => x.propertyId !== cmd.site.propertyId), cmd.site];
+  } else if (cmd.kind === "estate-ship-setup") {
+    // Repair for ship/shipyard properties bought without an operating record: the same site and
+    // fleet record a fresh purchase creates. No charge, no new deed; a retry finds the record.
+    dm();
+    const h = property(t, cmd.propertyId),
+      template = state.templates.find((x) => x.key === cmd.templateKey);
+    if (!template || !setupNeedsFleet(template))
+      throw Error("Choose a ship or shipyard template; other templates use property settings.");
+    if (
+      state.sites.some((x) => x.propertyId === h.id) ||
+      journal.fleet?.vessels.some((v) => v.propertyId === h.id) ||
+      journal.fleet?.facilities.some((y) => y.propertyId === h.id)
+    )
+      throw Error("This property's settings changed. Reload your draft.");
+    if (cmd.attachments.some((key) => !state.templates.some((x) => x.key === key)))
+      throw Error("A property template is missing.");
+    addPurchaseSite(t, state, h, template.key, cmd.attachments);
   } else if (cmd.kind === "estate-withdrawal-review") {
     const request = state.withdrawals.find((r) => r.id === cmd.requestId);
     if (!request || canonicalJson(request) !== cmd.before)

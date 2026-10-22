@@ -14,6 +14,15 @@ Owned ship and Private shipyard presets extend this same register, storage, staf
 4. Enable its operations and configure owner, assigned party-character or selected-character access. Party warehouses default to shared access. Set unlimited storage or a finite limit using existing inventory weight units; unknown weights must be reviewed for a finite limit.
 5. Purchase listings through the existing review flow. A reviewed operating template activates storage on acquisition, while staff and tenancy agreements require separate review. Purchased property retains its transaction-filled inventory deed. Imported pre-owned holdings do not invent a purchase receipt or deed.
 
+### Repair: properties bought without an operating record
+
+Before PR #165, an offline (device) campaign that imported a property document and then bought one of its listings got the deed and the charge but no operating record, because the stored listing had lost its template key. Shared-room purchases were rejected instead, so no shared room was affected.
+
+- **Detection (read-only).** A deeded property holding (`deed.listingId`) with no site in `propertyOperations.sites` and no vessel/facility, whose listing still names a template or whose listing ID is an imported one (`…-property-N`). The `listingPurchase` receipt is reported as evidence but not required, because session archives close older ledger lines. Ordinary market properties without a template are not flagged. `estateSetupNeeds` returns nothing for players.
+- **Prompt (DM only).** Property Management shows a summary and a **Set up operations** form under each flagged property. The template is pre-selected when the listing still names one (its attachments are kept) or when exactly one template has the property's type; otherwise the DM chooses.
+- **Apply.** Ordinary templates use the existing `estate-site` command with `before: null` and the same record a purchase creates (`purchaseSite`). Ship and shipyard templates use `estate-ship-setup`, which also creates the vessel or facility (`initializeShipPurchase`). Both are DM-only on the server, charge nothing, write no deed or ledger line, and refuse a retry once the record exists. Offline runs the same commands through `executeLocalCommand`.
+- **Unsold imported listings** that lost their key: the DM re-selects the **Property operations template** in the listing editor; the editor shows a hint for imported listings without one.
+
 ## Store items and materials
 
 Deposit or withdraw real inventory lots while the party is at the property. Partial moves split the quantity while conserving total wealth. Stored, reserved and travelling goods cannot be equipped, consumed, sold or given through the carried character sheet. Sheet edits retain those records.

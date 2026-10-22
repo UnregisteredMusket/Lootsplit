@@ -31,6 +31,7 @@ import { Button, Field, Select, TextInput, TextArea, Modal } from "./ui";
 import { propertyDraft, readPropertyDraft } from "@/lib/quire/property-draft";
 import { readEstate } from "@/lib/quire/estate-schema";
 import { ESTATE_CATALOGUE } from "@/lib/quire/estate-catalogue";
+import { isImportedEstateListingId } from "@/lib/quire/estate";
 import { TemplateWorkshop } from "./property-operations";
 import "./property-marketplace.css";
 
@@ -1000,6 +1001,12 @@ function PropertyListingEditor({
           <p>No saved operations templates yet. Choose a preset to review and save one.</p>
         )}
         {templateNotice && <p role="status">{templateNotice}</p>}
+        {listing && !estateTemplateKey && isImportedEstateListingId(listing.id) && (
+          <p>
+            This listing came from a property import. If an older save lost its operations
+            template, choose it here again so a purchase creates the operating record.
+          </p>
+        )}
       </Field>
       <PropertyProfileFields
         draft={draft}

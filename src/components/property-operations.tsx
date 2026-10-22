@@ -29,9 +29,13 @@ import {
 import {
   canAccessEstate,
   estateCapabilities,
+  estateSetupNeeds,
   estateTemplates,
   physicallyHere,
+  purchaseSite,
+  setupNeedsFleet,
   storageWeight,
+  type EstateSetupNeed,
 } from "@/lib/quire/estate";
 import { ESTATE_CATALOGUE, estatePreset } from "@/lib/quire/estate-catalogue";
 import {
@@ -195,6 +199,8 @@ export function PropertyOperations({ holding: h }: { holding: Holding }) {
     site = state.sites.find((s) => s.propertyId === h.id),
     dm = seat.role === "dm";
   const here = physicallyHere(t, h);
+  // DM-only (estateSetupNeeds returns nothing for players); commands are DM-checked server-side.
+  const setup = estateSetupNeeds(t, seat).find((n) => n.holding.id === h.id);
   return (
     <section className="estate-operations" aria-label={`${h.name} operations`}>
       <ShipManagement holding={h} />
@@ -203,6 +209,7 @@ export function PropertyOperations({ holding: h }: { holding: Holding }) {
         {site?.enabled ? "Operations enabled" : "Awaiting DM setup"} ·{" "}
         {here ? "Party is at this location" : "Remote reports · travel here to move goods"}
       </p>
+      {setup && <OperationsSetup key={setup.templateKey ?? ""} need={setup} state={state} />}
       {dm && (
         <Fold title="Property settings & permissions">
           <SiteSettings key={JSON.stringify(site)} holding={h} state={state} />
@@ -276,6 +283,54 @@ export function PropertyOperations({ holding: h }: { holding: Holding }) {
         <AppLink href="/features/review">DM review inbox</AppLink>
       </p>
     </section>
+  );
+}
+/** Repair prompt for a deeded property bought before its listing kept the operations template. */
+function OperationsSetup({ need, state }: { need: EstateSetupNeed; state: Estate }) {
+  const h = need.holding,
+    [templateKey, setTemplateKey] = useState(need.templateKey ?? ""),
+    template = state.templates.find((x) => x.key === templateKey);
+  return (
+    <div className="estate-setup-prompt">
+      <ActionForm
+        title="Set up operations"
+        label="Set up operations"
+        disabled={!state.templates.length}
+        submitDisabled={!template}
+        command={() => {
+          if (!template) throw Error("Choose this property's operations template.");
+          const attachments = template.key === need.templateKey ? need.attachments : [];
+          return setupNeedsFleet(template)
+            ? {
+                kind: "estate-ship-setup",
+                propertyId: h.id,
+                templateKey: template.key,
+                attachments,
+              }
+            : { kind: "estate-site", before: null, site: purchaseSite(template, h.id, attachments) };
+        }}
+      >
+        <p>
+          This property was bought from a market listing, but no operating record was created.
+          Choose its template to create the record a purchase creates now. No coins are charged and
+          the deed is unchanged. Only the DM sees this.
+        </p>
+        {!state.templates.length && (
+          <p>Create or import a property template in the DM estate workshop first.</p>
+        )}
+        <Field label="Operations template for this property">
+          <Select value={templateKey} onChange={(e) => setTemplateKey(e.target.value)}>
+            <option value="">Choose a template</option>
+            {state.templates.map((x) => (
+              <option key={x.key} value={x.key}>
+                {x.name}
+                {x.key === need.templateKey ? " (suggested)" : ""}
+              </option>
+            ))}
+          </Select>
+        </Field>
+      </ActionForm>
+    </div>
   );
 }
 function SiteSettings({ holding: h, state }: { holding: Holding; state: Estate }) {

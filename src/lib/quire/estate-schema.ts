@@ -376,6 +376,13 @@ export const estateCommands = [
   z.object({ id, kind: z.literal("estate-site"), before: siteSchema.nullable(), site: siteSchema }),
   z.object({
     id,
+    kind: z.literal("estate-ship-setup"),
+    propertyId: id,
+    templateKey: estateKey,
+    attachments: z.array(estateKey).max(100),
+  }),
+  z.object({
+    id,
     kind: z.literal("estate-storage"),
     propertyId: id,
     holdingId: id,
