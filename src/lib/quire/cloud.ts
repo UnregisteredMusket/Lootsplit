@@ -64,6 +64,8 @@ export type CloudRoom = {
   viewOnly?: boolean;
   testMode?: boolean;
   testTemplate?: CloudTable;
+  /** Owner monitor synthetic round trip (cloudflare/probe-namespace.mjs); never a player campaign. */
+  monitorProbe?: boolean;
   departed?: Array<CloudSeat & { status: "left" | "dismissed" | "kicked" | "banned"; userId?: string }>;
   invitations?: Record<string, string>;
   blockedUsers?: Record<string, "kicked" | "banned">;

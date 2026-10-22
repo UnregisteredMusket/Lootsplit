@@ -25,6 +25,18 @@ import { characterSheet } from "../characters/campaign-sheet.mjs";
 import { makeCampaignRoll } from "../characters/campaign-roll.mjs";
 import { manualCharacterRolls, database } from "./room-store.server.ts";
 import { referenceAccess, referenceSection } from "./reference-access.ts";
+import { isProbeRoomCode } from "../../../cloudflare/probe-namespace.mjs";
+
+/**
+ * Server-only options. Client server functions pass a single `data` argument, so a browser can never
+ * supply these: only the owner monitor's multiplayer probe (cloudflare/multiplayer-probe.mjs) does.
+ */
+export type ProbeAccess = { monitorProbe: true; code: string };
+/** Probe rooms answer exactly like a missing room to every caller except the probe itself. */
+function refuseProbeRoom(room: CloudRoom, probe?: ProbeAccess) {
+  if ((room.monitorProbe || isProbeRoomCode(room.code)) && !(probe?.monitorProbe && probe.code === room.code))
+    throw new Error("No table uses that code.");
+}
 
 async function activeEncounter(code: string): Promise<boolean> {
   const db = database();
@@ -179,14 +191,16 @@ export async function openRoom(input: {
   name: string;
   table: CloudTable;
   userId?: string;
-}): Promise<{ code: string; token: string; seatId: string; revision: number; userId?: string }> {
+}, probe?: ProbeAccess): Promise<{ code: string; token: string; seatId: string; revision: number; userId?: string }> {
   const table = readCloudTableForImport(input.table);
   if (!table)
     throw new Error(
       "This campaign has invalid saved data. Keep a recovery export and repair unreadable archives before sharing a new room.",
     );
   if (table.purses.length === 0) throw new Error("The table has no characters to share.");
-  const code = await freshCode();
+  if (probe && (!isProbeRoomCode(probe.code) || input.userId))
+    throw new Error("A monitor probe room needs a probe code and no account.");
+  const code = probe ? probe.code : await freshCode();
   const seat: CloudSeat = {
     id: crypto.randomUUID(),
     token: crypto.randomUUID(),
@@ -205,6 +219,7 @@ export async function openRoom(input: {
     seats: [seat],
     table,
     seen: { gifts: [], sales: [] },
+    ...(probe ? { monitorProbe: true } : {}),
   });
   return { code, token: seat.token, seatId: seat.id, revision: 1, userId: seat.userId };
 }
@@ -215,6 +230,7 @@ export async function previewRoom(
   userId?: string,
 ): Promise<{ characters: { id: string; name: string }[] }> {
   const room = await must(code);
+  refuseProbeRoom(room);
   requireInvitationSession(room, sessionId);
   return {
     characters: room.table.purses
@@ -238,7 +254,7 @@ export async function joinRoom(input: {
   invitation?: string;
   userId?: string;
   sessionId?: string;
-}): Promise<{
+}, probe?: ProbeAccess): Promise<{
   token: string;
   seatId: string;
   revision: number;
@@ -247,6 +263,7 @@ export async function joinRoom(input: {
   userId?: string;
 }> {
   const room = await must(input.code);
+  refuseProbeRoom(room, probe);
   if (room.testMode) throw Error("Test rooms are private to the owner.");
   requireInvitationSession(room, input.sessionId);
   const existing =

@@ -189,6 +189,17 @@ async function seedHealthy(DB) {
   await DB.prepare("INSERT INTO owner_monitor_devices VALUES('d','owner',?,'{}')")
     .bind(now - MIN)
     .run();
+  // The latest half-hour multiplayer round-trip probe passed.
+  await DB.prepare(
+    "INSERT INTO owner_monitor_logs(id,source,observed_at,collected_at,summary,body) VALUES('multiplayer:1','multiplayer',?,?,?,?)",
+  )
+    .bind(
+      now - 15 * MIN,
+      now - 15 * MIN,
+      "Multiplayer round trip passed in 40 ms.",
+      '{"outcome":"passed","durationMs":40}',
+    )
+    .run();
 }
 async function seedIntervals(DB, errorsBySlot) {
   for (const { slot: at, errors } of intervalsWith(errorsBySlot))
@@ -209,7 +220,7 @@ async function seedIntervals(DB, errorsBySlot) {
       .run();
 }
 
-test("the production reading reads as attention with a coverage note, not a failure", async () => {
+test("the production reading reads as attention, not a failure, with Multiplayer measured", async () => {
   const DB = localAccountDb();
   try {
     await initializeMonitor(DB, now - 25 * HOUR);
@@ -227,12 +238,12 @@ test("the production reading reads as attention with a coverage note, not a fail
     assert.equal(errors.lastAt, slot("2026-10-22T00:30:00Z"));
     assert.equal(errors.errorCode, "WORKER_ERRORS_OBSERVED");
     const multiplayer = snapshot.diagnostics.find((d) => d.component === "Multiplayer");
-    assert.equal(multiplayer.color, "yellow", "The coverage limit stays visible");
-    assert.equal(multiplayer.required, false);
-    assert.equal(multiplayer.coverageLimit, true);
+    assert.equal(multiplayer.color, "green", "A passed probe is a real healthy observation");
+    assert.equal(multiplayer.required, true);
+    assert.equal(multiplayer.coverageLimit, undefined);
     assert.equal(snapshot.overall.status, "attention");
     assert.equal(snapshot.overall.reason, "Worker execution errors");
-    assert.deepEqual(snapshot.overall.notes, ["Multiplayer"]);
+    assert.deepEqual(snapshot.overall.notes, []);
     // A new error in the newest half-hour makes it a failure again.
     await DB.prepare("DELETE FROM owner_monitor_intervals").run();
     await seedIntervals(DB, { "2026-10-22T02:30:00.000Z": 1 });
@@ -242,7 +253,7 @@ test("the production reading reads as attention with a coverage note, not a fail
       collector: async () => reading(now + 1000, { requests: 23674, errors: 1, ...window24 }),
     });
     assert.equal(failing.overall.status, "failure");
-    // Without any errors the same system reads healthy, with Multiplayer as a coverage note.
+    // Without any errors the same system reads healthy; Multiplayer is no longer a coverage note.
     const healthy = await monitorSnapshot({ DB }, "owner", {
       force: true,
       now: now + 2000,
@@ -250,7 +261,7 @@ test("the production reading reads as attention with a coverage note, not a fail
     });
     assert.equal(healthy.overall.color, "green");
     assert.equal(healthy.overall.status, "healthy");
-    assert.match(healthy.overall.reason, /Coverage limit noted \(not a failure\): Multiplayer/);
+    assert.equal(healthy.overall.reason, "All required checks passed.");
     // History records each transition.
     const transitions = await DB.prepare(
       "SELECT COUNT(*) AS n FROM owner_monitor_logs WHERE source='diagnostics' AND json_extract(body,'$.diagnostic.component')='Worker execution errors'",
