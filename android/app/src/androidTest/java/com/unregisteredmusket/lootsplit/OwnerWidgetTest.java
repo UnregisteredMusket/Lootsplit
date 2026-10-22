@@ -524,6 +524,28 @@ public class OwnerWidgetTest {
         return out.get();
     }
     private String text(View view,int id){ return ((TextView)view.findViewById(id)).getText().toString(); }
+    @Test public void healthyReadingStaysGreenUntilThirtyFiveMinutes() throws Exception {
+        long now=System.currentTimeMillis();
+        JSONObject source=journalFixture();
+        source.put("overall",new JSONObject().put("color","green").put("status","healthy").put("reason","All required checks passed."));
+        for(int i=0;i<source.getJSONArray("diagnostics").length();i++)source.getJSONArray("diagnostics").getJSONObject(i).put("color","green");
+        JSONObject snapshot=WidgetData.project(source,now);
+        assertEquals(35L*60000,OwnerWidgetProvider.STALE_AFTER_MILLIS);
+        // A reading from the previous ~30-minute background refresh is still healthy (was amber after 2 minutes).
+        snapshot.put("checkedAt",now-31*60000L);
+        assertEquals("green",OwnerWidgetProvider.statusColor(snapshot,now));
+        assertEquals("HEALTHY",WidgetRows.status(snapshot));
+        snapshot.put("checkedAt",now-OwnerWidgetProvider.STALE_AFTER_MILLIS);
+        assertEquals("Exactly at the threshold is still fresh","green",OwnerWidgetProvider.statusColor(snapshot,now));
+        snapshot.put("checkedAt",now-36*60000L);
+        assertEquals("A missed refresh turns the healthy reading amber","yellow",OwnerWidgetProvider.statusColor(snapshot,now));
+        assertEquals("HEALTHY AT LAST CHECK",WidgetRows.status(snapshot));
+        // A confirmed failure stays red however old it is; readings over one hour are still hidden.
+        snapshot.put("statusColor","red");
+        assertEquals("red",OwnerWidgetProvider.statusColor(snapshot,now));
+        snapshot.put("checkedAt",now-3600001L);
+        assertNull(OwnerWidgetProvider.current(new JSONObject().put("token","synthetic").put("snapshot",snapshot)));
+    }
     @Test public void mainFaceGlyphsReasonStatsAndAttentionOrdering() throws Exception {
         java.util.Set<String> glyphs=new java.util.HashSet<>();
         for(String color:new String[]{"green","yellow","red"}) {

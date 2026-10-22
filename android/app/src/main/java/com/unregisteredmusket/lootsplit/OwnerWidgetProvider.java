@@ -33,10 +33,18 @@ public class OwnerWidgetProvider extends AppWidgetProvider {
         if (state.optString("token").isEmpty() || snapshot == null || System.currentTimeMillis()-snapshot.optLong("checkedAt")>3600000) return null;
         return snapshot;
     }
-    static String statusColor(JSONObject snapshot) {
+    /**
+     * A healthy reading older than this is drawn amber ("HEALTHY AT LAST CHECK"). Background delivery
+     * is about every 30 minutes, so 35 minutes keeps a normally refreshed widget green while still
+     * marking a missed refresh. The web dashboard, which polls continuously, keeps its two-minute rule.
+     * Readings over an hour old are hidden entirely (current()).
+     */
+    static final long STALE_AFTER_MILLIS = 35L * 60000;
+    static String statusColor(JSONObject snapshot) { return statusColor(snapshot, System.currentTimeMillis()); }
+    static String statusColor(JSONObject snapshot, long now) {
         if(snapshot==null)return "yellow";
         String color=snapshot.optString("statusColor","yellow");
-        return "red".equals(color)?"red":System.currentTimeMillis()-snapshot.optLong("checkedAt")>120000?"yellow":color;
+        return "red".equals(color)?"red":now-snapshot.optLong("checkedAt")>STALE_AFTER_MILLIS?"yellow":color;
     }
     static int color(String value,boolean light) { return light ? "red".equals(value)?Color.rgb(157,42,42):"green".equals(value)?Color.rgb(21,112,62):Color.rgb(133,91,8) : color(value); }
     static int color(String value) { return "red".equals(value)?Color.rgb(244,114,114):"green".equals(value)?Color.rgb(19,245,128):Color.rgb(238,199,113); }
