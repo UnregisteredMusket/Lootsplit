@@ -1,4 +1,10 @@
-import { encodeRoomImages, hydrateRoomImages, roomImageStatements } from "../../../cloudflare/room-images.mjs";
+import {
+  encodeRoomImages,
+  encodedRoomBytes,
+  hydrateRoomImages,
+  roomImageStatements,
+  ROOM_BODY_LIMIT,
+} from "../../../cloudflare/room-images.mjs";
 import { mkdir, open, readFile, rename, unlink } from "node:fs/promises";
 import path from "node:path";
 import type { CloudRoom } from "./cloud.ts";
@@ -153,12 +159,11 @@ export async function readRoom(code: string): Promise<CloudRoom | null> {
  * refused below that with a clear message, and the refusal is logged to the owner monitor
  * (`room-storage`, registered in BUILTIN_LOGS). The stored campaign is never changed by a refusal.
  */
-export const ROOM_BODY_LIMIT = 1_800_000;
+export { ROOM_BODY_LIMIT };
 type Encoded = Awaited<ReturnType<typeof encodeRoomImages>>;
 const utf8 = (text: string) => new TextEncoder().encode(text).length;
 async function guardRoomSize(db: Database, room: CloudRoom, encoded: Encoded) {
-  const bytes = utf8(encoded.body);
-  const largestReport = Math.max(0, ...encoded.reports.map((r) => utf8(r.body)));
+  const { bytes, largestReport } = encodedRoomBytes(encoded);
   if (bytes <= ROOM_BODY_LIMIT && largestReport <= ROOM_BODY_LIMIT) return;
   const now = Date.now();
   try {
