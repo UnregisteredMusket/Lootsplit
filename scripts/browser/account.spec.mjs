@@ -73,6 +73,13 @@ test("network-boundary", async ({ devices, baseURL: origin }) => {
 // unchanged per-test and suite budgets rather than the final queue remainder.
 test("ownership", async ({ devices, baseURL: origin }, testInfo) => {
   const dm = devices.page;
+  // Elapsed-time marks for the per-case duration annotation (account-durations.mjs).
+  const started = Date.now();
+  const phase = (name) =>
+    testInfo.annotations.push({
+      type: "phase",
+      description: `${name} ${((Date.now() - started) / 1000).toFixed(1)}s`,
+    });
   // This scenario verifies ownership and recovery, with the optional Help offer
   // already answered on each synthetic device. Dedicated Help audits exercise
   // the offer itself. Keep real title screens, cold entries and all auth gates.
@@ -142,7 +149,9 @@ test("ownership", async ({ devices, baseURL: origin }, testInfo) => {
   // Reload after the explicit legacy claim to prove ownership and bytes persist.
   await visitPage(dm, origin, "/party");
   await expect(dm.getByText("Preserved legacy hero", { exact: true }).first()).toBeVisible();
+  phase("legacy claimed");
   await createRoom(dm, origin, navigateAccountScenario);
+  phase("room created");
   await dm.evaluate(() =>
     Object.defineProperty(navigator, "share", {
       configurable: true,
@@ -176,6 +185,7 @@ test("ownership", async ({ devices, baseURL: origin }, testInfo) => {
   await guest.getByRole("button", { name: "Join room", exact: true }).click();
   await expect(guest.locator(".room-code")).toHaveText(code);
   expect(await guest.evaluate(async () => (await indexedDB.databases()).length)).toBe(0);
+  phase("guest joined");
   expect(
     await guest.evaluate(() => Object.keys(localStorage).some((k) => k.startsWith("quire.cloud"))),
   ).toBe(false);
@@ -213,6 +223,7 @@ test("ownership", async ({ devices, baseURL: origin }, testInfo) => {
   // pattern; remove this handler before later cold guest reloads and account resumes.
   // The fixture's independent external-network boundary remains in place.
   await guest.unroute("**/_serverFn/**", rejectRollPolicy);
+  phase("policy retried");
   await guest.getByRole("link", { name: "Home", exact: true }).first().click();
   await guest
     .getByRole("link", { name: "Campaign, messages & session status →", exact: true })
@@ -224,6 +235,7 @@ test("ownership", async ({ devices, baseURL: origin }, testInfo) => {
     path: testInfo.outputPath("guest-memory-mobile.png"),
     fullPage: true,
   });
+  phase("guest reloaded");
   await endSession(dm, origin, navigateAccountScenario);
   // Closing is acknowledged before either read. The DM can open its library
   // while the guest observes revocation; both finish before the room is reopened.
@@ -236,6 +248,7 @@ test("ownership", async ({ devices, baseURL: origin }, testInfo) => {
     })(),
     navigateAccountScenario(dm, origin, "/account"),
   ]);
+  phase("session ended");
   await dm.getByRole("button", { name: "Reopen as DM", exact: true }).click();
   await dm.waitForURL((u) => u.pathname === "/");
   // Reopen has acknowledged the new session. The old anonymous invitation read
@@ -263,17 +276,20 @@ test("ownership", async ({ devices, baseURL: origin }, testInfo) => {
       await dm.getByRole("button", { name: "Share join link", exact: true }).click();
     })(),
   ]);
+  phase("reopened");
   const returning = credentials();
   const { page: secondPlayer, context: playerContext } = await devices.newDevice();
   await playerContext.addInitScript(guidePreference);
   await accountPost(guest.context(), origin, "auth/sign-up/email", returning);
   await accountPost(playerContext, origin, "auth/sign-in/email", returning);
+  phase("accounts ready");
   const freshLink = new URL(await dm.evaluate(() => window.invitationForTest));
   await visitPage(guest, origin, freshLink.pathname + freshLink.search);
   await guest.getByRole("button", { name: "Find characters", exact: true }).click();
   await guest.getByPlaceholder("What should the party call you?").fill("Returning player");
   await guest.getByRole("button", { name: "Join room", exact: true }).click();
   await expect(guest.locator(".room-code")).toHaveText(code);
+  phase("returning joined");
   await visitPage(secondPlayer, origin, "/account");
   await secondPlayer.getByRole("button", { name: "Resume", exact: true }).click();
   await secondPlayer.waitForURL((u) => u.pathname === "/");
@@ -289,9 +305,11 @@ test("ownership", async ({ devices, baseURL: origin }, testInfo) => {
   await expect(secondPlayer.locator(".loot-opening")).toHaveCount(0);
   await expect(secondPlayer.locator(".room-code")).toHaveText(code);
   expect(await secondPlayer.evaluate(async () => (await indexedDB.databases()).length)).toBe(0);
+  phase("resumed");
   // Closing the DM's tab is not End session; a fresh player reload still reconnects.
   await dm.close();
   await secondPlayer.reload();
+  phase("reload started");
   await continueIntoApp(secondPlayer);
   await expect(secondPlayer.locator(".room-code")).toHaveText(code);
 });
