@@ -37,6 +37,15 @@ MCP servers are pinned to exact versions; `scripts/agent-guard.test.mjs` refuses
 
 Production D1 stays read-only through any of these: the guard and CLAUDE.md apply whichever tool issues the query.
 
+## Testing and profiling tools
+
+| Tool | How to run | What it does |
+| --- | --- | --- |
+| fast-check property tests | Part of `npm test` (`src/lib/quire/money-properties.test.ts`) | Generated inputs for whole-copper money and offline/shared engine parity. A failure prints the smallest counterexample. |
+| Accessibility audit (axe-core) | `node scripts/a11y-browser-audit.mjs` against `npm run dev`; CI job "Accessibility (axe-core)" in `code-health.yml` | Checks public and DM screens at 1280 and 390 px against WCAG 2.1 A/AA. Writes `test-results/a11y/result.json` and a summary table. It is report-only; `A11Y_FAIL_IMPACT=critical` (or serious, moderate, minor) makes it fail at that level. |
+| React Scan | `VITE_REACT_SCAN=1 npm run dev` | Highlights components as they re-render. It loads only in development and only when opted in, so production builds never include it. |
+| Mutation testing (StrykerJS) | `npm run mutation` | Mutates `src/lib/quire/money.ts` and checks that a test fails for each change. Stryker installs on demand into `.stryker-tools/`. The HTML report is at `test-results/mutation/index.html`. The first baseline was a 46% score, with most survivors in formatting and price parsing. It's manual and not in CI; widen `mutate` in `stryker.config.mjs` deliberately. |
+
 ## Owner setup outside the repository
 
 1. **Cloud environment setup script.**

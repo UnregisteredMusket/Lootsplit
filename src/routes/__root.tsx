@@ -69,6 +69,11 @@ function RootDocument() {
   return (
     <html lang="en" suppressHydrationWarning>
       <head>
+        {/* Development-only render profiler, opt in with VITE_REACT_SCAN=1 (docs/AGENT-TOOLING.md).
+            It must load before React; production builds drop this branch entirely. */}
+        {import.meta.env.DEV && import.meta.env.VITE_REACT_SCAN === "1" ? (
+          <script src="https://unpkg.com/react-scan@0.5.7/dist/auto.global.js" crossOrigin="anonymous" />
+        ) : null}
         <HeadContent />
       </head>
       <body>
