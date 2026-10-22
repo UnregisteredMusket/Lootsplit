@@ -13,9 +13,13 @@ on:
 # receive an OIDC token; fork PRs never do.
 permissions:
   contents: read
+# PR runs restart on every push. A main run is never cancelled once started: only a completed
+# main verification triggers website-release.yml, so cancelling main runs on each merge left
+# production undeployed through a burst of 13 merges (2026-10-22). Pushes that land while a main
+# run is going wait as one pending run (GitHub keeps the newest), which verifies the latest main.
 concurrency:
   group: verify-${{ github.workflow }}-${{ github.ref }}
-  cancel-in-progress: true
+  cancel-in-progress: ${{ github.ref != 'refs/heads/main' }}
 env:
   LOOTSPLIT_MONITOR_TELEMETRY: "true"
 jobs:
