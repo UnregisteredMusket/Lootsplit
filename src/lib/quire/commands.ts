@@ -234,6 +234,13 @@ export type CommandInput = Command extends infer C
     ? Omit<C, "id">
     : never
   : never;
+/**
+ * A command as a caller submits it. `id` is optional: pass one command ID per
+ * user action and reuse it when the same action is retried, so the device
+ * (local receipts) and the room (seen command IDs) apply it at most once.
+ * Without an `id` a fresh one is generated and no duplicate check is possible.
+ */
+export type CommandRequest = CommandInput & { id?: string };
 export function applyCommand(input: CloudTable, seat: CloudSeat, raw: Command, execution: TradeExecution = {}): CloudTable {
   return applyOwnedCommand(structuredClone(input), seat, raw, execution);
 }
