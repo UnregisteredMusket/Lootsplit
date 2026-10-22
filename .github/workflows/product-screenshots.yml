@@ -77,6 +77,15 @@ jobs:
         run: |
           set -o pipefail
           node --experimental-strip-types scripts/capture-product-screenshots.mjs 2>&1 | tee test-results/product-screenshots.log
+      - name: Guest chat repro (TEMP)
+        if: always()
+        timeout-minutes: 20
+        run: |
+          fails=0
+          for i in 1 2 3 4 5 6 7 8; do node --experimental-strip-types scripts/guest-chat-browser-check.mjs > test-results/chat-$i.log 2>&1 || fails=$((fails+1)); grep -h "REPRO\|passed\|Error" test-results/chat-$i.log | head -5; done
+          grep -h "REPRO" test-results/chat-*.log > test-results/repro.txt || true
+          msg=$(cat test-results/repro.txt | head -8 | sed -e 's/%/%25/g' | sed ':a;N;$!ba;s/\n/%0A/g')
+          echo "::warning title=Chat repro fails=${fails}::${msg}"
       - name: Report capture failures
         if: failure()
         run: |
