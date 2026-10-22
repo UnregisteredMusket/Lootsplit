@@ -9,7 +9,7 @@ import { useSheetReadouts, HpBar } from "@/components/control-panel/readouts";
 import { Shield, Backpack } from "lucide-react";
 import { LedgerArt, PortraitPicker, InventoryList } from "@/components/ledger-art";
 import { getCloudTable } from "@/lib/quire/cloud-client";
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, useRouterState } from "@tanstack/react-router";
 import { useEffect, useState, type FormEvent } from "react";
 import { useEconomy } from "@/lib/quire/economy-context";
 import { loadRoster, type RosterPerson } from "@/lib/quire/gift";
@@ -51,11 +51,13 @@ function PartyPage() {
   const partyTable = { purses: economy.purses, journal: economy.journal };
   const [section, setSection] = useState("characters");
   const { action: initialAction, section: requestedSection } = Route.useSearch();
+  // Router hash (not the window's) so this also works in a split-view pane.
+  const hash = useRouterState({ select: (s) => s.location.hash });
   useEffect(() => {
-    if (requestedSection === "funds" || initialAction || location.hash.startsWith("#purse-"))
+    if (requestedSection === "funds" || initialAction || hash.startsWith("purse-"))
       setSection("funds");
     else if (requestedSection === "characters") setSection("characters");
-  }, [requestedSection, initialAction]);
+  }, [requestedSection, initialAction, hash]);
   const [action, setAction] = useState(initialAction ?? "");
   useEffect(() => setAction(initialAction ?? ""), [initialAction]);
   const seat = useSeat();

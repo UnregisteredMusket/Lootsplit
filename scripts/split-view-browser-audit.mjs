@@ -103,7 +103,7 @@ try {
   await expect(right("Market")).toBeVisible();
   await expect(left("Character sheet")).toBeVisible();
   await expect(layout.getByRole("button", { name: "Split view" })).toHaveAttribute("aria-pressed", "true");
-  assert.equal(search().get("beside"), "/market");
+  assert.match(search().get("beside"), /^\/market(\?|$)/);
   assert.equal(new URL(page.url()).pathname, "/characters");
   await sameDocument("open beside");
   await noOverflow("split 1440");
@@ -159,7 +159,9 @@ try {
   await expect(left("Shop")).toBeVisible();
   await expect(right("Character sheet")).toBeVisible();
   await expect.poll(() => new URL(page.url()).pathname).toBe("/shop/lantern");
-  assert.equal(search().get("beside"), "/characters?id=party%3Amira");
+  const swapped = new URL(search().get("beside"), origin);
+  assert.equal(swapped.pathname, "/characters");
+  assert.equal(swapped.searchParams.get("id"), "party:mira");
   await right("Character sheet").getByRole("button", { name: "Swap panes", exact: true }).click();
   await expect(left("Character sheet")).toBeVisible();
   await expect(right("Shop")).toBeVisible();

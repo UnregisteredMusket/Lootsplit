@@ -539,6 +539,19 @@ try {
       await row.getByText(/Purchase recorded|pending/i).first().waitFor({ timeout: 8000 }).catch(() => {});
     }
     await page.locator('[data-split-pane="primary"]').click({ position: { x: 30, y: 90 } });
+    // Frame each pane like the approved mockup: the sheet's vitals and the shop's header.
+    await page.evaluate(() => {
+      const scroll = (side, selector, offset) => {
+        const pane = document.querySelector(`[data-split-scroll="${side}"]`);
+        const target = pane?.querySelector(selector);
+        if (!pane || !target) return;
+        pane.scrollTop += target.getBoundingClientRect().top - pane.getBoundingClientRect().top - offset;
+      };
+      scroll("primary", ".character-title, .character-heading", 12);
+      const shop = document.querySelector('[data-split-scroll="secondary"]');
+      if (shop) shop.scrollTop = 0;
+      scroll("secondary", "h1", 12);
+    });
   };
   await shot("split-player", { width: 1440, height: 900 }, async (page) => {
     await playerSeat(page);
@@ -548,7 +561,11 @@ try {
     await playerSeat(page);
     await page.evaluate(() => {
       const prefs = JSON.parse(localStorage.getItem("quire.prefs.v1") || "{}");
-      localStorage.setItem("quire.prefs.v1", JSON.stringify({ ...prefs, appearance: "light" }));
+      // The Light · Adventurer's Ledger look, as chosen in Settings.
+      localStorage.setItem(
+        "quire.prefs.v1",
+        JSON.stringify({ ...prefs, appearance: "light", accent: "#7c3224", ground: "#dfcca2" }),
+      );
     });
     await sheetBesideShop(page);
   });

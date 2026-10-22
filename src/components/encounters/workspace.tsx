@@ -23,7 +23,7 @@ import {
   subscribeCloudTable,
 } from "@/lib/quire/cloud-client";
 import { useEffect, useRef, useState } from "react";
-import { Link } from "@tanstack/react-router";
+import { Link, useRouter, useRouterState } from "@tanstack/react-router";
 import { AppLink } from "@/components/app-link";
 import { journalEntryHref } from "@/lib/quire/journal-navigation";
 import { z } from "zod";
@@ -99,9 +99,9 @@ const n = (value: string) => Number(value) || 0;
 export function EncounterWorkspace() {
   const seat = useSeat();
   const campaign = useSyncExternalStore(subscribeCampaigns, getCampaigns, serverCampaigns);
-  const personal =
-    typeof window !== "undefined" &&
-    new URLSearchParams(location.search).get("storage") === "personal";
+  // Read the router's location so the screen also works in a split-view pane.
+  const searchStr = useRouterState({ select: (s) => s.location.searchStr });
+  const personal = new URLSearchParams(searchStr).get("storage") === "personal";
   if (seat.role !== "dm" && !personal)
     return (
       <section className="encounter-panel">
@@ -115,13 +115,13 @@ export function EncounterWorkspace() {
 }
 function EncounterLibrary({ allowDevice }: { allowDevice: boolean }) {
   const desktop = useDesktop();
+  const router = useRouter();
   const [library, setLibrary] = useState<{
       campaigns: Campaign[];
       encounters: Summary[];
     } | null>(null),
     [code, setCode] = useState(() =>
-      typeof window !== "undefined" &&
-      new URLSearchParams(location.search).get("storage") === "personal"
+      new URLSearchParams(router.state.location.searchStr).get("storage") === "personal"
         ? "personal"
         : "",
     ),
@@ -199,7 +199,7 @@ function EncounterLibrary({ allowDevice }: { allowDevice: boolean }) {
             data.campaigns[0]?.code ||
             "",
         );
-        const params = new URLSearchParams(location.search);
+        const params = new URLSearchParams(router.state.location.searchStr);
         const linked = data.encounters.find((x) => x.id === params.get("encounter"));
         if (linked) {
           setCode(linked.code);
@@ -428,6 +428,7 @@ function EncounterEditor({
   onSaved: () => void;
 }) {
   const seat = useSeat();
+  const router = useRouter();
   const cloud = useSyncExternalStore(subscribeCloudTable, getCloudTable, getServerCloudTable);
   const loadedCampaignId = useRef(getCampaigns().activeId);
   const { prefs, setPrefs } = usePrefs();
@@ -437,9 +438,7 @@ function EncounterEditor({
   const [detail, setDetail] = useState<Detail | null>(null),
     [draft, setDraft] = useState<Encounter | null>(null),
     [tab, setTab] = useState(
-      typeof window !== "undefined" && new URLSearchParams(location.search).has("review")
-        ? "loot"
-        : "battle",
+      new URLSearchParams(router.state.location.searchStr).has("review") ? "loot" : "battle",
     ),
     [expanded, setExpanded] = useState(""),
     [hpAmount, setHpAmount] = useState(1),
