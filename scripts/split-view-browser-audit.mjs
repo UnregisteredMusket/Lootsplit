@@ -93,6 +93,17 @@ try {
   assert.equal(await anyRight.count(), 0);
   const single = await idleRequests(5000);
 
+  // Narrowing the window must not leave split controls in a too-narrow header, not even
+  // for the frame before React reacts to the media change (measured immediately).
+  await page.setViewportSize({ width: 320, height: 900 });
+  assert.ok(
+    await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1),
+    "320px right after narrowing: no horizontal overflow",
+  );
+  await expect(layout).toBeHidden();
+  await page.setViewportSize({ width: 1440, height: 900 });
+  await expect(layout).toBeVisible();
+
   // Open beside → Market. The sheet stays on the left in the same document.
   await page.getByRole("button", { name: "Open beside", exact: true }).click();
   const menu = page.getByRole("menu", { name: "Open beside" });

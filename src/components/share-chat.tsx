@@ -27,6 +27,7 @@ import {
   subscribeChatComposers,
   chatStorageError,
   restoreAccountChatOutboxes,
+  chatSenderPurseId,
   type ChatMessage,
   type ChatScope,
   type OutgoingMessage,
@@ -259,7 +260,10 @@ function LiveChat({ scope, library }: { scope: ChatScope; library: AccountLibrar
   }
   function send() {
     if (!text.trim() || isSending || viewOnly) return;
-    if (seat.role === "player" && !sender) {
+    // Right after a page load the seat is restored before the room's purses arrive. Send
+    // as the assigned character that is still loading; the server checks it is this seat's.
+    const senderId = sender?.id || chatSenderPurseId(seat.purseIds, purses);
+    if (seat.role === "player" && !senderId) {
       toast.error("Your character is no longer assigned. Ask the host for help.");
       return;
     }
@@ -269,7 +273,7 @@ function LiveChat({ scope, library }: { scope: ChatScope; library: AccountLibrar
       kind: "message",
       id: crypto.randomUUID(),
       to,
-      purseId: seat.role === "dm" ? (to === "party" ? "" : active.id) : sender!.id,
+      purseId: seat.role === "dm" ? (to === "party" ? "" : active.id) : senderId!,
       ...(to === "player" ? { recipientId: active.id } : {}),
       text: text.trim(),
     };

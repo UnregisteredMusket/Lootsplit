@@ -102,6 +102,26 @@ async function sendAndExpect(label, sender, readers, text, how) {
   if (how === "keyboard") await sender.locator("#chat-message").press("Control+Enter");
   else if (how === "submit") await sender.locator(".chat-composer").evaluate((f) => f.requestSubmit());
   else await chat(sender).getByRole("button", { name: "Send", exact: true }).click();
+  // Toasts disappear before a failed assertion is reported; record what the sender was told.
+  const toasts = new Set();
+  const until = Date.now() + 5000;
+  while (Date.now() < until && (await sender.locator("#chat-message").inputValue()) !== "") {
+    for (const text of await sender.locator("[data-sonner-toast]").allInnerTexts().catch(() => []))
+      toasts.add(text.replace(/\s+/g, " "));
+    await sender.waitForTimeout(100);
+  }
+  if ((await sender.locator("#chat-message").inputValue()) !== "") {
+    const state = await sender
+      .evaluate(async () => {
+        const { getSeat } = await import("/src/lib/quire/table.ts");
+        const { getCloudTable } = await import("/src/lib/quire/cloud-client.ts");
+        const room = getCloudTable();
+        const { purseIds, role } = getSeat();
+        return { role, purseIds, joined: room.joined, status: room.status, session: !!room.sessionId, viewOnly: room.viewOnly };
+      })
+      .catch((e) => String(e));
+    console.log(`  ${label}: draft kept after send; toasts ${JSON.stringify([...toasts])}; state ${JSON.stringify(state)}`);
+  }
   await expect(sender.locator("#chat-message")).toHaveValue("");
   const started = Date.now();
   await expect(
