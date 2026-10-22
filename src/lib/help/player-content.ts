@@ -11,7 +11,7 @@ export const PLAYER_HELP_GROUPS: HelpGroup[] = [
         id: "first-campaign",
         title: "Join your party",
         paragraphs: [
-          "Open the current invitation from your DM and choose your assigned available character. Guests do not need an account. Signing in lets you resume a saved membership on another device while its room and invitation remain valid.",
+          "Open the current invitation from your DM and choose your assigned available character. Guests do not need an account. Signing in lets you resume a saved membership on another device while its room and invitation remain valid. Repeated wrong passwords add a short wait before you can try again (up to 15 minutes).",
           "If another room is open, choose whether to stay or switch before accepting the new invitation. A character or campaign name does not identify a room. Ask your DM for a fresh invitation when a session closes; old invitations remain expired after reopening.",
         ],
         links: [
