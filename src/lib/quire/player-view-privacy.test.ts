@@ -314,6 +314,7 @@ test("DM toggle: party companion NPC funds are private when off, readable by par
   assert.equal(coins(onC, "near-npc"), 123500);
   // The DM's view is unchanged.
   assert.equal(coins(await roomState(dm), "hidden-npc"), 55600);
+});
 
 test("NPC barter: players receive only their own attempts and a public quote; a retried offer is never rolled twice", async () => {
   const { dm, a, b } = await privacyRoom();
