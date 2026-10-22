@@ -429,6 +429,11 @@ jobs:
         env:
           AUDIT_ORIGIN: http://127.0.0.1:8082
         run: node scripts/recovery-step.mjs worker-help 180 node scripts/help-browser-audit.mjs
+      - name: worker-csp
+        if: matrix.group == 'interface'
+        env:
+          AUDIT_ORIGIN: http://127.0.0.1:8082
+        run: node scripts/recovery-step.mjs worker-csp 240 node scripts/csp-browser-audit.mjs
       - name: Verify title screen on the built artifact
         if: matrix.group == 'interface'
         env:

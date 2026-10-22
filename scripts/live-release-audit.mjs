@@ -5,6 +5,7 @@ import { chromium } from "playwright";
 import { verifyArtifact } from "./release-artifact.mjs";
 import { waitForRelease } from "./release-readiness.mjs";
 import { grokScriptAssetReferences, grokScriptReferences, isGrokScriptUrl } from "./grok-script-check.mjs";
+import { SCRIPT_POLICY } from "../cloudflare/release-assets.mjs";
 const origin = process.env.AUDIT_ORIGIN || "http://127.0.0.1:8082";
 // Disposable Worker audits share a server with gameplay fixtures. Anonymous
 // title clients need their own quota too; real production requests stay unchanged.
@@ -44,7 +45,32 @@ for (const path of ["/", "/?install=1"]) {
     [],
     `${path} serves a Grok extension script tag`,
   );
+  // The script policy (audit S04) is served on every page.
+  assert.ok(
+    html.headers.get("content-security-policy")?.includes(SCRIPT_POLICY),
+    `${path} lacks the script Content-Security-Policy`,
+  );
 }
+// Script policy violations would mean a blocked script the app needs. String-eval probes
+// (Zod, pdf.js) are expected to be refused and fall back, so they are reported, not failed.
+const recordViolations = () => {
+  window.__lootsplitCsp = [];
+  document.addEventListener("securitypolicyviolation", (event) =>
+    window.__lootsplitCsp.push({
+      directive: event.effectiveDirective,
+      blocked: event.blockedURI,
+      source: event.sourceFile,
+      line: event.lineNumber,
+    }),
+  );
+};
+const evalProbes = [];
+const checkViolations = async (page, label) => {
+  for (const violation of await page.evaluate(() => window.__lootsplitCsp || [])) {
+    if (violation.blocked === "eval") evalProbes.push({ label, ...violation });
+    else errors.push(`CSP ${label}: ${JSON.stringify(violation)}`);
+  }
+};
 // Confirm the account service is configured and private data remains protected.
 const session = await fetch(`${origin}/api/account/auth/get-session`, {
   headers: fixtureHeaders(),
@@ -74,6 +100,7 @@ try {
       viewport: { width, height: 844 },
       extraHTTPHeaders: fixtureHeaders(),
     });
+    await context.addInitScript(recordViolations);
     const page = await context.newPage();
     page.on("pageerror", (error) => errors.push(error.message));
     page.on("request", (request) => {
@@ -148,6 +175,7 @@ try {
     await title.waitFor({ state: "detached" });
     await page.getByRole("link", { name: "Create an account or sign in", exact: true }).waitFor();
     assert.equal(await page.evaluate(async () => (await indexedDB.databases()).length), 0);
+    await checkViolations(page, `title ${width}`);
     await page.screenshot({ path: `test-results/live-release/app-${width}.png` });
     await context.close();
   }
@@ -155,6 +183,7 @@ try {
     reducedMotion: "reduce",
     extraHTTPHeaders: fixtureHeaders(),
   });
+  await reduced.addInitScript(recordViolations);
   const page = await reduced.newPage();
   await page.goto(origin, { waitUntil: "networkidle" });
   const title = page.getByRole("button", { name: "Lootsplit. Click to continue", exact: true });
@@ -168,10 +197,13 @@ try {
   await title.waitFor({ state: "detached" });
   await page.getByRole("link", { name: "Create an account or sign in", exact: true }).waitFor();
     assert.equal(await page.evaluate(async () => (await indexedDB.databases()).length), 0);
+  await checkViolations(page, "reduced motion");
   await reduced.close();
+  if (evalProbes.length)
+    console.log(`Refused string-eval probes (expected fallback): ${JSON.stringify(evalProbes)}`);
   assert.deepEqual(errors, []);
   console.log(
-    `PASS live commit ${expected}: parchment, single title fade, moving carrier/rogue, click and keyboard entry, reduced motion, desktop/mobile, no app errors.`,
+    `PASS live commit ${expected}: parchment, single title fade, moving carrier/rogue, click and keyboard entry, reduced motion, desktop/mobile, script policy served with no blocked scripts, no app errors.`,
   );
 } catch (error) {
   await writeFile(

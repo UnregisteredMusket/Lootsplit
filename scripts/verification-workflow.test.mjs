@@ -82,8 +82,8 @@ test("balanced Worker groups retain every complete audit and run account isolati
   const workerGroups = ["accounts", "features", "world", "economy", "library", "interface"];
   assert.match(workflow, new RegExp(`group: \\[${workerGroups.join(", ")}\\]`));
   const checks = [...workflow.matchAll(/- name: (worker-[\w-]+)\n\s+if: matrix.group == '([^']+)'/g)];
-  assert.equal(checks.length, 23);
-  assert.equal(new Set(checks.map(([, name]) => name)).size, 23);
+  assert.equal(checks.length, 24);
+  assert.equal(new Set(checks.map(([, name]) => name)).size, 24);
   for (const [, , group] of checks) assert.ok(workerGroups.includes(group), group);
   for (const group of workerGroups) assert.ok(checks.some(([, , assigned]) => assigned === group), group);
   const inGroup = (group) => checks.filter(([, , g]) => g === group).map(([, name]) => name);
@@ -96,6 +96,8 @@ test("balanced Worker groups retain every complete audit and run account isolati
   for (const name of ["trade-economy", "properties", "property-operations"])
     assert.ok(inGroup("economy").includes(`worker-${name}`));
   for (const name of ["blacksmith", "market-locations"]) assert.ok(inGroup("library").includes(`worker-${name}`));
+  // The script Content-Security-Policy is checked in a browser against the built artifact.
+  assert.ok(inGroup("interface").includes("worker-csp"));
   assert.match(workflow, /- name: Verify title screen on the built artifact\n\s+if: matrix.group == 'interface'/);
   assert.match(workflow, /timeout-minutes: 15/);
   assert.doesNotMatch(workflow, /continue-on-error: true/);

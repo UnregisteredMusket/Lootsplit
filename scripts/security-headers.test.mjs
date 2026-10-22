@@ -1,7 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
-import { releaseResponse, SECURITY_HEADERS } from "../cloudflare/release-assets.mjs";
+import { releaseResponse, SECURITY_HEADERS, SCRIPT_POLICY } from "../cloudflare/release-assets.mjs";
 import { injectGrokPwaHead } from "./grok-pwa-shared.mjs";
 
 test("every released page and asset carries baseline security headers", () => {
@@ -20,12 +20,40 @@ test("every released page and asset carries baseline security headers", () => {
     new Response("x", { headers: { "Content-Security-Policy": "default-src 'self'" } }),
     {},
   );
-  assert.equal(own.headers.get("Content-Security-Policy"), "default-src 'self'", "never overridden");
+  assert.equal(
+    own.headers.get("Content-Security-Policy"),
+    "default-src 'self'",
+    "never overridden",
+  );
+});
+
+test("scripts are limited to same-origin files, the app's inline hydration and WebAssembly", () => {
+  const csp = SECURITY_HEADERS["Content-Security-Policy"];
+  const directives = Object.fromEntries(
+    csp.split(";").map((part) => {
+      const [name, ...values] = part.trim().split(/\s+/);
+      return [name, values];
+    }),
+  );
+  assert.ok(csp.endsWith(SCRIPT_POLICY));
+  assert.deepEqual(directives["frame-ancestors"], ["'self'"], "earlier protections kept");
+  assert.deepEqual(directives["object-src"], ["'none'"]);
+  assert.deepEqual(directives["base-uri"], ["'self'"]);
+  assert.deepEqual(directives["script-src"], ["'self'", "'unsafe-inline'", "'wasm-unsafe-eval'"]);
+  assert.deepEqual(directives["script-src-attr"], ["'none'"]);
+  // Tesseract starts its OCR worker from a blob: URL; every worker script is same-origin.
+  assert.deepEqual(directives["worker-src"], ["'self'", "blob:"]);
+  for (const values of Object.values(directives)) {
+    assert.ok(!values.includes("'unsafe-eval'"), "string eval stays blocked");
+    assert.ok(!values.some((v) => /grok|https?:|\*/.test(v)), "no external script host");
+  }
 });
 
 test("the grok.com extension script is disabled for every Lootsplit build and deployment", () => {
   // The app-builder script would run with signed-in owner sessions (audit S01, 2026-10-21).
-  const appEnv = JSON.parse(readFileSync(new URL("../.grok/app-env.json", import.meta.url), "utf8"));
+  const appEnv = JSON.parse(
+    readFileSync(new URL("../.grok/app-env.json", import.meta.url), "utf8"),
+  );
   assert.equal(appEnv.VITE_GROK_EXTENSIONS, "0", "dev/build/preview/mobile builds");
   const wrangler = readFileSync(new URL("../wrangler.toml", import.meta.url), "utf8");
   assert.match(wrangler, /^VITE_GROK_EXTENSIONS = "0"$/m, "Worker runtime middleware");

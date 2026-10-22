@@ -29,11 +29,28 @@ export function releaseResponse(response, env, identity = false) {
 
 /**
  * Baseline protections for every page and build asset. Framing is limited to Lootsplit itself
- * (clickjacking of owner/staff controls); no script policy is imposed here because the app loads
- * OCR workers/WebAssembly and existing integrations that a script policy must be verified against.
+ * (clickjacking of owner/staff controls).
+ *
+ * Script policy (audit S04 remainder, 2026-10-22). Inline script audit of the served app:
+ * - TanStack Start's <Scripts/> writes per-request inline hydration/stream scripts
+ *   (`$_TSR` router state). Their content differs per response, so hashes cannot list them,
+ *   and the server renderer gives the Worker no nonce hook; 'unsafe-inline' keeps them running.
+ * - No other inline scripts or inline event handlers ship: React renders none, the app has no
+ *   dangerouslySetInnerHTML, and the PWA head middleware adds only meta/link tags. The Grok
+ *   extension script is the only script tag it can add, it stays off (VITE_GROK_EXTENSIONS=0),
+ *   and grok.com is not an allowed script source, so it could not run even if re-enabled.
+ * - Every script file is same-origin: Vite bundles in /assets, the pdf.js module worker,
+ *   the self-hosted OCR worker and cores in /ocr/v7, and the notification service worker.
+ * - Tesseract starts its worker from a blob: URL and compiles WebAssembly, so workers allow
+ *   blob: and scripts allow 'wasm-unsafe-eval' (WebAssembly only, not string eval).
+ * So `script-src` blocks every third-party or injected external script, string eval
+ * (libraries such as pdf.js and Zod probe for it and fall back), and `script-src-attr 'none'`
+ * blocks inline event-handler attributes. Android bundles its own files and is unaffected.
  */
+export const SCRIPT_POLICY =
+  "script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'; script-src-attr 'none'; worker-src 'self' blob:";
 export const SECURITY_HEADERS = Object.freeze({
-  "Content-Security-Policy": "frame-ancestors 'self'; object-src 'none'; base-uri 'self'",
+  "Content-Security-Policy": `frame-ancestors 'self'; object-src 'none'; base-uri 'self'; ${SCRIPT_POLICY}`,
   "X-Frame-Options": "SAMEORIGIN",
   "X-Content-Type-Options": "nosniff",
   "Referrer-Policy": "strict-origin-when-cross-origin",
