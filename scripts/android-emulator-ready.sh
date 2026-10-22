@@ -28,17 +28,28 @@ until [ "$(prop sys.boot_completed)" = 1 ] && [ "$(prop dev.bootcomplete)" = 1 ]
 done
 
 # The package manager service answers only once the framework is fully up.
-until timeout 15 adb shell pm path android 2>/dev/null | grep -q '^package:'; do
+# (Capture output before matching: with pipefail, `grep -q` closing a pipe early makes the
+# writer exit with SIGPIPE and the whole test fail even on a match.)
+until [[ "$(timeout 15 adb shell pm path android 2>/dev/null)" == *package:* ]]; do
   [ "$SECONDS" -lt "$deadline" ] || fail "package manager is not serving"
   sleep 2
 done
 
 [ "$(prop ro.kernel.qemu)" = 1 ] || fail "connected device is not an emulator"
 
-# Wait (bounded, informational) for the launcher to own focus so the first long-press lands.
-until timeout 10 adb shell dumpsys window windows 2>/dev/null | grep -E 'mCurrentFocus|mFocusedApp' | grep -qi launcher; do
-  if [ "$SECONDS" -ge "$deadline" ]; then
-    echo "::warning title=Android launcher focus not observed::$(timeout 10 adb shell dumpsys window windows 2>/dev/null | grep -m1 mCurrentFocus | tr -d '\r' | cut -c1-300)"
+# Wait (bounded to 60s, informational) for the launcher to be the focused/resumed activity so
+# the first long-press lands. `dumpsys window windows` prints no focus line on newer Android,
+# so read plain `dumpsys window` and the activity manager's resumed activity.
+focus() {
+  { timeout 10 adb shell dumpsys window 2>/dev/null | grep -E 'mCurrentFocus|mFocusedApp'
+    timeout 10 adb shell dumpsys activity activities 2>/dev/null | grep -E 'mResumedActivity|topResumedActivity|ResumedActivity:'
+  } | tr -d '\r'
+}
+launcher_deadline=$((SECONDS + 60))
+until [[ "$(focus)" == *[Ll]auncher* ]]; do
+  if [ "$SECONDS" -ge "$launcher_deadline" ] || [ "$SECONDS" -ge "$deadline" ]; then
+    seen=$(focus | tr '\n' ' ' | cut -c1-300 || true)
+    echo "::warning title=Android launcher focus not observed::focus after 60s: ${seen:-none reported}"
     break
   fi
   adb shell input keyevent KEYCODE_HOME >/dev/null 2>&1 || true
