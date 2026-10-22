@@ -33,6 +33,11 @@ export function parseDryRun(output) {
   return null;
 }
 
+/** True when every package is an optional font package (fonts-*, xfonts-*). */
+export function fontsOnly(packages) {
+  return packages.length > 0 && packages.every((name) => /^(fonts|xfonts)-/.test(name));
+}
+
 /** Packages that `dpkg-query -W -f '${Package} ${db:Status-Abbrev}\n'` did not report installed. */
 export function missingPackages(packages, dpkgOutput) {
   const installed = new Set(
@@ -113,16 +118,40 @@ function main() {
     missing = missingPackages(packages, query.stdout || "");
     total = packages.length;
   }
+  let fontGap = "";
   if (missing.length) {
     update();
-    const [cmd, ...args] = apt("install", "-y", "--no-install-recommends", ...missing);
-    libraries += bounded("apt-get install", cmd, args, { seconds: 180 });
+    const [cmd, ...args] = apt("install", "-y", "--no-install-recommends", "--fix-missing", ...missing);
+    try {
+      libraries += bounded("apt-get install", cmd, args, { seconds: 180 });
+    } catch (first) {
+      // A mirror that changed under the runner's package lists fails the install outright; refresh
+      // the lists and try once more, then fall back to Playwright's own installer.
+      updated = false;
+      update();
+      try {
+        libraries += bounded("apt-get install (fresh lists)", cmd, args, { seconds: 180, attempts: 1 });
+      } catch {
+        try {
+          libraries += bounded("playwright install-deps", node, [cli, "install-deps", "chromium"], {
+            seconds: 300,
+            attempts: 1,
+          });
+        } catch {
+          // Only optional font packages missing: the headless shell runs with the image's own
+          // fonts, so continue with an explicit warning rather than fail every audit on a mirror.
+          if (!fontsOnly(missing)) throw first;
+          fontGap = ` (font packages unavailable from the mirror, continued without them)`;
+          console.log(`::warning title=Chromium install::Optional font packages could not be installed: ${missing.join(" ")}`);
+        }
+      }
+    }
   }
   const shell = bounded("headless shell", node, [cli, "install", "--only-shell", "chromium"], { seconds: 120 });
   const cache = process.env.CHROMIUM_CACHE_HIT === "true" ? "restored from cache" : "downloaded";
   const summary =
     (missing.length
-      ? `System libraries: ${missing.length} missing${total ? ` of ${total}` : ""} (${missing.join(" ")}), apt took ${libraries}s`
+      ? `System libraries: ${missing.length} missing${total ? ` of ${total}` : ""} (${missing.join(" ")}), apt took ${libraries}s${fontGap}`
       : `System libraries: all present${updated ? ` after a ${libraries}s apt-get update` : ", apt skipped"}`) +
     `. Headless shell ${cache}, ready in ${shell}s.`;
   console.log(`::notice title=Chromium install::${summary}`);

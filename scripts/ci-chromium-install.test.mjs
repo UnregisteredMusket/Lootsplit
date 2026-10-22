@@ -1,7 +1,7 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
-import { bounded, missingPackages, parseDryRun } from "./ci-chromium-install.mjs";
+import { bounded, fontsOnly, missingPackages, parseDryRun } from "./ci-chromium-install.mjs";
 
 const dryRun =
   'sudo -- sh -c "apt-get update&& apt-get install -y --no-install-recommends libasound2t64 libnss3 xvfb fonts-liberation"\n';
@@ -54,4 +54,10 @@ test("browser jobs install Chromium through the cached, separately bounded step"
     assert.ok(steps.length > 0, name);
     for (const [, minutes] of steps) assert.equal(Number(minutes), 12, name);
   }
+});
+
+test("only optional font packages may be skipped when the mirror cannot supply them", () => {
+  assert.equal(fontsOnly(["fonts-freefont-ttf", "xfonts-scalable", "fonts-unifont"]), true);
+  assert.equal(fontsOnly(["fonts-liberation", "libnss3"]), false);
+  assert.equal(fontsOnly([]), false);
 });
