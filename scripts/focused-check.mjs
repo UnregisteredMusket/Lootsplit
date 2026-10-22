@@ -8,8 +8,11 @@ import { resolve, join, dirname } from "node:path";
 import { accountScenarios } from "./account-scenarios.mjs";
 
 const scenario = process.argv[2];
-if (process.argv.length !== 3 || !["accounts", ...accountScenarios].includes(scenario))
-  throw new Error(`Usage: npm run verify:focus -- ${["accounts", ...accountScenarios].join("|")}`);
+// Standalone feature audits that also run in CI against the development server.
+const featureAudits = { "npc-barter": "scripts/npc-barter-browser-audit.mjs" };
+const known = ["accounts", ...accountScenarios, ...Object.keys(featureAudits)];
+if (process.argv.length !== 3 || !known.includes(scenario))
+  throw new Error(`Usage: npm run verify:focus -- ${known.join("|")}`);
 if (process.env.CI)
   throw new Error("Focused checks are local diagnostics, never a CI release gate.");
 const required = readFileSync(".nvmrc", "utf8").trim();
@@ -118,13 +121,20 @@ try {
     await new Promise((done) => setTimeout(done, 250));
   }
   console.log(`Focused ${scenario}: disposable server ready; diagnostics: ${output}`);
-  const args = [
-    "scripts/account-browser-audit.mjs",
-    ...(scenario === "accounts" ? [] : ["--scenario", scenario]),
-  ];
+  const args = featureAudits[scenario]
+    ? ["--experimental-strip-types", featureAudits[scenario]]
+    : [
+        "scripts/account-browser-audit.mjs",
+        ...(scenario === "accounts" ? [] : ["--scenario", scenario]),
+      ];
   const check = spawn(process.execPath, args, {
     cwd: snapshot,
-    env: { ...process.env, ACCOUNT_AUDIT_ORIGIN: origin, AUDIT_RESULTS_DIR: output },
+    env: {
+      ...process.env,
+      ACCOUNT_AUDIT_ORIGIN: origin,
+      AUDIT_ORIGIN: origin,
+      AUDIT_RESULTS_DIR: output,
+    },
     detached: process.platform !== "win32",
     stdio: "inherit",
   });

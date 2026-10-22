@@ -267,6 +267,9 @@ jobs:
       - name: dev-navigation
         if: matrix.group == 'world'
         run: node scripts/recovery-step.mjs dev-navigation 240 node --experimental-strip-types scripts/navigation-browser-audit.mjs
+      - name: dev-npc-barter
+        if: matrix.group == 'world'
+        run: node scripts/recovery-step.mjs dev-npc-barter 240 node --experimental-strip-types scripts/npc-barter-browser-audit.mjs
       - name: Summarize measured verification stages
         if: always()
         run: node scripts/verification-timing.mjs
