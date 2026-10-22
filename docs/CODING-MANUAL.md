@@ -25,6 +25,12 @@ Prefer a direct unit/API regression for logic and permissions, plus a browser sc
 5. After dependency changes, validate a clean `npm ci` with the Node/npm versions used by CI in a disposable directory. Reusing installed modules can conceal an incomplete lockfile; do not regenerate it with a different npm major version.
 6. Submit the complete release suite once the local scenario and related checks are stable. If local verification is genuinely blocked, record the exact environment/access blocker and what was verified; do not claim a pass or weaken the release gate. Use CI to resolve that documented gap, not as the ordinary editing loop.
 
+**Sandboxes without `node_modules`.** When the npm registry is unreachable, tests can run with `node --experimental-strip-types --test` plus a loader that stubs missing packages, and TypeScript can be diffed against `main` with any local `tsc`. Treat a clean local `tsc` diff as weak evidence only:
+
+- Without the real package types (React, zod, sonner, `@types/node`…), imported values, component props and callback parameters become `any`. Real assignability errors then disappear, for example a callback typed `() => Promise<void>` that now receives `() => Promise<boolean>` (#180), or a test fixture cast against zod-inferred command types (#162). Both passed a stub-typed `tsc` and were caught by CI's first typecheck.
+- Stubbed or older packages also change runtime behaviour (the sandbox zod 3.25 `zod/v4` shim does not clone `.default([])` values the way zod 4.4 does), so a local failure that also fails on `main` is environmental.
+- Say in the PR exactly what ran and what could not. CI's typecheck, lint and tests are the gate; don't merge on the local diff alone.
+
 There is no requirement to rerun unrelated local browser suites after each keystroke. Pull requests run the build job (unit tests, typecheck, lint, immutable builds) and every development-server audit; documentation-only PRs run the build job only. Main runs every group, including the packaged Worker and standby audits, before any deployment (owner decision 2026-10-21).
 
 **Do not push to a PR while its verification is running.** A new push cancels the run in progress and starts over; batch documentation and follow-up commits. When a CI step fails, its last output lines appear as a GitHub annotation on the job (readable through the API even where log and artifact downloads are blocked); read it before re-running anything.
