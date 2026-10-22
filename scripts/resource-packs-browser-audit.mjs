@@ -241,6 +241,19 @@ try {
       fullPage: true,
     });
     await page.setViewportSize({ width: 320, height: 900 });
+    const probe = () => page.evaluate(() => ({
+      sw: document.documentElement.scrollWidth,
+      iw: innerWidth,
+      wide: [...document.querySelectorAll("body *")]
+        .filter((e) => e.getBoundingClientRect().right > innerWidth + 1 && e.getBoundingClientRect().width > 0)
+        .slice(0, 8)
+        .map((e) => `${e.tagName.toLowerCase()}.${String(e.className).slice(0, 60)}[${e.getAttribute("aria-label") || ""}] r=${Math.round(e.getBoundingClientRect().right)}`),
+    }));
+    const first = await probe();
+    if (first.sw > first.iw + 1) {
+      await page.waitForTimeout(600);
+      console.log(`REPRO overflow width=${width} now=${JSON.stringify(first)} later=${JSON.stringify(await probe())}`);
+    }
     assert.ok(
       await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1),
       "320px viewport has no horizontal overflow.",

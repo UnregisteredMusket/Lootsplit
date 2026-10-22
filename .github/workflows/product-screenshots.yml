@@ -77,6 +77,15 @@ jobs:
         run: |
           set -o pipefail
           node --experimental-strip-types scripts/capture-product-screenshots.mjs 2>&1 | tee test-results/product-screenshots.log
+      - name: Resource packs repro (TEMP)
+        if: always()
+        timeout-minutes: 25
+        run: |
+          fails=0
+          for i in 1 2 3 4 5 6; do node scripts/resource-packs-browser-audit.mjs > test-results/rp-$i.log 2>&1 || fails=$((fails+1)); done
+          grep -h "REPRO" test-results/rp-*.log | head -6 > test-results/rp.txt || true
+          msg=$(cat test-results/rp.txt | sed -e 's/%/%25/g' | sed ':a;N;$!ba;s/\n/%0A/g')
+          echo "::warning title=RP repro fails=${fails}::x ${msg}"
       - name: Report capture failures
         if: failure()
         run: |
