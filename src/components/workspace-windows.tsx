@@ -6,6 +6,8 @@ import { Button, Field, Modal, Select } from "./ui";
 import { useSeat } from "@/lib/quire/seat";
 import { featureScreens, screenName } from "@/lib/quire/feature-navigation";
 import { openWorkspaceWindow } from "@/lib/quire/workspace-windows";
+import { paneTitle, screenKey } from "@/lib/quire/split-view";
+import { OPEN_WORKSPACE_WINDOWS, useSplitView } from "./split-view";
 
 export function WorkspaceWindows() {
   const [open, setOpen] = useState(false),
@@ -14,13 +16,42 @@ export function WorkspaceWindows() {
   const href = useRouterState({ select: (s) => s.location.href });
   const dm = useSeat().role === "dm";
   const native = import.meta.env.VITE_MOBILE === "true";
+  const split = useSplitView();
+  // In split view the tab title names the focused pane's screen.
+  const titleHref =
+    split.open && split.focused === "secondary" && split.secondaryHref ? split.secondaryHref : href;
+  const title = split.open ? paneTitle(titleHref, dm) : screenName(href, dm);
   useEffect(() => {
     const previous = document.title;
-    document.title = `${screenName(href, dm)} · Lootsplit`;
+    document.title = `${title} · Lootsplit`;
     return () => {
       document.title = previous;
     };
-  }, [href, dm]);
+  }, [title]);
+  // "Open in a separate window…" from the split-view menus opens this dialog for that screen.
+  useEffect(() => {
+    const open = (event: Event) => {
+      const requested = (event as CustomEvent<string>).detail;
+      const known = [
+        "/?view=home",
+        "/maps",
+        "/encounters",
+        "/characters",
+        "/party",
+        "/market",
+        "/library",
+        "/share?tab=chat",
+      ].find((value) => typeof requested === "string" && screenKey(value) === screenKey(requested));
+      const path =
+        typeof requested === "string" ? new URL(requested, "https://lootsplit.invalid").pathname : "";
+      const feature = /^\/features\/[a-z]+$/.test(path) ? path : "";
+      setDestination(known || feature || "current");
+      setError("");
+      setOpen(true);
+    };
+    window.addEventListener(OPEN_WORKSPACE_WINDOWS, open);
+    return () => window.removeEventListener(OPEN_WORKSPACE_WINDOWS, open);
+  }, []);
   function launch(mode: "tab" | "window") {
     setError("");
     try {
@@ -49,12 +80,15 @@ export function WorkspaceWindows() {
         <div className="space-y-4">
           <p>
             Keep different Lootsplit screens open side by side. Move a separate window to another
-            monitor using your computer’s window controls.
+            monitor using your computer’s window controls. On a wide screen, Split view in the
+            header shows two screens in this window instead.
           </p>
           {native ? (
             <p role="status">
               Use the Lootsplit website in your desktop browser for separate windows and multiple
-              monitors. The Android app keeps its current navigation.
+              monitors. On a tablet in landscape (at least 1024 pixels wide), Split view in the
+              header shows two screens side by side in this app; narrower screens keep their
+              current navigation.
             </p>
           ) : (
             <>

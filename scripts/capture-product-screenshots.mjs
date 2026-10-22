@@ -513,6 +513,67 @@ try {
     await reloadApplication(page);
     await page.getByRole("heading", { name: "Home", exact: true }).first().waitFor();
   });
+
+  // 16–19. Split view: two screens in one window (desktop and tablet landscape).
+  const playerSeat = (page) =>
+    page.evaluate(async () => {
+      const { setSeat, getSeat } = await import("/src/lib/quire/table.ts");
+      setSeat({ ...getSeat(), role: "player", purseIds: ["mira"], shopIds: ["lantern", "forge"], openedAt: Date.now() });
+    });
+  const sheetBesideShop = async (page) => {
+    await openApplication(
+      page,
+      `${origin}/characters?id=${encodeURIComponent("party:mira")}&beside=${encodeURIComponent("/shop/lantern")}`,
+    );
+    const shop = page.getByRole("region", { name: "Right pane: Shop", exact: true });
+    await shop.getByText("Potion of healing", { exact: false }).first().waitFor();
+    await page
+      .getByRole("region", { name: "Left pane: Character sheet", exact: true })
+      .getByRole("heading", { name: "Mira Ashfall", exact: true })
+      .first()
+      .waitFor();
+    const row = shop.locator("li").filter({ has: page.getByLabel("Quantity of Torches (bundle of 5)", { exact: true }) });
+    const buy = row.getByRole("button", { name: /^Buy / });
+    if (await buy.isEnabled().catch(() => false)) {
+      await buy.click();
+      await row.getByText(/Purchase recorded|pending/i).first().waitFor({ timeout: 8000 }).catch(() => {});
+    }
+    await page.locator('[data-split-pane="primary"]').click({ position: { x: 30, y: 90 } });
+  };
+  await shot("split-player", { width: 1440, height: 900 }, async (page) => {
+    await playerSeat(page);
+    await sheetBesideShop(page);
+  });
+  await shot("split-light", { width: 1440, height: 900 }, async (page) => {
+    await playerSeat(page);
+    await page.evaluate(() => {
+      const prefs = JSON.parse(localStorage.getItem("quire.prefs.v1") || "{}");
+      localStorage.setItem("quire.prefs.v1", JSON.stringify({ ...prefs, appearance: "light" }));
+    });
+    await sheetBesideShop(page);
+  });
+  await shot("split-open-beside", { width: 1440, height: 900 }, async (page) => {
+    await playerSeat(page);
+    await openApplication(page, `${origin}/characters?id=${encodeURIComponent("party:mira")}`);
+    await page.getByRole("heading", { name: "Mira Ashfall", exact: true }).first().waitFor();
+    await page.getByRole("button", { name: "Open beside", exact: true }).click();
+    await page.getByRole("menu", { name: "Open beside" }).waitFor();
+  });
+  await shot("split-tablet", { width: 1194, height: 834 }, async (page) => {
+    await page.evaluate(() =>
+      localStorage.setItem(
+        "lootsplit.split-view.v1",
+        JSON.stringify({ open: true, beside: "/encounters?resume=1", ratio: 0.6, recent: ["/encounters?resume=1"] }),
+      ),
+    );
+    await openApplication(page, `${origin}/maps?beside=${encodeURIComponent("/encounters?resume=1")}`);
+    await page.getByRole("region", { name: "Right pane: Encounters", exact: true }).waitFor();
+    await selectMapType(page, "dungeon");
+    await closeMapSettings(page);
+    await page.getByRole("img", { name: "Smugglers' cove beneath the lighthouse", exact: true }).waitFor();
+    await page.getByRole("button", { name: "Fit map", exact: true }).click();
+    await page.locator(".encounter-combatant.is-active").first().waitFor();
+  });
 } finally {
   await browser.close();
   const summary = results.join("\n");
