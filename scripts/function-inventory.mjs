@@ -2,7 +2,7 @@
 import ts from "typescript";
 import { readdir, mkdir, writeFile } from "node:fs/promises";
 import path from "node:path";
-const roots = ["src", "cloudflare", "server", "scripts", "db"];
+const roots = ["src", "cloudflare", "server", "scripts"];
 async function walk(dir) {
   const entries = await readdir(dir, { withFileTypes: true });
   return (
