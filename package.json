@@ -21,7 +21,7 @@
     "test": "node --experimental-strip-types --test scripts/*.test.mjs && npm run test:app",
     "lint": "eslint .",
     "format": "prettier --write .",
-    "test:app": "node --experimental-strip-types --test src/lib/quire/*.test.ts src/lib/mobile/*.test.ts",
+    "test:app": "node --experimental-strip-types --test src/lib/quire/*.test.ts src/lib/mobile/*.test.ts src/lib/monitor/*.test.ts",
     "build:cloudflare": "VITE_AUTH_ENABLED=false node scripts/with-app-env.mjs vite build",
     "deploy:cloudflare": "node scripts/require-github-release.mjs",
     "build:mobile": "VITE_AUTH_ENABLED=false VITE_MOBILE=true node scripts/with-app-env.mjs vite build --config vite.mobile.config.ts && node scripts/prepare-mobile.mjs",

@@ -355,6 +355,24 @@
   border-top: 1px solid #87928f40;
   margin-top: 18px;
 }
+.owner-monitor-usage {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+  gap: 6px 24px;
+}
+.owner-monitor-usage > div {
+  min-width: 0;
+}
+.owner-monitor-usage strong {
+  font-size: 14px;
+}
+.owner-monitor-usage > div[data-level="attention"] strong,
+.owner-monitor-usage > div[data-level="over"] strong {
+  color: #b7791f;
+}
+.owner-monitor-usage small {
+  color: var(--portal-muted);
+}
 .owner-monitor-development > p {
   font-size: 14px;
 }

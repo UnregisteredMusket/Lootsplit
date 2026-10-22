@@ -49,7 +49,7 @@ async function capture(operation) {
     clearTimeout(timer);
   }
 }
-async function json(fetcher, url, options = {}) {
+export async function json(fetcher, url, options = {}) {
   const response = await fetcher(url, {
     ...options,
     redirect: "manual",

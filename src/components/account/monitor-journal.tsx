@@ -510,6 +510,31 @@ export function MonitorJournal({ data, refresh }: { data: JournalSnapshot; refre
                   ))}
                 </details>
               )}
+              {report.cloudflareUsage && (
+                <details>
+                  <summary>
+                    Cloudflare plan usage ({report.cloudflareUsage.available} of{" "}
+                    {report.cloudflareUsage.readings} hourly readings)
+                  </summary>
+                  {report.cloudflareUsage.latest ? (
+                    <>
+                      <p className="owner-monitor-note">
+                        Latest available reading {dated(report.cloudflareUsage.latest.observedAt)}.
+                        Account-wide, UTC windows, against the Workers Paid included allowance.
+                      </p>
+                      <ul>
+                        {report.cloudflareUsage.lines.map((line) => (
+                          <li key={line}>{line}</li>
+                        ))}
+                      </ul>
+                    </>
+                  ) : (
+                    <p>
+                      No available Cloudflare usage reading for this day; this is a coverage gap.
+                    </p>
+                  )}
+                </details>
+              )}
               <details>
                 <summary>Analytics changes and measurement windows</summary>
                 {report.trends?.map((trend) => (

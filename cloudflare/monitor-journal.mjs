@@ -8,6 +8,15 @@ import {
 import { staffCommitGuard } from "./members.mjs";
 import { PROBE_FRESH_MS, runMultiplayerProbe } from "./multiplayer-probe.mjs";
 import {
+  cloudflareUsage,
+  usageSummary,
+  usageLines,
+  USAGE_HOUR,
+  USAGE_STALE_MS,
+  USAGE_ATTENTION_PERCENT,
+  formatPercent,
+} from "./cloudflare-usage.mjs";
+import {
   INTERVAL,
   DEFAULT_CONFIG,
   config,
@@ -121,6 +130,13 @@ export const BUILTIN_LOGS = [
     "interval",
     INTERVAL * 2,
     "Synthetic open/join/message/read-back/cleanup through the real room path, once per half-hour collection; probe rooms are isolated from campaigns and totals.",
+  ],
+  [
+    "cloudflare-usage",
+    "Cloudflare plan usage",
+    "interval",
+    2 * USAGE_HOUR,
+    "Hourly account-wide Worker requests and CPU time and D1 rows read, rows written and storage against the Workers Paid included allowance (daily and weekly shares and month to date). An unavailable metric is an explicit gap, never zero.",
   ],
   [
     "runtime",
@@ -705,6 +721,76 @@ export async function recordProbe(db, result, now) {
   await sourceSuccess(db, "multiplayer", now);
   return true;
 }
+/**
+ * Hourly Cloudflare plan usage (`usage:<hour>` in the `cloudflare-usage` log). One attempt per
+ * UTC hour: the id is claimed by the stored entry, so the minute dispatcher does not repeat the
+ * four provider requests. Not connected or unavailable readings are stored too, each with an
+ * explicit coverage gap, so a missing reading is never counted as data or as zero.
+ */
+export async function collectUsage(env, now, reader = cloudflareUsage, fetcher = fetch) {
+  const db = env.DB,
+    hour = Math.floor(now / USAGE_HOUR) * USAGE_HOUR,
+    id = `usage:${hour}`;
+  if (await db.prepare("SELECT 1 FROM owner_monitor_logs WHERE id=?").bind(id).first()) return null;
+  let usage;
+  try {
+    usage = await reader(env, fetcher, now);
+  } catch (error) {
+    usage = {
+      state: "unavailable",
+      checkedAt: now,
+      data: null,
+      errorCode: providerErrorCode(error),
+    };
+  }
+  const missing =
+    usage.state === "ready"
+      ? usage.data.metrics
+          .filter((m) => m.state !== "ready")
+          .map((m) => `${m.label} (${m.errorCode})`)
+      : [];
+  const coverageGap =
+    usage.state === "not-connected"
+      ? "Cloudflare usage is not connected (account ID and Account Analytics Read token)."
+      : usage.state !== "ready"
+        ? `Cloudflare usage could not be read (${usage.errorCode || "SOURCE_UNAVAILABLE"}).`
+        : missing.length
+          ? `Unavailable Cloudflare usage metrics: ${missing.join(", ")}.`
+          : null;
+  await recordLog(
+    db,
+    {
+      id,
+      source: "cloudflare-usage",
+      observedAt: now,
+      summary: usageSummary(usage),
+      usage,
+      coverageGap,
+    },
+    now,
+  );
+  if (usage.state === "ready") await sourceSuccess(db, "cloudflare-usage", now);
+  return usage;
+}
+/** The newest usage reading for the snapshot; none, or one older than two hours, is a gap. */
+export async function latestUsage(db, now) {
+  const row = await db
+    .prepare(
+      "SELECT body FROM owner_monitor_logs WHERE source='cloudflare-usage' ORDER BY observed_at DESC,sequence DESC LIMIT 1",
+    )
+    .first();
+  const usage = decode(row)?.usage;
+  if (!usage)
+    return { state: "unavailable", checkedAt: null, data: null, errorCode: "NOT_COLLECTED" };
+  if (usage.state === "ready" && now - usage.checkedAt > USAGE_STALE_MS)
+    return {
+      state: "unavailable",
+      checkedAt: usage.checkedAt,
+      data: null,
+      errorCode: "STALE_READING",
+    };
+  return usage;
+}
 async function updateDiagnostics(db, snapshot, now, settings) {
   const previous = new Map(
     (await rows(db, "SELECT component,body FROM owner_monitor_incidents")).map((r) => [
@@ -988,6 +1074,8 @@ export async function monitorSnapshot(
   }
   // Every refresh reads task state, even when provider snapshot is reused; the task has its own revision.
   snapshot.developmentStatus = await currentTask(db, now, settings, snapshot.development ?? null);
+  // Hourly plan usage is read from its log on every serve, so a reused snapshot is never staler.
+  snapshot.usage = await latestUsage(db, now);
   snapshot.servedAt = now;
   snapshot.devices = (
     await rows(
@@ -1627,6 +1715,30 @@ async function buildReport(db, day, settings, now) {
     .map((row) => ({ entryId: row.id, sequence: row.sequence, ...decode(row).diagnostic }))
     .filter((d) => d.color !== "green")
     .map((d) => ({ ...d, durationMs: Math.max(0, end - (d.firstOccurredAt || end)), asOf: end }));
+  const usageEntries = evidence.filter((e) => e.source === "cloudflare-usage" && e.usage);
+  const usageEntry = usageEntries.at(-1) || null;
+  const lastUsage = [...usageEntries].reverse().find((e) => e.usage.state === "ready") || null;
+  const cloudflareUsage = {
+    readings: usageEntries.length,
+    available: usageEntries.filter((e) => e.usage.state === "ready").length,
+    // The newest reading of the day (its month to date covers the day); null stays a gap.
+    latest: lastUsage
+      ? { observedAt: lastUsage.observedAt, summary: lastUsage.summary, usage: lastUsage.usage }
+      : null,
+    latestAttempt: usageEntry
+      ? {
+          observedAt: usageEntry.observedAt,
+          state: usageEntry.usage.state,
+          errorCode: usageEntry.usage.errorCode || null,
+        }
+      : null,
+    lines: lastUsage ? usageLines(lastUsage.usage) : [],
+  };
+  const highUsage = (lastUsage?.usage.data?.metrics || []).filter(
+    (m) =>
+      m.state === "ready" &&
+      (m.month?.percent ?? m.current?.percent ?? 0) >= USAGE_ATTENTION_PERCENT,
+  );
   const gaps = coverage.filter((c) => c.gap).map((c) => `${c.name}: ${c.gap}`);
   if (collected < expected)
     gaps.unshift(
@@ -1650,6 +1762,10 @@ async function buildReport(db, day, settings, now) {
     ...unresolved.map(
       (d) =>
         `${d.component}: ${d.action} Last observed check ${new Date(d.latestCheckAt).toISOString()}; ${d.retainedFailure ? "known failure remains unverified" : d.state}.`,
+    ),
+    ...highUsage.map(
+      (m) =>
+        `${m.label} is at ${formatPercent(m.month?.percent ?? m.current?.percent)} of the Workers Paid included ${m.unit === "bytes" ? "storage" : "monthly allowance"}; review usage before overage billing applies.`,
     ),
     ...(tasks.some((e) => e.task?.state === "blocked")
       ? ["Resolve recorded development blockers or publish the next handoff."]
@@ -1677,8 +1793,10 @@ async function buildReport(db, day, settings, now) {
     start,
     end,
     generatedAt: now,
-    summary: `${day}: ${collected} of ${expected} scheduled intervals observed, ${incidents.length} incident/recovery changes, ${performance.length} performance records and ${tasks.length} development updates. ${gaps.length ? "Monitoring coverage is incomplete." : "Registered sources supplied the expected coverage."}${retiredLogs.length ? ` ${retiredLogs.length} retired log span${retiredLogs.length === 1 ? " is" : "s are"} listed separately and not counted as missing data.` : ""}`,
+    summary: `${day}: ${collected} of ${expected} scheduled intervals observed, ${incidents.length} incident/recovery changes, ${performance.length} performance records and ${tasks.length} development updates. ${gaps.length ? "Monitoring coverage is incomplete." : "Registered sources supplied the expected coverage."} ${lastUsage ? `Cloudflare plan usage: ${cloudflareUsage.available} of ${cloudflareUsage.readings} hourly readings available; latest ${new Date(lastUsage.observedAt).toISOString()}.` : "Cloudflare plan usage: no available reading for this day."}${retiredLogs.length ? ` ${retiredLogs.length} retired log span${retiredLogs.length === 1 ? " is" : "s are"} listed separately and not counted as missing data.` : ""}`,
     coverage,
+    // Workers Paid allowance use: hourly readings for the day and the newest available one.
+    cloudflareUsage,
     // Retired registry entries are not active coverage; their stored history stays in History.
     retiredLogs,
     gaps,
@@ -1795,6 +1913,20 @@ export async function scheduledMonitor(env, scheduledAt = Date.now(), options = 
   await batches(db, missing);
   // Do not jump the cursor over older missing intervals; the next minute continues the backlog.
   if (cursor >= slot) await collectInterval(env, owner.user_id, slot, { ...options, now });
+  // Hourly Cloudflare plan usage. The deployed Worker (ASSETS bound) reads it by default; tests
+  // and tools pass `cloudflareUsage` explicitly. It never blocks collection or reports.
+  const usageReader =
+    options.cloudflareUsage !== undefined
+      ? options.cloudflareUsage
+      : env.ASSETS
+        ? cloudflareUsage
+        : null;
+  if (options.integrations !== false && usageReader)
+    try {
+      await collectUsage(env, now, usageReader, options.fetcher || fetch);
+    } catch {
+      /* The hour stays without an entry: an explicit coverage gap in the daily report. */
+    }
   const interrupted = await rows(
     db,
     "SELECT slot FROM owner_monitor_intervals WHERE outcome IN ('collecting','failed') AND slot<? AND (lease_until IS NULL OR lease_until<?) ORDER BY slot LIMIT 2",

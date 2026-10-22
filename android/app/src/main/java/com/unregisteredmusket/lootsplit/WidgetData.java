@@ -81,6 +81,87 @@ final class WidgetData {
         int active = data.optInt("activeActivity", 0);
         return out.put("state", "ready").put("reason", "").put("active", Math.max(0, active)).put("events", safe);
     }
+    static final int USAGE_ROWS = 6;
+    /** "—" when missing, "<0.01%" for tiny shares; the same rules as the server and website. */
+    static String percent(Object value) {
+        if (!(value instanceof Number)) return "—";
+        double p = ((Number) value).doubleValue();
+        if (!Double.isFinite(p) || p < 0) return "—";
+        if (p == 0) return "0%";
+        if (p < 0.01) return "<0.01%";
+        return (p < 1 ? String.format(java.util.Locale.ROOT, "%.2f", p) : p < 10 ? String.format(java.util.Locale.ROOT, "%.1f", p) : Long.toString(Math.round(p))) + "%";
+    }
+    static String amount(Object value, String unit) {
+        if (!(value instanceof Number)) return "—";
+        double n = ((Number) value).doubleValue();
+        if (!Double.isFinite(n) || n < 0 || n > 9007199254740991d) return "—";
+        if ("bytes".equals(unit)) return n >= 1e9 && n % 1e9 == 0 ? Math.round(n / 1e9) + " GB" : n >= 1e9 ? String.format(java.util.Locale.ROOT, "%.2f GB", n / 1e9) : n >= 1e6 ? String.format(java.util.Locale.ROOT, "%.1f MB", n / 1e6) : NumberFormat.getIntegerInstance().format(Math.round(n / 1e3)) + " kB";
+        String text = NumberFormat.getIntegerInstance().format(Math.round(n));
+        return "ms".equals(unit) ? text + " ms" : text;
+    }
+    static String allowance(Object value, String unit) {
+        if (!(value instanceof Number)) return "—";
+        long n = ((Number) value).longValue();
+        return "bytes".equals(unit) ? amount(value, unit) : WidgetRows.compact(n) + ("ms".equals(unit) ? " ms" : "");
+    }
+    private static Object part(JSONObject metric, String window, String key) {
+        JSONObject part = metric.optJSONObject(window);
+        return part == null || part.isNull(key) ? null : part.opt(key);
+    }
+    /**
+     * Cloudflare plan usage (hourly, account-wide, UTC) against the Workers Paid allowance:
+     * one row per metric with precomputed text. A missing, stale, disconnected or older-server
+     * reading stays an explicit unavailable state; a missing metric is never shown as zero.
+     */
+    static JSONObject usage(JSONObject root, long now) throws Exception {
+        JSONObject source = root.optJSONObject("usage"), out = new JSONObject();
+        long checked = source == null ? 0 : source.optLong("checkedAt", 0);
+        out.put("checkedAt", checked > 0 && checked <= now + 60000 ? checked : 0);
+        JSONObject data = source != null && "ready".equals(text(source, "state")) ? source.optJSONObject("data") : null;
+        JSONArray metrics = data == null ? null : data.optJSONArray("metrics");
+        JSONArray rows = new JSONArray();
+        if (metrics == null) {
+            String state = source == null ? "" : text(source, "state"), code = source == null ? "" : text(source, "errorCode");
+            out.put("state", "not-connected".equals(state) ? "not-connected" : "unavailable");
+            out.put("reason", source == null ? "Cloudflare usage unavailable · not provided by server"
+                : "not-connected".equals(state) ? "Cloudflare usage not connected"
+                : "STALE_READING".equals(code) ? "Cloudflare usage unavailable · last hourly reading over 2 hours old"
+                : "NOT_COLLECTED".equals(code) ? "Cloudflare usage unavailable · first hourly reading pending"
+                : "Cloudflare usage unavailable" + (code.matches("[A-Z0-9_]{1,40}") ? " · " + code : ""));
+            return out.put("summary", "").put("rows", rows);
+        }
+        JSONObject month = data.optJSONObject("windows") == null ? null : data.optJSONObject("windows").optJSONObject("month");
+        String elapsed = month == null ? "—" : percent(month.opt("elapsedPercent"));
+        for (int i = 0; i < metrics.length() && rows.length() < USAGE_ROWS; i++) {
+            JSONObject metric = metrics.optJSONObject(i);
+            if (metric == null) continue;
+            String label = text(metric, "label"), unit = text(metric, "unit"), level = text(metric, "level");
+            if (label.isEmpty() || label.length() > 40) continue;
+            if (!"ready".equals(text(metric, "state"))) {
+                String code = text(metric, "errorCode");
+                rows.put(new JSONObject().put("title", label + " · unavailable").put("color", "")
+                    .put("detail", "No reading" + (code.matches("[A-Z0-9_]{1,40}") ? " (" + code + ")" : "") + "; not counted as zero"));
+                continue;
+            }
+            // Month to date at or above 80% of the allowance (or over it) is amber; never red: overage is billed, not an outage.
+            String color = "attention".equals(level) || "over".equals(level) ? "yellow" : "";
+            if ("bytes".equals(unit)) {
+                Object databases = metric.opt("databases");
+                rows.put(new JSONObject().put("color", color)
+                    .put("title", label + " " + amount(part(metric, "current", "value"), unit))
+                    .put("detail", percent(part(metric, "current", "percent")) + " of " + allowance(metric.opt("allowance"), unit) + " included · current size"
+                        + (databases instanceof Number ? " · " + ((Number) databases).longValue() + " database" + (((Number) databases).longValue() == 1 ? "" : "s") : "")));
+                continue;
+            }
+            rows.put(new JSONObject().put("color", color)
+                .put("title", label + " today " + amount(part(metric, "day", "value"), unit))
+                .put("detail", percent(part(metric, "day", "percent")) + " of daily share\n7d " + amount(part(metric, "week", "value"), unit)
+                    + " (" + percent(part(metric, "week", "percent")) + " of weekly share)\nMonth " + amount(part(metric, "month", "value"), unit)
+                    + " (" + percent(part(metric, "month", "percent")) + " of " + allowance(metric.opt("monthlyAllowance"), unit) + ")"));
+        }
+        return out.put("state", "ready").put("reason", "").put("rows", rows)
+            .put("summary", "Workers Paid allowance · account-wide, UTC · " + elapsed + " of month elapsed");
+    }
     /** healthy, attention (a recent problem, not current), unverified or failure; older servers send only a colour. */
     static String statusKind(JSONObject overall) {
         if (overall == null) return "unverified";
@@ -133,6 +214,7 @@ final class WidgetData {
             .put("games", games).put("gamesTime", sourceTime(root, "analytics"))
             .put("commit", commit);
         projected.put("activity", activity(root, now));
+        projected.put("usage", usage(root, now));
         projected.put("snapshotId", root.optLong("snapshotId",0));
         JSONObject overall=root.optJSONObject("overall");
         projected.put("statusColor",overall==null?"yellow":text(overall,"color"));
