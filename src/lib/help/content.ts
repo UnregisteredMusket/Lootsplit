@@ -555,8 +555,10 @@ export const HELP_GROUPS: HelpGroup[] = [
         paragraphs: [
           "Lootsplit has a new name: Lootsplitter. It is the same app with the same campaigns, characters, funds, settings and accounts; nothing needs to be moved or re-entered. On Android, version 1.10.0 and later shows the new name on the home screen and in the Widgets menu (Lootsplitter Field monitor and Lootsplitter 4×1 companion). Install the update over the existing app as usual; placed widgets and your sign-in carry over.",
           "Backups, campaign copies and other files exported under the old name still import, and invitations and the website address you already use keep working. If a new web address is announced later, Help and Downloads will say so.",
+          "To get ready ahead of any address change, open Settings → Prepare for a future website address change. It reads this device only: it lists unsubmitted shared-room changes in every campaign saved here, not just the open one, and names what stays on this device and does not move with the address, such as private PDFs, the local audio library, preferences, map camera positions and bookmarks. It never submits, discards or clears anything.",
         ],
         links: [
+          ["Prepare for an address change", "/settings#migration-readiness"],
           ["Downloads & release details", "/downloads"],
           ["Versioned changelog", "/updates"],
         ],
