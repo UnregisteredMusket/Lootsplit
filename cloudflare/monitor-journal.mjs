@@ -22,6 +22,10 @@ import {
   transitionTask,
   diagnostic,
   overall,
+  workflowTaskRun,
+  workflowTaskEnded,
+  interruptedTask,
+  WORKFLOW_ORPHAN_MS,
 } from "./monitor-model.mjs";
 
 const REPO = "https://github.com/UnregisteredMusket/Lootsplit";
@@ -262,13 +266,303 @@ export function snapshotMetrics(snapshot, traffic) {
     ),
   ];
 }
-async function currentTask(db, now, settings) {
+const TASK_ORDER = "(json_extract(body,'$.source')='owner') DESC,updated_at DESC,id DESC";
+const TERMINAL_SQL = "json_extract(body,'$.state') IN ('completed','failed','idle')";
+async function latestDevelopment(db) {
   const row = await db
     .prepare(
-      "SELECT body FROM owner_monitor_tasks ORDER BY (json_extract(body,'$.state') NOT IN ('completed','failed','idle')) DESC,(json_extract(body,'$.source')='owner') DESC,updated_at DESC,id DESC LIMIT 1",
+      "SELECT json_extract(body,'$.development') AS development FROM owner_monitor_snapshots ORDER BY revision DESC LIMIT 1",
     )
     .first();
-  return taskView(decode(row), now, settings);
+  return row?.development ? JSON.parse(row.development) : null;
+}
+/**
+ * The displayed development task. Stored rows are never rewritten here: a workflow step that
+ * GitHub shows can no longer report (its run completed, was re-run, or was superseded) is
+ * presented as interrupted and skipped when choosing the active task. Without GitHub data the
+ * stored state, and any heartbeat warning, is shown unchanged.
+ */
+async function currentTask(db, now, settings, development) {
+  if (development === undefined) development = await latestDevelopment(db);
+  const live = await rows(
+    db,
+    `SELECT body FROM owner_monitor_tasks WHERE NOT ${TERMINAL_SQL} ORDER BY ${TASK_ORDER} LIMIT 200`,
+  );
+  const ended = [];
+  let finishedByBranch = null;
+  for (const row of live) {
+    const task = decode(row);
+    let end = workflowTaskEnded(task, development, now);
+    const ref = workflowTaskRun(task);
+    if (
+      !end &&
+      ref &&
+      development?.state === "ready" &&
+      now - task.heartbeatAt > WORKFLOW_ORPHAN_MS &&
+      !(development.data?.runs || []).some((r) => r.id === ref.runId)
+    ) {
+      finishedByBranch ??= new Map(
+        (
+          await rows(
+            db,
+            `SELECT json_extract(body,'$.branch') AS branch,MAX(json_extract(body,'$.heartbeatAt')) AS at FROM owner_monitor_tasks WHERE json_extract(body,'$.source')='workflow' AND ${TERMINAL_SQL} GROUP BY 1`,
+          )
+        ).map((r) => [r.branch || "", r.at]),
+      );
+      end = workflowTaskEnded(task, development, now, finishedByBranch);
+    }
+    if (!end) return taskView(task, now, settings);
+    ended.push(interruptedTask(task, end));
+  }
+  const terminal = decode(
+    await db
+      .prepare(
+        `SELECT body FROM owner_monitor_tasks WHERE ${TERMINAL_SQL} ORDER BY ${TASK_ORDER} LIMIT 1`,
+      )
+      .first(),
+  );
+  const interrupted = ended.sort((a, b) => b.heartbeatAt - a.heartbeatAt)[0];
+  return taskView(
+    interrupted && (!terminal || interrupted.heartbeatAt > terminal.heartbeatAt)
+      ? interrupted
+      : terminal,
+    now,
+    settings,
+  );
+}
+// Not build/test evidence: the failure reporter and the performance logger have their own logs.
+const WORKFLOW_EXCLUDED = /performance|failure report|report workflow failure/i;
+const WORKFLOW_FAILED = ["failure", "timed_out", "action_required", "startup_failure"];
+const WORKFLOW_PASSED = ["success", "neutral"];
+const workflowComponent = (name, branch) => `Workflow: ${name} (${branch})`;
+const parseWorkflowComponent = (component) => {
+  const match = /^Workflow: (.+) \(([^()]+)\)$/.exec(component);
+  return match ? { name: match[1], branch: match[2] } : null;
+};
+/**
+ * The run that decides a workflow's status, from its runs newest first. Skipped runs decide
+ * nothing; a cancelled run followed by a newer (not skipped) run of the same workflow and
+ * branch was superseded. A cancelled newest run with no successor is still returned (needs attention).
+ */
+export function decisiveRun(runs) {
+  let newer = false; // a newer run that actually ran (or is running) exists
+  for (const run of runs) {
+    if (run.conclusion === "skipped") continue;
+    if (run.status === "completed" && !(run.conclusion === "cancelled" && newer)) return run;
+    newer = true;
+  }
+  return null;
+}
+const runSummary = (run) =>
+  run
+    ? {
+        id: run.id,
+        name: run.name,
+        branch: run.branch,
+        status: run.status,
+        conclusion: run.conclusion,
+        url: run.url,
+        startedAt: run.startedAt || null,
+        updatedAt: run.updatedAt || null,
+      }
+    : null;
+/** Last decisive run recorded in the retained workflow log (bounded window, used once). */
+async function loggedDecisiveRun(db, name, branch, now) {
+  const logged = await rows(
+    db,
+    "SELECT body FROM owner_monitor_logs WHERE source IN ('workflows','recovery') AND observed_at>=? AND json_extract(body,'$.workflow.name')=? AND json_extract(body,'$.workflow.branch')=? ORDER BY observed_at DESC LIMIT 60",
+    now - 14 * 86400000,
+    name,
+    branch,
+  );
+  const byId = new Map();
+  for (const row of logged) {
+    const run = decode(row).workflow;
+    if (run && !byId.has(run.id)) byId.set(run.id, run); // newest observation of each run
+  }
+  return decisiveRun(
+    [...byId.values()].sort((a, b) => (b.startedAt || 0) - (a.startedAt || 0) || b.id - a.id),
+  );
+}
+/**
+ * One component per workflow and branch. Main failures stay visible until a newer main run of
+ * that workflow succeeds. A branch whose pull request finished is retired once, with the reason
+ * recorded in its diagnostic and history entry; stored history rows are never deleted.
+ */
+async function workflowDiagnostics(db, development, previous, now, add) {
+  const ready = development?.state === "ready";
+  const data = (ready && development.data) || {};
+  const runs = ready && Array.isArray(data.runs) ? data.runs : [];
+  const open = Array.isArray(data.openPulls) ? data.openPulls : [];
+  // Older cached readings carry no head branch; without it no branch is retired.
+  const branchesKnown = ready && open.every((pr) => typeof pr.headRef === "string");
+  const openBranches = new Set(open.map((pr) => pr.headRef).filter(Boolean));
+  const closedByBranch = new Map();
+  for (const pr of Array.isArray(data.closedPulls) ? data.closedPulls : [])
+    if (pr.headRef && !closedByBranch.has(pr.headRef)) closedByBranch.set(pr.headRef, pr);
+  const finished = (branch, seen) => {
+    const pr = closedByBranch.get(branch);
+    const at = pr?.mergedAt || pr?.closedAt;
+    return pr
+      ? `Pull request #${pr.number} for ${branch} was ${pr.mergedAt ? "merged" : "closed"}${at ? ` at ${new Date(at).toISOString()}` : ""}`
+      : `${branch} has no open pull request${seen ? "" : " and no runs in the scanned GitHub history"}`;
+  };
+  const groups = new Map();
+  for (const run of runs) {
+    if (WORKFLOW_EXCLUDED.test(run.name)) continue;
+    const component = workflowComponent(run.name, run.branch);
+    if (!groups.has(component)) groups.set(component, []);
+    groups.get(component).push(run); // GitHub lists runs newest first
+  }
+  let reported = 0;
+  const report = (component, state, symptom, run, extra = {}) => {
+    if (state !== "retired") reported++;
+    add(
+      component,
+      state,
+      symptom,
+      state === "retired"
+        ? "This branch or workflow no longer affects the deployed version; its history is retained."
+        : "A failed candidate does not replace the deployed version; review the linked run.",
+      ["healthy", "retired", "not-applicable"].includes(state)
+        ? "No action required."
+        : "Inspect failed job evidence before retrying.",
+      run?.conclusion || null,
+      {
+        evidence: run?.url ? [{ label: run.name, url: run.url }] : [],
+        lastRun: runSummary(run),
+        ...extra,
+      },
+    );
+  };
+  const fromRun = (run, previousCheck, note = "") => [
+    WORKFLOW_FAILED.includes(run.conclusion)
+      ? "error"
+      : WORKFLOW_PASSED.includes(run.conclusion)
+        ? // A remembered result older than a confirmed failure cannot clear that failure.
+          previousCheck?.confirmedFailure &&
+          (run.updatedAt || 0) < (previousCheck.firstOccurredAt || 0)
+          ? "unavailable"
+          : "healthy"
+        : "unavailable",
+    `${run.name}: ${run.conclusion}${note}.`,
+  ];
+  const placeholder = "Workflow: available results";
+  const components = [
+    ...groups.keys(),
+    ...[...previous.keys()].filter(
+      (c) => c.startsWith("Workflow:") && c !== placeholder && !groups.has(c),
+    ),
+  ];
+  for (const component of components) {
+    const list = groups.get(component) || [];
+    const seen = list.length > 0;
+    const previousCheck = previous.get(component);
+    const retired = previousCheck?.state === "retired";
+    const parsed = seen
+      ? { name: list[0].name, branch: list[0].branch }
+      : parseWorkflowComponent(component);
+    if (!parsed || WORKFLOW_EXCLUDED.test(parsed.name)) {
+      if (!retired)
+        report(
+          component,
+          "retired",
+          "This workflow reports failures or performance; it is not a build or test result.",
+          null,
+          { retiredAt: now },
+        );
+      continue;
+    }
+    if (!ready) {
+      // Unchanged honest uncertainty: nothing is decided without GitHub data.
+      // The remembered decisive run is kept for when GitHub data returns.
+      if (!retired)
+        report(component, "unavailable", "No completed build or test result was returned.", null, {
+          lastRun: previousCheck?.lastRun || null,
+          historyChecked: previousCheck?.historyChecked || false,
+        });
+      continue;
+    }
+    const { name, branch } = parsed;
+    const run = decisiveRun(list);
+    if (
+      branch !== "main" &&
+      branchesKnown &&
+      // Only main and branches with an open pull request are monitored; opening a pull
+      // request for the branch brings it back.
+      !openBranches.has(branch)
+    ) {
+      if (!retired) {
+        const last = run || previousCheck?.lastRun || null;
+        report(
+          component,
+          "retired",
+          `${finished(branch, seen)}; this branch is no longer monitored. Last result: ${last ? `${last.name}: ${last.conclusion}` : previousCheck?.symptom ? `not recorded (last check: ${previousCheck.symptom})` : "none recorded"}.`,
+          last,
+          { retiredAt: now, retiredBranch: branch, historyChecked: true },
+        );
+      }
+      continue;
+    }
+    if (run) {
+      const [state, symptom] = fromRun(run, null);
+      report(component, state, symptom, run, { historyChecked: true });
+      continue;
+    }
+    // Nothing decisive in the scanned runs: no newer result exists, so the last decisive run
+    // (remembered, or found once in the retained workflow log) still decides.
+    // A first sighting with nothing decisive (only running or skipped runs) adds no component,
+    // as before: there is nothing to report yet.
+    if (!previousCheck) continue;
+    let known = previousCheck.lastRun || null;
+    if (!known && !previousCheck.historyChecked)
+      known = await loggedDecisiveRun(db, name, branch, now);
+    if (known) {
+      let [state, symptom] = fromRun(
+        known,
+        previousCheck,
+        !seen
+          ? "; latest run, older than the scanned GitHub runs"
+          : list.some((r) => r.status !== "completed")
+            ? "; a newer run is in progress"
+            : "; newer runs were skipped or superseded",
+      );
+      // A confirmed failure that was not rechecked stays the retained (red) failure it was.
+      if (state === "error" && previousCheck?.confirmedFailure) state = "unavailable";
+      report(component, state, symptom, known, { historyChecked: true });
+    } else if (seen && !previousCheck.confirmedFailure)
+      report(
+        component,
+        "not-applicable",
+        list.some((r) => r.status !== "completed")
+          ? "A run is in progress; no completed result is recorded yet."
+          : "Recent runs were skipped or superseded; there is no result to verify.",
+        null,
+        { historyChecked: true },
+      );
+    else
+      report(component, "unavailable", "No completed build or test result was returned.", null, {
+        historyChecked: true,
+      });
+  }
+  // The placeholder means GitHub returned nothing usable, never that every result was filtered.
+  if (!ready ? !reported : !runs.length)
+    report(
+      placeholder,
+      "unavailable",
+      ready
+        ? "GitHub returned no workflow runs."
+        : "No completed build or test result was returned.",
+      null,
+    );
+  else if (ready && previous.has(placeholder) && previous.get(placeholder).state !== "retired")
+    report(
+      placeholder,
+      "retired",
+      "GitHub workflow results are available; each workflow is listed separately.",
+      null,
+      { retiredAt: now },
+    );
 }
 async function updateDiagnostics(db, snapshot, now, settings) {
   const previous = new Map(
@@ -352,7 +646,6 @@ async function updateDiagnostics(db, snapshot, now, settings) {
       { sourceCheckedAt: source?.checkedAt || null },
     );
   }
-  const latestRuns = new Map();
   const traffic = snapshot.traffic;
   const trafficCurrent = traffic?.state === "ready" && now - traffic.checkedAt <= 6 * 60000;
   const trafficErrors = trafficCurrent ? traffic.data?.errors : null;
@@ -372,37 +665,7 @@ async function updateDiagnostics(db, snapshot, now, settings) {
       : "Review the dated source window; an unavailable count does not establish recovery.",
     trafficErrors > 0 ? "WORKER_ERRORS_OBSERVED" : null,
   );
-  for (const run of snapshot.development?.data?.runs || []) {
-    if (run.status !== "completed" || /performance|failure report/i.test(run.name)) continue;
-    const component = `Workflow: ${run.name} (${run.branch})`;
-    if (!latestRuns.has(component)) latestRuns.set(component, run);
-  }
-  // A different workflow cannot resolve this workflow's failure. Keep absent histories unknown.
-  for (const component of previous.keys())
-    if (component.startsWith("Workflow:") && !latestRuns.has(component))
-      latestRuns.set(component, null);
-  if (!latestRuns.size) latestRuns.set("Workflow: available results", null);
-  for (const [component, latestRun] of latestRuns) {
-    add(
-      component,
-      snapshot.development?.state !== "ready"
-        ? "unavailable"
-        : latestRun && ["failure", "timed_out", "action_required"].includes(latestRun.conclusion)
-          ? "error"
-          : latestRun?.conclusion === "success"
-            ? "healthy"
-            : "unavailable",
-      latestRun
-        ? `${latestRun.name}: ${latestRun.conclusion}.`
-        : "No completed build or test result was returned.",
-      "A failed candidate does not replace the deployed version; review the linked run.",
-      latestRun?.conclusion === "success"
-        ? "No action required."
-        : "Inspect failed job evidence before retrying.",
-      latestRun?.conclusion || null,
-      { evidence: latestRun ? [{ label: latestRun.name, url: latestRun.url }] : [] },
-    );
-  }
+  await workflowDiagnostics(db, snapshot.development, previous, now, add);
   const last = await db
     .prepare(
       "SELECT slot,collected_at,outcome FROM owner_monitor_intervals WHERE outcome IN ('complete','partial','recovered') ORDER BY slot DESC LIMIT 1",
@@ -513,7 +776,7 @@ export async function monitorSnapshot(
   else {
     const observed = await collector(env, userId);
     const diagnostics = await updateDiagnostics(db, observed, now, settings);
-    const task = await currentTask(db, now, settings);
+    const task = await currentTask(db, now, settings, observed.development ?? null);
     const interval = await db
       .prepare("SELECT * FROM owner_monitor_intervals ORDER BY slot DESC LIMIT 1")
       .first();
@@ -591,7 +854,7 @@ export async function monitorSnapshot(
     }
   }
   // Every refresh reads task state, even when provider snapshot is reused; the task has its own revision.
-  snapshot.developmentStatus = await currentTask(db, now, settings);
+  snapshot.developmentStatus = await currentTask(db, now, settings, snapshot.development ?? null);
   snapshot.servedAt = now;
   snapshot.devices = (
     await rows(
@@ -961,7 +1224,14 @@ export async function collectInterval(
   return { outcome: committed.outcome, ...committed.body };
 }
 
-const SUMMARIZED_SECTIONS = ["evidence", "correlations", "builds", "performance", "incidents", "trends"];
+const SUMMARIZED_SECTIONS = [
+  "evidence",
+  "correlations",
+  "builds",
+  "performance",
+  "incidents",
+  "trends",
+];
 const reportBytes = (report) => new TextEncoder().encode(JSON.stringify(report)).length;
 // Failures, errors and regressions are kept first; then the most recent entries.
 const attention = (item) =>
@@ -1564,7 +1834,14 @@ async function storeFailedReport(db, day, settings, now, attempts) {
     ),
     logStatement(
       db,
-      { id: `report-failed:${id}`, source: "reports", observedAt: now, outcome: "failed", reportId: id, summary },
+      {
+        id: `report-failed:${id}`,
+        source: "reports",
+        observedAt: now,
+        outcome: "failed",
+        reportId: id,
+        summary,
+      },
       now,
     ),
   ]);

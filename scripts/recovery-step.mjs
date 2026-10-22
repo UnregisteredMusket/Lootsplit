@@ -29,7 +29,8 @@ export function failureCollector(limit = 12) {
           detail = 6;
         } else if (detail > 0 && line.trim()) {
           detail -= 1;
-          if (/error|expected|actual|message|location/i.test(line)) failures.push("    " + line.trim().slice(0, 240));
+          if (/error|expected|actual|message|location/i.test(line))
+            failures.push("    " + line.trim().slice(0, 240));
         }
       }
     },
@@ -38,15 +39,16 @@ export function failureCollector(limit = 12) {
 
 export function failureAnnotation(id, status, output, failures = []) {
   const failed = failures.length ? "Failed tests:\n" + failures.join("\n") + "\n---\n" : "";
-  const lines = failed + String(output)
-    .replace(ANSI_COLOR, "")
-    .split(/\r?\n/)
-    .filter((line) => line.trim())
-    .slice(-40)
-    .join("\n")
-    .slice(-3500);
-  const escape = (value) =>
-    value.replace(/%/g, "%25").replace(/\r/g, "%0D").replace(/\n/g, "%0A");
+  const lines =
+    failed +
+    String(output)
+      .replace(ANSI_COLOR, "")
+      .split(/\r?\n/)
+      .filter((line) => line.trim())
+      .slice(-40)
+      .join("\n")
+      .slice(-3500);
+  const escape = (value) => value.replace(/%/g, "%25").replace(/\r/g, "%0D").replace(/\n/g, "%0A");
   return `::error title=${escape(`${id} ${status}`).replace(/[:,]/g, " ")}::${escape(lines || "(no output)")}`;
 }
 
@@ -122,9 +124,20 @@ export async function runStep({
     signalTree("SIGTERM");
     killTimer = setTimeout(() => signalTree("SIGKILL"), 2000);
   };
-  const interrupt = () => stop("interrupted");
-  process.once("SIGTERM", interrupt);
-  process.once("SIGINT", interrupt);
+  // GitHub cancellation sends SIGINT, then SIGTERM, then kills the runner a few seconds later.
+  // Report the terminal state at once, in parallel with stopping the child, so a cancelled run
+  // does not leave its step "testing" forever. Repeated signals are absorbed (not fatal) here.
+  let terminal = null;
+  const interrupt = () => {
+    if (!reason)
+      terminal = publish(
+        "interrupted",
+        "The workflow run was cancelled or interrupted before this step reported a result.",
+      );
+    stop("interrupted");
+  };
+  process.on("SIGTERM", interrupt);
+  process.on("SIGINT", interrupt);
   const deadline = setTimeout(() => stop("timed_out"), seconds * 1000);
   const heartbeat = setInterval(() => {
     record.heartbeatAt = new Date().toISOString();
@@ -153,7 +166,8 @@ export async function runStep({
   if (record.status !== "passed" && process.env.GITHUB_ACTIONS === "true")
     console.log(failureAnnotation(id, record.status, tail, collector.failures));
   console.log(`[recovery] ${record.status.toUpperCase()} ${id}`);
-  await publish(record.status === "passed" ? "success" : record.status);
+  // An interruption was already reported; a second terminal event would be rejected.
+  await (terminal ?? publish(record.status === "passed" ? "success" : record.status));
   return record;
 }
 
