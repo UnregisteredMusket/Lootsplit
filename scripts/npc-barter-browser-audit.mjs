@@ -79,6 +79,8 @@ async function fits(page, label) {
   );
 }
 const talk = (page) => page.getByRole("region", { name: "Talk to Odile Marsh", exact: true });
+// NPC lines keep their full text for screen readers while the visible copy types out.
+const said = (page, text) => talk(page).locator(".sr-only").getByText(text, { exact: true }).last();
 const reply = (page, text) => talk(page).locator(".npc-talk-reply").filter({ hasText: text });
 async function openConversation(page, character) {
   await navigateApplication(page, origin + "/features/npcs?npc=odile");
@@ -118,7 +120,7 @@ try {
     await askColumn(page).getByRole("button", { name: /^Hooded lantern/ }).click();
     await expect(talk(page).locator(".npc-talk-note")).toContainText("no interest in Wolf pelt");
     await reply(page, "Take it or leave it.").click();
-    await expect(talk(page).getByText("I've no use for Wolf pelt.")).toBeAttached();
+    await expect(said(page, "I've no use for Wolf pelt.")).toBeAttached();
     await expect.poll(async () => (await attempts(page)).at(-1)?.status).toBe("refused");
     assert.equal((await attempts(page)).at(-1).roll, undefined, "refused without a roll");
     await reply(page, "I've got something you might want").click();
@@ -132,7 +134,7 @@ try {
 
     // Accept: a generous offer needs no roll; Odile answers in her own voice.
     await openConversation(page, "Mira Ashfall");
-    await expect(talk(page).getByText("A trade, then. Let's see what you have.")).toBeAttached();
+    await expect(said(page, "A trade, then. Let's see what you have.")).toBeAttached();
     await askColumn(page).getByRole("button", { name: /^Hooded lantern/ }).click();
     await giveColumn(page).getByLabel("Coins you give (copper)").fill("600");
     const offerReply = reply(page, "Here. Take it, it's a good deal.");
@@ -141,7 +143,7 @@ try {
     await fits(page, `${width} offer`);
     await page.screenshot({ path: `${output}/offer-${width}.png`, fullPage: true });
     await offerReply.click();
-    await expect(talk(page).getByText("Fair enough. We have a deal.")).toBeAttached();
+    await expect(said(page, "Fair enough. We have a deal.")).toBeAttached();
     await expect.poll(async () => (await attempts(page)).at(-1)?.status).toBe("accepted");
     await expect(talk(page).locator(".npc-talk-receipt")).toContainText("Hooded lantern");
 
@@ -163,10 +165,10 @@ try {
     await fits(page, `${width} queue`);
     await navigateApplication(page, origin + "/features/npcs?npc=odile");
     await talk(page).getByLabel("Speaking as").selectOption({ label: "Tamsin Reed" });
-    await expect(talk(page).getByText("Close. Add 1 gp and we have a deal.")).toBeAttached();
+    await expect(said(page, "Close. Add 1 gp and we have a deal.")).toBeAttached();
     await reply(page, "Deal.").click();
     await expect.poll(async () => (await attempts(page)).at(-1)?.status).toBe("accepted");
-    await expect(talk(page).getByText("Fair enough. We have a deal.").last()).toBeAttached();
+    await expect(said(page, "Fair enough. We have a deal.")).toBeAttached();
     await fits(page, `${width} counter`);
     await page.screenshot({ path: `${output}/counter-${width}.png`, fullPage: true });
     await context.close();
