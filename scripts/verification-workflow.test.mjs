@@ -43,7 +43,7 @@ test("each development check belongs to exactly one declared isolated group", ()
   assert.equal(new Set(groups).size, groups.length);
   const checks = [...workflow.matchAll(/- name: (dev-[\w-]+)\n\s+if: matrix.group == '([^']+)'/g)];
   assert.equal(checks.length, 38);
-  assert.ok(checks.some(([, name, group]) => name === "dev-downtime" && group === "desktop"));
+  assert.ok(checks.some(([, name, group]) => name === "dev-downtime" && group === "accounts"));
   assert.match(
     workflow,
     /worker-downtime 240 node --experimental-strip-types scripts\/downtime-browser-audit\.mjs/,
@@ -56,7 +56,7 @@ test("each development check belongs to exactly one declared isolated group", ()
   assert.ok(checks.some(([, name, group]) => name === "dev-navigation" && group === "world"));
   assert.ok(checks.some(([, name, group]) => name === "dev-map-tiles" && group === "desktop"));
   assert.match(workflow, /worker-map-tiles 240 node scripts\/map-tiles-browser-audit\.mjs/);
-  assert.ok(checks.some(([, name, group]) => name === "dev-ships" && group === "desktop"));
+  assert.ok(checks.some(([, name, group]) => name === "dev-ships" && group === "accounts-2"));
   assert.match(workflow, /worker-ships 240 node scripts\/ships-browser-audit\.mjs/);
   assert.ok(checks.some(([, name, group]) => name === "dev-trade-economy" && group === "economy"));
   assert.ok(
@@ -68,9 +68,9 @@ test("each development check belongs to exactly one declared isolated group", ()
   assert.ok(checks.some(([, name, group]) => name === "dev-properties" && group === "economy"));
   assert.ok(checks.some(([, name, group]) => name === "dev-shop-stock" && group === "gameplay"));
   assert.ok(
-    checks.some(([, name, group]) => name === "dev-market-locations" && group === "economy"),
+    checks.some(([, name, group]) => name === "dev-market-locations" && group === "gameplay"),
   );
-  assert.ok(checks.some(([, name, group]) => name === "dev-sound" && group === "governance"));
+  assert.ok(checks.some(([, name, group]) => name === "dev-sound" && group === "economy"));
   assert.ok(checks.some(([, name, group]) => name === "dev-guest-chat" && group === "governance"));
   for (const [, name, group] of checks) assert.ok(groups.includes(group), `${name}: ${group}`);
   for (const group of groups) assert.ok(checks.some(([, , assigned]) => assigned === group));
@@ -78,20 +78,34 @@ test("each development check belongs to exactly one declared isolated group", ()
 
 test("balanced Worker groups retain every complete audit and run account isolation before campaign fixtures", () => {
   const workflow = readFileSync(".github/workflows/verify.yml", "utf8");
+  const workerGroups = ["accounts", "features", "world", "economy", "library", "interface"];
+  assert.match(workflow, new RegExp(`group: \\[${workerGroups.join(", ")}\\]`));
   const checks = [...workflow.matchAll(/- name: (worker-[\w-]+)\n\s+if: matrix.group == '([^']+)'/g)];
-  assert.equal(checks.length,23);
-  assert.equal(new Set(checks.map(([,name])=>name)).size,23);
-  for (const [,,group] of checks) assert.ok(["accounts","features","interface"].includes(group));
-  const accounts=checks.filter(([,,group])=>group==="accounts").map(([,name])=>name);
-  const features=checks.filter(([,,group])=>group==="features").map(([,name])=>name);
+  assert.equal(checks.length, 23);
+  assert.equal(new Set(checks.map(([, name]) => name)).size, 23);
+  for (const [, , group] of checks) assert.ok(workerGroups.includes(group), group);
+  for (const group of workerGroups) assert.ok(checks.some(([, , assigned]) => assigned === group), group);
+  const inGroup = (group) => checks.filter(([, , g]) => g === group).map(([, name]) => name);
   // Each account shard runs first in its group, before any campaign fixtures.
-  assert.deepEqual(accounts.slice(0,3),["worker-account-1","worker-monitor","worker-finance"]);
-  assert.equal(features[0],"worker-account-2");
-  for (const name of ["ships"]) assert.ok(accounts.includes(`worker-${name}`));
-  for (const name of ["blacksmith","downtime","map-tiles","trade-economy","world-features"])
-    assert.ok(features.includes(`worker-${name}`));
-  assert.match(workflow,/timeout-minutes: 15/);
-  assert.doesNotMatch(workflow,/continue-on-error: true/);
+  assert.deepEqual(inGroup("accounts").slice(0, 3), ["worker-account-1", "worker-monitor", "worker-finance"]);
+  assert.equal(inGroup("features")[0], "worker-account-2");
+  assert.ok(inGroup("accounts").includes("worker-ships"));
+  assert.ok(inGroup("features").includes("worker-map-tiles"));
+  for (const name of ["downtime", "world-features"]) assert.ok(inGroup("world").includes(`worker-${name}`));
+  for (const name of ["trade-economy", "properties", "property-operations"])
+    assert.ok(inGroup("economy").includes(`worker-${name}`));
+  for (const name of ["blacksmith", "market-locations"]) assert.ok(inGroup("library").includes(`worker-${name}`));
+  assert.match(workflow, /- name: Verify title screen on the built artifact\n\s+if: matrix.group == 'interface'/);
+  assert.match(workflow, /timeout-minutes: 15/);
+  assert.doesNotMatch(workflow, /continue-on-error: true/);
+});
+
+test("development account shards run first in their jobs, before campaign fixtures", () => {
+  const workflow = readFileSync(".github/workflows/verify.yml", "utf8");
+  const checks = [...workflow.matchAll(/- name: (dev-[\w-]+)\n\s+if: matrix.group == '([^']+)'/g)];
+  const first = (group) => checks.find(([, , g]) => g === group)[1];
+  assert.equal(first("accounts"), "dev-account-1");
+  assert.equal(first("accounts-2"), "dev-account-2");
 });
 
 test("both account shards run in development and packaged Worker groups, each in its own job", () => {
