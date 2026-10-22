@@ -38,12 +38,12 @@ import { sameCommand } from "./command-identity.ts";
 import { readRoomResponse, readUnchangedRoom } from "./room-response.ts";
 import {
   rememberRevokedRecovery,
-  revokedRecoverySummaries,
+  recoveryVisibility,
   revokedRecoveryCopy,
   discardRevokedRecovery,
   hasRevokedMemoryWork,
-  legacyRecoveryCount,
-  legacyRecoveryChecked,
+  invalidateRecoveryVisibility,
+  type RecoveryVisibility,
 } from "./revoked-recovery.ts";
 let playerSession: Session | null = null;
 const PLAYER_TICKET = "lootsplit.player.reconnect.v1";
@@ -106,6 +106,13 @@ let acceptedPoll:
       revision: number;
       userId?: string;
       sessionId?: string;
+      /**
+       * Set when this server revision could not be previewed under the local
+       * pending batch. Conditional polls then ask only whether the room moved
+       * past it, instead of re-reading and re-failing the whole room.
+       */
+      conflictBatch?: string;
+      conflictMessage?: string;
     }
   | undefined;
 export async function requestCampaignRoll(body: { purseId: string; [key: string]: unknown }) {
@@ -269,16 +276,36 @@ function serial<T>(fn: () => Promise<T>): Promise<T> {
   chain = next.catch(() => undefined);
   return next;
 }
+let seenRecovery: RecoveryVisibility | undefined;
+function sameValue(a: unknown, b: unknown) {
+  return (
+    Object.is(a, b) ||
+    (typeof a === "object" &&
+      typeof b === "object" &&
+      a !== null &&
+      b !== null &&
+      JSON.stringify(a) === JSON.stringify(b))
+  );
+}
+/** Keep the external-store snapshot identity unless a readout actually changed. */
+function sameView(a: typeof view, b: typeof view) {
+  for (const k of Object.keys(b) as Array<keyof typeof view>)
+    if (!sameValue(a[k], b[k])) return false;
+  return Object.keys(a).length === Object.keys(b).length;
+}
 function publish(next: Partial<typeof view>, dataChanged = true) {
   const previous = view;
-  view = {
+  const recovery = (seenRecovery = recoveryVisibility());
+  const candidate = {
     ...view,
     ...next,
-    recoveries: revokedRecoverySummaries(),
-    unverifiedRecoveries: legacyRecoveryCount(),
-    legacyRecoveryChecked: legacyRecoveryChecked(),
+    recoveries: recovery.recoveries as typeof view.recoveries,
+    unverifiedRecoveries: recovery.unverifiedRecoveries,
+    legacyRecoveryChecked: recovery.legacyRecoveryChecked,
   };
-  if (previous.joined && view.joined) {
+  const same = sameView(previous, candidate);
+  if (!same) view = candidate;
+  if (!same && previous.joined && view.joined) {
     if (previous.live !== view.live)
       notify("Mode changed", view.live ? "Live Mode" : "Turn-based Mode", "mode");
     if (!previous.mine && view.mine && !view.live)
@@ -290,34 +317,57 @@ function publish(next: Partial<typeof view>, dataChanged = true) {
     { joined: view.joined, mine: view.mine, live: view.live, who: view.who },
     dataChanged,
   );
-  for (const fn of listeners) fn();
+  // An unchanged poll (same room, same status) notifies no subscriber, so the
+  // ~60 useSyncExternalStore readers in both split-view panes stay idle.
+  if (!same) for (const fn of listeners) fn();
 }
 export function getCloudTable() {
   // Owner changes can occur while no room is connected. Keep the external-store
   // snapshot stable except when the authorized recovery list actually changes.
-  const recoveries = revokedRecoverySummaries(),
-    unverifiedRecoveries = legacyRecoveryCount(),
-    checked = legacyRecoveryChecked();
+  // recoveryVisibility() is cached until storage changes, so this getter stays
+  // cheap; it returns the same object until then.
+  const recovery = recoveryVisibility();
+  if (recovery === seenRecovery) return view;
+  seenRecovery = recovery;
   if (
-    JSON.stringify(recoveries) !== JSON.stringify(view.recoveries) ||
-    unverifiedRecoveries !== view.unverifiedRecoveries ||
-    checked !== view.legacyRecoveryChecked
+    !sameValue(recovery.recoveries, view.recoveries) ||
+    recovery.unverifiedRecoveries !== view.unverifiedRecoveries ||
+    recovery.legacyRecoveryChecked !== view.legacyRecoveryChecked
   )
-    view = { ...view, recoveries, unverifiedRecoveries, legacyRecoveryChecked: checked };
+    view = {
+      ...view,
+      recoveries: recovery.recoveries as typeof view.recoveries,
+      unverifiedRecoveries: recovery.unverifiedRecoveries,
+      legacyRecoveryChecked: recovery.legacyRecoveryChecked,
+    };
   return view;
 }
 export function refreshRecoveryVisibility() {
   publish({}, false);
 }
+function storageChanged() {
+  // Another document changed storage: the cached recovery view may be stale.
+  invalidateRecoveryVisibility();
+  refreshRecoveryVisibility();
+}
 export function subscribeCloudTable(fn: () => void) {
-  if (!listeners.size && typeof window !== "undefined")
+  if (!listeners.size && typeof window !== "undefined") {
     window.addEventListener("lootsplit-account-changed", refreshRecoveryVisibility);
+    window.addEventListener("storage", storageChanged);
+  }
   listeners.add(fn);
   return () => {
     listeners.delete(fn);
-    if (!listeners.size && typeof window !== "undefined")
+    if (!listeners.size && typeof window !== "undefined") {
       window.removeEventListener("lootsplit-account-changed", refreshRecoveryVisibility);
+      window.removeEventListener("storage", storageChanged);
+    }
   };
+}
+/** A preview conflict for the current pending batch is waiting on the user or the room. */
+function previewConflictOpen() {
+  const s = session();
+  return !!acceptedPoll?.conflictBatch && !!s && acceptedPoll.conflictBatch === s.batchId;
 }
 export function hasPendingChanges() {
   return !!session()?.pending.length;
@@ -362,7 +412,10 @@ function start() {
           await serial(async () => {
             if (generation === pollGeneration) await refresh(true);
           });
-          pollFailures = 0;
+          // A pending batch that cannot be previewed on the room needs the user
+          // (export, discard or retry) or a newer room revision. Back off like a
+          // failure instead of polling every 2 s; the conflict was shown once.
+          pollFailures = previewConflictOpen() ? Math.min(4, pollFailures + 1) : 0;
         } catch (error) {
           if (generation === pollGeneration) {
             pollFailures = Math.min(4, pollFailures + 1);
@@ -423,8 +476,12 @@ async function accept(value: RoomView, committed = false) {
   const previousRevision = s.revision;
   s.revision = remote.revision;
   s.purseIds = remote.purseIds;
+  // Only a table actually written to this device asks the economy to reload.
+  let applied = false;
+  let conflict: string | undefined;
   if (!s.pending.length && (changed || committed)) {
     await applyCloudTable(remote.table);
+    applied = true;
   } else if (changed) {
     try {
       let preview = remote.table;
@@ -442,9 +499,25 @@ async function accept(value: RoomView, committed = false) {
           { preview: true },
         );
       await applyCloudTable(preview);
+      applied = true;
     } catch (error) {
       s.revision = previousRevision;
-      fail(error);
+      conflict =
+        error instanceof Error
+          ? error.message
+          : "Connection failed. Your pending changes are saved on this device.";
+      // Surface a conflict once per pending batch; a later revision that fails
+      // the same way keeps the existing attention instead of re-announcing it.
+      const repeated =
+        acceptedPoll?.campaignKey === key() &&
+        acceptedPoll.token === s.token &&
+        acceptedPoll.seatId === s.seatId &&
+        acceptedPoll.conflictBatch === s.batchId &&
+        acceptedPoll.conflictMessage === conflict &&
+        view.error === conflict;
+      // Nothing was written to the device table, so this attention must not
+      // ask the economy to reload (fail() would announce a data change).
+      if (!repeated) publish({ status: "attention", error: conflict }, false);
       await rememberIncoming(remote.table.notes);
     }
   }
@@ -453,14 +526,15 @@ async function accept(value: RoomView, committed = false) {
   // treat an empty/incomplete local copy as already synchronized.
   remember(s);
   acceptedPoll =
-    s.revision === remote.revision
+    s.revision === remote.revision || conflict !== undefined
       ? {
           campaignKey: key(),
           token: s.token,
           seatId: s.seatId,
-          revision: s.revision,
+          revision: remote.revision,
           userId: remote.userId,
           sessionId: remote.sessionId,
+          ...(conflict !== undefined ? { conflictBatch: s.batchId, conflictMessage: conflict } : {}),
         }
       : undefined;
   if (s.role === "player")
@@ -494,7 +568,7 @@ async function accept(value: RoomView, committed = false) {
       error: s.pending.length ? view.error : "",
       lastSync: Date.now(),
     },
-    changed || committed,
+    applied || committed,
   );
   start();
 }
@@ -503,13 +577,18 @@ async function refresh(conditional = false) {
   if (!s) return;
   const campaignKey = key();
   let remote: RoomView | import("./cloud.server.ts").RoomUnchanged;
+  const sameSeat =
+    conditional &&
+    acceptedPoll?.campaignKey === campaignKey &&
+    acceptedPoll.token === s.token &&
+    acceptedPoll.seatId === s.seatId;
+  // After a preview conflict the device keeps its older revision, but the
+  // poll only needs to learn whether the room moved past the conflicting one.
+  const conflicted =
+    sameSeat && !!acceptedPoll!.conflictBatch && acceptedPoll!.conflictBatch === s.batchId;
+  const known = sameSeat && (conflicted || acceptedPoll!.revision === s.revision);
+  const knownRevision = conflicted ? acceptedPoll!.revision : s.revision;
   try {
-    const known =
-      conditional &&
-      acceptedPoll?.campaignKey === campaignKey &&
-      acceptedPoll.token === s.token &&
-      acceptedPoll.seatId === s.seatId &&
-      acceptedPoll.revision === s.revision;
     if (known) {
       try {
         remote = await pollCloudTable({
@@ -517,7 +596,7 @@ async function refresh(conditional = false) {
             tabletopProtocol: 2,
             code: s.code,
             token: s.token,
-            knownRevision: s.revision,
+            knownRevision,
             knownSeatId: s.seatId,
           },
         });
@@ -559,13 +638,16 @@ async function refresh(conditional = false) {
     // older linked seats may legitimately omit userId in both full and compact views.
     const fresh = readUnchangedRoom(remote, {
       ...s,
+      revision: knownRevision,
       userId: acceptedPoll?.userId,
       sessionId: acceptedPoll?.sessionId,
     });
     publish(
       {
         encounterActive: fresh.encounterActive,
-        lastSync: Date.now(),
+        // Readers only distinguish "never synced" (0); a clock tick alone must
+        // not give every subscriber a new snapshot.
+        lastSync: view.lastSync || Date.now(),
         error: s.pending.length ? view.error : "",
         status: s.pending.length ? (view.error ? "attention" : "pending") : "synced",
       },

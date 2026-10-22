@@ -154,3 +154,33 @@ test("full storage preserves verified work in memory and tells the caller verifi
     h.restore();
   }
 });
+
+test("the recovery readout is cached until storage changes, without re-parsing on every snapshot", async () => {
+  const h = await harness();
+  try {
+    h.local.setItem(key, raw);
+    let reads = 0;
+    const getItem = h.local.getItem.bind(h.local);
+    h.local.getItem = (k: string) => {
+      reads++;
+      return getItem(k);
+    };
+    const first = h.recovery.recoveryVisibility();
+    assert.equal(first.unverifiedRecoveries, 1);
+    reads = 0;
+    for (let i = 0; i < 50; i++) assert.equal(h.recovery.recoveryVisibility(), first);
+    assert.equal(reads, 0, "a cached snapshot reads no stored recovery value");
+    // A new key, an account change or an explicit storage invalidation recomputes.
+    h.local.setItem("lootsplit.revoked-recovery:SECOND", raw.replace("OWNED", "SECOND"));
+    assert.equal(h.recovery.recoveryVisibility().unverifiedRecoveries, 2);
+    h.session.setItem("lootsplit.verified-account", "owner-b");
+    const other = h.recovery.recoveryVisibility();
+    assert.notEqual(other, first);
+    h.local.setItem(key, "{}");
+    assert.equal(h.recovery.recoveryVisibility(), other, "same-length overwrite waits for invalidation");
+    h.recovery.invalidateRecoveryVisibility();
+    assert.notEqual(h.recovery.recoveryVisibility(), other);
+  } finally {
+    h.restore();
+  }
+});

@@ -18,6 +18,56 @@ const LEGACY = "lootsplit.revoked-recovery:";
 const CHECK = "lootsplit.legacy-recovery-check.v1";
 let lastCheck: { owner: string; keys: string[] } | null = null;
 
+// The room store reads recovery visibility on every external-store snapshot, so
+// the localStorage scan and JSON parsing are cached until storage can have
+// changed: this module's own writes, another document's storage event, a new
+// or removed key, or a different verified account.
+let storageVersion = 0;
+let cached: { fingerprint: string; value: RecoveryVisibility } | null = null;
+export type RecoveryVisibility = Readonly<{
+  recoveries: ReadonlyArray<{ id: string; code: string; pending: number }>;
+  unverifiedRecoveries: number;
+  legacyRecoveryChecked: boolean;
+}>;
+function changed() {
+  storageVersion++;
+  cached = null;
+}
+if (typeof window !== "undefined" && typeof window.addEventListener === "function")
+  window.addEventListener("storage", changed);
+function fingerprint() {
+  let size = -1,
+    check: string | null = null;
+  try {
+    size = typeof localStorage === "undefined" ? -1 : localStorage.length;
+  } catch {
+    /* Blocked storage reads as its own state. */
+  }
+  try {
+    check = typeof sessionStorage === "undefined" ? null : sessionStorage.getItem(CHECK);
+  } catch {
+    /* Blocked storage reads as its own state. */
+  }
+  return JSON.stringify([storageVersion, copies.length, verifiedOwner(), size, check]);
+}
+/** One cached, identity-stable view of every recovery readout. */
+export function recoveryVisibility(): RecoveryVisibility {
+  const current = fingerprint();
+  if (cached?.fingerprint === current) return cached.value;
+  const value = Object.freeze({
+    recoveries: revokedRecoverySummaries(),
+    unverifiedRecoveries: legacyRecoveryCount(),
+    legacyRecoveryChecked: legacyRecoveryChecked(),
+  });
+  // Loading copies can itself grow the in-memory list; key the cache after it.
+  cached = { fingerprint: fingerprint(), value };
+  return value;
+}
+/** Drop the cached recovery view after an out-of-band storage change. */
+export function invalidateRecoveryVisibility() {
+  changed();
+}
+
 function legacyKeys() {
   if (typeof localStorage === "undefined") return [];
   return Array.from({ length: localStorage.length }, (_, i) => localStorage.key(i))
@@ -56,9 +106,13 @@ export function legacyRecoveryChecked() {
 }
 
 function verifiedOwner() {
-  return typeof sessionStorage === "undefined"
-    ? null
-    : sessionStorage.getItem("lootsplit.verified-account");
+  try {
+    return typeof sessionStorage === "undefined"
+      ? null
+      : sessionStorage.getItem("lootsplit.verified-account");
+  } catch {
+    return null;
+  }
 }
 function eligible(copy: StoredCopy) {
   return copy.guest || (!!copy.value.userId && copy.value.userId === verifiedOwner());
@@ -122,6 +176,7 @@ export function rememberRevokedRecovery(
   // Preserve the memory copy even if durable storage is unavailable/full.
   const copy: StoredCopy = { value, guest: ephemeral && !owner };
   copies.push(copy);
+  changed();
   if (key) {
     try {
       localStorage.setItem(key, JSON.stringify(value));
@@ -170,6 +225,7 @@ export function discardRevokedRecovery(id: string) {
     localStorage.removeItem(copy.legacyKey);
   if (copy.key && copy.key !== copy.legacyKey) localStorage.removeItem(copy.key);
   copies.splice(index, 1);
+  changed();
 }
 export function legacyRecoveryCount() {
   loadOwnedCopies();
@@ -233,6 +289,7 @@ export function authorizeLegacyRecovery(
     }
   }
   lastCheck = { owner, keys };
+  changed();
   try {
     sessionStorage.setItem(CHECK, JSON.stringify(lastCheck));
   } catch {
