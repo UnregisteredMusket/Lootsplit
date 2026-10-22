@@ -1,6 +1,12 @@
 import { readCloudTableForImport } from "../src/lib/quire/cloud.ts";
 import { encounterSchema } from "../src/lib/encounters/model.mjs";
 import { sheetSchema } from "../src/lib/characters/model.mjs";
+import {
+  encodeRoomImages,
+  encodedRoomBytes,
+  roomImageStatements,
+  ROOM_BODY_LIMIT,
+} from "./room-images.mjs";
 
 const fail = (message, status = 400) => {
   throw Object.assign(new Error(message), { status });
@@ -295,6 +301,16 @@ export async function restoreDeletedCampaign(db, userId, body, actor) {
       receiptId: receiptIds.get(sourceAward.receipt_id),
     };
   }
+  // Store the restored room exactly as every other room write does: archived session snapshots
+  // (and map images/resource packs) go to their own tables, so a backup with large history fits
+  // D1's row limit and the restored row is already in its current shape.
+  const encoded = await encodeRoomImages(room);
+  const { bytes, largestReport } = encodedRoomBytes(encoded);
+  if (bytes > ROOM_BODY_LIMIT || largestReport > ROOM_BODY_LIMIT)
+    fail(
+      `This campaign is too large to restore online (${(Math.max(bytes, largestReport) / 1e6).toFixed(2)} MB; the limit is ${(ROOM_BODY_LIMIT / 1e6).toFixed(1)} MB). No campaign was created and your backup is still safe; download it for recovery.`,
+      413,
+    );
   const committed = "EXISTS(SELECT 1 FROM campaign_recoveries WHERE id=? AND user_id=?)";
   const statements = [
     db
@@ -315,7 +331,10 @@ export async function restoreDeletedCampaign(db, userId, body, actor) {
       ),
     db
       .prepare(`INSERT INTO campaign_rooms(code,revision,body) SELECT ?,1,? WHERE ${committed}`)
-      .bind(code, JSON.stringify(room), id, userId),
+      .bind(code, encoded.body, id, userId),
+    // Guarded by the row just inserted (code, revision 1, exact body): nothing is stored unless
+    // the restore commits, and the whole batch is one atomic D1 transaction.
+    ...(await roomImageStatements(db, { code, revision: 1 }, encoded)),
     db
       .prepare(
         `INSERT INTO library_members(user_id,code,seat_id,token,name,archived,updated_at) SELECT ?,?,?,?,?,0,? WHERE ${committed}`,

@@ -4,6 +4,21 @@ import {
   roomResourceStatements,
 } from "./room-resources.mjs";
 import { encodeRoomReports, hydrateRoomReports, roomReportStatements } from "./room-reports.mjs";
+/**
+ * D1 rejects rows above 2,000,000 bytes with an opaque error. An encoded room body and each
+ * archived snapshot row must stay at or below this budget (room-store.server.ts guards room
+ * writes; campaign-recovery.mjs guards restores).
+ */
+export const ROOM_BODY_LIMIT = 1_800_000;
+/** UTF-8 bytes of the largest row an encoded room write would store (room body or one snapshot).
+ * @param {{body:string;reports?:{body:string}[]}} encoded */
+export function encodedRoomBytes(encoded) {
+  const utf8 = (/** @type {string} */ text) => new TextEncoder().encode(text).length;
+  return {
+    bytes: utf8(encoded.body),
+    largestReport: Math.max(0, ...(encoded.reports || []).map((r) => utf8(r.body))),
+  };
+}
 /** Campaign-scoped immutable raster bytes; references are internal storage only. */
 const raster = /data:image\/(?:png|jpeg|webp);base64,[A-Za-z0-9+/=]{8000,}/g;
 const reference = /\/art\/room-image-[a-f0-9]{64}\.webp/g;
