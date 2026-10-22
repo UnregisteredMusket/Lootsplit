@@ -1110,6 +1110,8 @@ test("monitoring writes, logs, reports and device records require the current ow
     const paths = [
       ["task", task],
       ["registry", register],
+      ["registry/retire", { id: "external-check", eventId: "audit-retire", revision: 0 }],
+      ["registry/reinstate", { id: "external-check", eventId: "audit-reinstate", revision: 1 }],
       ["entry", entry],
       ["device", { id: "device-audit-123", snapshotId: 4, version: "test" }],
       ["settings", {}],

@@ -68,6 +68,13 @@ export type MonitorSettings = {
   progressMs: number;
   deviceFreshMs: number;
 };
+export type MonitorRetiredSpan = {
+  retiredAt: number;
+  retiredBy?: { id: string; name: string };
+  reason?: string;
+  reinstatedAt: number | null;
+  reinstatedBy?: { id: string; name: string } | null;
+};
 export type MonitorReport = {
   id: string;
   day: string;
@@ -102,7 +109,11 @@ export type MonitorReport = {
     entries: number;
     gap: string | null;
     lastObservationAt: number | null;
+    /** Retired spans overlapping this day; that time is not counted as missing data. */
+    retiredSpans?: MonitorRetiredSpan[];
   }[];
+  /** Registry entries retired for some or all of this day; listed instead of reported as gaps. */
+  retiredLogs?: (MonitorRetiredSpan & { id: string; name: string })[];
   evidence?: MonitorEntry[];
   correlations?: { entry: string; related: string[]; statement: string }[];
 };

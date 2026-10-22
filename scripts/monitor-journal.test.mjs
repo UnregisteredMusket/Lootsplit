@@ -20,6 +20,9 @@ import {
   scheduledMonitor,
   updateTask,
   monitorHistory,
+  monitorApi,
+  changeRegistryStatus,
+  activeSegments,
 } from "../cloudflare/monitor-journal.mjs";
 
 const instant = Date.parse("2026-10-20T12:00:00Z");
@@ -845,5 +848,220 @@ test("failing daily reports back off, then a failed placeholder unblocks later d
     );
   } finally {
     base.close();
+  }
+});
+
+const HOUR = 3600000;
+async function ownerSession(DB, id = "owner-1", role = "owner") {
+  await DB.prepare(
+    'INSERT INTO "user"(id,name,email,emailVerified,createdAt,updatedAt) VALUES(?,?,?,1,?,?)',
+  )
+    .bind(id, `Owner ${id}`, `${id}@example.com`, "2026-01-01", "2026-01-01")
+    .run();
+  await DB.prepare(
+    'INSERT INTO "session"(id,expiresAt,token,createdAt,updatedAt,userId) VALUES(?,?,?,?,?,?)',
+  )
+    .bind(`s-${id}`, "2999-01-01T00:00:00.000Z", `t-${id}`, "2026-01-01", "2026-01-01", id)
+    .run();
+  if (role) await DB.prepare("INSERT INTO site_roles VALUES(?,?,?)").bind(id, role, 0).run();
+  return (route, body) =>
+    monitorApi(
+      { DB },
+      id,
+      `s-${id}`,
+      new Request(`https://test/api/account/owner/monitor/${route}`, {
+        method: body ? "POST" : "GET",
+      }),
+      body,
+    );
+}
+const registryOf = async (call, id) => (await call("registry")).logs.find((l) => l.id === id);
+
+test("active segments subtract retired spans, including an open one", () => {
+  assert.deepEqual(activeSegments(0, 100, []), [[0, 100]]);
+  assert.deepEqual(activeSegments(0, 100, [{ retiredAt: 20, reinstatedAt: 40 }]), [
+    [0, 20],
+    [40, 100],
+  ]);
+  assert.deepEqual(activeSegments(0, 100, [{ retiredAt: 60, reinstatedAt: null }]), [[0, 60]]);
+  assert.deepEqual(activeSegments(0, 100, [{ retiredAt: -5, reinstatedAt: null }]), []);
+});
+
+test("owner retires and reinstates a custom log once per event; built-ins and stale revisions are refused", async () => {
+  const DB = localAccountDb();
+  try {
+    const call = await ownerSession(DB);
+    const register = {
+      id: "external-feed",
+      name: "External feed",
+      description: "Disposable",
+      mode: "external",
+      expectedMs: HOUR,
+    };
+    await call("registry", register);
+    await call("entry", {
+      source: "external-feed",
+      id: "before-retire",
+      summary: "Observed before retirement",
+      observedAt: Date.now() - 1000,
+    });
+    const before = await registryOf(call, "external-feed");
+    assert.equal(before.revision, 0);
+    assert.equal(before.retired, null);
+    await assert.rejects(
+      () => call("registry/retire", { id: "monitoring", eventId: "e0", revision: 0 }),
+      /Built-in logs/,
+    );
+    await assert.rejects(
+      () => call("registry/retire", { id: "external-feed", eventId: "e1", revision: 5 }),
+      /changed/,
+    );
+    await assert.rejects(
+      () => call("registry/retire", { id: "missing", eventId: "e1", revision: 0 }),
+      /not registered/,
+    );
+    await assert.rejects(() => call("registry/retire", { id: "external-feed" }), /event identifier/);
+    const retired = await call("registry/retire", {
+      id: "external-feed",
+      eventId: "e1",
+      revision: 0,
+      reason: "Feed decommissioned",
+    });
+    assert.equal(retired.revision, 1);
+    assert.equal(retired.retired.retiredBy.name, "Owner owner-1");
+    assert.equal(retired.retired.reason, "Feed decommissioned");
+    // A retried request is applied once.
+    const retry = await call("registry/retire", { id: "external-feed", eventId: "e1", revision: 0 });
+    assert.equal(retry.revision, 1);
+    await assert.rejects(
+      () => call("registry/reinstate", { id: "external-feed", eventId: "e1", revision: 1 }),
+      /another registry change/,
+    );
+    await assert.rejects(
+      () => call("registry/retire", { id: "external-feed", eventId: "e2", revision: 1 }),
+      /already retired/,
+    );
+    // Updating the definition keeps the retirement.
+    await call("registry", { ...register, name: "External feed (renamed)" });
+    const renamed = await registryOf(call, "external-feed");
+    assert.equal(renamed.revision, 2);
+    assert.ok(renamed.retired, "re-registering does not silently reinstate");
+    const reinstated = await call("registry/reinstate", {
+      id: "external-feed",
+      eventId: "e3",
+      revision: 2,
+    });
+    assert.equal(reinstated.retired, null);
+    assert.equal(reinstated.retirements.length, 1);
+    assert.ok(reinstated.retirements[0].reinstatedAt >= reinstated.retirements[0].retiredAt);
+    // History is retained: the original entry plus both audit entries, all exportable.
+    const history = await call("export?source=external-feed");
+    const ids = history.entries.map((e) => e.id);
+    assert.ok(ids.includes("external:external-feed:before-retire"));
+    assert.ok(ids.includes("registry:external-feed:e1"));
+    assert.ok(ids.includes("registry:external-feed:e3"));
+    assert.equal(
+      (await DB.prepare("SELECT COUNT(*) AS n FROM owner_monitor_logs WHERE id LIKE 'registry:%'").first()).n,
+      2,
+    );
+  } finally {
+    DB.close();
+  }
+});
+
+test("only the current owner may retire or reinstate a log", async () => {
+  const DB = localAccountDb();
+  try {
+    const owner = await ownerSession(DB, "owner-2");
+    await owner("registry", {
+      id: "owned-feed",
+      name: "Owned feed",
+      description: "",
+      mode: "event",
+      expectedMs: 0,
+    });
+    const admin = await ownerSession(DB, "admin-1", "admin");
+    const member = await ownerSession(DB, "member-1", null);
+    for (const call of [admin, member])
+      await assert.rejects(
+        () => call("registry/retire", { id: "owned-feed", eventId: "x", revision: 0 }),
+        (error) => error.status === 403,
+      );
+    // The commit guard rejects a write whose session ended between check and commit.
+    const settings = await initializeMonitor(DB);
+    assert.ok(settings);
+    await assert.rejects(
+      () =>
+        changeRegistryStatus(DB, { id: "owned-feed", eventId: "y", revision: 0 }, "retire", "owner-2", Date.now(), {
+          sql: "0",
+          binds: [],
+        }),
+      /authorization changed/,
+    );
+    assert.equal((await registryOf(owner, "owned-feed")).retired, null);
+  } finally {
+    DB.close();
+  }
+});
+
+test("daily reports list retired spans separately and never report them as missing data", async () => {
+  const DB = localAccountDb();
+  try {
+    const { start: d1 } = dayBounds("2026-10-17", "America/New_York");
+    await initializeMonitor(DB, d1 - 86400000);
+    await DB.prepare("INSERT INTO \"user\"(id,name,email,emailVerified,createdAt,updatedAt) VALUES('o','Olive','o@example.com',1,'x','x')").run();
+    await DB.prepare("INSERT INTO owner_monitor_registry(id,body,registered_at) VALUES('feed',?,?)")
+      .bind(
+        JSON.stringify({ id: "feed", name: "Feed", mode: "external", expectedMs: HOUR, builtin: false }),
+        d1 - 86400000,
+      )
+      .run();
+    const hourly = async (from, to) => {
+      for (let at = from; at <= to; at += HOUR)
+        await recordLog(DB, { id: `feed-${at}`, source: "feed", observedAt: at, summary: "ok" }, at);
+    };
+    // Day 1: hourly data until noon, then retired.
+    await hourly(d1, d1 + 12 * HOUR);
+    await changeRegistryStatus(DB, { id: "feed", eventId: "r1", revision: 0 }, "retire", "o", d1 + 12 * HOUR + 1);
+    const { start: d2 } = dayBounds("2026-10-18", "America/New_York");
+    const { start: d3, end: e3 } = dayBounds("2026-10-19", "America/New_York");
+    // Day 3: reinstated at noon, hourly data from then on.
+    await changeRegistryStatus(DB, { id: "feed", eventId: "r2", revision: 1 }, "reinstate", "o", d3 + 12 * HOUR);
+    await hourly(d3 + 12 * HOUR, e3 - HOUR);
+    const after = e3 + 86400000;
+    const r1 = await generateReport(DB, "2026-10-17", DEFAULT_CONFIG, after);
+    const c1 = r1.coverage.find((c) => c.id === "feed");
+    assert.equal(c1.gap, null, "the retired afternoon is not a gap");
+    assert.equal(c1.retiredSpans.length, 1);
+    assert.equal(r1.retiredLogs[0].retiredBy.name, "Olive");
+    assert.doesNotMatch(r1.gaps.join("\n"), /Feed/);
+    const r2 = await generateReport(DB, "2026-10-18", DEFAULT_CONFIG, after);
+    assert.equal(r2.coverage.find((c) => c.id === "feed"), undefined, "not active coverage");
+    assert.equal(r2.retiredLogs.length, 1);
+    assert.equal(r2.retiredLogs[0].id, "feed");
+    assert.equal(r2.retiredLogs[0].retiredAt, d1 + 12 * HOUR + 1);
+    assert.doesNotMatch(r2.gaps.join("\n"), /Feed/);
+    assert.match(r2.summary, /1 retired log span is listed separately/);
+    const r3 = await generateReport(DB, "2026-10-19", DEFAULT_CONFIG, after);
+    const c3 = r3.coverage.find((c) => c.id === "feed");
+    assert.equal(c3.gap, null, "coverage resumes at reinstatement; the retired morning is not a gap");
+    assert.ok(r3.retiredLogs[0].reinstatedAt === d3 + 12 * HOUR);
+    // A reinstated source that then stops reporting is a gap again.
+    const { start: d4 } = dayBounds("2026-10-20", "America/New_York");
+    const r4 = await generateReport(DB, "2026-10-20", DEFAULT_CONFIG, d4 + 2 * 86400000);
+    assert.match(r4.coverage.find((c) => c.id === "feed").gap, /No data/);
+    assert.equal(r4.retiredLogs.length, 0);
+    // Retiring for the rest of a day with no data while active is still a gap for the active part.
+    await DB.prepare("INSERT INTO owner_monitor_registry(id,body,registered_at) VALUES('quiet',?,?)")
+      .bind(JSON.stringify({ id: "quiet", name: "Quiet", mode: "external", expectedMs: HOUR, builtin: false }), d1 - 86400000)
+      .run();
+    await changeRegistryStatus(DB, { id: "quiet", eventId: "q1", revision: 0 }, "retire", "o", d4 + 6 * HOUR);
+    const r4b = await generateReport(DB, "2026-10-20", DEFAULT_CONFIG, d4 + 2 * 86400000);
+    assert.match(r4b.coverage.find((c) => c.id === "quiet").gap, /while this source was active/);
+    // Every stored entry remains in history, including during and after retirement.
+    const history = await monitorHistory(DB, new URL("https://test/export?source=feed&limit=100"));
+    assert.ok(history.entries.length >= 26);
+  } finally {
+    DB.close();
   }
 });

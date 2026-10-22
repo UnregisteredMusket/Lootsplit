@@ -122,6 +122,39 @@ export const BUILTIN_LOGS = [
   ],
 ];
 const decode = (row) => (row ? JSON.parse(row.body) : null);
+/**
+ * Retired spans of a registry entry, oldest first. `retirements` holds closed spans; `retired`
+ * is the open one. Both live in the registry row's JSON body (no schema change).
+ */
+export function retiredSpans(source) {
+  return [
+    ...(source?.retirements || []),
+    ...(source?.retired ? [{ ...source.retired, reinstatedAt: null, reinstatedBy: null }] : []),
+  ];
+}
+/** [from, to] minus every retired span; what remains is the time a source was expected to report. */
+export function activeSegments(from, to, spans) {
+  let segments = from < to ? [[from, to]] : [];
+  for (const span of spans) {
+    const a = span.retiredAt,
+      b = span.reinstatedAt ?? Infinity;
+    segments = segments.flatMap(([x, y]) =>
+      b <= x || a >= y ? [[x, y]] : [...(a > x ? [[x, a]] : []), ...(b < y ? [[b, y]] : [])],
+    );
+  }
+  return segments;
+}
+const registryView = (r) => {
+  const source = decode(r);
+  return {
+    ...source,
+    revision: source.revision || 0,
+    retired: source.retired || null,
+    retirements: source.retirements || [],
+    registeredAt: r.registered_at,
+    lastSuccessAt: r.last_success,
+  };
+};
 const rows = async (db, sql, ...args) =>
   (
     await db
@@ -1356,33 +1389,58 @@ async function buildReport(db, day, settings, now) {
   const collected = intervals.filter(
     (i) => i.slot > scheduledFrom && ["complete", "partial"].includes(i.outcome),
   ).length;
-  const coverage = registry.map((r) => {
-    const source = decode(r),
-      count = entries.filter((e) => e.source === r.id).length;
-    // A current heartbeat cannot prove yesterday's coverage; use dated observations/attestations.
-    const observations = entries.filter((e) => e.source === r.id);
-    const observedTimes = observations
-      .map((e) => decode(e).sourceFreshAt ?? e.observed_at)
-      .sort((a, b) => a - b);
-    const freshness = observedTimes.length ? observedTimes.at(-1) : null;
-    const coverageStart = Math.max(start, r.registered_at);
-    const widestGap = Math.max(
-      ...[coverageStart, ...observedTimes, end]
-        .slice(1)
-        .map((at, i) => at - [coverageStart, ...observedTimes][i]),
+  const coverage = [],
+    retiredLogs = [];
+  for (const r of registry) {
+    const source = decode(r);
+    // Retire/reinstate audit entries stay in history but are not evidence that the source reported.
+    const observations = entries.filter((e) => e.source === r.id && !decode(e).registryChange);
+    const spans = retiredSpans(source).filter(
+      (s) => s.retiredAt < end && (s.reinstatedAt ?? Infinity) > start,
     );
-    const explicitGap = observations.map((e) => decode(e).coverageGap).find(Boolean);
+    const coverageStart = Math.max(start, r.registered_at);
+    const segments = activeSegments(coverageStart, end, spans);
+    for (const span of spans) retiredLogs.push({ id: r.id, name: source.name, ...span });
+    // Retired for the whole day: listed under retired logs, not as active coverage or a gap.
+    if (spans.length && r.registered_at < end && !segments.length) continue;
+    const freshAt = (e) => decode(e).sourceFreshAt ?? e.observed_at;
+    const active = spans.length
+      ? observations.filter((e) =>
+          segments.some(([a, b]) => e.observed_at >= a && e.observed_at <= b),
+        )
+      : observations;
+    const count = active.length;
+    // A current heartbeat cannot prove yesterday's coverage; use dated observations/attestations.
+    const observedTimes = active.map(freshAt).sort((a, b) => a - b);
+    const freshness = observedTimes.length ? observedTimes.at(-1) : null;
+    const widest = (from, to, times) =>
+      Math.max(...[from, ...times, to].slice(1).map((at, i) => at - [from, ...times][i]));
+    const widestGap = spans.length
+      ? Math.max(
+          0,
+          ...segments.map(([a, b]) =>
+            widest(
+              a,
+              b,
+              observedTimes.filter((t) => t >= a && t <= b),
+            ),
+          ),
+        )
+      : widest(coverageStart, end, observedTimes);
+    const explicitGap = active.map((e) => decode(e).coverageGap).find(Boolean);
     const gap =
       (r.registered_at >= end
         ? "This source was registered after this day; earlier coverage is not verified."
         : null) ||
       explicitGap ||
       (!count
-        ? "No data or coverage attestation for this day."
+        ? spans.length
+          ? "No data or coverage attestation while this source was active; it was retired for part of this day."
+          : "No data or coverage attestation for this day."
         : source.expectedMs && widestGap > source.expectedMs
           ? "One or more expected source checks are missing or stale."
           : null);
-    return {
+    coverage.push({
       id: r.id,
       name: source.name,
       mode: source.mode,
@@ -1390,8 +1448,9 @@ async function buildReport(db, day, settings, now) {
       lastObservationAt: freshness,
       gap,
       registrationAt: r.registered_at,
-    };
-  });
+      ...(spans.length ? { retiredSpans: spans } : {}),
+    });
+  }
   const evidence = entries.map((e) => ({
     id: e.id,
     sequence: e.sequence,
@@ -1503,8 +1562,10 @@ async function buildReport(db, day, settings, now) {
     start,
     end,
     generatedAt: now,
-    summary: `${day}: ${collected} of ${expected} scheduled intervals observed, ${incidents.length} incident/recovery changes, ${performance.length} performance records and ${tasks.length} development updates. ${gaps.length ? "Monitoring coverage is incomplete." : "Registered sources supplied the expected coverage."}`,
+    summary: `${day}: ${collected} of ${expected} scheduled intervals observed, ${incidents.length} incident/recovery changes, ${performance.length} performance records and ${tasks.length} development updates. ${gaps.length ? "Monitoring coverage is incomplete." : "Registered sources supplied the expected coverage."}${retiredLogs.length ? ` ${retiredLogs.length} retired log span${retiredLogs.length === 1 ? " is" : "s are"} listed separately and not counted as missing data.` : ""}`,
     coverage,
+    // Retired registry entries are not active coverage; their stored history stays in History.
+    retiredLogs,
     gaps,
     recommendations,
     trends,
@@ -1933,6 +1994,89 @@ export async function updateTask(db, input, now, settings, guard = null) {
     fail("Task or authorization changed. Refresh before updating.", 409);
   return task;
 }
+/**
+ * Retires or reinstates a custom registry entry (audit M10). The state and every retired span live
+ * in the registry row's JSON body, guarded by its revision; the change is also a history entry of
+ * that log, keyed by a persistent event ID so a retried request is applied once. Nothing stored for
+ * the log is deleted, and built-in logs cannot be retired.
+ */
+export async function changeRegistryStatus(
+  db,
+  input,
+  action,
+  actor,
+  now = Date.now(),
+  guard = null,
+) {
+  if (!["retire", "reinstate"].includes(action)) fail("Monitoring route not found.", 404);
+  const id = clean(input?.id ?? "", 80),
+    eventId = clean(input?.eventId ?? "", 160),
+    reason = clean(input?.reason || "", 500);
+  if (!id || !eventId) fail("Choose a registered log and supply a persistent event identifier.");
+  const row = await db.prepare("SELECT * FROM owner_monitor_registry WHERE id=?").bind(id).first();
+  if (!row) fail("This log is not registered.", 404);
+  const source = decode(row);
+  if (source.builtin) fail("Built-in logs are maintained in code and cannot be retired.", 409);
+  const logId = `registry:${id}:${eventId}`;
+  const duplicate = await db
+    .prepare("SELECT body FROM owner_monitor_logs WHERE id=?")
+    .bind(logId)
+    .first();
+  if (duplicate) {
+    if (decode(duplicate).registryChange?.action !== action)
+      fail("This event identifier belongs to another registry change.", 409);
+    return registryView(row);
+  }
+  if (!Number.isSafeInteger(input.revision) || (source.revision || 0) !== input.revision)
+    fail("The log registry changed. Refresh before updating.", 409);
+  if (action === "retire" && source.retired) fail("This log is already retired.", 409);
+  if (action === "reinstate" && !source.retired) fail("This log is not retired.", 409);
+  const by = {
+    id: actor,
+    name:
+      (await db.prepare('SELECT name FROM "user" WHERE id=?').bind(actor).first())?.name ||
+      "Site owner",
+  };
+  const next = { ...source, revision: (source.revision || 0) + 1 };
+  let summary;
+  if (action === "retire") {
+    next.retired = { retiredAt: now, retiredBy: by, reason };
+    summary = `${source.name} retired by ${by.name}${reason ? `: ${reason}` : "."} Its stored history stays readable and exportable; daily reports list it under retired logs instead of reporting missing data.`;
+  } else {
+    const span = { ...source.retired, reinstatedAt: now, reinstatedBy: by };
+    delete next.retired;
+    next.retirements = [...(source.retirements || []), span];
+    summary = `${source.name} reinstated by ${by.name}${reason ? `: ${reason}` : "."} Daily coverage resumes now; the span retired since ${new Date(span.retiredAt).toISOString()} is shown as retired, not as a gap.`;
+  }
+  const predicate = guard ? ` AND ${guard.sql}` : "",
+    binds = guard?.binds || [];
+  const results = await db.batch([
+    statement(
+      db,
+      `UPDATE owner_monitor_registry SET body=? WHERE id=? AND body=? AND json_extract(body,'$.builtin')=0${predicate}`,
+      JSON.stringify(next),
+      id,
+      row.body,
+      ...binds,
+    ),
+    statement(
+      db,
+      "INSERT OR IGNORE INTO owner_monitor_logs(id,source,observed_at,collected_at,summary,body) SELECT ?,?,?,?,?,? WHERE changes()=1",
+      logId,
+      id,
+      now,
+      now,
+      summary,
+      JSON.stringify({
+        outcome: action === "retire" ? "retired" : "reinstated",
+        registryChange: { action, at: now, by, reason, revision: next.revision },
+      }),
+    ),
+  ]);
+  if (!results[0].meta.changes)
+    fail("The log registry or authorization changed. Refresh before updating.", 409);
+  return registryView({ ...row, body: JSON.stringify(next) });
+}
 export async function monitorApi(env, userId, sessionId, request, body) {
   await authorizeOwner(env, userId, sessionId);
   const db = env.DB,
@@ -1945,11 +2089,10 @@ export async function monitorApi(env, userId, sessionId, request, body) {
     if (route === "history" || route === "export") result = await monitorHistory(db, url);
     else if (route === "registry")
       result = {
-        logs: (await rows(db, "SELECT * FROM owner_monitor_registry ORDER BY id")).map((r) => ({
-          ...decode(r),
-          registeredAt: r.registered_at,
-          lastSuccessAt: r.last_success,
-        })),
+        logs: (await rows(db, "SELECT * FROM owner_monitor_registry ORDER BY id")).map(
+          registryView,
+        ),
+        customLimit: REGISTRY_CUSTOM_LIMIT,
         settings,
       };
     else if (route === "reports")
@@ -2003,9 +2146,18 @@ export async function monitorApi(env, userId, sessionId, request, body) {
       };
       // Every registered source adds work to each daily report; bound new custom entries.
       const existing = await db
-        .prepare("SELECT id FROM owner_monitor_registry WHERE id=?")
+        .prepare("SELECT body FROM owner_monitor_registry WHERE id=?")
         .bind(id)
         .first();
+      const previous = decode(existing);
+      // Updating a definition keeps its retirement state and span history.
+      if (previous) {
+        record.revision = (previous.revision || 0) + 1;
+        if (previous.retired) record.retired = previous.retired;
+        if (previous.retirements) record.retirements = previous.retirements;
+      }
+      // Retired entries still count: they keep their definition, history and report notes, and
+      // reinstating one then never has to fail on a full registry.
       if (!existing) {
         const custom = await db
           .prepare(
@@ -2020,18 +2172,28 @@ export async function monitorApi(env, userId, sessionId, request, body) {
       }
       const changed = await run(
         db,
-        `INSERT INTO owner_monitor_registry(id,body,registered_at) SELECT ?,?,? WHERE ${guard.sql} ON CONFLICT(id) DO UPDATE SET body=excluded.body WHERE json_extract(owner_monitor_registry.body,'$.builtin')=0`,
+        `INSERT INTO owner_monitor_registry(id,body,registered_at) SELECT ?,?,? WHERE ${guard.sql} ON CONFLICT(id) DO UPDATE SET body=excluded.body WHERE json_extract(owner_monitor_registry.body,'$.builtin')=0 AND owner_monitor_registry.body IS ?`,
         id,
         JSON.stringify(record),
         now,
         ...guard.binds,
+        existing?.body ?? null,
       );
       if (!changed.meta.changes)
         fail(
-          "Built-in registry definitions are maintained in code, or authorization changed.",
+          "Built-in registry definitions are maintained in code, the log changed meanwhile, or authorization changed. Refresh and try again.",
           409,
         );
       result = record;
+    } else if (route === "registry/retire" || route === "registry/reinstate") {
+      result = await changeRegistryStatus(
+        db,
+        body,
+        route.slice("registry/".length),
+        userId,
+        now,
+        guard,
+      );
     } else if (route === "entry") {
       const source = clean(body.source, 80),
         id = clean(body.id, 160),

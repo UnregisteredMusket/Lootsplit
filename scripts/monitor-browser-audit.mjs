@@ -146,6 +146,33 @@ try {
       .locator(".owner-monitor-scroll")
       .evaluate((el) => el.scrollHeight > el.clientHeight && el.clientHeight <= 640),
   );
+  // Retire asks for confirmation, keeps history and can be reinstated (audit M10).
+  await detailsNav.getByRole("link", { name: "Log registry & settings", exact: true }).click();
+  await overview.getByText("Browser external log · browser-external", { exact: true }).click();
+  await overview.getByRole("button", { name: "Retire Browser external log…", exact: true }).click();
+  await overview.getByText("Nothing is deleted", { exact: false }).waitFor();
+  await overview.getByLabel("Reason (optional)", { exact: true }).fill("Browser audit");
+  await overview.getByRole("button", { name: "Retire log", exact: true }).click();
+  await overview.getByText("Browser external log retired.", { exact: false }).waitFor();
+  const retiredRegistry = await (
+    await context.request.get(origin + "/api/account/owner/monitor/registry")
+  ).json();
+  const retiredLog = retiredRegistry.logs.find((log) => log.id === "browser-external");
+  assert.equal(retiredLog.retired.reason, "Browser audit");
+  assert.equal(
+    retiredRegistry.logs.find((log) => log.id === "monitoring").retired,
+    null,
+    "built-in logs are untouched",
+  );
+  await overview
+    .getByRole("button", { name: "Reinstate Browser external log", exact: true })
+    .click();
+  await overview.getByText("Browser external log reinstated.", { exact: false }).waitFor();
+  const history = await (
+    await context.request.get(origin + "/api/account/owner/monitor/export?source=browser-external")
+  ).json();
+  assert.ok(history.entries.some((e) => e.id === "external:browser-external:browser-observation"));
+  assert.equal(history.entries.filter((e) => e.registryChange).length, 2);
   await detailsNav.getByRole("link", { name: "Daily reports", exact: true }).click();
   await overview.getByRole("button", { name: "Generate previous day", exact: true }).click();
   await overview.locator("#monitor-reports h4").first().waitFor();
