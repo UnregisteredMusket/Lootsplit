@@ -36,6 +36,10 @@ def snapshot(name):
     return root
 
 
+# The app group label in the launcher picker: current name, and the name before 1.10.0.
+APP_LABELS = {"Lootsplitter", "Lootsplit"}
+
+
 def label(node):
     return " ".join([node.get("text", ""), node.get("content-desc", "")]).strip()
 
@@ -73,7 +77,9 @@ picker = snapshot("picker-open")
 search = next((n for n in picker.iter("node") if n.get("class") == "android.widget.EditText"), None)
 if search is not None:
     tap(search)
-    adb("shell", "input", "text", "Lootsplitter")
+    # "Lootsplit" matches both the current name and releases before 1.10.0 ("Lootsplit"); the
+    # upgrade audit runs this picker against the previous release first.
+    adb("shell", "input", "text", "Lootsplit")
     adb("shell", "input", "keyevent", "KEYCODE_BACK")
 
 seen = set()
@@ -82,7 +88,7 @@ for attempt in range(12):
     picker = snapshot("picker-" + str(attempt))
     labels = {label(n) for n in picker.iter("node")}
     seen.update(labels)
-    group = next((n for n in picker.iter("node") if label(n) == "Lootsplitter"), None)
+    group = next((n for n in picker.iter("node") if label(n) in APP_LABELS), None)
     if group is not None and not expanded:
         tap(group)
         expanded = True
