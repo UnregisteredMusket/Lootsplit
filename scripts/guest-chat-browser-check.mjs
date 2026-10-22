@@ -102,6 +102,17 @@ async function sendAndExpect(label, sender, readers, text, how) {
   if (how === "keyboard") await sender.locator("#chat-message").press("Control+Enter");
   else if (how === "submit") await sender.locator(".chat-composer").evaluate((f) => f.requestSubmit());
   else await chat(sender).getByRole("button", { name: "Send", exact: true }).click();
+  await sender.waitForTimeout(300);
+  if ((await sender.locator("#chat-message").inputValue()) !== "") {
+    const toasts = await sender.locator("[data-sonner-toast]").allInnerTexts().catch(() => []);
+    const state = await sender.evaluate(async () => {
+      const t = await import("/src/lib/quire/table.ts");
+      const c = await import("/src/lib/quire/cloud-client.ts");
+      const room = c.getCloudTable();
+      return { seat: t.getSeat(), joined: room.joined, purses: (room.table?.purses || []).map((p) => [p.id, p.kind, p.control]) };
+    }).catch((e) => String(e));
+    console.log(`  REPRO ${label}: not cleared; toasts=${JSON.stringify(toasts)} state=${JSON.stringify(state)}`);
+  }
   await expect(sender.locator("#chat-message")).toHaveValue("");
   const started = Date.now();
   await expect(
