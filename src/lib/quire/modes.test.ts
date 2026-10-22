@@ -21,7 +21,7 @@ const sql = new DatabaseSync(":memory:");
 sql.exec(readFileSync(new URL("../../../cloudflare/migrations/0008_encounters.sql", import.meta.url), "utf8"));
 sql.exec("CREATE TABLE library_members(user_id TEXT, code TEXT, seat_id TEXT, token TEXT)");
 sql.exec(
-  readFileSync(new URL("../../../drizzle/0000_mysterious_lord_tyger.sql", import.meta.url), "utf8"),
+  readFileSync(new URL("../../../cloudflare/migrations/0001_campaign_rooms.sql", import.meta.url), "utf8"),
 );
 (globalThis as any).__env__ = {
   DB: {
