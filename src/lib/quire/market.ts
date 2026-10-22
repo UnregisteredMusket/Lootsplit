@@ -130,10 +130,22 @@ function normalizeListing(value: unknown): Listing | null {
   if (!id || !name || (listing.kind !== "item" && listing.kind !== "property") || !Number.isFinite(copper) || copper < 0) return null;
   const quantity = listing.quantity === null || listing.quantity === undefined ? null : Math.max(0, Math.floor(Number(listing.quantity)));
   if (quantity !== null && !Number.isFinite(quantity)) return null;
-  return listingSchema.parse({ id, name, kind: listing.kind, copper, quantity, notes: typeof listing.notes === "string" ? listing.notes.trim() : "",
+  const base = { id, name, kind: listing.kind, copper, quantity, notes: typeof listing.notes === "string" ? listing.notes.trim() : "",
     ...(listing.locationId !== undefined ? { locationId: listing.locationId } : {}),
     ...(listing.property !== undefined ? { property: listing.property } : {}),
-    ...(listing.status !== undefined ? { status: listing.status } : {}) });
+    ...(listing.status !== undefined ? { status: listing.status } : {}) };
+  // Estate listings (estate-import.ts) carry their operating template; the shared engine needs
+  // both fields to initialize the purchase and to match the client's `before` copy. A damaged
+  // estate field is dropped rather than making the listing (and the save) unreadable.
+  const estate = {
+    ...(listing.estateTemplateKey !== undefined ? { estateTemplateKey: listing.estateTemplateKey } : {}),
+    ...(listing.estateAttachments !== undefined ? { estateAttachments: listing.estateAttachments } : {}),
+  };
+  if (Object.keys(estate).length) {
+    const kept = listingSchema.safeParse({ ...base, ...estate });
+    if (kept.success) return kept.data;
+  }
+  return listingSchema.parse(base);
 }
 
 function normalizeLoan(value: unknown): LoanAsk | null {
