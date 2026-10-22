@@ -1,4 +1,4 @@
-import { isAppOrigin } from "../../src/lib/mobile/origin.ts";
+import { isAppOrigin, isWorkerApiPath } from "../../src/lib/mobile/origin.ts";
 
 interface CorsEvent {
   url: URL;
@@ -10,8 +10,9 @@ function headersFor(origin: string, requested: string | null): Headers {
   headers.set("access-control-allow-origin", origin);
   headers.set("access-control-allow-methods", "GET, POST, OPTIONS");
   headers.set("access-control-allow-headers", requested || "content-type, accept, x-tsr-serverfn");
-  // TanStack uses these response headers to decode server-function results.
-  headers.set("access-control-expose-headers", "x-tss-serialized, x-tss-raw, x-tss-context");
+  // TanStack uses the x-tss headers to decode server-function results; the room image GET
+  // revalidates by ETag.
+  headers.set("access-control-expose-headers", "x-tss-serialized, x-tss-raw, x-tss-context, etag");
   headers.set("access-control-max-age", "86400");
   headers.set("vary", "origin");
   return headers;
@@ -22,7 +23,8 @@ export default async function mobileCors(
   next: () => unknown | Promise<unknown>,
 ): Promise<unknown> {
   const origin = event.req.headers.get("origin");
-  if (!origin || !isAppOrigin(origin) || !event.url.pathname.startsWith("/_serverFn")) return next();
+  if (!origin || !isAppOrigin(origin) || !(event.url.pathname.startsWith("/_serverFn") || isWorkerApiPath(event.url.pathname)))
+    return next();
   const allowed = headersFor(origin, event.req.headers.get("access-control-request-headers"));
   if ((event.req.method ?? "GET").toUpperCase() === "OPTIONS") return new Response(null, { status: 204, headers: allowed });
   const result = await next();

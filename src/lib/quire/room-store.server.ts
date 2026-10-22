@@ -4,6 +4,7 @@ import {
   hydrateRoomImages,
   roomImageStatements,
   ROOM_BODY_LIMIT,
+  ROOM_IMAGE_SOURCES,
 } from "../../../cloudflare/room-images.mjs";
 import { mkdir, open, readFile, rename, unlink } from "node:fs/promises";
 import path from "node:path";
@@ -45,7 +46,18 @@ export function roomStorageBody(room: CloudRoom): string {
 export function keepStoredBody<T extends CloudRoom>(source: CloudRoom, derived: T): T {
   const stored = (source as CloudRoom & { [STORED_BODY]?: string })[STORED_BODY];
   if (stored !== undefined) Object.defineProperty(derived, STORED_BODY, { value: stored });
+  const sources = roomImageSources(source);
+  if (sources.size)
+    Object.defineProperty(derived, ROOM_IMAGE_SOURCES, { value: sources, configurable: true });
   return derived;
+}
+/**
+ * Reference -> inline image for the map images this read restored from the room's own
+ * `campaign_room_images` rows (empty for local rooms and rooms without stored images). Used only
+ * to send tabletop protocol 4 clients references instead of rasters; never stored or compared.
+ */
+export function roomImageSources(room: CloudRoom): Map<string, string> {
+  return (room as CloudRoom & { [ROOM_IMAGE_SOURCES]?: Map<string, string> })[ROOM_IMAGE_SOURCES] ?? new Map();
 }
 export type RoomAccess = Pick<CloudRoom, "code" | "revision" | "ownerId" | "sessionId" | "closed" | "seats">;
 /** Read authorization/revision only, without private campaign/media hydration. */
@@ -131,7 +143,15 @@ async function localSave(rooms: CloudRoom[]): Promise<void> {
     throw error;
   }
 }
-export async function readRoom(code: string): Promise<CloudRoom | null> {
+export type ReadRoomOptions = {
+  /**
+   * Tabletop protocol 4 read-only views: keep the current maps' stored image references instead
+   * of reading their rasters. Never pass this for a read that may be written back, exported,
+   * backed up or compared; those always need the fully hydrated room.
+   */
+  mapImageReferences?: boolean;
+};
+export async function readRoom(code: string, options: ReadRoomOptions = {}): Promise<CloudRoom | null> {
   const db = database();
   if (db) {
     const row = await db
@@ -144,7 +164,9 @@ export async function readRoom(code: string): Promise<CloudRoom | null> {
     const parsed = JSON.parse(row.body) as CloudRoom, revision = parsed.revision;
     const room = await hydrateCampaignCharacters(db, parsed);
     const stored = room.revision === revision ? row.body : JSON.stringify(room);
-    const hydrated = await hydrateRoomImages(db, room.code, room);
+    const hydrated = await hydrateRoomImages(db, room.code, room, {
+      keepMapImageReferences: options.mapImageReferences === true,
+    });
     Object.defineProperty(hydrated, STORED_BODY, { value: stored });
     ensureCityExchanges(hydrated.table);
     return hydrated;

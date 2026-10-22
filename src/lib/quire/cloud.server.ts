@@ -12,6 +12,7 @@ import {
   updateRoom,
   roomStorageBody,
   keepStoredBody,
+  roomImageSources,
 } from "./room-store.server.ts";
 import { syncTimer } from "./sync-timing.server.ts";
 import {
@@ -34,6 +35,7 @@ import { manualCharacterRolls, database } from "./room-store.server.ts";
 import { referenceAccess, referenceSection } from "./reference-access.ts";
 import { isProbeRoomCode } from "../../../cloudflare/probe-namespace.mjs";
 import { SUBMIT_LIMIT_MESSAGE, takeSubmitAllowance } from "./room-submit-limit.ts";
+import { IMAGE_REFERENCE_PROTOCOL, ROOM_IMAGE_SOURCES_KEY } from "./tabletop-protocol.ts";
 
 /**
  * Server-only options. Client server functions pass a single `data` argument, so a browser can never
@@ -319,10 +321,17 @@ export async function joinRoom(input: {
   };
 }
 
-export async function roomState(input: { code: string; token: string }): Promise<RoomView> {
+export async function roomState(input: {
+  code: string;
+  token: string;
+  tabletopProtocol?: number;
+}): Promise<RoomView> {
   const timer = syncTimer("full-read");
   try {
-    const room = await timer.measure("hydrate", () => must(input.code));
+    // Protocol 4 clients load map artwork by reference: this read-only view skips those rasters.
+    const room = await timer.measure("hydrate", () =>
+      must(input.code, { mapImageReferences: wantsImageReferences(input.tabletopProtocol) }),
+    );
     const seat = room.seats.find((item) => item.token === input.token);
     if (!seat) throw new Error("This browser is not seated at that table.");
     const result = await timer.measure("projection", () => view(room, seat));
@@ -416,7 +425,7 @@ export async function choosePace(input: {
   await updateRoom(next, room.revision);
   const seat = next.seats.find((item) => item.token === input.token);
   if (!seat) throw new Error("This browser is not seated at that table.");
-  return view(next, seat);
+  return view(next, seat, room);
 }
 
 export async function closeRoom(input: {
@@ -466,7 +475,7 @@ export async function passTurn(input: { code: string; token: string }): Promise<
   await updateRoom(next, room.revision);
   const seat = next.seats.find((item) => item.token === input.token);
   if (!seat) throw new Error("This browser is not seated at that table.");
-  return view(next, seat);
+  return view(next, seat, room);
 }
 
 export type RoomView = {
@@ -502,8 +511,11 @@ function requireInvitationSession(room: CloudRoom, sessionId?: string) {
     throw Error("This invitation has expired. Ask the DM for the current session link.");
 }
 
-async function must(code: string): Promise<CloudRoom> {
-  const room = await readRoom(code.trim().toUpperCase());
+async function must(
+  code: string,
+  options?: import("./room-store.server.ts").ReadRoomOptions,
+): Promise<CloudRoom> {
+  const room = await readRoom(code.trim().toUpperCase(), options);
   if (!room) throw new Error("No table uses that code.");
   if (room.closed) throw new Error("This room is closed.");
   // Older clients may have staged a delayed copy of a committed action. Such a
@@ -520,8 +532,8 @@ async function must(code: string): Promise<CloudRoom> {
   });
 }
 
-async function view(room: CloudRoom, seat: CloudSeat): Promise<RoomView> {
-  const current = room.seats[room.turn];
+/** The seat's projected campaign table: exactly what `view` sends that seat. */
+async function seatTable(room: CloudRoom, seat: CloudSeat) {
   const record = projectRecord({ ...room.table, journal: room.table.journal }, seat, {
     directory: true,
   });
@@ -535,7 +547,22 @@ async function view(room: CloudRoom, seat: CloudSeat): Promise<RoomView> {
       }),
     );
   }
-  return {
+  const table: CloudTable =
+    seat.role === "dm"
+      ? {
+          ...room.table,
+          journal,
+          notes: room.table.notes.filter((note) => canReadNote(note, seat)),
+        }
+      : playerTable(room.table, record, seat);
+  return { record, table };
+}
+
+/** `read` is the room as read from storage when `room` is a derived next state of it. */
+async function view(room: CloudRoom, seat: CloudSeat, read: CloudRoom = room): Promise<RoomView> {
+  const current = room.seats[room.turn];
+  const { record, table } = await seatTable(room, seat);
+  return withImageSources(read, {
     encounterActive: await activeEncounter(room.code),
     userId: seat.userId,
     code: room.code,
@@ -570,15 +597,57 @@ async function view(room: CloudRoom, seat: CloudSeat): Promise<RoomView> {
       .filter((id) => id.startsWith(seat.id + ":"))
       .map((id) => id.slice(seat.id.length + 1)),
     draft: JSON.stringify(room.drafts?.[seat.id] ?? []),
-    table:
-      seat.role === "dm"
-        ? {
-            ...room.table,
-            journal,
-            notes: room.table.notes.filter((note) => canReadNote(note, seat)),
-          }
-        : playerTable(room.table, record, seat),
-  };
+    table,
+  });
+}
+
+/** Protocol 4 clients receive map images as references (tabletop-protocol.ts). */
+function wantsImageReferences(protocol?: number) {
+  return typeof protocol === "number" && protocol >= IMAGE_REFERENCE_PROTOCOL;
+}
+/**
+ * Hand the response layer (tabletopResponse) the inline images this read restored from the
+ * room's own rows, so protocol 4 responses can send their references instead. Non-enumerable:
+ * it never serializes, and older protocols ignore it and receive the full inline envelope.
+ */
+function withImageSources(room: CloudRoom, value: RoomView): RoomView {
+  const sources = roomImageSources(room);
+  if (sources.size)
+    Object.defineProperty(value, ROOM_IMAGE_SOURCES_KEY, {
+      value: new Map([...sources].map(([reference, image]) => [image, reference])),
+    });
+  return value;
+}
+
+/**
+ * Seat-authorized read of one shared map image (GET /api/room-image/CODE/HASH). The reference
+ * must appear as a current map image in the seat's own projection, the same projection `view`
+ * sends, so private or hidden maps, other seats' DM-only data and other campaigns stay
+ * unreachable. The raster is read from this room's own rows only (never by hash alone).
+ */
+export async function authorizedRoomImage(input: {
+  code: string;
+  token: string;
+  reference: string;
+}): Promise<{ image: string } | { status: 403 | 404 }> {
+  const { ROOM_IMAGE_REFERENCE, readRoomImage } = await import("../../../cloudflare/room-images.mjs");
+  if (!ROOM_IMAGE_REFERENCE.test(input.reference)) return { status: 404 };
+  const db = database();
+  if (!db) return { status: 404 };
+  let room: CloudRoom;
+  try {
+    room = await must(input.code, { mapImageReferences: true });
+  } catch {
+    return { status: 404 };
+  }
+  if (room.monitorProbe || isProbeRoomCode(room.code)) return { status: 404 };
+  const seat = room.seats.find((s) => s.token === input.token);
+  if (!seat) return { status: 403 };
+  const { table } = await seatTable(room, seat);
+  if (!(table.journal?.world?.maps ?? []).some((map) => map.image === input.reference))
+    return { status: 404 };
+  const image = await readRoomImage(db, room.code, input.reference);
+  return image === null ? { status: 404 } : { image };
 }
 
 /**
@@ -683,6 +752,12 @@ export async function submitCommands(input: {
   )
     throw new Error("Invalid command batch (maximum 100 actions).");
   const commands = input.commands.map((c) => commandSchema.parse(c));
+  // Map image references are a wire form only (tabletop protocol 4). Clients restore the inline
+  // image before any command is made; a reference inside a command would be stored as artwork.
+  if (commands.some((c) => /\/art\/room-image-[a-f0-9]{64}\.webp/.test(JSON.stringify(c))))
+    throw Error(
+      "This action refers to shared map artwork that has not finished loading. Wait for the map to load, then retry. Your pending actions are retained.",
+    );
   const seasonalPlan = (c: (typeof commands)[number]) =>
     c.kind === "trade-season-plan" || (c.kind === "downtime-plan" && c.advanceSeason);
   if (input.stage && commands.some(seasonalPlan))
@@ -851,7 +926,7 @@ export async function submitCommands(input: {
           }
         }
       }
-      return view(next, seat);
+      return view(next, seat, room);
     } catch (error) {
       if (attempt === 4 || !(error instanceof Error) || !error.message.includes("table changed"))
         throw error;
@@ -987,7 +1062,7 @@ export async function manageRoom(input: {
     if (next.drafts) delete next.drafts[target.id];
   }
   await updateRoom(next, room.revision);
-  return view(next, next.seats.find((s) => s.id === caller.id) ?? caller);
+  return view(next, next.seats.find((s) => s.id === caller.id) ?? caller, room);
 }
 
 /** Read-only, freshly authorized combat presentation for the map being viewed. */

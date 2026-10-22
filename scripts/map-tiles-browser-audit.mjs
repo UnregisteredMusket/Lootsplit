@@ -122,6 +122,13 @@ try {
       c.font = "30px serif";
       c.fillStyle = "#2b2118";
       c.fillText("KEEP COURTYARD", 230, 140);
+      // An opaque noise patch in the corner keeps the PNG above the 8,000-character threshold, so a
+      // shared room stores it outside the row and protocol 4 clients load it by reference.
+      for (let y = 0; y < 64; y += 2)
+        for (let x = 0; x < 64; x += 2) {
+          c.fillStyle = `rgb(${(x * 37 + y * 11) % 256},${(x * 13 + y * 29) % 256},${(x * y) % 256})`;
+          c.fillRect(x, y, 2, 2);
+        }
       const image = canvas.toDataURL("image/png");
       try {
         await new Promise((res, rej) => {
@@ -328,6 +335,15 @@ try {
     );
     const guest = await guestContext.newPage();
     current = guest;
+    // Tabletop protocol 4: room responses carry map image references, and the seat-authorized
+    // GET /api/room-image/CODE/HASH supplies the artwork.
+    const imageLoads = [],
+      roomBodies = [];
+    guest.on("response", (response) => {
+      const path = new URL(response.url()).pathname;
+      if (path.startsWith("/api/room-image/")) imageLoads.push(response.status());
+      if (path.startsWith("/_serverFn/")) roomBodies.push(response.text().catch(() => ""));
+    });
     guest.guestAccessAudit = true;
     guest.on("pageerror", (e) => errors.push(e.message));
     await openApplication(guest, invite);
@@ -342,6 +358,21 @@ try {
     const guestEnterTiles = guest.getByRole("button", { name: "Enter tile mode", exact: true });
     if (await guestEnterTiles.count()) await guestEnterTiles.click();
     await expect(guest.getByTitle("Combatant: Tile Hero", { exact: true })).toBeVisible();
+    const guestMap = guest.getByRole("img", { name: "Keep map", exact: true });
+    await expect
+      .poll(() => guestMap.evaluate((img) => (img.complete ? img.naturalWidth : 0)))
+      .toBe(800);
+    assert.match(await guestMap.getAttribute("src"), /^data:image\/png;base64,/);
+    assert.ok(imageLoads.includes(200), `map artwork loads by reference: ${imageLoads}`);
+    const bodies = await Promise.all(roomBodies);
+    assert.ok(
+      bodies.some((body) => body.includes("/art/room-image-")),
+      "room responses carry map image references",
+    );
+    assert.ok(
+      !bodies.some((body) => /data:image\/png;base64,[A-Za-z0-9+/=]{8000,}/.test(body)),
+      "room responses carry no inline map rasters",
+    );
     await expect(
       guest.getByRole("region", { name: "Combat tile controls", exact: true }),
     ).toHaveCount(0);
@@ -396,6 +427,7 @@ try {
         "shared-player-privacy",
         "player-display-privacy-calibration-fullscreen-reload-blank-campaign-switch",
         "guest-memory",
+        "map-artwork-by-reference",
         "online-assigned-coordinate-keyboard-drag",
         "online-measurement-area-template",
         "explicit-activation-camera",

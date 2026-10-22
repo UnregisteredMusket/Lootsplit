@@ -2,8 +2,21 @@ import type { CloudTable } from "./cloud.ts";
 import type { CampaignMap, MapToken } from "./world-schema.ts";
 import { expandTabletopHistory, tabletopHasFogDiffs } from "./fog-history.ts";
 
-/** The current tabletop protocol; 3 added compact fog history and continued brush strokes. */
+/**
+ * The current tabletop table shape; 3 added compact fog history and continued brush strokes.
+ * Every client at protocol 3 or later reads that shape, so this stays 3.
+ */
 export const TABLETOP_PROTOCOL = 3;
+/**
+ * Transport protocol 4 (2026-10-22): the protocol 3 table shape, with each current shared map's
+ * stored image sent as its `/art/room-image-<sha256>.webp` reference instead of the inline raster.
+ * The client loads references through the seat-authorized GET /api/room-image/CODE/HASH and
+ * restores the inline image before the table reaches the app. Protocols 0-3 (older websites and
+ * APKs) keep receiving full inline envelopes.
+ */
+export const IMAGE_REFERENCE_PROTOCOL = 4;
+/** Server-only, non-enumerable: inline image -> its stored reference for this room read. */
+export const ROOM_IMAGE_SOURCES_KEY = Symbol.for("lootsplit.room-view-image-sources");
 
 const commands = new Set([
   "tabletop-session",
@@ -97,6 +110,7 @@ export function tabletopResponse<T extends { table: CloudTable; draft: string }>
   value: T,
   protocol?: number,
 ): T {
+  if (protocol && protocol >= IMAGE_REFERENCE_PROTOCOL) return withImageReferences(value);
   if (protocol && protocol >= TABLETOP_PROTOCOL) return value;
   const draft: unknown = JSON.parse(value.draft);
   if (
@@ -132,4 +146,33 @@ export function tabletopResponse<T extends { table: CloudTable; draft: string }>
       "This session has unfinished map actions from an updated Lootsplitter client. Finish or resolve those actions on the updated website before resuming this older app. Your saved campaign and pending work are retained.",
     );
   return { ...value, table: tableForProtocol(value.table, protocol) };
+}
+
+/**
+ * Protocol 4: replace each current map's inline image with the reference it was read from.
+ * Only images restored from this room's own stored rows are replaced (the server attached them),
+ * so every reference sent is one the seat can load. Images stored inline (shared with portraits,
+ * or written in this same request) stay inline.
+ */
+export function withImageReferences<T extends { table: CloudTable }>(value: T): T {
+  const sources = (value as T & { [ROOM_IMAGE_SOURCES_KEY]?: Map<string, string> })[
+    ROOM_IMAGE_SOURCES_KEY
+  ];
+  const world = value.table.journal?.world;
+  if (!sources?.size || !world?.maps.some((map) => sources.has(map.image))) return value;
+  return {
+    ...value,
+    table: {
+      ...value.table,
+      journal: {
+        ...value.table.journal!,
+        world: {
+          ...world,
+          maps: world.maps.map((map) =>
+            sources.has(map.image) ? { ...map, image: sources.get(map.image)! } : map,
+          ),
+        },
+      },
+    },
+  };
 }
