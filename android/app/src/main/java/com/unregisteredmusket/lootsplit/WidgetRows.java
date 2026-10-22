@@ -21,13 +21,13 @@ final class WidgetRows {
     static JSONArray rows(JSONObject snapshot) {
         JSONArray rows = new JSONArray();
         try {
-            if (snapshot == null) { add(rows, "No current owner reading", "Sign in or tap Refresh. Backend logging continues independently.", "account"); return rows; }
+            if (snapshot == null) { add(rows, "No current owner reading", "Sign in or tap Refresh. Backend logging continues independently.", "account"); return identify(rows); }
             JSONObject task = snapshot.optJSONObject("task");
             add(rows, "Development", task == null || !task.optBoolean("active") ? "No development task active" + lastTask(task, " · last: ") : task.optString("title") + " · " + task.optString("state") + "\n" + task.optString("phase") + ": " + task.optString("progress"), "task");
             if (!snapshot.optString("warning").isEmpty()) add(rows, "Development warning", snapshot.optString("warning"), "task", "yellow");
             JSONArray recent=snapshot.optJSONArray("recentEntries");
             if(recent==null||recent.length()==0)add(rows, "Latest monitoring entry", snapshot.optString("log", "No scheduled entry yet"), "logs");
-            else for(int i=0;i<recent.length();i++){JSONObject entry=recent.getJSONObject(i);add(rows,"Monitoring",entry.optString("summary"),"logs","",clock(entry.optLong("observedAt")));}
+            else for(int i=0;i<recent.length();i++){JSONObject entry=recent.getJSONObject(i);add(rows,"Monitoring",entry.optString("summary"),"logs","",clock(entry.optLong("observedAt")));id(rows,"monitoring:"+entry.optLong("observedAt"));}
             add(rows, "Daily report", snapshot.optString("report", "No daily report yet"), "report");
             add(rows, "Cloudflare traffic · past 24h", snapshot.optString("traffic") + snapshot.optString("trafficTime"), "logs");
             usageRows(rows, snapshot.optJSONObject("usage"));
@@ -39,12 +39,31 @@ final class WidgetRows {
                 boolean limit=check.optBoolean("coverageLimit",false);
                 String color=limit?"":check.optString("color","yellow");
                 add(rows, check.optString("component") + (limit ? " · coverage limit" : ""), check.optString("symptom") + "\n" + check.optString("action"), "diagnostics",color,clock(check.optLong("lastAt",0)));
+                id(rows, "diagnostic:" + check.optString("component"));
             }
             add(rows, "Builds and deployments", snapshot.optString("development") + "\n" + snapshot.optString("deployment") + snapshot.optString("developmentTime"), "task");
             add(rows, "Shared snapshot " + snapshot.optLong("snapshotId"), "Data collected " + WidgetData.time(snapshot.optLong("checkedAt")) + ". Android delivery may be delayed. Web " + snapshot.optString("commit"), "diagnostics","",clock(snapshot.optLong("checkedAt")));
+            id(rows, "snapshot");
             add(rows, "Full history, search and export", "Open private monitoring logs and detailed reports in Lootsplit.", "logs");
         } catch (Exception ignored) { }
-        return attentionFirst(rows);
+        return attentionFirst(identify(rows));
+    }
+    /** Names the row just added: its title carries a value or time that changes between readings. */
+    private static void id(JSONArray rows, String id) throws Exception { rows.getJSONObject(rows.length() - 1).put("id", id); }
+    /**
+     * Gives every row a stable ID (the expanded state of a row is keyed by it, so it must survive a
+     * refresh that changes the row's numbers). Rows without an explicit ID use their fixed title;
+     * a repeated ID gets "#2", "#3" in order.
+     */
+    static JSONArray identify(JSONArray rows) {
+        java.util.Map<String, Integer> seen = new java.util.HashMap<>();
+        for (int i = 0; i < rows.length(); i++) {
+            JSONObject row = rows.optJSONObject(i); if (row == null) continue;
+            String id = row.optString("id"); if (id.isEmpty()) id = row.optString("title");
+            Integer count = seen.get(id); seen.put(id, count == null ? 1 : count + 1);
+            try { row.put("id", count == null ? id : id + "#" + (count + 1)); } catch (Exception ignored) { }
+        }
+        return rows;
     }
     /**
      * Cloudflare plan usage: a heading row with the reading time, then one row per metric
@@ -58,7 +77,10 @@ final class WidgetRows {
         JSONArray metrics = usage.optJSONArray("rows");
         if (ready && metrics != null) for (int i = 0; i < metrics.length(); i++) {
             JSONObject metric = metrics.optJSONObject(i);
-            if (metric != null) add(rows, metric.optString("title"), metric.optString("detail"), "logs", metric.optString("color"));
+            if (metric == null) continue;
+            add(rows, metric.optString("title"), metric.optString("detail"), "logs", metric.optString("color"));
+            // The title carries today's value; the metric label is the stable part.
+            if (!metric.optString("id").isEmpty()) id(rows, metric.optString("id"));
         }
     }
     /** Stable reorder: red rows, then yellow rows, then everything else in its original order. Nothing is dropped. */

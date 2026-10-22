@@ -5,6 +5,7 @@
         <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:baselineAligned="false">
             <TextView android:id="@+id/widget_row_title" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:textSize="11sp" android:textColor="#E6F8EC" android:fontFamily="monospace" android:maxLines="1" android:ellipsize="end" />
             <TextView android:id="@+id/widget_row_time" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginStart="6dp" android:textSize="10sp" android:textColor="#B1D6C1" android:fontFamily="monospace" android:maxLines="1" android:visibility="gone" />
+            <TextView android:id="@+id/widget_row_chevron" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginStart="6dp" android:text="▾" android:textSize="10sp" android:textColor="#B1D6C1" android:fontFamily="monospace" android:maxLines="1" android:importantForAccessibility="no" />
         </LinearLayout>
         <TextView android:id="@+id/widget_row_detail" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="1dp" android:textSize="10sp" android:textColor="#B1D6C1" android:fontFamily="monospace" android:maxLines="1" android:ellipsize="end" />
     </LinearLayout>

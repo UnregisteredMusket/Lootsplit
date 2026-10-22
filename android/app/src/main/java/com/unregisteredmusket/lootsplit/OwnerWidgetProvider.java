@@ -17,6 +17,9 @@ import org.json.JSONObject;
 public class OwnerWidgetProvider extends AppWidgetProvider {
     static final String REFRESH = "com.unregisteredmusket.lootsplit.WIDGET_REFRESH";
     static final String OPEN = "lootsplit_owner_widget";
+    /** A tap on a log row: toggles the row named by ROW_ID, or opens WidgetActions.DESTINATION. */
+    static final String ROW_TAP = "com.unregisteredmusket.lootsplit.WIDGET_ROW_TAP";
+    static final String ROW_ID = "lootsplit_widget_row";
 
     static int[] ids(Context context) {
         return AppWidgetManager.getInstance(context).getAppWidgetIds(new ComponentName(context, OwnerWidgetProvider.class));
@@ -133,17 +136,22 @@ public class OwnerWidgetProvider extends AppWidgetProvider {
         boolean attention=WidgetRows.attention(rows)>0;
         view.setTextViewText(R.id.monitor_list_label,attention?"NEEDS ATTENTION FIRST":"LOG");
         view.setInt(R.id.monitor_list_rule,"setBackgroundColor",WidgetRows.anyRed(rows)?(light?Color.rgb(157,42,42):Color.argb(89,244,114,114)):(light?ink:Color.argb(64,91,236,160)));
+        // Expanded rows are kept by row ID across readings; IDs no longer present are pruned here.
+        java.util.Set<String> expandedRows=WidgetRowState.prune(context,id,rows);
         if(Build.VERSION.SDK_INT>=31) {
-            RemoteViews.RemoteCollectionItems.Builder items=new RemoteViews.RemoteCollectionItems.Builder().setViewTypeCount(1).setHasStableIds(false);
-            for(int i=0;i<rows.length();i++)items.addItem(i,OwnerWidgetService.rowView(context,rows.optJSONObject(i),id));
+            // Two view types: compact and expanded rows (OwnerWidgetService.Factory.getViewTypeCount).
+            RemoteViews.RemoteCollectionItems.Builder items=new RemoteViews.RemoteCollectionItems.Builder().setViewTypeCount(2).setHasStableIds(false);
+            for(int i=0;i<rows.length();i++){JSONObject row=rows.optJSONObject(i);items.addItem(i,OwnerWidgetService.rowView(context,row,id,row!=null&&expandedRows.contains(row.optString("id"))));}
             view.setRemoteAdapter(R.id.monitor_list,items.build());
         } else {
             Intent service=new Intent(context,OwnerWidgetService.class).putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID,id).putExtra("generation",state.optString("generation"));
             service.setData(android.net.Uri.parse("lootsplit-widget://collection/"+id+"/"+state.optString("generation","empty")));
             view.setRemoteAdapter(R.id.monitor_list,service);
         }
-        Intent template=new Intent(context,MainActivity.class).putExtra(OPEN,true).setData(android.net.Uri.parse("lootsplit-widget://collection-open/"+id)).addFlags(Intent.FLAG_ACTIVITY_CLEAR_TOP|Intent.FLAG_ACTIVITY_SINGLE_TOP);
-        view.setPendingIntentTemplate(R.id.monitor_list,PendingIntent.getActivity(context,230000+Math.max(0,id),template,PendingIntent.FLAG_UPDATE_CURRENT|(Build.VERSION.SDK_INT>=31?PendingIntent.FLAG_MUTABLE:0)));
+        // Row taps are a broadcast to this provider: a row's fill-in names the row to expand or
+        // collapse, an expanded row's OPEN button names the app destination (opened in onReceive).
+        Intent template=new Intent(context,OwnerWidgetProvider.class).setAction(ROW_TAP).putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID,id).setData(android.net.Uri.parse("lootsplit-widget://collection-row/"+id)).addFlags(Intent.FLAG_RECEIVER_FOREGROUND);
+        view.setPendingIntentTemplate(R.id.monitor_list,PendingIntent.getBroadcast(context,230000+Math.max(0,id),template,PendingIntent.FLAG_UPDATE_CURRENT|(Build.VERSION.SDK_INT>=31?PendingIntent.FLAG_MUTABLE:0)));
 
         // 6. Footer: identity (no email on the face), LOGS and REFRESH.
         view.setTextViewText(R.id.monitor_identity,snapshot==null?"OWNER · SIGN IN":"OWNER · "+snapshot.optString("name")+" · #"+snapshot.optLong("snapshotId"));
@@ -183,13 +191,42 @@ public class OwnerWidgetProvider extends AppWidgetProvider {
         if (REFRESH.equals(intent.getAction())) {
             PendingResult pending = goAsync();
             WidgetRefresh.request(context, true, error -> pending.finish());
+        } else if (ROW_TAP.equals(intent.getAction())) {
+            rowTap(context, intent);
         } else if (WidgetRefresh.ACTIVITY_TICK.equals(intent.getAction())) {
             // Background (not manual) check: the same coalescing, deadline and account checks apply.
             PendingResult pending = goAsync();
             if (!WidgetRefresh.activityTick(context, error -> pending.finish())) pending.finish();
         }
     }
-    @Override public void onDeleted(Context context,int[] ids){ for(int id:ids)CompanionSettings.remove(context,id); }
+    /**
+     * Expand/collapse: flip the row's saved state, re-render that instance (API 31+ carries the rows
+     * in the RemoteViews) and notify the collection (API 24–30 RemoteViewsService reloads its rows).
+     * OPEN on an expanded row starts the same in-app destination the row used to open directly.
+     */
+    static void rowTap(Context context, Intent intent) {
+        int id = intent.getIntExtra(AppWidgetManager.EXTRA_APPWIDGET_ID, AppWidgetManager.INVALID_APPWIDGET_ID);
+        if (id == AppWidgetManager.INVALID_APPWIDGET_ID) return;
+        String destination = intent.getStringExtra(WidgetActions.DESTINATION), row = intent.getStringExtra(ROW_ID);
+        if (destination != null) { openRow(context, id, WidgetActions.rowAction(destination)); return; }
+        if (row == null || row.isEmpty()) return;
+        WidgetRowState.toggle(context, id, row);
+        AppWidgetManager manager = AppWidgetManager.getInstance(context);
+        render(context, manager, id, null);
+        manager.notifyAppWidgetViewDataChanged(id, R.id.monitor_list);
+    }
+    private static void openRow(Context context, int id, String action) {
+        PendingIntent open = WidgetActions.pending(context, id, action, false);
+        try {
+            if (Build.VERSION.SDK_INT >= 34) {
+                // Pass on the launcher tap's permission to start the activity (Android 14+ sender opt-in).
+                android.app.ActivityOptions options = android.app.ActivityOptions.makeBasic()
+                    .setPendingIntentBackgroundActivityStartMode(android.app.ActivityOptions.MODE_BACKGROUND_ACTIVITY_START_ALLOWED);
+                open.send(context, 0, null, null, null, null, options.toBundle());
+            } else open.send();
+        } catch (PendingIntent.CanceledException ignored) { }
+    }
+    @Override public void onDeleted(Context context,int[] ids){ for(int id:ids){CompanionSettings.remove(context,id);WidgetRowState.remove(context,id);} }
     @Override public void onDisabled(Context context) {
         if (CompanionWidgetProvider.ids(context).length == 0) {
             OwnerWidgetJob.cancel(context);

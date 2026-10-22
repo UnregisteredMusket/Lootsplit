@@ -143,7 +143,7 @@ final class WidgetData {
             if (label.isEmpty() || label.length() > 40) continue;
             if (!"ready".equals(text(metric, "state"))) {
                 String code = text(metric, "errorCode");
-                rows.put(new JSONObject().put("title", label + " · unavailable").put("color", "")
+                rows.put(new JSONObject().put("id", "usage:" + label).put("title", label + " · unavailable").put("color", "")
                     .put("detail", "No reading" + (code.matches("[A-Z0-9_]{1,40}") ? " (" + code + ")" : "") + "; not counted as zero"));
                 continue;
             }
@@ -151,13 +151,13 @@ final class WidgetData {
             String color = "attention".equals(level) || "over".equals(level) ? "yellow" : "";
             if ("bytes".equals(unit)) {
                 Object databases = metric.opt("databases");
-                rows.put(new JSONObject().put("color", color)
+                rows.put(new JSONObject().put("id", "usage:" + label).put("color", color)
                     .put("title", label + " " + amount(part(metric, "current", "value"), unit))
                     .put("detail", percent(part(metric, "current", "percent")) + " of " + allowance(metric.opt("allowance"), unit) + " included · current size"
                         + (databases instanceof Number ? " · " + ((Number) databases).longValue() + " database" + (((Number) databases).longValue() == 1 ? "" : "s") : "")));
                 continue;
             }
-            rows.put(new JSONObject().put("color", color)
+            rows.put(new JSONObject().put("id", "usage:" + label).put("color", color)
                 .put("title", label + " today " + amount(part(metric, "day", "value"), unit))
                 .put("detail", percent(part(metric, "day", "percent")) + " of daily share\n7d " + amount(part(metric, "week", "value"), unit)
                     + " (" + percent(part(metric, "week", "percent")) + " of weekly share)\n" + windowName + " " + amount(part(metric, "month", "value"), unit)
