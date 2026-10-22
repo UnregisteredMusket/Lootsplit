@@ -9,11 +9,20 @@ import { serveBuildAsset, releaseResponse } from "./release-assets.mjs";
 import handler from "../dist/server/index.mjs";
 import { scheduledMonitor } from "./monitor-journal.mjs";
 import { telemetryResponse } from "./monitor-telemetry.mjs";
+import { expireRateLimits, rateLimitExpiryDue } from "./rate-limit-expiry.mjs";
 
 export default {
   async scheduled(controller, env) {
     // Await the durable result: rejected scheduled executions remain visible in Cloudflare.
-    await scheduledMonitor(env, controller.scheduledTime);
+    // Rate-limit expiry runs independently of monitoring, so one failing never skips the other.
+    const [monitor, expiry] = await Promise.allSettled([
+      scheduledMonitor(env, controller.scheduledTime),
+      rateLimitExpiryDue(controller.scheduledTime)
+        ? expireRateLimits(env.DB, controller.scheduledTime)
+        : null,
+    ]);
+    if (monitor.status === "rejected") throw monitor.reason;
+    if (expiry.status === "rejected") throw expiry.reason;
   },
   async fetch(request, env, context) {
     const recovery = await recoveryGuard(request, env);
