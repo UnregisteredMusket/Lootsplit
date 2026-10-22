@@ -1,5 +1,35 @@
 [
   {
+    "version": "1.9.3",
+    "date": "2026-10-22",
+    "summary": "Split view on tablets, NPC barter conversations, expandable widget rows with Cloudflare usage, and more reliable widgets and backups.",
+    "features": [
+      "Split view on tablets in landscape: open two screens side by side in one window, for example your character sheet beside the map.",
+      "Barter with NPCs in conversation: make an offer, get a counter-offer, and a Persuasion roll against a difficulty set by how fair the deal is decides the answer. The DM chooses whether they decide each offer or the game rolls.",
+      "DM setting Party can see companion NPC funds (off by default) lets players in the party see the coins of visible NPCs travelling with them.",
+      "DMs can repair an estate property bought without its operating record with Set up operations, at no charge.",
+      "Owner Field monitor widget: tap a log row to expand it and read the full text, tap again to collapse, or press OPEN to go to the matching screen.",
+      "Owner Field monitor widget: Cloudflare plan usage rows (requests, CPU time and database reads and writes) for today, the last 7 days and the billing cycle that renews on the 11th."
+    ],
+    "improvements": [
+      "When an action fails, the app now says so and keeps your input, instead of looking like it worked. Retrying never applies a payment, gift or purchase twice.",
+      "Offline (device) campaigns now handle buying, selling, gifts and listing purchases exactly like shared rooms.",
+      "Clearer widget status: a problem that has already stopped shows as attention rather than failure, and the multiplayer check is a real test round trip.",
+      "A healthy widget reading turns amber only after 35 minutes, matching the background refresh, and widget sync counts only phones seen in the last week.",
+      "Large campaigns with long session history keep saving, and restored campaigns keep their full history.",
+      "Smoother shared rooms: fewer unnecessary refreshes while nothing changes."
+    ],
+    "fixes": [
+      "Privacy: players no longer receive NPC or exchange treasury balances, and only players whose character is in the party see other party members' balances.",
+      "The widget stays connected through a temporary storage error on the phone (it shows Widget storage busy and retries) and finishes refreshes within its time limit.",
+      "Android backups no longer carry your account sign-in to a new phone or reinstall; your campaigns and settings are still backed up.",
+      "Finance actions in offline campaigns with a blacksmith no longer fail.",
+      "Buying an imported estate listing keeps its property details, and storage accepts exact fits such as 0.1 lb items filling 0.3 lb.",
+      "Party chat keeps what you type right after opening a room, and messages send while your character is still loading.",
+      "Property import no longer reports unchanged data as changed, item weights no longer show long decimals, and device rolls are labeled DEVICE ROLL."
+    ]
+  },
+  {
     "version": "1.9.2",
     "date": "2026-10-21",
     "summary": "Redesigned Android widgets, Agent activity on the 4\u00d71 companion and a new app icon.",

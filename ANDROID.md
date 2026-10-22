@@ -103,7 +103,7 @@ The native gate now uses a Pixel6 profile for its API24/API35 launchers, require
 
 ## Tablets in landscape: split view
 
-The app shows the same split view as the website when the WebView is at least 1024 CSS pixels wide (most 10–11" tablets in landscape). Rotating to portrait or a narrower window shows only the left screen; the right one returns when the tablet is turned back (the activity already handles orientation/size changes without restarting). The feature ships in the bundled web build, so it reaches installed apps only with the next signed APK release. See `docs/SPLIT-VIEW.md`.
+The app shows the same split view as the website when the WebView is at least 1024 CSS pixels wide (most 10–11" tablets in landscape). Rotating to portrait or a narrower window shows only the left screen; the right one returns when the tablet is turned back (the activity already handles orientation/size changes without restarting). The feature ships in the bundled web build, so it reaches installed apps with Android 1.9.3. See `docs/SPLIT-VIEW.md`.
 
 ## Development and verification rules
 
