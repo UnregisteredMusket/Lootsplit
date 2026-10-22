@@ -1,4 +1,5 @@
 import type { HelpGroup } from "./content";
+import { SUPPORT_EMAIL } from "../website/contact.ts";
 
 export const PLAYER_DESCRIPTION =
   "Play your assigned character, manage permitted inventory and requests, read shared records, and stay connected to your party.";
@@ -337,6 +338,16 @@ export const PLAYER_HELP_GROUPS: HelpGroup[] = [
           "Reports and replies are private to you and authorized site staff. Preserve pending work and a recovery copy before an action that replaces or clears device data.",
         ],
         links: [["Report a bug", "/account#bug-reports"]],
+      },
+      {
+        id: "contact-support",
+        title: "Contact support",
+        paragraphs: [
+          `Need help? Email ${SUPPORT_EMAIL}. Use it for questions, feedback or problems you cannot report from My account, such as being unable to sign in. Questions about your campaign's rules, funds or seat go to your DM.`,
+          "Describe what you did and what happened. Never send passwords, recovery keys or campaign invitation links.",
+        ],
+        links: [["Report a bug", "/account#bug-reports"]],
+        email: SUPPORT_EMAIL,
       },
     ],
   },

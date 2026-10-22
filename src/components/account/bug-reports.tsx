@@ -2,6 +2,7 @@ import { useEffect, useRef, useState, type FormEvent } from "react";
 import { accountRequest } from "@/lib/account/client";
 import { Capacitor } from "@capacitor/core";
 import { clientKind } from "@/lib/website/client-presentation";
+import { SUPPORT_EMAIL, SUPPORT_MAILTO } from "@/lib/website/contact";
 import { useDraftGuard } from "@/lib/quire/use-draft-guard";
 import { APP_VERSION } from "@/lib/quire/version";
 
@@ -110,6 +111,10 @@ export function BugReports({ userId, role }: { userId?: string; role?: string })
       <p>
         Tell us what went wrong. Reports are private to you, the owner and administrators. Check
         here for responses; email notifications are not sent.
+      </p>
+      <p>
+        Can’t sign in, or want to ask a question instead? Email{" "}
+        <a href={SUPPORT_MAILTO}>{SUPPORT_EMAIL}</a>.
       </p>
       {!userId ? (
         <p>Sign in below to report a bug and track its progress.</p>

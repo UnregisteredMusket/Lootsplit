@@ -177,6 +177,12 @@ Not implemented or promised by this inventory: Google Drive backup integration, 
 - Five reports per account per rolling 24 hours; retry receipts prevent duplicate submissions. No automatic campaign/file capture, uploads or email delivery.
 - Existing guest play, account permissions, saved campaigns and Android signing remain unchanged. Existing installed APKs can use the website; native navigation changes ship with a future APK release.
 
+### Public support email (2026-10-22)
+
+- `support@lootsplitter.com` is the public contact address (Cloudflare Email Routing on lootsplitter.com; it forwards privately to the owner, whose address is never published). The single source is `src/lib/website/contact.ts`.
+- It appears as a plain `mailto:` link in every website footer ("Contact & support"), on the website Help page intro, on Downloads ("Having trouble?"), in My account → Bug reports (also for people who cannot sign in), and as a "Contact support" topic in both the DM and player Help guides (website Help, in-app Help dialog and Android, which bundles the same help).
+- Bug reports stay the in-app route for tracked issues; the email does not replace or change them. The website itself stays on lootsplit.oliverstorie2017.workers.dev.
+
 ### Account-linked interactive character play
 
 - `/characters` provides full editable account sheets with species, classes/subclasses, background, level, abilities, proficiency/training, HP/temp HP, AC, initiative, speed, death saves, inspiration, attacks/damage, spells/preparation/slots, equipment, currency, resources, features, custom content and source credits.

@@ -508,12 +508,34 @@
 .ls-paper .ls-footer-motto {
   color: var(--paper-link);
 }
-.ls-footer-brand p:last-child {
+.ls-footer-blurb {
   font-size: 15px;
   color: var(--on-ink-4);
 }
-.ls-paper .ls-footer-brand p:last-child {
+.ls-paper .ls-footer-blurb {
   color: var(--paper-muted);
+}
+.ls-footer-contact {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0 8px;
+  font-size: 15px;
+}
+.ls-footer-contact span {
+  font: 600 13px/1 var(--serif);
+  letter-spacing: 0.08em;
+  text-transform: uppercase;
+  color: var(--on-ink-4);
+}
+.ls-paper .ls-footer-contact span {
+  color: var(--paper-muted);
+}
+.ls-footer-contact a {
+  display: inline-flex;
+  align-items: center;
+  min-height: 44px;
+  overflow-wrap: anywhere;
 }
 .ls-footer-nav ul {
   list-style: none;

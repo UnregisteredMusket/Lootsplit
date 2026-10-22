@@ -1,6 +1,7 @@
 import test from "node:test";
 import assert from "node:assert/strict";
-import { HELP_GROUPS } from "../help/content.ts";
+import { HELP_GROUPS, topicMatches } from "../help/content.ts";
+import { SUPPORT_EMAIL } from "../website/contact.ts";
 import { PLAYER_HELP_GROUPS } from "../help/player-content.ts";
 import { featureScreens, type Feature } from "./feature-navigation.ts";
 import { dmOnlyScreen } from "./split-view.ts";
@@ -65,4 +66,16 @@ test("DM Help covers every DM-only feature screen and Favorites", () => {
     if (screen.dm)
       assert.ok(hrefs.has(`/features/${feature}`), `no DM Help link to ${screen.title}`);
   assert.ok(hrefs.has("/favorites"), "no DM Help link to Favorites");
+});
+
+test("both Help guides offer the public support address as a mailto, not an app link", () => {
+  assert.equal(SUPPORT_EMAIL, "support@lootsplitter.com");
+  for (const groups of [HELP_GROUPS, PLAYER_HELP_GROUPS]) {
+    const topic = groups.flatMap((g) => g.topics).find((t) => t.id === "contact-support");
+    assert.ok(topic, "no Contact support topic");
+    assert.equal(topic.email, SUPPORT_EMAIL);
+    assert.ok(topic.paragraphs.some((p) => p.includes(SUPPORT_EMAIL)));
+    assert.ok(topicMatches(topic, "support@lootsplitter"));
+    assert.ok(topic.links.every(([, href]) => !href.startsWith("mailto:")));
+  }
 });

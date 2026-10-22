@@ -10,6 +10,7 @@ import { useEffect, useId, useState, type ReactNode } from "react";
 import type { ProductShot } from "@/lib/website/product-shots";
 import release from "@/lib/website/release.json";
 import { OPEN_APP } from "@/lib/website/labels";
+import { SUPPORT_EMAIL, SUPPORT_MAILTO } from "@/lib/website/contact";
 import "./website.css";
 
 /** One order and one set of labels for the header and the footer. */
@@ -122,9 +123,13 @@ function SiteFooter({
               Lootsplit
             </Link>
             <p className="ls-footer-motto">Keep the books. Tell the story.</p>
-            <p>
+            <p className="ls-footer-blurb">
               A companion for your tabletop adventures. DMs need an account. Players can join as
               guests with a current session invitation.
+            </p>
+            <p className="ls-footer-contact">
+              <span>Contact &amp; support</span>
+              <a href={SUPPORT_MAILTO}>{SUPPORT_EMAIL}</a>
             </p>
           </div>
           <nav aria-label="Website footer" className="ls-footer-nav">
@@ -479,6 +484,9 @@ export function HelpPage() {
         <p className="ls-lead ls-measure">
           Menus, money, encounters and recovery. Find a topic and jump straight to the tool you
           need.
+        </p>
+        <p className="ls-fine">
+          Still stuck, or have feedback? Email <a href={SUPPORT_MAILTO}>{SUPPORT_EMAIL}</a>.
         </p>
       </PageHero>
       <section className="ls-ink ls-section ls-section-tight">

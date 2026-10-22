@@ -3,6 +3,7 @@ import { ArrowDownToLine, ArrowRight, ShieldCheck } from "lucide-react";
 import { AppLink } from "@/components/app-link";
 import changelog from "@/lib/website/changelog.json";
 import { formatReleaseDate } from "@/lib/website/format";
+import { SUPPORT_EMAIL, SUPPORT_MAILTO } from "@/lib/website/contact";
 import { OPEN_APP } from "@/lib/website/labels";
 import release from "@/lib/website/release.json";
 import { AboutLootsplit } from "./about";
@@ -69,7 +70,8 @@ export function DownloadsPage() {
               </a>
               <p className="ls-fine">
                 Having trouble? <a href={release.apkUrl}>Download from GitHub</a> or open this
-                page in Chrome.{" "}
+                page in Chrome. Still stuck? Email{" "}
+                <a href={SUPPORT_MAILTO}>{SUPPORT_EMAIL}</a>.{" "}
                 <a href="https://drive.google.com/file/d/1MT4by-7mNe7-7PANKbTwcbBOcd2CSKrr/view">
                   Earlier Android release on Google Drive
                 </a>
