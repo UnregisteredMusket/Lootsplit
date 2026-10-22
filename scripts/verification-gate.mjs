@@ -3,14 +3,17 @@ import { appendFileSync } from "node:fs";
 import { resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
-export const requiredJobs = ["changes", "build", "development", "worker", "standby"];
+export const requiredJobs = ["changes", "build", "development", "worker", "pr-worker", "standby"];
 
 /**
  * Which groups a run must pass. Main pushes, manual runs and release calls require every group.
  * Pull requests (owner-approved 2026-10-21) require the change scope, the build job (unit tests,
  * typecheck, lint, immutable builds) and, when code changed, every development-server audit; the
- * packaged Worker and standby audits run on main before any deployment. A group that runs must
- * always succeed: a failed, cancelled or timed-out group is never accepted.
+ * packaged Worker and standby audits run on main before any deployment. When code changed, pull
+ * requests also run `pr-worker`: the script-policy audit against the PR's own built Worker, so
+ * Worker-only behavior is checked before merge (main covers it in the full Worker groups and
+ * skips this job). A group that runs must always succeed: a failed, cancelled or timed-out group
+ * is never accepted.
  */
 export function expectedGroups(event, code) {
   const pullRequest = event === "pull_request";
@@ -19,6 +22,7 @@ export function expectedGroups(event, code) {
     build: true,
     development: !pullRequest || code !== false,
     worker: !pullRequest,
+    "pr-worker": pullRequest && code !== false,
     standby: !pullRequest,
   };
 }
@@ -57,7 +61,7 @@ if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1]
         requiredJobs
           .map(
             (job) =>
-              `| ${job} | ${expected[job] ? "yes" : "main only"} | ${results[job]?.result || "missing"} |`,
+              `| ${job} | ${expected[job] ? "yes" : job === "pr-worker" ? "pull requests only" : "main only"} | ${results[job]?.result || "missing"} |`,
           )
           .join("\n") +
         "\n\nMain requires every group before release. Artifacts are built once and checked before and after packaged audits.\n",

@@ -68,7 +68,9 @@ try {
   await page.getByText("Campaign control", { exact: true }).waitFor();
   await violations("app");
 
-  await page.goto(origin + "/account");
+  // /account is not a public page: a cold document load shows the title screen first, and the
+  // account heading renders only after it is dismissed (as every other account audit does).
+  await openApplication(page, origin + "/account");
   await page.getByRole("heading", { level: 1 }).first().waitFor();
   await page.screenshot({ path: `${output}/account.png` });
   await violations("account");
