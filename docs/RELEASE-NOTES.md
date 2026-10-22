@@ -1,3 +1,41 @@
+# Lootsplit 1.9.3
+
+Android version code **16**, same package and permanent signing certificate. Install over the existing app; do not uninstall or clear saved data.
+
+## Added
+
+- **Split view on tablets.** On a tablet in landscape (at least 1024 pixels wide), open two screens side by side in one window, for example your character sheet beside the map. Turning the tablet to portrait shows one screen; the second comes back when you turn it again.
+- **Barter with NPCs in conversation.** Make an offer to a nearby NPC that allows bartering and get a reply or a counter-offer. A Persuasion roll against a difficulty set by how fair the deal is decides the answer; the DM chooses whether they decide each offer themselves or let the game roll.
+- **Companion NPC funds (DM setting).** Party can see companion NPC funds, off by default, lets players whose character is in the party see the coins of visible NPCs travelling with them. Hidden NPCs stay hidden.
+- **Set up operations.** DMs can repair an estate property that was bought without its operating record. Nothing is charged and the deed is unchanged.
+- **Expandable widget rows (owner Field monitor).** Tap a log row to expand it and read its full title and text, tap again to collapse it, or press OPEN to go to the matching screen in the app. Expanded rows stay open when the widget refreshes.
+- **Cloudflare plan usage on the large widget (owner).** Rows for Worker requests, CPU time and database reads and writes: today, the last 7 days and the billing cycle so far, which renews on the 11th of each month (for example “Cycle since Oct 11”). A reading Cloudflare did not return says unavailable, never zero.
+
+## Improved
+
+- When an action fails, the app now tells you and keeps what you entered, instead of looking as if it worked. Retrying never applies the same payment, gift or purchase twice.
+- Offline (device) campaigns now buy, sell, give and buy listings exactly like shared rooms.
+- Clearer widget status: a problem that has already stopped shows as attention, not failure, and the Multiplayer check is a real test round trip that never appears in your campaigns.
+- A healthy widget reading turns amber after 35 minutes instead of 2, matching the background refresh, and widget sync counts only phones seen in the last 7 days.
+- Campaigns with long session history keep saving, and restored campaigns keep all their history.
+- Shared rooms refresh less when nothing has changed.
+
+## Fixed
+
+- **Privacy:** players no longer receive NPC or exchange treasury balances, and only players whose character is in the party see other party members’ balances.
+- The widget stays connected through a temporary storage error on the phone (“Widget storage busy · tap Refresh to retry”) and finishes each refresh within its time limit.
+- Android backups no longer carry your account sign-in to a new phone or a reinstall; you sign in again there. Campaigns and settings are still backed up.
+- Finance actions in offline campaigns that have a blacksmith no longer fail.
+- Buying an imported estate listing keeps its property details, and storage accepts exact fits such as three 0.1 lb items in 0.3 lb.
+- Party chat keeps what you type right after opening a room, and sends while your character is still loading.
+- Property imports no longer report unchanged data as changed, item weights no longer show long decimals, and rolls made on the device are labeled DEVICE ROLL.
+
+## Release verification
+
+To be completed by the signed release workflow (API 24/API 35 widget checks, preservation checks and the signed-APK upgrade gate).
+
+---
+
 # Lootsplit 1.9.2
 
 Android version code **15**, same package and permanent signing certificate. Install over the existing app; do not uninstall or clear saved data.
