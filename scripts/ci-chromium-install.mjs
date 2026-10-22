@@ -12,14 +12,25 @@ import { createRequire } from "node:module";
 import { dirname, join, resolve } from "node:path";
 import { pathToFileURL } from "node:url";
 
-/** Packages from `playwright install-deps --dry-run chromium` output. */
-export function aptPackages(dryRun) {
-  const match = /apt-get install -y --no-install-recommends ([^"&;|]+)/.exec(dryRun);
-  if (!match) throw Error(`Unrecognized Playwright dependency command: ${dryRun.trim().slice(0, 300)}`);
-  const packages = match[1].trim().split(/\s+/);
-  for (const name of packages)
-    if (!/^[a-z0-9][a-z0-9.+-]*(:[a-z0-9]+)?$/.test(name)) throw Error(`Unexpected package name: ${name}`);
+const PACKAGE = /^[a-z0-9][a-z0-9.+-]*(:[a-z0-9]+)?$/;
+function checked(packages) {
+  for (const name of packages) if (!PACKAGE.test(name)) throw Error(`Unexpected package name: ${name}`);
   return packages;
+}
+
+/**
+ * Reads `playwright install-deps --dry-run chromium`. Playwright 1.63 simulates the install
+ * (`apt-get install -s`) and reports what is missing; earlier versions print the apt command,
+ * whose package list is then checked with dpkg. Returns null when the output is unrecognized
+ * (for example the simulation failed on missing package lists).
+ */
+export function parseDryRun(output) {
+  if (/All system dependencies are installed\./.test(output)) return { missing: [] };
+  const report = /Missing system dependencies \(\d+\):\n((?:[ \t]+\S+[ \t]*(?:\n|$))+)/.exec(output);
+  if (report) return { missing: checked(report[1].trim().split(/\s+/)) };
+  const command = /apt-get install -y --no-install-recommends ([^"&;|]+)/.exec(output);
+  if (command) return { packages: checked(command[1].trim().split(/\s+/)) };
+  return null;
 }
 
 /** Packages that `dpkg-query -W -f '${Package} ${db:Status-Abbrev}\n'` did not report installed. */
@@ -55,42 +66,75 @@ function main() {
   const require = createRequire(resolve("package.json"));
   const cli = join(dirname(require.resolve("playwright/package.json")), "cli.js");
   const node = process.execPath;
-  const dryRun = spawnSync(node, [cli, "install-deps", "--dry-run", "chromium"], { encoding: "utf8" });
-  if (dryRun.status !== 0) throw Error(`Playwright dry run failed: ${dryRun.stderr}`);
-  const packages = aptPackages(dryRun.stdout);
-  const query = spawnSync("dpkg-query", ["-W", "-f", "${Package} ${db:Status-Abbrev}\\n", ...packages], {
-    encoding: "utf8",
-  });
-  // dpkg-query exits 1 when a package is unknown; its stdout still lists the known ones.
-  const missing = missingPackages(packages, query.stdout || "");
+  const sudo = process.getuid?.() === 0 ? [] : ["sudo"];
+  const apt = (...args) => [
+    ...sudo,
+    "env",
+    "DEBIAN_FRONTEND=noninteractive",
+    "apt-get",
+    // Fail over a stalled mirror instead of waiting on it, and wait a bounded time for the
+    // image's own apt activity to release the lock.
+    "-o", "Acquire::Retries=3",
+    "-o", "Acquire::http::Timeout=30",
+    "-o", "Acquire::https::Timeout=30",
+    "-o", "DPkg::Lock::Timeout=120",
+    ...args,
+  ];
+  let updated = false;
   let libraries = 0;
+  const update = () => {
+    if (updated) return;
+    const [cmd, ...args] = apt("update");
+    libraries += bounded("apt-get update", cmd, args, { seconds: 120 });
+    updated = true;
+  };
+  const dryRun = () => {
+    const result = spawnSync(node, [cli, "install-deps", "--dry-run", "chromium"], {
+      encoding: "utf8",
+      timeout: 120000,
+    });
+    return { text: `${result.stdout || ""}\n${result.stderr || ""}`, parsed: parseDryRun(result.stdout || "") };
+  };
+  let check = dryRun();
+  // The simulation needs current package lists; refresh them once and ask again.
+  if (!check.parsed) {
+    update();
+    check = dryRun();
+  }
+  if (!check.parsed) throw Error(`Unrecognized Playwright dependency check: ${check.text.trim().slice(0, 600)}`);
+  let missing = check.parsed.missing;
+  let total;
+  if (!missing) {
+    const packages = check.parsed.packages;
+    const query = spawnSync("dpkg-query", ["-W", "-f", "${Package} ${db:Status-Abbrev}\\n", ...packages], {
+      encoding: "utf8",
+    });
+    // dpkg-query exits 1 when a package is unknown; its stdout still lists the known ones.
+    missing = missingPackages(packages, query.stdout || "");
+    total = packages.length;
+  }
   if (missing.length) {
-    const sudo = process.getuid?.() === 0 ? [] : ["sudo"];
-    const apt = (...args) => [
-      ...sudo,
-      "env",
-      "DEBIAN_FRONTEND=noninteractive",
-      "apt-get",
-      // Fail over a stalled mirror instead of waiting on it, and wait a bounded time for the
-      // image's own apt activity to release the lock.
-      "-o", "Acquire::Retries=3",
-      "-o", "Acquire::http::Timeout=30",
-      "-o", "Acquire::https::Timeout=30",
-      "-o", "DPkg::Lock::Timeout=120",
-      ...args,
-    ];
-    const [cmd, ...updateArgs] = apt("update");
-    libraries += bounded("apt-get update", cmd, updateArgs, { seconds: 120 });
-    const [cmd2, ...installArgs] = apt("install", "-y", "--no-install-recommends", ...missing);
-    libraries += bounded("apt-get install", cmd2, installArgs, { seconds: 180 });
+    update();
+    const [cmd, ...args] = apt("install", "-y", "--no-install-recommends", ...missing);
+    libraries += bounded("apt-get install", cmd, args, { seconds: 180 });
   }
   const shell = bounded("headless shell", node, [cli, "install", "--only-shell", "chromium"], { seconds: 120 });
   const cache = process.env.CHROMIUM_CACHE_HIT === "true" ? "restored from cache" : "downloaded";
   const summary =
-    `System libraries: ${missing.length} of ${packages.length} missing` +
-    (missing.length ? ` (${missing.join(" ")}), installed in ${libraries}s` : ", apt skipped") +
+    (missing.length
+      ? `System libraries: ${missing.length} missing${total ? ` of ${total}` : ""} (${missing.join(" ")}), apt took ${libraries}s`
+      : `System libraries: all present${updated ? ` after a ${libraries}s apt-get update` : ", apt skipped"}`) +
     `. Headless shell ${cache}, ready in ${shell}s.`;
   console.log(`::notice title=Chromium install::${summary}`);
 }
 
-if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) main();
+if (process.argv[1] && import.meta.url === pathToFileURL(resolve(process.argv[1])).href) {
+  try {
+    main();
+  } catch (error) {
+    // Job logs are not always readable; the annotation carries the reason.
+    const text = String(error?.stack || error).slice(0, 1500).replace(/%/g, "%25").replace(/\r?\n/g, "%0A");
+    console.log(`::error title=Chromium install failed::${text}`);
+    process.exitCode = 1;
+  }
+}

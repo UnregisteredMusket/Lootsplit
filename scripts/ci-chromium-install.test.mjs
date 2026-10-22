@@ -1,19 +1,27 @@
 import assert from "node:assert/strict";
 import { readFileSync } from "node:fs";
 import test from "node:test";
-import { aptPackages, bounded, missingPackages } from "./ci-chromium-install.mjs";
+import { bounded, missingPackages, parseDryRun } from "./ci-chromium-install.mjs";
 
 const dryRun =
   'sudo -- sh -c "apt-get update&& apt-get install -y --no-install-recommends libasound2t64 libnss3 xvfb fonts-liberation"\n';
 
-test("reads Playwright's own dependency list from its dry run", () => {
-  assert.deepEqual(aptPackages(dryRun), ["libasound2t64", "libnss3", "xvfb", "fonts-liberation"]);
-  assert.throws(() => aptPackages("Installing dependencies..."), /Unrecognized/);
-  assert.throws(() => aptPackages('sh -c "apt-get install -y --no-install-recommends ok $(evil)"'), /Unexpected package/);
+test("reads Playwright's own dependency check, current and earlier formats", () => {
+  // Playwright 1.63+: an apt simulation reports exactly what is missing.
+  assert.deepEqual(parseDryRun("All system dependencies are installed.\n"), { missing: [] });
+  assert.deepEqual(
+    parseDryRun("Missing system dependencies (2):\n  fonts-wqy-zenhei\n  xvfb\n"),
+    { missing: ["fonts-wqy-zenhei", "xvfb"] },
+  );
+  // Earlier versions print the install command; its list is checked with dpkg.
+  assert.deepEqual(parseDryRun(dryRun), { packages: ["libasound2t64", "libnss3", "xvfb", "fonts-liberation"] });
+  assert.equal(parseDryRun("Error: 'apt-get install -s' exited with code 100"), null);
+  assert.throws(() => parseDryRun('sh -c "apt-get install -y --no-install-recommends ok $(evil)"'), /Unexpected package/);
+  assert.throws(() => parseDryRun("Missing system dependencies (1):\n  $(evil)\n"), /Unexpected package/);
 });
 
 test("only packages dpkg reports installed (ii) are skipped", () => {
-  const packages = aptPackages(dryRun);
+  const { packages } = parseDryRun(dryRun);
   const dpkg = "libasound2t64 ii \nlibnss3 rc \nxvfb un \n";
   assert.deepEqual(missingPackages(packages, dpkg), ["libnss3", "xvfb", "fonts-liberation"]);
   assert.deepEqual(missingPackages(["libnss3"], "libnss3:amd64 ii \n"), []);
