@@ -1,0 +1,85 @@
+name: Code health and security scans
+# Report-only scans that help agents and the owner find problems early. None of these jobs blocks a
+# merge or a release yet: findings go to the job summary or the repository's Security tab.
+# Tighten a job to blocking only after its first findings are triaged (see docs/AGENT-TOOLING.md).
+# Android Lint already runs as `:app:lintDebug` in android-widget.yml.
+on:
+  pull_request:
+  push:
+    branches: [main]
+  schedule:
+    - cron: "17 6 * * 1" # Weekly full scan, Monday 06:17 UTC.
+  workflow_dispatch:
+permissions:
+  contents: read
+concurrency:
+  group: code-health-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  knip:
+    name: Unused files, exports and dependencies (knip)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version-file: .nvmrc
+          cache: npm
+      - run: npm ci --ignore-scripts
+      - name: Report unused code (does not fail the job)
+        run: |
+          set -o pipefail
+          {
+            echo "## knip report"
+            echo
+            npx --yes knip@6.42.1 --reporter markdown --no-exit-code 2>&1 | head -c 900000
+          } >> "$GITHUB_STEP_SUMMARY" || echo "::warning title=knip::knip did not complete; see the job log."
+
+  zizmor:
+    name: GitHub Actions security (zizmor)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    permissions:
+      contents: read
+      actions: read
+      security-events: write
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          persist-credentials: false
+      # With Advanced Security (public repository), findings go to the Security tab and the
+      # action fails only on internal errors.
+      - uses: zizmorcore/zizmor-action@85b2b9fb8e3325e7a23d7d0a9d7ba5ae0f999e3e # v0.7.1
+
+  osv:
+    name: Dependency vulnerabilities (OSV-Scanner)
+    permissions:
+      contents: read
+      actions: read
+      security-events: write
+    uses: google/osv-scanner-action/.github/workflows/osv-scanner-reusable.yml@b1d267aea5211fa648d9d442fa64b90dbdcbdd36 # v2.7.0
+    with:
+      fail-on-vuln: false
+      upload-sarif: true
+
+  gitleaks:
+    name: Committed secrets (gitleaks)
+    runs-on: ubuntu-latest
+    timeout-minutes: 10
+    # Report-only until the first full-history scan is triaged.
+    continue-on-error: true
+    permissions:
+      contents: read
+      pull-requests: read
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          fetch-depth: 0
+          persist-credentials: false
+      - uses: gitleaks/gitleaks-action@ff98106e4c7b2bc287b24eaf42907196329070c7 # v2.3.9
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GITLEAKS_ENABLE_COMMENTS: "false"
