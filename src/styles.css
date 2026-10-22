@@ -3758,7 +3758,7 @@ input,select,textarea { max-width: 100%; }
 .split-pane-action:hover:not(:disabled) { border-color: var(--color-lead); color: var(--color-lead); }
 .split-pane-action[aria-pressed="true"] { border-color: var(--color-lead); background: var(--color-lead); color: var(--color-bg); }
 .split-pane-action:disabled { opacity: .4; }
-.split-pane-body { position: relative; flex: 1; min-height: 0; contain: layout paint; }
+.split-pane-body { position: relative; flex: 1; min-height: 0; contain: layout paint; container: split-pane / inline-size; }
 .split-pane-scroll { position: absolute; inset: 0; overflow: auto; overscroll-behavior: contain; }
 .split-pane-slot, .split-pane-host, .pane-shell { min-height: 100%; }
 .split-divider { display: flex; flex: 0 0 20px; align-items: center; justify-content: center; cursor: col-resize; touch-action: none; }
@@ -3800,3 +3800,16 @@ input,select,textarea { max-width: 100%; }
 /* A map in a pane uses the existing narrow-window arrangement of its floating controls. */
 .split-on .map-title-capsule { max-width: 230px; }
 .split-on .map-top-controls { left: auto; right: 14px; transform: none; width: calc(100% - 272px); max-width: 508px; }
+/* Desktop multi-column layouts follow the pane's width, not the window's. */
+@container split-pane (max-width: 800px) {
+  .split-pane-body .encounter-layout { grid-template-columns: minmax(0, 1fr); }
+  .split-pane-body .encounter-library { position: static; max-height: 240px; overflow: auto; }
+  .split-pane-body .concept-main:has(> .multiplayer-heading) { display: block; }
+  .split-pane-body .dm-control-panel,
+  .split-pane-body .desktop-desk-panels { grid-template-columns: minmax(0, 1fr); }
+}
+@container split-pane (max-width: 640px) {
+  .split-pane-body .play-sheet:has(> .play-surface) { display: block; }
+  .split-pane-body .ability-grid { grid-template-columns: repeat(3, minmax(0, 1fr)); }
+  .split-pane-body .play-surface > div:has(> .play-action-row) { display: block; }
+}
