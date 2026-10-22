@@ -715,7 +715,7 @@ public class OwnerWidgetTest {
                 TextView chevron=child==null?null:child.findViewById(R.id.widget_row_chevron);TextView detail=child==null?null:child.findViewById(R.id.widget_row_detail);
                 View open=child==null?null:child.findViewById(R.id.widget_row_open);
                 if(chevron==null||detail==null){state.set(-1);return;}
-                boolean isExpanded="▴".contentEquals(chevron.getText())&&detail.getMaxLines()>1&&open!=null&&open.getVisibility()==View.VISIBLE;
+                boolean isExpanded="▴".contentEquals(chevron.getText())&&detail.getMaxLines()>1&&open!=null&&open.getVisibility()==View.VISIBLE&&open.hasOnClickListeners();
                 boolean isCompact="▾".contentEquals(chevron.getText())&&detail.getMaxLines()==1&&open==null;
                 state.set(isExpanded?1:isCompact?0:-1);
             });
@@ -725,8 +725,9 @@ public class OwnerWidgetTest {
     }
     private void tapFirstRow(AtomicReference<android.appwidget.AppWidgetHostView> hosted) {
         InstrumentationRegistry.getInstrumentation().runOnMainSync(()->{
-            android.widget.ListView list=hosted.get().findViewById(R.id.monitor_list);View row=list.getChildAt(0).findViewById(R.id.widget_row);
-            assertTrue("Row has a tap handler",row.performClick());
+            // A collection item's root fill-in is delivered by the list's item click, as a real tap is.
+            android.widget.ListView list=hosted.get().findViewById(R.id.monitor_list);View child=list.getChildAt(0);
+            assertTrue("Row tap reaches the host's click handler",list.performItemClick(child,list.getFirstVisiblePosition(),list.getItemIdAtPosition(list.getFirstVisiblePosition())));
         });
     }
     @Test public void actualFrameworkHostExpandsAndCollapsesRowOnTap() throws Exception {
