@@ -124,7 +124,8 @@ function acceptance(pending: Command[], acknowledged: string[], draft: Command[]
     () => {},
     () => ({}),
     () => {},
-    (next: object) => { Object.assign(view, next); },
+    // A preview conflict is published as attention directly (no data change).
+    (next: { error?: string }) => { Object.assign(view, next); if (next.error) error = next.error; },
     () => {},
     applyCommand,
     (e: Error) => {
