@@ -14,6 +14,7 @@ import {
   acknowledgeAccountRestore,
 } from "../src/lib/account/restore-request.ts";
 import { characterRoll } from "../src/lib/quire/cloud.server.ts";
+import { hydrateRoomImages } from "../cloudflare/room-images.mjs";
 
 async function setup(kind) {
   let DB;
@@ -707,13 +708,13 @@ for (const kind of ["sqlite", "libsql"]) {
       );
       acknowledgeAccountRestore(dm.id, backupId, request.requestKey, storage);
       assert.ok([...markers.keys()].every((k) => !k.includes(dm.id)));
-      const next = JSON.parse(
-        (
-          await DB.prepare("SELECT body FROM campaign_rooms WHERE code=?")
-            .bind(resumed.code)
-            .first()
-        ).body,
-      );
+      // Archived snapshots are stored beside the restored row (campaign_room_reports) and
+      // hydrate to the exact original bytes, as every room reader sees them.
+      const nextBody = (
+        await DB.prepare("SELECT body FROM campaign_rooms WHERE code=?").bind(resumed.code).first()
+      ).body;
+      assert.equal(nextBody.includes('"snapshot"'), false, "Restore stores no inline snapshot");
+      const next = await hydrateRoomImages(DB, resumed.code, JSON.parse(nextBody));
       assert.equal(next.viewOnly, true);
       assert.equal(next.seats.length, 1);
       assert.equal(next.seats[0].userId, dm.id);
@@ -842,12 +843,16 @@ for (const kind of ["sqlite", "libsql"]) {
         "Old seat approval requests stay archived, never active",
       );
       assert.equal((await call("library", undefined, dm.cookie)).data.backups.length, 1);
-      const final = JSON.parse(
-        (
-          await DB.prepare("SELECT body FROM campaign_rooms WHERE code=?")
-            .bind(resumed.code)
-            .first()
-        ).body,
+      const final = await hydrateRoomImages(
+        DB,
+        resumed.code,
+        JSON.parse(
+          (
+            await DB.prepare("SELECT body FROM campaign_rooms WHERE code=?")
+              .bind(resumed.code)
+              .first()
+          ).body,
+        ),
       );
       assert.deepEqual(
         final.table.purses[0].coins,
