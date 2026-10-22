@@ -108,6 +108,12 @@ export function HelpContent({
                       <span aria-hidden="true"> →</span>
                     </AppLink>
                   ))}
+                  {topic.email && (
+                    <a href={`mailto:${topic.email}`}>
+                      Email {topic.email}
+                      <span aria-hidden="true"> →</span>
+                    </a>
+                  )}
                 </nav>
               </div>
             </details>

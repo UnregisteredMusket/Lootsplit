@@ -1,3 +1,5 @@
+import { SUPPORT_EMAIL } from "../website/contact.ts";
+
 export const APP_DESCRIPTION =
   "Manage tabletop campaigns with character sheets, shared funds, inventory, shops, encounters, and DM-approved downtime finances. Play locally or in shared rooms, with account-owned campaigns, guest invitations and backups.";
 export type HelpTopic = {
@@ -6,6 +8,8 @@ export type HelpTopic = {
   audience?: string;
   paragraphs: string[];
   links: [string, string][];
+  /** A public email address shown as a mailto link beside the topic's app links. */
+  email?: string;
 };
 export type HelpGroup = { id: string; title: string; topics: HelpTopic[] };
 export const HELP_GROUPS: HelpGroup[] = [
@@ -529,6 +533,16 @@ export const HELP_GROUPS: HelpGroup[] = [
           ["Diagnostics", "/settings#backups"],
         ],
       },
+      {
+        id: "contact-support",
+        title: "Contact support",
+        paragraphs: [
+          `Need help? Email ${SUPPORT_EMAIL}. It is the public support address for questions, feedback and problems you cannot report from My account, such as being unable to sign in.`,
+          "Say what you were doing, what you expected and whether you were using Local, Live or Turn-based play. Never send passwords, recovery keys or campaign invitation links; attach a diagnostic report only after previewing it. Bug reports in My account keep their replies in one place.",
+        ],
+        links: [["Report a bug", "/account#bug-reports"]],
+        email: SUPPORT_EMAIL,
+      },
     ],
   },
   {
@@ -565,7 +579,7 @@ export const HELP_GROUPS: HelpGroup[] = [
   },
 ];
 export function topicMatches(topic: HelpTopic, query: string) {
-  return [topic.title, topic.audience, ...topic.paragraphs, ...topic.links.flat()]
+  return [topic.title, topic.audience, ...topic.paragraphs, ...topic.links.flat(), topic.email]
     .join(" ")
     .toLowerCase()
     .includes(query.trim().toLowerCase());
