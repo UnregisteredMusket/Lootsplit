@@ -62,5 +62,7 @@ This file is the required reading. Everything under "Read on demand" is consulte
 | Performance log rules | `docs/PERFORMANCE.md` |
 | Agent hooks, skills, MCP servers, cloud environment setup | `docs/AGENT-TOOLING.md` |
 | Ready-to-use prompts for future work, with status | `docs/prompts/README.md` |
-| Past audits and evidence | `docs/audit/` (newest: `2026-10-21-code-audit.md`) |
+| Custom-domain move (lootsplitter.com), rename to Lootsplitter, cutover checklist | `docs/audit/2026-10-22-domain-migration-audit.md`, `docs/plans/DOMAIN-READINESS.md` |
+| Monetization (free, donations only) and marketing plan | `docs/plans/MONETIZATION-AND-MARKETING.md` |
+| Past audits and evidence | `docs/audit/` (newest: `2026-10-22-domain-migration-audit.md`) |
 | Historical checkpoints | `docs/archive/recovery-checkpoints-2026-10.md` |
