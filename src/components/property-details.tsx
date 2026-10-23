@@ -1,4 +1,5 @@
 import { useArchiveReaderSeat } from "@/lib/quire/use-archive-reader-seat";
+import { MapRecordStrip } from "./map-record-strip";
 import { readArchiveResult } from "@/lib/quire/archive-reader";
 import { currentPropertyRules } from "@/lib/quire/finance-record-links";
 import { nextFinancePeriod } from "@/lib/quire/finance-presentation";
@@ -72,6 +73,7 @@ export function PropertyDetails({ plans = false, propertyId }: { plans?: boolean
               <PropertyFacts profile={h.property} />
             </div>
           </div>
+          {!propertyId && <MapRecordStrip reference={{ kind: "property", id: h.id }} />}
           <p>
             Owner: {purses.find((p) => p.id === h.purseId)?.name || "Missing account"} · Property
             record {h.id}

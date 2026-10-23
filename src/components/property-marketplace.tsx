@@ -1,4 +1,5 @@
 import { SearchSelect } from "@/components/search-select";
+import { MapRecordStrip } from "./map-record-strip";
 import { useEffect, useId, useRef, useState } from "react";
 import { Building2, MapPin, ScrollText, Search, Scale, KeyRound } from "lucide-react";
 import { useCommandId, useEconomy } from "@/lib/quire/economy-context";
@@ -408,6 +409,7 @@ export function PropertyMarketplace() {
               </p>
               <PropertyFacts profile={listing.property} />
               {listing.notes && <p className="property-excerpt">{listing.notes}</p>}
+              <MapRecordStrip reference={{ kind: "listing", id: listing.id }} />
               <div className="property-actions">
                 <Button
                   variant="secondary"

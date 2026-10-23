@@ -313,7 +313,16 @@ const emptyDraft = (): Draft => ({ give: {}, giveCopper: 0, ask: {}, askCopper: 
 
 const carried = (h: Holding) => h.quantity > 0 && !h.custody && !h.reservedFor && !h.service;
 
-export function NpcConversation({ npc, table }: { npc: Npc; table: CloudTable }) {
+export function NpcConversation({
+  npc,
+  table,
+  onFarewell,
+}: {
+  npc: Npc;
+  table: CloudTable;
+  /** On a map pin, Farewell closes the place card and returns to the map. */
+  onFarewell?: () => void;
+}) {
   const seat = useSeat(),
     dm = seat.role === "dm",
     { commandOutcome } = useEconomy();
@@ -440,6 +449,8 @@ export function NpcConversation({ npc, table }: { npc: Npc; table: CloudTable })
       push({ kind: "pc", text: "Farewell.", key: nextKey("pc") }, { kind: "npc", text: say("bye"), key: nextKey("npc") });
       setStep("left");
       setDrawer(false);
+      // Let the goodbye line show before returning to the map.
+      if (onFarewell) setTimeout(onFarewell, reduced() ? 0 : 900);
     },
   };
   if (step === "left") {

@@ -63,15 +63,8 @@ import { AppLink } from "./app-link";
 import { libraryRecordHref } from "@/lib/quire/library-records";
 import { useNavigate, useRouter, useRouterState } from "@tanstack/react-router";
 import {
-  Users,
-  UserRound,
   Store,
-  House,
-  Mail,
-  Flag,
   MapPin,
-  EyeOff,
-  Ship as ShipIcon,
   Swords,
   Hand,
   MousePointer2,
@@ -92,6 +85,8 @@ import {
   Menu,
 } from "lucide-react";
 import { MapFrame } from "./map-frame";
+import { RecordIcon } from "./map-record-icon";
+import { MapPlaceCard } from "./map-place-card";
 import {
   groupMapRecords,
   mapRecordKinds,
@@ -105,12 +100,10 @@ import { MapAnnouncer } from "./map-announcer";
 import { PingGlyph } from "./ping-glyph";
 import { pingShapes } from "@/lib/quire/map-announcements";
 import type { CloudTable } from "@/lib/quire/cloud";
+import { parseRecordParam, recordMapSpots, sameRecord, PLACE_UNAVAILABLE } from "@/lib/quire/place-hub";
 
 const MapCombatWorkspace = lazy(() =>
   import("./map-combat-workspace").then((m) => ({ default: m.MapCombatWorkspace })),
-);
-const MapServicePanel = lazy(() =>
-  import("./map-service-panel").then((m) => ({ default: m.MapServicePanel })),
 );
 
 export function CampaignMaps() {
@@ -177,7 +170,8 @@ function CampaignMapWorkspace({ viewScope }: { viewScope: { key: string; ephemer
     [typeFilter, setTypeFilter] = useState(""),
     [tileMode, setTileMode] = useState(true),
     [selectedToken, setSelectedToken] = useState("");
-  const requestedMap = useRouterState({ select: (s) => s.location.search.map });
+  const requestedMap = useRouterState({ select: (s) => s.location.search.map }),
+    requestedRecord = useRouterState({ select: (s) => s.location.search.record });
   const navigate = useNavigate(),
     router = useRouter();
   const [entryCamera, setEntryCamera] = useState<{
@@ -282,6 +276,40 @@ function CampaignMapWorkspace({ viewScope }: { viewScope: { key: string; ephemer
     setPlacement("");
     setPoint(undefined);
   }, [viewedMapId, viewScope.key, viewScope.ephemeral]);
+  // Place hub deep link: /maps?map=&record=kind:id centres on the pin and opens its card. Any
+  // record this viewer can't be shown gets the same neutral message (docs/MAP-TILES.md).
+  const [deepLink, setDeepLink] = useState<{
+      mapId: string;
+      reference: MapRecordReference;
+      nonce: string;
+    }>(),
+    [placeNotice, setPlaceNotice] = useState(""),
+    handledLink = useRef("");
+  useEffect(() => {
+    if (requestedRecord === undefined) {
+      handledLink.current = "";
+      return;
+    }
+    const key = `${requestedMap ?? ""}|${requestedRecord}`;
+    if (handledLink.current === key) return;
+    handledLink.current = key;
+    const reference = parseRecordParam(requestedRecord);
+    const spots = reference ? recordMapSpots(t, reference, seat, allMaps) : [];
+    const spot = spots.find((s) => s.map.id === requestedMap) ?? spots[0];
+    if (!reference || !spot) {
+      setDeepLink(undefined);
+      setPlaceNotice(PLACE_UNAVAILABLE);
+      return;
+    }
+    const nonce = crypto.randomUUID();
+    setPlaceNotice("");
+    setTypeFilter("");
+    setSelected(spot.map.id);
+    setEntryCamera({ mapId: spot.map.id, view: { ...spot.point, zoom: 1.5 }, nonce });
+    setDeepLink({ mapId: spot.map.id, reference, nonce });
+    // The link is handled once per URL; later room updates never move the viewer's camera.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [requestedMap, requestedRecord]);
   const party =
     map &&
     (w.partyPosition?.mapId === map.id &&
@@ -793,6 +821,10 @@ function CampaignMapWorkspace({ viewScope }: { viewScope: { key: string; ephemer
             placementKind={placement}
             recordTable={t}
             entryCamera={entryCamera}
+            openRecord={deepLink}
+            notice={placeNotice}
+            dismissNotice={() => setPlaceNotice("")}
+            onRecordMissing={() => setPlaceNotice(PLACE_UNAVAILABLE)}
             selectMap={selectMap}
             locationMaps={(id) => mapsForLocation(allMaps, id)}
             openLocation={(id) => {
@@ -1239,6 +1271,10 @@ function MapViewport({
   placementKind,
   navigation,
   entryCamera,
+  openRecord,
+  notice,
+  dismissNotice,
+  onRecordMissing,
   selectMap,
   locationMaps,
   openLocation,
@@ -1268,6 +1304,11 @@ function MapViewport({
   navigation: ReactNode;
   recordTable: CloudTable;
   entryCamera?: { mapId: string; view: { x: number; y: number; zoom: number }; nonce: string };
+  /** A deep-linked record to highlight and open (Place hub). */
+  openRecord?: { mapId: string; reference: MapRecordReference; nonce: string };
+  notice?: string;
+  dismissNotice?: () => void;
+  onRecordMissing?: () => void;
   selectMap: (id: string, entry?: { x: number; y: number; zoom: number }) => void;
   locationMaps: (id: string) => CampaignMap[];
   openLocation: (id: string) => boolean;
@@ -1298,14 +1339,12 @@ function MapViewport({
     [hotbarOpen, setHotbarOpen] = useState(true),
     [moreTools, setMoreTools] = useState(false),
     [contextOpen, setContextOpen] = useState(false),
-    [settingsTab, setSettingsTab] = useState<"settings" | "places">("settings");
+    [settingsTab, setSettingsTab] = useState<"settings" | "places">("settings"),
+    [highlight, setHighlight] = useState<MapRecordReference>(),
+    [placeAnnouncement, setPlaceAnnouncement] = useState(""),
+    [cardFocus, setCardFocus] = useState<string>(),
+    [deepLinkedCard, setDeepLinkedCard] = useState<MapRecordReference>();
   const serviceTable = recordTable;
-  const closeService = () => {
-    if (allowContextChange()) {
-      setService(undefined);
-      setServiceExpanded(false);
-    }
-  };
   useLayoutEffect(() => {
     setDetails([]);
     setService(undefined);
@@ -1360,6 +1399,11 @@ function MapViewport({
         ? [d]
         : [];
   });
+  // The deep-link highlight lasts while that record's card is open (the pulse itself is short).
+  const highlighted =
+    currentDetails.length === 1 && sameRecord(currentDetails[0].reference, highlight)
+      ? highlight
+      : undefined;
   useEffect(() => {
     setDetails([]);
   }, [selectedToken]);
@@ -1604,11 +1648,37 @@ function MapViewport({
         y: size.h / 2 - record.point!.y * h * v.scale,
       }));
     setDetails([record]);
-    setService(undefined);
+    setService(record.reference);
+    setServiceExpanded(false);
     setDrawerOpen(false);
     setContextOpen(false);
     tools.hideInspector();
+    if (record.reference) setCardFocus(crypto.randomUUID());
   };
+  const handledOpen = useRef("");
+  useEffect(() => {
+    if (!openRecord || openRecord.mapId !== map.id || handledOpen.current === openRecord.nonce)
+      return;
+    handledOpen.current = openRecord.nonce;
+    const record = records.find((r) => sameRecord(r.reference, openRecord.reference));
+    if (!record) {
+      onRecordMissing?.();
+      return;
+    }
+    setDetails([record]);
+    setService(record.reference);
+    setServiceExpanded(false);
+    setDrawerOpen(false);
+    setContextOpen(false);
+    tools.hideInspector();
+    setHighlight(record.reference);
+    setDeepLinkedCard(record.reference);
+    setCardFocus(openRecord.nonce);
+    setPlaceAnnouncement(`Showing ${record.label} on ${map.name}`);
+    // Runs once per deep link; `records` is read at that moment only.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [openRecord?.nonce, map.id]);
+
   useEffect(() => {
     const key = (e: KeyboardEvent) => {
       if (
@@ -2252,6 +2322,9 @@ function MapViewport({
       )}
       {!interfaceHidden && <MapCombatHud map={map} />}
       <MapAnnouncer map={map} pings={signals.pings} />
+      <p className="sr-only" aria-live="polite" aria-atomic="true">
+        {placeAnnouncement}
+      </p>
       <div className="map-feedback" hidden={interfaceHidden}>
         <MapRenderBadge />
         {full && (
@@ -2274,6 +2347,16 @@ function MapViewport({
           </p>
         )}
         {signals.viewOnly && <p className="text-sm text-muted">Resume play to share map pings.</p>}
+        {notice && (
+          <p role="status" className="map-place-notice">
+            {notice}{" "}
+            {dismissNotice && (
+              <button type="button" onClick={dismissNotice}>
+                Dismiss
+              </button>
+            )}
+          </p>
+        )}
         {signals.error && <p role="alert">{signals.error}</p>}
       </div>
       <div className={`tabletop-workspace ${tools.panel ? "has-inspector" : ""}`}>
@@ -2531,7 +2614,7 @@ function MapViewport({
                         map.tokens?.some((token) => token.id === record.id),
                       )?.id
                     }
-                    className={`map-record-icon map-kind-${type.kind.toLowerCase().replaceAll(" ", "-")}`}
+                    className={`map-record-icon map-kind-${type.kind.toLowerCase().replaceAll(" ", "-")}${highlighted && type.records.some((r) => sameRecord(r.reference, highlighted)) ? " map-record-highlight" : ""}`}
                     title={`${type.kind}: ${type.records.map((r) => r.label).join(", ")}`}
                     aria-label={`${type.kind}: ${type.records.length} ${type.records.length === 1 ? "record" : "records"}`}
                     aria-pressed={
@@ -2574,7 +2657,14 @@ function MapViewport({
                             openLocation(type.records[0].reference.id)
                           )
                             setDetails([]);
-                          else setDetails(type.records);
+                          else if (type.records.length === 1 && type.records[0].reference) {
+                            // One record with a service opens straight into its place card.
+                            setDetails(type.records);
+                            setService(type.records[0].reference);
+                            setServiceExpanded(false);
+                            setDrawerOpen(false);
+                            tools.hideInspector();
+                          } else setDetails(type.records);
                         }
                       }
                     }}
@@ -2646,79 +2736,37 @@ function MapViewport({
             </section>
           )}
           {currentDetails.length > 0 && (
-            <section
-              className={`map-record-details ${service ? "map-service-open" : ""} ${serviceExpanded ? "map-service-expanded" : ""}`}
-              aria-label="Map record details"
-            >
-              <div className="world-row">
-                <strong>
-                  {currentDetails[0].kind} · {currentDetails.length}{" "}
-                  {currentDetails.length === 1 ? "record" : "records"}
-                </strong>
-                {service && (
-                  <Button onClick={() => setServiceExpanded((v) => !v)}>
-                    {serviceExpanded ? "Collapse service" : "Expand service"}
-                  </Button>
-                )}
-                <Button
-                  onClick={() => {
-                    if (allowContextChange()) {
-                      setDetails([]);
-                      setService(undefined);
-                      root.current?.focus();
-                    }
-                  }}
-                >
-                  Close details
-                </Button>
-              </div>
-              {currentDetails.map((r) => (
-                <div key={r.id}>
-                  {r.href ? (
-                    <AppLink className="settings-link" href={r.href}>
-                      {r.label} →
-                    </AppLink>
-                  ) : (
-                    <strong>{r.label}</strong>
-                  )}
-                  {r.reference && (
-                    <Button
-                      onClick={() => {
-                        if (allowContextChange()) {
-                          setService(r.reference);
-                          setDrawerOpen(false);
-                          tools.hideInspector();
-                        }
-                      }}
-                    >
-                      Open in map
-                    </Button>
-                  )}
-                  {r.targetMapId && (
-                    <Button onClick={() => selectMap(r.targetMapId!, r.entry)}>Open map</Button>
-                  )}
-                  {r.reference?.kind === "location" &&
-                    locationMaps(r.reference.id)
-                      .filter((m) => m.id !== map.id)
-                      .map((m) => (
-                        <Button key={m.id} onClick={() => selectMap(m.id)}>
-                          Open {m.name}
-                        </Button>
-                      ))}
-                  {r.description && <p>{r.description}</p>}
-                </div>
-              ))}
-              {service && (
-                <Suspense fallback={<p role="status">Opening service…</p>}>
-                  <MapServicePanel
-                    key={`${service.kind}:${service.id}`}
-                    reference={service}
-                    table={serviceTable}
-                    close={closeService}
-                  />
-                </Suspense>
-              )}
-            </section>
+            <MapPlaceCard
+              records={currentDetails}
+              map={map}
+              table={serviceTable}
+              service={service}
+              openService={(r) => {
+                if (!allowContextChange()) return;
+                setDetails([r]);
+                setService(r.reference);
+                setServiceExpanded(false);
+                setDrawerOpen(false);
+                tools.hideInspector();
+              }}
+              expanded={serviceExpanded}
+              setExpanded={setServiceExpanded}
+              close={() => {
+                if (allowContextChange()) {
+                  setDetails([]);
+                  setService(undefined);
+                  setServiceExpanded(false);
+                  setHighlight(undefined);
+                  root.current?.focus();
+                }
+              }}
+              selectMap={selectMap}
+              locationMaps={locationMaps}
+              focusKey={cardFocus}
+              deepLinked={
+                currentDetails.length === 1 && sameRecord(currentDetails[0].reference, deepLinkedCard)
+              }
+            />
           )}
         </div>
         <div hidden={interfaceHidden}>{tools.panel}</div>
@@ -2756,27 +2804,4 @@ function MapRecordGlyph({
         )}
     </>
   );
-}
-function RecordIcon({ kind }: { kind: string }) {
-  const Icon =
-    kind === "Ship"
-      ? ShipIcon
-      : kind === "Combatant"
-        ? Swords
-        : kind === "NPC" || kind === "Character"
-          ? UserRound
-          : kind === "Party"
-            ? Users
-            : kind === "Shop"
-              ? Store
-              : kind === "Black market"
-                ? EyeOff
-                : kind === "Property"
-                  ? House
-                  : kind === "Post office"
-                    ? Mail
-                    : kind === "Marker"
-                      ? Flag
-                      : MapPin;
-  return <Icon size={18} aria-hidden="true" />;
 }

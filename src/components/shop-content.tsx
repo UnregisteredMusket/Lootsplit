@@ -1,4 +1,5 @@
 import { SearchSelect } from "@/components/search-select";
+import { MapRecordStrip } from "./map-record-strip";
 import { BlacksmithServices } from "@/components/blacksmith-services";
 import { BlackMarketVendor } from "@/components/black-market";
 import { shopVisible } from "@/lib/quire/world";
@@ -35,7 +36,16 @@ import { RemoveButton } from "@/components/quire-ui";
 import { CatalogStockPicker, ShopStockList } from "@/components/shop-stock-manager";
 import { Button, Confirm, Segmented, Slider, TextInput } from "@/components/ui";
 
-export function ShopContent({ shopId, onRemoved }: { shopId: string; onRemoved?: () => void }) {
+export function ShopContent({
+  shopId,
+  onRemoved,
+  mapStrip = true,
+}: {
+  shopId: string;
+  onRemoved?: () => void;
+  /** False inside the map's place card, which is already on the map. */
+  mapStrip?: boolean;
+}) {
   const navigate = useNavigate();
   const economy = useEconomy();
   const { prefs } = usePrefs();
@@ -133,6 +143,7 @@ export function ShopContent({ shopId, onRemoved }: { shopId: string; onRemoved?:
       <p className="mt-2 text-sm text-muted">
         {locationLabel(readMarketLocations(economy.journal.market), shop.locationId)}
       </p>
+      {mapStrip && <MapRecordStrip reference={{ kind: "shop", id: shop.id }} />}
       {viewing === "edit" ? (
         <div className="mt-3 flex flex-col gap-3">
           <TextInput

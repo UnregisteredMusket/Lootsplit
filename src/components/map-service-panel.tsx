@@ -1,15 +1,11 @@
 import { lazy, Suspense, useState } from "react";
 import type { MapRecordReference } from "@/lib/quire/connected-maps-schema";
 import { mapReferenceRecord, mapReferenceName } from "@/lib/quire/connected-maps";
-import { npcAvailableHere, shopVisible } from "@/lib/quire/world";
 import { useSeat } from "@/lib/quire/seat";
-import { canReadCharacter } from "@/lib/quire/character-position";
 import { canAccessEstate } from "@/lib/quire/estate";
 import { readEstate } from "@/lib/quire/estate-schema";
 import { readMarketLocations } from "@/lib/quire/shop-locations";
-import { propertyAvailableHere } from "@/lib/quire/property";
-import { exchangeHere } from "@/lib/quire/trade-economy";
-import { facilityAccess } from "@/lib/quire/ships";
+import { mapServiceAllowed } from "@/lib/quire/place-hub";
 import { canonicalJson } from "@/lib/quire/canonical-json";
 import { journalEntryHref } from "@/lib/quire/journal-navigation";
 import type { CloudTable } from "@/lib/quire/cloud";
@@ -41,10 +37,13 @@ export function MapServicePanel({
   reference,
   table,
   close,
+  titled = true,
 }: {
   reference: MapRecordReference;
   table: CloudTable;
   close: () => void;
+  /** False inside the place card, whose header already names the record. */
+  titled?: boolean;
 }) {
   const seat = useSeat(),
     dm = seat.role === "dm",
@@ -52,60 +51,7 @@ export function MapServicePanel({
     estate = readEstate(table.journal?.propertyOperations),
     market = readMarketLocations(table.journal?.market);
   const [training, setTraining] = useState(false);
-  let allowed = !!record;
-  if (!dm && record)
-    switch (reference.kind) {
-      case "shop": {
-        const s = table.shops.find((s) => s.id === reference.id)!;
-        allowed = seat.shopIds.includes(s.id) && shopVisible(s, table);
-        break;
-      }
-      case "npc":
-        allowed = npcAvailableHere(
-          table.journal!.world!.npcs.find((n) => n.id === reference.id)!,
-          table,
-        );
-        break;
-      case "character":
-        allowed = canReadCharacter(
-          table,
-          table.purses.find((p) => p.id === reference.id)!,
-          seat,
-        );
-        break;
-      case "property": {
-        const h = table.holdings.find((h) => h.id === reference.id)!;
-        allowed = seat.purseIds.includes(h.purseId) || canAccessEstate(table, estate, h.id, seat);
-        break;
-      }
-      case "listing": {
-        const l = table.listings.find((l) => l.id === reference.id)!;
-        allowed =
-          propertyAvailableHere(l, market, !!table.journal?.world?.partyPosition) &&
-          l.quantity !== 0 &&
-          l.status !== "withdrawn";
-        break;
-      }
-      case "exchange": {
-        const e = table.journal!.tradeEconomy!.exchanges.find((e) => e.id === reference.id)!;
-        allowed = e.visible && exchangeHere(table, e);
-        break;
-      }
-      case "facility":
-        allowed = facilityAccess(
-          table,
-          table.journal!.fleet!.facilities.find((f) => f.id === reference.id)!,
-          seat,
-        );
-        break;
-      case "entry": {
-        const e = table.journal!.entries!.find((e) => e.id === reference.id)!;
-        allowed =
-          e.visibility === "party" ||
-          (e.visibility === "player" && seat.purseIds.includes(e.purseId));
-        break;
-      }
-    }
+  const allowed = mapServiceAllowed(table, reference, seat);
   if (!allowed || !record)
     return (
       <section aria-label="Map service">
@@ -115,11 +61,11 @@ export function MapServicePanel({
     );
   return (
     <section aria-label="Map service" className="map-service-content">
-      <h3>{mapReferenceName(table, reference)}</h3>
+      {titled && <h3>{mapReferenceName(table, reference)}</h3>}
       <Suspense fallback={<p role="status">Opening service…</p>}>
         {reference.kind === "shop" && (
           <>
-            <Shop shopId={reference.id} onRemoved={close} />
+            <Shop shopId={reference.id} onRemoved={close} mapStrip={false} />
             {estate.postal.offices.some((o) => o.shopId === reference.id) && (
               <Fold title="Post office · letters & manager orders">
                 <Postal />
@@ -129,7 +75,7 @@ export function MapServicePanel({
         )}
         {reference.kind === "npc" && (
           <>
-            <Npc npcId={reference.id} />
+            <Npc npcId={reference.id} onFarewell={close} />
             <Button onClick={() => setTraining((v) => !v)}>
               {training ? "Close training" : "Train this NPC"}
             </Button>

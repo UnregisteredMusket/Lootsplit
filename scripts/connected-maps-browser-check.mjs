@@ -11,6 +11,7 @@ import { blankEncounter, blankCombatant } from "../src/lib/encounters/model.mjs"
 import { expect } from "playwright/test";
 import { openApplication, reloadApplication } from "./title-screen-navigation.mjs";
 import { chooseOption } from "./search-select-browser.mjs";
+import { checkPlaceHub, noHorizontalScroll } from "./place-hub-browser-check.mjs";
 export async function checkConnectedMaps({ browser, origin, output }) {
   assert.match(origin, /^http:\/\/(localhost|127\.0\.0\.1):/);
   const results = [];
@@ -85,6 +86,13 @@ export async function checkConnectedMaps({ browser, origin, output }) {
                 x: 0.3,
                 y: 0.6,
               },
+              {
+                id: "mara-pin",
+                record: { kind: "npc", id: "mara" },
+                visibility: "party",
+                x: 0.62,
+                y: 0.32,
+              },
             ],
             links: [
               {
@@ -126,6 +134,14 @@ export async function checkConnectedMaps({ browser, origin, output }) {
                 name: "Mira",
                 kind: "character",
                 coins: { cp: 10000, sp: 0, ep: 0, gp: 0, pp: 0 },
+              });
+              tx.objectStore("purses").put({
+                id: "mara",
+                name: "Mara",
+                kind: "character",
+                control: "npc",
+                nonParty: true,
+                coins: { cp: 500, sp: 0, ep: 0, gp: 0, pp: 0 },
               });
               for (const [id, name] of [
                 ["forge", "Ash & Anvil"],
@@ -179,7 +195,20 @@ export async function checkConnectedMaps({ browser, origin, output }) {
                       },
                     ],
                   },
-                  world: { maps: [region, town, battle] },
+                  world: {
+                    maps: [region, town, battle],
+                    npcs: [
+                      {
+                        id: "mara",
+                        name: "Mara",
+                        description: "Herbalist of the square",
+                        locationId: "town",
+                        visible: true,
+                        barterAllowed: true,
+                        controllerPurseId: null,
+                      },
+                    ],
+                  },
                 },
               });
               for (const id of ["listings", "loans", "sheets", "handouts"])
@@ -224,8 +253,9 @@ export async function checkConnectedMaps({ browser, origin, output }) {
       await expect(frame.getByRole("img", { name: "Brackenford", exact: true })).toBeVisible();
       await frame.getByRole("button", { name: "Fit map", exact: true }).click();
       await frame.locator('button[title="Shop: Ash & Anvil"]').click();
+      // One record with a service opens straight into its place card.
       const details = frame.getByRole("region", { name: "Map record details", exact: true });
-      await details.getByRole("button", { name: "Open in map", exact: true }).click();
+      await expect(details.getByRole("heading", { name: "Ash & Anvil", exact: true })).toBeVisible();
       await details.getByRole("button", { name: /^Buy / }).click();
       await expect(details).toContainText("Purchase recorded.");
       await details.getByRole("button", { name: "Edit", exact: true }).click();
@@ -247,6 +277,9 @@ export async function checkConnectedMaps({ browser, origin, output }) {
       await expect(confirmation).toHaveCount(0);
       await expect(frame).toHaveClass(/map-fullscreen/);
       await details.getByRole("button", { name: "Close details", exact: true }).click();
+      // The place hub steps end on Brackenford (their last links name map=town-map).
+      const placeHubFlows = await checkPlaceHub(page, origin, width);
+      await expect(frame.getByRole("img", { name: "Brackenford", exact: true })).toBeVisible();
       await frame.getByRole("button", { name: "Fit map", exact: true }).click();
       await frame.locator('button[title="Map: Watchtower gate"]').click();
       await expect(frame.getByRole("img", { name: "Old Watchtower", exact: true })).toBeVisible();
@@ -314,7 +347,6 @@ export async function checkConnectedMaps({ browser, origin, output }) {
           await page.setViewportSize(viewport);
           await frame.getByRole("button", { name: "Fit map", exact: true }).click();
           await frame.locator('button[title="Shop: Ash & Anvil"]').click();
-          await frame.getByRole("button", { name: "Open in map", exact: true }).click();
           const panel = frame.getByRole("region", { name: "Map record details", exact: true });
           await expect(
             panel.getByRole("heading", { name: "Ash & Anvil", exact: true }).first(),
@@ -333,6 +365,20 @@ export async function checkConnectedMaps({ browser, origin, output }) {
           assert.ok(
             await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1),
           );
+          // The NPC hub as a bottom sheet at this width.
+          await frame.getByRole("button", { name: "Fit map", exact: true }).click();
+          await frame.locator('button[title="NPC: Mara"]').click();
+          await expect(panel.getByRole("region", { name: "Talk to Mara", exact: true })).toBeVisible();
+          assert.ok(await noHorizontalScroll(page), `NPC sheet fits at ${viewport.width}px`);
+          const npcClose = panel.getByRole("button", { name: "Close details", exact: true });
+          assert.ok(
+            await npcClose.evaluate((e) => {
+              const r = e.getBoundingClientRect();
+              return e.contains(document.elementFromPoint(r.x + r.width / 2, r.y + r.height / 2));
+            }),
+            "NPC sheet close control remains reachable above the map",
+          );
+          await npcClose.click();
         }
       }
       await page.setViewportSize({ width, height: 900 });
@@ -342,6 +388,7 @@ export async function checkConnectedMaps({ browser, origin, output }) {
         width,
         flows: [
           ...workspaceFlows,
+          ...placeHubFlows,
           "fullscreen-linked-navigation",
           "camera-return",
           "canonical-shop-purchase",
