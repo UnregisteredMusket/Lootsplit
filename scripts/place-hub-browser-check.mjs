@@ -111,5 +111,8 @@ export async function checkPlaceHub(page, origin, width) {
   await expect(card.getByRole("button", { name: "Let the party see this pin", exact: true })).toBeVisible();
   await card.getByRole("button", { name: "Close details", exact: true }).click();
   flows.push("place-on-map");
+  // Hand back on Brackenford, where the connected-maps check continues.
+  await openApplication(page, `${origin}/maps?map=town-map`);
+  await expect(frame.getByRole("img", { name: "Brackenford", exact: true })).toBeVisible();
   return flows;
 }
