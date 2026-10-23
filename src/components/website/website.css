@@ -947,6 +947,55 @@
   grid-template-columns: repeat(4, minmax(0, 1fr));
   gap: 36px 28px;
 }
+/* "Everything around the ledger": one slowly drifting, hand-scrollable row (2026-10-23). */
+.ls-carousel {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+  /* Bleed to the window edges so cards slide in and out of view. */
+  margin-left: calc(var(--gutter) * -1);
+  margin-right: calc(var(--gutter) * -1);
+}
+.ls-carousel-track {
+  display: flex;
+  column-gap: 28px;
+  overflow-x: auto;
+  overscroll-behavior-x: contain;
+  padding: 4px var(--gutter) 14px;
+  scrollbar-width: thin;
+  scrollbar-color: var(--paper-shade) transparent;
+}
+.ls-carousel-track:focus-visible {
+  outline: 2px solid var(--paper-link);
+  outline-offset: 2px;
+}
+.ls-areas.ls-areas-row {
+  display: flex;
+  flex: none;
+  gap: 28px;
+}
+.ls-areas-row > li {
+  flex: none;
+  width: clamp(250px, 26vw, 320px);
+}
+.ls-site .ls-carousel-toggle {
+  align-self: flex-end;
+  margin-right: var(--gutter);
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  min-height: 44px;
+  padding: 0 14px;
+  border: 1px solid var(--paper-shade);
+  border-radius: 2px;
+  background: var(--paper-card);
+  color: var(--paper-ink);
+  font-size: 15px;
+  cursor: pointer;
+}
+.ls-site .ls-carousel-toggle:hover {
+  border-color: var(--paper-link);
+}
 .ls-site .ls-area {
   display: flex;
   flex-direction: column;
