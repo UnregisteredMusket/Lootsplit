@@ -105,6 +105,10 @@ The native gate now uses a Pixel6 profile for its API24/API35 launchers, require
 
 Version 1.10.0/code 17 changes only the user-visible name: `app_name`, `title_activity_main`, `capacitor.config.ts` `appName`, both widget labels (Lootsplitter Field monitor, Lootsplitter 4×1 companion) and the widget settings activity label. The package/appId `com.unregisteredmusket.lootsplit`, Java package and class names, the permanent signing key, storage keys, `X-Lootsplit-*` request headers and the native API origin are unchanged, so the update installs over 1.9.3 and keeps local data, sign-in and placed widgets. The GitHub release asset keeps the `Lootsplit-VERSION.apk` filename that the website download proxy and checks rely on; the release title uses the new name.
 
+## Kobold app icon — 1.11.0
+
+Version 1.11.0/code 18 replaces the coin-and-quill mark with the owner's kobold brand set (`docs/brand/`, owner go-ahead 2026-10-23). The adaptive icon foreground and monochrome layer are density PNGs (`drawable-*dpi/ic_launcher_foreground.png`, `ic_launcher_monochrome.png`) with the artwork inside the 66 dp safe zone; the background colour is navy `#0C1424`, which also colours the Android 12+ system splash. Legacy `mipmap-*/ic_launcher(_round).png` and the pre-12 `splash.png` images use the same mark. The in-app title animation, widgets (which carry no logo), package and signing key are unchanged. Regenerate from the masters in `docs/brand/` rather than editing the PNGs.
+
 ## Tablets in landscape: split view
 
 The app shows the same split view as the website when the WebView is at least 1024 CSS pixels wide (most 10–11" tablets in landscape). Rotating to portrait or a narrower window shows only the left screen; the right one returns when the tablet is turned back (the activity already handles orientation/size changes without restarting). The feature ships in the bundled web build, so it reaches installed apps with Android 1.9.3. See `docs/SPLIT-VIEW.md`.

@@ -16,6 +16,7 @@ This turns CLAUDE.md's "How a change ships" into steps. CLAUDE.md wins if they e
 Run `npm run verify:quick`: unit tests, typecheck and lint.
 
 **If `node_modules` is missing:**
+
 - Run the touched tests with `node --experimental-strip-types --test FILE`.
 - Diff `tsc` output against `main`.
 - Write down exactly what could not run. CI is then the gate.
@@ -27,6 +28,7 @@ Run `npm run verify:quick`: unit tests, typecheck and lint.
 - No applied migration was edited (the guard hook blocks it). New schema is a new additive migration in this PR.
 - Money and inventory changes followed `/money-command`.
 - Any user-visible change has a help review (`src/lib/help/content.ts`, `player-content.ts`) and a `docs/FEATURE-INVENTORY.md` entry.
+- Any user-visible website or backend change (`src/`, `cloudflare/`, `public/`, `server/`, except tests and migrations) adds `src/lib/website/web-changes/<branch-name-with-dashes>.json` with `title`, `summary` and `items` in plain player language (no PR numbers, dates, commits or private details). It is published automatically when the release goes live (docs/CODING-MANUAL.md §7). For an invisible change, write `Web changelog: none — <reason>` in the PR description instead. The **Website changelog note** check enforces this.
 - New third-party content is credited in `src/lib/website/resources.ts`.
 - Android changes follow the release rules: version bump, changelog, workflow-only publishing.
 
@@ -39,6 +41,7 @@ Run `npm run verify:quick`: unit tests, typecheck and lint.
 ## Why
 ## How verified
 ## Help review
+## Web changelog
 ## What is left
 ```
 
@@ -51,7 +54,7 @@ gh api repos/UnregisteredMusket/Lootsplit/pulls -f title='…' -f head=BRANCH -f
 ## 5. CI
 
 - **Don't push while the PR's run is in progress;** it cancels and restarts.
-- **Wait for checks** with a background loop rather than repeated sleeps:
+- **Wait for checks**, including **Website changelog note**, with a background loop rather than repeated sleeps:
 
   ```
   gh api repos/UnregisteredMusket/Lootsplit/commits/SHA/check-runs --jq '.check_runs[] | "\(.name): \(.status) \(.conclusion)"'

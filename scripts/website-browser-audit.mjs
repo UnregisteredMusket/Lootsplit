@@ -231,6 +231,14 @@ try {
         const webEntries = page.locator('article[id^="web-"]');
         const androidEntries = page.locator('article[id^="android-"]');
         assert.ok((await webEntries.count()) >= 1 && (await androidEntries.count()) >= 1);
+        // Website and backend history runs from October 7 with no gap (owner rule 2026-10-23);
+        // every entry names its deployed commit and its verification and live checks.
+        assert.ok((await webEntries.count()) >= 14);
+        for (const label of ["Complete main verification", "Publication and live checks"])
+          assert.equal(
+            await webEntries.getByRole("link", { name: label, exact: true }).count(),
+            await webEntries.count(),
+          );
         await android.click();
         assert.equal(await android.getAttribute("aria-pressed"), "true");
         assert.equal(await all.getAttribute("aria-pressed"), "false");
