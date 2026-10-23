@@ -70,6 +70,27 @@ The user requests speed improvements as **before → after, absolute time saved,
 - If upload succeeded but its live check failed, use **Verify existing live website (read only)** with the deployed SHA and its successful main verification run ID. It downloads the original artifact and performs no deploy, rebuild, database write or campaign action. Do not rerun the deployment job merely to repeat its audit.
 - Before a handoff/interruption, record branch/PR, latest commit, tests and their environment, run links, remaining failure and next action in the PR description (the PR is the checkpoint; do not add dated entries to `docs/RECOVERY.md`). Push useful completed checkpoints so temporary workspace loss does not erase them.
 
+## 7. Website and backend changelog
+
+Owner rule (2026-10-23): every user-visible website or backend change adds a website changelog entry, published when it goes live. The Changelog page's **Website and backend** filter shows them; Android notes stay in `src/lib/website/changelog.json` and are unaffected.
+
+- **Add one note per PR**: `src/lib/website/web-changes/<branch-name-with-dashes>.json`, for example `feature-coin-split.json` for `feature/coin-split`. One file per branch means parallel PRs never conflict.
+
+  ```json
+  {
+    "title": "Even coin splits",
+    "summary": "One sentence a player understands.",
+    "items": ["What changed, in plain words.", "Up to ten short items."]
+  }
+  ```
+
+  Write for players and DMs: what they can now do or what no longer goes wrong. No PR numbers, commit hashes, dates, internal audit codes, owner-only email, monitoring internals or anything that weakens security; `scripts/web-changelog.mjs` rejects emails other than `support@lootsplitter.com`, token-like strings and `#123` references. Do not add a commit, date or links: they do not exist yet.
+
+- **User-visible** means any change under `src/`, `cloudflare/`, `public/` or `server/` other than tests and migrations. The **Website changelog note** check (`.github/workflows/web-changelog.yml`) fails such a PR without a note. If nobody can see the change (a refactor, test-only or internal tooling change), put `Web changelog: none — <reason>` on its own line in the PR description or add the `no-web-changelog` label; the check reruns when the description or labels change.
+- **Publication is automatic.** Only the main verification build (`verify.yml`, web-build step, `LOOTSPLIT_WEB_CHANGELOG=release`) stamps notes. For each note it finds the main commit that added it, then the first successful **Deploy verified website** run whose commit contains it, and groups notes by the UTC day of that deployed commit. A note no deploy contains yet is stamped with the commit being built and its own verification run, which is exactly what the page describes if that artifact goes live; its "Publication and live checks" link points at the publisher's main history until the next main build links the exact run. The entries are compiled into the immutable artifact, so the release job deploys them unchanged and never writes to the repository (no bot commits to `main`, nothing for the push hooks or branch rules to block). Pull request and development builds validate notes and show none of them; `LOOTSPLIT_WEB_CHANGELOG=preview npm run dev` shows them as if HEAD were live, for local review only.
+- **Committed history** is `src/lib/website/web-releases.json` (deployed commit, verification and live-check runs per entry; `historyProblems` checks it). `node scripts/web-changelog.mjs freeze` (needs `GH_TOKEN` and full history) moves notes that are already live into it and deletes them; run it in an ordinary PR now and then so the build reads a short window of runs. Correct a published entry by editing that file in a PR, never by rewriting a note that already deployed.
+- **Verify** with `node --test scripts/web-changelog.test.mjs`; `node scripts/web-changelog.mjs validate` checks every note and the history.
+
 ## Help, reference lookups and tooling
 
 Preserve the existing credential-free public `searchOpen5e` GET function for bundled Android clients. Current in-campaign searches use the separate scoped POST function; room credentials must never be put into a reference URL. Unseated local DM searches retain the public lookup protocol. Website role-guide/control updates become bundled APK features only with a separately verified signed Android release.

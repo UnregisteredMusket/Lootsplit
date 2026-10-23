@@ -1,3 +1,5 @@
+import history from "./web-releases.json" with { type: "json" };
+
 export type WebRelease = {
   id: string;
   status: "published" | "planned";
@@ -9,40 +11,25 @@ export type WebRelease = {
   evidence: { label: string; url: string }[];
 };
 
+// Entries stamped at build time from src/lib/website/web-changes/*.json by
+// scripts/web-changelog-plugin.mjs; only the main verification build defines any.
+declare const __LOOTSPLIT_WEB_CHANGES__: WebRelease[] | undefined;
+const stamped: readonly WebRelease[] =
+  typeof __LOOTSPLIT_WEB_CHANGES__ === "undefined" ? [] : __LOOTSPLIT_WEB_CHANGES__;
+
 // Publication evidence is deliberately separate from Android release metadata.
-// An unverified source candidate must never be added as a published release.
+// An unverified source candidate must never be added as a published release:
+// web-releases.json holds deployed history; pending notes are stamped only when they deploy.
 export const webReleases: readonly WebRelease[] = [
-  {
-    id: "2026-10-07-campaign-integrity",
-    status: "published",
-    date: "2026-10-07",
-    commit: "fb776325721f940143bc0c1bd3aadb3e147aa95d",
-    title: "Safer campaign access, recovery and shared actions",
-    summary:
-      "The website and backend received campaign integrity repairs after the Android 1.6.0 release. Installed APK clients retain their own bundled interface and local behavior.",
-    improvements: [
-      "Campaign actions recheck current membership, restrictions and permissions when they commit.",
-      "Interrupted shared actions and conflicting drafts retain scoped recovery and retry protection.",
-      "Purchases, reversals and loans preserve financial and inventory integrity.",
-      "Validated restores preserve complete campaign records; server-produced deletion backups support fresh, DM-only view-only recovery.",
-      "Full shared handouts, paused-player controls and failed chat recovery are retained.",
-    ],
-    evidence: [
-      { label: "Release details", url: "https://github.com/UnregisteredMusket/Lootsplit/pull/67" },
-      {
-        label: "Complete main verification",
-        url: "https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37661353259",
-      },
-      {
-        label: "Publication and live checks",
-        url: "https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37661998263",
-      },
-    ],
-  },
+  ...(history as WebRelease[]),
+  ...stamped.filter((entry) => !history.some((known) => known.id === entry.id)),
 ];
 
+/** Newest first; entries on the same day keep the later release first. */
 export function publishedWebReleases(entries: readonly WebRelease[]) {
   return entries
-    .filter((entry) => entry.status === "published")
-    .sort((a, b) => b.date.localeCompare(a.date));
+    .map((entry, index) => ({ entry, index }))
+    .filter(({ entry }) => entry.status === "published")
+    .sort((a, b) => b.entry.date.localeCompare(a.entry.date) || b.index - a.index)
+    .map(({ entry }) => entry);
 }

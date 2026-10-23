@@ -8,6 +8,8 @@ import { nitro } from "nitro/vite";
 import { grokPwaPlugin } from "./scripts/grok-pwa-plugin.mjs";
 // @ts-expect-error JS plugin alongside the TS vite config
 import { appEnvPlugin } from "./scripts/app-env-plugin.mjs";
+// @ts-expect-error JS plugin alongside the TS vite config
+import { webChangelogPlugin } from "./scripts/web-changelog-plugin.mjs";
 
 // `0.0.0.0:8080` is the live-preview contract — don't change host/port.
 // The dev server starts once `src/router.tsx` and `src/routes/` exist — see
@@ -44,6 +46,8 @@ export default defineConfig(({ command, isPreview }) => ({
     appEnvPlugin(),
     // PWA head + ?install=1 tutorial page; runs before Start/Nitro.
     grokPwaPlugin(),
+    // Website changelog notes stamped with their deployed commit (main builds only).
+    webChangelogPlugin(),
     tailwindcss(),
     tanstackStart(),
     ...(command === "build" || isPreview

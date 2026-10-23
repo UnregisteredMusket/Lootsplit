@@ -38,6 +38,7 @@ This file is the required reading. Everything under "Read on demand" is consulte
 - **Never test destructive actions on real campaigns or production data.** Production D1 is read-only except for reviewed additive migrations, which only the release job applies.
 - **History:** never silently truncate campaign history or monitoring history. (The only approved pruning is the monitoring snapshot cache; oversized daily reports summarize long lists explicitly.)
 - **Help:** any user-visible change gets a review of `src/lib/help/content.ts` (DM) and `player-content.ts` (players — no DM setup links); record the review in the PR.
+- **Website changelog** (owner, 2026-10-23): every user-visible website or backend change adds a website changelog entry (`src/lib/website/web-changes/<branch>.json`), published automatically when it goes live; see `docs/CODING-MANUAL.md` §7.
 - **Credits:** new third-party content goes in `src/lib/website/resources.ts` with source and license.
 - **Navigation** uses TanStack `Link`/`AppLink`; internal navigation must not replay the title screen.
 - **Android releases:** bump `APP_VERSION` and `versionCode`, add a `src/lib/website/changelog.json` entry and release notes; publish only through the workflow; update `release.json` after the signed APK is verified.
