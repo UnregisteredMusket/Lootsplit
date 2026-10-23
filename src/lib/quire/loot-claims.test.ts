@@ -16,7 +16,7 @@ import {
   type LootPlanInput,
 } from "./loot-claims.ts";
 import { POOL_GUARD } from "./custody.ts";
-import type { Holding, Purse } from "./types.ts";
+import type { Holding, Purse, Shop } from "./types.ts";
 import type { LootChoice } from "./loot-claims-schema.ts";
 
 const dm: CloudSeat = { id: "dm", token: "", name: "DM", role: "dm", purseIds: [] };
@@ -338,7 +338,7 @@ test("one at a time: the DM may give to anyone in the party, including someone w
 
 test("guard: Give, sell and equip of a pooled item are refused for everyone until it leaves the pool", () => {
   const t = campaign();
-  t.shops.push({ id: "shop", name: "Shop", keeper: "", place: "", notes: "", sellRate: 1, buyRate: 0.5, wealth: "modest", category: "general" });
+  t.shops.push({ id: "shop", name: "Shop", keeper: "", place: "", notes: "", sellRate: 1, buyRate: 0.5, wealth: "modest", category: "general" } as Shop);
   const give = { id: "g", kind: "give" as const, fromId: "hoard", toId: "aria", copper: 0, holdingId: "potion", quantity: 1 };
   assert.throws(() => applyCommand(t, dm, give), new RegExp(POOL_GUARD.slice(0, 40)));
   // "Allow party fund": a player seat that controls the fund.

@@ -36,6 +36,8 @@ import {
   validateEstate,
 } from "./estate.ts";
 import { verifyReportBase, type ReportBase } from "./local-report.ts";
+import { POOL_GUARD } from "./custody.ts";
+import { assertPoolable } from "./loot-claims.ts";
 import {
   coinsSchema,
   validateEconomyRows,
@@ -859,7 +861,8 @@ export async function addShelfStock(shopId: string, rows: ShelfDraft[]): Promise
   });
 }
 
-export async function saveHolding(holding: Holding): Promise<void> {
+export async function saveHolding(input: Holding): Promise<void> {
+  let holding = input;
   if (
     !Number.isSafeInteger(holding.quantity) ||
     holding.quantity < 1 ||
@@ -888,6 +891,20 @@ export async function saveHolding(holding: Holding): Promise<void> {
         ?.value,
     );
     const rows = await request<Holding[]>(tx.objectStore("holdings").getAll());
+    // Treasure pool: an edit keeps a pooled lot in its fund and pooled (loot-pool-set takes it
+    // out); a new party-fund item may enter the pool from Add loot.
+    let pooledNow = false;
+    if (old?.pool) {
+      if (holding.purseId !== old.purseId || holding.equipped) throw Error(POOL_GUARD);
+      holding = { ...holding, pool: old.pool };
+    } else if (holding.pool) {
+      if (old) throw Error("Use Put in the treasure pool to pool an existing item.");
+      assertPoolable(
+        { purses: await request<Purse[]>(tx.objectStore("purses").getAll()), holdings: rows, journal },
+        holding,
+      );
+      pooledNow = true;
+    }
     if (
       old?.kind === "property" &&
       (old.purseId !== holding.purseId || holding.kind !== "property")
@@ -903,9 +920,23 @@ export async function saveHolding(holding: Holding): Promise<void> {
     tx.objectStore("holdings").put(holding);
     await audit(
       tx,
-      `Recorded holding: ${holding.name} ×${holding.quantity}`,
+      pooledNow
+        ? `Put in the treasure pool: ${holding.name} × ${holding.quantity}`
+        : `Recorded holding: ${holding.name} ×${holding.quantity}`,
       "management",
       holding.purseId,
+      undefined,
+      pooledNow
+        ? {
+            lootPool: {
+              holdingId: holding.id,
+              name: holding.name.slice(0, 200),
+              quantity: holding.quantity,
+              pooled: true,
+              source: holding.pool!.source,
+            },
+          }
+        : undefined,
     );
   });
 }
@@ -2679,6 +2710,7 @@ async function audit(
   kind: "prices" | "management",
   purseId?: string,
   change?: Journal["events"][number]["change"],
+  extra?: Pick<Journal["events"][number], "lootPool">,
 ) {
   const store = tx.objectStore("meta");
   const row = await request<{ value: unknown } | undefined>(store.get("journal"));
@@ -2690,6 +2722,7 @@ async function audit(
     kind,
     ...(purseId ? { purseId } : {}),
     ...(change ? { change } : {}),
+    ...(extra ?? {}),
   });
   store.put({ id: "journal", value: journal });
 }
@@ -2738,9 +2771,15 @@ export async function executeLocalCommand(
     if (await alreadyApplied(tx, receipt)) return;
     const source = await readEconomyTransaction(tx);
     guard();
-    const next = applyCommand(source, localSeat(), command, {
+    const seat = localSeat();
+    // A player-only device link holds part of the party: its treasure pool is read-only
+    // (owner decision, 2026-10-23). The DM's device rolls and may enter Pen & Paper totals.
+    if (seat.role !== "dm" && command.kind.startsWith("loot-"))
+      throw Error("The treasure pool is read-only on a player link. Ask the DM to mark claims at the table.");
+    const next = applyCommand(source, seat, command, {
       source: "local",
       random: randomTradeRoll,
+      manualRolls: seat.role === "dm",
     });
     for (const store of ["purses", "holdings", "shops", "stock", "ledger"] as const) {
       const prior = new Map(source[store].map((row) => [row.id, JSON.stringify(row)]));

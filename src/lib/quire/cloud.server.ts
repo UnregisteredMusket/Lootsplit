@@ -764,6 +764,14 @@ export async function submitCommands(input: {
     throw Error("Seasonal previews must be prepared directly by the DM authority.");
   if (input.stage && commands.some((c) => c.kind.startsWith("npc-barter-")))
     throw Error("NPC barter is answered by the room directly. Send the offer again.");
+  // Treasure-pool claims move nothing and resolutions are rolled by the room: both are sent
+  // directly, never staged with a turn.
+  if (input.stage && commands.some((c) => c.kind === "loot-claim" || c.kind === "loot-resolve"))
+    throw Error("Treasure-pool claims and resolutions are sent to the room directly. Send it again.");
+  // Pen & Paper totals follow the campaign's manual-roll policy (play_policies), read on the server.
+  const manualRolls = commands.some((c) => c.kind === "loot-resolve" && c.rolls === "manual")
+    ? await manualCharacterRolls(input.code)
+    : false;
   const { randomTradeRoll } = await import("./trade-economy.ts");
   const seasonalRolls = new Map<string, number>();
   const digest = async (value: string) => {
@@ -819,7 +827,10 @@ export async function submitCommands(input: {
         );
       return view(room, seat);
     }
-    const messagesOnly = commands.length > 0 && commands.every((c) => c.kind === "message");
+    // Chat and treasure-pool claims (which move nothing) may be sent outside the seat's turn
+    // (owner decision, 2026-10-23).
+    const messagesOnly =
+      commands.length > 0 && commands.every((c) => c.kind === "message" || c.kind === "loot-claim");
     if (!room.viewOnly && !messagesOnly && !room.live && room.seats[room.turn]?.id !== seat.id)
       throw new Error("It is not your turn. Your pending actions have been preserved.");
     const seen = new Set(room.commands ?? []);
@@ -863,6 +874,7 @@ export async function submitCommands(input: {
     });
     table = applyCommandBatch(table, seat, unapplied, (command) => ({
       source: "server",
+      manualRolls,
       random: (draw) => {
         const key = command.id + ":" + draw;
         if (!seasonalRolls.has(key)) seasonalRolls.set(key, randomTradeRoll());

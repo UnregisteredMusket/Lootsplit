@@ -176,9 +176,22 @@ type EconomyApi = {
     kind: Holding["kind"],
     quantity: number,
     unitCopper: number,
-    metadata?: Pick<Holding, "notes" | "category">,
+    metadata?: Pick<Holding, "notes" | "category"> & { pool?: boolean },
   ) => Promise<void>;
   deleteHolding: (id: string) => Promise<void>;
+  /**
+   * Treasure pool (one `loot-*` command, shared room or this device's engine). Each resolves to
+   * null once accepted, or to the refusal text so the form keeps its choices for another try.
+   */
+  lootClaim: (
+    input: Omit<Extract<CommandRequest, { kind: "loot-claim" }>, "kind" | "id">,
+    options?: CommandOptions,
+  ) => Promise<string | null>;
+  lootPoolSet: (holdingId: string, pooled: boolean, options?: CommandOptions) => Promise<string | null>;
+  lootResolve: (
+    input: Omit<Extract<CommandRequest, { kind: "loot-resolve" }>, "kind" | "id">,
+    options?: CommandOptions,
+  ) => Promise<string | null>;
   // Money and item actions take `{ commandId }`: one ID per user action, reused
   // on retry, so a repeated submit is applied once (see command-id.ts).
   buy: (
@@ -620,6 +633,31 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
         void playSound("coins");
       return outcome;
     };
+    const lootCommand = async (
+      command: CommandRequest,
+      ok?: string,
+      coins = false,
+    ): Promise<string | null> => {
+      try {
+        if (getCloudWatch().joined) {
+          await queueCommand(command);
+          await reload();
+          announceWorkspaceChange();
+        } else {
+          // A player-only device link holds part of the party: its pool is read-only.
+          if (getSeat().role === "player")
+            throw Error("The treasure pool is read-only on a player link. Ask the DM to mark claims at the table.");
+          await acceptCommand(command);
+        }
+        if (coins) void playSound("coins");
+        if (ok) toast.success(ok);
+        return null;
+      } catch (error) {
+        // Show the pool that refused it; the form keeps its choices for another review.
+        await reload().catch(() => undefined);
+        return error instanceof Error && error.message ? error.message : "The treasure pool could not be saved.";
+      }
+    };
     const mutation = async <T,>(work: () => Promise<T>): Promise<T> => {
       if (!getCloudWatch().joined) {
         const result = await work();
@@ -782,9 +820,23 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
               unitCopper,
               notes: metadata?.notes ?? "",
               ...(metadata?.category ? { category: metadata.category } : {}),
+              ...(metadata?.pool ? { pool: { at: Date.now(), source: "add-loot" as const } } : {}),
             });
           },
           "Holding added.",
+          true,
+        ),
+      lootClaim: (input, options = {}) =>
+        lootCommand({ kind: "loot-claim", ...input, ...idOf(options) }),
+      lootPoolSet: (holdingId, pooled, options = {}) =>
+        lootCommand(
+          { kind: "loot-pool-set", holdingId, pooled, ...idOf(options) },
+          pooled ? "Put in the treasure pool." : "Taken out of the treasure pool. It stays in the party fund.",
+        ),
+      lootResolve: (input, options = {}) =>
+        lootCommand(
+          { kind: "loot-resolve", ...input, ...idOf(options) },
+          "Treasure pool resolved. It appears once in Activity and the party chat.",
           true,
         ),
       deleteHolding: (id) =>

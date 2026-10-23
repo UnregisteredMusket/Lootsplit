@@ -65,7 +65,6 @@ const id = z.string().min(1).max(150),
   qty = amount.min(1).max(100000);
 const base = { id };
 export const commandSchema = z.discriminatedUnion("kind", [
-  ...lootCommands,
   z.object({ ...base, kind: z.literal("reference-policy"), before: referencePolicySchema, policy: referencePolicySchema }).strict(),
   ledgerVoidCommandSchema,
   ...tradeCommands,
@@ -250,6 +249,7 @@ export const commandSchema = z.discriminatedUnion("kind", [
       )
       .max(10000),
   }),
+  ...lootCommands,
 ]);
 export type Command = z.infer<typeof commandSchema>;
 export type CommandInput = Command extends infer C

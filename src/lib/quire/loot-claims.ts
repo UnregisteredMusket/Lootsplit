@@ -9,6 +9,7 @@
  * executeLocalCommand, the device), the Review Inbox preview and the tests.
  */
 import { canonicalJson } from "./canonical-json.ts";
+import { characterVisible, seatInParty } from "./character-position.ts";
 import { isNpc, partyFunds, designatedPartyFund, recipientProblem } from "./coin-split.ts";
 import { formatCopper } from "./money.ts";
 import { POOL_GUARD } from "./custody.ts";
@@ -596,4 +597,60 @@ export function formatLotValue(h: Pick<Holding, "unitCopper" | "quantity">): str
   return h.quantity > 1
     ? `${formatCopper(h.unitCopper)} each`
     : formatCopper(h.unitCopper);
+}
+
+/** A visible player character (claims and award lines name only these to other players). */
+function playerCharacter(t: LootTable, purseId: string): boolean {
+  const p = t.purses.find((x) => x.id === purseId);
+  return !!p && p.kind === "character" && !isNpc(t, p) && !p.nonParty && characterVisible(t, p);
+}
+type JournalEvent = NonNullable<CloudTable["journal"]>["events"][number];
+/**
+ * Player projection of the pool's journal data, decided on the unprojected `table`.
+ * Owner decisions (2026-10-23): claims are visible to the whole party; a seat away from the
+ * party sees only its own characters' claims and award lines; an NPC's award line is DM-only.
+ * Returns a filter for loot events (undefined: not a loot event, the caller's rule applies).
+ */
+export function projectLoot(
+  table: LootTable,
+  projected: LootTable,
+  seat: Pick<CloudSeat, "role" | "purseIds">,
+): (event: JournalEvent) => JournalEvent | null | undefined {
+  const inParty = seatInParty(table, seat);
+  const shown = (purseId: string) =>
+    seat.purseIds.includes(purseId) || (inParty && playerCharacter(table, purseId));
+  const journal = projected.journal as { lootClaims?: LootClaims } | undefined;
+  if (journal?.lootClaims) {
+    const state = readLootClaims(table);
+    const lots = new Set(projected.holdings.filter((h) => h.pool).map((h) => h.id));
+    const pointer = state.rotation?.lastPurseId;
+    journal.lootClaims = {
+      claims: state.claims.filter(
+        (c) => seat.purseIds.includes(c.purseId) || (inParty && lots.has(c.holdingId) && shown(c.purseId)),
+      ),
+      ...(inParty && pointer && playerCharacter(table, pointer) ? { rotation: { lastPurseId: pointer } } : {}),
+    };
+  }
+  return (event) => {
+    if (event.lootClaim) return shown(event.lootClaim.purseId) ? event : null;
+    if (event.lootPool) return inParty || (!!event.purseId && seat.purseIds.includes(event.purseId)) ? event : null;
+    const receipt = event.lootResolution;
+    if (!receipt) return undefined;
+    const lots = receipt.lots
+      .map((lot) => ({
+        ...lot,
+        claims: lot.claims.filter((c) => shown(c.purseId)),
+        unmarked: lot.unmarked.filter(shown),
+        rolls: lot.rolls.filter((r) => shown(r.purseId)),
+        awards: lot.awards.filter((a) => shown(a.purseId)),
+      }))
+      .filter((lot) => lot.awards.length);
+    if (!lots.length) return null;
+    const { npc, ...rest } = receipt;
+    return {
+      ...event,
+      ...(npc ? { summary: "Treasure pool resolved" } : {}),
+      lootResolution: { ...rest, lots },
+    };
+  };
 }

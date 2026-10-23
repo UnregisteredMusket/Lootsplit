@@ -10,6 +10,7 @@ import {
   seatInParty,
 } from "./character-position.ts";
 import { designatedPartyFund, isNpc, partyFunds } from "./coin-split.ts";
+import { projectLoot } from "./loot-claims.ts";
 import { readWorld } from "./world-schema.ts";
 import { exchangeHere } from "./trade-economy.ts";
 import { readTradeEconomy } from "./trade-economy-schema.ts";
@@ -298,9 +299,15 @@ export function projectRecord(
     t.ledger = t.ledger.filter(
       (l) => seat.purseIds.includes(l.purseId) || companions.has(l.purseId),
     );
+    // Treasure pool: pooled party-fund lots are visible to seats with a party character
+    // (owner decision, 2026-10-23); other fund items keep the "Allow party fund" rule.
+    const poolFundIds = seatInParty(table, seat)
+      ? new Set(partyFunds(table).map((p) => p.id))
+      : new Set<string>();
     t.holdings = t.holdings.filter(
       (h) =>
         seat.purseIds.includes(h.purseId) ||
+        (!!h.pool && poolFundIds.has(h.purseId)) ||
         (readableNpcs.has(h.purseId) && !h.custody && !h.reservedFor) ||
         visibleSites.has(h.id) ||
         (h.custody && visibleSites.has(h.custody.propertyId)),
@@ -424,14 +431,21 @@ export function projectRecord(
       };
     }
     t.journal.requests = t.journal.requests.filter((r) => seat.purseIds.includes(r.purseId));
+    // Treasure-pool events follow the pool's party rule (projectLoot); others keep theirs.
+    const lootEvent = projectLoot(table, t, seat);
     t.journal.events = t.journal.events
-      .filter(
-        (e) =>
-          !e.dmOnly &&
-          (e.propertyId
+      .flatMap((e) => {
+        if (e.dmOnly) return [];
+        const loot = lootEvent(e);
+        if (loot !== undefined) return loot ? [loot] : [];
+        return (
+          e.propertyId
             ? visibleSites.has(e.propertyId) || (!!e.purseId && seat.purseIds.includes(e.purseId))
-            : !e.purseId || seat.purseIds.includes(e.purseId)),
-      )
+            : !e.purseId || seat.purseIds.includes(e.purseId)
+        )
+          ? [e]
+          : [];
+      })
       .map(({ change, ...e }) => e);
     t.loans = t.loans.filter((l) => seat.purseIds.includes(l.purseId));
     t.sheets = t.sheets.filter(
