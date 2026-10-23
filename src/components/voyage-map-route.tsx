@@ -3,20 +3,28 @@ import { SearchSelect } from "./search-select";
 import type { CampaignMap } from "@/lib/quire/world-schema";
 import type { ShipVoyage } from "@/lib/quire/ships-schema";
 import { routeDistance, tileAt } from "@/lib/quire/map-tiles";
+import { parseTileList } from "@/lib/quire/journey";
+import { AppLink } from "./app-link";
 export function VoyageMapRoute({
   maps,
   originId,
   destinationId,
   route,
   set,
+  propertyId,
+  initialWaypoints = "",
 }: {
   maps: CampaignMap[];
   originId?: string;
   destinationId: string;
   route?: ShipVoyage["mapRoute"];
   set: (route: ShipVoyage["mapRoute"]) => void;
+  /** The ship, for "Draw this route on the map" (journey planner). */
+  propertyId?: string;
+  /** Intermediate tiles drawn on the map ("column,row; …"), kept in the typed field. */
+  initialWaypoints?: string;
 }) {
-  const [waypoints, setWaypoints] = useState(""),
+  const [waypoints, setWaypoints] = useState(initialWaypoints),
     [error, setError] = useState("");
   const available = maps.filter(
     (m) =>
@@ -42,19 +50,7 @@ export function VoyageMapRoute({
           map.anchors.find((a) => a.locationId === destinationId)!,
         );
       if (!first || !last) throw Error("Both port anchors must be inside the grid.");
-      const points = input.trim()
-        ? input
-            .trim()
-            .split(";")
-            .map((s) => {
-              if (!/^\s*\d+\s*,\s*\d+\s*$/.test(s))
-                throw Error("Enter waypoints as column,row; column,row.");
-              const [c, r] = s.split(",").map(Number);
-              if (c < 1 || c > map.grid!.columns || r < 1 || r > map.grid!.rows)
-                throw Error("A waypoint is outside the grid.");
-              return { column: c - 1, row: r - 1 };
-            })
-        : [];
+      const points = parseTileList(input, map.grid);
       if (points.length > 98) throw Error("Use up to 98 intermediate waypoints.");
       set({ mapId, grid: map.grid, points: [first, ...points, last] });
     } catch (e) {
@@ -105,6 +101,14 @@ export function VoyageMapRoute({
         Optional: choose a gridded map with anchors for both ports. Enter intermediate tiles to
         follow a river, coastline or sea route. Columns and rows start at 1.
       </p>
+      {propertyId && available.length > 0 && (
+        <AppLink
+          className="settings-link"
+          href={`/maps?map=${encodeURIComponent(route?.mapId ?? available[0].id)}&plan=${encodeURIComponent(`ship:${propertyId}`)}`}
+        >
+          Draw this route on the map →
+        </AppLink>
+      )}
     </div>
   );
 }

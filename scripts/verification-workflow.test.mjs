@@ -62,6 +62,8 @@ test("each development check belongs to exactly one declared isolated group", ()
   assert.ok(checks.some(([, name, group]) => name === "dev-navigation" && group === "world"));
   // NPC barter conversation: accept, counter and refuse by real clicks (docs/NPC-BARTER.md).
   assert.ok(checks.some(([, name, group]) => name === "dev-npc-barter" && group === "world"));
+  // Journey planner: calibrate, draw, review, approve, progress, arrive (docs/MAP-TILES.md).
+  assert.ok(checks.some(([, name, group]) => name === "dev-journey-planner" && group === "world"));
   assert.ok(checks.some(([, name, group]) => name === "dev-map-tiles" && group === "desktop"));
   assert.ok(checks.some(([, name, group]) => name === "dev-split-view" && group === "desktop"));
   assert.match(workflow, /worker-map-tiles 240 node scripts\/map-tiles-browser-audit\.mjs/);
