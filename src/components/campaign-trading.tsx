@@ -227,7 +227,7 @@ function TradeEditor({
     if (dm || canAct(purseId) || world.npcs.some((n) => n.id === purseId))
       return table.holdings.filter(
         (h) =>
-          h.purseId === purseId && h.quantity > 0 && !h.custody && !h.reservedFor && !h.service,
+          h.purseId === purseId && h.quantity > 0 && !h.custody && !h.reservedFor && !h.pool && !h.service,
       );
     return side?.items.map((i) => JSON.parse(i.before) as Holding) ?? [];
   }

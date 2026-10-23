@@ -1,3 +1,4 @@
+import { lotClaims, pooledLots } from "@/lib/quire/loot-claims";
 import { inParty } from "@/lib/quire/character-position";
 import { localEncounterRequest } from "@/lib/encounters/local";
 import { encounterRequest } from "@/lib/encounters/client";
@@ -124,6 +125,10 @@ function DmDeskContents() {
       (journal.propertyOperations?.withdrawals.filter((r) => r.status === "pending").length ?? 0) +
       (journal.fleet?.boarding.filter((r) => r.status === "pending").length ?? 0) +
       (journal.fleet?.voyages.filter((v) => v.status === "proposed").length ?? 0),
+    // Treasure-pool lots with at least one Need or Greed claim wait for the DM.
+    poolPending = pooledLots({ purses, holdings, journal }).filter((h) =>
+      lotClaims({ purses, holdings, journal }, h.id).some((c) => c.choice !== "pass"),
+    ).length,
     totals = session ? sessionSummary(ledger, session) : null,
     allCoins = purses
       .filter((p) => inParty({ purses, journal }, p))
@@ -183,10 +188,11 @@ function DmDeskContents() {
               <strong>
                 {imports === null
                   ? `${pending} financial · ${propertyPending} property`
-                  : pending + imports + propertyPending}
+                  : pending + imports + propertyPending + poolPending}
               </strong>
               <small>
                 {pending} financial · {propertyPending} property
+                {poolPending ? ` · ${poolPending} treasure pool` : ""}
                 {room.joined
                   ? imports !== null
                     ? ` · ${imports} imports`

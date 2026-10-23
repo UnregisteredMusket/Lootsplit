@@ -7,6 +7,7 @@ import {
 } from "../src/lib/encounters/model.mjs";
 import { parseDice, throwDice } from "../src/lib/characters/model.mjs";
 import { applyEncounterSplit } from "../src/lib/quire/coin-split.ts";
+import { encounterPoolRows } from "../src/lib/quire/loot-claims.ts";
 const fail = (message, status = 400) => {
   throw Object.assign(new Error(message), { status });
 };
@@ -400,7 +401,28 @@ export async function handleEncounters(db, user, path, body = {}) {
         transactionType: "adjustment",
       });
     }
+    // Treasure-pool items (prompt 2, phase 2): the same rows as the device path.
+    let pool = null;
+    try {
+      pool = encounterPoolRows(room.table, e.loot, {
+        ...(e.poolFundId ? { fundId: e.poolFundId } : {}),
+        receiptId,
+        encounterId: d.row.id,
+        encounterName: e.name,
+        at,
+      });
+    } catch (err) {
+      fail(err.message);
+    }
+    if (pool) {
+      room.table.holdings.push(...pool.holdings);
+      room.table.ledger.push(...pool.ledger);
+      room.table.journal = room.table.journal ?? {};
+      room.table.journal.events = [...(room.table.journal.events ?? []), ...pool.events];
+      room.table.notes.push(pool.note);
+    }
     for (const item of e.loot) {
+      if (item.pool) continue;
       const p = findPurse(item.purseId);
       room.table.holdings.push({
         id: crypto.randomUUID(),
@@ -431,13 +453,16 @@ export async function handleEncounters(db, user, path, body = {}) {
       coins,
       coinPurseId: e.coinPurseId,
       ...(split ? split.receipt : {}),
+      ...(pool ? { poolFundId: pool.fundId } : {}),
       items: e.loot,
       recipients: room.table.purses
         .filter(
           (p) =>
             (split
               ? split.touched.includes(p.id)
-              : p.id === e.coinPurseId) || e.loot.some((i) => i.purseId === p.id),
+              : p.id === e.coinPurseId) ||
+            e.loot.some((i) => i.purseId === p.id) ||
+            p.id === pool?.fundId,
         )
         .map((p) => ({ id: p.id, name: p.name })),
     };

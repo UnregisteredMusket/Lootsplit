@@ -21,6 +21,12 @@ import { sheetSchema } from "../characters/model.mjs";
 import { financeSchema } from "./finance.ts";
 import { quireDb, request } from "./db.ts";
 import type { LedgerLine } from "./types.ts";
+import {
+  lootClaimEventSchema,
+  lootClaimsSchema,
+  lootPoolEventSchema,
+  lootResolutionSchema,
+} from "./loot-claims-schema.ts";
 const id = z.string().min(1).max(150),
   at = z.number().int().nonnegative();
 /** Optional receipt identity; it carries no recipient, financial or enemy data. */
@@ -59,6 +65,7 @@ export const coinSplitEventSchema = z
   .strict();
 const journalFields = z.object({
   coinSplit: coinSplitSettingsSchema.optional(),
+  lootClaims: lootClaimsSchema.optional(),
   downtimeActivities: downtimeActivitiesSchema.optional(),
   blacksmith: blacksmithSchema.optional(),
   referenceAccess: referencePolicySchema.optional(),
@@ -139,6 +146,9 @@ const journalFields = z.object({
         purseId: id.optional(),
         propertyId: id.optional(),
         split: coinSplitEventSchema.optional(),
+        lootClaim: lootClaimEventSchema.optional(),
+        lootPool: lootPoolEventSchema.optional(),
+        lootResolution: lootResolutionSchema.optional(),
         change: z
           .object({
             entity: z.enum(["stock", "realm", "shop", "holding", "account"]),
@@ -288,6 +298,7 @@ export function preserveJournalMetadata(value: unknown, current: Journal): Journ
   const next = readJournal(value);
   delete next.resourceLibrary;
   delete next.referenceAccess;
+  delete next.lootClaims;
   const reports = new Map((current.reports || []).map((report) => [report.id, report]));
   for (const report of next.reports || []) {
     // An archive is immutable. Hydrated error placeholders and stale client copies must
@@ -299,6 +310,12 @@ export function preserveJournalMetadata(value: unknown, current: Journal): Journ
   }
   const changes = new Map(current.events.map((event) => [event.id, event.change]));
   const splits = new Map(current.events.map((event) => [event.id, event.split]));
+  const loot = new Map(
+    current.events.map((event) => [
+      event.id,
+      { lootClaim: event.lootClaim, lootPool: event.lootPool, lootResolution: event.lootResolution },
+    ]),
+  );
   const privateEvents = new Set(current.events.filter((e) => e.dmOnly).map((e) => e.id));
   const entries = new Map((current.entries || []).map((entry) => [entry.id, entry]));
   for (const entry of next.entries || []) {
@@ -385,11 +402,17 @@ export function preserveJournalMetadata(value: unknown, current: Journal): Journ
       : {}),
     // Older clients drop the optional split settings and receipts; keep the stored ones.
     ...(next.coinSplit ?? current.coinSplit ? { coinSplit: next.coinSplit ?? current.coinSplit } : {}),
+    // Claims change only through loot commands; a journal patch never rewrites them.
+    ...(current.lootClaims ? { lootClaims: current.lootClaims } : {}),
     events: next.events.map((event) => {
       const change = event.change ?? changes.get(event.id);
       const split = event.split ?? splits.get(event.id);
+      const kept = loot.get(event.id);
       return {
         ...event,
+        ...(kept?.lootClaim && !event.lootClaim ? { lootClaim: kept.lootClaim } : {}),
+        ...(kept?.lootPool && !event.lootPool ? { lootPool: kept.lootPool } : {}),
+        ...(kept?.lootResolution && !event.lootResolution ? { lootResolution: kept.lootResolution } : {}),
         ...(change ? { change } : {}),
         ...(split ? { split } : {}),
         ...(privateEvents.has(event.id) ? { dmOnly: true } : {}),

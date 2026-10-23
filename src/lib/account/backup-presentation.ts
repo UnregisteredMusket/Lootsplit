@@ -83,6 +83,12 @@ export function pendingCommandDescription(value: unknown): string {
       return `Transfer ${formatCopper(c.copper)}${c.holdingId ? ` and ${c.quantity} item units` : ""} · ${c.fromId} → ${c.toId}`;
     case "coin-split":
       return `Split ${formatCopper(c.copper)} among ${c.recipientIds.length} · from ${c.sourceId}`;
+    case "loot-claim":
+      return `Treasure pool claim: ${c.choice} · item ${c.holdingId} · character ${c.purseId}`;
+    case "loot-pool-set":
+      return `${c.pooled ? "Put in" : "Take out of"} the treasure pool · item ${c.holdingId}`;
+    case "loot-resolve":
+      return `Resolve ${c.lots.length} treasure-pool item${c.lots.length === 1 ? "" : "s"} (${c.method})`;
     case "bank-repay":
     case "finance-repay":
       return `Repay ${formatCopper(c.copper)} · debt ${c.loanId}`;

@@ -28,6 +28,7 @@ import { getCloudTable, getServerCloudTable, subscribeCloudTable } from "@/lib/q
 import { SettingsPage } from "@/components/settings-page";
 import { LocalAudioPanel } from "@/components/local-audio-panel";
 import { DowntimeActivities } from "@/components/downtime-activities";
+import { LootClaimsReview } from "@/components/treasure-pool";
 // Load exchange editors only for this screen. Downtime shares the small review
 // without pulling every market editor into startup.
 const TradeEconomyPanel = lazy(() =>
@@ -151,6 +152,7 @@ function FeaturePage() {
             )}
             {feature === "review" && (
               <>
+                {(!code || code === room.code) && <LootClaimsReview />}
                 {(!code || code === room.code) && <DowntimeActivities reviewsOnly />}
                 <PropertyOperationReviews />
                 {(!code || code === room.code) && <CampaignJournal section="bank" reviewOnly />}

@@ -311,7 +311,7 @@ function OddsPips({ chance }: { chance: number }) {
 type Draft = { give: Record<string, number>; giveCopper: number; ask: Record<string, number>; askCopper: number };
 const emptyDraft = (): Draft => ({ give: {}, giveCopper: 0, ask: {}, askCopper: 0 });
 
-const carried = (h: Holding) => h.quantity > 0 && !h.custody && !h.reservedFor && !h.service;
+const carried = (h: Holding) => h.quantity > 0 && !h.custody && !h.reservedFor && !h.pool && !h.service;
 
 export function NpcConversation({
   npc,

@@ -34,6 +34,8 @@ import { downloadJson, getSeat } from "@/lib/quire/table";
 import { formatCoins, formatCopper, fromCopper } from "@/lib/quire/money";
 import {
   defaultSplitRule,
+  designatedPartyFund,
+  partyFunds,
   encounterSplitInput,
   isNpc,
   planCoinSplit,
@@ -91,8 +93,12 @@ type Detail = {
     coinShares?: Array<{ purseId: string; copper: number }>;
     coinRemainder?: { purseId: string; copper: number; rule: SplitRule };
     coinSplitId?: string;
+    /** Treasure-pool items' fund (prompt 2, phase 2). Absent on older awards. */
+    poolFundId?: string;
   };
 };
+/** The recipient select's value for "Treasure pool · <fund>" (never a purse ID). */
+const POOL_VALUE = "__treasure_pool__";
 type Roll = {
   seq: number;
   at: number;
@@ -857,7 +863,15 @@ function EncounterEditor({
       add.set(splitPlan.remainderTo, (add.get(splitPlan.remainderTo) ?? 0) + splitPlan.remainder);
     for (const [id, copper] of add) splitCoins.set(id, fromCopper(copper));
   }
-  const awardPreview = recipientAwardPreview(draft, detail.purses, splitCoins);
+  // Treasure pool (prompt 2, phase 2): the designated party fund unless the DM picks another.
+  const poolFundRows = partyFunds(splitTable);
+  const poolFundId =
+    draft.poolFundId && poolFundRows.some((p) => p.id === draft.poolFundId)
+      ? draft.poolFundId
+      : designatedPartyFund(splitTable);
+  const poolFund = detail.purses.find((p) => p.id === poolFundId) ?? null;
+  const pooledItems = draft.loot.filter((l) => l.pool);
+  const awardPreview = recipientAwardPreview(draft, detail.purses, splitCoins, poolFund);
   const lootSummary = confirmedLootSummary(detail);
   const summaryEntry =
     lootSummary && currentContext
@@ -872,7 +886,12 @@ function EncounterEditor({
       ...draft,
       combatants: draft.combatants.map((c) => (c.id === id ? { ...c, ...patch } : c)),
     });
-  const recipients = (value: string, onChange: (v: string) => void, label = "Recipient") => (
+  const recipients = (
+    value: string,
+    onChange: (v: string) => void,
+    label = "Recipient",
+    pool = false,
+  ) => (
     <label>
       {label}
       <SearchSelect
@@ -881,6 +900,11 @@ function EncounterEditor({
         onValueChange={(selectedValue) => onChange(selectedValue)}
       >
         <option value="">Choose recipient</option>
+        {pool && (
+          <option value={POOL_VALUE} disabled={!poolFund}>
+            {poolFund ? `Treasure pool · ${poolFund.name}` : "Treasure pool (add a party fund first)"}
+          </option>
+        )}
         {detail.purses.map((p) => (
           <option key={p.id} value={p.id}>
             {p.name}
@@ -1025,6 +1049,31 @@ function EncounterEditor({
                       {ruleLabel(detail.award.coinRemainder.rule)} rule)
                     </span>
                     <span className="coin-split-amt">{formatCopper(detail.award.coinRemainder.copper)}</span>
+                  </div>
+                )}
+              </section>
+            )}
+            {detail.award?.poolFundId && (
+              <section className="coin-split-preview" aria-label="Items sent to the treasure pool">
+                <div className="coin-split-preview-head">
+                  <strong>Items</strong>
+                </div>
+                {detail.body.loot.map((item) => (
+                  <div className="coin-split-row" key={item.id}>
+                    <span>
+                      {item.name} × {item.quantity}
+                    </span>
+                    <span className="coin-split-amt">
+                      →{" "}
+                      {item.pool
+                        ? "Treasure pool"
+                        : (detail.purses.find((p) => p.id === item.purseId)?.name ?? "Removed account")}
+                    </span>
+                  </div>
+                ))}
+                {currentContext && (
+                  <div className="coin-split-sum">
+                    <AppLink href="/party?section=pool">Open the treasure pool →</AppLink>
                   </div>
                 )}
               </section>
@@ -1855,7 +1904,7 @@ function EncounterEditor({
                       ...draft,
                       coinSplit: undefined,
                       coinPurseId: recipient,
-                      loot: draft.loot.map((l) => ({
+                      loot: draft.loot.map(({ pool: _pool, ...l }) => ({
                         ...l,
                         purseId: recipient,
                       })),
@@ -1865,7 +1914,46 @@ function EncounterEditor({
               >
                 Assign all to party inventory
               </button>
+              <button
+                className="loot-pool-send-all"
+                disabled={!poolFund || !draft.loot.length}
+                title={poolFund ? undefined : "Add a party fund before sending items to the treasure pool."}
+                onClick={() =>
+                  change({
+                    ...draft,
+                    loot: draft.loot.map((l) => ({ ...l, purseId: "", pool: true })),
+                  })
+                }
+              >
+                Send all items to the treasure pool
+              </button>
             </div>
+            <p className="text-sm text-muted">
+              “Assign all to party inventory” makes the items ordinary holdings of the party fund.
+              “Send all items to the treasure pool” puts them in the party fund <em>and</em> opens
+              them for Need / Greed / Pass claims.
+              {!poolFund && " The treasure pool needs a party fund in this campaign."}
+            </p>
+            {pooledItems.length > 0 && poolFundRows.length > 1 && (
+              <label>
+                Treasure pool fund
+                <select
+                  value={poolFundId ?? ""}
+                  onChange={(e) =>
+                    change({
+                      ...draft,
+                      poolFundId: e.target.value === designatedPartyFund(splitTable) ? undefined : e.target.value,
+                    })
+                  }
+                >
+                  {poolFundRows.map((fund) => (
+                    <option key={fund.id} value={fund.id}>
+                      {fund.name} (party fund{fund.id === designatedPartyFund(splitTable) ? " · campaign default" : ""})
+                    </option>
+                  ))}
+                </select>
+              </label>
+            )}
             <details>
               <summary>Add items from your current catalog</summary>
               <label>
@@ -1958,13 +2046,18 @@ function EncounterEditor({
                   </label>
                 </div>
                 {recipients(
-                  l.purseId,
+                  l.pool ? POOL_VALUE : l.purseId,
                   (v) =>
                     change({
                       ...draft,
-                      loot: draft.loot.map((r, j) => (i === j ? { ...r, purseId: v } : r)),
+                      loot: draft.loot.map((r, j) => {
+                        if (i !== j) return r;
+                        const { pool: _pool, ...rest } = r;
+                        return v === POOL_VALUE ? { ...rest, purseId: "", pool: true } : { ...rest, purseId: v };
+                      }),
                     }),
                   `Recipient for item ${i + 1}`,
+                  true,
                 )}
                 <details>
                   <summary>Item notes</summary>
@@ -2244,7 +2337,23 @@ function EncounterEditor({
                       )}
                     </article>
                   ))}
+                  {awardPreview.pool && (
+                    <article className="loot-pool-preview">
+                      <strong>Treasure pool · {awardPreview.pool.fund?.name ?? "no party fund"}</strong>
+                      <ul>
+                        {awardPreview.pool.items.map((item) => (
+                          <li key={item.id}>
+                            {item.name} × {item.quantity}
+                          </li>
+                        ))}
+                      </ul>
+                      <p className="text-sm text-muted">
+                        Party members can mark Need, Greed or Pass as soon as the transfer finishes.
+                      </p>
+                    </article>
+                  )}
                   {!awardPreview.recipients.length &&
+                    !awardPreview.pool &&
                     !awardPreview.unresolved.length &&
                     !awardPreview.unresolvedCoins && (
                       <p>No coins or items are attached to this award.</p>

@@ -104,7 +104,7 @@ function SmithMaterialIdentification({
   profile: SmithProfile;
 }) {
   const lots = t.holdings.filter(
-    (h) => h.kind === "item" && !h.service && !h.custody && !h.reservedFor && h.quantity > 0,
+    (h) => h.kind === "item" && !h.service && !h.custody && !h.reservedFor && !h.pool && h.quantity > 0,
   );
   const [holdingId, setHoldingId] = useState(lots[0]?.id ?? ""),
     [materialKey, setMaterialKey] = useState(profile.materials[0]?.materialKey ?? ""),

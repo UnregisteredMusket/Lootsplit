@@ -882,7 +882,9 @@ export async function queueCommand(
     const s = requireSession();
     if (view.viewOnly && s.role === "player")
       throw Error("The session has ended. This room is view-only until the DM resumes play.");
-    if (input.kind !== "message" && !view.mine) throw new Error(`It is ${view.who}'s turn.`);
+    // Chat and treasure-pool claims (which move nothing) are not bound to the turn.
+    if (input.kind !== "message" && input.kind !== "loot-claim" && !view.mine)
+      throw new Error(`It is ${view.who}'s turn.`);
     if (s.pending.length >= 100) throw new Error("Submit your pending actions before adding more.");
     // A caller-supplied ID identifies one user action across retries: an action
     // already queued is not queued twice, and the room skips IDs it has applied.
@@ -904,7 +906,12 @@ export async function queueCommand(
     const npcBarter = input.kind.startsWith("npc-barter-");
     if (npcBarter && s.pending.length)
       throw Error("Submit or discard your pending actions before bartering with an NPC.");
-    if (input.kind === "message" || seasonalPlan || npcBarter) {
+    // Treasure-pool claims and resolutions go to the room directly: a claim moves nothing, and a
+    // resolution is rolled by the room server, so the preview cannot show its results.
+    const loot = input.kind === "loot-claim" || input.kind === "loot-resolve";
+    if (input.kind === "loot-resolve" && s.pending.length)
+      throw Error("Submit or discard your pending actions before resolving the treasure pool.");
+    if (input.kind === "message" || seasonalPlan || npcBarter || loot) {
       // Chat is independent of transaction turns; retain a failed message in the editor.
       const remote = await submitCloudCommands({
         data: {

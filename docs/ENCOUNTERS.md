@@ -25,6 +25,14 @@ The generator retrieves the SRD 5.1 creature index through Open5e, retaining sou
 - **Old awards.** Awards with `coinPurseId` and no `coinShares` keep the original branch of `recipientAwardPreview`, byte for byte; tests prove it.
 - **Detail.** Shared detail responses add `splitTable` (purse kinds, NPC flags, party positions and split settings only) so the DM's preview plans exactly what the Worker will.
 
+### Treasure pool awards (2026-10-23)
+
+- **Shape.** A loot item may carry optional `pool: true` with an empty `purseId` (an older client that drops the flag asks for a recipient instead of sending the item elsewhere); the draft may carry optional `poolFundId`. Pooled items go to `poolFundId` when it is still a party fund, else the designated party fund (`journal.coinSplit.partyFundId`, else the first). With no party fund the award is refused and readiness says "Add a party fund before sending items to the treasure pool."
+- **Rows.** Both paths call `encounterPoolRows` (`src/lib/quire/loot-claims.ts`): holdings `${receiptId}-pool-${i}` in the fund with `pool: { source: "encounter", encounterId, receiptId }`, 0 cp ledger lines with `loot.role: "added"`, one `lootPool` journal event per item and one party chat note. Other items move exactly as before.
+- **Receipt.** The award body adds `poolFundId`; `recipients` includes the fund. The read-only receipt lists each item with "→ Treasure pool" or its character, and links to the pool.
+- **Exactly once and rollback.** Unchanged: `dm_encounter_awards`, the room-body comparison and the D1 batch (shared); one IndexedDB transaction with the `status === "review"` check (device). Tests cover a lost-response retry, an injected write failure and the no-fund refusal on both paths.
+- **Old awards.** Awards without pool fields keep exactly their previous preview shape and receipt.
+
 ## Verification
 
 Service tests cover ownership/DM permissions, revoked memberships, revision conflicts, manual/automatic rolls, weighted results, review before transfer, recipient validation, pending turns, turn ownership, repeated transfers, concurrent room changes, and transactional rollback after an injected inventory-write failure.
