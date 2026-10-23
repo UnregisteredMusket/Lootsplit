@@ -104,5 +104,10 @@ export function lootActivity(
     });
   }
   flush();
-  return rows.sort((a, b) => b.at - a.at);
+  // Newest first. Rows are built in event order, so events in the same millisecond keep their
+  // real order by breaking ties on that position (newer position first).
+  return rows
+    .map((row, index) => ({ row, index }))
+    .sort((a, b) => b.row.at - a.row.at || b.index - a.index)
+    .map(({ row }) => row);
 }

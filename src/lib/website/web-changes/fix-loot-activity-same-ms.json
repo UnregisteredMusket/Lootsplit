@@ -1,0 +1,7 @@
+{
+  "title": "Treasure pool activity order",
+  "summary": "Activity now lists treasure pool claims and resolutions in the order they happened, even when two happen at the same moment.",
+  "items": [
+    "A claim made in the same instant as a resolution no longer appears before it in Activity."
+  ]
+}
