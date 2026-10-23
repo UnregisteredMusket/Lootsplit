@@ -554,11 +554,12 @@ export const HELP_GROUPS: HelpGroup[] = [
         title: "Lootsplit is now Lootsplitter",
         paragraphs: [
           "Lootsplit has a new name: Lootsplitter. It is the same app with the same campaigns, characters, funds, settings and accounts; nothing needs to be moved or re-entered. On Android, version 1.10.0 and later shows the new name on the home screen and in the Widgets menu (Lootsplitter Field monitor and Lootsplitter 4×1 companion). Install the update over the existing app as usual; placed widgets and your sign-in carry over.",
-          "Backups, campaign copies and other files exported under the old name still import, and invitations and the website address you already use keep working. If a new web address is announced later, Help and Downloads will say so.",
-          "To get ready ahead of any address change, open Settings → Prepare for a future website address change. It reads this device only: it lists unsubmitted shared-room changes in every campaign saved here, not just the open one, and names what stays on this device and does not move with the address, such as private PDFs, the local audio library, preferences, map camera positions and bookmarks. It never submits, discards or clears anything.",
+          "Backups, campaign copies and other files exported under the old name still import, and existing invitations keep working.",
+          "The website has moved to lootsplitter.com. The old address (lootsplit.oliverstorie2017.workers.dev) keeps working for at least 12 months, and the Android app and widgets need no change. Accounts and shared campaigns live on the same server, so sign in again at lootsplitter.com and they are all there. Browsers keep each address separate, so a few things stay with the old address until you move them: campaigns stored only in that browser (move them with a backup), notifications (turn them on again), bookmarks and an installed home-screen web app (replace them).",
+          "Settings → Moving to the new website address reads this device only: it lists unsubmitted shared-room changes in every campaign saved here, not just the open one, and names what stays on this device, such as private PDFs, the local audio library, preferences, map camera positions and bookmarks. It never submits, discards or clears anything. Finish or export pending work there before you switch.",
         ],
         links: [
-          ["Prepare for an address change", "/settings#migration-readiness"],
+          ["Moving to the new address", "/settings#migration-readiness"],
           ["Downloads & release details", "/downloads"],
           ["Versioned changelog", "/updates"],
         ],

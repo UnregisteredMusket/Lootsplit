@@ -13,7 +13,7 @@ export const PLAYER_HELP_GROUPS: HelpGroup[] = [
         title: "Lootsplit is now Lootsplitter",
         paragraphs: [
           "Lootsplit has a new name: Lootsplitter. It is the same app: your character, saved memberships, settings and account stay as they were, and invitations from your DM keep working. On Android, version 1.10.0 and later shows the new name on the home screen; install the update over the existing app.",
-          "If the website address changes in future, your DM's campaign moves with the server, but some things live only on this device: unsubmitted changes, saved seats, preferences, map camera positions and bookmarks. Settings → Prepare for a future website address change lists unfinished work for every campaign on this device without changing anything.",
+          "The website has moved to lootsplitter.com. The old address keeps working for at least 12 months, and the Android app needs no change. Your account and your DM's campaign are on the same server: sign in again at lootsplitter.com and rejoin as usual. Some things live only in the browser you used before: unsubmitted changes, saved seats, preferences, map camera positions, notifications and bookmarks. Settings → Moving to the new website address lists unfinished work for every campaign on this device without changing anything; submit it before you switch.",
         ],
         links: [["Campaign connection", "/share"]],
       },

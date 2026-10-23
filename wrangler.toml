@@ -62,10 +62,11 @@ OWNER_MONITOR_GITHUB = "true"
 # The Grok app-builder extension script (grok.com) would run with signed-in sessions; disabled
 # for every Lootsplit deployment (owner-approved 2026-10-21). Builds read .grok/app-env.json.
 VITE_GROK_EXTENSIONS = "0"
-ACCOUNT_ORIGIN = "https://lootsplit.oliverstorie2017.workers.dev"
+ACCOUNT_ORIGIN = "https://lootsplitter.com"
 # Other approved account hosts, comma-separated: exactly origins.mjs `legacy` minus `website`
-# (empty while workers.dev is the website). migration:check and release preflight enforce it.
-ACCOUNT_LEGACY_ORIGINS = ""
+# (workers.dev since the 2026-10 move to lootsplitter.com). migration:check and release preflight
+# enforce it. Keep workers.dev here for installed APKs, widgets and old links (coexistence period).
+ACCOUNT_LEGACY_ORIGINS = "https://lootsplit.oliverstorie2017.workers.dev"
 # ACCOUNT_SECRET is a Worker secret, never committed. Guest play does not depend on it.
 
 # Read-only release identity for the administrator server monitor.

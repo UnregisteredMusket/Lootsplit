@@ -50,13 +50,26 @@ test("deployment and read-only audit destinations match reviewed configuration",
 
 const OLD = "https://lootsplit.oliverstorie2017.workers.dev";
 const NEW = "https://lootsplitter.com";
+// The repository is on the cutover configuration (website lootsplitter.com since 2026-10-23);
+// `before` rebuilds the pre-cutover files so both states, and the move between them, stay tested.
 const future = { website: NEW, nativeApi: OLD, legacy: [OLD] };
-const wrangler = readFileSync("wrangler.toml", "utf8");
-const workflows = Object.fromEntries(LIVE_AUDIT_WORKFLOWS.map((path) => [path, readFileSync(path, "utf8")]));
-const cutoverWrangler = wrangler
-  .replace(`ACCOUNT_ORIGIN = "${OLD}"`, `ACCOUNT_ORIGIN = "${NEW}"`)
-  .replace('ACCOUNT_LEGACY_ORIGINS = ""', `ACCOUNT_LEGACY_ORIGINS = "${OLD}"`);
+const before = { website: OLD, nativeApi: OLD, legacy: [OLD] };
+const cutoverWrangler = readFileSync("wrangler.toml", "utf8");
+const cutoverWorkflows = Object.fromEntries(LIVE_AUDIT_WORKFLOWS.map((path) => [path, readFileSync(path, "utf8")]));
+const wrangler = cutoverWrangler
+  .replace(`ACCOUNT_ORIGIN = "${NEW}"`, `ACCOUNT_ORIGIN = "${OLD}"`)
+  .replace(`ACCOUNT_LEGACY_ORIGINS = "${OLD}"`, 'ACCOUNT_LEGACY_ORIGINS = ""');
+const preWorkflow = (text) => text.replace(`AUDIT_ORIGIN: ${NEW}`, `AUDIT_ORIGIN: ${OLD}`).replace(`AUDIT_LEGACY_ORIGINS: "${OLD}"`, 'AUDIT_LEGACY_ORIGINS: ""');
+const workflows = Object.fromEntries(Object.entries(cutoverWorkflows).map(([path, text]) => [path, preWorkflow(text)]));
 const cutoverWorkflow = (text) => text.replace(`AUDIT_ORIGIN: ${OLD}`, `AUDIT_ORIGIN: ${NEW}`).replace('AUDIT_LEGACY_ORIGINS: ""', `AUDIT_LEGACY_ORIGINS: "${OLD}"`);
+
+test("the repository is on the reviewed lootsplitter.com cutover configuration", () => {
+  assert.deepEqual({ ...deploymentOrigins, legacy: [...deploymentOrigins.legacy] }, future);
+  assert.deepEqual({ website: previousDeploymentOrigins.website, legacy: [...previousDeploymentOrigins.legacy] }, { website: OLD, legacy: [OLD] });
+  assert.equal(wrangler === cutoverWrangler, false, "wrangler.toml must hold the cutover account origins");
+  checkDomainReadiness({ wrangler: cutoverWrangler, workflows: cutoverWorkflows });
+  for (const text of Object.values(cutoverWorkflows)) assert.equal(cutoverWorkflow(preWorkflow(text)), text);
+});
 
 test("workers.dev stays explicitly on in source and in the generated release config", () => {
   assert.equal(topLevelValue(wrangler, "workers_dev"), true);
@@ -72,8 +85,10 @@ test("workers.dev stays explicitly on in source and in the generated release con
 });
 
 test("ACCOUNT_LEGACY_ORIGINS equals legacy minus website, today and after a cutover", () => {
-  assert.deepEqual(accountLegacyOrigins(), []);
-  assertWranglerOrigins(wrangler);
+  assert.deepEqual(accountLegacyOrigins(), [OLD]);
+  assert.deepEqual(accountLegacyOrigins(before), []);
+  assertWranglerOrigins(wrangler, before);
+  assertWranglerOrigins(cutoverWrangler);
   assert.deepEqual(accountLegacyOrigins(future), [OLD]);
   assertWranglerOrigins(cutoverWrangler, future);
   const two = { ...future, legacy: [OLD, "https://old.example.test"] };
@@ -90,7 +105,11 @@ test("release preflight accepts unchanged origins and a reviewed transition, and
   // Unchanged configuration (today), with the legacy binding empty or not yet created.
   assert.equal(assertAccountOriginBindings(live(OLD, ""), { website: OLD, nativeApi: OLD, legacy: [OLD] }, previous), "current");
   assert.equal(assertAccountOriginBindings(live(OLD), { website: OLD, nativeApi: OLD, legacy: [OLD] }, previous), "current");
-  assert.equal(assertAccountOriginBindings(live(OLD, ""), undefined, previousDeploymentOrigins), "current");
+  // Defaults are the repository's own (cutover) origins: the first release after the move is a
+  // transition from the old bindings, and every later release sees the new bindings as current.
+  assert.equal(assertAccountOriginBindings(live(OLD, ""), undefined, previousDeploymentOrigins), "transition");
+  assert.equal(assertAccountOriginBindings(live(OLD), undefined, previousDeploymentOrigins), "transition");
+  assert.equal(assertAccountOriginBindings(live(NEW, OLD), undefined, previousDeploymentOrigins), "current");
   // The cutover release: live still has the previous values; the new legacy list keeps the old website.
   assert.equal(assertAccountOriginBindings(live(OLD, ""), future, previous), "transition");
   // A re-run after the cutover deployed: live already equals the new values.
@@ -115,11 +134,11 @@ test("live audits run once per approved origin, and workflow targets match origi
   assert.equal(legacyEnv.AUDIT_ORIGIN, OLD);
   assert.equal(legacyEnv.WEBSITE_SCREENSHOTS, "test-results/website/lootsplit.oliverstorie2017.workers.dev");
   assert.equal(legacyEnv.LIVE_RELEASE_RESULTS, "test-results/live-release/lootsplit.oliverstorie2017.workers.dev");
-  checkDomainReadiness({ wrangler, workflows });
+  checkDomainReadiness({ origins: before, wrangler, workflows });
   checkDomainReadiness({ origins: future, wrangler: cutoverWrangler, workflows: Object.fromEntries(Object.entries(workflows).map(([path, text]) => [path, cutoverWorkflow(text)])) });
   for (const [path, text] of Object.entries(workflows)) {
     assert.throws(() => assertAuditWorkflow(text, future, path), /website origin/);
     assert.throws(() => assertAuditWorkflow(cutoverWorkflow(text).replace(`AUDIT_LEGACY_ORIGINS: "${OLD}"`, 'AUDIT_LEGACY_ORIGINS: ""'), future, path), /AUDIT_LEGACY_ORIGINS/);
-    assert.throws(() => assertAuditWorkflow(text.replace("node scripts/live-audit-origins.mjs scripts/website-browser-audit.mjs", "node scripts/website-browser-audit.mjs"), undefined, path), /once per approved origin/);
+    assert.throws(() => assertAuditWorkflow(text.replace("node scripts/live-audit-origins.mjs scripts/website-browser-audit.mjs", "node scripts/website-browser-audit.mjs"), before, path), /once per approved origin/);
   }
 });

@@ -1,5 +1,5 @@
 /**
- * Read-only checks for the "Prepare for a website address change" guide.
+ * Read-only checks for the Settings guide for moving to the new website address.
  * Nothing here writes, submits or clears storage.
  */
 export type CampaignPending = { id: string; name: string; pending: number; shared: boolean };
