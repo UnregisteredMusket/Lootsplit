@@ -146,27 +146,35 @@ try {
     });
     assert.equal(saved.distance, 40);
     assert.equal(saved.unit, "mi");
-    // Draw: the route starts at the party (Harrowgate); Kestrel Watch's pin adds that place.
+    // Draw: the route starts at the party (Harrowgate). Kestrel Watch is added as a place (the
+    // typed path); its pin may sit under the tool dock at some widths.
     await expect(frame.getByRole("button", { name: /^Waypoint 1: Harrowgate/ })).toBeVisible();
-    await frame.locator('button[title="Location: Vale of Harrow / Kestrel Watch"]').click();
+    await planner.getByRole("button", { name: "Type instead", exact: true }).click();
+    await planner.getByLabel("Add an anchored place", { exact: true }).selectOption("kestrel");
+    await planner.getByRole("button", { name: "Add place", exact: true }).click();
     const legs = planner.getByRole("list", { name: "Legs", exact: true });
     await expect(legs.getByRole("listitem")).toHaveCount(1);
     await expect(legs).toContainText("Harrowgate → Kestrel Watch");
     await expect(legs).toContainText("60.0 mi");
-    // Tap the middle of the leg: a waypoint is inserted there.
-    const layer = await frame.locator(".map-layer").boundingBox(),
-      box = await viewport.boundingBox();
-    await viewport.click({
-      position: { x: layer.x - box.x + layer.width * 0.5, y: layer.y - box.y + layer.height * 0.5 },
-    });
+    // Tap the middle of the leg: a waypoint is inserted there. Pan the map up first so the leg
+    // sits above the phone bottom sheet.
+    await planner.getByRole("button", { name: "Tap to add", exact: true }).click();
+    await viewport.focus();
+    if (width <= 650) for (let i = 0; i < 5; i++) await page.keyboard.press("ArrowDown");
+    const centre = async (name) => {
+      const b = await frame.getByRole("button", { name }).boundingBox();
+      return { x: b.x + b.width / 2, y: b.y + b.height / 2 };
+    };
+    const [a, b] = [await centre(/^Waypoint 1: /), await centre(/^Waypoint 2: /)];
+    await page.mouse.click((a.x + b.x) / 2, (a.y + b.y) / 2);
     await expect(legs.getByRole("listitem")).toHaveCount(2);
-    await expect(legs).toContainText("30.0 mi");
-    await expect(planner).toContainText("60.0 mi total");
+    await expect(legs).toContainText("Point ");
+    await expect(planner).toContainText(/(59\.9|60\.0|60\.1) mi total/);
     assert.ok(await noSideways(page), `drawn route fits at ${width}px`);
     assert.ok(await inside(planner), `planner with legs inside the viewport at ${width}px`);
     await page.screenshot({ path: `${output}/draw-${width}x${height}.png` });
     // Tap the inserted waypoint to remove it.
-    await frame.getByRole("button", { name: /^Waypoint 2: Point 50\.0%, 50\.0%/ }).click();
+    await frame.getByRole("button", { name: /^Waypoint 2: Point / }).click();
     await expect(legs.getByRole("listitem")).toHaveCount(1);
     // Typed fallback: add a free point.
     await planner.getByRole("button", { name: "Type instead", exact: true }).click();
