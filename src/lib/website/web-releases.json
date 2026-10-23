@@ -1,0 +1,431 @@
+[
+  {
+    "id": "2026-10-07-campaign-integrity",
+    "status": "published",
+    "date": "2026-10-07",
+    "commit": "fb776325721f940143bc0c1bd3aadb3e147aa95d",
+    "title": "Safer campaign access, recovery and shared actions",
+    "summary": "The website and backend received campaign integrity repairs after the Android 1.6.0 release. Installed APK clients retain their own bundled interface and local behavior.",
+    "improvements": [
+      "Campaign actions recheck current membership, restrictions and permissions when they commit.",
+      "Interrupted shared actions and conflicting drafts retain scoped recovery and retry protection.",
+      "Purchases, reversals and loans preserve financial and inventory integrity.",
+      "Validated restores preserve complete campaign records; server-produced deletion backups support fresh, DM-only view-only recovery.",
+      "Full shared handouts, paused-player controls and failed chat recovery are retained."
+    ],
+    "evidence": [
+      {
+        "label": "Release details",
+        "url": "https://github.com/UnregisteredMusket/Lootsplit/pull/67"
+      },
+      {
+        "label": "Complete main verification",
+        "url": "https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37661353259"
+      },
+      {
+        "label": "Publication and live checks",
+        "url": "https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37661998263"
+      }
+    ]
+  },
+  {
+    "id": "2026-10-08-shop-locations",
+    "status": "published",
+    "date": "2026-10-08",
+    "commit": "26f4d069f259735e15ae077a9f9e9025e1b6e9cb",
+    "title": "Shop locations, name imports and fantasy backgrounds",
+    "summary": "DMs can organize shops by region, city and area and import location names, campaign records are easier to read, and submenus gained day and night fantasy artwork.",
+    "improvements": [
+      "Campaign screens are better organized, with safer drafts, readable financial and session records, and clearer feedback while an action is pending or interrupted.",
+      "Encounters can optionally use the current party, and the journal can summarize confirmed loot receipts.",
+      "Recovery verification survives a reload, and My account explains backup copies that did not match.",
+      "DMs can create regions, cities, towns and areas, upload player-facing location and shop images, and set where the party is. Players see the shops available where they are.",
+      "DMs can import region, city, town, area and shop names from pasted text or TXT, CSV, TSV and JSON files, and review them before importing.",
+      "Submenus show matching day or night fantasy backgrounds. Turn them off in Settings → Colors."
+    ],
+    "evidence": [
+      {
+        "label": "Release details",
+        "url": "https://github.com/UnregisteredMusket/Lootsplit/compare/fb776325721f...26f4d069f259"
+      },
+      {
+        "label": "Complete main verification",
+        "url": "https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37831342775"
+      },
+      {
+        "label": "Publication and live checks",
+        "url": "https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37832042546"
+      }
+    ]
+  },
+  {
+    "id": "2026-10-09-maps-property-trade",
+    "status": "published",
+    "date": "2026-10-09",
+    "commit": "73c84e1724a1b4577d3c1c7f8ea402a84d7365e4",
+    "title": "Maps, property, trade exchanges and music",
+    "summary": "A new Maps tab, property you can buy and run, seasonal trade exchanges, and optional menu music with DM playlists.",
+    "improvements": [
+      "Optional fantasy menu music and scene ambience, off by default, with separate volumes in Settings → Sound effects.",
+      "DMs can build playlists on their device and import their own audio with creator, source and license notes in Campaign tools → Music & Ambience.",
+      "Property listings: buy a fantasy estate and receive its deed in your inventory, then give or sell it later.",
+      "Property operations: party warehouses, home tenancy, staged construction and upgrades, staff, managers and city post offices, all through DM-approved downtime.",
+      "New Maps tab: import map images, place the party, mark shops, NPCs and properties, trade with NPCs and black markets, and track session time.",
+      "Campaign trade exchanges with their own stock, prices and seasonal settlement.",
+      "A map name typed while its image is still processing is kept, so the map can be saved.",
+      "Interrupted shared actions can be resumed or retried instead of being blocked by an old receipt."
+    ],
+    "evidence": [
+      {
+        "label": "Release details",
+        "url": "https://github.com/UnregisteredMusket/Lootsplit/compare/26f4d069f259...73c84e1724a1"
+      },
+      {
+        "label": "Complete main verification",
+        "url": "https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37965977121"
+      },
+      {
+        "label": "Publication and live checks",
+        "url": "https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37966935310"
+      }
+    ]
+  },
+  {
+    "id": "2026-10-10-library-markets-barter",
+    "status": "published",
+    "date": "2026-10-10",
+    "commit": "c3ed29d01c669a60be884a8d6f948c779fab3987",
+    "title": "Resource packs, searchable Library and commodity boards",
+    "summary": "DMs can import reviewed resource packs, everything in the Library is searchable, and trading has new commodity boards and portrait barter screens.",
+    "improvements": [
+      "Library → Resource packs imports reviewed creatures, items and location, shop and NPC templates. Imported creatures can be added to encounters as editable copies.",
+      "Long location, NPC and monster lists have searchable dropdowns, and map icons and records open their exact Library entry.",
+      "Maps are easier to read: compact icons by record type, visibility filters, fullscreen, and colored pings that everyone in the room sees.",
+      "Characters and NPCs can leave or join the party, keep their own location and start individual downtime. DMs can hide NPC records and sheets.",
+      "Market and Trade Exchanges show compact commodity boards with quotes and price charts that lead straight into buying and selling.",
+      "Trading & Barter uses portraits, searchable inventory tiles and central offer trays, and fits phones down to 320 px wide.",
+      "Global markets open only while the party is in a city, and DMs can import a reviewed list of fantasy commodities.",
+      "Market suppliers keep goods and prices correct, reversals stay consistent, and history shows older records with their original values.",
+      "Pending work is kept when a shared campaign reply arrives incomplete."
+    ],
+    "evidence": [
+      {
+        "label": "Release details",
+        "url": "https://github.com/UnregisteredMusket/Lootsplit/compare/73c84e1724a1...c3ed29d01c66"
+      },
+      {
+        "label": "Complete main verification",
+        "url": "https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38076562217"
+      },
+      {
+        "label": "Publication and live checks",
+        "url": "https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38077277877"
+      }
+    ]
+  },
+  {
+    "id": "2026-10-11-ships-map-tiles",
+    "status": "published",
+    "date": "2026-10-11",
+    "commit": "5d10e6e126b4d830d94684867196247bdbf6eac9",
+    "title": "Ships, map categories and player Library access",
+    "summary": "Owned ships and shipyards, map categories with free party placement and combat tiles, and DM control over what players can look up.",
+    "improvements": [
+      "Every city gets one editable default trade exchange. Existing custom exchanges are unchanged.",
+      "Players see role-appropriate Library lookups, paused during encounters by default, and DMs can limit or turn them off. Help has separate player and DM guides.",
+      "Ships: buy and name ships, store cargo, crew them, request repairs and upgrades and make downtime voyages, with private shipyards and DM teleport.",
+      "Maps have categories (regional, city, dungeon, property, wilderness, battle, ship and other) with a type filter, free party placement and combat tiles for encounters and ships.",
+      "Initiative rows stay in place while scores are entered, and Sort initiative orders them when the DM chooses.",
+      "Links from review requests, holdings and property guidance open the right screen, and DMs get a global market readout.",
+      "Mobile character sheets offer Retry after a failed load instead of crashing."
+    ],
+    "evidence": [
+      {
+        "label": "Release details",
+        "url": "https://github.com/UnregisteredMusket/Lootsplit/compare/c3ed29d01c66...5d10e6e126b4"
+      },
+      {
+        "label": "Complete main verification",
+        "url": "https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38175377882"
+      },
+      {
+        "label": "Publication and live checks",
+        "url": "https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38176299340"
+      }
+    ]
+  },
+  {
+    "id": "2026-10-12-blacksmith-training",
+    "status": "published",
+    "date": "2026-10-12",
+    "commit": "a57caad5e01bb7baac23d2ff4042c35efcec3e22",
+    "title": "Blacksmith commissions and hourly downtime training",
+    "summary": "Players can commission weapons and armor from a blacksmith, and downtime now has hourly budgets with DM-reviewed NPC training.",
+    "improvements": [
+      "Blacksmith commissions: contribute materials, pay once, wait through DM-approved downtime and collect the finished item at the forge.",
+      "Downtime has an hourly budget per character (16 usable hours a day by default), shared by training, property labor and away activities. DMs review NPC training.",
+      "Late training bookkeeping can be confirmed against the location and levels at the time.",
+      "The selected map icon is highlighted.",
+      "NPC records start collapsed, and the creation editor opens above the list.",
+      "Shared rooms check for changes more efficiently and no longer re-send an unchanged campaign in full."
+    ],
+    "evidence": [
+      {
+        "label": "Release details",
+        "url": "https://github.com/UnregisteredMusket/Lootsplit/compare/5d10e6e126b4...a57caad5e01b"
+      },
+      {
+        "label": "Complete main verification",
+        "url": "https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38310299946"
+      },
+      {
+        "label": "Publication and live checks",
+        "url": "https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38311362171"
+      }
+    ]
+  },
+  {
+    "id": "2026-10-13-clearer-play-screens",
+    "status": "published",
+    "date": "2026-10-13",
+    "commit": "862bda82be96153f31b39a1180ff6e8465aeab5d",
+    "title": "Clearer play screens and mobile picker fixes",
+    "summary": "Player Home, character sheets, recovery and downtime screens are clearer, and pickers scroll properly on phones.",
+    "improvements": [
+      "On a phone, Player Home opens your assigned sheet directly. Sheet export and reload are grouped under Sheet tools, next to a dice shortcut.",
+      "The shared status strip offers retry and recovery, and tells a saved turn draft apart from committed campaign changes.",
+      "DM readouts, selectors and downtime budget and training groups are easier to read.",
+      "Property pickers scroll by touch on phones again.",
+      "Property listings offer reviewed ship presets."
+    ],
+    "evidence": [
+      {
+        "label": "Release details",
+        "url": "https://github.com/UnregisteredMusket/Lootsplit/compare/a57caad5e01b...862bda82be96"
+      },
+      {
+        "label": "Complete main verification",
+        "url": "https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38409667330"
+      },
+      {
+        "label": "Publication and live checks",
+        "url": "https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38413268062"
+      }
+    ]
+  },
+  {
+    "id": "2026-10-16-player-display",
+    "status": "published",
+    "date": "2026-10-16",
+    "commit": "1cce8f7383022575dc920d20387f712f00fa858f",
+    "title": "Player TV display",
+    "summary": "DMs can show maps, encounters and loot on a TV or second monitor while keeping their own screens open.",
+    "improvements": [
+      "Open a dedicated player display from the header, Maps or the current encounter.",
+      "The display shows shared maps with saved grid and token positions, revealed combatants, turns and optional confirmed loot awards, with fullscreen, rotation and fit controls.",
+      "Lootsplit can stay open in several tabs or windows at once."
+    ],
+    "evidence": [
+      {
+        "label": "Release details",
+        "url": "https://github.com/UnregisteredMusket/Lootsplit/compare/862bda82be96...1cce8f738302"
+      },
+      {
+        "label": "Complete main verification",
+        "url": "https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38938272606"
+      },
+      {
+        "label": "Publication and live checks",
+        "url": "https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38939797217"
+      }
+    ]
+  },
+  {
+    "id": "2026-10-19-online-tabletop",
+    "status": "published",
+    "date": "2026-10-19",
+    "commit": "25b77d14c40450c4c4b8e70b69395182434274fb",
+    "title": "Online tabletop for remote players",
+    "summary": "Remote players can use Maps in their own sessions, with token movement, measurements, fog and protected map media.",
+    "improvements": [
+      "Players move their assigned tokens by dragging, with the keyboard or to an exact position, and can measure distances and place area templates.",
+      "DMs control scenes and cameras, saved fog and optional vision, and detailed map media stays hidden from players who should not see it.",
+      "DMs can import reviewed Universal VTT (UVTT) maps.",
+      "Fullscreen maps fill desktop and phone screens, with floating zoom, Fit map and Ping controls and a scrollable tools drawer."
+    ],
+    "evidence": [
+      {
+        "label": "Release details",
+        "url": "https://github.com/UnregisteredMusket/Lootsplit/compare/1cce8f738302...25b77d14c404"
+      },
+      {
+        "label": "Complete main verification",
+        "url": "https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39331912265"
+      },
+      {
+        "label": "Publication and live checks",
+        "url": "https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39333373176"
+      }
+    ]
+  },
+  {
+    "id": "2026-10-20-connected-maps",
+    "status": "published",
+    "date": "2026-10-20",
+    "commit": "6934e5c3da52dd0dc9cf76be1b3acde81c6e3c05",
+    "title": "Connected Maps workspace",
+    "summary": "Maps became one persistent workspace that connects regions, local businesses and encounters, with a less crowded phone layout.",
+    "improvements": [
+      "Move between linked maps with Back and breadcrumbs, and each scene keeps its own camera.",
+      "Map pins open the existing shops, smiths, NPCs and properties, and encounters started from a map can be recovered.",
+      "Maps settings typed before the first map import are kept.",
+      "On portrait phones, Maps has settings beside the title, full-width search and a bottom tool dock.",
+      "The website download published Android 1.8.0 and 1.8.1.",
+      "The site owner has a private status page in My account. Nothing changes for players or DMs."
+    ],
+    "evidence": [
+      {
+        "label": "Release details",
+        "url": "https://github.com/UnregisteredMusket/Lootsplit/compare/25b77d14c404...6934e5c3da52"
+      },
+      {
+        "label": "Complete main verification",
+        "url": "https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39506221936"
+      },
+      {
+        "label": "Publication and live checks",
+        "url": "https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39507810885"
+      }
+    ]
+  },
+  {
+    "id": "2026-10-21-security-website",
+    "status": "published",
+    "date": "2026-10-21",
+    "commit": "1098502b75024e8565a38a195cb17fa9938cd603",
+    "title": "Security hardening and a redesigned website",
+    "summary": "Accounts, private rolls and shared rooms were hardened, several reliability bugs were fixed, and the public website was redesigned.",
+    "improvements": [
+      "Security: stronger account protections, better protected private rolls and stricter browser security headers.",
+      "Character rolls work again in rooms that use map images or resource packs.",
+      "Encounter drafts are no longer replaced by a background reload, a failed campaign deletion no longer locks you out, and failures are reported instead of passing silently.",
+      "Property imports no longer look out of date, item weights no longer show long decimals, and device rolls are labeled DEVICE ROLL.",
+      "The public website was redesigned with a parchment ledger look, a Features page, real screenshots and phone layouts.",
+      "The website download published Android 1.9.0, 1.9.1 and 1.9.2."
+    ],
+    "evidence": [
+      {
+        "label": "Release details",
+        "url": "https://github.com/UnregisteredMusket/Lootsplit/compare/6934e5c3da52...1098502b7502"
+      },
+      {
+        "label": "Complete main verification",
+        "url": "https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39696617175"
+      },
+      {
+        "label": "Publication and live checks",
+        "url": "https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39698032348"
+      }
+    ]
+  },
+  {
+    "id": "2026-10-22-split-view-barter-privacy",
+    "status": "published",
+    "date": "2026-10-22",
+    "commit": "ca2940649be2036ca5fff2be2561ea81bfdf9890",
+    "title": "Split view, NPC barter and party privacy",
+    "summary": "Two screens in one window, bartering with NPCs in conversation, tighter privacy for balances, and many reliability fixes.",
+    "improvements": [
+      "Split view: open two screens side by side in one window on wide screens.",
+      "Barter with NPCs in conversation: make an offer, get a counter-offer, and a Persuasion roll decides the answer. The DM chooses whether they decide each offer or the game rolls.",
+      "A DM setting lets party members see the coins of companion NPCs travelling with them (off by default).",
+      "Privacy: players no longer receive NPC or exchange treasury balances, and only players whose character is in the party see party members' balances.",
+      "When an action fails, the app says so and keeps your input. Retrying never applies a payment, gift or purchase twice.",
+      "Offline campaigns buy, sell, give and trade listings exactly like shared rooms, including campaigns with a blacksmith.",
+      "Campaigns with long session history keep saving, and a restored campaign keeps its full history.",
+      "Shared rooms refresh less often while nothing changes, and party chat keeps what you type right after opening a room.",
+      "Security: repeated failed sign-ins are slowed down per email without locking the account, and pages use a stricter Content Security Policy.",
+      "Estates: imported listings keep their details, storage accepts exact fits, and DMs can set up operations for an estate bought without them.",
+      "The website download published Android 1.9.3."
+    ],
+    "evidence": [
+      {
+        "label": "Release details",
+        "url": "https://github.com/UnregisteredMusket/Lootsplit/compare/1098502b7502...ca2940649be2"
+      },
+      {
+        "label": "Complete main verification",
+        "url": "https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39777411177"
+      },
+      {
+        "label": "Publication and live checks",
+        "url": "https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39780332754"
+      }
+    ]
+  },
+  {
+    "id": "2026-10-22-lootsplitter",
+    "status": "published",
+    "date": "2026-10-22",
+    "commit": "85de474007b30409e3cb643b8ffb3640b859d8cf",
+    "title": "Lootsplit is now Lootsplitter",
+    "summary": "The app and website were renamed Lootsplitter, with a public support address, a guide for the address change and faster shared maps.",
+    "improvements": [
+      "Lootsplit is now called Lootsplitter across the website, the app and Help. Campaigns, accounts and settings carry over unchanged.",
+      "Questions can go to the public support address, support@lootsplitter.com, listed on the website and in Help.",
+      "Settings → Moving to the new website address lists unsubmitted shared-room changes in every campaign saved on the device, and names what stays on the device.",
+      "Invitation and report links from the Android app open the right address.",
+      "Painting fog no longer fills up a shared room: strokes are stored compactly and undo keeps only the changes.",
+      "Shared map images are sent once and reused, so big maps update faster.",
+      "Maps: Consolidate fog, a message while the DM's device is still updating the map, the alternating 5/10/5 diagonal rule, and screen-reader announcements for token moves, pings and scene changes.",
+      "The website download published Android 1.10.0."
+    ],
+    "evidence": [
+      {
+        "label": "Release details",
+        "url": "https://github.com/UnregisteredMusket/Lootsplit/compare/ca2940649be2...85de474007b3"
+      },
+      {
+        "label": "Complete main verification",
+        "url": "https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39869932188"
+      },
+      {
+        "label": "Publication and live checks",
+        "url": "https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39871552208"
+      }
+    ]
+  },
+  {
+    "id": "2026-10-23-lootsplitter-com-place-hub",
+    "status": "published",
+    "date": "2026-10-23",
+    "commit": "7b828d14f5d9ec847c4dfe3059c3fb1431d4bf8b",
+    "title": "lootsplitter.com, a new home page and map place cards",
+    "summary": "The website moved to lootsplitter.com with a refreshed home page and a privacy page, and maps gained place cards, Show on map and a Here sheet, plus even coin splits.",
+    "improvements": [
+      "The website now lives at lootsplitter.com. The old workers.dev address keeps working.",
+      "A first visit to lootsplitter.com opens the home page; returning players go straight to the app.",
+      "Every public page has its own title and share preview, search engines get a sitemap, and public pages load faster.",
+      "The home page says Lootsplitter is 100% free and supported by donations, and adds a maker's note, a promo video and the kobold logo.",
+      "A new privacy page explains what stays on your device, what the server stores, cookies and how to delete your account.",
+      "Clearer Downloads and navigation, underlined links and a steadier Help page. Changelog and Resources moved to the footer.",
+      "Map pins open place cards, and shops, NPCs, properties, listings and exchanges link to Show on map. DMs can place records on the map and use portraits as pins.",
+      "The Here sheet on the map lists the shops, people and services where the party is.",
+      "Split coins evenly: split a party fund or an encounter's coins between party members in one step."
+    ],
+    "evidence": [
+      {
+        "label": "Release details",
+        "url": "https://github.com/UnregisteredMusket/Lootsplit/compare/85de474007b3...7b828d14f5d9"
+      },
+      {
+        "label": "Complete main verification",
+        "url": "https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39927283289"
+      },
+      {
+        "label": "Publication and live checks",
+        "url": "https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39929129161"
+      }
+    ]
+  }
+]

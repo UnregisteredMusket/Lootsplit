@@ -1,0 +1,8 @@
+{
+  "title": "Website and backend history is complete again",
+  "summary": "The changelog lists every website and backend release since October 7, and each new release now adds its own entry when it goes live.",
+  "items": [
+    "Changelog → Website and backend shows the releases from October 8 to October 23, grouped by day, each with its published source and its verification and live checks.",
+    "From now on, every website or backend change adds a plain-language note that appears here when that release goes live."
+  ]
+}
