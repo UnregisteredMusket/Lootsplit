@@ -17,9 +17,12 @@ Confidence labels:
 - **Name:** the app is renamed **Lootsplitter**. lootsplit.com was registered on 2026-08-28 and is parked for aftermarket sale, so owning the matching name avoids confusion and look-alike sites. No US trademark was found for "Lootsplitter". A federal filing ($350 per class) stays optional.
 - **Domain:** **lootsplitter.com**, registered by the owner on Cloudflare Registrar ($10.46 a year at cost, with renewal at the same price). lootsplitter.app was also free on 2026-10-22 ($8.20 the first year, then $14.20) and is an optional redirect.
 - **Price:** Lootsplitter stays free, and the Donate page stays. See `docs/plans/MONETIZATION-AND-MARKETING.md`.
+- **Registered (2026-10-22):** lootsplitter.com and lootspliter.com on Cloudflare Registrar for 3 years, with 2FA and DNSSEC on. DNSSEC was validating by the evening of 2026-10-22.
+- **Decided 2026-10-22:**
+  - `www.lootsplitter.com` redirects to `lootsplitter.com`, using a zone Single Redirect plus a proxied placeholder `www` record. Custom Domains need an exact hostname, so `www` is not attached to the Worker.
+  - `lootspliter.com` redirects to `lootsplitter.com` and forwards mail. Its redirect goes live only after step 3, once lootsplitter.com serves the Worker.
+  - Coexistence: the old workers.dev website stays at least **12 months** after cutover. The native API on workers.dev stays indefinitely, per "Coexistence period" below.
 - **Still pending owner decisions:**
-  - registering the domain;
-  - the coexistence period for the old host;
   - the cutover date;
   - each sign-off point in the checklist below.
 
@@ -405,3 +408,4 @@ This check confirms that the source, Wrangler and live-audit origins agree today
 
 - 2026-10-22, PR `fix/domain-cutover-guards` (PR-A, without P1-7, which is a separate PR): **P1-1** `workers_dev = true` is set and asserted by `migration:check`, the release artifact config and preflight. **P1-3** `ACCOUNT_LEGACY_ORIGINS = ""` is in `[vars]` and asserted to equal `legacy − website`. **P1-2** preflight accepts the reviewed transition (`previousDeploymentOrigins` in `origins.mjs`) only when the new legacy list keeps the old website. **P1-6** both live-audit workflows declare `AUDIT_LEGACY_ORIGINS` and run each audit once per origin via `scripts/live-audit-origins.mjs`. The live origin is unchanged.
 - 2026-10-22 `fix/origin-constants`: fixed P1-4, P1-5, P1-7, P2-2, P2-3 (forwarded host no longer trusted; `og:url` + canonical on public pages), P2-7 (POST targets; OIDC audience kept), P2-8, P3-1, P3-2.
+- 2026-10-22 `feature/sitemap-robots`: **P2-9** (remainder). The Worker serves `/robots.txt` (disallows `/api/`, `/_serverFn/`, `/account`, `/share`) and `/sitemap.xml` (the seven public pages). Both are built from `deploymentOrigins.website` and never from the request host, so the old host points crawlers at the new address after cutover. Canonical tags had already landed in `fix/origin-constants`.
