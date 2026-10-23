@@ -45,6 +45,8 @@ import { terrainLabel } from "./map-route-planner";
 import { Button, Modal, Segmented, Switch } from "./ui";
 import { AppLink } from "./app-link";
 import { CommandForm } from "./world-tools";
+import { defaultLocationMap } from "@/lib/quire/connected-maps";
+import { readTabletopSession } from "@/lib/quire/tabletop";
 import { DEFAULT_TRAVEL } from "@/lib/quire/journey-schema";
 import { X } from "lucide-react";
 
@@ -853,6 +855,13 @@ function ArrivalDialog({ table, journey: j, notYet }: { table: Table; journey: J
   const to = placeName(table, j.destinationLocationId);
   const market = readMarketLocations(table.journal?.market);
   const open = table.shops.filter((s) => s.locationId === j.destinationLocationId && !s.closed);
+  const [show, setShow] = useState(false);
+  const scene = j.destinationLocationId
+    ? defaultLocationMap(
+        (table.journal?.world?.maps ?? []).filter((m) => m.visible),
+        j.destinationLocationId,
+      )
+    : undefined;
   return (
     <Modal open onOpenChange={(o) => !o && notYet()} title="Move party here?">
       <p>The party has reached {to ?? "the end of its route"} on the frozen route.</p>
@@ -864,6 +873,12 @@ function ArrivalDialog({ table, journey: j, notYet }: { table: Table; journey: J
       </ul>
       {!j.destinationLocationId && (
         <p>This journey ends at a point on the map, not a place. Stop the journey to keep the party there.</p>
+      )}
+      {scene && (
+        <label className="map-journey-share">
+          <input type="checkbox" checked={show} onChange={(e) => setShow(e.target.checked)} /> Also show {to} to players
+          <span className="map-route-help"> Runs Activate for players afterwards; the result reports each step.</span>
+        </label>
       )}
       <div className="map-route-actions">
         <Button variant="secondary" onClick={notYet}>
@@ -883,6 +898,20 @@ function ArrivalDialog({ table, journey: j, notYet }: { table: Table; journey: J
                   ? canonicalJson(table.journal.world.partyPosition)
                   : undefined,
               });
+              if (!show || !scene) return;
+              const session = readTabletopSession(table);
+              try {
+                await actions.commandOutcome({
+                  id: newCommandId(),
+                  kind: "tabletop-session",
+                  before: table.journal?.world?.tabletop ?? null,
+                  session: { ...session, activeMapId: scene.id, activationId: crypto.randomUUID(), camera: null },
+                });
+              } catch (e) {
+                throw Error(
+                  `The party moved to ${to}, but ${scene.name} could not be shown to players: ${e instanceof Error ? e.message : "try Activate for players"}.`,
+                );
+              }
             })
           }
         >
