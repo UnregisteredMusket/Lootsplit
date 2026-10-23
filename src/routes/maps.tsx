@@ -1,8 +1,15 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { Shell } from "@/components/shell";
 import { CampaignMaps } from "@/components/campaign-map";
+// `record=kind:id` shows a record on the map (anyone; the map checks permissions). Presentation
+// only: it changes no campaign data and no one else's camera.
+const bounded = (value: unknown, limit: number) =>
+  typeof value === "string" ? value.slice(0, limit) : undefined;
 export const Route = createFileRoute("/maps")({
-  validateSearch: (s: Record<string, unknown>) => ({ map: typeof s.map === "string" ? s.map.slice(0, 150) : undefined }),
+  validateSearch: (s: Record<string, unknown>) => ({
+    map: bounded(s.map, 150),
+    record: bounded(s.record, 170),
+  }),
   component: () => (
     <Shell>
       <CampaignMaps />

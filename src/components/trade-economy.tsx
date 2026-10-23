@@ -1,3 +1,4 @@
+import { MapRecordStrip } from "./map-record-strip";
 import {
   useState,
   useMemo,
@@ -191,6 +192,7 @@ export function TradeEconomyPanel() {
               · {e.open ? "Open" : "Closed"} · {e.offers.length} goods
             </p>
             {e.notes && <p>{e.notes}</p>}
+            <MapRecordStrip reference={{ kind: "exchange", id: e.id }} />
             {dm && (
               <p>
                 {table.purses.find((p) => p.id === e.purseId)

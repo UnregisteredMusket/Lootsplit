@@ -1,4 +1,5 @@
 import { CharacterPlacement } from "./character-placement";
+import { MapRecordStrip } from "./map-record-strip";
 import { characterLocation, characterPosition } from "@/lib/quire/character-position";
 import { SearchSelect } from "@/components/search-select";
 import { useEffect, useRef, useState } from "react";
@@ -20,6 +21,7 @@ import type { CloudTable } from "@/lib/quire/cloud";
 import { NpcConversation } from "./npc-conversation";
 import { NpcBarterConfigForm } from "./npc-barter-desk";
 import { npcAnswersBarter } from "@/lib/quire/npc-barter";
+import { npcPinOpensHub } from "@/lib/quire/place-hub";
 
 export function LocationNpcs() {
   const t = useWorldTable(),
@@ -210,6 +212,7 @@ export function LocationNpcs() {
                 </p>
               </span>
             </div>
+            <MapRecordStrip reference={{ kind: "npc", id: n.id }} />
             <details className="npc-record-details">
               <summary aria-label={`Details & actions for ${n.name}`}>Details & actions</summary>
               <div className="world-toolbar">
@@ -413,7 +416,16 @@ function NpcSmithToggle({ npc }: { npc: Npc }) {
     </CommandForm>
   );
 }
-function NpcInteraction({ npc, table }: { npc: Npc; table: CloudTable }) {
+function NpcInteraction({
+  npc,
+  table,
+  showConversation = true,
+}: {
+  npc: Npc;
+  table: CloudTable;
+  /** False where the conversation hub is already shown above (the map's NPC pin). */
+  showConversation?: boolean;
+}) {
   const seat = useSeat(),
     dm = seat.role === "dm",
     controller = npcController(npc, seat),
@@ -444,7 +456,9 @@ function NpcInteraction({ npc, table }: { npc: Npc; table: CloudTable }) {
   return (
     <section className="world-card">
       <h2>{npc.name} · interaction</h2>
-      {npcAnswersBarter(npc) && near && <NpcConversation key={npc.id} npc={npc} table={table} />}
+      {showConversation && npcAnswersBarter(npc) && near && (
+        <NpcConversation key={npc.id} npc={npc} table={table} />
+      )}
       <h3>Inventory</h3>
       {table.holdings
         .filter((h) => h.purseId === npc.id && h.quantity > 0 && !h.custody && !h.reservedFor)
@@ -605,10 +619,29 @@ function NpcInteraction({ npc, table }: { npc: Npc; table: CloudTable }) {
   );
 }
 
-/** Reuses the same dialogue/barter controls without the NPC directory. */
-export function NpcMapService({ npcId }: { npcId: string }) {
-  const table = useWorldTable(), seat = useSeat();
-  const npc = table.journal.world?.npcs.find(n => n.id === npcId);
-  if (!npc || (seat.role !== "dm" && !npcAvailableHere(npc, table))) return <p>This NPC is unavailable here.</p>;
-  return <><p>{npc.description}</p><NpcInteraction key={npc.id} npc={npc} table={table} /></>;
+/** Reuses the same dialogue/barter controls without the NPC directory. An NPC pin opens the
+ * conversation hub (Barter, Shop, Services, Talk, Farewell) directly; NPCs a player controls keep
+ * the existing interaction (Talk plus the Trading & Barter table). */
+export function NpcMapService({ npcId, onFarewell }: { npcId: string; onFarewell?: () => void }) {
+  const table = useWorldTable(),
+    seat = useSeat();
+  const npc = table.journal.world?.npcs.find((n) => n.id === npcId);
+  if (!npc || (seat.role !== "dm" && !npcAvailableHere(npc, table)))
+    return <p>This NPC is unavailable here.</p>;
+  if (!npcPinOpensHub(npc))
+    return (
+      <>
+        <p>{npc.description}</p>
+        <NpcInteraction key={npc.id} npc={npc} table={table} />
+      </>
+    );
+  return (
+    <>
+      <NpcConversation key={npc.id} npc={npc} table={table} onFarewell={onFarewell} />
+      <Fold title={`More about ${npc.name}`}>
+        <p>{npc.description}</p>
+        <NpcInteraction key={npc.id} npc={npc} table={table} showConversation={false} />
+      </Fold>
+    </>
+  );
 }
