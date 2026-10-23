@@ -203,8 +203,10 @@ try {
     assert.equal(new URL(page.url()).pathname, "/");
     // Opening the app marks this browser, so the bare address now goes straight into the app.
     await page.waitForFunction(() => document.cookie.includes("lootsplit-app=1"));
-    await page.goto(origin + "/");
-    assert.equal(new URL(page.url()).pathname, "/");
+    await page.waitForLoadState("networkidle");
+    const returning = await context.newPage();
+    await returning.goto(origin + "/");
+    assert.equal(new URL(returning.url()).pathname, "/");
     await context.close();
   }
   // A first visit to the bare address (a new visitor or a search engine) opens the home page.

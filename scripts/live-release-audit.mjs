@@ -60,7 +60,9 @@ assert.deepEqual(
       redirect: "manual",
       signal: AbortSignal.timeout(15000),
     });
-    assert.equal(app.status, 200, `${path} ${cookie} must serve the app`);
+    // The app may normalise its own search (/ → /?view=home); it must never send this visitor home.
+    assert.ok(app.status < 400, `${path} ${cookie} must serve the app (${app.status})`);
+    assert.notEqual(app.headers.get("location"), "/welcome", `${path} ${cookie} must serve the app`);
   }
 }
 for (const path of ["/", "/?install=1"]) {
