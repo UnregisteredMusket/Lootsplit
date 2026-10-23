@@ -6,12 +6,13 @@ import { financeMove, readFinance } from "./finance.ts";
 import { toCopper } from "./money.ts";
 import { smithQuote, smithHere, smithDescription } from "./blacksmith.ts";
 import { validateBlacksmith } from "./blacksmith-validation.ts";
+import { controlOrder, downtimePending } from "./service-core.ts";
 const same = (a: unknown, b: unknown) => canonicalJson(a) === canonicalJson(b);
 const open = (o: SmithOrder) => ["active", "paused", "ready"].includes(o.status);
 export function applySmithCommand(t: CloudTable, seat: CloudSeat, cmd: SmithCommand, at: number) {
   const s = readBlacksmith(t.journal?.blacksmith),
     f = readFinance(t.journal?.finance);
-  if (f.downtime.some((d) => d.status === "pending"))
+  if (downtimePending(t))
     throw Error("Approve or cancel pending downtime before changing smith services or orders.");
   const dm = () => {
     if (seat.role !== "dm")
@@ -109,15 +110,7 @@ export function applySmithCommand(t: CloudTable, seat: CloudSeat, cmd: SmithComm
       order.message = "Collected into inventory.";
     } else {
       dm();
-      if (
-        (cmd.action === "pause" && order.status !== "active") ||
-        (cmd.action === "resume" && order.status !== "paused") ||
-        (cmd.action === "cancel" && !open(order))
-      )
-        throw Error("This commission cannot make that status change.");
-      order.status =
-        cmd.action === "pause" ? "paused" : cmd.action === "resume" ? "active" : "cancelled";
-      order.message = cmd.reason;
+      controlOrder(order, cmd.action, cmd.reason, (o) => open(o as SmithOrder));
     }
   }
   t.journal!.blacksmith = s;

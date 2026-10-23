@@ -19,6 +19,7 @@ import type { BarterAttempt, BarterSide } from "@/lib/quire/npc-barter-schema";
 import { useNpcBarterQuote } from "@/lib/quire/use-npc-barter";
 import type { CloudTable } from "@/lib/quire/cloud";
 import type { Holding, Purse } from "@/lib/quire/types";
+import { npcServices, servicesReply, type HubService } from "@/lib/quire/service-hub";
 import { AppLink } from "./app-link";
 
 // The reusable NPC conversation (docs/NPC-BARTER.md): a portrait stage, a transcript and
@@ -340,7 +341,7 @@ export function NpcConversation({
   const character = characters.find((p) => p.id === characterId);
   const lines = npc.barter?.lines,
     say = (key: "greet" | "barter" | "bye") => lines?.[key] ?? STANCE_LINES.fair[key];
-  const [step, setStep] = useState<"hub" | "barter" | "left">("hub");
+  const [step, setStep] = useState<"hub" | "barter" | "services" | "left">("hub");
   const [local, setLocal] = useState<Line[]>(() => [{ kind: "npc", text: say("greet"), key: "greet-0" }]);
   const [typing, setTyping] = useState<string | undefined>("greet-0");
   const [drawer, setDrawer] = useState(false);
@@ -442,6 +443,16 @@ export function NpcConversation({
   }
 
   const replies: Reply[] = [];
+  // Every provider this NPC runs, each with the same availability check the server runs.
+  const providers = npcServices(table, npc.id, character?.id);
+  const serviceReply = (p: HubService): Reply => ({
+    tag: p.tag,
+    text: p.text,
+    // A locked entry shows its reason; a ready order is still worth mentioning.
+    sub: p.locked && !p.ready ? undefined : p.sub,
+    href: p.href,
+    disabled: p.locked || undefined,
+  });
   const leave: Reply = {
     text: "Farewell.",
     tone: "leave",
@@ -493,7 +504,6 @@ export function NpcConversation({
     });
     replies.push(leave);
   } else if (step === "hub") {
-    const smith = table.journal?.blacksmith?.profiles.find((p) => p.npcId === npc.id);
     replies.push({
       tag: "Barter",
       text: "I'd like to make you an offer.",
@@ -514,10 +524,25 @@ export function NpcConversation({
       },
     });
     replies.push({ tag: "Shop", text: "What's for sale around here?", href: "/market", sub: "Opens the Market's shops at the party's location." });
+    const services = servicesReply(providers, npc.name);
     replies.push(
-      smith
-        ? { tag: "Services · Blacksmith", text: "Do you take commissions?", href: `/shop/${encodeURIComponent(smith.shopId)}`, sub: "Opens the existing blacksmith services." }
-        : { tag: "Services", text: "Do you offer any services?", disabled: `${npc.name} offers no services.` },
+      services.mode === "direct"
+        ? serviceReply(services)
+        : services.mode === "list"
+          ? {
+              tag: services.tag,
+              text: services.text,
+              sub: services.sub,
+              disabled: services.locked || undefined,
+              run: () => {
+                push(
+                  { kind: "pc", text: services.text, tag: "Services", key: nextKey("pc") },
+                  { kind: "npc", text: "Here's what I can do for you.", key: nextKey("npc") },
+                );
+                setStep("services");
+              },
+            }
+          : { tag: services.tag, text: services.text, disabled: services.locked },
     );
     replies.push({
       tag: "Talk",
@@ -526,6 +551,17 @@ export function NpcConversation({
       sub: "Your message thread with this NPC. The DM (or a controller) replies.",
     });
     replies.push(leave);
+  } else if (step === "services") {
+    for (const p of providers) replies.push({ ...serviceReply(p), tag: `${p.tag} · ${p.place}` });
+    replies.push({
+      text: "Never mind.",
+      tone: "leave",
+      sub: "Back to the conversation.",
+      run: () => {
+        push({ kind: "pc", text: "Never mind.", key: nextKey("pc") }, { kind: "npc", text: say("greet"), key: nextKey("npc") });
+        setStep("hub");
+      },
+    });
   } else {
     replies.push({
       tag: drawer ? "Hide my offer" : "Show my goods",
