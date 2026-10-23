@@ -22,6 +22,8 @@ const PLAYER_ROUTES = new Set([
   "/market",
   "/maps",
   "/help",
+  // Find a group: the public Looking for Group directory, open to players (docs/COMMUNITY.md).
+  "/community",
 ]);
 
 function links(groups: typeof HELP_GROUPS) {

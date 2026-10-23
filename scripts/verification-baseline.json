@@ -14,6 +14,7 @@
   "node scripts/recovery-step.mjs dev-account-2 240 node scripts/account-browser-audit.mjs",
   "node scripts/recovery-step.mjs dev-owner 240 node scripts/owner-browser-audit.mjs",
   "node scripts/recovery-step.mjs dev-member 240 node scripts/member-browser-audit.mjs",
+  "node scripts/recovery-step.mjs dev-community 240 node scripts/community-browser-audit.mjs",
   "node scripts/recovery-step.mjs dev-monitor 240 node scripts/monitor-browser-audit.mjs",
   "node scripts/recovery-step.mjs dev-bug 240 node scripts/bug-browser-audit.mjs",
   "node scripts/recovery-step.mjs dev-character 240 node scripts/character-browser-audit.mjs",

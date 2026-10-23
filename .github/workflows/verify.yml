@@ -182,6 +182,9 @@ jobs:
       - name: dev-member
         if: matrix.group == 'accounts'
         run: node scripts/recovery-step.mjs dev-member 240 node scripts/member-browser-audit.mjs
+      - name: dev-community
+        if: matrix.group == 'accounts'
+        run: node scripts/recovery-step.mjs dev-community 240 node scripts/community-browser-audit.mjs
       - name: dev-monitor
         if: matrix.group == 'accounts'
         run: node scripts/recovery-step.mjs dev-monitor 240 node scripts/monitor-browser-audit.mjs

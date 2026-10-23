@@ -31,6 +31,7 @@ const publicPaths = new Set([
   "/resources",
   "/donate",
   "/privacy",
+  "/community",
   "/account",
 ]);
 /** Resolve identity before providers open any campaign storage. Never erase legacy saves. */
@@ -117,6 +118,7 @@ export function CampaignGate({ children }: { children: ReactNode }) {
     );
   if (
     publicPaths.has(path) ||
+    path.startsWith("/community/") ||
     allowed ||
     !!sessionStorage.getItem("lootsplit.player.reconnect.v1") ||
     invitation ||

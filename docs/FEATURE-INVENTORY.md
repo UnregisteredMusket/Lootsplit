@@ -1,3 +1,7 @@
+# Community profiles and Find a group — October 23, 2026
+
+- **Community profile** in My account: hidden by default; each member chooses signed-in members or everyone. Handle (profile address `/community/<handle>`), DM / player / both, looking for players or a group with a note, games, time zone, play times and an optional Discord username, shown with the existing display name, picture and introduction. Never an email address.
+- **Find a group** (`/community`): directory filtered by role, looking for, game, time zone and name; profile pages with Discord copy and Report. Staff review reports in My account and can hide or show a profile (moderation audit). Details: [COMMUNITY.md](COMMUNITY.md).
 # Party treasure pool and item claims — October 23, 2026 (prompt 2, phase 2)
 
 - **The pool (owner decision 2026-10-23).** The pool is a party fund's holdings with an optional `pool` marker (`Holding.pool: { at, source: "encounter" | "add-loot" | "dm", encounterId?, receiptId? }`), not a new purse kind, so Funds & inventory, combined wealth, valuations, exports, backups and session reports keep showing pooled items. With no party fund the pool is unavailable (no fund is created automatically). Party → **Treasure pool** (a new tab for the DM and players) lists the lots; Add loot offers **Put in the treasure pool** when the owner is a party fund; encounter loot review offers **Treasure pool · <fund>** per item and **Send all items to the treasure pool**.

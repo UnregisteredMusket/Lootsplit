@@ -307,6 +307,19 @@ export const PLAYER_HELP_GROUPS: HelpGroup[] = [
         ],
       },
       {
+        id: "find-a-group",
+        title: "Find players or a group",
+        paragraphs: [
+          "Find a group (lootsplitter.com/community) lists community profiles of Dungeon Masters looking for players and players looking for a table. Filter by role, what people are looking for, game, time zone or name. Signed-in members also see members-only profiles.",
+          "To appear there, open My account → Community profile, choose a handle (your profile address is lootsplitter.com/community/your-handle), then choose who can see it: nobody (the default), signed-in Lootsplitter members, or everyone including search engines. Add whether you DM, play or both, your games, time zone, usual play times, a looking-for-group note and, if you want people to message you, your Discord username. The profile also shows your display name, picture and introduction from your member profile; your email addresses are never shown.",
+          "Signed-in members can report a profile from its page. Site staff review reports in My account and can hide a profile; its owner sees a notice and can contact support. Lootsplitter has no private messages between members: arrange games on Discord or wherever you both chat.",
+        ],
+        links: [
+          ["Find a group", "/community"],
+          ["Community profile", "/account#account-community"],
+        ],
+      },
+      {
         id: "permissions",
         title: "Assignment and session access",
         paragraphs: [
