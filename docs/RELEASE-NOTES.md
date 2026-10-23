@@ -1,3 +1,26 @@
+# Lootsplitter 1.11.0
+
+Android version code **18**, same package and permanent signing certificate. Install over the existing app; do not uninstall or clear saved data.
+
+## Added
+
+- **New app icon and splash screen.** The Lootsplitter kobold clutching a gold coin (the owner's brand set, `docs/brand/`). The adaptive icon has a navy background and a monochrome layer for Android 13+ themed icons; the legacy and round icons and the pre-Android-12 splash use the same mark. The in-app title animation is unchanged.
+- **Even coin split** (#230). Split a party fund or an encounter's coins between party members in one step; leftover copper goes to the party fund by default.
+- **Map place hub** (#228, #232). Pins open place cards, records have Show on map, DMs can Place on map and use portrait pins, and the Here sheet lists what is available at the party's location.
+- **Map tools** (#211). Consolidate fog, the alternating 5/10/5 diagonal rule.
+
+## Improved
+
+- Shared map images are sent as references and cached on the device (tabletop protocol 4, #209).
+- Players see when the DM's device is still updating the map; screen readers announce token moves, pings and scene changes (#211).
+- Website links in the app use lootsplitter.com (#214).
+
+## Fixed
+
+- None in this release.
+
+---
+
 # Lootsplitter 1.10.0
 
 Android version code **17**, same package and permanent signing certificate. Install over the existing app; do not uninstall or clear saved data.
