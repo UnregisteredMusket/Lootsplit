@@ -75,6 +75,9 @@ try {
       assert.ok((await appLink.boundingBox()).height >= 44, `${path} app link target ${width}`);
       for (const old of ["Open app", "Open browser app", "Start your ledger"])
         assert.equal(await page.getByRole("link", { name: old, exact: true }).count(), 0);
+      const footerNav = page.getByRole("navigation", { name: "Website footer" });
+      for (const label of ["Home", "Features", "Downloads", "Changelog", "Help", "Resources", "Donate"])
+        assert.equal(await footerNav.getByRole("link", { name: label, exact: true }).count(), 1, `${path} footer ${label}`);
       const identity = page.locator(".ls-footer-identity");
       assert.match(
         await identity.innerText(),
@@ -83,9 +86,11 @@ try {
       assert.match(await identity.getAttribute("href"), /\/downloads#release-details$/);
       assert.equal(await page.getByText("About this app & releases", { exact: true }).count(), path === "downloads" ? 1 : 0);
       const current = path === "welcome" ? null : `/${path}`;
+      // Changelog and Resources are marked current in the footer; the rest in the header too.
+      const marked = ["/updates", "/resources"].includes(current ?? "") ? ".ls-footer-nav" : ".ls-header nav";
       if (current)
         assert.equal(
-          await page.locator(`.ls-header nav a[href="${current}"]`).getAttribute("aria-current"),
+          await page.locator(`${marked} a[href="${current}"]`).getAttribute("aria-current"),
           "page",
         );
       if (width <= 768) {
@@ -96,8 +101,11 @@ try {
         assert.equal(await menu.getAttribute("aria-expanded"), "false");
         await menu.click();
         assert.equal(await menu.getAttribute("aria-expanded"), "true");
-        for (const label of ["Features", "Downloads", "Changelog", "Help", "Resources", "Donate", "My account"])
+        for (const label of ["Features", "Downloads", "Help", "Donate", "My account"])
           await nav.getByRole("link", { name: label, exact: true }).waitFor();
+        // Changelog and Resources moved to the footer (owner decision 2026-10-23), beside Home.
+        for (const label of ["Changelog", "Resources"])
+          assert.equal(await nav.getByRole("link", { name: label, exact: true }).count(), 0);
         await page.keyboard.press("Escape");
         assert.equal(await menu.getAttribute("aria-expanded"), "false");
         assert.equal(await nav.isVisible(), false);
@@ -167,6 +175,10 @@ try {
         assert.ok((await older.locator("li").count()) > 0);
       }
       if (path === "downloads") {
+        // Technical details are folded for players (W8); the summary opens them.
+        const tech = page.locator("details.ls-tech");
+        assert.equal(await tech.evaluate((el) => el.open), false);
+        await tech.locator("summary").click();
         const details = page.locator("#release-details");
         await details.getByText(/Browser · Client release label/).waitFor();
         const identityText = await details.innerText();
@@ -195,6 +207,11 @@ try {
     await page.getByRole("heading", { name: "One party. Your platform." }).waitFor();
     const download = page.getByRole("link", { name: "Download for Android", exact: true });
     assert.equal(await download.getAttribute("href"), "/download/android");
+    await page.getByText("Why isn’t this on Google Play?", { exact: true }).waitFor();
+    await page.getByText("Works in any modern browser, with nothing to install.", { exact: true }).waitFor();
+    // The footer's release link opens the folded technical details.
+    await page.locator(".ls-footer-identity").click();
+    await page.waitForURL(/\/downloads#release-details$/);
     await page.locator(".ls-hash").waitFor({ state: "visible" });
     assert.equal(await page.locator(".ls-hash").textContent(), release.sha256);
     await page.getByRole("link", { name: "Installation & update guide" }).click();

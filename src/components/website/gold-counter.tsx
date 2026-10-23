@@ -7,11 +7,46 @@ import {
 } from "@/lib/website/public-spending";
 import "./release-presentation.css";
 
-/** Ledger entry No. 1: the public aggregate spending total and how it is counted. */
-export function GoldSpentCounter() {
+/** The home page shows the treasury total only once it is impressive (owner decision 2026-10-23):
+ * 10,000 gp, in copper. Below it, while loading and on failure the entry is left out; the endpoint
+ * and the counting are unchanged. */
+export const TREASURY_PUBLIC_MIN_COPPER = 1_000_000;
+
+/** Home page ledger entry "The treasury", shown only at or above `minimumCopper`. */
+export function TreasuryEntry({
+  minimumCopper = TREASURY_PUBLIC_MIN_COPPER,
+}: {
+  minimumCopper?: number;
+}) {
   const [snapshot, setSnapshot] = useState<PublicSpendingSnapshot | null>(null);
+  useEffect(() => {
+    let alive = true;
+    accountRequest<unknown>("site-analytics")
+      .then((value) => {
+        if (alive) setSnapshot(parsePublicSpendingSnapshot(value));
+      })
+      .catch(() => {});
+    return () => {
+      alive = false;
+    };
+  }, []);
+  if (!snapshot || snapshot.spentCopper < minimumCopper) return null;
+  return (
+    <div className="ls-ledger-entry">
+      <p className="ls-sc ls-entry-no">The treasury</p>
+      <GoldSpentCounter initial={snapshot} />
+    </div>
+  );
+}
+
+/** Ledger entry No. 1: the public aggregate spending total and how it is counted. */
+export function GoldSpentCounter({
+  initial = null,
+}: { initial?: PublicSpendingSnapshot | null } = {}) {
+  const [snapshot, setSnapshot] = useState<PublicSpendingSnapshot | null>(initial);
   const [failed, setFailed] = useState(false);
   useEffect(() => {
+    if (initial) return;
     let alive = true;
     accountRequest<unknown>("site-analytics")
       .then((value) => {
@@ -24,7 +59,7 @@ export function GoldSpentCounter() {
     return () => {
       alive = false;
     };
-  }, []);
+  }, [initial]);
   return (
     <div className="ls-spending-total">
       <div role="status">
