@@ -101,6 +101,8 @@ try {
   await openApplication(staff.page, origin + "/account");
   const reports = staff.page.locator("section", { has: staff.page.getByRole("heading", { name: "Community profile reports" }) });
   await reports.getByText("“Audit report”", { exact: false }).waitFor();
+  assert.equal(await reports.getByRole("button", { name: "Hide profile" }).first().isDisabled(), true, "a reason is required");
+  await reports.getByLabel(/^Reason/).first().fill("Audit: spam");
   await reports.getByRole("button", { name: "Hide profile" }).first().click();
   await reports.getByText("No open reports.").waitFor();
   await anonPage.reload();

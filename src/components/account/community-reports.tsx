@@ -17,6 +17,7 @@ export function CommunityReports() {
   const [reports, setReports] = useState<Report[] | null>(null);
   const [error, setError] = useState("");
   const [busy, setBusy] = useState("");
+  const [reasons, setReasons] = useState<Record<string, string>>({});
   const load = useCallback(async () => {
     try {
       setReports((await accountRequest<{ reports: Report[] }>("staff/community-reports")).reports);
@@ -31,7 +32,7 @@ export function CommunityReports() {
     setBusy(handle);
     setError("");
     try {
-      await accountRequest("staff/community-action", { handle, action, reason: "" });
+      await accountRequest("staff/community-action", { handle, action, reason: reasons[handle] ?? "" });
       await load();
     } catch (e) {
       setError(e instanceof Error ? e.message : "Could not update that profile.");
@@ -72,13 +73,21 @@ export function CommunityReports() {
                   </li>
                 ))}
               </ul>
+              <label>
+                Reason (recorded in the moderation log)
+                <input
+                  maxLength={500}
+                  value={reasons[handle] ?? ""}
+                  onChange={(e) => setReasons({ ...reasons, [handle]: e.target.value })}
+                />
+              </label>
               <div className="portal-actions">
                 {list[0]!.community_hidden ? (
-                  <button className="portal-button secondary" disabled={!!busy} onClick={() => act(handle, "show")}>
+                  <button className="portal-button secondary" disabled={!!busy || !(reasons[handle] ?? "").trim()} onClick={() => act(handle, "show")}>
                     Show profile again
                   </button>
                 ) : (
-                  <button className="portal-button" disabled={!!busy} onClick={() => act(handle, "hide")}>
+                  <button className="portal-button" disabled={!!busy || !(reasons[handle] ?? "").trim()} onClick={() => act(handle, "hide")}>
                     Hide profile
                   </button>
                 )}

@@ -111,7 +111,7 @@ export function communityFields(body) {
   };
 }
 
-const ACTIVE = `NOT (COALESCE(a.status,'active')='revoked' OR (a.status='banned' AND (a.ban_until IS NULL OR a.ban_until>?)))`;
+const ACTIVE = `NOT (COALESCE(a.status,'active')='revoked' OR (COALESCE(a.status,'active')='banned' AND (a.ban_until IS NULL OR a.ban_until>?)))`;
 const PUBLIC_COLUMNS = `p.handle,u.name,u.createdAt AS member_since,COALESCE(p.introduction,'') AS introduction,
   CASE WHEN COALESCE(p.portrait,'')<>'' THEN 1 ELSE 0 END AS has_portrait,p.revision,
   p.play_role,p.games,p.time_zone,p.play_times,p.discord,p.lfg,p.lfg_note,p.community_changed_at`;
@@ -242,7 +242,7 @@ export async function communityDirectory(db, viewer, url) {
   const game = (params.get("game") || "").trim().slice(0, 30);
   const zone = (params.get("tz") || "").trim().slice(0, 64);
   const q = (params.get("q") || "").trim().slice(0, 60);
-  const offset = Math.max(0, Math.min(100000, Number(params.get("offset")) || 0));
+  const offset = Math.max(0, Math.min(100000, Math.floor(Number(params.get("offset")) || 0)));
   if (role && !["dm", "player"].includes(role)) fail("Unknown role filter.");
   if (lfg && !["players", "group"].includes(lfg)) fail("Unknown looking-for filter.");
   const like = (s) => "%" + s.replace(/[\\%_]/g, "\\$&") + "%";
@@ -292,9 +292,9 @@ export async function communityDirectory(db, viewer, url) {
 
 /** The portrait image for a visible profile, as bytes with its own content type. */
 export async function communityPortrait(db, viewer, rawHandle) {
-  const { profile, self } = await communityProfile(db, viewer, rawHandle);
+  const { profile } = await communityProfile(db, viewer, rawHandle);
   const row = await db
-    .prepare("SELECT portrait,visibility FROM member_profiles WHERE handle=?")
+    .prepare("SELECT portrait FROM member_profiles WHERE handle=?")
     .bind(profile.handle)
     .first();
   const match = /^data:(image\/(?:png|jpeg|webp));base64,([A-Za-z0-9+/=]+)$/.exec(row?.portrait || "");
@@ -304,8 +304,8 @@ export async function communityPortrait(db, viewer, rawHandle) {
     headers: {
       "Content-Type": match[1],
       "X-Content-Type-Options": "nosniff",
-      "Cache-Control":
-        row.visibility === "public" && !self ? "public, max-age=300" : "private, max-age=60",
+      // The account API marks every response no-store, so visibility changes apply at once.
+      "Cache-Control": "no-store",
     },
   });
 }
@@ -353,12 +353,23 @@ export async function moderateCommunityProfile(db, actor, body, sessionId) {
   const handle = typeof body?.handle === "string" ? body.handle.trim().toLowerCase() : "";
   if (!["hide", "show", "dismiss"].includes(body?.action)) fail("Unknown community action.");
   const reason = text(body?.reason ?? "", 500, "The reason");
+  if (body.action !== "dismiss" && !reason) fail("Give a short reason; it is recorded in the moderation log.");
   const guard = await staffCommitGuard(db, actor, sessionId, STAFF);
   const target = await db
     .prepare("SELECT user_id FROM member_profiles WHERE handle=?")
     .bind(handle)
     .first();
   if (!target) fail("No profile with that handle.", 404);
+  // Same rule as account moderation (members.mjs): never yourself or the owner, and only the
+  // owner acts on other staff.
+  const actorRole = await roleOf(db, actor);
+  const targetRole = await roleOf(db, target.user_id);
+  if (
+    target.user_id === actor ||
+    targetRole === "owner" ||
+    (actorRole !== "owner" && targetRole !== "member")
+  )
+    fail("You cannot moderate yourself or this staff account.", 403);
   const now = Date.now();
   const statements = [];
   if (body.action !== "dismiss")

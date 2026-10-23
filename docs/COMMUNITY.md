@@ -13,6 +13,8 @@ Owner decisions, 2026-10-23: profiles **yes**; an on-site Looking for Group **di
 ## Safety and moderation
 
 - Banned or revoked accounts and staff-hidden profiles are never listed or shown (to anyone but their owner).
+- Handles are unique, so a signed-in member who tries to take a handle can learn that it is in use even when its profile is hidden. That is inherent to unique addresses; the profile itself stays unreadable.
+- Staff follow the account-moderation rule: nobody moderates themselves or the owner, and only the owner acts on other staff. Hide and Show need a reason, recorded in `moderation_audit`.
 - Reports: signed-in members only, not their own profile, at most 5 per reporter per 24 h (`community_reports`).
 - Staff (owner, admin, moderator) see **Community profile reports** in My account and can **Hide profile**, **Show profile again** or **Dismiss reports**. Each action resolves the open reports and writes a `community-hide` / `community-show` / `community-dismiss` entry to `moderation_audit`, behind the same live staff-session guard as other staff actions. The member sees a notice that staff hid their profile.
 

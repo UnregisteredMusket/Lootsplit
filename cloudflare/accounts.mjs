@@ -355,12 +355,17 @@ export async function handleAccounts(request, env) {
           viewer = null;
         }
       }
-      const rest = path.slice("/api/account/community/".length);
+      let rest = "";
+      try {
+        rest = decodeURIComponent(path.slice("/api/account/community/".length));
+      } catch {
+        fail("No profile with that name is visible to you.", 404);
+      }
       if (rest === "directory") return cors(json(await communityDirectory(db, viewer, new URL(request.url))));
       if (rest.startsWith("profile/"))
-        return cors(json(await communityProfile(db, viewer, decodeURIComponent(rest.slice(8)))));
+        return cors(json(await communityProfile(db, viewer, rest.slice(8))));
       if (rest.startsWith("portrait/"))
-        return cors(await communityPortrait(db, viewer, decodeURIComponent(rest.slice(9))));
+        return cors(await communityPortrait(db, viewer, rest.slice(9)));
     }
     const session = await auth.api.getSession({ headers: request.headers });
     if (!session) fail("Sign in to open your account library.", 401);

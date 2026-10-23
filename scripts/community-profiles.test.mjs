@@ -148,7 +148,11 @@ test("banned members and staff-hidden profiles disappear; reports reach staff", 
   assert.equal((await ownCommunityProfile(db, "u-dm")).hidden_by_staff, true);
   const audit = await db.prepare("SELECT action FROM moderation_audit WHERE target_id='u-dm'").first();
   assert.equal(audit.action, "community-hide");
-  await moderateCommunityProfile(db, "u-staff", { handle: "kobold_dm", action: "show", reason: "" }, "s1");
+  await assert.rejects(
+    moderateCommunityProfile(db, "u-staff", { handle: "kobold_dm", action: "show", reason: "" }, "s1"),
+    /reason/,
+  );
+  await moderateCommunityProfile(db, "u-staff", { handle: "kobold_dm", action: "show", reason: "Reviewed" }, "s1");
   assert.equal((await communityDirectory(db, null, url())).total, 1);
   await db.prepare("UPDATE member_access SET status='banned',ban_until=NULL WHERE user_id='u-dm'").run();
   assert.equal((await communityDirectory(db, null, url())).total, 0);
@@ -179,4 +183,29 @@ test("portraits are served only for visible profiles, as image bytes", async () 
   assert.equal(response.headers.get("content-type"), "image/png");
   assert.equal((await response.arrayBuffer()).byteLength, 8);
   assert.match((await communityProfile(db, "u-viewer", "bram")).profile.portrait, /^\/api\/account\/community\/portrait\/bram\?v=\d+$/);
+});
+
+test("moderators cannot moderate themselves, the owner or other staff (same rule as account moderation)", async () => {
+  const db = await setup();
+  await db.prepare("INSERT INTO site_roles(user_id,role,granted_at) VALUES ('u-dm','owner',0)").run();
+  await saveCommunityProfile(db, "u-dm", base({ handle: "the_owner" }));
+  await saveCommunityProfile(db, "u-staff", base({ handle: "the_mod" }));
+  await saveCommunityProfile(db, "u-pl", base({ handle: "bram" }));
+  await db.prepare("INSERT INTO session(id,userId,token,expiresAt,createdAt,updatedAt) VALUES ('s1','u-staff','t1',?,?,?)")
+    .bind(new Date(Date.now() + 3600000).toISOString(), new Date().toISOString(), new Date().toISOString()).run();
+  for (const handle of ["the_owner", "the_mod"])
+    await assert.rejects(
+      moderateCommunityProfile(db, "u-staff", { handle, action: "hide", reason: "x" }, "s1"),
+      (e) => e.status === 403,
+      handle,
+    );
+  await moderateCommunityProfile(db, "u-staff", { handle: "bram", action: "hide", reason: "spam" }, "s1");
+  assert.deepEqual((await communityDirectory(db, null, url())).profiles.map((p) => p.handle).sort(), ["the_mod", "the_owner"]);
+});
+
+test("a fractional or junk offset is treated as a whole number", async () => {
+  const db = await setup();
+  await saveCommunityProfile(db, "u-dm", base());
+  assert.equal((await communityDirectory(db, null, url("?offset=1.5"))).offset, 1);
+  assert.equal((await communityDirectory(db, null, url("?offset=abc"))).offset, 0);
 });
