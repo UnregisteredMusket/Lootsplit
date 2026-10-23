@@ -26,7 +26,8 @@ import {
   serviceLabel,
   settlementNeeded,
 } from "@/lib/quire/services";
-import { applyPreset, newProvider, type ServicePreset } from "@/lib/quire/services-presets";
+import { applyPreset, newProvider, workshopSpecialties, type ServicePreset } from "@/lib/quire/services-presets";
+import { presentAt } from "@/lib/quire/service-core";
 import { CommandForm, CommandButton } from "./world-tools";
 import { Button, Fold } from "./ui";
 import { AppLink } from "./app-link";
@@ -36,7 +37,7 @@ import { offerFlags, serviceWhen } from "./service-talk";
 
 const kindName: Record<ServiceKind, string> = { temple: "Temple", workshop: "Workshop", inn: "Inn" };
 /** Kinds the DM can add in this release; later kinds arrive with their own presets. */
-const addableKinds: ServiceKind[] = ["temple"];
+const addableKinds: ServiceKind[] = ["temple", "workshop"];
 const presetName: Record<ServicePreset, string> = { "srd-5.2.1": "SRD 5.2.1", "srd-5.1": "SRD 5.1", blank: "Blank" };
 
 function npcName(t: CloudTable, id: string) {
@@ -113,8 +114,16 @@ function ProviderCard({
       {mine.length > 0 && (
         <>
           <h4>{dm ? "Orders" : "Your orders here"}</h4>
+          {mine
+            .filter((o) => o.terms.workDays > 0 && o.status !== "requested")
+            .slice()
+            .reverse()
+            .map((o) => (
+              <ServiceOrderCard key={o.id} order={o} table={t} dm={dm} />
+            ))}
           <ul className="svc-offers">
             {mine
+              .filter((o) => !(o.terms.workDays > 0 && o.status !== "requested"))
               .slice()
               .reverse()
               .map((o) => (
@@ -154,6 +163,7 @@ function AddProvider({ shop, table: t }: { shop: Shop; table: CloudTable }) {
   const [kind, setKind] = useState<ServiceKind>(addableKinds[0]);
   const [npcId, setNpcId] = useState(npcs.find((n) => n.locationId === shop.locationId)?.id ?? npcs[0]?.id ?? "");
   const [preset, setPreset] = useState<ServicePreset>("srd-5.2.1");
+  const [specialty, setSpecialty] = useState<string>(workshopSpecialties[0]);
   if (!shop.locationId) return <p>Give this shop a location first; the provider works there.</p>;
   if (!npcs.length) return <p>Create the NPC who provides the service in People & NPCs first.</p>;
   return (
@@ -161,7 +171,8 @@ function AddProvider({ shop, table: t }: { shop: Shop; table: CloudTable }) {
       label="Add service provider"
       submit={() => {
         const id = `svc-${shop.id}-${kind}-${Date.now().toString(36)}`;
-        return { kind: "service-provider", providerId: id, before: null, provider: newProvider(kind, shop, npcId, id, preset) } as never;
+        const provider = newProvider(kind, shop, npcId, id, preset, kind === "workshop" ? specialty.trim() || undefined : undefined);
+        return { kind: "service-provider", providerId: id, before: null, provider } as never;
       }}
     >
       <label>
@@ -184,16 +195,32 @@ function AddProvider({ shop, table: t }: { shop: Shop; table: CloudTable }) {
           ))}
         </select>
       </label>
+      {kind === "workshop" && (
+        <label>
+          Workshop preset
+          <select
+            value={(workshopSpecialties as readonly string[]).includes(specialty) ? specialty : ""}
+            onChange={(e) => setSpecialty(e.target.value)}
+          >
+            {workshopSpecialties.map((w) => (
+              <option key={w} value={w}>
+                {w}
+              </option>
+            ))}
+            <option value="">Other (no preset offers)</option>
+          </select>
+        </label>
+      )}
       <p className="svc-hint">
         Must be present at {shop.name}, visible and not on downtime for players to order. Switch on this kind in the NPC's
         record (People & NPCs) as well.
       </p>
-      <PresetChoice value={preset} onChange={setPreset} />
+      <PresetChoice value={preset} onChange={setPreset} kind={kind} />
     </CommandForm>
   );
 }
 
-function PresetChoice({ value, onChange }: { value: ServicePreset; onChange: (p: ServicePreset) => void }) {
+function PresetChoice({ value, onChange, kind = "temple" }: { value: ServicePreset; onChange: (p: ServicePreset) => void; kind?: ServiceKind }) {
   return (
     <div>
       <span>Price preset</span>
@@ -205,7 +232,13 @@ function PresetChoice({ value, onChange }: { value: ServicePreset; onChange: (p:
         ))}
       </div>
       <p className="svc-hint">
-        {value === "srd-5.1"
+        {kind === "workshop"
+          ? value === "srd-5.1"
+            ? "SRD 5.1 has no scroll-scribing rule, so scrolls stay unpriced drafts; brews take the SRD 5.1 crafting pace (5 gp of work a day)."
+            : value === "blank"
+              ? "No offers: add your own."
+              : "SRD 5.2.1: scrolls at twice the scribing cost and its days (the scroll's value); a Potion of Healing takes a day, other brews the crafting rule (price in gp ÷ 10 days). Applying a preset fills missing offers and unset prices only."
+          : value === "srd-5.1"
           ? "SRD 5.1 gives no fixed rates (1st–2nd level “might cost 10 to 50 gold pieces”). It fills levels 1–2 at 50 gp and leaves higher levels as unpriced drafts for you to set."
           : value === "blank"
             ? "No offers: add your own."
@@ -246,7 +279,7 @@ function ProviderEditor({ provider, table: t }: { provider: ServiceProvider; tab
           </label>
         </div>
         <div>
-          <PresetChoice value={preset} onChange={setPreset} />
+          <PresetChoice value={preset} onChange={setPreset} kind={draft.kind} />
           <Button variant="secondary" onClick={() => setDraft((d) => applyPreset(d, preset))}>
             Apply {presetName[preset]} preset
           </Button>
@@ -325,9 +358,14 @@ function ProviderEditor({ provider, table: t }: { provider: ServiceProvider; tab
                       description: "",
                       approved: false,
                       priceCopper: 0,
-                      time: { kind: "instant" },
+                      ...(d.kind === "workshop"
+                        ? {
+                            time: { kind: "downtime-days" as const, days: 1, perUnit: true },
+                            maxUnits: 1,
+                            output: { kind: "holding" as const, name: "New item", unitCopper: 0, weight: 0, category: "service", notes: "" },
+                          }
+                        : { time: { kind: "instant" as const }, output: { kind: "record" as const } }),
                       review: "auto",
-                      output: { kind: "record" },
                     },
                   ],
                 };
@@ -396,7 +434,7 @@ function OfferEditor({
           Description
           <textarea value={o.description} maxLength={1500} onChange={(e) => onChange({ description: e.target.value })} />
         </label>
-        {kind === "temple" && (
+        {kind !== "inn" && (
           <div className="svc-grid">
             <label>
               Spell level
@@ -412,7 +450,7 @@ function OfferEditor({
                 ))}
               </select>
             </label>
-            <label>
+            {kind === "temple" && <label>
               Casting time noted on the receipt (minutes)
               <input
                 type="number"
@@ -426,8 +464,11 @@ function OfferEditor({
                 }}
               />
               <span className="svc-hint">The campaign clock never advances on its own.</span>
-            </label>
+            </label>}
           </div>
+        )}
+        {kind === "workshop" && o.time.kind === "downtime-days" && o.output.kind === "holding" && (
+          <WorkshopFields offer={o} onChange={onChange} />
         )}
         <div>
           <span>Review</span>
@@ -650,5 +691,173 @@ function ServiceRequestRow({ order: o, table: t, dm }: { order: ServiceOrder; ta
       )}
       {error && <p role="alert">{error}</p>}
     </article>
+  );
+}
+
+/** A workshop order: progress over approved downtime, collection at the workshop, DM control. */
+export function ServiceOrderCard({ order: o, table: t, dm }: { order: ServiceOrder; table: CloudTable; dm: boolean }) {
+  const { commandOutcome } = useEconomy();
+  const [busy, setBusy] = useState(false);
+  const [error, setError] = useState("");
+  const [action, setAction] = useState<"pause" | "resume" | "cancel">(o.status === "paused" ? "resume" : "pause");
+  const [reason, setReason] = useState("");
+  const out = o.terms.offer.output;
+  const title = `${out.kind === "holding" ? out.name : o.terms.offer.name}${o.terms.units > 1 ? ` ×${o.terms.units}` : ""}`;
+  const payer = t.purses.find((p) => p.id === o.purseId)?.name ?? "the paying character";
+  const here = presentAt(t, o.terms.locationId, o.purseId);
+  const pct = o.terms.workDays ? Math.round((100 * o.progressDays) / o.terms.workDays) : 100;
+  const open = ["active", "paused", "ready"].includes(o.status);
+  async function run(input: Record<string, unknown>, id: string) {
+    setBusy(true);
+    setError("");
+    try {
+      await commandOutcome({ ...input, id } as never);
+      setReason("");
+    } catch (e) {
+      setError(e instanceof Error ? e.message : "That didn't work. Nothing changed.");
+    } finally {
+      setBusy(false);
+    }
+  }
+  return (
+    <article className="svc-order world-card" aria-label={`Commission ${title}`}>
+      <h4>
+        {title} <span className={`svc-status ${o.status}`}>{o.status}</span>
+      </h4>
+      <div
+        className={`svc-bar${o.status === "ready" || o.status === "claimed" ? " ready" : o.status === "paused" ? " paused" : ""}`}
+        role="progressbar"
+        aria-label={`${title} progress`}
+        aria-valuemin={0}
+        aria-valuemax={o.terms.workDays}
+        aria-valuenow={o.progressDays}
+      >
+        <i style={{ width: `${pct}%` }} />
+      </div>
+      <div className="svc-days">
+        <span>
+          {o.progressDays}/{o.terms.workDays} approved downtime days
+        </span>
+        <span>
+          {payer} · paid {formatCopper(o.terms.priceCopper)}
+        </span>
+      </div>
+      <p className="svc-hint">
+        Ordered {serviceWhen(o.orderedDay, o.orderedMinute)} · {o.terms.npcName} · pickup at {o.terms.shopName}, {o.terms.placeName}.
+      </p>
+      <p className="svc-hint">{o.message}</p>
+      <details>
+        <summary className="svc-hint">Commission terms & provenance</summary>
+        <p className="svc-hint">
+          Terms fixed {serviceWhen(o.orderedDay, o.orderedMinute)}: {o.terms.units} × {out.kind === "holding" ? out.name : o.terms.offer.name}
+          {out.kind === "holding" ? `, value ${formatCopper(out.unitCopper)} each` : ""}, {o.terms.workDays} days, by {o.terms.npcName} at{" "}
+          {o.terms.shopName}.{" "}
+          {o.terms.components.map((c) => `${c.quantity} × ${c.label} ${c.supplied === "party" ? `brought by ${payer}` : "supplied"}`).join(", ")}
+          {o.terms.components.length ? ". " : ""}Order {o.id}.
+        </p>
+      </details>
+      {o.status === "ready" &&
+        (here ? (
+          <Button disabled={busy} onClick={() => void run({ kind: "service-claim", orderId: o.id, before: o }, `${o.id}-claim`)}>
+            Collect {title}
+          </Button>
+        ) : (
+          <p className="svc-hint">
+            Return to {o.terms.shopName} in {o.terms.placeName} with {payer} to collect.
+          </p>
+        ))}
+      {dm && open && (
+        <div className="svc-editor">
+          <label>
+            Commission control
+            <select value={action} onChange={(e) => setAction(e.target.value as typeof action)}>
+              {o.status === "active" && <option value="pause">Pause work</option>}
+              {o.status === "paused" && <option value="resume">Resume work</option>}
+              <option value="cancel">Cancel · refund or salvage separately</option>
+            </select>
+          </label>
+          <label>
+            Reason for commission control
+            <textarea value={reason} maxLength={1000} onChange={(e) => setReason(e.target.value)} />
+          </label>
+          <Button
+            variant="secondary"
+            disabled={busy || !reason.trim()}
+            onClick={() =>
+              void run({ kind: "service-control", orderId: o.id, before: o, action, reason: reason.trim() }, `${o.id}-${action}-${o.history.length}`)
+            }
+          >
+            Record commission control
+          </Button>
+          <p className="svc-hint">A reason is required. A cancel never refunds automatically.</p>
+        </div>
+      )}
+      {error && <p role="alert">{error}</p>}
+    </article>
+  );
+}
+
+/** Market: workshop orders keep their workshop and terms while the party travels. */
+export function ServiceOrders() {
+  const t = useWorldTable() as unknown as CloudTable,
+    seat = useSeat(),
+    dm = seat.role === "dm";
+  const orders = readServices(t.journal?.services).orders.filter(
+    (o) => o.terms.workDays > 0 && o.status !== "requested" && (dm || seat.purseIds.includes(o.purseId)),
+  );
+  if (!orders.length) return null;
+  return (
+    <Fold title="Service commission register">
+      <p>Orders keep their original workshop and terms while you travel. Only approved downtime advances work.</p>
+      {orders.map((o) => (
+        <div key={o.id}>
+          <AppLink href={`/shop/${encodeURIComponent(o.terms.shopId)}#services`}>{o.terms.shopName} →</AppLink>
+          <ServiceOrderCard order={o} table={t} dm={dm} />
+        </div>
+      ))}
+    </Fold>
+  );
+}
+
+const whole = (v: string, min = 0, max = 1e12) => Math.min(max, Math.max(min, Math.floor(Number(v) || 0)));
+function WorkshopFields({ offer: o, onChange }: { offer: ServiceOffer; onChange: (patch: Partial<ServiceOffer>) => void }) {
+  if (o.time.kind !== "downtime-days" || o.output.kind !== "holding") return null;
+  const time = o.time,
+    out = o.output;
+  return (
+    <div className="svc-grid">
+      <label>
+        Downtime days
+        <input type="number" min={1} max={3650} value={time.days} onChange={(e) => onChange({ time: { ...time, days: whole(e.target.value, 1, 3650) } })} />
+      </label>
+      <label className="svc-check">
+        <input type="checkbox" checked={time.perUnit} onChange={(e) => onChange({ time: { ...time, perUnit: e.target.checked } })} />
+        Days are per item
+      </label>
+      <label>
+        Most per order
+        <input type="number" min={1} max={100} value={o.maxUnits ?? 1} onChange={(e) => onChange({ maxUnits: whole(e.target.value, 1, 100) })} />
+      </label>
+      <label>
+        Item collected
+        <input value={out.name} maxLength={160} onChange={(e) => onChange({ output: { ...out, name: e.target.value } })} />
+      </label>
+      <label>
+        Item value each (copper)
+        <input type="number" min={0} value={out.unitCopper} onChange={(e) => onChange({ output: { ...out, unitCopper: whole(e.target.value) } })} />
+        <span className="svc-hint">{formatCopper(out.unitCopper)}</span>
+      </label>
+      <label>
+        Weight each
+        <input
+          type="number"
+          min={0}
+          max={9999}
+          step={0.1}
+          value={out.weight}
+          onChange={(e) => onChange({ output: { ...out, weight: Math.min(9999, Math.max(0, Number(e.target.value) || 0)) } })}
+        />
+      </label>
+    </div>
   );
 }

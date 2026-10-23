@@ -331,16 +331,42 @@ export function CampaignFinance({
                     </p>
                   </details>
                 )}
-                {pending.quote.blacksmith && (
-                  <div className="mt-3">
-                    <h3>Blacksmith commissions</h3>
-                    {pending.quote.blacksmith.notices.map((n) => (
-                      <p key={n.orderId}>{n.summary}</p>
-                    ))}
-                    {!pending.quote.blacksmith.notices.length && (
-                      <p>No active smith work; paused orders keep their progress.</p>
+                {(pending.quote.blacksmith || pending.quote.services) && (
+                  // One fold for the forge and workshops, so the screen doesn't grow per kind.
+                  <details className="mt-3" open>
+                    <summary>
+                      Commissions ·{" "}
+                      {(pending.quote.blacksmith?.notices.length ?? 0) +
+                        (pending.quote.services?.notices.length ?? 0)}{" "}
+                      in progress
+                    </summary>
+                    {pending.quote.blacksmith && (
+                      <>
+                        <h3>Blacksmith commissions</h3>
+                        {pending.quote.blacksmith.notices.map((n) => (
+                          <p key={n.orderId}>{n.summary}</p>
+                        ))}
+                        {!pending.quote.blacksmith.notices.length && (
+                          <p>No active smith work; paused orders keep their progress.</p>
+                        )}
+                      </>
                     )}
-                  </div>
+                    {pending.quote.services && (
+                      <>
+                        <h3>Workshop commissions</h3>
+                        {pending.quote.services.notices.map((n) => (
+                          <p key={n.orderId}>{n.summary}</p>
+                        ))}
+                        {!pending.quote.services.notices.length && (
+                          <p>No active workshop work; paused orders keep their progress.</p>
+                        )}
+                      </>
+                    )}
+                    <p className="text-sm text-muted">
+                      Work advances only when you approve this downtime, never by session hours. Finished
+                      work waits where it was ordered.
+                    </p>
+                  </details>
                 )}
                 {pending.quote.tradeSeason && (
                   <TradeSeasonReview quote={pending.quote.tradeSeason} />
@@ -349,6 +375,7 @@ export function CampaignFinance({
                   !pending.quote.market?.length &&
                   !pending.quote.propertyOperations &&
                   !pending.quote.blacksmith &&
+                  !pending.quote.services &&
                   !pending.quote.tradeSeason && (
                     <p>No active financial agreements; approval advances only in-game time.</p>
                   )}

@@ -468,6 +468,11 @@ Adds a contextual Maps session bar, searchable scene cards, separate activation/
 - Anti-exploit: cooldown per player account, repeat DC, 24-hour combined judgement, caps, unit cap, unwanted categories, and player-set item values (`valueSource: "player"`) count for nothing. Settlement reuses the atomic barter exchange; command IDs make retries no-ops and never re-roll. Players never receive NPC rules, valuation, purse or other players' attempts. The existing trading table, controlled-NPC flow, Give and every earlier save are unchanged. See [NPC-BARTER.md](NPC-BARTER.md).
 
 
+### NPC services, phase 2: workshop (October 23, 2026)
+
+- Workshop providers with Scribe (SRD 5.2.1 spell scrolls) and Alchemist (potions and brews) presets, SRD 5.1 and Blank; offers made over approved downtime days, paid on order like the forge, optional brought materials (healing herbs) that lower the price. See [services](SERVICES.md).
+- Progress only through the DM-approved downtime quote (`quote.services`), shown with the forge in one Commissions fold; order cards with progress, Collect once at the workshop, DM pause/resume/cancel with a reason (no automatic refund); Market Service commission register. The forge is unchanged.
+
 ### NPC services, phase 1: temple (October 23, 2026)
 
 - Temple service providers (an NPC at a located shop): SRD 5.2.1 (default), SRD 5.1 or Blank price presets, editable whole-copper offers with spell level, casting time (noted only), components (bring your own or supplied at a price) and Automatic or DM review. Settlement rule by spell level with a per-provider override; "Not taking new orders" pause; optional review threshold. See [services](SERVICES.md).

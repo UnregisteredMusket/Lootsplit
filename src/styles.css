@@ -4356,3 +4356,5 @@ input,select,textarea { max-width: 100%; }
 .svc-table th, .svc-table td { padding:.35rem .3rem; border-bottom:1px solid var(--color-border); text-align:left; vertical-align:middle; }
 .svc-table input[type=number] { width:5rem; max-width:100%; }
 .npc-talk-sub .svc-flags { margin-top:.15rem; }
+.svc-editor select, .svc-editor input:not([type=checkbox]):not([type=radio]), .svc-editor textarea, .svc-offer-body select, .svc-offer-body input:not([type=checkbox]):not([type=radio]), .svc-offer-body textarea, .svc-inbox-row textarea { width:100%; max-width:100%; min-width:0; }
+.svc-order details, .svc-order p { min-width:0; overflow-wrap:anywhere; }

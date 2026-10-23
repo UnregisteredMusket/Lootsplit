@@ -12,6 +12,7 @@ import { applyTradeSeason, previewTradeSeason } from "./trade-economy.ts";
 import { z } from "zod";
 import { smithQuoteSchema } from "./blacksmith-schema.ts";
 import { previewSmith } from "./blacksmith-time.ts";
+import { previewServices, serviceQuoteSchema } from "./services-time.ts";
 import type { CloudTable } from "./cloud.ts";
 import { toCopper, fromCopper, spendCoins } from "./money.ts";
 import {
@@ -74,6 +75,8 @@ export const quoteSchema = z.object({
   journey: journeyQuoteSchema.optional(),
   downtimeActivities: downtimeActivityQuoteSchema.optional(),
   blacksmith: smithQuoteSchema.optional(),
+  /** Workshop commissions (docs/SERVICES.md), beside the forge's. */
+  services: serviceQuoteSchema.optional(),
   tradeSeason: tradeSeasonQuoteSchema.optional(),
   propertyOperations: estateQuoteSchema.optional(),
   market: z
@@ -321,6 +324,7 @@ export function previewDowntime(
       )
     : undefined;
   const smith = previewSmith({ journal: table.journal }, days, !!estateTime);
+  const services = previewServices({ journal: table.journal }, days, !!estateTime);
   // Journey lines are paid after every other line, from what is left (all-or-nothing payer).
   const journey =
     journeyId && !estateTime
@@ -344,6 +348,7 @@ export function previewDowntime(
         }
       : {}),
     ...(smith ? { blacksmith: smith } : {}),
+    ...(services ? { services } : {}),
     ...(seasonReceiptId && table.journal?.tradeEconomy?.settings.enabled
       ? {
           tradeSeason: previewTradeSeason(
@@ -417,6 +422,11 @@ export function applyDowntime(
   // fields, then add the new resource window in the same authoritative approval.
   const comparable = structuredClone(quote);
   if (!d.quote.downtimeActivities) delete comparable.downtimeActivities;
+  // A pending quote saved before workshop commissions existed advances none; approve it as saved.
+  if (!d.quote.services) {
+    delete comparable.services;
+    delete quote.services;
+  }
   if (comparable.propertyOperations && !d.quote.propertyOperations?.characterWorkDays)
     delete comparable.propertyOperations.characterWorkDays;
   if (JSON.stringify(comparable) !== JSON.stringify(d.quote))
@@ -489,6 +499,17 @@ export function applyFinanceQuote(
     for (const [i, notice] of quote.blacksmith.notices.entries())
       table.journal!.events.push({
         id: `${receipt.id}-smith-${i}`,
+        at,
+        kind: "management",
+        purseId: notice.purseId,
+        summary: notice.summary.slice(0, 500),
+      });
+  }
+  if (quote.services) {
+    table.journal!.services = quote.services.state;
+    for (const [i, notice] of quote.services.notices.entries())
+      table.journal!.events.push({
+        id: `${receipt.id}-service-${i}`,
         at,
         kind: "management",
         purseId: notice.purseId,

@@ -1,6 +1,6 @@
-// NPC services in the conversation hub (docs/SERVICES.md): the Services reply runs the same
-// availability check as the order command and lists every provider the NPC runs. Real clicks and
-// number keys on a disposable device campaign at 1280, 390 and 320 px.
+// NPC services (docs/SERVICES.md): the hub's Services reply, the temple (instant and DM review),
+// the workshop (downtime work and collection) and DM setup. Real clicks and number keys on a
+// disposable device campaign at 1280, 390 and 320 px, in Ironbound and Parchment.
 import assert from "node:assert/strict";
 import { chromium } from "playwright";
 import { expect } from "playwright/test";
@@ -9,7 +9,7 @@ import { smithFixture, smithDm } from "../src/lib/quire/test-fixtures/blacksmith
 import { applyCommand } from "../src/lib/quire/commands.ts";
 import { defaultSmith } from "../src/lib/quire/blacksmith-schema.ts";
 import { validateWorld } from "../src/lib/quire/world.ts";
-import { servicesFixture } from "../src/lib/quire/test-fixtures/services.ts";
+import { servicesFixture, workshopFixture } from "../src/lib/quire/test-fixtures/services.ts";
 import { openApplication, reloadApplication, navigateApplication } from "./title-screen-navigation.mjs";
 
 const origin = process.env.AUDIT_ORIGIN || "http://127.0.0.1:8080";
@@ -110,6 +110,71 @@ async function open(page, fixture, npc = "maker", name = "Aster") {
   await expect(talk(page)).toBeVisible();
 }
 const said = (page, text) => talk(page).locator(".sr-only").getByText(text, { exact: true }).last();
+
+/** Approve campaign downtime on this device, the same way the DM does at the table. */
+async function approveDowntime(page, days) {
+  await navigateApplication(page, origin + "/features/downtime");
+  const summary = page.locator("summary").filter({ hasText: "Set downtime & review calculations" });
+  if (!(await summary.locator("..").evaluate((el) => el.open))) await summary.click();
+  await page.getByLabel("In-game days", { exact: true }).fill(String(days));
+  await page.getByRole("button", { name: /^(Preview|Recalculate) downtime$/ }).click();
+  await expect(page.locator("main")).toContainText("Workshop commissions");
+  await expect(page.locator("main")).toContainText("Commissions ·");
+  const id = (await readJournal(page)).journal.finance.downtime.at(-1).id;
+  await page.getByRole("button", { name: /^(Play sessions|Session ·)/ }).click();
+  await page.getByLabel("Session name", { exact: true }).fill("Brewing days");
+  await page.getByRole("checkbox", { name: /I approve the downtime plan/ }).check();
+  await page.getByRole("button", { name: "Approve downtime & start session", exact: true }).click();
+  await expect
+    .poll(async () => (await readJournal(page)).journal.finance.downtime.find((d) => d.id === id)?.status)
+    .toBe("applied");
+}
+
+/** Workshop: three potions with herbs, approved downtime, then collect once at the workshop. */
+async function workshop(page, width) {
+  await open(page, workshopFixture(), "tamsin", "Old Tamsin");
+  await reply(page, "Can you brew something for me?").click();
+  await reply(page, "Potion of Healing").click();
+  const drawer = talk(page).locator(".npc-talk-drawer");
+  await drawer.getByRole("button", { name: "More how many" }).click();
+  await drawer.getByRole("button", { name: "More how many" }).click();
+  await expect(drawer.getByLabel(/Bring your own: Healing herbs/)).toBeChecked();
+  // Bring two of the three bundles; Tamsin supplies the third.
+  await drawer.getByRole("button", { name: "Fewer healing herbs you bring" }).click();
+  await expect(drawer.locator(".svc-total")).toContainText("100 gp");
+  await expect(drawer).toContainText("3 approved downtime days");
+  await fits(page, `${width} brew`);
+  await page.screenshot({ path: `${output}/workshop-order-${width}.png`, fullPage: true });
+  const commission = reply(page, "Let's do it.");
+  await expect(commission).toContainText("ready after 3 downtime days");
+  await commission.click();
+  await expect.poll(async () => (await readJournal(page)).journal.services.orders.at(-1)?.status).toBe("active");
+  let state = await readJournal(page);
+  const order = state.journal.services.orders.at(-1);
+  assert.equal(state.holdings.find((h) => h.id === "herbs").quantity, 1, "two bundles handed over once");
+
+  // The Market register follows the order while travelling.
+  await navigateApplication(page, origin + "/market");
+  await page.getByText("Service commission register", { exact: true }).click();
+  await expect(page.getByRole("article", { name: "Commission Potion of Healing ×3" })).toContainText("0/3 approved downtime days");
+  await fits(page, `${width} register`);
+
+  await approveDowntime(page, 3);
+  await expect.poll(async () => (await readJournal(page)).journal.services.orders.at(-1).status).toBe("ready");
+  await navigateApplication(page, origin + "/features/npcs?npc=tamsin");
+  const hub = reply(page, "Can you brew something for me?");
+  await expect(hub).toContainText("Your Potion of Healing is ready to collect.");
+  await hub.click();
+  await reply(page, "Collect · Potion of Healing ×3").click();
+  await expect(talk(page)).toContainText("Collected into Kael's inventory");
+  state = await readJournal(page);
+  const crafted = state.holdings.filter((h) => h.id === order.id + "-crafted");
+  assert.equal(crafted.length, 1);
+  assert.equal(crafted[0].quantity, 3);
+  assert.equal(state.journal.services.orders.at(-1).status, "claimed");
+  await fits(page, `${width} collected`);
+  await page.screenshot({ path: `${output}/workshop-collected-${width}.png`, fullPage: true });
+}
 
 /** DM setup on the shop page: edit an offer's price and save; the change is one DM command. */
 async function setup(page) {
@@ -252,6 +317,7 @@ try {
     }
     await temple(page, width);
     if (width === 1280) await setup(page);
+    await workshop(page, width);
     await context.close();
   }
   assert.deepEqual(errors, [], "No browser runtime errors");

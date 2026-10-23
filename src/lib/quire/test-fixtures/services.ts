@@ -106,3 +106,46 @@ export function orderCommand(
   const q = serviceQuote(t, providerId, offerKey, purseId, req);
   return { id, kind: "service-order" as const, providerId, offerKey, purseId, request: req, before: q.before };
 }
+
+/**
+ * Adds Old Tamsin's Remedies (alchemist) and a scribe at the temple run by Aldous, so Aldous
+ * runs two providers. Kael carries 3 bundles of healing herbs.
+ */
+export function workshopFixture(): CloudTable {
+  let t = servicesFixture();
+  t.shops.push({ ...t.shops[0], id: "remedies", name: "Old Tamsin's Remedies", keeper: "Tamsin", category: "apothecary" });
+  t.holdings.push({ id: "herbs", purseId: "kael", name: "Healing herbs", kind: "item", quantity: 3, unitCopper: 100, notes: "", materialKey: "healing-herbs" });
+  t.journal!.propertyOperations!.materials.push({ key: "healing-herbs", name: "Healing herbs", unit: "bundle" });
+  t = applyCommand(t, svcDm, {
+    id: "tamsin",
+    kind: "npc-create",
+    npc: {
+      id: "tamsin",
+      name: "Old Tamsin",
+      description: "Herbalist.",
+      locationId: "harrowgate",
+      visible: true,
+      barterAllowed: false,
+      controllerPurseId: null,
+      services: ["workshop"],
+    },
+    copper: 0,
+    inventory: [],
+  });
+  const aldous = t.journal!.world!.npcs.find((n) => n.id === "aldous")!;
+  t = applyCommand(t, svcDm, { id: "aldous-workshop", kind: "npc-save", before: aldous, npc: { ...aldous, services: ["temple", "workshop"] } });
+  t = applyCommand(t, svcDm, {
+    id: "alchemist-setup",
+    kind: "service-provider",
+    providerId: "tamsin-brews",
+    before: null,
+    provider: newProvider("workshop", { id: "remedies", name: "Old Tamsin's Remedies" }, "tamsin", "tamsin-brews", "srd-5.2.1", "Alchemist"),
+  });
+  return applyCommand(t, svcDm, {
+    id: "scribe-setup",
+    kind: "service-provider",
+    providerId: "dawn-scribe",
+    before: null,
+    provider: newProvider("workshop", { id: "temple", name: "Temple of the Dawn" }, "aldous", "dawn-scribe", "srd-5.2.1", "Scribe"),
+  });
+}
