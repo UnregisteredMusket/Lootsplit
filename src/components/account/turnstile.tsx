@@ -10,6 +10,7 @@ type TurnstileApi = {
       sitekey: string;
       action: string;
       theme?: "auto" | "light" | "dark";
+      size?: "normal" | "flexible" | "compact";
       callback: (token: string) => void;
       "expired-callback": () => void;
       "error-callback": () => boolean | void;
@@ -87,6 +88,9 @@ export const HumanCheck = forwardRef<HumanCheckHandle, { action: "signin" | "sig
             sitekey: siteKey,
             action,
             theme: "auto",
+            // The normal widget is 300 px wide; on the narrowest phones (320 px) it would
+            // overflow the sign-in card, so use the compact 150 px widget there.
+            size: box.current.clientWidth < 300 ? "compact" : "flexible",
             callback: (t) => {
               setProblem("");
               setToken(t);
