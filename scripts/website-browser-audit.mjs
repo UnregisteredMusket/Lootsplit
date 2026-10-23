@@ -201,7 +201,28 @@ try {
     await page.getByRole("link", { name: "Create an account or sign in", exact: true }).waitFor();
     assert.equal(await page.evaluate(async () => (await indexedDB.databases()).length), 0);
     assert.equal(new URL(page.url()).pathname, "/");
+    // Opening the app marks this browser, so the bare address now goes straight into the app.
+    await page.waitForFunction(() => document.cookie.includes("lootsplit-app=1"));
+    await page.waitForLoadState("networkidle");
+    const returning = await context.newPage();
+    await returning.goto(origin + "/");
+    assert.equal(new URL(returning.url()).pathname, "/");
     await context.close();
+  }
+  // A first visit to the bare address (a new visitor or a search engine) opens the home page.
+  {
+    const local = ["localhost", "127.0.0.1", "[::1]"].includes(new URL(origin).hostname);
+    const first = await browser.newContext({
+      extraHTTPHeaders: local
+        ? { "cf-connecting-ip": `2001:db8:${crypto.randomUUID().slice(0, 4)}:${crypto.randomUUID().slice(0, 4)}::1` }
+        : {},
+    });
+    const visitor = await first.newPage();
+    await visitor.goto(origin + "/");
+    assert.equal(new URL(visitor.url()).pathname, "/welcome");
+    await visitor.getByRole("link", { name: "Open the app", exact: true }).first().waitFor();
+    assert.equal(await visitor.locator(".loot-opening").count(), 0);
+    await first.close();
   }
   assert.deepEqual(failures, []);
   // Local fixtures keep their existing route checks; remote live audits also hash the APK bytes.

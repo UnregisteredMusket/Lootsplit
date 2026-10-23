@@ -6,7 +6,7 @@
 import { handleAccounts } from "./accounts.mjs";
 import { recoveryGuard } from "./recovery-guard.mjs";
 import { serveBuildAsset, releaseResponse } from "./release-assets.mjs";
-import { crawlerFile } from "../src/lib/deployment/public-urls.mjs";
+import { crawlerFile, landingRedirect } from "../src/lib/deployment/public-urls.mjs";
 import handler from "../dist/server/index.mjs";
 import { scheduledMonitor } from "./monitor-journal.mjs";
 import { telemetryResponse } from "./monitor-telemetry.mjs";
@@ -37,6 +37,20 @@ export default {
       return releaseResponse(
         new Response(request.method === "HEAD" ? null : crawler.body, {
           headers: { "Content-Type": crawler.type, "Cache-Control": "public, max-age=3600" },
+        }),
+        env,
+      );
+    const landing = landingRedirect({
+      method: request.method,
+      url: request.url,
+      accept: request.headers.get("accept"),
+      cookie: request.headers.get("cookie"),
+    });
+    if (landing)
+      return releaseResponse(
+        new Response(null, {
+          status: 302,
+          headers: { Location: landing, "Cache-Control": "no-store", Vary: "Cookie" },
         }),
         env,
       );

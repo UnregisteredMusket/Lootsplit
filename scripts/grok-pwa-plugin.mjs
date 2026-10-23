@@ -17,7 +17,7 @@ import {
   renderWebManifest,
   snapshotOgIdentity,
 } from "./grok-pwa-shared.mjs";
-import { canonicalPublicUrl, publicShareHost } from "../src/lib/deployment/public-urls.mjs";
+import { canonicalPublicUrl, landingRedirect, publicShareHost } from "../src/lib/deployment/public-urls.mjs";
 
 export const GROK_OG_IDENTITY_ID = "virtual:grok-og-identity";
 
@@ -47,6 +47,18 @@ function serveGrokPwa(middlewares) {
     const method = (req.method ?? "GET").toUpperCase();
     if (method !== "GET") {
       next();
+      return;
+    }
+
+    // Same first-visit landing rule as the Worker (cloudflare/worker.mjs), so development audits
+    // exercise what production serves.
+    const landing = landingRedirect({ method, url: rawUrl, accept: req.headers.accept, cookie: req.headers.cookie });
+    if (landing) {
+      res.statusCode = 302;
+      res.setHeader("location", landing);
+      res.setHeader("cache-control", "no-store");
+      res.setHeader("vary", "Cookie");
+      res.end();
       return;
     }
 
