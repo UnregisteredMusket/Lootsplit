@@ -26,6 +26,26 @@ for (const path of ["/", "/welcome", "/account", "/encounters", "/ocr/v7/worker.
   );
 }
 
+// robots.txt and sitemap.xml come from the built Worker, name the configured website (never the
+// request host) and keep the security headers (audit P2-9).
+{
+  const { deploymentOrigins } = await import("../src/lib/deployment/origins.mjs");
+  const robots = await fetch(origin + "/robots.txt", { headers: { "cf-connecting-ip": ip() } });
+  assert.equal(robots.status, 200);
+  assert.match(robots.headers.get("content-type") ?? "", /^text\/plain/);
+  assert.ok(robots.headers.get("content-security-policy")?.includes(SCRIPT_POLICY));
+  const robotsText = await robots.text();
+  assert.match(robotsText, /^User-agent: \*$/m);
+  assert.match(robotsText, /^Disallow: \/api\/$/m);
+  assert.ok(robotsText.includes(`Sitemap: ${deploymentOrigins.website}/sitemap.xml`), robotsText);
+  const sitemap = await fetch(origin + "/sitemap.xml", { headers: { "cf-connecting-ip": ip() } });
+  assert.equal(sitemap.status, 200);
+  assert.match(sitemap.headers.get("content-type") ?? "", /^application\/xml/);
+  const sitemapText = await sitemap.text();
+  assert.ok(sitemapText.includes(`<loc>${deploymentOrigins.website}/welcome</loc>`), sitemapText);
+  assert.doesNotMatch(sitemapText, /127\.0\.0\.1|\/account/);
+}
+
 // Seat-authorized room image GET (tabletop protocol 4): refusals carry the security headers and
 // are never cached, and the Android app's WebView origin may call it (CORS preflight).
 {

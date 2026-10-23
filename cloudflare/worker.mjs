@@ -6,6 +6,7 @@
 import { handleAccounts } from "./accounts.mjs";
 import { recoveryGuard } from "./recovery-guard.mjs";
 import { serveBuildAsset, releaseResponse } from "./release-assets.mjs";
+import { crawlerFile } from "../src/lib/deployment/public-urls.mjs";
 import handler from "../dist/server/index.mjs";
 import { scheduledMonitor } from "./monitor-journal.mjs";
 import { telemetryResponse } from "./monitor-telemetry.mjs";
@@ -31,6 +32,14 @@ export default {
     if (telemetry) return telemetry;
     const asset = await serveBuildAsset(request, env);
     if (asset) return asset;
+    const crawler = crawlerFile(request);
+    if (crawler)
+      return releaseResponse(
+        new Response(request.method === "HEAD" ? null : crawler.body, {
+          headers: { "Content-Type": crawler.type, "Cache-Control": "public, max-age=3600" },
+        }),
+        env,
+      );
     const accountResponse = await handleAccounts(request, env);
     if (accountResponse) return accountResponse;
     globalThis.__env__ = env;
