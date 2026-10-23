@@ -73,6 +73,9 @@ try {
         const why = page.locator("section#why, section[aria-labelledby='why']");
         assert.equal(await why.getByRole("heading", { name: "Why did I create Lootsplitter?", level: 2 }).count(), 1);
         assert.equal(await why.locator(".ls-why-signature").innerText(), "— UnregisteredMusket");
+        // The kobold mascot heads the note; the kobold mark is the header logo (owner's brand set, 2026-10-23).
+        assert.match(await why.locator("img.ls-why-mascot").getAttribute("alt"), /kobold/);
+        assert.equal(await page.locator(".ls-header .ls-brand img").getAttribute("src"), "/brand/kobold-icon-128.png");
         await why.getByText("I created Lootsplitter to smite shopping episodes forever.", { exact: true }).waitFor();
         assert.equal(await page.locator("main > section").last().getAttribute("aria-labelledby"), "why");
       }
