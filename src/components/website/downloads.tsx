@@ -43,8 +43,8 @@ export function DownloadsPage() {
     <Website>
       <PageHero kicker="Take Lootsplitter to your table" title="One party." accent="Your platform.">
         <p className="ls-lead ls-measure">
-          Play in your browser or download the Android app. Sign in to host, or join the DM’s
-          current invitation as a guest.
+          Play in your browser or download the Android app, both free. Sign in to host, or join the
+          DM’s current invitation as a guest.
         </p>
       </PageHero>
 

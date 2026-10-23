@@ -87,3 +87,87 @@ export function landingRedirect({ method = "GET", url, accept, cookie }) {
   if (/(?:^|;\s*)(?:__Secure-)?lootsplit\.session_token=/.test(jar)) return null;
   return "/welcome";
 }
+
+/**
+ * Title and description per public page: the route head (<title>, meta description) and the
+ * share tags (og:title, og:description) read the same text. Descriptions stay under about 155
+ * characters so search results show them whole.
+ */
+/** @type {Readonly<Record<string, {title: string, description: string}>>} */
+export const PUBLIC_PAGE_META = Object.freeze({
+  "/welcome": {
+    title: "Lootsplitter \u2014 free D&D loot splitter and campaign ledger",
+    description:
+      "Split loot fairly and run your whole tabletop campaign: party funds, character sheets, shops, maps and encounters. 100% free, in the browser and on Android.",
+  },
+  "/features": {
+    title: "Features for DMs and players \u00b7 Lootsplitter",
+    description:
+      "Loot splits, party funds, character sheets, shops and trade, maps with fog of war, encounters, downtime and live rooms: everything Lootsplitter does.",
+  },
+  "/downloads": {
+    title: "Download Lootsplitter for Android or play in your browser",
+    description:
+      "Play in any browser with nothing to install, or get the free signed Android app with home-screen widgets. Latest version, checksum and install guide.",
+  },
+  "/updates": {
+    title: "Changelog \u00b7 Lootsplitter",
+    description:
+      "Every Lootsplitter release, newest first: new features, improvements and fixes for the website and the Android app.",
+  },
+  "/help": {
+    title: "Help and guides \u00b7 Lootsplitter",
+    description:
+      "Guides for Dungeon Masters and players: setting up a campaign, splitting loot, shops, maps, encounters, backups and joining a shared room.",
+  },
+  "/resources": {
+    title: "Resources and credits \u00b7 Lootsplitter",
+    description:
+      "The open game content, sounds, fonts and art Lootsplitter uses, with their sources and licenses.",
+  },
+  "/donate": {
+    title: "Support Lootsplitter",
+    description:
+      "Lootsplitter is 100% free, supported by donations. Chip in on Ko-fi to help cover hosting and keep it free for every table.",
+  },
+});
+
+/** The page's own title and description, or null for app, account and other paths.
+ * @param {string} pathname */
+export function publicPageMeta(pathname) {
+  const path = String(pathname ?? "").replace(/\/+$/, "") || "/";
+  return PUBLIC_PAGE_META[path] ?? null;
+}
+
+/** TanStack route `head()` for a public page: its title and description. @param {string} path */
+export function publicPageHead(path) {
+  const meta = PUBLIC_PAGE_META[path];
+  return { meta: [{ title: meta.title }, { name: "description", content: meta.description }] };
+}
+
+/** WebSite and Organization structured data for the home page (no SoftwareApplication markup:
+ * Google requires ratings or reviews for that, and Lootsplitter shows none). */
+export function homeStructuredData() {
+  const url = deploymentOrigins.website;
+  return {
+    "@context": "https://schema.org",
+    "@graph": [
+      {
+        "@type": "WebSite",
+        "@id": `${url}/#website`,
+        name: "Lootsplitter",
+        url: `${url}/`,
+        publisher: { "@id": `${url}/#organization` },
+      },
+      {
+        "@type": "Organization",
+        "@id": `${url}/#organization`,
+        name: "Lootsplitter",
+        url: `${url}/`,
+        logo: `${url}/favicon.svg`,
+        email: "support@lootsplitter.com",
+        sameAs: ["https://github.com/UnregisteredMusket/Lootsplit"],
+      },
+    ],
+  };
+}
