@@ -1,5 +1,26 @@
 [
   {
+    "version": "1.12.0",
+    "date": "2026-10-23",
+    "summary": "Party journeys across the map, NPC services at temples, workshops and inns, and community profiles for finding a group.",
+    "features": [
+      "Party journeys: plan a route on the map, then Review journey turns it into a downtime preview with your pace, each day of travel and optional rations and mount upkeep. The DM chooses Approve & depart, the party marker follows the route as downtime is approved, and on arrival the DM confirms Move party here.",
+      "Players can send journey requests to the DM, who can approve them in one step from the Review Inbox. Players see the planned route where the map is visible to them, or a short text card when it is private.",
+      "Services in NPC conversations: asking an NPC about services lists every service they run and says plainly why one can't be used right now.",
+      "Temples: priests heal, lift curses and raise the dead for a price, with SRD prices or the DM's own. Raise Dead and Resurrection go to the DM first and are charged only if approved.",
+      "Workshops: order spell scrolls from scribes and potions from alchemists. You pay once when you order, the work moves forward with approved downtime, and you collect it at the workshop.",
+      "Inns: book rooms and meals for the party, paid once up front, and buy rumours that arrive in your private chat with the innkeeper.",
+      "Community profile in My account: choose a handle, whether you DM, play or both, your games, time zone, play times and an optional Discord username, and who can see it, for the Find a group directory on lootsplitter.com. Profiles stay hidden until you choose, and email addresses are never shown."
+    ],
+    "improvements": [
+      "The Downtime screen shows blacksmith and workshop work together under Commissions, and Market's Service commission register tracks your orders while you travel.",
+      "Temples, workshops and inns appear on the map's Here sheet and on the shop's place card."
+    ],
+    "fixes": [
+      "Treasure pool Activity lists claims and resolutions in the order they happened, even when two happen at the same moment."
+    ]
+  },
+  {
     "version": "1.11.0",
     "date": "2026-10-23",
     "summary": "A new kobold app icon, even coin splits, and maps you can travel through: place cards, Show on map and a Here sheet.",
@@ -11,7 +32,8 @@
       "DMs can place a record on the map from its card, move or hide pins, and use a character's or NPC's portrait as their pin.",
       "Here sheet on the map: one list of the shops, people and services available where the party is.",
       "Maps: Consolidate fog shrinks heavily painted fog without changing what anyone sees, and grids can use the alternating 5/10/5 diagonal rule.",
-      "Journey planner: draw a route on a map to see each leg's distance, travel days and terrain, and send a drawn route to a ship voyage request."
+      "Journey planner: draw a route on a map to see each leg's distance, travel days and terrain, and send a drawn route to a ship voyage request.",
+      "Party treasure pool: the DM puts loot in the pool, players mark Need, Greed or Pass for their characters, and the DM hands items out fairly in one step from the Review Inbox."
     ],
     "improvements": [
       "Shared map images load from a cache instead of being re-sent with every change, so big maps update faster.",

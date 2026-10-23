@@ -1,3 +1,32 @@
+# Lootsplitter 1.12.0
+
+Android version code **19**, same package and permanent signing certificate. Install over the existing app; do not uninstall or clear saved data.
+
+## Added
+
+- **Party journeys** (#243). Plan a route on the map, then Review journey turns it into a downtime preview: pace, each day of travel, and optional trail rations and mount upkeep (off by default, charged once on approval). The DM chooses Approve & depart; while the party is on the road the route is locked and located shops are unavailable, the marker moves only when downtime is approved, and on arrival the DM confirms Move party here or Not yet. Players can send journey requests, which the DM approves from the Review Inbox; players see the route where the map is visible to them, or a text card when it is private.
+- **Services in NPC conversations** (#247). Services lists every service an NPC runs and explains why one is unavailable (shop closed, NPC or character not there, not switched on). People & NPCs shows the conversation for NPCs who offer services even if they don't barter. Blacksmith commissions are unchanged.
+- **Temples** (#249). Healing, curse removal and raising the dead, with SRD 5.2.1 / SRD 5.1 presets or DM prices. Raise Dead and Resurrection go to the DM first and are charged only on approval. Higher-level spells need a town or city.
+- **Workshop commissions** (#250). Spell scrolls from scribes and potions from alchemists, paid once at order, advanced by approved downtime and collected at the workshop. The DM can pause, resume or cancel with a reason.
+- **Inns** (#251). Rooms and meals for the party, paid once up front, and rumours delivered to the buyer's private thread with the innkeeper.
+- **Community profile** (#240). My account → Community profile sets up a profile for the Find a group directory on lootsplitter.com: handle, role, games, time zone, play times, optional Discord username and visibility (Nobody by default). Email addresses are never shown. The directory itself is a website page.
+
+## Improved
+
+- Downtime shows blacksmith and workshop work together under Commissions; Market's Service commission register tracks orders while travelling (#250).
+- Temples, workshops and inns appear on the map's Here sheet and on place cards (#249–#251).
+
+## Fixed
+
+- Treasure pool Activity keeps claims and resolutions in order when they share a timestamp (#246).
+
+## Not in this release
+
+- The Cloudflare human check (#241, #248) applies to website sign-up, sign-in and recovery reset only; the app is exempt and unchanged.
+- Website-only changes (#242, #244, #253) and documentation (#252) do not affect the app.
+
+---
+
 # Lootsplitter 1.11.0
 
 Android version code **18**, same package and permanent signing certificate. Install over the existing app; do not uninstall or clear saved data.
@@ -9,6 +38,7 @@ Android version code **18**, same package and permanent signing certificate. Ins
 - **Map place hub** (#228, #232). Pins open place cards, records have Show on map, DMs can Place on map and use portrait pins, and the Here sheet lists what is available at the party's location.
 - **Map tools** (#211). Consolidate fog, the alternating 5/10/5 diagonal rule.
 - **Journey planner** (#235). Draw a route on a map for leg distances, travel days and terrain; send a drawn route to a ship voyage request; calibrate a scale bar on maps without a grid.
+- **Party treasure pool and item claims** (#238). Players mark Need, Greed or Pass; the DM resolves items from the Review Inbox. This merged before the 1.11.0 build commit and ships in its APK; it was added to these notes with 1.12.0.
 
 ## Improved
 
