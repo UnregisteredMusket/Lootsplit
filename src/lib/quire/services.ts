@@ -354,3 +354,39 @@ export function serviceSummary(o: Pick<ServiceOrder, "terms">) {
 export function pendingServiceRequests(t: Pick<CloudTable, "journal">) {
   return readServices(t.journal?.services).orders.filter((o) => o.status === "requested").length;
 }
+
+/** Why this purse can't buy this rumour; empty when it can. */
+export function rumourLock(t: Table, p: ServiceProvider, rumourId: string, purseId: string | undefined) {
+  const lock = providerLock(t, p, purseId);
+  if (lock) return lock;
+  const r = p.rumours?.find((x) => x.id === rumourId);
+  if (!r) return "That rumour isn't for sale any more.";
+  const npc = t.journal?.world?.npcs.find((n) => n.id === p.npcId)?.name ?? "the innkeeper";
+  if ((r.buyers ?? r.boughtBy ?? []).includes(purseId!)) return `You bought this. It's in your thread with ${npc}.`;
+  if (r.once === "party" && (r.boughtByParty || (r.buyers?.length ?? 0) > 0))
+    return "Someone in the party already bought this one.";
+  return "";
+}
+/** The stale-price fingerprint of a rumour purchase (the same on the DM's and a player's table). */
+export function rumourQuote(t: Table, providerId: string, rumourId: string, purseId: string) {
+  const p = readServices(t.journal?.services).providers.find((x) => x.id === providerId);
+  if (!p) throw Error("This service is no longer offered.");
+  const lock = rumourLock(t, p, rumourId, purseId);
+  if (lock) throw Error(lock);
+  const r = p.rumours!.find((x) => x.id === rumourId)!;
+  const npc = t.journal!.world!.npcs.find((n) => n.id === p.npcId)!;
+  const payer = t.purses.find((x) => x.id === purseId)!;
+  const f = t.journal?.finance ?? { day: 0, minuteOfDay: 0 };
+  return {
+    provider: p,
+    rumour: r,
+    before: quoteFingerprint({
+      provider: publicProvider(p),
+      npc: { id: npc.id, name: npc.name, services: npc.services },
+      rumour: { id: r.id, teaser: r.teaser, priceCopper: r.priceCopper, once: r.once },
+      day: f.day,
+      minute: f.minuteOfDay ?? 0,
+      payer: payer.coins,
+    }),
+  };
+}

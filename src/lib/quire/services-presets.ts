@@ -173,10 +173,45 @@ function brewOffer(b: (typeof brews)[number], preset: ServicePreset): ServiceOff
   };
 }
 
+/** SRD 5.2.1 Food, Drink and Lodging (p.101-102): a night per person and each meal, by lifestyle. */
+const innTiers: [string, string, number, number, number][] = [
+  // key, name, night cp, meal cp (5.2.1, each), food per day cp (5.1)
+  ["squalid", "Squalid", 7, 1, 3],
+  ["poor", "Poor", 10, 2, 6],
+  ["modest", "Modest", 50, 10, 30],
+  ["comfortable", "Comfortable", 80, 20, 50],
+  ["wealthy", "Wealthy", 200, 30, 80],
+  ["aristocratic", "Aristocratic", 400, 60, 200],
+];
+function innOffer(preset: ServicePreset): ServiceOffer {
+  return {
+    key: "stay",
+    name: "Rooms and meals",
+    // SRD 5.1 prices food per day rather than per meal: one "meal" a day is a full day's food.
+    description:
+      preset === "srd-5.1"
+        ? "A night's lodging per guest; meals are a day's food per guest (SRD 5.1)."
+        : "A night's lodging per guest, and meals each day.",
+    approved: true,
+    priceCopper: 0,
+    time: { kind: "per-night", maxNights: 14 },
+    review: "auto",
+    output: { kind: "record" },
+    tiers: innTiers.map(([key, name, night, meal, day]) => ({
+      key,
+      name,
+      nightCopper: night,
+      mealCopper: preset === "srd-5.1" ? day : meal,
+      offered: true,
+    })),
+  };
+}
+
 /** The offers a preset brings for this kind (and workshop specialty). Blank brings none. */
 export function presetOffers(kind: ServiceKind, preset: ServicePreset, specialty?: string): ServiceOffer[] {
   if (preset === "blank") return [];
   if (kind === "temple") return templeSpells.map((s) => templeOffer(s, preset));
+  if (kind === "inn") return [innOffer(preset)];
   if (kind === "workshop" && specialty === "Scribe") return scrollSpells.map((s) => scrollOffer(s, preset));
   if (kind === "workshop" && specialty === "Alchemist") return brews.map((b) => brewOffer(b, preset));
   return [];

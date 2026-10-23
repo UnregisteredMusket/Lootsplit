@@ -22,6 +22,7 @@ import { NpcConversation } from "./npc-conversation";
 import { npcServices } from "@/lib/quire/service-hub";
 import { serviceKinds } from "@/lib/quire/services-schema";
 import { NpcServicesToggle } from "./service-providers";
+import { ShareRumour } from "./service-talk";
 import { NpcBarterConfigForm } from "./npc-barter-desk";
 import { npcAnswersBarter } from "@/lib/quire/npc-barter";
 import { npcPinOpensHub } from "@/lib/quire/place-hub";
@@ -610,11 +611,18 @@ function NpcInteraction({
         </SearchSelect>
       </label>
       {conversation?.messages.map((m) => (
-        <p key={m.id} className="world-message">
+        <p key={m.id} className={`world-message${m.id.endsWith("-rumour") ? " svc-rumour" : ""}`}>
           <strong>
             {m.author === "npc" ? npc.name : table.purses.find((p) => p.id === character)?.name}
           </strong>
-          : {m.text}
+          {/* A rumour bought from an inn (docs/SERVICES.md) arrives as an NPC message. */}
+          {m.id.endsWith("-rumour") && <span className="svc-flag review"> Rumour</span>}: {m.text}
+          {m.id.endsWith("-rumour") && conversation && (
+            <>
+              {" "}
+              <ShareRumour text={m.text} npcName={npc.name} purseId={conversation.purseId} />
+            </>
+          )}
         </p>
       ))}
       {near && character ? (

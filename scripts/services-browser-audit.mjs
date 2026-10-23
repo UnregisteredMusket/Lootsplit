@@ -9,7 +9,7 @@ import { smithFixture, smithDm } from "../src/lib/quire/test-fixtures/blacksmith
 import { applyCommand } from "../src/lib/quire/commands.ts";
 import { defaultSmith } from "../src/lib/quire/blacksmith-schema.ts";
 import { validateWorld } from "../src/lib/quire/world.ts";
-import { servicesFixture, workshopFixture } from "../src/lib/quire/test-fixtures/services.ts";
+import { servicesFixture, workshopFixture, innFixture } from "../src/lib/quire/test-fixtures/services.ts";
 import { openApplication, reloadApplication, navigateApplication } from "./title-screen-navigation.mjs";
 
 const origin = process.env.AUDIT_ORIGIN || "http://127.0.0.1:8080";
@@ -176,6 +176,40 @@ async function workshop(page, width) {
   await page.screenshot({ path: `${output}/workshop-collected-${width}.png`, fullPage: true });
 }
 
+/** Inn: book two nights for the party, then buy a rumour delivered to the private thread. */
+async function inn(page, width) {
+  await open(page, innFixture(), "bram", "Bram Tolliver");
+  await reply(page, "We need rooms, and a meal.").click();
+  const drawer = talk(page).locator(".npc-talk-drawer");
+  await expect(drawer.getByRole("button", { name: /^Comfortable/ })).toHaveAttribute("aria-pressed", "true");
+  await expect(drawer.getByRole("button", { name: /^Wren/ })).toBeDisabled();
+  await drawer.getByRole("button", { name: "More nights" }).click();
+  await expect(drawer.locator(".svc-total")).toContainText("Rooms · 2 guests × 2 nights × 8 sp");
+  await expect(drawer.locator(".svc-total")).toContainText("4 gp, 8 sp");
+  await fits(page, `${width} inn booking`);
+  await page.screenshot({ path: `${output}/inn-booking-${width}.png`, fullPage: true });
+  const bookIt = reply(page, "We'll take it.");
+  await expect(bookIt).toContainText("Book");
+  await bookIt.click();
+  await expect(talk(page).getByLabel("Receipt: Rooms and meals")).toContainText("Buying a room doesn't grant a rest");
+  let state = await readJournal(page);
+  assert.equal(state.ledger.filter((l) => l.copper === -480).length, 1, "booked and paid once");
+
+  await reply(page, "Heard anything interesting?").click();
+  await expect(reply(page, "Lights at the old mill.")).toContainText("5 sp");
+  await expect(talk(page)).not.toContainText("lanterns in the old mill");
+  await reply(page, "Lights at the old mill.").click();
+  await expect(said(page, "SECRET: lanterns in the old mill three nights running.")).toBeAttached();
+  await expect(reply(page, "Lights at the old mill.")).toBeDisabled();
+  await talk(page).getByRole("button", { name: "Share in party chat" }).click();
+  await expect(talk(page).getByRole("button", { name: "Shared in party chat" })).toBeVisible();
+  await expect(page.locator(".world-message.svc-rumour")).toContainText("lanterns in the old mill");
+  state = await readJournal(page);
+  assert.deepEqual(state.journal.services.providers.find((p) => p.id === "goose-inn").rumours.find((r) => r.id === "mill").buyers, ["kael"]);
+  await fits(page, `${width} rumour`);
+  await page.screenshot({ path: `${output}/inn-rumour-${width}.png`, fullPage: true });
+}
+
 /** DM setup on the shop page: edit an offer's price and save; the change is one DM command. */
 async function setup(page) {
   await navigateApplication(page, origin + "/shop/temple");
@@ -318,6 +352,7 @@ try {
     await temple(page, width);
     if (width === 1280) await setup(page);
     await workshop(page, width);
+    await inn(page, width);
     await context.close();
   }
   assert.deepEqual(errors, [], "No browser runtime errors");

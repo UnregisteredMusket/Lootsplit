@@ -12,8 +12,8 @@ approved "as shown" on 2026-10-23.
 | --- | --- | --- |
 | 0 | Shared helpers lifted from the forge (`service-core.ts`); hub Services runs the real availability check and lists every provider | Shipped |
 | 1 | Temple, with DM review (charged on approval) | Shipped |
-| 2 | Workshop: scribe and alchemist presets | This change |
-| 3 | Inn: booked stays, meals, rumours into the buyer's private NPC thread | Planned |
+| 2 | Workshop: scribe and alchemist presets | Shipped |
+| 3 | Inn: booked stays, meals, rumours into the buyer's private NPC thread | This change |
 
 ## Shared helpers (`src/lib/quire/service-core.ts`)
 
@@ -112,6 +112,21 @@ commands are refused with the usual "finish on the updated website" message.
   Market → Service commission register; the Downtime preview's single **Commissions** fold holds
   the forge's lines ("Blacksmith commissions", unchanged) and the workshop's.
 
+## Inn (phase 3)
+
+- **Preset**: one "Rooms and meals" offer, per night, up to 14 nights, six tiers with SRD 5.2.1
+  night and meal prices (SRD 5.1: food per day). The price is guests × nights × night price plus
+  guests × days × meals × meal price, each factor shown; paid once up front, recorded only (no rest
+  granted). Leaving early refunds nothing automatically; downtime charges nothing for stays (the
+  Downtime preview says so). Open stays are not offered (owner decision: not now).
+- **Rumours** (`service-rumour`): the provider's `rumours` hold teaser, DM-only text, price and
+  `once: "character" | "party"`. One command pays once (`id+"-payment"`), records the buyer and
+  appends an NPC message `id+"-rumour"` to the buyer's private thread with the innkeeper, so it
+  follows that thread's privacy. `rumourLock` refuses a second purchase per character (or any after
+  the first for once-per-party); a stale fingerprint or a race is refused, never charged twice.
+  Players see teaser and price only, plus `boughtBy` for their own characters. The buyer may share
+  the text in party chat (owner decision).
+
 ## Screens
 
 - Conversation (`service-talk.tsx`): offers as numbered replies with price, time, component and
@@ -145,10 +160,14 @@ commands are refused with the usual "finish on the updated website" message.
 reason, whole copper, authorization, privacy, deletion guards, old saves and protocol 8, presets,
 offline parity, Here rows), `services-workshop.test.ts` (presets, herbs, downtime-only progress,
 pause, collect once at the workshop, cancel without refund, privacy, offline parity through
-`executeLocalCommand` and `executeFinanceCommand`), `service-hub.test.ts`, the unchanged `blacksmith.test.ts`, `npc-barter*.test.ts` and
+`executeLocalCommand` and `executeFinanceCommand`), `services-inn.test.ts` (presets, stay price
+and overflow, rumour text never projected before purchase and only in the buyer's thread after,
+once per character and per party, retries and races never charged twice, offline parity),
+`service-hub.test.ts`, the unchanged `blacksmith.test.ts`, `npc-barter*.test.ts` and
 `room-store.test.ts`; browser audits `scripts/services-browser-audit.mjs`
 (`npm run verify:focus -- services`, CI step `dev-services`, 1280/390/320: hub, temple offers and
 locks, Remove Curse paid at once, Raise Dead requested then approved in Review Inbox, shop Services
 section, DM editor, an alchemist order with brought herbs through approved downtime to collection,
-Market register, Commissions fold; Ironbound and Parchment) with the unchanged
+Market register, Commissions fold, an inn booking and a rumour shared in party chat; Ironbound and
+Parchment) with the unchanged
 `blacksmith-browser-audit.mjs` and `npc-barter-browser-audit.mjs`.

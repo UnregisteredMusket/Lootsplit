@@ -4358,3 +4358,6 @@ input,select,textarea { max-width: 100%; }
 .npc-talk-sub .svc-flags { margin-top:.15rem; }
 .svc-editor select, .svc-editor input:not([type=checkbox]):not([type=radio]), .svc-editor textarea, .svc-offer-body select, .svc-offer-body input:not([type=checkbox]):not([type=radio]), .svc-offer-body textarea, .svc-inbox-row textarea { width:100%; max-width:100%; min-width:0; }
 .svc-order details, .svc-order p { min-width:0; overflow-wrap:anywhere; }
+.world-message.svc-rumour { border-left:3px solid var(--color-lead); padding-left:.5rem; }
+.svc-seg.tiers button { overflow-wrap:normal; word-break:normal; hyphens:auto; font-size:.84rem; padding:.2rem .25rem; }
+@media (max-width:360px) { .svc-seg.tiers { grid-template-columns:repeat(2,minmax(0,1fr)); } }

@@ -82,7 +82,7 @@ export const rumourSchema = z
     /** Players see the teaser and price. */
     teaser: z.string().trim().min(1).max(300),
     /** DM-only until bought; a player projection never carries it. */
-    text: z.string().trim().min(1).max(4000).optional(),
+    text: z.string().trim().min(1).max(2000).optional(),
     priceCopper: copper,
     once: z.enum(["character", "party"]),
     /** Purses that bought it; DM-only. */
@@ -271,5 +271,16 @@ export const serviceCommands = [
     })
     .strict(),
   z.object({ ...orderRef, kind: z.literal("service-claim") }).strict(),
+  /** Buy one rumour: one payment, and the text lands in the buyer's private thread with the NPC. */
+  z
+    .object({
+      id,
+      kind: z.literal("service-rumour"),
+      providerId: id,
+      rumourId: id,
+      purseId: id,
+      before: z.string().max(100000),
+    })
+    .strict(),
 ] as const;
 export type ServiceCommand = z.infer<(typeof serviceCommands)[number]>;
