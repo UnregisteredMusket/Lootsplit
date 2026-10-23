@@ -5,6 +5,8 @@ import { homeStructuredData, publicPageHead } from "@/lib/deployment/public-urls
 export const Route = createFileRoute("/welcome")({
   head: () => ({
     ...publicPageHead("/welcome"),
+    // The hero landscape is the largest element on phones (Lighthouse LCP); fetch it first.
+    links: [{ rel: "preload", as: "image", href: "/art/landscape.webp", fetchPriority: "high" }],
     scripts: [{ type: "application/ld+json", children: JSON.stringify(homeStructuredData()) }],
   }),
   component: WelcomePage,

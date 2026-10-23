@@ -231,7 +231,7 @@ export function WelcomePage() {
     <Website>
       <SiteAnnouncement />
       <section className="ls-hero" aria-labelledby="welcome-title">
-        <img className="ls-hero-art" src="/art/landscape.webp" alt="" />
+        <img className="ls-hero-art" src="/art/landscape.webp" alt="" fetchPriority="high" />
         <div className="ls-hero-shade" />
         <div className="ls-wrap ls-hero-grid">
           <div className="ls-stack ls-hero-copy">
