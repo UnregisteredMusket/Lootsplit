@@ -8,7 +8,7 @@ import { randomTradeRoll, recordShopTrade, validateTradeEconomy } from "./trade-
 import { captureDeviceMutationScope, assertDeviceMutationScope } from "./mutation-scope.ts";
 import { isEphemeralCampaign } from "./guest-storage.ts";
 import { assertMerchantSale, isService, stockCategory } from "./merchant.ts";
-import { applyCommand, commandSchema, type CommandRequest } from "./commands.ts";
+import { applyCommand, applyCommandBatch, commandSchema, type CommandRequest } from "./commands.ts";
 import { actionDigest, commandIdentity } from "./command-identity.ts";
 import { ensureCityExchanges } from "./city-exchanges.ts";
 import { canonicalJson } from "./canonical-json.ts";
@@ -2803,46 +2803,76 @@ export async function executeLocalCommand(
   if (changedChat) await refreshChat();
 }
 
+const financeKind = (kind: string) =>
+  kind.startsWith("finance-") ||
+  kind === "shop-schedule" ||
+  kind === "property-plan" ||
+  kind === "property-details" ||
+  kind === "bank-repay" ||
+  kind.startsWith("downtime-") ||
+  kind === "session";
 /** Read, calculate and commit campaign finances under one IndexedDB write lock. */
 export async function executeFinanceCommand(
   input: CommandRequest,
   assertScope?: () => void,
 ): Promise<void> {
   const invoked = captureDeviceMutationScope();
+  assertDeviceMutationScope(invoked);
+  assertScope?.();
+  if (!financeKind(input.kind)) throw Error("Not a finance command.");
+  const { command, receipt } = await identify(input);
+  await commitFinance(invoked, [command], receipt, assertScope);
+}
+/**
+ * Several finance commands as one atomic action on this device (journey planner one-click
+ * approval: `downtime-plan` then `downtime-apply`), through the same `applyCommandBatch` the room
+ * uses. All apply or none do; `batchId` (one per user action, reused on retry) makes a retry a
+ * no-op.
+ */
+export async function executeFinanceBatch(
+  batchId: string,
+  inputs: CommandRequest[],
+  assertScope?: () => void,
+): Promise<void> {
+  const invoked = captureDeviceMutationScope();
+  assertDeviceMutationScope(invoked);
+  assertScope?.();
+  if (!inputs.length || !inputs.every((i) => financeKind(i.kind)))
+    throw Error("Not a finance command batch.");
+  const commands = inputs.map(
+    (input) => ({ ...input, id: input.id || crypto.randomUUID() }) as Parameters<typeof applyCommand>[2],
+  );
+  const receipt = await actionReceipt(batchId, () => canonicalJson(commands.map(commandIdentity)));
+  await commitFinance(invoked, commands, receipt, assertScope);
+}
+async function commitFinance(
+  invoked: ReturnType<typeof captureDeviceMutationScope>,
+  commands: Parameters<typeof applyCommand>[2][],
+  receipt: Awaited<ReturnType<typeof actionReceipt>>,
+  assertScope?: () => void,
+) {
   const guard = () => {
     assertDeviceMutationScope(invoked);
     assertScope?.();
   };
   guard();
-  if (!(
-    input.kind.startsWith("finance-") ||
-    input.kind === "shop-schedule" ||
-    input.kind === "property-plan" ||
-    input.kind === "property-details" ||
-    input.kind === "bank-repay" ||
-    input.kind.startsWith("downtime-") ||
-    input.kind === "session"
-  ))
-    throw Error("Not a finance command.");
+  const settles = commands.some((c) => c.kind === "session" || c.kind === "downtime-apply");
+  const rewritesHoldings = settles || commands.some((c) => c.kind === "property-details");
   // Every finance command reads the real shops and stock, as a shared room does:
   // applyCommand runs the shared validators (a smith profile needs its shop).
   // Unchanged shop and stock rows are not rewritten below.
   const stores: Parameters<typeof atomic>[0] = ["purses", "holdings", "shops", "stock", "ledger", "meta"];
-  const { command, receipt } = await identify(input);
-  guard();
   let applied = false;
   await atomic(stores, async (tx) => {
     if (await alreadyApplied(tx, receipt)) return;
     applied = true;
-    const source: CloudTable = await readEconomyTransaction(
-      tx,
-      input.kind === "session" || input.kind === "downtime-apply",
-    );
+    const source: CloudTable = await readEconomyTransaction(tx, settles);
     guard();
-    const next = applyCommand(source, localSeat(), command, {
-      source: "local",
-      random: randomTradeRoll,
-    });
+    const execution = () => ({ source: "local" as const, random: randomTradeRoll });
+    const next =
+      commands.length === 1
+        ? applyCommand(source, localSeat(), commands[0], execution())
+        : applyCommandBatch(source, localSeat(), commands, execution);
     const priorShops = new Map(source.shops.map((s) => [s.id, JSON.stringify(s)]));
     const priorStock = new Map(source.stock.map((s) => [s.id, s.quantity]));
     for (const shop of next.shops)
@@ -2850,16 +2880,12 @@ export async function executeFinanceCommand(
     for (const line of next.stock)
       if (priorStock.get(line.id) !== line.quantity) tx.objectStore("stock").put(line);
     for (const p of next.purses) tx.objectStore("purses").put(p);
-    if (
-      input.kind === "property-details" ||
-      input.kind === "session" ||
-      input.kind === "downtime-apply"
-    ) {
+    if (rewritesHoldings) {
       const kept = new Set(next.holdings.map((h) => h.id));
       for (const h of source.holdings) if (!kept.has(h.id)) tx.objectStore("holdings").delete(h.id);
       for (const h of next.holdings) tx.objectStore("holdings").put(h);
     }
-    if (input.kind === "session" || input.kind === "downtime-apply") {
+    if (settles) {
       tx.objectStore("ledger").clear();
       tx.objectStore("meta").put({ id: "chat", notes: next.notes });
     }
@@ -2868,5 +2894,5 @@ export async function executeFinanceCommand(
       tx.objectStore("meta").put({ id: "settings", ...clampRealm(next.realm) });
     tx.objectStore("meta").put({ id: "journal", value: next.journal });
   });
-  if (applied && (input.kind === "session" || input.kind === "downtime-apply")) await refreshChat();
+  if (applied && settles) await refreshChat();
 }

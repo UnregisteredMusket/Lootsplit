@@ -4232,3 +4232,39 @@ input,select,textarea { max-width: 100%; }
 @media(max-height:550px) and (orientation:landscape) {
  .map-workspace .map-route-panel { top:64px; bottom:auto; left:10px; right:auto; width:min(340px,calc(100% - 100px)); max-height:calc(100dvh - 140px); }
 }
+/* Journey planner phase B: review / progress panels (same place as the planner), the on-the-road
+   chip, the arrival dialog and Review Inbox entries. */
+.map-workspace .map-journey-panel { position:absolute; z-index:47; top:calc(70px + env(safe-area-inset-top)); left:max(14px,env(safe-area-inset-left)); width:min(520px,calc(100% - 100px)); max-height:calc(var(--map-usable-height,100dvh) - 190px); overflow:auto; overscroll-behavior:contain; padding:12px 14px; border-radius:16px; }
+.map-journey-panel h2 { margin:0; font-size:17px; font-family:inherit; }
+.map-journey-panel h2:focus { outline:none; }
+.map-journey-panel h3 { margin:12px 0 4px; font-size:14px; font-family:inherit; }
+.map-journey-panel h4 { margin:8px 0 2px; font-size:13px; font-family:inherit; color:var(--color-muted); }
+.map-journey-panel p { overflow-wrap:anywhere; }
+.map-journey-panel .map-panel-heading .map-icon-button { width:44px; height:44px; min-height:44px; display:grid; place-items:center; }
+.map-journey-sub { margin:2px 0 8px; font-size:13px; color:var(--color-muted); }
+.map-journey-days,.map-journey-lines { margin:4px 0; padding-left:18px; font-size:13px; }
+.map-journey-days li,.map-journey-lines li { margin:2px 0; overflow-wrap:anywhere; }
+.map-journey-cost { border-top:1px solid var(--color-border); padding:4px 0; }
+.map-journey-cost p { margin:0 0 4px; font-size:13px; }
+.map-journey-warning { color:var(--color-danger,#b3261e); font-weight:600; }
+.map-journey-mounts { border:0; margin:4px 0; padding:0; display:flex; flex-direction:column; gap:2px; }
+.map-journey-mounts label { display:flex; align-items:center; gap:8px; min-height:44px; }
+.map-journey-notice { margin:8px 0; padding:8px 10px; border:1px dashed var(--color-border); border-radius:10px; font-size:13px; }
+.map-journey-notice h3 { margin-top:0; }
+.map-journey-notice ul { margin:0; padding-left:18px; }
+.map-workspace .map-journey-chip { position:absolute; z-index:44; top:calc(70px + env(safe-area-inset-top)); left:50%; transform:translateX(-50%); max-width:min(440px,calc(100% - 200px)); min-height:44px; padding:6px 14px; border-radius:14px; display:flex; flex-direction:column; align-items:flex-start; text-align:left; font-size:12px; }
+.map-workspace .map-journey-chip strong { font-size:13px; }
+.map-workspace .map-journey-chip span { overflow-wrap:anywhere; }
+.map-journey-actions { display:flex; flex-direction:column; gap:8px; flex-basis:100%; }
+.map-journey-actions textarea { width:100%; min-height:64px; }
+.map-journey-entry blockquote { margin:6px 0; padding-left:10px; border-left:3px solid var(--color-border); font-style:italic; overflow-wrap:anywhere; }
+.map-journey-share { display:flex; align-items:center; gap:8px; min-height:44px; }
+.map-journey-inbox h3 { margin:10px 0 4px; }
+@media(max-width:650px) {
+ .map-workspace .map-journey-panel { top:auto; bottom:calc(130px + env(safe-area-inset-bottom)); left:max(10px,env(safe-area-inset-left)); right:max(10px,env(safe-area-inset-right)); width:auto; max-height:min(60dvh,calc(var(--map-usable-height,100dvh) - 250px)); }
+ .map-workspace .map-journey-chip { top:calc(160px + env(safe-area-inset-top)); left:max(10px,env(safe-area-inset-left)); right:max(10px,env(safe-area-inset-right)); transform:none; max-width:none; }
+}
+@media(max-height:550px) and (orientation:landscape) {
+ .map-workspace .map-journey-panel { top:64px; bottom:auto; left:10px; right:auto; width:min(420px,calc(100% - 100px)); max-height:calc(100dvh - 140px); }
+ .map-workspace .map-journey-chip { top:64px; max-width:min(300px,calc(100% - 420px)); }
+}

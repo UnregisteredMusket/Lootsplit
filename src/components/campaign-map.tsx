@@ -87,6 +87,7 @@ import {
   Route as RouteIcon,
 } from "lucide-react";
 import { useRoutePlanner } from "./map-route-planner";
+import { JourneyPlanActions, JourneyReview, useMapJourney } from "./map-journeys";
 import { MapFrame } from "./map-frame";
 import { RecordIcon } from "./map-record-icon";
 import { MapPlaceCard } from "./map-place-card";
@@ -1718,9 +1719,23 @@ function MapViewport({
     };
   }
   // Journey planner ("Plan route"): taps add waypoints while it is open (map-route-planner.tsx).
+  const [reviewJourney, setReviewJourney] = useState<string>();
+  const journeyView = useMapJourney({ map, table: recordTable, openReview: setReviewJourney });
   const planner = useRoutePlanner({
     map,
     table: recordTable,
+    milesPerDay: recordTable.journal?.world?.travel?.paces.normal,
+    partyActions: (draft) => (
+      <JourneyPlanActions
+        table={recordTable}
+        map={map}
+        draft={draft}
+        onReview={(id) => {
+          planner.finish();
+          setReviewJourney(id);
+        }}
+      />
+    ),
     aspect: ratio,
     toScreen: (p) => ({ x: view.x + p.x * w * view.scale, y: view.y + p.y * h * view.scale }),
     toMap: mapPoint,
@@ -1744,6 +1759,11 @@ function MapViewport({
     if (handledPlan.current === key || (planMapId && planMapId !== map.id)) return;
     handledPlan.current = key;
     if (planRequest === "party") planner.start("party");
+    else if (planRequest.startsWith("journey:")) {
+      const id = planRequest.slice("journey:".length);
+      if (useDm && recordTable.journal?.world?.journeys?.some((j) => j.id === id && j.status !== "completed"))
+        setReviewJourney(id);
+    }
     else if (planRequest.startsWith("ship:"))
       planner.start("ship", { shipId: planRequest.slice("ship:".length) });
     // Handled once per URL.
@@ -2501,7 +2521,17 @@ function MapViewport({
         {placeAnnouncement}
       </p>
       {!interfaceHidden && placeBar}
-      {!interfaceHidden && planner.panel}
+      {!interfaceHidden && !reviewJourney && planner.panel}
+      {!interfaceHidden && reviewJourney && (
+        <JourneyReview
+          table={recordTable}
+          journeyId={reviewJourney}
+          close={() => setReviewJourney(undefined)}
+        />
+      )}
+      {!interfaceHidden && !reviewJourney && !planner.active && journeyView.panel}
+      {!interfaceHidden && !placeBar && !reviewJourney && journeyView.chip}
+      {journeyView.arrival}
       {!interfaceHidden && !hereOpen && !placeBar && !planner.active && (
         <button
           type="button"
@@ -2775,6 +2805,7 @@ function MapViewport({
                 }
               />
               {sketches.overlay}
+              {journeyView.overlay}
               {planner.overlay}
               {visible.includes("Ship") && routes.length > 0 && (
                 <svg

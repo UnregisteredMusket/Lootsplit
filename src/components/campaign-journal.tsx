@@ -27,6 +27,9 @@ import { useArchiveReaderSeat } from "@/lib/quire/use-archive-reader-seat";
 import { mutationNotice } from "@/lib/quire/mutation-outcome";
 import { journalEntryHref, sessionChronicleEntries } from "@/lib/quire/journal-navigation";
 import { AppLink } from "./app-link";
+import { JourneyInbox } from "./map-journeys";
+import { useWorldTable } from "@/lib/quire/use-world-table";
+import type { CloudTable } from "@/lib/quire/cloud";
 import { readFinance } from "@/lib/quire/finance";
 import {
   debtForLoanRequest,
@@ -616,6 +619,7 @@ export function CampaignJournal({
             Permitted shop purchases use Buy in the Market.
           </p>
           <FinanceReadiness />
+          <JourneyRequests />
           <div className="flex flex-wrap gap-2 my-3">
             <input
               className="ledger-search"
@@ -994,4 +998,10 @@ export function PriceHistory() {
         ))}
     </Fold>
   );
+}
+
+/** Journey requests and drafts in the Review Inbox (journey planner, docs/MAP-TILES.md). */
+function JourneyRequests() {
+  const table = useWorldTable() as unknown as CloudTable;
+  return <JourneyInbox table={{ ...table, handouts: [] }} />;
 }

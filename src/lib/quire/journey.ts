@@ -197,3 +197,37 @@ export function legDayRange(legs: readonly number[], index: number, milesPerDay:
   const endDay = Math.max(startDay, Math.ceil(endDistance / 10 / milesPerDay - 1e-9));
   return { startDay, endDay };
 }
+/**
+ * Day-by-day plan of a stretch of a frozen journey (the review's "Day 41 … Day 43" rows): for
+ * each downtime day between `fromMinutes` and `toMinutes`, the deci-miles covered, the legs it
+ * touches and, on the last day, the arrival minute of the day.
+ */
+export function journeyDayPlan(
+  legs: readonly number[],
+  durationMinutes: number,
+  fromMinutes: number,
+  toMinutes: number,
+  firstDay: number,
+) {
+  const total = legs.reduce((s, l) => s + l, 0);
+  const days: { day: number; deci: number; legs: number[]; arrivalMinute?: number }[] = [];
+  for (let start = fromMinutes, day = firstDay; start < toMinutes; start += 1440, day++) {
+    const end = Math.min(toMinutes, start + 1440);
+    const a = start / durationMinutes,
+      b = end / durationMinutes;
+    const first = legIndexAt(legs, a),
+      last = legIndexAt(legs, Math.max(a, b - 1e-9));
+    days.push({
+      day,
+      deci: Math.round(total * (b - a)),
+      legs: Array.from({ length: last - first + 1 }, (_, i) => first + i),
+      ...(end === durationMinutes ? { arrivalMinute: end - start } : {}),
+    });
+  }
+  return days;
+}
+/** "about 1 pm" for a minute of the day. */
+export function aboutTime(minute: number) {
+  const hour = Math.round(minute / 60) % 24;
+  return hour === 0 ? "about midnight" : hour === 12 ? "about noon" : `about ${hour % 12} ${hour < 12 ? "am" : "pm"}`;
+}

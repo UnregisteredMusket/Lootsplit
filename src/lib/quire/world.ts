@@ -419,6 +419,9 @@ export function applyWorldCommand(t: CloudTable, seat: CloudSeat, cmd: WorldComm
       throw Error("The party moved. Refresh before placing it.");
     if (journal.finance?.downtime.some((d) => d.status === "pending"))
       throw Error("Approve or cancel pending downtime before moving the party.");
+    // The party marker follows a journey under way; stop it before moving the party freely.
+    if (w.journeys?.some((j) => j.status === "active" || j.status === "arrived"))
+      throw Error("The party is on a journey. Stop it on the road before moving the party freely.");
     if (cmd.position) {
       w.partyPosition = cmd.position;
       journal.market = readMarketLocations({ ...market, currentLocationId: null });
@@ -503,6 +506,13 @@ export function applyWorldCommand(t: CloudTable, seat: CloudSeat, cmd: WorldComm
       )
     )
       throw Error("Resolve this map's ongoing ship routes before removing it.");
+    if (
+      !cmd.map &&
+      w.journeys?.some(
+        (j) => j.mapId === cmd.mapId && ["planned", "active", "arrived"].includes(j.status),
+      )
+    )
+      throw Error("Finish or stop the journey on this map before removing it.");
     if (cmd.map?.connected) delete cmd.map.connected.placedRecords;
     if (cmd.map && current?.connected && cmd.map.connected === undefined) cmd.map.connected = current.connected;
     if (cmd.map && current?.tabletop) {

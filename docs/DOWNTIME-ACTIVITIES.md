@@ -46,6 +46,10 @@ Existing construction, ship repair, production and blacksmith commissions keep a
 
 Example default day: 4 hours martial practice + 6 hours research + 2 hours contacts + 4 hours NPC training = 16 personal hours. The NPC also allocates 4 hours. Ship travel can advance concurrently without reducing either allowance. A 16-hour training-only allocation represents 2 training days at the default 8-hour conversion, rather than two elapsed calendar days.
 
+## Party journeys in downtime (journey planner, October 23, 2026)
+
+A party journey is priced and moved by an ordinary downtime preview: `downtime-plan` with a `journeyId` adds `quote.journey` (route window, the party's position at its end, optional ration and mount lines, notices) after every other quote line, and `downtime-apply` settles it inside the same approval. The recompute-and-compare check covers the journey section, so changed balances, a changed journey or a changed map scale refuse a stale preview. A payer who can't cover a journey line refuses the whole approval (no arrears, nothing charged). Session Time never advances a journey. Details: `docs/MAP-TILES.md` "Journey planner".
+
 ## Verification and maintenance
 
 Run downtime-activities, finance, estate, character-position, ships, blacksmith and shared room regressions; quick checks; web/mobile builds; the dedicated desktop/mobile downtime browser audit in development and the immutable Worker; both Help and all preservation gates. Check player projections and optimistic turn drafts against hidden NPC resource balances. Never use real campaigns for training or reset tests.

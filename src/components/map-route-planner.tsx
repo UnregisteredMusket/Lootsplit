@@ -286,6 +286,13 @@ export function useRoutePlanner({
       if (options.shipId) setShipId(options.shipId);
     }
   }
+  /** Close after the drawn route was used (saved or reviewed): nothing is discarded. */
+  function finish() {
+    setOpen(false);
+    setPoints([]);
+    setTerrain([]);
+    setCalibrating(undefined);
+  }
   function close() {
     if (!allowContextChange()) return;
     setOpen(false);
@@ -743,6 +750,7 @@ export function useRoutePlanner({
     calibrating: !!calibrating,
     start,
     close,
+    finish,
     tap,
     /** Keyboard: Enter adds a waypoint at the crosshair. */
     addAt: (p: RoutePoint) => addPoint(p),

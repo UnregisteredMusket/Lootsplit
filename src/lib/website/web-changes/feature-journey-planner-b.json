@@ -1,0 +1,12 @@
+{
+  "title": "Party journeys",
+  "summary": "Plan a party journey on the map and approve it as downtime; the party marker follows the route as the days pass.",
+  "items": [
+    "Review journey turns a drawn route into a downtime preview: choose the pace, see each day of travel and apply all the days or only some.",
+    "Trail rations and mount upkeep are optional costs, off by default, charged once when the DM approves.",
+    "While the party is on the road the route is locked, located shops are unavailable, and the marker moves only when downtime is approved.",
+    "On arrival the DM confirms Move party here, or Not yet to stay on the road.",
+    "Players can send journey requests to the DM, who can approve them in one step from the Review Inbox.",
+    "Players see the planned route where the map is visible to them, or a short text card when the map is private."
+  ]
+}
