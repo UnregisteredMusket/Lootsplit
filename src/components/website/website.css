@@ -961,9 +961,22 @@
   column-gap: 28px;
   overflow-x: auto;
   overscroll-behavior-x: contain;
-  padding: 4px var(--gutter) 14px;
-  scrollbar-width: thin;
-  scrollbar-color: var(--paper-shade) transparent;
+  padding: 4px var(--gutter) 18px;
+  /* A visible scroll bar says the row continues sideways (owner request 2026-10-23). */
+  scrollbar-width: auto;
+  scrollbar-color: var(--paper-link) var(--paper-shade);
+}
+.ls-carousel-track::-webkit-scrollbar {
+  height: 12px;
+}
+.ls-carousel-track::-webkit-scrollbar-track {
+  background: var(--paper-shade);
+  border-radius: 6px;
+  margin: 0 var(--gutter);
+}
+.ls-carousel-track::-webkit-scrollbar-thumb {
+  background: var(--paper-link);
+  border-radius: 6px;
 }
 .ls-carousel-track:focus-visible {
   outline: 2px solid var(--paper-link);
