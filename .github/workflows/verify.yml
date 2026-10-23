@@ -279,6 +279,9 @@ jobs:
       - name: dev-blacksmith
         if: matrix.group == 'desktop'
         run: node scripts/recovery-step.mjs dev-blacksmith 240 node --experimental-strip-types scripts/blacksmith-browser-audit.mjs
+      - name: dev-services
+        if: matrix.group == 'desktop'
+        run: node scripts/recovery-step.mjs dev-services 300 node --experimental-strip-types scripts/services-browser-audit.mjs
       - name: dev-desktop
         if: matrix.group == 'desktop'
         run: node scripts/recovery-step.mjs dev-desktop 240 node scripts/desktop-browser-audit.mjs

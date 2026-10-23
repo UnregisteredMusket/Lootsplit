@@ -26,7 +26,7 @@ The top-level replies form a hub:
 | --- | --- |
 | Barter | Fully implemented here. |
 | Shop | Opens the Market's shops. |
-| Services | Opens this NPC's existing blacksmith services. It is locked when the NPC offers none. |
+| Services | Lists every service provider the NPC runs (`service-hub.ts`, docs/SERVICES.md), each with the order command's availability check as its lock reason. One provider opens directly; several open a numbered sub-list. Locked with "offers no services" when there are none. |
 | Talk | Opens the existing message thread, `#npc-messages`. |
 | Farewell | Ends the conversation. |
 

@@ -19,6 +19,7 @@ import { Button, Fold } from "./ui";
 import { AppLink } from "./app-link";
 import type { CloudTable } from "@/lib/quire/cloud";
 import { NpcConversation } from "./npc-conversation";
+import { npcServices } from "@/lib/quire/service-hub";
 import { NpcBarterConfigForm } from "./npc-barter-desk";
 import { npcAnswersBarter } from "@/lib/quire/npc-barter";
 import { npcPinOpensHub } from "@/lib/quire/place-hub";
@@ -456,7 +457,10 @@ function NpcInteraction({
   return (
     <section className="world-card">
       <h2>{npc.name} · interaction</h2>
-      {showConversation && npcAnswersBarter(npc) && near && (
+      {showConversation &&
+        near &&
+        (npcAnswersBarter(npc) ||
+          (!npc.controllerPurseId && npcServices(table, npc.id, undefined).length > 0)) && (
         <NpcConversation key={npc.id} npc={npc} table={table} />
       )}
       <h3>Inventory</h3>

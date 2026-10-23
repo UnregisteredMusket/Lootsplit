@@ -44,7 +44,7 @@ test("each development check belongs to exactly one declared isolated group", ()
     .map((v) => v.trim());
   assert.equal(new Set(groups).size, groups.length);
   const checks = [...workflow.matchAll(/- name: (dev-[\w-]+)\n\s+if: matrix.group == '([^']+)'/g)];
-  assert.equal(checks.length, 44);
+  assert.equal(checks.length, 45);
   // Community profiles and the Looking for Group directory (docs/COMMUNITY.md).
   assert.ok(checks.some(([, name, group]) => name === "dev-community" && group === "accounts"));
   // Even coin split: fund split, refusal keeps the form, Activity row, encounter split (1280/390/320).
@@ -57,6 +57,8 @@ test("each development check belongs to exactly one declared isolated group", ()
     /worker-downtime 240 node --experimental-strip-types scripts\/downtime-browser-audit\.mjs/,
   );
   assert.ok(checks.some(([, name, group]) => name === "dev-blacksmith" && group === "desktop"));
+  // NPC services in the conversation hub (docs/SERVICES.md), 1280/390/320.
+  assert.ok(checks.some(([, name, group]) => name === "dev-services" && group === "desktop"));
   assert.match(
     workflow,
     /worker-blacksmith 240 node --experimental-strip-types scripts\/blacksmith-browser-audit\.mjs/,

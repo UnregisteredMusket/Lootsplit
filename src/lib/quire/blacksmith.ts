@@ -1,9 +1,12 @@
 import type { CloudTable } from "./cloud.ts";
-import { canonicalJson } from "./canonical-json.ts";
-import { characterLocation, characterPosition } from "./character-position.ts";
-import { locationPath, readMarketLocations } from "./shop-locations.ts";
 import { shopVisible } from "./vendors.ts";
-import { assertCarried } from "./custody.ts";
+import {
+  assertContribution,
+  money as serviceMoney,
+  npcAtShop,
+  presentAt,
+  quoteFingerprint,
+} from "./service-core.ts";
 import {
   smithSkills,
   smithTermsSchema,
@@ -16,27 +19,11 @@ type Table = Pick<CloudTable, "journal" | "purses" | "holdings" | "shops">;
 function unique(keys: string[], label: string) {
   if (new Set(keys).size !== keys.length) throw Error(`Duplicate ${label}.`);
 }
-function money(n: number) {
-  const v = Math.ceil(n);
-  if (!Number.isSafeInteger(v) || v < 0 || v > 1e12)
-    throw Error("Smith price or value exceeds the supported copper range.");
-  return v;
-}
+const money = (n: number) =>
+  serviceMoney(n, "Smith price or value exceeds the supported copper range.");
+/** Kept under its original name; the rule now lives in service-core (`presentAt`). */
 export function smithHere(t: Table, locationId: string, purseId: string) {
-  const p = t.purses.find((p) => p.id === purseId),
-    m = readMarketLocations(t.journal?.market);
-  if (!p) return false;
-  if (p.kind === "character" && characterPosition(t, p).downtime) return false;
-  const aboard = t.journal?.fleet?.aboard.find((a) => a.purseId === purseId);
-  if (
-    aboard &&
-    t.journal?.fleet?.vessels.some(
-      (v) => v.propertyId === aboard.propertyId && v.mode === "sailing",
-    )
-  )
-    return false;
-  const location = p.kind === "character" ? characterLocation(t, p) : m.currentLocationId;
-  return !!location && locationPath(m, location).some((l) => l.id === locationId);
+  return presentAt(t, locationId, purseId);
 }
 export function smithEnchantments(p: SmithProfile) {
   return p.magicalForge
@@ -51,19 +38,9 @@ export function smithAvailability(t: Table, p: SmithProfile, purseId: string) {
   if (!shop || !shopVisible(shop, t) || shop.closed)
     return "The smith's shop is closed or unavailable.";
   if (!npc?.blacksmithServices) return "The DM has not enabled this NPC's blacksmith services.";
-  const maker = t.purses.find((a) => a.id === npc.id);
-  if (
-    !maker ||
-    !npc.visible ||
-    !characterPosition(t, maker).visible ||
-    characterPosition(t, maker).downtime ||
-    !shop.locationId ||
-    !locationPath(readMarketLocations(t.journal?.market), characterLocation(t, maker)).some(
-      (l) => l.id === shop.locationId,
-    )
-  )
+  if (!npcAtShop(t, npc.id, shop.locationId))
     return "The smith is not available at this forge.";
-  if (!smithHere(t, shop.locationId, purseId))
+  if (!smithHere(t, shop.locationId!, purseId))
     return "Visit the forge with the paying character and materials first.";
   return "";
 }
@@ -101,17 +78,11 @@ export function smithQuote(t: Table, shopId: string, purseId: string, design: Sm
     materialValue = money(materialValue + valueCopper);
     if (!choice.holdingId) suppliedValue = money(suppliedValue + valueCopper);
     else {
-      const h = t.holdings.find((h) => h.id === choice.holdingId);
-      if (
-        !h ||
-        h.kind !== "item" ||
-        h.service ||
-        h.purseId !== purseId ||
-        h.materialKey !== material.materialKey
-      )
-        throw Error("Contribute matching materials owned by the paying account.");
-      assertCarried(h);
-      if (h.equipped) throw Error("Unequip a material item before offering it to the smith.");
+      assertContribution(t, choice.holdingId, purseId, {
+        materialKey: material.materialKey,
+        mismatch: "Contribute matching materials owned by the paying account.",
+        equipped: "Unequip a material item before offering it to the smith.",
+      });
     }
     materials.push({
       materialKey: material.materialKey,
@@ -191,7 +162,7 @@ export function smithQuote(t: Table, shopId: string, purseId: string, design: Sm
     materials,
   });
   const f = t.journal?.finance ?? { day: 0, minuteOfDay: 0 };
-  const before = canonicalJson({
+  const before = quoteFingerprint({
     profile: { ...profile, enchantments: profile.enchantments.filter((e) => e.approved) },
     maker: { id: maker.id, name: maker.name, blacksmithServices: maker.blacksmithServices },
     terms,

@@ -468,6 +468,12 @@ Adds a contextual Maps session bar, searchable scene cards, separate activation/
 - Anti-exploit: cooldown per player account, repeat DC, 24-hour combined judgement, caps, unit cap, unwanted categories, and player-set item values (`valueSource: "player"`) count for nothing. Settlement reuses the atomic barter exchange; command IDs make retries no-ops and never re-roll. Players never receive NPC rules, valuation, purse or other players' attempts. The existing trading table, controlled-NPC flow, Give and every earlier save are unchanged. See [NPC-BARTER.md](NPC-BARTER.md).
 
 
+### NPC services, phase 0 (October 23, 2026)
+
+- Shared service helpers (`service-core.ts`) lifted from the forge with no behaviour change; the forge's schema, commands, tests and browser audit are unchanged. See [services](SERVICES.md).
+- The conversation hub's Services reply runs the real availability check and shows its reason (permission off, shop closed, NPC or character away, downtime under review). It lists every provider the NPC runs: one opens directly, several open a numbered sub-list with Never mind.
+- People & NPCs shows the conversation for an NPC who runs a service but doesn't barter. Barter, Shop, Talk and Farewell are unchanged.
+
 ### Map place hub, phase A (October 23, 2026)
 
 - Pin → place card: one record with a service opens its card directly (header with icon/portrait, location trail, status chips, Copy link, Close details) over the existing service panel; several records at one point list rows with Open in map; desktop overlay, bottom sheet at 650px and below. All previous record details, Library links, location map buttons and service panels remain.

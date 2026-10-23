@@ -41,6 +41,10 @@ Completed orders wait at the original forge. **Collect crafted item** rechecks t
 
 **Market → Blacksmith commission register** retains order tracking while travelling. Other players' orders and unapproved enchantment drafts are not disclosed. Resolve open orders before deleting a customer, pickup location or forge configuration. Removing a resolved forge retains commission history. Old saves and archives remain readable; older journal writes retain authoritative smith metadata. The shared web/mobile client includes the feature; an installed APK needs a separately signed update to bundle it.
 
+## Shared service helpers
+
+Since 2026-10-23 the forge's presence check, whole-copper rounding, quote fingerprint, material contribution check, pause/resume/cancel and downtime progress live in `src/lib/quire/service-core.ts` so later providers (temple, workshop, inn) share them; see `docs/SERVICES.md`. The forge's schema, commands, messages and results are unchanged, and `smithHere` remains as an alias of `presentAt`. The NPC conversation hub's **Services · Blacksmith** reply now runs `smithAvailability` and shows its reason instead of opening a shop page that then refuses.
+
 ## Verification
 
 Run `blacksmith.test.ts`, shared `room-store.test.ts`, finance/estate/world/ship regressions and `npm run verify:quick`. `scripts/blacksmith-browser-audit.mjs` exercises actual DM setup, NPC permission, custom extra parts, armor/weapon choices, magical approval, player contribution, review/payment, partial/full downtime, provenance, collection, reload and guest memory at 1280/390 pixels. Development and immutable Worker checks are required by the unchanged nine-group release suite; all prior checks remain. Complete exact-head PR/main verification and immutable publishers/read-only live verification before declaring a release.
