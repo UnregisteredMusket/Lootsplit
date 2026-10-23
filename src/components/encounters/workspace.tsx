@@ -834,7 +834,8 @@ function EncounterEditor({
   });
   // One planner for previews, the device path and the Worker (src/lib/quire/coin-split.ts).
   const splitTable: SplitTable = detail.splitTable ?? {
-    purses: detail.purses.map((p) => ({ ...p, coins: p.coins ?? fromCopper(0) })),
+    // Device detail rows are full purses; only kind, control and position matter to the plan.
+    purses: detail.purses.map((p) => ({ coins: fromCopper(0), ...p })) as unknown as SplitTable["purses"],
     journal: currentContext ? journal : undefined,
   };
   const awardCopper =
