@@ -4,6 +4,7 @@ import assert from "node:assert/strict";
 import { mkdir, writeFile } from "node:fs/promises";
 import { verifyAndroidDownload } from "./android-download-audit.mjs";
 import { readFileSync } from "node:fs";
+import { PUBLIC_PAGE_META } from "../src/lib/deployment/public-urls.mjs";
 const release = JSON.parse(readFileSync("src/lib/website/release.json", "utf8"));
 const origin = process.env.AUDIT_ORIGIN || "http://127.0.0.1:8080";
 const output = process.env.WEBSITE_SCREENSHOTS || "test-results/website";
@@ -51,6 +52,21 @@ try {
       });
       assert.equal(response.status(), 200);
       await page.getByRole("heading", { level: 1 }).filter({ hasText: heading }).waitFor();
+      // Each public page carries its own title, one description and matching share tags (W3).
+      const meta = PUBLIC_PAGE_META[`/${path}`];
+      if (meta && width === 1280) {
+        assert.equal(await page.title(), meta.title, `${path} title`);
+        const descriptions = await page.locator('meta[name="description"]').evaluateAll((els) => els.map((e) => e.getAttribute("content")));
+        assert.deepEqual(descriptions, [meta.description], `${path} description`);
+        assert.equal(await page.locator('meta[property="og:title"]').getAttribute("content"), meta.title);
+        assert.equal(await page.locator('meta[property="og:description"]').getAttribute("content"), meta.description);
+      }
+      if (path === "welcome" && width === 1280) {
+        const ld = await page.locator('script[type="application/ld+json"]').allTextContents();
+        assert.equal(ld.length, 1, "one JSON-LD block on the home page");
+        assert.deepEqual(JSON.parse(ld[0])["@graph"].map((n) => n["@type"]), ["WebSite", "Organization"]);
+        await page.getByText("100% free, supported by donations", { exact: true }).waitFor();
+      }
       // One header, one consistent app link label, and a footer route to release details.
       assert.equal(await page.locator(".ls-header").count(), 1);
       assert.equal(await page.locator(".portal-header").count(), 0);

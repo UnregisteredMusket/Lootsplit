@@ -249,9 +249,7 @@ export function WelcomePage() {
                 Tour the features
               </Link>
             </div>
-            <p className="ls-fine">
-              Browser & Android · Guest access · Local and shared campaigns
-            </p>
+            <p className="ls-fine ls-free-line">100% free, supported by donations</p>
           </div>
           <Shot name="ledger" tone="ink" className="ls-hero-shot" />
         </div>

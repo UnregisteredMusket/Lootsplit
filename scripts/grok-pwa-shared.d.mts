@@ -43,6 +43,8 @@ export type GrokHeadContext = {
   canonical?: string;
   cwd?: string;
   site?: OgSite;
+  /** A public page's own title and description for og:title / og:description. */
+  page?: { title: string; description: string } | null;
 };
 
 export declare function readOgSite(cwd?: string): OgSite;

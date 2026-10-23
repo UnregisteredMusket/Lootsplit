@@ -347,14 +347,16 @@ export function grokOgHeadTags({
   documentTitle = "",
   cwd = process.cwd(),
   canonical = "",
+  page = null,
 } = {}) {
-  const title = resolveOgTitle(site, appName, host, documentTitle);
+  // A public page's own title and description (PUBLIC_PAGE_META) win over the site-wide card.
+  const title = String(page?.title ?? "").trim() || resolveOgTitle(site, appName, host, documentTitle);
   const publicHost = resolvePublicHost(host);
   const tags = [
     `<meta name="twitter:card" content="summary_large_image">`,
     `<meta property="og:title" content="${escapeHtml(title)}">`,
   ];
-  const description = String(site.description ?? "").trim();
+  const description = String(page?.description ?? "").trim() || String(site.description ?? "").trim();
   if (description) {
     tags.push(`<meta property="og:description" content="${escapeHtml(description)}">`);
   }
@@ -437,6 +439,7 @@ export function normalizeHeadContext(ctx = {}) {
     creatorId: ctx.creatorId ?? readXCreatorId(),
     host: ctx.host ?? "",
     canonical: ctx.canonical ?? "",
+    page: ctx.page ?? null,
     cwd,
     site,
   };
@@ -444,7 +447,7 @@ export function normalizeHeadContext(ctx = {}) {
 
 export function injectGrokPwaHead(html, ctx = {}) {
   if (typeof html !== "string") return html;
-  const { site, projectId, creator, creatorId, host, cwd, canonical } = normalizeHeadContext(ctx);
+  const { site, projectId, creator, creatorId, host, cwd, canonical, page } = normalizeHeadContext(ctx);
   const documentTitle = titleFromDocument(html);
   const appName = resolveOgTitle(
     site,
@@ -466,7 +469,7 @@ export function injectGrokPwaHead(html, ctx = {}) {
 
   next = insertAfterHeadOpen(
     next,
-    grokOgHeadTags({ host, appName, site, documentTitle, cwd, canonical }).join(""),
+    grokOgHeadTags({ host, appName, site, documentTitle, cwd, canonical, page }).join(""),
   );
 
   if (readGrokExtensionsEnabled() && !next.includes("/grok-app-builder/extensions.js")) {
@@ -519,6 +522,7 @@ export function createHeadInjector(ctx = {}) {
       creatorId: normalized.creatorId,
       host: normalized.host,
       canonical: normalized.canonical,
+      page: normalized.page,
       cwd: normalized.cwd,
       site: normalized.site,
     });

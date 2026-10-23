@@ -16,7 +16,7 @@
  */
 import installPageTemplate from "../../scripts/install-page.html?raw";
 import { grokOgIdentity } from "virtual:grok-og-identity";
-import { canonicalPublicUrl, publicShareHost } from "../../src/lib/deployment/public-urls.mjs";
+import { canonicalPublicUrl, publicPageMeta, publicShareHost } from "../../src/lib/deployment/public-urls.mjs";
 import {
   acceptsHtml,
   createHeadInjector,
@@ -36,6 +36,7 @@ function injectHeadStreaming(response: Response, path: string): Response {
   const injector = createHeadInjector({
     host: publicShareHost(),
     canonical: canonicalPublicUrl(path),
+    page: publicPageMeta(path),
     site: grokOgIdentity.site,
   });
   const transformed = response.body!.pipeThrough(

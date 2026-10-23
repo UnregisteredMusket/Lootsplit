@@ -17,7 +17,7 @@ import {
   renderWebManifest,
   snapshotOgIdentity,
 } from "./grok-pwa-shared.mjs";
-import { canonicalPublicUrl, landingRedirect, publicShareHost } from "../src/lib/deployment/public-urls.mjs";
+import { canonicalPublicUrl, landingRedirect, publicPageMeta, publicShareHost } from "../src/lib/deployment/public-urls.mjs";
 
 export const GROK_OG_IDENTITY_ID = "virtual:grok-og-identity";
 
@@ -114,6 +114,7 @@ function wrapHtmlResponses(middlewares, cwd) {
     const injector = createHeadInjector({
       host: requestHost(),
       canonical: canonicalPublicUrl(pathOnly),
+      page: publicPageMeta(pathOnly),
       cwd,
     });
     let mode = null; // null = undecided, "inject" | "passthrough"

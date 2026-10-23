@@ -261,7 +261,7 @@ export function FeaturesPage() {
       <PageHero kicker="The whole campaign" title="Features">
         <p className="ls-lead ls-measure">
           It started with splitting loot. Now the ledger sits at the center of everything your
-          table tracks, from the first copper piece to a fleet of ships.
+          table tracks, from the first copper piece to a fleet of ships. Every feature is free.
         </p>
         <nav aria-label="Feature areas" className="ls-chips">
           {featureAreas.map((area) => (
