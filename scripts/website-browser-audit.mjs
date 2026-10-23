@@ -76,7 +76,7 @@ try {
         // The kobold mascot heads the note; the kobold mark is the header logo (owner's brand set, 2026-10-23).
         assert.match(await why.locator("img.ls-why-mascot").getAttribute("alt"), /kobold/);
         assert.equal(await page.locator(".ls-header .ls-brand img").getAttribute("src"), "/brand/kobold-icon-128.png");
-        await why.getByText("I created Lootsplitter to smite shopping episodes forever.", { exact: true }).waitFor();
+        await why.getByText("That’s why I created Lootsplitter: to save you time, and to smite shopping episodes forever.", { exact: true }).waitFor();
         assert.equal(await page.locator("main > section").last().getAttribute("aria-labelledby"), "why");
       }
       if (path === "privacy" && width === 1280) {
