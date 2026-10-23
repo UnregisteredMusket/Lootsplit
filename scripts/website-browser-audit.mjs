@@ -157,6 +157,11 @@ try {
       if (path === "donate")
         // Owner's wording, 2026-10-23.
         await page.getByText(/^For the price of one coffee, you can help support the development of Lootsplitter\./).waitFor();
+      // Home is a header tab too (owner request 2026-10-23), marked current on the home page.
+      assert.equal(
+        await page.locator('.ls-header nav a[href="/welcome"]').getAttribute("aria-current"),
+        path === "welcome" ? "page" : null,
+      );
       const current = path === "welcome" ? null : `/${path}`;
       // Changelog, Resources and Privacy are marked current in the footer; the rest in the header too.
       const marked = ["/updates", "/resources", "/privacy"].includes(current ?? "") ? ".ls-footer-nav" : ".ls-header nav";
@@ -173,7 +178,7 @@ try {
         assert.equal(await menu.getAttribute("aria-expanded"), "false");
         await menu.click();
         assert.equal(await menu.getAttribute("aria-expanded"), "true");
-        for (const label of ["Features", "Downloads", "Help", "Donate", "My account"])
+        for (const label of ["Home", "Features", "Downloads", "Help", "Donate", "My account"])
           await nav.getByRole("link", { name: label, exact: true }).waitFor();
         // Changelog and Resources moved to the footer (owner decision 2026-10-23), beside Home.
         for (const label of ["Changelog", "Resources", "Privacy"])

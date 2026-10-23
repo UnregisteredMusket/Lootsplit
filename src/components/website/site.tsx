@@ -71,6 +71,11 @@ export function Website({
             data-open={menuOpen ? "true" : "false"}
           >
             <ul>
+              <li>
+                <Link to="/welcome" aria-current={current("/welcome")}>
+                  Home
+                </Link>
+              </li>
               {headerLinks.map(([to, label]) => (
                 <li key={to}>
                   <Link to={to} aria-current={current(to)}>
