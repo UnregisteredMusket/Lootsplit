@@ -41,7 +41,7 @@ async function accountRequestCore<T>(
     await disconnectOwnerWidget();
   const headers = new Headers();
   headers.set("accept", "application/json");
-  headers.set("x-lootsplit-tabletop", "6");
+  headers.set("x-lootsplit-tabletop", "7");
   if (body !== undefined) headers.set("content-type", "application/json");
   // Once per page: drop a token restored from another installation before it is ever sent.
   if (native() && !accountTokenSettled()) await accountTokenReady();

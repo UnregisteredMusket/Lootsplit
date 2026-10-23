@@ -14,6 +14,12 @@ import { smithQuoteSchema } from "./blacksmith-schema.ts";
 import { previewSmith } from "./blacksmith-time.ts";
 import type { CloudTable } from "./cloud.ts";
 import { toCopper, fromCopper, spendCoins } from "./money.ts";
+import {
+  applyJourney,
+  assertJourneyPayable,
+  journeyQuoteSchema,
+  previewJourney,
+} from "./journey-engine.ts";
 const id = z.string().min(1).max(150);
 const money = z.number().int().min(0).max(1e12);
 export const termsSchema = z.object({
@@ -64,6 +70,8 @@ const lineSchema = z.object({
   balance: money,
 });
 export const quoteSchema = z.object({
+  /** Party journey (journey planner): optional ration/mount lines and the route position. */
+  journey: journeyQuoteSchema.optional(),
   downtimeActivities: downtimeActivityQuoteSchema.optional(),
   blacksmith: smithQuoteSchema.optional(),
   tradeSeason: tradeSeasonQuoteSchema.optional(),
@@ -168,6 +176,7 @@ export function previewDowntime(
   days: number,
   estateTime?: import("./estate.ts").EstateTime,
   seasonReceiptId?: string,
+  journeyId?: string,
 ) {
   z.number().int().min(1).max(3650).parse(days);
   const f = readFinance(raw);
@@ -312,7 +321,19 @@ export function previewDowntime(
       )
     : undefined;
   const smith = previewSmith({ journal: table.journal }, days, !!estateTime);
+  // Journey lines are paid after every other line, from what is left (all-or-nothing payer).
+  const journey =
+    journeyId && !estateTime
+      ? previewJourney(
+          { ...table, holdings: table.holdings, journal: table.journal },
+          f.day,
+          days,
+          journeyId,
+          balances,
+        )
+      : undefined;
   return quoteSchema.parse({
+    ...(journey ? { journey } : {}),
     ...(!estateTime
       ? {
           downtimeActivities: previewActivityWindow(
@@ -384,7 +405,14 @@ export function applyDowntime(
   const f = table.journal!.finance!;
   const d = f.downtime.find((d) => d.id === downtimeId);
   if (!d || d.status !== "pending") throw Error("Downtime is missing or has already been decided.");
-  const quote = previewDowntime(table, f, d.days, undefined, d.quote.tradeSeason?.id);
+  const quote = previewDowntime(
+    table,
+    f,
+    d.days,
+    undefined,
+    d.quote.tradeSeason?.id,
+    d.quote.journey?.journeyId,
+  );
   // An older saved pending quote has no hourly metadata. Compare its original
   // fields, then add the new resource window in the same authoritative approval.
   const comparable = structuredClone(quote);
@@ -395,7 +423,13 @@ export function applyDowntime(
     throw Error(
       "Campaign finances changed after this preview. Recalculate downtime before approving.",
     );
+  // A journey payer short of coins refuses the whole approval before anything moves.
+  assertJourneyPayable(table, quote.journey);
   applyFinanceQuote(table, quote, { id: d.id, name: d.name }, at);
+  if (quote.journey)
+    applyJourney(table, quote.journey, { id: d.id, name: d.name }, at, (purseId, delta, id, summary) =>
+      financeMove(table, purseId, delta, id, summary, at),
+    );
   if (quote.downtimeActivities) {
     const activities = readDowntimeActivities(table.journal!.downtimeActivities);
     if (activities.windows.some((w) => w.id === d.id))

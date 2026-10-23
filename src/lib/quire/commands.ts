@@ -5,7 +5,15 @@ import { smithCommands, type SmithCommand } from "./blacksmith-schema.ts";
 import { applyShipCommand, validateFleet, assertShipTradingHere } from "./ships.ts";
 import { characterVisible, canReadCharacter } from "./character-position.ts";
 import { ensureCityExchanges, removeUnusedCityExchange, renameUnusedCityExchange } from "./city-exchanges.ts";
-import { worldCommands, type WorldCommand } from "./world-schema.ts";
+import { worldCommands, readWorld, type WorldCommand } from "./world-schema.ts";
+import { journeyCommands, journeyKinds, type JourneyCommand } from "./journey-schema.ts";
+import {
+  applyJourneyCommand,
+  prepareJourneyPlan,
+  quoteHash,
+  travellingJourney,
+  validateJourneys,
+} from "./journey-engine.ts";
 import { npcBarterCommands, npcBarterKinds, type NpcBarterCommand } from "./npc-barter-schema.ts";
 import { applyNpcBarterCommand, validateNpcBarter } from "./npc-barter.ts";
 import { resourcePackSchema, resourceFingerprint, previewResourcePack } from "./resource-packs.ts";
@@ -70,6 +78,7 @@ export const commandSchema = z.discriminatedUnion("kind", [
   ...tradeCommands,
   ...worldCommands,
   ...npcBarterCommands,
+  ...journeyCommands,
   ...estateCommands,
   ...shipCommands,
   ...smithCommands,
@@ -85,7 +94,9 @@ export const commandSchema = z.discriminatedUnion("kind", [
     before: z.object({ locationId: id.nullable(), image: artworkSchema.nullable() }),
     locationId: id.nullable(), image: artworkSchema.nullable() }),
   z.object({ ...base, kind: z.literal("market-location"), locationId: id, before: marketLocationSchema.nullable(), after: marketLocationSchema.nullable() }),
-  z.object({ ...base, kind: z.literal("party-location"), before: id.nullable(), locationId: id.nullable(), beforePosition: z.string().optional() }),
+  z.object({ ...base, kind: z.literal("party-location"), before: id.nullable(), locationId: id.nullable(), beforePosition: z.string().optional(),
+    /** Journey planner: "Move party here" on arrival completes this journey. */
+    journeyId: id.optional() }),
   z.object({ ...base, kind: z.literal("bank-repay"), loanId: id, copper: amount.min(1) }),
   z.object({ ...base, kind: z.literal("property-details"), holdingId: id, before: z.object({name:z.string(),notes:z.string()}), name: z.string().trim().min(1).max(160), notes: z.string().max(4000) }),
   z.object({ ...base, kind: z.literal("shop-schedule"), shopId: id, schedule: shopScheduleSchema.nullable() }),
@@ -118,6 +129,10 @@ export const commandSchema = z.discriminatedUnion("kind", [
     advanceSeason: z.boolean().optional(),
     name: z.string().trim().min(1).max(100),
     days: z.number().int().min(1).max(3650),
+    /** Journey planner: price and move a party journey in this downtime. */
+    journeyId: id.optional(),
+    /** One-click inbox approval: refuse if the quote differs from the one the DM was shown. */
+    expectedQuoteHash: z.string().max(100).optional(),
   }),
   z.object({ ...base, kind: z.literal("downtime-cancel"), downtimeId: id }),
   z.object({ ...base, kind: z.literal("downtime-apply"), downtimeId: id, endSession: z.boolean() }),
@@ -378,6 +393,11 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
     applyTradeCommand(t, seat, cmd as TradeCommand, at, execution);
   } else if (lootKinds.has(cmd.kind)) {
     applyLootCommand(t, seat, cmd as LootCommand, at, execution, event);
+  } else if (journeyKinds.has(cmd.kind)) {
+    journal.world = readWorld(journal.world);
+    applyJourneyCommand(t, seat, cmd as JourneyCommand, at, (summary, purseId) =>
+      event(summary, "management", purseId),
+    );
   } else if (npcBarterKinds.has(cmd.kind)) {
     applyNpcBarterCommand(t, seat, cmd as NpcBarterCommand, at, execution);
   } else if (worldCommands.some((schema) => schema.shape.kind.value === cmd.kind)) {
@@ -505,11 +525,26 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
     if (market.currentLocationId !== cmd.before) throw Error("The party moved elsewhere. Refresh before changing location.");
     if (journal.world?.partyPosition && canonicalJson(journal.world.partyPosition) !== cmd.beforePosition) throw Error("The party travel position changed. Refresh before choosing a location.");
     if (journal.finance?.downtime.some(d=>d.status==="pending")) throw Error("Approve or cancel pending downtime before moving the party.");
+    const travelling = travellingJourney(t);
+    if (cmd.journeyId) {
+      // "Move party here" on arrival: no time passes and nothing is charged.
+      if (!travelling || travelling.id !== cmd.journeyId || travelling.status !== "arrived")
+        throw Error("This journey hasn't arrived. Refresh before moving the party.");
+      if (!cmd.locationId || (travelling.destinationLocationId && travelling.destinationLocationId !== cmd.locationId))
+        throw Error("Move the party to the journey's destination, or stop the journey first.");
+      travelling.status = "completed";
+      travelling.decidedAt = at;
+    } else if (travelling)
+      throw Error(
+        travelling.status === "arrived"
+          ? "The party has arrived on a journey. Confirm Move party here, or stop the journey first."
+          : "The party is on a journey. Stop it on the road before moving the party.",
+      );
     if (journal.world) delete journal.world.partyPosition;
     journal.market = readMarketLocations({ ...market, currentLocationId: cmd.locationId });
     event(
       cmd.locationId
-        ? `Party location: ${market.locations.find((location) => location.id === cmd.locationId)?.name}`
+        ? `Party location: ${market.locations.find((location) => location.id === cmd.locationId)?.name}${cmd.journeyId ? " (journey arrived)" : ""}`
         : "Party location cleared; all shops available",
     );
   } else if (cmd.kind === "property-details") {
@@ -688,7 +723,11 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
       if (journal.tradeEconomy?.pendingSeason) throw Error("Cancel the manual seasonal preview before preparing seasonal downtime.");
       if (journal.tradeEconomy?.settings.enabled) prepareTradeSeason(t, execution);
     }
-    const quote = previewDowntime(t, f, cmd.days, undefined, cmd.advanceSeason ? cmd.id : undefined);
+    // A journey is frozen (route, scale, duration, travellers, prices) when it is reviewed.
+    if (cmd.journeyId) prepareJourneyPlan(t, cmd.journeyId);
+    const quote = previewDowntime(t, f, cmd.days, undefined, cmd.advanceSeason ? cmd.id : undefined, cmd.journeyId);
+    if (cmd.expectedQuoteHash && quoteHash(quote) !== cmd.expectedQuoteHash)
+      throw Error("Something changed since this request was drawn up (balances, the route's map or a pending preview). Open the full review.");
     journal.downtimePrompt = { enabled: true, days: cmd.days };
     for (const d of f.downtime) if (d.status === "pending") d.status = "cancelled";
     f.downtime.push({
@@ -1288,6 +1327,7 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
     }
   }
   validateWorld(t);
+  validateJourneys(t);
   validateNpcBarter(t);
   validateFleet(t);
   validateBlacksmith(t);

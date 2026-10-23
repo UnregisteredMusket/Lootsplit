@@ -253,6 +253,125 @@ export const tradeSchema = z
     decidedAt: z.number().optional(),
   })
   .strict();
+/* ---- Party journeys and travel settings (journey planner phase B; journey-schema.ts) ---- */
+const travelCopper = z.number().int().min(0).max(1_000_000);
+const paceMilesPerDay = z.number().int().min(1).max(200);
+export const journeyStatuses = [
+  "proposed",
+  "planned",
+  "active",
+  "stopped",
+  "arrived",
+  "completed",
+  "cancelled",
+  "denied",
+] as const;
+/** A journey that still holds the party's plans: at most one per campaign. */
+export const OPEN_JOURNEY_STATUSES = ["proposed", "planned", "active", "arrived"] as const;
+export const pacePresets = ["slow", "normal", "fast"] as const;
+
+export const travelSettingsSchema = z
+  .object({
+    paces: z.object({ slow: paceMilesPerDay, normal: paceMilesPerDay, fast: paceMilesPerDay }).strict(),
+    forcedMarch: z
+      .object({ allowed: z.boolean(), maxExtraHours: z.number().int().min(0).max(8) })
+      .strict(),
+    /** Catalogue prices snapshotted when the DM saves travel settings (whole copper). */
+    /** Absent in a player's projection (prices are DM-only); defaults apply. */
+    rations: z.object({ name: z.string().trim().min(1).max(160), unitCopper: travelCopper }).strict().optional(),
+    mounts: z.object({ name: z.string().trim().min(1).max(160), unitCopper: travelCopper }).strict().optional(),
+  })
+  .strict();
+export type TravelSettings = z.infer<typeof travelSettingsSchema>;
+/** Owner defaults (2026-10-23): 18/24/30 mi/day, forced march off, catalogue rations and oats. */
+export const DEFAULT_TRAVEL: Required<TravelSettings> = {
+  paces: { slow: 18, normal: 24, fast: 30 },
+  forcedMarch: { allowed: false, maxExtraHours: 0 },
+  rations: { name: "Day's trail rations", unitCopper: 5 },
+  mounts: { name: "Nosebag of oats", unitCopper: 8 },
+};
+export function readTravel(value?: unknown): Required<TravelSettings> {
+  const parsed = value ? travelSettingsSchema.parse(value) : {};
+  return { ...structuredClone(DEFAULT_TRAVEL), ...parsed } as Required<TravelSettings>;
+}
+
+export const journeyPointSchema = z
+  .object({ x: z.number().min(0).max(1), y: z.number().min(0).max(1), locationId: id.optional() })
+  .strict();
+export const journeyLegSchema = z
+  .object({
+    environment: z.enum(travelEnvironments),
+    biome: z.enum(wildernessBiomes).optional(),
+    description: z.string().trim().max(200).optional(),
+  })
+  .strict()
+  .superRefine((leg, ctx) => {
+    if (leg.environment === "Wilderness" && !leg.biome)
+      ctx.addIssue({ code: "custom", message: "Choose a wilderness biome for each wilderness leg." });
+    if (leg.environment !== "Wilderness" && leg.biome)
+      ctx.addIssue({ code: "custom", message: "Biomes apply to wilderness legs." });
+  });
+export const journeyFrameSchema = z.discriminatedUnion("kind", [
+  z.object({ kind: z.literal("grid"), grid: mapGridSchema }).strict(),
+  z.object({ kind: z.literal("scale"), scale: mapScaleSchema }).strict(),
+]);
+export const journeySchema = z
+  .object({
+    id,
+    status: z.enum(journeyStatuses),
+    /** "dm", or the character purse that asked. */
+    requestedBy: id,
+    message: z.string().trim().max(500).optional(),
+    reason: z.object({ text: z.string().trim().max(500), showToPlayer: z.boolean() }).strict().optional(),
+    /** Absent only in a player's projection of a private map. */
+    mapId: id.optional(),
+    /** Normalized waypoints. Absent in a player's projection of a private or fogged map. */
+    points: z.array(journeyPointSchema).min(2).max(100).optional(),
+    /** Player projection of a fogged shared map: only the visible stretches of the route. */
+    runs: z.array(z.array(journeyPointSchema.omit({ locationId: true })).min(2).max(2500)).max(200).optional(),
+    legs: z.array(journeyLegSchema).min(1).max(99),
+    originLocationId: id.nullable().optional(),
+    destinationLocationId: id.nullable().optional(),
+    pace: z.object({ preset: z.enum([...pacePresets, "custom"]), milesPerDay: paceMilesPerDay }).strict(),
+    forcedMarchHours: z.number().int().min(0).max(8),
+    costs: z
+      .object({
+        rations: z.boolean(),
+        mounts: z.boolean(),
+        payerId: id.nullable(),
+        mountHoldingIds: z.array(id).max(50),
+      })
+      .strict(),
+    /** Set when the journey is reviewed (downtime-plan); immutable once it is under way. */
+    frozen: z
+      .object({
+        frame: journeyFrameSchema.optional(),
+        fingerprint: z.string().max(5000).optional(),
+        legDeciMiles: z.array(z.number().int().min(0).max(1e9)).max(99).optional(),
+        durationMinutes: z.number().int().min(1).max(3650 * 1440),
+        travellerIds: z.array(id).max(500),
+        unitCopper: z.object({ rations: travelCopper, mounts: travelCopper }).strict().optional(),
+      })
+      .strict()
+      .optional(),
+    elapsedMinutes: z.number().int().min(0).max(3650 * 1440),
+    downtimeIds: z.array(id).max(3650),
+    createdAt: z.number(),
+    decidedAt: z.number().optional(),
+  })
+  .strict()
+  .superRefine((j, ctx) => {
+    if (j.points && j.legs.length !== j.points.length - 1)
+      ctx.addIssue({ code: "custom", message: "Each leg needs its terrain." });
+    if (j.frozen?.legDeciMiles && j.frozen.legDeciMiles.length !== j.legs.length)
+      ctx.addIssue({ code: "custom", message: "Frozen legs do not match the route." });
+    if (j.frozen && j.elapsedMinutes > j.frozen.durationMinutes)
+      ctx.addIssue({ code: "custom", message: "A journey cannot travel past its end." });
+  });
+export type Journey = z.infer<typeof journeySchema>;
+export type JourneyPoint = z.infer<typeof journeyPointSchema>;
+export type JourneyLeg = z.infer<typeof journeyLegSchema>;
+
 const conversationSchema = z
   .object({
     id,
@@ -278,6 +397,10 @@ export const worldSchema = z
     partyCharacters: z.array(z.object({ id, name }).strict()).max(10000).optional(),
     maps: z.array(campaignMapSchema).max(100).default([]),
     partyPosition: partyMapPositionSchema.optional(),
+    /** Party journeys, history kept (journey planner; tabletop protocol 7). */
+    journeys: z.array(journeySchema).max(1000).optional(),
+    /** DM travel settings (paces, forced march, cost prices); defaults when absent. */
+    travel: travelSettingsSchema.optional(),
     npcs: z.array(npcSchema).max(500).default([]),
     trades: z.array(tradeSchema).default([]),
     conversations: z.array(conversationSchema).default([]),

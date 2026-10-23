@@ -355,6 +355,9 @@ export function preserveJournalMetadata(value: unknown, current: Journal): Journ
               };
             }),
             ...(current.world?.partyPosition ? { partyPosition: current.world.partyPosition } : {}),
+            // Journeys and travel settings change only through their commands.
+            ...(current.world?.journeys ? { journeys: current.world.journeys } : {}),
+            ...(current.world?.travel ? { travel: current.world.travel } : {}),
             maps: next.world.maps.map((map) => {
               const old = current.world?.maps.find((m) => m.id === map.id);
               if (old?.connected) map.connected = old.connected;

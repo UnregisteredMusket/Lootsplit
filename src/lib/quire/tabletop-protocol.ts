@@ -28,8 +28,15 @@ export const PLACEMENT_STYLE_PROTOCOL = 5;
  * it; their map saves keep the stored scale (world.ts map-save).
  */
 export const MAP_SCALE_PROTOCOL = 6;
+/**
+ * Protocol 7 (2026-10-23, Journey planner B): the world may carry party `journeys` and `travel`
+ * settings. Older clients have a strict world schema, so protocols 0-6 receive the world without
+ * them; their whole-journal writes keep them (journal.ts), and pending journey commands ask them
+ * to finish on the updated website.
+ */
+export const JOURNEY_PROTOCOL = 7;
 /** The protocol current clients declare. */
-export const CURRENT_TABLETOP_PROTOCOL = MAP_SCALE_PROTOCOL;
+export const CURRENT_TABLETOP_PROTOCOL = JOURNEY_PROTOCOL;
 /** Server-only, non-enumerable: inline image -> its stored reference for this room read. */
 export const ROOM_IMAGE_SOURCES_KEY = Symbol.for("lootsplit.room-view-image-sources");
 
@@ -133,6 +140,42 @@ function scaleFreeTable(table: CloudTable): CloudTable {
     },
   };
 }
+/** Whether a table (or a stored backup body) holds journeys or travel settings. */
+export function hasJourneys(table: CloudTable): boolean {
+  const world = table.journal?.world;
+  return (
+    world?.journeys !== undefined ||
+    world?.travel !== undefined ||
+    !!table.journal?.reports?.some((r) => journeyed(r.snapshot ?? ""))
+  );
+}
+const journeyed = (text: string) => text.includes('"journeys":') || text.includes('"travel":{');
+function journeyFreeTable(table: CloudTable): CloudTable {
+  if (!hasJourneys(table)) return table;
+  const world = table.journal?.world;
+  const reports = table.journal?.reports?.map((report) => {
+    if (!journeyed(report.snapshot ?? "")) return report;
+    try {
+      return { ...report, snapshot: JSON.stringify(journeyFreeTable(JSON.parse(report.snapshot))) };
+    } catch {
+      return report; // Preserve existing unreadable-archive evidence for the recovery reader.
+    }
+  });
+  let plainWorld = world;
+  if (world && (world.journeys !== undefined || world.travel !== undefined)) {
+    plainWorld = { ...world };
+    delete plainWorld.journeys;
+    delete plainWorld.travel;
+  }
+  return {
+    ...table,
+    journal: {
+      ...table.journal!,
+      ...(plainWorld ? { world: plainWorld } : {}),
+      ...(reports ? { reports } : {}),
+    },
+  };
+}
 // Token styles are objects; only placement styles are these strings.
 const placementStyled = (text: string) =>
   text.includes('"placements"') && /"style":"(icon|portrait)"/.test(text);
@@ -182,6 +225,8 @@ export function legacyTabletopTable(table: CloudTable): CloudTable {
   return tableForProtocol(table, 0);
 }
 export function tableForProtocol(table: CloudTable, protocol = 0): CloudTable {
+  if (protocol >= JOURNEY_PROTOCOL) return table;
+  table = journeyFreeTable(table);
   if (protocol >= MAP_SCALE_PROTOCOL) return table;
   table = scaleFreeTable(table);
   if (protocol >= PLACEMENT_STYLE_PROTOCOL) return table;
@@ -253,12 +298,20 @@ export function tabletopResponse<T extends { table: CloudTable; draft: string }>
   value: T,
   protocol?: number,
 ): T {
-  if (protocol && protocol >= MAP_SCALE_PROTOCOL) return withImageReferences(value);
+  if (protocol && protocol >= JOURNEY_PROTOCOL) return withImageReferences(value);
   const draft: unknown = JSON.parse(value.draft);
   if (
     Array.isArray(draft) &&
     draft.some((c) => {
       if (!c || typeof c !== "object") return false;
+      // Protocol 7: journey commands and journey fields older apps cannot read.
+      if (
+        c.kind === "party-journey" ||
+        c.kind === "travel-settings" ||
+        ((c.kind === "downtime-plan" || c.kind === "party-location") && c.journeyId !== undefined)
+      )
+        return true;
+      if (protocol && protocol >= MAP_SCALE_PROTOCOL) return false;
       // Protocol 6: a map scale bar fails older strict map schemas.
       if (c.kind === "map-save" && [c.map, c.before].some((m) => m?.scale !== undefined))
         return true;
