@@ -137,14 +137,14 @@ test("Show on map prefers the active scene's exact pin, then exact pins, then th
     ["default", false],
     ["vale", false],
   ]);
-  t.journal.world!.tabletop = { activeMapId: "harrow", playerBrowsing: true } as never;
+  t.journal!.world!.tabletop = { activeMapId: "harrow", playerBrowsing: true } as never;
   assert.deepEqual(ids(player)[0], ["harrow", true]);
   assert.deepEqual(recordMapSpots(t, { kind: "shop", id: "lantern" }, player)[0].point, {
     x: 0.31,
     y: 0.62,
   });
   // Restricting players to the active scene limits links to that scene.
-  t.journal.world!.tabletop = { activeMapId: "harrow", playerBrowsing: false } as never;
+  t.journal!.world!.tabletop = { activeMapId: "harrow", playerBrowsing: false } as never;
   assert.deepEqual(ids(player), [["harrow", true]]);
   assert.equal(ids(dm).length, 4);
   // A location shows on maps that anchor it.
@@ -206,7 +206,7 @@ test("records players can't see on the map are never offered, and remote shops a
     "players receive no shop (or stock) outside the party's location",
   );
   // A hidden NPC is unknown to players.
-  t.journal.world!.npcs[0].visible = false;
+  t.journal!.world!.npcs[0].visible = false;
   assert.deepEqual(recordMapSpots(t, { kind: "npc", id: "tamsin" }, player), []);
   assert.deepEqual(recordMapSpots(projectRecord(t, player), { kind: "npc", id: "tamsin" }, player), []);
   assert.equal(recordMapSpots(t, { kind: "npc", id: "tamsin" }, dm).length, 1);
@@ -220,10 +220,10 @@ test("map services keep their presence checks; viewing a pin grants no remote ac
   assert.equal(mapServiceAllowed(t, { kind: "shop", id: "ford" }, dm), true);
   assert.equal(mapServiceAllowed(t, { kind: "npc", id: "tamsin" }, seat), true);
   // Travelling closes located shops and leaves the party nowhere.
-  t.journal.world!.partyPosition = { environment: "roads" } as never;
+  t.journal!.world!.partyPosition = { environment: "roads" } as never;
   assert.equal(mapServiceAllowed(t, { kind: "shop", id: "lantern" }, seat), false);
   assert.equal(partyAt(t, "town"), false);
-  delete t.journal.world!.partyPosition;
+  delete t.journal!.world!.partyPosition;
   assert.equal(partyAt(t, "town"), true);
   assert.equal(partyAt(t, "ford"), false);
   assert.equal(recordLocationId(t, { kind: "shop", id: "lantern" }), "street");

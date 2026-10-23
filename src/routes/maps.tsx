@@ -6,7 +6,7 @@ import { CampaignMaps } from "@/components/campaign-map";
 const bounded = (value: unknown, limit: number) =>
   typeof value === "string" ? value.slice(0, limit) : undefined;
 export const Route = createFileRoute("/maps")({
-  validateSearch: (s: Record<string, unknown>) => ({
+  validateSearch: (s: Record<string, unknown>): { map?: string; record?: string } => ({
     map: bounded(s.map, 150),
     record: bounded(s.record, 170),
   }),

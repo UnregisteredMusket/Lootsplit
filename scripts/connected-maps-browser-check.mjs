@@ -277,9 +277,8 @@ export async function checkConnectedMaps({ browser, origin, output }) {
       await expect(confirmation).toHaveCount(0);
       await expect(frame).toHaveClass(/map-fullscreen/);
       await details.getByRole("button", { name: "Close details", exact: true }).click();
+      // The place hub steps end on Brackenford (their last links name map=town-map).
       const placeHubFlows = await checkPlaceHub(page, origin, width);
-      await openMapNavigation(page);
-      await chooseOption(page.getByLabel("Map", { exact: true }), "town-map");
       await expect(frame.getByRole("img", { name: "Brackenford", exact: true })).toBeVisible();
       await frame.getByRole("button", { name: "Fit map", exact: true }).click();
       await frame.locator('button[title="Map: Watchtower gate"]').click();
