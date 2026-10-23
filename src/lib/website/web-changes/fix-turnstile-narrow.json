@@ -1,0 +1,7 @@
+{
+  "title": "Human check fits small phones",
+  "summary": "On the narrowest phones the sign-in human check now uses its compact size, so the form no longer scrolls sideways.",
+  "items": [
+    "On screens narrower than the standard check, the sign-in, sign-up and recovery forms show Cloudflare's compact human check."
+  ]
+}
