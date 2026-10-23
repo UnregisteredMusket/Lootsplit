@@ -109,6 +109,10 @@ Version 1.10.0/code 17 changes only the user-visible name: `app_name`, `title_ac
 
 Version 1.11.0/code 18 replaces the coin-and-quill mark with the owner's kobold brand set (`docs/brand/`, owner go-ahead 2026-10-23). The adaptive icon foreground and monochrome layer are density PNGs (`drawable-*dpi/ic_launcher_foreground.png`, `ic_launcher_monochrome.png`) with the artwork inside the 66 dp safe zone; the background colour is navy `#0C1424`, which also colours the Android 12+ system splash. Legacy `mipmap-*/ic_launcher(_round).png` and the pre-12 `splash.png` images use the same mark. The in-app title animation, widgets (which carry no logo), package and signing key are unchanged. Regenerate from the masters in `docs/brand/` rather than editing the PNGs.
 
+## Journeys, services and community profiles — 1.12.0
+
+Version 1.12.0/code 19 bundles the web source merged since the 1.11.0 build commit `ca6fbb3`: party journeys (#243), NPC services with temples, workshops and inns (#247, #249–#251), the My account Community profile card (#240; the Find a group directory stays a website page) and the treasure pool activity-order fix (#246). The Turnstile human check (#241, #248) does not apply to the app, whose native origins are exempt. Package, signing key, widgets and icon are unchanged.
+
 ## Tablets in landscape: split view
 
 The app shows the same split view as the website when the WebView is at least 1024 CSS pixels wide (most 10–11" tablets in landscape). Rotating to portrait or a narrower window shows only the left screen; the right one returns when the tablet is turned back (the activity already handles orientation/size changes without restarting). The feature ships in the bundled web build, so it reaches installed apps with Android 1.9.3. See `docs/SPLIT-VIEW.md`.
