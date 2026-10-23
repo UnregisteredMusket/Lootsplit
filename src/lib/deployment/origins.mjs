@@ -1,6 +1,6 @@
 /** Public addresses only. Keep the native endpoint independent of future website moves. */
 export const deploymentOrigins = Object.freeze({
-  website: "https://lootsplit.oliverstorie2017.workers.dev",
+  website: "https://lootsplitter.com",
   nativeApi: "https://lootsplit.oliverstorie2017.workers.dev",
   legacy: Object.freeze(["https://lootsplit.oliverstorie2017.workers.dev"]),
 });

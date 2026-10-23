@@ -23,9 +23,9 @@ jobs:
     env:
       EXPECTED_RELEASE_SHA: ${{ inputs.release_sha }}
       RELEASE_SHA: ${{ inputs.release_sha }}
-      AUDIT_ORIGIN: https://lootsplit.oliverstorie2017.workers.dev
+      AUDIT_ORIGIN: https://lootsplitter.com
       # Other approved origins (origins.mjs legacy minus website); empty while there are none.
-      AUDIT_LEGACY_ORIGINS: ""
+      AUDIT_LEGACY_ORIGINS: "https://lootsplit.oliverstorie2017.workers.dev"
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
         with:

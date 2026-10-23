@@ -88,10 +88,10 @@ jobs:
       - name: Verify deployed identity and read-only desktop/mobile website behavior
         env:
           EXPECTED_RELEASE_SHA: ${{ env.RELEASE_SHA }}
-          AUDIT_ORIGIN: https://lootsplit.oliverstorie2017.workers.dev
+          AUDIT_ORIGIN: https://lootsplitter.com
           # Other approved origins (src/lib/deployment/origins.mjs legacy minus website), audited
           # the same way; empty while the website is the only origin. migration:check enforces it.
-          AUDIT_LEGACY_ORIGINS: ""
+          AUDIT_LEGACY_ORIGINS: "https://lootsplit.oliverstorie2017.workers.dev"
         run: |
           node scripts/recovery-step.mjs website-live-audit 180 node scripts/live-audit-origins.mjs scripts/live-release-audit.mjs
           node scripts/live-audit-origins.mjs scripts/website-browser-audit.mjs
