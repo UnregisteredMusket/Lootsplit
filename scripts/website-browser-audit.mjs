@@ -86,6 +86,26 @@ try {
         for (const id of ["device", "server", "security", "cookies", "others", "deleting", "children", "changes"])
           assert.equal(await page.locator(`h2#${id}`).count(), 1, id);
       }
+      if (path === "welcome" && width === 1280) {
+        // The owner's promo video plays muted and looped in the hero, and can be paused (WCAG 2.2.2).
+        const video = page.locator(".ls-hero video.ls-promo-video");
+        assert.deepEqual(
+          await video.evaluate((v) => ({ muted: v.muted, loop: v.loop, inline: v.playsInline, poster: v.getAttribute("poster") })),
+          { muted: true, loop: true, inline: true, poster: "/media/lootsplitter-promo-poster.webp" },
+        );
+        await page.waitForFunction(() => document.querySelector(".ls-promo-video")?.currentTime > 0.5);
+        await page.getByRole("button", { name: "Pause the video", exact: true }).click();
+        assert.equal(await video.evaluate((v) => v.paused), true);
+        await page.getByRole("button", { name: "Play the video", exact: true }).click();
+        assert.equal(await video.evaluate((v) => v.paused), false);
+        // Visitors who ask for reduced motion see the poster until they press play.
+        const calm = await browser.newPage({ viewport: { width: 1280, height: 900 }, reducedMotion: "reduce" });
+        await openApplication(calm, `${origin}/welcome`, { waitUntil: "networkidle" });
+        await calm.waitForTimeout(1500);
+        assert.equal(await calm.locator(".ls-promo-video").evaluate((v) => v.paused), true);
+        await calm.getByRole("button", { name: "Play the video", exact: true }).waitFor();
+        await calm.close();
+      }
       // One header, one consistent app link label, and a footer route to release details.
       assert.equal(await page.locator(".ls-header").count(), 1);
       assert.equal(await page.locator(".portal-header").count(), 0);
