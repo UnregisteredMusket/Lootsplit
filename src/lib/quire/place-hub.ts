@@ -1,7 +1,14 @@
 // Place hub (docs/MAP-TILES.md "Place hub"): deep links to a record on a map, "Show on map"
 // and the pin → place card. Everything here reads the table the viewer already has (the
 // permission-projected room for players), so it can never reveal more than the map itself.
-import { mapRecordTypes, type MapRecordReference } from "./connected-maps-schema.ts";
+import {
+  mapRecordTypes,
+  type ConnectedMap,
+  type MapPlacement,
+  type MapRecordReference,
+} from "./connected-maps-schema.ts";
+import { formatCopper } from "./money.ts";
+import { partyEnvironment } from "./map-tiles.ts";
 import { mapReferenceRecord } from "./connected-maps.ts";
 import { characterLocation, characterVisible, canReadCharacter } from "./character-position.ts";
 import { canAccessEstate } from "./estate.ts";
@@ -12,7 +19,7 @@ import { exchangeHere } from "./trade-economy.ts";
 import { facilityAccess } from "./ships.ts";
 import { npcAvailableHere, shopVisible } from "./world.ts";
 import { mapAccessible, readTabletopSession } from "./tabletop.ts";
-import { readWorld, type CampaignMap } from "./world-schema.ts";
+import type { CampaignMap } from "./world-schema.ts";
 import type { CloudSeat, CloudTable } from "./cloud.ts";
 
 /** The one message for every record a viewer can't be shown: hidden, DM-only, fogged, private,
@@ -52,7 +59,8 @@ export function recordMapHref(
 
 /** Maps this viewer may open, with the same rule the server projection uses. */
 export function browsableMaps(t: Table, viewer: Viewer) {
-  return readWorld(t.journal?.world).maps.filter((m) => mapAccessible(t, m, viewer));
+  // The journal is already parsed; no re-validation per card.
+  return (t.journal?.world?.maps ?? []).filter((m) => mapAccessible(t, m, viewer));
 }
 
 /** Kinds the map already draws at their location's anchor until the DM pins them. */
@@ -277,3 +285,242 @@ export function partyAt(t: Table, locationId: string | null | undefined) {
 /** An NPC pin opens the conversation hub (#188) unless a player controls that NPC; controlled
  * NPCs keep the existing interaction (Talk plus the Trading & Barter table). */
 export const npcPinOpensHub = (npc: { controllerPurseId: string | null }) => !npc.controllerPurseId;
+
+/** Kinds that can use a portrait pin. */
+export const portraitKinds = new Set<MapRecordReference["kind"]>(["npc", "character"]);
+/** The portrait a portrait pin shows (an NPC's own portrait, else its purse's), if any. */
+export function placementPortrait(t: Pick<Table, "purses" | "journal">, ref: MapRecordReference) {
+  if (!portraitKinds.has(ref.kind)) return undefined;
+  return (
+    (ref.kind === "npc"
+      ? t.journal?.world?.npcs.find((n) => n.id === ref.id)?.portrait
+      : undefined) ?? t.purses.find((p) => p.id === ref.id)?.portrait
+  );
+}
+
+// ---------------------------------------------------------------------------------------------
+// Phase B: DM placement (`place=`), portrait pins and the "Here" sheet.
+
+/**
+ * The `map-save` that places, moves, restyles or removes one record's exact pin. It keeps the
+ * pin's identity and label, and changes nothing else on the map. `change: null` removes the pin.
+ * A pin never changes where the record belongs.
+ */
+export function placementSave(
+  map: CampaignMap,
+  ref: MapRecordReference,
+  change: Partial<Pick<MapPlacement, "x" | "y" | "visibility" | "style">> | null,
+  newId: () => string = () => crypto.randomUUID(),
+) {
+  const connected: ConnectedMap = map.connected ?? { links: [], placements: [] };
+  const existing = connected.placements.find((p) => sameRecord(p.record, ref));
+  const others = connected.placements.filter((p) => !sameRecord(p.record, ref));
+  let placements = others;
+  if (change) {
+    const x = change.x ?? existing?.x,
+      y = change.y ?? existing?.y;
+    if (x === undefined || y === undefined) throw Error("Choose where the pin goes on the map.");
+    const style = "style" in change ? change.style : existing?.style;
+    const next: MapPlacement = {
+      id: existing?.id ?? newId(),
+      record: { kind: ref.kind, id: ref.id },
+      x,
+      y,
+      visibility: change.visibility ?? existing?.visibility ?? "party",
+      ...(existing?.label ? { label: existing.label } : {}),
+      ...(style && style !== "icon" && portraitKinds.has(ref.kind) ? { style } : {}),
+    };
+    placements = [...others, next];
+  } else if (!existing) throw Error("This record has no exact pin on this map.");
+  const next = { ...connected, placements };
+  delete next.placedRecords;
+  return {
+    kind: "map-save" as const,
+    mapId: map.id,
+    before: map,
+    map: { ...map, connected: next },
+  };
+}
+
+/** The map a DM's "Place on map" opens: the record's best map, else its location's default
+ * map, else the active scene, else the first map. */
+export function placementMap(t: Table, ref: MapRecordReference, maps: CampaignMap[]) {
+  const dm = { role: "dm" as const, purseIds: [] };
+  const spot = recordMapSpots(t, ref, dm, maps)[0];
+  if (spot) return spot.map;
+  const location = recordLocationId(t, ref);
+  const market = readMarketLocations(t.journal?.market);
+  for (const l of [...locationPath(market, location)].reverse()) {
+    const local = maps.find((m) => m.locationId === l.id && m.connected?.defaultForLocation);
+    if (local) return local;
+    const any = maps.find((m) => m.locationId === l.id);
+    if (any) return any;
+  }
+  const active = readTabletopSession(t).activeMapId;
+  return maps.find((m) => m.id === active) ?? maps[0];
+}
+
+export type HereRow = {
+  reference: MapRecordReference;
+  label: string;
+  group: "shops" | "people" | "services";
+  /** Shop, Trade, Person, Post office, Property, For sale. */
+  kind: string;
+  detail: string;
+  /** The verb on the row's button: Shop, Trade, Talk, Send, Open, View. */
+  action: string;
+  /** DM view only: players would not see this row. */
+  dmOnly: boolean;
+};
+export type HereSheet =
+  | { mode: "here"; locationName: string; rows: HereRow[] }
+  | { mode: "road"; environment: string }
+  | { mode: "nowhere" }
+  | {
+      mode: "away";
+      placeName: string;
+      partyPlace: string;
+      rows: { reference: MapRecordReference; label: string; kind: string; action: string; dmOnly: boolean }[];
+    };
+
+const firstLine = (text: string) => {
+  const line = text.split("\n")[0].trim();
+  return line.length > 80 ? `${line.slice(0, 79)}…` : line;
+};
+
+/**
+ * The "Here" sheet (derived, never stored): what this viewer may use at the party's location,
+ * with the same checks as the original screens. When the viewer browses a map of somewhere else
+ * it becomes a read-only list of that map's pins the viewer already receives: names and kinds
+ * only, never stock, prices, hours or people's details.
+ */
+export function hereSheet(
+  t: Table,
+  viewer: Viewer & { shopIds?: string[] },
+  viewed?: CampaignMap,
+): HereSheet {
+  const dm = viewer.role === "dm";
+  const market = readMarketLocations(t.journal?.market);
+  const world = { npcs: t.journal?.world?.npcs ?? [], partyPosition: t.journal?.world?.partyPosition };
+  const current = market.currentLocationId;
+  const path = locationPath(market, current);
+  const name = (id?: string | null) => market.locations.find((l) => l.id === id)?.name ?? "";
+  // Browsing a map of a place the party isn't in (nor inside): read only.
+  if (viewed?.locationId && current && !path.some((l) => l.id === viewed.locationId)) {
+    const inside = locationPath(market, viewed.locationId).some((l) => l.id === current);
+    if (!inside) {
+      const verbs: Partial<Record<MapRecordReference["kind"], [string, string]>> = {
+        shop: ["Shop", "Visit to shop"],
+        npc: ["Person", "Visit to talk"],
+        character: ["Person", "Visit to talk"],
+        property: ["Property", "Visit to open"],
+        listing: ["For sale", "Visit to view"],
+        exchange: ["Trade", "Visit to trade"],
+        facility: ["Dock", "Visit to use"],
+        location: ["Place", "Visit"],
+      };
+      const offices = new Set(readEstate(t.journal?.propertyOperations).postal.offices.map((o) => o.shopId));
+      return {
+        mode: "away",
+        placeName: name(viewed.locationId) || viewed.name,
+        partyPlace: world.partyPosition ? "on the road" : name(current),
+        rows: (viewed.connected?.placements ?? []).flatMap((p) => {
+          const verb = verbs[p.record.kind];
+          if (!verb || (!dm && p.visibility !== "party") || !mapReferenceRecord(t, p.record)) return [];
+          const office = p.record.kind === "shop" && offices.has(p.record.id);
+          const label =
+            p.label ?? (mapReferenceRecord(t, p.record) as { name?: string } | undefined)?.name;
+          if (!label) return [];
+          return [
+            {
+              reference: p.record,
+              label,
+              kind: office ? "Post office" : verb[0],
+              action: office ? "Visit to send" : verb[1],
+              dmOnly: p.visibility === "dm",
+            },
+          ];
+        }),
+      };
+    }
+  }
+  if (world.partyPosition) return { mode: "road", environment: partyEnvironment(world.partyPosition) };
+  if (!current) return { mode: "nowhere" };
+  const on = (id?: string | null) => !!id && path.some((l) => l.id === id);
+  const rows: HereRow[] = [];
+  const estate = readEstate(t.journal?.propertyOperations);
+  const offices = new Set(estate.postal.offices.map((o) => o.shopId));
+  for (const s of t.shops) {
+    if (!on(s.locationId)) continue;
+    const visible =
+      shopVisible(s, t) && (dm || !viewer.shopIds || viewer.shopIds.includes(s.id));
+    if (!dm && !visible) continue;
+    const office = offices.has(s.id);
+    rows.push({
+      reference: { kind: "shop", id: s.id },
+      label: s.name,
+      group: office ? "services" : "shops",
+      kind: office ? "Post office" : s.blackMarket ? "Black market" : "Shop",
+      detail: [s.closed ? "Closed" : "Open", name(s.locationId)].filter(Boolean).join(" · "),
+      action: office ? "Send" : "Shop",
+      dmOnly: !visible,
+    });
+  }
+  for (const e of t.journal?.tradeEconomy?.exchanges ?? []) {
+    if (!on(e.locationId)) continue;
+    const visible = e.visible && exchangeHere(t, e);
+    if (!dm && !visible) continue;
+    rows.push({
+      reference: { kind: "exchange", id: e.id },
+      label: e.name,
+      group: "shops",
+      kind: "Trade",
+      detail: `${e.offers.length} ${e.offers.length === 1 ? "good" : "goods"} quoted${e.open ? "" : " · closed"}`,
+      action: "Trade",
+      dmOnly: !visible,
+    });
+  }
+  for (const n of world.npcs) {
+    const p = t.purses.find((p) => p.id === n.id);
+    const available = npcAvailableHere(n, t);
+    if (!(available || (dm && p && on(characterLocation(t, p))))) continue;
+    rows.push({
+      reference: { kind: "npc", id: n.id },
+      label: n.name,
+      group: "people",
+      kind: "Person",
+      detail: firstLine(n.description),
+      action: "Talk",
+      dmOnly: !available,
+    });
+  }
+  for (const h of t.holdings) {
+    if (h.kind !== "property" || h.quantity <= 0 || !on(h.locationId)) continue;
+    const own = viewer.purseIds.includes(h.purseId);
+    if (!dm && !own && !canAccessEstate(t, estate, h.id, viewer)) continue;
+    rows.push({
+      reference: { kind: "property", id: h.id },
+      label: h.name,
+      group: "services",
+      kind: "Property",
+      detail: own ? "Your property" : dm ? (t.purses.find((p) => p.id === h.purseId)?.name ?? "Property") : "You have access",
+      action: "Open",
+      dmOnly: false,
+    });
+  }
+  for (const l of t.listings) {
+    if (!on(l.locationId) || l.quantity === 0 || l.status === "withdrawn") continue;
+    rows.push({
+      reference: { kind: "listing", id: l.id },
+      label: l.name,
+      group: "services",
+      kind: "For sale",
+      detail: `For sale · ${formatCopper(l.copper)}`,
+      action: "View",
+      dmOnly: false,
+    });
+  }
+  const order = { shops: 0, people: 1, services: 2 };
+  rows.sort((a, b) => order[a.group] - order[b.group] || a.label.localeCompare(b.label));
+  return { mode: "here", locationName: name(current), rows };
+}

@@ -277,7 +277,7 @@ export async function checkConnectedMaps({ browser, origin, output }) {
       await expect(confirmation).toHaveCount(0);
       await expect(frame).toHaveClass(/map-fullscreen/);
       await details.getByRole("button", { name: "Close details", exact: true }).click();
-      // The place hub steps end on Brackenford (their last links name map=town-map).
+      // The place hub steps end on Brackenford.
       const placeHubFlows = await checkPlaceHub(page, origin, width);
       await expect(frame.getByRole("img", { name: "Brackenford", exact: true })).toBeVisible();
       await frame.getByRole("button", { name: "Fit map", exact: true }).click();
@@ -379,6 +379,11 @@ export async function checkConnectedMaps({ browser, origin, output }) {
             "NPC sheet close control remains reachable above the map",
           );
           await npcClose.click();
+          await frame.getByRole("button", { name: /^Here/ }).click();
+          const hereSheet = frame.getByRole("region", { name: "Here", exact: true });
+          await expect(hereSheet).toContainText("Ash & Anvil");
+          assert.ok(await noHorizontalScroll(page), `Here sheet fits at ${viewport.width}px`);
+          await hereSheet.getByRole("button", { name: "Close Here", exact: true }).click();
         }
       }
       await page.setViewportSize({ width, height: 900 });

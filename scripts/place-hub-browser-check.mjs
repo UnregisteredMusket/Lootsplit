@@ -76,5 +76,43 @@ export async function checkPlaceHub(page, origin, width) {
   await frame.locator(".map-place-notice").getByRole("button", { name: "Dismiss", exact: true }).click();
   await expect(frame.getByText(UNAVAILABLE, { exact: false })).toHaveCount(0);
   flows.push("record-deep-link", "neutral-unavailable");
+
+  // Here: what the party can use at its location; each row opens the same place card.
+  await frame.getByRole("button", { name: /^Here/ }).click();
+  const here = frame.getByRole("region", { name: "Here", exact: true });
+  await expect(here).toContainText("Party is in Brackenford");
+  await expect(here).toContainText("Ash & Anvil");
+  assert.ok(await noHorizontalScroll(page), `Here sheet fits at ${width}px`);
+  assert.ok(
+    await reachable(here.getByRole("button", { name: "Close Here", exact: true })),
+    `Here close is reachable at ${width}px`,
+  );
+  await here.getByRole("button", { name: "Talk: Mara", exact: true }).click();
+  await expect(card.getByRole("region", { name: "Talk to Mara", exact: true })).toBeVisible();
+  // DM: switch Mara to an opt-in portrait pin (she has no picture, so her initial shows).
+  await card.getByRole("button", { name: "Use portrait pin", exact: true }).click();
+  await expect(frame.locator('button[title="NPC: Mara"] .map-portrait-initial')).toHaveText("M");
+  await card.getByRole("button", { name: "Close details", exact: true }).click();
+  flows.push("here-sheet", "portrait-pin");
+
+  // DM "Place on map": the record is already chosen; tap, choose DM only, save.
+  await openApplication(page, `${origin}/maps?map=region-map&place=shop%3Ainn`);
+  const bar = frame.getByRole("region", { name: "Place on map", exact: true });
+  await expect(bar).toContainText("Placing The Lantern Inn");
+  assert.ok(await noHorizontalScroll(page), `Placement bar fits at ${width}px`);
+  // Keyboard path: Enter places the pin at the crosshair (the centre of the view).
+  await frame.getByRole("region", { name: "Interactive campaign map", exact: true }).focus();
+  await page.keyboard.press("Enter");
+  await expect(bar).toContainText("Pin at");
+  await bar.getByRole("radio", { name: "DM only", exact: true }).check();
+  await bar.getByRole("button", { name: "Save pin", exact: true }).click();
+  await page.waitForURL((u) => u.searchParams.get("record") === "shop:inn");
+  await expect(card.getByRole("heading", { name: "The Lantern Inn", exact: true })).toBeVisible();
+  await expect(card.getByRole("button", { name: "Let the party see this pin", exact: true })).toBeVisible();
+  await card.getByRole("button", { name: "Close details", exact: true }).click();
+  flows.push("place-on-map");
+  // Hand back on Brackenford, where the connected-maps check continues.
+  await openApplication(page, `${origin}/maps?map=town-map`);
+  await expect(frame.getByRole("img", { name: "Brackenford", exact: true })).toBeVisible();
   return flows;
 }

@@ -36,6 +36,7 @@ import {
   useEffect,
   useCallback,
   useLayoutEffect,
+  useMemo,
   useRef,
   useState,
   type ReactNode,
@@ -87,6 +88,8 @@ import {
 import { MapFrame } from "./map-frame";
 import { RecordIcon } from "./map-record-icon";
 import { MapPlaceCard } from "./map-place-card";
+import { MapPlaceBar } from "./map-place-bar";
+import { MapHereSheet } from "./map-here-sheet";
 import {
   groupMapRecords,
   mapRecordKinds,
@@ -100,7 +103,17 @@ import { MapAnnouncer } from "./map-announcer";
 import { PingGlyph } from "./ping-glyph";
 import { pingShapes } from "@/lib/quire/map-announcements";
 import type { CloudTable } from "@/lib/quire/cloud";
-import { parseRecordParam, recordMapSpots, sameRecord, PLACE_UNAVAILABLE } from "@/lib/quire/place-hub";
+import {
+  hereSheet,
+  parseRecordParam,
+  placementMap,
+  placementPortrait,
+  recordMapSpots,
+  recordParam,
+  sameRecord,
+  PLACE_UNAVAILABLE,
+} from "@/lib/quire/place-hub";
+import { mapReferenceRecord } from "@/lib/quire/connected-maps";
 
 const MapCombatWorkspace = lazy(() =>
   import("./map-combat-workspace").then((m) => ({ default: m.MapCombatWorkspace })),
@@ -159,9 +172,9 @@ function CampaignMapWorkspace({ viewScope }: { viewScope: { key: string; ephemer
   );
   const [selected, setSelected] = useState(""),
     [editing, setEditing] = useState<CampaignMap | null | undefined>(),
-    [placement, setPlacement] = useState<"" | "anchor" | "marker" | "party" | "token" | "record">(
-      "",
-    ),
+    [placement, setPlacement] = useState<
+      "" | "anchor" | "marker" | "party" | "token" | "record" | "place"
+    >(""),
     [location, setLocation] = useState(""),
     [point, setPoint] = useState<{ x: number; y: number }>(),
     [label, setLabel] = useState(""),
@@ -171,7 +184,8 @@ function CampaignMapWorkspace({ viewScope }: { viewScope: { key: string; ephemer
     [tileMode, setTileMode] = useState(true),
     [selectedToken, setSelectedToken] = useState("");
   const requestedMap = useRouterState({ select: (s) => s.location.search.map }),
-    requestedRecord = useRouterState({ select: (s) => s.location.search.record });
+    requestedRecord = useRouterState({ select: (s) => s.location.search.record }),
+    requestedPlace = useRouterState({ select: (s) => s.location.search.place });
   const navigate = useNavigate(),
     router = useRouter();
   const [entryCamera, setEntryCamera] = useState<{
@@ -273,8 +287,10 @@ function CampaignMapWorkspace({ viewScope }: { viewScope: { key: string; ephemer
     returningMap.current = "";
     setHistory((h) => (returning ? h.slice(0, -1) : previous ? [...h, previous].slice(-100) : h));
     setSelectedToken("");
-    setPlacement("");
     setPoint(undefined);
+    // A DM's "Place on map" link chose this map: keep its placement mode.
+    if (placeRequest?.mapId !== viewedMapId) setPlacement("");
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [viewedMapId, viewScope.key, viewScope.ephemeral]);
   // Place hub deep link: /maps?map=&record=kind:id centres on the pin and opens its card. Any
   // record this viewer can't be shown gets the same neutral message (docs/MAP-TILES.md).
@@ -310,6 +326,55 @@ function CampaignMapWorkspace({ viewScope }: { viewScope: { key: string; ephemer
     // The link is handled once per URL; later room updates never move the viewer's camera.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [requestedMap, requestedRecord]);
+  // DM "Place on map": /maps?map=&place=kind:id opens placement mode with the record chosen.
+  // Players opening such a link simply get the map.
+  const [placeRequest, setPlaceRequest] = useState<{
+      mapId: string;
+      reference: MapRecordReference;
+    }>(),
+    handledPlace = useRef("");
+  useEffect(() => {
+    if (requestedPlace === undefined) {
+      handledPlace.current = "";
+      return;
+    }
+    const key = `${requestedMap ?? ""}|${requestedPlace}`;
+    if (!dm || handledPlace.current === key) return;
+    handledPlace.current = key;
+    const reference = parseRecordParam(requestedPlace);
+    if (!reference || !mapReferenceRecord(t, reference)) {
+      setPlaceNotice(PLACE_UNAVAILABLE);
+      return;
+    }
+    const target =
+      allMaps.find((m) => m.id === requestedMap) ?? placementMap(t, reference, allMaps);
+    if (!target) {
+      setPlaceNotice("Import a map before placing records on it.");
+      return;
+    }
+    setPlaceNotice("");
+    setTypeFilter("");
+    setPlaceRequest({ mapId: target.id, reference });
+    setSelected(target.id);
+    setPlacement("place");
+    setPoint(undefined);
+    // Handled once per URL.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [requestedMap, requestedPlace, dm]);
+  // Leave placement first; navigate once the bar (and its draft guard) has unmounted.
+  const [afterPlacing, setAfterPlacing] = useState<{ map: string; record?: string }>();
+  const endPlacing = (show?: MapRecordReference) => {
+    const mapId = placeRequest?.mapId ?? map?.id;
+    setPlaceRequest(undefined);
+    setPlacement("");
+    setPoint(undefined);
+    if (mapId) setAfterPlacing(show ? { map: mapId, record: recordParam(show) } : { map: mapId });
+  };
+  useEffect(() => {
+    if (!afterPlacing || placement === "place") return;
+    setAfterPlacing(undefined);
+    void navigate({ to: "/maps", search: afterPlacing });
+  }, [afterPlacing, placement, navigate]);
   const party =
     map &&
     (w.partyPosition?.mapId === map.id &&
@@ -444,6 +509,7 @@ function CampaignMapWorkspace({ viewScope }: { viewScope: { key: string; ephemer
               point: p,
               reference: p.record,
               href: libraryRecordHref(p.record.kind, p.record.id),
+              style: p.style,
             },
           ];
         }),
@@ -822,6 +888,22 @@ function CampaignMapWorkspace({ viewScope }: { viewScope: { key: string; ephemer
             recordTable={t}
             entryCamera={entryCamera}
             openRecord={deepLink}
+            partyMapId={w.partyPosition?.mapId ?? best?.id}
+            placeBar={
+              placement === "place" && placeRequest?.mapId === map.id ? (
+                <MapPlaceBar
+                  key={`${placeRequest.reference.kind}:${placeRequest.reference.id}`}
+                  map={map}
+                  table={t}
+                  reference={placeRequest.reference}
+                  point={point}
+                  done={() => endPlacing(placeRequest.reference)}
+                  cancel={() => {
+                    if (allowContextChange()) endPlacing();
+                  }}
+                />
+              ) : undefined
+            }
             notice={placeNotice}
             dismissNotice={() => setPlaceNotice("")}
             onRecordMissing={() => setPlaceNotice(PLACE_UNAVAILABLE)}
@@ -1272,6 +1354,8 @@ function MapViewport({
   navigation,
   entryCamera,
   openRecord,
+  partyMapId,
+  placeBar,
   notice,
   dismissNotice,
   onRecordMissing,
@@ -1306,6 +1390,10 @@ function MapViewport({
   entryCamera?: { mapId: string; view: { x: number; y: number; zoom: number }; nonce: string };
   /** A deep-linked record to highlight and open (Place hub). */
   openRecord?: { mapId: string; reference: MapRecordReference; nonce: string };
+  /** The map that shows the party (for the Here sheet's "Back to where the party is"). */
+  partyMapId?: string;
+  /** The DM's "Place on map" bar while placing a chosen record. */
+  placeBar?: ReactNode;
   notice?: string;
   dismissNotice?: () => void;
   onRecordMissing?: () => void;
@@ -1343,7 +1431,10 @@ function MapViewport({
     [highlight, setHighlight] = useState<MapRecordReference>(),
     [placeAnnouncement, setPlaceAnnouncement] = useState(""),
     [cardFocus, setCardFocus] = useState<string>(),
-    [deepLinkedCard, setDeepLinkedCard] = useState<MapRecordReference>();
+    [deepLinkedCard, setDeepLinkedCard] = useState<MapRecordReference>(),
+    [hereOpen, setHereOpen] = useState(false);
+  const viewer = useSeat(),
+    navigate = useNavigate();
   const serviceTable = recordTable;
   useLayoutEffect(() => {
     setDetails([]);
@@ -1353,11 +1444,12 @@ function MapViewport({
     setDrawerOpen(false);
   }, [map.id]);
   useEffect(() => {
-    if (placing && full) {
+    // "Place on map" keeps its own bar; the settings drawer stays closed.
+    if (placing && full && placementKind !== "place") {
       setDrawerOpen(!!point);
       if (point) setSettingsTab("settings");
     }
-  }, [placing, point, full]);
+  }, [placing, point, full, placementKind]);
   const signals = useMapPings(map.id),
     useDm = useSeat().role === "dm",
     tools = useMapTabletopTools(map, selectedToken, onTokenSelect);
@@ -1395,10 +1487,18 @@ function MapViewport({
     const match = records.filter((r) => r.id === d.id && r.kind === d.kind);
     return match.length
       ? match
-      : d.kind === "Location" && map.anchors.some((a) => a.locationId === d.id)
+      : d.detached || (d.kind === "Location" && map.anchors.some((a) => a.locationId === d.id))
         ? [d]
         : [];
   });
+  // Derived from the projected table; recomputed only when it or the viewed map changes.
+  const here = useMemo(
+    () => hereSheet(recordTable, viewer, map),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [recordTable.journal, recordTable.shops, recordTable.holdings, recordTable.listings, recordTable.purses, viewer, map],
+  );
+  const drawnRecord = (reference: MapRecordReference) =>
+    records.find((r) => sameRecord(r.reference, reference) && r.point);
   // The deep-link highlight lasts while that record's card is open (the pulse itself is short).
   const highlighted =
     currentDetails.length === 1 && sameRecord(currentDetails[0].reference, highlight)
@@ -1691,8 +1791,9 @@ function MapViewport({
       if (e.key === "Escape") {
         if (drawerOpen) setDrawerOpen(false);
         else if (moreTools) setMoreTools(false);
-        else if (service || details.length || combatOpen || tools.inspecting) {
+        else if (service || details.length || combatOpen || tools.inspecting || hereOpen) {
           if (!allowContextChange()) return;
+          setHereOpen(false);
           setService(undefined);
           setDetails([]);
           setCombatOpen(false);
@@ -2325,6 +2426,26 @@ function MapViewport({
       <p className="sr-only" aria-live="polite" aria-atomic="true">
         {placeAnnouncement}
       </p>
+      {!interfaceHidden && placeBar}
+      {!interfaceHidden && !hereOpen && !placeBar && (
+        <button
+          type="button"
+          className="map-here-button map-glass"
+          title="What you can use at the party's location"
+          onClick={() => {
+            if (!allowContextChange()) return;
+            setDetails([]);
+            setService(undefined);
+            setDrawerOpen(false);
+            setCombatOpen(false);
+            tools.hideInspector();
+            setHereOpen(true);
+          }}
+        >
+          {here.mode === "road" ? "Here: on the road" : "Here"}
+          {here.mode === "here" && <span className="map-here-count">{here.rows.length}</span>}
+        </button>
+      )}
       <div className="map-feedback" hidden={interfaceHidden}>
         <MapRenderBadge />
         {full && (
@@ -2640,6 +2761,7 @@ function MapViewport({
                       ) {
                         setService(undefined);
                         setCombatOpen(false);
+                        setHereOpen(false);
                         const token = type.records.find(
                           (r) =>
                             r.kind === "Combatant" ||
@@ -2735,7 +2857,79 @@ function MapViewport({
               </Suspense>
             </section>
           )}
-          {currentDetails.length > 0 && (
+          {hereOpen && !combatOpen && (
+            <MapHereSheet
+              sheet={here}
+              dm={useDm}
+              close={() => {
+                setHereOpen(false);
+                root.current?.focus();
+              }}
+              open={(row) => {
+                if (!allowContextChange()) return;
+                const drawn = drawnRecord(row.reference);
+                setHereOpen(false);
+                if (drawn) {
+                  focusRecord(drawn);
+                  return;
+                }
+                const kind = (
+                  {
+                    shop: "Shop",
+                    npc: "NPC",
+                    character: "Character",
+                    property: "Property",
+                    listing: "Listing",
+                    exchange: "Exchange",
+                    facility: "Dock",
+                    location: "Location",
+                    entry: "Journal",
+                    handout: "Handout",
+                  } as const
+                )[row.reference.kind];
+                setDetails([
+                  {
+                    id: row.reference.id,
+                    label: row.label,
+                    kind,
+                    reference: row.reference,
+                    href: libraryRecordHref(row.reference.kind, row.reference.id),
+                    detached: true,
+                  },
+                ]);
+                setService(row.reference);
+                setServiceExpanded(false);
+                setDrawerOpen(false);
+                tools.hideInspector();
+                setCardFocus(crypto.randomUUID());
+              }}
+              canLocate={(reference) =>
+                !!drawnRecord(reference) || recordMapSpots(recordTable, reference, viewer, maps).length > 0
+              }
+              locate={(reference) => {
+                const drawn = drawnRecord(reference);
+                setHereOpen(false);
+                if (drawn) {
+                  focusRecord(drawn);
+                  setHighlight(reference);
+                } else void navigate({ to: "/maps", search: { record: recordParam(reference) } });
+              }}
+              backToParty={
+                partyMapId && partyMapId !== map.id ? () => selectMap(partyMapId) : undefined
+              }
+              showParty={
+                party
+                  ? () =>
+                      setView((v) => ({
+                        ...v,
+                        x: size.w / 2 - party.x * w * v.scale,
+                        y: size.h / 2 - party.y * h * v.scale,
+                      }))
+                  : undefined
+              }
+            />
+          )}
+          {currentDetails.length > 0 && !hereOpen && (
             <MapPlaceCard
               records={currentDetails}
               map={map}
@@ -2787,14 +2981,22 @@ function MapRecordGlyph({
 }) {
   const table = useWorldTable(),
     token = map.tokens?.find((token) => records.some((record) => record.id === token.id)),
+    // Opt-in portrait pin (Place hub): one NPC or character placed with style "portrait".
+    pinned =
+      !token && records.length === 1 && records[0].style === "portrait" ? records[0] : undefined,
+    pinnedPortrait = pinned?.reference && placementPortrait(table, pinned.reference),
     portrait =
       token?.kind === "character"
         ? table.purses.find((person) => person.id === token.entityId)?.portrait
-        : undefined;
+        : pinnedPortrait || undefined;
   return (
     <>
       {portrait ? (
         <img className="tabletop-token-portrait" src={portrait} alt="" draggable={false} />
+      ) : pinned ? (
+        <span className="map-portrait-initial" aria-hidden="true">
+          {pinned.label.slice(0, 1)}
+        </span>
       ) : (
         <RecordIcon kind={kind} />
       )}

@@ -2,7 +2,13 @@ import { MapPin } from "lucide-react";
 import type { MapRecordReference } from "@/lib/quire/connected-maps-schema";
 import { useSeat } from "@/lib/quire/seat";
 import { useWorldTable } from "@/lib/quire/use-world-table";
-import { recordMapHref, recordMapSpots, recordMapStatus } from "@/lib/quire/place-hub";
+import {
+  browsableMaps,
+  placementMap,
+  recordMapHref,
+  recordMapSpots,
+  recordMapStatus,
+} from "@/lib/quire/place-hub";
 import { AppLink } from "./app-link";
 
 /**
@@ -16,6 +22,12 @@ export function MapRecordStrip({ reference }: { reference: MapRecordReference })
     table = useWorldTable();
   const status = recordMapStatus(recordMapSpots(table, reference, seat));
   const first = status.spots[0];
+  // DM: Place on map / Place exactly / Move pin open the map in placement mode (`place=`).
+  const exactSpot = status.spots.find((s) => s.exact);
+  const placeTarget = dm
+    ? exactSpot?.map ?? first?.map ?? placementMap(table, reference, browsableMaps(table, seat))
+    : undefined;
+  const placeLabel = exactSpot ? "Move pin" : first ? "Place exactly" : "Place on map";
   const state =
     status.kind === "none"
       ? dm
@@ -42,6 +54,14 @@ export function MapRecordStrip({ reference }: { reference: MapRecordReference })
       {first && (
         <AppLink className="map-record-strip-action" href={recordMapHref(first.map.id, reference)}>
           Show on map
+        </AppLink>
+      )}
+      {placeTarget && (
+        <AppLink
+          className="map-record-strip-action"
+          href={recordMapHref(placeTarget.id, reference, "place")}
+        >
+          {placeLabel}
         </AppLink>
       )}
       {status.kind === "several" && (

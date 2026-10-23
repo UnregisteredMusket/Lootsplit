@@ -20,6 +20,9 @@ export const mapPlacementSchema = scenePointSchema
     record: mapRecordReferenceSchema,
     visibility: z.enum(["party", "dm"]),
     label: z.string().trim().min(1).max(160).optional(),
+    /** Pin style (Place hub). Absent means the round icon; "portrait" shows an NPC's or
+     * character's portrait (or initial). Tabletop protocol 5; older clients never see it. */
+    style: z.enum(["icon", "portrait"]).optional(),
   })
   .strict();
 export const sceneLinkSchema = scenePointSchema
