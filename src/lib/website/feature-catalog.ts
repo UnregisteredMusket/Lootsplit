@@ -439,6 +439,17 @@ export const FEATURE_AREAS: FeatureArea[] = [
         ],
       },
       {
+        title: "Journey planner",
+        summary:
+          "Draw a route across a map to see each leg's distance, travel days at your pace and terrain.",
+        details: [
+          "Waypoints snap to places and to tile centres on gridded maps",
+          "Leg list with miles, days at the chosen pace and terrain",
+          "Type a route instead of drawing it, or use the keyboard",
+          "Draw a ship voyage route and send it to the voyage request",
+        ],
+      },
+      {
         title: "Fog, walls and vision",
         summary:
           "Reveal or conceal areas, add walls, doors and lights, and show players only what they can see.",
@@ -455,6 +466,11 @@ export const FEATURE_AREAS: FeatureArea[] = [
       {
         title: "Place on map",
         text: "Pin a record with a crosshair, choose visibility and an optional portrait pin.",
+        dm: true,
+      },
+      {
+        title: "Map scale bar",
+        text: "Calibrate a scale on maps without a grid so measuring and routes use real distances.",
         dm: true,
       },
       {
