@@ -111,7 +111,7 @@ try {
       const { economySnapshot } = await import("/src/lib/quire/economy.ts");
       return ((await economySnapshot()).journal?.lootClaims?.claims ?? []).length === 1;
     });
-    await potion.locator(".loot-claim-list").getByText("· marked by the DM", { exact: false }).waitFor();
+    await potion.locator(".loot-claim-list").getByText("marked by the DM", { exact: true }).waitFor();
     const marked = await readBooks(page);
     assert.deepEqual(marked.holdings, before.holdings);
     assert.deepEqual(marked.purses, before.purses);

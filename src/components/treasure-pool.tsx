@@ -355,9 +355,11 @@ function LotCard({ t, h, mine, readOnly }: { t: LootTable; h: Holding; mine: Pur
             return (
               <li key={p.id}>
                 <span>
-                  {p.name}
-                  {seat.purseIds.includes(p.id) ? " (you)" : ""}
-                  {claim?.by === "dm" ? <small className="text-muted"> · marked by the DM</small> : null}
+                  <span>
+                    {p.name}
+                    {seat.purseIds.includes(p.id) ? " (you)" : ""}
+                  </span>
+                  {claim?.by === "dm" ? <small className="text-muted">marked by the DM</small> : null}
                 </span>
                 <Pill choice={claim?.choice ?? "none"} />
               </li>

@@ -1072,7 +1072,9 @@ function EncounterEditor({
                   </div>
                 ))}
                 {currentContext && (
-                  <AppLink href="/party?section=pool">Open the treasure pool →</AppLink>
+                  <div className="coin-split-sum">
+                    <AppLink href="/party?section=pool">Open the treasure pool →</AppLink>
+                  </div>
                 )}
               </section>
             )}
