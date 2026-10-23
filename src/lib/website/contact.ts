@@ -6,3 +6,6 @@
  */
 export const SUPPORT_EMAIL = "support@lootsplitter.com";
 export const SUPPORT_MAILTO = `mailto:${SUPPORT_EMAIL}`;
+
+/** The owner's public Instagram account (shared 2026-10-23), without tracking parameters. */
+export const INSTAGRAM_URL = "https://www.instagram.com/lootsplitterdev/";
