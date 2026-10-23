@@ -503,14 +503,16 @@ export function WelcomePage() {
             </h2>
           </div>
           <p>
-            I really don’t like shopping episodes. You know the ones: the dragon is dead, the hoard
-            is on the floor, and the rest of the night goes to price lists, coin conversions and
-            crossed-out inventory sheets.
+            I really hate shopping episodes. You know the ones: they follow the party comically
+            killing your BBEG with no plan at all, which loads them up with a pile of treasure.
+            Then they spend the next two or three sessions arguing with multiple shopkeepers,
+            splitting hairs over 2 copper pieces to get a cool new hat for their pet monkey named
+            “Bingo”.
           </p>
           <p>
-            <strong>I created Lootsplitter to smite shopping episodes forever.</strong> Manage your
-            party, build encounters and assign loot, and set up shops for your players to interact
-            with, eliminating paper inventory sheets in your campaign.
+            <strong>That’s why I created Lootsplitter: to save you time, and to smite shopping episodes forever.</strong>{" "}
+            Manage your party, build encounters and assign loot, and set up shops for your players
+            to interact with, eliminating paper inventory sheets in your campaign.
           </p>
           <p>
             Plus… Open5e integration, service features such as blacksmithing, a bartering system,
