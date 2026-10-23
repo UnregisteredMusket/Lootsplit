@@ -1,0 +1,9 @@
+{
+  "title": "Home page refresh",
+  "summary": "The home page's feature cards now scroll by slowly, and the note from the maker sits right after \"Where it all began\".",
+  "items": [
+    "\"Everything around the ledger\" is one row of screenshots that drifts sideways; scroll it yourself, or pause it with the button.",
+    "Visitors who prefer reduced motion see a still row.",
+    "\"Why did I create Lootsplitter?\" now follows the loot section."
+  ]
+}

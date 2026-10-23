@@ -2,13 +2,13 @@ import { AppLink } from "@/components/app-link";
 import { HelpContent } from "../help-content";
 import { TreasuryEntry } from "./gold-counter";
 import { SiteAnnouncement } from "./announcement";
+import { AreasCarousel, type Area } from "./areas-carousel";
 import { PromoVideo } from "./promo-video";
 import { Kicker, PageHero, Shot } from "./parts";
 import { useReleaseIdentity } from "./release-identity";
 import { Link, useRouterState } from "@tanstack/react-router";
 import { ArrowRight, Menu, X } from "lucide-react";
 import { useEffect, useId, useState, type ReactNode } from "react";
-import type { ProductShot } from "@/lib/website/product-shots";
 import release from "@/lib/website/release.json";
 import { OPEN_APP } from "@/lib/website/labels";
 import { INSTAGRAM_URL, SUPPORT_EMAIL, SUPPORT_MAILTO } from "@/lib/website/contact";
@@ -184,7 +184,7 @@ function SiteFooter({
   );
 }
 
-const areas: [ProductShot, string, string, string][] = [
+const areas: Area[] = [
   [
     "character",
     "characters",
@@ -271,28 +271,7 @@ export function WelcomePage() {
         </div>
       </section>
 
-      <section className="ls-paper" aria-label="At a glance">
-        <div className="ls-wrap ls-ledger">
-          <TreasuryEntry />
-          <div className="ls-ledger-entry">
-            <p className="ls-sc ls-entry-no">At the table</p>
-            <p className="ls-ledger-title">Three ways to play</p>
-            <p className="ls-ledger-note">
-              Local at one table, Turn-based between sessions, or Live online. One party, a shared
-              ledger.
-            </p>
-          </div>
-          <div className="ls-ledger-entry">
-            <p className="ls-sc ls-entry-no">Behind the screen</p>
-            <p className="ls-ledger-title">The DM keeps the keys</p>
-            <p className="ls-ledger-note">
-              Access, permissions and anything that needs a ruling. Built for the table.
-            </p>
-          </div>
-        </div>
-      </section>
-
-      <section className="ls-ink ls-section" aria-labelledby="loot">
+      <section className="ls-paper ls-section" aria-labelledby="loot">
         <div className="ls-wrap ls-split">
           <div className="ls-stack">
             <Kicker ornament>Where it all began</Kicker>
@@ -313,7 +292,49 @@ export function WelcomePage() {
               <li>Character purses, party funds and a full activity ledger with voiding</li>
             </ul>
           </div>
-          <Shot name="loot" tone="ink" />
+          <Shot name="loot" tone="paper" />
+        </div>
+      </section>
+
+      <section className="ls-ink ls-section" aria-labelledby="why">
+        <div className="ls-wrap ls-measure ls-stack ls-gap-lg ls-why">
+          <img
+            className="ls-why-mascot"
+            src="/brand/mascot-chase.webp"
+            alt="A grinning kobold sprints off with a giant gold coin while an exasperated fighter lunges after it."
+            width={1200}
+            height={859}
+            loading="lazy"
+            decoding="async"
+          />
+          <div className="ls-stack ls-center">
+            <Kicker ornament>A note from the maker</Kicker>
+            <h2 id="why" className="ls-display">
+              Why did I create Lootsplitter?
+            </h2>
+          </div>
+          <p>
+            I really hate shopping episodes. You know the ones: they follow the party comically
+            killing your BBEG with no plan at all, which loads them up with a pile of treasure.
+            Then they spend the next two or three sessions arguing with multiple shopkeepers,
+            splitting hairs over 2 copper pieces to get a cool new hat for their pet monkey named
+            “Bingo”.
+          </p>
+          <p>
+            <strong>That’s why I created Lootsplitter: to save you time, and to smite shopping episodes forever.</strong>{" "}
+            Manage your party, build encounters and assign loot, and set up shops for your players
+            to interact with, eliminating paper inventory sheets in your campaign.
+          </p>
+          <p>
+            Plus… Open5e integration, service features such as blacksmithing, a bartering system,
+            property listings, a fully integrated map system with fog of war, and so much more!
+          </p>
+          <p>
+            Free to use, with no ads of any kind.{" "}
+            <AppLink href="/">Open the app</AppLink> or{" "}
+            <Link to="/downloads">download it for Android</Link>.
+          </p>
+          <p className="ls-why-signature">— UnregisteredMusket</p>
         </div>
       </section>
 
@@ -329,17 +350,7 @@ export function WelcomePage() {
               post to the same ledger.
             </p>
           </div>
-          <ul className="ls-areas">
-            {areas.map(([shot, anchor, title, text]) => (
-              <li key={title}>
-                <Link className="ls-area" to="/features" hash={anchor}>
-                  <h3>{title}</h3>
-                  <Shot name={shot} size="inset" />
-                  <p>{text}</p>
-                </Link>
-              </li>
-            ))}
-          </ul>
+          <AreasCarousel areas={areas} />
           <Link className="ls-btn ls-btn-ink ls-self-center" to="/features">
             See every feature
           </Link>
@@ -434,6 +445,27 @@ export function WelcomePage() {
         </div>
       </section>
 
+      <section className="ls-paper" aria-label="At a glance">
+        <div className="ls-wrap ls-ledger">
+          <TreasuryEntry />
+          <div className="ls-ledger-entry">
+            <p className="ls-sc ls-entry-no">At the table</p>
+            <p className="ls-ledger-title">Three ways to play</p>
+            <p className="ls-ledger-note">
+              Local at one table, Turn-based between sessions, or Live online. One party, a shared
+              ledger.
+            </p>
+          </div>
+          <div className="ls-ledger-entry">
+            <p className="ls-sc ls-entry-no">Behind the screen</p>
+            <p className="ls-ledger-title">The DM keeps the keys</p>
+            <p className="ls-ledger-note">
+              Access, permissions and anything that needs a ruling. Built for the table.
+            </p>
+          </div>
+        </div>
+      </section>
+
       <section className="ls-ink ls-section" aria-labelledby="platforms">
         <div className="ls-wrap ls-stack ls-gap-lg">
           <div className="ls-stack ls-center">
@@ -488,47 +520,6 @@ export function WelcomePage() {
         </div>
       </section>
 
-      <section className="ls-paper ls-section" aria-labelledby="why">
-        <div className="ls-wrap ls-measure ls-stack ls-gap-lg ls-why">
-          <img
-            className="ls-why-mascot"
-            src="/brand/mascot-chase.webp"
-            alt="A grinning kobold sprints off with a giant gold coin while an exasperated fighter lunges after it."
-            width={1200}
-            height={859}
-            loading="lazy"
-            decoding="async"
-          />
-          <div className="ls-stack ls-center">
-            <Kicker ornament>A note from the maker</Kicker>
-            <h2 id="why" className="ls-display">
-              Why did I create Lootsplitter?
-            </h2>
-          </div>
-          <p>
-            I really hate shopping episodes. You know the ones: they follow the party comically
-            killing your BBEG with no plan at all, which loads them up with a pile of treasure.
-            Then they spend the next two or three sessions arguing with multiple shopkeepers,
-            splitting hairs over 2 copper pieces to get a cool new hat for their pet monkey named
-            “Bingo”.
-          </p>
-          <p>
-            <strong>That’s why I created Lootsplitter: to save you time, and to smite shopping episodes forever.</strong>{" "}
-            Manage your party, build encounters and assign loot, and set up shops for your players
-            to interact with, eliminating paper inventory sheets in your campaign.
-          </p>
-          <p>
-            Plus… Open5e integration, service features such as blacksmithing, a bartering system,
-            property listings, a fully integrated map system with fog of war, and so much more!
-          </p>
-          <p>
-            Free to use, with no ads of any kind.{" "}
-            <AppLink href="/">Open the app</AppLink> or{" "}
-            <Link to="/downloads">download it for Android</Link>.
-          </p>
-          <p className="ls-why-signature">— UnregisteredMusket</p>
-        </div>
-      </section>
     </Website>
   );
 }

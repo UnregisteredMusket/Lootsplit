@@ -77,7 +77,28 @@ try {
         assert.match(await why.locator("img.ls-why-mascot").getAttribute("alt"), /kobold/);
         assert.equal(await page.locator(".ls-header .ls-brand img").getAttribute("src"), "/brand/kobold-icon-128.png");
         await why.getByText("That’s why I created Lootsplitter: to save you time, and to smite shopping episodes forever.", { exact: true }).waitFor();
-        assert.equal(await page.locator("main > section").last().getAttribute("aria-labelledby"), "why");
+        // Owner, 2026-10-23: the note sits right under "Where it all began" (the loot section).
+        assert.equal(
+          await page.locator("main > section[aria-labelledby='loot'] + section").getAttribute("aria-labelledby"),
+          "why",
+        );
+        // "Everything around the ledger" drifts sideways, loops, and pauses on request.
+        const track = page.locator(".ls-carousel-track");
+        assert.equal(await page.locator(".ls-carousel ul:not([data-loop-copy]) a.ls-area").count(), 8);
+        assert.equal(await page.locator("[data-loop-copy]").getAttribute("aria-hidden"), "true");
+        for (const tab of await page.locator("[data-loop-copy] a").evaluateAll((a) => a.map((n) => n.tabIndex)))
+          assert.equal(tab, -1);
+        assert.ok(await track.evaluate((e) => e.scrollWidth > e.clientWidth), "the row scrolls sideways");
+        await track.scrollIntoViewIfNeeded();
+        await page.mouse.move(1, 1);
+        const start = await track.evaluate((e) => e.scrollLeft);
+        await page.waitForFunction((s) => document.querySelector(".ls-carousel-track").scrollLeft > s + 20, start);
+        await page.getByRole("button", { name: "Pause the scrolling", exact: true }).click();
+        await page.mouse.move(1, 1);
+        const held = await track.evaluate((e) => e.scrollLeft);
+        await page.waitForTimeout(1200);
+        assert.equal(await track.evaluate((e) => e.scrollLeft), held, "paused row stays still");
+        await page.getByRole("button", { name: "Play the scrolling", exact: true }).click();
       }
       if (path === "privacy" && width === 1280) {
         // Owner decisions 2026-10-23: named as UnregisteredMusket, 30-day deletion, under-13 line.
@@ -107,6 +128,8 @@ try {
         await calm.waitForTimeout(1500);
         assert.equal(await calm.locator(".ls-promo-video").evaluate((v) => v.paused), true);
         await calm.getByRole("button", { name: "Play the video", exact: true }).waitFor();
+        assert.equal(await calm.locator("[data-loop-copy]").count(), 0, "no looping copy for reduced motion");
+        assert.equal(await calm.locator(".ls-carousel-track").evaluate((e) => e.scrollLeft), 0);
         await calm.close();
       }
       // One header, one consistent app link label, and a footer route to release details.
