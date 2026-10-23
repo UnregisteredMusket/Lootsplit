@@ -170,7 +170,7 @@ export function homeStructuredData() {
         "@id": `${url}/#organization`,
         name: "Lootsplitter",
         url: `${url}/`,
-        logo: `${url}/favicon.svg`,
+        logo: `${url}/brand/kobold-icon-circle-512.png`,
         email: "support@lootsplitter.com",
         sameAs: [
           "https://github.com/UnregisteredMusket/Lootsplit",

@@ -1686,6 +1686,11 @@
 }
 
 /* "Why did I create Lootsplitter?" — the maker's note closing the home page. */
+.ls-why .ls-why-mascot {
+  align-self: center;
+  width: min(100%, 520px);
+  height: auto;
+}
 .ls-why p {
   font-size: 1.15rem;
   line-height: 1.7;

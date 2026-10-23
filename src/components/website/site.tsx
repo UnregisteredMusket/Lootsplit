@@ -58,7 +58,7 @@ export function Website({
       <header className="ls-header">
         <div className="ls-wrap ls-header-row">
           <Link className="ls-brand" to="/welcome" aria-label="Lootsplitter home">
-            <img src="/favicon.svg" alt="" width="34" height="34" />
+            <img src="/brand/kobold-icon-128.png" alt="" width="40" height="40" />
             <span className="ls-brand-text">
               <span className="ls-brand-name">Lootsplitter</span>
               <span className="ls-brand-tag">The Party Ledger</span>
@@ -487,6 +487,15 @@ export function WelcomePage() {
 
       <section className="ls-paper ls-section" aria-labelledby="why">
         <div className="ls-wrap ls-measure ls-stack ls-gap-lg ls-why">
+          <img
+            className="ls-why-mascot"
+            src="/brand/mascot-chase.webp"
+            alt="A grinning kobold sprints off with a giant gold coin while an exasperated fighter lunges after it."
+            width={1200}
+            height={859}
+            loading="lazy"
+            decoding="async"
+          />
           <div className="ls-stack ls-center">
             <Kicker ornament>A note from the maker</Kicker>
             <h2 id="why" className="ls-display">
