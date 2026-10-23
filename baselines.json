@@ -61704,5 +61704,22 @@
     "finishedAt": "2026-10-22T23:15:52Z",
     "durationMs": 1000,
     "trendId": "39869932188:1:8e3a871a6785f0b4fd34377c8603155e712e6167e3a149217b43a297a67ebde7"
+  },
+  "[\".github/workflows/code-health.yml\",\"pull_request\",\"pull-request\",\"step\",\"Dependency vulnerabilities (OSV-Scanner) / osv-scan / Complete job\",\"ubuntu-latest\",1]": {
+    "schema": 1,
+    "id": "39896924104:1:512d29086f5b1fbe4404547bc2203bb3c51dc2ae14351d9cf9ebcc52eca56fec",
+    "scope": "[\".github/workflows/code-health.yml\",\"pull_request\",\"pull-request\",\"step\",\"Dependency vulnerabilities (OSV-Scanner) / osv-scan / Complete job\",\"ubuntu-latest\",1]",
+    "kind": "step",
+    "name": "Dependency vulnerabilities (OSV-Scanner) / osv-scan / Complete job",
+    "environment": "ubuntu-latest",
+    "commit": "9b0fc67782d159fcf536ff73e1f0c65db2bd5b12",
+    "runId": 39896924104,
+    "attempt": 1,
+    "url": "https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39896924104/job/120229404378",
+    "outcome": "success",
+    "startedAt": "2026-10-23T03:48:23Z",
+    "finishedAt": "2026-10-23T03:48:24Z",
+    "durationMs": 1000,
+    "trendId": "39896924104:1:512d29086f5b1fbe4404547bc2203bb3c51dc2ae14351d9cf9ebcc52eca56fec"
   }
 }
