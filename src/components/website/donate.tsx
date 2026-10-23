@@ -30,8 +30,8 @@ export function DonatePage() {
     <Website footer="ink">
       <PageHero kicker="A little support goes a long way" title="Support Lootsplitter">
         <p className="ls-lead ls-measure">
-          Enjoying your party’s ledger? Donations are an optional way to support ongoing development
-          and hosting.
+          For the price of one coffee, you can help support the development of Lootsplitter.
+          Donations keep it free for every table and pay for hosting.
         </p>
       </PageHero>
       <section className="ls-paper ls-section ls-section-tight" aria-labelledby="donate-title">

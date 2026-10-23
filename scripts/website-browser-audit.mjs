@@ -128,6 +128,9 @@ try {
       );
       assert.match(await identity.getAttribute("href"), /\/downloads#release-details$/);
       assert.equal(await page.getByText("About this app & releases", { exact: true }).count(), path === "downloads" ? 1 : 0);
+      if (path === "donate")
+        // Owner's wording, 2026-10-23.
+        await page.getByText(/^For the price of one coffee, you can help support the development of Lootsplitter\./).waitFor();
       const current = path === "welcome" ? null : `/${path}`;
       // Changelog, Resources and Privacy are marked current in the footer; the rest in the header too.
       const marked = ["/updates", "/resources", "/privacy"].includes(current ?? "") ? ".ls-footer-nav" : ".ls-header nav";
