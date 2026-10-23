@@ -13,7 +13,7 @@ import { type Command } from "./commands.ts";
 import { readJournal } from "./journal.ts";
 import { lootFingerprint, readLootClaims } from "./loot-claims.ts";
 import type { LootChoice } from "./loot-claims-schema.ts";
-import { applyCloudTable, economySnapshot, executeLocalCommand } from "./economy.ts";
+import { applyCloudTable, economySnapshot, executeLocalCommand, saveHolding } from "./economy.ts";
 import { DM_SEAT, setSeat } from "./table.ts";
 import type { Holding, Purse } from "./types.ts";
 
@@ -346,4 +346,29 @@ test("projection: party members see the pool, every party claim and party lines;
   assert.deepEqual(readLootClaims(away).claims, []);
   assert.equal((away.journal?.events ?? []).some((e) => e.lootClaim || e.lootResolution), false);
   assert.equal(away.ledger.some((l) => l.loot), false);
+});
+
+test("device: a player-only link is read-only; pooled items stay in their fund and cannot be moved or equipped", async () => {
+  setSeat(DM_SEAT);
+  await applyCloudTable(campaign());
+  const potion = (await economySnapshot()).holdings.find((h) => h.id === "potion")!;
+  await assert.rejects(saveHolding({ ...potion, purseId: "aria" }), /in the treasure pool/);
+  await assert.rejects(saveHolding({ ...potion, equipped: true }), /in the treasure pool/);
+  // An edit keeps the marker even when the edit form omits it.
+  const { pool: _pool, ...edited } = potion;
+  await saveHolding({ ...edited, notes: "edited" });
+  assert.ok((await economySnapshot()).holdings.find((h) => h.id === "potion")!.pool);
+  // Add loot into a party fund may pool a new item; never into a character's purse.
+  await saveHolding({ id: "new-loot", purseId: "hoard", name: "Gem", kind: "item", quantity: 1, unitCopper: 100, notes: "", pool: { at: 1, source: "add-loot" } });
+  const events = (await economySnapshot()).journal!.events.filter((e) => e.lootPool);
+  assert.deepEqual(events.map((e) => [e.lootPool!.holdingId, e.lootPool!.source]), [["new-loot", "add-loot"]]);
+  await assert.rejects(
+    saveHolding({ id: "bad-loot", purseId: "aria", name: "Gem", kind: "item", quantity: 1, unitCopper: 100, notes: "", pool: { at: 1, source: "add-loot" } }),
+    /held by a party fund/,
+  );
+  // A player-only device link cannot claim or resolve.
+  setSeat({ role: "player", purseIds: ["aria", "hoard"], shopIds: [], openedAt: 0 });
+  await assert.rejects(executeLocalCommand(claimCmd(campaign(), "link", "sword", "aria", "need")), /read-only on a player link/);
+  await assert.rejects(giveToPlayer({ fromId: "hoard", toId: "aria", copper: 0, holdingId: "potion", quantity: 1 } ), /treasure pool/);
+  setSeat(DM_SEAT);
 });

@@ -298,6 +298,7 @@ export function preserveJournalMetadata(value: unknown, current: Journal): Journ
   const next = readJournal(value);
   delete next.resourceLibrary;
   delete next.referenceAccess;
+  delete next.lootClaims;
   const reports = new Map((current.reports || []).map((report) => [report.id, report]));
   for (const report of next.reports || []) {
     // An archive is immutable. Hydrated error placeholders and stale client copies must
@@ -402,7 +403,7 @@ export function preserveJournalMetadata(value: unknown, current: Journal): Journ
     // Older clients drop the optional split settings and receipts; keep the stored ones.
     ...(next.coinSplit ?? current.coinSplit ? { coinSplit: next.coinSplit ?? current.coinSplit } : {}),
     // Claims change only through loot commands; a journal patch never rewrites them.
-    ...(current.lootClaims ? { lootClaims: current.lootClaims } : { lootClaims: undefined }),
+    ...(current.lootClaims ? { lootClaims: current.lootClaims } : {}),
     events: next.events.map((event) => {
       const change = event.change ?? changes.get(event.id);
       const split = event.split ?? splits.get(event.id);

@@ -386,3 +386,36 @@ test("old data: a campaign without pool fields loads and runs every command unch
   assert.equal(after.journal!.lootClaims, undefined);
   assert.equal(after.holdings.find((h) => h.id === "g-item")!.purseId, "aria");
 });
+
+test("history: a DM journal patch (older client) cannot rewrite open claims or drop loot event payloads", () => {
+  let t = marked(campaign(), [["potion", "aria", "need"]]);
+  t = resolve(t, { id: "hist", method: "round-robin", lots: [{ holdingId: "potion", quantity: 2 }] });
+  const journal = t.journal!;
+  // An older client's copy: no lootClaims, no loot payloads on events.
+  const older = {
+    ...journal,
+    lootClaims: undefined,
+    events: journal.events.map(({ lootClaim: _c, lootPool: _p, lootResolution: _r, ...e }) => e),
+  };
+  const patched = applyCommand(t, dm, { id: "jp", kind: "patch", changes: [{ store: "journal", id: "journal", before: older, after: older }] });
+  assert.deepEqual(patched.journal!.lootClaims, journal.lootClaims);
+  assert.deepEqual(
+    patched.journal!.events.filter((e) => e.lootClaim || e.lootResolution).map((e) => e.id),
+    journal.events.filter((e) => e.lootClaim || e.lootResolution).map((e) => e.id),
+  );
+});
+
+test("Activity: one row per resolution and one row per run of claim changes, with party lines only", async () => {
+  const { lootActivity } = await import("./loot-activity.ts");
+  let t = marked(campaign(), [["sword", "bram", "need"], ["sword", "aria", "greed"]]);
+  t = resolve(t, { id: "act", method: "round-robin", lots: [{ holdingId: "sword", quantity: 1 }] });
+  t = claim(t, seat("cass"), "symbol", "cass", "greed", "late-claim");
+  const rows = lootActivity(t.journal!.events, t.purses, { ownPurseIds: ["bram"] });
+  assert.deepEqual(rows.map((r) => [r.icon, r.title]), [
+    ["claims", "Claims marked · 1 change"],
+    ["resolve", "Treasure pool resolved · 1 item to 1 character"],
+    ["claims", "Claims marked · 2 changes"],
+  ]);
+  assert.deepEqual(rows[1]!.lines.map((l) => [l.who, l.item, l.own]), [["The Hoard → Bram Ironfoot", "+1 Longsword × 1", true]]);
+  assert.equal(rows[1]!.total, "1 item · 500 gp");
+});
