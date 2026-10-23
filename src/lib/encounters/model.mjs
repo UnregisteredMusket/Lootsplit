@@ -44,6 +44,34 @@ export const tableSchema = z
     (t) => t.selected === null || t.selected < t.entries.length,
     "Choose an existing loot result.",
   );
+/**
+ * Optional even split of the award's coins (prompt 2, phase 1). When present, the coins are
+ * split among `purseIds` at transfer time and `coinPurseId` is left empty, so an older client
+ * that drops this field cannot silently send every coin to one purse.
+ */
+export const encounterCoinSplitSchema = z
+  .object({
+    purseIds: z.array(z.string().min(1).max(120)).min(1).max(20),
+    remainderRule: z.enum(["party-fund", "recipient", "rotate"]),
+    remainderPurseId: z.string().min(1).max(120).optional(),
+  })
+  .strict()
+  .refine((s) => new Set(s.purseIds).size === s.purseIds.length, "Tick each character once.");
+/** What a split award stores on its receipt; `copper` converts to coins with fromCopper. */
+export const awardSplitReceiptSchema = {
+  coinShares: z
+    .array(z.object({ purseId: z.string().min(1).max(120), copper: z.number().int().positive() }))
+    .max(20)
+    .optional(),
+  coinRemainder: z
+    .object({
+      purseId: z.string().min(1).max(120),
+      copper: z.number().int().positive(),
+      rule: z.enum(["party-fund", "source", "recipient", "rotate"]),
+    })
+    .optional(),
+  coinSplitId: z.string().max(120).optional(),
+};
 export const encounterSchema = z
   .object({
     version: z.literal(1),
@@ -59,6 +87,7 @@ export const encounterSchema = z
     tables: z.array(tableSchema).max(20),
     coins: z.object({ cp: integer, sp: integer, ep: integer, gp: integer, pp: integer }),
     coinPurseId: z.string().max(120),
+    coinSplit: encounterCoinSplitSchema.optional(),
   })
   .superRefine((e, ctx) => {
     for (const rows of [e.combatants, e.loot, e.tables])

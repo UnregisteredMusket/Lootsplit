@@ -120,3 +120,49 @@ test("party loot summary requires a confirmed award and only emits safe aggregat
   assert.ok(!summary.text.includes("20 gp"));
   assert.deepEqual(Object.keys(summary), ["title", "text", "encounterId", "receiptId"]);
 });
+
+test("an old single-purse award previews byte-identically; a split award previews its shares", () => {
+  const old = {
+    coins: { cp: 0, sp: 6, ep: 0, gp: 12, pp: 1 },
+    coinPurseId: "party",
+    loot: [{ id: "dagger", name: "Silvered dagger", quantity: 1, purseId: "party" }],
+    tables: [],
+  };
+  // The exact shape every award saved before coin splitting rendered from.
+  assert.equal(
+    JSON.stringify(recipientAwardPreview(old, recipients)),
+    JSON.stringify({
+      recipients: [
+        {
+          id: "party",
+          name: "Party",
+          kind: "party",
+          coins: { cp: 0, sp: 6, ep: 0, gp: 12, pp: 1 },
+          items: [{ id: "dagger", name: "Silvered dagger", quantity: 1, purseId: "party" }],
+        },
+      ],
+      unresolved: [],
+      unresolvedCoins: false,
+    }),
+  );
+  // Split shares never replace an old award's single purse, even if a map is passed.
+  assert.deepEqual(
+    recipientAwardPreview(old, recipients, new Map([["hero", { cp: 1, sp: 0, ep: 0, gp: 0, pp: 0 }]])),
+    recipientAwardPreview(old, recipients),
+  );
+  const split = { ...old, coinPurseId: "", coinSplit: { purseIds: ["hero"], remainderRule: "party-fund" } };
+  const share = { cp: 6, sp: 2, ep: 0, gp: 22, pp: 0 };
+  const preview = recipientAwardPreview(split, recipients, new Map([["hero", share]]));
+  assert.deepEqual(preview.recipients.find((r) => r.id === "hero")?.coins, share);
+  assert.equal(preview.unresolvedCoins, false);
+  // Readiness for a split: recipients must exist and there must be enough copper.
+  const ready = (b: typeof split) =>
+    encounterReadiness({ status: "review", body: b, recipients, dirty: false }).transfer;
+  assert.deepEqual(ready(split), []);
+  assert.ok(ready({ ...split, coinSplit: { purseIds: ["gone"], remainderRule: "party-fund" } }).some((l) => l.includes("must still exist")));
+  assert.ok(
+    ready({ ...split, coins: { cp: 1, sp: 0, ep: 0, gp: 0, pp: 0 }, coinSplit: { purseIds: ["hero", "party"], remainderRule: "party-fund" } }).some((l) =>
+      l.includes("Too little to split"),
+    ),
+  );
+});

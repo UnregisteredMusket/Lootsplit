@@ -3,6 +3,8 @@ type Loot = { id: string; name: string; quantity: number; purseId: string };
 export type AwardBody = {
   coins: Coins;
   coinPurseId: string;
+  /** Optional even split (prompt 2, phase 1). Absent on every award saved before it. */
+  coinSplit?: { purseIds: string[]; remainderRule: string; remainderPurseId?: string };
   loot: Loot[];
   tables: Array<{ name: string; selected: number | null }>;
 };
@@ -37,7 +39,18 @@ export function encounterReadiness(input: {
       "Account-only drafts cannot award campaign loot. Import into a campaign to award it.",
     );
   const known = new Set(input.recipients.map((p) => p.id));
-  if (hasAwardCoins(input.body.coins) && !known.has(input.body.coinPurseId))
+  const split = input.body.coinSplit;
+  if (hasAwardCoins(input.body.coins) && split) {
+    if (!split.purseIds.length) transfer.push("Tick at least one character to split the coins with.");
+    else if (split.purseIds.some((id) => !known.has(id)))
+      transfer.push("Every character in the coin split must still exist.");
+    else if (awardCopper(input.body.coins) < split.purseIds.length)
+      transfer.push(
+        `Too little to split: each share would be 0 cp. Add coins or tick fewer characters.`,
+      );
+    if (split.remainderRule === "recipient" && !split.purseIds.includes(split.remainderPurseId ?? ""))
+      transfer.push("Choose who gets the leftover copper from the ticked characters.");
+  } else if (hasAwardCoins(input.body.coins) && !known.has(input.body.coinPurseId))
     transfer.push("Choose an existing coin recipient.");
   input.body.loot.forEach((item, index) => {
     if (!known.has(item.purseId))
@@ -52,8 +65,20 @@ export function encounterReadiness(input: {
   return { conclude, transfer };
 }
 
-/** Only the authorized recipient list supplies display names. Unknown IDs stay explicit. */
-export function recipientAwardPreview(body: AwardBody, recipients: AwardRecipient[]) {
+export function awardCopper(coins: Coins): number {
+  return coins.cp + coins.sp * 10 + coins.ep * 50 + coins.gp * 100 + coins.pp * 1000;
+}
+
+/**
+ * Only the authorized recipient list supplies display names. Unknown IDs stay explicit.
+ * `splitCoins` (purse ID → coins) is used only for an award with `coinSplit`; an award with a
+ * single `coinPurseId` previews exactly as it always has.
+ */
+export function recipientAwardPreview(
+  body: AwardBody,
+  recipients: AwardRecipient[],
+  splitCoins?: Map<string, Coins>,
+) {
   const rows = recipients.map((p) => ({ ...p, coins: null as Coins | null, items: [] as Loot[] }));
   const unresolved: Loot[] = [];
   for (const item of body.loot) {
@@ -62,6 +87,17 @@ export function recipientAwardPreview(body: AwardBody, recipients: AwardRecipien
     else unresolved.push(item);
   }
   const coinsPresent = hasAwardCoins(body.coins);
+  if (body.coinSplit) {
+    for (const [id, coins] of splitCoins ?? []) {
+      const row = rows.find((r) => r.id === id);
+      if (row) row.coins = { ...coins };
+    }
+    return {
+      recipients: rows.filter((r) => r.coins || r.items.length),
+      unresolved,
+      unresolvedCoins: coinsPresent && !splitCoins?.size,
+    };
+  }
   const coinRow = rows.find((r) => r.id === body.coinPurseId);
   if (coinsPresent && coinRow) coinRow.coins = { ...body.coins };
   return {

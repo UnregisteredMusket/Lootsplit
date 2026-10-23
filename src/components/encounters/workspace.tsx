@@ -31,7 +31,19 @@ import { Shield } from "lucide-react";
 import { accountRequest } from "@/lib/account/client";
 import { useEconomy } from "@/lib/quire/economy-context";
 import { downloadJson, getSeat } from "@/lib/quire/table";
-import { formatCoins } from "@/lib/quire/money";
+import { formatCoins, formatCopper, fromCopper } from "@/lib/quire/money";
+import {
+  defaultSplitRule,
+  encounterSplitInput,
+  isNpc,
+  planCoinSplit,
+  ruleLabel,
+  splitRecipients,
+  type CoinSplitPlan,
+  type SplitRule,
+  type SplitTable,
+} from "@/lib/quire/coin-split";
+import { SplitPreview, SplitRecipientPicker, SplitRules } from "@/components/coin-split";
 import {
   confirmedLootSummary,
   currentPartyMembers,
@@ -71,7 +83,15 @@ type Detail = {
   revision: number;
   status: string;
   purses: Purse[];
-  award: null | { receiptId: string; at: number };
+  /** Shared rooms: party membership and split settings for the DM's coin-split preview. */
+  splitTable?: SplitTable;
+  award: null | {
+    receiptId: string;
+    at: number;
+    coinShares?: Array<{ purseId: string; copper: number }>;
+    coinRemainder?: { purseId: string; copper: number; rule: SplitRule };
+    coinSplitId?: string;
+  };
 };
 type Roll = {
   seq: number;
@@ -812,7 +832,32 @@ function EncounterEditor({
         }
       : {}),
   });
-  const awardPreview = recipientAwardPreview(draft, detail.purses);
+  // One planner for previews, the device path and the Worker (src/lib/quire/coin-split.ts).
+  const splitTable: SplitTable = detail.splitTable ?? {
+    // Device detail rows are full purses; only kind, control and position matter to the plan.
+    purses: detail.purses.map((p) => ({ coins: fromCopper(0), ...p })) as unknown as SplitTable["purses"],
+    journal: currentContext ? journal : undefined,
+  };
+  const awardCopper =
+    draft.coins.cp + draft.coins.sp * 10 + draft.coins.ep * 50 + draft.coins.gp * 100 + draft.coins.pp * 1000;
+  let splitPlan: CoinSplitPlan | null = null;
+  let splitProblem = "";
+  if (draft.coinSplit && awardCopper > 0) {
+    try {
+      splitPlan = planCoinSplit(splitTable, encounterSplitInput(draft.coinSplit, awardCopper), { actor: "dm" });
+    } catch (e) {
+      splitProblem = message(e);
+    }
+  }
+  const splitCoins = new Map<string, ReturnType<typeof fromCopper>>();
+  if (splitPlan) {
+    const add = new Map<string, number>();
+    for (const row of splitPlan.shares) add.set(row.purseId, (add.get(row.purseId) ?? 0) + row.copper);
+    if (splitPlan.remainderMoves && splitPlan.remainderTo)
+      add.set(splitPlan.remainderTo, (add.get(splitPlan.remainderTo) ?? 0) + splitPlan.remainder);
+    for (const [id, copper] of add) splitCoins.set(id, fromCopper(copper));
+  }
+  const awardPreview = recipientAwardPreview(draft, detail.purses, splitCoins);
   const lootSummary = confirmedLootSummary(detail);
   const summaryEntry =
     lootSummary && currentContext
@@ -956,6 +1001,34 @@ function EncounterEditor({
               Awarded {detail.award ? new Date(detail.award.at).toLocaleString() : ""}. Receipt:{" "}
               {detail.award?.receiptId}. This encounter is locked against a second award.
             </p>
+            {detail.award?.coinShares && (
+              <section className="coin-split-preview" aria-label="Coins split evenly">
+                <div className="coin-split-preview-head">
+                  <strong>Coins · split evenly</strong>
+                  <span className="tabular-nums">
+                    {formatCopper(
+                      detail.award.coinShares.reduce((sum, s) => sum + s.copper, 0) +
+                        (detail.award.coinRemainder?.copper ?? 0),
+                    )}
+                  </span>
+                </div>
+                {detail.award.coinShares.map((share) => (
+                  <div className="coin-split-row" key={share.purseId}>
+                    <span>{detail.purses.find((p) => p.id === share.purseId)?.name ?? "Removed account"}</span>
+                    <span className="coin-split-amt">{formatCopper(share.copper)}</span>
+                  </div>
+                ))}
+                {detail.award.coinRemainder && (
+                  <div className="coin-split-row is-remainder">
+                    <span>
+                      Leftover → {detail.purses.find((p) => p.id === detail.award!.coinRemainder!.purseId)?.name ?? "Removed account"} (
+                      {ruleLabel(detail.award.coinRemainder.rule)} rule)
+                    </span>
+                    <span className="coin-split-amt">{formatCopper(detail.award.coinRemainder.copper)}</span>
+                  </div>
+                )}
+              </section>
+            )}
             {lootSummary && (
               <div className="character-toolbar">
                 <AppLink href={`/encounters?encounter=${encodeURIComponent(detail.id)}`}>
@@ -1657,10 +1730,118 @@ function EncounterEditor({
                 </label>
               ))}
             </div>
-            {recipients(
-              draft.coinPurseId,
-              (v) => change({ ...draft, coinPurseId: v }),
-              "Coin recipient",
+            <p className="text-sm text-muted">
+              Total {formatCopper(awardCopper)} ({awardCopper.toLocaleString("en")} cp).
+            </p>
+            <fieldset className="coin-split-group" disabled={readOnly}>
+              <legend>Coins go to</legend>
+              <div className="coin-split-mode">
+                <label className={`coin-split-rule${draft.coinSplit ? "" : " is-selected"}`}>
+                  <input
+                    type="radio"
+                    name="encounter-coin-mode"
+                    checked={!draft.coinSplit}
+                    onChange={() => {
+                      const { coinSplit: _split, ...rest } = draft;
+                      change({ ...rest, coinPurseId: "" });
+                    }}
+                  />
+                  <span>One purse</span>
+                  <small>Every coin goes to one recipient, in the coin types above.</small>
+                  {!draft.coinSplit &&
+                    recipients(
+                      draft.coinPurseId,
+                      (v) => change({ ...draft, coinPurseId: v }),
+                      "Coin recipient",
+                    )}
+                </label>
+                <div className={`coin-split-rule${draft.coinSplit ? " is-selected" : ""}`}>
+                  <input
+                    type="radio"
+                    name="encounter-coin-mode"
+                    id="encounter-coin-split"
+                    checked={!!draft.coinSplit}
+                    onChange={() => {
+                      const rule = defaultSplitRule(splitTable);
+                      change({
+                        ...draft,
+                        coinPurseId: "",
+                        coinSplit: {
+                          purseIds: splitRecipients(splitTable, "dm")
+                            .filter((p) => !isNpc(splitTable, p))
+                            .map((p) => p.id)
+                            .slice(0, 20),
+                          remainderRule: rule === "source" ? "party-fund" : rule,
+                        },
+                      });
+                    }}
+                  />
+                  <label htmlFor="encounter-coin-split">
+                    <strong>Split evenly among</strong>
+                  </label>
+                  <small>Each share is paid largest coins first (gold, silver, copper).</small>
+                </div>
+              </div>
+            </fieldset>
+            {draft.coinSplit && (
+              <>
+                <SplitRecipientPicker
+                  table={splitTable}
+                  actor="dm"
+                  legend="Split evenly among"
+                  selected={draft.coinSplit.purseIds}
+                  onChange={(ids) =>
+                    change({
+                      ...draft,
+                      coinSplit: {
+                        ...draft.coinSplit!,
+                        purseIds: ids.slice(0, 20),
+                        ...(draft.coinSplit!.remainderPurseId &&
+                        !ids.includes(draft.coinSplit!.remainderPurseId) &&
+                        draft.coinSplit!.remainderRule !== "party-fund"
+                          ? { remainderPurseId: undefined }
+                          : {}),
+                      },
+                    })
+                  }
+                />
+                <SplitRules
+                  table={splitTable}
+                  encounter
+                  isDm
+                  projected={false}
+                  rule={draft.coinSplit.remainderRule}
+                  onRule={(r) => {
+                    if (r === "source") return;
+                    const { remainderPurseId: _old, ...rest } = draft.coinSplit!;
+                    change({ ...draft, coinSplit: { ...rest, remainderRule: r } });
+                  }}
+                  plan={splitPlan}
+                  sourceId={null}
+                  recipientIds={draft.coinSplit.purseIds}
+                  purseId={draft.coinSplit.remainderPurseId ?? ""}
+                  onPurseId={(id) =>
+                    change({
+                      ...draft,
+                      coinSplit: { ...draft.coinSplit!, ...(id ? { remainderPurseId: id } : { remainderPurseId: undefined }) },
+                    })
+                  }
+                />
+                {splitPlan ? (
+                  <SplitPreview
+                    plan={splitPlan}
+                    table={splitTable}
+                    title="Coin preview"
+                    note={
+                      draft.coins.pp || draft.coins.ep || draft.coins.sp >= 10 || draft.coins.cp >= 10
+                        ? "Platinum, electrum and loose silver or copper become gold, silver and copper in the shares."
+                        : undefined
+                    }
+                  />
+                ) : awardCopper > 0 ? (
+                  <p className="character-error">{splitProblem}</p>
+                ) : null}
+              </>
             )}
             <div className="character-toolbar">
               <button onClick={() => change({ ...draft, loot: [...draft.loot, blankLoot()] })}>
@@ -1672,6 +1853,7 @@ function EncounterEditor({
                   if (recipient)
                     change({
                       ...draft,
+                      coinSplit: undefined,
                       coinPurseId: recipient,
                       loot: draft.loot.map((l) => ({
                         ...l,

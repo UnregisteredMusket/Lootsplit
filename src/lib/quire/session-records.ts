@@ -7,7 +7,9 @@ import {
   canReadCharacter,
   companionFundsReadable,
   inParty,
+  seatInParty,
 } from "./character-position.ts";
+import { designatedPartyFund, isNpc, partyFunds } from "./coin-split.ts";
 import { readWorld } from "./world-schema.ts";
 import { exchangeHere } from "./trade-economy.ts";
 import { readTradeEconomy } from "./trade-economy-schema.ts";
@@ -375,6 +377,9 @@ export function projectRecord(
       ...estate.jobs.flatMap((j) => [j.purseId, ...j.assignments.map((a) => a.purseId)]),
       ...estate.letters.map((l) => l.senderId),
       ...estate.withdrawals.map((r) => r.purseId),
+      // Party members can name the party funds (a split's leftover and fund lines); balances
+      // follow the party-balance rule in cloud.server.ts playerTable.
+      ...(seatInParty(table, seat) ? partyFunds(table).map((p) => p.id) : []),
     ]);
     t.purses = t.purses
       .filter((p) => seat.purseIds.includes(p.id) || publicNames.has(p.id))
@@ -393,6 +398,9 @@ export function projectRecord(
               coins: companions.has(p.id) ? p.coins : { cp: 0, sp: 0, ep: 0, gp: 0, pp: 0 },
             },
       );
+    const coinSplit = projectCoinSplit(table, t);
+    if (Object.keys(coinSplit).length) t.journal.coinSplit = coinSplit;
+    else delete t.journal.coinSplit;
     world.characterPositions = world.characterPositions
       .filter((s) => t.purses.some((p) => p.id === s.purseId))
       .map((s) => ({ ...s, ...(s.downtime ? { downtime: undefined } : {}) }));
@@ -435,6 +443,31 @@ export function projectRecord(
   if (!dm) projectConnectedMaps(t, seat);
   for (const p of t.purses) delete p.editBaseline;
   return t;
+}
+/**
+ * A player's copy of the split settings. It must plan the same split the server will: the
+ * designated party fund is resolved on the full table, and a rotation pointer to a purse the
+ * player cannot list (an NPC) becomes the nearest listed purse before it in Party order, which
+ * selects the same next recipient without naming the hidden purse.
+ */
+function projectCoinSplit(table: CloudTable, projected: CloudTable) {
+  const settings = projected.journal?.coinSplit ?? {};
+  const fund = designatedPartyFund(table);
+  const listed = new Set(projected.purses.map((p) => p.id));
+  const last = settings.rotation?.lastPurseId;
+  let pointer: string | undefined;
+  if (last) {
+    const full = table.purses.map((p) => p.id);
+    const at = full.indexOf(last);
+    const lastPurse = table.purses[at];
+    if (at >= 0 && listed.has(last) && lastPurse && !isNpc(table, lastPurse)) pointer = last;
+    else for (let i = at - 1; i >= 0 && !pointer; i--) if (listed.has(full[i]!)) pointer = full[i];
+  }
+  return {
+    ...(settings.remainderRule ? { remainderRule: settings.remainderRule } : {}),
+    ...(fund ? { partyFundId: fund } : {}),
+    ...(pointer ? { rotation: { lastPurseId: pointer } } : {}),
+  };
 }
 /** Freeze a complete record before clearing active logs; never include prior snapshots recursively. */
 export function archiveSession(table: CloudTable, id: string, name: string, at = Date.now()) {

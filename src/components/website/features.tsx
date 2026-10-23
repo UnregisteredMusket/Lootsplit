@@ -34,8 +34,12 @@ const featureAreas: Area[] = [
         text: "with conversion, payments, transfers and optional real-money estimates",
       },
       {
+        lead: "Even coin splits",
+        text: "from a party fund or a purse, shared to the copper with the leftover sent where you choose",
+      },
+      {
         lead: "Loot awards",
-        text: "from guaranteed items and weighted loot tables, reviewed before one transfer",
+        text: "from guaranteed items and weighted loot tables, coins sent to one purse or split evenly, reviewed before one transfer",
         dm: true,
       },
       { lead: "Party purses", text: "and player and NPC accounts with shared inventory" },

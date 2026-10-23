@@ -28,13 +28,17 @@ import { Shell } from "@/components/shell";
 import { CharacterSheetPanel } from "@/components/character-sheet";
 import { Button, Modal, Segmented, TextInput } from "@/components/ui";
 import { RemoveButton } from "@/components/quire-ui";
+import { SplitCoins } from "@/components/coin-split";
 
 export const Route = createFileRoute("/party")({
   validateSearch: (
     search: Record<string, unknown>,
   ): { action?: string; section?: "funds" | "characters" } => ({
     action:
-      search.action === "add" || search.action === "give" || search.action === "pay"
+      search.action === "add" ||
+      search.action === "give" ||
+      search.action === "pay" ||
+      search.action === "split"
         ? search.action
         : "",
     ...(search.section === "funds" || search.section === "characters"
@@ -63,6 +67,10 @@ function PartyPage() {
   const seat = useSeat();
   const cloud = getCloudTable();
   const readOnly = seat.role === "player" || (cloud.joined && !cloud.mine);
+  // Split runs on the DM's device or in a shared room; a player-only device link holds only part
+  // of the party, so it is not offered there (owner decision, phase 1).
+  const canSplit = seat.role === "dm" || cloud.joined;
+  const [splitSource, setSplitSource] = useState("");
   const visible =
     seat.role === "player"
       ? economy.purses.filter((purse) => seat.purseIds.includes(purse.id))
@@ -310,21 +318,36 @@ function PartyPage() {
                       .filter((holding) => holding.purseId === purse.id)
                       .reduce((sum, holding) => sum + holding.unitCopper * holding.quantity, 0);
                   return (
-                    <li key={purse.id}>
+                    <li key={purse.id} className="coin-split-fund-row">
                       <a
                         onClick={() => {
                           const detail = document.getElementById(`purse-${purse.id}`);
                           if (detail instanceof HTMLDetailsElement) detail.open = true;
                         }}
                         href={`#purse-${purse.id}`}
-                        className="flex min-h-11 items-center justify-between gap-3 text-sm"
+                        className="flex min-h-11 min-w-0 flex-1 items-center justify-between gap-3 text-sm"
                       >
-                        <span className="flex items-center gap-3 py-2">
+                        <span className="flex min-w-0 items-center gap-3 py-2">
                           <LedgerArt kind="portrait" src={purse.portrait} className="round" />
-                          {purse.name}
+                          <span className="min-w-0 break-words">{purse.name}</span>
                         </span>
                         <span className="tabular-nums text-lead">{formatCopper(worth)}</span>
                       </a>
+                      {purse.kind === "party" && canSplit ? (
+                        <Button
+                          variant="secondary"
+                          className="min-h-11 shrink-0 px-3 text-sm"
+                          aria-label={`Split coins from ${purse.name}`}
+                          title={toCopper(purse.coins) ? undefined : "This fund has no coins to split"}
+                          disabled={!toCopper(purse.coins)}
+                          onClick={() => {
+                            setSplitSource(purse.id);
+                            setAction("split");
+                          }}
+                        >
+                          Split
+                        </Button>
+                      ) : null}
                     </li>
                   );
                 })}
@@ -441,7 +464,7 @@ function PartyPage() {
                     );
                   })}
               </ul>
-              <div className="mt-5 flex gap-3">
+              <div className="mt-5 flex flex-wrap gap-3">
                 <Button
                   onClick={() => setAction("add")}
                   disabled={visible.length === 0 || readOnly}
@@ -455,6 +478,18 @@ function PartyPage() {
                 >
                   Give
                 </Button>
+                {canSplit ? (
+                  <Button
+                    variant="secondary"
+                    onClick={() => {
+                      setSplitSource("");
+                      setAction("split");
+                    }}
+                    disabled={visible.length === 0}
+                  >
+                    Split coins
+                  </Button>
+                ) : null}
                 <Button
                   variant="secondary"
                   onClick={() => setAction("pay")}
@@ -474,10 +509,18 @@ function PartyPage() {
                   ? "Add loot"
                   : action === "give"
                     ? "Give to a player"
-                    : "Record a payment"
+                    : action === "split"
+                      ? "Split coins"
+                      : "Record a payment"
               }
             >
-              {readOnly && action !== "give" ? (
+              {action === "split" ? (
+                <SplitCoins
+                  sources={visible}
+                  initialSourceId={splitSource}
+                  onDone={() => setAction("")}
+                />
+              ) : readOnly && action !== "give" ? (
                 <p>
                   Only the DM can directly edit funds and inventory in shared modes. Use Buy, Sell,
                   Give, or Request loan.

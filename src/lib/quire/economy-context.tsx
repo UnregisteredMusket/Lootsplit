@@ -213,6 +213,14 @@ type EconomyApi = {
     },
     options?: CommandOptions,
   ) => Promise<boolean>;
+  /**
+   * Even coin split (one atomic `coin-split` command, shared room or this device's engine).
+   * Resolves to null once accepted, or to the refusal text so the dialog can keep its form.
+   */
+  split: (
+    input: Omit<Extract<CommandRequest, { kind: "coin-split" }>, "kind" | "id">,
+    options?: CommandOptions,
+  ) => Promise<string | null>;
   listings: Listing[];
   loans: LoanAsk[];
   addListing: (input: {
@@ -847,6 +855,38 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
                 ownPurse(input.fromId);
                 await giveToPlayer(input, options);
               }, "Transfer recorded and added to party messages."),
+      split: async (input, options = {}) => {
+        const command = { kind: "coin-split" as const, ...input, ...idOf(options) };
+        try {
+          const joined = getCloudWatch().joined;
+          if (joined) {
+            await queueCommand(command);
+            await reload();
+            announceWorkspaceChange();
+          } else {
+            // A player link holds only some of the party; the DM's device or a room splits.
+            if (getSeat().role === "player")
+              throw Error(
+                "Splitting coins isn't available on a player link. Ask the DM to split, or use Give.",
+              );
+            await acceptCommand(command);
+          }
+          const pending = joined && hasPendingChanges();
+          if (!pending) void playSound("coins");
+          toast.success(
+            pending
+              ? "Split saved as pending. Check sync status."
+              : "Coins split. It appears once in Activity and the party chat.",
+          );
+          return null;
+        } catch (error) {
+          // Show the balances that refused it; the dialog keeps its choices for another review.
+          await reload().catch(() => undefined);
+          return error instanceof Error && error.message
+            ? error.message
+            : "The split could not be saved.";
+        }
+      },
       addListing: (input) =>
         accept(async (guard) => {
           dmOnly();

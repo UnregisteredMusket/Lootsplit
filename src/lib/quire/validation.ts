@@ -84,6 +84,14 @@ const ledger = z.object({
   trade: tradeLedgerLinkSchema.optional(),
   purchase: z.object({ stockId: id, quantity: amount.positive(), holding: holdingSchema.nullable() }).optional(),
   listingPurchase: z.object({ listingId: id, quantity: amount.positive(), holding: holdingSchema }).optional(),
+  split: z
+    .object({
+      id,
+      role: z.enum(["source", "share", "remainder"]),
+      keptShare: amount.optional(),
+    })
+    .strict()
+    .optional(),
   transactionType: z
     .enum(["transfer", "purchase", "sale", "loan", "payment", "adjustment", "void"])
     .optional(),

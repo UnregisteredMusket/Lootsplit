@@ -4,7 +4,14 @@ import { quireDb, request, activeDatabaseName } from "../quire/db.ts";
 import { getSeat } from "../quire/table.ts";
 import { getCloudWatch } from "../quire/cloud-turn.ts";
 import type { Purse } from "../quire/types.ts";
-import { blankEncounter, encounterSchema, generatorSchema, generateEncounter } from "./model.mjs";
+import {
+  awardSplitReceiptSchema,
+  blankEncounter,
+  encounterSchema,
+  generatorSchema,
+  generateEncounter,
+} from "./model.mjs";
+import { applyEncounterSplit, type EncounterCoinSplitReceipt } from "../quire/coin-split.ts";
 import { creatureIndex } from "./index.mjs";
 import { parseDice, throwDice } from "../characters/model.mjs";
 import { announceSheetChange } from "../quire/party-sheet-links.ts";
@@ -29,7 +36,7 @@ export const localEncounterSchema = z.object({
   status: z.enum(["draft", "active", "review", "awarded"]),
   updated_at: z.number(),
   rolls: z.array(rollSchema),
-  award: z.object({ receiptId: z.string(), at: z.number() }).nullable(),
+  award: z.object({ receiptId: z.string(), at: z.number(), ...awardSplitReceiptSchema }).nullable(),
 });
 export const readLocalEncounters = (value: unknown) =>
   z.array(localEncounterSchema).parse(value ?? []);
@@ -214,7 +221,8 @@ export async function localEncounterRequest<T>(path: string, input: unknown = {}
             return p;
           };
           const e = r.body,
-            at = Date.now();
+            at = Date.now(),
+            receiptId = crypto.randomUUID();
           const copper =
             e.coins.cp + e.coins.sp * 10 + e.coins.ep * 50 + e.coins.gp * 100 + e.coins.pp * 1000;
           const ledger = (purseId: string, summary: string, copper: number) =>
@@ -229,7 +237,20 @@ export async function localEncounterRequest<T>(path: string, input: unknown = {}
                 copper,
                 transactionType: "adjustment",
               });
-          if (copper) {
+          let splitReceipt: EncounterCoinSplitReceipt | null = null;
+          if (copper && e.coinSplit) {
+            // The same planner and credit as the shared Worker path (coin-split.ts).
+            const meta = await request<{ value: unknown } | undefined>(
+              tx.objectStore("meta").get("journal"),
+            );
+            const journal = (meta?.value ?? undefined) as import("../quire/journal.ts").Journal | undefined;
+            const table = { purses, journal };
+            const split = applyEncounterSplit(table, e.coinSplit, copper, receiptId, at, e.name);
+            for (const id of split.touched) tx.objectStore("purses").put(purses.find((p) => p.id === id)!);
+            for (const line of split.ledger) tx.objectStore("ledger").put(line);
+            if (split.plan.rotation) tx.objectStore("meta").put({ id: "journal", value: table.journal });
+            splitReceipt = split.receipt;
+          } else if (copper) {
             const p = recipient(e.coinPurseId);
             for (const key of ["cp", "sp", "ep", "gp", "pp"] as const) {
               p.coins[key] += e.coins[key];
@@ -262,7 +283,7 @@ export async function localEncounterRequest<T>(path: string, input: unknown = {}
             });
             ledger(p.id, `Encounter loot: ${item.quantity} × ${item.name} (${e.name})`, 0);
           }
-          r.award = { receiptId: crypto.randomUUID(), at };
+          r.award = { receiptId, at, ...(splitReceipt ?? {}) };
           r.status = "awarded";
           result = { award: r.award, duplicate: false };
         } else throw new Error("Unknown encounter action.");
