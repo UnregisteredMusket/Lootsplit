@@ -25,6 +25,15 @@ Android version code **19**, same package and permanent signing certificate. Ins
 - The Cloudflare human check (#241, #248) applies to website sign-up, sign-in and recovery reset only; the app is exempt and unchanged.
 - Website-only changes (#242, #244, #253) and documentation (#252) do not affect the app.
 
+## Release verification
+
+Published October 23, 2026 by `android-release.yml` (run 40031758182, first attempt) from main `b4edf5e`, after the full preservation checks, the API 24 and API 35 widget and picker checks, and the signed-APK upgrade gate passed.
+
+Independent inspection of the public APK, downloaded through the GitHub API:
+- SHA-256 `7362855ecdfa9db1442c501b583f6eee6c940b9407e5f65f7745e917d58017b1` (32,010,479 bytes), matching the workflow's signed-APK output, SHA256SUMS.txt and the GitHub asset digest.
+- Its v2 signing block carries the permanent certificate (`baca95a8…f730a0`, unchanged from 1.11.0).
+- The manifest keeps package `com.unregisteredmusket.lootsplit`, with versionName 1.12.0 and versionCode 19.
+
 ---
 
 # Lootsplitter 1.11.0
