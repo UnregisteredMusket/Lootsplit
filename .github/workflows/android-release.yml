@@ -27,6 +27,9 @@ jobs:
       contents: read
       # verify.yml's recovery steps publish main-push OIDC development telemetry.
       id-token: write
+      # verify.yml's build job reads workflow runs to stamp the website changelog on main; a
+      # called job cannot hold more than this grant, or the whole release fails to start.
+      actions: read
   native:
     uses: ./.github/workflows/android-widget.yml
     permissions:
