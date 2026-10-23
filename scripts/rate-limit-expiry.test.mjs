@@ -25,7 +25,7 @@ test("stale per-IP rate-limit rows expire and current ones keep counting", async
   await auth.bind("a", "ip-old/sign-in", 40, now - RATE_LIMIT_RETENTION_MS - 1).run();
   await auth.bind("b", "ip-new/sign-in", 39, now - 1000).run();
 
-  assert.deepEqual(await expireRateLimits(db, now), { library_limits: 2, rateLimit: 1 });
+  assert.deepEqual(await expireRateLimits(db, now), { library_limits: 2, rateLimit: 1, signin_throttle: 0 });
   const left = await db.prepare("SELECT key, hits FROM library_limits ORDER BY key").all();
   assert.deepEqual(
     left.results.map((r) => [r.key, r.hits]),
@@ -40,7 +40,22 @@ test("stale per-IP rate-limit rows expire and current ones keep counting", async
     [["ip-new/sign-in", 39]],
   );
   // Running again changes nothing; the active window's counter was not reset.
-  assert.deepEqual(await expireRateLimits(db, now), { library_limits: 0, rateLimit: 0 });
+  assert.deepEqual(await expireRateLimits(db, now), { library_limits: 0, rateLimit: 0, signin_throttle: 0 });
+});
+
+test("forgotten sign-in throttle rows expire; counting and active waits stay", async () => {
+  const db = localAccountDb();
+  const day = 24 * 3600_000;
+  const row = db.prepare(
+    "INSERT INTO signin_throttle (key, failures, last_attempt_at, blocked_until) VALUES (?, ?, ?, ?)",
+  );
+  await row.bind("forgotten", 9, now - day - 1, now - day + 60_000).run();
+  await row.bind("counting", 3, now - day + 60_000, 0).run();
+  await row.bind("old-but-waiting", 12, now - day - 1, now + 60_000).run();
+  const result = await expireRateLimits(db, now);
+  assert.equal(result.signin_throttle, 1);
+  const left = await db.prepare("SELECT key FROM signin_throttle ORDER BY key").all();
+  assert.deepEqual(left.results.map((r) => r.key), ["counting", "old-but-waiting"]);
 });
 
 test("expiry never touches history tables", async () => {
@@ -49,7 +64,7 @@ test("expiry never touches history tables", async () => {
     "utf8",
   );
   const tables = [...source.matchAll(/DELETE FROM "?(\w+)"?/g)].map((m) => m[1]);
-  assert.deepEqual(tables, ["library_limits", "rateLimit"]);
+  assert.deepEqual(tables, ["library_limits", "rateLimit", "signin_throttle"]);
 });
 
 test("the minute cron runs expiry once an hour, independently of monitoring", () => {
