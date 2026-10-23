@@ -7,6 +7,7 @@ import { handleAccounts } from "./accounts.mjs";
 import { recoveryGuard } from "./recovery-guard.mjs";
 import { serveBuildAsset, releaseResponse } from "./release-assets.mjs";
 import { crawlerFile, landingRedirect } from "../src/lib/deployment/public-urls.mjs";
+import { cachedPublicPage } from "./public-page-cache.mjs";
 import handler from "../dist/server/index.mjs";
 import { scheduledMonitor } from "./monitor-journal.mjs";
 import { telemetryResponse } from "./monitor-telemetry.mjs";
@@ -57,6 +58,9 @@ export default {
     const accountResponse = await handleAccounts(request, env);
     if (accountResponse) return accountResponse;
     globalThis.__env__ = env;
-    return releaseResponse(await handler.fetch(request, env, context), env);
+    return releaseResponse(
+      await cachedPublicPage(request, env, context, () => handler.fetch(request, env, context)),
+      env,
+    );
   },
 };
