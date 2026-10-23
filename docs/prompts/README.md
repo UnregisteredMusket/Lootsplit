@@ -7,10 +7,10 @@ Findings and line numbers age as `main` moves. Every prompt tells the agent to r
 | # | Prompt | Source | Status (updated 2026-10-23) |
 | --- | --- | --- | --- |
 | 1 | [Fix the bugs from the October 22 review](#1-fix-the-bugs-from-the-october-22-review) | Read-only code review of `main` at `5d77d25`, re-checked at `b325758` | Done: P1–P10 merged in #160–#185 (2026-10-22), including the estate repair #171 and P10 follow-ups #185 |
-| 2 | [Make Lootsplit split loot, then expand the item and session tools](#2-make-lootsplit-split-loot-then-expand-the-item-and-session-tools) | Feature analysis of the same review | Not started. Its prerequisites, P1 (#166) and P2 (#177), are merged |
-| 3 | [Implement the website design review](#3-implement-the-website-design-review) | Website design review, 2026-10-23 (Lighthouse, NN/g, Google Search Central, five comparable TTRPG sites) | Not started |
+| 2 | [Make Lootsplit split loot, then expand the item and session tools](#2-make-lootsplit-split-loot-then-expand-the-item-and-session-tools) | Feature analysis of the same review | In progress: Phase 1 even coin split (#230) and Phase 2 treasure pool and claims (#238) merged and live 2026-10-23. Phases 3–6 not started (Phase 3 fairness ledger is next). Related, outside this prompt: map Place hub (#228, #232), journey planner (#235, #243), services wave 1 (#247, #249–#251) |
+| 3 | [Implement the website design review](#3-implement-the-website-design-review) | Website design review, 2026-10-23 (Lighthouse, NN/g, Google Search Central, five comparable TTRPG sites) | In progress: W1–W8 merged (#219, #220, #222, #223, #225); W9 demo waits on the owner's decision |
 
-Prompt 1 is complete, so prompt 2 can start. It's kept below as the record of what was asked; line numbers in it refer to `5d77d25`.
+Prompt 1 is complete, and prompt 2 is under way. It's kept below as the record of what was asked; line numbers in it refer to `5d77d25`.
 
 ## 1. Fix the bugs from the October 22 review
 
