@@ -1,4 +1,5 @@
-import { Link } from "@tanstack/react-router";
+import { Link, useRouterState } from "@tanstack/react-router";
+import { useEffect, useState, type ReactNode } from "react";
 import { ArrowDownToLine, ArrowRight, ShieldCheck } from "lucide-react";
 import { AppLink } from "@/components/app-link";
 import changelog from "@/lib/website/changelog.json";
@@ -9,6 +10,29 @@ import release from "@/lib/website/release.json";
 import { AboutLootsplit } from "./about";
 import { Kicker, PageHero } from "./parts";
 import { Website } from "./site";
+
+/** Version, checksum and release history, folded by default for players; links to
+ * #release-details (every page footer) open it. Nothing inside is removed. */
+function TechnicalDetails({ children }: { children: ReactNode }) {
+  const hash = useRouterState({ select: (s) => s.location.hash });
+  const [open, setOpen] = useState(false);
+  useEffect(() => {
+    if (hash === "release-details") {
+      setOpen(true);
+      document.getElementById("release-details")?.scrollIntoView({ block: "start" });
+    }
+  }, [hash]);
+  return (
+    <details
+      className="ls-tech"
+      open={open}
+      onToggle={(event) => setOpen((event.currentTarget as HTMLDetailsElement).open)}
+    >
+      <summary>Technical details: version, checksum and release history</summary>
+      {children}
+    </details>
+  );
+}
 
 const currentChanges = changelog.find((entry) => entry.version === release.version)!;
 
@@ -77,6 +101,15 @@ export function DownloadsPage() {
                 </a>
                 .
               </p>
+              <details className="ls-fine ls-play-note">
+                <summary>Why isn’t this on Google Play?</summary>
+                <p>
+                  Lootsplitter is a free project without a Play Store listing yet, so Android asks
+                  you to allow installs from your browser or file manager. Every release is signed
+                  with the same permanent key, so updates install over the existing app, and the
+                  checksum under Technical details lets you confirm the file is the published one.
+                </p>
+              </details>
               <Link className="ls-text-link" to="/help" hash="android">
                 Installation & update guide <ArrowRight size={16} aria-hidden="true" />
               </Link>
@@ -96,7 +129,7 @@ export function DownloadsPage() {
               <AppLink className="ls-btn ls-btn-ink ls-self-start" href="/">
                 {OPEN_APP}
               </AppLink>
-              <p className="ls-fine">A native Windows or macOS installer is not available yet.</p>
+              <p className="ls-fine">Works in any modern browser, with nothing to install.</p>
               <Link className="ls-text-link" to="/help" hash="desktop">
                 Using Lootsplitter on your PC <ArrowRight size={16} aria-hidden="true" />
               </Link>
@@ -181,6 +214,7 @@ export function DownloadsPage() {
         aria-labelledby="release-details-title"
       >
         <div className="ls-wrap">
+          <TechnicalDetails>
           <div className="ls-card ls-card-ink ls-release-details">
             <h2 id="release-details-title">Release details and verification</h2>
             <p>
@@ -213,6 +247,7 @@ export function DownloadsPage() {
             </dl>
             <AboutLootsplit />
           </div>
+          </TechnicalDetails>
         </div>
       </section>
     </Website>

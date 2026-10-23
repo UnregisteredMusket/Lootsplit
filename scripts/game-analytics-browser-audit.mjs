@@ -24,8 +24,17 @@ try {
       (await context.request.get(origin + "/api/account/owner/analytics")).status(),
       401,
     );
+    // The home page shows the treasury only from 10,000 gp (owner decision 2026-10-23); a fresh
+    // disposable database is far below that, so the display is checked with routed snapshots.
+    const snapshotBody = (spentCopper) => JSON.stringify({ ...data, metrics: { spentCopper } });
+    const serve = (body, status = 200) =>
+      page.route("**/api/account/site-analytics", (route) =>
+        route.fulfill({ status, contentType: "application/json", body }),
+      );
+    await serve(snapshotBody(2_500_000));
     await openApplication(page, origin + "/welcome");
     await page.getByRole("status").filter({ hasText: "gp spent" }).waitFor();
+    assert.equal(await page.locator(".ls-ledger-entry").count(), 3);
     const explanation = page.getByText("About this total", { exact: true });
     await explanation.focus();
     await explanation.press("Enter");
@@ -38,21 +47,28 @@ try {
       false,
     );
     await page.screenshot({ path: `${output}/gold-${width}.png`, fullPage: true });
-    await page.route("**/api/account/site-analytics", (route) =>
-      route.fulfill({
-        status: 503,
-        contentType: "application/json",
-        body: '{"error":"Unavailable"}',
-      }),
-    );
-    await page.reload();
-    await page.getByText("Gold spent · temporarily unavailable", { exact: false }).waitFor();
-    assert.equal(await page.getByRole("status").filter({ hasText: "0 gp spent" }).count(), 0);
+    for (const [label, body, status] of [
+      ["below threshold", snapshotBody(999_999), 200],
+      ["unavailable", '{"error":"Unavailable"}', 503],
+    ]) {
+      await page.unroute("**/api/account/site-analytics");
+      await serve(body, status);
+      await page.reload();
+      await page.getByText("Three ways to play", { exact: true }).waitFor();
+      await page.waitForLoadState("networkidle");
+      assert.equal(await page.getByText("The treasury", { exact: true }).count(), 0, label);
+      assert.equal(await page.locator(".ls-ledger-entry").count(), 2, label);
+      assert.equal(
+        await page.getByRole("status").filter({ hasText: "gp spent" }).count(),
+        0,
+        label,
+      );
+    }
     assert.deepEqual(errors, []);
     await context.close();
   }
   console.log(
-    "Gold counter: public response, private denial, desktop/mobile and failure state passed.",
+    "Gold counter: public response, private denial, shown from 10,000 gp, hidden below it and on failure, desktop/mobile passed.",
   );
 } finally {
   await browser.close();

@@ -1,6 +1,6 @@
 import { AppLink } from "@/components/app-link";
 import { HelpContent } from "../help-content";
-import { GoldSpentCounter } from "./gold-counter";
+import { TreasuryEntry } from "./gold-counter";
 import { SiteAnnouncement } from "./announcement";
 import { Kicker, PageHero, Shot } from "./parts";
 import { useReleaseIdentity } from "./release-identity";
@@ -13,7 +13,8 @@ import { OPEN_APP } from "@/lib/website/labels";
 import { SUPPORT_EMAIL, SUPPORT_MAILTO } from "@/lib/website/contact";
 import "./website.css";
 
-/** One order and one set of labels for the header and the footer. */
+/** One order and one set of labels for the footer; the header shows the main four
+ * (owner decision 2026-10-23: Changelog and Resources live in the footer). */
 const siteLinks = [
   ["/features", "Features"],
   ["/downloads", "Downloads"],
@@ -22,6 +23,7 @@ const siteLinks = [
   ["/resources", "Resources"],
   ["/donate", "Donate"],
 ] as const;
+const headerLinks = siteLinks.filter(([to]) => to !== "/updates" && to !== "/resources");
 
 export function Website({
   children,
@@ -65,7 +67,7 @@ export function Website({
             data-open={menuOpen ? "true" : "false"}
           >
             <ul>
-              {siteLinks.map(([to, label]) => (
+              {headerLinks.map(([to, label]) => (
                 <li key={to}>
                   <Link to={to} aria-current={current(to)}>
                     {label}
@@ -134,6 +136,11 @@ function SiteFooter({
           </div>
           <nav aria-label="Website footer" className="ls-footer-nav">
             <ul>
+              <li>
+                <Link to="/welcome" aria-current={current("/welcome")}>
+                  Home
+                </Link>
+              </li>
               {siteLinks.map(([to, label]) => (
                 <li key={to}>
                   <Link to={to} aria-current={current(to)}>
@@ -259,10 +266,7 @@ export function WelcomePage() {
 
       <section className="ls-paper" aria-label="At a glance">
         <div className="ls-wrap ls-ledger">
-          <div className="ls-ledger-entry">
-            <p className="ls-sc ls-entry-no">The treasury</p>
-            <GoldSpentCounter />
-          </div>
+          <TreasuryEntry />
           <div className="ls-ledger-entry">
             <p className="ls-sc ls-entry-no">At the table</p>
             <p className="ls-ledger-title">Three ways to play</p>
@@ -490,7 +494,7 @@ export function HelpPage() {
         </p>
       </PageHero>
       <section className="ls-ink ls-section ls-section-tight">
-        <div className="ls-wrap ls-reading">
+        <div className="ls-wrap ls-reading ls-help-guide">
           <HelpContent />
         </div>
       </section>
