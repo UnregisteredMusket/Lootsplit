@@ -4,10 +4,11 @@ Ready-to-use prompts for future Lootsplit development sessions. Copy a prompt (G
 
 Findings and line numbers age as `main` moves. Every prompt tells the agent to re-check each item against current code before changing it. When a prompt's work is done, update its status here rather than deleting it, so the record stays.
 
-| # | Prompt | Source | Status (updated 2026-10-22) |
+| # | Prompt | Source | Status (updated 2026-10-23) |
 | --- | --- | --- | --- |
 | 1 | [Fix the bugs from the October 22 review](#1-fix-the-bugs-from-the-october-22-review) | Read-only code review of `main` at `5d77d25`, re-checked at `b325758` | Done: P1–P10 merged in #160–#185 (2026-10-22), including the estate repair #171 and P10 follow-ups #185 |
 | 2 | [Make Lootsplit split loot, then expand the item and session tools](#2-make-lootsplit-split-loot-then-expand-the-item-and-session-tools) | Feature analysis of the same review | Not started. Its prerequisites, P1 (#166) and P2 (#177), are merged |
+| 3 | [Implement the website design review](#3-implement-the-website-design-review) | Website design review, 2026-10-23 (Lighthouse, NN/g, Google Search Central, five comparable TTRPG sites) | Not started |
 
 Prompt 1 is complete, so prompt 2 can start. It's kept below as the record of what was asked; line numbers in it refer to `5d77d25`.
 
@@ -518,4 +519,161 @@ Add a read-only view of how much loot value each party character has received:
 When you finish, reply with:
 - one line per branch: its PR link, status, and what is left;
 - the owner decisions you are waiting on.
+````
+
+## 3. Implement the website design review
+
+````markdown
+# Implement the October 23, 2026 Lootsplitter website design review
+
+Repo: github.com/UnregisteredMusket/Lootsplit (attach with push access and clone it).
+Live site: https://lootsplitter.com (the old address, https://lootsplit.oliverstorie2017.workers.dev, stays as a legacy host).
+Review document: https://claude.ai/artifact/ANbhivr37akQv6eXebQqbq (the owner's copy; everything you need from it is below).
+
+A review of the seven public website pages (/welcome, /features, /downloads, /updates, /help, /resources, /donate) found that the site is well built but undersells itself. It scored accessibility 96–100 and SEO 100 in Lighthouse. Its gaps:
+- it never says it is free;
+- pictures still show the old name "Lootsplit";
+- there is no privacy policy;
+- every page has the same description;
+- phones wait 4–5 s for the first screen.
+
+Your job is to implement the improvements below. They cover the public website only; the app behind "Open the app" is out of scope.
+
+## Before you start
+
+1. **Read the guides.** Read `CLAUDE.md` first; every non-negotiable rule applies. Then read:
+   - `docs/plans/MONETIZATION-AND-MARKETING.md` (free, donations only; Ko-fi is live);
+   - `docs/audit/2026-10-22-domain-migration-audit.md` (sections 7 and 9).
+2. **Re-check every finding against current `main`.** Files and numbers below were true on 2026-10-23. If something is already fixed, say so in the PR and skip it.
+3. **Know what is already merged:**
+   - robots.txt and sitemap.xml (#213);
+   - canonical and og:url tags from `deploymentOrigins.website` (#202);
+   - the lootsplitter.com cutover (#214);
+   - the first-visit redirect of `/` to `/welcome` (#215, if merged).
+
+   Don't redo them.
+4. **One topic per branch.** Use the branch names given. Each PR description is the checkpoint, so record:
+   - what changed and why;
+   - before and after evidence: screenshots at 1366×900 and 390×844, and Lighthouse scores where relevant;
+   - the help review (`src/lib/help/content.ts` and `player-content.ts`);
+   - what is left.
+5. **Verify like a user.** Run the existing browser audits that cover the website (`scripts/website-browser-audit.mjs`, `scripts/live-release-audit.mjs` against a local built Worker, `scripts/a11y-browser-audit.mjs`). Extend them for new behaviour. Don't push to a PR while its CI run is in progress.
+6. **Hard limits:**
+   - Preserve every feature and link.
+   - Never invent testimonials, reviews, ratings or user counts.
+   - Never add third-party scripts, trackers or ads. The CSP in `cloudflare/release-assets.mjs` stays as it is unless the owner approves a change.
+   - Credit any new third-party asset in `src/lib/website/resources.ts`.
+7. **Stop and ask the owner** on every item marked **OWNER DECISION**.
+
+Work in this order.
+
+---
+
+## W1: Say it is free (`feature/website-free-claim`, size S)
+
+The word "free" appears nowhere on /welcome. World Anvil ("Start Creating! It's Free"), Kanka ("Start for free") and LegendKeeper ("Try for free") all lead with it, and Lootsplitter has no paid tier at all.
+
+- **Where:** the hero in `src/components/website/site.tsx` (`WelcomePage`).
+- **Change:** under the two hero buttons, replace "Browser & Android · Guest access · Local and shared campaigns" with a line that leads with **Free**. For example: "Free · No ads · Browser & Android · Guest access". **OWNER DECISION:** the exact wording. Offer two or three options.
+- Also mention "free" once on /downloads and /features.
+- **Check:** `scripts/website-browser-audit.mjs` asserts the free line on /welcome at all four widths.
+
+## W2: Replace pictures that show the old name (`fix/website-rename-images`, size S–M)
+
+- **The share image** `public/og.jpg` (1200×630) reads "Lootsplit · Campaign ledger". It appears in every Discord, Reddit and Google preview. Make a new 1200×630 image reading "Lootsplitter", with the tagline "The party ledger" and "Free". Keep it under about 150 KiB. It may reuse the existing art, but no new third-party art without a credit. **OWNER DECISION:** approve the image before merge.
+- **The product screenshots** in `public/product/*.webp` and the hero screenshot show "Lootsplit" in the app sidebar. Re-capture them with `scripts/capture-product-screenshots.mjs`, against a disposable local server with synthetic data only. Keep every alt text accurate.
+- **Check:** `scripts/brand-check.mjs` (and its test) catches the old name in website images or text where it can. Extend it if it doesn't cover `og.jpg` and the product images.
+
+## W3: Titles, descriptions and share tags per page (`feature/website-page-metadata`, size S)
+
+**Now:** every public page has the same 230-character meta description (`APP_DESCRIPTION` in `src/lib/help/content.ts`, set in `src/routes/__root.tsx`). og:title is "Lootsplitter" on every page, and the home page's `<title>` is just "Lootsplitter".
+
+**Change:**
+- give each public route its own `title`, `description`, `og:title` and `og:description` through its `head()`;
+- keep descriptions under about 155 characters;
+- set the home title to "Lootsplitter — free D&D loot splitter and campaign ledger" (**OWNER DECISION:** wording);
+- lead other titles with the page subject, for example "Features for DMs and players · Lootsplitter".
+
+The app routes keep the generic title.
+
+**Add** WebSite and Organization JSON-LD on /welcome only: name, url `https://lootsplitter.com`, logo, `sameAs` the GitHub repository. Do **not** add SoftwareApplication markup. Google requires a rating or review for it, and Lootsplitter has none to show.
+
+**Check:** extend `scripts/grok-pwa-plugin.test.mjs` or a new unit test so that every public page has a unique title and description and the home page has valid JSON-LD.
+
+## W4: Privacy policy and terms (`feature/website-privacy`, size S–M)
+
+`/privacy` and `/terms` return 404, and the footer links to neither. The site creates accounts with email addresses and stores campaigns on Cloudflare D1.
+
+**Add** a public `/privacy` page with the same layout as `/donate`, and link it from the footer of every public page and from My account. Add it to `PUBLIC_PAGES` in `src/lib/deployment/public-urls.mjs` so it gets a canonical tag and a sitemap entry. Add its path to the public-path lists (`__root.tsx`, `scripts/title-screen-navigation.mjs`).
+
+**Write it from the code, not from memory:**
+- what is collected: account email and name, campaigns and rooms in D1, device-only data;
+- where it lives: Cloudflare;
+- how long it is kept;
+- how to delete an account;
+- that there are no ads or trackers;
+- the contact: support@lootsplitter.com.
+
+**OWNER DECISION:** approve the text. Terms are optional; ask the owner.
+
+## W5: Rework the live coin counter (`fix/website-treasury-counter`, size S)
+
+/welcome shows "The treasury: 5.58 gp spent across shared campaigns" (`src/components/website/gold-counter.tsx`). While the site is new, this reads as near-zero use.
+
+**OWNER DECISION:** hide it until the total passes a threshold, or replace it with a capability statement (for example, "Five coin types, every split recorded"). Don't remove the counter's data or endpoint; only its presentation changes.
+
+## W6: Faster first screen on phones (`perf/website-mobile-lcp`, size M)
+
+Lighthouse 12 mobile, 2026-10-23:
+
+| Page | Performance | LCP |
+| --- | --- | --- |
+| /welcome | 75 | 5.0 s |
+| /features | 77 | 4.1 s |
+| /downloads | 78 | 4.1 s |
+| /help | 70 | 4.0 s |
+
+The target is LCP ≤ 2.5 s (web.dev "good").
+
+- **Hero image:** on /welcome the LCP element is the hero background `public/art/landscape.webp`, drawn 412×972 on a phone. Preload it, add a phone-sized variant (`srcset`/`sizes`) and give it `fetchpriority="high"`.
+- **Server response:** it is about 780 ms. Investigate edge caching of the public pages' HTML, for example a Cache API wrapper in the Worker for GET public pages without cookies. Keep correct release identity, CSP and the no-store rules in `releaseResponse`. **OWNER DECISION** if caching changes how fast a release becomes visible.
+- **Unused code:** public pages load about 169 KiB of unused app JavaScript and one render-blocking stylesheet. Reduce it where TanStack Start allows, with a route-level split. Measure before and after.
+- **Check:** record Lighthouse before and after in the PR, mobile and desktop, for the four pages. The performance log rules in `docs/PERFORMANCE.md` apply.
+
+## W7: Accessibility and layout fixes (`fix/website-a11y-polish`, size S)
+
+- **Links distinguished by colour alone** on /welcome and /help (Lighthouse `link-in-text-block`, WCAG 2.2 SC 1.4.1, Level A). Underline links in running text, or give them ≥ 3:1 contrast against body text.
+- **/help layout shift:** CLS is 0.22–0.25, because the footer jumps as help content loads. Reserve the content's height or render it on the server. The target is CLS ≤ 0.1.
+- **Check:** extend `scripts/a11y-browser-audit.mjs`.
+
+## W8: Downloads, Donate and navigation clarity (`feature/website-clarity`, size S)
+
+- **/downloads:**
+  - Fold "Release details and verification" and "About this app & releases" under one "Technical details" disclosure, closed by default. Keep every value and link; the audits read them, so update them.
+  - Rephrase "A native Windows or macOS installer is not available yet" as "Works in any modern browser — nothing to install."
+  - Add a short "Why isn't this on Google Play?" note beside the APK. (It is sideloaded; the checksum and permanent signing key make it safe to update.)
+- **/donate:** say what donations pay for. Hosting is about $70 a year (Workers Paid plus the domain). **OWNER DECISION:** wording.
+- **Header:** consider moving "Changelog" and "Resources" to the footer, leaving Features, Downloads, Help, Donate, My account and Open the app. **OWNER DECISION.**
+- **Footer:** add a labelled "Home" link.
+
+## W9: A short demo (`feature/website-demo`, size M–L, OWNER DECISION before starting)
+
+Foundry and Kanka offer a web demo or a 45-second video. Propose one of these to the owner:
+- a 30-second silent video or animated capture of a loot split (self-hosted under `public/`, no third-party player, so the CSP stays unchanged);
+- a read-only sample campaign ("The Wayfarers" fixture) that opens without signing in.
+
+Build only the approved option.
+
+## Owner tasks (not code; list them in your first PR)
+
+- **Google Search Console:** verify lootsplitter.com as a Domain property (DNS TXT record through Cloudflare) and submit `https://lootsplitter.com/sitemap.xml`.
+- **Launch posts:** follow the marketing plan's posts (r/rpg, AlternativeTo, itch.io) after W1–W3 ship, so shared links show the new name and image.
+- **Testimonials:** collect real testimonials, with permission, before adding any social proof.
+
+## Out of scope
+
+- The app's own screens.
+- Paid tiers, ads or analytics scripts.
+- Google Play publishing, which needs its own plan and owner approval.
+- Changing the Android widget's website link (P2-1 in the domain audit), which ships with the next APK.
 ````
