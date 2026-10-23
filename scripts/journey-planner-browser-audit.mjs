@@ -148,7 +148,7 @@ try {
     assert.equal(saved.unit, "mi");
     // Draw: the route starts at the party (Harrowgate); Kestrel Watch's pin adds that place.
     await expect(frame.getByRole("button", { name: /^Waypoint 1: Harrowgate/ })).toBeVisible();
-    await frame.locator('button[title="Location: Kestrel Watch"]').click();
+    await frame.locator('button[title="Location: Vale of Harrow / Kestrel Watch"]').click();
     const legs = planner.getByRole("list", { name: "Legs", exact: true });
     await expect(legs.getByRole("listitem")).toHaveCount(1);
     await expect(legs).toContainText("Harrowgate → Kestrel Watch");
