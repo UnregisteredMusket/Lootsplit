@@ -3,6 +3,8 @@ import { downtimeActivitiesSchema } from "./downtime-activities-schema.ts";
 import { validateDowntimeActivities } from "./downtime-activities.ts";
 import { blacksmithSchema } from "./blacksmith-schema.ts";
 import { validateBlacksmith } from "./blacksmith-validation.ts";
+import { servicesSchema } from "./services-schema.ts";
+import { validateServices } from "./services-validation.ts";
 import { fleetSchema } from "./ships-schema.ts";
 import { validateFleet } from "./ships.ts";
 import { referencePolicySchema } from "./reference-access.ts";
@@ -68,6 +70,7 @@ const journalFields = z.object({
   lootClaims: lootClaimsSchema.optional(),
   downtimeActivities: downtimeActivitiesSchema.optional(),
   blacksmith: blacksmithSchema.optional(),
+  services: servicesSchema.optional(),
   referenceAccess: referencePolicySchema.optional(),
   resourceLibrary: resourceLibrarySchema.optional(),
   tradeEconomy: tradeEconomySchema.optional(),
@@ -203,6 +206,7 @@ export function readArchivedSnapshot(snapshot: string): CloudTable {
     validateEstate({ ...t, journal }, true);
     validateFleet({ ...t, journal }, true);
     validateBlacksmith({ ...t, journal }, true);
+    validateServices({ ...t, journal }, true);
     validateDowntimeActivities({ ...t, journal }, true);
     validateTradeEconomy({ ...t, journal });
     validateWorld({ ...t, journal }, true);
@@ -299,6 +303,7 @@ export function preserveJournalMetadata(value: unknown, current: Journal): Journ
   delete next.resourceLibrary;
   delete next.referenceAccess;
   delete next.lootClaims;
+  delete next.services;
   const reports = new Map((current.reports || []).map((report) => [report.id, report]));
   for (const report of next.reports || []) {
     // An archive is immutable. Hydrated error placeholders and stale client copies must
@@ -327,6 +332,8 @@ export function preserveJournalMetadata(value: unknown, current: Journal): Journ
   return readJournal({
     ...next,
     ...(current.blacksmith ? { blacksmith: current.blacksmith } : {}),
+    // Services change only through service commands; a journal patch never rewrites them.
+    ...(current.services ? { services: current.services } : {}),
     ...(current.downtimeActivities ? { downtimeActivities: current.downtimeActivities } : {}),
     ...(current.fleet ? { fleet: current.fleet } : {}),
     ...(current.referenceAccess ? { referenceAccess: current.referenceAccess } : {}),
@@ -351,6 +358,10 @@ export function preserveJournalMetadata(value: unknown, current: Journal): Journ
                 ...n,
                 ...(old?.blacksmithServices !== undefined
                   ? { blacksmithServices: old.blacksmithServices }
+                  : {}),
+                // Older clients don't know the services list; keep the stored one.
+                ...(n.services === undefined && old?.services !== undefined
+                  ? { services: old.services }
                   : {}),
               };
             }),

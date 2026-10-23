@@ -35,8 +35,16 @@ export const MAP_SCALE_PROTOCOL = 6;
  * to finish on the updated website.
  */
 export const JOURNEY_PROTOCOL = 7;
+/**
+ * Protocol 8 (2026-10-23, NPC services): an NPC may carry an optional `services` list. Older
+ * clients have a strict NPC schema, so protocols 0-7 receive NPCs without it; their NPC saves and
+ * whole-journal writes keep the stored list (world.ts npc-save, journal.ts), and pending service
+ * commands ask them to finish on the updated website. `journal.services` itself is ignored by
+ * older clients' journal parser, so it needs no stripping.
+ */
+export const SERVICES_PROTOCOL = 8;
 /** The protocol current clients declare. */
-export const CURRENT_TABLETOP_PROTOCOL = JOURNEY_PROTOCOL;
+export const CURRENT_TABLETOP_PROTOCOL = SERVICES_PROTOCOL;
 /** Server-only, non-enumerable: inline image -> its stored reference for this room read. */
 export const ROOM_IMAGE_SOURCES_KEY = Symbol.for("lootsplit.room-view-image-sources");
 
@@ -176,6 +184,46 @@ function journeyFreeTable(table: CloudTable): CloudTable {
     },
   };
 }
+const serviced = (text: string) => /"services":\["(temple|workshop|inn)"/.test(text) || text.includes('"services":[]');
+/** Whether a table (or a stored backup body) holds NPC service lists. */
+export function hasNpcServices(table: CloudTable): boolean {
+  return (
+    !!table.journal?.world?.npcs?.some((n) => n.services !== undefined) ||
+    !!table.journal?.reports?.some((r) => serviced(r.snapshot ?? ""))
+  );
+}
+function serviceFreeTable(table: CloudTable): CloudTable {
+  if (!hasNpcServices(table)) return table;
+  const world = table.journal?.world;
+  const reports = table.journal?.reports?.map((report) => {
+    if (!serviced(report.snapshot ?? "")) return report;
+    try {
+      return { ...report, snapshot: JSON.stringify(serviceFreeTable(JSON.parse(report.snapshot))) };
+    } catch {
+      return report; // Preserve existing unreadable-archive evidence for the recovery reader.
+    }
+  });
+  return {
+    ...table,
+    journal: {
+      ...table.journal!,
+      ...(world?.npcs
+        ? {
+            world: {
+              ...world,
+              npcs: world.npcs.map((n) => {
+                if (n.services === undefined) return n;
+                const plain = { ...n };
+                delete plain.services;
+                return plain;
+              }),
+            },
+          }
+        : {}),
+      ...(reports ? { reports } : {}),
+    },
+  };
+}
 // Token styles are objects; only placement styles are these strings.
 const placementStyled = (text: string) =>
   text.includes('"placements"') && /"style":"(icon|portrait)"/.test(text);
@@ -225,6 +273,8 @@ export function legacyTabletopTable(table: CloudTable): CloudTable {
   return tableForProtocol(table, 0);
 }
 export function tableForProtocol(table: CloudTable, protocol = 0): CloudTable {
+  if (protocol >= SERVICES_PROTOCOL) return table;
+  table = serviceFreeTable(table);
   if (protocol >= JOURNEY_PROTOCOL) return table;
   table = journeyFreeTable(table);
   if (protocol >= MAP_SCALE_PROTOCOL) return table;
@@ -298,12 +348,20 @@ export function tabletopResponse<T extends { table: CloudTable; draft: string }>
   value: T,
   protocol?: number,
 ): T {
-  if (protocol && protocol >= JOURNEY_PROTOCOL) return withImageReferences(value);
+  if (protocol && protocol >= SERVICES_PROTOCOL) return withImageReferences(value);
   const draft: unknown = JSON.parse(value.draft);
   if (
     Array.isArray(draft) &&
     draft.some((c) => {
       if (!c || typeof c !== "object") return false;
+      // Protocol 8: service commands and NPC service lists older apps cannot read.
+      if (
+        (typeof c.kind === "string" && c.kind.startsWith("service-")) ||
+        ((c.kind === "npc-save" || c.kind === "npc-create") &&
+          [c.npc, c.before].some((n) => n?.services !== undefined))
+      )
+        return true;
+      if (protocol && protocol >= JOURNEY_PROTOCOL) return false;
       // Protocol 7: journey commands and journey fields older apps cannot read.
       if (
         c.kind === "party-journey" ||

@@ -1,6 +1,7 @@
 import { SearchSelect } from "@/components/search-select";
 import { MapRecordStrip } from "./map-record-strip";
 import { BlacksmithServices } from "@/components/blacksmith-services";
+import { ShopServices } from "@/components/service-providers";
 import { BlackMarketVendor } from "@/components/black-market";
 import { shopVisible } from "@/lib/quire/world";
 import { useFinanceReadiness } from "@/lib/quire/use-finance-readiness";
@@ -255,6 +256,7 @@ export function ShopContent({
         <CharismaNote purseId={purseId} />
       </label>
       <BlacksmithServices shop={shop} purseId={purseId} />
+      <ShopServices shop={shop} purseId={purseId} />
       <TurnLock />
       {viewing === "edit" ? <CatalogStockPicker key={`catalog-${shop.id}`} shop={shop} /> : null}
       <ShopStockList

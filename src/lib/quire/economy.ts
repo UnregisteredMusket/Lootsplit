@@ -2,6 +2,8 @@ import { mapAssetReferences } from "./map-assets-references.ts";
 import { activeCampaignId } from "./campaign-context.ts";
 import { assertShipTradingHere, validateFleet } from "./ships.ts";
 import { validateBlacksmith } from "./blacksmith-validation.ts";
+import { validateServices } from "./services-validation.ts";
+import { serviceOrderOpen } from "./services-schema.ts";
 import { projectRecord } from "./session-records.ts";
 import { shopVisible, shopAsking, validateWorld } from "./world.ts";
 import { randomTradeRoll, recordShopTrade, validateTradeEconomy } from "./trade-economy.ts";
@@ -990,6 +992,8 @@ export async function removeShop(id: string): Promise<void> {
       throw Error(
         "Resolve commissions and remove this forge's blacksmith configuration before deleting its shop.",
       );
+    if (journal.services?.providers.some((p) => p.shopId === id))
+      throw Error("Remove the services this shop hosts before deleting it.");
     const lines = await request<StockLine[]>(tx.objectStore("stock").index("shopId").getAll(id));
     tx.objectStore("shops").delete(id);
     for (const line of lines) tx.objectStore("stock").delete(line.id);
@@ -1042,6 +1046,10 @@ export async function removePurse(id: string): Promise<void> {
       throw Error("Resolve pending NPC training before removing this character.");
     if (journal.blacksmith?.profiles.some((p) => p.npcId === id))
       throw Error("Remove this maker's forge configuration before deleting the NPC account.");
+    if (journal.services?.providers.some((p) => p.npcId === id))
+      throw Error("Remove the services this NPC provides before deleting the NPC account.");
+    if (journal.services?.orders.some((o) => o.purseId === id && serviceOrderOpen(o)))
+      throw Error("Resolve this character's open service orders before deleting the account.");
     if (
       journal.blacksmith?.orders.some(
         (o) => o.purseId === id && ["active", "paused", "ready"].includes(o.status),
@@ -2420,6 +2428,7 @@ export function readQuireFile(value: unknown): QuireFile {
   validateEstate({ ...(file as QuireFile), journal });
   validateFleet({ ...(file as QuireFile), journal });
   validateBlacksmith({ ...(file as QuireFile), journal });
+  validateServices({ ...(file as QuireFile), journal });
   validateWorld({ ...(file as QuireFile), ...metadata, journal });
   validateTradeEconomy({ ...(file as QuireFile), journal });
   // A clone error must occur before the destructive transaction, including non-JSON callers.

@@ -468,6 +468,12 @@ Adds a contextual Maps session bar, searchable scene cards, separate activation/
 - Anti-exploit: cooldown per player account, repeat DC, 24-hour combined judgement, caps, unit cap, unwanted categories, and player-set item values (`valueSource: "player"`) count for nothing. Settlement reuses the atomic barter exchange; command IDs make retries no-ops and never re-roll. Players never receive NPC rules, valuation, purse or other players' attempts. The existing trading table, controlled-NPC flow, Give and every earlier save are unchanged. See [NPC-BARTER.md](NPC-BARTER.md).
 
 
+### NPC services, phase 1: temple (October 23, 2026)
+
+- Temple service providers (an NPC at a located shop): SRD 5.2.1 (default), SRD 5.1 or Blank price presets, editable whole-copper offers with spell level, casting time (noted only), components (bring your own or supplied at a price) and Automatic or DM review. Settlement rule by spell level with a per-provider override; "Not taking new orders" pause; optional review threshold. See [services](SERVICES.md).
+- Ordered in the NPC conversation: offers as replies, beneficiary (any present party character, no control granted), component choice, total; automatic offers pay once and record a receipt; Raise Dead and Resurrection go to Review Inbox and are charged only on approval; deny or withdraw moves nothing. Effects are record only.
+- Shop page Services section, People & NPCs service permissions (`npc.services`, the forge's checkbox unchanged), Review Inbox service requests, Desk count, place card chip and Here sheet provider rows. Tabletop protocol 8 keeps older clients working.
+
 ### NPC services, phase 0 (October 23, 2026)
 
 - Shared service helpers (`service-core.ts`) lifted from the forge with no behaviour change; the forge's schema, commands, tests and browser audit are unchanged. See [services](SERVICES.md).

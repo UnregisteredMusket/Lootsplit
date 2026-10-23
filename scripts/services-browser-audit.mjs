@@ -9,6 +9,7 @@ import { smithFixture, smithDm } from "../src/lib/quire/test-fixtures/blacksmith
 import { applyCommand } from "../src/lib/quire/commands.ts";
 import { defaultSmith } from "../src/lib/quire/blacksmith-schema.ts";
 import { validateWorld } from "../src/lib/quire/world.ts";
+import { servicesFixture } from "../src/lib/quire/test-fixtures/services.ts";
 import { openApplication, reloadApplication, navigateApplication } from "./title-screen-navigation.mjs";
 
 const origin = process.env.AUDIT_ORIGIN || "http://127.0.0.1:8080";
@@ -52,6 +53,30 @@ async function seed(page, table) {
     }
   }, table);
 }
+async function readJournal(page) {
+  return page.evaluate(async () => {
+    const active = localStorage.getItem("quire.campaign.v1"),
+      name =
+        JSON.parse(localStorage.getItem("quire.campaigns.v1") || "[]").find((r) => r.id === active)?.db ||
+        "quire";
+    const db = await new Promise((resolve, reject) => {
+      const r = indexedDB.open(name);
+      r.onsuccess = () => resolve(r.result);
+      r.onerror = () => reject(r.error);
+    });
+    try {
+      const read = (store, key) =>
+        new Promise((resolve, reject) => {
+          const r = key ? db.transaction(store).objectStore(store).get(key) : db.transaction(store).objectStore(store).getAll();
+          r.onsuccess = () => resolve(r.result);
+          r.onerror = () => reject(r.error);
+        });
+      return { journal: (await read("meta", "journal")).value, ledger: await read("ledger"), holdings: await read("holdings") };
+    } finally {
+      db.close();
+    }
+  });
+}
 async function fits(page, label) {
   assert.ok(
     await page.evaluate(() => document.documentElement.scrollWidth <= innerWidth + 1),
@@ -73,14 +98,99 @@ function twoForges() {
     profile: defaultSmith("hall-forge", "maker"),
   });
 }
-const talk = (page) => page.getByRole("region", { name: "Talk to Aster", exact: true });
+let npcName = "Aster";
+const talk = (page) => page.getByRole("region", { name: `Talk to ${npcName}`, exact: true });
 const reply = (page, text) => talk(page).locator(".npc-talk-reply").filter({ hasText: text });
-async function open(page, fixture) {
+async function open(page, fixture, npc = "maker", name = "Aster") {
+  npcName = name;
   validateWorld(fixture);
   await seed(page, fixture);
   await reloadApplication(page);
-  await navigateApplication(page, origin + "/features/npcs?npc=maker");
+  await navigateApplication(page, origin + `/features/npcs?npc=${npc}`);
   await expect(talk(page)).toBeVisible();
+}
+const said = (page, text) => talk(page).locator(".sr-only").getByText(text, { exact: true }).last();
+
+/** DM setup on the shop page: edit an offer's price and save; the change is one DM command. */
+async function setup(page) {
+  await navigateApplication(page, origin + "/shop/temple");
+  const section = page.getByRole("region", { name: "Services at this shop" });
+  await section.getByText("Configure Temple", { exact: true }).click();
+  const row = section.locator(".svc-offer-row").filter({ hasText: "Cure Wounds" });
+  await row.locator("summary").click();
+  await row.getByLabel("Price (copper)").fill("4500");
+  await section.getByRole("button", { name: "Save provider", exact: true }).click();
+  await expect
+    .poll(async () => (await readJournal(page)).journal.services.providers[0].offers.find((o) => o.key === "cure-wounds").priceCopper)
+    .toBe(4500);
+  const events = (await readJournal(page)).journal.events.filter((e) => e.summary.startsWith("Service updated"));
+  assert.ok(events.length >= 1 && events.every((e) => e.dmOnly), "provider changes are DM-only events");
+  await page.screenshot({ path: `${output}/temple-setup-1280.png`, fullPage: true });
+}
+
+/** Temple: an instant offer paid at once, then Raise Dead requested, approved in the inbox. */
+async function temple(page, width) {
+  await open(page, servicesFixture(), "aldous", "Brother Aldous");
+  const services = reply(page, "I need a priest's help.");
+  await expect(services).toContainText("[Services · Temple]");
+  await services.click();
+  await expect(said(page, "Say what ails you, and who. The faithful ask an offering for each blessing.")).toBeAttached();
+  // Resurrection is listed but locked: Harrowgate is a town.
+  await expect(reply(page, "Resurrection")).toBeDisabled();
+  await expect(reply(page, "Resurrection")).toContainText("Only in a city. Harrowgate is a town.");
+  await expect(talk(page)).not.toContainText("Greater Restoration");
+  await fits(page, `${width} temple offers`);
+  await page.screenshot({ path: `${output}/temple-offers-${width}.png`, fullPage: true });
+
+  await reply(page, "Remove Curse").click();
+  const drawer = talk(page).locator(".npc-talk-drawer");
+  await drawer.getByRole("button", { name: /^Thorn/ }).click();
+  await expect(drawer.getByRole("button", { name: /^Wren/ })).toBeDisabled();
+  await expect(drawer.locator(".svc-total")).toContainText("300 gp");
+  const pay = reply(page, "Here's the offering.");
+  await expect(pay).toContainText("Pay 300 gp");
+  await fits(page, `${width} remove curse`);
+  await pay.click();
+  await expect(talk(page).getByLabel("Receipt: Remove Curse")).toContainText("Recorded only. The DM updates Thorn's sheet");
+  let state = await readJournal(page);
+  assert.equal(state.journal.services.orders.at(-1).status, "completed");
+  assert.equal(state.ledger.filter((l) => l.id.endsWith("-payment") && l.copper === -30000).length, 1, "paid once");
+
+  // Raise Dead: bring the diamond, ask the priest; nothing moves until the DM approves.
+  await reply(page, "Raise Dead").click();
+  await drawer.getByRole("button", { name: /^Thorn/ }).click();
+  await expect(drawer.getByLabel(/Bring your own: Diamond \(500 gp\)/)).toBeChecked();
+  await expect(drawer.locator(".svc-choice.blocked")).toContainText("Worth less than 500 gp.");
+  await expect(drawer.locator(".svc-total")).toContainText("Charged when approved");
+  await fits(page, `${width} raise dead`);
+  await page.screenshot({ path: `${output}/temple-raise-dead-${width}.png`, fullPage: true });
+  await reply(page, "Please. Here is what we bring.").click();
+  await expect(talk(page)).toContainText("Sent to the DM's queue. Nothing has been charged");
+  state = await readJournal(page);
+  const request = state.journal.services.orders.at(-1);
+  assert.equal(request.status, "requested");
+  assert.ok(state.holdings.some((h) => h.id === "diamond-500"), "the diamond stays until approval");
+  await expect(reply(page, "Forget I asked.")).toBeVisible();
+
+  await navigateApplication(page, origin + "/features/review");
+  const row = page.getByRole("article", { name: "Service request Raise Dead" });
+  await expect(row).toContainText("Thorn is at Harrowgate");
+  await fits(page, `${width} inbox`);
+  await page.screenshot({ path: `${output}/temple-inbox-${width}.png`, fullPage: true });
+  await row.getByLabel(/Note to the player/).fill("Thorn's soul answers. He wakes at dusk.");
+  await row.getByRole("button", { name: /^Approve · charge 2000 gp/ }).click();
+  await expect.poll(async () => (await readJournal(page)).journal.services.orders.at(-1).status).toBe("completed");
+  state = await readJournal(page);
+  assert.ok(!state.holdings.some((h) => h.id === "diamond-500"), "the diamond is consumed once");
+  assert.equal(state.ledger.filter((l) => l.id === request.id + "-payment").length, 1);
+
+  // The shop page lists the temple's offers and the order.
+  await navigateApplication(page, origin + "/shop/temple");
+  const section = page.getByRole("region", { name: "Services at this shop" });
+  await expect(section).toContainText("Raise Dead");
+  await expect(section).toContainText("completed");
+  await fits(page, `${width} shop services`);
+  await page.screenshot({ path: `${output}/temple-shop-${width}.png`, fullPage: true });
 }
 
 try {
@@ -133,6 +243,15 @@ try {
     await reply(page, "Opens Hall Forge's commissions.").focus();
     await page.keyboard.press("2");
     await expect(page).toHaveURL(/\/shop\/hall-forge$/);
+
+    // Ironbound (the default) at 1280 and 320; Parchment (Adventurer's Ledger) at 390.
+    if (width === 390) {
+      await navigateApplication(page, origin + "/settings#appearance");
+      await page.getByRole("button", { name: "Light · Adventurer’s Ledger", exact: true }).click();
+      await page.waitForFunction(() => document.documentElement.dataset.fantasyTheme === "adventurers-ledger");
+    }
+    await temple(page, width);
+    if (width === 1280) await setup(page);
     await context.close();
   }
   assert.deepEqual(errors, [], "No browser runtime errors");

@@ -563,9 +563,13 @@ export function applyWorldCommand(t: CloudTable, seat: CloudSeat, cmd: WorldComm
   } else if (cmd.kind === "npc-save") {
     dm();
     const current = w.npcs.find((n) => n.id === cmd.npc.id);
-    if (!same(current, cmd.before) || cmd.before.id !== cmd.npc.id)
+    // Clients before tabletop protocol 8 never see an NPC's service list (tabletop-protocol.ts):
+    // compare without it and keep the stored list when both sides omit it.
+    const legacy = cmd.before.services === undefined && cmd.npc.services === undefined;
+    const compared = legacy && current ? { ...current, services: undefined } : current;
+    if (!same(compared, cmd.before) || cmd.before.id !== cmd.npc.id)
       throw Error("NPC configuration changed. Reload before saving.");
-    Object.assign(current!, cmd.npc);
+    Object.assign(current!, cmd.npc, legacy && current?.services ? { services: current.services } : {});
     const p = t.purses.find((p) => p.id === cmd.npc.id)!;
     if (
       cmd.npc.locationId !== cmd.before.locationId &&

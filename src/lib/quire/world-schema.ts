@@ -1,4 +1,5 @@
 import { z } from "zod";
+import { serviceKinds } from "./services-schema.ts";
 import { mapCombatBindingSchema } from "./map-combat-schema.ts";
 import { connectedMapSchema } from "./connected-maps-schema.ts";
 import { artworkSchema } from "./artwork.ts";
@@ -177,6 +178,8 @@ export const campaignMapSchema = z
 export const npcSchema = z
   .object({
     blacksmithServices: z.boolean().optional(),
+    /** Service kinds this NPC offers (docs/SERVICES.md); the forge keeps `blacksmithServices`. */
+    services: z.array(z.enum(serviceKinds)).max(3).optional(),
     id,
     name,
     description: z.string().max(4000),

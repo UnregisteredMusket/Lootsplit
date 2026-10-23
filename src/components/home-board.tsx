@@ -1,3 +1,4 @@
+import { pendingServiceRequests } from "@/lib/quire/services";
 import { inParty } from "@/lib/quire/character-position";
 import type { ReactNode } from "react";
 import { DesktopDeskPanels } from "./control-panel/desktop-panels";
@@ -210,7 +211,8 @@ export function HomeBoard({ embedded = false }: { embedded?: boolean }) {
                       <p className="mt-4 font-display text-3xl">
                         {seat.role === "dm"
                           ? loans.filter((loan) => loan.status === "pending").length +
-                            journal.requests.filter((x) => x.status === "pending").length
+                            journal.requests.filter((x) => x.status === "pending").length+
+                            pendingServiceRequests({ journal })
                           : loot.filter((holding) => holding.kind === "property").length}
                       </p>
                       <p className="text-sm text-muted">

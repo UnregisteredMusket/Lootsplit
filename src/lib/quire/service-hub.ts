@@ -2,6 +2,8 @@ import type { CloudTable } from "./cloud.ts";
 import { readBlacksmith } from "./blacksmith-schema.ts";
 import { smithAvailability } from "./blacksmith.ts";
 import { downtimePending } from "./service-core.ts";
+import { readServices, type ServiceProvider } from "./services-schema.ts";
+import { approvedOffers, providerLock, serviceLabel } from "./services.ts";
 
 // The Services branch of the NPC conversation hub (docs/SERVICES.md, docs/NPC-BARTER.md).
 // One entry per provider this NPC runs. Each entry runs the same availability check the
@@ -18,6 +20,8 @@ export type HubService = {
   sub?: string;
   /** Opens an existing page (the forge's shop page). */
   href?: string;
+  /** Opens this provider's branch of the conversation (temple, workshop, inn). */
+  providerId?: string;
   /** Why it can't be used now; empty when usable. */
   locked: string;
   /** The provider's place (shop name), added to the tag in the sub-list. */
@@ -59,7 +63,48 @@ export function npcServices(t: CloudTable, npcId: string, purseId: string | unde
           : smithAvailability(t, p, purseId),
     });
   }
+  const services = readServices(t.journal?.services);
+  for (const p of services.providers.filter((p) => p.npcId === npcId)) {
+    const shop = t.shops.find((s) => s.id === p.shopId),
+      offers = approvedOffers(p);
+    // A provider with nothing approved is a DM draft: not listed (players never receive it).
+    if (!shop || !offers.length) continue;
+    const mine = purseId ? services.orders.filter((o) => o.providerId === p.id && o.purseId === purseId) : [];
+    const ready = mine.find((o) => o.status === "ready"),
+      waiting = mine.find((o) => o.status === "requested");
+    let locked = providerLock(t, p, purseId);
+    // A pause stops new orders only: collecting or withdrawing stays open.
+    if (p.paused && locked.startsWith("Not taking new orders") && (ready || waiting)) locked = "";
+    const label = serviceLabel(p);
+    out.push({
+      key: `svc:${p.id}`,
+      label,
+      tag: `Services · ${label}`,
+      text: hubLine(p),
+      sub: ready
+        ? `Your ${ready.terms.offer.output.kind === "holding" ? ready.terms.offer.output.name : ready.terms.offer.name} is ready to collect.`
+        : waiting
+          ? `Your request for ${waiting.terms.offer.name} is waiting for the DM.`
+          : hubSub(p, offers.length),
+      providerId: p.id,
+      ready: !!ready || !!waiting,
+      place: shop.name,
+      locked,
+    });
+  }
   return out;
+}
+
+function hubLine(p: ServiceProvider) {
+  if (p.kind === "temple") return "I need a priest's help.";
+  if (p.kind === "inn") return "We need rooms, and a meal.";
+  const s = p.specialty?.toLowerCase();
+  return s === "scribe" ? "Can you scribe a scroll for me?" : s === "alchemist" ? "Can you brew something for me?" : "Can you make something for me?";
+}
+function hubSub(p: ServiceProvider, offers: number) {
+  const review = approvedOffers(p).some((o) => o.review === "dm") || p.reviewAboveCopper !== undefined;
+  const count = `${offers} ${offers === 1 ? "offer" : "offers"}`;
+  return review ? `${count}. Some need the DM's approval.` : `${count}.`;
 }
 
 /** The single hub reply that leads to the providers: open directly, open a sub-list, or locked. */

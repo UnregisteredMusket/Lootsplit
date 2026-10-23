@@ -21,6 +21,7 @@ import type { CloudTable } from "@/lib/quire/cloud";
 import type { Holding, Purse } from "@/lib/quire/types";
 import { npcServices, servicesReply, type HubService } from "@/lib/quire/service-hub";
 import { AppLink } from "./app-link";
+import { useServiceTalk } from "./service-talk";
 
 // The reusable NPC conversation (docs/NPC-BARTER.md): a portrait stage, a transcript and
 // numbered replies. Barter is the worked branch; the others open existing pages.
@@ -67,6 +68,7 @@ const replySpeech: Record<BarterAttempt["reply"], string> = {
 
 type Line =
   | { kind: "attempt"; id: string; key: string }
+  | { kind: "order"; id: string; key: string }
   | { kind: "npc"; text: string; key: string }
   | { kind: "pc"; text: string; tag?: string; key: string }
   | { kind: "sys"; node: ReactNode; key: string }
@@ -245,7 +247,7 @@ export function Transcript({
       aria-label={`Conversation with ${npcName}`}
     >
       {lines.map((l) =>
-        l.kind === "attempt" ? null : l.kind === "npc" ? (
+        l.kind === "attempt" || l.kind === "order" ? null : l.kind === "npc" ? (
           <li key={l.key} className="npc-talk-line npc">
             <span className="npc-talk-who">{npcName}</span>
             <NpcSay text={l.text} animate={typing === l.key && !reduced()} onDone={onTyped ?? (() => undefined)} />
@@ -341,7 +343,7 @@ export function NpcConversation({
   const character = characters.find((p) => p.id === characterId);
   const lines = npc.barter?.lines,
     say = (key: "greet" | "barter" | "bye") => lines?.[key] ?? STANCE_LINES.fair[key];
-  const [step, setStep] = useState<"hub" | "barter" | "services" | "left">("hub");
+  const [step, setStep] = useState<"hub" | "barter" | "services" | "service" | "left">("hub");
   const [local, setLocal] = useState<Line[]>(() => [{ kind: "npc", text: say("greet"), key: "greet-0" }]);
   const [typing, setTyping] = useState<string | undefined>("greet-0");
   const [drawer, setDrawer] = useState(false);
@@ -354,6 +356,19 @@ export function NpcConversation({
   const counter = useRef(0);
   const nextKey = (p: string) => `${p}-${++counter.current}`;
   const push = (...items: Line[]) => setLocal((current) => [...current, ...items]);
+  // Temple, workshop and inn branches (docs/SERVICES.md).
+  const svc = useServiceTalk({
+    table,
+    npc,
+    character,
+    push,
+    nextKey,
+    send: (input, id, renew) => send(input, id, renew),
+    onBack: () => {
+      push({ kind: "npc", text: say("greet"), key: nextKey("npc") });
+      setStep("hub");
+    },
+  });
   // Open offers with this NPC (a counter to answer, an offer waiting for the DM) join the conversation.
   const attempts = state.attempts.filter((a) => a.npcId === npc.id && a.purseId === characterId);
   const shown = attempts.filter(
@@ -409,12 +424,16 @@ export function NpcConversation({
     return spinning === a.id ? all.slice(0, all.findIndex((l) => l.kind === "roll") + 1) : all;
   };
   // Attempts appear where they were made; open ones from earlier follow the greeting.
-  const placed = new Set(local.flatMap((l) => (l.kind === "attempt" ? [l.id] : [])));
+  const placed = new Set(local.flatMap((l) => (l.kind === "attempt" || l.kind === "order" ? [l.id] : [])));
   const earlier = shown.filter((a) => !placed.has(a.id));
+  // Open service requests from earlier visits join the conversation too.
+  const earlierOrders = svc.shown.filter((o) => !placed.has(o.id));
   const transcript: Line[] = [
     ...local.slice(0, 1),
     ...earlier.flatMap(linesOf),
+    ...earlierOrders.flatMap((o) => svc.linesFor(o.id) as Line[]),
     ...local.slice(1).flatMap((l) => {
+      if (l.kind === "order") return svc.linesFor(l.id) as Line[];
       if (l.kind !== "attempt") return [l];
       const a = shown.find((x) => x.id === l.id);
       return a ? linesOf(a) : [];
@@ -452,6 +471,14 @@ export function NpcConversation({
     sub: p.locked && !p.ready ? undefined : p.sub,
     href: p.href,
     disabled: p.locked || undefined,
+    ...(p.providerId
+      ? {
+          run: () => {
+            svc.open(p.providerId!, p.text, p.tag);
+            setStep("service");
+          },
+        }
+      : {}),
   });
   const leave: Reply = {
     text: "Farewell.",
@@ -551,6 +578,17 @@ export function NpcConversation({
       sub: "Your message thread with this NPC. The DM (or a controller) replies.",
     });
     replies.push(leave);
+  } else if (step === "service") {
+    replies.push(...svc.replies);
+    if (!svc.active)
+      replies.push({
+        text: "Never mind.",
+        tone: "leave",
+        run: () => {
+          push({ kind: "npc", text: say("greet"), key: nextKey("npc") });
+          setStep("hub");
+        },
+      });
   } else if (step === "services") {
     for (const p of providers) replies.push({ ...serviceReply(p), tag: `${p.tag} · ${p.place}` });
     replies.push({
@@ -713,6 +751,7 @@ export function NpcConversation({
                 // A new speaker starts a fresh conversation; their open offers rejoin it.
                 setCharacterId(e.target.value);
                 setDraft(emptyDraft());
+                svc.close();
                 setStep("hub");
                 setDrawer(false);
                 setError("");
@@ -741,6 +780,7 @@ export function NpcConversation({
           spinning={spinning}
           live
         />
+        {step === "service" && svc.drawer}
         {drawer && step === "barter" && character && (
           <div className="npc-talk-drawer">
             <div className="npc-talk-drawer-head">
