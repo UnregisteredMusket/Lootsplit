@@ -419,3 +419,18 @@ test("Activity: one row per resolution and one row per run of claim changes, wit
   assert.deepEqual(rows[1]!.lines.map((l) => [l.who, l.item, l.own]), [["The Hoard → Bram Ironfoot", "+1 Longsword × 1", true]]);
   assert.equal(rows[1]!.total, "1 item · 500 gp");
 });
+
+test("Activity keeps the real order when a claim and a resolution share a millisecond", async () => {
+  const { lootActivity } = await import("./loot-activity.ts");
+  let t = marked(campaign(), [["sword", "bram", "need"], ["sword", "aria", "greed"]]);
+  t = resolve(t, { id: "same-ms", method: "round-robin", lots: [{ holdingId: "sword", quantity: 1 }] });
+  t = claim(t, seat("cass"), "symbol", "cass", "greed", "same-ms-claim");
+  // Force every event onto one timestamp: order must come from the journal, not the clock.
+  const events = t.journal!.events.map((e) => ({ ...e, at: 1_800_000_000_000 }));
+  const rows = lootActivity(events, t.purses, { ownPurseIds: ["bram"] });
+  assert.deepEqual(rows.map((r) => r.title), [
+    "Claims marked · 1 change",
+    "Treasure pool resolved · 1 item to 1 character",
+    "Claims marked · 2 changes",
+  ]);
+});
