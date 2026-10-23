@@ -252,6 +252,17 @@ export const FEATURE_AREAS: FeatureArea[] = [
         ],
       },
       {
+        title: "Temple, workshop and inn",
+        summary:
+          "NPCs run paid services at their shop: temple spellcasting, scribe and alchemist commissions, and inn stays.",
+        details: [
+          "Prices default to the SRD 5.2.1 lists; the DM can edit or start blank",
+          "Raise Dead and Resurrection wait for DM review and are charged on approval",
+          "Workshop orders are made during approved downtime",
+          "Inns book nights and meals, and share rumours privately",
+        ],
+      },
+      {
         title: "Blacksmith commissions",
         summary:
           "Players order custom weapons and armor from a permitted smith NPC, built during approved downtime.",
@@ -621,6 +632,17 @@ export const FEATURE_AREAS: FeatureArea[] = [
           "Recipients must be equal or lower level than the trainer",
           "Current and lifetime hours per trainer, NPC and category",
           "DM milestones reset counters without changing sheets",
+        ],
+      },
+      {
+        title: "Party journeys",
+        summary:
+          "Plan a trip on the map and travel it with downtime: the DM approves departure, progress and arrival.",
+        details: [
+          "Players propose a route; the DM approves it with the downtime preview",
+          "Paces of 18, 24 or 30 miles a day, set by the DM",
+          "Optional rations and mount feed, paid once on approval",
+          "The DM confirms arrival and moves the party",
         ],
       },
       {
