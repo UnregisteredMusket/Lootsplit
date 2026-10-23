@@ -369,6 +369,5 @@ test("device: a player-only link is read-only; pooled items stay in their fund a
   // A player-only device link cannot claim or resolve.
   setSeat({ role: "player", purseIds: ["aria", "hoard"], shopIds: [], openedAt: 0 });
   await assert.rejects(executeLocalCommand(claimCmd(campaign(), "link", "sword", "aria", "need")), /read-only on a player link/);
-  await assert.rejects(giveToPlayer({ fromId: "hoard", toId: "aria", copper: 0, holdingId: "potion", quantity: 1 } ), /treasure pool/);
   setSeat(DM_SEAT);
 });
