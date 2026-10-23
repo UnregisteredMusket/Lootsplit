@@ -27,6 +27,10 @@ export type MapRecord = {
   targetMapId?: string;
   entry?: { x: number; y: number; zoom: number };
   description?: string;
+  /** Pin style of an exact placement (Place hub); absent is the round icon. */
+  style?: "icon" | "portrait";
+  /** Opened from the Here sheet without a pin on the viewed map. */
+  detached?: boolean;
 };
 export const mapRecordKinds = [
   "Map",

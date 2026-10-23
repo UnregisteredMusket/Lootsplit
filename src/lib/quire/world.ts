@@ -18,7 +18,7 @@ import { applyCharacterPosition } from "./character-position.ts";
 import { readFleet } from "./ships-schema.ts";
 import { applyTabletopCommand, validateTabletop, readTabletopSession } from "./tabletop.ts";
 import { tabletopCommands, type TabletopCommand } from "./tabletop-schema.ts";
-import { fogSnapshotMap, legacyDiagonals, legacyTabletopMap, legacyTabletopToken, previousTabletopMap } from "./tabletop-protocol.ts";
+import { fogSnapshotMap, legacyDiagonals, legacyTabletopMap, legacyTabletopToken, previousTabletopMap, withoutPlacementStyles } from "./tabletop-protocol.ts";
 import { compactTabletopHistory } from "./fog-history.ts";
 
 export function npcAvailableHere(npc: Npc, table: Pick<CloudTable, "journal">) {
@@ -470,10 +470,18 @@ export function applyWorldCommand(t: CloudTable, seat: CloudSeat, cmd: WorldComm
   } else if (cmd.kind === "map-save") {
     dm();
     const current = w.maps.find((m) => m.id === cmd.mapId) ?? null;
+    // Older apps (tabletop protocol 4 or earlier) never see placement pin styles.
+    const plain = current && withoutPlacementStyles(current);
     // Older apps (tabletop protocol 2 or earlier) saw full-snapshot fog history.
     // They also see an alternating diagonal grid as "equal" (legacyDiagonals).
-    const expanded = current && legacyDiagonals(fogSnapshotMap(current));
-    const legacy = current && cmd.before && !same(current, cmd.before) && (same(expanded, cmd.before) || same(legacyDiagonals(legacyTabletopMap(current)), cmd.before) || same(previousTabletopMap(expanded!), cmd.before));
+    const expanded = plain && legacyDiagonals(fogSnapshotMap(plain));
+    const legacy = current && cmd.before && !same(current, cmd.before) && (same(plain, cmd.before) || same(expanded, cmd.before) || same(legacyDiagonals(legacyTabletopMap(plain!)), cmd.before) || same(previousTabletopMap(expanded!), cmd.before));
+    // An older app saving the map keeps the pin styles it cannot display.
+    if (legacy && cmd.map?.connected && current?.connected)
+      cmd.map.connected.placements = cmd.map.connected.placements.map((p) => {
+        const old = current.connected!.placements.find((o) => o.id === p.id);
+        return old?.style && p.style === undefined ? { ...p, style: old.style } : p;
+      });
     // An older app saving the map unchanged keeps the alternating rule it cannot display.
     if (legacy && cmd.map?.grid && current?.grid?.diagonal === "alternating" && cmd.before?.grid?.diagonal === "equal" && cmd.map.grid.diagonal === "equal")
       cmd.map.grid = { ...cmd.map.grid, diagonal: "alternating" };

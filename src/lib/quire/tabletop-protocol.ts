@@ -16,6 +16,14 @@ export const TABLETOP_PROTOCOL = 3;
  * APKs) keep receiving full inline envelopes.
  */
 export const IMAGE_REFERENCE_PROTOCOL = 4;
+/**
+ * Protocol 5 (2026-10-23, Place hub): record placements may carry an optional pin `style`
+ * ("icon" | "portrait"). Older clients have a strict placement schema, so protocols 0-4 receive
+ * placements without it; their map saves keep the stored styles (world.ts map-save).
+ */
+export const PLACEMENT_STYLE_PROTOCOL = 5;
+/** The protocol current clients declare. */
+export const CURRENT_TABLETOP_PROTOCOL = PLACEMENT_STYLE_PROTOCOL;
 /** Server-only, non-enumerable: inline image -> its stored reference for this room read. */
 export const ROOM_IMAGE_SOURCES_KEY = Symbol.for("lootsplit.room-view-image-sources");
 
@@ -66,6 +74,54 @@ export function fogSnapshotMap(map: CampaignMap): CampaignMap {
   if (!map.tabletop || !tabletopHasFogDiffs(map.tabletop)) return map;
   return { ...map, tabletop: expandTabletopHistory(map.tabletop) };
 }
+/** A map without placement pin styles (protocols 0-4). The same object when there are none. */
+export function withoutPlacementStyles(map: CampaignMap): CampaignMap {
+  if (!map.connected?.placements.some((p) => p.style !== undefined)) return map;
+  return {
+    ...map,
+    connected: {
+      ...map.connected,
+      placements: map.connected.placements.map((p) => {
+        const plain = { ...p };
+        delete plain.style;
+        return plain;
+      }),
+    },
+  };
+}
+// Token styles are objects; only placement styles are these strings.
+const placementStyled = (text: string) =>
+  text.includes('"placements"') && /"style":"(icon|portrait)"/.test(text);
+/** Whether a table (or a stored backup body) holds placement pin styles. */
+export function hasPlacementStyles(table: CloudTable): boolean {
+  return (
+    !!table.journal?.world?.maps.some((m) => m.connected?.placements.some((p) => p.style)) ||
+    !!table.journal?.reports?.some((r) => placementStyled(r.snapshot ?? ""))
+  );
+}
+function styleFreeTable(table: CloudTable): CloudTable {
+  if (!hasPlacementStyles(table)) return table;
+  const world = table.journal?.world;
+  const reports = table.journal?.reports?.map((report) => {
+    if (!placementStyled(report.snapshot ?? "")) return report;
+    try {
+      return {
+        ...report,
+        snapshot: JSON.stringify(styleFreeTable(JSON.parse(report.snapshot))),
+      };
+    } catch {
+      return report; // Preserve existing unreadable-archive evidence for the recovery reader.
+    }
+  });
+  return {
+    ...table,
+    journal: {
+      ...table.journal!,
+      ...(world ? { world: { ...world, maps: world.maps.map(withoutPlacementStyles) } } : {}),
+      ...(reports ? { reports } : {}),
+    },
+  };
+}
 export function previousTabletopMap(map: CampaignMap): CampaignMap {
   const result = { ...map };
   delete result.connected;
@@ -82,6 +138,8 @@ export function legacyTabletopTable(table: CloudTable): CloudTable {
   return tableForProtocol(table, 0);
 }
 export function tableForProtocol(table: CloudTable, protocol = 0): CloudTable {
+  if (protocol >= PLACEMENT_STYLE_PROTOCOL) return table;
+  table = styleFreeTable(table);
   if (protocol >= TABLETOP_PROTOCOL) return table;
   table = legacyDiagonalTable(table);
   if (protocol === 2) {
@@ -149,13 +207,19 @@ export function tabletopResponse<T extends { table: CloudTable; draft: string }>
   value: T,
   protocol?: number,
 ): T {
-  if (protocol && protocol >= IMAGE_REFERENCE_PROTOCOL) return withImageReferences(value);
-  if (protocol && protocol >= TABLETOP_PROTOCOL) return value;
+  if (protocol && protocol >= PLACEMENT_STYLE_PROTOCOL) return withImageReferences(value);
   const draft: unknown = JSON.parse(value.draft);
   if (
     Array.isArray(draft) &&
     draft.some((c) => {
       if (!c || typeof c !== "object") return false;
+      // Protocol 5: placement pin styles fail older strict placement schemas.
+      if (
+        c.kind === "map-save" &&
+        [c.map, c.before].some((m) => m?.connected?.placements?.some((p: { style?: string }) => p?.style))
+      )
+        return true;
+      if (protocol && protocol >= TABLETOP_PROTOCOL) return false;
       // Protocol 3 forms (compact history, continued strokes, consolidation, the alternating
       // diagonal) fail older strict schemas.
       if (
@@ -189,6 +253,10 @@ export function tabletopResponse<T extends { table: CloudTable; draft: string }>
     throw Error(
       "This session has unfinished map actions from an updated Lootsplitter client. Finish or resolve those actions on the updated website before resuming this older app. Your saved campaign and pending work are retained.",
     );
+  if (protocol && protocol >= IMAGE_REFERENCE_PROTOCOL) {
+    const referenced = withImageReferences(value);
+    return { ...referenced, table: tableForProtocol(referenced.table, protocol) };
+  }
   return { ...value, table: tableForProtocol(value.table, protocol) };
 }
 

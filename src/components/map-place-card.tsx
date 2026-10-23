@@ -10,10 +10,14 @@ import { locationPath, readMarketLocations } from "@/lib/quire/shop-locations";
 import {
   mapServiceAllowed,
   partyAt,
+  placementPortrait,
+  placementSave,
+  portraitKinds,
   recordLocationId,
   recordMapHref,
   sameRecord,
 } from "@/lib/quire/place-hub";
+import { CommandButton } from "./world-tools";
 import { AppLink } from "./app-link";
 import { Button } from "./ui";
 import { RecordIcon } from "./map-record-icon";
@@ -83,13 +87,7 @@ export function MapPlaceCard({
     ? map.connected?.placements.find((p) => sameRecord(p.record, reference))
     : undefined;
   const shop = reference?.kind === "shop" ? table.shops.find((s) => s.id === reference.id) : undefined;
-  const portrait =
-    reference?.kind === "npc"
-      ? (table.journal?.world?.npcs.find((n) => n.id === reference.id)?.portrait ??
-        table.purses.find((p) => p.id === reference.id)?.portrait)
-      : reference?.kind === "character"
-        ? table.purses.find((p) => p.id === reference.id)?.portrait
-        : undefined;
+  const portrait = reference ? placementPortrait(table, reference) : undefined;
   async function copyLink() {
     if (!reference) return;
     const link = new URL(recordMapHref(map.id, reference), window.location.origin).toString();
@@ -191,6 +189,51 @@ export function MapPlaceCard({
                 ))}
           </div>
           {card.description && <p>{card.description}</p>}
+          {dm && (
+            <section className="map-place-dm" aria-label="DM · this pin">
+              <h3>DM · this pin</h3>
+              {pin ? (
+                <>
+                  <div className="map-place-dm-actions">
+                    <CommandButton
+                      input={placementSave(map, reference, {
+                        visibility: pin.visibility === "party" ? "dm" : "party",
+                      })}
+                    >
+                      {pin.visibility === "party" ? "Make pin DM only" : "Let the party see this pin"}
+                    </CommandButton>
+                    {portraitKinds.has(reference.kind) && (
+                      <CommandButton
+                        input={placementSave(map, reference, {
+                          style: pin.style === "portrait" ? "icon" : "portrait",
+                        })}
+                      >
+                        {pin.style === "portrait" ? "Use icon pin" : "Use portrait pin"}
+                      </CommandButton>
+                    )}
+                    <AppLink
+                      className="settings-link"
+                      href={recordMapHref(map.id, reference, "place")}
+                    >
+                      Move pin
+                    </AppLink>
+                    <CommandButton input={placementSave(map, reference, null)}>
+                      Remove exact pin
+                    </CommandButton>
+                  </div>
+                  <p className="map-here-note">
+                    {pin.visibility === "party" ? "Party can see this pin." : "Only you can see this pin."}{" "}
+                    Moving a pin only changes where it is drawn. Removing it puts the record back at its
+                    location's anchor. Neither changes where it belongs.
+                  </p>
+                </>
+              ) : reference.kind !== "location" ? (
+                <AppLink className="settings-link" href={recordMapHref(map.id, reference, "place")}>
+                  Place exactly on {map.name}
+                </AppLink>
+              ) : null}
+            </section>
+          )}
           {allowed ? (
             <Suspense fallback={<p role="status">Opening service…</p>}>
               <MapServicePanel
