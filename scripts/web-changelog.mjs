@@ -249,11 +249,11 @@ export function stampNotes({ notes, deploys, contains, current = null }) {
       const base = deploys[firstIndex - 1];
       const prs = [...new Set(group.items.map((item) => item.pr).filter(Boolean))];
       const details =
-        prs.length === 1 || !base
-          ? prs.length
-            ? `${GITHUB}/pull/${prs[0]}`
-            : `${GITHUB}/commit/${last.sha}`
-          : `${GITHUB}/compare/${base.sha.slice(0, 12)}...${last.sha.slice(0, 12)}`;
+        prs.length === 1
+          ? `${GITHUB}/pull/${prs[0]}`
+          : base
+            ? `${GITHUB}/compare/${base.sha.slice(0, 12)}...${last.sha.slice(0, 12)}`
+            : `${GITHUB}/commit/${last.sha}`;
       const notesInGroup = group.items.map((item) => item.note);
       return {
         id: `${group.day}-web-${last.sha.slice(0, 8)}`,
@@ -354,6 +354,9 @@ export async function collectEntries({ mode, root = "." }) {
       current: { sha: head, date: headDate, verifyRunId: "preview" },
     }).map((entry) => ({ ...entry, id: `preview-${entry.id}` }));
   if (mode !== "release") throw new Error(`Unknown LOOTSPLIT_WEB_CHANGELOG mode: ${mode}`);
+  const runId = process.env.GITHUB_RUN_ID;
+  if (!runId)
+    throw new Error("Release stamping runs only in the main verification build (GITHUB_RUN_ID).");
   if (git(["rev-parse", "--is-shallow-repository"], root) === "true")
     throw new Error("Stamping the website changelog needs full history (checkout fetch-depth: 0).");
   const located = noteCommits(notes, root);
@@ -395,9 +398,6 @@ export async function collectEntries({ mode, root = "." }) {
       return false;
     }
   };
-  const runId = process.env.GITHUB_RUN_ID;
-  if (!runId)
-    throw new Error("Release stamping runs only in the main verification build (GITHUB_RUN_ID).");
   return stampNotes({
     notes: located,
     deploys,

@@ -1,0 +1,30 @@
+name: Website changelog note
+# Owner rule (2026-10-23): every user-visible website or backend change adds a website changelog
+# note (src/lib/website/web-changes/<branch>.json) that is published when it goes live. This
+# check fails a pull request that changes src/, cloudflare/, public/ or server/ without a note,
+# unless the description says "Web changelog: none — <reason>" or it has the no-web-changelog
+# label. It also runs when the description or labels change, so an opt-out takes effect without
+# a new push. It reads only the event and the merge commit: no token, no npm install.
+on:
+  pull_request:
+    types: [opened, synchronize, reopened, edited, labeled, unlabeled]
+permissions:
+  contents: read
+concurrency:
+  group: web-changelog-${{ github.ref }}
+  cancel-in-progress: true
+jobs:
+  note:
+    name: Website changelog note
+    runs-on: ubuntu-latest
+    timeout-minutes: 5
+    steps:
+      - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          # The pull_request checkout is the test merge commit; its first parent is the base.
+          fetch-depth: 2
+          persist-credentials: false
+      - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
+        with:
+          node-version-file: .nvmrc
+      - run: node scripts/web-changelog.mjs check-pr

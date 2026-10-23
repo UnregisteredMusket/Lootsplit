@@ -44,11 +44,17 @@ jobs:
     permissions:
       contents: read
       id-token: write
+      # The main web build reads successful deploy and verification runs to stamp the website
+      # changelog (scripts/web-changelog.mjs).
+      actions: read
     outputs:
       website_artifact: ${{ steps.website.outputs.artifact-id }}
       standby_artifact: ${{ steps.standby.outputs.artifact-id }}
     steps:
       - uses: actions/checkout@11d5960a326750d5838078e36cf38b85af677262 # v4.4.0
+        with:
+          # Changelog stamping checks which deployed commits contain each note.
+          fetch-depth: 0
       - uses: actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 # v4.4.0
         with:
           node-version-file: .nvmrc
@@ -65,6 +71,11 @@ jobs:
           INVENTORY_OUTPUT_DIR: test-results/function-inventory
         run: node scripts/function-inventory.mjs
       - name: web-build
+        env:
+          # Only the main build stamps website changelog notes with their deployed commit and
+          # runs; pull request builds validate notes and show none of them.
+          LOOTSPLIT_WEB_CHANGELOG: ${{ github.event_name == 'push' && github.ref == 'refs/heads/main' && 'release' || '' }}
+          GH_TOKEN: ${{ github.token }}
         run: node scripts/recovery-step.mjs web-build 240 npm run build:cloudflare
       - run: node scripts/release-artifact.mjs prepare
       - run: node scripts/standby-artifact.mjs prepare
