@@ -1,0 +1,13 @@
+{
+  "title": "Party treasure pool and item claims",
+  "summary": "The DM can put loot in the party's treasure pool, players claim Need, Greed or Pass, and the DM hands items out fairly in one step.",
+  "items": [
+    "Party → Treasure pool lists the items waiting for the party. Each player marks Need, Greed or Pass for their characters; claims are visible to the whole party and never move anything.",
+    "The DM puts items in the pool from Add loot (when the owner is a party fund) or from an encounter's loot review with Treasure pool as the recipient or Send all items to the treasure pool.",
+    "Review Inbox → Treasure pool claims resolves items one at a time, at random (Need first, then Greed, with d100 rolls or Pen & Paper totals) or round-robin, with a preview before anything moves.",
+    "Every item moves once, even after a lost connection: if a claim changes during review, nothing moves and the DM reviews again.",
+    "Pooled items stay in the party fund but can't be given, sold, offered or equipped until the DM resolves them or takes them out of the pool.",
+    "Each resolution appears once in Activity and the party chat, and the pool's History tab shows who received what, with any rolls.",
+    "Claims can be sent outside a player's turn. Players away from the party see only their own claims and items, and items given to companion NPCs stay private to the DM."
+  ]
+}
