@@ -19,7 +19,9 @@ jobs:
   verify:
     runs-on: ubuntu-latest
     environment: production
-    timeout-minutes: 10
+    # Two origins (lootsplitter.com + workers.dev) are audited since the cutover (#214); the
+    # 2026-10-23 run spent 8.5 minutes on setup and timed out in the second origin's audits.
+    timeout-minutes: 25
     env:
       EXPECTED_RELEASE_SHA: ${{ inputs.release_sha }}
       RELEASE_SHA: ${{ inputs.release_sha }}
