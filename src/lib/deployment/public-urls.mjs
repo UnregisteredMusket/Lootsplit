@@ -63,3 +63,27 @@ export function crawlerFile(request) {
     };
   return null;
 }
+
+/** Set by the app (not the public website) once a browser has opened it; lets returning players
+ * go straight into the app from the bare address. Not a secret and not an identity. */
+export const APP_VISITOR_COOKIE = "lootsplit-app";
+
+/**
+ * The bare address opens the public home page for first-time visitors and search engines; people
+ * who have opened the app (marker cookie) or are signed in (account session cookie) go straight
+ * into the app. Only `GET|HEAD /` with no query string and an HTML Accept header is redirected, so
+ * invitations (/share?…), app links with a query, the installed web app (start_url /?view=home),
+ * API calls and the Android app (bundled files) are never affected.
+ * @param {{ method?: string, url: string, accept?: string | null, cookie?: string | null }} request
+ * @returns {string | null} the redirect path, or null to serve the app
+ */
+export function landingRedirect({ method = "GET", url, accept, cookie }) {
+  if (!["GET", "HEAD"].includes(method.toUpperCase())) return null;
+  const parsed = new URL(url, "http://local.invalid");
+  if (parsed.pathname !== "/" || parsed.search) return null;
+  if (!String(accept ?? "").includes("text/html")) return null;
+  const jar = String(cookie ?? "");
+  if (new RegExp(`(?:^|;\\s*)${APP_VISITOR_COOKIE}=1(?:;|$)`).test(jar)) return null;
+  if (/(?:^|;\s*)(?:__Secure-)?lootsplit\.session_token=/.test(jar)) return null;
+  return "/welcome";
+}

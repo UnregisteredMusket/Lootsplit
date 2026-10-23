@@ -581,7 +581,7 @@ export const HELP_GROUPS: HelpGroup[] = [
         id: "desktop",
         title: "Use Lootsplitter on desktop or mobile web",
         paragraphs: [
-          "Open the browser app on your computer or phone. Bookmark it, or use your browser’s Install app/Create shortcut option if available. A native Windows or macOS installer is not available. A shortcut does not synchronize saves or make a backup.",
+          "Open the browser app on your computer or phone. On a first visit, the plain website address shows the Lootsplitter home page; choose Open the app. After that, this browser opens the app directly. Bookmark it, or use your browser’s Install app/Create shortcut option if available. A native Windows or macOS installer is not available. A shortcut does not synchronize saves or make a backup.",
           "Use the same browser profile and website address for device-local campaigns. Clearing browser storage can remove them. Use shared rooms or an exported backup to move between devices; optional accounts do not automatically upload all local data.",
         ],
         links: [

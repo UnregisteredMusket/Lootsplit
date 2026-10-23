@@ -4,8 +4,13 @@ import { mkdir, writeFile } from "node:fs/promises";
 import { chromium } from "playwright";
 import { verifyArtifact } from "./release-artifact.mjs";
 import { waitForRelease } from "./release-readiness.mjs";
-import { grokScriptAssetReferences, grokScriptReferences, isGrokScriptUrl } from "./grok-script-check.mjs";
+import {
+  grokScriptAssetReferences,
+  grokScriptReferences,
+  isGrokScriptUrl,
+} from "./grok-script-check.mjs";
 import { SCRIPT_POLICY } from "../cloudflare/release-assets.mjs";
+import { markAppVisitor } from "./title-screen-navigation.mjs";
 const origin = process.env.AUDIT_ORIGIN || "http://127.0.0.1:8082";
 // Additional audited origins (scripts/live-audit-origins.mjs) write to their own folder.
 const results = process.env.LIVE_RELEASE_RESULTS || "test-results/live-release";
@@ -23,8 +28,7 @@ await mkdir(results, { recursive: true });
 const readiness = await waitForRelease({
   origin,
   manifest: verifyArtifact("dist/website-release", expected),
-  onReport: (report) =>
-    writeFile(`${results}/readiness.json`, JSON.stringify(report, null, 2)),
+  onReport: (report) => writeFile(`${results}/readiness.json`, JSON.stringify(report, null, 2)),
 });
 console.log(
   `Release assets ready: ${readiness.attempts.at(-1).assetCount} matching JavaScript/CSS files in ${readiness.durationMs}ms (${readiness.attempts.length} probes).`,
@@ -37,9 +41,32 @@ assert.deepEqual(
   [],
   "Release assets reference the Grok extension script",
 );
+// First visit: the bare address opens the public home page; a browser that has opened the app,
+// and every address with a query (invitations, the installed web app), goes to the app.
+{
+  const first = await fetch(`${origin}/`, {
+    headers: { ...fixtureHeaders(), accept: "text/html" },
+    redirect: "manual",
+    signal: AbortSignal.timeout(15000),
+  });
+  assert.equal(first.status, 302, "A first visit to / must open the home page");
+  assert.equal(first.headers.get("location"), "/welcome");
+  for (const [path, cookie] of [
+    ["/", "lootsplit-app=1"],
+    ["/?view=home", ""],
+  ]) {
+    const app = await fetch(`${origin}${path}`, {
+      headers: { ...fixtureHeaders(), accept: "text/html", ...(cookie ? { cookie } : {}) },
+      redirect: "manual",
+      signal: AbortSignal.timeout(15000),
+    });
+    assert.equal(app.status, 200, `${path} ${cookie} must serve the app`);
+  }
+}
 for (const path of ["/", "/?install=1"]) {
   const html = await fetch(`${origin}${path}`, {
-    headers: fixtureHeaders(),
+    // The app document itself (a returning browser), not the first-visit home page redirect.
+    headers: { ...fixtureHeaders(), cookie: "lootsplit-app=1" },
     signal: AbortSignal.timeout(15000),
   });
   assert.deepEqual(
@@ -103,6 +130,7 @@ try {
       extraHTTPHeaders: fixtureHeaders(),
     });
     await context.addInitScript(recordViolations);
+    await markAppVisitor(context, origin);
     const page = await context.newPage();
     page.on("pageerror", (error) => errors.push(error.message));
     page.on("request", (request) => {
@@ -116,7 +144,10 @@ try {
         errors.push(`${response.status()} ${path}`);
     });
     await page.goto(origin, { waitUntil: "networkidle" });
-    const title = page.getByRole("button", { name: "Lootsplitter. Click to continue", exact: true });
+    const title = page.getByRole("button", {
+      name: "Lootsplitter. Click to continue",
+      exact: true,
+    });
     await title.waitFor();
     await page.waitForFunction(() => {
       const button = document.querySelector(".loot-opening");
@@ -186,6 +217,7 @@ try {
     extraHTTPHeaders: fixtureHeaders(),
   });
   await reduced.addInitScript(recordViolations);
+  await markAppVisitor(reduced, origin);
   const page = await reduced.newPage();
   await page.goto(origin, { waitUntil: "networkidle" });
   const title = page.getByRole("button", { name: "Lootsplitter. Click to continue", exact: true });
@@ -198,7 +230,7 @@ try {
   await page.keyboard.press("Enter");
   await title.waitFor({ state: "detached" });
   await page.getByRole("link", { name: "Create an account or sign in", exact: true }).waitFor();
-    assert.equal(await page.evaluate(async () => (await indexedDB.databases()).length), 0);
+  assert.equal(await page.evaluate(async () => (await indexedDB.databases()).length), 0);
   await checkViolations(page, "reduced motion");
   await reduced.close();
   if (evalProbes.length)

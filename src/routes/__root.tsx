@@ -20,6 +20,8 @@ import { EconomyProvider } from "@/lib/quire/economy-context";
 import { PrefsProvider } from "@/lib/quire/prefs";
 import { MenuAudioBridge } from "@/components/menu-audio-bridge";
 import { installMobileApi } from "@/lib/mobile/boot";
+import { useEffect } from "react";
+import { APP_VISITOR_COOKIE } from "@/lib/deployment/public-urls.mjs";
 import { SplitViewProvider, usePane } from "@/components/split-view";
 import { retainBeside } from "@/lib/quire/split-view";
 import appCss from "../styles.css?url";
@@ -66,6 +68,17 @@ function RootDocument() {
   ].includes(pathname.replace(/\/$/, ""));
   const playerDisplay = pathname.replace(/\/$/, "") === "/player-display";
   installMobileApi();
+  const appPage = !publicPage && !playerDisplay;
+  useEffect(() => {
+    // Opening the app marks this browser as a returning player, so the bare address skips the
+    // public home page next time (landingRedirect in public-urls.mjs). Public pages never set it.
+    if (!appPage) return;
+    try {
+      document.cookie = `${APP_VISITOR_COOKIE}=1; Path=/; Max-Age=34560000; SameSite=Lax${location.protocol === "https:" ? "; Secure" : ""}`;
+    } catch {
+      // Cookies blocked: the bare address shows the home page, whose "Open the app" still works.
+    }
+  }, [appPage]);
   return (
     <html lang="en" suppressHydrationWarning>
       <head>

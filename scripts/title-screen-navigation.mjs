@@ -1,4 +1,11 @@
 // Existing workflow audits enter through the same title screen as a user.
+import { APP_VISITOR_COOKIE } from "../src/lib/deployment/public-urls.mjs";
+
+/** A browser that has opened the app before: the bare address goes to the app, not the home page
+ * (landingRedirect). Audits that start at "/" mean the app, so they mark the browser first. */
+export async function markAppVisitor(context, origin) {
+  await context.addCookies([{ name: APP_VISITOR_COOKIE, value: "1", url: new URL(origin).origin }]);
+}
 const publicPaths = new Set([
   "/welcome",
   "/features",
@@ -21,6 +28,7 @@ export async function continueIntoApp(page) {
 }
 export async function openApplication(page, ...args) {
   const destination = new URL(args[0]);
+  if (destination.pathname === "/") await markAppVisitor(page.context(), destination.origin);
   if (!page.guestAccessAudit && ["localhost", "127.0.0.1"].includes(destination.hostname) && !publicPaths.has(destination.pathname) && destination.pathname !== "/account" && !destination.searchParams.has("join") && destination.searchParams.get("as") !== "player") {
     await prepareDmFixture(page, destination.origin);
   }

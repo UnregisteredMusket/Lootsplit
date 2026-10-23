@@ -164,7 +164,8 @@ export function renderWebManifest(hostHeader) {
       name,
       short_name: name,
       id: "/",
-      start_url: "/",
+      // The installed web app opens straight into the app, never the first-visit home page redirect.
+      start_url: "/?view=home",
       scope: "/",
       display: "standalone",
       background_color: "#000000",
