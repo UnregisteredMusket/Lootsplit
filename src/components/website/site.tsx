@@ -2,6 +2,7 @@ import { AppLink } from "@/components/app-link";
 import { HelpContent } from "../help-content";
 import { TreasuryEntry } from "./gold-counter";
 import { SiteAnnouncement } from "./announcement";
+import { PromoVideo } from "./promo-video";
 import { Kicker, PageHero, Shot } from "./parts";
 import { useReleaseIdentity } from "./release-identity";
 import { Link, useRouterState } from "@tanstack/react-router";
@@ -266,7 +267,7 @@ export function WelcomePage() {
             </div>
             <p className="ls-fine ls-free-line">100% free, supported by donations</p>
           </div>
-          <Shot name="ledger" tone="ink" className="ls-hero-shot" />
+          <PromoVideo />
         </div>
       </section>
 
