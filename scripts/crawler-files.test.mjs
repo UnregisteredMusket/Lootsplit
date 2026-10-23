@@ -21,7 +21,7 @@ test("sitemap.xml lists only the public pages on the configured website", () => 
   const locs = [...sitemap.body.matchAll(/<loc>([^<]+)<\/loc>/g)].map((m) => m[1]);
   assert.deepEqual(
     locs,
-    ["/welcome", "/features", "/downloads", "/updates", "/help", "/resources", "/donate"].map(
+    ["/welcome", "/features", "/downloads", "/updates", "/help", "/resources", "/donate", "/privacy"].map(
       (p) => deploymentOrigins.website + p,
     ),
   );

@@ -22,8 +22,11 @@ const siteLinks = [
   ["/help", "Help"],
   ["/resources", "Resources"],
   ["/donate", "Donate"],
+  ["/privacy", "Privacy"],
 ] as const;
-const headerLinks = siteLinks.filter(([to]) => to !== "/updates" && to !== "/resources");
+/** Changelog, Resources and Privacy live in the footer only (owner decision 2026-10-23). */
+const footerOnly = new Set<string>(["/updates", "/resources", "/privacy"]);
+const headerLinks = siteLinks.filter(([to]) => !footerOnly.has(to));
 
 export function Website({
   children,

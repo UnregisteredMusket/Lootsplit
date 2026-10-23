@@ -14,6 +14,7 @@ const publicPaths = new Set([
   "/help",
   "/resources",
   "/donate",
+  "/privacy",
 ]);
 export async function continueIntoApp(page) {
   const path = new URL(page.url()).pathname.replace(/\/$/, "") || "/";

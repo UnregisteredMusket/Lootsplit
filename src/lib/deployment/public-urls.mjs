@@ -9,6 +9,7 @@ const PUBLIC_PAGES = [
   "/help",
   "/resources",
   "/donate",
+  "/privacy",
 ];
 
 /** Host used for absolute share-card URLs. Never taken from Host or X-Forwarded-Host. */
@@ -129,6 +130,11 @@ export const PUBLIC_PAGE_META = Object.freeze({
     title: "Support Lootsplitter",
     description:
       "Lootsplitter is 100% free, supported by donations. Chip in on Ko-fi to help cover hosting and keep it free for every table.",
+  },
+  "/privacy": {
+    title: "Privacy \u00b7 Lootsplitter",
+    description:
+      "What Lootsplitter stores, where and for how long: no ads, no trackers, campaigns on your device unless you share them, and how to delete your account.",
   },
 });
 

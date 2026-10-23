@@ -30,6 +30,7 @@ const publicPaths = new Set([
   "/help",
   "/resources",
   "/donate",
+  "/privacy",
   "/account",
 ]);
 /** Resolve identity before providers open any campaign storage. Never erase legacy saves. */

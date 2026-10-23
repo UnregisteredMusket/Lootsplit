@@ -565,7 +565,7 @@ test("share cards, manifest and install page ignore Host and X-Forwarded-Host; p
   assert.doesNotMatch(app, /evil\.example|og:url|rel="canonical"/);
   assert.doesNotMatch(await run("/__grok/manifest.webmanifest", ""), /evil/);
   assert.doesNotMatch(await run("/welcome?install=1&platform=ios", ""), /evil/);
-  for (const path of ["/welcome", "/features", "/features/ships", "/downloads", "/updates", "/help", "/resources", "/donate", "/help/"])
+  for (const path of ["/welcome", "/features", "/features/ships", "/downloads", "/updates", "/help", "/resources", "/donate", "/privacy", "/help/"])
     assert.ok(canonicalPublicUrl(path).startsWith(deploymentOrigins.website + "/"), path);
   for (const path of ["/", "/account", "/share", "/characters", "/api/account/library", "/features/../account", "/download/android"])
     assert.equal(canonicalPublicUrl(path), "", path);

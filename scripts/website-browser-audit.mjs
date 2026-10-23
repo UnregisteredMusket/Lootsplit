@@ -45,6 +45,7 @@ try {
       ["help", "A little help, adventurer."],
       ["resources", "Resources & credits"],
       ["donate", "Support Lootsplitter"],
+      ["privacy", "Privacy at Lootsplitter"],
       ["account", "Welcome to your next chapter."],
     ]) {
       const response = await openApplication(page, `${origin}/${path}`, {
@@ -75,6 +76,16 @@ try {
         await why.getByText("I created Lootsplitter to smite shopping episodes forever.", { exact: true }).waitFor();
         assert.equal(await page.locator("main > section").last().getAttribute("aria-labelledby"), "why");
       }
+      if (path === "privacy" && width === 1280) {
+        // Owner decisions 2026-10-23: named as UnregisteredMusket, 30-day deletion, under-13 line.
+        const policy = await page.locator("main").innerText();
+        assert.match(policy, /run by one person, UnregisteredMusket/);
+        assert.match(policy, /deleted within 30 days/);
+        assert.match(policy, /not directed at children under 13/);
+        assert.doesNotMatch(policy, /Oliver|Storie|UnregisteredMusket_Owner/i);
+        for (const id of ["device", "server", "security", "cookies", "others", "deleting", "children", "changes"])
+          assert.equal(await page.locator(`h2#${id}`).count(), 1, id);
+      }
       // One header, one consistent app link label, and a footer route to release details.
       assert.equal(await page.locator(".ls-header").count(), 1);
       assert.equal(await page.locator(".portal-header").count(), 0);
@@ -84,7 +95,7 @@ try {
       for (const old of ["Open app", "Open browser app", "Start your ledger"])
         assert.equal(await page.getByRole("link", { name: old, exact: true }).count(), 0);
       const footerNav = page.getByRole("navigation", { name: "Website footer" });
-      for (const label of ["Home", "Features", "Downloads", "Changelog", "Help", "Resources", "Donate"])
+      for (const label of ["Home", "Features", "Downloads", "Changelog", "Help", "Resources", "Donate", "Privacy"])
         assert.equal(await footerNav.getByRole("link", { name: label, exact: true }).count(), 1, `${path} footer ${label}`);
       assert.equal(
         await footerNav.getByRole("link", { name: "Instagram ↗", exact: true }).getAttribute("href"),
@@ -98,8 +109,8 @@ try {
       assert.match(await identity.getAttribute("href"), /\/downloads#release-details$/);
       assert.equal(await page.getByText("About this app & releases", { exact: true }).count(), path === "downloads" ? 1 : 0);
       const current = path === "welcome" ? null : `/${path}`;
-      // Changelog and Resources are marked current in the footer; the rest in the header too.
-      const marked = ["/updates", "/resources"].includes(current ?? "") ? ".ls-footer-nav" : ".ls-header nav";
+      // Changelog, Resources and Privacy are marked current in the footer; the rest in the header too.
+      const marked = ["/updates", "/resources", "/privacy"].includes(current ?? "") ? ".ls-footer-nav" : ".ls-header nav";
       if (current)
         assert.equal(
           await page.locator(`${marked} a[href="${current}"]`).getAttribute("aria-current"),
@@ -116,7 +127,7 @@ try {
         for (const label of ["Features", "Downloads", "Help", "Donate", "My account"])
           await nav.getByRole("link", { name: label, exact: true }).waitFor();
         // Changelog and Resources moved to the footer (owner decision 2026-10-23), beside Home.
-        for (const label of ["Changelog", "Resources"])
+        for (const label of ["Changelog", "Resources", "Privacy"])
           assert.equal(await nav.getByRole("link", { name: label, exact: true }).count(), 0);
         await page.keyboard.press("Escape");
         assert.equal(await menu.getAttribute("aria-expanded"), "false");
@@ -277,7 +288,7 @@ try {
     console.log(`PASS live Android ${release.version}: ${downloadReport.sha256}`);
   }
   console.log(
-    JSON.stringify({ ok: true, widths: [1280, 768, 390, 320], pages: 8, externalFailures }, null, 2),
+    JSON.stringify({ ok: true, widths: [1280, 768, 390, 320], pages: 9, externalFailures }, null, 2),
   );
 } finally {
   await browser.close();

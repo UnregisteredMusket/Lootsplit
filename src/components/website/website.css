@@ -1656,3 +1656,29 @@
   font-style: italic;
   font-size: 1.4rem;
 }
+
+/* Privacy policy: readable prose with real list markers and section spacing. */
+.ls-privacy {
+  max-width: 760px;
+  font-size: 1.05rem;
+  line-height: 1.7;
+}
+.ls-privacy > * + * {
+  margin-top: 0.75rem;
+}
+.ls-privacy h2 {
+  font-size: clamp(1.6rem, 3vw, 2.1rem);
+  line-height: 1.15;
+  margin-top: 2.5rem;
+  scroll-margin-top: 5rem;
+}
+.ls-privacy ul {
+  list-style: disc;
+  padding-left: 1.4rem;
+}
+.ls-privacy li + li {
+  margin-top: 0.4rem;
+}
+.ls-privacy a {
+  text-decoration: underline;
+}

@@ -65,6 +65,7 @@ function RootDocument() {
     "/help",
     "/resources",
     "/donate",
+    "/privacy",
   ].includes(pathname.replace(/\/$/, ""));
   const playerDisplay = pathname.replace(/\/$/, "") === "/player-display";
   installMobileApi();
