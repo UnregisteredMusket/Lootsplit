@@ -654,3 +654,92 @@ export function projectLoot(
     };
   };
 }
+
+/** An encounter award item; `pool: true` (with an empty recipient) sends it to the treasure pool. */
+export type EncounterPoolItem = {
+  name: string;
+  quantity: number;
+  unitCopper: number;
+  notes: string;
+  purseId: string;
+  pool?: boolean;
+};
+/**
+ * The pooled part of an encounter award, for both award paths (cloudflare/encounters.mjs and
+ * src/lib/encounters/local.ts). Returns the rows to write in the caller's one atomic
+ * transaction; IDs derive from the award receipt, which the award paths already acquire once.
+ */
+export function encounterPoolRows(
+  t: Pick<LootTable, "purses" | "journal">,
+  items: EncounterPoolItem[],
+  options: { fundId?: string; receiptId: string; encounterId: string; encounterName: string; at: number },
+): {
+  fundId: string;
+  holdings: Holding[];
+  ledger: CloudTable["ledger"];
+  events: JournalEvent[];
+  note: CloudTable["notes"][number];
+} | null {
+  const pooled = items.filter((item) => item.pool);
+  if (!pooled.length) return null;
+  const table = { ...t, holdings: [] };
+  if (options.fundId && !partyFunds(table).some((p) => p.id === options.fundId))
+    throw Error("Choose an existing party fund for the treasure pool.");
+  const fundId = poolFund(table, options.fundId);
+  if (!fundId) throw Error("Add a party fund before sending items to the treasure pool.");
+  const { receiptId, encounterId, encounterName, at } = options;
+  const holdings: Holding[] = [];
+  const ledger: CloudTable["ledger"] = [];
+  const events: JournalEvent[] = [];
+  for (const [i, item] of pooled.entries()) {
+    if (item.purseId) throw Error("A treasure-pool item has no other recipient.");
+    const id = `${receiptId}-pool-${i}`;
+    holdings.push({
+      id,
+      purseId: fundId,
+      name: item.name,
+      kind: "item",
+      quantity: item.quantity,
+      unitCopper: item.unitCopper,
+      notes: item.notes,
+      pool: { at, source: "encounter", encounterId, receiptId },
+    });
+    ledger.push({
+      id,
+      at,
+      purseId: fundId,
+      shopId: null,
+      summary: `Encounter loot to the treasure pool: ${item.quantity} × ${item.name} (${encounterName})`,
+      copper: 0,
+      transactionType: "adjustment",
+      loot: { id: receiptId, holdingId: id, role: "added", quantity: item.quantity, unitCopper: item.unitCopper },
+    });
+    events.push({
+      id: `${id}-event`,
+      at,
+      kind: "management",
+      purseId: fundId,
+      summary: `Added to the treasure pool from ${encounterName}: ${item.name} × ${item.quantity}`.slice(0, 500),
+      lootPool: { holdingId: id, name: item.name.slice(0, 200), quantity: item.quantity, pooled: true, source: "encounter", receiptId },
+    });
+  }
+  const names = list(pooled.map((item) => (item.quantity > 1 ? `${item.name} × ${item.quantity}` : item.name)));
+  const full = `${names} from ${encounterName} ${pooled.length === 1 && pooled[0]!.quantity === 1 ? "is" : "are"} in the treasure pool. Mark Need, Greed or Pass on Party → Treasure pool.`;
+  return {
+    fundId,
+    holdings,
+    ledger,
+    events,
+    note: {
+      id: `${receiptId}-pool-note`,
+      at,
+      from: "dm",
+      to: "party",
+      purseId: fundId,
+      text:
+        full.length <= 500
+          ? full
+          : `${pooled.length} items from ${encounterName.slice(0, 200)} are in the treasure pool. Mark Need, Greed or Pass on Party → Treasure pool.`,
+    },
+  };
+}

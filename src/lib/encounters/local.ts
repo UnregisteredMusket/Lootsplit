@@ -12,6 +12,8 @@ import {
   generateEncounter,
 } from "./model.mjs";
 import { applyEncounterSplit, type EncounterCoinSplitReceipt } from "../quire/coin-split.ts";
+import { encounterPoolRows } from "../quire/loot-claims.ts";
+import { readJournal } from "../quire/journal.ts";
 import { creatureIndex } from "./index.mjs";
 import { parseDice, throwDice } from "../characters/model.mjs";
 import { announceSheetChange } from "../quire/party-sheet-links.ts";
@@ -36,7 +38,14 @@ export const localEncounterSchema = z.object({
   status: z.enum(["draft", "active", "review", "awarded"]),
   updated_at: z.number(),
   rolls: z.array(rollSchema),
-  award: z.object({ receiptId: z.string(), at: z.number(), ...awardSplitReceiptSchema }).nullable(),
+  award: z
+    .object({
+      receiptId: z.string(),
+      at: z.number(),
+      ...awardSplitReceiptSchema,
+      poolFundId: z.string().max(120).optional(),
+    })
+    .nullable(),
 });
 export const readLocalEncounters = (value: unknown) =>
   z.array(localEncounterSchema).parse(value ?? []);
@@ -270,7 +279,27 @@ export async function localEncounterRequest<T>(path: string, input: unknown = {}
             tx.objectStore("purses").put(p);
             ledger(p.id, `Encounter loot: ${e.name}`, copper);
           }
+          // Treasure-pool items: the same rows as the shared Worker path (loot-claims.ts).
+          const poolJournal = readJournal(
+            (await request<{ value: unknown } | undefined>(tx.objectStore("meta").get("journal")))?.value,
+          );
+          const pool = encounterPoolRows({ purses, journal: poolJournal }, e.loot, {
+            ...(e.poolFundId ? { fundId: e.poolFundId } : {}),
+            receiptId,
+            encounterId: r.id,
+            encounterName: e.name,
+            at,
+          });
+          if (pool) {
+            for (const holding of pool.holdings) tx.objectStore("holdings").put(holding);
+            for (const line of pool.ledger) tx.objectStore("ledger").put(line);
+            poolJournal.events.push(...pool.events);
+            tx.objectStore("meta").put({ id: "journal", value: poolJournal });
+            const chat = await request<{ notes?: unknown[] } | undefined>(tx.objectStore("meta").get("chat"));
+            tx.objectStore("meta").put({ id: "chat", notes: [...(chat?.notes ?? []), pool.note] });
+          }
           for (const item of e.loot) {
+            if (item.pool) continue;
             const p = recipient(item.purseId);
             tx.objectStore("holdings").put({
               id: crypto.randomUUID(),
@@ -283,7 +312,7 @@ export async function localEncounterRequest<T>(path: string, input: unknown = {}
             });
             ledger(p.id, `Encounter loot: ${item.quantity} × ${item.name} (${e.name})`, 0);
           }
-          r.award = { receiptId, at, ...(splitReceipt ?? {}) };
+          r.award = { receiptId, at, ...(splitReceipt ?? {}), ...(pool ? { poolFundId: pool.fundId } : {}) };
           r.status = "awarded";
           result = { award: r.award, duplicate: false };
         } else throw new Error("Unknown encounter action.");

@@ -29,6 +29,12 @@ export const lootSchema = z.object({
   catalogId: z.string().max(120),
   sourceTableId: z.string().max(120).default(""),
   purseId: z.string().max(120),
+  /**
+   * Optional (prompt 2, phase 2): send this item to the party treasure pool. Saved with an empty
+   * `purseId`, so an older client that drops the flag asks for a recipient instead of silently
+   * sending the item somewhere else.
+   */
+  pool: z.boolean().optional(),
 });
 export const tableSchema = z
   .object({
@@ -88,8 +94,12 @@ export const encounterSchema = z
     coins: z.object({ cp: integer, sp: integer, ep: integer, gp: integer, pp: integer }),
     coinPurseId: z.string().max(120),
     coinSplit: encounterCoinSplitSchema.optional(),
+    /** The party fund that holds this award's treasure-pool items (default: the designated fund). */
+    poolFundId: z.string().max(120).optional(),
   })
   .superRefine((e, ctx) => {
+    if (e.loot.some((item) => item.pool && item.purseId))
+      ctx.addIssue({ code: "custom", message: "A treasure-pool item has no other recipient." });
     for (const rows of [e.combatants, e.loot, e.tables])
       if (new Set(rows.map((r) => r.id)).size !== rows.length)
         ctx.addIssue({ code: "custom", message: "Each row needs a unique ID." });

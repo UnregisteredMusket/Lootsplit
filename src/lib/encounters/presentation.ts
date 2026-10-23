@@ -1,10 +1,12 @@
 type Coins = { cp: number; sp: number; ep: number; gp: number; pp: number };
-type Loot = { id: string; name: string; quantity: number; purseId: string };
+type Loot = { id: string; name: string; quantity: number; purseId: string; pool?: boolean };
 export type AwardBody = {
   coins: Coins;
   coinPurseId: string;
   /** Optional even split (prompt 2, phase 1). Absent on every award saved before it. */
   coinSplit?: { purseIds: string[]; remainderRule: string; remainderPurseId?: string };
+  /** Optional treasure-pool fund (prompt 2, phase 2). Absent on every award saved before it. */
+  poolFundId?: string;
   loot: Loot[];
   tables: Array<{ name: string; selected: number | null }>;
 };
@@ -52,7 +54,15 @@ export function encounterReadiness(input: {
       transfer.push("Choose who gets the leftover copper from the ticked characters.");
   } else if (hasAwardCoins(input.body.coins) && !known.has(input.body.coinPurseId))
     transfer.push("Choose an existing coin recipient.");
+  const funds = input.recipients.filter((p) => p.kind === "party");
+  if (input.body.loot.some((item) => item.pool)) {
+    if (!funds.length)
+      transfer.push("Add a party fund before sending items to the treasure pool.");
+    else if (input.body.poolFundId && !funds.some((p) => p.id === input.body.poolFundId))
+      transfer.push("Choose an existing party fund for the treasure pool.");
+  }
   input.body.loot.forEach((item, index) => {
+    if (item.pool) return;
     if (!known.has(item.purseId))
       transfer.push(`Choose an existing recipient for item ${index + 1}: ${item.name}.`);
   });
@@ -78,10 +88,16 @@ export function recipientAwardPreview(
   body: AwardBody,
   recipients: AwardRecipient[],
   splitCoins?: Map<string, Coins>,
+  /** The fund that receives treasure-pool items (only consulted when some item has `pool`). */
+  poolFund?: AwardRecipient | null,
 ) {
   const rows = recipients.map((p) => ({ ...p, coins: null as Coins | null, items: [] as Loot[] }));
   const unresolved: Loot[] = [];
+  const pooled = body.loot.filter((item) => item.pool);
+  // Older awards have no pooled items and keep exactly their previous preview shape.
+  const pool = pooled.length ? { fund: poolFund ?? null, items: pooled } : undefined;
   for (const item of body.loot) {
+    if (item.pool) continue;
     const row = rows.find((r) => r.id === item.purseId);
     if (row) row.items.push(item);
     else unresolved.push(item);
@@ -96,6 +112,7 @@ export function recipientAwardPreview(
       recipients: rows.filter((r) => r.coins || r.items.length),
       unresolved,
       unresolvedCoins: coinsPresent && !splitCoins?.size,
+      ...(pool ? { pool } : {}),
     };
   }
   const coinRow = rows.find((r) => r.id === body.coinPurseId);
@@ -104,6 +121,7 @@ export function recipientAwardPreview(
     recipients: rows.filter((r) => r.coins || r.items.length),
     unresolved,
     unresolvedCoins: coinsPresent && !coinRow,
+    ...(pool ? { pool } : {}),
   };
 }
 
