@@ -200,18 +200,52 @@ try {
         assert.match(theme.headingFont, /Cormorant Garamond/);
       }
       if (path === "features") {
-        // Nine numbered areas, each reachable from its jump chip, with real screenshots.
-        for (const id of ["money", "characters", "markets", "world", "encounters", "downtime", "together", "library", "platforms"]) {
-          assert.equal(await page.locator(`section#${id} h2`).count(), 1, id);
-          assert.equal(await page.locator(`nav[aria-label="Feature areas"] a[href="#${id}"]`).count(), 1, id);
+        // Owner request 2026-10-23: one tab per area instead of a long scroll, major features as
+        // expandable cards, smaller ones listed, search and an audience filter.
+        const tabs = page.getByRole("tab");
+        const ids = ["money", "characters", "markets", "world", "maps", "encounters", "downtime", "together", "library", "platforms"];
+        assert.equal(await tabs.count(), ids.length);
+        for (const id of ids) {
+          assert.equal(await page.locator(`#${id}-panel h2#${id}`).count(), 1, id);
+          assert.ok((await page.locator(`#${id}-panel .ls-feature-card`).count()) >= 3, `${id} major`);
+          assert.ok((await page.locator(`#${id}-panel .ls-feature-minor li`).count()) >= 3, `${id} minor`);
         }
+        // One area at a time: a short page, not a long scroll.
+        assert.equal(await page.locator("[role=tabpanel]:not([hidden])").count(), 1);
+        await page.getByRole("tab", { name: "Shops & trade", exact: true }).click();
+        assert.match(page.url(), /#markets$/);
+        const panel = page.locator("#markets-panel");
+        assert.equal(await panel.isVisible(), true);
+        await page.keyboard.press("ArrowRight");
+        assert.equal(await page.getByRole("tab", { name: "World", exact: true }).getAttribute("aria-selected"), "true");
+        // Cards expand to their details; Expand all opens every card.
+        const world = page.locator("#world-panel");
+        const card = world.locator(".ls-feature-card").first();
+        await card.locator("summary").click();
+        assert.equal(await card.evaluate((d) => d.open), true);
+        await world.getByRole("button", { name: "Expand all" }).click();
+        assert.equal(await world.locator(".ls-feature-card:not([open])").count(), 0);
+        // Audience filter: DM tools only shows DM-tagged items.
+        await page.getByRole("radio", { name: "DM tools" }).click();
+        const tagged = await world.locator(".ls-feature-card, .ls-feature-minor li").evaluateAll((els) =>
+          els.every((el) => el.querySelector(".ls-dm")),
+        );
+        assert.ok(tagged, "DM filter shows only DM tools");
+        await page.getByRole("radio", { name: "Everything" }).click();
+        // Search finds a feature in another area and opens it.
+        await page.getByRole("searchbox").fill("fog");
+        await page.locator(".ls-feature-results button").first().click();
+        assert.match(page.url(), /#maps$/);
+        assert.equal(await page.locator('#maps-panel [data-feature="Fog, walls and vision"]').evaluate((d) => d.open), true);
+        // Deep links from the home page open their area.
+        await page.goto(`${origin}/features#downtime`, { waitUntil: "networkidle" });
+        assert.equal(await page.getByRole("tab", { name: "Downtime", exact: true }).getAttribute("aria-selected"), "true");
         const images = await page.locator("main img[src^='/product/']").evaluateAll((nodes) =>
           nodes.map((img) => ({ alt: img.alt, width: img.getAttribute("width"), loading: img.loading })),
         );
-        assert.ok(images.length >= 9);
-        for (const image of images) {
-          assert.ok(image.alt.length > 20 && image.width && image.loading === "lazy", JSON.stringify(image));
-        }
+        assert.ok(images.length >= 10);
+        for (const image of images.filter((i) => i.width))
+          assert.ok(image.alt.length > 20 && image.loading === "lazy", JSON.stringify(image));
       }
       if (path === "updates") {
         const latest = page.locator(`#android-${release.version.replaceAll(".", "\\.")}`);

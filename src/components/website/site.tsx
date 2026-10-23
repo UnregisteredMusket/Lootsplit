@@ -200,7 +200,7 @@ const areas: Area[] = [
   ],
   [
     "maps",
-    "encounters",
+    "maps",
     "Maps & tabletop",
     "Linked scenes, tokens, fog of war, pings and a player display.",
   ],
