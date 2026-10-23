@@ -1,5 +1,7 @@
 import { useState, type ReactNode } from "react";
 import { useCommandId } from "@/lib/quire/economy-context";
+import { useSeat } from "@/lib/quire/seat";
+import { postNotes } from "@/lib/quire/chat";
 import { canonicalJson } from "@/lib/quire/canonical-json";
 import { formatCopper, toCopper } from "@/lib/quire/money";
 import type { CloudTable } from "@/lib/quire/cloud";
@@ -13,6 +15,8 @@ import {
   type ServiceRequest,
 } from "@/lib/quire/services-schema";
 import {
+  rumourLock,
+  rumourQuote,
   approvedOffers,
   beneficiaryRule,
   componentCandidates,
@@ -254,6 +258,10 @@ export function useServiceTalk({
   const [picks, setPicks] = useState<Pick_>({});
   /** How many pieces the player brings for an "either" component (the rest is supplied). */
   const [counts, setCounts] = useState<Record<string, number>>({});
+  /** Inn: the room tier and meals a day; the rumour list. */
+  const [tierKey, setTierKey] = useState<string>();
+  const [meals, setMeals] = useState(2);
+  const [rumours, setRumours] = useState(false);
   const [units, setUnits] = useState(1);
   const [mine, setMine] = useState<string[]>([]);
   const services = readServices(table.journal?.services);
@@ -266,6 +274,7 @@ export function useServiceTalk({
       ? {
           beneficiaryPurseIds: beneficiaries,
           units,
+          ...(provider.kind === "inn" && tierKey ? { inn: { tierKey, meals } } : {}),
           contributions: (offer.components ?? []).flatMap((c) => {
             const pick = picks[c.key];
             if (!pick || pick === "provider") return [];
@@ -287,6 +296,7 @@ export function useServiceTalk({
       problem = e instanceof Error ? e.message : String(e);
     }
   const action = useCommandId(`${providerId}|${offerKey}|${purseId}|${request ? canonicalJson(request) : ""}`);
+  const rumourAction = useCommandId(`${providerId}|rumours|${purseId}`);
 
   function chooseOffer(o: ServiceOffer) {
     setOfferKey(o.key);
@@ -301,6 +311,13 @@ export function useServiceTalk({
     }
     setPicks(next);
     setCounts({});
+    if (provider!.kind === "inn") {
+      // Everyone in the party who is here stays; Comfortable unless the inn doesn't offer it.
+      setBeneficiaries(serviceBeneficiaries(table, provider!).filter((b) => b.here).map((b) => b.purseId));
+      const tiers = (o.tiers ?? []).filter((x) => x.offered);
+      setTierKey((tiers.find((x) => x.key === "comfortable") ?? tiers[0])?.key);
+      setMeals(2);
+    }
   }
 
   /** Open a provider's branch from the hub or the sub-list. */
@@ -310,15 +327,75 @@ export function useServiceTalk({
     push({ kind: "pc", text, tag, key: nextKey("pc") }, { kind: "npc", text: intro[p.kind], key: nextKey("npc") });
     setProviderId(id);
     setOfferKey(undefined);
+    setRumours(false);
+    // An inn with one offer opens its booking straight away.
+    const offers = approvedOffers(p);
+    if (p.kind === "inn" && offers.length === 1) {
+      setOfferKey(offers[0].key);
+      setUnits(1);
+      setBeneficiaries(serviceBeneficiaries(table, p).filter((b) => b.here).map((b) => b.purseId));
+      const tiers = (offers[0].tiers ?? []).filter((x) => x.offered);
+      setTierKey((tiers.find((x) => x.key === "comfortable") ?? tiers[0])?.key);
+      setMeals(2);
+    }
   }
   const close = () => {
     setProviderId(undefined);
     setOfferKey(undefined);
+    setRumours(false);
   };
+  const forSale = provider?.rumours ?? [];
+  const rumourReply = (): TalkReply => ({
+    tag: (
+      <>
+        Rumours <em>· {forSale.filter((r) => !rumourLock(table, provider!, r.id, purseId)).length} for sale</em>
+      </>
+    ),
+    text: "Heard anything interesting?",
+    run: () => {
+      push(
+        { kind: "pc", text: "Heard anything interesting?", tag: "Rumours", key: nextKey("pc") },
+        { kind: "npc", text: "Might have. Ears cost, mind. Coin on the bar.", key: nextKey("npc") },
+      );
+      setRumours(true);
+    },
+  });
 
   const replies: TalkReply[] = [];
   const payerName = character?.name ?? "You";
-  if (provider && !offer) {
+  if (provider && rumours) {
+    for (const r of forSale) {
+      const lock = rumourLock(table, provider, r.id, purseId);
+      replies.push({
+        tag: (
+          <>
+            Rumour <em>· {formatCopper(r.priceCopper)}</em>
+          </>
+        ),
+        text: r.teaser,
+        sub: lock ? undefined : `Only you get the full story, in your private thread with ${npc.name}.`,
+        disabled: lock || undefined,
+        run: async () => {
+          if (!purseId) return;
+          let q;
+          try {
+            q = rumourQuote(table, provider.id, r.id, purseId);
+          } catch {
+            return;
+          }
+          const id = `${rumourAction.commandId}-${r.id}`.slice(0, 150);
+          push({ kind: "pc", text: r.teaser, tag: `Rumour · ${formatCopper(r.priceCopper)}`, key: nextKey("pc") });
+          const ok = await send(
+            { kind: "service-rumour", providerId: provider.id, rumourId: r.id, purseId, before: q.before },
+            id,
+            rumourAction.renew,
+          );
+          if (ok) push({ kind: "order", id, key: nextKey("order") });
+        },
+      });
+    }
+    replies.push({ text: "Never mind.", tone: "leave", sub: "Back to the inn.", run: () => setRumours(false) });
+  } else if (provider && !offer) {
     const waiting = services.orders.filter((o) => o.providerId === provider.id && o.purseId === purseId && o.status === "requested");
     const ready = services.orders.filter((o) => o.providerId === provider.id && o.purseId === purseId && o.status === "ready");
     for (const r of ready) {
@@ -368,6 +445,7 @@ export function useServiceTalk({
         },
       });
     }
+    if (provider.kind === "inn" && forSale.length) replies.push(rumourReply());
     replies.push({
       text: "Never mind.",
       tone: "leave",
@@ -387,20 +465,43 @@ export function useServiceTalk({
         </>
       ) : (
         <>
-          {offer.time.kind === "downtime-days" ? "Commission" : `Pay ${price}`}{" "}
-          <em>· {offer.time.kind === "downtime-days" ? `pay ${price} · ready after ${quote?.terms.workDays ?? "…"} downtime days` : "recorded at once"}</em>
+          {offer.time.kind === "downtime-days" ? "Commission" : offer.time.kind === "per-night" ? "Book" : `Pay ${price}`}{" "}
+          <em>
+            ·{" "}
+            {offer.time.kind === "downtime-days"
+              ? `pay ${price} · ready after ${quote?.terms.workDays ?? "…"} downtime days`
+              : offer.time.kind === "per-night"
+                ? `pay ${price} · ${units} ${units === 1 ? "night" : "nights"}`
+                : "recorded at once"}
+          </em>
         </>
       ),
-      text: review ? "Please. Here is what we bring." : offer.time.kind === "downtime-days" ? "Let's do it." : "Here's the offering.",
+      text: review
+        ? "Please. Here is what we bring."
+        : offer.time.kind === "downtime-days"
+          ? "Let's do it."
+          : offer.time.kind === "per-night"
+            ? "We'll take it."
+            : "Here's the offering.",
       tone: review ? "dm" : "check",
-      sub: review ? "Sends the request to the DM's Review Inbox. Nothing is charged now." : "One payment, one receipt. Retrying after a dropped connection can't charge twice.",
+      sub: review
+        ? "Sends the request to the DM's Review Inbox. Nothing is charged now."
+        : offer.time.kind === "per-night"
+          ? "Records the stay. A long rest is still the DM's call."
+          : "One payment, one receipt. Retrying after a dropped connection can't charge twice.",
       disabled: problem || (!quote ? "Checking" : undefined),
       run: async () => {
         if (!quote || !request || !purseId) return;
         const id = action.commandId;
         push({
           kind: "pc",
-          text: review ? "Please. Here is what we bring." : offer.time.kind === "downtime-days" ? "Let's do it." : "Here's the offering.",
+          text: review
+            ? "Please. Here is what we bring."
+            : offer.time.kind === "downtime-days"
+              ? "Let's do it."
+              : offer.time.kind === "per-night"
+                ? "We'll take it."
+                : "Here's the offering.",
           tag: review ? "Ask · DM review" : `Pay ${price}`,
           key: nextKey("pc"),
         });
@@ -416,11 +517,19 @@ export function useServiceTalk({
         }
       },
     });
+    if (provider.kind === "inn" && forSale.length) replies.push(rumourReply());
+    const single = provider.kind === "inn" && approvedOffers(provider).length === 1;
     replies.push({
       text: "Never mind.",
       tone: "leave",
-      sub: "Back to the list of services.",
-      run: () => setOfferKey(undefined),
+      sub: single ? "Back to the conversation." : "Back to the list of services.",
+      run: () => {
+        setOfferKey(undefined);
+        if (single) {
+          close();
+          onBack();
+        }
+      },
     });
   }
 
@@ -467,6 +576,28 @@ export function useServiceTalk({
               Only party characters at this place. Paying for someone gives you no control over their sheet or purse, and their
               player doesn't need to confirm.
             </p>
+          </div>
+        )}
+        {provider.kind === "inn" && (
+          <div className="svc-section">
+            <h4>Room</h4>
+            <div className="svc-seg tiers" role="group" aria-label="Room">
+              {(offer.tiers ?? [])
+                .filter((x) => x.offered)
+                .map((x) => (
+                  <button key={x.key} type="button" aria-pressed={tierKey === x.key} onClick={() => setTierKey(x.key)}>
+                    {x.name}
+                    <small>{formatCopper(x.nightCopper)}/night</small>
+                  </button>
+                ))}
+            </div>
+            <p className="npc-talk-hint">Per guest per night. Meals use the same tier.</p>
+            <div className="svc-row">
+              <div>
+                <h4>Meals a day</h4>
+                <Stepper value={meals} min={0} max={3} label="Meals a day" onChange={setMeals} />
+              </div>
+            </div>
           </div>
         )}
         {maxUnits(offer) > 1 && (
@@ -583,12 +714,17 @@ export function useServiceTalk({
           <dt className="sum">{quote?.terms.review === "dm" ? "Charged when approved" : "Pay now"}</dt>
           <dd className="sum">{quote ? formatCopper(quote.terms.priceCopper) : "—"}</dd>
           <dd className="note">
+            {provider.kind === "inn" && quote
+              ? `Booked and paid up front: ${quote.terms.priceCopper} cp, one ledger line. Leaving early refunds nothing automatically. `
+              : ""}
             {problem ||
               (quote?.terms.review === "dm"
                 ? "Nothing moves now. If the DM approves, coins and any item you bring leave together, once."
                 : offer.time.kind === "downtime-days"
                   ? "Paid once, now. Work advances only when the DM approves downtime, never by session hours or real time."
-                  : "Charged and recorded at once.")}
+                  : provider.kind === "inn"
+                    ? ""
+                    : "Charged and recorded at once.")}
           </dd>
         </dl>
       </div>
@@ -599,9 +735,28 @@ export function useServiceTalk({
   const shown = services.orders.filter(
     (o) => o.purseId === purseId && o.terms.npcId === npc.id && (mine.includes(o.id) || o.status === "requested" || o.status === "ready"),
   );
-  const linesFor = (id: string) => {
+  const linesFor = (id: string): TalkLine[] => {
     const o = shown.find((x) => x.id === id);
-    return o ? orderLines(o, payerName, npc.name) : [];
+    if (o) return orderLines(o, payerName, npc.name);
+    // A rumour bought here: its text is in the buyer's private thread with this NPC.
+    const message = table.journal?.world?.conversations
+      .find((c) => c.npcId === npc.id && c.purseId === purseId)
+      ?.messages.find((m) => m.id === `${id}-rumour`);
+    if (!message) return [];
+    const paid = table.ledger.find((l) => l.id === `${id}-payment`);
+    return [
+      { kind: "npc", key: `${id}-text`, text: message.text },
+      {
+        kind: "sys",
+        key: `${id}-paid`,
+        node: (
+          <>
+            {paid ? `Paid ${formatCopper(-paid.copper)}. ` : ""}The rumour is saved in your private thread with {npc.name}.{" "}
+            {purseId && <ShareRumour text={message.text} npcName={npc.name} purseId={purseId} />}
+          </>
+        ),
+      },
+    ];
   };
   return {
     active: !!provider,
@@ -639,5 +794,30 @@ function Stepper({
         +
       </button>
     </span>
+  );
+}
+
+/** Copy a bought rumour into the party chat (owner decision: rumours may be shared). */
+export function ShareRumour({ text, npcName, purseId }: { text: string; npcName: string; purseId: string }) {
+  const seat = useSeat();
+  const [state, setState] = useState<"idle" | "busy" | "done" | "failed">("idle");
+  const body = `Rumour from ${npcName}: ${text}`;
+  return (
+    <button
+      type="button"
+      className="npc-talk-chip"
+      disabled={state === "busy" || state === "done"}
+      onClick={async () => {
+        setState("busy");
+        try {
+          await postNotes([{ from: seat.role === "dm" ? "dm" : "player", to: "party", purseId, text: body.length > 500 ? `${body.slice(0, 499)}…` : body }]);
+          setState("done");
+        } catch {
+          setState("failed");
+        }
+      }}
+    >
+      {state === "done" ? "Shared in party chat" : state === "failed" ? "Couldn't share · try again" : "Share in party chat"}
+    </button>
   );
 }

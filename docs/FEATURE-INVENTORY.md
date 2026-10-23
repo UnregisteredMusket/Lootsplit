@@ -468,6 +468,11 @@ Adds a contextual Maps session bar, searchable scene cards, separate activation/
 - Anti-exploit: cooldown per player account, repeat DC, 24-hour combined judgement, caps, unit cap, unwanted categories, and player-set item values (`valueSource: "player"`) count for nothing. Settlement reuses the atomic barter exchange; command IDs make retries no-ops and never re-roll. Players never receive NPC rules, valuation, purse or other players' attempts. The existing trading table, controlled-NPC flow, Give and every earlier save are unchanged. See [NPC-BARTER.md](NPC-BARTER.md).
 
 
+### NPC services, phase 3: inn (October 23, 2026)
+
+- Inn providers with SRD 5.2.1 (default), SRD 5.1 and Blank room tiers: booked stays for party guests present, nights and meals a day, paid once up front, record only (no rest granted, no automatic refund for leaving early). See [services](SERVICES.md).
+- Paid rumours: teaser and price public, text DM-only until bought, then delivered into the buyer's private NPC thread; once per character or once per party; shareable in party chat. Inn editor with tiers and rumours; Downtime preview notes that stays charge nothing.
+
 ### NPC services, phase 2: workshop (October 23, 2026)
 
 - Workshop providers with Scribe (SRD 5.2.1 spell scrolls) and Alchemist (potions and brews) presets, SRD 5.1 and Blank; offers made over approved downtime days, paid on order like the forge, optional brought materials (healing herbs) that lower the price. See [services](SERVICES.md).

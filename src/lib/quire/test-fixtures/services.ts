@@ -149,3 +149,31 @@ export function workshopFixture(): CloudTable {
     provider: newProvider("workshop", { id: "temple", name: "Temple of the Dawn" }, "aldous", "dawn-scribe", "srd-5.2.1", "Scribe"),
   });
 }
+
+/** Adds the Gilded Goose with Bram Tolliver: SRD 5.2.1 rooms and two rumours. */
+export function innFixture(): CloudTable {
+  let t = servicesFixture();
+  t.shops.push({ ...t.shops[0], id: "goose", name: "Gilded Goose", keeper: "Bram", category: "inn" });
+  t = applyCommand(t, svcDm, {
+    id: "bram",
+    kind: "npc-create",
+    npc: {
+      id: "bram",
+      name: "Bram Tolliver",
+      description: "Innkeeper.",
+      locationId: "harrowgate",
+      visible: true,
+      barterAllowed: false,
+      controllerPurseId: null,
+      services: ["inn"],
+    },
+    copper: 0,
+    inventory: [],
+  });
+  const provider = newProvider("inn", { id: "goose", name: "Gilded Goose" }, "bram", "goose-inn");
+  provider.rumours = [
+    { id: "mill", teaser: "Lights at the old mill.", text: "SECRET: lanterns in the old mill three nights running.", priceCopper: 50, once: "character", buyers: [] },
+    { id: "toll", teaser: "The toll-road bandits?", text: "SECRET: they camp by the ford.", priceCopper: 100, once: "party", buyers: [] },
+  ];
+  return applyCommand(t, svcDm, { id: "inn-setup", kind: "service-provider", providerId: "goose-inn", before: null, provider });
+}

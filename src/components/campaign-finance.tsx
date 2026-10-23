@@ -368,6 +368,12 @@ export function CampaignFinance({
                     </p>
                   </details>
                 )}
+                {journal.services?.providers.some((p) => p.kind === "inn") && (
+                  <details className="mt-3">
+                    <summary>Inn stays · nothing recurring</summary>
+                    <p className="text-sm">Stays are booked and paid up front, so downtime charges nothing here.</p>
+                  </details>
+                )}
                 {pending.quote.tradeSeason && (
                   <TradeSeasonReview quote={pending.quote.tradeSeason} />
                 )}

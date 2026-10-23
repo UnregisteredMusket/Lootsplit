@@ -37,7 +37,7 @@ import { offerFlags, serviceWhen } from "./service-talk";
 
 const kindName: Record<ServiceKind, string> = { temple: "Temple", workshop: "Workshop", inn: "Inn" };
 /** Kinds the DM can add in this release; later kinds arrive with their own presets. */
-const addableKinds: ServiceKind[] = ["temple", "workshop"];
+const addableKinds: ServiceKind[] = ["temple", "workshop", "inn"];
 const presetName: Record<ServicePreset, string> = { "srd-5.2.1": "SRD 5.2.1", "srd-5.1": "SRD 5.1", blank: "Blank" };
 
 function npcName(t: CloudTable, id: string) {
@@ -103,12 +103,21 @@ function ProviderCard({
           return (
             <li key={o.key} className={locked ? "locked" : undefined}>
               <b>{o.name}</b>
-              <span>{formatCopper(o.priceCopper)}</span>
+              <span>
+                {p.kind === "inn" && o.tiers?.length
+                  ? `from ${formatCopper(Math.min(...o.tiers.filter((x) => x.offered).map((x) => x.nightCopper)))}/night`
+                  : formatCopper(o.priceCopper)}
+              </span>
               <small>{locked || offerFlags(o)}</small>
             </li>
           );
         })}
       </ul>
+      {(p.rumours?.length ?? 0) > 0 && (
+        <p className="svc-hint">
+          {p.rumours!.length} {p.rumours!.length === 1 ? "rumour" : "rumours"} for sale. Ask in conversation.
+        </p>
+      )}
       {!dm && lock && <p role="status">{lock}</p>}
       <AppLink href={`/features/npcs?npc=${encodeURIComponent(p.npcId)}`}>Talk to {npcName(t, p.npcId)} →</AppLink>
       {mine.length > 0 && (
@@ -358,7 +367,13 @@ function ProviderEditor({ provider, table: t }: { provider: ServiceProvider; tab
                       description: "",
                       approved: false,
                       priceCopper: 0,
-                      ...(d.kind === "workshop"
+                      ...(d.kind === "inn"
+                        ? {
+                            time: { kind: "per-night" as const, maxNights: 14 },
+                            output: { kind: "record" as const },
+                            tiers: [{ key: "room", name: "Room", nightCopper: 50, mealCopper: 10, offered: true }],
+                          }
+                        : d.kind === "workshop"
                         ? {
                             time: { kind: "downtime-days" as const, days: 1, perUnit: true },
                             maxUnits: 1,
@@ -375,6 +390,9 @@ function ProviderEditor({ provider, table: t }: { provider: ServiceProvider; tab
             Add offer
           </Button>
         </div>
+        {draft.kind === "inn" && (
+          <RumourEditor rumours={draft.rumours ?? []} onChange={(rumours) => set({ rumours })} />
+        )}
       </div>
     </CommandForm>
   );
@@ -404,7 +422,9 @@ function OfferEditor({
     <details className={`svc-offer-row${o.approved ? "" : " draft"}`}>
       <summary>
         <b>{o.name}</b>
-        <span className="svc-price">{copperLabel(o.priceCopper)}</span>
+        <span className="svc-price">
+          {kind === "inn" && o.tiers?.length ? `from ${formatCopper(Math.min(...o.tiers.map((x) => x.nightCopper)))}/night` : copperLabel(o.priceCopper)}
+        </span>
         <small>{summary.join(" · ")}</small>
       </summary>
       <div className="svc-offer-body">
@@ -417,19 +437,22 @@ function OfferEditor({
             Name players see
             <input value={o.name} maxLength={160} onChange={(e) => onChange({ name: e.target.value })} />
           </label>
-          <label>
-            Price (copper)
-            <input
-              type="number"
-              min={0}
-              step={1}
-              inputMode="numeric"
-              value={o.priceCopper}
-              onChange={(e) => onChange({ priceCopper: Math.max(0, Math.floor(Number(e.target.value) || 0)) })}
-            />
-            <span className="svc-hint">{copperLabel(o.priceCopper)}</span>
-          </label>
+          {kind !== "inn" && (
+            <label>
+              Price (copper)
+              <input
+                type="number"
+                min={0}
+                step={1}
+                inputMode="numeric"
+                value={o.priceCopper}
+                onChange={(e) => onChange({ priceCopper: Math.max(0, Math.floor(Number(e.target.value) || 0)) })}
+              />
+              <span className="svc-hint">{copperLabel(o.priceCopper)}</span>
+            </label>
+          )}
         </div>
+        {kind === "inn" && <InnFields offer={o} onChange={onChange} />}
         <label>
           Description
           <textarea value={o.description} maxLength={1500} onChange={(e) => onChange({ description: e.target.value })} />
@@ -858,6 +881,123 @@ function WorkshopFields({ offer: o, onChange }: { offer: ServiceOffer; onChange:
           onChange={(e) => onChange({ output: { ...out, weight: Math.min(9999, Math.max(0, Number(e.target.value) || 0)) } })}
         />
       </label>
+    </div>
+  );
+}
+
+function InnFields({ offer: o, onChange }: { offer: ServiceOffer; onChange: (patch: Partial<ServiceOffer>) => void }) {
+  const tiers = o.tiers ?? [];
+  const setTier = (key: string, patch: Partial<NonNullable<ServiceOffer["tiers"]>[number]>) =>
+    onChange({ tiers: tiers.map((x) => (x.key === key ? { ...x, ...patch } : x)) });
+  return (
+    <>
+      <div className="svc-table-wrap">
+        <table className="svc-table">
+          <thead>
+            <tr>
+              <th>Tier</th>
+              <th>Night, cp</th>
+              <th>Meal, cp</th>
+              <th>On</th>
+            </tr>
+          </thead>
+          <tbody>
+            {tiers.map((x) => (
+              <tr key={x.key}>
+                <td>{x.name}</td>
+                <td>
+                  <input aria-label={`${x.name} night (copper)`} type="number" min={0} value={x.nightCopper} onChange={(e) => setTier(x.key, { nightCopper: whole(e.target.value) })} />
+                </td>
+                <td>
+                  <input aria-label={`${x.name} meal (copper)`} type="number" min={0} value={x.mealCopper} onChange={(e) => setTier(x.key, { mealCopper: whole(e.target.value) })} />
+                </td>
+                <td>
+                  <input aria-label={`Offer ${x.name}`} type="checkbox" checked={x.offered} onChange={(e) => setTier(x.key, { offered: e.target.checked })} />
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      <p className="svc-hint">Per guest. Booked stays are paid up front; leaving early refunds nothing unless you record an adjustment.</p>
+      {o.time.kind === "per-night" && (
+        <label>
+          Most nights per booking
+          <input
+            type="number"
+            min={1}
+            max={365}
+            value={o.time.maxNights}
+            onChange={(e) => onChange({ time: { kind: "per-night", maxNights: whole(e.target.value, 1, 365) } })}
+          />
+        </label>
+      )}
+    </>
+  );
+}
+
+function RumourEditor({ rumours, onChange }: { rumours: NonNullable<ServiceProvider["rumours"]>; onChange: (r: NonNullable<ServiceProvider["rumours"]>) => void }) {
+  const set = (id: string, patch: Partial<(typeof rumours)[number]>) => onChange(rumours.map((r) => (r.id === id ? { ...r, ...patch } : r)));
+  return (
+    <div>
+      <h4>Rumours</h4>
+      <p className="svc-hint">
+        Players see the teaser and price. The full text stays with you until a character buys it; then it arrives in that
+        character's private thread with this NPC.
+      </p>
+      <ul className="svc-offer-list">
+        {rumours.map((r) => (
+          <li key={r.id}>
+            <details className="svc-offer-row">
+              <summary>
+                <b>{r.teaser}</b>
+                <span className="svc-price">{formatCopper(r.priceCopper)}</span>
+                <small>
+                  Once per {r.once} · {r.buyers?.length ? `bought by ${r.buyers.length}` : "not bought"}
+                </small>
+              </summary>
+              <div className="svc-offer-body">
+                <label>
+                  Teaser (players see this)
+                  <input value={r.teaser} maxLength={300} onChange={(e) => set(r.id, { teaser: e.target.value })} />
+                </label>
+                <label>
+                  Full text (DM only until bought)
+                  <textarea value={r.text ?? ""} maxLength={2000} onChange={(e) => set(r.id, { text: e.target.value })} />
+                </label>
+                <div className="svc-grid">
+                  <label>
+                    Price (copper)
+                    <input type="number" min={0} value={r.priceCopper} onChange={(e) => set(r.id, { priceCopper: whole(e.target.value) })} />
+                    <span className="svc-hint">{formatCopper(r.priceCopper)}</span>
+                  </label>
+                  <label>
+                    Can be bought
+                    <select value={r.once} onChange={(e) => set(r.id, { once: e.target.value as "character" | "party" })}>
+                      <option value="character">Once per character</option>
+                      <option value="party">Once per party</option>
+                    </select>
+                  </label>
+                </div>
+                <Button variant="danger" onClick={() => onChange(rumours.filter((x) => x.id !== r.id))}>
+                  Remove rumour
+                </Button>
+              </div>
+            </details>
+          </li>
+        ))}
+      </ul>
+      <Button
+        variant="secondary"
+        onClick={() =>
+          onChange([
+            ...rumours,
+            { id: `rumour-${Date.now().toString(36)}`, teaser: "A new rumour", text: "What the innkeeper says.", priceCopper: 50, once: "character", buyers: [] },
+          ])
+        }
+      >
+        Add rumour
+      </Button>
     </div>
   );
 }

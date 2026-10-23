@@ -1,0 +1,11 @@
+{
+  "title": "Inns: rooms, meals and rumours",
+  "summary": "Book rooms and meals for the party at an inn, and buy rumours that land in your private chat with the innkeeper.",
+  "items": [
+    "The DM sets up an inn with ready-made room and meal prices from the free D&D rules (SRD 5.2.1 or SRD 5.1) or their own.",
+    "Choose the room, who stays, how many nights and meals a day; the total shows each part and is paid once up front.",
+    "A room doesn't grant a rest by itself, and leaving early isn't refunded automatically; ask the DM.",
+    "Ask the innkeeper for rumours: you see a teaser and the price, and the full story arrives in your private thread with them.",
+    "Each character can buy a rumour once (some only once per party), and you can share it in party chat."
+  ]
+}

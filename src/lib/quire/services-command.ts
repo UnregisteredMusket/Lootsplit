@@ -10,7 +10,7 @@ import {
   type ServiceOrder,
   type ServiceStatus,
 } from "./services-schema.ts";
-import { serviceQuote, serviceSummary } from "./services.ts";
+import { rumourQuote, serviceQuote, serviceSummary } from "./services.ts";
 import { validateServices } from "./services-validation.ts";
 
 // Authoritative service commands (docs/SERVICES.md). Every coin movement is one financeMove with
@@ -104,6 +104,30 @@ export function applyServiceCommand(t: CloudTable, seat: CloudSeat, cmd: Service
     s.orders.push(order);
     purseId = cmd.purseId;
     summary = `Service ${order.status === "requested" ? "requested" : "ordered"}: ${serviceSummary(order)}.`;
+  } else if (cmd.kind === "service-rumour") {
+    own(cmd.purseId);
+    const q = rumourQuote(t, cmd.providerId, cmd.rumourId, cmd.purseId);
+    if (q.before !== cmd.before) throw Error("The price or details changed. Review again before buying.");
+    const payer = t.purses.find((p) => p.id === cmd.purseId)!;
+    if (payer.kind !== "character" || payer.nonParty) throw Error("Buy rumours with a party character.");
+    if (toCopper(payer.coins) < q.rumour.priceCopper)
+      throw Error(`${payer.name} can't afford ${formatCopper(q.rumour.priceCopper)} for this rumour.`);
+    const npc = t.journal!.world!.npcs.find((n) => n.id === q.provider.npcId)!;
+    financeMove(t, cmd.purseId, -q.rumour.priceCopper, cmd.id + "-payment", `Rumour · ${q.provider.name}`, at);
+    if (q.rumour.priceCopper) t.ledger.at(-1)!.shopId = q.provider.shopId;
+    // The buyer is recorded once; the text goes only into the buyer's private thread with the NPC.
+    const stored = s.providers.find((p) => p.id === q.provider.id)!.rumours!.find((r) => r.id === q.rumour.id)!;
+    stored.buyers = [...(stored.buyers ?? []), cmd.purseId];
+    const w = t.journal!.world!,
+      conversationId = `${npc.id}:${cmd.purseId}`;
+    let c = w.conversations.find((x) => x.id === conversationId);
+    if (!c) {
+      c = { id: conversationId, npcId: npc.id, purseId: cmd.purseId, messages: [] };
+      w.conversations.push(c);
+    }
+    c.messages.push({ id: cmd.id + "-rumour", author: "npc", text: stored.text!, at });
+    purseId = cmd.purseId;
+    summary = `Rumour bought from ${npc.name} at ${q.provider.name}.`;
   } else {
     const o = s.orders.find((x) => x.id === cmd.orderId);
     if (!o || !same(o, cmd.before)) throw Error("This order changed. Refresh before acting.");
