@@ -44,9 +44,11 @@ test("each development check belongs to exactly one declared isolated group", ()
     .map((v) => v.trim());
   assert.equal(new Set(groups).size, groups.length);
   const checks = [...workflow.matchAll(/- name: (dev-[\w-]+)\n\s+if: matrix.group == '([^']+)'/g)];
-  assert.equal(checks.length, 41);
+  assert.equal(checks.length, 42);
   // Even coin split: fund split, refusal keeps the form, Activity row, encounter split (1280/390/320).
   assert.ok(checks.some(([, name, group]) => name === "dev-coin-split" && group === "gameplay"));
+  // Treasure pool: claims, Review Inbox resolution, refusal keeps the form, Activity, encounter (1280/390/320).
+  assert.ok(checks.some(([, name, group]) => name === "dev-loot-claims" && group === "gameplay"));
   assert.ok(checks.some(([, name, group]) => name === "dev-downtime" && group === "accounts"));
   assert.match(
     workflow,

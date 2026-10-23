@@ -308,6 +308,7 @@ export function WelcomePage() {
               <li>Five coin denominations with conversion, payments and transfers</li>
               <li>Guaranteed items and weighted loot tables per encounter</li>
               <li>Even coin splits to the copper, with the leftover sent where you choose</li>
+              <li>A party treasure pool: claim Need, Greed or Pass, and the DM resolves fairly</li>
               <li>A review step before the one-time transfer, so nothing is paid twice</li>
               <li>Character purses, party funds and a full activity ledger with voiding</li>
             </ul>

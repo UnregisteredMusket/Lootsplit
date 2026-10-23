@@ -38,6 +38,10 @@ const featureAreas: Area[] = [
         text: "from a party fund or a purse, shared to the copper with the leftover sent where you choose",
       },
       {
+        lead: "Treasure pool claims",
+        text: "the party marks Need, Greed or Pass; the DM resolves by hand, at random or round-robin, and items move once",
+      },
+      {
         lead: "Loot awards",
         text: "from guaranteed items and weighted loot tables, coins sent to one purse or split evenly, reviewed before one transfer",
         dm: true,
