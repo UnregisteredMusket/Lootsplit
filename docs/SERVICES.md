@@ -11,8 +11,8 @@ approved "as shown" on 2026-10-23.
 | Phase | What | State |
 | --- | --- | --- |
 | 0 | Shared helpers lifted from the forge (`service-core.ts`); hub Services runs the real availability check and lists every provider | Shipped |
-| 1 | Temple, with DM review (charged on approval) | This change |
-| 2 | Workshop: scribe and alchemist presets | Planned |
+| 1 | Temple, with DM review (charged on approval) | Shipped |
+| 2 | Workshop: scribe and alchemist presets | This change |
 | 3 | Inn: booked stays, meals, rumours into the buyer's private NPC thread | Planned |
 
 ## Shared helpers (`src/lib/quire/service-core.ts`)
@@ -95,6 +95,23 @@ lists only their own characters), and only their own orders. Provider events are
 journal writes keep the stored list and `journal.services`, and their pending drafts with service
 commands are refused with the usual "finish on the updated website" message.
 
+## Workshop (phase 2)
+
+- **Presets** (`services-presets.ts`, specialty Scribe or Alchemist): scrolls from SRD 5.2.1 Spell
+  Scroll Costs (price = twice the cost = the scroll's value, days per level), one per order; brews
+  with SRD 5.2.1 brewing (Potion of Healing: 1 day, herbs for half the price, bring your own or
+  supplied) and the crafting rule (gp ÷ 10 days), up to 5 per order. SRD 5.1: scrolls are unpriced
+  drafts; brews at 5 gp of work a day. Blank: none.
+- **Progress** (`services-time.ts`): `previewServices` is the forge's `previewDays` over active
+  workshop orders, added to `quoteSchema.services` beside `blacksmith`; only approved downtime
+  advances it, never session hours. A pending quote saved before this existed is approved as saved.
+  Approval writes the state and one event per order for the payer.
+- **Collecting**: `service-claim` at the workshop by the payer: one holding `id+"-crafted"` with
+  the units, value, weight and a provenance note.
+- **Screens**: workshop order cards with a progress bar, Collect, and DM pause/resume/cancel;
+  Market → Service commission register; the Downtime preview's single **Commissions** fold holds
+  the forge's lines ("Blacksmith commissions", unchanged) and the workshop's.
+
 ## Screens
 
 - Conversation (`service-talk.tsx`): offers as numbered replies with price, time, component and
@@ -126,9 +143,12 @@ commands are refused with the usual "finish on the updated website" message.
 
 `services-temple.test.ts` (command IDs, stale quotes, charge on approval, components, every lock
 reason, whole copper, authorization, privacy, deletion guards, old saves and protocol 8, presets,
-offline parity, Here rows), `service-hub.test.ts`, the unchanged `blacksmith.test.ts`, `npc-barter*.test.ts` and
+offline parity, Here rows), `services-workshop.test.ts` (presets, herbs, downtime-only progress,
+pause, collect once at the workshop, cancel without refund, privacy, offline parity through
+`executeLocalCommand` and `executeFinanceCommand`), `service-hub.test.ts`, the unchanged `blacksmith.test.ts`, `npc-barter*.test.ts` and
 `room-store.test.ts`; browser audits `scripts/services-browser-audit.mjs`
 (`npm run verify:focus -- services`, CI step `dev-services`, 1280/390/320: hub, temple offers and
 locks, Remove Curse paid at once, Raise Dead requested then approved in Review Inbox, shop Services
-section) with the unchanged
+section, DM editor, an alchemist order with brought herbs through approved downtime to collection,
+Market register, Commissions fold; Ironbound and Parchment) with the unchanged
 `blacksmith-browser-audit.mjs` and `npc-barter-browser-audit.mjs`.

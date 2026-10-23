@@ -82,10 +82,103 @@ function templeOffer(s: Spell, preset: ServicePreset): ServiceOffer {
   };
 }
 
-/** The offers a preset brings for this kind. Blank brings none. */
-export function presetOffers(kind: ServiceKind, preset: ServicePreset): ServiceOffer[] {
+export const workshopSpecialties = ["Scribe", "Alchemist"] as const;
+export type WorkshopSpecialty = (typeof workshopSpecialties)[number];
+
+/** SRD 5.2.1 Spell Scroll Costs (p.103-104): days and scribing cost by level; price is double (p.206). */
+export const scrollTable = [
+  { level: 0, days: 1, costGp: 15 },
+  { level: 1, days: 1, costGp: 25 },
+  { level: 2, days: 3, costGp: 100 },
+  { level: 3, days: 5, costGp: 150 },
+  { level: 4, days: 10, costGp: 1000 },
+  { level: 5, days: 25, costGp: 1500 },
+  { level: 6, days: 40, costGp: 10000 },
+  { level: 7, days: 50, costGp: 12500 },
+  { level: 8, days: 60, costGp: 15000 },
+  { level: 9, days: 120, costGp: 50000 },
+];
+const scrollSpells: [string, string, number][] = [
+  ["bless", "Bless", 1],
+  ["cure-wounds", "Cure Wounds", 1],
+  ["shield", "Shield", 1],
+  ["misty-step", "Misty Step", 2],
+  ["lesser-restoration", "Lesser Restoration", 2],
+  ["fireball", "Fireball", 3],
+  ["counterspell", "Counterspell", 3],
+  ["remove-curse", "Remove Curse", 3],
+];
+function scrollOffer([key, name, level]: [string, string, number], preset: ServicePreset): ServiceOffer {
+  const row = scrollTable[level];
+  // SRD 5.1 has no scroll-scribing rule: the offers stay unpriced drafts for the DM.
+  const price = preset === "srd-5.1" ? 0 : gp(row.costGp * 2);
+  return {
+    key: `scroll-${key}`,
+    name: `Scroll of ${name}`,
+    description: `A spell scroll of ${name} (level ${level}).`,
+    approved: preset !== "srd-5.1",
+    priceCopper: price,
+    spellLevel: level,
+    time: { kind: "downtime-days", days: row.days, perUnit: true },
+    review: "auto",
+    maxUnits: 1,
+    output: {
+      kind: "holding",
+      name: `Spell Scroll of ${name}`,
+      unitCopper: price,
+      weight: 0,
+      category: "scribe",
+      notes: `Spell scroll (${level === 0 ? "cantrip" : `level ${level}`}): ${name}. The DM rules how it is used.`,
+    },
+  };
+}
+/** Brews: SRD 5.2.1 Brewing Potions of Healing (1 day, 25 gp materials) and the crafting rule
+ * (half the price in materials, gp ÷ 10 days, rounded up); SRD 5.1 crafting is 5 gp a day. */
+const brews: { key: string; name: string; gp: number; weight: number; herbs?: boolean }[] = [
+  { key: "potion-of-healing", name: "Potion of Healing", gp: 50, weight: 0.5, herbs: true },
+  { key: "antitoxin", name: "Antitoxin", gp: 50, weight: 0 },
+  { key: "alchemists-fire", name: "Alchemist's Fire", gp: 50, weight: 1 },
+  { key: "acid", name: "Acid", gp: 25, weight: 1 },
+  { key: "holy-water", name: "Holy Water", gp: 25, weight: 1 },
+  { key: "basic-poison", name: "Basic Poison", gp: 100, weight: 0 },
+];
+function brewOffer(b: (typeof brews)[number], preset: ServicePreset): ServiceOffer {
+  const days =
+    preset === "srd-5.1" ? Math.ceil(b.gp / 5) : b.key === "potion-of-healing" ? 1 : Math.ceil(b.gp / 10);
+  const herbs: ServiceComponent | undefined = b.herbs
+    ? {
+        key: "healing-herbs",
+        label: "Healing herbs",
+        materialKey: "healing-herbs",
+        minCopper: 0,
+        quantity: 1,
+        perUnit: true,
+        consumed: true,
+        supply: "either",
+        supplyCopper: gp(b.gp / 2),
+      }
+    : undefined;
+  return {
+    key: b.key,
+    name: b.name,
+    description: `${b.name}, brewed to order.`,
+    approved: true,
+    // With herbs the price covers the work; the herbs cost half the price unless brought.
+    priceCopper: herbs ? gp(b.gp / 2) : gp(b.gp),
+    time: { kind: "downtime-days", days, perUnit: true },
+    review: "auto",
+    maxUnits: 5,
+    ...(herbs ? { components: [herbs] } : {}),
+    output: { kind: "holding", name: b.name, unitCopper: gp(b.gp), weight: b.weight, category: "apothecary", notes: `${b.name}. The DM rules its effect.` },
+  };
+}
+
+/** The offers a preset brings for this kind (and workshop specialty). Blank brings none. */
+export function presetOffers(kind: ServiceKind, preset: ServicePreset, specialty?: string): ServiceOffer[] {
   if (preset === "blank") return [];
   if (kind === "temple") return templeSpells.map((s) => templeOffer(s, preset));
+  if (kind === "workshop" && specialty === "Scribe") return scrollSpells.map((s) => scrollOffer(s, preset));
+  if (kind === "workshop" && specialty === "Alchemist") return brews.map((b) => brewOffer(b, preset));
   return [];
 }
 
@@ -95,10 +188,10 @@ export function presetOffers(kind: ServiceKind, preset: ServicePreset): ServiceO
  */
 export function applyPreset(p: ServiceProvider, preset: ServicePreset): ServiceProvider {
   const offers = p.offers.map((o) => {
-    const fill = presetOffers(p.kind, preset).find((x) => x.key === o.key);
+    const fill = presetOffers(p.kind, preset, p.specialty).find((x) => x.key === o.key);
     return fill && o.priceCopper === 0 && fill.priceCopper > 0 ? { ...o, priceCopper: fill.priceCopper } : o;
   });
-  for (const o of presetOffers(p.kind, preset))
+  for (const o of presetOffers(p.kind, preset, p.specialty))
     if (!offers.some((x) => x.key === o.key)) offers.push(o);
   return { ...p, preset, offers };
 }
@@ -109,9 +202,10 @@ export function newProvider(
   npcId: string,
   id: string,
   preset: ServicePreset = "srd-5.2.1",
+  specialty?: string,
 ): ServiceProvider {
   return applyPreset(
-    { id, kind, preset, shopId: shop.id, npcId, name: shop.name, description: "", offers: [] },
+    { id, kind, preset, ...(specialty ? { specialty } : {}), shopId: shop.id, npcId, name: shop.name, description: "", offers: [] },
     preset,
   );
 }

@@ -206,7 +206,20 @@ export function orderLines(o: ServiceOrder, payer: string, npcName: string): Tal
   }
   if (o.status === "cancelled" && reviewed)
     lines.push({ kind: "sys", key: `${o.id}-withdrawn`, node: <>Request withdrawn. Nothing was charged.</> });
-  if (["completed", "active", "ready", "claimed", "paused"].includes(o.status)) {
+  if (o.status === "ready")
+    lines.push({ kind: "sys", key: `${o.id}-ready`, node: <>Your {t.offer.output.kind === "holding" ? t.offer.output.name : t.offer.name} is ready to collect here.</> });
+  if (o.status === "claimed")
+    lines.push({
+      kind: "sys",
+      key: `${o.id}-claimed`,
+      node: (
+        <>
+          Collected into {payer}'s inventory: <b>{t.offer.output.kind === "holding" ? t.offer.output.name : t.offer.name}</b>
+          {t.units > 1 ? ` ×${t.units}` : ""}.
+        </>
+      ),
+    });
+  if (["completed", "active", "paused"].includes(o.status)) {
     const note = reviewed ? decided?.note.replace(/^Approved and paid\.( Recorded only; the DM updates character sheets\.| Work advances only with DM-approved downtime\.)?\s*/, "") : "";
     if (note) lines.push({ kind: "sys", key: `${o.id}-dm`, node: <>The DM decided: {note}</> });
     lines.push({ kind: "npc", key: `${o.id}-done`, text: t.kind === "temple" ? "It is done." : t.kind === "inn" ? "Room's at the top of the stairs." : "I'll get to work." });
@@ -239,6 +252,8 @@ export function useServiceTalk({
   const [offerKey, setOfferKey] = useState<string>();
   const [beneficiaries, setBeneficiaries] = useState<string[]>([]);
   const [picks, setPicks] = useState<Pick_>({});
+  /** How many pieces the player brings for an "either" component (the rest is supplied). */
+  const [counts, setCounts] = useState<Record<string, number>>({});
   const [units, setUnits] = useState(1);
   const [mine, setMine] = useState<string[]>([]);
   const services = readServices(table.journal?.services);
@@ -254,7 +269,12 @@ export function useServiceTalk({
           contributions: (offer.components ?? []).flatMap((c) => {
             const pick = picks[c.key];
             if (!pick || pick === "provider") return [];
-            return [{ componentKey: c.key, holdingId: pick, quantity: c.quantity * (c.perUnit ? units : 1) }];
+            const needed = c.quantity * (c.perUnit ? units : 1),
+              lot = table.holdings.find((h) => h.id === pick);
+            // "Either": bring what you carry, the provider supplies the rest.
+            const most = Math.min(needed, lot?.quantity ?? needed);
+            const quantity = c.supply === "either" ? Math.max(1, Math.min(most, counts[c.key] ?? most)) : needed;
+            return [{ componentKey: c.key, holdingId: pick, quantity }];
           }),
         }
       : null;
@@ -280,6 +300,7 @@ export function useServiceTalk({
       next[c.key] = c.supply === "provider" ? "provider" : own ? own.holding.id : c.supply === "party" ? "" : "provider";
     }
     setPicks(next);
+    setCounts({});
   }
 
   /** Open a provider's branch from the hub or the sub-list. */
@@ -299,6 +320,22 @@ export function useServiceTalk({
   const payerName = character?.name ?? "You";
   if (provider && !offer) {
     const waiting = services.orders.filter((o) => o.providerId === provider.id && o.purseId === purseId && o.status === "requested");
+    const ready = services.orders.filter((o) => o.providerId === provider.id && o.purseId === purseId && o.status === "ready");
+    for (const r of ready) {
+      const out = r.terms.offer.output,
+        name = `${out.kind === "holding" ? out.name : r.terms.offer.name}${r.terms.units > 1 ? ` ×${r.terms.units}` : ""}`;
+      replies.push({
+        tag: `Collect · ${name}`,
+        text: "I've come for my order.",
+        sub: "Adds it to your inventory once.",
+        run: async () => {
+          setMine((m) => [...m, r.id]);
+          push({ kind: "pc", text: "I've come for my order.", tag: "Collect", key: nextKey("pc") });
+          if (await send({ kind: "service-claim", orderId: r.id, before: r }, `${r.id}-claim`, () => undefined))
+            push({ kind: "order", id: r.id, key: nextKey("order") });
+        },
+      });
+    }
     for (const w of waiting)
       replies.push({
         tag: `Cancel request · ${w.terms.offer.name}`,
@@ -350,17 +387,23 @@ export function useServiceTalk({
         </>
       ) : (
         <>
-          Pay {price} <em>· {offer.time.kind === "downtime-days" ? `ready after ${quote?.terms.workDays ?? "…"} downtime days` : "recorded at once"}</em>
+          {offer.time.kind === "downtime-days" ? "Commission" : `Pay ${price}`}{" "}
+          <em>· {offer.time.kind === "downtime-days" ? `pay ${price} · ready after ${quote?.terms.workDays ?? "…"} downtime days` : "recorded at once"}</em>
         </>
       ),
-      text: review ? "Please. Here is what we bring." : "Here's the offering.",
+      text: review ? "Please. Here is what we bring." : offer.time.kind === "downtime-days" ? "Let's do it." : "Here's the offering.",
       tone: review ? "dm" : "check",
       sub: review ? "Sends the request to the DM's Review Inbox. Nothing is charged now." : "One payment, one receipt. Retrying after a dropped connection can't charge twice.",
       disabled: problem || (!quote ? "Checking" : undefined),
       run: async () => {
         if (!quote || !request || !purseId) return;
         const id = action.commandId;
-        push({ kind: "pc", text: review ? "Please. Here is what we bring." : "Here's the offering.", tag: review ? "Ask · DM review" : `Pay ${price}`, key: nextKey("pc") });
+        push({
+          kind: "pc",
+          text: review ? "Please. Here is what we bring." : offer.time.kind === "downtime-days" ? "Let's do it." : "Here's the offering.",
+          tag: review ? "Ask · DM review" : `Pay ${price}`,
+          key: nextKey("pc"),
+        });
         const ok = await send(
           { kind: "service-order", providerId: provider.id, offerKey: offer.key, purseId, request, before: quote.before },
           id,
@@ -457,12 +500,40 @@ export function useServiceTalk({
                     />
                     <b>
                       Bring your own: {holding.name}
-                      {holding.name.includes(formatCopper(holding.unitCopper)) ? "" : ` (${formatCopper(holding.unitCopper)})`}
+                      {!c.minCopper || holding.name.includes(formatCopper(holding.unitCopper)) ? "" : ` (${formatCopper(holding.unitCopper)})`}
                     </b>
-                    <span className="svc-amt">{c.supply === "either" ? `−${formatCopper(c.supplyCopper * needed)}` : ""}</span>
-                    <small>{blocked || `Carried by ${character.name}, not equipped. ${c.consumed ? (offer.review === "dm" ? "Handed over and consumed when the DM approves." : "Handed over and consumed when you pay.") : "Shown, not consumed."}`}</small>
+                    <span className="svc-amt">
+                      {c.supply === "either"
+                        ? `−${formatCopper(c.supplyCopper * (request?.contributions.find((x) => x.holdingId === holding.id)?.quantity ?? Math.min(needed, holding.quantity)))}`
+                        : ""}
+                    </span>
+                    <small>
+                      {blocked ||
+                        `${needed > 1 ? `${holding.quantity} carried by` : "Carried by"} ${character.name}, not equipped. ${c.consumed ? (offer.review === "dm" ? "Handed over and consumed when the DM approves." : "Handed over and consumed when you pay.") : "Shown, not consumed."}`}
+                    </small>
                   </label>
                 ))}
+              {c.supply === "either" &&
+                picks[c.key] &&
+                picks[c.key] !== "provider" &&
+                Math.min(needed, table.holdings.find((h) => h.id === picks[c.key])?.quantity ?? 0) > 1 &&
+                (() => {
+                  const most = Math.min(needed, table.holdings.find((h) => h.id === picks[c.key])?.quantity ?? 0);
+                  return (
+                    <div className="svc-row">
+                      <Stepper
+                        value={Math.max(1, Math.min(most, counts[c.key] ?? most))}
+                        min={1}
+                        max={most}
+                        label={`${c.label} you bring`}
+                        onChange={(n) => setCounts((x) => ({ ...x, [c.key]: n }))}
+                      />
+                      <span className="svc-hint">
+                        You bring these; {npc.name} supplies the rest.
+                      </span>
+                    </div>
+                  );
+                })()}
               {c.supply !== "party" && (
                 <label className={`svc-choice${picks[c.key] === "provider" ? " on" : ""}`}>
                   <input type="radio" name={name} checked={picks[c.key] === "provider"} onChange={() => setPicks((p) => ({ ...p, [c.key]: "provider" }))} />
@@ -481,6 +552,25 @@ export function useServiceTalk({
             </fieldset>
           );
         })}
+        {offer.output.kind === "holding" && quote && (
+          <div className="svc-section">
+            <h4>What you get</h4>
+            <dl className="svc-kv">
+              <dt>Item</dt>
+              <dd>
+                {offer.output.name} × {units} (one holding)
+              </dd>
+              <dt>Value</dt>
+              <dd>{formatCopper(offer.output.unitCopper)} each</dd>
+              <dt>Work</dt>
+              <dd>{quote.terms.workDays} approved downtime days</dd>
+              <dt>Collect at</dt>
+              <dd>
+                {quote.terms.shopName}, {quote.terms.placeName}, with {character.name}
+              </dd>
+            </dl>
+          </div>
+        )}
         <dl className="svc-total">
           {(quote?.terms.lines ?? []).map((l, i) => (
             <span key={i} style={{ display: "contents" }}>
@@ -496,7 +586,9 @@ export function useServiceTalk({
             {problem ||
               (quote?.terms.review === "dm"
                 ? "Nothing moves now. If the DM approves, coins and any item you bring leave together, once."
-                : "Charged and recorded at once.")}
+                : offer.time.kind === "downtime-days"
+                  ? "Paid once, now. Work advances only when the DM approves downtime, never by session hours or real time."
+                  : "Charged and recorded at once.")}
           </dd>
         </dl>
       </div>
@@ -505,7 +597,7 @@ export function useServiceTalk({
 
   /** Orders to show: those placed or touched in this conversation, and open requests. */
   const shown = services.orders.filter(
-    (o) => o.purseId === purseId && o.terms.npcId === npc.id && (mine.includes(o.id) || o.status === "requested"),
+    (o) => o.purseId === purseId && o.terms.npcId === npc.id && (mine.includes(o.id) || o.status === "requested" || o.status === "ready"),
   );
   const linesFor = (id: string) => {
     const o = shown.find((x) => x.id === id);

@@ -1,0 +1,12 @@
+{
+  "title": "Workshop commissions: scribes and alchemists",
+  "summary": "Order spell scrolls and potions from NPC scribes and alchemists, made over downtime and collected at their workshop.",
+  "items": [
+    "The DM sets up a scribe or alchemist with ready-made prices from the free D&D rules (SRD 5.2.1 or SRD 5.1) or their own.",
+    "Talk to them and choose Services · Workshop: pick the scroll or brew and how many, and bring your own healing herbs to pay less.",
+    "You pay once when you order. Work only moves forward when the DM approves downtime.",
+    "The Downtime screen shows blacksmith and workshop work together under Commissions.",
+    "When it's ready, go back to the workshop and collect it; Market's Service commission register tracks your orders while you travel.",
+    "The DM can pause, resume or cancel an order with a reason."
+  ]
+}
