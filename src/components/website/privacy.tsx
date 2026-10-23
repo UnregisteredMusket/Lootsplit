@@ -104,7 +104,10 @@ export function PrivacyPage() {
           <ul>
             <li>
               <strong>Cloudflare</strong> hosts the website and its database, and forwards email
-              sent to <Support />.
+              sent to <Support />. On the website, signing in, creating an account and resetting a
+              password with a recovery key include Cloudflare Turnstile, a human check that
+              usually needs no clicks; Cloudflare receives technical signals from your browser to
+              run it.
             </li>
             <li>
               <strong>Open5e:</strong> when you search monsters, spells or items from the SRD, your

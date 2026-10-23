@@ -24,6 +24,7 @@ import { serverMonitor } from "./monitoring.mjs";
 import { ownerMonitor } from "./owner-monitor.mjs";
 import { monitorApi } from "./monitor-journal.mjs";
 import { throttledSignin } from "./signin-throttle.mjs";
+import { captchaConfig, verifyCaptcha } from "./turnstile.mjs";
 import {
   assertActive,
   touchMember,
@@ -264,6 +265,12 @@ export async function handleAccounts(request, env) {
       if (!request.headers.get("content-type")?.startsWith("application/json"))
         fail("JSON is required.", 415);
       await rateLimit(env, request);
+      // Turnstile on sign-up, sign-in and recovery-key reset (website only; see turnstile.mjs).
+      await verifyCaptcha(env, request, {
+        path,
+        native,
+        hostnames: [new URL(authOrigin).hostname],
+      });
     }
     if (path.startsWith("/api/account/auth/")) {
       if (request.method === "POST") {
@@ -330,6 +337,8 @@ export async function handleAccounts(request, env) {
     if (path === "/api/account/site-announcement" && request.method === "GET") {
       return cors(json(await publicAnnouncement(db)));
     }
+    if (path === "/api/account/captcha" && request.method === "GET")
+      return cors(json(captchaConfig(env)));
     if (path === "/api/account/site-donations" && request.method === "GET")
       return cors(json(await publicDonations(db)));
     if (path === "/api/account/site-analytics" && request.method === "GET")

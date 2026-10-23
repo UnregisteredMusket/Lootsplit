@@ -39,13 +39,22 @@ test("scripts are limited to same-origin files, the app's inline hydration and W
   assert.deepEqual(directives["frame-ancestors"], ["'self'"], "earlier protections kept");
   assert.deepEqual(directives["object-src"], ["'none'"]);
   assert.deepEqual(directives["base-uri"], ["'self'"]);
-  assert.deepEqual(directives["script-src"], ["'self'", "'unsafe-inline'", "'wasm-unsafe-eval'"]);
+  assert.deepEqual(directives["script-src"], [
+    "'self'",
+    "'unsafe-inline'",
+    "'wasm-unsafe-eval'",
+    "https://challenges.cloudflare.com",
+  ]);
   assert.deepEqual(directives["script-src-attr"], ["'none'"]);
   // Tesseract starts its OCR worker from a blob: URL; every worker script is same-origin.
   assert.deepEqual(directives["worker-src"], ["'self'", "blob:"]);
   for (const values of Object.values(directives)) {
     assert.ok(!values.includes("'unsafe-eval'"), "string eval stays blocked");
-    assert.ok(!values.some((v) => /grok|https?:|\*/.test(v)), "no external script host");
+    // The only external script host is Cloudflare Turnstile (the sign-in human check).
+    assert.ok(
+      !values.some((v) => /grok|\*/.test(v) || (/https?:/.test(v) && v !== "https://challenges.cloudflare.com")),
+      "no other external script host",
+    );
   }
 });
 

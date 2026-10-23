@@ -12,11 +12,12 @@ import { ServerMonitor } from "@/components/account/server-monitor";
 import { OwnerMonitor } from "@/components/account/owner-monitor";
 import { MobileOwnerWidget } from "@/components/account/mobile-owner-widget";
 import { ProfileControls } from "@/components/account/profile-controls";
+import { HumanCheck, type HumanCheckHandle } from "@/components/account/turnstile";
 import { StaffControls } from "@/components/account/staff-controls";
 import { Campaigns } from "@/components/campaigns";
 import { OwnerControls } from "@/components/account/owner-controls";
 import { createFileRoute, Link } from "@tanstack/react-router";
-import { useEffect, useState, useSyncExternalStore, type FormEvent } from "react";
+import { useEffect, useRef, useState, useSyncExternalStore, type FormEvent } from "react";
 import {
   ArrowRight,
   Archive,
@@ -28,7 +29,12 @@ import {
   Trash2,
 } from "lucide-react";
 import { Website } from "@/components/website/site";
-import { accountRequest, type AccountLibrary, type AccountMembership } from "@/lib/account/client";
+import {
+  accountRequest,
+  accountRequestWithCaptcha,
+  type AccountLibrary,
+  type AccountMembership,
+} from "@/lib/account/client";
 import {
   addAccountCharacter,
   linkCurrentCampaign,
@@ -60,6 +66,7 @@ function Account() {
     [name, setName] = useState(""),
     [recoveryInput, setRecoveryInput] = useState(""),
     [key, setKey] = useState("");
+  const humanCheck = useRef<HumanCheckHandle>(null);
   const [profileName, setProfileName] = useState(""),
     [description, setDescription] = useState(""),
     [portrait, setPortrait] = useState(""),
@@ -125,33 +132,54 @@ function Account() {
   }
   function authSubmit(e: FormEvent) {
     e.preventDefault();
+    const captcha = humanCheck.current?.token() ?? "";
+    if (humanCheck.current?.required() && !captcha) {
+      setError("Complete the human check, then try again.");
+      return;
+    }
     void run(async () => {
-      if (mode === "recover") {
-        const result = await accountRequest<{ key: string }>("recover", {
+      try {
+        await authAttempt(captcha);
+      } finally {
+        // Each token works once; the next attempt needs a fresh one.
+        humanCheck.current?.reset();
+      }
+    });
+  }
+  async function authAttempt(captcha: string) {
+    if (mode === "recover") {
+      const result = await accountRequestWithCaptcha<{ key: string }>(
+        "recover",
+        {
           email,
           key: recoveryInput,
           password,
-        });
-        setKey(result.key);
-        setNotice("Password changed. Save your replacement recovery key, then sign in.");
-        setMode("signin");
-        setRecoveryInput("");
-        setPassword("");
-        return;
-      }
-      await accountRequest(mode === "signup" ? "auth/sign-up/email" : "auth/sign-in/email", {
+        },
+        captcha,
+      );
+      setKey(result.key);
+      setNotice("Password changed. Save your replacement recovery key, then sign in.");
+      setMode("signin");
+      setRecoveryInput("");
+      setPassword("");
+      return;
+    }
+    await accountRequestWithCaptcha(
+      mode === "signup" ? "auth/sign-up/email" : "auth/sign-in/email",
+      {
         email,
         password,
         ...(mode === "signup" ? { name } : {}),
-      });
-      setPassword("");
+      },
+      captcha,
+    );
+    setPassword("");
+    await reload();
+    if (mode === "signup") {
+      const result = await accountRequest<{ key: string }>("recovery-key", {});
+      setKey(result.key);
       await reload();
-      if (mode === "signup") {
-        const result = await accountRequest<{ key: string }>("recovery-key", {});
-        setKey(result.key);
-        await reload();
-      }
-    });
+    }
   }
   async function signOut() {
     if (!allowContextChange()) return;
@@ -733,6 +761,13 @@ function Account() {
                       <Link to="/privacy">privacy policy</Link>.
                     </p>
                   )}
+                  <HumanCheck
+                    key={mode}
+                    ref={humanCheck}
+                    action={
+                      mode === "signup" ? "signup" : mode === "recover" ? "recover" : "signin"
+                    }
+                  />
                   <button className="portal-button" disabled={busy}>
                     {busy
                       ? "Please wait…"
