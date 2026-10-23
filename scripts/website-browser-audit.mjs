@@ -67,6 +67,14 @@ try {
         assert.deepEqual(JSON.parse(ld[0])["@graph"].map((n) => n["@type"]), ["WebSite", "Organization"]);
         await page.getByText("100% free, supported by donations", { exact: true }).waitFor();
       }
+      if (path === "welcome") {
+        // The maker's note closes the home page, signed with the owner's public handle.
+        const why = page.locator("section#why, section[aria-labelledby='why']");
+        assert.equal(await why.getByRole("heading", { name: "Why did I create Lootsplitter?", level: 2 }).count(), 1);
+        assert.equal(await why.locator(".ls-why-signature").innerText(), "— UnregisteredMusket");
+        await why.getByText("I created Lootsplitter to smite shopping episodes forever.", { exact: true }).waitFor();
+        assert.equal(await page.locator("main > section").last().getAttribute("aria-labelledby"), "why");
+      }
       // One header, one consistent app link label, and a footer route to release details.
       assert.equal(await page.locator(".ls-header").count(), 1);
       assert.equal(await page.locator(".portal-header").count(), 0);
@@ -78,6 +86,10 @@ try {
       const footerNav = page.getByRole("navigation", { name: "Website footer" });
       for (const label of ["Home", "Features", "Downloads", "Changelog", "Help", "Resources", "Donate"])
         assert.equal(await footerNav.getByRole("link", { name: label, exact: true }).count(), 1, `${path} footer ${label}`);
+      assert.equal(
+        await footerNav.getByRole("link", { name: "Instagram ↗", exact: true }).getAttribute("href"),
+        "https://www.instagram.com/lootsplitterdev/",
+      );
       const identity = page.locator(".ls-footer-identity");
       assert.match(
         await identity.innerText(),

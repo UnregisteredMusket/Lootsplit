@@ -1644,3 +1644,15 @@
 .ls-tech[open] > summary {
   margin-bottom: 24px;
 }
+
+/* "Why did I create Lootsplitter?" — the maker's note closing the home page. */
+.ls-why p {
+  font-size: 1.15rem;
+  line-height: 1.7;
+}
+.ls-why .ls-why-signature {
+  align-self: flex-end;
+  font-family: var(--serif);
+  font-style: italic;
+  font-size: 1.4rem;
+}

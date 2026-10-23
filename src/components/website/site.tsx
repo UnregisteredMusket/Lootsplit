@@ -10,7 +10,7 @@ import { useEffect, useId, useState, type ReactNode } from "react";
 import type { ProductShot } from "@/lib/website/product-shots";
 import release from "@/lib/website/release.json";
 import { OPEN_APP } from "@/lib/website/labels";
-import { SUPPORT_EMAIL, SUPPORT_MAILTO } from "@/lib/website/contact";
+import { INSTAGRAM_URL, SUPPORT_EMAIL, SUPPORT_MAILTO } from "@/lib/website/contact";
 import "./website.css";
 
 /** One order and one set of labels for the footer; the header shows the main four
@@ -158,6 +158,11 @@ function SiteFooter({
               </li>
               <li>
                 <a href={release.historyUrl}>GitHub releases ↗</a>
+              </li>
+              <li>
+                <a href={INSTAGRAM_URL} rel="noopener">
+                  Instagram ↗
+                </a>
               </li>
             </ul>
           </nav>
@@ -473,6 +478,37 @@ export function WelcomePage() {
             </Link>
             .
           </p>
+        </div>
+      </section>
+
+      <section className="ls-paper ls-section" aria-labelledby="why">
+        <div className="ls-wrap ls-measure ls-stack ls-gap-lg ls-why">
+          <div className="ls-stack ls-center">
+            <Kicker ornament>A note from the maker</Kicker>
+            <h2 id="why" className="ls-display">
+              Why did I create Lootsplitter?
+            </h2>
+          </div>
+          <p>
+            I really don’t like shopping episodes. You know the ones: the dragon is dead, the hoard
+            is on the floor, and the rest of the night goes to price lists, coin conversions and
+            crossed-out inventory sheets.
+          </p>
+          <p>
+            <strong>I created Lootsplitter to smite shopping episodes forever.</strong> Manage your
+            party, build encounters and assign loot, and set up shops for your players to interact
+            with, eliminating paper inventory sheets in your campaign.
+          </p>
+          <p>
+            Plus… Open5e integration, service features such as blacksmithing, a bartering system,
+            property listings, a fully integrated map system with fog of war, and so much more!
+          </p>
+          <p>
+            Free to use, with no ads of any kind.{" "}
+            <AppLink href="/">Open the app</AppLink> or{" "}
+            <Link to="/downloads">download it for Android</Link>.
+          </p>
+          <p className="ls-why-signature">— UnregisteredMusket</p>
         </div>
       </section>
     </Website>

@@ -166,7 +166,10 @@ export function homeStructuredData() {
         url: `${url}/`,
         logo: `${url}/favicon.svg`,
         email: "support@lootsplitter.com",
-        sameAs: ["https://github.com/UnregisteredMusket/Lootsplit"],
+        sameAs: [
+          "https://github.com/UnregisteredMusket/Lootsplit",
+          "https://www.instagram.com/lootsplitterdev/",
+        ],
       },
     ],
   };
