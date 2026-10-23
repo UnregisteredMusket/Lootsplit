@@ -2,6 +2,7 @@ import { projectConnectedMaps } from "./connected-maps.ts";
 import { facilityAccess } from "./ships.ts";
 import { readDowntimeActivities } from "./downtime-activities-schema.ts";
 import { readBlacksmith } from "./blacksmith-schema.ts";
+import { readServices } from "./services-schema.ts";
 import {
   characterVisible,
   canReadCharacter,
@@ -255,6 +256,32 @@ export function projectRecord(
       smith.orders = smith.orders.filter((o) => seat.purseIds.includes(o.purseId));
       t.journal.blacksmith = smith;
     }
+    if (t.journal.services) {
+      // Players see providers at visible shops with readable NPCs and at least one approved offer,
+      // only approved offers, rumour teasers without text or buyers, and only their own orders.
+      const services = readServices(t.journal.services);
+      services.providers = services.providers
+        .filter((p) => t.shops.some((s) => s.id === p.shopId) && readableNpcs.has(p.npcId))
+        .map((p) => {
+          const projected = { ...p, offers: p.offers.filter((o) => o.approved) };
+          if (p.rumours)
+            projected.rumours = p.rumours.map((r) => {
+              const mine = (r.buyers ?? []).filter((id) => seat.purseIds.includes(id));
+              return {
+                id: r.id,
+                teaser: r.teaser,
+                priceCopper: r.priceCopper,
+                once: r.once,
+                ...(mine.length ? { boughtBy: mine } : {}),
+                ...(r.once === "party" && r.buyers?.length ? { boughtByParty: true } : {}),
+              };
+            });
+          return projected;
+        })
+        .filter((p) => p.offers.length > 0);
+      services.orders = services.orders.filter((o) => seat.purseIds.includes(o.purseId));
+      t.journal.services = services;
+    }
     t.listings = t.listings.filter(
       (listing) =>
         propertyAvailableHere(listing, market, !!world.partyPosition) &&
@@ -286,6 +313,7 @@ export function projectRecord(
               }),
             t.shops.flatMap((s) => (s.locationId ? [s.locationId] : [])),
             t.journal.blacksmith?.orders.map((o) => o.terms.locationId) ?? [],
+            t.journal.services?.orders.map((o) => o.terms.locationId) ?? [],
             t.listings.flatMap((l) => (l.locationId ? [l.locationId] : [])),
             t.journal.tradeEconomy?.exchanges.flatMap((e) =>
               e.locationId ? [e.locationId] : [],

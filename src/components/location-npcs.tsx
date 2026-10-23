@@ -20,6 +20,8 @@ import { AppLink } from "./app-link";
 import type { CloudTable } from "@/lib/quire/cloud";
 import { NpcConversation } from "./npc-conversation";
 import { npcServices } from "@/lib/quire/service-hub";
+import { serviceKinds } from "@/lib/quire/services-schema";
+import { NpcServicesToggle } from "./service-providers";
 import { NpcBarterConfigForm } from "./npc-barter-desk";
 import { npcAnswersBarter } from "@/lib/quire/npc-barter";
 import { npcPinOpensHub } from "@/lib/quire/place-hub";
@@ -234,6 +236,7 @@ export function LocationNpcs() {
               {dm && t.journal.blacksmith?.profiles.some((p) => p.npcId === n.id) && (
                 <NpcSmithToggle npc={n} />
               )}
+              {dm && <NpcServicesToggle npc={n} table={t as unknown as CloudTable} />}
               {dm && n.barterAllowed && (
                 <NpcBarterConfigForm key={JSON.stringify(n.barter ?? null)} npc={n} table={t} />
               )}
@@ -294,6 +297,27 @@ function NpcEditor({ npc, table, close }: { npc?: Npc; table: CloudTable; close:
           />{" "}
           Offers blacksmith services
         </label>
+        <fieldset>
+          <legend>Other services</legend>
+          {serviceKinds.map((k) => (
+            <label key={k}>
+              <input
+                type="checkbox"
+                checked={draft.services?.includes(k) === true}
+                onChange={(e) =>
+                  setDraft({
+                    ...draft,
+                    services: serviceKinds.filter((x) =>
+                      x === k ? e.target.checked : draft.services?.includes(x),
+                    ),
+                  })
+                }
+              />{" "}
+              Offers {k} services
+            </label>
+          ))}
+          <p>Set up the offers on the shop page where this NPC works (Services · Add a service provider).</p>
+        </fieldset>
         <p>
           Enable only when this NPC agrees to accept commissions. Configure the linked forge's
           skill, materials, parts and enchantments in its shop.

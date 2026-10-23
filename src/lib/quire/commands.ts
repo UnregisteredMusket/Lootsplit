@@ -68,6 +68,9 @@ import { transferPropertyDeed } from "./property-deed.ts";
 import { locationLabel } from "./shop-locations.ts";
 import { applySmithCommand } from "./blacksmith-command.ts";
 import { validateBlacksmith } from "./blacksmith-validation.ts";
+import { serviceCommands, type ServiceCommand } from "./services-schema.ts";
+import { applyServiceCommand } from "./services-command.ts";
+import { validateServices } from "./services-validation.ts";
 const id = z.string().min(1).max(150),
   amount = z.number().int().nonnegative().max(1e12),
   qty = amount.min(1).max(100000);
@@ -82,6 +85,7 @@ export const commandSchema = z.discriminatedUnion("kind", [
   ...estateCommands,
   ...shipCommands,
   ...smithCommands,
+  ...serviceCommands,
   ...downtimeActivityCommands,
   estateImportCommand,
   z.object({ ...base, kind: z.literal("resource-pack-import"), before: z.string().max(30000), pack: resourcePackSchema }).strict(),
@@ -418,6 +422,8 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
     );
   } else if (cmd.kind.startsWith("smith-")) {
     applySmithCommand(t, seat, cmd as SmithCommand, at);
+  } else if (cmd.kind.startsWith("service-")) {
+    applyServiceCommand(t, seat, cmd as ServiceCommand, at);
   } else if (cmd.kind.startsWith("ship-")) {
     applyShipCommand(t, seat, cmd as ShipCommand, at);
   } else if (cmd.kind.startsWith("estate-")) {
@@ -1333,6 +1339,7 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
   validateNpcBarter(t);
   validateFleet(t);
   validateBlacksmith(t);
+  validateServices(t, execution.preview === true);
   validateDowntimeActivities(t, execution.preview === true);
   validateLootPool(t);
   return t;

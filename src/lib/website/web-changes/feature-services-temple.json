@@ -1,0 +1,13 @@
+{
+  "title": "Temple services",
+  "summary": "Priests can now heal, lift curses and raise the dead for a price, ordered in conversation and recorded on a receipt.",
+  "items": [
+    "The DM sets up a temple at a shop with ready-made prices from the free D&D rules (SRD 5.2.1 or SRD 5.1) or their own, and chooses which offers players can see.",
+    "Talk to the priest and choose Services · Temple: pick the spell, who it's for and whether you bring the diamond or the temple supplies it.",
+    "Most spells are paid and recorded at once. Raise Dead and Resurrection go to the DM first and are charged only if the DM approves; withdrawing or a refusal costs nothing.",
+    "You can pay for another party character who is with you.",
+    "Bigger spells need a bigger settlement: levels 3–5 need a town or city, levels 6–9 a city.",
+    "Services are recorded only: the DM updates hit points, conditions and the rest on the sheet.",
+    "Temples show up on the map's Here list and on the shop's place card."
+  ]
+}

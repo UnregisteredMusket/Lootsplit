@@ -80,6 +80,7 @@ import { validateEstate } from "./estate.ts";
 import { validateTradeEconomy } from "./trade-economy.ts";
 import { validateFleet } from "./ships.ts";
 import { validateBlacksmith } from "./blacksmith-validation.ts";
+import { validateServices } from "./services-validation.ts";
 import { validateWorld } from "./world.ts";
 
 export function emptyCloudTable(): CloudTable {
@@ -100,6 +101,7 @@ export function readCloudTable(value: unknown): CloudTable | null {
     validateWorld(table as CloudTable, true);
     validateFleet(table as CloudTable, true);
     validateBlacksmith(table as CloudTable, true);
+    validateServices(table as CloudTable, true);
     validateDowntimeActivities(table as CloudTable, true);
   } catch { return null; }
   return {

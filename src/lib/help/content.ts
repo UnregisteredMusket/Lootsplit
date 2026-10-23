@@ -291,6 +291,23 @@ export const HELP_GROUPS: HelpGroup[] = [
     title: "Money, shops & downtime",
     topics: [
       {
+        id: "npc-services",
+        title: "Temple and other NPC services",
+        audience: "DM",
+        paragraphs: [
+          "A service provider is an NPC working at a shop with a location, like the forge. In People & NPCs → Configure NPC, tick Offers temple services (the forge keeps its own checkbox). Then open the shop page → Services → Add a service provider, choose the kind and NPC, and a price preset: SRD 5.2.1 (default), SRD 5.1 or Blank. SRD 5.1 has no fixed rates, so it prices spell levels 1–2 at 50 gp and leaves higher levels as unpriced drafts. Applying a preset later fills missing offers and unset prices only.",
+          "Each offer has a price in whole copper, a spell level, a casting time noted on the receipt (the clock never advances by itself), Automatic or DM review, and optional components such as a diamond with a minimum value, consumed or not, brought by the party, supplied by the provider for an added price, or either. Switch an offer on to approve it; players never see drafts. Raise Dead and Resurrection default to DM review. Review anything above sends any larger order to review as well.",
+          "Spell levels 0–2 are available anywhere, 3–5 in a town or city and 6–9 only in a city. The settlement is the nearest town or city above the shop in Market locations, otherwise a village; the provider's Settlement setting overrides it. Not taking new orders pauses a provider with a reason players see; orders already placed stay.",
+          "Effects are record only: a service never changes hit points, conditions, curses or death on a sheet. Edit the sheet yourself. A player may pay for another party character who is present; that grants no control and needs no confirmation.",
+          "Requests that need review wait in Review Inbox → Service requests with every check rerun live (who is where, the NPC, the offer and price, funds, the item they bring). Approve charges the payer once and consumes components once; it stays disabled while a check fails. Deny needs a reason and moves nothing, as does a player withdrawing a request. Refunds are separate recorded adjustments. Remove a provider only after its open orders are resolved; history is kept.",
+        ],
+        links: [
+          ["Market", "/market"],
+          ["People & NPCs", "/features/npcs"],
+          ["Review Inbox", "/features/review"],
+        ],
+      },
+      {
         id: "blacksmith-services",
         title: "Custom blacksmith commissions",
         audience: "DM",

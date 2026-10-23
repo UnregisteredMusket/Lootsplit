@@ -168,7 +168,7 @@ export function MapHereSheet({
                   <h3 className="map-here-group">{title}</h3>
                   <ul className="map-here-rows">
                     {rows.map((row) => (
-                      <li key={`${row.reference.kind}:${row.reference.id}`}>
+                      <li key={row.key ?? `${row.reference.kind}:${row.reference.id}`}>
                         <span>
                           <strong>{row.label}</strong>
                           <small>
@@ -177,7 +177,7 @@ export function MapHereSheet({
                           </small>
                         </span>
                         {pin(row.reference, row.label)}
-                        <Button aria-label={`${row.action}: ${row.label}`} onClick={() => open(row)}>
+                        <Button aria-label={`${row.action}: ${row.label}`} disabled={!!row.disabled} onClick={() => open(row)}>
                           {row.action}
                         </Button>
                       </li>

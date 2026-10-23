@@ -1,6 +1,8 @@
 // Place hub (docs/MAP-TILES.md "Place hub"): deep links to a record on a map, "Show on map"
 // and the pin → place card. Everything here reads the table the viewer already has (the
 // permission-projected room for players), so it can never reveal more than the map itself.
+import { readServices } from "./services-schema.ts";
+import { approvedOffers, serviceLabel } from "./services.ts";
 import {
   mapRecordTypes,
   type ConnectedMap,
@@ -371,6 +373,10 @@ export type HereRow = {
   action: string;
   /** DM view only: players would not see this row. */
   dmOnly: boolean;
+  /** Distinguishes several rows for one record (an NPC's service providers). */
+  key?: string;
+  /** Why the row's action can't be used now (a closed or paused service). */
+  disabled?: string;
 };
 export type HereSheet =
   | { mode: "here"; locationName: string; rows: HereRow[] }
@@ -518,6 +524,29 @@ export function hereSheet(
       detail: `For sale · ${formatCopper(l.copper)}`,
       action: "View",
       dmOnly: false,
+    });
+  }
+  // Service providers (docs/SERVICES.md): one row each, opening the provider NPC's conversation.
+  const services = readServices(t.journal?.services);
+  for (const p of services.providers) {
+    const shop = t.shops.find((s) => s.id === p.shopId),
+      offers = approvedOffers(p);
+    if (!shop || !on(shop.locationId) || !offers.length) continue;
+    const npc = world.npcs.find((n) => n.id === p.npcId);
+    if (!npc || (!dm && !npcAvailableHere(npc, t))) continue;
+    const mine = services.orders.filter((o) => o.providerId === p.id && viewer.purseIds.includes(o.purseId));
+    const ready = mine.find((o) => o.status === "ready");
+    const closed = shop.closed ? `Closed${p.paused ? `: ${p.paused.reason}` : ""}` : p.paused ? `Not taking new orders: ${p.paused.reason}` : "";
+    rows.push({
+      reference: { kind: "npc", id: p.npcId },
+      key: `service:${p.id}`,
+      label: `${serviceLabel(p)} · ${shop.name}`,
+      group: "services",
+      kind: serviceLabel(p),
+      detail: closed || `${npc.name} · ${ready ? "your order is ready to collect" : `${offers.length} ${offers.length === 1 ? "offer" : "offers"}`}`,
+      action: ready ? "Collect" : p.kind === "inn" ? "Book" : "Services",
+      dmOnly: false,
+      ...(shop.closed || (p.paused && !ready) ? { disabled: closed } : {}),
     });
   }
   const order = { shops: 0, people: 1, services: 2 };

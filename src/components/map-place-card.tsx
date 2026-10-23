@@ -6,6 +6,8 @@ import type { MapRecordReference } from "@/lib/quire/connected-maps-schema";
 import type { CampaignMap } from "@/lib/quire/world-schema";
 import type { CloudTable } from "@/lib/quire/cloud";
 import { useSeat } from "@/lib/quire/seat";
+import { readServices } from "@/lib/quire/services-schema";
+import { approvedOffers, serviceLabel } from "@/lib/quire/services";
 import { locationPath, readMarketLocations } from "@/lib/quire/shop-locations";
 import {
   mapServiceAllowed,
@@ -87,6 +89,13 @@ export function MapPlaceCard({
     ? map.connected?.placements.find((p) => sameRecord(p.record, reference))
     : undefined;
   const shop = reference?.kind === "shop" ? table.shops.find((s) => s.id === reference.id) : undefined;
+  // Temple, workshop and inn providers at this shop (docs/SERVICES.md); a player's table holds only
+  // providers with approved offers.
+  const shopServices = shop
+    ? readServices(table.journal?.services)
+        .providers.filter((p) => p.shopId === shop.id && approvedOffers(p).length)
+        .map((p) => serviceLabel(p).replace(/^Workshop · /, ""))
+    : [];
   const portrait = reference ? placementPortrait(table, reference) : undefined;
   async function copyLink() {
     if (!reference) return;
@@ -166,6 +175,9 @@ export function MapPlaceCard({
           <ul className="map-place-chips" aria-label="Status">
             {shop && <li>{shop.closed ? "Closed" : "Open"}</li>}
             {here && <li className="map-place-chip-here">The party is here</li>}
+            {shopServices.length > 0 && (
+              <li className="map-place-chip-here">Services: {shopServices.join(" · ")}</li>
+            )}
             {!allowed && <li>Viewing only</li>}
             {dm && pin?.visibility === "dm" && <li>DM only pin</li>}
             {dm && !pin && reference.kind !== "location" && <li>Shown at its location</li>}
