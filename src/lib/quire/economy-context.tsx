@@ -17,7 +17,12 @@ import { type Journal } from "./journal.ts";
 import { type CommandRequest } from "./commands.ts";
 import { newCommandId, type CommandOptions } from "./command-id.ts";
 import { canonicalJson } from "./canonical-json.ts";
-import { economyView, executeLocalCommand, executeFinanceCommand } from "./economy.ts";
+import {
+  economyView,
+  executeLocalCommand,
+  executeFinanceCommand,
+  executeFinanceBatch,
+} from "./economy.ts";
 import { loadSeatLock, passwordMatches } from "./lock.ts";
 import {
   createContext,
@@ -84,6 +89,7 @@ import {
   captureDeviceBackup,
   resumeTable,
   queueCommand,
+  queueCommandBatch,
   runSharedMutation,
   hasPendingChanges,
   refreshShared,
@@ -122,6 +128,12 @@ type EconomyApi = {
     input: CommandRequest,
     expected?: import("./cloud-client.ts").ExpectedMutationScope,
   ) => Promise<EconomyMutationOutcome>;
+  /**
+   * Finance commands applied as one atomic action (journey "Approve & depart"): the room's
+   * `applyCommandBatch` online, the same engine in one IndexedDB transaction on this device.
+   * Pass one `batchId` per user action and reuse it on retry.
+   */
+  commandBatch: (batchId: string, inputs: CommandRequest[]) => Promise<EconomyMutationOutcome>;
   ready: boolean;
   purses: Purse[];
   holdings: Holding[];
@@ -674,6 +686,19 @@ export function EconomyProvider({ children }: { children: ReactNode }) {
     return {
       journal,
       commandOutcome: acceptCommand,
+      commandBatch: async (batchId, inputs) => {
+        const invoked = captureMutationScope();
+        const outcome =
+          invoked.code !== "device"
+            ? await queueCommandBatch(batchId, inputs, invoked)
+            : await acceptedMutation(
+                () => executeFinanceBatch(batchId, inputs, () => assertMutationScope(invoked)),
+                () => false,
+              );
+        announceWorkspaceChange();
+        await refreshAccepted();
+        return outcome;
+      },
       command: async (input) => {
         if (getCloudWatch().joined) {
           await queueCommand(input);

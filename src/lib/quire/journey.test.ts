@@ -252,3 +252,17 @@ test("a map's measuring frame: grid wins over a scale bar", () => {
     frameFingerprint({ kind: "scale", scale: { ...scale, distance: 2 } }),
   );
 });
+
+test("day plan for the review: 61.1 mi at 24 mi/day departs day 41 and arrives day 43 about 1 pm", async () => {
+  const { journeyDayPlan, aboutTime } = await import("./journey.ts");
+  const days = journeyDayPlan([168, 150, 144, 149], 3666, 0, 3666, 41);
+  assert.deepEqual(days.map((d) => [d.day, d.deci, d.legs]), [
+    [41, 240, [0, 1]],
+    [42, 240, [1, 2, 3]],
+    [43, 131, [3]],
+  ]);
+  assert.equal(days[2].arrivalMinute, 786);
+  assert.equal(aboutTime(786), "about 1 pm");
+  // Partial approval: one day now, the rest later from the same frozen route.
+  assert.deepEqual(journeyDayPlan([168, 150, 144, 149], 3666, 1440, 3666, 42).map((d) => d.day), [42, 43]);
+});

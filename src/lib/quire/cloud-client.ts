@@ -972,6 +972,40 @@ export async function queueCommand(
     };
   });
 }
+/**
+ * Several commands submitted as one batch the room applies atomically (`applyCommandBatch`):
+ * the journey planner's one-click "Approve & depart". Sent directly, like NPC barter, so it
+ * needs no other pending actions. `batchId` is one per user action, reused on retry.
+ */
+export async function queueCommandBatch(
+  batchId: string,
+  inputs: CommandRequest[],
+  expected?: ExpectedMutationScope,
+): Promise<EconomyMutationOutcome> {
+  const invoked = captureMutationScope();
+  const guard = () => {
+    assertMutationScope(invoked);
+    if (expected) assertMutationScope(expected);
+  };
+  return serial(async () => {
+    guard();
+    const s = requireSession();
+    if (view.viewOnly && s.role === "player")
+      throw Error("The session has ended. This room is view-only until the DM resumes play.");
+    if (!view.mine) throw new Error(`It is ${view.who}'s turn.`);
+    if (s.pending.length)
+      throw Error("Submit or discard your pending actions before approving in one step.");
+    const commands = inputs.map((input) =>
+      commandSchema.parse({ ...input, id: input.id || crypto.randomUUID() }),
+    );
+    const remote = await submitCloudCommands({
+      data: { tabletopProtocol: 7, code: s.code, token: s.token, batchId, commands },
+    });
+    guard();
+    await accept(remote);
+    return { status: "committed" };
+  });
+}
 /** True when the table holds records the shared engine keys by this command ID. */
 function carriesCommand(table: CloudTable, id: string): boolean {
   const ours = (rowId: string) => rowId === id || rowId.startsWith(id + "-");
