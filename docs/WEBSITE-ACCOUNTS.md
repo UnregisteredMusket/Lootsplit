@@ -11,6 +11,19 @@ Web sessions use HttpOnly cookies. The packaged client's account code uses signe
 
 Email addresses are login identifiers, not verified identities. No email-based invitations or automatic account linking exist. Email reset is not enabled. Recovery keys are 256-bit random values, stored only as hashes; resetting rotates the key and atomically revokes all account sessions. A fresh sign-in is required to replace a recovery key. Rate limits and origin checks cover custom mutations as well as Better Auth's own protections.
 
+## Human check (Cloudflare Turnstile)
+
+Owner request, 2026-10-23.
+- **Widget:** "Lootsplitter", Managed mode, hostnames lootsplitter.com and lootsplit.oliverstorie2017.workers.dev.
+- **Keys:** the site key is public (`TURNSTILE_SITE_KEY` in `cloudflare/turnstile.mjs`). The secret is the Worker secret `TURNSTILE_SECRET_KEY`, set by the owner in the dashboard; never commit it.
+- **Protected requests:** `POST /api/account/auth/sign-up/email`, `/auth/sign-in/email` and `/recover`. The client sends the token in `x-captcha-response`; Siteverify must report success, the request's own hostname and the matching action (`signup`, `signin`, `recover`). If Cloudflare can't be reached, the request is refused (503).
+- **Off when the secret is absent:** development, CI and standby all run without the secret. `GET /api/account/captcha` tells the form whether to show the widget.
+- **Exempt:**
+  - **Native app origins** (`https://localhost` and its variants). Installed APKs can't render a widget for `localhost` and must keep signing in. Because an `Origin` header can be forged by a non-browser client, this is a known bypass; the per-IP limits and the per-email sign-in throttle still apply. Closing it needs `localhost` added to the widget and app support in a future APK.
+- **CSP:** `script-src` allows `https://challenges.cloudflare.com` for the widget script. It is the only external script host.
+- **Local check:** run the dev server with Cloudflare's testing keys, `TURNSTILE_SECRET_KEY=1x0000000000000000000000000000000AA TURNSTILE_SITE_KEY=1x00000000000000000000AA`. Server-side Siteverify also needs network access (`NODE_USE_ENV_PROXY=1` behind a proxy). The testing secret's `example.com` answer is accepted only with a testing secret.
+- **Tests:** `scripts/turnstile.test.mjs`.
+
 ## Campaign preservation
 Linking requires a current room token, binds the actual seat, and rejects linking an already-owned seat to another account. Resume rechecks that same token against current room data every time. Revoked/deleted memberships do not regain access. Credentials are only returned to their authenticated owner. A resumed campaign uses a separate per-account/per-room device database, preserving previous device campaigns and roles; pending actions block switching. Account sign-out removes account-resumed room credentials from that device without deleting campaign data. Original guest connections remain guest capabilities.
 

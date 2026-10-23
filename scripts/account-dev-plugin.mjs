@@ -27,6 +27,13 @@ export function accountDevPlugin() {
             DB,
             ACCOUNT_SECRET: readFileSync(secretPath, "utf8"),
             ACCOUNT_ORIGIN: origin,
+            // Off unless set: lets a local check use Cloudflare's always-pass test keys.
+            ...(process.env.TURNSTILE_SECRET_KEY
+              ? {
+                  TURNSTILE_SECRET_KEY: process.env.TURNSTILE_SECRET_KEY,
+                  TURNSTILE_SITE_KEY: process.env.TURNSTILE_SITE_KEY,
+                }
+              : {}),
           });
           res.statusCode = response.status;
           response.headers.forEach((v, k) => {

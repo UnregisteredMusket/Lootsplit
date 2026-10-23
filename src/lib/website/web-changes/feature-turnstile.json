@@ -1,0 +1,8 @@
+{
+  "title": "Human check on sign-in",
+  "summary": "Signing in, creating an account and resetting a password on the website now include a quick human check to keep bots out.",
+  "items": [
+    "Cloudflare Turnstile runs on the website's sign-in, sign-up and recovery-key password reset forms. Most people never need to click anything.",
+    "The Android app and the existing sign-in protections are unchanged."
+  ]
+}

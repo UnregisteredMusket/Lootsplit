@@ -47,8 +47,11 @@ export function releaseResponse(response, env, identity = false) {
  * (libraries such as pdf.js and Zod probe for it and fall back), and `script-src-attr 'none'`
  * blocks inline event-handler attributes. Android bundles its own files and is unaffected.
  */
+// challenges.cloudflare.com serves the Turnstile human check on the sign-in form (owner request
+// 2026-10-23); it is the only external script host.
+export const TURNSTILE_SCRIPT_ORIGIN = "https://challenges.cloudflare.com";
 export const SCRIPT_POLICY =
-  "script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval'; script-src-attr 'none'; worker-src 'self' blob:";
+  `script-src 'self' 'unsafe-inline' 'wasm-unsafe-eval' ${TURNSTILE_SCRIPT_ORIGIN}; script-src-attr 'none'; worker-src 'self' blob:`;
 export const SECURITY_HEADERS = Object.freeze({
   "Content-Security-Policy": `frame-ancestors 'self'; object-src 'none'; base-uri 'self'; ${SCRIPT_POLICY}`,
   "X-Frame-Options": "SAMEORIGIN",
