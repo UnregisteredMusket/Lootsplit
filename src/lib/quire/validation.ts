@@ -10,6 +10,7 @@ import { propertyFields, validatePropertyLocations, type PropertyRecord } from "
 import { propertyDeedSchema } from "./property-deed.ts";
 import { custodySchema, estateKey } from "./estate-schema.ts";
 import { tradeLedgerLinkSchema } from "./trade-economy-schema.ts";
+import { lootLedgerSchema, lootPoolMarkerSchema } from "./loot-claims-schema.ts";
 const id = z.string().min(1);
 const amount = z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER);
 export const coinsSchema = z
@@ -48,6 +49,7 @@ export const holdingSchema = z.object({
   category: z.string().max(80).optional(),
   weight: z.number().min(0).max(9999).optional(),
   equipped: z.boolean().optional(),
+  pool: lootPoolMarkerSchema.optional(),
 });
 
 const shop = z.object({
@@ -92,6 +94,7 @@ const ledger = z.object({
     })
     .strict()
     .optional(),
+  loot: lootLedgerSchema.optional(),
   transactionType: z
     .enum(["transfer", "purchase", "sale", "loan", "payment", "adjustment", "void"])
     .optional(),

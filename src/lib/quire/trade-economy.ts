@@ -1,3 +1,4 @@
+import { assertNotPooled } from "./custody.ts";
 import { assertShipTradingHere } from "./ships.ts";
 import type { CloudSeat, CloudTable } from "./cloud.ts";
 import type { Holding } from "./types.ts";
@@ -501,6 +502,7 @@ export function executeExchange(
     };
   } else {
     holding = table.holdings.find((h) => h.id === input.holdingId);
+    if (holding) assertNotPooled(holding);
     if (
       !holding ||
       holding.kind !== "item" ||

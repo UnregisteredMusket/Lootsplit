@@ -1,3 +1,4 @@
+import { assertNotPooled } from "./custody.ts";
 import type { CloudSeat, CloudTable } from "./cloud.ts";
 import type { Holding } from "./types.ts";
 import { readWorld, type Npc } from "./world-schema.ts";
@@ -287,6 +288,7 @@ export function quoteNpcBarter(
   for (const item of input.give.items) {
     const h = t.holdings.find((h) => h.id === item.holdingId && h.purseId === input.purseId);
     if (!h) throw Error("An item you offered is no longer in your inventory. Review the offer.");
+    assertNotPooled(h);
     if (wants && !wants.includes(h.category ?? "")) {
       unwanted.push(h.name);
       continue;

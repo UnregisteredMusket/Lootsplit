@@ -19,6 +19,9 @@ import { applyEstateCommand, assertCarried, assertEstateDisposable, initializeEs
 import { marketLocationSchema, readMarketLocations, validateShopLocations } from "./shop-locations.ts";
 import { canonicalJson } from "./canonical-json.ts";
 import { applyFundSplit, planCoinSplit, remainderText, SPLIT_RULES, MAX_SPLIT_RECIPIENTS, partyFunds } from "./coin-split.ts";
+import { lootCommands, lootKinds, type LootCommand } from "./loot-claims-schema.ts";
+import { applyLootCommand, validateLootPool } from "./loot-claims.ts";
+import { POOL_GUARD } from "./custody.ts";
 import { applyLedgerVoid, assertNoPartialTradeVoid, ledgerVoidCommandSchema } from "./ledger-reversal.ts";
 import { marketNameRowsSchema, marketNameFingerprint, previewMarketNames } from "./market-name-import.ts";
 import {
@@ -62,6 +65,7 @@ const id = z.string().min(1).max(150),
   qty = amount.min(1).max(100000);
 const base = { id };
 export const commandSchema = z.discriminatedUnion("kind", [
+  ...lootCommands,
   z.object({ ...base, kind: z.literal("reference-policy"), before: referencePolicySchema, policy: referencePolicySchema }).strict(),
   ledgerVoidCommandSchema,
   ...tradeCommands,
@@ -372,6 +376,8 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
     applyDowntimeActivity(t, seat, cmd as DowntimeActivityCommand, at, execution.preview === true);
   } else if (tradeCommands.some((schema) => schema.shape.kind.value === cmd.kind)) {
     applyTradeCommand(t, seat, cmd as TradeCommand, at, execution);
+  } else if (lootKinds.has(cmd.kind)) {
+    applyLootCommand(t, seat, cmd as LootCommand, at, execution, event);
   } else if (npcBarterKinds.has(cmd.kind)) {
     applyNpcBarterCommand(t, seat, cmd as NpcBarterCommand, at, execution);
   } else if (worldCommands.some((schema) => schema.shape.kind.value === cmd.kind)) {
@@ -1231,6 +1237,13 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
         throw new Error(
           `Conflict in ${change.store}. Export your pending changes, then refresh and retry.`,
         );
+      // A pooled lot stays in its party fund until the DM resolves it or takes it out of the
+      // pool (loot-pool-set). An older client that drops the marker keeps it pooled.
+      if (change.store === "holdings" && current?.pool && change.after !== null) {
+        const after = change.after as import("./types.ts").Holding;
+        if (after.purseId !== current.purseId) throw Error(POOL_GUARD);
+        if (!after.pool) change.after = { ...after, pool: current.pool };
+      }
       if (change.store === "purses" && current?.sheetReadOnlyForDm && change.after !== null) {
         const after = change.after as import("./types.ts").Purse;
         if (
@@ -1279,6 +1292,7 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
   validateFleet(t);
   validateBlacksmith(t);
   validateDowntimeActivities(t, execution.preview === true);
+  validateLootPool(t);
   return t;
 }
 export function same(a: unknown, b: unknown): boolean {

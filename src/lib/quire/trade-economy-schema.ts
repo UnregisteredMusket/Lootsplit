@@ -191,6 +191,8 @@ export type TradeExecution = {
   random?: (key: string) => number;
   source?: "server" | "local";
   preview?: boolean;
+  /** Treasure pool: the campaign's manual-roll policy allows Pen & Paper totals from the DM. */
+  manualRolls?: boolean;
 };
 export const readTradeEconomy = (raw?: unknown): TradeEconomy =>
   tradeEconomySchema.parse(raw ?? {});

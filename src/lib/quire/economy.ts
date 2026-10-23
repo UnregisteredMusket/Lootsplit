@@ -979,7 +979,7 @@ export async function removeHolding(id: string): Promise<void> {
         ?.value,
     );
     if (old) {
-      assertCarried(old);
+      assertCarried(old, true);
       if (old.kind === "property") {
         const table = {
           ...emptyCloudTable(),
@@ -1047,7 +1047,7 @@ export async function removePurse(id: string): Promise<void> {
     );
     const all = await request<Holding[]>(tx.objectStore("holdings").getAll());
     for (const h of holdings) {
-      assertCarried(h);
+      assertCarried(h, true);
       if (h.kind === "property")
         assertEstateDisposable({ holdings: all, purses: [], shops: [], stock: [], journal }, h.id);
     }

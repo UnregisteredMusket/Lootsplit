@@ -39,6 +39,8 @@ export function characterControl(purse: Purse): "player" | "npc" | null {
 }
 
 export type Holding = {
+  /** In the party treasure pool (a party-fund holding the party can claim). Absent otherwise. */
+  pool?: import("./loot-claims-schema.ts").LootPoolMarker;
   /** "player": a player set this value through a sheet edit, so NPC barter treats it as unreferenced. */
   valueSource?: "player";
   commodityId?: string;
@@ -156,6 +158,8 @@ export type LedgerLine = {
   listingPurchase?: { listingId: string; quantity: number; holding: Holding };
   /** Even coin split: every line of one split carries the same split ID (the command or award receipt ID). */
   split?: { id: string; role: "source" | "share" | "remainder"; keptShare?: number };
+  /** Treasure pool: a 0 cp line per item moved or pooled, with its recorded value (one resolution or award ID). */
+  loot?: import("./loot-claims-schema.ts").LootLedgerLink;
   id: string;
   at: number;
   purseId: string;
