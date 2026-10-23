@@ -749,11 +749,13 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Development / gameplay / dev-loot-claims | open | 2 | 24s → 36s | +12s | +50% |
 | Development / desktop / dev-services | open | 4 | 31s → 114s | +83s | +267.74% |
 | Development / desktop / dev-services | open | 2 | 43s → 114s | +71s | +165.12% |
+| Unused files, exports and dependencies (knip) / Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262 | open | 2 | 2s → 4s | +2s | +100% |
 
 ## Recorded slowdowns
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-23T22:49:24Z | step: Unused files, exports and dependencies (knip) / Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262 | 3s → 4s | +1s | +33.33% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40031758507/job/120681448227) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40036015745/job/120695544782) |
 | 2026-10-23T22:37:16Z | step: Accessibility (axe-core) / Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262 | 3s → 4s | +1s | +33.33% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39808894877/job/119929447230) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40034768677/job/120691426791) |
 | 2026-10-23T22:35:26Z | step: publish-apk / Upload signed APK only | 2s → 3s | +1s | +50% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39768391571/job/119808297170) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40031758182/job/120690767169) |
 | 2026-10-23T22:35:22Z | step: publish-apk / Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262 | 1s → 2s | +1s | +100% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39768391571/job/119808297170) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40031758182/job/120690767169) |
