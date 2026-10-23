@@ -85,6 +85,7 @@ export function screenName(href: string, dm: boolean) {
         "/help": "Help",
         "/resources": "Resources",
         "/donate": "Donate",
+        "/privacy": "Privacy",
         "/downloads": "Downloads",
         "/updates": "Changelog",
       } as Record<string, string>

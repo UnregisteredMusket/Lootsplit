@@ -727,6 +727,12 @@ function Account() {
                       recovery key.
                     </p>
                   )}
+                  {mode === "signup" && (
+                    <p className="portal-subtle">
+                      See what an account stores and how to delete it in the{" "}
+                      <Link to="/privacy">privacy policy</Link>.
+                    </p>
+                  )}
                   <button className="portal-button" disabled={busy}>
                     {busy
                       ? "Please wait…"
