@@ -13,6 +13,7 @@ const featureAudits = {
   "npc-barter": "scripts/npc-barter-browser-audit.mjs",
   "coin-split": "scripts/coin-split-browser-audit.mjs",
   "loot-claims": "scripts/loot-claims-browser-audit.mjs",
+  "journey-planner": "scripts/journey-planner-browser-audit.mjs",
 };
 const known = ["accounts", ...accountScenarios, ...Object.keys(featureAudits)];
 if (process.argv.length !== 3 || !known.includes(scenario))

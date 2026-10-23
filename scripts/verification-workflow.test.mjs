@@ -44,7 +44,7 @@ test("each development check belongs to exactly one declared isolated group", ()
     .map((v) => v.trim());
   assert.equal(new Set(groups).size, groups.length);
   const checks = [...workflow.matchAll(/- name: (dev-[\w-]+)\n\s+if: matrix.group == '([^']+)'/g)];
-  assert.equal(checks.length, 42);
+  assert.equal(checks.length, 43);
   // Even coin split: fund split, refusal keeps the form, Activity row, encounter split (1280/390/320).
   assert.ok(checks.some(([, name, group]) => name === "dev-coin-split" && group === "gameplay"));
   // Treasure pool: claims, Review Inbox resolution, refusal keeps the form, Activity, encounter (1280/390/320).
@@ -62,6 +62,8 @@ test("each development check belongs to exactly one declared isolated group", ()
   assert.ok(checks.some(([, name, group]) => name === "dev-navigation" && group === "world"));
   // NPC barter conversation: accept, counter and refuse by real clicks (docs/NPC-BARTER.md).
   assert.ok(checks.some(([, name, group]) => name === "dev-npc-barter" && group === "world"));
+  // Journey planner: calibrate, draw, review, approve, progress, arrive (docs/MAP-TILES.md).
+  assert.ok(checks.some(([, name, group]) => name === "dev-journey-planner" && group === "world"));
   assert.ok(checks.some(([, name, group]) => name === "dev-map-tiles" && group === "desktop"));
   assert.ok(checks.some(([, name, group]) => name === "dev-split-view" && group === "desktop"));
   assert.match(workflow, /worker-map-tiles 240 node scripts\/map-tiles-browser-audit\.mjs/);

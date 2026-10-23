@@ -363,6 +363,7 @@ export function preserveJournalMetadata(value: unknown, current: Journal): Journ
                 ...(old?.type ? { type: old.type } : {}),
                 ...(old?.propertyId ? { propertyId: old.propertyId } : {}),
                 ...(old?.grid ? { grid: old.grid } : {}),
+                ...(old?.scale ? { scale: old.scale } : {}),
                 ...(old?.tokens ? { tokens: old.tokens } : {}),
                 ...(old?.encounterId ? { encounterId: old.encounterId } : {}),
                 ...(old?.tabletop ? { tabletop: old.tabletop } : {}),
