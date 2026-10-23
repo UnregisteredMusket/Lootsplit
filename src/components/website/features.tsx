@@ -1,269 +1,182 @@
 import { Link } from "@tanstack/react-router";
-import type { ReactNode } from "react";
-import type { ProductShot } from "@/lib/website/product-shots";
+import { useEffect, useId, useMemo, useRef, useState, type KeyboardEvent } from "react";
+import { FEATURE_AREAS, type FeatureArea, type MajorFeature } from "@/lib/website/feature-catalog";
+import { productShots } from "@/lib/website/product-shots";
 import { DmTag, Kicker, PageHero, Shot } from "./parts";
 import { Website } from "./site";
 
-type Item = { lead: string; text: ReactNode; dm?: boolean };
-type Area = {
-  id: string;
-  chip: string;
-  numeral: string;
-  kicker: string;
-  title: string;
-  lead: string;
-  shot: ProductShot;
-  insets?: ProductShot[];
-  items: Item[];
-};
-
-/** Public feature tour. In-app screens stay at /features/$feature. */
-const featureAreas: Area[] = [
-  {
-    id: "money",
-    chip: "Loot & money",
-    numeral: "I",
-    kicker: "The ledger",
-    title: "Loot & money",
-    lead: "Every coin and item, in one shared record.",
-    shot: "ledger",
-    insets: ["loot"],
-    items: [
-      {
-        lead: "Five coin denominations",
-        text: "with conversion, payments, transfers and optional real-money estimates",
-      },
-      {
-        lead: "Even coin splits",
-        text: "from a party fund or a purse, shared to the copper with the leftover sent where you choose",
-      },
-      {
-        lead: "Treasure pool claims",
-        text: "the party marks Need, Greed or Pass; the DM resolves by hand, at random or round-robin, and items move once",
-      },
-      {
-        lead: "Loot awards",
-        text: "from guaranteed items and weighted loot tables, coins sent to one purse or split evenly, reviewed before one transfer",
-        dm: true,
-      },
-      { lead: "Party purses", text: "and player and NPC accounts with shared inventory" },
-      { lead: "Activity ledger", text: "with voiding and full history" },
-      { lead: "Bank and loans", text: "with interest, installments and repayments" },
-    ],
-  },
-  {
-    id: "characters",
-    chip: "Characters",
-    numeral: "II",
-    kicker: "The party",
-    title: "Characters & party",
-    lead: "Full sheets that share one wallet and inventory with the campaign.",
-    shot: "character",
-    insets: ["party"],
-    items: [
-      {
-        lead: "Character sheets",
-        text: "with abilities, attacks, spells and slots, resources and features, in Play and Edit views",
-      },
-      {
-        lead: "Import",
-        text: "from JSON, filled PDF forms, or scanned pages read on your device",
-      },
-      {
-        lead: "Built-in dice",
-        text: "with advantage, custom formulas and roll history, or record physical dice",
-      },
-      { lead: "Per-field permissions", text: "and edit reports", dm: true },
-      {
-        lead: "Player Home",
-        text: "with sheet, bank, finances, properties, journal and party chat",
-      },
-    ],
-  },
-  {
-    id: "markets",
-    chip: "Shops & trade",
-    numeral: "III",
-    kicker: "The market",
-    title: "Shops, trade & barter",
-    lead: "Merchants, markets and deals, all posted to the ledger.",
-    shot: "market",
-    insets: ["trade", "barter"],
-    items: [
-      {
-        lead: "Shops",
-        text: "with keepers, stock generation, restocks, custom prices and buy/sell rates",
-      },
-      {
-        lead: "Shop calendars",
-        text: "on in-game days and Charisma-based pricing",
-        dm: true,
-      },
-      {
-        lead: "Trade Exchanges",
-        text: ": regional commodity markets with quotes, seasons and price charts",
-      },
-      {
-        lead: "Trading & Barter",
-        text: "between players: coins, goods and deeds, with counteroffers",
-      },
-      {
-        lead: "Black markets",
-        text: (
-          <>
-            and <b>blacksmith commissions</b> with materials and enchantments
-          </>
-        ),
-        dm: true,
-      },
-    ],
-  },
-  {
-    id: "world",
-    chip: "World",
-    numeral: "IV",
-    kicker: "The world",
-    title: "NPCs, property & ships",
-    lead: "Build the campaign world and connect it to the economy.",
-    shot: "properties",
-    insets: ["ships"],
-    items: [
-      {
-        lead: "Locations",
-        text: ": regions, towns and areas with images and assigned shops",
-        dm: true,
-      },
-      {
-        lead: "People & NPCs",
-        text: "with their own inventories, dialogue, trade and private conversations",
-      },
-      {
-        lead: "Property",
-        text: ": listings, purchase with a deed, storage, building projects, staff, tenants and upkeep",
-      },
-      {
-        lead: "Ships and shipyards",
-        text: ": crew, cargo, passengers, berths and voyages during downtime",
-      },
-    ],
-  },
-  {
-    id: "encounters",
-    chip: "Encounters & maps",
-    numeral: "V",
-    kicker: "The battle",
-    title: "Encounters & maps",
-    lead: "Build, run and reward combat, on a map everyone can see.",
-    shot: "encounter",
-    insets: ["maps"],
-    items: [
-      {
-        lead: "Encounter builder",
-        text: "with the SRD creature index, or generate by party level and difficulty",
-        dm: true,
-      },
-      { lead: "Initiative tracker", text: "with rounds, HP, AC and conditions", dm: true },
-      {
-        lead: "Maps",
-        text: ": regional, city, dungeon and battle scenes linked together, with markers and five-color pings",
-      },
-      {
-        lead: "Online tabletop",
-        text: ": tokens, measurements, fog of war, walls, doors, lights and vision",
-      },
-      {
-        lead: "TV / player display",
-        text: "showing only the map, combatants and loot you choose",
-      },
-    ],
-  },
-  {
-    id: "downtime",
-    chip: "Downtime",
-    numeral: "VI",
-    kicker: "Between adventures",
-    title: "Sessions & downtime",
-    lead: "Time, money owed and what characters do between sessions.",
-    shot: "downtime",
-    items: [
-      { lead: "Session Time", text: ": advance hours with rest and prorated labor", dm: true },
-      {
-        lead: "Downtime",
-        text: "from a day to ten years, applied only after the DM previews and approves it",
-      },
-      { lead: "Training", text: "for characters and NPCs, logged by the hour" },
-      {
-        lead: "Recurring revenue and expenses",
-        text: "settled with loans, property and voyages",
-      },
-      { lead: "Review Inbox", text: "for payments, loans, imports and training", dm: true },
-    ],
-  },
-  {
-    id: "together",
-    chip: "Play together",
-    numeral: "VII",
-    kicker: "The table",
-    title: "Play together",
-    lead: "In one room, by turns, or live online.",
-    shot: "room",
-    items: [
-      { lead: "Three play modes", text: ": Local, Turn-based and Live" },
-      {
-        lead: "Room codes and invitation links",
-        text: "; assign characters to players",
-      },
-      { lead: "Guests welcome", text: ": players join without an account" },
-      { lead: "Party and private chat", text: "with unread markers and notifications" },
-      { lead: "Keep the room online", text: "between sessions, then resume", dm: true },
-    ],
-  },
-  {
-    id: "library",
-    chip: "Library & table tools",
-    numeral: "VIII",
-    kicker: "The shelf",
-    title: "Library & table tools",
-    lead: "References, records and atmosphere.",
-    shot: "journal",
-    items: [
-      { lead: "Journal", text: "with session reports and DM, party and private entries" },
-      { lead: "SRD 2014 and 2024", text: "spells, items and creatures, with attribution" },
-      {
-        lead: "Private PDF books",
-        text: "kept on your device, with search and price import",
-        dm: true,
-      },
-      { lead: "Music and ambience", text: "with your own device tracks per scene", dm: true },
-      {
-        lead: "Two themes",
-        text: ", Adventurer’s Ledger and Ironbound Dragon, plus multi-window and multi-monitor layouts",
-      },
-    ],
-  },
+type Audience = "all" | "players" | "dm";
+const AUDIENCES: [Audience, string][] = [
+  ["all", "Everything"],
+  ["players", "For players"],
+  ["dm", "DM tools"],
 ];
+const shows = (audience: Audience, dm?: boolean) =>
+  audience === "all" || (audience === "dm" ? !!dm : !dm);
 
-function FeatureList({ items }: { items: Item[] }) {
+/** Every feature in one flat list, for search. */
+const SEARCH_INDEX = FEATURE_AREAS.flatMap((area) => [
+  ...area.major.map((f) => ({
+    area,
+    title: f.title,
+    text: `${f.summary} ${f.details.join(" ")}`,
+    major: true,
+    dm: !!f.dm,
+  })),
+  ...area.minor.map((f) => ({ area, title: f.title, text: f.text, major: false, dm: !!f.dm })),
+]);
+
+function areaFromHash() {
+  if (typeof window === "undefined") return FEATURE_AREAS[0]!.id;
+  const id = window.location.hash.slice(1);
+  return FEATURE_AREAS.some((a) => a.id === id) ? id : FEATURE_AREAS[0]!.id;
+}
+
+function Gallery({ area }: { area: FeatureArea }) {
+  const [index, setIndex] = useState(0);
+  const shot = area.shots[Math.min(index, area.shots.length - 1)]!;
   return (
-    <ul className="ls-feature-list">
-      {items.map((item) => (
-        <li key={item.lead}>
-          <b>{item.lead}</b>
-          {typeof item.text === "string" && /^[,:;]/.test(item.text) ? "" : " "}
-          {item.text}
-          {item.dm && (
+    <div className="ls-feature-gallery">
+      <Shot name={shot} tone="paper" />
+      {area.shots.length > 1 && (
+        <div className="ls-feature-thumbs" role="group" aria-label={`${area.title} screenshots`}>
+          {area.shots.map((name, i) => (
+            <button
+              key={name}
+              type="button"
+              aria-pressed={i === index}
+              aria-label={`Show screenshot ${i + 1} of ${area.shots.length}: ${productShots[name].alt}`}
+              onClick={() => setIndex(i)}
+            >
+              <img src={`/product/${name}.webp`} alt="" loading="lazy" decoding="async" />
+            </button>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}
+
+function MajorCard({
+  feature,
+  open,
+  onToggle,
+}: {
+  feature: MajorFeature;
+  open: boolean;
+  onToggle: (open: boolean) => void;
+}) {
+  return (
+    <details
+      className="ls-feature-card"
+      open={open}
+      onToggle={(e) => {
+        const next = (e.currentTarget as HTMLDetailsElement).open;
+        if (next !== open) onToggle(next);
+      }}
+      data-feature={feature.title}
+    >
+      <summary>
+        <span className="ls-feature-card-title">
+          {feature.title}
+          {feature.dm && (
             <>
               {" "}
               <DmTag />
             </>
           )}
-        </li>
-      ))}
-    </ul>
+        </span>
+        <span className="ls-feature-card-summary">{feature.summary}</span>
+      </summary>
+      <ul>
+        {feature.details.map((d) => (
+          <li key={d}>{d}</li>
+        ))}
+      </ul>
+    </details>
   );
 }
 
+/** Public feature tour. In-app screens stay at /features/$feature. */
 export function FeaturesPage() {
+  const [active, setActive] = useState(FEATURE_AREAS[0]!.id);
+  const [audience, setAudience] = useState<Audience>("all");
+  const [query, setQuery] = useState("");
+  const [open, setOpen] = useState<Record<string, boolean>>({});
+  const tabsId = useId();
+  const panelTop = useRef<HTMLDivElement>(null);
+  const tabRefs = useRef<Record<string, HTMLButtonElement | null>>({});
+
+  // Deep links (#money, #maps, …) open their area; the home page links here by area.
+  useEffect(() => {
+    const sync = () => setActive(areaFromHash());
+    sync();
+    if (window.location.hash) panelTop.current?.scrollIntoView({ block: "start" });
+    window.addEventListener("hashchange", sync);
+    return () => window.removeEventListener("hashchange", sync);
+  }, []);
+
+  function choose(id: string, focus = false) {
+    setActive(id);
+    history.replaceState(null, "", `#${id}`);
+    if (focus) tabRefs.current[id]?.focus();
+  }
+
+  function onTabKey(e: KeyboardEvent<HTMLButtonElement>, index: number) {
+    const last = FEATURE_AREAS.length - 1;
+    const next =
+      e.key === "ArrowRight" || e.key === "ArrowDown"
+        ? index === last
+          ? 0
+          : index + 1
+        : e.key === "ArrowLeft" || e.key === "ArrowUp"
+          ? index === 0
+            ? last
+            : index - 1
+          : e.key === "Home"
+            ? 0
+            : e.key === "End"
+              ? last
+              : -1;
+    if (next < 0) return;
+    e.preventDefault();
+    choose(FEATURE_AREAS[next]!.id, true);
+  }
+
+  const q = query.trim().toLowerCase();
+  const results = useMemo(
+    () =>
+      q.length < 2
+        ? []
+        : SEARCH_INDEX.filter(
+            (f) =>
+              shows(audience, f.dm) &&
+              `${f.title} ${f.text} ${f.area.title}`.toLowerCase().includes(q),
+          ).slice(0, 12),
+    [q, audience],
+  );
+
+  function openResult(areaId: string, title: string, major: boolean) {
+    choose(areaId);
+    if (major) setOpen((o) => ({ ...o, [`${areaId}/${title}`]: true }));
+    setQuery("");
+    requestAnimationFrame(() => {
+      const el = document.querySelector<HTMLElement>(
+        `#${areaId}-panel [data-feature="${CSS.escape(title)}"]`,
+      );
+      el?.scrollIntoView({ block: "center" });
+      el?.querySelector<HTMLElement>("summary, b")?.focus();
+    });
+  }
+
+  const totals = useMemo(
+    () => ({
+      major: FEATURE_AREAS.reduce((n, a) => n + a.major.length, 0),
+      minor: FEATURE_AREAS.reduce((n, a) => n + a.minor.length, 0),
+    }),
+    [],
+  );
+
   return (
     <Website footer="ink">
       <PageHero kicker="The whole campaign" title="Features">
@@ -271,90 +184,184 @@ export function FeaturesPage() {
           It started with splitting loot. Now the ledger sits at the center of everything your
           table tracks, from the first copper piece to a fleet of ships. Every feature is free.
         </p>
-        <nav aria-label="Feature areas" className="ls-chips">
-          {featureAreas.map((area) => (
-            <a key={area.id} className="ls-chip" href={`#${area.id}`}>
-              {area.chip}
-            </a>
-          ))}
-          <a className="ls-chip" href="#platforms">
-            Platforms
-          </a>
-        </nav>
         <p className="ls-fine">
-          <DmTag /> marks tools for the Dungeon Master
+          {totals.major} major features and {totals.minor} smaller ones in {FEATURE_AREAS.length}{" "}
+          areas. <DmTag /> marks tools for the Dungeon Master.
         </p>
       </PageHero>
 
-      {featureAreas.map((area, index) => {
-        const tone = index % 2 === 0 ? "paper" : "ink";
-        return (
-          <section
-            key={area.id}
-            id={area.id}
-            className={`ls-${tone} ls-section ls-anchor`}
-            aria-labelledby={`${area.id}-title`}
-          >
-            <div className={`ls-wrap ls-feature-area${index % 2 ? " is-flip" : ""}`}>
-              <Shot name={area.shot} tone={tone} />
-              <div className="ls-stack">
-                <div className="ls-area-head">
-                  <Kicker>
-                    {area.numeral} · {area.kicker}
-                  </Kicker>
-                  <h2 id={`${area.id}-title`} className="ls-display">
-                    {area.title}
-                  </h2>
-                </div>
-                <p className="ls-lead">{area.lead}</p>
-                <FeatureList items={area.items} />
-                {area.insets && (
-                  <div className="ls-insets">
-                    {area.insets.map((inset) => (
-                      <Shot key={inset} name={inset} tone={tone} size="inset" />
-                    ))}
-                  </div>
-                )}
-              </div>
+      <section className="ls-paper ls-section ls-section-tight" aria-label="Feature explorer">
+        <div className="ls-wrap ls-stack ls-gap-lg" ref={panelTop}>
+          <div className="ls-feature-tools">
+            <label className="ls-feature-search">
+              <span>Find a feature</span>
+              <input
+                type="search"
+                value={query}
+                placeholder="Try “fog”, “loans” or “barter”"
+                maxLength={60}
+                onChange={(e) => setQuery(e.target.value)}
+                aria-controls={`${tabsId}-results`}
+              />
+            </label>
+            <div className="ls-feature-audience" role="radiogroup" aria-label="Show features for">
+              {AUDIENCES.map(([value, label]) => (
+                <button
+                  key={value}
+                  type="button"
+                  role="radio"
+                  aria-checked={audience === value}
+                  onClick={() => setAudience(value)}
+                >
+                  {label}
+                </button>
+              ))}
             </div>
-          </section>
-        );
-      })}
-
-      <section
-        id="platforms"
-        className="ls-paper ls-section ls-anchor"
-        aria-labelledby="platforms-title"
-      >
-        <div className="ls-wrap ls-feature-area is-flip">
-          <Shot name="phone-home" tone="paper" />
-          <div className="ls-stack">
-            <Kicker>IX · Anywhere</Kicker>
-            <h2 id="platforms-title" className="ls-display">
-              Platforms, accounts & backups
-            </h2>
-            <p className="ls-lead">The same campaign in the browser, on Android and at the table.</p>
-            <FeatureList
-              items={[
-                { lead: "Browser app", text: "on desktop and phone, always current" },
-                {
-                  lead: "Android app",
-                  text: ", permanently signed, with device campaigns that work offline",
-                },
-                {
-                  lead: "Optional accounts",
-                  text: ": your campaigns on any device, reusable character profiles",
-                },
-                {
-                  lead: "Backups",
-                  text: "on the device and private cloud versions, with protected saves",
-                },
-              ]}
-            />
-            <Link className="ls-btn ls-btn-ink ls-self-start" to="/downloads">
-              Compare Browser and Android
-            </Link>
           </div>
+
+          <div id={`${tabsId}-results`} aria-live="polite" className="ls-feature-results-slot">
+            {q.length >= 2 && (
+              <div className="ls-feature-results">
+                <p className="ls-fine">
+                  {results.length === 0
+                    ? "No features match. Try a shorter word."
+                    : `${results.length} match${results.length === 1 ? "" : "es"}`}
+                </p>
+                <ul>
+                  {results.map((r) => (
+                    <li key={`${r.area.id}/${r.title}`}>
+                      <button type="button" onClick={() => openResult(r.area.id, r.title, r.major)}>
+                        <b>{r.title}</b> <span className="ls-fine">in {r.area.title}</span>
+                        {r.dm && (
+                          <>
+                            {" "}
+                            <DmTag />
+                          </>
+                        )}
+                        <span className="ls-feature-result-text">{r.text}</span>
+                      </button>
+                    </li>
+                  ))}
+                </ul>
+              </div>
+            )}
+          </div>
+
+          <nav aria-label="Feature areas" className="ls-feature-tabs-wrap">
+            <div role="tablist" aria-label="Feature areas" className="ls-feature-tabs">
+              {FEATURE_AREAS.map((area, i) => (
+                <button
+                  key={area.id}
+                  ref={(el) => {
+                    tabRefs.current[area.id] = el;
+                  }}
+                  id={`${area.id}-tab`}
+                  role="tab"
+                  type="button"
+                  aria-selected={active === area.id}
+                  aria-controls={`${area.id}-panel`}
+                  tabIndex={active === area.id ? 0 : -1}
+                  data-href={`#${area.id}`}
+                  onClick={() => choose(area.id)}
+                  onKeyDown={(e) => onTabKey(e, i)}
+                >
+                  {area.chip}
+                </button>
+              ))}
+            </div>
+          </nav>
+
+          {FEATURE_AREAS.map((area) => {
+            const major = area.major.filter((f) => shows(audience, f.dm));
+            const minor = area.minor.filter((f) => shows(audience, f.dm));
+            const allOpen = major.length > 0 && major.every((f) => open[`${area.id}/${f.title}`]);
+            return (
+              <section
+                key={area.id}
+                id={`${area.id}-panel`}
+                role="tabpanel"
+                aria-labelledby={`${area.id}-tab`}
+                hidden={active !== area.id}
+                className="ls-feature-panel"
+              >
+                <div className="ls-feature-panel-head">
+                  <Gallery area={area} />
+                  <div className="ls-stack">
+                    <Kicker>
+                      {area.major.length} major · {area.minor.length} more
+                    </Kicker>
+                    <h2 id={area.id} className="ls-display ls-anchor">
+                      {area.title}
+                    </h2>
+                    <p className="ls-lead">{area.lead}</p>
+                    {area.id === "platforms" && (
+                      <Link className="ls-btn ls-btn-ink ls-self-start" to="/downloads">
+                        Compare Browser and Android
+                      </Link>
+                    )}
+                  </div>
+                </div>
+
+                {major.length > 0 && (
+                  <>
+                    <div className="ls-feature-subhead">
+                      <h3>Major features</h3>
+                      <button
+                        type="button"
+                        className="ls-feature-toggle"
+                        onClick={() =>
+                          setOpen((o) => ({
+                            ...o,
+                            ...Object.fromEntries(
+                              major.map((f) => [`${area.id}/${f.title}`, !allOpen]),
+                            ),
+                          }))
+                        }
+                      >
+                        {allOpen ? "Collapse all" : "Expand all"}
+                      </button>
+                    </div>
+                    <div className="ls-feature-cards">
+                      {major.map((f) => (
+                        <MajorCard
+                          key={f.title}
+                          feature={f}
+                          open={!!open[`${area.id}/${f.title}`]}
+                          onToggle={(next) =>
+                            setOpen((o) => ({ ...o, [`${area.id}/${f.title}`]: next }))
+                          }
+                        />
+                      ))}
+                    </div>
+                  </>
+                )}
+                {minor.length > 0 && (
+                  <>
+                    <div className="ls-feature-subhead">
+                      <h3>Also included</h3>
+                    </div>
+                    <ul className="ls-feature-minor">
+                      {minor.map((f) => (
+                        <li key={f.title} data-feature={f.title}>
+                          <b tabIndex={-1}>{f.title}</b>
+                          {f.dm && (
+                            <>
+                              {" "}
+                              <DmTag />
+                            </>
+                          )}
+                          <span className="ls-feature-minor-text">{f.text}</span>
+                        </li>
+                      ))}
+                    </ul>
+                  </>
+                )}
+                {major.length + minor.length === 0 && (
+                  <p className="ls-fine">Nothing in this area matches that filter.</p>
+                )}
+              </section>
+            );
+          })}
         </div>
       </section>
     </Website>

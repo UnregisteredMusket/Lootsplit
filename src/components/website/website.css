@@ -1954,3 +1954,287 @@
 .ls-member-detail > p:has(> a) {
   margin-top: 24px;
 }
+
+/* ---------- Features explorer (2026-10-23): tabs, search, audience filter, cards ---------- */
+.ls-feature-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  justify-content: space-between;
+  gap: 16px 24px;
+}
+.ls-feature-search {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1 1 280px;
+  max-width: 520px;
+  font-size: 15px;
+  color: var(--paper-muted);
+}
+.ls-feature-search input {
+  min-height: 46px;
+  padding: 8px 12px;
+  border: 1px solid var(--paper-shade);
+  border-radius: 2px;
+  background: #fffaf0;
+  color: var(--paper-ink);
+  font: inherit;
+  font-size: 17px;
+}
+.ls-feature-audience {
+  display: inline-flex;
+  border: 1px solid var(--paper-shade);
+  border-radius: 2px;
+  background: var(--paper-card);
+}
+.ls-site .ls-feature-audience button {
+  min-height: 44px;
+  padding: 0 16px;
+  border: 0;
+  background: none;
+  color: var(--paper-ink);
+  font: inherit;
+  font-size: 15px;
+  cursor: pointer;
+}
+.ls-site .ls-feature-audience button[aria-checked="true"] {
+  background: var(--paper-ink);
+  color: var(--paper);
+}
+.ls-feature-results {
+  border: 1px solid var(--paper-shade);
+  background: var(--paper-card);
+  padding: 14px 18px;
+}
+.ls-feature-results ul {
+  list-style: none;
+  margin: 8px 0 0;
+  padding: 0;
+  display: grid;
+  gap: 4px;
+}
+.ls-site .ls-feature-results button {
+  display: block;
+  width: 100%;
+  text-align: left;
+  padding: 10px 12px;
+  border: 0;
+  border-radius: 2px;
+  background: none;
+  color: var(--paper-ink);
+  font: inherit;
+  cursor: pointer;
+}
+.ls-site .ls-feature-results button:hover,
+.ls-site .ls-feature-results button:focus-visible {
+  background: var(--paper-shade);
+}
+.ls-feature-result-text {
+  display: block;
+  font-size: 14px;
+  color: var(--paper-muted);
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+.ls-feature-tabs-wrap {
+  position: sticky;
+  top: 0;
+  z-index: 4;
+  margin: 0 calc(var(--gutter) * -1);
+  padding: 10px var(--gutter);
+  background: var(--paper);
+  border-bottom: 1px solid var(--paper-shade);
+}
+.ls-feature-tabs {
+  display: flex;
+  gap: 8px;
+  overflow-x: auto;
+  scrollbar-width: thin;
+}
+.ls-site .ls-feature-tabs button {
+  flex: none;
+  min-height: 44px;
+  padding: 0 16px;
+  border: 1px solid var(--paper-shade);
+  border-radius: 999px;
+  background: var(--paper-card);
+  color: var(--paper-ink);
+  font: inherit;
+  font-size: 15px;
+  cursor: pointer;
+  white-space: nowrap;
+}
+.ls-site .ls-feature-tabs button[aria-selected="true"] {
+  background: var(--paper-ink);
+  border-color: var(--paper-ink);
+  color: var(--paper);
+}
+.ls-site .ls-feature-tabs button:focus-visible,
+.ls-site .ls-feature-audience button:focus-visible {
+  outline: 2px solid var(--paper-link);
+  outline-offset: 2px;
+}
+.ls-feature-panel {
+  display: flex;
+  flex-direction: column;
+  gap: 20px;
+}
+.ls-feature-panel-head {
+  display: grid;
+  grid-template-columns: minmax(0, 6fr) minmax(0, 5fr);
+  gap: clamp(24px, 4vw, 48px);
+  align-items: center;
+}
+.ls-feature-panel-head h2 {
+  font-size: clamp(36px, 3vw + 16px, 56px);
+}
+.ls-feature-gallery {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+}
+.ls-feature-thumbs {
+  display: flex;
+  gap: 10px;
+}
+.ls-site .ls-feature-thumbs button {
+  width: 96px;
+  padding: 0;
+  border: 2px solid transparent;
+  border-radius: 2px;
+  background: none;
+  cursor: pointer;
+  opacity: 0.7;
+}
+.ls-site .ls-feature-thumbs button[aria-pressed="true"] {
+  border-color: var(--paper-link);
+  opacity: 1;
+}
+.ls-feature-thumbs img {
+  display: block;
+  width: 100%;
+  aspect-ratio: 16 / 10;
+  object-fit: cover;
+}
+.ls-feature-subhead {
+  display: flex;
+  align-items: baseline;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 8px;
+  border-bottom: 1px solid var(--paper-shade);
+  padding-bottom: 6px;
+}
+.ls-feature-subhead h3 {
+  font: 700 15px/1.6 var(--sc);
+  letter-spacing: 0.12em;
+  color: var(--paper-link);
+}
+.ls-site .ls-feature-toggle {
+  border: 0;
+  padding: 8px 0;
+  background: none;
+  color: var(--paper-link);
+  text-decoration: underline;
+  font: inherit;
+  font-size: 15px;
+  cursor: pointer;
+}
+.ls-feature-cards {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(320px, 1fr));
+  gap: 14px;
+  align-items: start;
+}
+.ls-feature-card {
+  border: 1px solid var(--paper-shade);
+  background: var(--paper-card);
+}
+.ls-feature-card[open] {
+  border-color: var(--gold-deep);
+}
+.ls-feature-card summary {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 14px 44px 14px 16px;
+  position: relative;
+  cursor: pointer;
+  list-style: none;
+}
+.ls-feature-card summary::-webkit-details-marker {
+  display: none;
+}
+.ls-feature-card summary::after {
+  content: "+";
+  position: absolute;
+  right: 16px;
+  top: 12px;
+  font: 700 22px/1 var(--serif);
+  color: var(--paper-link);
+}
+.ls-feature-card[open] summary::after {
+  content: "−";
+}
+.ls-feature-card summary:focus-visible {
+  outline: 2px solid var(--paper-link);
+  outline-offset: -2px;
+}
+.ls-feature-card-title {
+  font: 700 22px/1.2 var(--serif);
+  color: var(--paper-ink);
+}
+.ls-feature-card-summary {
+  font-size: 15px;
+  color: var(--paper-muted);
+}
+.ls-feature-card ul {
+  margin: 0;
+  padding: 0 16px 16px 34px;
+  font-size: 15px;
+  color: var(--paper-ink);
+}
+.ls-feature-card li + li {
+  margin-top: 4px;
+}
+.ls-feature-minor {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(260px, 1fr));
+  gap: 10px 24px;
+}
+.ls-feature-minor li {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: baseline;
+  gap: 2px 6px;
+  padding: 8px 0;
+  border-bottom: 1px dashed var(--paper-shade);
+  font-size: 15px;
+}
+.ls-feature-minor b {
+  color: var(--paper-ink);
+}
+.ls-feature-minor-text {
+  flex-basis: 100%;
+  color: var(--paper-muted);
+}
+@media (max-width: 860px) {
+  .ls-feature-panel-head {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .ls-feature-cards {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+.ls-feature-results-slot:empty {
+  display: none;
+}
+.ls-site .ls-feature-results button {
+  overflow: hidden;
+  overflow-wrap: anywhere;
+}
