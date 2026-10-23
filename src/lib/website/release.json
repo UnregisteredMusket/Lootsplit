@@ -1,11 +1,11 @@
 {
-  "version": "1.10.0",
-  "date": "October 22, 2026",
-  "filename": "Lootsplit-1.10.0.apk",
-  "sha256": "83f5841e550ced47196e6467d9a1a0827c217712e0457a7147334d25df0cf456",
-  "apkUrl": "https://github.com/UnregisteredMusket/Lootsplit/releases/download/android-v1.10.0/Lootsplit-1.10.0.apk",
-  "releaseUrl": "https://github.com/UnregisteredMusket/Lootsplit/releases/tag/android-v1.10.0",
+  "version": "1.11.0",
+  "date": "October 23, 2026",
+  "filename": "Lootsplit-1.11.0.apk",
+  "sha256": "add727d131fcc2031d89fdf13cae57caa3a8ec2784fd9291981e6daf09f22970",
+  "apkUrl": "https://github.com/UnregisteredMusket/Lootsplit/releases/download/android-v1.11.0/Lootsplit-1.11.0.apk",
+  "releaseUrl": "https://github.com/UnregisteredMusket/Lootsplit/releases/tag/android-v1.11.0",
   "historyUrl": "https://github.com/UnregisteredMusket/Lootsplit/releases",
-  "checksumUrl": "https://github.com/UnregisteredMusket/Lootsplit/releases/download/android-v1.10.0/SHA256SUMS.txt",
-  "versionCode": 17
+  "checksumUrl": "https://github.com/UnregisteredMusket/Lootsplit/releases/download/android-v1.11.0/SHA256SUMS.txt",
+  "versionCode": 18
 }

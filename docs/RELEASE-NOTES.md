@@ -8,6 +8,7 @@ Android version code **18**, same package and permanent signing certificate. Ins
 - **Even coin split** (#230). Split a party fund or an encounter's coins between party members in one step; leftover copper goes to the party fund by default.
 - **Map place hub** (#228, #232). Pins open place cards, records have Show on map, DMs can Place on map and use portrait pins, and the Here sheet lists what is available at the party's location.
 - **Map tools** (#211). Consolidate fog, the alternating 5/10/5 diagonal rule.
+- **Journey planner** (#235). Draw a route on a map for leg distances, travel days and terrain; send a drawn route to a ship voyage request; calibrate a scale bar on maps without a grid.
 
 ## Improved
 
@@ -18,6 +19,15 @@ Android version code **18**, same package and permanent signing certificate. Ins
 ## Fixed
 
 - None in this release.
+
+## Release verification
+
+Published October 23, 2026 by `android-release.yml` (run 39948775805) from main `ca6fbb3`, after the full preservation checks, the API 24 and API 35 widget and picker checks, and the signed-APK upgrade gate passed. Two earlier attempts stopped before publishing: one on a widget-test clock race (fixed in #236), and one because main advanced during the run.
+
+Independent inspection of the public APK:
+- SHA-256 `add727d131fcc2031d89fdf13cae57caa3a8ec2784fd9291981e6daf09f22970` (31,945,666 bytes), matching SHA256SUMS.txt and the GitHub asset digest.
+- Its v2 signing block carries the permanent certificate (`baca95a8…f730a0`, unchanged from 1.10.0).
+- The manifest keeps package `com.unregisteredmusket.lootsplit`, with versionName 1.11.0 and versionCode 18.
 
 ---
 
