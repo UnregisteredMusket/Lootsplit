@@ -154,6 +154,8 @@ export type LedgerLine = {
   trade?: { receiptId: string; leg: "owner" | "treasury" };
   purchase?: { stockId: string; quantity: number; holding: Holding | null };
   listingPurchase?: { listingId: string; quantity: number; holding: Holding };
+  /** Even coin split: every line of one split carries the same split ID (the command or award receipt ID). */
+  split?: { id: string; role: "source" | "share" | "remainder"; keptShare?: number };
   id: string;
   at: number;
   purseId: string;

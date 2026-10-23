@@ -8,6 +8,7 @@ Open **My account → DM encounters**, or **More → DM encounters** in the app.
 4. Start the encounter. Enter initiative, HP, AC, conditions and rounds manually; Next turn cycles the sorted initiative roster, including defeated combatants until the DM removes/skips them. Equal initiatives use roster order.
 5. Record physical results or use app-generated dice in Roll history. Apply results to gameplay yourself.
 6. Conclude to create the private loot review. Edit amounts and recipients, save, then explicitly transfer. The campaign must be on the DM's turn in turn-based mode and must have no pending submitted turn drafts.
+   Coins go to **One purse** (every coin, original coin types, `coinPurseId`) or **Split evenly among** ticked party characters (`coinSplit`; `coinPurseId` is then empty so an older client cannot send everything to one purse). Split shares use gold, silver and copper; the leftover follows the party-fund, chosen-recipient or rotate rule shared with fund splits (see FEATURE-INVENTORY "Even coin split").
 7. The awarded encounter is read-only with a receipt. A retry, double-click or lost response cannot award it again. Export/import intentionally creates a separate new encounter, not a retry of an old award.
 
 ## Persistence and compatibility
@@ -15,6 +16,14 @@ Open **My account → DM encounters**, or **More → DM encounters** in the app.
 Migration `0008_encounters.sql` adds account-owned encounter, roll and award tables. Existing campaign room JSON and legacy saves remain unchanged until a reviewed award adds ordinary holdings/ledger entries. The account encounter records are separate from existing campaign backup exports; export the encounter JSON to keep a portable copy. Server receipts remain authoritative for awards and rolls. Do not delete receipt tables during rollback.
 
 The generator retrieves the SRD 5.1 creature index through Open5e, retaining source attribution. Each creature's environment tags drive filters; no matching data produces a visible message. An external-source outage does not prevent custom encounter editing or access to saved encounters. No copyrighted non-SRD monsters are bundled.
+
+### Coin split awards (2026-10-23)
+
+- **Shape.** The draft may carry optional `coinSplit: { purseIds (1–20), remainderRule: "party-fund" | "recipient" | "rotate", remainderPurseId? }`. At transfer time both paths call the one planner `applyEncounterSplit` (`src/lib/quire/coin-split.ts`), which credits each share and any moved leftover with `creditCoins` and writes ledger lines `${receiptId}-share-${i}` / `${receiptId}-remainder` (`transactionType: "adjustment"`, `split.id = receiptId`). A rotation advances `journal.coinSplit.rotation`.
+- **Receipt.** The award body adds `coinShares: [{ purseId, copper }]`, optional `coinRemainder: { purseId, copper, rule }` and `coinSplitId`; `recipients` lists every share holder. Copper converts to coins with `fromCopper`.
+- **Exactly once.** Unchanged: `dm_encounter_awards`, the room-body comparison and the D1 batch (shared), and the single IndexedDB transaction with the `status === "review"` check (device). A refused split (for example a party fund ticked as a recipient, or too few coins) changes nothing.
+- **Old awards.** Awards with `coinPurseId` and no `coinShares` keep the original branch of `recipientAwardPreview`, byte for byte; tests prove it.
+- **Detail.** Shared detail responses add `splitTable` (purse kinds, NPC flags, party positions and split settings only) so the DM's preview plans exactly what the Worker will.
 
 ## Verification
 

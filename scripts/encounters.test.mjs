@@ -448,3 +448,107 @@ test("lost normal and weighted roll responses recover receipts after newer saves
     await assert.rejects(call("dm","/roll",normal),error=>error.status===403);
   } finally {db.close();}
 });
+
+async function splitFixture() {
+  const f = await fixture();
+  const row = await f.db.prepare("SELECT body FROM campaign_rooms WHERE code=?").bind("BATTLE").first();
+  const room = JSON.parse(row.body);
+  const character = (id, name, coins = {}) => ({
+    id,
+    name,
+    kind: "character",
+    coins: { cp: 0, sp: 0, ep: 0, gp: 0, pp: 0, ...coins },
+  });
+  room.table.purses.push(character("aria", "Aria"), character("bram", "Bram", { pp: 1, ep: 2 }), character("cass", "Cass"));
+  await f.db.prepare("UPDATE campaign_rooms SET body=? WHERE code=?").bind(JSON.stringify(room), "BATTLE").run();
+  return f;
+}
+const splitDraft = (purseIds = ["hero", "aria", "bram", "cass"], remainderRule = "party-fund") => {
+  const e = blankEncounter();
+  e.coins = { cp: 7, sp: 14, ep: 0, gp: 23, pp: 1 }; // 3,447 cp
+  e.coinSplit = { purseIds, remainderRule };
+  e.loot = [{ ...blankLoot(), name: "Potion", purseId: "party" }];
+  return e;
+};
+const roomBody = async (db) =>
+  JSON.parse((await db.prepare("SELECT body FROM campaign_rooms WHERE code=?").bind("BATTLE").first()).body);
+
+test("split encounter coins: shares paid exactly once across a retry, leftover to the party fund, receipt recorded", async () => {
+  const { db, call, id } = await splitFixture();
+  try {
+    await call("dm", "/save", { id, revision: 0, encounter: splitDraft() });
+    await call("dm", "/conclude", { id, revision: 1 });
+    const detail = await call("dm", "/detail", { id });
+    assert.deepEqual(detail.body.coinSplit.purseIds, ["hero", "aria", "bram", "cass"]);
+    assert.ok(detail.splitTable.purses.some((p) => p.id === "aria"));
+    const award = await call("dm", "/award", { id, revision: 2 });
+    const retry = await call("dm", "/award", { id, revision: 2 });
+    assert.equal(retry.duplicate, true);
+    assert.equal(retry.award.receiptId, award.award.receiptId);
+    const { table } = await roomBody(db);
+    const copper = (p) => p.coins.cp + p.coins.sp * 10 + p.coins.ep * 50 + p.coins.gp * 100 + p.coins.pp * 1000;
+    const by = (id) => table.purses.find((p) => p.id === id);
+    for (const id of ["hero", "aria", "cass"]) assert.equal(copper(by(id)), 861);
+    // Shares are gold/silver/copper added to the recipient's own coins (pp and ep kept).
+    assert.deepEqual(by("bram").coins, { cp: 1, sp: 6, ep: 2, gp: 8, pp: 1 });
+    assert.equal(copper(by("party")), 1000 + 3);
+    const lines = table.ledger.filter((l) => l.split?.id === award.award.receiptId);
+    assert.equal(lines.length, 5);
+    assert.equal(lines.reduce((s, l) => s + l.copper, 0), 3447);
+    assert.deepEqual(award.award.coinShares.map((s) => s.copper), [861, 861, 861, 861]);
+    assert.deepEqual(award.award.coinRemainder, { purseId: "party", copper: 3, rule: "party-fund" });
+    assert.equal(award.award.coinSplitId, award.award.receiptId);
+    assert.equal(award.award.coinPurseId, "");
+  } finally {
+    db.close();
+  }
+});
+
+test("split encounter coins: a write failure rolls back every share, and invalid splits are refused", async () => {
+  const { db, call, id } = await splitFixture();
+  try {
+    // A split with no ticked recipient never saves.
+    await assert.rejects(call("dm", "/save", { id, revision: 0, encounter: { ...splitDraft(), coinSplit: { purseIds: [], remainderRule: "party-fund" } } }));
+    // A party fund is never a split recipient; the award is refused before anything moves.
+    await call("dm", "/save", { id, revision: 0, encounter: splitDraft(["aria", "party"]) });
+    await call("dm", "/conclude", { id, revision: 1 });
+    await assert.rejects(call("dm", "/award", { id, revision: 2 }), /party funds are not split recipients/);
+    await call("dm", "/save", { id, revision: 2, encounter: splitDraft() });
+    db.exec(
+      "CREATE TRIGGER fail_split BEFORE UPDATE ON campaign_rooms BEGIN SELECT RAISE(ABORT, 'test write failure'); END;",
+    );
+    await assert.rejects(call("dm", "/award", { id, revision: 3 }));
+    db.exec("DROP TRIGGER fail_split");
+    const { table } = await roomBody(db);
+    assert.equal(table.ledger.length, 0);
+    assert.ok(table.purses.filter((p) => p.kind === "character").every((p) => p.coins.gp === 0 && p.coins.cp === 0));
+    assert.equal((await db.prepare("SELECT COUNT(*) AS n FROM dm_encounter_awards").first()).n, 0);
+    assert.equal((await call("dm", "/detail", { id })).status, "review");
+  } finally {
+    db.close();
+  }
+});
+
+test("old single-purse awards read back exactly as before", async () => {
+  const { db, call, id } = await fixture();
+  try {
+    const e = blankEncounter();
+    e.coins = { cp: 0, sp: 6, ep: 0, gp: 12, pp: 1 };
+    e.coinPurseId = "party";
+    await call("dm", "/save", { id, revision: 0, encounter: e });
+    await call("dm", "/conclude", { id, revision: 1 });
+    const { award } = await call("dm", "/award", { id, revision: 2 });
+    assert.deepEqual(Object.keys(award).sort(), ["at", "code", "coinPurseId", "coins", "encounterId", "items", "name", "receiptId", "recipients"]);
+    assert.deepEqual(award.coins, { cp: 0, sp: 6, ep: 0, gp: 12, pp: 1 });
+    const { table } = await roomBody(db);
+    // Original coin types on the one purse; one coin ledger line with no split metadata.
+    assert.deepEqual(table.purses[0].coins, { cp: 0, sp: 6, ep: 0, gp: 22, pp: 1 });
+    assert.equal(table.ledger.filter((l) => l.copper > 0).length, 1);
+    assert.equal(table.ledger.some((l) => l.split), false);
+    // A stored award body from before this change still parses for the device schema too.
+    const detail = await call("dm", "/detail", { id });
+    assert.equal(detail.award.coinShares, undefined);
+  } finally {
+    db.close();
+  }
+});

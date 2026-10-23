@@ -18,6 +18,7 @@ import { estateImportCommand, estateImportFingerprint, previewEstateImport } fro
 import { applyEstateCommand, assertCarried, assertEstateDisposable, initializeEstatePurchase, removeEstateSite, validateEstate } from "./estate.ts";
 import { marketLocationSchema, readMarketLocations, validateShopLocations } from "./shop-locations.ts";
 import { canonicalJson } from "./canonical-json.ts";
+import { applyFundSplit, planCoinSplit, remainderText, SPLIT_RULES, MAX_SPLIT_RECIPIENTS, partyFunds } from "./coin-split.ts";
 import { applyLedgerVoid, assertNoPartialTradeVoid, ledgerVoidCommandSchema } from "./ledger-reversal.ts";
 import { marketNameRowsSchema, marketNameFingerprint, previewMarketNames } from "./market-name-import.ts";
 import {
@@ -48,7 +49,7 @@ import {
   editLegacyCharacter,
 } from "../characters/campaign-sheet.mjs";
 import type { CloudTable, CloudSeat } from "./cloud.ts";
-import { fromCopper, toCopper, spendCoins, priceAfterCharisma } from "./money.ts";
+import { formatCopper, fromCopper, toCopper, spendCoins, priceAfterCharisma } from "./money.ts";
 import { charismaScore, readSheets } from "./sheet.ts";
 import { validateEconomyRows } from "./validation.ts";
 import { listingSchema, propertyProfileSchema, propertyAvailableHere, validatePropertyLocations } from "./property.ts";
@@ -177,6 +178,21 @@ export const commandSchema = z.discriminatedUnion("kind", [
     holdingId: id.nullable(),
     quantity: amount,
   }),
+  z
+    .object({
+      ...base,
+      kind: z.literal("coin-split"),
+      sourceId: id,
+      copper: amount.min(1),
+      recipientIds: z.array(id).min(1).max(MAX_SPLIT_RECIPIENTS),
+      remainder: z
+        .object({ rule: z.enum(SPLIT_RULES), purseId: id.optional() })
+        .strict(),
+      // What the reviewed preview showed; a split that would now differ is refused.
+      expect: z.object({ share: amount.min(1), remainderTo: id.nullable() }).strict(),
+      makeDefault: z.boolean().optional(),
+    })
+    .strict(),
   z.object({
     ...base,
     kind: z.literal("loan"),
@@ -1016,6 +1032,87 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
       to: "party",
       purseId: cmd.fromId,
       text: `${seat.name} transferred ${cmd.copper} cp${cmd.holdingId ? " and items" : ""} to ${t.purses.find((p) => p.id === cmd.toId)?.name}.`,
+    });
+  } else if (cmd.kind === "coin-split") {
+    // Whoever may give from the source may split it (DM, controller or shared-fund permission).
+    const source = own(cmd.sourceId);
+    if (cmd.makeDefault) dm();
+    const plan = planCoinSplit(
+      t,
+      {
+        sourceId: source.id,
+        copper: cmd.copper,
+        recipientIds: cmd.recipientIds,
+        rule: cmd.remainder.rule,
+        ...(cmd.remainder.purseId ? { purseId: cmd.remainder.purseId } : {}),
+      },
+      // A player's client previews pending commands on its projected table (cloud-client.ts).
+      { actor: seat.role === "dm" ? "dm" : "player", projected: execution.preview === true && seat.role !== "dm" },
+    );
+    if (plan.share !== cmd.expect.share || plan.remainderTo !== cmd.expect.remainderTo)
+      throw Error(
+        "The split changed (the party fund, rotation or recipients moved). Review it again.",
+      );
+    applyFundSplit(t, plan, cmd.id, at, execution.preview === true && seat.role !== "dm");
+    const settings = (journal.coinSplit ??= {});
+    if (plan.rotation) settings.rotation = { lastPurseId: plan.rotation };
+    if (cmd.makeDefault) {
+      settings.remainderRule = cmd.remainder.rule;
+      if (
+        cmd.remainder.rule === "party-fund" &&
+        cmd.remainder.purseId &&
+        partyFunds(t).some((p) => p.id === cmd.remainder.purseId)
+      )
+        settings.partyFundId = cmd.remainder.purseId;
+    }
+    if (!Object.keys(settings).length) delete journal.coinSplit;
+    const name = (purseId: string) => t.purses.find((p) => p.id === purseId)?.name ?? "an account";
+    const names = plan.recipientIds.map(name);
+    const list =
+      names.length > 1 ? `${names.slice(0, -1).join(", ")} and ${names.at(-1)}` : names[0];
+    event(
+      `Coin split from ${source.name}: ${formatCopper(plan.copper)} among ${plan.n}`,
+      "management",
+      source.id,
+    );
+    const receipt = journal.events[journal.events.length - 1]!;
+    receipt.split = {
+      id: cmd.id,
+      sourceId: source.id,
+      copper: plan.copper,
+      share: plan.share,
+      n: plan.n,
+      remainder: plan.remainder,
+      remainderTo: plan.remainderTo,
+      rule: plan.rule,
+      recipientIds: plan.recipientIds,
+    };
+    // A split that pays an NPC is DM-only text; party members still see their own lines.
+    if (plan.npc) receipt.dmOnly = true;
+    // Chat keeps 500 characters; a long roster is summarized by count rather than cut off.
+    const leftover = remainderText(plan, name);
+    const full = [`Split ${formatCopper(plan.copper)} from ${source.name}: ${formatCopper(plan.share)} each to ${list}.`, leftover]
+      .filter(Boolean)
+      .join(" ");
+    const text =
+      full.length <= 500
+        ? full
+        : [`Split ${formatCopper(plan.copper)} from ${source.name}: ${formatCopper(plan.share)} each to ${plan.n} characters.`, leftover]
+            .filter(Boolean)
+            .join(" ")
+            .slice(0, 500);
+    // A split that pays an NPC posts its note to the DM only (filed under that NPC's account).
+    const npcId = plan.recipientIds.find((purseId) => {
+      const p = t.purses.find((p) => p.id === purseId);
+      return p?.kind === "character" && (p.control === "npc" || !!journal.world?.npcs.some((n) => n.id === p.id));
+    });
+    t.notes.push({
+      id: cmd.id + "-note",
+      at,
+      from: seat.role,
+      to: plan.npc ? "dm" : "party",
+      purseId: plan.npc && npcId ? npcId : source.id,
+      text,
     });
   } else if (cmd.kind === "loan") {
     const p = own(cmd.purseId);

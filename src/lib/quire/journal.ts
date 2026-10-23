@@ -34,7 +34,31 @@ export const encounterLootProvenanceSchema = z
   .strict();
 export type EncounterLootProvenance = z.infer<typeof encounterLootProvenanceSchema>;
 export const encounterLootEntryId = (receiptId: string) => `encounter-loot:${receiptId}`;
+const splitRule = z.enum(["party-fund", "source", "recipient", "rotate"]);
+/** Campaign coin-split settings. Missing means the party-fund rule (owner decision). */
+export const coinSplitSettingsSchema = z
+  .object({
+    remainderRule: splitRule.optional(),
+    partyFundId: id.optional(),
+    rotation: z.object({ lastPurseId: id }).strict().optional(),
+  })
+  .strict();
+/** One split's receipt on its journal event; ledger lines link to it by `id`. */
+export const coinSplitEventSchema = z
+  .object({
+    id,
+    sourceId: id,
+    copper: z.number().int().positive().max(1e12),
+    share: z.number().int().positive().max(1e12),
+    n: z.number().int().min(1).max(20),
+    remainder: z.number().int().nonnegative().max(19),
+    remainderTo: id.nullable(),
+    rule: splitRule,
+    recipientIds: z.array(id).min(1).max(20),
+  })
+  .strict();
 const journalFields = z.object({
+  coinSplit: coinSplitSettingsSchema.optional(),
   downtimeActivities: downtimeActivitiesSchema.optional(),
   blacksmith: blacksmithSchema.optional(),
   referenceAccess: referencePolicySchema.optional(),
@@ -114,6 +138,7 @@ const journalFields = z.object({
         dmOnly: z.boolean().optional(),
         purseId: id.optional(),
         propertyId: id.optional(),
+        split: coinSplitEventSchema.optional(),
         change: z
           .object({
             entity: z.enum(["stock", "realm", "shop", "holding", "account"]),
@@ -273,6 +298,7 @@ export function preserveJournalMetadata(value: unknown, current: Journal): Journ
     }
   }
   const changes = new Map(current.events.map((event) => [event.id, event.change]));
+  const splits = new Map(current.events.map((event) => [event.id, event.split]));
   const privateEvents = new Set(current.events.filter((e) => e.dmOnly).map((e) => e.id));
   const entries = new Map((current.entries || []).map((entry) => [entry.id, entry]));
   for (const entry of next.entries || []) {
@@ -357,11 +383,15 @@ export function preserveJournalMetadata(value: unknown, current: Journal): Journ
           ],
         }
       : {}),
+    // Older clients drop the optional split settings and receipts; keep the stored ones.
+    ...(next.coinSplit ?? current.coinSplit ? { coinSplit: next.coinSplit ?? current.coinSplit } : {}),
     events: next.events.map((event) => {
       const change = event.change ?? changes.get(event.id);
+      const split = event.split ?? splits.get(event.id);
       return {
         ...event,
         ...(change ? { change } : {}),
+        ...(split ? { split } : {}),
         ...(privateEvents.has(event.id) ? { dmOnly: true } : {}),
       };
     }),

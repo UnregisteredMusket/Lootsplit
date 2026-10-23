@@ -9,7 +9,10 @@ import { accountScenarios } from "./account-scenarios.mjs";
 
 const scenario = process.argv[2];
 // Standalone feature audits that also run in CI against the development server.
-const featureAudits = { "npc-barter": "scripts/npc-barter-browser-audit.mjs" };
+const featureAudits = {
+  "npc-barter": "scripts/npc-barter-browser-audit.mjs",
+  "coin-split": "scripts/coin-split-browser-audit.mjs",
+};
 const known = ["accounts", ...accountScenarios, ...Object.keys(featureAudits)];
 if (process.argv.length !== 3 || !known.includes(scenario))
   throw new Error(`Usage: npm run verify:focus -- ${known.join("|")}`);

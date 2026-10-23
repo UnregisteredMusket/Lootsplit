@@ -226,6 +226,9 @@ jobs:
       - name: dev-local-encounter
         if: matrix.group == 'gameplay'
         run: node scripts/recovery-step.mjs dev-local-encounter 240 node scripts/local-encounter-browser-audit.mjs
+      - name: dev-coin-split
+        if: matrix.group == 'gameplay'
+        run: node scripts/recovery-step.mjs dev-coin-split 240 node scripts/coin-split-browser-audit.mjs
       - name: dev-finance
         if: matrix.group == 'gameplay'
         run: node scripts/recovery-step.mjs dev-finance 240 node scripts/finance-browser-audit.mjs

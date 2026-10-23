@@ -6,6 +6,7 @@ import {
   blankEncounter,
 } from "../src/lib/encounters/model.mjs";
 import { parseDice, throwDice } from "../src/lib/characters/model.mjs";
+import { applyEncounterSplit } from "../src/lib/quire/coin-split.ts";
 const fail = (message, status = 400) => {
   throw Object.assign(new Error(message), { status });
 };
@@ -47,6 +48,29 @@ async function detail(db, user, id) {
   return { row, ...(await dmMembership(db, user, row.code)) };
 }
 const view = (r) => ({ ...r, user_id: undefined, body: JSON.parse(r.body) });
+/** The DM's coin-split preview inputs: party membership, NPC flags and the split settings only. */
+function splitTable(table) {
+  const j = table.journal ?? {};
+  return {
+    purses: (table.purses ?? []).map((p) => ({
+      id: p.id,
+      name: p.name,
+      kind: p.kind,
+      ...(p.control ? { control: p.control } : {}),
+      ...(p.nonParty ? { nonParty: true } : {}),
+      coins: { cp: 0, sp: 0, ep: 0, gp: 0, pp: 0 },
+    })),
+    journal: {
+      ...(j.coinSplit ? { coinSplit: j.coinSplit } : {}),
+      world: {
+        npcs: (j.world?.npcs ?? []).map((n) => ({ id: n.id, locationId: n.locationId, visible: n.visible })),
+        characterPositions: j.world?.characterPositions ?? [],
+      },
+      fleet: { aboard: j.fleet?.aboard ?? [] },
+      tradeEconomy: { exchanges: (j.tradeEconomy?.exchanges ?? []).map((e) => ({ purseId: e.purseId })) },
+    },
+  };
+}
 async function save(db, user, d, encounter, status = d.row.status) {
   if (d.personal) {
     const result = await db
@@ -198,6 +222,7 @@ export async function handleEncounters(db, user, path, body = {}) {
       ...view(d.row),
       readOnly: d.room.closed === true,
       purses: d.room.table.purses.map((p) => ({ id: p.id, name: p.name, kind: p.kind })),
+      splitTable: splitTable(d.room.table),
       award: award ? JSON.parse(award.body) : null,
     };
   }
@@ -346,7 +371,16 @@ export async function handleEncounters(db, user, path, body = {}) {
     };
     const coins = e.coins,
       copper = coins.cp + coins.sp * 10 + coins.ep * 50 + coins.gp * 100 + coins.pp * 1000;
-    if (copper > 0) {
+    let split = null;
+    if (copper > 0 && e.coinSplit) {
+      // One planner for the Worker and the device path (src/lib/quire/coin-split.ts).
+      try {
+        split = applyEncounterSplit(room.table, e.coinSplit, copper, receiptId, at, e.name);
+      } catch (err) {
+        fail(err.message);
+      }
+      room.table.ledger.push(...split.ledger);
+    } else if (copper > 0) {
       const p = findPurse(e.coinPurseId);
       for (const k of Object.keys(coins)) {
         const v = p.coins[k] + coins[k];
@@ -396,9 +430,15 @@ export async function handleEncounters(db, user, path, body = {}) {
       at,
       coins,
       coinPurseId: e.coinPurseId,
+      ...(split ? split.receipt : {}),
       items: e.loot,
       recipients: room.table.purses
-        .filter((p) => p.id === e.coinPurseId || e.loot.some((i) => i.purseId === p.id))
+        .filter(
+          (p) =>
+            (split
+              ? split.touched.includes(p.id)
+              : p.id === e.coinPurseId) || e.loot.some((i) => i.purseId === p.id),
+        )
         .map((p) => ({ id: p.id, name: p.name })),
     };
     // D1 batch is one serializable transaction. A unique receipt is acquired only against

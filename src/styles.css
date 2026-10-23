@@ -3981,3 +3981,79 @@ input,select,textarea { max-width: 100%; }
 .map-record-strip-choices { flex-basis:100%; }
 .map-record-strip-choices ul { margin:0; padding-left:18px; }
 .map-record-strip-choices a { display:inline-flex; min-height:44px; align-items:center; overflow-wrap:anywhere; }
+
+/* Even coin split (Party → Split coins, encounter award, Activity). docs/ENCOUNTERS.md, prompt 2 phase 1. */
+.coin-split { display: grid; gap: .75rem; min-width: 0; }
+.coin-split-field { display: grid; gap: .3rem; font-size: .9rem; }
+.coin-split-field > span { font-weight: 600; }
+.coin-split-field small, .coin-split-hint { color: var(--color-muted); font-size: .8rem; line-height: 1.35; }
+.coin-split-link { background: none; border: 0; padding: 0; color: var(--color-lead); text-decoration: underline; text-underline-offset: 2px; cursor: pointer; font: inherit; min-height: 24px; }
+.coin-split-group { border: 1px solid var(--color-border); border-radius: 8px; padding: .5rem .75rem .65rem; min-width: 0; }
+.coin-split-group > legend { padding: 0 .3rem; font-weight: 600; font-size: .9rem; }
+.coin-split-choose { display: flex; flex-wrap: wrap; gap: .75rem; justify-content: flex-end; }
+.coin-split-check { display: flex; align-items: center; gap: .6rem; min-height: 44px; font-size: .9rem; border-bottom: 1px solid color-mix(in srgb, var(--color-border) 45%, transparent); }
+.coin-split-check:last-child { border-bottom: 0; }
+.coin-split-check input { width: 1.15rem; height: 1.15rem; accent-color: var(--color-lead); flex-shrink: 0; }
+.coin-split-who { flex: 1; min-width: 0; overflow-wrap: anywhere; }
+.coin-split-who small { display: block; color: var(--color-muted); font-size: .75rem; line-height: 1.25; }
+.coin-split-subgroup { display: flex; align-items: center; gap: .5rem; margin: .6rem 0 0; font-size: .78rem; font-weight: 600; color: var(--color-muted); letter-spacing: .06em; text-transform: uppercase; }
+.coin-split-tag { padding: .05rem .4rem; border-radius: 999px; font-size: .68rem; letter-spacing: .06em; background: color-mix(in srgb, var(--color-lead) 18%, var(--color-subtle)); color: var(--color-lead); }
+.coin-split-rules { display: grid; gap: .4rem; margin-top: .4rem; }
+.coin-split-rule { display: grid; grid-template-columns: auto minmax(0, 1fr); gap: .1rem .6rem; align-items: start; padding: .55rem .65rem; border: 1px solid var(--color-border); border-radius: 8px; background: color-mix(in srgb, var(--color-subtle) 55%, transparent); font-size: .9rem; cursor: pointer; }
+.coin-split-rule input { margin-top: .2rem; width: 1.1rem; height: 1.1rem; accent-color: var(--color-lead); }
+.coin-split-rule small { grid-column: 2; color: var(--color-muted); font-size: .78rem; line-height: 1.3; }
+.coin-split-rule select { grid-column: 2; margin-top: .35rem; }
+.coin-split-rule.is-selected { border-color: var(--color-lead); background: color-mix(in srgb, var(--color-lead) 10%, var(--color-elevated)); }
+.coin-split-rule.is-disabled { opacity: .55; cursor: not-allowed; }
+.coin-split-default { margin-left: .35rem; font-size: .68rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; color: var(--color-lead); }
+.coin-split-preview { border: 1px solid var(--fantasy-metal, var(--color-border)); border-radius: 6px; overflow: hidden; min-width: 0; }
+.coin-split-preview-head { display: flex; flex-wrap: wrap; justify-content: space-between; gap: .25rem .75rem; padding: .55rem .75rem; background: color-mix(in srgb, var(--color-lead) 10%, var(--color-elevated)); font-size: .85rem; }
+.coin-split-preview-head strong { font-family: var(--font-display); font-size: 1.15rem; font-variant: small-caps; color: var(--fantasy-title, var(--color-lead)); }
+.coin-split-row { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: .1rem .75rem; padding: .5rem .75rem; border-top: 1px solid color-mix(in srgb, var(--color-border) 60%, transparent); font-size: .9rem; overflow-wrap: anywhere; }
+.coin-split-row small { display: block; color: var(--color-muted); font-size: .75rem; }
+.coin-split-amt { text-align: right; font-variant-numeric: tabular-nums; font-weight: 600; white-space: nowrap; }
+.coin-split-row .coin-split-chips { grid-column: 1 / -1; }
+.coin-split-row.is-remainder { background: color-mix(in srgb, var(--color-lead) 6%, transparent); }
+.coin-split-row.is-source .coin-split-amt, .coin-split-minus { color: color-mix(in srgb, var(--color-negative) 70%, var(--color-fg)); }
+.coin-split-plus { color: color-mix(in srgb, var(--color-positive) 70%, var(--color-fg)); }
+.coin-split-chips { display: flex; flex-wrap: wrap; gap: .3rem; }
+.coin-split-chip { display: inline-flex; align-items: center; gap: .25rem; padding: .05rem .4rem .05rem .2rem; border-radius: 999px; border: 1px solid var(--color-border); font-size: .75rem; font-variant-numeric: tabular-nums; background: var(--color-bg); }
+.coin-split-chip::before { content: ""; width: .8rem; height: .8rem; border-radius: 50%; box-shadow: inset 0 0 0 1px #0004; }
+.coin-split-chip.gp::before { background: radial-gradient(circle at 35% 30%, #f6dd8a, #b8892c); }
+.coin-split-chip.sp::before { background: radial-gradient(circle at 35% 30%, #f2f2f2, #9aa0a6); }
+.coin-split-chip.cp::before { background: radial-gradient(circle at 35% 30%, #e7a774, #8f4f25); }
+.coin-split-sum { padding: .5rem .75rem; border-top: 1px dashed var(--color-border); font-size: .8rem; color: var(--color-muted); font-variant-numeric: tabular-nums; overflow-wrap: anywhere; }
+.coin-split-sum b { color: color-mix(in srgb, var(--color-positive) 70%, var(--color-fg)); }
+.coin-split-alert { padding: .65rem .75rem; border: 1px solid var(--color-danger); border-left-width: 4px; border-radius: 6px; background: color-mix(in srgb, var(--color-danger) 12%, var(--color-elevated)); font-size: .9rem; }
+.coin-split-alert strong { display: block; }
+.coin-split-confirm { padding: .75rem; border: 1px solid var(--fantasy-metal, var(--color-border)); border-radius: 6px; background: color-mix(in srgb, var(--color-elevated) 70%, var(--color-bg)); font-size: .9rem; }
+.coin-split-confirm ul { margin: .4rem 0 0; padding-left: 1.1rem; list-style: disc; }
+.coin-split-spinner { display: inline-block; width: 1em; height: 1em; margin-right: .35rem; vertical-align: -.15em; border-radius: 50%; border: 2px solid currentColor; border-right-color: transparent; animation: coin-split-spin .8s linear infinite; }
+@keyframes coin-split-spin { to { transform: rotate(360deg); } }
+.coin-split-mode { display: grid; gap: .5rem; margin-top: .25rem; }
+@media (min-width: 720px) { .coin-split-mode { grid-template-columns: minmax(0, 1fr) minmax(0, 1.4fr); align-items: start; } }
+.coin-split-fund-row { display: flex; align-items: center; gap: .5rem; }
+.coin-split-entry { padding: .85rem 0; border-bottom: 1px solid var(--color-border); }
+.coin-split-entry > summary { list-style: none; cursor: pointer; display: grid; grid-template-columns: auto minmax(0, 1fr) auto; gap: .2rem .65rem; align-items: start; min-height: 44px; }
+.coin-split-entry > summary::-webkit-details-marker { display: none; }
+.coin-split-icon { display: grid; place-items: center; width: 2.2rem; height: 2.2rem; border-radius: 50%; border: 1px solid var(--fantasy-metal, var(--color-border)); background: color-mix(in srgb, var(--color-lead) 14%, var(--color-elevated)); color: var(--color-lead); font-weight: 700; }
+.coin-split-heading { min-width: 0; overflow-wrap: anywhere; }
+.coin-split-title { font-size: .95rem; font-weight: 600; }
+.coin-split-entry small { display: block; color: var(--color-muted); font-size: .75rem; margin-top: .15rem; }
+.coin-split-total { text-align: right; font-weight: 600; font-size: .9rem; white-space: nowrap; }
+.coin-split-lines { list-style: none; margin: .6rem 0 0 2.85rem; padding: 0; border-left: 2px solid color-mix(in srgb, var(--color-lead) 40%, transparent); }
+.coin-split-lines li { display: grid; grid-template-columns: minmax(0, 1fr) auto; gap: .1rem .75rem; padding: .35rem 0 .35rem .75rem; font-size: .85rem; overflow-wrap: anywhere; }
+.coin-split-lines li > span:nth-child(2) { text-align: right; white-space: nowrap; }
+.coin-split-lines li small { grid-column: 1 / -1; margin: 0; }
+.coin-split-lines li.is-remainder { font-style: italic; }
+.coin-split-session { margin: .35rem 0 0; font-size: .875rem; }
+@media (max-width: 430px) {
+  .coin-split-lines { margin-left: .5rem; }
+  .coin-split-entry > summary { grid-template-columns: auto minmax(0, 1fr); }
+  .coin-split-total { grid-column: 2; text-align: left; }
+}
+@media (max-width: 340px) {
+  .coin-split-row { grid-template-columns: minmax(0, 1fr); }
+  .coin-split-amt { text-align: left; }
+}
+@media (prefers-reduced-motion: reduce) { .coin-split-spinner { animation: none; } }

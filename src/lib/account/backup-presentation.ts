@@ -81,6 +81,8 @@ export function pendingCommandDescription(value: unknown): string {
       return `Buy ${c.quantity} listed units · character ${c.purseId}`;
     case "give":
       return `Transfer ${formatCopper(c.copper)}${c.holdingId ? ` and ${c.quantity} item units` : ""} · ${c.fromId} → ${c.toId}`;
+    case "coin-split":
+      return `Split ${formatCopper(c.copper)} among ${c.recipientIds.length} · from ${c.sourceId}`;
     case "bank-repay":
     case "finance-repay":
       return `Repay ${formatCopper(c.copper)} · debt ${c.loanId}`;

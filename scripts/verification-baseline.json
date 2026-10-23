@@ -24,6 +24,7 @@
   "node scripts/recovery-step.mjs dev-encounter 240 node scripts/encounter-browser-audit.mjs",
   "node scripts/recovery-step.mjs dev-local-encounter 240 node scripts/local-encounter-browser-audit.mjs",
   "node scripts/recovery-step.mjs dev-finance 240 node scripts/finance-browser-audit.mjs",
+  "node scripts/recovery-step.mjs dev-coin-split 240 node scripts/coin-split-browser-audit.mjs",
   "node scripts/recovery-step.mjs dev-shop-stock 240 node scripts/shop-stock-browser-audit.mjs",
   "node scripts/recovery-step.mjs dev-control-panel 240 node scripts/control-panel-browser-audit.mjs",
   "node scripts/recovery-step.mjs dev-library-navigation 240 node scripts/library-navigation-browser-audit.mjs",

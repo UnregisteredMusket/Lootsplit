@@ -300,12 +300,14 @@ export function WelcomePage() {
               Loot, settled <em>fairly.</em>
             </h2>
             <p className="ls-lead">
-              Award the hoard after a fight, review it, and send it once to the characters or the
-              party fund. From the first copper piece to a dragon’s hoard, every coin is recorded.
+              Award the hoard after a fight, review it, and send it once to one purse or split the
+              coins evenly across the party. From the first copper piece to a dragon’s hoard, every
+              coin is recorded.
             </p>
             <ul className="ls-ticks">
               <li>Five coin denominations with conversion, payments and transfers</li>
               <li>Guaranteed items and weighted loot tables per encounter</li>
+              <li>Even coin splits to the copper, with the leftover sent where you choose</li>
               <li>A review step before the one-time transfer, so nothing is paid twice</li>
               <li>Character purses, party funds and a full activity ledger with voiding</li>
             </ul>

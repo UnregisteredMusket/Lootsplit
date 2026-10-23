@@ -9,7 +9,8 @@ import { useState, useMemo, useEffect } from "react";
 import { toast } from "sonner";
 import { useEconomy } from "@/lib/quire/economy-context";
 import { useSeat } from "@/lib/quire/seat";
-import type { Journal } from "@/lib/quire/journal";
+import { selectSessionLedgerRows, type Journal } from "@/lib/quire/journal";
+import { splitActivity, type SplitActivity } from "@/lib/quire/split-activity";
 import {
   readArchiveResult,
   readSessionSummary,
@@ -235,11 +236,24 @@ export function CampaignJournal({
         .includes(requestSearch.trim().toLowerCase()));
   const shownLoanRequests = requestKind === "payments" ? [] : loanRequests.filter(matchesRequest);
   const shownRequests = requestKind === "loans" ? [] : requests.filter(matchesRequest);
-  const events = [
+  // Each coin split is one row; inside it, every line this seat's projection supplies.
+  const splits = useMemo(
+    () =>
+      splitActivity(ledger, journal.events, purses, { dm, ownPurseIds: seat.purseIds }),
+    [ledger, journal.events, purses, dm, seat.purseIds],
+  );
+  const events: Array<
+    | (typeof ledger)[number] & { kind: string }
+    | Journal["events"][number]
+    | SplitActivity
+  > = [
     ...ledger
-      .filter((x) => dm || seat.purseIds.includes(x.purseId))
+      .filter((x) => !x.split && (dm || seat.purseIds.includes(x.purseId)))
       .map((x) => ({ ...x, kind: "transaction" })),
-    ...journal.events.filter((x) => dm || !x.purseId || seat.purseIds.includes(x.purseId)),
+    ...journal.events.filter(
+      (x) => !x.split && (dm || !x.purseId || seat.purseIds.includes(x.purseId)),
+    ),
+    ...splits,
   ].sort((a, b) => b.at - a.at);
   const reports = useMemo(
     () =>
@@ -270,6 +284,10 @@ export function CampaignJournal({
       }),
     [journal.sessions, journal.reports, ledger, archiveSeat],
   );
+  const sessionSplits = (session: Journal["sessions"][number]) => {
+    const ids = new Set(selectSessionLedgerRows(ledger, session).map((l) => l.id));
+    return splits.filter((split) => split.lines.some((l) => ids.has(l.id)));
+  };
   const shownSessions = sessionRecords.filter(
     ({ session }) =>
       (!sessionSearch.trim() ||
@@ -399,6 +417,15 @@ export function CampaignJournal({
                       Read session report
                     </Button>
                   )}
+                  {sessionSplits(session).map((split) => (
+                    <p className="coin-split-session" key={split.id}>
+                      <strong>{split.title}</strong>
+                      {split.event?.split
+                        ? ` · ${dm ? `${split.event.split.n} shares of ` : ""}${formatCopper(split.event.split.share)}${dm ? "" : " each"}`
+                        : ` · ${formatCopper(split.copper)}`}{" "}
+                      <AppLink href={`/features/reports#split-${split.id}`}>Open in Activity</AppLink>
+                    </p>
+                  ))}
                   {sessionChronicleEntries(journal.entries || [], seat, session.id).map((entry) => (
                     <AppLink
                       className="settings-link"
@@ -799,7 +826,10 @@ export function CampaignJournal({
           <p className="text-sm text-muted">
             {shownEvents.length} of {events.length} records
           </p>
-          {shownEvents.map((x, i) => (
+          {shownEvents.map((x, i) =>
+            x.kind === "split" && "lines" in x ? (
+              <SplitActivityRow key={`${x.id}-${i}`} split={x} purses={purses} ownPurseIds={dm ? [] : seat.purseIds} />
+            ) : (
             <div className="journal-entry" key={`${x.id}-${i}`}>
               <p>{x.summary}</p>
               {dm && "change" in x && x.change ? <RecordedChange change={x.change} /> : null}
@@ -808,7 +838,8 @@ export function CampaignJournal({
                 {"copper" in x ? ` · ${formatCopper(x.copper)}` : ""}
               </small>
             </div>
-          ))}
+            ),
+          )}
           {!events.length ? <p>No activity recorded.</p> : null}
           {!!events.length && !shownEvents.length && (
             <p>No activity matches. Clear the search or choose All activity.</p>
@@ -828,6 +859,60 @@ export function CampaignJournal({
     </div>
   );
 }
+/** One coin split: a single Activity row that opens to its ledger lines (one split ID). */
+function SplitActivityRow({
+  split,
+  purses,
+  ownPurseIds,
+}: {
+  split: SplitActivity;
+  purses: { id: string; name: string }[];
+  ownPurseIds: string[];
+}) {
+  const name = (id: string) => purses.find((p) => p.id === id)?.name ?? "An account";
+  return (
+    <details className="coin-split-entry" id={`split-${split.id}`}>
+      <summary>
+        <span className="coin-split-icon" aria-hidden="true">
+          {split.source === "encounter" ? "⚔" : "÷"}
+        </span>
+        <span className="coin-split-heading">
+          <span className="coin-split-title">{split.title}</span>
+          <small>
+            {new Date(split.at).toLocaleString()} · split
+            {split.detail ? ` · ${split.detail}` : ""}
+          </small>
+        </span>
+        <span className="coin-split-total tabular-nums">
+          {split.source === "encounter" ? "+" : ""}
+          {formatCopper(split.copper)}
+        </span>
+      </summary>
+      <ul className="coin-split-lines">
+        {split.lines.map((line) => (
+          <li key={line.id} className={line.split?.role === "remainder" ? "is-remainder" : undefined}>
+            <span>
+              {ownPurseIds.includes(line.purseId) ? (
+                <strong>{name(line.purseId)} (you)</strong>
+              ) : (
+                name(line.purseId)
+              )}
+            </span>
+            <span className={`tabular-nums ${line.copper < 0 ? "coin-split-minus" : "coin-split-plus"}`}>
+              {line.copper > 0 ? "+" : ""}
+              {formatCopper(line.copper)}
+            </span>
+            <small>
+              {line.summary}
+              {line.split?.keptShare ? ` (kept its own ${formatCopper(line.split.keptShare)} share)` : ""}
+            </small>
+          </li>
+        ))}
+      </ul>
+    </details>
+  );
+}
+
 export function PriceHistory() {
   const dm = useSeat().role === "dm";
   const { journal } = useEconomy();
