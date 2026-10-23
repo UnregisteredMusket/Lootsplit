@@ -246,7 +246,9 @@ function LotCard({ t, h, mine, readOnly }: { t: LootTable; h: Holding; mine: Pur
   const [pending, setPending] = useState<LootChoice | null>(null);
   const [error, setError] = useState("");
   const [busyOut, setBusyOut] = useState(false);
-  const action = useCommandId(`${h.id}|${who?.id}|${pending ?? ""}|${current?.choice ?? ""}`);
+  // One command ID per (lot, character, prior claim); each choice derives its own from it, so a
+  // retried click reuses its ID and a different choice is a different action.
+  const action = useCommandId(`${h.id}|${who?.id}|${current?.choice ?? ""}`);
   const outAction = useCommandId(`out|${h.id}`);
   const shownChoice = pending ?? current?.choice ?? null;
   const count = (c: LootChoice) => claims.filter((x) => x.choice === c).length;
@@ -258,7 +260,7 @@ function LotCard({ t, h, mine, readOnly }: { t: LootTable; h: Holding; mine: Pur
     try {
       const refusal = await economy.lootClaim(
         { holdingId: h.id, purseId: who.id, choice, before: current?.choice ?? null },
-        { commandId: action.commandId },
+        { commandId: `${action.commandId}-${choice}` },
       );
       if (refusal) setError(refusal);
       else action.renew();
