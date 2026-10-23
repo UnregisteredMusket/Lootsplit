@@ -26,6 +26,7 @@ import { propertyAvailableHere } from "./property.ts";
 import { canAccessEstate } from "./estate.ts";
 import { readEstate } from "./estate-schema.ts";
 import { mapAccessible, projectTabletopMap } from "./tabletop.ts";
+import { projectJourneys } from "./journey-engine.ts";
 
 /** Server/default projections enforce historical seats; verified local DM readers may retain their owned nested records. */
 export function projectRecord(
@@ -292,6 +293,13 @@ export function projectRecord(
           ),
         !!world.partyPosition,
       );
+    // Journeys: status, progress and terrain; private routes and fogged waypoints are cut here.
+    projectJourneys(
+      table,
+      world,
+      seat,
+      new Set(readMarketLocations(t.journal.market).locations.map((l) => l.id)),
+    );
     // DM setting: party companions' funds are readable by party players (decided on the unprojected table).
     const companions = new Set(
       table.purses.filter((p) => companionFundsReadable(table, p, seat)).map((p) => p.id),

@@ -3,13 +3,13 @@ import { accountRequestOrigin } from "../src/lib/deployment/origins.mjs";
 import { ownerTestMode } from "./test-mode.mjs";
 import { campaignRecords } from "./campaign-records.mjs";
 import { accountMapAsset, validateBackupMapAssets } from "./account-map-assets.mjs";
-import { hasMapScales, hasPlacementStyles, tableForProtocol } from "../src/lib/quire/tabletop-protocol.ts";
+import { hasJourneys, hasMapScales, hasPlacementStyles, tableForProtocol } from "../src/lib/quire/tabletop-protocol.ts";
 
-/** Tabletop protocol the account client declared: 0 (none) to 6 (current; 4 adds nothing here,
- * 5 adds placement pin styles, 6 map scale bars). */
+/** Tabletop protocol the account client declared: 0 (none) to 7 (current; 4 adds nothing here,
+ * 5 adds placement pin styles, 6 map scale bars, 7 journeys). */
 const tabletopHeader = (request) => {
   const value = Number(request.headers.get("x-lootsplit-tabletop"));
-  return Number.isInteger(value) && value >= 0 ? Math.min(value, 6) : 0;
+  return Number.isInteger(value) && value >= 0 ? Math.min(value, 7) : 0;
 };
 import { publicAnalytics, ownerAnalytics } from "./game-analytics.mjs";
 import { handleEncounters } from "./encounters.mjs";
@@ -475,7 +475,7 @@ export async function handleAccounts(request, env) {
     if (path === "/api/account/records" && request.method === "GET") {
       const result = await campaignRecords(db, userId);
       const protocol = tabletopHeader(request);
-      if (protocol < 6)
+      if (protocol < 7)
         for (const report of result.reports)
           if (report.snapshot) report.snapshot = tableForProtocol(report.snapshot, protocol);
       return cors(json(result));
@@ -627,7 +627,8 @@ export async function handleAccounts(request, env) {
         (protocol < 2 &&
           JSON.stringify(tableForProtocol(stored, protocol)) !== JSON.stringify(stored)) ||
         (protocol < 5 && hasPlacementStyles(stored)) ||
-        (protocol < 6 && hasMapScales(stored))
+        (protocol < 6 && hasMapScales(stored)) ||
+        (protocol < 7 && hasJourneys(stored))
       )
         fail(
           "This backup includes detailed tabletop maps. Restore it on the updated website; the complete backup is retained.",

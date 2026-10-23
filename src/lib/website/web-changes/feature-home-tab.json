@@ -1,0 +1,8 @@
+{
+  "title": "Home tab and a clearer feature row",
+  "summary": "The website header has a Home tab, and the home page's feature row shows a scroll bar.",
+  "items": [
+    "Home sits first in the website header and the phone menu, beside Features, Downloads, Help and Donate.",
+    "\"Everything around the ledger\" on the home page shows a scroll bar so it's clear the row continues sideways."
+  ]
+}

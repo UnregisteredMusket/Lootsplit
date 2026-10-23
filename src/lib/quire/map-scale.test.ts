@@ -76,7 +76,7 @@ test("old saves without a scale load unchanged", () => {
 test("protocols 0-5 never receive a scale bar; their saves keep it", () => {
   const t = fixture();
   assert.equal(MAP_SCALE_PROTOCOL, 6);
-  assert.equal(CURRENT_TABLETOP_PROTOCOL, MAP_SCALE_PROTOCOL);
+  assert.ok(CURRENT_TABLETOP_PROTOCOL >= MAP_SCALE_PROTOCOL);
   assert.equal(hasMapScales(t), true);
   for (const protocol of [0, 1, 2, 3, 4, 5])
     assert.equal(hasMapScales(tableForProtocol(t, protocol)), false, `protocol ${protocol}`);
