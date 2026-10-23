@@ -2,6 +2,8 @@
 
 # Lootsplitter
 
+**License:** source-available under the [PolyForm Noncommercial License 1.0.0](LICENSE.md). You may read, run and change the code for personal, educational and other noncommercial purposes; selling it or running it commercially needs the copyright holder's permission. Bundled third-party resources keep their own licenses (`src/lib/website/resources.ts`).
+
 [Owner monitoring](docs/OWNER-MONITORING.md) connects the website, Android account dashboard, scrollable Field monitor and configurable4×1 companion to a private half-hour journal, daily reports, diagnostics and explicit development status. Logging continues on the backend while devices sleep; dated Android delivery is separate. New and external logs must register for daily-report coverage. See the [implementation/release audit](docs/audit/2026-10-20-monitoring.md) for verified versus pending status.
 
 [Hourly downtime and NPC training](docs/DOWNTIME-ACTIVITIES.md) gives each character 16 usable hours per approved downtime day by default. Players allocate training across Martial, Academic or Skill / Profession with a written description; the DM reviews eligibility and records manual milestone resets. Training changes no character sheets, and lifetime hours/days remain saved. The DM configures daily hours and the default 8-hour training-day conversion. Property work shares the resource; ship travel uses no personal hours. The guide also proposes additional tracking activities for a later decision.
