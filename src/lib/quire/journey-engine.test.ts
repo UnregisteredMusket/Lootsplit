@@ -429,6 +429,15 @@ test("projection: private maps, fog cutting, reasons, purses and prices", () => 
   assert.equal(p.frozen!.durationMinutes, 3666);
   assert.equal(p.destinationLocationId, undefined, "Kestrel Watch is unknown to players");
   assert.equal(projectRecord(hidden, aria).journal!.world!.partyPosition!.x, undefined);
+  // A player's own commands still preview on the projected table (shared play).
+  const view = projectRecord(hidden, aria);
+  assert.doesNotThrow(() =>
+    applyCommand(view, aria, { id: "note", kind: "journal-note", purseId: "aria", visibility: "player", title: "Road", text: "Cold" } as Command, { preview: true }),
+  );
+  const foggedView = projectRecord(t, aria);
+  assert.doesNotThrow(() =>
+    applyCommand(foggedView, aria, { id: "note2", kind: "journal-note", purseId: "aria", visibility: "player", title: "Road", text: "Cold" } as Command, { preview: true }),
+  );
   // Requests: another player's request, messages and unshared reasons stay private.
   const request = propose(fixture(), journey({ requestedBy: "aria", message: "Secret plan" }), aria);
   assert.equal(projectRecord(request, bram).journal!.world!.journeys!.length, 0);

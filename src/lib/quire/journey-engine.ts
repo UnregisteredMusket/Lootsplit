@@ -336,11 +336,13 @@ export function validateJourneys(t: CloudTable, projected = false) {
   if (journeys.filter((j) => (OPEN_JOURNEY_STATUSES as readonly string[]).includes(j.status)).length > 1)
     throw Error("Only one journey can be open at a time.");
   if (projected) return;
+  // A player's projected table (previews of their own commands) has journeys without a route or
+  // map on private and fogged maps; only the room's full table is checked for those.
   for (const j of journeys) {
-    if (!j.points || !j.mapId) throw Error("A journey is missing its route.");
     if (["planned", "active", "stopped", "arrived", "completed"].includes(j.status) && !j.frozen)
       throw Error("A reviewed journey must keep its frozen route.");
     if (
+      j.mapId &&
       ["planned", "active", "arrived"].includes(j.status) &&
       !t.journal?.world?.maps.some((m) => m.id === j.mapId)
     )

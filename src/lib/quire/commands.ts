@@ -1326,7 +1326,9 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
       n.portrait = p.portrait;
     }
   }
-  validateWorld(t);
+  // A shared-play preview runs on the seat's projected table (a private map's party position and
+  // journey are redacted); the room re-validates the full table.
+  validateWorld(t, execution.preview === true);
   validateJourneys(t);
   validateNpcBarter(t);
   validateFleet(t);
