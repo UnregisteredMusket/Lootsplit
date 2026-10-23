@@ -29,11 +29,13 @@ import { CharacterSheetPanel } from "@/components/character-sheet";
 import { Button, Modal, Segmented, TextInput } from "@/components/ui";
 import { RemoveButton } from "@/components/quire-ui";
 import { SplitCoins } from "@/components/coin-split";
+import { TreasurePool, usePoolCount } from "@/components/treasure-pool";
+import { partyFunds } from "@/lib/quire/coin-split";
 
 export const Route = createFileRoute("/party")({
   validateSearch: (
     search: Record<string, unknown>,
-  ): { action?: string; section?: "funds" | "characters" } => ({
+  ): { action?: string; section?: "funds" | "characters" | "pool" } => ({
     action:
       search.action === "add" ||
       search.action === "give" ||
@@ -41,7 +43,7 @@ export const Route = createFileRoute("/party")({
       search.action === "split"
         ? search.action
         : "",
-    ...(search.section === "funds" || search.section === "characters"
+    ...(search.section === "funds" || search.section === "characters" || search.section === "pool"
       ? { section: search.section }
       : {}),
   }),
@@ -61,6 +63,7 @@ function PartyPage() {
     if (requestedSection === "funds" || initialAction || hash.startsWith("purse-"))
       setSection("funds");
     else if (requestedSection === "characters") setSection("characters");
+    else if (requestedSection === "pool" || hash === "treasure-pool") setSection("pool");
   }, [requestedSection, initialAction, hash]);
   const [action, setAction] = useState(initialAction ?? "");
   useEffect(() => setAction(initialAction ?? ""), [initialAction]);
@@ -71,6 +74,14 @@ function PartyPage() {
   // of the party, so it is not offered there (owner decision, phase 1).
   const canSplit = seat.role === "dm" || cloud.joined;
   const [splitSource, setSplitSource] = useState("");
+  const poolCount = usePoolCount();
+  // Party sections: the DM's Characters / Funds & inventory, and the treasure pool for everyone.
+  const tabs: Array<[string, string]> = [
+    ...(seat.role === "dm" ? ([["characters", "Characters"]] as Array<[string, string]>) : []),
+    ["funds", seat.role === "dm" ? "Funds & inventory" : "Inventory & purse"],
+    ["pool", "Treasure pool"],
+  ];
+  const shownSection = seat.role !== "dm" && section === "characters" ? "funds" : section;
   const visible =
     seat.role === "player"
       ? economy.purses.filter((purse) => seat.purseIds.includes(purse.id))
@@ -99,56 +110,79 @@ function PartyPage() {
           + Add loot
         </Button>
       </div>
-      {seat.role === "dm" && (
-        <div className="flex flex-wrap items-center gap-3">
-          <div className="mode-switch party-sections" role="tablist" aria-label="Party sections">
-            {[
-              ["characters", "Characters"],
-              ["funds", "Funds & inventory"],
-            ].map(([k, label]) => (
-              <button
-                type="button"
-                id={`party-tab-${k}`}
-                role="tab"
-                aria-selected={section === k}
-                aria-controls={`party-panel-${k}`}
-                tabIndex={section === k ? 0 : -1}
-                key={k}
-                onClick={() => setSection(k!)}
-                onKeyDown={(event) => {
-                  const next =
-                    event.key === "Home"
-                      ? "characters"
-                      : event.key === "End"
-                        ? "funds"
-                        : ["ArrowRight", "ArrowLeft"].includes(event.key)
-                          ? k === "characters"
-                            ? "funds"
-                            : "characters"
+      <div className="flex flex-wrap items-center gap-3">
+        <div className="mode-switch party-sections" role="tablist" aria-label="Party sections">
+          {tabs.map(([k, label], index) => (
+            <button
+              type="button"
+              id={`party-tab-${k}`}
+              role="tab"
+              aria-selected={shownSection === k}
+              aria-controls={`party-panel-${k}`}
+              tabIndex={shownSection === k ? 0 : -1}
+              key={k}
+              onClick={() => setSection(k)}
+              onKeyDown={(event) => {
+                const next =
+                  event.key === "Home"
+                    ? tabs[0]![0]
+                    : event.key === "End"
+                      ? tabs.at(-1)![0]
+                      : event.key === "ArrowRight"
+                        ? tabs[(index + 1) % tabs.length]![0]
+                        : event.key === "ArrowLeft"
+                          ? tabs[(index - 1 + tabs.length) % tabs.length]![0]
                           : undefined;
-                  if (!next) return;
-                  event.preventDefault();
-                  setSection(next);
-                  document.getElementById(`party-tab-${next}`)?.focus();
-                }}
-              >
-                {label}
-              </button>
-            ))}
-          </div>
+                if (!next) return;
+                event.preventDefault();
+                setSection(next);
+                document.getElementById(`party-tab-${next}`)?.focus();
+              }}
+            >
+              {label}
+              {k === "pool" && poolCount > 0 ? (
+                <span className="loot-count" aria-label={`${poolCount} lots`}>
+                  {poolCount}
+                </span>
+              ) : null}
+            </button>
+          ))}
+        </div>
+        {seat.role === "dm" && (
           <AppLink href={seat.role === "dm" ? "/features/reports" : "/features/finances"}>
             Ledger
           </AppLink>
-        </div>
-      )}
-      {seat.role === "dm" && <CharacterPlacement selectedId={managed} />}
+        )}
+      </div>
+      <div
+        id="party-panel-pool"
+        role="tabpanel"
+        aria-labelledby="party-tab-pool"
+        hidden={shownSection !== "pool"}
+        tabIndex={0}
+      >
+        {shownSection === "pool" && (
+          <TreasurePool
+            onAddLoot={
+              readOnly
+                ? undefined
+                : () => {
+                    setSection("funds");
+                    setAction("add");
+                  }
+            }
+            onAddFund={() => void economy.createPurse("party")}
+          />
+        )}
+      </div>
+      {seat.role === "dm" && shownSection === "characters" && <CharacterPlacement selectedId={managed} />}
       {seat.role === "dm" && (
         <div
           className="party-profile-list"
           id="party-panel-characters"
           role="tabpanel"
           aria-labelledby="party-tab-characters"
-          hidden={section !== "characters"}
+          hidden={shownSection !== "characters"}
           tabIndex={0}
         >
           {visible
@@ -270,10 +304,10 @@ function PartyPage() {
       )}
       <div
         id="party-panel-funds"
-        role={seat.role === "dm" ? "tabpanel" : undefined}
-        aria-labelledby={seat.role === "dm" ? "party-tab-funds" : undefined}
-        hidden={seat.role === "dm" && section !== "funds"}
-        tabIndex={seat.role === "dm" ? 0 : undefined}
+        role="tabpanel"
+        aria-labelledby="party-tab-funds"
+        hidden={shownSection !== "funds"}
+        tabIndex={0}
       >
         {!economy.ready ? <p className="mt-6 text-muted">Loading…</p> : null}
         {economy.ready ? (
@@ -425,6 +459,7 @@ function PartyPage() {
                             </span>
                             <span className="text-sm text-muted">
                               {owner?.name ?? "Unassigned"} · {holding.kind} · × {holding.quantity}
+                              {holding.pool ? " · in the treasure pool" : ""}
                             </span>
                           </span>
                           <span className="text-right text-sm tabular-nums">
@@ -733,7 +768,8 @@ function DollarLine({ copper }: { copper: number }) {
 }
 
 function AddHolding({ purses }: { purses: Purse[] }) {
-  const { addHolding } = useEconomy();
+  const { addHolding, journal } = useEconomy();
+  const [pool, setPool] = useState(false);
   const [purseId, setPurseId] = useState(purses[0]?.id ?? "");
   const [name, setName] = useState("");
   const [kind, setKind] = useState<"item" | "property">("item");
@@ -748,6 +784,9 @@ function AddHolding({ purses }: { purses: Purse[] }) {
   useEffect(() => {
     if (!purses.some((purse) => purse.id === purseId)) setPurseId(purses[0]?.id ?? "");
   }, [purses, purseId]);
+  // Treasure pool (prompt 2, phase 2): offered only when the owner is a party fund.
+  const fund = partyFunds({ purses, journal }).some((p) => p.id === purseId);
+  const poolable = fund && kind === "item";
 
   return (
     <>
@@ -794,7 +833,11 @@ function AddHolding({ purses }: { purses: Purse[] }) {
             setSaving(true);
             setError("");
             try {
-              await addHolding(purseId, name.trim(), kind, quantity, copper, { notes, category });
+              await addHolding(purseId, name.trim(), kind, quantity, copper, {
+                notes,
+                category,
+                ...(poolable && pool ? { pool: true } : {}),
+              });
               setName("");
               setPrice("");
               setNotes("");
@@ -851,6 +894,23 @@ function AddHolding({ purses }: { purses: Purse[] }) {
               </option>
             ))}
           </select>
+          {poolable ? (
+            <label className={`coin-split-rule${pool ? " is-selected" : ""}`}>
+              <input type="checkbox" checked={pool} onChange={(e) => setPool(e.target.checked)} />
+              <span>
+                <strong>Put in the treasure pool</strong>
+              </span>
+              <small>
+                The party can mark Need, Greed or Pass. It stays in the party fund until you resolve
+                it in Review Inbox.
+              </small>
+            </label>
+          ) : !partyFunds({ purses, journal }).length ? (
+            <p className="text-sm text-muted">
+              The treasure pool lives in a party fund. This campaign has none, so “Put in the
+              treasure pool” is not offered.
+            </p>
+          ) : null}
           <TextInput
             aria-label="Holding category"
             placeholder="Category (optional)"
@@ -933,8 +993,10 @@ function GiveToPlayer({ purses }: { purses: Purse[] }) {
             )
             .map((purse) => ({ id: purse.id, name: purse.name }))
         : roster.filter((person) => person.id !== fromId);
+  // Pooled items wait for the DM's resolution (owner decision): Give doesn't offer them.
   const mine = holdings.filter(
-    (holding) => holding.purseId === fromId && !holding.custody && !holding.reservedFor,
+    (holding) =>
+      holding.purseId === fromId && !holding.custody && !holding.reservedFor && !holding.pool,
   );
 
   useEffect(() => {

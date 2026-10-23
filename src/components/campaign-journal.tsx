@@ -11,6 +11,7 @@ import { useEconomy } from "@/lib/quire/economy-context";
 import { useSeat } from "@/lib/quire/seat";
 import { selectSessionLedgerRows, type Journal } from "@/lib/quire/journal";
 import { splitActivity, type SplitActivity } from "@/lib/quire/split-activity";
+import { lootActivity, type LootActivity } from "@/lib/quire/loot-activity";
 import {
   readArchiveResult,
   readSessionSummary,
@@ -242,18 +243,33 @@ export function CampaignJournal({
       splitActivity(ledger, journal.events, purses, { dm, ownPurseIds: seat.purseIds }),
     [ledger, journal.events, purses, dm, seat.purseIds],
   );
+  // Each treasure-pool resolution is one row; claim changes group into "Claims marked" rows.
+  const loot = useMemo(
+    () => lootActivity(journal.events, purses, { ownPurseIds: dm ? [] : seat.purseIds }),
+    [journal.events, purses, dm, seat.purseIds],
+  );
   const events: Array<
     | (typeof ledger)[number] & { kind: string }
     | Journal["events"][number]
     | SplitActivity
+    | LootActivity
   > = [
     ...ledger
-      .filter((x) => !x.split && (dm || seat.purseIds.includes(x.purseId)))
+      .filter(
+        (x) =>
+          !x.split && x.loot?.role !== "award" && (dm || seat.purseIds.includes(x.purseId)),
+      )
       .map((x) => ({ ...x, kind: "transaction" })),
     ...journal.events.filter(
-      (x) => !x.split && (dm || !x.purseId || seat.purseIds.includes(x.purseId)),
+      (x) =>
+        !x.split &&
+        !x.lootClaim &&
+        !x.lootResolution &&
+        // Pool events reach a player only through the pool's party rule (projectLoot).
+        (dm || !!x.lootPool || !x.purseId || seat.purseIds.includes(x.purseId)),
     ),
     ...splits,
+    ...loot,
   ].sort((a, b) => b.at - a.at);
   const reports = useMemo(
     () =>
@@ -284,6 +300,13 @@ export function CampaignJournal({
       }),
     [journal.sessions, journal.reports, ledger, archiveSeat],
   );
+  const sessionLoot = (session: Journal["sessions"][number]) =>
+    loot.filter(
+      (row) =>
+        row.icon === "resolve" &&
+        row.at >= session.startedAt &&
+        (!session.endedAt || row.at < session.endedAt),
+    );
   const sessionSplits = (session: Journal["sessions"][number]) => {
     const ids = new Set(selectSessionLedgerRows(ledger, session).map((l) => l.id));
     return splits.filter((split) => split.lines.some((l) => ids.has(l.id)));
@@ -417,6 +440,13 @@ export function CampaignJournal({
                       Read session report
                     </Button>
                   )}
+                  {sessionLoot(session).map((row) => (
+                    <p className="coin-split-session" key={row.id}>
+                      <strong>{row.title}</strong> ·{" "}
+                      {row.lines.map((l) => `${l.who.split(" → ")[1] ?? l.who}: ${l.item}`).join(". ")}{" "}
+                      <AppLink href={`/features/reports#loot-${row.id}`}>Open in Activity</AppLink>
+                    </p>
+                  ))}
                   {sessionSplits(session).map((split) => (
                     <p className="coin-split-session" key={split.id}>
                       <strong>{split.title}</strong>
@@ -827,7 +857,9 @@ export function CampaignJournal({
             {shownEvents.length} of {events.length} records
           </p>
           {shownEvents.map((x, i) =>
-            x.kind === "split" && "lines" in x ? (
+            x.kind === "treasure pool" && "lines" in x ? (
+              <LootActivityRow key={`${x.id}-${i}`} row={x as LootActivity} />
+            ) : x.kind === "split" && "lines" in x ? (
               <SplitActivityRow key={`${x.id}-${i}`} split={x} purses={purses} ownPurseIds={dm ? [] : seat.purseIds} />
             ) : (
             <div className="journal-entry" key={`${x.id}-${i}`}>
@@ -857,6 +889,34 @@ export function CampaignJournal({
         />
       )}
     </div>
+  );
+}
+/** One treasure-pool resolution (or a run of claim changes): one row that opens to its lines. */
+function LootActivityRow({ row }: { row: LootActivity }) {
+  return (
+    <details className="coin-split-entry" id={`loot-${row.id}`}>
+      <summary>
+        <span className="coin-split-icon" aria-hidden="true">
+          {row.icon === "resolve" ? "⚖" : "✎"}
+        </span>
+        <span className="coin-split-heading">
+          <span className="coin-split-title">{row.title}</span>
+          <small>
+            {new Date(row.at).toLocaleString()} · {row.detail}
+          </small>
+        </span>
+        <span className="coin-split-total tabular-nums">{row.total}</span>
+      </summary>
+      <ul className="coin-split-lines">
+        {row.lines.map((line) => (
+          <li key={line.id}>
+            <span>{line.own ? <strong>{line.who} (you)</strong> : line.who}</span>
+            <span>{line.item}</span>
+            <small>{line.detail}</small>
+          </li>
+        ))}
+      </ul>
+    </details>
   );
 }
 /** One coin split: a single Activity row that opens to its ledger lines (one split ID). */
