@@ -24,7 +24,8 @@ jobs:
       github.repository == 'UnregisteredMusket/Lootsplit'
     runs-on: ubuntu-latest
     environment: production
-    timeout-minutes: 15
+    # Deploy plus live audits of two origins (lootsplitter.com + workers.dev) since #214.
+    timeout-minutes: 25
     # A job's permissions replace the workflow defaults, so list everything this job uses.
     permissions:
       contents: read
