@@ -1085,6 +1085,9 @@ public class OwnerWidgetTest {
         // Relative ages only while the fast cadence re-renders; otherwise the clock time.
         long now=System.currentTimeMillis();
         JSONObject event=activityEvent("pr-merged","ok","Merged #138","Widget redesign",138,2);
+        // Pin the age to the same clock reading the assertions use; building the event reads
+        // the clock again, and a millisecond later "2m ago" floors to "1m" (API 24 flake, 1.11.0).
+        event.put("at",now-2*60000L);
         assertEquals("Merged #138 · Widget redesign · 2m",WidgetRows.activityLine(event,now,true));
         assertEquals("Merged #138 · Widget redesign · "+WidgetRows.clock(event.getLong("at")),WidgetRows.activityLine(event,now,false));
         org.json.JSONArray events=new org.json.JSONArray().put(event);

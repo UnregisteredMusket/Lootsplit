@@ -51,8 +51,11 @@ export async function checkPlaceHub(page, origin, width) {
   await page.waitForURL((u) => u.pathname === "/maps" && u.searchParams.get("record") === "shop:forge");
   assert.equal(await page.locator(".loot-opening").count(), 0, "Show on map kept the app open");
   await expect(frame.locator(".map-record-highlight")).toHaveCount(1);
-  await expect(card.getByRole("heading", { name: "Ash & Anvil", exact: true })).toBeVisible();
-  await expect(card.getByRole("heading", { name: "Ash & Anvil", exact: true })).toBeFocused();
+  // The card's own heading is level 2; the shop service inside it repeats the name as its h1 once
+  // the shop loads, which made an unlevelled locator match twice on slower runners.
+  const cardHeading = card.getByRole("heading", { name: "Ash & Anvil", exact: true, level: 2 });
+  await expect(cardHeading).toBeVisible();
+  await expect(cardHeading).toBeFocused();
   await expect(frame.getByRole("img", { name: "Brackenford", exact: true })).toBeVisible();
   await expect(card.getByRole("button", { name: /^Buy / }).first()).toBeVisible();
   assert.ok(await noHorizontalScroll(page), `Deep-linked card fits at ${width}px`);
