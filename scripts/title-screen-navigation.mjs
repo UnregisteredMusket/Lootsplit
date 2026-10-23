@@ -15,10 +15,13 @@ const publicPaths = new Set([
   "/resources",
   "/donate",
   "/privacy",
+  "/community",
 ]);
+/** Website pages (no title screen, no DM fixture): the listed pages plus community profiles. */
+const isPublicPath = (path) => publicPaths.has(path) || path.startsWith("/community/");
 export async function continueIntoApp(page) {
   const path = new URL(page.url()).pathname.replace(/\/$/, "") || "/";
-  if (publicPaths.has(path)) return;
+  if (isPublicPath(path)) return;
   const title = page.getByRole("button", { name: "Lootsplitter. Click to continue", exact: true });
   await page.waitForFunction(() =>
     document.querySelector(".loot-opening") ||
@@ -30,7 +33,7 @@ export async function continueIntoApp(page) {
 export async function openApplication(page, ...args) {
   const destination = new URL(args[0]);
   if (destination.pathname === "/") await markAppVisitor(page.context(), destination.origin);
-  if (!page.guestAccessAudit && ["localhost", "127.0.0.1"].includes(destination.hostname) && !publicPaths.has(destination.pathname) && destination.pathname !== "/account" && !destination.searchParams.has("join") && destination.searchParams.get("as") !== "player") {
+  if (!page.guestAccessAudit && ["localhost", "127.0.0.1"].includes(destination.hostname) && !isPublicPath(destination.pathname) && destination.pathname !== "/account" && !destination.searchParams.has("join") && destination.searchParams.get("as") !== "player") {
     await prepareDmFixture(page, destination.origin);
   }
   const response = await page.goto(...args);

@@ -54,6 +54,14 @@ export function PrivacyPage() {
               contact email you choose to share.
             </li>
             <li>
+              <strong>Your community profile, if you turn it on:</strong> a handle, whether you
+              DM or play, your games, time zone, usual play times, an optional Discord username
+              and a looking-for-group note. You choose who sees it: nobody (the default),
+              signed-in members, or everyone including search engines. It shows those details
+              with your display name, picture and introduction, never your email addresses.
+              Reports members send about a profile are kept for site staff.
+            </li>
+            <li>
               <strong>Sign-in sessions:</strong> each session stores the IP address and browser
               description it started from, to keep your account secure. Sessions last up to 30
               days.

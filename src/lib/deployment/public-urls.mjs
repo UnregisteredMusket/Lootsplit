@@ -10,6 +10,7 @@ const PUBLIC_PAGES = [
   "/resources",
   "/donate",
   "/privacy",
+  "/community",
 ];
 
 /** Host used for absolute share-card URLs. Never taken from Host or X-Forwarded-Host. */
@@ -130,6 +131,11 @@ export const PUBLIC_PAGE_META = Object.freeze({
     title: "Support Lootsplitter",
     description:
       "Lootsplitter is 100% free, supported by donations. Chip in on Ko-fi to help cover hosting and keep it free for every table.",
+  },
+  "/community": {
+    title: "Find a D&D group or players \u00b7 Lootsplitter",
+    description:
+      "The Lootsplitter Looking for Group directory: Dungeon Masters looking for players and players looking for a table, by game, role and time zone.",
   },
   "/privacy": {
     title: "Privacy \u00b7 Lootsplitter",

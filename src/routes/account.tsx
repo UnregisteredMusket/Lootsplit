@@ -13,6 +13,8 @@ import { OwnerMonitor } from "@/components/account/owner-monitor";
 import { MobileOwnerWidget } from "@/components/account/mobile-owner-widget";
 import { ProfileControls } from "@/components/account/profile-controls";
 import { StaffControls } from "@/components/account/staff-controls";
+import { CommunityControls } from "@/components/account/community-controls";
+import { CommunityReports } from "@/components/account/community-reports";
 import { Campaigns } from "@/components/campaigns";
 import { OwnerControls } from "@/components/account/owner-controls";
 import { createFileRoute, Link } from "@tanstack/react-router";
@@ -593,6 +595,7 @@ function Account() {
             {library && library.user.role !== "member" && (
               <div id="account-member-management">
                 <StaffControls userId={library.user.id} role={library.user.role} />
+                <CommunityReports />
               </div>
             )}
           </div>
@@ -637,6 +640,9 @@ function Account() {
               </div>
               <div id="account-profile">
                 <ProfileControls profile={library.profile} onSaved={reload} />
+              </div>
+              <div id="account-community">
+                <CommunityControls profileRevision={library.profile.revision} />
               </div>
               <section className="portal-card" id="account-device-campaigns">
                 <h2>Campaigns on this device</h2>

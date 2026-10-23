@@ -31,6 +31,8 @@ import { Route as ShareRouteImport } from './routes/share'
 import { Route as UpdatesRouteImport } from './routes/updates'
 import { Route as WelcomeRouteImport } from './routes/welcome'
 import { Route as BookBookIdRouteImport } from './routes/book.$bookId'
+import { Route as CommunityIndexRouteImport } from './routes/community.index'
+import { Route as CommunityHandleRouteImport } from './routes/community.$handle'
 import { Route as DownloadAndroidRouteImport } from './routes/download.android'
 import { Route as FeaturesIndexRouteImport } from './routes/features.index'
 import { Route as FeaturesFeatureRouteImport } from './routes/features.$feature'
@@ -148,6 +150,16 @@ const BookBookIdRoute = BookBookIdRouteImport.update({
   path: '/book/$bookId',
   getParentRoute: () => rootRouteImport,
 } as any)
+const CommunityIndexRoute = CommunityIndexRouteImport.update({
+  id: '/community/',
+  path: '/community/',
+  getParentRoute: () => rootRouteImport,
+} as any)
+const CommunityHandleRoute = CommunityHandleRouteImport.update({
+  id: '/community/$handle',
+  path: '/community/$handle',
+  getParentRoute: () => rootRouteImport,
+} as any)
 const DownloadAndroidRoute = DownloadAndroidRouteImport.update({
   id: '/download/android',
   path: '/download/android',
@@ -202,10 +214,12 @@ export interface FileRoutesByFullPath {
   '/updates': typeof UpdatesRoute
   '/welcome': typeof WelcomeRoute
   '/book/$bookId': typeof BookBookIdRoute
+  '/community/$handle': typeof CommunityHandleRoute
   '/download/android': typeof DownloadAndroidRoute
   '/features/$feature': typeof FeaturesFeatureRoute
   '/read/$articleId': typeof ReadArticleIdRoute
   '/shop/$shopId': typeof ShopShopIdRoute
+  '/community/': typeof CommunityIndexRoute
   '/features/': typeof FeaturesIndexRoute
   '/api/room-image/$code/$hash': typeof ApiRoomImageCodeHashRoute
 }
@@ -232,10 +246,12 @@ export interface FileRoutesByTo {
   '/updates': typeof UpdatesRoute
   '/welcome': typeof WelcomeRoute
   '/book/$bookId': typeof BookBookIdRoute
+  '/community/$handle': typeof CommunityHandleRoute
   '/download/android': typeof DownloadAndroidRoute
   '/features/$feature': typeof FeaturesFeatureRoute
   '/read/$articleId': typeof ReadArticleIdRoute
   '/shop/$shopId': typeof ShopShopIdRoute
+  '/community': typeof CommunityIndexRoute
   '/features': typeof FeaturesIndexRoute
   '/api/room-image/$code/$hash': typeof ApiRoomImageCodeHashRoute
 }
@@ -263,10 +279,12 @@ export interface FileRoutesById {
   '/updates': typeof UpdatesRoute
   '/welcome': typeof WelcomeRoute
   '/book/$bookId': typeof BookBookIdRoute
+  '/community/$handle': typeof CommunityHandleRoute
   '/download/android': typeof DownloadAndroidRoute
   '/features/$feature': typeof FeaturesFeatureRoute
   '/read/$articleId': typeof ReadArticleIdRoute
   '/shop/$shopId': typeof ShopShopIdRoute
+  '/community/': typeof CommunityIndexRoute
   '/features/': typeof FeaturesIndexRoute
   '/api/room-image/$code/$hash': typeof ApiRoomImageCodeHashRoute
 }
@@ -295,10 +313,12 @@ export interface FileRouteTypes {
     | '/updates'
     | '/welcome'
     | '/book/$bookId'
+    | '/community/$handle'
     | '/download/android'
     | '/features/$feature'
     | '/read/$articleId'
     | '/shop/$shopId'
+    | '/community/'
     | '/features/'
     | '/api/room-image/$code/$hash'
   fileRoutesByTo: FileRoutesByTo
@@ -325,10 +345,12 @@ export interface FileRouteTypes {
     | '/updates'
     | '/welcome'
     | '/book/$bookId'
+    | '/community/$handle'
     | '/download/android'
     | '/features/$feature'
     | '/read/$articleId'
     | '/shop/$shopId'
+    | '/community'
     | '/features'
     | '/api/room-image/$code/$hash'
   id:
@@ -355,10 +377,12 @@ export interface FileRouteTypes {
     | '/updates'
     | '/welcome'
     | '/book/$bookId'
+    | '/community/$handle'
     | '/download/android'
     | '/features/$feature'
     | '/read/$articleId'
     | '/shop/$shopId'
+    | '/community/'
     | '/features/'
     | '/api/room-image/$code/$hash'
   fileRoutesById: FileRoutesById
@@ -386,10 +410,12 @@ export interface RootRouteChildren {
   UpdatesRoute: typeof UpdatesRoute
   WelcomeRoute: typeof WelcomeRoute
   BookBookIdRoute: typeof BookBookIdRoute
+  CommunityHandleRoute: typeof CommunityHandleRoute
   DownloadAndroidRoute: typeof DownloadAndroidRoute
   FeaturesFeatureRoute: typeof FeaturesFeatureRoute
   ReadArticleIdRoute: typeof ReadArticleIdRoute
   ShopShopIdRoute: typeof ShopShopIdRoute
+  CommunityIndexRoute: typeof CommunityIndexRoute
   FeaturesIndexRoute: typeof FeaturesIndexRoute
   ApiRoomImageCodeHashRoute: typeof ApiRoomImageCodeHashRoute
 }
@@ -550,6 +576,20 @@ declare module '@tanstack/react-router' {
       preLoaderRoute: typeof BookBookIdRouteImport
       parentRoute: typeof rootRouteImport
     }
+    '/community/': {
+      id: '/community/'
+      path: '/community'
+      fullPath: '/community/'
+      preLoaderRoute: typeof CommunityIndexRouteImport
+      parentRoute: typeof rootRouteImport
+    }
+    '/community/$handle': {
+      id: '/community/$handle'
+      path: '/community/$handle'
+      fullPath: '/community/$handle'
+      preLoaderRoute: typeof CommunityHandleRouteImport
+      parentRoute: typeof rootRouteImport
+    }
     '/download/android': {
       id: '/download/android'
       path: '/download/android'
@@ -618,10 +658,12 @@ const rootRouteChildren: RootRouteChildren = {
   UpdatesRoute: UpdatesRoute,
   WelcomeRoute: WelcomeRoute,
   BookBookIdRoute: BookBookIdRoute,
+  CommunityHandleRoute: CommunityHandleRoute,
   DownloadAndroidRoute: DownloadAndroidRoute,
   FeaturesFeatureRoute: FeaturesFeatureRoute,
   ReadArticleIdRoute: ReadArticleIdRoute,
   ShopShopIdRoute: ShopShopIdRoute,
+  CommunityIndexRoute: CommunityIndexRoute,
   FeaturesIndexRoute: FeaturesIndexRoute,
   ApiRoomImageCodeHashRoute: ApiRoomImageCodeHashRoute,
 }

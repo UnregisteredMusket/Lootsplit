@@ -36,6 +36,16 @@ import {
   memberDetail,
 } from "./members.mjs";
 import { campaignAction, resumeCampaignMembership } from "./account-campaigns.mjs";
+import {
+  communityDirectory,
+  communityPortrait,
+  communityProfile,
+  communityReports,
+  moderateCommunityProfile,
+  ownCommunityProfile,
+  reportCommunityProfile,
+  saveCommunityProfile,
+} from "./community.mjs";
 import { restoreDeletedCampaign, campaignRecoveryRecords } from "./campaign-recovery.mjs";
 import {
   siteRole,
@@ -334,6 +344,29 @@ export async function handleAccounts(request, env) {
       return cors(json(await publicDonations(db)));
     if (path === "/api/account/site-analytics" && request.method === "GET")
       return cors(json(await publicAnalytics(db)));
+    // Community profiles: readable without an account; signed-in members also see members-only ones.
+    if (path.startsWith("/api/account/community/") && request.method === "GET") {
+      const viewerSession = await auth.api.getSession({ headers: request.headers }).catch(() => null);
+      let viewer = viewerSession?.user?.id ?? null;
+      if (viewer) {
+        try {
+          await assertActive(db, viewer);
+        } catch {
+          viewer = null;
+        }
+      }
+      let rest = "";
+      try {
+        rest = decodeURIComponent(path.slice("/api/account/community/".length));
+      } catch {
+        fail("No profile with that name is visible to you.", 404);
+      }
+      if (rest === "directory") return cors(json(await communityDirectory(db, viewer, new URL(request.url))));
+      if (rest.startsWith("profile/"))
+        return cors(json(await communityProfile(db, viewer, rest.slice(8))));
+      if (rest.startsWith("portrait/"))
+        return cors(await communityPortrait(db, viewer, rest.slice(9)));
+    }
     const session = await auth.api.getSession({ headers: request.headers });
     if (!session) fail("Sign in to open your account library.", 401);
     const userId = session.user.id;
@@ -388,6 +421,16 @@ export async function handleAccounts(request, env) {
       return cors(json(await monitorApi(env, userId, session.session.id, request, body)));
     if (path === "/api/account/profile" && request.method === "POST")
       return cors(json(await saveProfile(db, userId, body)));
+    if (path === "/api/account/community" && request.method === "GET")
+      return cors(json(await ownCommunityProfile(db, userId)));
+    if (path === "/api/account/community" && request.method === "POST")
+      return cors(json(await saveCommunityProfile(db, userId, body)));
+    if (path === "/api/account/community-report" && request.method === "POST")
+      return cors(json(await reportCommunityProfile(db, userId, body), 201));
+    if (path === "/api/account/staff/community-reports" && request.method === "GET")
+      return cors(json(await communityReports(db, userId)));
+    if (path === "/api/account/staff/community-action" && request.method === "POST")
+      return cors(json(await moderateCommunityProfile(db, userId, body, session.session.id)));
     if (path === "/api/account/activity" && request.method === "GET")
       return cors(json({ ok: true }));
     if (path === "/api/account/staff/members" && request.method === "GET")
