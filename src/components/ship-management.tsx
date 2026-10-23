@@ -1,5 +1,6 @@
 import { VoyageMapRoute } from "./voyage-map-route";
 import { routeDistance } from "@/lib/quire/map-tiles";
+import { setVoyageRouteDraft, voyageRouteDraft } from "@/lib/quire/voyage-route-draft";
 import { AppLink } from "./app-link";
 import { useState } from "react";
 import { useSeat } from "@/lib/quire/seat";
@@ -674,8 +675,10 @@ function VoyageForm({ holding: h, vessel: s }: { holding: Holding; vessel: Vesse
     dm = seat.role === "dm",
     fleet = readFleet(t.journal?.fleet),
     mine = t.purses.filter((p) => dm || seat.purseIds.includes(p.id)),
-    market = readMarketLocations(t.journal?.market);
-  const [destinationId, setDest] = useState(""),
+    market = readMarketLocations(t.journal?.market),
+    // A route drawn on the map with the journey planner ("Use in voyage request").
+    drawn = voyageRouteDraft(h.id);
+  const [destinationId, setDest] = useState(drawn?.destinationId ?? ""),
     [facilityId, setFacility] = useState(""),
     [days, setDays] = useState(1),
     [budget, setBudget] = useState(0),
@@ -683,7 +686,7 @@ function VoyageForm({ holding: h, vessel: s }: { holding: Holding; vessel: Vesse
     [captainId, setCaptain] = useState(""),
     [crew, setCrew] = useState<string[]>([]),
     [notes, setNotes] = useState(""),
-    [mapRoute, setMapRoute] = useState<ShipVoyage["mapRoute"]>();
+    [mapRoute, setMapRoute] = useState<ShipVoyage["mapRoute"]>(drawn?.mapRoute);
   const chars = mine.filter(
     (p) => p.kind === "character" && characterPosition(t, p).shipId === h.id,
   );
@@ -691,7 +694,9 @@ function VoyageForm({ holding: h, vessel: s }: { holding: Holding; vessel: Vesse
     <ActionForm
       title="Propose downtime voyage"
       disabled={!h.locationId || !payerId}
-      command={() => ({
+      command={() => {
+        setVoyageRouteDraft(undefined);
+        return {
         kind: "ship-voyage",
         before: null,
         voyage: {
@@ -723,7 +728,8 @@ function VoyageForm({ holding: h, vessel: s }: { holding: Holding; vessel: Vesse
           routeVersion: 1,
           routeNotes: notes,
         } satisfies ShipVoyage,
-      })}
+        };
+      }}
     >
       <Field label="Voyage destination">
         <SearchSelect
@@ -758,6 +764,8 @@ function VoyageForm({ holding: h, vessel: s }: { holding: Holding; vessel: Vesse
         destinationId={destinationId}
         route={mapRoute}
         set={setMapRoute}
+        propertyId={h.id}
+        initialWaypoints={drawn?.mapRoute.mapId === mapRoute?.mapId ? drawn?.waypoints : undefined}
       />
       {mapRoute ? (
         <p>

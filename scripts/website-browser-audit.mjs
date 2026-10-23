@@ -46,6 +46,7 @@ try {
       ["resources", "Resources & credits"],
       ["donate", "Support Lootsplitter"],
       ["privacy", "Privacy at Lootsplitter"],
+      ["community", "Find your"],
       ["account", "Welcome to your next chapter."],
     ]) {
       const response = await openApplication(page, `${origin}/${path}`, {
@@ -350,7 +351,7 @@ try {
     console.log(`PASS live Android ${release.version}: ${downloadReport.sha256}`);
   }
   console.log(
-    JSON.stringify({ ok: true, widths: [1280, 768, 390, 320], pages: 9, externalFailures }, null, 2),
+    JSON.stringify({ ok: true, widths: [1280, 768, 390, 320], pages: 10, externalFailures }, null, 2),
   );
 } finally {
   await browser.close();

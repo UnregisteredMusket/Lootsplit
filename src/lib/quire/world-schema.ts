@@ -114,6 +114,26 @@ export const mapGridSchema = z
     if (g.x + g.width > 1.000000001 || g.y + g.height > 1.000000001)
       ctx.addIssue({ code: "custom", message: "Grid must fit inside the map image." });
   });
+/** Map distance units for a scale bar. */
+export const mapScaleUnits = ["mi", "km", "ft"] as const;
+/**
+ * A two-point scale bar for an ungridded map (journey planner, tabletop protocol 6). `a` and `b`
+ * are normalized points; `aspect` is the image's width ÷ height when it was calibrated, so
+ * distances use the image's true proportions. A grid always wins when the map has one.
+ */
+export const mapScaleSchema = z
+  .object({
+    a: pointSchema,
+    b: pointSchema,
+    distance: z.number().finite().positive().max(1000000),
+    unit: z.enum(mapScaleUnits),
+    aspect: z.number().finite().min(0.01).max(100),
+  })
+  .strict()
+  .superRefine((s, ctx) => {
+    if (Math.hypot((s.b.x - s.a.x) * s.aspect, s.b.y - s.a.y) < 0.001)
+      ctx.addIssue({ code: "custom", message: "Drag the scale handles apart." });
+  });
 export const mapTokenSchema = z
   .object({
     ...tokenTabletopFields,
@@ -148,6 +168,8 @@ export const campaignMapSchema = z
     type: z.enum(mapTypes).optional(),
     propertyId: id.optional(),
     grid: mapGridSchema.optional(),
+    /** Scale-bar calibration for ungridded maps (tabletop protocol 6). */
+    scale: mapScaleSchema.optional(),
     tokens: z.array(mapTokenSchema).max(200).optional(),
     encounterId: id.optional(),
   })
@@ -286,6 +308,7 @@ export const worldSchema = z
 export type World = z.infer<typeof worldSchema>;
 export type CampaignMap = z.infer<typeof campaignMapSchema>;
 export type MapGrid = z.infer<typeof mapGridSchema>;
+export type MapScale = z.infer<typeof mapScaleSchema>;
 export type MapToken = z.infer<typeof mapTokenSchema>;
 export type PartyMapPosition = z.infer<typeof partyMapPositionSchema>;
 export type Npc = z.infer<typeof npcSchema>;

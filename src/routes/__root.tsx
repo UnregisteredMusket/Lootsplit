@@ -66,7 +66,8 @@ function RootDocument() {
     "/resources",
     "/donate",
     "/privacy",
-  ].includes(pathname.replace(/\/$/, ""));
+    "/community",
+  ].includes(pathname.replace(/\/$/, "")) || pathname.startsWith("/community/");
   const playerDisplay = pathname.replace(/\/$/, "") === "/player-display";
   installMobileApi();
   const appPage = !publicPage && !playerDisplay;

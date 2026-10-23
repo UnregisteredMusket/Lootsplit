@@ -9,7 +9,7 @@ import {
 import { deploymentOrigins } from "../src/lib/deployment/origins.mjs";
 import { grokOgHeadTags } from "./grok-pwa-shared.mjs";
 
-const pages = ["/welcome", "/features", "/downloads", "/updates", "/help", "/resources", "/donate", "/privacy"];
+const pages = ["/welcome", "/features", "/downloads", "/updates", "/help", "/resources", "/donate", "/privacy", "/community"];
 
 test("every public page has its own title and description, short enough for search results", () => {
   assert.deepEqual(Object.keys(PUBLIC_PAGE_META).sort(), [...pages].sort());
@@ -43,6 +43,7 @@ test("each public route head uses its own metadata", () => {
     ["resources", "/resources"],
     ["donate", "/donate"],
     ["privacy", "/privacy"],
+    ["community.index", "/community"],
   ])
     assert.match(
       readFileSync(`src/routes/${file}.tsx`, "utf8"),

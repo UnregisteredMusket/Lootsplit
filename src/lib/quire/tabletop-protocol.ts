@@ -22,8 +22,14 @@ export const IMAGE_REFERENCE_PROTOCOL = 4;
  * placements without it; their map saves keep the stored styles (world.ts map-save).
  */
 export const PLACEMENT_STYLE_PROTOCOL = 5;
+/**
+ * Protocol 6 (2026-10-23, Journey planner): a map may carry an optional scale bar (`scale`) for
+ * ungridded maps. Older clients have a strict map schema, so protocols 0-5 receive maps without
+ * it; their map saves keep the stored scale (world.ts map-save).
+ */
+export const MAP_SCALE_PROTOCOL = 6;
 /** The protocol current clients declare. */
-export const CURRENT_TABLETOP_PROTOCOL = PLACEMENT_STYLE_PROTOCOL;
+export const CURRENT_TABLETOP_PROTOCOL = MAP_SCALE_PROTOCOL;
 /** Server-only, non-enumerable: inline image -> its stored reference for this room read. */
 export const ROOM_IMAGE_SOURCES_KEY = Symbol.for("lootsplit.room-view-image-sources");
 
@@ -89,6 +95,44 @@ export function withoutPlacementStyles(map: CampaignMap): CampaignMap {
     },
   };
 }
+/** A map without its scale bar (protocols 0-5). The same object when it has none. */
+export function withoutMapScale(map: CampaignMap): CampaignMap {
+  if (map.scale === undefined) return map;
+  const plain = { ...map };
+  delete plain.scale;
+  return plain;
+}
+/** Whether a table (or a stored backup body) holds a map scale bar. */
+export function hasMapScales(table: CloudTable): boolean {
+  return (
+    !!table.journal?.world?.maps.some((m) => m.scale) ||
+    !!table.journal?.reports?.some((r) => mapScaled(r.snapshot ?? ""))
+  );
+}
+const mapScaled = (text: string) => text.includes('"scale":{') && text.includes('"aspect"');
+function scaleFreeTable(table: CloudTable): CloudTable {
+  if (!hasMapScales(table)) return table;
+  const world = table.journal?.world;
+  const reports = table.journal?.reports?.map((report) => {
+    if (!mapScaled(report.snapshot ?? "")) return report;
+    try {
+      return {
+        ...report,
+        snapshot: JSON.stringify(scaleFreeTable(JSON.parse(report.snapshot))),
+      };
+    } catch {
+      return report; // Preserve existing unreadable-archive evidence for the recovery reader.
+    }
+  });
+  return {
+    ...table,
+    journal: {
+      ...table.journal!,
+      ...(world ? { world: { ...world, maps: world.maps.map(withoutMapScale) } } : {}),
+      ...(reports ? { reports } : {}),
+    },
+  };
+}
 // Token styles are objects; only placement styles are these strings.
 const placementStyled = (text: string) =>
   text.includes('"placements"') && /"style":"(icon|portrait)"/.test(text);
@@ -138,6 +182,8 @@ export function legacyTabletopTable(table: CloudTable): CloudTable {
   return tableForProtocol(table, 0);
 }
 export function tableForProtocol(table: CloudTable, protocol = 0): CloudTable {
+  if (protocol >= MAP_SCALE_PROTOCOL) return table;
+  table = scaleFreeTable(table);
   if (protocol >= PLACEMENT_STYLE_PROTOCOL) return table;
   table = styleFreeTable(table);
   if (protocol >= TABLETOP_PROTOCOL) return table;
@@ -207,12 +253,16 @@ export function tabletopResponse<T extends { table: CloudTable; draft: string }>
   value: T,
   protocol?: number,
 ): T {
-  if (protocol && protocol >= PLACEMENT_STYLE_PROTOCOL) return withImageReferences(value);
+  if (protocol && protocol >= MAP_SCALE_PROTOCOL) return withImageReferences(value);
   const draft: unknown = JSON.parse(value.draft);
   if (
     Array.isArray(draft) &&
     draft.some((c) => {
       if (!c || typeof c !== "object") return false;
+      // Protocol 6: a map scale bar fails older strict map schemas.
+      if (c.kind === "map-save" && [c.map, c.before].some((m) => m?.scale !== undefined))
+        return true;
+      if (protocol && protocol >= PLACEMENT_STYLE_PROTOCOL) return false;
       // Protocol 5: placement pin styles fail older strict placement schemas.
       if (
         c.kind === "map-save" &&

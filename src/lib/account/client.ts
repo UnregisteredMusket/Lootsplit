@@ -15,6 +15,11 @@ let identityRead: { until: number; result: Promise<unknown> } | undefined;
 export function forgetAccountIdentity() {
   identityRead = undefined;
 }
+/** A sign-in, sign-up or recovery request carrying the Turnstile human-check token. */
+export function accountRequestWithCaptcha<T>(path: string, body: unknown, captcha: string): Promise<T> {
+  if (path.startsWith("auth/")) identityRead = undefined;
+  return accountRequestCore<T>(path, body, undefined, captcha);
+}
 export function accountRequest<T>(path: string, body?: unknown, signal?: AbortSignal): Promise<T> {
   if (body !== undefined && path.startsWith("auth/")) identityRead = undefined;
   if (path === "auth/get-session" && body === undefined && !signal) {
@@ -32,6 +37,7 @@ async function accountRequestCore<T>(
   path: string,
   body?: unknown,
   signal?: AbortSignal,
+  captcha?: string,
 ): Promise<T> {
   if (
     native() &&
@@ -41,8 +47,9 @@ async function accountRequestCore<T>(
     await disconnectOwnerWidget();
   const headers = new Headers();
   headers.set("accept", "application/json");
-  headers.set("x-lootsplit-tabletop", "5");
+  headers.set("x-lootsplit-tabletop", "6");
   if (body !== undefined) headers.set("content-type", "application/json");
+  if (captcha) headers.set("x-captcha-response", captcha);
   // Once per page: drop a token restored from another installation before it is ever sent.
   if (native() && !accountTokenSettled()) await accountTokenReady();
   const token = native() ? localStorage.getItem(TOKEN) : null;

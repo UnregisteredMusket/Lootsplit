@@ -10,7 +10,8 @@
       "Show on map: shops, NPCs, properties, listings and exchanges link to where they are on the map.",
       "DMs can place a record on the map from its card, move or hide pins, and use a character's or NPC's portrait as their pin.",
       "Here sheet on the map: one list of the shops, people and services available where the party is.",
-      "Maps: Consolidate fog shrinks heavily painted fog without changing what anyone sees, and grids can use the alternating 5/10/5 diagonal rule."
+      "Maps: Consolidate fog shrinks heavily painted fog without changing what anyone sees, and grids can use the alternating 5/10/5 diagonal rule.",
+      "Journey planner: draw a route on a map to see each leg's distance, travel days and terrain, and send a drawn route to a ship voyage request."
     ],
     "improvements": [
       "Shared map images load from a cache instead of being re-sent with every change, so big maps update faster.",

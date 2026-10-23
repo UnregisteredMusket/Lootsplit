@@ -6,6 +6,7 @@ import { getCloudTable, getServerCloudTable, subscribeCloudTable } from "@/lib/q
 import { readMapTabletop, readTabletopSession, canMoveMapToken } from "@/lib/quire/tabletop";
 import { sceneDistance, sceneRouteDistance, sceneTokenPoint } from "@/lib/quire/tabletop-geometry";
 import { canonicalJson } from "@/lib/quire/canonical-json";
+import { scaleDistance } from "@/lib/quire/journey";
 import { fogStorageBytes, fogDiff } from "@/lib/quire/fog-history";
 import { consolidateFog, type FogConsolidation } from "@/lib/quire/fog-consolidate";
 import {
@@ -446,14 +447,22 @@ export function useMapTabletopTools(
     return false;
   }
   const measurePoints = [...points, ...(tool === "measure" && cursor ? [cursor] : [])],
-    measured = map.grid ? sceneRouteDistance(map.grid, measurePoints) * settings.unitsPerFoot : 0;
+    // A grid always wins; an ungridded map measures with its scale bar (journey planner).
+    measured = map.grid
+      ? sceneRouteDistance(map.grid, measurePoints) * settings.unitsPerFoot
+      : map.scale
+        ? measurePoints
+            .slice(1)
+            .reduce((sum, p, i) => sum + scaleDistance(map.scale!, measurePoints[i], p), 0)
+        : 0,
+    measureUnit = map.grid ? settings.unitLabel : (map.scale?.unit ?? settings.unitLabel);
   const contextControls = (
     <div className="map-context-fields">
       {" "}
       {tool === "measure" && (
         <div className="tabletop-tool-row">
           <output aria-label="Measured distance">
-            {measured.toFixed(1)} {settings.unitLabel}
+            {measured.toFixed(1)} {measureUnit}
           </output>
           <Button
             onClick={() => {
@@ -469,7 +478,9 @@ export function useMapTabletopTools(
           >
             Undo waypoint
           </Button>
-          {!map.grid && <span>Configure a grid scale to measure.</span>}
+          {!map.grid && !map.scale && (
+            <span>Configure a grid or set the map's scale bar to measure.</span>
+          )}
         </div>
       )}
       {tool === "template" && (
@@ -1098,7 +1109,7 @@ export function useMapTabletopTools(
     openInspector: () => setInspector(true),
     feedback,
     toolLabel: toolNames[tool],
-    measurement: tool === "measure" ? `${measured.toFixed(1)} ${settings.unitLabel}` : "",
+    measurement: tool === "measure" ? `${measured.toFixed(1)} ${measureUnit}` : "",
     inspecting: inspector,
     hideInspector: () => setInspector(false),
     panel,

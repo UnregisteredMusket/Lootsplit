@@ -9,3 +9,9 @@ export const SUPPORT_MAILTO = `mailto:${SUPPORT_EMAIL}`;
 
 /** The owner's public Instagram account (shared 2026-10-23), without tracking parameters. */
 export const INSTAGRAM_URL = "https://www.instagram.com/lootsplitterdev/";
+
+/**
+ * The Lootsplitter Discord server invite (owner decision 2026-10-23: Discord instead of an
+ * on-site forum). Empty until the owner creates the server; the site hides the link until then.
+ */
+export const DISCORD_INVITE = "";

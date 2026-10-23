@@ -84,7 +84,9 @@ import {
   MoreHorizontal,
   ChevronDown,
   Menu,
+  Route as RouteIcon,
 } from "lucide-react";
+import { useRoutePlanner } from "./map-route-planner";
 import { MapFrame } from "./map-frame";
 import { RecordIcon } from "./map-record-icon";
 import { MapPlaceCard } from "./map-place-card";
@@ -185,7 +187,8 @@ function CampaignMapWorkspace({ viewScope }: { viewScope: { key: string; ephemer
     [selectedToken, setSelectedToken] = useState("");
   const requestedMap = useRouterState({ select: (s) => s.location.search.map }),
     requestedRecord = useRouterState({ select: (s) => s.location.search.record }),
-    requestedPlace = useRouterState({ select: (s) => s.location.search.place });
+    requestedPlace = useRouterState({ select: (s) => s.location.search.place }),
+    requestedPlan = useRouterState({ select: (s) => s.location.search.plan });
   const navigate = useNavigate(),
     router = useRouter();
   const [entryCamera, setEntryCamera] = useState<{
@@ -860,6 +863,8 @@ function CampaignMapWorkspace({ viewScope }: { viewScope: { key: string; ephemer
         <>
           <MapViewport
             map={map}
+            planRequest={requestedPlan}
+            planMapId={requestedMap}
             navigation={navigation}
             maps={allMaps}
             indexedRecords={allMaps.flatMap((m) =>
@@ -1342,6 +1347,8 @@ function MapEditor({
 }
 function MapViewport({
   map,
+  planRequest,
+  planMapId,
   maps,
   indexedRecords,
   settings: setupSettings,
@@ -1376,6 +1383,9 @@ function MapViewport({
   selectedToken,
 }: {
   map: CampaignMap;
+  /** `plan=party` or `plan=ship:<propertyId>` from the URL opens the route planner. */
+  planRequest?: string;
+  planMapId?: string;
   maps: CampaignMap[];
   indexedRecords: { mapId: string; context: string; record: MapRecord }[];
   settings: ReactNode;
@@ -1707,6 +1717,58 @@ function MapViewport({
       y: Math.max(0, Math.min(1, (clientY - rect.top - view.y) / (h * view.scale))),
     };
   }
+  // Journey planner ("Plan route"): taps add waypoints while it is open (map-route-planner.tsx).
+  const planner = useRoutePlanner({
+    map,
+    table: recordTable,
+    aspect: ratio,
+    toScreen: (p) => ({ x: view.x + p.x * w * view.scale, y: view.y + p.y * h * view.scale }),
+    toMap: mapPoint,
+    partyStart: party,
+    openShip: (propertyId) => {
+      const reference = { kind: "property" as const, id: propertyId };
+      const drawn = drawnRecord(reference);
+      if (drawn) {
+        focusRecord(drawn);
+        setServiceExpanded(true);
+      } else void navigate({ to: "/maps", search: { record: recordParam(reference) } });
+    },
+  });
+  const handledPlan = useRef("");
+  useEffect(() => {
+    if (!planRequest) {
+      handledPlan.current = "";
+      return;
+    }
+    const key = `${planMapId ?? ""}|${planRequest}`;
+    if (handledPlan.current === key || (planMapId && planMapId !== map.id)) return;
+    handledPlan.current = key;
+    if (planRequest === "party") planner.start("party");
+    else if (planRequest.startsWith("ship:"))
+      planner.start("ship", { shipId: planRequest.slice("ship:".length) });
+    // Handled once per URL.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [planRequest, planMapId, map.id]);
+  const openPlanner = () => {
+    if (planner.active) {
+      planner.close();
+      return;
+    }
+    if (!allowContextChange()) return;
+    tools.cancel();
+    sketches.cancel();
+    stopPlacing();
+    setPinging(false);
+    setMoreTools(false);
+    setDrawerOpen(false);
+    setContextOpen(false);
+    setDetails([]);
+    setService(undefined);
+    setHereOpen(false);
+    tools.hideInspector();
+    planner.start("party");
+    root.current?.focus();
+  };
   const openSettings = () => {
     if (!drawerOpen && (tools.inspecting || service || combatOpen) && !allowContextChange()) return;
     tools.hideInspector();
@@ -1727,6 +1789,7 @@ function MapViewport({
     tools.hideInspector();
   };
   const chooseTool = (tool: Parameters<typeof tools.activateTool>[0]) => {
+    if (planner.active && !["pan", "select"].includes(tool)) planner.close();
     if (!tools.activateTool(tool)) return;
     stopPlacing();
     sketches.cancel();
@@ -1798,6 +1861,8 @@ function MapViewport({
           setDetails([]);
           setCombatOpen(false);
           tools.hideInspector();
+        } else if (planner.active) {
+          planner.close();
         } else if (
           contextOpen ||
           placing ||
@@ -2159,6 +2224,15 @@ function MapViewport({
                   >
                     <Ruler size={19} />
                   </button>
+                  <button
+                    className="map-icon-button"
+                    title="Plan route"
+                    aria-label="Plan route"
+                    aria-pressed={planner.active}
+                    onClick={openPlanner}
+                  >
+                    <RouteIcon size={19} />
+                  </button>
                   {tools.playerTemplates && (
                     <button
                       className="map-icon-button"
@@ -2427,7 +2501,8 @@ function MapViewport({
         {placeAnnouncement}
       </p>
       {!interfaceHidden && placeBar}
-      {!interfaceHidden && !hereOpen && !placeBar && (
+      {!interfaceHidden && planner.panel}
+      {!interfaceHidden && !hereOpen && !placeBar && !planner.active && (
         <button
           type="button"
           className="map-here-button map-glass"
@@ -2522,6 +2597,21 @@ function MapViewport({
                 )
               )
                 e.preventDefault();
+              if (planner.active && !planner.calibrating && !pinging && !placing) {
+                if (e.key === "Enter") {
+                  e.preventDefault();
+                  planner.addAt({
+                    x: Math.max(0, Math.min(1, (size.w / 2 - view.x) / (w * view.scale))),
+                    y: Math.max(0, Math.min(1, (size.h / 2 - view.y) / (h * view.scale))),
+                  });
+                  return;
+                }
+                if (e.key === "Backspace") {
+                  e.preventDefault();
+                  planner.removeLast();
+                  return;
+                }
+              }
               if ((pinging || placing) && (e.key === "Enter" || e.key === " ")) {
                 e.preventDefault();
                 const x = (size.w / 2 - view.x) / (w * view.scale),
@@ -2622,6 +2712,18 @@ function MapViewport({
                 return;
               }
               if (
+                planner.active &&
+                !placing &&
+                !pinging &&
+                !(e.target as Element).closest("button") &&
+                !moved.current &&
+                pointers.current.has(e.pointerId) &&
+                pointers.current.size === 1
+              ) {
+                const r = e.currentTarget.getBoundingClientRect();
+                planner.tap(e.clientX, e.clientY, { x: e.clientX - r.left, y: e.clientY - r.top });
+              }
+              if (
                 (placing || pinging) &&
                 (pinging || !(e.target as Element).closest("button")) &&
                 !moved.current &&
@@ -2673,6 +2775,7 @@ function MapViewport({
                 }
               />
               {sketches.overlay}
+              {planner.overlay}
               {visible.includes("Ship") && routes.length > 0 && (
                 <svg
                   className="map-route-trails"
@@ -2717,6 +2820,7 @@ function MapViewport({
               )}
               {tools.overlay}
             </div>
+            {planner.handles}
             {groups.map((group) => (
               <div
                 key={group.id}
@@ -2752,6 +2856,11 @@ function MapViewport({
                           )
                     }
                     onClick={(event) => {
+                      // While planning a route, a pin adds a waypoint at its place.
+                      if (planner.active && !moved.current && !placing && !pinging) {
+                        if (!planner.calibrating) planner.addAt(group.point);
+                        return;
+                      }
                       if (
                         !moved.current &&
                         !pinging &&

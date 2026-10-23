@@ -3,13 +3,13 @@ import { accountRequestOrigin } from "../src/lib/deployment/origins.mjs";
 import { ownerTestMode } from "./test-mode.mjs";
 import { campaignRecords } from "./campaign-records.mjs";
 import { accountMapAsset, validateBackupMapAssets } from "./account-map-assets.mjs";
-import { hasPlacementStyles, tableForProtocol } from "../src/lib/quire/tabletop-protocol.ts";
+import { hasMapScales, hasPlacementStyles, tableForProtocol } from "../src/lib/quire/tabletop-protocol.ts";
 
-/** Tabletop protocol the account client declared: 0 (none) to 5 (current; 4 adds nothing here,
- * 5 adds placement pin styles). */
+/** Tabletop protocol the account client declared: 0 (none) to 6 (current; 4 adds nothing here,
+ * 5 adds placement pin styles, 6 map scale bars). */
 const tabletopHeader = (request) => {
   const value = Number(request.headers.get("x-lootsplit-tabletop"));
-  return Number.isInteger(value) && value >= 0 ? Math.min(value, 5) : 0;
+  return Number.isInteger(value) && value >= 0 ? Math.min(value, 6) : 0;
 };
 import { publicAnalytics, ownerAnalytics } from "./game-analytics.mjs";
 import { handleEncounters } from "./encounters.mjs";
@@ -24,6 +24,7 @@ import { serverMonitor } from "./monitoring.mjs";
 import { ownerMonitor } from "./owner-monitor.mjs";
 import { monitorApi } from "./monitor-journal.mjs";
 import { throttledSignin } from "./signin-throttle.mjs";
+import { captchaConfig, verifyCaptcha } from "./turnstile.mjs";
 import {
   assertActive,
   touchMember,
@@ -36,6 +37,16 @@ import {
   memberDetail,
 } from "./members.mjs";
 import { campaignAction, resumeCampaignMembership } from "./account-campaigns.mjs";
+import {
+  communityDirectory,
+  communityPortrait,
+  communityProfile,
+  communityReports,
+  moderateCommunityProfile,
+  ownCommunityProfile,
+  reportCommunityProfile,
+  saveCommunityProfile,
+} from "./community.mjs";
 import { restoreDeletedCampaign, campaignRecoveryRecords } from "./campaign-recovery.mjs";
 import {
   siteRole,
@@ -264,6 +275,12 @@ export async function handleAccounts(request, env) {
       if (!request.headers.get("content-type")?.startsWith("application/json"))
         fail("JSON is required.", 415);
       await rateLimit(env, request);
+      // Turnstile on sign-up, sign-in and recovery-key reset (website only; see turnstile.mjs).
+      await verifyCaptcha(env, request, {
+        path,
+        native,
+        hostnames: [new URL(authOrigin).hostname],
+      });
     }
     if (path.startsWith("/api/account/auth/")) {
       if (request.method === "POST") {
@@ -330,10 +347,35 @@ export async function handleAccounts(request, env) {
     if (path === "/api/account/site-announcement" && request.method === "GET") {
       return cors(json(await publicAnnouncement(db)));
     }
+    if (path === "/api/account/captcha" && request.method === "GET")
+      return cors(json(captchaConfig(env)));
     if (path === "/api/account/site-donations" && request.method === "GET")
       return cors(json(await publicDonations(db)));
     if (path === "/api/account/site-analytics" && request.method === "GET")
       return cors(json(await publicAnalytics(db)));
+    // Community profiles: readable without an account; signed-in members also see members-only ones.
+    if (path.startsWith("/api/account/community/") && request.method === "GET") {
+      const viewerSession = await auth.api.getSession({ headers: request.headers }).catch(() => null);
+      let viewer = viewerSession?.user?.id ?? null;
+      if (viewer) {
+        try {
+          await assertActive(db, viewer);
+        } catch {
+          viewer = null;
+        }
+      }
+      let rest = "";
+      try {
+        rest = decodeURIComponent(path.slice("/api/account/community/".length));
+      } catch {
+        fail("No profile with that name is visible to you.", 404);
+      }
+      if (rest === "directory") return cors(json(await communityDirectory(db, viewer, new URL(request.url))));
+      if (rest.startsWith("profile/"))
+        return cors(json(await communityProfile(db, viewer, rest.slice(8))));
+      if (rest.startsWith("portrait/"))
+        return cors(await communityPortrait(db, viewer, rest.slice(9)));
+    }
     const session = await auth.api.getSession({ headers: request.headers });
     if (!session) fail("Sign in to open your account library.", 401);
     const userId = session.user.id;
@@ -388,6 +430,16 @@ export async function handleAccounts(request, env) {
       return cors(json(await monitorApi(env, userId, session.session.id, request, body)));
     if (path === "/api/account/profile" && request.method === "POST")
       return cors(json(await saveProfile(db, userId, body)));
+    if (path === "/api/account/community" && request.method === "GET")
+      return cors(json(await ownCommunityProfile(db, userId)));
+    if (path === "/api/account/community" && request.method === "POST")
+      return cors(json(await saveCommunityProfile(db, userId, body)));
+    if (path === "/api/account/community-report" && request.method === "POST")
+      return cors(json(await reportCommunityProfile(db, userId, body), 201));
+    if (path === "/api/account/staff/community-reports" && request.method === "GET")
+      return cors(json(await communityReports(db, userId)));
+    if (path === "/api/account/staff/community-action" && request.method === "POST")
+      return cors(json(await moderateCommunityProfile(db, userId, body, session.session.id)));
     if (path === "/api/account/activity" && request.method === "GET")
       return cors(json({ ok: true }));
     if (path === "/api/account/staff/members" && request.method === "GET")
@@ -423,7 +475,7 @@ export async function handleAccounts(request, env) {
     if (path === "/api/account/records" && request.method === "GET") {
       const result = await campaignRecords(db, userId);
       const protocol = tabletopHeader(request);
-      if (protocol < 5)
+      if (protocol < 6)
         for (const report of result.reports)
           if (report.snapshot) report.snapshot = tableForProtocol(report.snapshot, protocol);
       return cors(json(result));
@@ -574,7 +626,8 @@ export async function handleAccounts(request, env) {
       if (
         (protocol < 2 &&
           JSON.stringify(tableForProtocol(stored, protocol)) !== JSON.stringify(stored)) ||
-        (protocol < 5 && hasPlacementStyles(stored))
+        (protocol < 5 && hasPlacementStyles(stored)) ||
+        (protocol < 6 && hasMapScales(stored))
       )
         fail(
           "This backup includes detailed tabletop maps. Restore it on the updated website; the complete backup is retained.",

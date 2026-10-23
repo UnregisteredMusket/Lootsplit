@@ -1789,3 +1789,168 @@
 .ls-privacy a {
   text-decoration: underline;
 }
+
+/* ---------- Community: Looking for Group directory and profiles (2026-10-23) ---------- */
+.ls-community-filters {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(170px, 1fr));
+  gap: 14px 18px;
+  align-items: end;
+  padding: 20px;
+  border: 1px solid var(--paper-shade);
+  background: var(--paper-card);
+}
+.ls-community-filters label,
+.ls-member-report label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  font-size: 15px;
+  color: var(--paper-muted);
+}
+.ls-community-filters input,
+.ls-community-filters select,
+.ls-member-report textarea {
+  min-height: 44px;
+  padding: 8px 10px;
+  border: 1px solid var(--paper-shade);
+  border-radius: 2px;
+  background: #fffaf0;
+  color: var(--paper-ink);
+  font: inherit;
+}
+.ls-member-grid {
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+  gap: 20px;
+}
+.ls-site .ls-member-card {
+  display: flex;
+  gap: 16px;
+  height: 100%;
+  padding: 18px;
+  border: 1px solid var(--paper-shade);
+  background: var(--paper-card);
+  color: var(--paper-ink);
+  text-decoration: none;
+}
+.ls-site .ls-member-card:hover,
+.ls-site .ls-member-card:focus-visible {
+  border-color: var(--paper-link);
+}
+.ls-member-card h3 {
+  font-size: 26px;
+  line-height: 1.1;
+}
+.ls-member-card .ls-stack {
+  gap: 6px;
+  min-width: 0;
+}
+.ls-member-portrait {
+  flex: none;
+  border-radius: 50%;
+  object-fit: cover;
+  border: 2px solid var(--gold);
+  background: var(--ink-card);
+}
+.ls-member-initial {
+  display: grid;
+  place-items: center;
+  color: var(--gold);
+  font: 700 28px var(--serif);
+}
+.ls-member-hero .ls-member-initial {
+  font-size: 56px;
+}
+.ls-member-badges {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  margin: 0;
+}
+.ls-badge {
+  display: inline-block;
+  padding: 2px 10px;
+  border: 1px solid currentColor;
+  border-radius: 999px;
+  font-size: 14px;
+}
+.ls-badge-gold {
+  border-color: var(--gold-deep);
+  background: rgba(223, 187, 120, 0.25);
+}
+.ls-ink .ls-badge-gold {
+  color: var(--gold);
+}
+.ls-member-games {
+  font-size: 15px;
+  color: var(--paper-muted);
+}
+.ls-member-note {
+  font-size: 15px;
+  overflow-wrap: anywhere;
+}
+.ls-member-hero {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 28px;
+}
+.ls-member-hero .ls-display {
+  font-size: clamp(42px, 4vw + 20px, 72px);
+}
+.ls-member-detail h2 {
+  font-size: clamp(26px, 2vw + 16px, 34px);
+  margin-top: 28px;
+}
+.ls-member-intro {
+  white-space: pre-line;
+  overflow-wrap: anywhere;
+}
+.ls-band.ls-band-paper {
+  border-color: var(--paper-shade);
+}
+.ls-band.ls-band-paper p:not(.ls-sc) {
+  color: var(--paper-muted);
+}
+.ls-site .ls-btn-ghost-paper {
+  color: var(--paper-ink);
+  border: 1px solid var(--paper-shade);
+  background: transparent;
+}
+.ls-site .ls-text-button {
+  border: 0;
+  padding: 8px 0;
+  background: none;
+  color: var(--paper-link);
+  text-decoration: underline;
+  cursor: pointer;
+  font: inherit;
+}
+.ls-member-report {
+  margin-top: 36px;
+  padding-top: 16px;
+  border-top: 1px solid var(--paper-shade);
+}
+.ls-community-error {
+  color: var(--paper-link);
+}
+.ls-member-detail .ls-meta {
+  margin-top: 8px;
+  font-size: 17px;
+}
+.ls-member-detail .ls-meta dt {
+  color: var(--paper-link);
+}
+.ls-member-detail .ls-meta dd {
+  color: var(--paper-ink);
+}
+.ls-member-detail .ls-meta code {
+  font-size: 16px;
+}
+.ls-member-detail > p:has(> a) {
+  margin-top: 24px;
+}

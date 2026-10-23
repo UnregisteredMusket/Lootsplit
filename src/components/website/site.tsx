@@ -23,6 +23,7 @@ const siteLinks = [
   ["/help", "Help"],
   ["/resources", "Resources"],
   ["/donate", "Donate"],
+  ["/community", "Find a group"],
   ["/privacy", "Privacy"],
 ] as const;
 /** Changelog, Resources and Privacy live in the footer only (owner decision 2026-10-23). */

@@ -1,0 +1,10 @@
+{
+  "title": "Plan routes on the map",
+  "summary": "A new Plan route tool lets you tap out a journey on any map and see each leg's miles, days and terrain.",
+  "items": [
+    "Tap the map to add waypoints; points near a place snap to it, and on gridded maps they snap to tile centres.",
+    "Tap a leg to insert a waypoint, tap a waypoint to remove it, or drag it. Type instead and the keyboard work too.",
+    "DMs can set a scale bar on maps without a grid, and Measure uses it.",
+    "Ship voyages can be drawn on gridded maps and sent straight into the ship's voyage request, with the typed tiles kept in sync."
+  ]
+}
