@@ -1800,27 +1800,6 @@
 .ls-member-report textarea {
   min-height: 44px;
   padding: 8px 10px;
-
-/* ---------- Features explorer (2026-10-23): tabs, search, audience filter, cards ---------- */
-.ls-feature-tools {
-  display: flex;
-  flex-wrap: wrap;
-  align-items: end;
-  justify-content: space-between;
-  gap: 16px 24px;
-}
-.ls-feature-search {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-  flex: 1 1 280px;
-  max-width: 520px;
-  font-size: 15px;
-  color: var(--paper-muted);
-}
-.ls-feature-search input {
-  min-height: 46px;
-  padding: 8px 12px;
   border: 1px solid var(--paper-shade);
   border-radius: 2px;
   background: #fffaf0;
@@ -1930,7 +1909,64 @@
   background: transparent;
 }
 .ls-site .ls-text-button {
+  border: 0;
+  padding: 8px 0;
+  background: none;
+  color: var(--paper-link);
+  text-decoration: underline;
+  cursor: pointer;
+  font: inherit;
+}
+.ls-member-report {
+  margin-top: 36px;
+  padding-top: 16px;
+  border-top: 1px solid var(--paper-shade);
+}
+.ls-community-error {
+  color: var(--paper-link);
+}
+.ls-member-detail .ls-meta {
+  margin-top: 8px;
+  font-size: 17px;
+}
+.ls-member-detail .ls-meta dt {
+  color: var(--paper-link);
+}
+.ls-member-detail .ls-meta dd {
+  color: var(--paper-ink);
+}
+.ls-member-detail .ls-meta code {
+  font-size: 16px;
+}
+.ls-member-detail > p:has(> a) {
+  margin-top: 24px;
+}
 
+/* ---------- Features explorer (2026-10-23): tabs, search, audience filter, cards ---------- */
+.ls-feature-tools {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: end;
+  justify-content: space-between;
+  gap: 16px 24px;
+}
+.ls-feature-search {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  flex: 1 1 280px;
+  max-width: 520px;
+  font-size: 15px;
+  color: var(--paper-muted);
+}
+.ls-feature-search input {
+  min-height: 46px;
+  padding: 8px 12px;
+  border: 1px solid var(--paper-shade);
+  border-radius: 2px;
+  background: #fffaf0;
+  color: var(--paper-ink);
+  font: inherit;
   font-size: 17px;
 }
 .ls-feature-audience {
@@ -2089,33 +2125,6 @@
   background: none;
   color: var(--paper-link);
   text-decoration: underline;
-  cursor: pointer;
-  font: inherit;
-}
-.ls-member-report {
-  margin-top: 36px;
-  padding-top: 16px;
-  border-top: 1px solid var(--paper-shade);
-}
-.ls-community-error {
-  color: var(--paper-link);
-}
-.ls-member-detail .ls-meta {
-  margin-top: 8px;
-  font-size: 17px;
-}
-.ls-member-detail .ls-meta dt {
-  color: var(--paper-link);
-}
-.ls-member-detail .ls-meta dd {
-  color: var(--paper-ink);
-}
-.ls-member-detail .ls-meta code {
-  font-size: 16px;
-}
-.ls-member-detail > p:has(> a) {
-  margin-top: 24px;
-
   font: inherit;
   font-size: 15px;
   cursor: pointer;
