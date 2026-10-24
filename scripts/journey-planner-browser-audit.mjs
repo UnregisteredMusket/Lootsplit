@@ -1,5 +1,6 @@
 // Journey planner browser audit (docs/MAP-TILES.md "Journey planner") in a disposable device
-// campaign: Plan route, scale-bar calibration on an ungridded map, tap-to-draw with snapping, leg
+// campaign: finding the planner (labelled Plan journey control, Here sheet, Downtime link), Plan
+// route, scale-bar calibration on an ungridded map, tap-to-draw with snapping, leg
 // insert and removal, the typed fallback and keyboard path, at 1280, 390, 320 and 844×390 with
 // no sideways scrolling and the planner inside the viewport. Never targets a real campaign.
 import { chromium } from "playwright";
@@ -8,6 +9,7 @@ import assert from "node:assert/strict";
 import { mkdir } from "node:fs/promises";
 import { openApplication, reloadApplication } from "./title-screen-navigation.mjs";
 import { checkJourneyPhaseB } from "./journey-planner-browser-steps.mjs";
+import { checkJourneyDiscoverability } from "./journey-discoverability-browser-steps.mjs";
 
 const origin = process.env.AUDIT_ORIGIN || "http://127.0.0.1:8080";
 const output = "test-results/journey-planner";
@@ -125,6 +127,8 @@ try {
       viewport = frame.getByRole("region", { name: "Interactive campaign map", exact: true }),
       planner = frame.getByRole("complementary", { name: "Plan a route", exact: true });
     await expect(frame.getByRole("img", { name: "Vale of Harrow", exact: true })).toBeVisible();
+    const found = await checkJourneyDiscoverability(page, { origin, frame, width, height, output });
+    await expect(frame.getByRole("img", { name: "Vale of Harrow", exact: true })).toBeVisible();
     await frame.getByRole("button", { name: "Fit map", exact: true }).click();
     // Open the planner: the map has no grid or scale yet.
     await frame.getByRole("button", { name: "Plan route", exact: true }).click();
@@ -156,16 +160,24 @@ try {
     await expect(legs.getByRole("listitem")).toHaveCount(1);
     await expect(legs).toContainText("Harrowgate → Kestrel Watch");
     await expect(legs).toContainText("60.0 mi");
-    // Tap the middle of the leg: a waypoint is inserted there. Pan the map up first so the leg
-    // sits above the phone bottom sheet.
+    // Tap the middle of the leg: a waypoint is inserted there. On phones the planner is a bottom
+    // sheet and the map is framed in the band above it (mockup 4), so the route is tappable
+    // without panning.
     await planner.getByRole("button", { name: "Tap to add", exact: true }).click();
     await viewport.focus();
-    if (width <= 650) for (let i = 0; i < 5; i++) await page.keyboard.press("ArrowDown");
     const centre = async (name) => {
       const b = await frame.getByRole("button", { name }).boundingBox();
       return { x: b.x + b.width / 2, y: b.y + b.height / 2 };
     };
     const [a, b] = [await centre(/^Waypoint 1: /), await centre(/^Waypoint 2: /)];
+    if (width <= 650) {
+      const sheet = await planner.boundingBox();
+      for (const p of [a, b])
+        assert.ok(
+          p.y < sheet.y && p.y > 0 && p.x > 0 && p.x < width,
+          `waypoint shown above the planner sheet at ${width}px`,
+        );
+    }
     await page.mouse.click((a.x + b.x) / 2, (a.y + b.y) / 2);
     await expect(legs.getByRole("listitem")).toHaveCount(2);
     await expect(legs).toContainText("Point ");
@@ -187,7 +199,7 @@ try {
     await expect(legs.getByRole("listitem")).toHaveCount(1);
     // The leg's terrain is chosen by the planner, never read from the artwork.
     await planner.getByLabel("Leg 1 terrain", { exact: true }).selectOption("Wilderness|Forest");
-    const flows = ["calibrate", "draw-snap", "insert-remove", "typed", "keyboard", "terrain"];
+    const flows = [...found, "calibrate", "draw-snap", "insert-remove", "typed", "keyboard", "terrain"];
     if (width === 1280) flows.push(...(await checkJourneyPhaseB(page, { frame, planner, output })));
     else await planner.getByRole("button", { name: "Close route planner", exact: true }).click();
     await expect(planner).toHaveCount(0);

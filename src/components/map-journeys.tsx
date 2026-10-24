@@ -920,7 +920,7 @@ export function JourneyStatusCard({
         <Footprints size={14} aria-hidden="true" /> {j.status === "arrived" ? "Arrived" : "Travelling"}
       </p>
       <div className="map-panel-heading">
-        <h2>{j.status === "arrived" ? `Arrived near ${to ?? "the end of the route"}` : to ? `Bound for ${to}` : "Travelling"}</h2>
+        <h2>{j.status === "arrived" ? `Arrived near ${to ?? "the end of the route"}` : to ? `Bound for ${to}` : "On the road"}</h2>
         {close && (
           <button className="map-icon-button" aria-label="Close journey" onClick={close}>
             <X size={16} />

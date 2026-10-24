@@ -1806,56 +1806,44 @@ function MapViewport({
     planner.start("party");
     root.current?.focus();
   };
-  // Keep the route (or, on phones, the whole map) in view beside or above the planner and the
-  // journey review, as the mockups show: once when each opens, never while someone is drawing.
-  const framing = planner.active
-    ? planner.calibrating
-      ? "scale"
-      : "plan"
-    : reviewJourney
-      ? `review:${reviewJourney}`
-      : "";
+  // Phones (mockup 4): the planner is a bottom sheet over the map, so when it opens, or switches
+  // to scale calibration, the camera zooms out just enough to show the map (or a drawn route) in
+  // the band above the sheet. Once per mode, never while someone is drawing. Wider screens keep
+  // their camera: the panel sits beside the map there.
+  const framing = planner.active ? (planner.calibrating ? "scale" : "plan") : "";
   useEffect(() => {
-    if (!framing || !artworkReady) return;
+    if (!framing || !artworkReady || !window.matchMedia("(max-width: 650px)").matches) return;
     const frame = requestAnimationFrame(() => {
       const region = root.current;
-      if (!region) return;
-      const r = region.getBoundingClientRect();
-      const panelRect = region
-        .closest(".map-workspace")
-        ?.querySelector<HTMLElement>(".map-route-panel, .map-journey-review")
+      const sheet = region
+        ?.closest(".map-workspace")
+        ?.querySelector<HTMLElement>(".map-route-panel")
         ?.getBoundingClientRect();
-      const phone = window.matchMedia("(max-width: 650px)").matches;
+      if (!region || !sheet) return;
+      const r = region.getBoundingClientRect();
       const area = freeArea(
         { width: r.width, height: r.height },
-        panelRect && {
-          left: panelRect.left - r.left,
-          top: panelRect.top - r.top,
-          right: panelRect.right - r.left,
-          bottom: panelRect.bottom - r.top,
+        {
+          left: sheet.left - r.left,
+          top: sheet.top - r.top,
+          right: sheet.right - r.left,
+          bottom: sheet.bottom - r.top,
         },
-        phone
-          ? { left: 10, top: 170, right: 10, bottom: 10 }
-          : { left: 14, top: 70, right: 72, bottom: 60 },
+        { left: 10, top: 112, right: 10, bottom: 10 },
       );
-      const journey = framing.startsWith("review:")
-        ? recordTable.journal?.world?.journeys?.find((j) => j.id === reviewJourney)
-        : undefined;
-      let points: { x: number; y: number }[] = journey
-        ? journey.mapId === map.id
-          ? (journey.points ?? [])
-          : []
-        : planner.focusPoints;
-      if (phone && !journey && (framing === "scale" || points.length < 2))
-        points = [
-          { x: 0, y: 0 },
-          { x: 1, y: 1 },
-        ];
+      const route = planner.focusPoints;
+      const points =
+        framing === "plan" && route.length > 1
+          ? route
+          : [
+              { x: 0, y: 0 },
+              { x: 1, y: 1 },
+            ];
       const next = frameRoute(points, viewRef.current, { w, h }, area);
       if (next) setView(next);
     });
     return () => cancelAnimationFrame(frame);
-    // Framed once per opened panel; later edits leave the camera to the person drawing.
+    // Framed once per opened mode; later edits leave the camera to the person drawing.
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [framing, map.id, artworkReady]);
   const openSettings = () => {
