@@ -249,3 +249,48 @@ export function linksFixture(options: { property?: boolean } = {}): CloudTable {
     t = applyCommand(t, svcDm, { id: `${provider.id}-setup`, kind: "service-provider", providerId: provider.id, before: null, provider });
   return t;
 }
+
+/**
+ * Wave 2 Sage: Magister Quillon at the Gilded Quill offers Identify (50 gp, DM review). Kael wears
+ * a plain silver ring and carries a blue bottle; an old longsword is in storage and an odd brass
+ * key belongs to the party fund.
+ */
+export function sageFixture(): CloudTable {
+  let t = servicesFixture();
+  t.shops.push({ ...t.shops[0], id: "quill", name: "The Gilded Quill", keeper: "Quillon", category: "general" });
+  t.holdings.push(
+    { id: "ring", purseId: "kael", name: "Plain silver ring", kind: "item", quantity: 1, unitCopper: 2500, notes: "Cold to the touch. No markings.", equipped: true },
+    { id: "bottle", purseId: "kael", name: "Stoppered blue bottle", kind: "item", quantity: 1, unitCopper: 100, notes: "" },
+    { id: "sword", purseId: "kael", name: "Old longsword", kind: "item", quantity: 1, unitCopper: 1500, notes: "" },
+    { id: "key", purseId: "fund", name: "Odd brass key", kind: "item", quantity: 1, unitCopper: 10, notes: "" },
+    { id: "thorn-amulet", purseId: "thorn", name: "Thorn's amulet", kind: "item", quantity: 1, unitCopper: 10, notes: "" },
+  );
+  t = applyCommand(t, svcDm, {
+    id: "quillon",
+    kind: "npc-create",
+    npc: {
+      id: "quillon",
+      name: "Magister Quillon",
+      description: "Sage of the Gilded Quill.",
+      locationId: "harrowgate",
+      visible: true,
+      barterAllowed: false,
+      controllerPurseId: null,
+      services: ["sage"],
+    },
+    copper: 0,
+    inventory: [],
+  });
+  return applyCommand(t, svcDm, {
+    id: "sage-setup",
+    kind: "service-provider",
+    providerId: "quill-sage",
+    before: null,
+    provider: newProvider("sage", { id: "quill", name: "The Gilded Quill" }, "quillon", "quill-sage"),
+  });
+}
+/** An Identify request for one carried item. */
+export function identifyCommand(t: CloudTable, id: string, holdingId: string, purseId = "kael") {
+  const req: ServiceRequest = { beneficiaryPurseIds: [], units: 1, contributions: [], itemHoldingId: holdingId };
+  return orderCommand(t, id, "identify", purseId, req, "quill-sage");
+}

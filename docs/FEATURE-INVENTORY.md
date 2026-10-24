@@ -468,6 +468,10 @@ Adds a contextual Maps session bar, searchable scene cards, separate activation/
 - Anti-exploit: cooldown per player account, repeat DC, 24-hour combined judgement, caps, unit cap, unwanted categories, and player-set item values (`valueSource: "player"`) count for nothing. Settlement reuses the atomic barter exchange; command IDs make retries no-ops and never re-roll. Players never receive NPC rules, valuation, purse or other players' attempts. The existing trading table, controlled-NPC flow, Give and every earlier save are unchanged. See [NPC-BARTER.md](NPC-BARTER.md).
 
 
+### NPC services, wave 2 phase 4b: Sage Identify (October 24, 2026)
+
+- Sage providers offer Identify (50 gp, DM review); temples carry it as a draft. The player picks a carried item (worn allowed) and asks; nothing moves. The DM writes the answer in Review Inbox; approval charges once, posts the answer to the payer's private thread with the sage and optionally appends it to the item's notes and renames the item, in one command. Record only. See [services](SERVICES.md).
+
 ### NPC services, wave 2 phase 4a: links, Tailor and protocol 9 (October 24, 2026)
 
 - New provider kinds in the data model (trainer, stable, courier, sage, fence, bank, hire); the engines (trainer, stable, courier, sage) switch on in their own phases. Tabletop protocol 9 strips wave-2 providers, offers, orders and NPC kinds for protocol 0-8 clients (also in pending quotes and archived reports) and keeps them on those clients' writes. See [services](SERVICES.md).

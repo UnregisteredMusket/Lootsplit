@@ -14,8 +14,8 @@ approved "as shown" on 2026-10-23.
 | 1 | Temple, with DM review (charged on approval) | Shipped |
 | 2 | Workshop: scribe and alchemist presets | Shipped |
 | 3 | Inn: booked stays, meals, rumours into the buyer's private NPC thread | Shipped |
-| 4a | Wave 2: new kinds, tabletop protocol 9, Fence/Bank/Hire links, Tailor preset | This change |
-| 4b | Wave 2: Sage (Identify, record only) | Planned |
+| 4a | Wave 2: new kinds, tabletop protocol 9, Fence/Bank/Hire links, Tailor preset | Shipped |
+| 4b | Wave 2: Sage (Identify, record only) | This change |
 | 4c | Wave 2: Stable and coach | Planned |
 | 4d | Wave 2: Trainer (paid lessons) | Planned |
 | 4e | Wave 2: Courier (letters to NPCs) | Planned |
@@ -173,6 +173,26 @@ marked ↗. Deleting an NPC a hire role names is refused.
 prices and weights), SRD 5.2.1 crafting days (gp ÷ 10, rounded up; SRD 5.1: 5 gp a day), half the
 price as cloth the party may bring or the tailor supplies.
 
+### Sage: Identify (phase 4b)
+
+- **Offer**: `target: "held-item"`, instant, spell level 1, 50 gp in both presets, DM review (the
+  DM writes the answer), no components (the pearl is the sage's own and not consumed), one item per
+  order. A `sage` provider's offers must have a target; a temple may carry the same offer (the temple
+  preset adds it as a draft); no other kind may.
+- **Request**: `itemHoldingId`, an item the payer owns and carries (`assertHeldItem`: owned, not a
+  service, `assertCarried`; equipped allowed). No beneficiaries. Terms snapshot `item` (name and
+  notes at the time). Lock in the conversation: "Carry the item you want identified."
+- **Approval** (`service-review` with `reveal: { text, appendToNotes, rename? }`, required for an
+  Identify approval and refused otherwise): reruns the quote (the item still carried, funds), pays
+  once (`id-payment`), posts one NPC message `id-answer` to the payer's private thread with the
+  NPC, appends `Day N · identified by {NPC}: {text}` to the item's notes when ticked (old notes
+  stay) and renames it when asked, all in one command; `order.reveal` records it. Deny or withdraw
+  moves nothing.
+- **Phase 5 hook**: `revealIdentify` in `services-command.ts` is where the item-identification
+  reveal will be called, so payment and reveal stay atomic.
+- **Privacy**: other players never receive the order or the thread; the answer exists only after
+  approval. Protocol 8 clients never receive Identify offers or orders (key whitelist).
+
 ## Screens
 
 - Conversation (`service-talk.tsx`): offers as numbered replies with price, time, component and
@@ -202,7 +222,9 @@ price as cloth the party may bring or the tailor supplies.
 
 ## Verification
 
-`service-links.test.ts` (link validation, no orders on links, fence projection and lock, bank note
+`services-identify.test.ts` (presets, held-item rule, request moves nothing, answer required, one
+payment and one message, notes and rename in the same command, recheck refusals, privacy, protocol
+8, offline parity), `service-links.test.ts` (link validation, no orders on links, fence projection and lock, bank note
 and terms, hire lock and proposal moving nothing, role NPC privacy, protocol 8 stripping and older
 writes, Tailor and link presets, Here rows, offline parity), `services-temple.test.ts` (command IDs, stale quotes, charge on approval, components, every lock
 reason, whole copper, authorization, privacy, deletion guards, old saves and protocol 8, presets,

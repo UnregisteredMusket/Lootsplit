@@ -121,6 +121,8 @@ function hubLine(p: ServiceProvider) {
   return s === "scribe" ? "Can you scribe a scroll for me?" : s === "alchemist" ? "Can you brew something for me?" : "Can you make something for me?";
 }
 function hubSub(p: ServiceProvider, offers: number) {
+  if (p.kind === "sage")
+    return `${approvedOffers(p).map((o) => `${o.name} ${formatCopper(o.priceCopper)}`).join(" · ")}. ${approvedOffers(p).some((o) => o.review === "dm") ? "Charged when the DM answers." : ""}`.trim();
   if (p.kind === "fence") return "Opens the Sell tab. The fence's buy rate applies; selling is the shop's usual sale.";
   if (p.kind === "bank") {
     const l = p.link?.loan;

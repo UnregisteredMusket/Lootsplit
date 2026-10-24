@@ -96,6 +96,17 @@ export function assertContribution(
   return h;
 }
 
+/**
+ * An item the payer shows the provider without handing it over (a sage's Identify): owned by the
+ * payer, not a service, carried (not stored, travelling, reserved or pooled). Worn items are fine.
+ */
+export function assertHeldItem(t: Pick<CloudTable, "holdings">, holdingId: string, purseId: string, mismatch: string): Holding {
+  const h = t.holdings.find((h) => h.id === holdingId);
+  if (!h || h.kind !== "item" || h.service || h.purseId !== purseId) throw Error(mismatch);
+  assertCarried(h);
+  return h;
+}
+
 /** Orders that still hold the provider, the customer and the pickup location. */
 export type WorkOrder = {
   id: string;

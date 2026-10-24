@@ -8,6 +8,7 @@ import {
   serviceOrderOpen,
   type ServiceCommand,
   type ServiceOrder,
+  type ServiceReveal,
   type ServiceStatus,
 } from "./services-schema.ts";
 import { rumourQuote, serviceQuote, serviceSummary } from "./services.ts";
@@ -51,6 +52,31 @@ function settle(t: CloudTable, o: ServiceOrder, at: number, approved: boolean) {
     o.completedMinute = f.minuteOfDay ?? 0;
     note(o, "completed", `${paid} Recorded only; the DM updates character sheets.`, at);
   }
+}
+
+/**
+ * Identify (sage or temple): deliver the DM's answer once, in the same command as the payment.
+ * The answer goes into the payer's private thread with the NPC (`id-answer`); when ticked it is
+ * appended to the item's notes with the day, and the item may be renamed. Phase 5 (item
+ * identification) will call its logged reveal from here, so payment and reveal stay atomic.
+ */
+function revealIdentify(t: CloudTable, o: ServiceOrder, reveal: ServiceReveal, at: number) {
+  const item = o.terms.item!;
+  const h = t.holdings.find((x) => x.id === item.holdingId)!;
+  const w = t.journal!.world!,
+    conversationId = `${o.terms.npcId}:${o.purseId}`;
+  let c = w.conversations.find((x) => x.id === conversationId);
+  if (!c) {
+    c = { id: conversationId, npcId: o.terms.npcId, purseId: o.purseId, messages: [] };
+    w.conversations.push(c);
+  }
+  if (!c.messages.some((m) => m.id === o.id + "-answer"))
+    c.messages.push({ id: o.id + "-answer", author: "npc", text: reveal.text, at });
+  const day = readFinance(t.journal?.finance).day;
+  if (reveal.appendToNotes)
+    h.notes = [h.notes, `Day ${day} · identified by ${o.terms.npcName}: ${reveal.text}`].filter(Boolean).join("\n");
+  if (reveal.rename) h.name = reveal.rename;
+  o.reveal = reveal;
 }
 
 export function applyServiceCommand(t: CloudTable, seat: CloudSeat, cmd: ServiceCommand, at: number) {
@@ -140,6 +166,8 @@ export function applyServiceCommand(t: CloudTable, seat: CloudSeat, cmd: Service
     } else if (cmd.kind === "service-review") {
       dm();
       if (o.status !== "requested") throw Error("This request has already been decided.");
+      if (cmd.reveal && (!o.terms.item || cmd.decision !== "approve"))
+        throw Error("Only an Identify approval carries an answer.");
       if (cmd.decision === "deny") {
         if (!cmd.reason) throw Error("Give the player a reason for the denial.");
         note(o, "denied", `${cmd.reason} Nothing was charged.`, at);
@@ -149,7 +177,13 @@ export function applyServiceCommand(t: CloudTable, seat: CloudSeat, cmd: Service
         const q = serviceQuote(t, o.providerId, o.offerKey, o.purseId, o.request);
         if (q.terms.priceCopper !== o.terms.priceCopper)
           throw Error("The price changed since the request. Deny it and ask the player to request again.");
+        if (o.terms.item && !cmd.reveal) throw Error(`Write what ${o.terms.npcName} says before approving.`);
         settle(t, o, at, true);
+        if (o.terms.item && cmd.reveal) {
+          revealIdentify(t, o, cmd.reveal, at);
+          o.message = `Answered and paid. The answer is in your thread with ${o.terms.npcName}.`;
+          o.history.at(-1)!.note = o.message;
+        }
         if (cmd.reason) o.message = `${o.message} ${cmd.reason}`.slice(0, 1000);
         if (cmd.reason) o.history.at(-1)!.note = o.message;
         summary = `Service request approved: ${serviceSummary(o)}.`;

@@ -40,9 +40,10 @@ import { offerFlags, serviceWhen } from "./service-talk";
 
 const kindName = serviceKindNames;
 /** Kinds the DM can add in this release; later kinds arrive with their own presets. */
-const addableKinds: ServiceKind[] = ["temple", "workshop", "inn", "fence", "bank", "hire"];
+const addableKinds: ServiceKind[] = ["temple", "workshop", "inn", "sage", "fence", "bank", "hire"];
 /** What each kind's toggle in the NPC record says. */
 const kindHint: Partial<Record<ServiceKind, string>> = {
+  sage: "Identify a carried item; you write the answer.",
   fence: "Opens a black-market shop's Sell tab.",
   bank: "Opens a loan request naming this bank.",
   hire: "Proposes a property staff contract.",
@@ -251,7 +252,11 @@ function PresetChoice({ value, onChange, kind = "temple" }: { value: ServicePres
         ))}
       </div>
       <p className="svc-hint">
-        {kind === "fence"
+        {kind === "sage"
+          ? value === "blank"
+            ? "No offers: add your own."
+            : "Identify at 50 gp (SRD 5.2.1, a level 1 spell; SRD 5.1's top of 10–50 gp). The pearl is the sage's own and isn't consumed. DM review: you write the answer."
+          : kind === "fence"
           ? "A fence has no price list: it buys at its shop's rate. Apply the fence preset to the shop below."
           : kind === "bank"
           ? value === "blank"
@@ -402,8 +407,10 @@ function ProviderEditor({ provider, table: t }: { provider: ServiceProvider; tab
                             maxUnits: 1,
                             output: { kind: "holding" as const, name: "New item", unitCopper: 0, weight: 0, category: "service", notes: "" },
                           }
+                        : d.kind === "sage"
+                        ? { time: { kind: "instant" as const }, output: { kind: "record" as const }, target: "held-item" as const }
                         : { time: { kind: "instant" as const }, output: { kind: "record" as const } }),
-                      review: "auto",
+                      review: d.kind === "sage" ? "dm" : "auto",
                     },
                   ],
                 };
@@ -496,6 +503,15 @@ function OfferEditor({
                 ))}
               </select>
             </label>
+            {o.target === "held-item" && (
+              <label>
+                Target
+                <select value="held-item" disabled>
+                  <option value="held-item">A carried item of the payer</option>
+                </select>
+                <span className="svc-hint">DM review: you write what the {kind === "sage" ? "sage" : "priest"} says when you approve.</span>
+              </label>
+            )}
             {kind === "temple" && <label>
               Casting time noted on the receipt (minutes)
               <input
@@ -608,6 +624,7 @@ export function NpcServicesToggle({ npc, table: t }: { npc: Npc; table: CloudTab
             />{" "}
             {kindName[k]} · {npc.name}
             {isLinkKind(k) && <small> · Link only, no new money path. {kindHint[k]}</small>}
+            {!isLinkKind(k) && kindHint[k] && <small> · {kindHint[k]}</small>}
             {mine.map((p) => (
               <small key={p.id}>
                 {" "}
@@ -663,6 +680,12 @@ export function ServiceRequests() {
 function ServiceRequestRow({ order: o, table: t, dm }: { order: ServiceOrder; table: CloudTable; dm: boolean }) {
   const { commandOutcome } = useEconomy();
   const [note, setNote] = useState("");
+  /** Identify: the answer, and the two optional item updates. */
+  const [answer, setAnswer] = useState("");
+  const [appendToNotes, setAppendToNotes] = useState(true);
+  const [renaming, setRenaming] = useState(false);
+  const [rename, setRename] = useState(o.terms.item?.name ?? "");
+  const item = o.terms.item ? t.holdings.find((h) => h.id === o.terms.item!.holdingId) : undefined;
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const checks = dm ? reviewChecks(t, o) : [];
@@ -687,10 +710,12 @@ function ServiceRequestRow({ order: o, table: t, dm }: { order: ServiceOrder; ta
       <span className="svc-flag">{serviceWhen(o.orderedDay, o.orderedMinute)}</span>
       <h4>
         {o.terms.offer.name}
+        {o.terms.item ? ` ${o.terms.item.name}` : ""}
         {o.terms.beneficiaries.length ? ` on ${o.terms.beneficiaries.map((b) => b.name).join(", ")}` : ""} · {formatCopper(o.terms.priceCopper)}
       </h4>
       <p className="svc-meta">
         {payer} asks {o.terms.npcName} at {o.terms.shopName}, {o.terms.placeName}.{brought.length ? ` ${brought.join(". ")}.` : ""}
+        {o.terms.item ? ` Item notes now: “${item?.notes || o.terms.item.notesBefore || "none"}”` : ""}
       </p>
       {dm ? (
         <>
@@ -702,7 +727,34 @@ function ServiceRequestRow({ order: o, table: t, dm }: { order: ServiceOrder; ta
               </li>
             ))}
           </ul>
+          {o.terms.item && (
+            <div className="svc-editor">
+              <label>
+                What {o.terms.npcName} says (the player receives this)
+                <textarea value={answer} maxLength={2000} onChange={(e) => setAnswer(e.target.value)} />
+              </label>
+              <label className="svc-check">
+                <input type="checkbox" checked={appendToNotes} onChange={(e) => setAppendToNotes(e.target.checked)} />
+                Add this to the item's notes <small>Appends a dated line; the old notes stay.</small>
+              </label>
+              <label className="svc-check">
+                <input type="checkbox" checked={renaming} onChange={(e) => setRenaming(e.target.checked)} />
+                Rename the item
+              </label>
+              {renaming && (
+                <label>
+                  New name
+                  <input value={rename} maxLength={160} onChange={(e) => setRename(e.target.value)} />
+                </label>
+              )}
+            </div>
+          )}
           <p className="svc-hint">
+            {o.terms.item
+              ? `Approving charges ${payer} ${formatCopper(o.terms.priceCopper)} once and posts the answer to ${payer}'s thread with ${o.terms.npcName}${appendToNotes || renaming ? `; the same command updates the item's ${[appendToNotes ? "notes" : "", renaming ? "name" : ""].filter(Boolean).join(" and ")}` : ""}. Attunement and charges are not touched.`
+              : null}
+          </p>
+          <p className="svc-hint" hidden={!!o.terms.item}>
             Approving pays {o.terms.shopName} <b>{formatCopper(o.terms.priceCopper)}</b> from {payer} (one ledger line)
             {o.terms.components.some((c) => c.consumed && c.supplied === "party") ? " and consumes the item they bring" : ""}. It does not change any
             sheet.
@@ -713,10 +765,24 @@ function ServiceRequestRow({ order: o, table: t, dm }: { order: ServiceOrder; ta
           </label>
           <div className="svc-buttons">
             <Button
-              disabled={busy || checks.some((c) => !c.ok)}
-              onClick={() => void run({ kind: "service-review", orderId: o.id, before: o, decision: "approve", reason: note.trim() }, `${o.id}-approve`)}
+              disabled={busy || checks.some((c) => !c.ok) || (!!o.terms.item && (!answer.trim() || (renaming && !rename.trim())))}
+              onClick={() =>
+                void run(
+                  {
+                    kind: "service-review",
+                    orderId: o.id,
+                    before: o,
+                    decision: "approve",
+                    reason: note.trim(),
+                    ...(o.terms.item
+                      ? { reveal: { text: answer.trim(), appendToNotes, ...(renaming && rename.trim() ? { rename: rename.trim() } : {}) } }
+                      : {}),
+                  },
+                  `${o.id}-approve`,
+                )
+              }
             >
-              Approve · charge {formatCopper(o.terms.priceCopper)}
+              {o.terms.item ? "Answer" : "Approve"} · charge {formatCopper(o.terms.priceCopper)}
             </Button>
             <Button
               variant="danger"

@@ -9,7 +9,7 @@ import { smithFixture, smithDm } from "../src/lib/quire/test-fixtures/blacksmith
 import { applyCommand } from "../src/lib/quire/commands.ts";
 import { defaultSmith } from "../src/lib/quire/blacksmith-schema.ts";
 import { validateWorld } from "../src/lib/quire/world.ts";
-import { servicesFixture, workshopFixture, innFixture, linksFixture, svcDm } from "../src/lib/quire/test-fixtures/services.ts";
+import { servicesFixture, workshopFixture, innFixture, linksFixture, sageFixture, svcDm } from "../src/lib/quire/test-fixtures/services.ts";
 import { openApplication, reloadApplication, navigateApplication } from "./title-screen-navigation.mjs";
 
 const origin = process.env.AUDIT_ORIGIN || "http://127.0.0.1:8080";
@@ -355,6 +355,51 @@ async function links(page, width) {
     const seat = await import("/src/lib/quire/table.ts");
     seat.setSeat({ ...seat.getSeat(), role: "dm", purseIds: [] });
   });
+}
+
+/** Sage: ask about the worn ring, then answer in Review Inbox with the notes and a new name. */
+async function sage(page, width) {
+  await open(page, sageFixture(), "quillon", "Magister Quillon");
+  const services = reply(page, "What is this thing?");
+  await expect(services).toContainText("Services · Sage");
+  await expect(services).toContainText("Identify 50 gp. Charged when the DM answers.");
+  await services.click();
+  await reply(page, "Identify").click();
+  const drawer = talk(page).locator(".npc-talk-drawer");
+  await drawer.getByLabel(/Plain silver ring/).check();
+  await expect(drawer.locator(".svc-choice.blocked")).toContainText("Party fund. A character has to carry it first.");
+  await expect(drawer.locator(".svc-total")).toContainText("Charged when answered");
+  await fits(page, `${width} identify`);
+  await page.screenshot({ path: `${output}/sage-pick-${width}.png`, fullPage: true });
+  const ask = reply(page, "This one.");
+  await expect(ask).toContainText("charged on answer");
+  await ask.click();
+  await expect(talk(page)).toContainText("Plain silver ring stays with Kael until the DM answers");
+  let state = await readJournal(page);
+  const request = state.journal.services.orders.at(-1);
+  assert.equal(request.status, "requested");
+  assert.equal(state.ledger.filter((l) => l.id === request.id + "-payment").length, 0, "nothing moves on request");
+
+  await navigateApplication(page, origin + "/features/review");
+  const row = page.getByRole("article", { name: "Service request Identify" });
+  await expect(row).toContainText("Plain silver ring is still owned and carried by Kael");
+  await expect(row.getByRole("button", { name: /^Answer · charge 50 gp/ })).toBeDisabled();
+  await row.getByLabel(/What Magister Quillon says/).fill("A Ring of Feather Falling.");
+  await row.getByLabel("Rename the item").check();
+  await row.getByLabel("New name").fill("Ring of Feather Falling");
+  await fits(page, `${width} identify inbox`);
+  await page.screenshot({ path: `${output}/sage-inbox-${width}.png`, fullPage: true });
+  await row.getByRole("button", { name: /^Answer · charge 50 gp/ }).click();
+  await expect.poll(async () => (await readJournal(page)).journal.services.orders.at(-1).status).toBe("completed");
+  state = await readJournal(page);
+  const ring = state.holdings.find((h) => h.id === "ring");
+  assert.equal(ring.name, "Ring of Feather Falling");
+  assert.match(ring.notes, /identified by Magister Quillon: A Ring of Feather Falling\./);
+  assert.equal(state.ledger.filter((l) => l.id === request.id + "-payment").length, 1, "charged once");
+  await navigateApplication(page, origin + "/features/npcs?npc=quillon");
+  await reply(page, "What is this thing?").click();
+  await expect(said(page, "A Ring of Feather Falling.")).toBeAttached();
+  await fits(page, `${width} identify answered`);
 }
 
 try {
