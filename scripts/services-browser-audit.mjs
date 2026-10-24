@@ -111,6 +111,10 @@ async function open(page, fixture, npc = "maker", name = "Aster") {
   await reloadApplication(page);
   await navigateApplication(page, origin + `/features/npcs?npc=${npc}`);
   await expect(talk(page)).toBeVisible();
+  // Speak as Kael: the device may keep another campaign character from an earlier step.
+  const speaking = talk(page).getByLabel("Speaking as");
+  if ((await speaking.count()) && (await speaking.inputValue()) !== "kael" && (await speaking.locator('option[value="kael"]').count()))
+    await speaking.selectOption("kael");
 }
 const said = (page, text) => talk(page).locator(".sr-only").getByText(text, { exact: true }).last();
 
@@ -367,7 +371,7 @@ async function sage(page, width) {
   await reply(page, "Identify").click();
   const drawer = talk(page).locator(".npc-talk-drawer");
   await drawer.getByLabel(/Plain silver ring/).check();
-  await expect(drawer.locator(".svc-choice.blocked")).toContainText("Party fund. A character has to carry it first.");
+  await expect(drawer.locator(".svc-choice.blocked").filter({ hasText: "Odd brass key" })).toContainText("Party fund. A character has to carry it first.");
   await expect(drawer.locator(".svc-total")).toContainText("Charged when answered");
   await fits(page, `${width} identify`);
   await page.screenshot({ path: `${output}/sage-pick-${width}.png`, fullPage: true });
@@ -465,6 +469,7 @@ try {
     if (runs("workshop")) await workshop(page, width);
     if (runs("inn")) await inn(page, width);
     if (runs("links")) await links(page, width);
+    if (runs("sage")) await sage(page, width);
     await context.close();
   }
   assert.deepEqual(errors, [], "No browser runtime errors");
