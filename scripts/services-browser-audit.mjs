@@ -523,6 +523,7 @@ try {
     if (runs("inn")) await inn(page, width);
     if (runs("links")) await links(page, width);
     if (runs("sage")) await sage(page, width);
+    if (runs("trainer")) await trainer(page, width);
     await context.close();
   }
   assert.deepEqual(errors, [], "No browser runtime errors");

@@ -105,7 +105,7 @@ export function PaidLessons({ table: t, locked, initialLessonId = "" }: { table:
             What you practised (optional)
             <input aria-label="What you practised" maxLength={4000} value={description} onChange={(e) => setDescription(e.target.value)} />
           </label>
-          <dl className="svc-kv" aria-label="Lesson hours">
+          <dl className="svc-kv" aria-label="Hours for both people">
             <dt>{pupil?.name ?? "Pupil"}, this period</dt>
             <dd>{pupil ? `${days(downtimeRemaining(state, period.id, pupil.id, true) / 60)} h free` : "—"}</dd>
             <dt>{chosen?.terms.npcName ?? "Teacher"}</dt>

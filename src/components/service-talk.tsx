@@ -60,6 +60,7 @@ export const serviceWhen = (day: number, minute = 0) =>
 const intro: Partial<Record<ServiceProvider["kind"], string>> = {
   temple: "Say what ails you, and who. The faithful ask an offering for each blessing.",
   sage: "Show me. And keep your fingers off the pearl.",
+  trainer: "Pick your subject. You pay for each day you actually sit with me, not before.",
   workshop: "Tell me what you need made. Good work takes time.",
   inn: "Rooms upstairs, food on the fire. What'll it be?",
   hire: "Steady hands, fair wages. Where would they work?",
@@ -68,6 +69,7 @@ const offerLine: Partial<Record<ServiceProvider["kind"], string>> = {
   temple: "Who is it for, and what do you bring?",
   workshop: "Here's what that will take.",
   inn: "How many of you, and for how long?",
+  trainer: "Here's how the lessons would go.",
 };
 
 /** What the character says when choosing a preset offer; custom offers use their name. */
