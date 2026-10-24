@@ -13,6 +13,7 @@ import { z } from "zod";
 import { smithQuoteSchema } from "./blacksmith-schema.ts";
 import { previewSmith } from "./blacksmith-time.ts";
 import { previewServices, serviceQuoteSchema } from "./services-time.ts";
+import { deliverLetters } from "./services-courier.ts";
 import type { CloudTable } from "./cloud.ts";
 import { toCopper, fromCopper, spendCoins } from "./money.ts";
 import {
@@ -324,7 +325,7 @@ export function previewDowntime(
       )
     : undefined;
   const smith = previewSmith({ journal: table.journal }, days, !!estateTime);
-  const services = previewServices({ journal: table.journal }, days, !!estateTime);
+  const services = previewServices({ journal: table.journal, purses: table.purses }, days, !!estateTime);
   // Journey lines are paid after every other line, from what is left (all-or-nothing payer).
   const journey =
     journeyId && !estateTime
@@ -507,6 +508,8 @@ export function applyFinanceQuote(
   }
   if (quote.services) {
     table.journal!.services = quote.services.state;
+    // Courier letters that arrived land in the sender's thread with the recipient, once each.
+    deliverLetters(table, at);
     for (const [i, notice] of quote.services.notices.entries())
       table.journal!.events.push({
         id: `${receipt.id}-service-${i}`,

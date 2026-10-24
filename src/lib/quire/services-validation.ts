@@ -12,9 +12,10 @@ const timeFor: Partial<Record<ServiceKind, string>> = {
   inn: "per-night",
   sage: "instant",
   trainer: "training",
+  courier: "delivery",
 };
 /** Wave-2 engines not switched on yet: their providers are refused until they ship. */
-const comingKinds: readonly ServiceKind[] = ["stable", "courier"];
+const comingKinds: readonly ServiceKind[] = ["stable"];
 
 /**
  * Runs after every command and on every read. `projected` is a player's view, which lacks DM
@@ -57,6 +58,16 @@ export function validateServices(
           if (r.npcId && !t.journal?.world?.npcs.some((n) => n.id === r.npcId))
             throw Error(`${r.name}: choose an existing NPC for this role.`);
     } else if (p.link) throw Error(`${p.name}: only fence, bank and hire links carry link settings.`);
+    if (p.destinations && p.kind !== "courier") throw Error(`${p.name}: only a courier has destinations.`);
+    unique(
+      (p.destinations ?? []).map((d) => d.locationId),
+      "courier destinations",
+    );
+    if (!projected) {
+      if (p.recipients) throw Error("Courier recipients are worked out for each viewer, never stored.");
+      for (const d of p.destinations ?? [])
+        if (!locations.some((l) => l.id === d.locationId)) throw Error("A courier destination needs an existing Market location.");
+    }
     unique(
       p.offers.map((o) => o.key),
       "service offers",
@@ -96,6 +107,13 @@ export function validateServices(
         if (r.text === undefined || r.buyers === undefined) throw Error("A rumour needs its full text.");
   }
   for (const o of s.orders) {
+    if (
+      o.terms.letter &&
+      serviceOrderOpen(o) &&
+      !projected &&
+      !t.journal?.world?.npcs.some((n) => n.id === o.terms.letter!.recipientNpcId)
+    )
+      throw Error("Resolve letters in transit before deleting their recipient.");
     if (o.reveal && (!o.terms.item || o.status !== "completed"))
       throw Error("Only an answered Identify order carries an answer.");
     if (

@@ -36,16 +36,18 @@ import { Button, Fold } from "./ui";
 import { AppLink } from "./app-link";
 import { offerFlags, serviceWhen } from "./service-talk";
 import { LessonsCard } from "./service-lessons";
+import { miles } from "@/lib/quire/services-courier";
 
 // DM setup and player views of temple, workshop and inn providers (docs/SERVICES.md).
 
 const kindName = serviceKindNames;
 /** Kinds the DM can add in this release; later kinds arrive with their own presets. */
-const addableKinds: ServiceKind[] = ["temple", "workshop", "inn", "trainer", "sage", "fence", "bank", "hire"];
+const addableKinds: ServiceKind[] = ["temple", "workshop", "inn", "trainer", "courier", "sage", "fence", "bank", "hire"];
 /** What each kind's toggle in the NPC record says. */
 const kindHint: Partial<Record<ServiceKind, string>> = {
   sage: "Identify a carried item; you write the answer.",
   trainer: "Paid lessons, charged per approved session.",
+  courier: "Letters to NPCs, priced per mile.",
   fence: "Opens a black-market shop's Sell tab.",
   bank: "Opens a loan request naming this bank.",
   hire: "Proposes a property staff contract.",
@@ -262,7 +264,11 @@ function PresetChoice({ value, onChange, kind = "temple" }: { value: ServicePres
         ))}
       </div>
       <p className="svc-hint">
-        {kind === "trainer"
+        {kind === "courier"
+          ? value === "blank"
+            ? "No offers: add your own."
+            : "Letters at SRD Messenger pay, 2 cp a mile (5.1 and 5.2.1 agree), over the distance you set for each destination."
+          : kind === "trainer"
           ? value === "blank"
             ? "No subjects: add your own."
             : "The SRD has no training price: a training day costs SRD skilled hireling pay, 2 gp (5.2.1 and 5.1 agree). Subjects: Thieves' tools, a language, weapon drills; edit or add your own."
@@ -328,6 +334,9 @@ function ProviderEditor({ provider, table: t }: { provider: ServiceProvider; tab
         </div>
         {isLinkKind(draft.kind) && (
           <LinkEditor provider={draft} table={t} onChange={(link) => set({ link })} />
+        )}
+        {draft.kind === "courier" && (
+          <CourierDestinations provider={draft} table={t} onChange={(destinations) => set({ destinations })} />
         )}
         <div>
           <PresetChoice value={preset} onChange={setPreset} kind={draft.kind} />
@@ -421,6 +430,8 @@ function ProviderEditor({ provider, table: t }: { provider: ServiceProvider; tab
                             maxUnits: 1,
                             output: { kind: "holding" as const, name: "New item", unitCopper: 0, weight: 0, category: "service", notes: "" },
                           }
+                        : d.kind === "courier"
+                        ? { time: { kind: "delivery" as const }, output: { kind: "record" as const }, priceCopper: 2 }
                         : d.kind === "trainer"
                         ? { time: { kind: "training" as const }, output: { kind: "record" as const }, category: "profession" as const, maxDays: 250, priceCopper: 200 }
                         : d.kind === "sage"
@@ -848,10 +859,15 @@ export function ServiceOrderCard({ order: o, table: t, dm }: { order: ServiceOrd
   const { commandOutcome } = useEconomy();
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
-  const [action, setAction] = useState<"pause" | "resume" | "cancel">(o.status === "paused" ? "resume" : "pause");
+  const [action, setAction] = useState<"pause" | "resume" | "cancel" | "deliver" | "return">(
+    o.terms.letter && o.status === "paused" && o.progressDays === o.terms.workDays ? "deliver" : o.status === "paused" ? "resume" : "pause",
+  );
   const [reason, setReason] = useState("");
   const out = o.terms.offer.output;
-  const title = `${out.kind === "holding" ? out.name : o.terms.offer.name}${o.terms.units > 1 ? ` ×${o.terms.units}` : ""}`;
+  const title = o.terms.letter
+    ? `Letter to ${o.terms.letter.recipientName}`
+    : `${out.kind === "holding" ? out.name : o.terms.offer.name}${o.terms.units > 1 ? ` ×${o.terms.units}` : ""}`;
+  const held = !!o.terms.letter && o.status === "paused" && o.progressDays === o.terms.workDays;
   const payer = t.purses.find((p) => p.id === o.purseId)?.name ?? "the paying character";
   const here = presentAt(t, o.terms.locationId, o.purseId);
   const pct = o.terms.workDays ? Math.round((100 * o.progressDays) / o.terms.workDays) : 100;
@@ -892,7 +908,9 @@ export function ServiceOrderCard({ order: o, table: t, dm }: { order: ServiceOrd
         </span>
       </div>
       <p className="svc-hint">
-        Ordered {serviceWhen(o.orderedDay, o.orderedMinute)} · {o.terms.npcName} · pickup at {o.terms.shopName}, {o.terms.placeName}.
+        {o.terms.letter
+          ? `Sent ${serviceWhen(o.orderedDay, o.orderedMinute)} from ${o.terms.shopName} to ${o.terms.letter.placeName} (${miles(o.terms.letter.deciMiles)} mi).`
+          : `Ordered ${serviceWhen(o.orderedDay, o.orderedMinute)} · ${o.terms.npcName} · pickup at ${o.terms.shopName}, ${o.terms.placeName}.`}
       </p>
       <p className="svc-hint">{o.message}</p>
       <details>
@@ -920,8 +938,10 @@ export function ServiceOrderCard({ order: o, table: t, dm }: { order: ServiceOrd
           <label>
             Commission control
             <select value={action} onChange={(e) => setAction(e.target.value as typeof action)}>
+              {held && <option value="deliver">Deliver anyway</option>}
+              {held && <option value="return">Return to sender · no refund</option>}
               {o.status === "active" && <option value="pause">Pause work</option>}
-              {o.status === "paused" && <option value="resume">Resume work</option>}
+              {o.status === "paused" && !held && <option value="resume">Resume work</option>}
               <option value="cancel">Cancel · refund or salvage separately</option>
             </select>
           </label>
@@ -1311,6 +1331,94 @@ function LinkEditor({
       <p className="svc-hint">
         A player's Hire proposes the existing staff contract for one of the party's properties, with this role and wage. You
         approve it in Review Inbox as today. Hirelings who travel with the party are not offered.
+      </p>
+    </div>
+  );
+}
+
+/** Courier: the places it delivers to, with your distance and delivery days. */
+function CourierDestinations({
+  provider: p,
+  table: t,
+  onChange,
+}: {
+  provider: ServiceProvider;
+  table: CloudTable;
+  onChange: (d: NonNullable<ServiceProvider["destinations"]>) => void;
+}) {
+  const rows = p.destinations ?? [];
+  const locations = (t.journal?.market as { locations?: { id: string; name: string }[] } | undefined)?.locations ?? [];
+  const rate = p.offers.find((o) => o.time.kind === "delivery")?.priceCopper ?? 0;
+  const set = (i: number, patch: Partial<(typeof rows)[number]>) => onChange(rows.map((r, n) => (n === i ? { ...r, ...patch } : r)));
+  const free = locations.filter((l) => !rows.some((r) => r.locationId === l.id));
+  return (
+    <div>
+      <h4>Delivers to</h4>
+      <div className="svc-table-wrap">
+        <table className="svc-table">
+          <thead>
+            <tr>
+              <th>Place</th>
+              <th>Miles</th>
+              <th>Days</th>
+              <th>Letter</th>
+              <th />
+            </tr>
+          </thead>
+          <tbody>
+            {rows.map((r, i) => (
+              <tr key={r.locationId}>
+                <td>{locations.find((l) => l.id === r.locationId)?.name ?? "Unknown place"}</td>
+                <td>
+                  <input
+                    aria-label={`Miles to ${locations.find((l) => l.id === r.locationId)?.name ?? "place"}`}
+                    type="number"
+                    min={0.1}
+                    step={0.1}
+                    value={r.deciMiles / 10}
+                    onChange={(e) => set(i, { deciMiles: whole(String(Math.round(Number(e.target.value) * 10)), 1, 1e9) })}
+                  />
+                </td>
+                <td>
+                  <input
+                    aria-label={`Delivery days to ${locations.find((l) => l.id === r.locationId)?.name ?? "place"}`}
+                    type="number"
+                    min={1}
+                    max={3650}
+                    value={r.days}
+                    onChange={(e) => set(i, { days: whole(e.target.value, 1, 3650) })}
+                  />
+                </td>
+                <td>{formatCopper(Math.ceil((r.deciMiles * rate) / 10))}</td>
+                <td>
+                  <Button variant="danger" onClick={() => onChange(rows.filter((_, n) => n !== i))}>
+                    Remove
+                  </Button>
+                </td>
+              </tr>
+            ))}
+          </tbody>
+        </table>
+      </div>
+      {free.length > 0 && (
+        <label>
+          Add a destination
+          <select
+            value=""
+            onChange={(e) => e.target.value && onChange([...rows, { locationId: e.target.value, deciMiles: 10, days: 1 }])}
+          >
+            <option value="">Choose a place</option>
+            {free.map((l) => (
+              <option key={l.id} value={l.id}>
+                {l.name}
+              </option>
+            ))}
+          </select>
+        </label>
+      )}
+      <p className="svc-hint">
+        Letters go to NPCs a character has met, wherever the NPC is inside one of these places. Places not listed can't receive
+        letters from here. Parcels are not carried. Property letters keep using your post office postage.
       </p>
     </div>
   );

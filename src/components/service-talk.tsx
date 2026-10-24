@@ -15,6 +15,7 @@ import {
   type ServiceRequest,
 } from "@/lib/quire/services-schema";
 import { readFinance } from "@/lib/quire/finance";
+import { courierRecipients, miles } from "@/lib/quire/services-courier";
 import { canAccessEstate } from "@/lib/quire/estate";
 import { readEstate } from "@/lib/quire/estate-schema";
 import {
@@ -61,6 +62,7 @@ const intro: Partial<Record<ServiceProvider["kind"], string>> = {
   temple: "Say what ails you, and who. The faithful ask an offering for each blessing.",
   sage: "Show me. And keep your fingers off the pearl.",
   trainer: "Pick your subject. You pay for each day you actually sit with me, not before.",
+  courier: "Post goes out at noon. To whom?",
   workshop: "Tell me what you need made. Good work takes time.",
   inn: "Rooms upstairs, food on the fire. What'll it be?",
   hire: "Steady hands, fair wages. Where would they work?",
@@ -70,6 +72,7 @@ const offerLine: Partial<Record<ServiceProvider["kind"], string>> = {
   workshop: "Here's what that will take.",
   inn: "How many of you, and for how long?",
   trainer: "Here's how the lessons would go.",
+  courier: "Seal it here. I'll not read it. Probably.",
 };
 
 /** What the character says when choosing a preset offer; custom offers use their name. */
@@ -81,6 +84,7 @@ const offerSpeech: Record<string, string> = {
   "greater-restoration": "Restore what was taken.",
   "raise-dead": "Please, raise our friend.",
   identify: "What is this thing?",
+  letter: "To someone I know.",
   resurrection: "Can you restore a body long gone?",
 };
 const speech = (o: ServiceOffer) => offerSpeech[o.key] ?? `${o.name}, please.`;
@@ -128,14 +132,18 @@ export function ServiceReceipt({ order, payer }: { order: ServiceOrder; payer: s
         <b>
           {t.kind === "inn"
             ? `Stay · ${t.shopName}`
-            : t.lessons
+            : t.letter
+              ? `Letter to ${t.letter.recipientName}`
+              : t.lessons
               ? `Lessons · ${t.lessons.topic}`
               : t.item
                 ? `${t.offer.name} · ${t.item.name}`
                 : t.offer.name}
         </b>
         <span className={`svc-status ${order.status}`}>
-          {t.lessons && order.status === "active"
+          {t.letter && order.status === "active"
+            ? "In transit"
+            : t.lessons && order.status === "active"
             ? "Agreed"
             : order.status === "completed"
             ? order.reveal
@@ -147,6 +155,20 @@ export function ServiceReceipt({ order, payer }: { order: ServiceOrder; payer: s
         </span>
       </div>
       <dl className="svc-kv">
+        {t.letter && (
+          <>
+            <dt>To</dt>
+            <dd>
+              {t.letter.recipientName}, {t.letter.placeName}
+            </dd>
+            <dt>Distance</dt>
+            <dd>
+              {miles(t.letter.deciMiles)} mi · {formatCopper(t.priceCopper)}
+            </dd>
+            <dt>Arrives</dt>
+            <dd>After {t.workDays} approved downtime {t.workDays === 1 ? "day" : "days"}</dd>
+          </>
+        )}
         {t.lessons && (
           <>
             <dt>Pupil</dt>
@@ -226,7 +248,9 @@ export function ServiceReceipt({ order, payer }: { order: ServiceOrder; payer: s
         )}
       </dl>
       <p className="svc-record-only">
-        {t.lessons
+        {t.letter
+          ? `The letter is a record. Nothing happens on its own when it arrives; the DM answers as ${t.letter.recipientName}.`
+          : t.lessons
           ? `Recorded only. Finishing the lessons doesn't add a proficiency; the DM decides what ${t.lessons.pupilName} learns.`
           : t.item
           ? `Recorded. The answer is in your thread with ${t.npcName}${order.reveal?.appendToNotes ? " and in the item's notes" : ""}.`
@@ -311,7 +335,9 @@ export function orderLines(o: ServiceOrder, payer: string, npcName: string): Tal
       key: `${o.id}-done`,
       text: o.reveal
         ? o.reveal.text
-        : t.lessons
+        : t.letter
+          ? "Rider leaves at noon."
+          : t.lessons
           ? "Come by after the bells. Bring your own tools."
           : t.kind === "temple"
             ? "It is done."
@@ -358,6 +384,9 @@ export function useServiceTalk({
   const [mine, setMine] = useState<string[]>([]);
   /** Identify: the carried item the sage looks at. */
   const [itemId, setItemId] = useState("");
+  /** Courier: the recipient and the letter. */
+  const [recipientId, setRecipientId] = useState("");
+  const [letterText, setLetterText] = useState("");
   /** Hire: the chosen role, property and the name on the contract. */
   const [roleKey, setRoleKey] = useState<string>();
   const [propertyId, setPropertyId] = useState("");
@@ -377,6 +406,9 @@ export function useServiceTalk({
           beneficiaryPurseIds: beneficiaries,
           units,
           ...(offer.target && itemId ? { itemHoldingId: itemId } : {}),
+          ...(provider.kind === "courier" && recipientId && letterText.trim()
+            ? { letter: { recipientNpcId: recipientId, text: letterText.trim() } }
+            : {}),
           ...(provider.kind === "inn" && tierKey ? { inn: { tierKey, meals } } : {}),
           contributions: (offer.components ?? []).flatMap((c) => {
             const pick = picks[c.key];
@@ -412,6 +444,8 @@ export function useServiceTalk({
   function chooseOffer(o: ServiceOffer) {
     setOfferKey(o.key);
     setUnits(o.time.kind === "training" ? Math.min(10, maxUnits(o)) : 1);
+    if (provider!.kind === "courier" && purseId)
+      setRecipientId(courierRecipients(table, provider!, purseId).find((r) => !r.blocked)?.npcId ?? "");
     if (o.target && purseId) setItemId(identifyCandidates(table, purseId).find((c) => !c.blocked)?.holding.id ?? "");
     const rule = beneficiaryRule(provider!.kind, o);
     setBeneficiaries(rule.min && purseId ? [purseId] : []);
@@ -657,7 +691,7 @@ export function useServiceTalk({
       replies.push({
         tag: (
           <>
-            {o.name} <em>· {formatCopper(o.priceCopper)}{o.time.kind === "training" ? " a training day" : o.time.kind === "per-night" ? "" : maxUnits(o) > 1 ? " each" : ""}{o.components?.length ? ` + ${o.components.map((c) => c.label.toLowerCase()).join(", ")}` : ""}</em>
+            {o.name} <em>· {formatCopper(o.priceCopper)}{o.time.kind === "delivery" ? " a mile" : o.time.kind === "training" ? " a training day" : o.time.kind === "per-night" ? "" : maxUnits(o) > 1 ? " each" : ""}{o.components?.length ? ` + ${o.components.map((c) => c.label.toLowerCase()).join(", ")}` : ""}</em>
           </>
         ),
         text: speech(o),
@@ -673,6 +707,15 @@ export function useServiceTalk({
       });
     }
     if (provider.kind === "inn" && forSale.length) replies.push(rumourReply());
+    if (provider.kind === "courier") {
+      replies.push({
+        tag: <>Property letter ↗</>,
+        text: "To the steward of our property.",
+        sub: "Reports and instructions to a property manager use the existing property letter (the DM's postage).",
+        href: "/features/properties",
+      });
+      replies.push({ tag: "Parcel", text: "Can you carry a parcel?", disabled: "Parcels aren't carried yet (letters only)." });
+    }
     replies.push({
       text: "Never mind.",
       tone: "leave",
@@ -686,8 +729,11 @@ export function useServiceTalk({
     const review = quote?.terms.review === "dm" || (!quote && offer.review === "dm");
     const price = quote ? formatCopper(quote.terms.priceCopper) : "…";
     const lessons = offer.time.kind === "training";
+    const letter = offer.time.kind === "delivery";
     const say = lessons
       ? "Agreed."
+      : letter && !review
+        ? "Send it."
       : review
         ? offer.target
           ? "This one."
@@ -712,7 +758,9 @@ export function useServiceTalk({
           {offer.time.kind === "downtime-days" ? "Commission" : offer.time.kind === "per-night" ? "Book" : `Pay ${price}`}{" "}
           <em>
             ·{" "}
-            {offer.time.kind === "downtime-days"
+            {letter
+              ? `arrives after ${quote?.terms.workDays ?? "…"} downtime ${quote?.terms.workDays === 1 ? "day" : "days"}`
+              : offer.time.kind === "downtime-days"
               ? `pay ${price} · ready after ${quote?.terms.workDays ?? "…"} downtime days`
               : offer.time.kind === "per-night"
                 ? `pay ${price} · ${units} ${units === 1 ? "night" : "nights"}`
@@ -724,6 +772,8 @@ export function useServiceTalk({
       tone: review ? "dm" : "check",
       sub: lessons
         ? "Adds the lessons to Downtime & NPC training. Log sessions there after the DM approves downtime."
+        : letter && !review
+          ? "One payment. The letter travels only with DM-approved downtime."
         : review
         ? offer.target
           ? "The item stays with you while the DM answers. Nothing is charged now."
@@ -858,6 +908,39 @@ export function useServiceTalk({
               player doesn't need to confirm.
             </p>
           </div>
+        )}
+        {provider.kind === "courier" && (
+          <>
+            <fieldset className="svc-section">
+              <h4>To</h4>
+              {courierRecipients(table, provider, character.id).map((r) => (
+                <label key={r.npcId} className={`svc-choice${recipientId === r.npcId ? " on" : ""}${r.blocked ? " blocked" : ""}`}>
+                  <input type="radio" name="svc-letter-to" checked={recipientId === r.npcId} disabled={!!r.blocked} onChange={() => setRecipientId(r.npcId)} />
+                  <b>{r.name}</b>
+                  <span className="svc-amt">{r.deciMiles && !r.blocked ? formatCopper(Math.ceil((r.deciMiles * offer.priceCopper) / 10)) : ""}</span>
+                  <small>
+                    {r.blocked ||
+                      `${r.placeName} · ${miles(r.deciMiles!)} mi · ${r.days} downtime ${r.days === 1 ? "day" : "days"}`}
+                  </small>
+                </label>
+              ))}
+              {!courierRecipients(table, provider, character.id).length && (
+                <p className="npc-talk-hint">{character.name} hasn't met anyone to write to yet.</p>
+              )}
+              <p className="npc-talk-hint">
+                NPCs {character.name} has met and can see, at places the courier serves. Hidden NPCs and places{" "}
+                {character.name} doesn't know aren't listed.
+              </p>
+            </fieldset>
+            <div className="svc-section">
+              <h4>Letter</h4>
+              <textarea aria-label="Letter text" maxLength={2000} value={letterText} onChange={(e) => setLetterText(e.target.value)} />
+              <p className="npc-talk-hint">
+                Only you and the DM read it. It is delivered into your thread with the recipient; the DM (or their controller)
+                answers there.
+              </p>
+            </div>
+          </>
         )}
         {offer.target === "held-item" && (
           <fieldset className="svc-section">
@@ -1056,7 +1139,9 @@ export function useServiceTalk({
               ? `Booked and paid up front: ${quote.terms.priceCopper} cp, one ledger line. Leaving early refunds nothing automatically. `
               : ""}
             {problem ||
-              (offer.time.kind === "training"
+              (offer.time.kind === "delivery"
+                ? `Paid once on sending. It arrives after ${quote?.terms.workDays ?? "…"} approved downtime days; session hours don't move it. Cancelling refunds nothing, as with property letters.`
+                : offer.time.kind === "training"
                 ? `Booking records the agreement only. Each logged session reserves hours for ${character.name} and ${npc.name}; the DM's approval counts the hours and charges that session's fee once. Fees are whole copper, rounded up.`
                 : quote?.terms.review === "dm"
                 ? offer.target

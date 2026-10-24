@@ -11,6 +11,7 @@ import {
   presentAt,
   quoteFingerprint,
 } from "./service-core.ts";
+import { courierRecipients, letterCopper, miles } from "./services-courier.ts";
 import {
   isLinkKind,
   readServices,
@@ -126,8 +127,10 @@ export const providerListed = (p: ServiceProvider) => isLinkKind(p.kind) || appr
 
 /** The provider as both the DM and a player see it: approved offers, no rumour text. */
 export function publicProvider(p: ServiceProvider) {
+  const { recipients, ...rest } = p;
+  void recipients; // Projection-only; the quote compares the chosen recipient in its terms.
   return {
-    ...p,
+    ...rest,
     offers: approvedOffers(p),
     rumours: p.rumours?.map((r) => ({ id: r.id, teaser: r.teaser, priceCopper: r.priceCopper, once: r.once })),
   };
@@ -269,6 +272,26 @@ export function serviceQuote(
     if (units !== 1) throw Error("Ask about one item at a time.");
   } else if (request.itemHoldingId) throw Error("This offer doesn't look at an item.");
 
+  // Courier: a letter to an NPC the payer knows, at a place the courier serves.
+  let letter: { recipientNpcId: string; recipientName: string; locationId: string; placeName: string; deciMiles: number; text: string } | undefined,
+    letterDays = 0;
+  if (p.kind === "courier") {
+    if (!request.letter) throw Error("Choose who the letter is for and write it.");
+    if (units !== 1) throw Error("Send one letter at a time.");
+    const r = courierRecipients(t, p, purseId).find((x) => x.npcId === request.letter!.recipientNpcId);
+    if (!r) throw Error(`${payer.name} can only write to someone they know.`);
+    if (r.blocked) throw Error(r.blocked);
+    letter = {
+      recipientNpcId: r.npcId,
+      recipientName: r.name.slice(0, 160),
+      locationId: r.locationId!,
+      placeName: (r.placeName ?? "").slice(0, 160),
+      deciMiles: r.deciMiles!,
+      text: request.letter.text,
+    };
+    letterDays = r.days!;
+  } else if (request.letter) throw Error("Letters go by courier.");
+
   // Price: the offer per unit, or an inn's tier per guest per night plus meals.
   const lines: { label: string; copper: number }[] = [];
   let inn: { tierKey: string; tierName: string; nightCopper: number; mealCopper: number; meals: number } | undefined;
@@ -288,7 +311,12 @@ export function serviceQuote(
         copper: money(guests * units * meals * tier.mealCopper),
       });
   } else if (request.inn) throw Error("Rooms are booked at an inn.");
-  else if (p.kind === "trainer") {
+  else if (letter) {
+    lines.push({
+      label: `${miles(letter.deciMiles)} mi × ${formatCopper(offer.priceCopper)} a mile, rounded up to whole copper`,
+      copper: letterCopper(letter.deciMiles, offer.priceCopper),
+    });
+  } else if (p.kind === "trainer") {
     // Booking moves no money: each session is charged once when the DM approves it.
     if (!offer.category) throw Error("This subject has no training category.");
     lines.push({ label: `Booking now · up to ${units} training ${units === 1 ? "day" : "days"} at ${formatCopper(offer.priceCopper)} a day, charged per approved session`, copper: 0 });
@@ -356,7 +384,11 @@ export function serviceQuote(
       ? ("dm" as const)
       : ("auto" as const);
   const workDays =
-    offer.time.kind === "downtime-days" ? offer.time.days * (offer.time.perUnit ? units : 1) : 0;
+    offer.time.kind === "downtime-days"
+      ? offer.time.days * (offer.time.perUnit ? units : 1)
+      : offer.time.kind === "delivery"
+        ? letterDays
+        : 0;
   if (workDays > 3650) throw Error("This order would take more than 3650 downtime days.");
   const settlement = providerSettlement(t, p);
   const terms = serviceTermsSchema.parse({
@@ -380,6 +412,7 @@ export function serviceQuote(
     workDays,
     settlement: settlement.kind,
     ...(item ? { item } : {}),
+    ...(letter ? { letter } : {}),
     ...(p.kind === "trainer"
       ? {
           lessons: {
@@ -477,6 +510,7 @@ export function reviewChecks(t: Table, o: ServiceOrder) {
 
 /** A short receipt line, for events and history. */
 export function serviceSummary(o: Pick<ServiceOrder, "terms">) {
+  if (o.terms.letter) return `Letter to ${o.terms.letter.recipientName} · ${o.terms.shopName}`;
   if (o.terms.lessons) return `Lessons · ${o.terms.lessons.topic} for ${o.terms.lessons.pupilName} · ${o.terms.shopName}`;
   if (o.terms.item) return `${o.terms.offer.name} · ${o.terms.item.name} · ${o.terms.shopName}`;
   const on = o.terms.beneficiaries.length && o.terms.kind === "temple" ? ` on ${o.terms.beneficiaries[0].name}` : "";

@@ -262,6 +262,7 @@ export const FEATURE_AREAS: FeatureArea[] = [
           "Inns book nights and meals, and share rumours privately",
           "Sages identify an item you carry; the DM writes the answer",
           "Trainers give paid lessons, charged per DM-approved session",
+          "Couriers carry letters to NPCs you've met, delivered over downtime",
           "Tailors make clothes; fences, banks and hiring agents open the Sell tab, a loan request or a staff contract",
         ],
       },

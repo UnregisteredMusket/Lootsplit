@@ -126,6 +126,20 @@ function trainerOffer([key, name, category, description]: (typeof subjects)[numb
   };
 }
 
+/** Courier: SRD Messenger, 2 cp a mile (SRD 5.1 and 5.2.1 agree), over the DM's distances. */
+export function letterOffer(): ServiceOffer {
+  return {
+    key: "letter",
+    name: "Letter",
+    description: "A letter to someone you know, carried by rider. Priced per mile; delivered over approved downtime.",
+    approved: true,
+    priceCopper: 2,
+    time: { kind: "delivery" },
+    review: "auto",
+    output: { kind: "record" },
+  };
+}
+
 export const workshopSpecialties = ["Scribe", "Alchemist", "Tailor"] as const;
 export type WorkshopSpecialty = (typeof workshopSpecialties)[number];
 
@@ -296,6 +310,7 @@ export function presetOffers(kind: ServiceKind, preset: ServicePreset, specialty
   if (kind === "temple") return [...templeSpells.map((s) => templeOffer(s, preset)), identifyOffer(false)];
   if (kind === "sage") return [identifyOffer()];
   if (kind === "trainer") return subjects.map(trainerOffer);
+  if (kind === "courier") return [letterOffer()];
   if (kind === "inn") return [innOffer(preset)];
   if (kind === "workshop" && specialty === "Scribe") return scrollSpells.map((s) => scrollOffer(s, preset));
   if (kind === "workshop" && specialty === "Alchemist") return brews.map((b) => brewOffer(b, preset));

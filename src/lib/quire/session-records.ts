@@ -3,6 +3,7 @@ import { facilityAccess } from "./ships.ts";
 import { readDowntimeActivities } from "./downtime-activities-schema.ts";
 import { readBlacksmith } from "./blacksmith-schema.ts";
 import { isLinkKind, readServices } from "./services-schema.ts";
+import { courierRecipients } from "./services-courier.ts";
 import {
   characterVisible,
   canReadCharacter,
@@ -277,6 +278,10 @@ export function projectRecord(
         .filter((p) => p.kind !== "fence" || !!world.blackMarketActive)
         .map((p) => {
           const projected = { ...p, offers: p.offers.filter((o) => o.approved) };
+          // Courier: who this viewer's characters may write to, worked out here from the full table
+          // (the NPCs they have threads with may be elsewhere and absent from the projection).
+          if (p.kind === "courier")
+            projected.recipients = seat.purseIds.flatMap((purseId) => courierRecipients(table, p, purseId));
           // Hire roles name an NPC only when the player can read that NPC.
           if (p.link?.roles)
             projected.link = {

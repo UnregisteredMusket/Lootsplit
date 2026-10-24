@@ -9,7 +9,7 @@ import { smithFixture, smithDm } from "../src/lib/quire/test-fixtures/blacksmith
 import { applyCommand } from "../src/lib/quire/commands.ts";
 import { defaultSmith } from "../src/lib/quire/blacksmith-schema.ts";
 import { validateWorld } from "../src/lib/quire/world.ts";
-import { servicesFixture, workshopFixture, innFixture, linksFixture, sageFixture, trainerFixture, svcDm } from "../src/lib/quire/test-fixtures/services.ts";
+import { servicesFixture, workshopFixture, innFixture, linksFixture, sageFixture, trainerFixture, courierFixture, svcDm } from "../src/lib/quire/test-fixtures/services.ts";
 import { openApplication, reloadApplication, navigateApplication } from "./title-screen-navigation.mjs";
 
 const origin = process.env.AUDIT_ORIGIN || "http://127.0.0.1:8080";
@@ -459,6 +459,42 @@ async function trainer(page, width) {
   assert.equal(state.journal.services.orders.at(-1).sessions.length, 1);
 }
 
+/** Courier: a letter to Lady Marrow, paid once, delivered over approved downtime into the thread. */
+async function courier(page, width) {
+  await open(page, courierFixture(), "pell", "Pell Quickfoot");
+  const services = reply(page, "I need a letter delivered.");
+  await expect(services).toContainText("Services · Courier");
+  await services.click();
+  await expect(reply(page, "Can you carry a parcel?")).toBeDisabled();
+  await expect(reply(page, "To the steward of our property.")).toHaveAttribute("href", /\/features\/properties(\?|$)/);
+  const letter = reply(page, "To someone I know.");
+  await expect(letter).toContainText("2 cp a mile");
+  await letter.click();
+  const drawer = talk(page).locator(".npc-talk-drawer");
+  await drawer.getByLabel(/Lady Marrow/).check();
+  await expect(drawer.locator(".svc-choice.blocked").filter({ hasText: "Old Tamsin" })).toContainText("is here. Talk to them instead.");
+  await expect(drawer).not.toContainText("Grey Spy");
+  await drawer.getByLabel("Letter text").fill("My lady, the lights at the old mill were no rumour.");
+  await expect(drawer.locator(".svc-total")).toContainText("7 sp, 7 cp");
+  await fits(page, `${width} letter`);
+  await page.screenshot({ path: `${output}/courier-write-${width}.png`, fullPage: true });
+  const send = reply(page, "Send it.");
+  await expect(send).toContainText("arrives after 2 downtime days");
+  await send.click();
+  await expect(talk(page).getByLabel("Receipt: Letter")).toContainText("In transit");
+  let state = await readJournal(page);
+  const sent = state.journal.services.orders.at(-1);
+  assert.equal(sent.status, "active");
+  assert.equal(state.ledger.filter((l) => l.id === sent.id + "-payment" && l.copper === -77).length, 1, "paid once");
+
+  await approveDowntime(page, 2);
+  await expect.poll(async () => (await readJournal(page)).journal.services.orders.at(-1).status).toBe("completed");
+  state = await readJournal(page);
+  const thread = state.journal.world.conversations.find((c) => c.id === "marrow:kael");
+  assert.equal(thread.messages.filter((m) => m.id === sent.id + "-letter").length, 1, "delivered once into Kael's thread");
+  await fits(page, `${width} letter delivered`);
+}
+
 try {
   for (const width of [1280, 390, 320]) {
     const context = await browser.newContext({ viewport: { width, height: 950 }, serviceWorkers: "block" });
@@ -524,6 +560,7 @@ try {
     if (runs("links")) await links(page, width);
     if (runs("sage")) await sage(page, width);
     if (runs("trainer")) await trainer(page, width);
+    if (runs("courier")) await courier(page, width);
     await context.close();
   }
   assert.deepEqual(errors, [], "No browser runtime errors");

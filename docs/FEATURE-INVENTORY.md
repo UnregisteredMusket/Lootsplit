@@ -485,6 +485,10 @@ Adds a contextual Maps session bar, searchable scene cards, separate activation/
 - Anti-exploit: cooldown per player account, repeat DC, 24-hour combined judgement, caps, unit cap, unwanted categories, and player-set item values (`valueSource: "player"`) count for nothing. Settlement reuses the atomic barter exchange; command IDs make retries no-ops and never re-roll. Players never receive NPC rules, valuation, purse or other players' attempts. The existing trading table, controlled-NPC flow, Give and every earlier save are unchanged. See [NPC-BARTER.md](NPC-BARTER.md).
 
 
+### NPC services, wave 2 phase 4e: Courier letters (October 24, 2026)
+
+- Courier providers carry letters to NPCs a character has met, at 2 cp a mile (SRD Messenger) over the DM's distance per destination, paid once on sending. Letters travel only with approved downtime and land in the sender's private thread with the recipient; a hidden or missing recipient holds the letter for the DM (deliver anyway or return, no refund). Property letters and post offices are unchanged; parcels aren't carried. See [services](SERVICES.md).
+
 ### NPC services, wave 2 phase 4d: Trainer paid lessons (October 24, 2026)
 
 - Trainer providers teach a character (the reverse of NPC training) at a rate per training day (2 gp default, SRD skilled hireling pay). Agreeing terms moves no money; sessions are logged in Downtime → Learn from a paid teacher, reserve hours for pupil and teacher, and are charged once each when the DM approves them in Review Inbox (`requestId-fee`). Agreements complete at their day cap; End lessons stops new sessions without charge. Lessons share the training counters and resets. See [services](SERVICES.md).
