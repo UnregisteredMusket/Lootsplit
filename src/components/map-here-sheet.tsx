@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { MapPin, X } from "lucide-react";
+import { MapPin, Route, X } from "lucide-react";
 import type { HereRow, HereSheet } from "@/lib/quire/place-hub";
 import type { MapRecordReference } from "@/lib/quire/connected-maps-schema";
 import { Button } from "./ui";
@@ -25,6 +25,8 @@ export function MapHereSheet({
   canLocate,
   backToParty,
   showParty,
+  planJourney,
+  showJourney,
 }: {
   sheet: HereSheet;
   dm: boolean;
@@ -34,6 +36,10 @@ export function MapHereSheet({
   canLocate: (reference: MapRecordReference) => boolean;
   backToParty?: () => void;
   showParty?: () => void;
+  /** Journey planner from the party's location ("Plan a journey from here"). */
+  planJourney?: () => void;
+  /** The party's journey under way (progress panel or status card). */
+  showJourney?: () => void;
 }) {
   const [filter, setFilter] = useState<"all" | HereRow["group"]>("all");
   const header = (title: string, subtitle: string) => (
@@ -79,7 +85,14 @@ export function MapHereSheet({
             The party is travelling{sheet.environment ? ` (${sheet.environment})` : ""}. Shops,
             people and services come back when the DM moves the party to a place.
           </p>
-          {showParty && <Button onClick={showParty}>Show the party</Button>}
+          <div className="map-here-actions">
+            {showJourney && (
+              <Button onClick={showJourney}>
+                <Route size={16} aria-hidden="true" /> Journey progress
+              </Button>
+            )}
+            {showParty && <Button variant="secondary" onClick={showParty}>Show the party</Button>}
+          </div>
         </div>
       </>
     );
@@ -139,6 +152,21 @@ export function MapHereSheet({
       <>
         {header("Here", "Everything you can use at the party's location")}
         <p className="map-here-note">Party is in {sheet.locationName}</p>
+        {planJourney && (
+          <div className="map-here-travel">
+            <span>
+              <strong>Travel from {sheet.locationName}</strong>
+              <small>
+                {dm
+                  ? "Draw a route; the review turns it into downtime days."
+                  : "Draw a route and send it to the DM."}
+              </small>
+            </span>
+            <Button onClick={planJourney}>
+              <Route size={16} aria-hidden="true" /> Plan a journey
+            </Button>
+          </div>
+        )}
         {sheet.rows.length ? (
           <>
             <div className="map-here-filters" role="group" aria-label="Filter places">

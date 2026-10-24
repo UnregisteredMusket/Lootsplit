@@ -48,7 +48,9 @@ import { CommandForm } from "./world-tools";
 import { defaultLocationMap } from "@/lib/quire/connected-maps";
 import { readTabletopSession } from "@/lib/quire/tabletop";
 import { DEFAULT_TRAVEL } from "@/lib/quire/journey-schema";
-import { X } from "lucide-react";
+import { journeyPlanHref, legTicks } from "@/lib/quire/journey-ui";
+import { useWorldTable } from "@/lib/quire/use-world-table";
+import { Footprints, Lock, Route as RouteIcon, X } from "lucide-react";
 
 const DM_SEAT: CloudSeat = { id: "dm", token: "", name: "DM", role: "dm", purseIds: [] };
 type Table = CloudTable;
@@ -73,6 +75,45 @@ function currentLeg(j: Journey) {
   if (!j.frozen) return 0;
   const legs = j.frozen.legDeciMiles ?? j.legs.map(() => 1);
   return legIndexAt(legs, j.elapsedMinutes / j.frozen.durationMinutes);
+}
+
+/** How far along a journey is (0–1), by approved travel time. */
+const journeyProgress = (j: Journey) =>
+  j.status === "arrived" || j.status === "completed"
+    ? 1
+    : j.frozen
+      ? Math.min(1, j.elapsedMinutes / j.frozen.durationMinutes)
+      : 0;
+/**
+ * The journey progress bar (mockup 6): travelled part filled, a tick where each leg ends. Ticks
+ * need leg distances, which a private map's projection doesn't carry, so players there get the
+ * bar alone. Built from spans so it can sit inside the status chip's button.
+ */
+export function JourneyProgressBar({ journey: j }: { journey: Journey }) {
+  const progress = journeyProgress(j),
+    percent = Math.round(progress * 100);
+  const ticks = j.frozen?.legDeciMiles ? legTicks(j.frozen.legDeciMiles) : [];
+  return (
+    <span
+      className="map-journey-progress"
+      role="progressbar"
+      aria-label="Journey progress"
+      aria-valuemin={0}
+      aria-valuemax={100}
+      aria-valuenow={percent}
+    >
+      <span className="map-journey-progress-fill" style={{ width: `${progress * 100}%` }} />
+      {ticks.map((t, i) => (
+        <span key={i} className="map-journey-progress-tick" style={{ left: `${t * 100}%` }} />
+      ))}
+    </span>
+  );
+}
+/** The next named place ahead of a journey under way, when this viewer may see it. */
+function nextPlace(t: Pick<CloudTable, "journal">, j: Journey) {
+  if (!j.points || j.status !== "active") return undefined;
+  const ahead = j.points.slice(currentLeg(j) + 1);
+  return ahead.map((p) => placeName(t, p.locationId)).find(Boolean);
 }
 
 /** A journey from the planner's drawn route, as a new (or edited) proposal. */
@@ -325,10 +366,23 @@ export function JourneyReview({
       ? journeyDayPlan(j.frozen.legDeciMiles, duration, quote.fromMinutes, quote.toMinutes, startDay)
       : [];
   const line = (kind: "rations" | "mounts") => quote?.lines.find((l) => l.kind === kind);
+  // What an optional line would cost if turned on (mockup 5: "off · 7 sp, 5 cp").
+  const quoteDays = preview?.days ?? days;
+  const animals = j.costs.mountHoldingIds.reduce(
+    (n, id) => n + (table.holdings.find((h) => h.id === id)?.quantity ?? 0),
+    0,
+  );
+  const estimate = (kind: "rations" | "mounts") =>
+    (kind === "rations" ? travellers.length : animals) *
+    quoteDays *
+    (kind === "rations" ? travel.rations : travel.mounts).unitCopper;
   const other = preview?.quote.lines.filter((l) => l.paid || l.unpaid) ?? [];
   return (
-    <aside className="map-journey-panel map-glass" aria-label="Journey review">
+    <aside className="map-journey-panel map-journey-review map-glass" aria-label="Journey review">
       <div className="map-panel-heading">
+        <span className="map-journey-glyph" aria-hidden="true">
+          <RouteIcon size={18} />
+        </span>
         <h2 ref={heading} tabIndex={-1}>
           Journey review · DM
         </h2>
@@ -472,7 +526,7 @@ export function JourneyReview({
                     <Switch
                       label={label}
                       checked={j.costs[kind]}
-                      hint={`${kind === "rations" ? `${travellers.length} travellers` : `${j.costs.mountHoldingIds.length ? "chosen animals" : "no animals chosen"}`} × days × ${formatCopper(unit)} (catalogue: ${(kind === "rations" ? travel.rations : travel.mounts).name})`}
+                      hint={`${kind === "rations" ? `${travellers.length} ${travellers.length === 1 ? "traveller" : "travellers"}` : animals ? `${animals} ${animals === 1 ? "animal" : "animals"}` : "no animals chosen"} × ${quoteDays} ${quoteDays === 1 ? "day" : "days"} × ${formatCopper(unit)} (catalogue: ${(kind === "rations" ? travel.rations : travel.mounts).name})${payer ? ` · paid by ${payer.name}` : ""}`}
                       onChange={(on) =>
                         void replan({
                           costs: {
@@ -483,6 +537,9 @@ export function JourneyReview({
                         })
                       }
                     />
+                  )}
+                  {!l && !j.costs[kind] && (kind === "rations" || animals > 0) && (
+                    <p className="map-route-help">Off · would be {formatCopper(estimate(kind))}</p>
                   )}
                   {l && (
                     <p className={l.short ? "map-journey-warning" : undefined}>
@@ -683,19 +740,34 @@ export function useMapJourney({
     shown?.status === "arrived"
       ? `Arrived near ${to ?? "the end of the route"}`
       : `On the road · Day ${day}`;
+  const next = shown ? nextPlace(table, shown) : undefined;
+  // The chip opens the journey panel; while that panel is open it carries the same facts, so the
+  // chip steps aside (on phones the two would otherwise overlap).
   const chip =
-    shown && shown.status !== "planned" ? (
+    shown && shown.status !== "planned" && !panelOpen ? (
       <button
         type="button"
         className="map-journey-chip map-glass"
-        aria-expanded={dm ? panelOpen : undefined}
-        onClick={() => (dm ? setPanelOpen(!panelOpen) : setPanelOpen(!panelOpen))}
+        aria-expanded={panelOpen}
+        onClick={() => setPanelOpen(true)}
       >
-        <strong>{statusText}</strong>
+        <strong>
+          {statusText}
+          <span className="map-journey-chip-percent">{Math.round(progress * 100)}%</span>
+        </strong>
+        <JourneyProgressBar journey={shown} />
         <span>
-          {Math.round(progress * 100)}%{shown.frozen ? ` · ${(shown.elapsedMinutes / 1440).toFixed(2)} of ${(shown.frozen.durationMinutes / 1440).toFixed(2)} days` : ""}
+          {shown.frozen ? `${(shown.elapsedMinutes / 1440).toFixed(2)} of ${(shown.frozen.durationMinutes / 1440).toFixed(2)} days` : ""}
           {leg ? ` · ${legText(leg)}` : ""}
-          {to && shown.status === "active" ? ` · bound for ${to}` : ""}
+          {shown.status === "arrived"
+            ? dm
+              ? " · waiting for you to move the party in"
+              : " · waiting for the DM"
+            : next && dm
+              ? ` · next: ${next}`
+              : to
+                ? ` · bound for ${to}`
+                : ""}
         </span>
       </button>
     ) : null;
@@ -711,7 +783,16 @@ export function useMapJourney({
     dm && shown?.status === "arrived" && notYet !== shown.id ? (
       <ArrivalDialog table={table} journey={shown} notYet={() => setNotYet(shown.id)} />
     ) : null;
-  return { overlay, chip, panel, arrival, journey: shown, onMap };
+  return {
+    overlay,
+    chip,
+    panel,
+    arrival,
+    journey: shown,
+    onMap,
+    /** Open the journey panel (progress for the DM, the status card for players). */
+    openPanel: () => setPanelOpen(true),
+  };
 }
 
 /** DM: journey under way (mockup 6A). */
@@ -737,7 +818,10 @@ function JourneyProgress({
   return (
     <aside className="map-journey-panel map-glass" aria-label="Journey under way">
       <div className="map-panel-heading">
-        <h2>Journey under way</h2>
+        <span className="map-journey-glyph" aria-hidden="true">
+          <RouteIcon size={18} />
+        </span>
+        <h2>{j.status === "arrived" ? "Journey arrived" : "Journey under way"}</h2>
         <button className="map-icon-button" aria-label="Close journey" onClick={close}>
           <X size={16} />
         </button>
@@ -745,7 +829,11 @@ function JourneyProgress({
       <p className="map-journey-sub">
         {journeyTitle(table, j)} · {j.pace.preset === "custom" ? `${j.pace.milesPerDay} mi/day` : `${j.pace.preset[0].toUpperCase()}${j.pace.preset.slice(1)} pace`}
       </p>
+      <JourneyProgressBar journey={j} />
       <p>
+        <span className="map-journey-tag">
+          <Lock size={13} aria-hidden="true" /> Day {readFinance(table.journal?.finance).day}
+        </span>{" "}
         <strong>Route locked while travelling.</strong> Travelled {formatMiles(doneDeci)} of {formatMiles(totalDeci(j))} · {(j.elapsedMinutes / 1440).toFixed(2)} of {((j.frozen?.durationMinutes ?? 0) / 1440).toFixed(2)} days. Approved {j.downtimeIds.length} {j.downtimeIds.length === 1 ? "downtime" : "downtimes"}.
       </p>
       <ol className="map-route-legs" aria-label="Journey legs">
@@ -810,18 +898,29 @@ export function JourneyStatusCard({
   table,
   journey: j,
   close,
+  inline = false,
+  children,
 }: {
   table: Table;
   journey: Journey;
   close?: () => void;
+  /** In page flow (Downtime screen, a player with no shared map) instead of over the map. */
+  inline?: boolean;
+  children?: ReactNode;
 }) {
   const day = readFinance(table.journal?.finance).day;
   const now = currentLeg(j);
   const to = placeName(table, j.destinationLocationId);
   return (
-    <aside className="map-journey-panel map-journey-card map-glass" aria-label="Travelling">
+    <aside
+      className={`map-journey-panel map-journey-card map-glass${inline ? " map-journey-inline" : ""}`}
+      aria-label="Travelling"
+    >
+      <p className="map-journey-eyebrow">
+        <Footprints size={14} aria-hidden="true" /> {j.status === "arrived" ? "Arrived" : "Travelling"}
+      </p>
       <div className="map-panel-heading">
-        <h2>{j.status === "arrived" ? `Arrived near ${to ?? "the end of the route"}` : "Travelling"}</h2>
+        <h2>{j.status === "arrived" ? `Arrived near ${to ?? "the end of the route"}` : to ? `Bound for ${to}` : "On the road"}</h2>
         {close && (
           <button className="map-icon-button" aria-label="Close journey" onClick={close}>
             <X size={16} />
@@ -831,6 +930,7 @@ export function JourneyStatusCard({
       <p>
         {to ? `Bound for ${to}. ` : ""}Day {day} · {(j.elapsedMinutes / 1440).toFixed(1)} of {((j.frozen?.durationMinutes ?? 0) / 1440).toFixed(1)} days · now: {legText(j.legs[now])}
       </p>
+      <JourneyProgressBar journey={j} />
       <ol className="map-route-legs" aria-label="Journey legs">
         {j.legs.map((leg, i) => (
           <li key={i}>
@@ -845,6 +945,7 @@ export function JourneyStatusCard({
           : "The DM's map for this journey is private, so its route and the party's position aren't shown. Shops and services are unavailable while travelling."}
         {j.status === "arrived" ? " Waiting for the DM to move the party in." : ""}
       </p>
+      {children}
     </aside>
   );
 }
@@ -1172,4 +1273,76 @@ function TravelSettingsForm({ table }: { table: Table }) {
       </p>
     </CommandForm>
   );
+}
+
+/**
+ * Travel where people look for it outside the map (Downtime screen; a player whose DM keeps the
+ * journey's map private). The party's journey, if any, as the same text-only card players get on
+ * the map; "Plan a journey on the map" (the planner from the party's position); a player's own
+ * requests; and, for the DM, the requests waiting in the Review Inbox.
+ */
+export function JourneyTravelSection({
+  table,
+  planLink = true,
+}: {
+  table: Table;
+  /** Off where there is no map to plan on (a player with no shared map). */
+  planLink?: boolean;
+}) {
+  const seat = useSeat(),
+    dm = seat.role === "dm";
+  const journeys = journeysOf(table);
+  const current = journeys.find((j) => ["active", "arrived"].includes(j.status));
+  const reviewed = journeys.find((j) => j.status === "planned");
+  const waiting = journeys.filter((j) => j.status === "proposed" || j.status === "planned").length;
+  const href = journeyPlanHref(table.journal);
+  const mapHref = (j: Journey, plan?: string) =>
+    j.mapId
+      ? `/maps?map=${encodeURIComponent(j.mapId)}${plan ? `&plan=${encodeURIComponent(plan)}` : ""}`
+      : "/maps";
+  return (
+    <section className="journey-travel" aria-label="Travel">
+      <h2>Travel</h2>
+      {current ? (
+        <JourneyStatusCard table={table} journey={current} inline>
+          <div className="map-route-actions">
+            {current.mapId && (
+              <AppLink className="settings-link" href={mapHref(current)}>
+                Show the journey on the map →
+              </AppLink>
+            )}
+          </div>
+        </JourneyStatusCard>
+      ) : (
+        <p className="text-sm">
+          {dm
+            ? "Draw the party's route on a map: Lootsplitter measures each leg, turns it into downtime days and moves the party along as you approve them."
+            : "Draw a route on a map and send it to the DM. The party travels as the DM approves downtime."}
+        </p>
+      )}
+      <div className="map-route-actions">
+        {planLink && !current && (
+          <AppLink className="settings-link journey-plan-link" href={href}>
+            Plan a journey on the map →
+          </AppLink>
+        )}
+        {dm && reviewed && (
+          <AppLink className="settings-link" href={mapHref(reviewed, `journey:${reviewed.id}`)}>
+            Open the journey review →
+          </AppLink>
+        )}
+        {dm && waiting > 0 && (
+          <AppLink className="settings-link" href="/features/review">
+            Journeys in the Review Inbox ({waiting}) →
+          </AppLink>
+        )}
+      </div>
+      {!dm && <JourneyInbox table={table} />}
+    </section>
+  );
+}
+/** The Downtime screen's Travel section (reads the viewer's own projected table). */
+export function DowntimeJourneys() {
+  const table = useWorldTable() as unknown as CloudTable;
+  return <JourneyTravelSection table={{ ...table, handouts: [] }} />;
 }

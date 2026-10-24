@@ -39,7 +39,7 @@ import { setVoyageRouteDraft } from "@/lib/quire/voyage-route-draft";
 import { allowContextChange, useDraftGuard } from "@/lib/quire/use-draft-guard";
 import { CommandForm } from "./world-tools";
 import { Button, Segmented } from "./ui";
-import { X } from "lucide-react";
+import { Route as RouteIcon, Ruler, Ship, Undo2, X } from "lucide-react";
 
 export type Waypoint = RoutePoint & { locationId?: string };
 export type LegTerrain = {
@@ -637,6 +637,9 @@ export function useRoutePlanner({
   const panel = open ? (
     <aside className="map-route-panel map-glass" aria-label="Plan a route">
       <div className="map-panel-heading">
+        <span className="map-journey-glyph" aria-hidden="true">
+          {calibrating ? <Ruler size={18} /> : kind === "ship" ? <Ship size={18} /> : <RouteIcon size={18} />}
+        </span>
         <strong>{calibrating ? "Set this map's scale" : kind === "ship" ? "Voyage route" : "Plan a journey"}</strong>
         <button className="map-icon-button" aria-label="Close route planner" onClick={close}>
           <X size={16} />
@@ -671,15 +674,30 @@ export function useRoutePlanner({
             noScale
           ) : kind === "ship" && (!map.grid || !shipEnds) ? null : (
             <>
-              <Segmented
-                label="Waypoint input"
-                value={input}
-                onChange={setInput}
-                options={[
-                  { value: "tap", label: "Tap to add" },
-                  { value: "type", label: "Type instead" },
-                ]}
-              />
+              <div className="map-route-input-row">
+                <Segmented
+                  label="Waypoint input"
+                  value={input}
+                  onChange={setInput}
+                  options={[
+                    { value: "tap", label: "Tap to add" },
+                    { value: "type", label: "Type instead" },
+                  ]}
+                />
+                <button
+                  type="button"
+                  className="map-icon-button"
+                  aria-label="Undo last waypoint"
+                  title="Undo last waypoint (Backspace)"
+                  disabled={points.length <= (kind === "party" && partyStart ? 1 : 0)}
+                  onClick={() => {
+                    const keep = kind === "party" && partyStart ? 1 : 0;
+                    if (points.length > keep) removePoint(points.length - 1);
+                  }}
+                >
+                  <Undo2 size={18} />
+                </button>
+              </div>
               {input === "tap" ? (
                 <p className="map-route-help">
                   {kind === "ship"
@@ -765,6 +783,8 @@ export function useRoutePlanner({
     draft,
     legs,
     beginCalibration,
+    /** What the camera should keep in view beside the panel: the scale handles or the route. */
+    focusPoints: !open ? [] : calibrating ? [calibrating.a, calibrating.b] : route,
   };
 }
 

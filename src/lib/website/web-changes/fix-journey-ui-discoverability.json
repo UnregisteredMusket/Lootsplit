@@ -1,0 +1,12 @@
+{
+  "title": "Easier to find the journey planner",
+  "summary": "Plan journey is now a labelled button on the map, and you can start a journey from the Here sheet or the Downtime screen.",
+  "items": [
+    "A labelled Plan journey button sits under Here on the map on phones, tablets and desktops, and stays when the tool bar is collapsed.",
+    "The Here sheet has Plan a journey at the party's location, and Journey progress while the party is on the road.",
+    "The Downtime screen starts with Travel: the party's journey, Plan a journey on the map, and journey requests.",
+    "On phones the map zooms out to show above the planner, and the journey review opens full height.",
+    "Journey progress shows a bar with a mark where each leg ends; players on a private map see their text-only journey card on Maps.",
+    "Undo removes the last waypoint, and optional journey costs show what they would cost before you turn them on."
+  ]
+}

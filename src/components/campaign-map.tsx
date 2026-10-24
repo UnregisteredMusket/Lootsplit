@@ -87,7 +87,13 @@ import {
   Route as RouteIcon,
 } from "lucide-react";
 import { useRoutePlanner } from "./map-route-planner";
-import { JourneyPlanActions, JourneyReview, useMapJourney } from "./map-journeys";
+import {
+  JourneyPlanActions,
+  JourneyReview,
+  JourneyTravelSection,
+  useMapJourney,
+} from "./map-journeys";
+import { frameRoute, freeArea } from "@/lib/quire/journey-ui";
 import { MapFrame } from "./map-frame";
 import { RecordIcon } from "./map-record-icon";
 import { MapPlaceCard } from "./map-place-card";
@@ -1044,7 +1050,18 @@ function CampaignMapWorkspace({ viewScope }: { viewScope: { key: string; ephemer
           />
         </>
       ) : (
-        <MapEmptyWorkspace dm={dm} settings={management} />
+        <MapEmptyWorkspace
+          dm={dm}
+          settings={management}
+          travel={
+            !dm &&
+            (t.journal.world?.journeys ?? []).some((j) =>
+              ["active", "arrived", "proposed", "denied"].includes(j.status),
+            ) ? (
+              <JourneyTravelSection table={t} planLink={false} />
+            ) : undefined
+          }
+        />
       )}
       {editing !== undefined && dm && (
         <MapEditor
@@ -1789,6 +1806,46 @@ function MapViewport({
     planner.start("party");
     root.current?.focus();
   };
+  // Phones (mockup 4): the planner is a bottom sheet over the map, so when it opens, or switches
+  // to scale calibration, the camera zooms out just enough to show the map (or a drawn route) in
+  // the band above the sheet. Once per mode, never while someone is drawing. Wider screens keep
+  // their camera: the panel sits beside the map there.
+  const framing = planner.active ? (planner.calibrating ? "scale" : "plan") : "";
+  useEffect(() => {
+    if (!framing || !artworkReady || !window.matchMedia("(max-width: 650px)").matches) return;
+    const frame = requestAnimationFrame(() => {
+      const region = root.current;
+      const sheet = region
+        ?.closest(".map-workspace")
+        ?.querySelector<HTMLElement>(".map-route-panel")
+        ?.getBoundingClientRect();
+      if (!region || !sheet) return;
+      const r = region.getBoundingClientRect();
+      const area = freeArea(
+        { width: r.width, height: r.height },
+        {
+          left: sheet.left - r.left,
+          top: sheet.top - r.top,
+          right: sheet.right - r.left,
+          bottom: sheet.bottom - r.top,
+        },
+        { left: 10, top: 112, right: 10, bottom: 10 },
+      );
+      const route = planner.focusPoints;
+      const points =
+        framing === "plan" && route.length > 1
+          ? route
+          : [
+              { x: 0, y: 0 },
+              { x: 1, y: 1 },
+            ];
+      const next = frameRoute(points, viewRef.current, { w, h }, area);
+      if (next) setView(next);
+    });
+    return () => cancelAnimationFrame(frame);
+    // Framed once per opened mode; later edits leave the camera to the person drawing.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [framing, map.id, artworkReady]);
   const openSettings = () => {
     if (!drawerOpen && (tools.inspecting || service || combatOpen) && !allowContextChange()) return;
     tools.hideInspector();
@@ -2551,6 +2608,27 @@ function MapViewport({
           {here.mode === "here" && <span className="map-here-count">{here.rows.length}</span>}
         </button>
       )}
+      {/* The journey planner, labelled where phones and desktops both see it (the hotbar's route
+          icon stays too). While the party is on a journey its status chip takes this place. In
+          tile (encounter grid) mode it steps aside so it never covers tokens; the hotbar keeps
+          Plan route there. */}
+      {!interfaceHidden &&
+        !tileMode &&
+        !hereOpen &&
+        !placeBar &&
+        !planner.active &&
+        !reviewJourney &&
+        !(journeyView.journey && journeyView.journey.status !== "planned") && (
+          <button
+            type="button"
+            className="map-plan-journey-button map-glass"
+            title="Plan a party journey or ship voyage on this map"
+            onClick={openPlanner}
+          >
+            <RouteIcon size={17} aria-hidden="true" />
+            Plan journey
+          </button>
+        )}
       <div className="map-feedback" hidden={interfaceHidden}>
         <MapRenderBadge />
         {full && (
@@ -3065,6 +3143,15 @@ function MapViewport({
                         x: size.w / 2 - party.x * w * v.scale,
                         y: size.h / 2 - party.y * h * v.scale,
                       }))
+                  : undefined
+              }
+              planJourney={here.mode === "here" ? openPlanner : undefined}
+              showJourney={
+                journeyView.journey && journeyView.journey.status !== "planned"
+                  ? () => {
+                      setHereOpen(false);
+                      journeyView.openPanel();
+                    }
                   : undefined
               }
             />

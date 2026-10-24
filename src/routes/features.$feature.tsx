@@ -28,6 +28,7 @@ import { getCloudTable, getServerCloudTable, subscribeCloudTable } from "@/lib/q
 import { SettingsPage } from "@/components/settings-page";
 import { LocalAudioPanel } from "@/components/local-audio-panel";
 import { DowntimeActivities } from "@/components/downtime-activities";
+import { DowntimeJourneys } from "@/components/map-journeys";
 import { LootClaimsReview } from "@/components/treasure-pool";
 // Load exchange editors only for this screen. Downtime shares the small review
 // without pulling every market editor into startup.
@@ -109,6 +110,7 @@ function FeaturePage() {
               (dm ? <CampaignJournal section="reports" /> : <PersonalFinances />)}
             {feature === "downtime" && (
               <>
+                <DowntimeJourneys />
                 <DowntimeActivities />
                 <AppLink className="settings-link" href="/features/properties">
                   Property Management →
