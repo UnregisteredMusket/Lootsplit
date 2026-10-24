@@ -568,6 +568,8 @@ export function projectJourneys(
         mounts: j.costs.mounts,
         payerId: j.costs.payerId && seat.purseIds.includes(j.costs.payerId) ? j.costs.payerId : null,
         mountHoldingIds: j.costs.mountHoldingIds.filter((id) => holdings.has(id)),
+        // A coach fare (services wave 2) is shown only to its payer (and the DM).
+        ...(j.costs.fare && seat.purseIds.includes(j.costs.fare.payerId) ? { fare: j.costs.fare } : {}),
       };
       if (j.frozen) {
         delete j.frozen.unitCopper;

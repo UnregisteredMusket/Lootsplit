@@ -131,7 +131,7 @@ test("departure charges the fare once before rations and upkeep, even over two w
 });
 
 test("a short payer refuses departure with Nothing was charged", () => {
-  let t = applyCommand(stableFixture(), svcKael, coachCommand(stableFixture(), "c1"));
+  const t = applyCommand(stableFixture(), svcKael, coachCommand(stableFixture(), "c1"));
   t.purses.find((p) => p.id === "kael")!.coins = { cp: 100, sp: 0, ep: 0, gp: 0, pp: 0 };
   assert.throws(() => depart(t, "c1-journey", 2), /coach fare.*Nothing was charged/);
   assert.equal(fares(t, "c1").length, 0);
@@ -160,6 +160,12 @@ test("privacy: other players see the journey but not the fare's payer; old clien
   let t = applyCommand(stableFixture(), svcKael, coachCommand(stableFixture(), "c1"));
   const thorn = projectRecord(t, svcThorn);
   assert.equal(readServices(thorn.journal?.services).orders.length, 0);
+  // The payer sees the fare on the journey (and can withdraw it from their own table); others don't.
+  assert.equal(thorn.journal!.world!.journeys?.find((j) => j.id === "c1-journey")?.costs.fare, undefined);
+  const mine = projectRecord(t, svcKael).journal!.world!.journeys!.find((j) => j.id === "c1-journey")!;
+  assert.deepEqual(mine.costs.fare, { orderId: "c1", copper: 230, payerId: "kael" });
+  const withdrawn = applyCommand(t, svcKael, { id: "wd", kind: "party-journey", journeyId: mine.id, before: mine, journey: { ...mine, status: "cancelled" } });
+  assert.equal(order(withdrawn, "c1").status, "cancelled");
   const own = projectRecord(t, svcKael);
   assert.equal(readServices(own.journal?.services).orders.length, 1);
   // Protocol 8: no stable provider, no coach order, no fare on the journey or in a pending quote.
