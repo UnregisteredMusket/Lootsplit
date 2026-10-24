@@ -13,6 +13,8 @@ import {
 } from "./services-schema.ts";
 import { rumourQuote, serviceQuote, serviceSummary } from "./services.ts";
 import { deliverLetter } from "./services-courier.ts";
+import { journeySchema } from "./journey-schema.ts";
+import { openJourney } from "./journey-engine.ts";
 import { validateServices } from "./services-validation.ts";
 
 // Authoritative service commands (docs/SERVICES.md). Every coin movement is one financeMove with
@@ -132,7 +134,40 @@ export function applyServiceCommand(t: CloudTable, seat: CloudSeat, cmd: Service
       message: "",
       history: [],
     };
-    if (q.terms.review === "dm")
+    if (q.terms.route) {
+      // A coach booking is a party journey request with a fare line, created in this command.
+      const r = q.provider.routes!.find((x) => x.key === q.terms.route!.key)!;
+      const w = t.journal!.world!;
+      if (openJourney(t)) throw Error("The party already has a journey planned. Finish or withdraw it first.");
+      const map = w.maps.find((m) => m.id === r.mapId)!;
+      const anchored = (locationId?: string | null) =>
+        locationId && map.anchors.some((a) => a.locationId === locationId) ? locationId : null;
+      const journey = journeySchema.parse({
+        id: `${cmd.id}-journey`,
+        status: "proposed",
+        requestedBy: seat.role === "dm" ? "dm" : cmd.purseId,
+        message: `Coach booked with ${q.terms.npcName}, ${q.terms.shopName}.`,
+        mapId: r.mapId,
+        points: r.points,
+        legs: r.legs,
+        originLocationId: anchored(r.points![0].locationId),
+        destinationLocationId: anchored(r.toLocationId),
+        pace: { preset: "custom", milesPerDay: r.paceMilesPerDay },
+        forcedMarchHours: 0,
+        costs: {
+          rations: false,
+          mounts: false,
+          payerId: null,
+          mountHoldingIds: [],
+          fare: { orderId: cmd.id, copper: q.terms.priceCopper, payerId: cmd.purseId },
+        },
+        elapsedMinutes: 0,
+        downtimeIds: [],
+        createdAt: at,
+      });
+      w.journeys = [...(w.journeys ?? []), journey];
+      note(order, "requested", "Journey request sent to the DM. Nothing is charged until the DM approves departure.", at);
+    } else if (q.terms.review === "dm")
       note(order, "requested", "Waiting for the DM's review. Nothing has been charged.", at);
     else settle(t, order, at, false);
     s.orders.push(order);
@@ -174,11 +209,18 @@ export function applyServiceCommand(t: CloudTable, seat: CloudSeat, cmd: Service
       } else {
         if (o.status !== "requested") throw Error("Only a request waiting for the DM can be withdrawn.");
         note(o, "cancelled", "Withdrawn. Nothing was charged.", at);
+        // A coach booking withdraws its journey request too (while it hasn't departed).
+        const j = o.terms.route && t.journal!.world!.journeys?.find((x) => x.id === `${o.id}-journey`);
+        if (j && (j.status === "proposed" || j.status === "planned")) {
+          j.status = "cancelled";
+          j.decidedAt = at;
+        }
       }
       summary = `Service request withdrawn: ${serviceSummary(o)}.`;
     } else if (cmd.kind === "service-review") {
       dm();
       if (o.status !== "requested") throw Error("This request has already been decided.");
+      if (o.terms.route) throw Error("A coach booking is decided as a journey: approve or deny its journey request.");
       if (cmd.reveal && (!o.terms.item || cmd.decision !== "approve"))
         throw Error("Only an Identify approval carries an answer.");
       if (cmd.decision === "deny") {

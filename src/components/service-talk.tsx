@@ -16,6 +16,10 @@ import {
 } from "@/lib/quire/services-schema";
 import { readFinance } from "@/lib/quire/finance";
 import { courierRecipients, miles } from "@/lib/quire/services-courier";
+import { mountLike } from "@/lib/quire/mounts";
+import { journeyTravellers, measureJourney, openJourney } from "@/lib/quire/journey-engine";
+import { downtimeDays, journeyDurationMinutes } from "@/lib/quire/journey";
+import { readMarketLocations } from "@/lib/quire/shop-locations";
 import { canAccessEstate } from "@/lib/quire/estate";
 import { readEstate } from "@/lib/quire/estate-schema";
 import {
@@ -132,7 +136,11 @@ export function ServiceReceipt({ order, payer }: { order: ServiceOrder; payer: s
         <b>
           {t.kind === "inn"
             ? `Stay · ${t.shopName}`
-            : t.letter
+            : t.stabling
+              ? `Stabling · ${t.shopName}`
+              : t.route
+              ? `Coach · ${t.route.placeName}`
+              : t.letter
               ? `Letter to ${t.letter.recipientName}`
               : t.lessons
               ? `Lessons · ${t.lessons.topic}`
@@ -141,7 +149,9 @@ export function ServiceReceipt({ order, payer }: { order: ServiceOrder; payer: s
                 : t.offer.name}
         </b>
         <span className={`svc-status ${order.status}`}>
-          {t.letter && order.status === "active"
+          {t.route && order.status === "completed"
+            ? "Departed"
+            : t.letter && order.status === "active"
             ? "In transit"
             : t.lessons && order.status === "active"
             ? "Agreed"
@@ -155,6 +165,27 @@ export function ServiceReceipt({ order, payer }: { order: ServiceOrder; payer: s
         </span>
       </div>
       <dl className="svc-kv">
+        {t.stabling && (
+          <>
+            <dt>Animals</dt>
+            <dd>{t.stabling.animals.map((a) => `${a.name}${a.quantity > 1 ? ` × ${a.quantity}` : ""}`).join(", ")}</dd>
+            <dt>Nights</dt>
+            <dd>
+              {t.stabling.nights}
+              {t.stabling.feed ? ", feed included" : ""}
+            </dd>
+          </>
+        )}
+        {t.route && (
+          <>
+            <dt>To</dt>
+            <dd>
+              {t.route.placeName} · {miles(t.route.deciMiles)} mi
+            </dd>
+            <dt>Passengers</dt>
+            <dd>{t.route.passengers}</dd>
+          </>
+        )}
         {t.letter && (
           <>
             <dt>To</dt>
@@ -248,7 +279,11 @@ export function ServiceReceipt({ order, payer }: { order: ServiceOrder; payer: s
         )}
       </dl>
       <p className="svc-record-only">
-        {t.letter
+        {t.stabling
+          ? "Recorded only. Leaving early refunds nothing automatically. On a journey, the journey's own mount upkeep line still applies."
+          : t.route
+          ? "The trip is the party's journey: it follows the journey's rules for progress, arrival and stopping."
+          : t.letter
           ? `The letter is a record. Nothing happens on its own when it arrives; the DM answers as ${t.letter.recipientName}.`
           : t.lessons
           ? `Recorded only. Finishing the lessons doesn't add a proficiency; the DM decides what ${t.lessons.pupilName} learns.`
@@ -337,6 +372,10 @@ export function orderLines(o: ServiceOrder, payer: string, npcName: string): Tal
         ? o.reveal.text
         : t.letter
           ? "Rider leaves at noon."
+          : t.stabling
+            ? "Stalls are ready. I'll see them fed."
+            : t.route
+              ? "Safe travels."
           : t.lessons
           ? "Come by after the bells. Bring your own tools."
           : t.kind === "temple"
@@ -384,6 +423,10 @@ export function useServiceTalk({
   const [mine, setMine] = useState<string[]>([]);
   /** Identify: the carried item the sage looks at. */
   const [itemId, setItemId] = useState("");
+  /** Stable: the animals, feed and the coach route. */
+  const [animalIds, setAnimalIds] = useState<string[]>([]);
+  const [feed, setFeed] = useState(true);
+  const [routeKey, setRouteKey] = useState("");
   /** Courier: the recipient and the letter. */
   const [recipientId, setRecipientId] = useState("");
   const [letterText, setLetterText] = useState("");
@@ -397,6 +440,36 @@ export function useServiceTalk({
   const provider = services.providers.find((p) => p.id === providerId);
   const offer = provider ? approvedOffers(provider).find((o) => o.key === offerKey) : undefined;
   const purseId = character?.id;
+  const placeOf = (locationId: string) =>
+    readMarketLocations(table.journal?.market).locations.find((l) => l.id === locationId)?.name ?? "the destination";
+  /** A drawn route's length in deci-miles (0 when it can't be measured). */
+  const routeDeci = (r: NonNullable<ServiceProvider["routes"]>[number]) => {
+    const map = table.journal?.world?.maps.find((m) => m.id === r.mapId);
+    if (!map || !r.points) return 0;
+    try {
+      return measureJourney(map, { points: r.points, pace: { preset: "custom", milesPerDay: r.paceMilesPerDay }, forcedMarchHours: 0 } as never).legDeciMiles.reduce((n, l) => n + l, 0);
+    } catch {
+      return 0;
+    }
+  };
+  /** Animals the payer could stable: theirs and the party fund's; someone else's are listed, blocked. */
+  const stableAnimals = (payerId: string) =>
+    table.holdings
+      .filter((h) => h.kind === "item" && h.quantity > 0 && mountLike(h as typeof h & { category?: string }))
+      .filter((h) => table.purses.some((p) => p.id === h.purseId && (p.kind === "party" || (p.kind === "character" && !p.nonParty && p.control !== "npc"))))
+      .map((h) => {
+        const owner = table.purses.find((p) => p.id === h.purseId);
+        return {
+          holding: h,
+          owner,
+          blocked:
+            h.purseId !== payerId && owner?.kind !== "party"
+              ? `${owner?.name ?? "Someone"}'s own. ${owner?.name ?? "They"} books for it.`
+              : h.custody || h.reservedFor || h.pool
+                ? "Not here with the party."
+                : "",
+        };
+      });
   const trainingHoursPerDay =
     (table.journal?.downtimeActivities as { settings?: { trainingHoursPerDay?: number } } | undefined)?.settings?.trainingHoursPerDay ?? 8;
 
@@ -406,6 +479,8 @@ export function useServiceTalk({
           beneficiaryPurseIds: beneficiaries,
           units,
           ...(offer.target && itemId ? { itemHoldingId: itemId } : {}),
+          ...(provider.kind === "stable" && offer.time.kind === "per-night" ? { stabling: { animalHoldingIds: animalIds, feed } } : {}),
+          ...(offer.time.kind === "coach" && routeKey ? { routeKey } : {}),
           ...(provider.kind === "courier" && recipientId && letterText.trim()
             ? { letter: { recipientNpcId: recipientId, text: letterText.trim() } }
             : {}),
@@ -444,6 +519,10 @@ export function useServiceTalk({
   function chooseOffer(o: ServiceOffer) {
     setOfferKey(o.key);
     setUnits(o.time.kind === "training" ? Math.min(10, maxUnits(o)) : 1);
+    if (provider!.kind === "stable" && o.time.kind === "per-night" && purseId) {
+      setAnimalIds(stableAnimals(purseId).filter((a) => !a.blocked).map((a) => a.holding.id));
+      setFeed(!!o.feedCopper);
+    }
     if (provider!.kind === "courier" && purseId)
       setRecipientId(courierRecipients(table, provider!, purseId).find((r) => !r.blocked)?.npcId ?? "");
     if (o.target && purseId) setItemId(identifyCandidates(table, purseId).find((c) => !c.blocked)?.holding.id ?? "");
@@ -687,11 +766,55 @@ export function useServiceTalk({
       });
     const lock = providerLock(table, provider, purseId);
     for (const o of approvedOffers(provider)) {
+      if (o.time.kind === "coach") {
+        // One reply per coach route; an undrawn route is listed but locked.
+        for (const r of provider.routes ?? []) {
+          const place = placeOf(r.toLocationId);
+          const deci = routeDeci(r);
+          const passengers = journeyTravellers(table).length;
+          replies.push({
+            tag: (
+              <>
+                Coach{" "}
+                <em>
+                  · {formatCopper(o.priceCopper)} a mile each{deci ? ` · ${miles(deci)} mi` : ""}
+                </em>
+              </>
+            ),
+            text: `Take us to ${place}.`,
+            sub: (
+              <span className="svc-flags">
+                {deci ? (
+                  <span className="svc-flag time">
+                    {downtimeDays(journeyDurationMinutes(deci, r.paceMilesPerDay))} downtime days
+                  </span>
+                ) : null}
+                <span className="svc-flag review">Becomes a journey · DM approves departure</span>
+                {passengers ? <span className="svc-flag">{passengers} passengers</span> : null}
+              </span>
+            ),
+            disabled:
+              lock ||
+              (!r.mapId || !r.points ? `Coach to ${place}: the DM hasn't drawn this route on a map yet.` : "") ||
+              (openJourney(table) ? "The party already has a journey planned. Finish or withdraw it first." : "") ||
+              undefined,
+            run: () => {
+              push(
+                { kind: "pc", text: `Take us to ${place}.`, tag: "Coach", key: nextKey("pc") },
+                { kind: "npc", text: "Coach leaves at first light.", key: nextKey("npc") },
+              );
+              chooseOffer(o);
+              setRouteKey(r.key);
+            },
+          });
+        }
+        continue;
+      }
       const settlement = offerSettlementLock(table, provider, o) || (o.target ? identifyLock(table, purseId) : "");
       replies.push({
         tag: (
           <>
-            {o.name} <em>· {formatCopper(o.priceCopper)}{o.time.kind === "delivery" ? " a mile" : o.time.kind === "training" ? " a training day" : o.time.kind === "per-night" ? "" : maxUnits(o) > 1 ? " each" : ""}{o.components?.length ? ` + ${o.components.map((c) => c.label.toLowerCase()).join(", ")}` : ""}</em>
+            {o.name} <em>· {formatCopper(o.priceCopper)}{o.time.kind === "delivery" ? " a mile" : o.time.kind === "training" ? " a training day" : o.time.kind === "per-night" ? (provider.kind === "stable" ? " a night each" : "") : maxUnits(o) > 1 ? " each" : ""}{o.components?.length ? ` + ${o.components.map((c) => c.label.toLowerCase()).join(", ")}` : ""}</em>
           </>
         ),
         text: speech(o),
@@ -730,8 +853,14 @@ export function useServiceTalk({
     const price = quote ? formatCopper(quote.terms.priceCopper) : "…";
     const lessons = offer.time.kind === "training";
     const letter = offer.time.kind === "delivery";
+    const coach = offer.time.kind === "coach";
+    const stall = provider.kind === "stable" && offer.time.kind === "per-night";
     const say = lessons
       ? "Agreed."
+      : coach
+        ? "Book us seats."
+        : stall
+          ? "Here's the coin."
       : letter && !review
         ? "Send it."
       : review
@@ -747,6 +876,10 @@ export function useServiceTalk({
       tag: lessons ? (
         <>
           Agree terms <em>· nothing charged now{review ? " · DM review" : ""}</em>
+        </>
+      ) : coach ? (
+        <>
+          Request the journey <em>· charged on departure</em>
         </>
       ) : review ? (
         <>
@@ -770,7 +903,9 @@ export function useServiceTalk({
       ),
       text: say,
       tone: review ? "dm" : "check",
-      sub: lessons
+      sub: coach
+        ? "Appears in the DM's Review Inbox as a journey request with a coach fare line."
+        : lessons
         ? "Adds the lessons to Downtime & NPC training. Log sessions there after the DM approves downtime."
         : letter && !review
           ? "One payment. The letter travels only with DM-approved downtime."
@@ -788,7 +923,7 @@ export function useServiceTalk({
         push({
           kind: "pc",
           text: say,
-          tag: lessons ? "Agree terms" : review ? "Ask · DM review" : `Pay ${price}`,
+          tag: lessons ? "Agree terms" : coach ? "Request the journey" : review ? "Ask · DM review" : `Pay ${price}`,
           key: nextKey("pc"),
         });
         const ok = await send(
@@ -909,6 +1044,72 @@ export function useServiceTalk({
             </p>
           </div>
         )}
+        {provider.kind === "stable" && offer.time.kind === "per-night" && (
+          <fieldset className="svc-section">
+            <h4>Animals</h4>
+            {stableAnimals(character.id).map(({ holding, owner, blocked }) => (
+              <label key={holding.id} className={`svc-choice${animalIds.includes(holding.id) ? " on" : ""}${blocked ? " blocked" : ""}`}>
+                <input
+                  type="checkbox"
+                  checked={animalIds.includes(holding.id)}
+                  disabled={!!blocked}
+                  onChange={(e) => setAnimalIds((ids) => (e.target.checked ? [...ids, holding.id] : ids.filter((x) => x !== holding.id)))}
+                />
+                <b>
+                  {holding.name}
+                  {holding.quantity > 1 ? ` × ${holding.quantity}` : ""}
+                </b>
+                <span className="svc-amt" />
+                <small>{blocked || (owner?.kind === "party" ? "Party fund" : `${owner?.name ?? character.name}'s`)}</small>
+              </label>
+            ))}
+            {!stableAnimals(character.id).length && (
+              <p className="npc-talk-hint">{character.name} has no animals here. Buy one on the shelf or ask whoever owns it.</p>
+            )}
+            {!!offer.feedCopper && (
+              <label className="svc-check">
+                <input type="checkbox" checked={feed} onChange={(e) => setFeed(e.target.checked)} /> Feed included{" "}
+                <small>{formatCopper(offer.feedCopper)} an animal a day</small>
+              </label>
+            )}
+            <p className="npc-talk-hint">
+              Animals the payer owns or the party fund holds, found the same way the journey planner finds mounts. They stay in
+              the inventory; nothing is stored or locked.
+            </p>
+          </fieldset>
+        )}
+        {offer.time.kind === "coach" && (() => {
+          const r = provider.routes?.find((x) => x.key === routeKey);
+          if (!r) return null;
+          const deci = routeDeci(r);
+          const minutes = deci ? journeyDurationMinutes(deci, r.paceMilesPerDay) : 0;
+          return (
+            <>
+              <div className="svc-section">
+                <h4>Route</h4>
+                <p className="npc-talk-hint">
+                  {placeOf(r.points?.[0].locationId ?? "") !== "the destination" ? placeOf(r.points![0].locationId!) : "Here"} →{" "}
+                  {placeOf(r.toLocationId)} · {miles(deci)} mi on the{" "}
+                  {table.journal?.world?.maps.find((m) => m.id === r.mapId)?.name ?? "DM's"} map · coach pace {r.paceMilesPerDay} mi a day ·{" "}
+                  {downtimeDays(minutes)} downtime {downtimeDays(minutes) === 1 ? "day" : "days"}
+                </p>
+              </div>
+              <div className="svc-section">
+                <h4>Passengers</h4>
+                <div className="npc-talk-chips" role="group" aria-label="Passengers">
+                  {journeyTravellers(table).map((p) => (
+                    <button key={p.id} type="button" className="npc-talk-chip" aria-pressed="true" disabled>
+                      {p.name} <small>{p.id === character.id ? "you" : "party"}</small>
+                    </button>
+                  ))}
+                </div>
+                <p className="npc-talk-hint">
+                  The coach carries the whole party, like any party journey. Someone staying behind tells the DM, who places them.
+                </p>
+              </div>
+            </>
+          );
+        })()}
         {provider.kind === "courier" && (
           <>
             <fieldset className="svc-section">
@@ -1125,7 +1326,9 @@ export function useServiceTalk({
           <dt>{character.name} carries</dt>
           <dd>{formatCopper(toCopper(character.coins))}</dd>
           <dt className="sum">
-            {offer.time.kind === "training"
+            {offer.time.kind === "coach"
+              ? "Charged on departure"
+              : offer.time.kind === "training"
               ? "Pay now"
               : quote?.terms.review === "dm"
                 ? offer.target
@@ -1139,7 +1342,11 @@ export function useServiceTalk({
               ? `Booked and paid up front: ${quote.terms.priceCopper} cp, one ledger line. Leaving early refunds nothing automatically. `
               : ""}
             {problem ||
-              (offer.time.kind === "delivery"
+              (offer.time.kind === "coach"
+                ? "Nothing moves now. This sends a journey request. When the DM approves departure, the fare is charged once, and the party moves only over approved downtime."
+                : provider.kind === "stable" && quote
+                ? `Booked and paid up front: ${quote.terms.priceCopper} cp, one ledger line. The animals stay in your inventory; leaving early refunds nothing automatically.`
+                : offer.time.kind === "delivery"
                 ? `Paid once on sending. It arrives after ${quote?.terms.workDays ?? "…"} approved downtime days; session hours don't move it. Cancelling refunds nothing, as with property letters.`
                 : offer.time.kind === "training"
                 ? `Booking records the agreement only. Each logged session reserves hours for ${character.name} and ${npc.name}; the DM's approval counts the hours and charges that session's fee once. Fees are whole copper, rounded up.`

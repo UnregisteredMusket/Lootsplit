@@ -125,6 +125,19 @@ function hubLine(p: ServiceProvider) {
   return s === "scribe" ? "Can you scribe a scroll for me?" : s === "alchemist" ? "Can you brew something for me?" : "Can you make something for me?";
 }
 function hubSub(p: ServiceProvider, offers: number) {
+  if (p.kind === "stable") {
+    const routes = p.routes ?? [];
+    const stall = approvedOffers(p).find((o) => o.time.kind === "per-night");
+    return [
+      stall ? `Stabling ${formatCopper(stall.priceCopper)} a night each` : "",
+      approvedOffers(p).some((o) => o.time.kind === "coach") && routes.length
+        ? `coach to ${routes.length} ${routes.length === 1 ? "place" : "places"} (the DM approves departure)`
+        : "",
+    ]
+      .filter(Boolean)
+      .join(" · ")
+      .concat(".");
+  }
   if (p.kind === "courier")
     return `${approvedOffers(p).map((o) => `${o.name}s ${formatCopper(o.priceCopper)} a mile`).join(" · ")}, to ${(p.destinations ?? []).length} ${(p.destinations ?? []).length === 1 ? "place" : "places"}. Delivered over approved downtime.`;
   if (p.kind === "trainer")

@@ -16,9 +16,9 @@ approved "as shown" on 2026-10-23.
 | 3 | Inn: booked stays, meals, rumours into the buyer's private NPC thread | Shipped |
 | 4a | Wave 2: new kinds, tabletop protocol 9, Fence/Bank/Hire links, Tailor preset | Shipped |
 | 4b | Wave 2: Sage (Identify, record only) | Shipped |
-| 4c | Wave 2: Stable and coach | Planned |
+| 4c | Wave 2: Stable and coach | This change |
 | 4d | Wave 2: Trainer (paid lessons) | Shipped |
-| 4e | Wave 2: Courier (letters to NPCs) | This change |
+| 4e | Wave 2: Courier (letters to NPCs) | Shipped |
 
 ## Shared helpers (`src/lib/quire/service-core.ts`)
 
@@ -230,6 +230,40 @@ same form, hour pool, Review Inbox, counters, resets and milestone notes.
   clients drop `lessonOrderId`/`feeCopper` when reading; their review `before` then differs and the
   server refuses it, never charges.
 
+### Stable and coach (phase 4c)
+
+- **Stabling** (offer `stabling`, per night, `feedCopper`): `request.stabling: { animalHoldingIds,
+  feed }`, units = nights. Animals are items found by the shared `mountLike` rule (`mounts.ts`, moved
+  from the journey planner), held by the payer or a party fund, here (not stored, travelling,
+  reserved or pooled); another character's animal is "Its owner books for it". Price
+  animals × nights × (stall [+ feed]), one payment `id-payment`, `completed`, recorded only (the
+  animals stay in the inventory). Presets: 5 sp a night, feed 5 cp a day (SRD 5.2.1 and 5.1).
+- **Coach** (offer `coach`, `time: { kind: "coach" }`, price per mile per passenger, 3 cp in both
+  presets from SRD 5.1): provider `routes: [{ key, toLocationId, mapId?, points?, legs?,
+  paceMilesPerDay }]`, copied by the DM from a journey route drawn with Plan journey. A route
+  without a map is listed but locked ("the DM hasn't drawn this route"). `request.routeKey`;
+  terms `route` (place, distance from the journey maths, passengers = `journeyTravellers`, pace).
+  Fare = `ceil(passengers × deciMiles × rate ÷ 10)`. Always reviewed.
+- **Booking** (`service-order`): refused while another journey is open; creates, in the same
+  command, journey `orderId-journey` (`proposed`, requested by the payer, the frozen-at-booking
+  route, custom pace, rations and upkeep off) with `costs.fare = { orderId, copper, payerId }`.
+  The order is `requested`; **no money moves**. `service-review` refuses coach orders (they are
+  decided as journeys). `party-journey` refuses any change to `costs.fare` (and a new journey
+  carrying one).
+- **Departure** (`downtime-plan`/`downtime-apply`, Review Inbox's Approve & depart):
+  `previewJourney` adds a `fare` line first, before rations and upkeep, only while
+  `orderId-payment` isn't in the ledger; `applyJourney` charges it once with that ID (at the
+  stable's shop) and completes the booking. A journey over several windows charges it once. A
+  short payer refuses the whole approval with "Nothing was charged". Denying or withdrawing the
+  journey closes the booking (`denied`/`cancelled`, nothing charged); withdrawing the booking
+  withdraws the journey.
+- **Mount upkeep and stabled animals**: as mocked, the journey's mount upkeep line stays as the
+  DM sets it; stabled animals are not skipped automatically (the stabling receipt says so).
+- **Protocol 9**: protocol 8 clients receive journeys without `costs.fare` and pending journey
+  quotes without fare lines; their journey edits of a coach journey are refused (stale `before`).
+- **Payer**: the booking character pays (the mockup's party-fund choice is not offered: service
+  orders are paid by the ordering character).
+
 ### Courier: letters (phase 4e)
 
 - **Provider**: `destinations: [{ locationId, deciMiles, days }]` (DM's distance in tenths of a mile
@@ -285,6 +319,10 @@ same form, hour pool, Review Inbox, counters, resets and milestone notes.
 
 ## Verification
 
+`services-stable.test.ts` (presets, stabling price, feed, ownership, overflow and one payment;
+one journey request per coach booking with nothing charged; undrawn route, open journey, fare
+edits refused; fare charged once before rations over two windows; short payer; withdraw and deny
+both ways; privacy and protocol 8; offline parity with the Approve & depart batch),
 `services-courier.test.ts` (preset and fee rounding, recipient rules, one payment, downtime-only
 progress, one delivery message, held letters delivered or returned, privacy and matching
 fingerprints, deletion guards, protocol 8, offline parity through `executeFinanceCommand`),

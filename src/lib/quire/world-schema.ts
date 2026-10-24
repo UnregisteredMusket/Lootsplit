@@ -343,6 +343,11 @@ export const journeySchema = z
         mounts: z.boolean(),
         payerId: id.nullable(),
         mountHoldingIds: z.array(id).max(50),
+        /**
+         * A stable's coach fare (services wave 2, tabletop protocol 9): charged once, with the
+         * booking's `orderId-payment`, when the DM approves departure.
+         */
+        fare: z.object({ orderId: id, copper: z.number().int().min(0).max(1e12), payerId: id }).strict().optional(),
       })
       .strict(),
     /** Set when the journey is reviewed (downtime-plan); immutable once it is under way. */

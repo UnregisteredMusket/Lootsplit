@@ -12,6 +12,8 @@ import {
   quoteFingerprint,
 } from "./service-core.ts";
 import { courierRecipients, letterCopper, miles } from "./services-courier.ts";
+import { mountLike } from "./mounts.ts";
+import { journeyTravellers, measureJourney, openJourney } from "./journey-engine.ts";
 import {
   isLinkKind,
   readServices,
@@ -138,7 +140,9 @@ export function publicProvider(p: ServiceProvider) {
 
 /** Units the offer allows per order. */
 export function maxUnits(o: ServiceOffer) {
-  return o.time.kind === "per-night" ? o.time.maxNights : o.time.kind === "training" ? (o.maxDays ?? 250) : (o.maxUnits ?? 1);
+  return o.time.kind === "coach"
+    ? 1
+    : o.time.kind === "per-night" ? o.time.maxNights : o.time.kind === "training" ? (o.maxDays ?? 250) : (o.maxUnits ?? 1);
 }
 /** Beneficiaries each kind takes: a temple casts on one, an inn hosts guests, a workshop has none. */
 export function beneficiaryRule(kind: ServiceKind, offer?: Pick<ServiceOffer, "target">) {
@@ -292,6 +296,40 @@ export function serviceQuote(
     letterDays = r.days!;
   } else if (request.letter) throw Error("Letters go by courier.");
 
+  // Stable: stalls for animals the payer (or a party fund) holds; or a coach route as a journey.
+  let stabling: { animals: { holdingId: string; name: string; quantity: number }[]; feed: boolean; nights: number } | undefined,
+    route: { key: string; toLocationId: string; placeName: string; deciMiles: number; passengers: number; paceMilesPerDay: number } | undefined;
+  if (p.kind === "stable" && offer.time.kind === "per-night") {
+    if (!request.stabling) throw Error("Choose the animals to stable.");
+    const ids = request.stabling.animalHoldingIds;
+    if (new Set(ids).size !== ids.length) throw Error("Choose each animal once.");
+    const animals = ids.map((hid) => {
+      const h = t.holdings.find((x) => x.id === hid);
+      const owner = h && t.purses.find((x) => x.id === h.purseId);
+      if (!h || h.kind !== "item" || h.quantity < 1 || !mountLike(h as typeof h & { category?: string }))
+        throw Error("Choose animals: horses, ponies, mules and the like.");
+      if (h.purseId !== purseId && owner?.kind !== "party")
+        throw Error(`${h.name} isn't ${payer.name}'s. Its owner books for it.`);
+      if (h.custody || h.reservedFor || h.pool) throw Error(`${h.name} isn't here with the party.`);
+      return { holdingId: h.id, name: h.name.slice(0, 160), quantity: h.quantity };
+    });
+    stabling = { animals, feed: request.stabling.feed, nights: units };
+  } else if (request.stabling) throw Error("Animals are stabled at a stable.");
+  if (offer.time.kind === "coach") {
+    const r = p.routes?.find((x) => x.key === request.routeKey);
+    if (!r) throw Error("Choose a coach route.");
+    const place = readMarketLocations(t.journal?.market).locations.find((l) => l.id === r.toLocationId)?.name ?? "the destination";
+    if (!r.mapId || !r.points || !r.legs) throw Error(`Coach to ${place}: the DM hasn't drawn this route yet.`);
+    const map = t.journal?.world?.maps.find((m) => m.id === r.mapId);
+    if (!map) throw Error(`Coach to ${place}: the route's map is gone.`);
+    if (openJourney(t as Parameters<typeof openJourney>[0])) throw Error("The party already has a journey planned. Finish or withdraw it first.");
+    const passengers = journeyTravellers(t as Parameters<typeof journeyTravellers>[0]).length;
+    if (!passengers) throw Error("No one in the party can travel.");
+    const measured = measureJourney(map, { points: r.points, pace: { preset: "custom", milesPerDay: r.paceMilesPerDay }, forcedMarchHours: 0 } as never);
+    const deciMiles = measured.legDeciMiles.reduce((n, l) => n + l, 0);
+    route = { key: r.key, toLocationId: r.toLocationId, placeName: place.slice(0, 160), deciMiles, passengers, paceMilesPerDay: r.paceMilesPerDay };
+  } else if (request.routeKey) throw Error("Coach routes are booked at a stable.");
+
   // Price: the offer per unit, or an inn's tier per guest per night plus meals.
   const lines: { label: string; copper: number }[] = [];
   let inn: { tierKey: string; tierName: string; nightCopper: number; mealCopper: number; meals: number } | undefined;
@@ -311,7 +349,23 @@ export function serviceQuote(
         copper: money(guests * units * meals * tier.mealCopper),
       });
   } else if (request.inn) throw Error("Rooms are booked at an inn.");
-  else if (letter) {
+  else if (stabling) {
+    const count = stabling.animals.reduce((n, a) => n + a.quantity, 0);
+    lines.push({
+      label: `Stalls · ${count} ${count === 1 ? "animal" : "animals"} × ${units} ${units === 1 ? "night" : "nights"} × ${formatCopper(offer.priceCopper)}`,
+      copper: money(count * units * offer.priceCopper),
+    });
+    if (stabling.feed && offer.feedCopper)
+      lines.push({
+        label: `Feed · ${count} × ${units} × ${formatCopper(offer.feedCopper)}`,
+        copper: money(count * units * offer.feedCopper),
+      });
+  } else if (route) {
+    lines.push({
+      label: `${route.passengers} ${route.passengers === 1 ? "passenger" : "passengers"} × ${miles(route.deciMiles)} mi × ${formatCopper(offer.priceCopper)}, rounded up to whole copper`,
+      copper: money((route.passengers * route.deciMiles * offer.priceCopper) / 10),
+    });
+  } else if (letter) {
     lines.push({
       label: `${miles(letter.deciMiles)} mi × ${formatCopper(offer.priceCopper)} a mile, rounded up to whole copper`,
       copper: letterCopper(letter.deciMiles, offer.priceCopper),
@@ -380,7 +434,8 @@ export function serviceQuote(
   }
   const priceCopper = money(lines.reduce((n, l) => n + l.copper, 0));
   const review =
-    offer.review === "dm" || (p.reviewAboveCopper !== undefined && priceCopper > p.reviewAboveCopper)
+    // A coach booking always waits for the DM to approve departure.
+    route || offer.review === "dm" || (p.reviewAboveCopper !== undefined && priceCopper > p.reviewAboveCopper)
       ? ("dm" as const)
       : ("auto" as const);
   const workDays =
@@ -413,6 +468,8 @@ export function serviceQuote(
     settlement: settlement.kind,
     ...(item ? { item } : {}),
     ...(letter ? { letter } : {}),
+    ...(stabling ? { stabling } : {}),
+    ...(route ? { route } : {}),
     ...(p.kind === "trainer"
       ? {
           lessons: {
@@ -447,6 +504,7 @@ export function serviceQuote(
     payer: payer.coins,
     holdings: [...used.keys()].sort().map((id) => t.holdings.find((h) => h.id === id)),
     ...(item ? { item: t.holdings.find((h) => h.id === item.holdingId) } : {}),
+    ...(stabling ? { animals: stabling.animals.map((a) => t.holdings.find((h) => h.id === a.holdingId)) } : {}),
   });
   return { terms, before, provider: p, offer };
 }
@@ -510,6 +568,8 @@ export function reviewChecks(t: Table, o: ServiceOrder) {
 
 /** A short receipt line, for events and history. */
 export function serviceSummary(o: Pick<ServiceOrder, "terms">) {
+  if (o.terms.route) return `Coach to ${o.terms.route.placeName} · ${o.terms.shopName}`;
+  if (o.terms.stabling) return `Stabling · ${o.terms.stabling.nights} ${o.terms.stabling.nights === 1 ? "night" : "nights"} · ${o.terms.shopName}`;
   if (o.terms.letter) return `Letter to ${o.terms.letter.recipientName} · ${o.terms.shopName}`;
   if (o.terms.lessons) return `Lessons · ${o.terms.lessons.topic} for ${o.terms.lessons.pupilName} · ${o.terms.shopName}`;
   if (o.terms.item) return `${o.terms.offer.name} · ${o.terms.item.name} · ${o.terms.shopName}`;

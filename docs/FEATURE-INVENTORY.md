@@ -485,6 +485,10 @@ Adds a contextual Maps session bar, searchable scene cards, separate activation/
 - Anti-exploit: cooldown per player account, repeat DC, 24-hour combined judgement, caps, unit cap, unwanted categories, and player-set item values (`valueSource: "player"`) count for nothing. Settlement reuses the atomic barter exchange; command IDs make retries no-ops and never re-roll. Players never receive NPC rules, valuation, purse or other players' attempts. The existing trading table, controlled-NPC flow, Give and every earlier save are unchanged. See [NPC-BARTER.md](NPC-BARTER.md).
 
 
+### NPC services, wave 2 phase 4c: Stable and coach (October 24, 2026)
+
+- Stable providers book stalls for the payer's or party fund's animals by the night, with optional feed (5 sp and 5 cp by default), paid once up front, recorded only. Coach routes (copied from a DM-drawn journey route) turn a booking into a party journey request with a coach fare line (passengers × miles × 3 cp), charged once when the DM approves departure, before rations and upkeep; undrawn routes are locked; denial or withdrawal charges nothing. See [services](SERVICES.md).
+
 ### NPC services, wave 2 phase 4e: Courier letters (October 24, 2026)
 
 - Courier providers carry letters to NPCs a character has met, at 2 cp a mile (SRD Messenger) over the DM's distance per destination, paid once on sending. Letters travel only with approved downtime and land in the sender's private thread with the recipient; a hidden or missing recipient holds the letter for the DM (deliver anyway or return, no refund). Property letters and post offices are unchanged; parcels aren't carried. See [services](SERVICES.md).

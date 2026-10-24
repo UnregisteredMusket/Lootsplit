@@ -9,7 +9,7 @@ import { smithFixture, smithDm } from "../src/lib/quire/test-fixtures/blacksmith
 import { applyCommand } from "../src/lib/quire/commands.ts";
 import { defaultSmith } from "../src/lib/quire/blacksmith-schema.ts";
 import { validateWorld } from "../src/lib/quire/world.ts";
-import { servicesFixture, workshopFixture, innFixture, linksFixture, sageFixture, trainerFixture, courierFixture, svcDm } from "../src/lib/quire/test-fixtures/services.ts";
+import { servicesFixture, workshopFixture, innFixture, linksFixture, sageFixture, trainerFixture, courierFixture, stableFixture, svcDm } from "../src/lib/quire/test-fixtures/services.ts";
 import { openApplication, reloadApplication, navigateApplication } from "./title-screen-navigation.mjs";
 
 const origin = process.env.AUDIT_ORIGIN || "http://127.0.0.1:8080";
@@ -495,6 +495,62 @@ async function courier(page, width) {
   await fits(page, `${width} letter delivered`);
 }
 
+/** Stable: stalls paid at once; a coach booked, approved and departed in Review Inbox. */
+async function stable(page, width) {
+  await open(page, stableFixture(), "hollin", "Hollin Marsh");
+  const services = reply(page, "Can you stable our animals, or take us somewhere?");
+  await expect(services).toContainText("Services · Stable");
+  await services.click();
+  await expect(reply(page, "Take us to Old Mill Crossing.")).toBeDisabled();
+  await expect(reply(page, "Take us to Old Mill Crossing.")).toContainText("hasn't drawn this route");
+  await reply(page, "Stabling").click();
+  const drawer = talk(page).locator(".npc-talk-drawer");
+  await expect(drawer.getByLabel(/Riding horse/)).toBeChecked();
+  await expect(drawer.getByLabel(/Pack mule/).first()).toBeChecked();
+  // Stable the horse only (the device may hold another party's mule as well).
+  for (const box of await drawer.getByLabel(/Pack mule/).all()) await box.uncheck();
+  await expect(drawer.locator(".svc-choice.blocked").filter({ hasText: "Pony" })).toContainText("Thorn books for it");
+  await drawer.getByRole("button", { name: "More nights" }).click();
+  await drawer.getByRole("button", { name: "More nights" }).click();
+  await expect(drawer.locator(".svc-total")).toContainText("Stalls · 1 animal × 3 nights × 5 sp");
+  await expect(drawer.locator(".svc-total")).toContainText("1 gp, 6 sp, 5 cp");
+  await fits(page, `${width} stabling`);
+  await page.screenshot({ path: `${output}/stable-stalls-${width}.png`, fullPage: true });
+  await reply(page, "Here's the coin.").click();
+  await expect(talk(page).getByLabel("Receipt: Stabling")).toContainText("Riding horse");
+  let state = await readJournal(page);
+  assert.equal(state.ledger.filter((l) => l.copper === -165).length, 1, "stabling paid once");
+
+  const coach = reply(page, "Take us to Saltmere.");
+  await expect(coach).toContainText("38.2 mi");
+  await coach.click();
+  await expect(drawer.getByRole("group", { name: "Passengers" })).toContainText("Kael");
+  await expect(drawer.locator(".svc-total")).toContainText("Charged on departure");
+  await fits(page, `${width} coach`);
+  await page.screenshot({ path: `${output}/stable-coach-${width}.png`, fullPage: true });
+  await reply(page, "Book us seats.").click();
+  await expect.poll(async () => (await readJournal(page)).journal.world.journeys?.length ?? 0).toBe(1);
+  state = await readJournal(page);
+  const booking = state.journal.services.orders.at(-1);
+  assert.equal(booking.status, "requested");
+  assert.equal(state.ledger.filter((l) => l.id === booking.id + "-payment").length, 0, "nothing charged on booking");
+
+  await navigateApplication(page, origin + "/features/review");
+  const row = page.locator("article.map-journey-entry").filter({ hasText: "Coach fare" }).first();
+  await expect(row).toContainText("once, on departure");
+  await fits(page, `${width} coach review`);
+  await page.screenshot({ path: `${output}/stable-review-${width}.png`, fullPage: true });
+  await row.getByRole("button", { name: /^Approve & depart/ }).click();
+  await expect.poll(async () => (await readJournal(page)).journal.services.orders.at(-1).status).toBe("completed");
+  state = await readJournal(page);
+  assert.equal(state.ledger.filter((l) => l.id === booking.id + "-payment").length, 1, "fare charged once on departure");
+  // The whole route fits in the approved days, so the party is on the road and arrives.
+  assert.ok(["active", "arrived"].includes(state.journal.world.journeys[0].status));
+  await navigateApplication(page, origin + "/maps");
+  await expect(page.locator("main")).toContainText(/On the road|Arrived near Saltmere/);
+  await fits(page, `${width} on the road`);
+}
+
 try {
   for (const width of [1280, 390, 320]) {
     const context = await browser.newContext({ viewport: { width, height: 950 }, serviceWorkers: "block" });
@@ -561,6 +617,7 @@ try {
     if (runs("sage")) await sage(page, width);
     if (runs("trainer")) await trainer(page, width);
     if (runs("courier")) await courier(page, width);
+    if (runs("stable")) await stable(page, width);
     await context.close();
   }
   assert.deepEqual(errors, [], "No browser runtime errors");

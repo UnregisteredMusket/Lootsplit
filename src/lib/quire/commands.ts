@@ -1,6 +1,7 @@
 import { shipCommands, type ShipCommand } from "./ships-schema.ts";
 import { downtimeActivityCommands, type DowntimeActivityCommand } from "./downtime-activities-schema.ts";
 import { applyDowntimeActivity, validateDowntimeActivities } from "./downtime-activities.ts";
+import { orderedTable } from "./journey-engine.ts";
 import { smithCommands, type SmithCommand } from "./blacksmith-schema.ts";
 import { applyShipCommand, validateFleet, assertShipTradingHere } from "./ships.ts";
 import { characterVisible, canReadCharacter } from "./character-position.ts";
@@ -731,11 +732,17 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
       if (journal.tradeEconomy?.pendingSeason) throw Error("Cancel the manual seasonal preview before preparing seasonal downtime.");
       if (journal.tradeEconomy?.settings.enabled) prepareTradeSeason(t, execution);
     }
+    // The one-click approval hashes its quote from the table in ID order (screens sort by name).
+    const ordered = cmd.expectedQuoteHash ? orderedTable(structuredClone(t)) : undefined;
     // A journey is frozen (route, scale, duration, travellers, prices) when it is reviewed.
     if (cmd.journeyId) prepareJourneyPlan(t, cmd.journeyId);
     const quote = previewDowntime(t, f, cmd.days, undefined, cmd.advanceSeason ? cmd.id : undefined, cmd.journeyId);
-    if (cmd.expectedQuoteHash && quoteHash(quote) !== cmd.expectedQuoteHash)
-      throw Error("Something changed since this request was drawn up (balances, the route's map or a pending preview). Open the full review.");
+    if (cmd.expectedQuoteHash && quoteHash(quote) !== cmd.expectedQuoteHash) {
+      if (cmd.journeyId) prepareJourneyPlan(ordered!, cmd.journeyId);
+      const same = previewDowntime(ordered!, readFinance(ordered!.journal?.finance), cmd.days, undefined, cmd.advanceSeason ? cmd.id : undefined, cmd.journeyId);
+      if (quoteHash(same) !== cmd.expectedQuoteHash)
+        throw Error("Something changed since this request was drawn up (balances, the route's map or a pending preview). Open the full review.");
+    }
     journal.downtimePrompt = { enabled: true, days: cmd.days };
     for (const d of f.downtime) if (d.status === "pending") d.status = "cancelled";
     f.downtime.push({

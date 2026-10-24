@@ -62,7 +62,7 @@ test("protocol 9 is the current protocol", () => {
   assert.equal(CURRENT_TABLETOP_PROTOCOL, 9);
 });
 
-test("link kinds take no offers, carry only their own settings, and engines not built yet are refused", () => {
+test("link kinds take no offers and carry only their own settings; every engine kind is accepted", () => {
   const t = linksFixture();
   const bank = provider(t, "ottilie-bank");
   const edit = (p: ServiceProvider) =>
@@ -76,17 +76,16 @@ test("link kinds take no offers, carry only their own settings, and engines not 
   const hire = provider(t, "ottilie-hire");
   assert.throws(() => edit({ ...hire, link: { roles: [hire.link!.roles![0], hire.link!.roles![0]] } }), /Duplicate hire roles/);
   assert.throws(() => edit({ ...hire, link: { roles: [{ ...hire.link!.roles![0], npcId: "nobody" }] } }), /existing NPC/);
-  for (const kind of ["stable"] as const)
-    assert.throws(
-      () =>
-        applyCommand(t, svcDm, {
-          id: `new-${kind}`,
-          kind: "service-provider",
-          providerId: `x-${kind}`,
-          before: null,
-          provider: newProvider(kind, { id: "temple", name: "Temple of the Dawn" }, "aldous", `x-${kind}`),
-        }),
-      /isn't available yet/,
+  // Every wave-2 engine is built: each kind's preset provider is accepted.
+  for (const kind of ["trainer", "stable", "courier", "sage"] as const)
+    assert.doesNotThrow(() =>
+      applyCommand(t, svcDm, {
+        id: `new-${kind}`,
+        kind: "service-provider",
+        providerId: `x-${kind}`,
+        before: null,
+        provider: newProvider(kind, { id: "temple", name: "Temple of the Dawn" }, "aldous", `x-${kind}`),
+      }),
     );
   // A player can't configure a link.
   assert.throws(

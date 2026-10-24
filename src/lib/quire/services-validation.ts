@@ -15,7 +15,7 @@ const timeFor: Partial<Record<ServiceKind, string>> = {
   courier: "delivery",
 };
 /** Wave-2 engines not switched on yet: their providers are refused until they ship. */
-const comingKinds: readonly ServiceKind[] = ["stable"];
+const comingKinds: readonly ServiceKind[] = [];
 
 /**
  * Runs after every command and on every read. `projected` is a player's view, which lacks DM
@@ -59,6 +59,17 @@ export function validateServices(
             throw Error(`${r.name}: choose an existing NPC for this role.`);
     } else if (p.link) throw Error(`${p.name}: only fence, bank and hire links carry link settings.`);
     if (p.destinations && p.kind !== "courier") throw Error(`${p.name}: only a courier has destinations.`);
+    if (p.routes && p.kind !== "stable") throw Error(`${p.name}: only a stable has coach routes.`);
+    unique(
+      (p.routes ?? []).map((r) => r.key),
+      "coach routes",
+    );
+    for (const r of p.routes ?? []) {
+      if (!!r.mapId !== !!r.points || !!r.points !== !!r.legs || (r.points && r.legs!.length !== r.points.length - 1))
+        throw Error("A coach route needs its map, waypoints and terrain together.");
+      if (!projected && !locations.some((l) => l.id === r.toLocationId))
+        throw Error("A coach route needs an existing Market location.");
+    }
     unique(
       (p.destinations ?? []).map((d) => d.locationId),
       "courier destinations",
@@ -77,6 +88,10 @@ export function validateServices(
       "rumours",
     );
     for (const o of p.offers) {
+      if (p.kind === "stable" && o.time.kind !== "per-night" && o.time.kind !== "coach")
+        throw Error(`${o.name}: a stable offers stabling by the night or a coach.`);
+      if (o.time.kind === "coach" && p.kind !== "stable") throw Error(`${o.name}: only a stable runs a coach.`);
+      if (o.feedCopper !== undefined && p.kind !== "stable") throw Error(`${o.name}: only a stable sells feed.`);
       const time = timeFor[p.kind];
       if (time && o.time.kind !== time)
         throw Error(`${o.name}: this kind of service uses ${time.replace("-", " ")} time.`);
