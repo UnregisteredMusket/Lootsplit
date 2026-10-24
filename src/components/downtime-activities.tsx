@@ -16,12 +16,23 @@ import { SearchSelect } from "./search-select";
 import { CommandForm, CommandButton } from "./world-tools";
 import { Fold } from "./ui";
 import { AppLink } from "./app-link";
+import { PaidLessons } from "./service-lessons";
+import { formatCopper } from "@/lib/quire/money";
+import type { CloudTable } from "@/lib/quire/cloud";
 
 const labels = { martial: "Martial", academic: "Academic", profession: "Skill / Profession" };
 const hours = (minutes: number) =>
   (minutes / 60).toLocaleString(undefined, { maximumFractionDigits: 2 });
 const days = (value: number) => value.toLocaleString(undefined, { maximumFractionDigits: 2 });
-export function DowntimeActivities({ reviewsOnly = false, initialNpcId = "" }: { reviewsOnly?: boolean; initialNpcId?: string }) {
+export function DowntimeActivities({
+  reviewsOnly = false,
+  initialNpcId = "",
+  initialLessonId = "",
+}: {
+  reviewsOnly?: boolean;
+  initialNpcId?: string;
+  initialLessonId?: string;
+}) {
   const t = useWorldTable(),
     seat = useSeat(),
     dm = seat.role === "dm";
@@ -345,6 +356,7 @@ export function DowntimeActivities({ reviewsOnly = false, initialNpcId = "" }: {
               </Fold>
             </>
           )}
+          <PaidLessons table={t as unknown as CloudTable} locked={locked} initialLessonId={initialLessonId} />
           <Fold
             title={dm ? "NPC training totals by category" : "My contributions by NPC and category"}
             defaultOpen
@@ -385,7 +397,9 @@ export function DowntimeActivities({ reviewsOnly = false, initialNpcId = "" }: {
             {counters.map((c) => (
               <article className="journal-entry" key={trainingKey(c.record)}>
                 <h3>
-                  {c.record.trainerName} → {c.record.npcName}
+                  {c.record.lessonOrderId
+                    ? `${c.record.trainerName} learning from ${c.record.npcName} (paid lessons)`
+                    : `${c.record.trainerName} → ${c.record.npcName}`}
                 </h3>
                 <p>
                   {labels[c.record.category]} · {c.record.topic}
@@ -417,8 +431,16 @@ export function DowntimeActivities({ reviewsOnly = false, initialNpcId = "" }: {
           .map((r) => (
             <article className="journal-entry" key={r.id}>
               <h3>
-                {r.trainerName} → {r.npcName}
+                {r.lessonOrderId
+                  ? `${r.trainerName} learns ${r.topic} from ${r.npcName} · ${hours(r.minutes)} h`
+                  : `${r.trainerName} → ${r.npcName}`}
               </h3>
+              {r.lessonOrderId && (
+                <p>
+                  <span className="svc-flag agree">Paid lesson</span> Fee {formatCopper(r.feeCopper ?? 0)}, charged once when the DM
+                  approves it.
+                </p>
+              )}
               <p>
                 {labels[r.category]} · {r.topic} · {hours(r.minutes)} hours · {r.status}
               </p>
@@ -526,8 +548,12 @@ function TrainingReview({ request: r, locked }: { request: TrainingRequest; lock
           value={approve ? "approve" : "deny"}
           onChange={(e) => setApprove(e.target.value === "approve")}
         >
-          <option value="approve">Approve recorded training time</option>
-          <option value="deny">Deny training</option>
+          <option value="approve">
+            {r.lessonOrderId
+              ? `Approve · count ${hours(r.minutes)} h · charge ${formatCopper(r.feeCopper ?? 0)}`
+              : "Approve recorded training time"}
+          </option>
+          <option value="deny">{r.lessonOrderId ? "Deny · releases the hours" : "Deny training"}</option>
         </select>
       </label>
       <label>
@@ -539,11 +565,20 @@ function TrainingReview({ request: r, locked }: { request: TrainingRequest; lock
           onChange={(e) => setNote(e.target.value)}
         />
       </label>
-      <p>
-        Confirm equal-or-lower levels, local conditions and completed time. When a sheet or class
-        level is unavailable, record that confirmation here. Approval changes only the time
-        allocation and tracking records.
-      </p>
+      {r.lessonOrderId ? (
+        <p>
+          A paid lesson: {r.npcName} teaches {r.trainerName}. Confirm the teacher is suitable (there
+          is no automatic level check), that they were together and the time was spent. Approving
+          counts the hours and charges the lesson's payer {formatCopper(r.feeCopper ?? 0)} once; it
+          grants nothing on the sheet. Denying releases the hours and moves no money.
+        </p>
+      ) : (
+        <p>
+          Confirm equal-or-lower levels, local conditions and completed time. When a sheet or class
+          level is unavailable, record that confirmation here. Approval changes only the time
+          allocation and tracking records.
+        </p>
+      )}
       <label><input type="checkbox" checked={historicalConfirmed} onChange={e => setHistoricalConfirmed(e.target.checked)} />
         Confirm historical training: together, equal-or-lower levels and completed time at that time
       </label>

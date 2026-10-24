@@ -294,3 +294,71 @@ export function identifyCommand(t: CloudTable, id: string, holdingId: string, pu
   const req: ServiceRequest = { beneficiaryPurseIds: [], units: 1, contributions: [], itemHoldingId: holdingId };
   return orderCommand(t, id, "identify", purseId, req, "quill-sage");
 }
+
+/**
+ * Wave 2 Trainer: Mistress Vey at the Tumbler's Lockworks teaches Thieves' tools at 2 gp a training
+ * day. Downtime days 41–44 are approved: 64 hours for each character and for Vey (8-hour training days).
+ */
+export function trainerFixture(): CloudTable {
+  let t = servicesFixture();
+  t.shops.push({ ...t.shops[0], id: "lockworks", name: "The Tumbler's Lockworks", keeper: "Vey", category: "general" });
+  t = applyCommand(t, svcDm, {
+    id: "vey",
+    kind: "npc-create",
+    npc: {
+      id: "vey",
+      name: "Mistress Vey",
+      description: "Locksmith.",
+      locationId: "harrowgate",
+      visible: true,
+      barterAllowed: false,
+      controllerPurseId: null,
+      services: ["trainer"],
+    },
+    copper: 0,
+    inventory: [],
+  });
+  t = applyCommand(t, svcDm, {
+    id: "trainer-setup",
+    kind: "service-provider",
+    providerId: "vey-lessons",
+    before: null,
+    provider: newProvider("trainer", { id: "lockworks", name: "The Tumbler's Lockworks" }, "vey", "vey-lessons"),
+  });
+  t.journal!.downtimeActivities = {
+    settings: { hoursPerDay: 16, trainingHoursPerDay: 8 },
+    windows: [
+      {
+        id: "w41",
+        name: "Downtime",
+        fromDay: 41,
+        days: 4,
+        settings: { hoursPerDay: 16, trainingHoursPerDay: 8 },
+        budgets: ["kael", "thorn", "vey", "aldous"].map((purseId) => ({ purseId, totalMinutes: 64 * 60, committedMinutes: 0 })),
+      },
+    ],
+    requests: [],
+    resets: [],
+  };
+  return t;
+}
+/** Book Thieves' tools lessons for a pupil (the payer by default). */
+export function lessonsCommand(t: CloudTable, id: string, days: number, purseId = "kael", pupil = purseId) {
+  return orderCommand(t, id, "thieves-tools", purseId, { beneficiaryPurseIds: [pupil], units: days, contributions: [] }, "vey-lessons");
+}
+/** Log a session of `hours` against an agreement. */
+export function sessionCommand(id: string, orderId: string, hours: number, pupil = "kael") {
+  return {
+    id,
+    kind: "downtime-training" as const,
+    windowId: "w41",
+    trainerId: pupil,
+    npcId: "vey",
+    category: "profession" as const,
+    topic: "Thieves' tools",
+    description: "Warded locks",
+    className: "",
+    minutes: hours * 60,
+    lessonOrderId: orderId,
+  };
+}

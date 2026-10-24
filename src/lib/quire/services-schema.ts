@@ -57,6 +57,8 @@ export const serviceTimeSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("downtime-days"), days: z.number().int().min(1).max(3650), perUnit: z.boolean() }).strict(),
   /** Booked and paid up front; units are nights. */
   z.object({ kind: z.literal("per-night"), maxNights: z.number().int().min(1).max(365) }).strict(),
+  /** Trainer (wave 2): the price is per training day; a day is the campaign's training-day setting. */
+  z.object({ kind: z.literal("training") }).strict(),
 ]);
 export const serviceOutputSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("record") }).strict(),
@@ -93,6 +95,10 @@ export const serviceOfferSchema = z
     tiers: z.array(innTierSchema).max(10).optional(),
     /** Sage or temple Identify: the order names one item the payer carries (wave 2). */
     target: z.literal("held-item").optional(),
+    /** Trainer: the existing training category of the subject (wave 2). */
+    category: z.enum(["martial", "academic", "profession"]).optional(),
+    /** Trainer: the most training days one agreement may book (1–250). */
+    maxDays: z.number().int().min(1).max(250).optional(),
   })
   .strict();
 export const rumourSchema = z
@@ -233,6 +239,18 @@ export const serviceTermsSchema = z
     review: z.enum(["auto", "dm"]),
     workDays: z.number().int().min(0).max(3650),
     settlement: z.enum(settlementKinds),
+    /** Trainer: the agreement. Sessions are charged one by one when the DM approves them. */
+    lessons: z
+      .object({
+        pupilId: id,
+        pupilName: z.string().max(160),
+        category: z.enum(["martial", "academic", "profession"]),
+        topic: z.string().trim().min(1).max(160),
+        dayCopper: copper,
+        maxDays: z.number().int().min(1).max(250),
+      })
+      .strict()
+      .optional(),
     /** Identify: the item as it was when asked (its notes are a snapshot, never rewritten). */
     item: z
       .object({ holdingId: id, name: z.string().max(160), notesBefore: z.string().max(4000) })
@@ -270,6 +288,22 @@ export const serviceOrderSchema = z
     completedMinute: minute.optional(),
     claimedDay: day.optional(),
     message: z.string().max(1000),
+    /** Trainer: each approved session, charged once (`requestId-fee`). */
+    sessions: z
+      .array(
+        z
+          .object({
+            requestId: id,
+            minutes: z.number().int().min(1).max(1e12),
+            trainingHoursPerDay: z.number().int().min(1).max(24),
+            feeCopper: copper,
+            approvedAt: z.number(),
+            day,
+          })
+          .strict(),
+      )
+      .max(1000)
+      .optional(),
     /** Identify: the DM's answer, set once on approval. */
     reveal: serviceRevealSchema.optional(),
     history: z

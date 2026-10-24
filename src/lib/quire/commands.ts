@@ -70,6 +70,8 @@ import { applySmithCommand } from "./blacksmith-command.ts";
 import { validateBlacksmith } from "./blacksmith-validation.ts";
 import { serviceCommands, type ServiceCommand } from "./services-schema.ts";
 import { applyServiceCommand } from "./services-command.ts";
+// After services-command: finance must load after journal here (see services-lessons.ts).
+import { chargeLesson } from "./services-lessons.ts";
 import { validateServices } from "./services-validation.ts";
 const id = z.string().min(1).max(150),
   amount = z.number().int().nonnegative().max(1e12),
@@ -392,7 +394,7 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
   if (cmd.kind === "ledger-void") {
     applyLedgerVoid(t, seat, cmd, at, execution.source === "local");
   } else if (downtimeActivityCommands.some(schema => schema.shape.kind.value === cmd.kind)) {
-    applyDowntimeActivity(t, seat, cmd as DowntimeActivityCommand, at, execution.preview === true);
+    applyDowntimeActivity(t, seat, cmd as DowntimeActivityCommand, at, execution.preview === true, { chargeLesson });
   } else if (tradeCommands.some((schema) => schema.shape.kind.value === cmd.kind)) {
     applyTradeCommand(t, seat, cmd as TradeCommand, at, execution);
   } else if (lootKinds.has(cmd.kind)) {
