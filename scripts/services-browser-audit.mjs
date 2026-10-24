@@ -466,7 +466,7 @@ async function courier(page, width) {
   await expect(services).toContainText("Services · Courier");
   await services.click();
   await expect(reply(page, "Can you carry a parcel?")).toBeDisabled();
-  await expect(reply(page, "To the steward of our property.")).toHaveAttribute("href", /\/features\/properties$/);
+  await expect(reply(page, "To the steward of our property.")).toHaveAttribute("href", /\/features\/properties(\?|$)/);
   const letter = reply(page, "To someone I know.");
   await expect(letter).toContainText("2 cp a mile");
   await letter.click();
