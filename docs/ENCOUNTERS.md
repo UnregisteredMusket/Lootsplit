@@ -33,6 +33,12 @@ The generator retrieves the SRD 5.1 creature index through Open5e, retaining sou
 - **Exactly once and rollback.** Unchanged: `dm_encounter_awards`, the room-body comparison and the D1 batch (shared); one IndexedDB transaction with the `status === "review"` check (device). Tests cover a lost-response retry, an injected write failure and the no-fund refusal on both paths.
 - **Old awards.** Awards without pool fields keep exactly their previous preview shape and receipt.
 
+### Award tag on ledger lines (2026-10-24)
+
+- **Shape.** The one-purse coin line and each item sent straight to a purse carry an optional `award: { receiptId, role: "coins" | "item", quantity?, unitCopper? }` (owner approval 2026-10-24): the award receipt and the value the DM reviewed. Metadata on lines both paths already wrote, never a balance; no table or migration.
+- **One helper.** Both paths call `encounterCoinLine` / `encounterItemLine` (`src/lib/quire/award-tag.ts`) inside the existing exactly-once award. Line IDs are now `${receiptId}-coins` and `${receiptId}-item-${i}` (were random); summaries are unchanged. A differential test (`src/lib/encounters/local-award-tag.test.ts`) checks the shared and device paths write the same tagged lines, once.
+- **Fairness.** The Fairness ledger counts tagged items at their recorded value. Older lines without the tag still read: coins by their summary, items as 0 cp flagged "value not recorded" (see FEATURE-INVENTORY "Fairness ledger").
+
 ## Verification
 
 Service tests cover ownership/DM permissions, revoked memberships, revision conflicts, manual/automatic rolls, weighted results, review before transfer, recipient validation, pending turns, turn ownership, repeated transfers, concurrent room changes, and transactional rollback after an injected inventory-write failure.

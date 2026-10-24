@@ -129,6 +129,8 @@ type Digest = {
   eligible: string[];
   names: Record<string, string>;
   lines: Map<string, LedgerLine>;
+  /** Split ID → whether it came from a party fund. */
+  sources: Map<string, SplitSource>;
 };
 
 function partyFundIds(t: Pick<FairTable, "purses" | "journal">): Set<string> {
@@ -296,21 +298,37 @@ function digest(t: FairTable, extension?: FairnessExtension): Digest {
       ]
     : t.purses.filter((p) => fairnessEligible(t, p) && inParty(t, p)).map((p) => ({ id: p.id, name: p.name }));
   const eligible = [...new Set([...party.map((p) => p.id), ...t.purses.filter((p) => fairnessEligible(t, p)).map((p) => p.id)])];
-  return { counted, voids, others, party, eligible, names, lines };
+  // Keep only the lines a projection may need (counted lines and their reversals), not the whole ledger.
+  const kept = new Map<string, LedgerLine>();
+  for (const r of counted) kept.set(r.lineId, lines.get(r.lineId)!);
+  for (const v of voids) kept.set(v.line.id, v.line);
+  return { counted, voids, others, party, eligible, names, lines: kept, sources };
 }
 
-/** Archived snapshots are immutable: digest each one once per page load or server isolate. */
-const CACHE_LIMIT = 400;
+/**
+ * Archived snapshots are immutable: digest each one once per page load or server isolate. The
+ * key is the length plus a sampled FNV-1a hash, so the cache never holds the snapshot text itself.
+ */
+const CACHE_LIMIT = 300;
 const snapshotCache = new Map<string, Digest | null>();
+function snapshotKey(snapshot: string): string {
+  let h = 0x811c9dc5;
+  const step = Math.max(1, Math.floor(snapshot.length / 65536));
+  for (let i = 0; i < snapshot.length; i += step) h = Math.imul(h ^ snapshot.charCodeAt(i), 0x01000193) >>> 0;
+  // The ends always count in full (IDs and amounts often differ there).
+  for (let i = Math.max(0, snapshot.length - 512); i < snapshot.length; i++) h = Math.imul(h ^ snapshot.charCodeAt(i), 0x01000193) >>> 0;
+  return `${snapshot.length}:${step}:${h.toString(16)}`;
+}
 function cached(snapshot: string, build: () => Digest | null): Digest | null {
-  const hit = snapshotCache.get(snapshot);
+  const key = snapshotKey(snapshot);
+  const hit = snapshotCache.get(key);
   if (hit !== undefined) {
-    snapshotCache.delete(snapshot);
-    snapshotCache.set(snapshot, hit);
+    snapshotCache.delete(key);
+    snapshotCache.set(key, hit);
     return hit;
   }
   const value = build();
-  snapshotCache.set(snapshot, value);
+  snapshotCache.set(key, value);
   if (snapshotCache.size > CACHE_LIMIT) snapshotCache.delete(snapshotCache.keys().next().value!);
   return value;
 }
@@ -644,7 +662,7 @@ export function fairnessProjection(
   ownLines: LedgerLine[],
 ): FairnessExtension {
   const d = cached(snapshot, () => digest(raw));
-  const sources = splitSources(raw);
+  const sources = d?.sources ?? splitSources(raw);
   const visible = new Set(outer.purses.filter((p) => fairnessEligible(outer, p)).map((p) => p.id));
   const party = viewerInParty && d ? d.party.filter((p) => visible.has(p.id)) : [];
   const ids = new Set(party.map((p) => p.id));

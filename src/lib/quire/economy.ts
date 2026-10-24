@@ -2659,23 +2659,20 @@ export async function economyView() {
     request<Lexeme[]>(tx.objectStore("lexicon").getAll()),
     finish(tx),
   ]);
-  return {
-    ...(getSeat().role === "player"
+  // A player-only device link: one projection, with the party directory as in shared rooms
+  // (cloud.server.ts seatTable), so the journal keeps the listed characters' party positions.
+  const projected =
+    getSeat().role === "player"
       ? projectRecord(table, getSeat(), {
           directory: true,
           tabletopProjected: getCloudWatch().joined,
         })
-      : table),
+      : null;
+  return {
+    ...(projected ?? table),
     realm: table.realm,
-    journal: readJournal(
-      getSeat().role === "player"
-        ? projectRecord(table, getSeat(), { tabletopProjected: getCloudWatch().joined }).journal
-        : table.journal,
-    ),
-    ledger: (getSeat().role === "player"
-      ? projectRecord(table, getSeat(), { tabletopProjected: getCloudWatch().joined }).ledger
-      : table.ledger
-    ).sort((a, b) => b.at - a.at),
+    journal: readJournal(projected ? projected.journal : table.journal),
+    ledger: (projected ? projected.ledger : table.ledger).sort((a, b) => b.at - a.at),
     catalog: catalog.sort((a, b) => a.name.localeCompare(b.name)),
     lexicon: lexicon.sort((a, b) => a.name.localeCompare(b.name)),
   };

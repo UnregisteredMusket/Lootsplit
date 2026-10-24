@@ -1,0 +1,13 @@
+{
+  "title": "Fairness: who has received what",
+  "summary": "A new Fairness tab on the Party page adds up the loot each party character has received, campaign to date or for one session.",
+  "items": [
+    "Party → Fairness shows each character's coins, items at their recorded value and total, with how far they are ahead of or behind the party average.",
+    "Coin splits from a party fund or an encounter, encounter awards and treasure-pool items count. Purchases, trades, Give, wages, loans, payments and downtime don't.",
+    "Tap a character to see the receipts behind their total, newest session first.",
+    "Older encounter items that were awarded before values were recorded count as 0 cp and are marked, never guessed.",
+    "Everyone travelling with the party sees the party's totals; a player away from the party sees only their own.",
+    "When resolving the treasure pool, the DM can choose Favour whoever is behind: Need still comes before Greed, a tied top roll goes to whoever has received least, and round-robin hands items to whoever is furthest behind. The receipt shows the totals used.",
+    "New encounter awards now record each item's value on its ledger line, so it counts at the value the DM reviewed."
+  ]
+}
