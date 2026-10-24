@@ -4402,3 +4402,4 @@ input,select,textarea { max-width: 100%; }
  .map-workspace .map-plan-journey-button { top:116px; left:10px; }
  .map-workspace .map-journey-panel.map-journey-review { top:10px; bottom:10px; max-height:none; }
 }
+.map-journey-entry .map-route-typed input,.map-journey-entry textarea { border:1px solid var(--color-border); border-radius:8px; padding:0 10px; background:color-mix(in srgb,var(--color-elevated,#0000) 70%,transparent); color:inherit; }
