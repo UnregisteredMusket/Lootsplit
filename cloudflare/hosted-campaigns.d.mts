@@ -1,4 +1,9 @@
-type Db = { prepare(sql: string): any; batch(statements: any[]): Promise<any[]> };
+type Statement = {
+  bind(...values: unknown[]): Statement;
+  first<T = Record<string, unknown>>(): Promise<T | null>;
+  run(): Promise<{ meta: { changes: number } }>;
+};
+type Db = { prepare(sql: string): Statement };
 export type HostedCampaignStatus = { hosted: number; limit: number; exempt: boolean; atLimit: boolean };
 export type HostingPath = "open" | "reopen" | "restore" | "link";
 export const DEFAULT_HOSTED_CAMPAIGN_LIMIT: number;
