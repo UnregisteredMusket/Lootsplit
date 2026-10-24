@@ -81,11 +81,12 @@ export function lootActivity(
           : r.method === "random" && lot.awards.length
             ? " · no roll needed"
             : "";
+        const favoured = e.lootFavour?.lots.find((l) => l.holdingId === lot.holdingId)?.purseIds.includes(a.purseId);
         return {
           id: `${lot.holdingId}-${a.purseId}`,
           who: `${name(lot.fundId)} → ${name(a.purseId)}`,
           item: `${lot.name} × ${a.quantity}`,
-          detail: `${CHOICE_LABEL[a.choice]}${rolled} · value ${formatCopper(lot.unitCopper * a.quantity)}`,
+          detail: `${CHOICE_LABEL[a.choice]}${rolled}${favoured ? " · favoured (behind)" : ""} · value ${formatCopper(lot.unitCopper * a.quantity)}`,
           own: options.ownPurseIds.includes(a.purseId),
         };
       }),
@@ -97,7 +98,14 @@ export function lootActivity(
       kind: "treasure pool",
       icon: "resolve",
       title,
-      detail: `treasure pool · by the DM · ${METHOD_LABEL[r.method]}${r.rolls ? ` · ${r.rolls === "manual" ? "Pen & Paper rolls" : r.rolls === "local" ? "DM device rolls" : "server rolls"}` : ""}`,
+      detail: `treasure pool · by the DM · ${METHOD_LABEL[r.method]}${r.rolls ? ` · ${r.rolls === "manual" ? "Pen & Paper rolls" : r.rolls === "local" ? "DM device rolls" : "server rolls"}` : ""}${
+        e.lootFavour
+          ? ` · favoured whoever was behind (${e.lootFavour.basis === "session" ? "this session" : "campaign to date"}; totals used: ${[...e.lootFavour.totals]
+              .sort((x, y) => x.copper - y.copper)
+              .map((x) => `${name(x.purseId).split(" ")[0]} ${formatCopper(x.copper)}`)
+              .join(", ")})`
+          : ""
+      }`,
       total: `${items} item${items === 1 ? "" : "s"} · ${formatCopper(value)}`,
       lines,
       summary: [title, ...lines.map((l) => `${l.who} ${l.item} ${l.detail}`)].join(" "),

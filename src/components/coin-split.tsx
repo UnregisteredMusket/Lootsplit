@@ -1,3 +1,4 @@
+import { AppLink } from "@/components/app-link";
 import { useMemo, useState, type FormEvent, type ReactNode } from "react";
 import { getCloudTable } from "@/lib/quire/cloud-client";
 import { useCommandId, useEconomy } from "@/lib/quire/economy-context";
@@ -530,6 +531,10 @@ export function SplitCoins({
           {planError}
         </p>
       )}
+      <p className="coin-split-hint">
+        An even split adds the same to everyone, so it never closes a gap.{" "}
+        <AppLink href="/party?section=fairness">See who is behind in Fairness →</AppLink>
+      </p>
       <div className="mt-3 flex flex-wrap gap-2">
         <Button type="submit" disabled={!plan || overBalance}>
           Review split

@@ -337,7 +337,7 @@ test("favour (round-robin): each unit to the lowest running total, across lots; 
 });
 
 test("favour command: totals come from the campaign, are recorded on the receipt, and a changed total refuses", () => {
-  let t = pool([lot("scroll", 1, 6000)], [["scroll", "aria", "need"], ["scroll", "bram", "need"]]);
+  const t = pool([lot("scroll", 1, 6000)], [["scroll", "aria", "need"], ["scroll", "bram", "need"]]);
   t.ledger.push(encounterCoinLine("old", Date.now(), "aria", "Ford ogre", 5000));
   const lots = [{ holdingId: "scroll", quantity: 1 }];
   const favour = { basis: "campaign" as const, totals: fairnessStandings(t, "campaign") };
