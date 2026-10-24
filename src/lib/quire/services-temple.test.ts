@@ -325,6 +325,8 @@ test("presets: SRD 5.2.1 by default, SRD 5.1 prices levels 1–2 and drafts the 
       ["greater-restoration", 200000, false, "auto"],
       ["raise-dead", 200000, true, "dm"],
       ["resurrection", 2000000, true, "dm"],
+      // Wave 2: temples carry Identify as a draft for the DM to switch on.
+      ["identify", 5000, false, "dm"],
     ],
   );
   const old = presetOffers("temple", "srd-5.1");
@@ -338,6 +340,7 @@ test("presets: SRD 5.2.1 by default, SRD 5.1 prices levels 1–2 and drafts the 
       ["greater-restoration", 0, false],
       ["raise-dead", 0, false],
       ["resurrection", 0, false],
+      ["identify", 5000, false],
     ],
   );
   assert.deepEqual(presetOffers("temple", "blank"), []);

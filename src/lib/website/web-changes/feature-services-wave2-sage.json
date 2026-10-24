@@ -1,0 +1,9 @@
+{
+  "title": "NPC services: sages identify items",
+  "summary": "Ask a sage what an item you carry really is.",
+  "items": [
+    "Choose an item your character carries and ask; nothing is charged while the DM considers it.",
+    "When the DM answers, the fee is charged once and the answer arrives in your private conversation with the sage.",
+    "The answer can be added to the item's notes, and the item can be renamed."
+  ]
+}

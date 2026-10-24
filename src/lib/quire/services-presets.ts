@@ -82,6 +82,26 @@ function templeOffer(s: Spell, preset: ServicePreset): ServiceOffer {
   };
 }
 
+/**
+ * Identify: SRD 5.2.1 prices a level 1 spell at 50 gp; SRD 5.1 gives "10 to 50 gp" for levels 1-2
+ * and the temple preset takes the top, so both are 50 gp. The 100 gp pearl is the provider's own
+ * and isn't consumed, so nothing is added. DM review by default: the DM writes the answer.
+ */
+export function identifyOffer(approved = true): ServiceOffer {
+  return {
+    key: "identify",
+    name: "Identify",
+    description: "The sage studies one item you carry and tells you what it is. The pearl is the sage's own and isn't consumed. Recorded only.",
+    approved,
+    priceCopper: gp(50),
+    spellLevel: 1,
+    time: { kind: "instant", castingMinutes: 1 },
+    review: "dm",
+    output: { kind: "record" },
+    target: "held-item",
+  };
+}
+
 export const workshopSpecialties = ["Scribe", "Alchemist", "Tailor"] as const;
 export type WorkshopSpecialty = (typeof workshopSpecialties)[number];
 
@@ -248,7 +268,9 @@ function innOffer(preset: ServicePreset): ServiceOffer {
 /** The offers a preset brings for this kind (and workshop specialty). Blank brings none. */
 export function presetOffers(kind: ServiceKind, preset: ServicePreset, specialty?: string): ServiceOffer[] {
   if (preset === "blank") return [];
-  if (kind === "temple") return templeSpells.map((s) => templeOffer(s, preset));
+  // Temples carry Identify as a draft for the DM to switch on; a sage offers it.
+  if (kind === "temple") return [...templeSpells.map((s) => templeOffer(s, preset)), identifyOffer(false)];
+  if (kind === "sage") return [identifyOffer()];
   if (kind === "inn") return [innOffer(preset)];
   if (kind === "workshop" && specialty === "Scribe") return scrollSpells.map((s) => scrollOffer(s, preset));
   if (kind === "workshop" && specialty === "Alchemist") return brews.map((b) => brewOffer(b, preset));

@@ -91,6 +91,8 @@ export const serviceOfferSchema = z
     components: z.array(serviceComponentSchema).max(5).optional(),
     output: serviceOutputSchema,
     tiers: z.array(innTierSchema).max(10).optional(),
+    /** Sage or temple Identify: the order names one item the payer carries (wave 2). */
+    target: z.literal("held-item").optional(),
   })
   .strict();
 export const rumourSchema = z
@@ -180,6 +182,8 @@ export const serviceRequestSchema = z
     units: z.number().int().min(1).max(1000),
     contributions: z.array(contributionSchema).max(10),
     inn: z.object({ tierKey: goodsKey, meals: z.number().int().min(0).max(3) }).strict().optional(),
+    /** Identify: the carried item the sage looks at. */
+    itemHoldingId: id.optional(),
   })
   .strict();
 export type ServiceRequest = z.infer<typeof serviceRequestSchema>;
@@ -229,9 +233,25 @@ export const serviceTermsSchema = z
     review: z.enum(["auto", "dm"]),
     workDays: z.number().int().min(0).max(3650),
     settlement: z.enum(settlementKinds),
+    /** Identify: the item as it was when asked (its notes are a snapshot, never rewritten). */
+    item: z
+      .object({ holdingId: id, name: z.string().max(160), notesBefore: z.string().max(4000) })
+      .strict()
+      .optional(),
   })
   .strict();
 export type ServiceTerms = z.infer<typeof serviceTermsSchema>;
+/** What the DM answered for an Identify order; the text is in the payer's thread with the NPC. */
+export const serviceRevealSchema = z
+  .object({
+    text: z.string().trim().min(1).max(2000),
+    /** Append a dated line with the answer to the item's notes (the old notes stay). */
+    appendToNotes: z.boolean(),
+    /** Rename the item. */
+    rename: name.optional(),
+  })
+  .strict();
+export type ServiceReveal = z.infer<typeof serviceRevealSchema>;
 export const serviceOrderSchema = z
   .object({
     id,
@@ -250,6 +270,8 @@ export const serviceOrderSchema = z
     completedMinute: minute.optional(),
     claimedDay: day.optional(),
     message: z.string().max(1000),
+    /** Identify: the DM's answer, set once on approval. */
+    reveal: serviceRevealSchema.optional(),
     history: z
       .array(
         z
@@ -306,6 +328,8 @@ export const serviceCommands = [
       kind: z.literal("service-review"),
       decision: z.enum(["approve", "deny"]),
       reason: z.string().trim().max(1000),
+      /** Identify approval: the answer, and whether to note it on the item and rename it. */
+      reveal: serviceRevealSchema.optional(),
     })
     .strict(),
   z

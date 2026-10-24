@@ -18,6 +18,8 @@ import { readFinance } from "@/lib/quire/finance";
 import { canAccessEstate } from "@/lib/quire/estate";
 import { readEstate } from "@/lib/quire/estate-schema";
 import {
+  identifyCandidates,
+  identifyLock,
   staffableProperties,
   rumourLock,
   rumourQuote,
@@ -56,6 +58,7 @@ export const serviceWhen = (day: number, minute = 0) =>
 
 const intro: Partial<Record<ServiceProvider["kind"], string>> = {
   temple: "Say what ails you, and who. The faithful ask an offering for each blessing.",
+  sage: "Show me. And keep your fingers off the pearl.",
   workshop: "Tell me what you need made. Good work takes time.",
   inn: "Rooms upstairs, food on the fire. What'll it be?",
   hire: "Steady hands, fair wages. Where would they work?",
@@ -74,6 +77,7 @@ const offerSpeech: Record<string, string> = {
   revivify: "They only just fell. Bring them back.",
   "greater-restoration": "Restore what was taken.",
   "raise-dead": "Please, raise our friend.",
+  identify: "What is this thing?",
   resurrection: "Can you restore a body long gone?",
 };
 const speech = (o: ServiceOffer) => offerSpeech[o.key] ?? `${o.name}, please.`;
@@ -114,13 +118,28 @@ export function ServiceReceipt({ order, payer }: { order: ServiceOrder; payer: s
   return (
     <div className="svc-receipt" aria-label={`Receipt: ${t.offer.name}`}>
       <div className="svc-receipt-head">
-        <b>{t.kind === "inn" ? `Stay · ${t.shopName}` : t.offer.name}</b>
+        <b>{t.kind === "inn" ? `Stay · ${t.shopName}` : t.item ? `${t.offer.name} · ${t.item.name}` : t.offer.name}</b>
         <span className={`svc-status ${order.status}`}>
-          {order.status === "completed" ? (order.history.some((h) => h.status === "requested") ? "Approved" : "Paid") : order.status}
+          {order.status === "completed"
+            ? order.reveal
+              ? "Answered"
+              : order.history.some((h) => h.status === "requested")
+                ? "Approved"
+                : "Paid"
+            : order.status}
         </span>
       </div>
       <dl className="svc-kv">
-        {t.kind === "temple" && (
+        {t.item && (
+          <>
+            <dt>Item</dt>
+            <dd>
+              {t.item.name}
+              {order.reveal?.rename && order.reveal.rename !== t.item.name ? `, now “${order.reveal.rename}”` : ""}
+            </dd>
+          </>
+        )}
+        {t.kind === "temple" && !t.item && (
           <>
             <dt>Cast on</dt>
             <dd>{names}</dd>
@@ -167,7 +186,9 @@ export function ServiceReceipt({ order, payer }: { order: ServiceOrder; payer: s
         )}
       </dl>
       <p className="svc-record-only">
-        {t.kind === "temple"
+        {t.item
+          ? `Recorded. The answer is in your thread with ${t.npcName}${order.reveal?.appendToNotes ? " and in the item's notes" : ""}.`
+          : t.kind === "temple"
           ? `Recorded only. The DM updates ${names}'s sheet: hit points, conditions, death.`
           : t.kind === "inn"
             ? "Recorded only. Buying a room doesn't grant a rest or change hit points. Ask the DM for a long rest."
@@ -190,7 +211,15 @@ export function orderLines(o: ServiceOrder, payer: string, npcName: string): Tal
       key: `${o.id}-ask`,
       node: (
         <>
-          {payer} asks for <b>{t.offer.name}</b>
+          {t.item ? (
+            <>
+              {payer} asks {t.npcName} to identify <b>{t.item.name}</b>
+            </>
+          ) : (
+            <>
+              {payer} asks for <b>{t.offer.name}</b>
+            </>
+          )}
           {on} · {formatCopper(t.priceCopper)}
           {brought.length ? ` · ${payer}'s ${brought.join(", ")}` : ""}.
         </>
@@ -203,7 +232,8 @@ export function orderLines(o: ServiceOrder, payer: string, npcName: string): Tal
       node: (
         <>
           Sent to the DM's queue. Nothing has been charged
-          {brought.length ? ` and ${brought.join(", ")} stays with ${payer}` : ""} until the DM approves.
+          {brought.length ? ` and ${brought.join(", ")} stays with ${payer}` : ""}
+          {t.item ? `, and ${t.item.name} stays with ${payer}` : ""} until the DM {t.item ? "answers" : "approves"}.
         </>
       ),
     });
@@ -229,9 +259,16 @@ export function orderLines(o: ServiceOrder, payer: string, npcName: string): Tal
       ),
     });
   if (["completed", "active", "paused"].includes(o.status)) {
-    const note = reviewed ? decided?.note.replace(/^Approved and paid\.( Recorded only; the DM updates character sheets\.| Work advances only with DM-approved downtime\.)?\s*/, "") : "";
+    const note = reviewed
+      ? decided?.note.replace(/^(Approved and paid\.( Recorded only; the DM updates character sheets\.| Work advances only with DM-approved downtime\.)?|Answered and paid\. The answer is in your thread with [^.]*\.)\s*/, "")
+      : "";
     if (note) lines.push({ kind: "sys", key: `${o.id}-dm`, node: <>The DM decided: {note}</> });
-    lines.push({ kind: "npc", key: `${o.id}-done`, text: t.kind === "temple" ? "It is done." : t.kind === "inn" ? "Room's at the top of the stairs." : "I'll get to work." });
+    if (o.reveal) lines.push({ kind: "sys", key: `${o.id}-answered`, node: <>The DM answered {payer}'s request.</> });
+    lines.push({
+      kind: "npc",
+      key: `${o.id}-done`,
+      text: o.reveal ? o.reveal.text : t.kind === "temple" ? "It is done." : t.kind === "inn" ? "Room's at the top of the stairs." : "I'll get to work.",
+    });
     lines.push({ kind: "sys", key: `${o.id}-receipt`, node: <ServiceReceipt order={o} payer={payer} /> });
   }
   void npcName;
@@ -269,6 +306,8 @@ export function useServiceTalk({
   const [rumours, setRumours] = useState(false);
   const [units, setUnits] = useState(1);
   const [mine, setMine] = useState<string[]>([]);
+  /** Identify: the carried item the sage looks at. */
+  const [itemId, setItemId] = useState("");
   /** Hire: the chosen role, property and the name on the contract. */
   const [roleKey, setRoleKey] = useState<string>();
   const [propertyId, setPropertyId] = useState("");
@@ -285,6 +324,7 @@ export function useServiceTalk({
       ? {
           beneficiaryPurseIds: beneficiaries,
           units,
+          ...(offer.target && itemId ? { itemHoldingId: itemId } : {}),
           ...(provider.kind === "inn" && tierKey ? { inn: { tierKey, meals } } : {}),
           contributions: (offer.components ?? []).flatMap((c) => {
             const pick = picks[c.key];
@@ -320,7 +360,8 @@ export function useServiceTalk({
   function chooseOffer(o: ServiceOffer) {
     setOfferKey(o.key);
     setUnits(1);
-    const rule = beneficiaryRule(provider!.kind);
+    if (o.target && purseId) setItemId(identifyCandidates(table, purseId).find((c) => !c.blocked)?.holding.id ?? "");
+    const rule = beneficiaryRule(provider!.kind, o);
     setBeneficiaries(rule.min && purseId ? [purseId] : []);
     // Bring your own when you carry a fitting lot; otherwise the provider supplies it.
     const next: Pick_ = {};
@@ -550,7 +591,7 @@ export function useServiceTalk({
       });
     const lock = providerLock(table, provider, purseId);
     for (const o of approvedOffers(provider)) {
-      const settlement = offerSettlementLock(table, provider, o);
+      const settlement = offerSettlementLock(table, provider, o) || (o.target ? identifyLock(table, purseId) : "");
       replies.push({
         tag: (
           <>
@@ -585,7 +626,8 @@ export function useServiceTalk({
     replies.push({
       tag: review ? (
         <>
-          Ask the {provider.kind === "temple" ? "priest" : npc.name} <em>· DM review · charged on approval</em>
+          Ask the {provider.kind === "temple" ? "priest" : provider.kind === "sage" ? "sage" : npc.name}{" "}
+          <em>· DM review · {offer.target ? "charged on answer" : "charged on approval"}</em>
         </>
       ) : (
         <>
@@ -601,7 +643,9 @@ export function useServiceTalk({
         </>
       ),
       text: review
-        ? "Please. Here is what we bring."
+        ? offer.target
+          ? "This one."
+          : "Please. Here is what we bring."
         : offer.time.kind === "downtime-days"
           ? "Let's do it."
           : offer.time.kind === "per-night"
@@ -609,7 +653,9 @@ export function useServiceTalk({
             : "Here's the offering.",
       tone: review ? "dm" : "check",
       sub: review
-        ? "Sends the request to the DM's Review Inbox. Nothing is charged now."
+        ? offer.target
+          ? "The item stays with you while the DM answers. Nothing is charged now."
+          : "Sends the request to the DM's Review Inbox. Nothing is charged now."
         : offer.time.kind === "per-night"
           ? "Records the stay. A long rest is still the DM's call."
           : "One payment, one receipt. Retrying after a dropped connection can't charge twice.",
@@ -620,7 +666,9 @@ export function useServiceTalk({
         push({
           kind: "pc",
           text: review
-            ? "Please. Here is what we bring."
+            ? offer.target
+              ? "This one."
+              : "Please. Here is what we bring."
             : offer.time.kind === "downtime-days"
               ? "Let's do it."
               : offer.time.kind === "per-night"
@@ -700,7 +748,7 @@ export function useServiceTalk({
       </div>
     );
   } else if (provider && offer && character) {
-    const rule = beneficiaryRule(provider.kind),
+    const rule = beneficiaryRule(provider.kind, offer),
       people = serviceBeneficiaries(table, provider);
     drawer = (
       <div className="npc-talk-drawer">
@@ -742,6 +790,26 @@ export function useServiceTalk({
               player doesn't need to confirm.
             </p>
           </div>
+        )}
+        {offer.target === "held-item" && (
+          <fieldset className="svc-section">
+            <h4>Which item</h4>
+            {identifyCandidates(table, character.id).map(({ holding, blocked }) => (
+              <label key={holding.id} className={`svc-choice${itemId === holding.id ? " on" : ""}${blocked ? " blocked" : ""}`}>
+                <input type="radio" name="svc-identify-item" checked={itemId === holding.id} disabled={!!blocked} onChange={() => setItemId(holding.id)} />
+                <b>{holding.name}</b>
+                <span className="svc-amt" />
+                <small>
+                  {blocked ||
+                    `Carried by ${character.name}${holding.equipped ? ", worn" : ""}.${holding.notes ? ` “${holding.notes.slice(0, 120)}${holding.notes.length > 120 ? "…" : ""}”` : ""}`}
+                </small>
+              </label>
+            ))}
+            <p className="npc-talk-hint">
+              Items owned and carried by the paying character; worn items are fine. Stored, travelling and reserved items are not.
+              The item stays with you.
+            </p>
+          </fieldset>
         )}
         {provider.kind === "inn" && (
           <div className="svc-section">
@@ -876,7 +944,7 @@ export function useServiceTalk({
           ))}
           <dt>{character.name} carries</dt>
           <dd>{formatCopper(toCopper(character.coins))}</dd>
-          <dt className="sum">{quote?.terms.review === "dm" ? "Charged when approved" : "Pay now"}</dt>
+          <dt className="sum">{quote?.terms.review === "dm" ? (offer.target ? "Charged when answered" : "Charged when approved") : "Pay now"}</dt>
           <dd className="sum">{quote ? formatCopper(quote.terms.priceCopper) : "—"}</dd>
           <dd className="note">
             {provider.kind === "inn" && quote
@@ -884,7 +952,9 @@ export function useServiceTalk({
               : ""}
             {problem ||
               (quote?.terms.review === "dm"
-                ? "Nothing moves now. If the DM approves, coins and any item you bring leave together, once."
+                ? offer.target
+                  ? `Nothing moves now. The DM answers as ${npc.name}; approval charges ${quote ? formatCopper(quote.terms.priceCopper) : "the fee"} once and sends you the answer.`
+                  : "Nothing moves now. If the DM approves, coins and any item you bring leave together, once."
                 : offer.time.kind === "downtime-days"
                   ? "Paid once, now. Work advances only when the DM approves downtime, never by session hours or real time."
                   : provider.kind === "inn"
@@ -898,7 +968,14 @@ export function useServiceTalk({
 
   /** Orders to show: those placed or touched in this conversation, and open requests. */
   const shown = services.orders.filter(
-    (o) => o.purseId === purseId && o.terms.npcId === npc.id && (mine.includes(o.id) || o.status === "requested" || o.status === "ready"),
+    (o) =>
+      o.purseId === purseId &&
+      o.terms.npcId === npc.id &&
+      (mine.includes(o.id) ||
+        o.status === "requested" ||
+        o.status === "ready" ||
+        // A sage's answer from today rejoins the conversation (it stays in the private thread).
+        (!!o.reveal && o.completedDay === readFinance(table.journal?.finance).day)),
   );
   const linesFor = (id: string): TalkLine[] => {
     const o = shown.find((x) => x.id === id);

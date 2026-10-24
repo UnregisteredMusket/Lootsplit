@@ -76,7 +76,7 @@ test("link kinds take no offers, carry only their own settings, and engines not 
   const hire = provider(t, "ottilie-hire");
   assert.throws(() => edit({ ...hire, link: { roles: [hire.link!.roles![0], hire.link!.roles![0]] } }), /Duplicate hire roles/);
   assert.throws(() => edit({ ...hire, link: { roles: [{ ...hire.link!.roles![0], npcId: "nobody" }] } }), /existing NPC/);
-  for (const kind of ["trainer", "stable", "courier", "sage"] as const)
+  for (const kind of ["trainer", "stable", "courier"] as const)
     assert.throws(
       () =>
         applyCommand(t, svcDm, {
@@ -211,7 +211,10 @@ test("protocol 8 and older clients: wave-2 kinds are stripped, and their writes 
   assert.deepEqual(eight.journal!.world!.npcs.find((n) => n.id === "ottilie")!.services, []);
   for (const p of s8.providers) serviceProviderSchema.parse(p);
   assert.equal(tableForProtocol(t, 9), t, "protocol 9 receives the table as it is");
+  // A wave-1 table (the temple preset's Identify draft is wave 2, so it is left out here).
   const wave1Only = servicesFixture();
+  const temple = readServices(wave1Only.journal?.services).providers[0];
+  wave1Only.journal!.services = { providers: [{ ...temple, offers: temple.offers.filter((o) => !o.target) }], orders: [] };
   assert.ok(!hasWave2Services(wave1Only));
   assert.deepEqual(tableForProtocol(wave1Only, 8).journal!.services, wave1Only.journal!.services, "wave-1 data is unchanged");
   // Protocol 7 also loses the lists entirely.

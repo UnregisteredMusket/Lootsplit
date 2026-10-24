@@ -6,9 +6,9 @@ function unique(keys: string[], label: string) {
   if (new Set(keys).size !== keys.length) throw Error(`Duplicate ${label}.`);
 }
 /** Each kind has one time model: temple instant, workshop downtime days, inn per night. */
-const timeFor: Partial<Record<ServiceKind, string>> = { temple: "instant", workshop: "downtime-days", inn: "per-night" };
+const timeFor: Partial<Record<ServiceKind, string>> = { temple: "instant", workshop: "downtime-days", inn: "per-night", sage: "instant" };
 /** Wave-2 engines not switched on yet: their providers are refused until they ship. */
-const comingKinds: readonly ServiceKind[] = ["trainer", "stable", "courier", "sage"];
+const comingKinds: readonly ServiceKind[] = ["trainer", "stable", "courier"];
 
 /**
  * Runs after every command and on every read. `projected` is a player's view, which lacks DM
@@ -73,6 +73,11 @@ export function validateServices(
         (o.components ?? []).map((c) => c.key),
         "components",
       );
+      if (o.target && p.kind !== "sage" && p.kind !== "temple")
+        throw Error(`${o.name}: only a sage or a temple identifies an item.`);
+      if (o.target && (o.components?.length || (o.maxUnits ?? 1) > 1))
+        throw Error(`${o.name}: Identify looks at one item and needs no components.`);
+      if (p.kind === "sage" && !o.target) throw Error(`${o.name}: a sage's offers identify a carried item.`);
       if (p.kind === "workshop" && o.output.kind !== "holding")
         throw Error(`${o.name}: a workshop order makes an item.`);
     }
@@ -81,6 +86,8 @@ export function validateServices(
         if (r.text === undefined || r.buyers === undefined) throw Error("A rumour needs its full text.");
   }
   for (const o of s.orders) {
+    if (o.reveal && (!o.terms.item || o.status !== "completed"))
+      throw Error("Only an answered Identify order carries an answer.");
     if (
       o.progressDays > o.terms.workDays ||
       (["ready", "claimed"].includes(o.status) &&

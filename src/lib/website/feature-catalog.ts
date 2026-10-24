@@ -260,6 +260,7 @@ export const FEATURE_AREAS: FeatureArea[] = [
           "Raise Dead and Resurrection wait for DM review and are charged on approval",
           "Workshop orders are made during approved downtime",
           "Inns book nights and meals, and share rumours privately",
+          "Sages identify an item you carry; the DM writes the answer",
           "Tailors make clothes; fences, banks and hiring agents open the Sell tab, a loan request or a staff contract",
         ],
       },

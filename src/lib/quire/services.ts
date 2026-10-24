@@ -3,6 +3,7 @@ import { toCopper, formatCopper } from "./money.ts";
 import { locationPath, readMarketLocations } from "./shop-locations.ts";
 import { shopVisible } from "./vendors.ts";
 import {
+  assertHeldItem,
   assertContribution,
   downtimePending,
   money as serviceMoney,
@@ -137,8 +138,36 @@ export function maxUnits(o: ServiceOffer) {
   return o.time.kind === "per-night" ? o.time.maxNights : (o.maxUnits ?? 1);
 }
 /** Beneficiaries each kind takes: a temple casts on one, an inn hosts guests, a workshop has none. */
-export function beneficiaryRule(kind: ServiceKind) {
+export function beneficiaryRule(kind: ServiceKind, offer?: Pick<ServiceOffer, "target">) {
+  if (offer?.target) return { min: 0, max: 0 };
   return kind === "temple" ? { min: 1, max: 1 } : kind === "inn" ? { min: 1, max: 20 } : { min: 0, max: 0 };
+}
+
+/**
+ * Items a payer could show a sage, with why others can't be chosen: their own carried items
+ * (worn is fine); stored, travelling, reserved or pooled ones, and party-fund items, are listed
+ * but blocked.
+ */
+export function identifyCandidates(t: Table, purseId: string) {
+  const fund = new Set(t.purses.filter((p) => p.kind === "party").map((p) => p.id));
+  return t.holdings
+    .filter((h) => h.kind === "item" && !h.service && (h.purseId === purseId || fund.has(h.purseId)))
+    .map((h) => ({
+      holding: h,
+      blocked:
+        h.purseId !== purseId
+          ? "Party fund. A character has to carry it first."
+          : h.custody || h.reservedFor
+            ? "Retrieve this item from its property first."
+            : h.pool
+              ? "In the treasure pool."
+              : "",
+    }));
+}
+/** Why this purse can't ask about an item at all; empty when it can. */
+export function identifyLock(t: Table, purseId: string | undefined) {
+  if (!purseId) return "";
+  return identifyCandidates(t, purseId).some((c) => !c.blocked) ? "" : "Carry the item you want identified.";
 }
 /** Party characters who can be named as a beneficiary (and whether they are here). */
 export function serviceBeneficiaries(t: Table, p: ServiceProvider) {
@@ -206,12 +235,18 @@ export function serviceQuote(
     throw Error(`Choose between 1 and ${maxUnits(offer)} for this offer.`);
 
   // Beneficiaries: party characters who are here. Paying for someone grants no control.
-  const rule = beneficiaryRule(p.kind),
+  const rule = beneficiaryRule(p.kind, offer),
     ids = request.beneficiaryPurseIds;
   if (new Set(ids).size !== ids.length) throw Error("Choose each character once.");
   if (ids.length < rule.min || ids.length > rule.max)
     throw Error(
-      p.kind === "temple" ? "Choose who the spell is cast on." : p.kind === "inn" ? "Choose who stays." : "This offer takes no beneficiary.",
+      offer.target
+        ? "This offer takes no beneficiary."
+        : p.kind === "temple"
+          ? "Choose who the spell is cast on."
+          : p.kind === "inn"
+            ? "Choose who stays."
+            : "This offer takes no beneficiary.",
     );
   const beneficiaries = ids.map((id) => {
     const b = t.purses.find((x) => x.id === id);
@@ -220,6 +255,15 @@ export function serviceQuote(
     if (!presentAt(t, shop.locationId!, id)) throw Error(`${b.name} isn't at ${shop.name}.`);
     return { purseId: id, name: b.name };
   });
+
+  // Identify: one item the payer carries (worn is fine); it never leaves their inventory.
+  let item: { holdingId: string; name: string; notesBefore: string } | undefined;
+  if (offer.target === "held-item") {
+    if (!request.itemHoldingId) throw Error("Carry the item you want identified.");
+    const h = assertHeldItem(t, request.itemHoldingId, purseId, `Choose an item ${payer.name} owns and carries.`);
+    item = { holdingId: h.id, name: h.name.slice(0, 160), notesBefore: h.notes.slice(0, 4000) };
+    if (units !== 1) throw Error("Ask about one item at a time.");
+  } else if (request.itemHoldingId) throw Error("This offer doesn't look at an item.");
 
   // Price: the offer per unit, or an inn's tier per guest per night plus meals.
   const lines: { label: string; copper: number }[] = [];
@@ -327,6 +371,7 @@ export function serviceQuote(
     review,
     workDays,
     settlement: settlement.kind,
+    ...(item ? { item } : {}),
   });
   const f = t.journal?.finance ?? { day: 0, minuteOfDay: 0 };
   const before = quoteFingerprint({
@@ -337,6 +382,7 @@ export function serviceQuote(
     minute: f.minuteOfDay ?? 0,
     payer: payer.coins,
     holdings: [...used.keys()].sort().map((id) => t.holdings.find((h) => h.id === id)),
+    ...(item ? { item: t.holdings.find((h) => h.id === item.holdingId) } : {}),
   });
   return { terms, before, provider: p, offer };
 }
@@ -384,12 +430,23 @@ export function reviewChecks(t: Table, o: ServiceOrder) {
       text: `${c.holdingName ?? c.label} still carried by ${payer?.name ?? "the payer"} and not equipped`,
     });
   }
+  if (o.terms.item) {
+    const h = t.holdings.find((h) => h.id === o.terms.item!.holdingId);
+    let carried = !!h && h.purseId === o.purseId;
+    try {
+      if (h) assertHeldItem(t, h.id, o.purseId, "");
+    } catch {
+      carried = false;
+    }
+    checks.push({ ok: carried, text: `${o.terms.item.name} is still owned and carried by ${payer?.name ?? "the payer"}` });
+  }
   if (error && checks.every((c) => c.ok)) checks.push({ ok: false, text: error });
   return checks;
 }
 
 /** A short receipt line, for events and history. */
 export function serviceSummary(o: Pick<ServiceOrder, "terms">) {
+  if (o.terms.item) return `${o.terms.offer.name} · ${o.terms.item.name} · ${o.terms.shopName}`;
   const on = o.terms.beneficiaries.length && o.terms.kind === "temple" ? ` on ${o.terms.beneficiaries[0].name}` : "";
   return `${o.terms.offer.name}${on} · ${o.terms.shopName}`;
 }
