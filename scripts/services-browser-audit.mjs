@@ -13,6 +13,9 @@ import { servicesFixture, workshopFixture, innFixture, linksFixture, svcDm } fro
 import { openApplication, reloadApplication, navigateApplication } from "./title-screen-navigation.mjs";
 
 const origin = process.env.AUDIT_ORIGIN || "http://127.0.0.1:8080";
+// Local diagnostics only: SERVICES_AUDIT_ONLY=links runs one section (CI always runs everything).
+const only = process.env.SERVICES_AUDIT_ONLY || "";
+const runs = (section) => !only || only.split(",").includes(section);
 assert.match(origin, /^http:\/\/(127\.0\.0\.1|localhost):\d+$/, "Service fixtures require a disposable server");
 const output = "test-results/services",
   started = Date.now(),
@@ -366,7 +369,12 @@ try {
     page.setDefaultTimeout(20000);
     page.on("pageerror", (e) => errors.push(e.message));
     await openApplication(page, origin + "/market");
-
+    if (width === 390) {
+      await navigateApplication(page, origin + "/settings#appearance");
+      await page.getByRole("button", { name: "Light · Adventurer’s Ledger", exact: true }).click();
+      await page.waitForFunction(() => document.documentElement.dataset.fantasyTheme === "adventurers-ledger");
+    }
+    if (runs("hub")) {
     // One forge: the Services reply opens it directly.
     await open(page, smithFixture());
     const forge = reply(page, "Do you take commissions?");
@@ -405,17 +413,13 @@ try {
     await page.keyboard.press("2");
     await expect(page).toHaveURL(/\/shop\/hall-forge$/);
 
-    // Ironbound (the default) at 1280 and 320; Parchment (Adventurer's Ledger) at 390.
-    if (width === 390) {
-      await navigateApplication(page, origin + "/settings#appearance");
-      await page.getByRole("button", { name: "Light · Adventurer’s Ledger", exact: true }).click();
-      await page.waitForFunction(() => document.documentElement.dataset.fantasyTheme === "adventurers-ledger");
     }
-    await temple(page, width);
-    if (width === 1280) await setup(page);
-    await workshop(page, width);
-    await inn(page, width);
-    await links(page, width);
+    // Ironbound (the default) at 1280 and 320; Parchment (Adventurer's Ledger) at 390.
+    if (runs("temple")) await temple(page, width);
+    if (width === 1280 && runs("setup")) await setup(page);
+    if (runs("workshop")) await workshop(page, width);
+    if (runs("inn")) await inn(page, width);
+    if (runs("links")) await links(page, width);
     await context.close();
   }
   assert.deepEqual(errors, [], "No browser runtime errors");
