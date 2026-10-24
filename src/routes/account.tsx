@@ -34,6 +34,8 @@ import { Website } from "@/components/website/site";
 import {
   accountRequest,
   accountRequestWithCaptcha,
+  HOSTING_LIMIT_HELP,
+  hostingLabel,
   type AccountLibrary,
   type AccountMembership,
 } from "@/lib/account/client";
@@ -320,6 +322,14 @@ function Account() {
                   <div>
                     <p className="portal-eyebrow">PICK UP WHERE YOU LEFT OFF</p>
                     <h2>My campaigns</h2>
+                    {library.hosting && (
+                      <p className="portal-subtle" data-testid="hosting-allowance">
+                        {hostingLabel(library.hosting)}
+                        {library.hosting.atLimit
+                          ? `. You can host up to ${library.hosting.limit} online campaigns; Reopen as DM and Restore shared records are unavailable until you are under the limit. ${HOSTING_LIMIT_HELP}`
+                          : ""}
+                      </p>
+                    )}
                   </div>
                   <button
                     className="portal-button secondary"
@@ -509,7 +519,13 @@ function Account() {
                         )}
                         <button
                           className="portal-button"
-                          disabled={busy || !m.role || (m.closed && m.role !== "dm")}
+                          disabled={
+                            busy ||
+                            !m.role ||
+                            (m.closed && m.role !== "dm") ||
+                            // Reopening hosts another live room; the server enforces the limit.
+                            (m.closed && m.role === "dm" && library.hosting?.atLimit === true)
+                          }
                           onClick={action(async () => {
                             if (!allowContextChange()) return;
                             // Another device may have saved a newer room since this page
@@ -853,7 +869,12 @@ function Account() {
                         {!!b.shared_recovery && (
                           <button
                             className="portal-button secondary"
-                            disabled={busy}
+                            disabled={busy || library.hosting?.atLimit === true}
+                            title={
+                              library.hosting?.atLimit
+                                ? `You can host up to ${library.hosting.limit} online campaigns. ${HOSTING_LIMIT_HELP}`
+                                : undefined
+                            }
                             onClick={action(async () => {
                               if (!allowContextChange()) return;
                               const { payload } = await accountRequest<{ payload: unknown }>(

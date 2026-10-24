@@ -1004,6 +1004,8 @@ test("campaign-choice", async ({ devices, baseURL: origin }, testInfo) => {
     }),
   ).toBeVisible();
   await expect(desktop.getByRole("button", { name: "Create room", exact: true })).toBeDisabled();
+  // Online campaign limit (default 2): the host sees the allowance before creating.
+  await expect(desktop.getByText("1 of 2 online campaigns", { exact: true })).toBeVisible();
   await desktop.screenshot({
     path: testInfo.outputPath("saved-campaign-choice.png"),
     fullPage: true,
@@ -1037,6 +1039,8 @@ test("campaign-choice", async ({ devices, baseURL: origin }, testInfo) => {
   await expect(desktop.locator(".room-code")).toHaveText(secondCode);
 
   await visit(phone, "/account");
+  await expect(phone.getByTestId("hosting-allowance")).toContainText("2 of 2 online campaigns");
+  await expect(phone.getByTestId("hosting-allowance")).toContainText("offline on your device");
   const old = phone.locator("article.portal-card").filter({ hasText: firstCode });
   await expect(
     old.getByText("Open on this device · Current campaign", { exact: true }),

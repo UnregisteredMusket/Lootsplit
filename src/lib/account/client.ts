@@ -126,7 +126,19 @@ export type AccountLibrary = {
   backups: { id: string; name: string; created_at: number; shared_recovery?: number }[];
   characters: CharacterProfile[];
   hasRecoveryKey: boolean;
+  /** Live online campaigns this account hosts against its limit; absent on older servers. */
+  hosting?: HostingAllowance;
 };
+/** Server-computed; the server enforces the limit on every hosting path (client display only). */
+export type HostingAllowance = { hosted: number; limit: number; exempt: boolean; atLimit: boolean };
+/** "1 of 2 online campaigns" (owner accounts are not limited). */
+export function hostingLabel(h: HostingAllowance) {
+  return h.exempt
+    ? `${h.hosted} online ${h.hosted === 1 ? "campaign" : "campaigns"} (site owner: not limited)`
+    : `${h.hosted} of ${h.limit} online ${h.limit === 1 ? "campaign" : "campaigns"}`;
+}
+export const HOSTING_LIMIT_HELP =
+  "End (close) or delete one of your online campaigns to free a slot, or keep playing this campaign offline on your device: Local play has no limit, and joining other campaigns as a player is never limited.";
 export type CharacterProfile = { id: string; name: string; description: string; portrait: string };
 export type AccountMembership = {
   userId: string;
