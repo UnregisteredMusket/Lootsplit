@@ -479,6 +479,10 @@ Adds a contextual Maps session bar, searchable scene cards, separate activation/
 - Anti-exploit: cooldown per player account, repeat DC, 24-hour combined judgement, caps, unit cap, unwanted categories, and player-set item values (`valueSource: "player"`) count for nothing. Settlement reuses the atomic barter exchange; command IDs make retries no-ops and never re-roll. Players never receive NPC rules, valuation, purse or other players' attempts. The existing trading table, controlled-NPC flow, Give and every earlier save are unchanged. See [NPC-BARTER.md](NPC-BARTER.md).
 
 
+### NPC services, wave 2 phase 4d: Trainer paid lessons (October 24, 2026)
+
+- Trainer providers teach a character (the reverse of NPC training) at a rate per training day (2 gp default, SRD skilled hireling pay). Agreeing terms moves no money; sessions are logged in Downtime → Learn from a paid teacher, reserve hours for pupil and teacher, and are charged once each when the DM approves them in Review Inbox (`requestId-fee`). Agreements complete at their day cap; End lessons stops new sessions without charge. Lessons share the training counters and resets. See [services](SERVICES.md).
+
 ### NPC services, wave 2 phase 4b: Sage Identify (October 24, 2026)
 
 - Sage providers offer Identify (50 gp, DM review); temples carry it as a draft. The player picks a carried item (worn allowed) and asks; nothing moves. The DM writes the answer in Review Inbox; approval charges once, posts the answer to the payer's private thread with the sage and optionally appends it to the item's notes and renames the item, in one command. Record only. See [services](SERVICES.md).

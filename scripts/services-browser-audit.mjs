@@ -9,7 +9,7 @@ import { smithFixture, smithDm } from "../src/lib/quire/test-fixtures/blacksmith
 import { applyCommand } from "../src/lib/quire/commands.ts";
 import { defaultSmith } from "../src/lib/quire/blacksmith-schema.ts";
 import { validateWorld } from "../src/lib/quire/world.ts";
-import { servicesFixture, workshopFixture, innFixture, linksFixture, sageFixture, svcDm } from "../src/lib/quire/test-fixtures/services.ts";
+import { servicesFixture, workshopFixture, innFixture, linksFixture, sageFixture, trainerFixture, svcDm } from "../src/lib/quire/test-fixtures/services.ts";
 import { openApplication, reloadApplication, navigateApplication } from "./title-screen-navigation.mjs";
 
 const origin = process.env.AUDIT_ORIGIN || "http://127.0.0.1:8080";
@@ -404,6 +404,59 @@ async function sage(page, width) {
   await reply(page, "What is this thing?").click();
   await expect(said(page, "A Ring of Feather Falling.")).toBeAttached();
   await fits(page, `${width} identify answered`);
+}
+
+/** Trainer: agree lessons, log a session in Downtime, approve it in Review Inbox (charged once). */
+async function trainer(page, width) {
+  await open(page, trainerFixture(), "vey", "Mistress Vey");
+  const services = reply(page, "Can you teach me?");
+  await expect(services).toContainText("Services · Trainer");
+  await services.click();
+  const subject = reply(page, "Thieves' tools");
+  await expect(subject).toContainText("2 gp a training day");
+  await expect(subject).toContainText("Paid per session");
+  await subject.click();
+  const drawer = talk(page).locator(".npc-talk-drawer");
+  await expect(drawer.getByRole("group", { name: "Pupil" }).getByRole("button", { name: /^Kael/ })).toHaveAttribute("aria-pressed", "true");
+  await expect(drawer.getByRole("group", { name: "Training days" }).locator("output")).toHaveText("10");
+  await expect(drawer.locator(".svc-total")).toContainText("nothing");
+  await expect(drawer).toContainText("A 6-hour session");
+  await fits(page, `${width} lessons booking`);
+  await page.screenshot({ path: `${output}/trainer-book-${width}.png`, fullPage: true });
+  await reply(page, "Agreed.").click();
+  await expect(talk(page).getByLabel("Receipt: Thieves' tools")).toContainText("charged per approved session");
+  let state = await readJournal(page);
+  const agreement = state.journal.services.orders.at(-1);
+  assert.equal(agreement.status, "active");
+  assert.equal(state.ledger.length, 0, "agreeing moves no money");
+
+  const log = reply(page, "When can we start?");
+  await expect(log).toHaveAttribute("href", /\/features\/downtime\?lesson=/);
+  await log.click();
+  await expect(page).toHaveURL(/\/features\/downtime/);
+  const form = page.locator("#paid-lessons").locator("..");
+  await expect(form.getByLabel("Lesson hours")).toHaveValue("8");
+  await expect(form).toContainText("Checked when the DM reviews");
+  await fits(page, `${width} log lesson`);
+  await page.screenshot({ path: `${output}/trainer-log-${width}.png`, fullPage: true });
+  await form.getByRole("button", { name: /^Send for review · 8 h · 2 gp on approval/ }).click();
+  await expect.poll(async () => (await readJournal(page)).journal.downtimeActivities.requests.at(-1)?.status).toBe("pending");
+  state = await readJournal(page);
+  const session = state.journal.downtimeActivities.requests.at(-1);
+  assert.equal(session.feeCopper, 200);
+  assert.equal(state.ledger.length, 0, "logging moves no money");
+
+  await navigateApplication(page, origin + "/features/review");
+  const row = page.locator("article").filter({ hasText: "Kael learns Thieves' tools from Mistress Vey" }).first();
+  await expect(row).toContainText("Paid lesson");
+  await expect(row.getByLabel("Training decision")).toContainText("Approve · count 8 h · charge 2 gp");
+  await fits(page, `${width} lesson review`);
+  await page.screenshot({ path: `${output}/trainer-review-${width}.png`, fullPage: true });
+  await row.getByRole("button", { name: "Record training decision", exact: true }).click();
+  await expect.poll(async () => (await readJournal(page)).ledger.filter((l) => l.id === session.id + "-fee").length).toBe(1);
+  state = await readJournal(page);
+  assert.equal(state.ledger.find((l) => l.id === session.id + "-fee").copper, -200);
+  assert.equal(state.journal.services.orders.at(-1).sessions.length, 1);
 }
 
 try {
