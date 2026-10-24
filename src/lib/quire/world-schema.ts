@@ -179,7 +179,7 @@ export const npcSchema = z
   .object({
     blacksmithServices: z.boolean().optional(),
     /** Service kinds this NPC offers (docs/SERVICES.md); the forge keeps `blacksmithServices`. */
-    services: z.array(z.enum(serviceKinds)).max(3).optional(),
+    services: z.array(z.enum(serviceKinds)).max(serviceKinds.length).optional(),
     id,
     name,
     description: z.string().max(4000),

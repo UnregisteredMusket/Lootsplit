@@ -2,7 +2,7 @@ import { projectConnectedMaps } from "./connected-maps.ts";
 import { facilityAccess } from "./ships.ts";
 import { readDowntimeActivities } from "./downtime-activities-schema.ts";
 import { readBlacksmith } from "./blacksmith-schema.ts";
-import { readServices } from "./services-schema.ts";
+import { isLinkKind, readServices } from "./services-schema.ts";
 import {
   characterVisible,
   canReadCharacter,
@@ -262,8 +262,21 @@ export function projectRecord(
       const services = readServices(t.journal.services);
       services.providers = services.providers
         .filter((p) => t.shops.some((s) => s.id === p.shopId) && readableNpcs.has(p.npcId))
+        // A fence deals only while the DM has the black market switched on (the check `sell` uses).
+        .filter((p) => p.kind !== "fence" || !!world.blackMarketActive)
         .map((p) => {
           const projected = { ...p, offers: p.offers.filter((o) => o.approved) };
+          // Hire roles name an NPC only when the player can read that NPC.
+          if (p.link?.roles)
+            projected.link = {
+              ...p.link,
+              roles: p.link.roles.map((r) => {
+                if (!r.npcId || readableNpcs.has(r.npcId)) return r;
+                const plain = { ...r };
+                delete plain.npcId;
+                return plain;
+              }),
+            };
           if (p.rumours)
             projected.rumours = p.rumours.map((r) => {
               const mine = (r.buyers ?? []).filter((id) => seat.purseIds.includes(id));
@@ -278,7 +291,7 @@ export function projectRecord(
             });
           return projected;
         })
-        .filter((p) => p.offers.length > 0);
+        .filter((p) => p.offers.length > 0 || isLinkKind(p.kind));
       services.orders = services.orders.filter((o) => seat.purseIds.includes(o.purseId));
       t.journal.services = services;
     }

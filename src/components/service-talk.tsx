@@ -14,7 +14,11 @@ import {
   type ServiceProvider,
   type ServiceRequest,
 } from "@/lib/quire/services-schema";
+import { readFinance } from "@/lib/quire/finance";
+import { canAccessEstate } from "@/lib/quire/estate";
+import { readEstate } from "@/lib/quire/estate-schema";
 import {
+  staffableProperties,
   rumourLock,
   rumourQuote,
   approvedOffers,
@@ -50,12 +54,13 @@ export type TalkLine =
 export const serviceWhen = (day: number, minute = 0) =>
   `Day ${day}, ${String(Math.floor(minute / 60)).padStart(2, "0")}:${String(minute % 60).padStart(2, "0")}`;
 
-const intro: Record<ServiceProvider["kind"], string> = {
+const intro: Partial<Record<ServiceProvider["kind"], string>> = {
   temple: "Say what ails you, and who. The faithful ask an offering for each blessing.",
   workshop: "Tell me what you need made. Good work takes time.",
   inn: "Rooms upstairs, food on the fire. What'll it be?",
+  hire: "Steady hands, fair wages. Where would they work?",
 };
-const offerLine: Record<ServiceProvider["kind"], string> = {
+const offerLine: Partial<Record<ServiceProvider["kind"], string>> = {
   temple: "Who is it for, and what do you bring?",
   workshop: "Here's what that will take.",
   inn: "How many of you, and for how long?",
@@ -264,6 +269,12 @@ export function useServiceTalk({
   const [rumours, setRumours] = useState(false);
   const [units, setUnits] = useState(1);
   const [mine, setMine] = useState<string[]>([]);
+  /** Hire: the chosen role, property and the name on the contract. */
+  const [roleKey, setRoleKey] = useState<string>();
+  const [propertyId, setPropertyId] = useState("");
+  const [hireName, setHireName] = useState("");
+  const [proposed, setProposed] = useState<string[]>([]);
+  const seat = useSeat();
   const services = readServices(table.journal?.services);
   const provider = services.providers.find((p) => p.id === providerId);
   const offer = provider ? approvedOffers(provider).find((o) => o.key === offerKey) : undefined;
@@ -296,6 +307,14 @@ export function useServiceTalk({
       problem = e instanceof Error ? e.message : String(e);
     }
   const action = useCommandId(`${providerId}|${offerKey}|${purseId}|${request ? canonicalJson(request) : ""}`);
+  const hireAction = useCommandId(`${providerId}|hire|${roleKey}|${propertyId}|${hireName}`);
+  const role = provider?.kind === "hire" ? provider.link?.roles?.find((r) => r.key === roleKey) : undefined;
+  // Properties this seat may staff (the server checks the same permission).
+  const estate = readEstate(table.journal?.propertyOperations);
+  const properties =
+    provider?.kind === "hire" && purseId
+      ? staffableProperties(table, purseId).filter((h) => canAccessEstate(table, estate, h.id, seat))
+      : [];
   const rumourAction = useCommandId(`${providerId}|rumours|${purseId}`);
 
   function chooseOffer(o: ServiceOffer) {
@@ -324,10 +343,11 @@ export function useServiceTalk({
   function open(id: string, text: string, tag: string) {
     const p = services.providers.find((x) => x.id === id);
     if (!p) return;
-    push({ kind: "pc", text, tag, key: nextKey("pc") }, { kind: "npc", text: intro[p.kind], key: nextKey("npc") });
+    push({ kind: "pc", text, tag, key: nextKey("pc") }, { kind: "npc", text: intro[p.kind] ?? "What can I do for you?", key: nextKey("npc") });
     setProviderId(id);
     setOfferKey(undefined);
     setRumours(false);
+    setRoleKey(undefined);
     // An inn with one offer opens its booking straight away.
     const offers = approvedOffers(p);
     if (p.kind === "inn" && offers.length === 1) {
@@ -343,6 +363,7 @@ export function useServiceTalk({
     setProviderId(undefined);
     setOfferKey(undefined);
     setRumours(false);
+    setRoleKey(undefined);
   };
   const forSale = provider?.rumours ?? [];
   const rumourReply = (): TalkReply => ({
@@ -363,7 +384,110 @@ export function useServiceTalk({
 
   const replies: TalkReply[] = [];
   const payerName = character?.name ?? "You";
-  if (provider && rumours) {
+  if (provider?.kind === "hire" && !role) {
+    const lock = providerLock(table, provider, purseId);
+    for (const r of provider.link?.roles ?? [])
+      replies.push({
+        tag: (
+          <>
+            Hire · {r.name}{" "}
+            <em>
+              · {formatCopper(r.wageCopper)} / {r.periodDays === 1 ? "day" : `${r.periodDays} days`} ↗
+            </em>
+          </>
+        ),
+        text: `I need a ${r.name.toLowerCase()}.`,
+        sub: "Proposes a staff contract for one of the party's properties. The DM approves it; wages follow the property's staff rules.",
+        disabled: lock || undefined,
+        run: () => {
+          push(
+            { kind: "pc", text: `I need a ${r.name.toLowerCase()}.`, tag: `Hire · ${r.name}`, key: nextKey("pc") },
+            { kind: "npc", text: "Where would they work?", key: nextKey("npc") },
+          );
+          setRoleKey(r.key);
+          setPropertyId(properties[0]?.id ?? "");
+          setHireName(r.npcId ? (table.journal?.world?.npcs.find((n) => n.id === r.npcId)?.name ?? r.name) : r.name);
+        },
+      });
+    replies.push({
+      text: "Never mind.",
+      tone: "leave",
+      sub: "Back to the conversation.",
+      run: () => {
+        close();
+        onBack();
+      },
+    });
+  } else if (provider?.kind === "hire" && role) {
+    const property = properties.find((h) => h.id === propertyId);
+    replies.push({
+      tag: (
+        <>
+          Propose hire <em>· DM review · nothing is paid now</em>
+        </>
+      ),
+      text: "Send word when they can start.",
+      tone: "dm",
+      sub: property
+        ? `${hireName || role.name} as ${role.name} at ${property.name}, ${formatCopper(role.wageCopper)} per ${role.periodDays === 1 ? "day" : `${role.periodDays} days`}.`
+        : undefined,
+      disabled: proposed.includes(hireAction.commandId)
+        ? "Proposed. It waits for the DM."
+        : !property
+          ? "Choose a property to staff."
+          : !hireName.trim()
+            ? "Name the hireling."
+            : undefined,
+      run: async () => {
+        if (!property) return;
+        const id = hireAction.commandId;
+        push({ kind: "pc", text: "Send word when they can start.", tag: "Propose hire", key: nextKey("pc") });
+        const ok = await send(
+          {
+            kind: "estate-staff",
+            before: null,
+            staff: {
+              id,
+              propertyId: property.id,
+              name: hireName.trim().slice(0, 160),
+              role: role.name,
+              wageCopper: role.wageCopper,
+              periodDays: role.periodDays,
+              status: seat.role === "dm" ? "active" : "proposed",
+              manager: false,
+              duties: [],
+              budgetCopper: 0,
+              budgetPeriodDays: 30,
+              budgetStartDay: readFinance(table.journal?.finance).day,
+              budgetSpentCopper: 0,
+              notes: `Hired through ${provider.name} (${npc.name}).`,
+              ...(role.npcId ? { npcId: role.npcId } : {}),
+            },
+          },
+          id,
+          hireAction.renew,
+        );
+        if (ok) {
+          setProposed((x) => [...x, id]);
+          push(
+            {
+              kind: "sys",
+              key: nextKey("sys"),
+              node: (
+                <>
+                  Staff contract proposed: <b>{hireName.trim()}</b>, {role.name} at {property.name}. It waits in the DM's Review
+                  Inbox; nothing is paid until wages fall due under the property's staff rules.
+                </>
+              ),
+            },
+            { kind: "npc", text: "I'll send them along once it's settled.", key: nextKey("npc") },
+          );
+          setRoleKey(undefined);
+        }
+      },
+    });
+    replies.push({ text: "Never mind.", tone: "leave", sub: "Back to the roles.", run: () => setRoleKey(undefined) });
+  } else if (provider && rumours) {
     for (const r of forSale) {
       const lock = rumourLock(table, provider, r.id, purseId);
       replies.push({
@@ -439,7 +563,7 @@ export function useServiceTalk({
         run: () => {
           push(
             { kind: "pc", text: speech(o), tag: o.name, key: nextKey("pc") },
-            { kind: "npc", text: offerLine[provider.kind], key: nextKey("npc") },
+            { kind: "npc", text: offerLine[provider.kind] ?? "Here's what that will take.", key: nextKey("npc") },
           );
           chooseOffer(o);
         },
@@ -534,7 +658,48 @@ export function useServiceTalk({
   }
 
   let drawer: ReactNode = null;
-  if (provider && offer && character) {
+  if (provider?.kind === "hire" && role && character) {
+    drawer = (
+      <div className="npc-talk-drawer">
+        <div className="npc-talk-drawer-head">
+          <h3>Hire · {role.name}</h3>
+          <span className="svc-flags">
+            <span className="svc-flag link">Existing staff contract</span>
+            <span className="svc-flag review">DM review</span>
+          </span>
+        </div>
+        <div className="svc-section">
+          <h4>Property</h4>
+          <div className="npc-talk-chips" role="group" aria-label="Property to staff">
+            {properties.map((h) => (
+              <button key={h.id} type="button" className="npc-talk-chip" aria-pressed={propertyId === h.id} onClick={() => setPropertyId(h.id)}>
+                {h.name}
+              </button>
+            ))}
+          </div>
+          {!properties.length && <p className="npc-talk-hint">The party owns no property to staff.</p>}
+        </div>
+        <div className="svc-section">
+          <label>
+            <h4>Name on the contract</h4>
+            <input value={hireName} maxLength={160} onChange={(e) => setHireName(e.target.value)} aria-label="Name on the contract" />
+          </label>
+        </div>
+        <dl className="svc-total">
+          <dt>Wage</dt>
+          <dd>
+            {formatCopper(role.wageCopper)} / {role.periodDays === 1 ? "day" : `${role.periodDays} days`}
+          </dd>
+          <dt className="sum">Paid now</dt>
+          <dd className="sum">Nothing</dd>
+          <dd className="note">
+            A proposal only. The DM approves it in Review Inbox; wages are then paid by the property's staff rules over approved
+            downtime, as for any staff contract.
+          </dd>
+        </dl>
+      </div>
+    );
+  } else if (provider && offer && character) {
     const rule = beneficiaryRule(provider.kind),
       people = serviceBeneficiaries(table, provider);
     drawer = (

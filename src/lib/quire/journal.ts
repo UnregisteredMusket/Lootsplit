@@ -3,7 +3,7 @@ import { downtimeActivitiesSchema } from "./downtime-activities-schema.ts";
 import { validateDowntimeActivities } from "./downtime-activities.ts";
 import { blacksmithSchema } from "./blacksmith-schema.ts";
 import { validateBlacksmith } from "./blacksmith-validation.ts";
-import { servicesSchema } from "./services-schema.ts";
+import { legacyServiceKinds, serviceKinds, servicesSchema } from "./services-schema.ts";
 import { validateServices } from "./services-validation.ts";
 import { fleetSchema } from "./ships-schema.ts";
 import { validateFleet } from "./ships.ts";
@@ -359,10 +359,21 @@ export function preserveJournalMetadata(value: unknown, current: Journal): Journ
                 ...(old?.blacksmithServices !== undefined
                   ? { blacksmithServices: old.blacksmithServices }
                   : {}),
-                // Older clients don't know the services list; keep the stored one.
+                // Older clients don't know the services list; keep the stored one. Protocol 8
+                // clients don't know wave-2 kinds (tabletop protocol 9); keep those stored too.
                 ...(n.services === undefined && old?.services !== undefined
                   ? { services: old.services }
-                  : {}),
+                  : n.services &&
+                      !n.services.some((k) => !legacyServiceKinds.includes(k as never)) &&
+                      old?.services?.some((k) => !legacyServiceKinds.includes(k as never))
+                    ? {
+                        services: serviceKinds.filter(
+                          (k) =>
+                            n.services!.includes(k) ||
+                            (!legacyServiceKinds.includes(k as never) && old.services!.includes(k)),
+                        ),
+                      }
+                    : {}),
               };
             }),
             ...(current.world?.partyPosition ? { partyPosition: current.world.partyPosition } : {}),

@@ -43,8 +43,18 @@ export const JOURNEY_PROTOCOL = 7;
  * older clients' journal parser, so it needs no stripping.
  */
 export const SERVICES_PROTOCOL = 8;
+/**
+ * Protocol 9 (2026-10-24, NPC services wave 2): providers and NPC service lists may use the kinds
+ * trainer, stable, courier, sage, fence, bank and hire, providers may carry `link` settings, and
+ * offers, requests, terms and orders may carry wave-2 fields. Protocol 8 clients have strict
+ * service schemas, so protocols 0-8 receive services without those providers, offers and orders
+ * and NPC lists without the new kinds (also inside pending downtime quotes and archived reports);
+ * their NPC saves and whole-journal writes keep the stored kinds (world.ts npc-save, journal.ts),
+ * and their pending drafts with wave-2 service data ask them to finish on the updated website.
+ */
+export const SERVICES_WAVE2_PROTOCOL = 9;
 /** The protocol current clients declare. */
-export const CURRENT_TABLETOP_PROTOCOL = SERVICES_PROTOCOL;
+export const CURRENT_TABLETOP_PROTOCOL = SERVICES_WAVE2_PROTOCOL;
 /** Server-only, non-enumerable: inline image -> its stored reference for this room read. */
 export const ROOM_IMAGE_SOURCES_KEY = Symbol.for("lootsplit.room-view-image-sources");
 
@@ -184,6 +194,107 @@ function journeyFreeTable(table: CloudTable): CloudTable {
     },
   };
 }
+// Protocol 9 (services wave 2). Field names protocol 8's strict service schemas know.
+const wave2Kinds = ["trainer", "stable", "courier", "sage", "fence", "bank", "hire"];
+const wave2Pattern = new RegExp(`("kind":|"services":\\[[^\\]]*)"(${wave2Kinds.join("|")})"`);
+const legacyKeys = {
+  provider: ["id", "kind", "preset", "specialty", "shopId", "npcId", "name", "description", "paused", "reviewAboveCopper", "settlement", "offers", "rumours"],
+  offer: ["key", "name", "description", "approved", "priceCopper", "spellLevel", "time", "review", "maxUnits", "components", "output", "tiers"],
+  order: ["id", "providerId", "offerKey", "purseId", "request", "terms", "orderedDay", "orderedMinute", "progressDays", "status", "paidDay", "paidMinute", "completedDay", "completedMinute", "claimedDay", "message", "history"],
+  request: ["beneficiaryPurseIds", "units", "contributions", "inn"],
+  terms: ["kind", "providerName", "specialty", "npcId", "npcName", "shopId", "shopName", "locationId", "placeName", "offer", "units", "beneficiaries", "inn", "components", "lines", "priceCopper", "review", "workDays", "settlement"],
+  time: ["instant", "downtime-days", "per-night"],
+};
+const legacyKind = (k: unknown) => k === "temple" || k === "workshop" || k === "inn";
+const only = (value: unknown, keys: string[]) =>
+  !!value && typeof value === "object" && Object.keys(value).every((k) => keys.includes(k));
+const legacyOffer = (o: { time?: { kind?: string } }) =>
+  only(o, legacyKeys.offer) && legacyKeys.time.includes(o.time?.kind ?? "");
+/** Whether text (a command, a backup body) holds wave-2 service kinds or fields. */
+export function wave2Text(text: string) {
+  return wave2Pattern.test(text) || /"(itemHoldingId|reveal|lessonOrderId)":|"target":"held-item"/.test(text);
+}
+/** A services object as protocol 8 reads it: wave-1 providers, offers and orders only. */
+export function wave1Services<T>(value: T): T {
+  if (!value || typeof value !== "object") return value;
+  const s = value as { providers?: Record<string, unknown>[]; orders?: Record<string, unknown>[] };
+  return {
+    ...s,
+    providers: (s.providers ?? [])
+      .filter((p) => legacyKind(p.kind))
+      .map((p) => {
+        const plain: Record<string, unknown> = {};
+        for (const k of legacyKeys.provider) if (p[k] !== undefined) plain[k] = p[k];
+        plain.offers = ((p.offers as Record<string, unknown>[]) ?? []).filter(legacyOffer);
+        return plain;
+      }),
+    orders: (s.orders ?? []).filter(
+      (o) =>
+        only(o, legacyKeys.order) &&
+        only(o.request, legacyKeys.request) &&
+        only(o.terms, legacyKeys.terms) &&
+        legacyKind((o.terms as { kind?: string }).kind) &&
+        legacyOffer((o.terms as { offer: { time?: { kind?: string } } }).offer),
+    ),
+  } as T;
+}
+const wave1Kinds = (services: string[]) => services.filter(legacyKind);
+/** Whether a table (or a stored backup body) holds wave-2 service data. */
+export function hasWave2Services(table: CloudTable): boolean {
+  const s = table.journal?.services;
+  const quotes = (table.journal?.finance as { downtime?: { quote?: { services?: { state?: unknown } } }[] } | undefined)
+    ?.downtime;
+  return (
+    !!table.journal?.world?.npcs?.some((n) => n.services?.some((k) => !legacyKind(k))) ||
+    (!!s && JSON.stringify(wave1Services(s)) !== JSON.stringify(s)) ||
+    !!quotes?.some((d) => d.quote?.services?.state && wave2Text(JSON.stringify(d.quote.services.state))) ||
+    !!table.journal?.reports?.some((r) => wave2Text(r.snapshot ?? ""))
+  );
+}
+function wave1Table(table: CloudTable): CloudTable {
+  if (!hasWave2Services(table)) return table;
+  const journal = table.journal!;
+  const world = journal.world;
+  const reports = journal.reports?.map((report) => {
+    if (!wave2Text(report.snapshot ?? "")) return report;
+    try {
+      return { ...report, snapshot: JSON.stringify(wave1Table(JSON.parse(report.snapshot))) };
+    } catch {
+      return report; // Preserve existing unreadable-archive evidence for the recovery reader.
+    }
+  });
+  const finance = journal.finance as (typeof journal.finance & { downtime?: { quote?: { services?: { state?: unknown } } }[] }) | undefined;
+  return {
+    ...table,
+    journal: {
+      ...journal,
+      ...(journal.services ? { services: wave1Services(journal.services) } : {}),
+      ...(finance?.downtime?.some((d) => d.quote?.services)
+        ? {
+            finance: {
+              ...finance,
+              downtime: finance.downtime.map((d) =>
+                d.quote?.services?.state
+                  ? { ...d, quote: { ...d.quote, services: { ...d.quote.services, state: wave1Services(d.quote.services.state) } } }
+                  : d,
+              ),
+            } as typeof journal.finance,
+          }
+        : {}),
+      ...(world?.npcs
+        ? {
+            world: {
+              ...world,
+              npcs: world.npcs.map((n) =>
+                n.services?.some((k) => !legacyKind(k)) ? { ...n, services: wave1Kinds(n.services) as typeof n.services } : n,
+              ),
+            },
+          }
+        : {}),
+      ...(reports ? { reports } : {}),
+    },
+  };
+}
 const serviced = (text: string) => /"services":\["(temple|workshop|inn)"/.test(text) || text.includes('"services":[]');
 /** Whether a table (or a stored backup body) holds NPC service lists. */
 export function hasNpcServices(table: CloudTable): boolean {
@@ -273,6 +384,8 @@ export function legacyTabletopTable(table: CloudTable): CloudTable {
   return tableForProtocol(table, 0);
 }
 export function tableForProtocol(table: CloudTable, protocol = 0): CloudTable {
+  if (protocol >= SERVICES_WAVE2_PROTOCOL) return table;
+  table = wave1Table(table);
   if (protocol >= SERVICES_PROTOCOL) return table;
   table = serviceFreeTable(table);
   if (protocol >= JOURNEY_PROTOCOL) return table;
@@ -348,12 +461,21 @@ export function tabletopResponse<T extends { table: CloudTable; draft: string }>
   value: T,
   protocol?: number,
 ): T {
-  if (protocol && protocol >= SERVICES_PROTOCOL) return withImageReferences(value);
+  if (protocol && protocol >= SERVICES_WAVE2_PROTOCOL) return withImageReferences(value);
   const draft: unknown = JSON.parse(value.draft);
   if (
     Array.isArray(draft) &&
     draft.some((c) => {
       if (!c || typeof c !== "object") return false;
+      // Protocol 9: wave-2 service kinds and fields older apps cannot read.
+      if (
+        ((typeof c.kind === "string" && c.kind.startsWith("service-")) ||
+          c.kind === "npc-save" ||
+          c.kind === "npc-create") &&
+        wave2Text(JSON.stringify(c))
+      )
+        return true;
+      if (protocol && protocol >= SERVICES_PROTOCOL) return false;
       // Protocol 8: service commands and NPC service lists older apps cannot read.
       if (
         (typeof c.kind === "string" && c.kind.startsWith("service-")) ||

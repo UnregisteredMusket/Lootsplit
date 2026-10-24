@@ -82,7 +82,7 @@ function templeOffer(s: Spell, preset: ServicePreset): ServiceOffer {
   };
 }
 
-export const workshopSpecialties = ["Scribe", "Alchemist"] as const;
+export const workshopSpecialties = ["Scribe", "Alchemist", "Tailor"] as const;
 export type WorkshopSpecialty = (typeof workshopSpecialties)[number];
 
 /** SRD 5.2.1 Spell Scroll Costs (p.103-104): days and scribing cost by level; price is double (p.206). */
@@ -173,6 +173,44 @@ function brewOffer(b: (typeof brews)[number], preset: ServicePreset): ServiceOff
   };
 }
 
+/** Tailor: SRD 5.1 equipment-list clothes (price, weight); SRD 5.2.1 crafting time (gp ÷ 10 days,
+ * rounded up) with half the price in cloth the party may bring; SRD 5.1 crafting is 5 gp a day. */
+const garments: { key: string; name: string; copper: number; weight: number }[] = [
+  { key: "common-clothes", name: "Common clothes", copper: 50, weight: 3 },
+  { key: "travelers-clothes", name: "Traveler's clothes", copper: 200, weight: 4 },
+  { key: "costume", name: "Costume", copper: 500, weight: 4 },
+  { key: "fine-clothes", name: "Fine clothes", copper: 1500, weight: 6 },
+];
+function garmentOffer(g: (typeof garments)[number], preset: ServicePreset): ServiceOffer {
+  const days = Math.max(1, Math.ceil(g.copper / (preset === "srd-5.1" ? 500 : 1000)));
+  const cloth = Math.floor(g.copper / 2);
+  return {
+    key: g.key,
+    name: g.name,
+    description: `${g.name}, cut and sewn to fit.`,
+    approved: true,
+    // The price covers the work; the cloth costs the other half unless the party brings it.
+    priceCopper: g.copper - cloth,
+    time: { kind: "downtime-days", days, perUnit: true },
+    review: "auto",
+    maxUnits: 5,
+    components: [
+      {
+        key: "cloth",
+        label: "Cloth",
+        materialKey: "cloth",
+        minCopper: 0,
+        quantity: 1,
+        perUnit: true,
+        consumed: true,
+        supply: "either",
+        supplyCopper: cloth,
+      },
+    ],
+    output: { kind: "holding", name: g.name, unitCopper: g.copper, weight: g.weight, category: "clothing", notes: `${g.name}, made by a tailor.` },
+  };
+}
+
 /** SRD 5.2.1 Food, Drink and Lodging (p.101-102): a night per person and each meal, by lifestyle. */
 const innTiers: [string, string, number, number, number][] = [
   // key, name, night cp, meal cp (5.2.1, each), food per day cp (5.1)
@@ -214,7 +252,32 @@ export function presetOffers(kind: ServiceKind, preset: ServicePreset, specialty
   if (kind === "inn") return [innOffer(preset)];
   if (kind === "workshop" && specialty === "Scribe") return scrollSpells.map((s) => scrollOffer(s, preset));
   if (kind === "workshop" && specialty === "Alchemist") return brews.map((b) => brewOffer(b, preset));
+  if (kind === "workshop" && specialty === "Tailor") return garments.map((g) => garmentOffer(g, preset));
   return [];
+}
+
+/** The fence preset for its shop: black market on, premium 1.5, buy rate 30% (a house default, not SRD). */
+export const fenceShopPreset = { blackMarket: true, blackMarketPremium: 1.5, buyRate: 0.3 } as const;
+
+/**
+ * Link defaults (fence, bank, hire). Bank terms are a house default (no SRD lending rule); hire
+ * wages are SRD 5.2.1 hirelings (skilled 2 gp, untrained 2 sp a day; the same in SRD 5.1).
+ */
+export function presetLink(kind: ServiceKind, preset: ServicePreset): ServiceProvider["link"] | undefined {
+  if (kind === "bank")
+    return preset === "blank"
+      ? { loan: { rateBps: 0, periodDays: 30, compound: false, maxCopper: 0 } }
+      : { loan: { rateBps: 500, periodDays: 30, compound: false, maxCopper: gp(500) } };
+  if (kind === "hire")
+    return preset === "blank"
+      ? { roles: [] }
+      : {
+          roles: [
+            { key: "guard", name: "Guard", wageCopper: gp(2), periodDays: 1 },
+            { key: "porter", name: "Porter", wageCopper: 20, periodDays: 1 },
+          ],
+        };
+  return kind === "fence" ? {} : undefined;
 }
 
 /**
@@ -222,6 +285,20 @@ export function presetOffers(kind: ServiceKind, preset: ServicePreset, specialty
  * still unset (0). Offers the DM edited keep their prices and settings.
  */
 export function applyPreset(p: ServiceProvider, preset: ServicePreset): ServiceProvider {
+  const link = presetLink(p.kind, preset);
+  if (link) {
+    // Links: fill missing roles and an unset bank; edited values stay.
+    const roles = [...(p.link?.roles ?? [])];
+    for (const r of link.roles ?? []) if (!roles.some((x) => x.key === r.key)) roles.push(r);
+    return {
+      ...p,
+      preset,
+      link: {
+        ...(p.link?.loan ?? link.loan ? { loan: p.link?.loan ?? link.loan } : {}),
+        ...(link.roles ? { roles } : {}),
+      },
+    };
+  }
   const offers = p.offers.map((o) => {
     const fill = presetOffers(p.kind, preset, p.specialty).find((x) => x.key === o.key);
     return fill && o.priceCopper === 0 && fill.priceCopper > 0 ? { ...o, priceCopper: fill.priceCopper } : o;

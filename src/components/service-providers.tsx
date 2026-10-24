@@ -8,9 +8,11 @@ import type { CloudTable } from "@/lib/quire/cloud";
 import type { Npc } from "@/lib/quire/world-schema";
 import type { Shop } from "@/lib/quire/types";
 import {
+  isLinkKind,
   readServices,
   serviceKinds,
   serviceProviderSchema,
+  type HireRole,
   type ServiceComponent,
   type ServiceKind,
   type ServiceOffer,
@@ -19,6 +21,7 @@ import {
 } from "@/lib/quire/services-schema";
 import {
   approvedOffers,
+  serviceKindNames,
   offerSettlementLock,
   providerLock,
   providerSettlement,
@@ -26,7 +29,7 @@ import {
   serviceLabel,
   settlementNeeded,
 } from "@/lib/quire/services";
-import { applyPreset, newProvider, workshopSpecialties, type ServicePreset } from "@/lib/quire/services-presets";
+import { applyPreset, fenceShopPreset, newProvider, workshopSpecialties, type ServicePreset } from "@/lib/quire/services-presets";
 import { presentAt } from "@/lib/quire/service-core";
 import { CommandForm, CommandButton } from "./world-tools";
 import { Button, Fold } from "./ui";
@@ -35,9 +38,15 @@ import { offerFlags, serviceWhen } from "./service-talk";
 
 // DM setup and player views of temple, workshop and inn providers (docs/SERVICES.md).
 
-const kindName: Record<ServiceKind, string> = { temple: "Temple", workshop: "Workshop", inn: "Inn" };
+const kindName = serviceKindNames;
 /** Kinds the DM can add in this release; later kinds arrive with their own presets. */
-const addableKinds: ServiceKind[] = ["temple", "workshop", "inn"];
+const addableKinds: ServiceKind[] = ["temple", "workshop", "inn", "fence", "bank", "hire"];
+/** What each kind's toggle in the NPC record says. */
+const kindHint: Partial<Record<ServiceKind, string>> = {
+  fence: "Opens a black-market shop's Sell tab.",
+  bank: "Opens a loan request naming this bank.",
+  hire: "Proposes a property staff contract.",
+};
 const presetName: Record<ServicePreset, string> = { "srd-5.2.1": "SRD 5.2.1", "srd-5.1": "SRD 5.1", blank: "Blank" };
 
 function npcName(t: CloudTable, id: string) {
@@ -97,7 +106,8 @@ function ProviderCard({
         {settlement.name} counts as a {settlement.kind}
         {p.settlement ? " (set by the DM)" : ""}. {p.paused ? `Not taking new orders: “${p.paused.reason}”` : ""}
       </p>
-      <ul className="svc-offers" aria-label={`${serviceLabel(p)} offers`}>
+      {isLinkKind(p.kind) && <LinkSummary provider={p} table={t} />}
+      <ul className="svc-offers" aria-label={`${serviceLabel(p)} offers`} hidden={isLinkKind(p.kind)}>
         {approvedOffers(p).map((o) => {
           const locked = offerSettlementLock(t, p, o);
           return (
@@ -241,12 +251,22 @@ function PresetChoice({ value, onChange, kind = "temple" }: { value: ServicePres
         ))}
       </div>
       <p className="svc-hint">
-        {kind === "workshop"
+        {kind === "fence"
+          ? "A fence has no price list: it buys at its shop's rate. Apply the fence preset to the shop below."
+          : kind === "bank"
+          ? value === "blank"
+            ? "No starting terms: you set every loan yourself."
+            : "Starting terms for loans that name this bank: 5% simple every 30 days, up to 500 gp (a house default; the SRD has no lending rule)."
+          : kind === "hire"
+          ? value === "blank"
+            ? "No roles: add your own."
+            : "SRD 5.2.1 hireling pay: a skilled guard at 2 gp a day and an untrained porter at 2 sp a day (the same in SRD 5.1)."
+          : kind === "workshop"
           ? value === "srd-5.1"
             ? "SRD 5.1 has no scroll-scribing rule, so scrolls stay unpriced drafts; brews take the SRD 5.1 crafting pace (5 gp of work a day)."
             : value === "blank"
               ? "No offers: add your own."
-              : "SRD 5.2.1: scrolls at twice the scribing cost and its days (the scroll's value); a Potion of Healing takes a day, other brews the crafting rule (price in gp ÷ 10 days). Applying a preset fills missing offers and unset prices only."
+              : "SRD 5.2.1: scrolls at twice the scribing cost and its days (the scroll's value); a Potion of Healing takes a day, other brews the crafting rule (price in gp ÷ 10 days). A tailor makes clothes from the SRD 5.1 equipment list by the same rule, with half the price in cloth the party may bring. Applying a preset fills missing offers and unset prices only."
           : value === "srd-5.1"
           ? "SRD 5.1 gives no fixed rates (1st–2nd level “might cost 10 to 50 gold pieces”). It fills levels 1–2 at 50 gp and leaves higher levels as unpriced drafts for you to set."
           : value === "blank"
@@ -287,13 +307,16 @@ function ProviderEditor({ provider, table: t }: { provider: ServiceProvider; tab
             <input value={draft.description} maxLength={1500} onChange={(e) => set({ description: e.target.value })} />
           </label>
         </div>
+        {isLinkKind(draft.kind) && (
+          <LinkEditor provider={draft} table={t} onChange={(link) => set({ link })} />
+        )}
         <div>
           <PresetChoice value={preset} onChange={setPreset} kind={draft.kind} />
           <Button variant="secondary" onClick={() => setDraft((d) => applyPreset(d, preset))}>
             Apply {presetName[preset]} preset
           </Button>
         </div>
-        <label>
+        <label hidden={isLinkKind(draft.kind)}>
           Settlement
           <select
             value={draft.settlement ?? ""}
@@ -321,7 +344,7 @@ function ProviderEditor({ provider, table: t }: { provider: ServiceProvider; tab
               <input value={draft.paused.reason} maxLength={500} onChange={(e) => set({ paused: { reason: e.target.value } })} />
             </label>
           )}
-          <label>
+          <label hidden={isLinkKind(draft.kind)}>
             Review anything above (copper, optional)
             <input
               type="number"
@@ -336,7 +359,7 @@ function ProviderEditor({ provider, table: t }: { provider: ServiceProvider; tab
             </span>
           </label>
         </div>
-        <div>
+        <div hidden={isLinkKind(draft.kind)}>
           <h4>Offers</h4>
           <p className="svc-hint">Switch on to approve. Players never see drafts. Open a row to edit it.</p>
           <ul className="svc-offer-list">
@@ -574,7 +597,7 @@ export function NpcServicesToggle({ npc, table: t }: { npc: Npc; table: CloudTab
       submit={() => ({ kind: "npc-save", before: npc, npc: { ...npc, services: serviceKinds.filter((k) => kinds.includes(k)) } }) as never}
     >
       <p>Services this NPC provides. Turning a kind off locks it in conversation; orders and history are kept.</p>
-      {serviceKinds.map((k) => {
+      {serviceKinds.filter((k) => addableKinds.includes(k) || kinds.includes(k)).map((k) => {
         const mine = providers.filter((p) => p.kind === k);
         return (
           <label key={k}>
@@ -584,6 +607,7 @@ export function NpcServicesToggle({ npc, table: t }: { npc: Npc; table: CloudTab
               onChange={(e) => setKinds((c) => (e.target.checked ? [...c, k] : c.filter((x) => x !== k)))}
             />{" "}
             {kindName[k]} · {npc.name}
+            {isLinkKind(k) && <small> · Link only, no new money path. {kindHint[k]}</small>}
             {mine.map((p) => (
               <small key={p.id}>
                 {" "}
@@ -998,6 +1022,194 @@ function RumourEditor({ rumours, onChange }: { rumours: NonNullable<ServiceProvi
       >
         Add rumour
       </Button>
+    </div>
+  );
+}
+
+/** What a link opens, for the shop page's Services section. */
+function LinkSummary({ provider: p, table: t }: { provider: ServiceProvider; table: CloudTable }) {
+  const shop = t.shops.find((s) => s.id === p.shopId);
+  if (p.kind === "fence")
+    return (
+      <p className="svc-hint">
+        Buys at {Math.round((shop?.buyRate ?? 0) * 100)}% of value through this shop's Sell tab, while the black market is
+        open. No questions are asked; nothing is flagged.
+      </p>
+    );
+  if (p.kind === "bank") {
+    const l = p.link?.loan;
+    return (
+      <p className="svc-hint">
+        Opens a loan request naming {p.name}. {l ? `Starting terms: ${l.rateBps / 100}% ${l.compound ? "compound" : "simple"} every ${l.periodDays} days${l.maxCopper ? `, up to ${formatCopper(l.maxCopper)}` : ""}. ` : ""}
+        The DM decides every request.
+      </p>
+    );
+  }
+  return (
+    <ul className="svc-offers" aria-label={`${serviceLabel(p)} roles`}>
+      {(p.link?.roles ?? []).map((r) => (
+        <li key={r.key}>
+          <b>{r.name}</b>
+          <span>
+            {formatCopper(r.wageCopper)} / {r.periodDays === 1 ? "day" : `${r.periodDays} days`}
+          </span>
+          <small>
+            Proposes a staff contract for one of the party's properties
+            {r.npcId ? ` · ${npcName(t, r.npcId)}` : ""}.
+          </small>
+        </li>
+      ))}
+    </ul>
+  );
+}
+
+/** DM settings of a link: the fence's shop preset, the bank's starting terms, hire roles. */
+function LinkEditor({
+  provider: p,
+  table: t,
+  onChange,
+}: {
+  provider: ServiceProvider;
+  table: CloudTable;
+  onChange: (link: ServiceProvider["link"]) => void;
+}) {
+  const shop = t.shops.find((s) => s.id === p.shopId);
+  const economy = useEconomy();
+  const [status, setStatus] = useState("");
+  if (p.kind === "fence")
+    return (
+      <div>
+        <h4>Fence preset</h4>
+        <p className="svc-hint">
+          {shop?.name ?? "This shop"}: black market {shop?.blackMarket ? "on" : "off"}, premium {shop?.blackMarketPremium ?? 1.5},
+          buys at {Math.round((shop?.buyRate ?? 0) * 100)}%.
+        </p>
+        <Button
+          variant="secondary"
+          disabled={!shop}
+          onClick={async () => {
+            if (!shop) return;
+            setStatus("");
+            try {
+              await economy.commandOutcome({
+                id: `fence-preset-${shop.id}-${Date.now().toString(36)}`,
+                kind: "shop-black-market",
+                shopId: shop.id,
+                before: { hidden: shop.blackMarket ?? false, premium: shop.blackMarketPremium ?? 1.5 },
+                hidden: fenceShopPreset.blackMarket,
+                premium: fenceShopPreset.blackMarketPremium,
+              } as never);
+              await economy.updateShop({ ...shop, blackMarket: true, blackMarketPremium: 1.5, buyRate: fenceShopPreset.buyRate });
+              setStatus("Fence preset applied to the shop.");
+            } catch (e) {
+              setStatus(e instanceof Error ? e.message : "The shop didn't change.");
+            }
+          }}
+        >
+          Apply to the shop
+        </Button>
+        <p className="svc-hint">
+          Sets black market on, premium 1.5 and buy rate 30%. Changes only those three shop fields; edit them after. The 30% is a
+          house default for a fence (SRD 5.1 “Selling Treasure” gives half for ordinary gear). Selling stays the shop's usual
+          sale.
+        </p>
+        {status && <p role="status">{status}</p>}
+      </div>
+    );
+  if (p.kind === "bank") {
+    const l = p.link?.loan ?? { rateBps: 0, periodDays: 30, compound: false, maxCopper: 0 };
+    const set = (patch: Partial<typeof l>) => onChange({ ...p.link, loan: { ...l, ...patch } });
+    return (
+      <div className="svc-grid">
+        <label>
+          Interest (% per period)
+          <input type="number" min={0} max={1000} step={0.01} value={l.rateBps / 100} onChange={(e) => set({ rateBps: whole(String(Number(e.target.value) * 100), 0, 100000) })} />
+        </label>
+        <label>
+          Period (days)
+          <input type="number" min={1} max={3650} value={l.periodDays} onChange={(e) => set({ periodDays: whole(e.target.value, 1, 3650) })} />
+        </label>
+        <label className="svc-check">
+          <input type="checkbox" checked={l.compound} onChange={(e) => set({ compound: e.target.checked })} />
+          Compound interest
+        </label>
+        <label>
+          Largest loan (copper)
+          <input type="number" min={0} value={l.maxCopper} onChange={(e) => set({ maxCopper: whole(e.target.value) })} />
+          <span className="svc-hint">{l.maxCopper ? formatCopper(l.maxCopper) : "No limit suggested"}</span>
+        </label>
+        <p className="svc-hint">
+          Only starting values for your loan form when a request names this bank. Loan maths, repayment and settlement are
+          unchanged. Deposits and money-changing are not offered.
+        </p>
+      </div>
+    );
+  }
+  const roles = p.link?.roles ?? [];
+  const setRole = (key: string, patch: Partial<HireRole>) =>
+    onChange({ ...p.link, roles: roles.map((r) => (r.key === key ? { ...r, ...patch } : r)) });
+  const npcs = t.journal?.world?.npcs ?? [];
+  return (
+    <div>
+      <h4>Roles for hire</h4>
+      <ul className="svc-offer-list">
+        {roles.map((r) => (
+          <li key={r.key}>
+            <fieldset className="svc-grid">
+              <legend>Role · {r.name}</legend>
+              <label>
+                Role name
+                <input value={r.name} maxLength={160} onChange={(e) => setRole(r.key, { name: e.target.value })} />
+              </label>
+              <label>
+                Wage (copper per period)
+                <input type="number" min={0} value={r.wageCopper} onChange={(e) => setRole(r.key, { wageCopper: whole(e.target.value) })} />
+                <span className="svc-hint">{formatCopper(r.wageCopper)}</span>
+              </label>
+              <label>
+                Wage period (days)
+                <input type="number" min={1} max={3650} value={r.periodDays} onChange={(e) => setRole(r.key, { periodDays: whole(e.target.value, 1, 3650) })} />
+              </label>
+              <label>
+                NPC who takes the job (optional)
+                <select
+                  value={r.npcId ?? ""}
+                  onChange={(e) => {
+                    const next = { ...r };
+                    if (e.target.value) next.npcId = e.target.value;
+                    else delete next.npcId;
+                    onChange({ ...p.link, roles: roles.map((x) => (x.key === r.key ? next : x)) });
+                  }}
+                >
+                  <option value="">None</option>
+                  {npcs.map((n) => (
+                    <option key={n.id} value={n.id}>
+                      {n.name}
+                    </option>
+                  ))}
+                </select>
+              </label>
+              <Button variant="danger" onClick={() => onChange({ ...p.link, roles: roles.filter((x) => x.key !== r.key) })}>
+                Remove {r.name}
+              </Button>
+            </fieldset>
+          </li>
+        ))}
+      </ul>
+      <Button
+        variant="secondary"
+        onClick={() => {
+          let n = roles.length + 1;
+          while (roles.some((r) => r.key === `role-${n}`)) n++;
+          onChange({ ...p.link, roles: [...roles, { key: `role-${n}`, name: "Hireling", wageCopper: 20, periodDays: 1 }] });
+        }}
+      >
+        Add role
+      </Button>
+      <p className="svc-hint">
+        A player's Hire proposes the existing staff contract for one of the party's properties, with this role and wage. You
+        approve it in Review Inbox as today. Hirelings who travel with the party are not offered.
+      </p>
     </div>
   );
 }

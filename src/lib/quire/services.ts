@@ -11,6 +11,7 @@ import {
   quoteFingerprint,
 } from "./service-core.ts";
 import {
+  isLinkKind,
   readServices,
   serviceTermsSchema,
   type ServiceKind,
@@ -28,11 +29,23 @@ type Table = Pick<CloudTable, "journal" | "purses" | "holdings" | "shops">;
 const money = (n: number) => serviceMoney(n, "Service price exceeds the supported copper range.");
 
 export const SERVICE_DOWNTIME_LOCK = "Services pause while the DM reviews downtime.";
-const kindNames: Record<ServiceKind, string> = { temple: "temple", workshop: "workshop", inn: "inn" };
+/** What each kind is called: "Temple", "Workshop", … "Hire". */
+export const serviceKindNames: Record<ServiceKind, string> = {
+  temple: "Temple",
+  workshop: "Workshop",
+  inn: "Inn",
+  trainer: "Trainer",
+  stable: "Stable",
+  courier: "Courier",
+  sage: "Sage",
+  fence: "Fence",
+  bank: "Bank",
+  hire: "Hire",
+};
 
-/** "Temple", "Workshop · Scribe", "Inn". */
+/** "Temple", "Workshop · Scribe", "Inn", "Sage". */
 export function serviceLabel(p: Pick<ServiceProvider, "kind" | "specialty">) {
-  const base = p.kind === "temple" ? "Temple" : p.kind === "workshop" ? "Workshop" : "Inn";
+  const base = serviceKindNames[p.kind] ?? "Service";
   return p.specialty ? `${base} · ${p.specialty}` : base;
 }
 
@@ -70,15 +83,45 @@ export function providerLock(t: Table, p: ServiceProvider, purseId: string | und
     shop = t.shops.find((s) => s.id === p.shopId);
   if (!npc) return "This service is no longer offered.";
   if (!npc.services?.includes(p.kind))
-    return `${npc.name} doesn't offer ${kindNames[p.kind]} services right now.`;
+    return `${npc.name} doesn't offer ${serviceKindNames[p.kind].toLowerCase()} services right now.`;
+  if (p.kind === "fence" && !blackMarketOn(t)) return `${npc.name} isn't dealing right now.`;
   if (!shop || !shopVisible(shop, t) || shop.closed) return `${shop?.name ?? p.name} is closed.`;
   if (!npcAtShop(t, npc.id, shop.locationId)) return `${npc.name} isn't at ${shop.name}.`;
   const payer = t.purses.find((x) => x.id === purseId);
   if (!presentAt(t, shop.locationId!, purseId))
     return `${payer?.name ?? "The paying character"} isn't at ${shop.name}.`;
   if (p.paused) return `Not taking new orders: “${p.paused.reason}”`;
+  return linkLock(t, p, purseId!);
+}
+
+/** Black-market dealing is visible only while the DM has the black market switched on. */
+export const blackMarketOn = (t: Pick<CloudTable, "journal">) => !!t.journal?.world?.blackMarketActive;
+
+/** Properties the payer's side could staff: held by the payer or a party fund, with property operations. */
+export function staffableProperties(t: Table, purseId: string) {
+  const sites = new Set(
+    ((t.journal?.propertyOperations as { sites?: { propertyId: string }[] } | undefined)?.sites ?? []).map((s) => s.propertyId),
+  );
+  return t.holdings.filter(
+    (h) =>
+      h.kind === "property" &&
+      sites.has(h.id) &&
+      (h.purseId === purseId || t.purses.some((p) => p.id === h.purseId && p.kind === "party")),
+  );
+}
+
+/** The per-kind lock of a link (after the shared reasons); empty when the link can be used. */
+function linkLock(t: Table, p: ServiceProvider, purseId: string) {
+  const npc = t.journal?.world?.npcs.find((n) => n.id === p.npcId);
+  if (p.kind === "hire") {
+    if (!p.link?.roles?.length) return `${npc?.name ?? "This agent"} has no one for hire right now.`;
+    if (!staffableProperties(t, purseId).length) return "The party owns no property to staff.";
+  }
   return "";
 }
+
+/** Whether the provider shows in the hub, the Here sheet and a player's projection. */
+export const providerListed = (p: ServiceProvider) => isLinkKind(p.kind) || approvedOffers(p).length > 0;
 
 /** The provider as both the DM and a player see it: approved offers, no rumour text. */
 export function publicProvider(p: ServiceProvider) {
@@ -150,6 +193,7 @@ export function serviceQuote(
   if (!p) throw Error("This service is no longer offered.");
   const lock = providerLock(t, p, purseId);
   if (lock) throw Error(lock);
+  if (isLinkKind(p.kind)) throw Error(`${serviceLabel(p)} opens another screen; it takes no orders here.`);
   const offer = approvedOffers(p).find((o) => o.key === offerKey);
   if (!offer) throw Error("Choose an offer the DM has approved.");
   const settlementLock = offerSettlementLock(t, p, offer);
@@ -389,4 +433,18 @@ export function rumourQuote(t: Table, providerId: string, rumourId: string, purs
       payer: payer.coins,
     }),
   };
+}
+
+/** The note a bank link starts a loan request with; the DM's loan form recognises it. */
+export function bankLoanNote(p: Pick<ServiceProvider, "name">, npcName: string) {
+  return `Loan from ${p.name} (${npcName}). `;
+}
+/** The bank a loan request names (by its note), for the DM's starting terms. */
+export function bankForLoanNote(t: Pick<CloudTable, "journal">, note: string) {
+  const s = readServices(t.journal?.services);
+  return s.providers.find((p) => {
+    if (p.kind !== "bank") return false;
+    const npc = t.journal?.world?.npcs.find((n) => n.id === p.npcId)?.name ?? "";
+    return note.startsWith(bankLoanNote(p, npc).trim());
+  });
 }

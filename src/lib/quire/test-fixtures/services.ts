@@ -2,6 +2,8 @@ import { emptyCloudTable, type CloudTable, type CloudSeat } from "../cloud.ts";
 import { applyCommand } from "../commands.ts";
 import { readJournal } from "../journal.ts";
 import { readFinance } from "../finance.ts";
+import { readEstate } from "../estate-schema.ts";
+import { estatePreset } from "../estate-catalogue.ts";
 import { newProvider } from "../services-presets.ts";
 import { serviceQuote } from "../services.ts";
 import type { ServiceProvider, ServiceRequest } from "../services-schema.ts";
@@ -176,4 +178,74 @@ export function innFixture(): CloudTable {
     { id: "toll", teaser: "The toll-road bandits?", text: "SECRET: they camp by the ford.", priceCopper: 100, once: "party", buyers: [] },
   ];
   return applyCommand(t, svcDm, { id: "inn-setup", kind: "service-provider", providerId: "goose-inn", before: null, provider });
+}
+
+/**
+ * Wave 2 links (docs/SERVICES.md): Rook fences at Rook's Back Room (a black-market shop), and
+ * Ottilie Grane runs the Harrowgate Counting House's bank and hire links. The party fund owns a
+ * townhouse in Harrowgate with property operations, party-member access.
+ */
+export function linksFixture(options: { property?: boolean } = {}): CloudTable {
+  let t = servicesFixture();
+  t.shops.push(
+    { ...t.shops[0], id: "back-room", name: "Rook's Back Room", keeper: "Rook", category: "general", blackMarket: true, blackMarketPremium: 1.5, buyRate: 0.3 },
+    { ...t.shops[0], id: "counting-house", name: "Harrowgate Counting House", keeper: "Ottilie", category: "general" },
+  );
+  if (options.property !== false) {
+    t.holdings.push({
+      id: "townhouse",
+      name: "Townhouse on Mill Lane",
+      purseId: "fund",
+      kind: "property",
+      unitCopper: 500000,
+      quantity: 1,
+      notes: "",
+      locationId: "harrowgate",
+      property: { type: "other", condition: "ready" },
+    } as never);
+    t.journal!.propertyOperations = readEstate({
+      ...t.journal!.propertyOperations,
+      templates: [estatePreset("house")],
+      sites: [
+        {
+          propertyId: "townhouse",
+          templateKey: estatePreset("house").key,
+          enabled: true,
+          access: "party-members",
+          accessPurseIds: [],
+          capacityWeight: null,
+          completedTemplates: [],
+          notes: "",
+        },
+      ],
+    });
+  }
+  for (const [id, name, services] of [
+    ["rook", "Rook", ["fence"]],
+    ["ottilie", "Ottilie Grane", ["bank", "hire"]],
+    ["brannoc", "Brannoc", []],
+  ] as const)
+    t = applyCommand(t, svcDm, {
+      id,
+      kind: "npc-create",
+      npc: {
+        id,
+        name,
+        description: "",
+        locationId: "harrowgate",
+        visible: true,
+        barterAllowed: false,
+        controllerPurseId: null,
+        services: [...services],
+      },
+      copper: 0,
+      inventory: [],
+    });
+  const fence = newProvider("fence", { id: "back-room", name: "Rook's Back Room" }, "rook", "rook-fence");
+  const bank = newProvider("bank", { id: "counting-house", name: "Harrowgate Counting House" }, "ottilie", "ottilie-bank");
+  const hire = newProvider("hire", { id: "counting-house", name: "Harrowgate Counting House" }, "ottilie", "ottilie-hire");
+  hire.link!.roles![0].npcId = "brannoc";
+  for (const provider of [fence, bank, hire])
+    t = applyCommand(t, svcDm, { id: `${provider.id}-setup`, kind: "service-provider", providerId: provider.id, before: null, provider });
+  return t;
 }

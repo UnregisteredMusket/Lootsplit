@@ -16,6 +16,7 @@ import { fromCopper, toCopper } from "./money.ts";
 import { advanceSessionTime } from "./session-time.ts";
 import { applyCharacterPosition } from "./character-position.ts";
 import { readFleet } from "./ships-schema.ts";
+import { legacyServiceKinds, serviceKinds } from "./services-schema.ts";
 import { applyTabletopCommand, validateTabletop, readTabletopSession } from "./tabletop.ts";
 import { tabletopCommands, type TabletopCommand } from "./tabletop-schema.ts";
 import { fogSnapshotMap, legacyDiagonals, legacyTabletopMap, legacyTabletopToken, previousTabletopMap, withoutMapScale, withoutPlacementStyles } from "./tabletop-protocol.ts";
@@ -566,10 +567,32 @@ export function applyWorldCommand(t: CloudTable, seat: CloudSeat, cmd: WorldComm
     // Clients before tabletop protocol 8 never see an NPC's service list (tabletop-protocol.ts):
     // compare without it and keep the stored list when both sides omit it.
     const legacy = cmd.before.services === undefined && cmd.npc.services === undefined;
-    const compared = legacy && current ? { ...current, services: undefined } : current;
+    // Protocol 8 clients see the list without wave-2 kinds (tabletop protocol 9): compare
+    // against that list and keep the stored wave-2 kinds they can't show.
+    const wave2 = (current?.services ?? []).filter((k) => !legacyServiceKinds.includes(k as never));
+    const wave1Client =
+      !legacy &&
+      wave2.length > 0 &&
+      !!cmd.before.services &&
+      !cmd.before.services.some((k) => wave2.includes(k)) &&
+      !(cmd.npc.services ?? []).some((k) => wave2.includes(k));
+    const compared =
+      legacy && current
+        ? { ...current, services: undefined }
+        : wave1Client && current
+          ? { ...current, services: current.services!.filter((k) => !wave2.includes(k)) }
+          : current;
     if (!same(compared, cmd.before) || cmd.before.id !== cmd.npc.id)
       throw Error("NPC configuration changed. Reload before saving.");
-    Object.assign(current!, cmd.npc, legacy && current?.services ? { services: current.services } : {});
+    Object.assign(
+      current!,
+      cmd.npc,
+      legacy && current?.services
+        ? { services: current.services }
+        : wave1Client
+          ? { services: serviceKinds.filter((k) => (cmd.npc.services ?? []).includes(k) || wave2.includes(k)) }
+          : {},
+    );
     const p = t.purses.find((p) => p.id === cmd.npc.id)!;
     if (
       cmd.npc.locationId !== cmd.before.locationId &&
