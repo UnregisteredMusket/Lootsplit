@@ -14,6 +14,8 @@ import {
 import { charismaScore } from "@/lib/quire/sheet";
 import { useDollarText } from "@/lib/quire/prefs";
 import { useSeat } from "@/lib/quire/seat";
+import { readServices } from "@/lib/quire/services-schema";
+import { bankLoanNote } from "@/lib/quire/services";
 import type { Listing } from "@/lib/quire/market";
 import { mutationNotice, type EconomyMutationOutcome } from "@/lib/quire/mutation-outcome";
 import { FinanceReadiness } from "./finance-input";
@@ -299,8 +301,8 @@ function ListingForm({
   );
 }
 
-export function LoanAskForm() {
-  const { purses, loans, askLoan } = useEconomy();
+export function LoanAskForm({ bankProviderId }: { bankProviderId?: string } = {}) {
+  const { purses, loans, askLoan, journal } = useEconomy();
   const seat = useSeat();
   const mine = purses.filter((purse) => seat.purseIds.includes(purse.id));
   const [purseId, setPurseId] = useState(mine[0]?.id ?? "");
@@ -308,8 +310,13 @@ export function LoanAskForm() {
     [error, setError] = useState(""),
     [notice, setNotice] = useState("");
   const { locked } = useFinanceReadiness();
+  // A bank link (NPC services) names the bank in the note; the DM's loan form starts from its terms.
+  const bank = bankProviderId
+    ? readServices(journal.services).providers.find((p) => p.id === bankProviderId && p.kind === "bank")
+    : undefined;
+  const bankNpc = bank ? (journal.world?.npcs.find((n) => n.id === bank.npcId)?.name ?? "") : "";
   const [amount, setAmount] = useState("");
-  const [note, setNote] = useState("");
+  const [note, setNote] = useState(() => (bank ? bankLoanNote(bank, bankNpc) : ""));
   useDraftGuard(!!amount || !!note, "loan request");
   const asked = loans.filter((loan) => mine.some((purse) => purse.id === loan.purseId));
 
@@ -324,6 +331,16 @@ export function LoanAskForm() {
       <p className="text-sm text-muted">
         Request a loan from the DM. Funds are added only after the loan is approved.
       </p>
+      {bank && (
+        <p className="text-sm" role="note">
+          <strong>From {bank.name}</strong> · opened from {bankNpc || "the bank"}. The note names the bank, and the DM's
+          approval starts from its terms
+          {bank.link?.loan
+            ? ` (${bank.link.loan.rateBps / 100}% ${bank.link.loan.compound ? "compound" : "simple"} every ${bank.link.loan.periodDays} days${bank.link.loan.maxCopper ? `, up to ${formatCopper(bank.link.loan.maxCopper)}` : ""})`
+            : ""}
+          . The DM can still change them.
+        </p>
+      )}
       {asked.length > 0 ? (
         <ul className="mt-3 flex flex-col gap-2">
           {asked.map((loan) => (

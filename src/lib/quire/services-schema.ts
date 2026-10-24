@@ -9,8 +9,25 @@ const name = z.string().trim().min(1).max(160);
 const copper = z.number().int().min(0).max(1e12);
 const day = z.number().int().nonnegative();
 const minute = z.number().int().min(0).max(1439);
-export const serviceKinds = ["temple", "workshop", "inn"] as const;
+export const serviceKinds = [
+  "temple",
+  "workshop",
+  "inn",
+  // Wave 2 (tabletop protocol 9): new engines, then links that only open an existing screen.
+  "trainer",
+  "stable",
+  "courier",
+  "sage",
+  "fence",
+  "bank",
+  "hire",
+] as const;
 export type ServiceKind = (typeof serviceKinds)[number];
+/** The kinds tabletop protocol 8 clients know; older clients never receive the others. */
+export const legacyServiceKinds = ["temple", "workshop", "inn"] as const;
+/** Link kinds open an existing screen (Sell tab, loan request, staff proposal): no offers, no money path. */
+export const linkServiceKinds = ["fence", "bank", "hire"] as const;
+export const isLinkKind = (k: string) => (linkServiceKinds as readonly string[]).includes(k);
 export const servicePresets = ["srd-5.2.1", "srd-5.1", "blank"] as const;
 export const settlementKinds = ["village", "town", "city"] as const;
 export type Settlement = (typeof settlementKinds)[number];
@@ -92,6 +109,31 @@ export const rumourSchema = z
     boughtByParty: z.boolean().optional(),
   })
   .strict();
+/** A hireling role a Hire link proposes as a property staff contract (estate-staff). */
+export const hireRoleSchema = z
+  .object({
+    key: goodsKey,
+    name,
+    wageCopper: copper,
+    periodDays: z.number().int().min(1).max(3650),
+    /** Optional NPC who takes the job; players see it only when they can read that NPC. */
+    npcId: id.optional(),
+  })
+  .strict();
+/** Starting values for the DM's loan form when a loan request names this bank. */
+export const bankTermsSchema = z
+  .object({
+    rateBps: z.number().int().min(0).max(100000),
+    periodDays: z.number().int().min(1).max(3650),
+    compound: z.boolean(),
+    /** Largest loan the bank suggests; the DM decides every request. */
+    maxCopper: copper,
+  })
+  .strict();
+/** Fence, bank and hire: what the link opens with. Never moves money by itself. */
+export const serviceLinkSchema = z
+  .object({ loan: bankTermsSchema.optional(), roles: z.array(hireRoleSchema).max(20).optional() })
+  .strict();
 export const serviceProviderSchema = z
   .object({
     id,
@@ -111,8 +153,12 @@ export const serviceProviderSchema = z
     settlement: z.enum(settlementKinds).optional(),
     offers: z.array(serviceOfferSchema).max(200),
     rumours: z.array(rumourSchema).max(200).optional(),
+    /** Link kinds only (fence, bank, hire). */
+    link: serviceLinkSchema.optional(),
   })
   .strict();
+export type HireRole = z.infer<typeof hireRoleSchema>;
+export type BankTerms = z.infer<typeof bankTermsSchema>;
 export const serviceStatuses = [
   "requested",
   "active",

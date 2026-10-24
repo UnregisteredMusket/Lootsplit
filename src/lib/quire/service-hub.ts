@@ -3,7 +3,8 @@ import { readBlacksmith } from "./blacksmith-schema.ts";
 import { smithAvailability } from "./blacksmith.ts";
 import { downtimePending } from "./service-core.ts";
 import { readServices, type ServiceProvider } from "./services-schema.ts";
-import { approvedOffers, providerLock, serviceLabel } from "./services.ts";
+import { approvedOffers, providerListed, providerLock, serviceLabel } from "./services.ts";
+import { formatCopper } from "./money.ts";
 
 // The Services branch of the NPC conversation hub (docs/SERVICES.md, docs/NPC-BARTER.md).
 // One entry per provider this NPC runs. Each entry runs the same availability check the
@@ -18,8 +19,10 @@ export type HubService = {
   /** What the character says when choosing it. */
   text: string;
   sub?: string;
-  /** Opens an existing page (the forge's shop page). */
+  /** Opens an existing page (the forge's shop page, a fence's Sell tab, a bank's loan request). */
   href?: string;
+  /** A link kind: it opens another screen and moves no money here (marked ↗). */
+  link?: boolean;
   /** Opens this provider's branch of the conversation (temple, workshop, inn). */
   providerId?: string;
   /** Why it can't be used now; empty when usable. */
@@ -68,7 +71,8 @@ export function npcServices(t: CloudTable, npcId: string, purseId: string | unde
     const shop = t.shops.find((s) => s.id === p.shopId),
       offers = approvedOffers(p);
     // A provider with nothing approved is a DM draft: not listed (players never receive it).
-    if (!shop || !offers.length) continue;
+    // Links (fence, bank, hire) have no offers and are listed as they are.
+    if (!shop || !providerListed(p)) continue;
     const mine = purseId ? services.orders.filter((o) => o.providerId === p.id && o.purseId === purseId) : [];
     const ready = mine.find((o) => o.status === "ready"),
       waiting = mine.find((o) => o.status === "requested");
@@ -76,17 +80,25 @@ export function npcServices(t: CloudTable, npcId: string, purseId: string | unde
     // A pause stops new orders only: collecting or withdrawing stays open.
     if (p.paused && locked.startsWith("Not taking new orders") && (ready || waiting)) locked = "";
     const label = serviceLabel(p);
+    const href =
+      p.kind === "fence"
+        ? `/shop/${encodeURIComponent(p.shopId)}#sell`
+        : p.kind === "bank"
+          ? `/features/bank?bank=${encodeURIComponent(p.id)}#apply-loan`
+          : undefined;
     out.push({
       key: `svc:${p.id}`,
       label,
       tag: `Services · ${label}`,
       text: hubLine(p),
+      ...(href ? { href } : {}),
+      ...(p.kind === "fence" || p.kind === "bank" || p.kind === "hire" ? { link: true } : {}),
       sub: ready
         ? `Your ${ready.terms.offer.output.kind === "holding" ? ready.terms.offer.output.name : ready.terms.offer.name} is ready to collect.`
         : waiting
           ? `Your request for ${waiting.terms.offer.name} is waiting for the DM.`
           : hubSub(p, offers.length),
-      providerId: p.id,
+      ...(href ? {} : { providerId: p.id }),
       ready: !!ready || !!waiting,
       place: shop.name,
       locked,
@@ -98,10 +110,26 @@ export function npcServices(t: CloudTable, npcId: string, purseId: string | unde
 function hubLine(p: ServiceProvider) {
   if (p.kind === "temple") return "I need a priest's help.";
   if (p.kind === "inn") return "We need rooms, and a meal.";
+  if (p.kind === "fence") return "What will you give me for these?";
+  if (p.kind === "bank") return "I'd like to borrow some coin.";
+  if (p.kind === "hire") return "Do you have work for hire? I need hands.";
+  if (p.kind === "trainer") return "Can you teach me?";
+  if (p.kind === "stable") return "Can you stable our animals, or take us somewhere?";
+  if (p.kind === "courier") return "I need a letter delivered.";
+  if (p.kind === "sage") return "What is this thing?";
   const s = p.specialty?.toLowerCase();
   return s === "scribe" ? "Can you scribe a scroll for me?" : s === "alchemist" ? "Can you brew something for me?" : "Can you make something for me?";
 }
 function hubSub(p: ServiceProvider, offers: number) {
+  if (p.kind === "fence") return "Opens the Sell tab. The fence's buy rate applies; selling is the shop's usual sale.";
+  if (p.kind === "bank") {
+    const l = p.link?.loan;
+    return `Opens a loan request naming ${p.name}. The DM decides it${l ? `; this bank lends at ${l.rateBps / 100}% ${l.compound ? "compound" : "simple"} per ${l.periodDays} days${l.maxCopper ? `, up to ${formatCopper(l.maxCopper)}` : ""}` : ""}.`;
+  }
+  if (p.kind === "hire") {
+    const roles = p.link?.roles ?? [];
+    return `Proposes a staff contract for one of the party's properties. ${roles.map((r) => `${r.name} ${formatCopper(r.wageCopper)} / ${r.periodDays === 1 ? "day" : `${r.periodDays} days`}`).join(" · ")}`.trim();
+  }
   const review = approvedOffers(p).some((o) => o.review === "dm") || p.reviewAboveCopper !== undefined;
   const count = `${offers} ${offers === 1 ? "offer" : "offers"}`;
   return review ? `${count}. Some need the DM's approval.` : `${count}.`;

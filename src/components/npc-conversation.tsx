@@ -465,7 +465,8 @@ export function NpcConversation({
   // Every provider this NPC runs, each with the same availability check the server runs.
   const providers = npcServices(table, npc.id, character?.id);
   const serviceReply = (p: HubService): Reply => ({
-    tag: p.tag,
+    // A link opens another screen (fence Sell tab, bank loan request, hire proposal).
+    tag: p.link ? `${p.tag} ↗` : p.tag,
     text: p.text,
     // A locked entry shows its reason; a ready order is still worth mentioning.
     sub: p.locked && !p.ready ? undefined : p.sub,
@@ -590,7 +591,7 @@ export function NpcConversation({
         },
       });
   } else if (step === "services") {
-    for (const p of providers) replies.push({ ...serviceReply(p), tag: `${p.tag} · ${p.place}` });
+    for (const p of providers) replies.push({ ...serviceReply(p), tag: `${p.tag} · ${p.place}${p.link ? " ↗" : ""}` });
     replies.push({
       text: "Never mind.",
       tone: "leave",

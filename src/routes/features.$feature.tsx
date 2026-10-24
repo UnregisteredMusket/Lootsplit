@@ -43,18 +43,20 @@ export const Route = createFileRoute("/features/$feature")({
     npc?: string;
     exchange?: string;
     commodity?: string;
+    bank?: string;
   } => ({
     from: safeReturn(s.from),
     code: typeof s.code === "string" ? s.code.slice(0, 24) : undefined,
     npc: typeof s.npc === "string" ? s.npc.slice(0, 150) : undefined,
     exchange: typeof s.exchange === "string" ? s.exchange.slice(0, 150) : undefined,
     commodity: typeof s.commodity === "string" ? s.commodity.slice(0, 150) : undefined,
+    bank: typeof s.bank === "string" ? s.bank.slice(0, 150) : undefined,
   }),
   component: FeaturePage,
 });
 function FeaturePage() {
   const { feature } = Route.useParams(),
-    { from, code } = Route.useSearch(),
+    { from, code, bank } = Route.useSearch(),
     seat = useSeat(),
     dm = seat.role === "dm";
   const campaigns = useSyncExternalStore(subscribeCampaigns, getCampaigns, serverCampaigns);
@@ -94,8 +96,10 @@ function FeaturePage() {
                 ) : (
                   <>
                     <PersonalFinances bank />
-                    <h2>Apply for a loan</h2>
-                    <LoanAskForm />
+                    <h2 id="apply-loan" style={{ scrollMarginTop: "6rem" }}>
+                      Apply for a loan
+                    </h2>
+                    <LoanAskForm bankProviderId={bank} />
                   </>
                 )}
                 <CampaignJournal section="bank" />

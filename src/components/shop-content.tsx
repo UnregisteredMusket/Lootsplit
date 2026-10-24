@@ -704,7 +704,9 @@ function SellBox({ shopId }: { shopId: string }) {
 
   return (
     <form
+      id="sell"
       className="mt-6 flex flex-col gap-2"
+      style={{ scrollMarginTop: "6rem" }}
       onSubmit={async (event) => {
         event.preventDefault();
         if (!holding || closed || turnLocked || locked || busy || eligibility) return;

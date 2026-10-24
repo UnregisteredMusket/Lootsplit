@@ -1,0 +1,10 @@
+{
+  "title": "NPC services: fences, banks, hirelings and tailors",
+  "summary": "More NPCs can offer services, and some open screens you already use.",
+  "items": [
+    "A fence opens their shop's Sell tab while the black market is open, at the fence's buy rate.",
+    "A bank opens the loan request with the bank named; the DM starts from that bank's terms.",
+    "Ask an agent for hired hands to propose a staff contract for one of the party's properties.",
+    "Tailors make clothes over approved downtime; bring your own cloth to pay less."
+  ]
+}

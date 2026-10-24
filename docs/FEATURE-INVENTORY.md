@@ -468,6 +468,12 @@ Adds a contextual Maps session bar, searchable scene cards, separate activation/
 - Anti-exploit: cooldown per player account, repeat DC, 24-hour combined judgement, caps, unit cap, unwanted categories, and player-set item values (`valueSource: "player"`) count for nothing. Settlement reuses the atomic barter exchange; command IDs make retries no-ops and never re-roll. Players never receive NPC rules, valuation, purse or other players' attempts. The existing trading table, controlled-NPC flow, Give and every earlier save are unchanged. See [NPC-BARTER.md](NPC-BARTER.md).
 
 
+### NPC services, wave 2 phase 4a: links, Tailor and protocol 9 (October 24, 2026)
+
+- New provider kinds in the data model (trainer, stable, courier, sage, fence, bank, hire); the engines (trainer, stable, courier, sage) switch on in their own phases. Tabletop protocol 9 strips wave-2 providers, offers, orders and NPC kinds for protocol 0-8 clients (also in pending quotes and archived reports) and keeps them on those clients' writes. See [services](SERVICES.md).
+- Connect-only links, no new money path: Fence (opens the fence shop's Sell tab, only while the black market is revealed; shop preset black market on, premium 1.5, buys at 30%), Bank (opens Apply for a loan with the bank named; its terms prefill the DM's debt form), Hire (proposes an ordinary `estate-staff` contract for a party property; locked without one). Replies marked ↗; Here sheet rows Sell, Borrow, Hire.
+- Tailor workshop preset: common, traveler's, costume and fine clothes (SRD 5.1 prices and weights, SRD 5.2.1 crafting days, cloth the party may bring for half the price).
+
 ### NPC services, phase 3: inn (October 23, 2026)
 
 - Inn providers with SRD 5.2.1 (default), SRD 5.1 and Blank room tiers: booked stays for party guests present, nights and meals a day, paid once up front, record only (no rest granted, no automatic refund for leaving early). See [services](SERVICES.md).

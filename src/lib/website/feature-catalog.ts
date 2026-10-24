@@ -254,12 +254,13 @@ export const FEATURE_AREAS: FeatureArea[] = [
       {
         title: "Temple, workshop and inn",
         summary:
-          "NPCs run paid services at their shop: temple spellcasting, scribe and alchemist commissions, and inn stays.",
+          "NPCs run paid services at their shop: temple spellcasting, scribe, alchemist and tailor commissions, and inn stays.",
         details: [
           "Prices default to the SRD 5.2.1 lists; the DM can edit or start blank",
           "Raise Dead and Resurrection wait for DM review and are charged on approval",
           "Workshop orders are made during approved downtime",
           "Inns book nights and meals, and share rumours privately",
+          "Tailors make clothes; fences, banks and hiring agents open the Sell tab, a loan request or a staff contract",
         ],
       },
       {

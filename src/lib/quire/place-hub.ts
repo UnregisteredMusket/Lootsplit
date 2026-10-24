@@ -2,7 +2,7 @@
 // and the pin → place card. Everything here reads the table the viewer already has (the
 // permission-projected room for players), so it can never reveal more than the map itself.
 import { readServices } from "./services-schema.ts";
-import { approvedOffers, serviceLabel } from "./services.ts";
+import { approvedOffers, providerListed, serviceLabel } from "./services.ts";
 import {
   mapRecordTypes,
   type ConnectedMap,
@@ -531,9 +531,11 @@ export function hereSheet(
   for (const p of services.providers) {
     const shop = t.shops.find((s) => s.id === p.shopId),
       offers = approvedOffers(p);
-    if (!shop || !on(shop.locationId) || !offers.length) continue;
+    if (!shop || !on(shop.locationId) || !providerListed(p)) continue;
     const npc = world.npcs.find((n) => n.id === p.npcId);
     if (!npc || (!dm && !npcAvailableHere(npc, t))) continue;
+    // Fences appear only while the black market is on (players never receive them otherwise).
+    if (p.kind === "fence" && !t.journal?.world?.blackMarketActive && !dm) continue;
     const mine = services.orders.filter((o) => o.providerId === p.id && viewer.purseIds.includes(o.purseId));
     const ready = mine.find((o) => o.status === "ready");
     const closed = shop.closed ? `Closed${p.paused ? `: ${p.paused.reason}` : ""}` : p.paused ? `Not taking new orders: ${p.paused.reason}` : "";
@@ -543,8 +545,30 @@ export function hereSheet(
       label: `${serviceLabel(p)} · ${shop.name}`,
       group: "services",
       kind: serviceLabel(p),
-      detail: closed || `${npc.name} · ${ready ? "your order is ready to collect" : `${offers.length} ${offers.length === 1 ? "offer" : "offers"}`}`,
-      action: ready ? "Collect" : p.kind === "inn" ? "Book" : "Services",
+      detail:
+        closed ||
+        `${npc.name} · ${
+          ready
+            ? "your order is ready to collect"
+            : p.kind === "fence"
+              ? `buys at ${Math.round(shop.buyRate * 100)}%`
+              : p.kind === "bank"
+                ? "loans by request"
+                : p.kind === "hire"
+                  ? (p.link?.roles ?? []).map((r) => r.name).join(", ") || "no one for hire"
+                  : `${offers.length} ${offers.length === 1 ? "offer" : "offers"}`
+        }`,
+      action: ready
+        ? "Collect"
+        : p.kind === "inn"
+          ? "Book"
+          : p.kind === "fence"
+            ? "Sell"
+            : p.kind === "bank"
+              ? "Borrow"
+              : p.kind === "hire"
+                ? "Hire"
+                : "Services",
       dmOnly: false,
       ...(shop.closed || (p.paused && !ready) ? { disabled: closed } : {}),
     });

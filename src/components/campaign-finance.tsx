@@ -1,3 +1,4 @@
+import { bankForLoanNote } from "@/lib/quire/services";
 import { finishingCharacters } from "@/lib/quire/character-position";
 import { loanRecordId, loanRequestRecordId } from "@/lib/quire/finance-record-links";
 import { TradeSeasonReview } from "./trade-season-review";
@@ -505,6 +506,9 @@ export function CampaignFinance({
               <div key={r.id} className="journal-entry">
                 <p>
                   Earlier approved loan: {r.note} · {formatCopper(r.copper)}
+                  {bankForLoanNote({ journal }, r.note)?.link?.loan
+                    ? ` · names ${bankForLoanNote({ journal }, r.note)!.name}: its terms fill the form`
+                    : ""}
                 </p>
                 <Button
                   disabled={busy || !!pending}
@@ -515,7 +519,16 @@ export function CampaignFinance({
                       !window.confirm("Discard unsaved loan terms and record this existing debt?")
                     )
                       return;
-                    const next = { ...defaults, name: r.note.slice(0, 100), purseId: r.purseId };
+                    // A request opened from a bank link starts from that bank's terms (NPC services).
+                    const bankTerms = bankForLoanNote({ journal }, r.note)?.link?.loan;
+                    const next = {
+                      ...defaults,
+                      ...(bankTerms
+                        ? { rateBps: bankTerms.rateBps, periodDays: bankTerms.periodDays, compound: bankTerms.compound }
+                        : {}),
+                      name: r.note.slice(0, 100),
+                      purseId: r.purseId,
+                    };
                     setLoanEntryRevision((v) => v + 1);
                     setTerms(next);
                     setTermsBefore(next);
