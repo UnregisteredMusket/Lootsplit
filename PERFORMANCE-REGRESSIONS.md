@@ -377,7 +377,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Packaged Worker / accounts (balanced v2) | open | 3 | 434s → 710s | +276s | +63.59% |
 | Verify preserved functionality | open | 2 | 1179s → 2649s | +1470s | +124.68% |
 | Encrypted offsite database backup / initial queue | open | 3 | 5s → 49s | +44s | +880% |
-| backup / Export consistently and encrypt before writing to disk | open | 3 | 3s → 7s | +4s | +133.33% |
+| backup / Export consistently and encrypt before writing to disk | open | 4 | 3s → 9s | +6s | +200% |
 | Development / gameplay (balanced v2) / dev-finance | open | 2 | 43s → 72s | +29s | +67.44% |
 | Development / desktop (balanced v2) / dev-map-tiles | open | 5 | 35s → 166s | +131s | +374.29% |
 | Packaged Worker / accounts (balanced v2) / worker-finance | open | 2 | 28s → 48s | +20s | +71.43% |
@@ -755,6 +755,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-24T09:41:34Z | step: backup / Export consistently and encrypt before writing to disk | 7s → 9s | +2s | +28.57% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39757935431/job/119754586449) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40082917379/job/120839966372) |
 | 2026-10-23T22:49:24Z | step: Unused files, exports and dependencies (knip) / Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262 | 3s → 4s | +1s | +33.33% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40031758507/job/120681448227) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40036015745/job/120695544782) |
 | 2026-10-23T22:37:16Z | step: Accessibility (axe-core) / Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262 | 3s → 4s | +1s | +33.33% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39808894877/job/119929447230) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40034768677/job/120691426791) |
 | 2026-10-23T22:35:26Z | step: publish-apk / Upload signed APK only | 2s → 3s | +1s | +50% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39768391571/job/119808297170) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40031758182/job/120690767169) |
