@@ -61,6 +61,8 @@ export const serviceTimeSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("training") }).strict(),
   /** Courier (wave 2): delivery takes the destination's days, over approved downtime only. */
   z.object({ kind: z.literal("delivery") }).strict(),
+  /** Stable coach (wave 2): a booking becomes a party journey; the price is per mile per passenger. */
+  z.object({ kind: z.literal("coach") }).strict(),
 ]);
 export const serviceOutputSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("record") }).strict(),
@@ -99,6 +101,8 @@ export const serviceOfferSchema = z
     target: z.literal("held-item").optional(),
     /** Trainer: the existing training category of the subject (wave 2). */
     category: z.enum(["martial", "academic", "profession"]).optional(),
+    /** Stable: feed per animal per day, optional for the customer. */
+    feedCopper: copper.optional(),
     /** Trainer: the most training days one agreement may book (1–250). */
     maxDays: z.number().int().min(1).max(250).optional(),
   })
@@ -149,6 +153,34 @@ export const courierDestinationSchema = z
   })
   .strict();
 export type CourierDestination = z.infer<typeof courierDestinationSchema>;
+/**
+ * Stable: a coach route the DM drew (copied from a journey's route). Without a map and points it
+ * is listed but locked. It is frozen into the journey at booking; redrawing changes new bookings.
+ */
+export const coachRouteSchema = z
+  .object({
+    key: goodsKey,
+    toLocationId: id,
+    mapId: id.optional(),
+    points: z
+      .array(z.object({ x: z.number().min(0).max(1), y: z.number().min(0).max(1), locationId: id.optional() }).strict())
+      .min(2)
+      .max(100)
+      .optional(),
+    /** The journey legs' terrain (checked against the journey schema when a coach is booked). */
+    legs: z
+      .array(
+        z
+          .object({ environment: z.string().max(40), biome: z.string().max(40).optional(), description: z.string().max(200).optional() })
+          .strict(),
+      )
+      .min(1)
+      .max(99)
+      .optional(),
+    paceMilesPerDay: z.number().int().min(1).max(200),
+  })
+  .strict();
+export type CoachRoute = z.infer<typeof coachRouteSchema>;
 /** Fence, bank and hire: what the link opens with. Never moves money by itself. */
 export const serviceLinkSchema = z
   .object({ loan: bankTermsSchema.optional(), roles: z.array(hireRoleSchema).max(20).optional() })
@@ -174,6 +206,8 @@ export const serviceProviderSchema = z
     rumours: z.array(rumourSchema).max(200).optional(),
     /** Link kinds only (fence, bank, hire). */
     link: serviceLinkSchema.optional(),
+    /** Stable only: coach routes. */
+    routes: z.array(coachRouteSchema).max(50).optional(),
     /** Courier only: the places letters go to. */
     destinations: z.array(courierDestinationSchema).max(200).optional(),
     /** Projection only: the NPCs the viewer's character could write to (never stored). */
@@ -222,6 +256,10 @@ export const serviceRequestSchema = z
     inn: z.object({ tierKey: goodsKey, meals: z.number().int().min(0).max(3) }).strict().optional(),
     /** Identify: the carried item the sage looks at. */
     itemHoldingId: id.optional(),
+    /** Stable: the animals stabled (held by the payer or a party fund) and whether feed is included. */
+    stabling: z.object({ animalHoldingIds: z.array(id).min(1).max(50), feed: z.boolean() }).strict().optional(),
+    /** Stable coach: the route booked. */
+    routeKey: goodsKey.optional(),
     /** Courier: the recipient NPC and the letter (only the sender and the DM read it). */
     letter: z.object({ recipientNpcId: id, text: z.string().trim().min(1).max(2000) }).strict().optional(),
   })
@@ -273,6 +311,27 @@ export const serviceTermsSchema = z
     review: z.enum(["auto", "dm"]),
     workDays: z.number().int().min(0).max(3650),
     settlement: z.enum(settlementKinds),
+    /** Stable: the animals and nights booked. */
+    stabling: z
+      .object({
+        animals: z.array(z.object({ holdingId: id, name: z.string().max(160), quantity: z.number().int().min(1).max(100000) }).strict()).max(50),
+        feed: z.boolean(),
+        nights: z.number().int().min(1).max(365),
+      })
+      .strict()
+      .optional(),
+    /** Stable coach: the route as booked; its journey request is `${orderId}-journey`. */
+    route: z
+      .object({
+        key: goodsKey,
+        toLocationId: id,
+        placeName: z.string().max(160),
+        deciMiles: z.number().int().min(1).max(1e9),
+        passengers: z.number().int().min(1).max(500),
+        paceMilesPerDay: z.number().int().min(1).max(200),
+      })
+      .strict()
+      .optional(),
     /** Courier: the letter as sent. Delivered into the sender's thread with the recipient. */
     letter: z
       .object({

@@ -4,6 +4,7 @@ import { readJournal } from "../journal.ts";
 import { readFinance } from "../finance.ts";
 import { readEstate } from "../estate-schema.ts";
 import { estatePreset } from "../estate-catalogue.ts";
+import { campaignMapSchema } from "../world-schema.ts";
 import { newProvider } from "../services-presets.ts";
 import { serviceQuote } from "../services.ts";
 import type { ServiceProvider, ServiceRequest } from "../services-schema.ts";
@@ -411,4 +412,67 @@ export function courierFixture(): CloudTable {
 export function letterCommand(t: CloudTable, id: string, recipientNpcId: string, text = "My lady, the lights at the old mill were no rumour.", purseId = "kael") {
   const req: ServiceRequest = { beneficiaryPurseIds: [], units: 1, contributions: [], letter: { recipientNpcId, text } };
   return orderCommand(t, id, "letter", purseId, req, "post-courier");
+}
+
+/**
+ * Wave 2 Stable: Hollin Marsh at Marsh's Livery & Coaching. Kael owns a riding horse, the party
+ * fund a pack mule, Thorn a pony. The Vale of Harrow map (100 mi across) has the coach route to
+ * Saltmere drawn (38.2 mi, 30 mi a day); the route to Old Mill Crossing isn't drawn yet.
+ */
+export function stableFixture(): CloudTable {
+  let t = servicesFixture();
+  t.journal!.market!.locations.push({ id: "mill", name: "Old Mill Crossing", kind: "town", parentId: "vale", description: "" } as never);
+  t.shops.push({ ...t.shops[0], id: "livery", name: "Marsh's Livery & Coaching", keeper: "Hollin", category: "general" });
+  t.holdings.push(
+    { id: "horse", purseId: "kael", name: "Riding horse", kind: "item", quantity: 1, unitCopper: 7500, notes: "" },
+    { id: "mule", purseId: "fund", name: "Pack mule", kind: "item", quantity: 1, unitCopper: 800, notes: "" },
+    { id: "pony", purseId: "thorn", name: "Pony", kind: "item", quantity: 1, unitCopper: 3000, notes: "" },
+  );
+  t.journal!.world!.maps.push(
+    campaignMapSchema.parse({
+      id: "vale-map",
+      name: "Vale of Harrow",
+      image: "data:image/png;base64,YQ==",
+      locationId: "vale",
+      visible: true,
+      type: "regional",
+      anchors: [
+        { locationId: "harrowgate", x: 0.2, y: 0.5 },
+        { locationId: "saltmere", x: 0.582, y: 0.5 },
+      ],
+      markers: [],
+      scale: { a: { x: 0, y: 0.5 }, b: { x: 1, y: 0.5 }, distance: 100, unit: "mi", aspect: 1 },
+    }),
+  );
+  t = applyCommand(t, svcDm, {
+    id: "hollin",
+    kind: "npc-create",
+    npc: { id: "hollin", name: "Hollin Marsh", description: "", locationId: "harrowgate", visible: true, barterAllowed: false, controllerPurseId: null, services: ["stable"] },
+    copper: 0,
+    inventory: [],
+  });
+  const stable = newProvider("stable", { id: "livery", name: "Marsh's Livery & Coaching" }, "hollin", "livery-stable");
+  stable.routes = [
+    {
+      key: "saltmere",
+      toLocationId: "saltmere",
+      mapId: "vale-map",
+      points: [
+        { x: 0.2, y: 0.5, locationId: "harrowgate" },
+        { x: 0.582, y: 0.5, locationId: "saltmere" },
+      ],
+      legs: [{ environment: "Roads" }],
+      paceMilesPerDay: 30,
+    },
+    { key: "mill", toLocationId: "mill", paceMilesPerDay: 30 },
+  ];
+  return applyCommand(t, svcDm, { id: "stable-setup", kind: "service-provider", providerId: "livery-stable", before: null, provider: stable });
+}
+export function stablingCommand(t: CloudTable, id: string, animals: string[], nights = 3, feed = true, purseId = "kael") {
+  const req: ServiceRequest = { beneficiaryPurseIds: [], units: nights, contributions: [], stabling: { animalHoldingIds: animals, feed } };
+  return orderCommand(t, id, "stabling", purseId, req, "livery-stable");
+}
+export function coachCommand(t: CloudTable, id: string, routeKey = "saltmere", purseId = "kael") {
+  const req: ServiceRequest = { beneficiaryPurseIds: [], units: 1, contributions: [], routeKey };
+  return orderCommand(t, id, "coach", purseId, req, "livery-stable");
 }

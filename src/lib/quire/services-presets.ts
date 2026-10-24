@@ -140,6 +140,37 @@ export function letterOffer(): ServiceOffer {
   };
 }
 
+/**
+ * Stable: stabling 5 sp an animal a night with feed 5 cp a day (SRD 5.2.1 and 5.1 agree); the
+ * coach at 3 cp a mile a passenger (SRD 5.1 "Coach cab, between towns"; SRD 5.2.1 has no coach
+ * row, so both presets use it). A coach booking always waits for the DM to approve departure.
+ */
+export function stableOffers(): ServiceOffer[] {
+  return [
+    {
+      key: "stabling",
+      name: "Stabling",
+      description: "A stall for each animal, by the night. Recorded only: the animals stay in your inventory.",
+      approved: true,
+      priceCopper: 50,
+      feedCopper: 5,
+      time: { kind: "per-night", maxNights: 30 },
+      review: "auto",
+      output: { kind: "record" },
+    },
+    {
+      key: "coach",
+      name: "Coach",
+      description: "Seats for the whole party on a coach route. Booking sends a journey request; the fare is charged when the DM approves departure.",
+      approved: true,
+      priceCopper: 3,
+      time: { kind: "coach" },
+      review: "dm",
+      output: { kind: "record" },
+    },
+  ];
+}
+
 export const workshopSpecialties = ["Scribe", "Alchemist", "Tailor"] as const;
 export type WorkshopSpecialty = (typeof workshopSpecialties)[number];
 
@@ -311,6 +342,7 @@ export function presetOffers(kind: ServiceKind, preset: ServicePreset, specialty
   if (kind === "sage") return [identifyOffer()];
   if (kind === "trainer") return subjects.map(trainerOffer);
   if (kind === "courier") return [letterOffer()];
+  if (kind === "stable") return stableOffers();
   if (kind === "inn") return [innOffer(preset)];
   if (kind === "workshop" && specialty === "Scribe") return scrollSpells.map((s) => scrollOffer(s, preset));
   if (kind === "workshop" && specialty === "Alchemist") return brews.map((b) => brewOffer(b, preset));

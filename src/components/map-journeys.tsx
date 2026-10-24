@@ -6,6 +6,7 @@
  * marker follows approved downtime; arrival waits for the DM's "Move party here"
  * (`party-location{journeyId}`).
  */
+import { mountLike as isMount } from "@/lib/quire/mounts";
 import { useEffect, useMemo, useRef, useState, type ReactNode } from "react";
 import { useEconomy } from "@/lib/quire/economy-context";
 import { useSeat } from "@/lib/quire/seat";
@@ -354,7 +355,7 @@ export function JourneyReview({
   const holdings = table.holdings.filter(
     (h) => h.kind === "item" && h.quantity > 0 && (j.frozen?.travellerIds ?? journeyTravellers(table).map((p) => p.id)).concat(table.purses.filter((p) => p.kind === "party").map((p) => p.id)).includes(h.purseId),
   );
-  const mountLike = holdings.filter((h) => /horse|pony|mule|donkey|camel|ox|mount|steed|mare|stallion|riding|pack animal/i.test(`${h.name} ${(h as { category?: string }).category ?? ""}`));
+  const mountLike = holdings.filter((h) => isMount(h as typeof h & { category?: string }));
   const mountChoices = mountLike.length ? mountLike : holdings;
   const payers = table.purses.filter((p) => p.kind === "party" || (p.kind === "character" && p.control !== "npc"));
   const payer = table.purses.find((p) => p.id === j.costs.payerId);
@@ -510,6 +511,13 @@ export function JourneyReview({
             <p className="map-route-help">
               Downtime quote · {preview.days} {preview.days === 1 ? "day" : "days"} · day {preview.fromDay} → day {preview.fromDay + preview.days} · from the existing downtime engine
             </p>
+            {j.costs.fare && (
+              <p className="map-route-help" aria-label="Coach fare">
+                <strong>Coach fare</strong> · {formatCopper(j.costs.fare.copper)} from{" "}
+                {table.purses.find((p) => p.id === j.costs.fare!.payerId)?.name ?? "the booking's payer"}, once, on departure
+                {quote?.lines.some((l) => l.kind === "fare") ? "" : " (already paid)"}. Charged before rations and upkeep.
+              </p>
+            )}
             <h4>Journey (optional lines)</h4>
             {underWay ? (
               <p className="map-route-help">Optional lines were set when the journey was approved.</p>
@@ -1080,6 +1088,13 @@ function JourneyInboxEntry({ table, journey: j }: { table: Table; journey: Journ
         {deci ? ` · ${formatMiles(deci)}` : ""} · {j.legs.length} {j.legs.length === 1 ? "leg" : "legs"} ·{" "}
         {j.costs.rations || j.costs.mounts ? "with optional costs" : "time only, no optional costs"}.
       </p>
+      {j.costs.fare && (
+        <p>
+          <span className="svc-flag review">Coach</span> Coach fare {formatCopper(j.costs.fare.copper)} from{" "}
+          {table.purses.find((p) => p.id === j.costs.fare!.payerId)?.name ?? "the booking's payer"}, once, on departure. Deny moves
+          nothing; the booking shows your reason.
+        </p>
+      )}
       {j.message && <blockquote>“{j.message}”</blockquote>}
       {quote && (
         <ul className="map-place-chips">

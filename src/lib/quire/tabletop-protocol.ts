@@ -212,7 +212,7 @@ const legacyOffer = (o: { time?: { kind?: string } }) =>
   only(o, legacyKeys.offer) && legacyKeys.time.includes(o.time?.kind ?? "");
 /** Whether text (a command, a backup body) holds wave-2 service kinds or fields. */
 export function wave2Text(text: string) {
-  return wave2Pattern.test(text) || /"(itemHoldingId|reveal|lessonOrderId)":|"target":"held-item"/.test(text);
+  return wave2Pattern.test(text) || /"(itemHoldingId|reveal|lessonOrderId)":|"target":"held-item"|"fare":\{|"kind":"fare"/.test(text);
 }
 /** A services object as protocol 8 reads it: wave-1 providers, offers and orders only. */
 export function wave1Services<T>(value: T): T {
@@ -245,6 +245,8 @@ export function hasWave2Services(table: CloudTable): boolean {
   const quotes = (table.journal?.finance as { downtime?: { quote?: { services?: { state?: unknown } } }[] } | undefined)
     ?.downtime;
   return (
+    !!table.journal?.world?.journeys?.some((j) => j.costs.fare) ||
+    !!quotes?.some((d) => (d.quote as { journey?: { lines?: { kind: string }[] } } | undefined)?.journey?.lines?.some((l) => l.kind === "fare")) ||
     !!table.journal?.world?.npcs?.some((n) => n.services?.some((k) => !legacyKind(k))) ||
     (!!s && JSON.stringify(wave1Services(s)) !== JSON.stringify(s)) ||
     !!quotes?.some((d) => d.quote?.services?.state && wave2Text(JSON.stringify(d.quote.services.state))) ||
@@ -269,15 +271,19 @@ function wave1Table(table: CloudTable): CloudTable {
     journal: {
       ...journal,
       ...(journal.services ? { services: wave1Services(journal.services) } : {}),
-      ...(finance?.downtime?.some((d) => d.quote?.services)
+      ...(finance?.downtime?.some((d) => d.quote?.services || (d.quote as { journey?: unknown } | undefined)?.journey)
         ? {
             finance: {
               ...finance,
-              downtime: finance.downtime.map((d) =>
-                d.quote?.services?.state
-                  ? { ...d, quote: { ...d.quote, services: { ...d.quote.services, state: wave1Services(d.quote.services.state) } } }
-                  : d,
-              ),
+              downtime: finance.downtime.map((d) => {
+                let quote = d.quote as (typeof d.quote & { journey?: { lines: { kind: string }[] } }) | undefined;
+                if (quote?.services?.state)
+                  quote = { ...quote, services: { ...quote.services, state: wave1Services(quote.services.state) } };
+                // Protocol 8 journey quotes know rations and mounts only (the coach fare is wave 2).
+                if (quote?.journey?.lines.some((l) => l.kind === "fare"))
+                  quote = { ...quote, journey: { ...quote.journey, lines: quote.journey.lines.filter((l) => l.kind !== "fare") } };
+                return quote === d.quote ? d : { ...d, quote };
+              }),
             } as typeof journal.finance,
           }
         : {}),
@@ -288,6 +294,17 @@ function wave1Table(table: CloudTable): CloudTable {
               npcs: world.npcs.map((n) =>
                 n.services?.some((k) => !legacyKind(k)) ? { ...n, services: wave1Kinds(n.services) as typeof n.services } : n,
               ),
+              // A coach fare is a wave-2 journey cost (protocol 8 has a strict costs schema).
+              ...(world.journeys?.some((j) => j.costs.fare)
+                ? {
+                    journeys: world.journeys.map((j) => {
+                      if (!j.costs.fare) return j;
+                      const costs = { ...j.costs };
+                      delete costs.fare;
+                      return { ...j, costs };
+                    }),
+                  }
+                : {}),
             },
           }
         : {}),

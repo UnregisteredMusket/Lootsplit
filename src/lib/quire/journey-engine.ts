@@ -43,10 +43,11 @@ export const journeyQuoteSchema = z.object({
   position: partyMapPositionSchema,
   lines: z.array(
     z.object({
-      kind: z.enum(["rations", "mounts"]),
+      /** fare: a stable's coach fare (services wave 2), charged once on departure. */
+      kind: z.enum(["fare", "rations", "mounts"]),
       purseId: id,
       quantity: z.number().int().min(1).max(100000),
-      unitCopper: z.number().int().min(0).max(1_000_000),
+      unitCopper: z.number().int().min(0).max(1e12),
       copper: z.number().int().min(0).max(1e12),
       /** The payer can't cover it: approval is refused until the line is off or coins are added. */
       short: z.boolean(),
@@ -178,7 +179,7 @@ export function journeyPosition(
  * approval refuses the whole downtime until the line is off or coins are added.
  */
 export function previewJourney(
-  t: Pick<CloudTable, "purses" | "holdings" | "journal"> & Partial<Pick<CloudTable, "shops">>,
+  t: Pick<CloudTable, "purses" | "holdings" | "journal"> & Partial<Pick<CloudTable, "shops" | "ledger">>,
   day: number,
   days: number,
   journeyId: string,
@@ -199,6 +200,14 @@ export function previewJourney(
     to = Math.min(frozen.durationMinutes, from + days * 1440),
     chargeDays = Math.ceil((to - from) / 1440);
   const lines: JourneyQuote["lines"] = [];
+  // A coach fare is charged once, first, when the DM approves departure (its booking's payment ID).
+  const fare = j.costs.fare;
+  if (fare && fare.copper && !t.ledger?.some((l) => l.id === `${fare.orderId}-payment`)) {
+    if (!balances.has(fare.payerId)) throw Error("The coach fare's payer no longer exists.");
+    const short = balances.get(fare.payerId)! < fare.copper;
+    if (!short) balances.set(fare.payerId, balances.get(fare.payerId)! - fare.copper);
+    lines.push({ kind: "fare", purseId: fare.payerId, quantity: 1, unitCopper: fare.copper, copper: fare.copper, short });
+  }
   const price = frozen.unitCopper ?? { rations: 0, mounts: 0 };
   const quantities = {
     rations: frozen.travellerIds.length * chargeDays,
@@ -274,7 +283,7 @@ export function previewJourney(
   });
 }
 
-const costLabel = { rations: "trail rations", mounts: "mount upkeep" } as const;
+const costLabel = { fare: "the coach fare", rations: "trail rations", mounts: "mount upkeep" } as const;
 /** All-or-nothing payer check, run before anything in an approved downtime moves. */
 export function assertJourneyPayable(t: Pick<CloudTable, "purses">, quote?: JourneyQuote) {
   const short = quote?.lines.find((l) => l.short);
@@ -303,13 +312,22 @@ export function applyJourney(
   const j = world.journeys?.find((j) => j.id === quote.journeyId);
   if (!j || (j.status !== "planned" && j.status !== "active"))
     throw Error("This journey is not waiting to travel.");
-  for (const line of quote.lines)
+  for (const line of quote.lines) {
+    if (line.kind === "fare") {
+      // Once, with the booking's payment ID, however many downtime windows the journey takes.
+      const fare = j.costs.fare!;
+      if (t.ledger.some((l) => l.id === `${fare.orderId}-payment`)) continue;
+      move(line.purseId, -line.copper, `${fare.orderId}-payment`, `${receipt.name}: coach fare`);
+      settleCoach(t, fare.orderId, at, true);
+      continue;
+    }
     move(
       line.purseId,
       -line.copper,
       `${receipt.id}:journey:${line.kind}`,
       `${receipt.name}: ${costLabel[line.kind]} (${line.quantity} × ${formatCopper(line.unitCopper)})`,
     );
+  }
   const departing = j.status === "planned";
   j.status = quote.arrived ? "arrived" : "active";
   j.decidedAt ??= at;
@@ -327,6 +345,29 @@ export function applyJourney(
       (quote.arrived ? " · arrived; waiting for the DM to move the party in" : "")
     ).slice(0, 500),
   });
+}
+
+/**
+ * A stable's coach booking follows its journey: departure pays it (completed), a denial or
+ * withdrawal closes it without charge. Only the booking's own record changes here.
+ */
+function settleCoach(t: CloudTable, orderId: string, at: number, departed: boolean, status?: "denied" | "cancelled", reason = "") {
+  const services = t.journal?.services as { orders?: { id: string; status: string; message: string; paidDay?: number; paidMinute?: number; completedDay?: number; completedMinute?: number; history: { at: number; status: string; note: string }[]; terms: { shopId: string } }[] } | undefined;
+  const o = services?.orders?.find((x) => x.id === orderId);
+  if (!o || o.status !== "requested") return;
+  const f = t.journal!.finance ?? { day: 0, minuteOfDay: 0 };
+  if (departed) {
+    const line = t.ledger.find((l) => l.id === `${orderId}-payment`);
+    if (line) line.shopId = o.terms.shopId;
+    o.status = "completed";
+    o.paidDay = o.completedDay = f.day;
+    o.paidMinute = o.completedMinute = f.minuteOfDay ?? 0;
+    o.message = "Departed. The fare was charged once when the DM approved departure.";
+  } else {
+    o.status = status!;
+    o.message = `${status === "denied" ? `The DM denied the journey.${reason ? ` ${reason}` : ""}` : "The journey request was withdrawn."} Nothing was charged.`.slice(0, 1000);
+  }
+  if (o.history.length < 50) o.history.push({ at, status: o.status, note: o.message });
 }
 
 /** Called by `validateWorld`. */
@@ -423,6 +464,9 @@ export function applyJourneyCommand(
     if (next.status === "denied" && !next.reason) next.reason = { text: "", showToPlayer: false };
     if (next.status !== "proposed") next.decidedAt = at;
   }
+  // A coach fare is set by its stable booking and never edited here.
+  if (!same(next.costs.fare ?? null, current?.costs.fare ?? null))
+    throw Error("A coach fare comes from its stable booking and can't be changed here.");
   if (!dm && next.reason) throw Error("Only the DM can give a reason.");
   if (!dm && (next.costs.rations || next.costs.mounts))
     throw Error("Optional journey costs are chosen by the DM.");
@@ -449,6 +493,8 @@ export function applyJourneyCommand(
   if (next.status === "stopped" && t.journal?.finance?.downtime.some((d) => d.status === "pending" && d.quote.journey?.journeyId === next.id))
     throw Error("Cancel the journey's pending downtime preview before stopping it.");
   world.journeys = [...journeys.filter((j) => j.id !== next.id), next];
+  if (next.costs.fare && (next.status === "denied" || next.status === "cancelled"))
+    settleCoach(t, next.costs.fare.orderId, at, false, next.status, next.reason?.showToPlayer ? next.reason.text : "");
   const to = placeName(t, next.destinationLocationId) || "a point on the map";
   event(
     {
