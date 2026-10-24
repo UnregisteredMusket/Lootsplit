@@ -13,7 +13,12 @@ approved "as shown" on 2026-10-23.
 | 0 | Shared helpers lifted from the forge (`service-core.ts`); hub Services runs the real availability check and lists every provider | Shipped |
 | 1 | Temple, with DM review (charged on approval) | Shipped |
 | 2 | Workshop: scribe and alchemist presets | Shipped |
-| 3 | Inn: booked stays, meals, rumours into the buyer's private NPC thread | This change |
+| 3 | Inn: booked stays, meals, rumours into the buyer's private NPC thread | Shipped |
+| 4a | Wave 2: new kinds, tabletop protocol 9, Fence/Bank/Hire links, Tailor preset | This change |
+| 4b | Wave 2: Sage (Identify, record only) | Planned |
+| 4c | Wave 2: Stable and coach | Planned |
+| 4d | Wave 2: Trainer (paid lessons) | Planned |
+| 4e | Wave 2: Courier (letters to NPCs) | Planned |
 
 ## Shared helpers (`src/lib/quire/service-core.ts`)
 
@@ -127,6 +132,47 @@ commands are refused with the usual "finish on the updated website" message.
   Players see teaser and price only, plus `boughtBy` for their own characters. The buyer may share
   the text in party chat (owner decision).
 
+## Wave 2 (owner-approved mockups, 2026-10-24)
+
+Design: the wave-2 design note and mockups (hub, training, stable, courier, identify, DM setup),
+approved "as shown". Wave-1 rules carry over: record only, SRD 5.2.1 defaults with SRD 5.1 and Blank
+presets, a per-provider pause, reviewed orders charged on approval. Moneychanger skipped (coins
+already make change); bank deposits, travelling hirelings, alterations, ship passage and a
+stolen-goods flag are deferred.
+
+### Kinds and protocol 9 (phase 4a)
+
+`serviceKinds` adds `trainer`, `stable`, `courier`, `sage` (engines) and `fence`, `bank`, `hire`
+(links). Engine kinds are refused by `validateServices` until their phase ships. `npc.services`
+takes the same values.
+
+**Tabletop protocol 9** (`SERVICES_WAVE2_PROTOCOL`): protocols 0-8 receive `journal.services`
+without wave-2 providers, without offers carrying wave-2 fields or time models, and without
+orders whose terms or fields are wave 2 (`wave1Services`, by key whitelist); NPC lists without
+wave-2 kinds; the same for a pending downtime quote's `services.state` and archived reports.
+Their NPC saves compare against the stripped list and keep the stored wave-2 kinds (`world.ts`
+npc-save), whole-journal writes keep them (`journal.ts`), account backups with wave-2 data are
+refused for restore on those clients, and their pending drafts with wave-2 service data ask them
+to finish on the updated website.
+
+### Links (phase 4a): no new money path
+
+Link providers have no offers (validated) and an optional `link`:
+
+| Kind | Opens | Settings | Lock (after the shared reasons) |
+| --- | --- | --- | --- |
+| Fence | The provider shop's Sell tab (`/shop/ID#sell`); selling is the existing `sell` at the shop's buy rate | Shop preset button: black market on, premium 1.5, buy rate 30% (house default) | "{NPC} isn't dealing right now." while the black market is hidden (checked before the shop) |
+| Bank | Bank → Apply for a loan (`/features/bank?bank=ID`), note "Loan from {bank} ({NPC}). " | `link.loan`: rate, period, simple/compound, largest loan; prefills the DM's Track existing debt form for a request whose note names the bank | — |
+| Hire | Conversation: choose a role and a party property, then the ordinary `estate-staff` proposal (status proposed; DM approves in Property proposals) | `link.roles`: name, wage, period, optional NPC (SRD hirelings: guard 2 gp, porter 2 sp a day) | "has no one for hire"; "The party owns no property to staff." |
+
+Projection: a fence only while `world.blackMarketActive`; a role's NPC only when the player can
+read that NPC; provider events stay DM-only. Here rows: Sell, Borrow, Hire. Hub replies are
+marked ↗. Deleting an NPC a hire role names is refused.
+
+**Tailor** is a third workshop specialty: common, traveler's, costume and fine clothes (SRD 5.1
+prices and weights), SRD 5.2.1 crafting days (gp ÷ 10, rounded up; SRD 5.1: 5 gp a day), half the
+price as cloth the party may bring or the tailor supplies.
+
 ## Screens
 
 - Conversation (`service-talk.tsx`): offers as numbered replies with price, time, component and
@@ -156,7 +202,9 @@ commands are refused with the usual "finish on the updated website" message.
 
 ## Verification
 
-`services-temple.test.ts` (command IDs, stale quotes, charge on approval, components, every lock
+`service-links.test.ts` (link validation, no orders on links, fence projection and lock, bank note
+and terms, hire lock and proposal moving nothing, role NPC privacy, protocol 8 stripping and older
+writes, Tailor and link presets, Here rows, offline parity), `services-temple.test.ts` (command IDs, stale quotes, charge on approval, components, every lock
 reason, whole copper, authorization, privacy, deletion guards, old saves and protocol 8, presets,
 offline parity, Here rows), `services-workshop.test.ts` (presets, herbs, downtime-only progress,
 pause, collect once at the workshop, cancel without refund, privacy, offline parity through

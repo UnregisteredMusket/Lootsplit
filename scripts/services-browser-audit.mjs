@@ -9,7 +9,7 @@ import { smithFixture, smithDm } from "../src/lib/quire/test-fixtures/blacksmith
 import { applyCommand } from "../src/lib/quire/commands.ts";
 import { defaultSmith } from "../src/lib/quire/blacksmith-schema.ts";
 import { validateWorld } from "../src/lib/quire/world.ts";
-import { servicesFixture, workshopFixture, innFixture } from "../src/lib/quire/test-fixtures/services.ts";
+import { servicesFixture, workshopFixture, innFixture, linksFixture, svcDm } from "../src/lib/quire/test-fixtures/services.ts";
 import { openApplication, reloadApplication, navigateApplication } from "./title-screen-navigation.mjs";
 
 const origin = process.env.AUDIT_ORIGIN || "http://127.0.0.1:8080";
@@ -292,6 +292,68 @@ async function temple(page, width) {
   await page.screenshot({ path: `${output}/temple-shop-${width}.png`, fullPage: true });
 }
 
+/** Wave 2 links: the fence opens its Sell tab; the bank a loan request; hire a staff proposal. */
+async function links(page, width) {
+  const t = applyCommand(linksFixture(), svcDm, { id: "bm-on", kind: "black-market", before: false, active: true });
+  await open(page, t, "rook", "Rook");
+  const fence = reply(page, "What will you give me for these?");
+  await expect(fence).toContainText("Services · Fence ↗");
+  await expect(fence).toHaveAttribute("href", /\/shop\/back-room#sell$/);
+  await fits(page, `${width} fence`);
+  await page.screenshot({ path: `${output}/links-fence-${width}.png`, fullPage: true });
+  await fence.click();
+  await expect(page).toHaveURL(/\/shop\/back-room#sell$/);
+  await expect(page.locator("#sell")).toContainText("merchant rate 30%");
+  await fits(page, `${width} fence sell tab`);
+
+  // A player at the Counting House: Bank and Hire in one sub-list.
+  await open(page, t, "ottilie", "Ottilie Grane");
+  await page.evaluate(async () => {
+    const seat = await import("/src/lib/quire/table.ts");
+    seat.setSeat({ ...seat.getSeat(), role: "player", purseIds: ["kael"] });
+  });
+  const services = reply(page, "Do you offer any services?");
+  await expect(services).toContainText("Services · Bank, Hire");
+  await services.click();
+  const bank = reply(page, "I'd like to borrow some coin.");
+  await expect(bank).toContainText("Services · Bank · Harrowgate Counting House ↗");
+  await expect(bank).toContainText("5% simple per 30 days, up to 500 gp");
+  await fits(page, `${width} bank and hire`);
+  await page.screenshot({ path: `${output}/links-sublist-${width}.png`, fullPage: true });
+  await reply(page, "Do you have work for hire? I need hands.").click();
+  const guard = reply(page, "I need a guard.");
+  await expect(guard).toContainText("Hire · Guard");
+  await guard.click();
+  const drawer = talk(page).locator(".npc-talk-drawer");
+  await expect(drawer.getByRole("button", { name: "Townhouse on Mill Lane" })).toHaveAttribute("aria-pressed", "true");
+  await expect(drawer.getByLabel("Name on the contract")).toHaveValue("Brannoc");
+  await expect(drawer.locator(".svc-total")).toContainText("Nothing");
+  await fits(page, `${width} hire`);
+  await page.screenshot({ path: `${output}/links-hire-${width}.png`, fullPage: true });
+  const coinsBefore = JSON.stringify((await readJournal(page)).ledger);
+  await reply(page, "Send word when they can start.").click();
+  await expect(talk(page)).toContainText("Staff contract proposed: Brannoc, Guard at Townhouse on Mill Lane");
+  const state = await readJournal(page);
+  const staff = state.journal.propertyOperations.staff;
+  assert.equal(staff.length, 1);
+  assert.deepEqual([staff[0].status, staff[0].wageCopper, staff[0].npcId], ["proposed", 200, "brannoc"]);
+  assert.equal(JSON.stringify(state.ledger), coinsBefore, "a hire proposal moves no money");
+
+  // The bank link opens the existing loan request with the bank named.
+  await reply(page, "Never mind.").click();
+  await reply(page, "Do you offer any services?").click();
+  await reply(page, "I'd like to borrow some coin.").click();
+  await expect(page).toHaveURL(/\/features\/bank\?bank=ottilie-bank/);
+  await expect(page.getByLabel("Loan reason")).toHaveValue("Loan from Harrowgate Counting House (Ottilie Grane). ");
+  await expect(page.locator("main")).toContainText("From Harrowgate Counting House");
+  await fits(page, `${width} loan request`);
+  await page.screenshot({ path: `${output}/links-loan-${width}.png`, fullPage: true });
+  await page.evaluate(async () => {
+    const seat = await import("/src/lib/quire/table.ts");
+    seat.setSeat({ ...seat.getSeat(), role: "dm", purseIds: [] });
+  });
+}
+
 try {
   for (const width of [1280, 390, 320]) {
     const context = await browser.newContext({ viewport: { width, height: 950 }, serviceWorkers: "block" });
@@ -353,6 +415,7 @@ try {
     if (width === 1280) await setup(page);
     await workshop(page, width);
     await inn(page, width);
+    await links(page, width);
     await context.close();
   }
   assert.deepEqual(errors, [], "No browser runtime errors");
