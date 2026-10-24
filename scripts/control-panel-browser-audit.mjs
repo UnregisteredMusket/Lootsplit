@@ -298,13 +298,20 @@ try {
       const characterTab = partyTabs.getByRole("tab", { name: "Characters", exact: true });
       const fundsTab = partyTabs.getByRole("tab", { name: "Funds & inventory", exact: true });
       const poolTab = partyTabs.getByRole("tab", { name: /^Treasure pool/ });
+      const fairnessTab = partyTabs.getByRole("tab", { name: /^Fairness/ });
       await characterTab.focus();
-      // Three tabs since the treasure pool (prompt 2, phase 2): End reaches the last one.
+      // Four tabs since Fairness (prompt 2, phase 3): End reaches the last one.
       await characterTab.press("End");
+      await expect(fairnessTab).toBeFocused();
+      await expect(fairnessTab).toHaveAttribute("aria-selected", "true");
+      await expect(page.locator("#party-panel-fairness")).toBeVisible();
+      await fairnessTab.press("ArrowLeft");
       await expect(poolTab).toBeFocused();
       await expect(poolTab).toHaveAttribute("aria-selected", "true");
       await expect(page.locator("#party-panel-pool")).toBeVisible();
       await poolTab.press("ArrowRight");
+      await expect(fairnessTab).toBeFocused();
+      await fairnessTab.press("ArrowRight");
       await expect(characterTab).toBeFocused();
       await characterTab.press("ArrowRight");
       await expect(fundsTab).toBeFocused();
