@@ -12,6 +12,7 @@ import {
   type ServiceStatus,
 } from "./services-schema.ts";
 import { rumourQuote, serviceQuote, serviceSummary } from "./services.ts";
+import { deliverLetter } from "./services-courier.ts";
 import { validateServices } from "./services-validation.ts";
 
 // Authoritative service commands (docs/SERVICES.md). Every coin movement is one financeMove with
@@ -50,7 +51,9 @@ function settle(t: CloudTable, o: ServiceOrder, at: number, approved: boolean) {
   o.paidDay = f.day;
   o.paidMinute = f.minuteOfDay ?? 0;
   const paid = approved ? "Approved and paid." : "Paid.";
-  if (o.terms.offer.time.kind === "downtime-days")
+  if (o.terms.letter)
+    note(o, "active", `${paid} In transit: it arrives after ${o.terms.workDays} approved downtime ${o.terms.workDays === 1 ? "day" : "days"}.`, at);
+  else if (o.terms.offer.time.kind === "downtime-days")
     note(o, "active", `${paid} Work advances only with DM-approved downtime.`, at);
   else {
     o.completedDay = f.day;
@@ -198,8 +201,23 @@ export function applyServiceCommand(t: CloudTable, seat: CloudSeat, cmd: Service
         if (cmd.reason) o.history.at(-1)!.note = o.message;
         summary = `Service request approved: ${serviceSummary(o)}.`;
       }
+    } else if (cmd.kind === "service-control" && (cmd.action === "deliver" || cmd.action === "return")) {
+      // A held courier letter: deliver it anyway, or return it to the sender (no refund).
+      dm();
+      if (!o.terms.letter || o.status !== "paused" || o.progressDays !== o.terms.workDays)
+        throw Error("Only a letter held on arrival can be delivered or returned.");
+      if (cmd.action === "deliver") {
+        if (!t.journal!.world!.npcs.some((n) => n.id === o.terms.letter!.recipientNpcId))
+          throw Error(`${o.terms.letter.recipientName} no longer exists. Return the letter instead.`);
+        o.completedDay ??= f.day;
+        o.completedMinute ??= f.minuteOfDay ?? 0;
+        note(o, "completed", `Delivered by the DM. In your thread with ${o.terms.letter.recipientName}. ${cmd.reason}`.slice(0, 1000), at);
+        deliverLetter(t, o, at);
+      } else note(o, "cancelled", `Returned to sender. Nothing is refunded. ${cmd.reason}`.slice(0, 1000), at);
+      summary = `Letter ${cmd.action === "deliver" ? "delivered" : "returned"}: ${serviceSummary(o)}.`;
     } else if (cmd.kind === "service-control") {
       dm();
+      if (cmd.action === "deliver" || cmd.action === "return") throw Error("Only a held letter can be delivered or returned.");
       controlOrder(o, cmd.action, cmd.reason, (x) => ["active", "paused", "ready"].includes(x.status), "This order cannot make that status change.");
       if (o.history.length < 50) o.history.push({ at, status: o.status, note: cmd.reason });
       summary = `Service order ${cmd.action}: ${serviceSummary(o)}.`;

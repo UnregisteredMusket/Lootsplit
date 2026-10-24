@@ -1,0 +1,9 @@
+{
+  "title": "NPC services: couriers carry letters",
+  "summary": "Send a letter to an NPC you've met, wherever they are.",
+  "items": [
+    "Write to someone your character has met at a place the courier serves, priced by distance.",
+    "The letter travels as the DM approves downtime and arrives in your private conversation with that NPC.",
+    "If the recipient can't be found, the DM decides whether to deliver it anyway or send it back."
+  ]
+}

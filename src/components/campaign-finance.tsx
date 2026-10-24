@@ -354,7 +354,10 @@ export function CampaignFinance({
                     )}
                     {pending.quote.services && (
                       <>
-                        <h3>Workshop commissions</h3>
+                        <h3>
+                          Workshop commissions
+                          {pending.quote.services.state.orders.some((o) => o.terms.letter) ? " & courier letters" : ""}
+                        </h3>
                         {pending.quote.services.notices.map((n) => (
                           <p key={n.orderId}>{n.summary}</p>
                         ))}
@@ -365,7 +368,8 @@ export function CampaignFinance({
                     )}
                     <p className="text-sm text-muted">
                       Work advances only when you approve this downtime, never by session hours. Finished
-                      work waits where it was ordered.
+                      work waits where it was ordered; a delivered letter lands in the sender's thread with its
+                      recipient when you approve, and you answer there as the NPC.
                     </p>
                   </details>
                 )}

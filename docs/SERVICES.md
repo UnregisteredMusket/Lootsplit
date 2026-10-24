@@ -17,8 +17,8 @@ approved "as shown" on 2026-10-23.
 | 4a | Wave 2: new kinds, tabletop protocol 9, Fence/Bank/Hire links, Tailor preset | Shipped |
 | 4b | Wave 2: Sage (Identify, record only) | Shipped |
 | 4c | Wave 2: Stable and coach | Planned |
-| 4d | Wave 2: Trainer (paid lessons) | This change |
-| 4e | Wave 2: Courier (letters to NPCs) | Planned |
+| 4d | Wave 2: Trainer (paid lessons) | Shipped |
+| 4e | Wave 2: Courier (letters to NPCs) | This change |
 
 ## Shared helpers (`src/lib/quire/service-core.ts`)
 
@@ -230,6 +230,32 @@ same form, hour pool, Review Inbox, counters, resets and milestone notes.
   clients drop `lessonOrderId`/`feeCopper` when reading; their review `before` then differs and the
   server refuses it, never charges.
 
+### Courier: letters (phase 4e)
+
+- **Provider**: `destinations: [{ locationId, deciMiles, days }]` (DM's distance in tenths of a mile
+  and delivery days, 1–3650; locations must exist). Offer "Letter" (`time: { kind: "delivery" }`),
+  `priceCopper` = rate per mile, 2 cp in both presets (SRD Messenger). A separate provider kind: post
+  offices don't get it automatically; their property letters (`estate-letter`) are unchanged and
+  linked from the conversation (Property letter ↗). Parcels: locked, not carried.
+- **Recipients** (`courierRecipients`): visible NPCs the sender already has a thread with ("knows"),
+  each under the destination containing the NPC's location; blocked when the NPC is at the
+  courier's place ("talk instead") or nowhere the courier serves. Hidden NPCs are never listed.
+  Players receive their characters' list as the projection-only `provider.recipients` (never
+  stored, refused by validation outside a projection), so a far-away NPC needs no other projection.
+- **Order** (`request.letter: { recipientNpcId, text ≤ 2000 }`, the NPC message limit): one payment
+  `id-payment` = `ceil(deciMiles × rate ÷ 10)`, status `active` with `workDays` = the destination's
+  days, terms `letter` (recipient, place, distance, text).
+- **Delivery**: `previewServices` advances letters like workshop work (approved downtime only).
+  On arrival the preview marks it `completed` ("Delivered campaign day N") or, when the recipient
+  is hidden or gone, `paused` ("Held at … The DM decides."). Approving the downtime runs
+  `deliverLetters`: each completed letter appends one message `orderId-letter` (author: the
+  character) to the sender's own thread with the recipient; repeats add nothing.
+- **Held letters**: `service-control` `deliver` (completed, delivered once) or `return` (cancelled,
+  nothing refunded), DM only, held letters only.
+- **Privacy**: the text is in the sender's order and thread only; other players get neither, and
+  their recipient lists are their own. Guards: a recipient with a letter in transit and a
+  destination's location can't be deleted.
+
 ## Screens
 
 - Conversation (`service-talk.tsx`): offers as numbered replies with price, time, component and
@@ -259,6 +285,9 @@ same form, hour pool, Review Inbox, counters, resets and milestone notes.
 
 ## Verification
 
+`services-courier.test.ts` (preset and fee rounding, recipient rules, one payment, downtime-only
+progress, one delivery message, held letters delivered or returned, privacy and matching
+fingerprints, deletion guards, protocol 8, offline parity through `executeFinanceCommand`),
 `services-trainer.test.ts` (presets, booking moves nothing, one open agreement, hours reserved
 for both, level check skipped only for lessons, matching and days cap, fee rounding, one charge
 per approval, retries, deny/cancel, short payer, cap completes, End lessons, privacy, protocol 8,

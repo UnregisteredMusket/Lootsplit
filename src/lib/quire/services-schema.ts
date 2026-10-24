@@ -59,6 +59,8 @@ export const serviceTimeSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("per-night"), maxNights: z.number().int().min(1).max(365) }).strict(),
   /** Trainer (wave 2): the price is per training day; a day is the campaign's training-day setting. */
   z.object({ kind: z.literal("training") }).strict(),
+  /** Courier (wave 2): delivery takes the destination's days, over approved downtime only. */
+  z.object({ kind: z.literal("delivery") }).strict(),
 ]);
 export const serviceOutputSchema = z.discriminatedUnion("kind", [
   z.object({ kind: z.literal("record") }).strict(),
@@ -138,6 +140,15 @@ export const bankTermsSchema = z
     maxCopper: copper,
   })
   .strict();
+/** Courier: a place it delivers to, with the DM's distance (tenths of a mile) and delivery days. */
+export const courierDestinationSchema = z
+  .object({
+    locationId: id,
+    deciMiles: z.number().int().min(1).max(1e9),
+    days: z.number().int().min(1).max(3650),
+  })
+  .strict();
+export type CourierDestination = z.infer<typeof courierDestinationSchema>;
 /** Fence, bank and hire: what the link opens with. Never moves money by itself. */
 export const serviceLinkSchema = z
   .object({ loan: bankTermsSchema.optional(), roles: z.array(hireRoleSchema).max(20).optional() })
@@ -163,6 +174,27 @@ export const serviceProviderSchema = z
     rumours: z.array(rumourSchema).max(200).optional(),
     /** Link kinds only (fence, bank, hire). */
     link: serviceLinkSchema.optional(),
+    /** Courier only: the places letters go to. */
+    destinations: z.array(courierDestinationSchema).max(200).optional(),
+    /** Projection only: the NPCs the viewer's character could write to (never stored). */
+    recipients: z
+      .array(
+        z
+          .object({
+            /** The viewer's character this entry is for. */
+            purseId: id,
+            npcId: id,
+            name: z.string().max(160),
+            locationId: id.optional(),
+            placeName: z.string().max(160).optional(),
+            deciMiles: z.number().int().min(1).max(1e9).optional(),
+            days: z.number().int().min(1).max(3650).optional(),
+            blocked: z.string().max(300),
+          })
+          .strict(),
+      )
+      .max(500)
+      .optional(),
   })
   .strict();
 export type HireRole = z.infer<typeof hireRoleSchema>;
@@ -190,6 +222,8 @@ export const serviceRequestSchema = z
     inn: z.object({ tierKey: goodsKey, meals: z.number().int().min(0).max(3) }).strict().optional(),
     /** Identify: the carried item the sage looks at. */
     itemHoldingId: id.optional(),
+    /** Courier: the recipient NPC and the letter (only the sender and the DM read it). */
+    letter: z.object({ recipientNpcId: id, text: z.string().trim().min(1).max(2000) }).strict().optional(),
   })
   .strict();
 export type ServiceRequest = z.infer<typeof serviceRequestSchema>;
@@ -239,6 +273,18 @@ export const serviceTermsSchema = z
     review: z.enum(["auto", "dm"]),
     workDays: z.number().int().min(0).max(3650),
     settlement: z.enum(settlementKinds),
+    /** Courier: the letter as sent. Delivered into the sender's thread with the recipient. */
+    letter: z
+      .object({
+        recipientNpcId: id,
+        recipientName: z.string().max(160),
+        locationId: id,
+        placeName: z.string().max(160),
+        deciMiles: z.number().int().min(1).max(1e9),
+        text: z.string().trim().min(1).max(2000),
+      })
+      .strict()
+      .optional(),
     /** Trainer: the agreement. Sessions are charged one by one when the DM approves them. */
     lessons: z
       .object({
@@ -370,7 +416,8 @@ export const serviceCommands = [
     .object({
       ...orderRef,
       kind: z.literal("service-control"),
-      action: z.enum(["pause", "resume", "cancel"]),
+      /** deliver / return: a courier letter held because its recipient couldn't be found. */
+      action: z.enum(["pause", "resume", "cancel", "deliver", "return"]),
       reason: z.string().trim().min(1).max(1000),
     })
     .strict(),

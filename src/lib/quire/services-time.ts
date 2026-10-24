@@ -3,6 +3,7 @@ import type { CloudTable } from "./cloud.ts";
 import { canonicalJson } from "./canonical-json.ts";
 import { previewDays } from "./service-core.ts";
 import { readServices, servicesSchema } from "./services-schema.ts";
+import { letterHeld } from "./services-courier.ts";
 
 const id = z.string().min(1).max(150);
 /** Workshop progress inside the single DM-approved downtime quote (the forge's model). */
@@ -15,7 +16,7 @@ export const serviceQuoteSchema = z
   .strict();
 
 /** Pure: only approved between-session downtime advances work; session hours never do. */
-export function previewServices(t: Pick<CloudTable, "journal">, days: number, withinSession = false) {
+export function previewServices(t: Pick<CloudTable, "journal" | "purses">, days: number, withinSession = false) {
   if (!t.journal?.services) return undefined;
   const s = readServices(t.journal.services),
     f = t.journal.finance ?? { day: 0, minuteOfDay: 0 },
@@ -31,10 +32,20 @@ export function previewServices(t: Pick<CloudTable, "journal">, days: number, wi
         {
           workDays: (o) => o.terms.workDays,
           name: (o) =>
-            `${o.terms.specialty ?? "Workshop"} · ${o.terms.offer.output.kind === "holding" ? o.terms.offer.output.name : o.terms.offer.name}${o.terms.units > 1 ? ` ×${o.terms.units}` : ""}`,
+            o.terms.letter
+              ? `Courier · Letter to ${o.terms.letter.recipientName}`
+              : `${o.terms.specialty ?? "Workshop"} · ${o.terms.offer.output.kind === "holding" ? o.terms.offer.output.name : o.terms.offer.name}${o.terms.units > 1 ? ` ×${o.terms.units}` : ""}`,
           readyMessage: "Finished; collect it where it was ordered.",
         },
       ),
     );
+  // Courier: a letter that arrives is delivered (approval puts it in the sender's thread), or held
+  // for the DM when its recipient is hidden or gone.
+  for (const o of s.orders)
+    if (o.terms.letter && o.status === "ready") {
+      const held = letterHeld(t as CloudTable, o);
+      o.status = held ? "paused" : "completed";
+      o.message = held || `Delivered campaign day ${o.completedDay}. In your thread with ${o.terms.letter.recipientName}.`;
+    }
   return { before: canonicalJson(t.journal.services), state: s, notices };
 }

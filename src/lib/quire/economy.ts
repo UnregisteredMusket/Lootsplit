@@ -1048,6 +1048,8 @@ export async function removePurse(id: string): Promise<void> {
       throw Error("Remove this maker's forge configuration before deleting the NPC account.");
     if (journal.services?.providers.some((p) => p.npcId === id))
       throw Error("Remove the services this NPC provides before deleting the NPC account.");
+    if (journal.services?.orders.some((o) => o.terms.letter?.recipientNpcId === id && serviceOrderOpen(o)))
+      throw Error("Resolve letters in transit to this NPC before deleting the NPC account.");
     if (journal.services?.providers.some((p) => p.link?.roles?.some((r) => r.npcId === id)))
       throw Error("Remove this NPC from the hire roles that name them before deleting the NPC account.");
     if (journal.services?.orders.some((o) => o.purseId === id && serviceOrderOpen(o)))

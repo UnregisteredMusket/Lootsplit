@@ -362,3 +362,53 @@ export function sessionCommand(id: string, orderId: string, hours: number, pupil
     lessonOrderId: orderId,
   };
 }
+
+/**
+ * Wave 2 Courier: Pell Quickfoot at Harrowgate Post delivers to Saltmere (38.2 mi, 2 days) and
+ * Greyford (61.1 mi, 3 days). Kael has threads with Lady Marrow (Saltmere), Captain Reyne
+ * (Greyford), Old Tamsin (here) and a hidden spy; Thorn has a thread with Lady Marrow only.
+ */
+export function courierFixture(): CloudTable {
+  let t = servicesFixture();
+  t.journal!.market!.locations.push({ id: "greyford", name: "Greyford", kind: "town", parentId: "vale", description: "" } as never);
+  t.journal!.market!.locations.push({ id: "saltmere-docks", name: "Saltmere docks", kind: "area", parentId: "saltmere", description: "" } as never);
+  t.shops.push({ ...t.shops[0], id: "post", name: "Harrowgate Post", keeper: "Pell", category: "general" });
+  for (const [id, name, locationId, visible, services] of [
+    ["pell", "Pell Quickfoot", "harrowgate", true, ["courier"]],
+    ["marrow", "Lady Marrow", "saltmere-docks", true, []],
+    ["reyne", "Captain Reyne", "greyford", true, []],
+    ["tamsin", "Old Tamsin", "harrowgate", true, []],
+    ["spy", "The Grey Spy", "saltmere", false, []],
+  ] as const)
+    t = applyCommand(t, svcDm, {
+      id,
+      kind: "npc-create",
+      npc: { id, name, description: "", locationId, visible, barterAllowed: false, controllerPurseId: null, services: [...services] },
+      copper: 0,
+      inventory: [],
+    });
+  const thread = (npcId: string, purseId: string) => ({
+    id: `${npcId}:${purseId}`,
+    npcId,
+    purseId,
+    messages: [{ id: `${npcId}-${purseId}-hello`, author: "character" as const, text: "Well met.", at: 1 }],
+  });
+  t.journal!.world!.conversations.push(
+    thread("marrow", "kael"),
+    thread("reyne", "kael"),
+    thread("tamsin", "kael"),
+    thread("spy", "kael"),
+    thread("marrow", "thorn"),
+  );
+  const courier = newProvider("courier", { id: "post", name: "Harrowgate Post" }, "pell", "post-courier");
+  courier.destinations = [
+    { locationId: "saltmere", deciMiles: 382, days: 2 },
+    { locationId: "greyford", deciMiles: 611, days: 3 },
+  ];
+  return applyCommand(t, svcDm, { id: "courier-setup", kind: "service-provider", providerId: "post-courier", before: null, provider: courier });
+}
+/** Send a letter. */
+export function letterCommand(t: CloudTable, id: string, recipientNpcId: string, text = "My lady, the lights at the old mill were no rumour.", purseId = "kael") {
+  const req: ServiceRequest = { beneficiaryPurseIds: [], units: 1, contributions: [], letter: { recipientNpcId, text } };
+  return orderCommand(t, id, "letter", purseId, req, "post-courier");
+}
