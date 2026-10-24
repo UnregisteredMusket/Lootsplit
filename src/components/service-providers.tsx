@@ -42,12 +42,13 @@ import { miles } from "@/lib/quire/services-courier";
 
 const kindName = serviceKindNames;
 /** Kinds the DM can add in this release; later kinds arrive with their own presets. */
-const addableKinds: ServiceKind[] = ["temple", "workshop", "inn", "trainer", "courier", "sage", "fence", "bank", "hire"];
+const addableKinds: ServiceKind[] = ["temple", "workshop", "inn", "trainer", "stable", "courier", "sage", "fence", "bank", "hire"];
 /** What each kind's toggle in the NPC record says. */
 const kindHint: Partial<Record<ServiceKind, string>> = {
   sage: "Identify a carried item; you write the answer.",
   trainer: "Paid lessons, charged per approved session.",
   courier: "Letters to NPCs, priced per mile.",
+  stable: "Stabling by the night and coach routes.",
   fence: "Opens a black-market shop's Sell tab.",
   bank: "Opens a loan request naming this bank.",
   hire: "Proposes a property staff contract.",
@@ -264,7 +265,11 @@ function PresetChoice({ value, onChange, kind = "temple" }: { value: ServicePres
         ))}
       </div>
       <p className="svc-hint">
-        {kind === "courier"
+        {kind === "stable"
+          ? value === "blank"
+            ? "No offers: add your own."
+            : "Stabling 5 sp an animal a night with feed 5 cp a day (SRD 5.2.1 and 5.1 agree). SRD 5.2.1 has no coach fare, so both use SRD 5.1's 3 cp a mile per passenger."
+          : kind === "courier"
           ? value === "blank"
             ? "No offers: add your own."
             : "Letters at SRD Messenger pay, 2 cp a mile (5.1 and 5.2.1 agree), over the distance you set for each destination."
@@ -334,6 +339,9 @@ function ProviderEditor({ provider, table: t }: { provider: ServiceProvider; tab
         </div>
         {isLinkKind(draft.kind) && (
           <LinkEditor provider={draft} table={t} onChange={(link) => set({ link })} />
+        )}
+        {draft.kind === "stable" && (
+          <CoachRoutes provider={draft} table={t} onChange={(routes) => set({ routes })} />
         )}
         {draft.kind === "courier" && (
           <CourierDestinations provider={draft} table={t} onChange={(destinations) => set({ destinations })} />
@@ -514,6 +522,31 @@ function OfferEditor({
           Description
           <textarea value={o.description} maxLength={1500} onChange={(e) => onChange({ description: e.target.value })} />
         </label>
+        {kind === "stable" && o.time.kind === "per-night" && (
+          <div className="svc-grid">
+            <label>
+              Feed per animal per day (copper)
+              <input type="number" min={0} value={o.feedCopper ?? 0} onChange={(e) => onChange({ feedCopper: whole(e.target.value) })} />
+              <span className="svc-hint">{formatCopper(o.feedCopper ?? 0)} · optional for the customer</span>
+            </label>
+            <label>
+              Most nights per booking
+              <input
+                type="number"
+                min={1}
+                max={365}
+                value={o.time.maxNights}
+                onChange={(e) => onChange({ time: { kind: "per-night", maxNights: whole(e.target.value, 1, 365) } })}
+              />
+            </label>
+          </div>
+        )}
+        {kind === "stable" && o.time.kind === "coach" && (
+          <p className="svc-hint">
+            The price is per mile per passenger. Each route below becomes a reply; a booking is a party journey request and the
+            fare is charged once when you approve departure.
+          </p>
+        )}
         {kind === "trainer" && (
           <div className="svc-grid">
             <label>
@@ -534,7 +567,7 @@ function OfferEditor({
             </p>
           </div>
         )}
-        {kind !== "inn" && kind !== "trainer" && (
+        {kind !== "inn" && kind !== "trainer" && kind !== "stable" && (
           <div className="svc-grid">
             <label>
               Spell level
@@ -1419,6 +1452,100 @@ function CourierDestinations({
       <p className="svc-hint">
         Letters go to NPCs a character has met, wherever the NPC is inside one of these places. Places not listed can't receive
         letters from here. Parcels are not carried. Property letters keep using your post office postage.
+      </p>
+    </div>
+  );
+}
+
+/** Stable: coach routes, each copied from a journey route drawn with the journey planner. */
+function CoachRoutes({
+  provider: p,
+  table: t,
+  onChange,
+}: {
+  provider: ServiceProvider;
+  table: CloudTable;
+  onChange: (routes: NonNullable<ServiceProvider["routes"]>) => void;
+}) {
+  const routes = p.routes ?? [];
+  const locations = (t.journal?.market as { locations?: { id: string; name: string }[] } | undefined)?.locations ?? [];
+  const name = (id: string) => locations.find((l) => l.id === id)?.name ?? "Unknown place";
+  const drawn = (t.journal?.world?.journeys ?? []).filter((j) => j.mapId && j.points && j.destinationLocationId);
+  const set = (i: number, patch: Partial<(typeof routes)[number]>) => onChange(routes.map((r, n) => (n === i ? { ...r, ...patch } : r)));
+  const [to, setTo] = useState("");
+  return (
+    <div>
+      <h4>Coach routes</h4>
+      <ul className="svc-offer-list">
+        {routes.map((r, i) => (
+          <li key={r.key}>
+            <fieldset className="svc-grid">
+              <legend>
+                {name(r.toLocationId)} {r.mapId ? "· drawn" : "· no route yet: players see it locked"}
+              </legend>
+              <label>
+                Coach pace (miles a day)
+                <input type="number" min={1} max={200} value={r.paceMilesPerDay} onChange={(e) => set(i, { paceMilesPerDay: whole(e.target.value, 1, 200) })} />
+                <span className="svc-hint">Becomes the journey's custom pace.</span>
+              </label>
+              <label>
+                Route
+                <select
+                  value=""
+                  onChange={(e) => {
+                    const j = drawn.find((x) => x.id === e.target.value);
+                    if (j) set(i, { mapId: j.mapId, points: j.points, legs: j.legs.map((l) => ({ ...l })) });
+                  }}
+                >
+                  <option value="">{r.mapId ? "Redraw from a journey route…" : "Copy a journey route…"}</option>
+                  {drawn
+                    .filter((j) => j.destinationLocationId === r.toLocationId)
+                    .map((j) => (
+                      <option key={j.id} value={j.id}>
+                        {t.journal?.world?.maps.find((m) => m.id === j.mapId)?.name ?? "Map"} · {j.points!.length} waypoints · {j.status}
+                      </option>
+                    ))}
+                </select>
+                <span className="svc-hint">
+                  Draw the route with Plan journey on the map (you can withdraw that journey after), then copy it here. A
+                  route is frozen into each booking; redrawing changes only new bookings.
+                </span>
+              </label>
+              <Button variant="danger" onClick={() => onChange(routes.filter((_, n) => n !== i))}>
+                Remove route to {name(r.toLocationId)}
+              </Button>
+            </fieldset>
+          </li>
+        ))}
+      </ul>
+      <label>
+        Add a route to
+        <select value={to} onChange={(e) => setTo(e.target.value)}>
+          <option value="">Choose a place</option>
+          {locations
+            .filter((l) => !routes.some((r) => r.toLocationId === l.id))
+            .map((l) => (
+              <option key={l.id} value={l.id}>
+                {l.name}
+              </option>
+            ))}
+        </select>
+      </label>
+      <Button
+        variant="secondary"
+        disabled={!to}
+        onClick={() => {
+          let n = routes.length + 1;
+          while (routes.some((r) => r.key === `route-${n}`)) n++;
+          onChange([...routes, { key: `route-${n}`, toLocationId: to, paceMilesPerDay: 30 }]);
+          setTo("");
+        }}
+      >
+        Add a route
+      </Button>
+      <p className="svc-hint">
+        Distances and days use the journey planner's maths. The coach always carries the whole party. Hiring out mounts isn't
+        offered.
       </p>
     </div>
   );
