@@ -2609,8 +2609,11 @@ function MapViewport({
         </button>
       )}
       {/* The journey planner, labelled where phones and desktops both see it (the hotbar's route
-          icon stays too). While the party is on a journey its status chip takes this place. */}
+          icon stays too). While the party is on a journey its status chip takes this place. In
+          tile (encounter grid) mode it steps aside so it never covers tokens; the hotbar keeps
+          Plan route there. */}
       {!interfaceHidden &&
+        !tileMode &&
         !hereOpen &&
         !placeBar &&
         !planner.active &&

@@ -516,7 +516,7 @@ Adds a contextual Maps session bar, searchable scene cards, separate activation/
 
 ### Journey planner discoverability (October 24, 2026)
 
-- A labelled Plan journey button on the map (under Here) for DM and players at every width, kept when the tool hotbar is collapsed and hidden only while a journey is under way (its status chip takes the place) or another map panel is open. The hotbar's Plan route icon is unchanged.
+- A labelled Plan journey button on the map (under Here) for DM and players at every width, kept when the tool hotbar is collapsed and hidden while a journey is under way (its status chip takes the place), in tile (encounter grid) mode so it never covers tokens, or while another map panel is open. The hotbar's Plan route icon is unchanged.
 - Entry points where travel is expected: the Here sheet at the party's location (Plan a journey; Journey progress on the road) and Travel at the top of the Downtime screen (the party's journey card, Plan a journey on the map → `/maps?map=<party map>&plan=party`, the DM's link to journey requests in the Review Inbox with a count, a player's own requests).
 - Phones: the map zooms out to show above the planner sheet when it opens or switches to scale calibration; the journey review is a full-height sheet. Undo last waypoint button. Progress bar with leg ticks on the chip, the DM progress panel and the player status card. A player with no shared map sees the text-only journey card on Maps. No data or protocol change.
 
