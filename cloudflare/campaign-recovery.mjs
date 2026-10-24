@@ -7,6 +7,12 @@ import {
   roomImageStatements,
   ROOM_BODY_LIMIT,
 } from "./room-images.mjs";
+import {
+  assertCanHost,
+  hostedCampaignGuardArgs,
+  hostedCampaignGuardSql,
+  hostedCampaignLimit,
+} from "./hosted-campaigns.mjs";
 
 const fail = (message, status = 400) => {
   throw Object.assign(new Error(message), { status });
@@ -208,7 +214,7 @@ async function restoredMembership(db, userId, code) {
   };
 }
 
-export async function restoreDeletedCampaign(db, userId, body, actor) {
+export async function restoreDeletedCampaign(db, userId, body, actor, limit = hostedCampaignLimit()) {
   const accountGuardArgs = recoveryAccountGuardArgs(actor, userId);
   if (
     typeof body.id !== "string" ||
@@ -224,6 +230,9 @@ export async function restoreDeletedCampaign(db, userId, body, actor) {
     .bind(userId, body.id, body.requestKey)
     .first();
   if (previous) return restoredMembership(db, userId, previous.code);
+  // A restored room is a live hosted room. At the limit nothing is written: the deletion
+  // backup is only ever read here, so it stays in the library unchanged.
+  await assertCanHost(db, userId, "restore", limit);
   // Do not trust a recovery marker in a client-uploaded backup. Only a backup
   // written by the guarded deletion transaction may restore server history.
   const row = await db
@@ -315,7 +324,7 @@ export async function restoreDeletedCampaign(db, userId, body, actor) {
   const statements = [
     db
       .prepare(
-        `INSERT INTO campaign_recoveries(id,backup_id,user_id,request_key,code,body,created_at) SELECT ?,?,?,?,?,?,? WHERE EXISTS(SELECT 1 FROM campaign_deletion_backups d JOIN library_backups b ON b.id=d.backup_id AND b.user_id=d.user_id WHERE d.backup_id=? AND d.user_id=?) AND ${recoveryAccountGuardSql} ON CONFLICT(user_id,backup_id,request_key) DO NOTHING`,
+        `INSERT INTO campaign_recoveries(id,backup_id,user_id,request_key,code,body,created_at) SELECT ?,?,?,?,?,?,? WHERE EXISTS(SELECT 1 FROM campaign_deletion_backups d JOIN library_backups b ON b.id=d.backup_id AND b.user_id=d.user_id WHERE d.backup_id=? AND d.user_id=?) AND ${recoveryAccountGuardSql} AND ${hostedCampaignGuardSql} ON CONFLICT(user_id,backup_id,request_key) DO NOTHING`,
       )
       .bind(
         id,
@@ -328,6 +337,7 @@ export async function restoreDeletedCampaign(db, userId, body, actor) {
         body.id,
         userId,
         ...accountGuardArgs,
+        ...hostedCampaignGuardArgs(userId, limit),
       ),
     db
       .prepare(`INSERT INTO campaign_rooms(code,revision,body) SELECT ?,1,? WHERE ${committed}`)
@@ -414,7 +424,10 @@ export async function restoreDeletedCampaign(db, userId, body, actor) {
     )
     .bind(userId, body.id, body.requestKey)
     .first();
-  if (!saved) fail("Your account access or backup changed. Refresh before restoring it.", 409);
+  if (!saved) {
+    await assertCanHost(db, userId, "restore", limit);
+    fail("Your account access or backup changed. Refresh before restoring it.", 409);
+  }
   return restoredMembership(db, userId, saved.code);
 }
 

@@ -39,6 +39,13 @@ import {
 } from "./members.mjs";
 import { campaignAction, resumeCampaignMembership } from "./account-campaigns.mjs";
 import {
+  assertCanHost,
+  hostedCampaignGuardArgs,
+  hostedCampaignGuardSql,
+  hostedCampaignLimit,
+  hostedCampaignStatus,
+} from "./hosted-campaigns.mjs";
+import {
   communityDirectory,
   communityPortrait,
   communityProfile,
@@ -195,7 +202,7 @@ async function roomSeat(db, code, token) {
  * Links a campaign seat to the signed-in account. A room write bumps the revision so
  * pollers see it and a request that loaded the room earlier cannot overwrite it.
  */
-export async function linkAccountSeat(db, userId, body) {
+export async function linkAccountSeat(db, userId, body, limit = hostedCampaignLimit()) {
   const code = text(body.code, 16).toUpperCase(),
     token = text(body.token, 128);
   const { room, seat } = await roomSeat(db, code, token);
@@ -211,6 +218,9 @@ export async function linkAccountSeat(db, userId, body) {
   if (owner && owner.user_id !== userId) fail("This seat is linked to another account.", 409);
   const prior = JSON.stringify(room);
   const changes = seat.userId !== userId || (seat.role === "dm" && room.ownerId !== userId);
+  // Taking ownership of an unowned live room (a guest-era DM seat) makes this account its host.
+  const hosting = seat.role === "dm" && room.ownerId !== userId;
+  if (hosting) await assertCanHost(db, userId, "link", limit);
   const statements = [];
   if (changes) {
     seat.userId = userId;
@@ -220,9 +230,21 @@ export async function linkAccountSeat(db, userId, body) {
     // tells knownRevision pollers that the room changed.
     room.revision = (Number.isSafeInteger(room.revision) ? room.revision : 0) + 1;
     statements.push(
-      db
-        .prepare("UPDATE campaign_rooms SET body=?,revision=? WHERE code=? AND body=?")
-        .bind(JSON.stringify(room), room.revision, code, prior),
+      hosting
+        ? db
+            .prepare(
+              `UPDATE campaign_rooms SET body=?,revision=? WHERE code=? AND body=? AND ${hostedCampaignGuardSql}`,
+            )
+            .bind(
+              JSON.stringify(room),
+              room.revision,
+              code,
+              prior,
+              ...hostedCampaignGuardArgs(userId, limit),
+            )
+        : db
+            .prepare("UPDATE campaign_rooms SET body=?,revision=? WHERE code=? AND body=?")
+            .bind(JSON.stringify(room), room.revision, code, prior),
     );
   }
   // An already linked seat leaves the room untouched (no revision bump); the membership
@@ -235,7 +257,10 @@ export async function linkAccountSeat(db, userId, body) {
       .bind(userId, code, seat.id, token, text(body.name), Date.now(), code, JSON.stringify(room)),
   );
   const updated = await db.batch(statements);
-  if (!updated[0].meta.changes) fail("The campaign changed. Retry saving this membership.", 409);
+  if (!updated[0].meta.changes) {
+    if (hosting) await assertCanHost(db, userId, "link", limit);
+    fail("The campaign changed. Retry saving this membership.", 409);
+  }
 }
 
 export async function handleAccounts(request, env) {
@@ -458,7 +483,11 @@ export async function handleAccounts(request, env) {
     if (path === "/api/account/campaign" && request.method === "POST")
       return cors(json(await campaignAction(db, userId, body, session.session)));
     if (path === "/api/account/restore-backup" && request.method === "POST")
-      return cors(json(await restoreDeletedCampaign(db, userId, body, session.session)));
+      return cors(
+        json(
+          await restoreDeletedCampaign(db, userId, body, session.session, hostedCampaignLimit(env)),
+        ),
+      );
     if (path === "/api/account/recovery-records" && request.method === "POST")
       return cors(json(await campaignRecoveryRecords(db, userId, body)));
     if (path === "/api/account/owner/donations" && request.method === "POST")
@@ -503,6 +532,8 @@ export async function handleAccounts(request, env) {
           .all(),
         db.prepare("SELECT user_id FROM library_recovery WHERE user_id=?").bind(userId).first(),
       ]);
+      // Online campaign limit (hosted-campaigns.mjs): shown where a DM hosts; enforced server-side.
+      const hosting = await hostedCampaignStatus(db, userId, hostedCampaignLimit(env));
       return cors(
         json({
           user: {
@@ -534,6 +565,7 @@ export async function handleAccounts(request, env) {
           backups: backups.results,
           characters: characters.results.map((r) => ({ id: r.id, ...JSON.parse(r.body) })),
           hasRecoveryKey: !!recovery,
+          hosting,
         }),
       );
     }
@@ -550,16 +582,21 @@ export async function handleAccounts(request, env) {
       return cors(json({ key }));
     }
     if (path === "/api/account/link" && request.method === "POST") {
-      await linkAccountSeat(db, userId, body);
+      await linkAccountSeat(db, userId, body, hostedCampaignLimit(env));
       return cors(json({ ok: true }));
     }
     if (path === "/api/account/resume" && request.method === "POST") {
       return cors(
         json(
-          await resumeCampaignMembership(db, userId, {
-            ...body,
-            code: text(body.code, 16).toUpperCase(),
-          }),
+          await resumeCampaignMembership(
+            db,
+            userId,
+            {
+              ...body,
+              code: text(body.code, 16).toUpperCase(),
+            },
+            hostedCampaignLimit(env),
+          ),
         ),
       );
     }

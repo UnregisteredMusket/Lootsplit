@@ -146,6 +146,13 @@ export const BUILTIN_LOGS = [
     "Room writes refused before D1's row limit (one entry per room per half-hour, with a size breakdown); silence means no refusal was recorded, checked every half-hour.",
   ],
   [
+    "campaign-limit",
+    "Online campaign limit refusals",
+    "event",
+    0,
+    "Accounts refused a new hosted online campaign at the per-account limit (one entry per account and path per half-hour, with a one-way account tag, the path and the live count); silence means no refusal was recorded, checked every half-hour.",
+  ],
+  [
     "runtime",
     "Worker invocation and application timing logs",
     "external",
@@ -1187,7 +1194,7 @@ export async function collectPerformance(db, now, fetcher = fetch) {
 }
 async function collectOtherLogs(env, snapshot, now) {
   const db = env.DB;
-  for (const id of ["development", "diagnostics", "devices", "room-storage"])
+  for (const id of ["development", "diagnostics", "devices", "room-storage", "campaign-limit"])
     await attest(
       db,
       id,

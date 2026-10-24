@@ -234,24 +234,52 @@ async function guardRoomSize(db: Database, room: CloudRoom, encoded: Encoded) {
     { status: 413 },
   );
 }
-export async function createRoom(room: CloudRoom): Promise<void> {
+/**
+ * `hostLimit` (set by every account hosting path) makes the insert itself conditional on the
+ * online campaign limit (cloudflare/hosted-campaigns.mjs), so concurrent opens cannot both pass.
+ */
+export async function createRoom(
+  room: CloudRoom,
+  options: { hostLimit?: { userId: string; limit: number; path: string } } = {},
+): Promise<void> {
   ensureCityExchanges(room.table);
   const db = database();
+  const host = options.hostLimit;
   if (db) {
+    const hosting = host ? await import("../../../cloudflare/hosted-campaigns.mjs") : null;
+    // Friendly pre-check: refuses before encoding images or writing anything.
+    if (host && hosting) await hosting.assertCanHost(db, host.userId, host.path, host.limit);
     const encoded = await encodeRoomImages(room);
     await guardRoomSize(db, room, encoded);
-    const insert = db
-      .prepare("INSERT INTO campaign_rooms (code, revision, body) VALUES (?, ?, ?)")
-      .bind(room.code, room.revision, encoded.body);
+    const insert = host && hosting
+      ? db
+          .prepare(
+            `INSERT INTO campaign_rooms (code, revision, body) SELECT ?, ?, ? WHERE ${hosting.hostedCampaignGuardSql}`,
+          )
+          .bind(room.code, room.revision, encoded.body, ...hosting.hostedCampaignGuardArgs(host.userId, host.limit))
+      : db
+          .prepare("INSERT INTO campaign_rooms (code, revision, body) VALUES (?, ?, ?)")
+          .bind(room.code, room.revision, encoded.body);
     const members = [...await roomImageStatements(db, room, encoded), ...accountSeats(db, room, encoded.body)];
-    if (members.length) await db.batch([insert, ...members]);
-    else await insert.run();
+    const result = members.length ? (await db.batch([insert, ...members]))[0]! : await insert.run();
+    if (host && hosting && !result.meta.changes) {
+      // A concurrent open filled the last slot between the pre-check and this write.
+      await hosting.assertCanHost(db, host.userId, host.path, host.limit);
+      throw hosting.hostedCampaignLimitError(host.limit);
+    }
     return;
   }
   await localWrite(async () => {
     const rooms = await localRooms();
     if (rooms.some((item) => item.code === room.code))
       throw new Error("That table code is already used. Try again.");
+    if (host) {
+      const hosted = rooms.filter((item) => item.ownerId === host.userId && !item.closed).length;
+      if (hosted >= host.limit) {
+        const { hostedCampaignLimitError } = await import("../../../cloudflare/hosted-campaigns.mjs");
+        throw hostedCampaignLimitError(host.limit);
+      }
+    }
     await localSave([...rooms, room]);
   });
 }
