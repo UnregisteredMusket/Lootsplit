@@ -374,7 +374,16 @@ export function MapWorkspaceChrome({
     </>
   );
 }
-export function MapEmptyWorkspace({ dm, settings }: { dm: boolean; settings: ReactNode }) {
+export function MapEmptyWorkspace({
+  dm,
+  settings,
+  travel,
+}: {
+  dm: boolean;
+  settings: ReactNode;
+  /** The party's journey for a player whose DM keeps its map private (text only). */
+  travel?: ReactNode;
+}) {
   const [open, setOpen] = useState(false),
     [hidden, setHidden] = useState(false);
   useEffect(() => {
@@ -402,7 +411,7 @@ export function MapEmptyWorkspace({ dm, settings }: { dm: boolean; settings: Rea
         hidden={hidden}
         setHidden={setHidden}
       />
-      <div className="map-empty-state">
+      <div className={`map-empty-state${travel ? " map-empty-state-travel" : ""}`}>
         <MapIcon size={38} />
         <h2>No map available</h2>
         <p>
@@ -411,6 +420,7 @@ export function MapEmptyWorkspace({ dm, settings }: { dm: boolean; settings: Rea
             : "The Dungeon Master has not shared an accessible map yet."}
         </p>
         {dm && <button onClick={() => setOpen(true)}>Open map library</button>}
+        {travel}
       </div>
       <aside
         hidden={!open || hidden}

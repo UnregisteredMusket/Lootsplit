@@ -87,7 +87,13 @@ import {
   Route as RouteIcon,
 } from "lucide-react";
 import { useRoutePlanner } from "./map-route-planner";
-import { JourneyPlanActions, JourneyReview, useMapJourney } from "./map-journeys";
+import {
+  JourneyPlanActions,
+  JourneyReview,
+  JourneyTravelSection,
+  useMapJourney,
+} from "./map-journeys";
+import { frameRoute, freeArea } from "@/lib/quire/journey-ui";
 import { MapFrame } from "./map-frame";
 import { RecordIcon } from "./map-record-icon";
 import { MapPlaceCard } from "./map-place-card";
@@ -1044,7 +1050,18 @@ function CampaignMapWorkspace({ viewScope }: { viewScope: { key: string; ephemer
           />
         </>
       ) : (
-        <MapEmptyWorkspace dm={dm} settings={management} />
+        <MapEmptyWorkspace
+          dm={dm}
+          settings={management}
+          travel={
+            !dm &&
+            (t.journal.world?.journeys ?? []).some((j) =>
+              ["active", "arrived", "proposed", "denied"].includes(j.status),
+            ) ? (
+              <JourneyTravelSection table={t} planLink={false} />
+            ) : undefined
+          }
+        />
       )}
       {editing !== undefined && dm && (
         <MapEditor
@@ -1789,6 +1806,58 @@ function MapViewport({
     planner.start("party");
     root.current?.focus();
   };
+  // Keep the route (or, on phones, the whole map) in view beside or above the planner and the
+  // journey review, as the mockups show: once when each opens, never while someone is drawing.
+  const framing = planner.active
+    ? planner.calibrating
+      ? "scale"
+      : "plan"
+    : reviewJourney
+      ? `review:${reviewJourney}`
+      : "";
+  useEffect(() => {
+    if (!framing || !artworkReady) return;
+    const frame = requestAnimationFrame(() => {
+      const region = root.current;
+      if (!region) return;
+      const r = region.getBoundingClientRect();
+      const panelRect = region
+        .closest(".map-workspace")
+        ?.querySelector<HTMLElement>(".map-route-panel, .map-journey-review")
+        ?.getBoundingClientRect();
+      const phone = window.matchMedia("(max-width: 650px)").matches;
+      const area = freeArea(
+        { width: r.width, height: r.height },
+        panelRect && {
+          left: panelRect.left - r.left,
+          top: panelRect.top - r.top,
+          right: panelRect.right - r.left,
+          bottom: panelRect.bottom - r.top,
+        },
+        phone
+          ? { left: 10, top: 170, right: 10, bottom: 10 }
+          : { left: 14, top: 70, right: 72, bottom: 60 },
+      );
+      const journey = framing.startsWith("review:")
+        ? recordTable.journal?.world?.journeys?.find((j) => j.id === reviewJourney)
+        : undefined;
+      let points: { x: number; y: number }[] = journey
+        ? journey.mapId === map.id
+          ? (journey.points ?? [])
+          : []
+        : planner.focusPoints;
+      if (phone && !journey && (framing === "scale" || points.length < 2))
+        points = [
+          { x: 0, y: 0 },
+          { x: 1, y: 1 },
+        ];
+      const next = frameRoute(points, viewRef.current, { w, h }, area);
+      if (next) setView(next);
+    });
+    return () => cancelAnimationFrame(frame);
+    // Framed once per opened panel; later edits leave the camera to the person drawing.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [framing, map.id, artworkReady]);
   const openSettings = () => {
     if (!drawerOpen && (tools.inspecting || service || combatOpen) && !allowContextChange()) return;
     tools.hideInspector();
@@ -2551,6 +2620,24 @@ function MapViewport({
           {here.mode === "here" && <span className="map-here-count">{here.rows.length}</span>}
         </button>
       )}
+      {/* The journey planner, labelled where phones and desktops both see it (the hotbar's route
+          icon stays too). While the party is on a journey its status chip takes this place. */}
+      {!interfaceHidden &&
+        !hereOpen &&
+        !placeBar &&
+        !planner.active &&
+        !reviewJourney &&
+        !(journeyView.journey && journeyView.journey.status !== "planned") && (
+          <button
+            type="button"
+            className="map-plan-journey-button map-glass"
+            title="Plan a party journey or ship voyage on this map"
+            onClick={openPlanner}
+          >
+            <RouteIcon size={17} aria-hidden="true" />
+            Plan journey
+          </button>
+        )}
       <div className="map-feedback" hidden={interfaceHidden}>
         <MapRenderBadge />
         {full && (
@@ -3065,6 +3152,15 @@ function MapViewport({
                         x: size.w / 2 - party.x * w * v.scale,
                         y: size.h / 2 - party.y * h * v.scale,
                       }))
+                  : undefined
+              }
+              planJourney={here.mode === "here" ? openPlanner : undefined}
+              showJourney={
+                journeyView.journey && journeyView.journey.status !== "planned"
+                  ? () => {
+                      setHereOpen(false);
+                      journeyView.openPanel();
+                    }
                   : undefined
               }
             />

@@ -4361,3 +4361,43 @@ input,select,textarea { max-width: 100%; }
 .world-message.svc-rumour { border-left:3px solid var(--color-lead); padding-left:.5rem; }
 .svc-seg.tiers button { overflow-wrap:normal; word-break:normal; hyphens:auto; font-size:.84rem; padding:.2rem .25rem; }
 @media (max-width:360px) { .svc-seg.tiers { grid-template-columns:repeat(2,minmax(0,1fr)); } }
+/* Journey planner discoverability (fix/journey-ui-discoverability): the labelled "Plan journey"
+   control under Here, the Here sheet's travel row, progress bars, the full-height review sheet
+   on phones, and the Travel section outside the map (Downtime; private-map players). */
+.map-workspace .map-plan-journey-button { position:absolute; z-index:40; top:calc(122px + env(safe-area-inset-top)); left:max(14px,env(safe-area-inset-left)); display:inline-flex; align-items:center; gap:8px; min-height:44px; padding:0 14px; border-radius:14px; font-weight:600; font-size:14px; white-space:nowrap; }
+.map-here-travel { display:flex; align-items:center; gap:8px; margin:6px 0 10px; padding:8px 10px; border:1px solid var(--color-border); border-radius:12px; min-width:0; }
+.map-here-travel > span { display:flex; flex-direction:column; flex:1; min-width:0; overflow-wrap:anywhere; }
+.map-here-travel small { color:var(--color-muted); }
+.map-here-travel button,.map-here-actions button { min-height:44px; display:inline-flex; align-items:center; gap:6px; }
+.map-here-actions { display:flex; flex-wrap:wrap; gap:8px; }
+.map-journey-glyph { display:inline-grid; place-items:center; flex:0 0 32px; width:32px; height:32px; border-radius:50%; border:1px solid var(--color-border); color:var(--color-lead); }
+.map-route-panel .map-panel-heading,.map-journey-panel .map-panel-heading { display:flex; align-items:center; gap:10px; }
+.map-route-panel .map-panel-heading > strong,.map-journey-panel .map-panel-heading > h2 { flex:1; min-width:0; }
+.map-route-input-row { display:flex; align-items:center; gap:6px; }
+.map-route-input-row > [role="group"] { flex:1; min-width:0; }
+.map-route-input-row .map-icon-button { flex:0 0 44px; width:44px; height:44px; min-height:44px; display:grid; place-items:center; border-radius:12px; border:1px solid var(--color-border); }
+.map-route-input-row .map-icon-button:disabled { opacity:.45; }
+.map-journey-progress { position:relative; display:block; width:100%; height:8px; margin:6px 0; border-radius:4px; background:color-mix(in srgb,var(--color-border) 70%,transparent); overflow:hidden; }
+.map-journey-progress-fill { position:absolute; inset:0 auto 0 0; display:block; border-radius:4px; background:#2e7d4f; }
+.map-journey-progress-tick { position:absolute; top:0; bottom:0; display:block; width:2px; margin-left:-1px; background:var(--color-bg); opacity:.8; }
+.map-workspace .map-journey-chip { min-width:min(260px,calc(100% - 28px)); }
+.map-workspace .map-journey-chip > strong { display:flex; justify-content:space-between; gap:12px; width:100%; }
+.map-journey-chip-percent { font-weight:500; }
+.map-journey-tag { display:inline-flex; align-items:center; gap:4px; padding:1px 8px; border:1px solid var(--color-border); border-radius:999px; font-size:12px; }
+.map-journey-eyebrow { display:flex; align-items:center; gap:6px; margin:0 0 2px; font-size:12px; text-transform:uppercase; letter-spacing:.05em; color:var(--color-muted); }
+.map-workspace .map-journey-panel.map-journey-inline,.map-journey-panel.map-journey-inline { position:relative; z-index:auto; inset:auto; width:auto; max-width:520px; max-height:none; margin:10px 0; text-align:left; transform:none; }
+.journey-travel { margin:0 0 16px; }
+.journey-travel > h2 { margin:0 0 6px; }
+.journey-travel .map-route-actions .settings-link { display:inline-flex; align-items:center; min-height:44px; }
+.map-empty-state.map-empty-state-travel { top:calc(120px + env(safe-area-inset-top)); transform:translateX(-50%); max-height:calc(100% - 140px); overflow:auto; width:min(520px,calc(100% - 20px)); }
+.map-empty-state-travel .journey-travel { text-align:left; }
+.map-empty-state-travel .journey-travel > h2 { font-size:18px; }
+@media(max-width:650px) {
+ .map-workspace .map-plan-journey-button { top:calc(166px + env(safe-area-inset-top)); left:max(10px,env(safe-area-inset-left)); }
+ /* The review is a form: a full-height sheet on phones (mockup 5). */
+ .map-workspace .map-journey-panel.map-journey-review { z-index:49; top:max(10px,env(safe-area-inset-top)); bottom:max(10px,env(safe-area-inset-bottom)); max-height:none; }
+}
+@media(max-height:550px) and (orientation:landscape) {
+ .map-workspace .map-plan-journey-button { top:116px; left:10px; }
+ .map-workspace .map-journey-panel.map-journey-review { top:10px; bottom:10px; max-height:none; }
+}
