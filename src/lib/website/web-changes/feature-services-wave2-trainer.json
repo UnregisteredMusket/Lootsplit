@@ -1,0 +1,9 @@
+{
+  "title": "NPC services: paid lessons from trainers",
+  "summary": "An NPC can now teach your character, paid per session.",
+  "items": [
+    "Agree lessons with a trainer in conversation; nothing is charged when you agree.",
+    "Log sessions in Downtime under Learn from a paid teacher; each one reserves hours like NPC training.",
+    "Each session's fee is charged once when the DM approves it, and lessons count in your training totals."
+  ]
+}

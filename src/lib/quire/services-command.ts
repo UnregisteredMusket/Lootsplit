@@ -30,6 +30,11 @@ function note(o: ServiceOrder, status: ServiceStatus, text: string, at: number) 
 
 /** Pay once and hand over components, then record the order as done or in progress. */
 function settle(t: CloudTable, o: ServiceOrder, at: number, approved: boolean) {
+  if (o.terms.lessons) {
+    // Lessons: agreeing moves no money; each approved session is charged once.
+    note(o, "active", `${approved ? "Agreed by the DM." : "Agreed."} Each session is charged once, when the DM approves it.`, at);
+    return;
+  }
   const payer = t.purses.find((p) => p.id === o.purseId)!;
   if (toCopper(payer.coins) < o.terms.priceCopper)
     throw Error(`${payer.name} can't afford ${formatCopper(o.terms.priceCopper)} for this service.`);
@@ -160,8 +165,13 @@ export function applyServiceCommand(t: CloudTable, seat: CloudSeat, cmd: Service
     purseId = o.purseId;
     if (cmd.kind === "service-cancel") {
       own(o.purseId);
-      if (o.status !== "requested") throw Error("Only a request waiting for the DM can be withdrawn.");
-      note(o, "cancelled", "Withdrawn. Nothing was charged.", at);
+      if (o.terms.lessons && (o.status === "active" || o.status === "paused")) {
+        // End lessons: no new sessions; sessions already paid stay in the history.
+        note(o, "cancelled", "Lessons ended. No new sessions; nothing more is charged.", at);
+      } else {
+        if (o.status !== "requested") throw Error("Only a request waiting for the DM can be withdrawn.");
+        note(o, "cancelled", "Withdrawn. Nothing was charged.", at);
+      }
       summary = `Service request withdrawn: ${serviceSummary(o)}.`;
     } else if (cmd.kind === "service-review") {
       dm();
@@ -174,7 +184,7 @@ export function applyServiceCommand(t: CloudTable, seat: CloudSeat, cmd: Service
         summary = `Service request denied: ${serviceSummary(o)}.`;
       } else {
         // Every check runs again against the campaign as it is now; the agreed price stands.
-        const q = serviceQuote(t, o.providerId, o.offerKey, o.purseId, o.request);
+        const q = serviceQuote(t, o.providerId, o.offerKey, o.purseId, o.request, o.id);
         if (q.terms.priceCopper !== o.terms.priceCopper)
           throw Error("The price changed since the request. Deny it and ask the player to request again.");
         if (o.terms.item && !cmd.reveal) throw Error(`Write what ${o.terms.npcName} says before approving.`);

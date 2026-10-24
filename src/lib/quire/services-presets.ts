@@ -102,6 +102,30 @@ export function identifyOffer(approved = true): ServiceOffer {
   };
 }
 
+/**
+ * Trainer subjects: the SRD has no training price, so a training day costs SRD skilled hireling
+ * pay, 2 gp (SRD 5.2.1 and SRD 5.1 agree). One agreement books up to 250 training days.
+ */
+const subjects: [string, string, "martial" | "academic" | "profession", string][] = [
+  ["thieves-tools", "Thieves' tools", "profession", "Locks and traps, taught at the bench."],
+  ["language", "A language", "academic", "Reading and speaking a language the teacher knows."],
+  ["weapon-drills", "Weapon drills", "martial", "Drills with one weapon the teacher favours."],
+];
+function trainerOffer([key, name, category, description]: (typeof subjects)[number]): ServiceOffer {
+  return {
+    key,
+    name,
+    description: `${description} Recorded only: the DM decides what is learned.`,
+    approved: true,
+    priceCopper: gp(2),
+    time: { kind: "training" },
+    review: "auto",
+    output: { kind: "record" },
+    category,
+    maxDays: 250,
+  };
+}
+
 export const workshopSpecialties = ["Scribe", "Alchemist", "Tailor"] as const;
 export type WorkshopSpecialty = (typeof workshopSpecialties)[number];
 
@@ -271,6 +295,7 @@ export function presetOffers(kind: ServiceKind, preset: ServicePreset, specialty
   // Temples carry Identify as a draft for the DM to switch on; a sage offers it.
   if (kind === "temple") return [...templeSpells.map((s) => templeOffer(s, preset)), identifyOffer(false)];
   if (kind === "sage") return [identifyOffer()];
+  if (kind === "trainer") return subjects.map(trainerOffer);
   if (kind === "inn") return [innOffer(preset)];
   if (kind === "workshop" && specialty === "Scribe") return scrollSpells.map((s) => scrollOffer(s, preset));
   if (kind === "workshop" && specialty === "Alchemist") return brews.map((b) => brewOffer(b, preset));

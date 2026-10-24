@@ -6,9 +6,15 @@ function unique(keys: string[], label: string) {
   if (new Set(keys).size !== keys.length) throw Error(`Duplicate ${label}.`);
 }
 /** Each kind has one time model: temple instant, workshop downtime days, inn per night. */
-const timeFor: Partial<Record<ServiceKind, string>> = { temple: "instant", workshop: "downtime-days", inn: "per-night", sage: "instant" };
+const timeFor: Partial<Record<ServiceKind, string>> = {
+  temple: "instant",
+  workshop: "downtime-days",
+  inn: "per-night",
+  sage: "instant",
+  trainer: "training",
+};
 /** Wave-2 engines not switched on yet: their providers are refused until they ship. */
-const comingKinds: readonly ServiceKind[] = ["trainer", "stable", "courier"];
+const comingKinds: readonly ServiceKind[] = ["stable", "courier"];
 
 /**
  * Runs after every command and on every read. `projected` is a player's view, which lacks DM
@@ -77,6 +83,10 @@ export function validateServices(
         throw Error(`${o.name}: only a sage or a temple identifies an item.`);
       if (o.target && (o.components?.length || (o.maxUnits ?? 1) > 1))
         throw Error(`${o.name}: Identify looks at one item and needs no components.`);
+      if (p.kind === "trainer" && (!o.category || o.components?.length || o.output.kind !== "record"))
+        throw Error(`${o.name}: a subject needs a training category and makes nothing.`);
+      if (p.kind !== "trainer" && (o.category || o.maxDays))
+        throw Error(`${o.name}: only a trainer's subjects have a category and days.`);
       if (p.kind === "sage" && !o.target) throw Error(`${o.name}: a sage's offers identify a carried item.`);
       if (p.kind === "workshop" && o.output.kind !== "holding")
         throw Error(`${o.name}: a workshop order makes an item.`);

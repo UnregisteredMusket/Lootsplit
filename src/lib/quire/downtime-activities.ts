@@ -6,6 +6,8 @@ import {
   characterVisible,
   campaignMinute,
 } from "./character-position.ts";
+import { readServices, type ServiceOrder } from "./services-schema.ts";
+import { lessonDays, lessonFee } from "./services.ts";
 import {
   readDowntimeActivities,
   type DowntimeActivities,
@@ -144,7 +146,23 @@ export function previewActivityWindow(
     },
   };
 }
-function eligibility(t: Table, trainerId: string, npcId: string, className: string, historical = false) {
+/**
+ * Paid lessons (services wave 2): the agreement a lesson request names, open and matching the
+ * pupil, the teacher, the category and the subject. Throws the reason it can't be used.
+ */
+export function lessonAgreement(
+  t: Table,
+  r: { lessonOrderId?: string; trainerId: string; npcId: string; category: string; topic: string },
+): ServiceOrder {
+  const o = readServices(t.journal?.services).orders.find((x) => x.id === r.lessonOrderId);
+  if (!o?.terms.lessons) throw Error("Choose lessons you have agreed with a teacher.");
+  if (o.status !== "active") throw Error(`These lessons are ${o.status === "paused" ? "paused" : "closed"}. No new sessions.`);
+  const l = o.terms.lessons;
+  if (r.trainerId !== l.pupilId || r.npcId !== o.terms.npcId || r.category !== l.category || r.topic !== l.topic)
+    throw Error("A session must match its lessons: the pupil, the teacher and the subject.");
+  return o;
+}
+function eligibility(t: Table, trainerId: string, npcId: string, className: string, historical = false, lesson = false) {
   const trainer = t.purses.find((p) => p.id === trainerId && p.kind === "character"),
     npc = t.purses.find(
       (p) =>
@@ -175,6 +193,8 @@ function eligibility(t: Table, trainerId: string, npcId: string, className: stri
           characterLocation(t, trainer) === characterLocation(t, npc));
   if (!together)
     throw Error("Trainer and NPC must be together at the same location or aboard the same ship.");
+  // Paid lessons reverse the roles (the NPC teaches): the DM confirms the teacher in review.
+  if (lesson) return { trainer, npc, verify: false };
   if (trainer.sheet && npc.sheet && npc.sheet.level > trainer.sheet.level)
     throw Error("The NPC's character level exceeds the trainer's level.");
   let verify = !trainer.sheet || !npc.sheet;
@@ -200,6 +220,10 @@ export function applyDowntimeActivity(
   cmd: DowntimeActivityCommand,
   at: number,
   preview = false,
+  hooks: {
+    /** Paid lessons: charge the approved session once (kept out of this module: finance imports it). */
+    chargeLesson?: (t: CloudTable, o: ServiceOrder, r: TrainingRequest, commandId: string, at: number) => void;
+  } = {},
 ) {
   const state = readDowntimeActivities(t.journal?.downtimeActivities);
   const dm = () => {
@@ -221,9 +245,20 @@ export function applyDowntimeActivity(
     state.settings = cmd.settings;
   } else if (cmd.kind === "downtime-training") {
     own(cmd.trainerId);
-    const { trainer, npc } = eligibility(t, cmd.trainerId, cmd.npcId, cmd.className, !!cmd.historicalContext);
+    const lesson = cmd.lessonOrderId ? lessonAgreement(t, cmd) : undefined;
+    if (lesson && cmd.historicalContext) throw Error("Log paid lessons as they happen, not as earlier training.");
+    const { trainer, npc } = eligibility(t, cmd.trainerId, cmd.npcId, cmd.className, !!cmd.historicalContext, !!lesson);
     const window = state.windows.find((w) => w.id === cmd.windowId);
     if (!window) throw Error("Choose approved campaign downtime.");
+    let feeCopper: number | undefined;
+    if (lesson) {
+      const l = lesson.terms.lessons!,
+        taken = lessonDays(t, lesson),
+        days = cmd.minutes / (window.settings.trainingHoursPerDay * 60);
+      if (taken.approved + taken.pending + days > l.maxDays + 1e-9)
+        throw Error(`These lessons have ${Math.max(0, l.maxDays - taken.approved - taken.pending).toLocaleString(undefined, { maximumFractionDigits: 2 })} training days left.`);
+      feeCopper = lessonFee(cmd.minutes, l.dayCopper, window.settings.trainingHoursPerDay);
+    }
     for (const id of [trainer.id, npc.id])
       // The player's projection deliberately omits another character's resource
       // balance. Only the authoritative server validates that private balance.
@@ -241,6 +276,7 @@ export function applyDowntimeActivity(
       status: "pending",
       at,
       reviewNote: "",
+      ...(feeCopper !== undefined ? { feeCopper } : {}),
     });
   } else if (cmd.kind === "downtime-training-reset-category") {
     dm();
@@ -282,7 +318,20 @@ export function applyDowntimeActivity(
       r.status = "cancelled";
     } else {
       dm();
-      if (cmd.approve) {
+      if (cmd.approve && r.lessonOrderId) {
+        // A paid lesson: recheck the agreement, the fee and funds, count the hours, charge once.
+        const o = lessonAgreement(t, r);
+        eligibility(t, r.trainerId, r.npcId, r.className, false, true);
+        for (const id of [r.trainerId, r.npcId])
+          if (downtimeRemaining(state, r.windowId, id) < r.minutes)
+            throw Error("The trainer or NPC no longer has enough hours in this downtime period.");
+        const fee = lessonFee(r.minutes, o.terms.lessons!.dayCopper, r.trainingHoursPerDay);
+        if (fee !== r.feeCopper) throw Error("The session's fee changed. Deny it and ask the player to log it again.");
+        if (!hooks.chargeLesson) throw Error("Paid lessons need the updated website.");
+        // Charges once and records the session on the agreement (services-lessons.ts).
+        r.status = "approved";
+        hooks.chargeLesson(t, o, r, cmd.id, at);
+      } else if (cmd.approve) {
         const historical = !!r.historicalContext || cmd.historicalConfirmed === true;
         if (historical && (!cmd.historicalConfirmed || !cmd.note.trim()))
           throw Error("Confirm historical location, equal-or-lower levels and completed time in the DM review note.");

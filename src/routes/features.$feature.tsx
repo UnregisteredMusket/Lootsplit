@@ -45,6 +45,7 @@ export const Route = createFileRoute("/features/$feature")({
     exchange?: string;
     commodity?: string;
     bank?: string;
+    lesson?: string;
   } => ({
     from: safeReturn(s.from),
     code: typeof s.code === "string" ? s.code.slice(0, 24) : undefined,
@@ -52,12 +53,13 @@ export const Route = createFileRoute("/features/$feature")({
     exchange: typeof s.exchange === "string" ? s.exchange.slice(0, 150) : undefined,
     commodity: typeof s.commodity === "string" ? s.commodity.slice(0, 150) : undefined,
     bank: typeof s.bank === "string" ? s.bank.slice(0, 150) : undefined,
+    lesson: typeof s.lesson === "string" ? s.lesson.slice(0, 150) : undefined,
   }),
   component: FeaturePage,
 });
 function FeaturePage() {
   const { feature } = Route.useParams(),
-    { from, code, bank } = Route.useSearch(),
+    { from, code, bank, lesson } = Route.useSearch(),
     seat = useSeat(),
     dm = seat.role === "dm";
   const campaigns = useSyncExternalStore(subscribeCampaigns, getCampaigns, serverCampaigns);
@@ -111,7 +113,7 @@ function FeaturePage() {
             {feature === "downtime" && (
               <>
                 <DowntimeJourneys />
-                <DowntimeActivities />
+                <DowntimeActivities initialLessonId={lesson} />
                 <AppLink className="settings-link" href="/features/properties">
                   Property Management →
                 </AppLink>

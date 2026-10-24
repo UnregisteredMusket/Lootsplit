@@ -15,9 +15,9 @@ approved "as shown" on 2026-10-23.
 | 2 | Workshop: scribe and alchemist presets | Shipped |
 | 3 | Inn: booked stays, meals, rumours into the buyer's private NPC thread | Shipped |
 | 4a | Wave 2: new kinds, tabletop protocol 9, Fence/Bank/Hire links, Tailor preset | Shipped |
-| 4b | Wave 2: Sage (Identify, record only) | This change |
+| 4b | Wave 2: Sage (Identify, record only) | Shipped |
 | 4c | Wave 2: Stable and coach | Planned |
-| 4d | Wave 2: Trainer (paid lessons) | Planned |
+| 4d | Wave 2: Trainer (paid lessons) | This change |
 | 4e | Wave 2: Courier (letters to NPCs) | Planned |
 
 ## Shared helpers (`src/lib/quire/service-core.ts`)
@@ -193,6 +193,43 @@ price as cloth the party may bring or the tailor supplies.
 - **Privacy**: other players never receive the order or the thread; the answer exists only after
   approval. Protocol 8 clients never receive Identify offers or orders (key whitelist).
 
+### Trainer: paid lessons (phase 4d)
+
+Paid lessons reverse NPC training (`downtime-activities.ts`): the NPC teaches a character, with the
+same form, hour pool, Review Inbox, counters, resets and milestone notes.
+
+- **Offer** (`time: { kind: "training" }`): a subject with `category` (martial, academic,
+  profession), `priceCopper` = rate per training day, `maxDays` (1–250). Preset (SRD 5.2.1 and 5.1):
+  Thieves' tools, A language, Weapon drills at 2 gp a training day (SRD skilled hireling pay; the SRD
+  has no training price). Blank: none.
+- **Agreement** (`service-order`): one pupil (a party character here, the beneficiary; the payer
+  may pay for another), `units` = training days booked. Terms `lessons` (pupil, category, topic,
+  day rate, max days). **No payment and no coin re-count**; `active` (or `requested` → `active` with
+  DM review). One open agreement per pupil, provider and subject.
+- **Session** (`downtime-training` with `lessonOrderId`): the character (pupil) is `trainerId`,
+  the teacher NPC `npcId`; category and subject must match the agreement; the automatic level checks
+  are skipped (the DM confirms the teacher in review), presence still applies; hours are reserved
+  for both; it may not exceed the agreement's remaining days (approved + pending). The fee
+  `ceil(minutes × rate ÷ (training hours per day × 60))` is stored on the request (`feeCopper`).
+  No money moves.
+- **Approval** (`downtime-training-review`): rechecks the agreement (active), presence, hours and
+  the fee, then `chargeLesson` (`services-lessons.ts`, a hook so `downtime-activities.ts` doesn't
+  import finance) makes one `financeMove(-fee, requestId+"-fee")` to the lesson payer at the
+  teacher's shop, appends the session to `order.sessions` and completes the agreement when its days
+  are taken. Deny or cancel releases the hours and moves nothing. A short payer is refused.
+- **End lessons** (`service-cancel` on an active agreement, payer or DM): closes it; pending sessions
+  can no longer be approved; nothing is charged or refunded.
+- **Screens**: Services · Trainer (sub shows the pupil's open lessons), subjects with the rate and
+  "Paid per session", a booking drawer (pupil, up to N days, worked fees, Pay now: nothing),
+  Agreed receipt, Log a session ↗ to Downtime; Downtime → Learn from a paid teacher (lessons,
+  period, hours, fee, teacher's hours "checked when the DM reviews") and lessons cards with
+  sessions and End lessons (also on the shop's Services section); Review Inbox rows tagged Paid
+  lesson with the fee.
+- **Privacy**: the teacher's hour budget is never projected (existing budget projection); players
+  see their own agreements and sessions only. Training requests are a non-strict schema, so older
+  clients drop `lessonOrderId`/`feeCopper` when reading; their review `before` then differs and the
+  server refuses it, never charges.
+
 ## Screens
 
 - Conversation (`service-talk.tsx`): offers as numbered replies with price, time, component and
@@ -222,7 +259,10 @@ price as cloth the party may bring or the tailor supplies.
 
 ## Verification
 
-`services-identify.test.ts` (presets, held-item rule, request moves nothing, answer required, one
+`services-trainer.test.ts` (presets, booking moves nothing, one open agreement, hours reserved
+for both, level check skipped only for lessons, matching and days cap, fee rounding, one charge
+per approval, retries, deny/cancel, short payer, cap completes, End lessons, privacy, protocol 8,
+offline parity), `services-identify.test.ts` (presets, held-item rule, request moves nothing, answer required, one
 payment and one message, notes and rename in the same command, recheck refusals, privacy, protocol
 8, offline parity), `service-links.test.ts` (link validation, no orders on links, fence projection and lock, bank note
 and terms, hire lock and proposal moving nothing, role NPC privacy, protocol 8 stripping and older

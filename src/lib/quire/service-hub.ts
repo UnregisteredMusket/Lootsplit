@@ -3,7 +3,7 @@ import { readBlacksmith } from "./blacksmith-schema.ts";
 import { smithAvailability } from "./blacksmith.ts";
 import { downtimePending } from "./service-core.ts";
 import { readServices, type ServiceProvider } from "./services-schema.ts";
-import { approvedOffers, providerListed, providerLock, serviceLabel } from "./services.ts";
+import { approvedOffers, lessonDays, providerListed, providerLock, serviceLabel } from "./services.ts";
 import { formatCopper } from "./money.ts";
 
 // The Services branch of the NPC conversation hub (docs/SERVICES.md, docs/NPC-BARTER.md).
@@ -79,6 +79,8 @@ export function npcServices(t: CloudTable, npcId: string, purseId: string | unde
     let locked = providerLock(t, p, purseId);
     // A pause stops new orders only: collecting or withdrawing stays open.
     if (p.paused && locked.startsWith("Not taking new orders") && (ready || waiting)) locked = "";
+    // Trainer: the pupil's open lessons here, as the forge shows ready orders.
+    const lessons = mine.filter((o) => o.terms.lessons && o.status === "active");
     const label = serviceLabel(p);
     const href =
       p.kind === "fence"
@@ -97,7 +99,9 @@ export function npcServices(t: CloudTable, npcId: string, purseId: string | unde
         ? `Your ${ready.terms.offer.output.kind === "holding" ? ready.terms.offer.output.name : ready.terms.offer.name} is ready to collect.`
         : waiting
           ? `Your request for ${waiting.terms.offer.name} is waiting for the DM.`
-          : hubSub(p, offers.length),
+          : lessons.length
+            ? `Your lessons: ${lessons.map((o) => `${o.terms.lessons!.topic} ${lessonDays(t, o).approved.toLocaleString("en", { maximumFractionDigits: 2 })}/${o.terms.lessons!.maxDays} days`).join(", ")}.`
+            : hubSub(p, offers.length),
       ...(href ? {} : { providerId: p.id }),
       ready: !!ready || !!waiting,
       place: shop.name,
@@ -121,6 +125,8 @@ function hubLine(p: ServiceProvider) {
   return s === "scribe" ? "Can you scribe a scroll for me?" : s === "alchemist" ? "Can you brew something for me?" : "Can you make something for me?";
 }
 function hubSub(p: ServiceProvider, offers: number) {
+  if (p.kind === "trainer")
+    return `${offers} ${offers === 1 ? "subject" : "subjects"}. Agree terms, then pay per approved session.`;
   if (p.kind === "sage")
     return `${approvedOffers(p).map((o) => `${o.name} ${formatCopper(o.priceCopper)}`).join(" · ")}. ${approvedOffers(p).some((o) => o.review === "dm") ? "Charged when the DM answers." : ""}`.trim();
   if (p.kind === "fence") return "Opens the Sell tab. The fence's buy rate applies; selling is the shop's usual sale.";

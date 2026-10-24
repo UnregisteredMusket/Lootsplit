@@ -18,6 +18,7 @@ import { readFinance } from "@/lib/quire/finance";
 import { canAccessEstate } from "@/lib/quire/estate";
 import { readEstate } from "@/lib/quire/estate-schema";
 import {
+  lessonFee,
   identifyCandidates,
   identifyLock,
   staffableProperties,
@@ -59,6 +60,7 @@ export const serviceWhen = (day: number, minute = 0) =>
 const intro: Partial<Record<ServiceProvider["kind"], string>> = {
   temple: "Say what ails you, and who. The faithful ask an offering for each blessing.",
   sage: "Show me. And keep your fingers off the pearl.",
+  trainer: "Pick your subject. You pay for each day you actually sit with me, not before.",
   workshop: "Tell me what you need made. Good work takes time.",
   inn: "Rooms upstairs, food on the fire. What'll it be?",
   hire: "Steady hands, fair wages. Where would they work?",
@@ -67,6 +69,7 @@ const offerLine: Partial<Record<ServiceProvider["kind"], string>> = {
   temple: "Who is it for, and what do you bring?",
   workshop: "Here's what that will take.",
   inn: "How many of you, and for how long?",
+  trainer: "Here's how the lessons would go.",
 };
 
 /** What the character says when choosing a preset offer; custom offers use their name. */
@@ -92,6 +95,10 @@ export function offerFlags(o: ServiceOffer): ReactNode {
     });
   if (o.time.kind === "downtime-days") flags.push({ kind: "time", text: `${o.time.days} downtime ${o.time.days === 1 ? "day" : "days"}${o.time.perUnit ? " each" : ""}` });
   if (o.time.kind === "per-night") flags.push({ kind: "time", text: "Per night" });
+  if (o.time.kind === "training") {
+    flags.push({ kind: "time", text: o.category === "martial" ? "Martial" : o.category === "academic" ? "Academic" : "Skill or Profession" });
+    flags.push({ kind: "agree", text: "Paid per session" });
+  }
   for (const c of o.components ?? [])
     flags.push({
       kind: "comp",
@@ -118,9 +125,19 @@ export function ServiceReceipt({ order, payer }: { order: ServiceOrder; payer: s
   return (
     <div className="svc-receipt" aria-label={`Receipt: ${t.offer.name}`}>
       <div className="svc-receipt-head">
-        <b>{t.kind === "inn" ? `Stay · ${t.shopName}` : t.item ? `${t.offer.name} · ${t.item.name}` : t.offer.name}</b>
+        <b>
+          {t.kind === "inn"
+            ? `Stay · ${t.shopName}`
+            : t.lessons
+              ? `Lessons · ${t.lessons.topic}`
+              : t.item
+                ? `${t.offer.name} · ${t.item.name}`
+                : t.offer.name}
+        </b>
         <span className={`svc-status ${order.status}`}>
-          {order.status === "completed"
+          {t.lessons && order.status === "active"
+            ? "Agreed"
+            : order.status === "completed"
             ? order.reveal
               ? "Answered"
               : order.history.some((h) => h.status === "requested")
@@ -130,6 +147,29 @@ export function ServiceReceipt({ order, payer }: { order: ServiceOrder; payer: s
         </span>
       </div>
       <dl className="svc-kv">
+        {t.lessons && (
+          <>
+            <dt>Pupil</dt>
+            <dd>{t.lessons.pupilName}</dd>
+            <dt>Teacher</dt>
+            <dd>
+              {t.npcName}, {t.shopName}
+            </dd>
+            <dt>Rate</dt>
+            <dd>{formatCopper(t.lessons.dayCopper)} a training day, charged per approved session</dd>
+            <dt>Up to</dt>
+            <dd>{t.lessons.maxDays} training days</dd>
+            {(order.sessions?.length ?? 0) > 0 && (
+              <>
+                <dt>Paid</dt>
+                <dd>
+                  {formatCopper(order.sessions!.reduce((n, x) => n + x.feeCopper, 0))} in {order.sessions!.length}{" "}
+                  {order.sessions!.length === 1 ? "ledger line" : "ledger lines"}
+                </dd>
+              </>
+            )}
+          </>
+        )}
         {t.item && (
           <>
             <dt>Item</dt>
@@ -139,7 +179,7 @@ export function ServiceReceipt({ order, payer }: { order: ServiceOrder; payer: s
             </dd>
           </>
         )}
-        {t.kind === "temple" && !t.item && (
+        {t.kind === "temple" && !t.item && !t.lessons && (
           <>
             <dt>Cast on</dt>
             <dd>{names}</dd>
@@ -186,7 +226,9 @@ export function ServiceReceipt({ order, payer }: { order: ServiceOrder; payer: s
         )}
       </dl>
       <p className="svc-record-only">
-        {t.item
+        {t.lessons
+          ? `Recorded only. Finishing the lessons doesn't add a proficiency; the DM decides what ${t.lessons.pupilName} learns.`
+          : t.item
           ? `Recorded. The answer is in your thread with ${t.npcName}${order.reveal?.appendToNotes ? " and in the item's notes" : ""}.`
           : t.kind === "temple"
           ? `Recorded only. The DM updates ${names}'s sheet: hit points, conditions, death.`
@@ -267,7 +309,15 @@ export function orderLines(o: ServiceOrder, payer: string, npcName: string): Tal
     lines.push({
       kind: "npc",
       key: `${o.id}-done`,
-      text: o.reveal ? o.reveal.text : t.kind === "temple" ? "It is done." : t.kind === "inn" ? "Room's at the top of the stairs." : "I'll get to work.",
+      text: o.reveal
+        ? o.reveal.text
+        : t.lessons
+          ? "Come by after the bells. Bring your own tools."
+          : t.kind === "temple"
+            ? "It is done."
+            : t.kind === "inn"
+              ? "Room's at the top of the stairs."
+              : "I'll get to work.",
     });
     lines.push({ kind: "sys", key: `${o.id}-receipt`, node: <ServiceReceipt order={o} payer={payer} /> });
   }
@@ -318,6 +368,8 @@ export function useServiceTalk({
   const provider = services.providers.find((p) => p.id === providerId);
   const offer = provider ? approvedOffers(provider).find((o) => o.key === offerKey) : undefined;
   const purseId = character?.id;
+  const trainingHoursPerDay =
+    (table.journal?.downtimeActivities as { settings?: { trainingHoursPerDay?: number } } | undefined)?.settings?.trainingHoursPerDay ?? 8;
 
   const request: ServiceRequest | null =
     provider && offer && purseId
@@ -359,7 +411,7 @@ export function useServiceTalk({
 
   function chooseOffer(o: ServiceOffer) {
     setOfferKey(o.key);
-    setUnits(1);
+    setUnits(o.time.kind === "training" ? Math.min(10, maxUnits(o)) : 1);
     if (o.target && purseId) setItemId(identifyCandidates(table, purseId).find((c) => !c.blocked)?.holding.id ?? "");
     const rule = beneficiaryRule(provider!.kind, o);
     setBeneficiaries(rule.min && purseId ? [purseId] : []);
@@ -589,13 +641,23 @@ export function useServiceTalk({
           await send({ kind: "service-cancel", orderId: w.id, before: w }, `${w.id}-cancel`, () => undefined);
         },
       });
+    // Trainer: open lessons are logged in Downtime & NPC training.
+    for (const l of services.orders.filter(
+      (o) => o.providerId === provider.id && o.terms.lessons?.pupilId === purseId && o.status === "active",
+    ))
+      replies.push({
+        tag: <>Log a session · {l.terms.lessons!.topic} ↗</>,
+        text: "When can we start?",
+        sub: "Opens Downtime & NPC training with these lessons selected.",
+        href: `/features/downtime?lesson=${encodeURIComponent(l.id)}#paid-lessons`,
+      });
     const lock = providerLock(table, provider, purseId);
     for (const o of approvedOffers(provider)) {
       const settlement = offerSettlementLock(table, provider, o) || (o.target ? identifyLock(table, purseId) : "");
       replies.push({
         tag: (
           <>
-            {o.name} <em>· {formatCopper(o.priceCopper)}{o.time.kind === "per-night" ? "" : maxUnits(o) > 1 ? " each" : ""}{o.components?.length ? ` + ${o.components.map((c) => c.label.toLowerCase()).join(", ")}` : ""}</em>
+            {o.name} <em>· {formatCopper(o.priceCopper)}{o.time.kind === "training" ? " a training day" : o.time.kind === "per-night" ? "" : maxUnits(o) > 1 ? " each" : ""}{o.components?.length ? ` + ${o.components.map((c) => c.label.toLowerCase()).join(", ")}` : ""}</em>
           </>
         ),
         text: speech(o),
@@ -623,8 +685,24 @@ export function useServiceTalk({
   } else if (provider && offer) {
     const review = quote?.terms.review === "dm" || (!quote && offer.review === "dm");
     const price = quote ? formatCopper(quote.terms.priceCopper) : "…";
+    const lessons = offer.time.kind === "training";
+    const say = lessons
+      ? "Agreed."
+      : review
+        ? offer.target
+          ? "This one."
+          : "Please. Here is what we bring."
+        : offer.time.kind === "downtime-days"
+          ? "Let's do it."
+          : offer.time.kind === "per-night"
+            ? "We'll take it."
+            : "Here's the offering.";
     replies.push({
-      tag: review ? (
+      tag: lessons ? (
+        <>
+          Agree terms <em>· nothing charged now{review ? " · DM review" : ""}</em>
+        </>
+      ) : review ? (
         <>
           Ask the {provider.kind === "temple" ? "priest" : provider.kind === "sage" ? "sage" : npc.name}{" "}
           <em>· DM review · {offer.target ? "charged on answer" : "charged on approval"}</em>
@@ -642,17 +720,11 @@ export function useServiceTalk({
           </em>
         </>
       ),
-      text: review
-        ? offer.target
-          ? "This one."
-          : "Please. Here is what we bring."
-        : offer.time.kind === "downtime-days"
-          ? "Let's do it."
-          : offer.time.kind === "per-night"
-            ? "We'll take it."
-            : "Here's the offering.",
+      text: say,
       tone: review ? "dm" : "check",
-      sub: review
+      sub: lessons
+        ? "Adds the lessons to Downtime & NPC training. Log sessions there after the DM approves downtime."
+        : review
         ? offer.target
           ? "The item stays with you while the DM answers. Nothing is charged now."
           : "Sends the request to the DM's Review Inbox. Nothing is charged now."
@@ -665,16 +737,8 @@ export function useServiceTalk({
         const id = action.commandId;
         push({
           kind: "pc",
-          text: review
-            ? offer.target
-              ? "This one."
-              : "Please. Here is what we bring."
-            : offer.time.kind === "downtime-days"
-              ? "Let's do it."
-              : offer.time.kind === "per-night"
-                ? "We'll take it."
-                : "Here's the offering.",
-          tag: review ? "Ask · DM review" : `Pay ${price}`,
+          text: say,
+          tag: lessons ? "Agree terms" : review ? "Ask · DM review" : `Pay ${price}`,
           key: nextKey("pc"),
         });
         const ok = await send(
@@ -762,8 +826,12 @@ export function useServiceTalk({
         {offer.description && <p className="npc-talk-hint">{offer.description}</p>}
         {rule.max > 0 && (
           <div className="svc-section">
-            <h4>{provider.kind === "temple" ? "Cast on" : "Who stays"}</h4>
-            <div className="npc-talk-chips" role="group" aria-label={provider.kind === "temple" ? "Cast on" : "Who stays"}>
+            <h4>{provider.kind === "temple" ? "Cast on" : provider.kind === "trainer" ? "Pupil" : "Who stays"}</h4>
+            <div
+              className="npc-talk-chips"
+              role="group"
+              aria-label={provider.kind === "temple" ? "Cast on" : provider.kind === "trainer" ? "Pupil" : "Who stays"}
+            >
               {people.map((b) => (
                 <button
                   key={b.purseId}
@@ -835,11 +903,40 @@ export function useServiceTalk({
         )}
         {maxUnits(offer) > 1 && (
           <div className="svc-section">
-            <h4>{offer.time.kind === "per-night" ? "Nights" : "How many"}</h4>
+            <h4>{offer.time.kind === "per-night" ? "Nights" : offer.time.kind === "training" ? "Up to" : "How many"}</h4>
             <div className="svc-row">
-              <Stepper value={units} min={1} max={maxUnits(offer)} label={offer.time.kind === "per-night" ? "Nights" : "How many"} onChange={setUnits} />
-              <span className="svc-hint">Up to {maxUnits(offer)} per order.</span>
+              <Stepper
+                value={units}
+                min={1}
+                max={maxUnits(offer)}
+                label={offer.time.kind === "per-night" ? "Nights" : offer.time.kind === "training" ? "Training days" : "How many"}
+                onChange={setUnits}
+              />
+              <span className="svc-hint">
+                {offer.time.kind === "training"
+                  ? `training days (1–${maxUnits(offer)}). Stops at ${units}; you can book more later.`
+                  : `Up to ${maxUnits(offer)} per order.`}
+              </span>
             </div>
+          </div>
+        )}
+        {offer.time.kind === "training" && (
+          <div className="svc-section">
+            <h4>How you pay</h4>
+            <dl className="svc-kv">
+              <dt>Rate</dt>
+              <dd>
+                {formatCopper(offer.priceCopper)} a training day ({trainingHoursPerDay} hours)
+              </dd>
+              <dt>A 4-hour session</dt>
+              <dd>{formatCopper(lessonFee(240, offer.priceCopper, trainingHoursPerDay))}</dd>
+              <dt>A 6-hour session</dt>
+              <dd>{formatCopper(lessonFee(360, offer.priceCopper, trainingHoursPerDay))}</dd>
+              <dt>When</dt>
+              <dd>Each session, when the DM approves it</dd>
+              <dt>{units} days, if all are taken</dt>
+              <dd>{formatCopper(offer.priceCopper * units)}</dd>
+            </dl>
           </div>
         )}
         {(offer.components ?? []).map((c) => {
@@ -944,14 +1041,24 @@ export function useServiceTalk({
           ))}
           <dt>{character.name} carries</dt>
           <dd>{formatCopper(toCopper(character.coins))}</dd>
-          <dt className="sum">{quote?.terms.review === "dm" ? (offer.target ? "Charged when answered" : "Charged when approved") : "Pay now"}</dt>
-          <dd className="sum">{quote ? formatCopper(quote.terms.priceCopper) : "—"}</dd>
+          <dt className="sum">
+            {offer.time.kind === "training"
+              ? "Pay now"
+              : quote?.terms.review === "dm"
+                ? offer.target
+                  ? "Charged when answered"
+                  : "Charged when approved"
+                : "Pay now"}
+          </dt>
+          <dd className="sum">{offer.time.kind === "training" ? "nothing" : quote ? formatCopper(quote.terms.priceCopper) : "—"}</dd>
           <dd className="note">
             {provider.kind === "inn" && quote
               ? `Booked and paid up front: ${quote.terms.priceCopper} cp, one ledger line. Leaving early refunds nothing automatically. `
               : ""}
             {problem ||
-              (quote?.terms.review === "dm"
+              (offer.time.kind === "training"
+                ? `Booking records the agreement only. Each logged session reserves hours for ${character.name} and ${npc.name}; the DM's approval counts the hours and charges that session's fee once. Fees are whole copper, rounded up.`
+                : quote?.terms.review === "dm"
                 ? offer.target
                   ? `Nothing moves now. The DM answers as ${npc.name}; approval charges ${quote ? formatCopper(quote.terms.priceCopper) : "the fee"} once and sends you the answer.`
                   : "Nothing moves now. If the DM approves, coins and any item you bring leave together, once."

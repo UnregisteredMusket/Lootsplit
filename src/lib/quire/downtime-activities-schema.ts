@@ -25,6 +25,10 @@ export const trainingRequestSchema = z.object({
   decidedAt: z.number().optional(),
   reviewNote: z.string().max(4000).default(""),
   historicalContext: z.string().trim().min(1).max(4000).optional(),
+  /** Paid lessons (services wave 2): the trainer order; the character is the pupil, the NPC teaches. */
+  lessonOrderId: id.optional(),
+  /** Paid lessons: this session's fee in copper, charged once when the DM approves it. */
+  feeCopper: z.number().int().min(0).max(1e12).optional(),
 });
 export const trainingResetSchema = z.object({
   id,
@@ -81,6 +85,7 @@ export const downtimeActivityCommands = [
       className: z.string().trim().max(120).default(""),
       minutes: minutes.min(1),
       historicalContext: z.string().trim().min(1).max(4000).optional(),
+      lessonOrderId: id.optional(),
     })
     .strict(),
   z

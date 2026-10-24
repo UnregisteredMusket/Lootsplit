@@ -35,15 +35,17 @@ import { CommandForm, CommandButton } from "./world-tools";
 import { Button, Fold } from "./ui";
 import { AppLink } from "./app-link";
 import { offerFlags, serviceWhen } from "./service-talk";
+import { LessonsCard } from "./service-lessons";
 
 // DM setup and player views of temple, workshop and inn providers (docs/SERVICES.md).
 
 const kindName = serviceKindNames;
 /** Kinds the DM can add in this release; later kinds arrive with their own presets. */
-const addableKinds: ServiceKind[] = ["temple", "workshop", "inn", "sage", "fence", "bank", "hire"];
+const addableKinds: ServiceKind[] = ["temple", "workshop", "inn", "trainer", "sage", "fence", "bank", "hire"];
 /** What each kind's toggle in the NPC record says. */
 const kindHint: Partial<Record<ServiceKind, string>> = {
   sage: "Identify a carried item; you write the answer.",
+  trainer: "Paid lessons, charged per approved session.",
   fence: "Opens a black-market shop's Sell tab.",
   bank: "Opens a loan request naming this bank.",
   hire: "Proposes a property staff contract.",
@@ -141,9 +143,17 @@ function ProviderCard({
             .map((o) => (
               <ServiceOrderCard key={o.id} order={o} table={t} dm={dm} />
             ))}
+          {mine
+            .filter((o) => o.terms.lessons && o.status !== "requested")
+            .slice()
+            .reverse()
+            .map((o) => (
+              <LessonsCard key={o.id} order={o} table={t} />
+            ))}
           <ul className="svc-offers">
             {mine
               .filter((o) => !(o.terms.workDays > 0 && o.status !== "requested"))
+              .filter((o) => !(o.terms.lessons && o.status !== "requested"))
               .slice()
               .reverse()
               .map((o) => (
@@ -252,7 +262,11 @@ function PresetChoice({ value, onChange, kind = "temple" }: { value: ServicePres
         ))}
       </div>
       <p className="svc-hint">
-        {kind === "sage"
+        {kind === "trainer"
+          ? value === "blank"
+            ? "No subjects: add your own."
+            : "The SRD has no training price: a training day costs SRD skilled hireling pay, 2 gp (5.2.1 and 5.1 agree). Subjects: Thieves' tools, a language, weapon drills; edit or add your own."
+          : kind === "sage"
           ? value === "blank"
             ? "No offers: add your own."
             : "Identify at 50 gp (SRD 5.2.1, a level 1 spell; SRD 5.1's top of 10–50 gp). The pearl is the sage's own and isn't consumed. DM review: you write the answer."
@@ -407,6 +421,8 @@ function ProviderEditor({ provider, table: t }: { provider: ServiceProvider; tab
                             maxUnits: 1,
                             output: { kind: "holding" as const, name: "New item", unitCopper: 0, weight: 0, category: "service", notes: "" },
                           }
+                        : d.kind === "trainer"
+                        ? { time: { kind: "training" as const }, output: { kind: "record" as const }, category: "profession" as const, maxDays: 250, priceCopper: 200 }
                         : d.kind === "sage"
                         ? { time: { kind: "instant" as const }, output: { kind: "record" as const }, target: "held-item" as const }
                         : { time: { kind: "instant" as const }, output: { kind: "record" as const } }),
@@ -469,7 +485,7 @@ function OfferEditor({
           </label>
           {kind !== "inn" && (
             <label>
-              Price (copper)
+              {kind === "trainer" ? "Rate per training day (copper)" : "Price (copper)"}
               <input
                 type="number"
                 min={0}
@@ -487,7 +503,27 @@ function OfferEditor({
           Description
           <textarea value={o.description} maxLength={1500} onChange={(e) => onChange({ description: e.target.value })} />
         </label>
-        {kind !== "inn" && (
+        {kind === "trainer" && (
+          <div className="svc-grid">
+            <label>
+              Category (existing training categories)
+              <select value={o.category ?? "profession"} onChange={(e) => onChange({ category: e.target.value as ServiceOffer["category"] })}>
+                <option value="martial">Martial</option>
+                <option value="academic">Academic</option>
+                <option value="profession">Skill or Profession</option>
+              </select>
+            </label>
+            <label>
+              Most days per agreement
+              <input type="number" min={1} max={250} value={o.maxDays ?? 250} onChange={(e) => onChange({ maxDays: whole(e.target.value, 1, 250) })} />
+            </label>
+            <p className="svc-hint">
+              A training day is your Hours per training day setting. Each session's fee is hours × rate ÷ that, rounded up to whole
+              copper, charged once when you approve the session. Booking moves no money; every session is still reviewed.
+            </p>
+          </div>
+        )}
+        {kind !== "inn" && kind !== "trainer" && (
           <div className="svc-grid">
             <label>
               Spell level

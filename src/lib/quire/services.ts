@@ -135,12 +135,12 @@ export function publicProvider(p: ServiceProvider) {
 
 /** Units the offer allows per order. */
 export function maxUnits(o: ServiceOffer) {
-  return o.time.kind === "per-night" ? o.time.maxNights : (o.maxUnits ?? 1);
+  return o.time.kind === "per-night" ? o.time.maxNights : o.time.kind === "training" ? (o.maxDays ?? 250) : (o.maxUnits ?? 1);
 }
 /** Beneficiaries each kind takes: a temple casts on one, an inn hosts guests, a workshop has none. */
 export function beneficiaryRule(kind: ServiceKind, offer?: Pick<ServiceOffer, "target">) {
   if (offer?.target) return { min: 0, max: 0 };
-  return kind === "temple" ? { min: 1, max: 1 } : kind === "inn" ? { min: 1, max: 20 } : { min: 0, max: 0 };
+  return kind === "temple" || kind === "trainer" ? { min: 1, max: 1 } : kind === "inn" ? { min: 1, max: 20 } : { min: 0, max: 0 };
 }
 
 /**
@@ -217,6 +217,8 @@ export function serviceQuote(
   offerKey: string,
   purseId: string,
   request: ServiceRequest,
+  /** The order being approved, which doesn't count as another open agreement. */
+  excludeOrderId?: string,
 ) {
   const p = readServices(t.journal?.services).providers.find((x) => x.id === providerId);
   if (!p) throw Error("This service is no longer offered.");
@@ -242,7 +244,9 @@ export function serviceQuote(
     throw Error(
       offer.target
         ? "This offer takes no beneficiary."
-        : p.kind === "temple"
+        : p.kind === "trainer"
+          ? "Choose who takes the lessons."
+          : p.kind === "temple"
           ? "Choose who the spell is cast on."
           : p.kind === "inn"
             ? "Choose who stays."
@@ -284,7 +288,11 @@ export function serviceQuote(
         copper: money(guests * units * meals * tier.mealCopper),
       });
   } else if (request.inn) throw Error("Rooms are booked at an inn.");
-  else
+  else if (p.kind === "trainer") {
+    // Booking moves no money: each session is charged once when the DM approves it.
+    if (!offer.category) throw Error("This subject has no training category.");
+    lines.push({ label: `Booking now · up to ${units} training ${units === 1 ? "day" : "days"} at ${formatCopper(offer.priceCopper)} a day, charged per approved session`, copper: 0 });
+  } else
     lines.push({
       label: units > 1 ? `${units} × ${offer.name} × ${formatCopper(offer.priceCopper)}` : offer.name,
       copper: money(units * offer.priceCopper),
@@ -372,7 +380,30 @@ export function serviceQuote(
     workDays,
     settlement: settlement.kind,
     ...(item ? { item } : {}),
+    ...(p.kind === "trainer"
+      ? {
+          lessons: {
+            pupilId: beneficiaries[0].purseId,
+            pupilName: beneficiaries[0].name.slice(0, 160),
+            category: offer.category!,
+            topic: offer.name,
+            dayCopper: offer.priceCopper,
+            maxDays: units,
+          },
+        }
+      : {}),
   });
+  if (p.kind === "trainer") {
+    const open = readServices(t.journal?.services).orders.find(
+      (o) =>
+        o.id !== excludeOrderId &&
+        o.providerId === p.id &&
+        o.offerKey === offer.key &&
+        o.terms.lessons?.pupilId === beneficiaries[0].purseId &&
+        ["requested", "active", "paused"].includes(o.status),
+    );
+    if (open) throw Error(`${beneficiaries[0].name} already has lessons in ${offer.name} with ${npc.name}.`);
+  }
   const f = t.journal?.finance ?? { day: 0, minuteOfDay: 0 };
   const before = quoteFingerprint({
     provider: publicProvider(p),
@@ -410,7 +441,7 @@ export function reviewChecks(t: Table, o: ServiceOrder) {
   let quote: ServiceQuote | undefined,
     error = "";
   try {
-    quote = serviceQuote(t, o.providerId, o.offerKey, o.purseId, o.request);
+    quote = serviceQuote(t, o.providerId, o.offerKey, o.purseId, o.request, o.id);
   } catch (e) {
     error = e instanceof Error ? e.message : String(e);
   }
@@ -446,6 +477,7 @@ export function reviewChecks(t: Table, o: ServiceOrder) {
 
 /** A short receipt line, for events and history. */
 export function serviceSummary(o: Pick<ServiceOrder, "terms">) {
+  if (o.terms.lessons) return `Lessons · ${o.terms.lessons.topic} for ${o.terms.lessons.pupilName} · ${o.terms.shopName}`;
   if (o.terms.item) return `${o.terms.offer.name} · ${o.terms.item.name} · ${o.terms.shopName}`;
   const on = o.terms.beneficiaries.length && o.terms.kind === "temple" ? ` on ${o.terms.beneficiaries[0].name}` : "";
   return `${o.terms.offer.name}${on} · ${o.terms.shopName}`;
@@ -504,4 +536,25 @@ export function bankForLoanNote(t: Pick<CloudTable, "journal">, note: string) {
     const npc = t.journal?.world?.npcs.find((n) => n.id === p.npcId)?.name ?? "";
     return note.startsWith(bankLoanNote(p, npc).trim());
   });
+}
+
+/** A paid lesson session's fee: hours × rate ÷ hours per training day, rounded up to whole copper. */
+export function lessonFee(minutes: number, dayCopper: number, trainingHoursPerDay: number) {
+  return serviceMoney((minutes * dayCopper) / (trainingHoursPerDay * 60), "Lesson fee exceeds the supported copper range.");
+}
+/** Training days taken on an agreement (approved sessions) and reserved (pending requests). */
+export function lessonDays(
+  t: Pick<CloudTable, "journal">,
+  o: Pick<ServiceOrder, "id">,
+): { approved: number; pending: number; paidCopper: number } {
+  const requests = ((t.journal?.downtimeActivities as { requests?: { lessonOrderId?: string; status: string; minutes: number; trainingHoursPerDay: number; feeCopper?: number }[] } | undefined)?.requests ?? []).filter(
+    (r) => r.lessonOrderId === o.id,
+  );
+  const days = (status: string) =>
+    requests.filter((r) => r.status === status).reduce((n, r) => n + r.minutes / (r.trainingHoursPerDay * 60), 0);
+  return {
+    approved: days("approved"),
+    pending: days("pending"),
+    paidCopper: requests.filter((r) => r.status === "approved").reduce((n, r) => n + (r.feeCopper ?? 0), 0),
+  };
 }
