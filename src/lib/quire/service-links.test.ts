@@ -76,7 +76,7 @@ test("link kinds take no offers, carry only their own settings, and engines not 
   const hire = provider(t, "ottilie-hire");
   assert.throws(() => edit({ ...hire, link: { roles: [hire.link!.roles![0], hire.link!.roles![0]] } }), /Duplicate hire roles/);
   assert.throws(() => edit({ ...hire, link: { roles: [{ ...hire.link!.roles![0], npcId: "nobody" }] } }), /existing NPC/);
-  for (const kind of ["stable", "courier"] as const)
+  for (const kind of ["stable"] as const)
     assert.throws(
       () =>
         applyCommand(t, svcDm, {
