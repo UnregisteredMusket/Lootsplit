@@ -67,6 +67,9 @@ ACCOUNT_ORIGIN = "https://lootsplitter.com"
 # (workers.dev since the 2026-10 move to lootsplitter.com). migration:check and release preflight
 # enforce it. Keep workers.dev here for installed APKs, widgets and old links (coexistence period).
 ACCOUNT_LEGACY_ORIGINS = "https://lootsplit.oliverstorie2017.workers.dev"
+# Online campaigns one account may host at once (owner decision 2026-10-24; the site owner is
+# exempt). cloudflare/hosted-campaigns.mjs defaults to 2 when this is unset or invalid.
+HOSTED_CAMPAIGN_LIMIT = "2"
 # ACCOUNT_SECRET is a Worker secret, never committed. Guest play does not depend on it.
 
 # Read-only release identity for the administrator server monitor.

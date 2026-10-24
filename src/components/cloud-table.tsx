@@ -5,7 +5,12 @@ import { Copy, Crown, DoorOpen, Radio, Users, ArrowLeft } from "lucide-react";
 import { toast } from "sonner";
 import { Link, useRouter, useRouterState } from "@tanstack/react-router";
 import * as AlertDialog from "@radix-ui/react-alert-dialog";
-import { accountRequest, type AccountLibrary } from "@/lib/account/client";
+import {
+  accountRequest,
+  HOSTING_LIMIT_HELP,
+  hostingLabel,
+  type AccountLibrary,
+} from "@/lib/account/client";
 import { linkCurrentCampaign } from "@/lib/account/transfers";
 import {
   captureDeviceBackup,
@@ -70,6 +75,8 @@ export function CloudTable() {
   // Restored credentials arrive before the authoritative session mode/invitation.
   const unavailable = busy || !online || (cloud.joined && cloud.lastSync === 0);
   const savedRooms = hostAccount?.members.filter((m) => !m.archived && m.role) || [];
+  // Convenience only: the server refuses every hosting path at the limit.
+  const atHostLimit = hostAccount?.hosting?.atLimit === true;
 
   async function prepareHosting() {
     setHosting(true);
@@ -333,6 +340,17 @@ export function CloudTable() {
                 <p>Create an account or sign in to proceed as a Dungeon Master in your own campaign.{" "}
                   <Link to="/account">Sign in</Link></p>
               )}
+              {hostAccount?.hosting && (
+                <div className="mt-3" role={atHostLimit ? "alert" : undefined}>
+                  <p className="text-sm font-semibold">{hostingLabel(hostAccount.hosting)}</p>
+                  {atHostLimit ? (
+                    <p className="text-sm">
+                      You can host up to {hostAccount.hosting.limit} online campaigns.{" "}
+                      {HOSTING_LIMIT_HELP}
+                    </p>
+                  ) : null}
+                </div>
+              )}
               {savedRooms.length > 0 && (
                 <div className="mt-3 rounded-xl border border-lead/30 p-3">
                   <h3>You already have saved campaigns</h3>
@@ -398,7 +416,7 @@ export function CloudTable() {
                 className="mt-5 w-full min-h-12"
                 disabled={
                   unavailable ||
-                  checkingAccount || !hostAccount ||
+                  checkingAccount || !hostAccount || atHostLimit ||
                   (!!(savedRooms.length || accountCheckError) && !separateRoom)
                 }
                 onClick={() =>

@@ -12,7 +12,9 @@ import { hydrateRoomImages } from "../cloudflare/room-images.mjs";
 
 // Disposable local D1 stand-in with every migration applied; never a real campaign or account.
 const db = localAccountDb();
-globalThis.__env__ = { DB: db };
+// One synthetic DM restores many rooms here; the hosting limit has its own suite
+// (hosted-campaign-limit.test.mjs), so this file raises it instead of closing rooms between cases.
+globalThis.__env__ = { DB: db, HOSTED_CAMPAIGN_LIMIT: "100" };
 const userId = "restore-dm",
   actor = { id: "restore-session" };
 db.prepare(

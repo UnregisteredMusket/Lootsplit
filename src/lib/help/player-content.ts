@@ -332,6 +332,7 @@ export const PLAYER_HELP_GROUPS: HelpGroup[] = [
           "Website Field monitor and the Android home-screen Field monitor (1.8.0 and later) are private to the site owner; player or campaign DM access does not grant it. Its aggregate statistics do not publish private campaign records or turn account activity into a count of concurrent players. Daily monitoring reports, development timers, diagnostics, log registration and the customizable 4×1 companion remain owner-only. Adding an Android widget before sign-in does not grant owner access; it shows a sign-in state until authorized. These features do not change player permissions or reveal private campaign details.",
           "Your room seat controls assigned characters and any expressly permitted party funds. Selecting a sheet does not change those assignments. Full editing and individual field grants come from the DM; they do not transfer ownership of another character.",
           "When the DM closes the room or removes your seat, campaign access ends and saving into that room is blocked. You may leave the room yourself. A room deliberately left online after play permits authorized viewing until play resumes.",
+          "There is no limit on how many campaigns you join as a player. The online campaign limit applies only to rooms an account hosts as DM.",
         ],
         links: [
           ["Campaign connection", "/share"],

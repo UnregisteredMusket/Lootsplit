@@ -407,6 +407,7 @@ export function MonitorJournal({ data, refresh }: { data: JournalSnapshot; refre
                 "devices",
                 "multiplayer",
                 "room-storage",
+                "campaign-limit",
                 "reports",
                 "recovery",
               ].map((s) => (

@@ -219,6 +219,7 @@ export async function openRoom(input: {
     userId: input.userId,
     purseIds: [],
   };
+  const { hostedCampaignLimit } = await import("../../../cloudflare/hosted-campaigns.mjs");
   await createRoom({
     ownerId: input.userId,
     sessionId: input.userId ? crypto.randomUUID() : undefined,
@@ -230,7 +231,7 @@ export async function openRoom(input: {
     table,
     seen: { gifts: [], sales: [] },
     ...(probe ? { monitorProbe: true } : {}),
-  });
+  }, input.userId ? { hostLimit: { userId: input.userId, limit: hostedCampaignLimit(), path: "open" } } : {});
   return { code, token: seat.token, seatId: seat.id, revision: 1, userId: seat.userId };
 }
 

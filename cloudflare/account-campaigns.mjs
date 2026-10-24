@@ -7,13 +7,20 @@ import {
   recoveryAccountGuardArgs,
 } from "./campaign-recovery.mjs";
 import { readCloudTable } from "../src/lib/quire/cloud.ts";
+import {
+  assertCanHost,
+  hostedCampaignGuardArgs,
+  hostedCampaignGuardSql,
+  hostedCampaignLimit,
+  hostedCampaignLimitError,
+} from "./hosted-campaigns.mjs";
 import { projectRecord } from "../src/lib/quire/session-records.ts";
 
 const fail = (message, status = 400) => {
   throw Object.assign(new Error(message), { status });
 };
 
-export async function resumeCampaignMembership(db, userId, body) {
+export async function resumeCampaignMembership(db, userId, body, limit = hostedCampaignLimit()) {
   const member = await db
     .prepare("SELECT * FROM library_members WHERE user_id=? AND code=?")
     .bind(userId, body.code)
@@ -36,6 +43,8 @@ export async function resumeCampaignMembership(db, userId, body) {
       fail("The campaign changed. Refresh My campaigns before reopening it.", 409);
     if (Object.values(room.drafts || {}).some((draft) => draft.length))
       fail("This campaign has pending turns. Resolve them before reopening it.", 409);
+    // A closed room is not live, so reopening it hosts a new online campaign.
+    await assertCanHost(db, userId, "reopen", limit);
     const next = structuredClone(room);
     next.closed = false;
     next.ownerId = userId;
@@ -51,11 +60,26 @@ export async function resumeCampaignMembership(db, userId, body) {
     next.seats = next.seats.filter((s) => s.role === "dm");
     next.turn = next.seats.findIndex((s) => s.id === seat.id);
     const saved = await db
-      .prepare("UPDATE campaign_rooms SET body=?,revision=? WHERE code=? AND revision=?")
-      .bind(JSON.stringify(next), next.revision, member.code, row.revision)
+      .prepare(
+        `UPDATE campaign_rooms SET body=?,revision=? WHERE code=? AND revision=? AND ${hostedCampaignGuardSql}`,
+      )
+      .bind(
+        JSON.stringify(next),
+        next.revision,
+        member.code,
+        row.revision,
+        ...hostedCampaignGuardArgs(userId, limit),
+      )
       .run();
-    if (saved.meta.changes !== 1)
+    if (saved.meta.changes !== 1) {
+      await assertCanHost(db, userId, "reopen", limit);
+      const current = await db
+        .prepare("SELECT revision FROM campaign_rooms WHERE code=?")
+        .bind(member.code)
+        .first();
+      if (current?.revision === row.revision) throw hostedCampaignLimitError(limit);
       fail("The campaign changed. Refresh My campaigns before reopening it.", 409);
+    }
     reopened = true;
   }
   await db
