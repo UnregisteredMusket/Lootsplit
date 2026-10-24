@@ -202,3 +202,23 @@ test("offline: stabling, booking and departure match the shared engine (Approve 
   assert.deepEqual(outcome(device), outcome(shared));
   assert.equal(outcome(device).payments.length, 2);
 });
+
+test("Review Inbox's one-click Approve & depart works when the screen lists purses by name", async () => {
+  const { orderedTable, quoteHash } = await import("./journey-engine.ts");
+  let t = applyCommand(stableFixture(), svcKael, coachCommand(stableFixture(), "c1"));
+  // The screen's table: the same records sorted by name (the room keeps insertion order).
+  const screen = { ...t, purses: [...t.purses].sort((a, b) => a.name.localeCompare(b.name)), holdings: [...t.holdings].sort((a, b) => a.name.localeCompare(b.name)) };
+  const plan = { id: "one-plan", kind: "downtime-plan", name: "Coach", days: 2, journeyId: "c1-journey" };
+  const simulated = applyCommand(orderedTable(screen), DM_SEAT as never, plan as never, { preview: true } as never);
+  const hash = quoteHash(simulated.journal!.finance!.downtime.at(-1)!.quote);
+  t = applyCommandBatch(t, svcDm, [
+    { ...plan, expectedQuoteHash: hash },
+    { id: "one-apply", kind: "downtime-apply", downtimeId: "one-plan", endSession: false },
+  ] as never);
+  assert.equal(fares(t, "c1").length, 1);
+  assert.equal(order(t, "c1").status, "completed");
+  // A real change still stops it.
+  const changed = applyCommand(stableFixture(), svcKael, coachCommand(stableFixture(), "c1"));
+  changed.purses.find((p) => p.id === "kael")!.coins.gp -= 1;
+  assert.throws(() => applyCommandBatch(changed, svcDm, [{ ...plan, expectedQuoteHash: hash }] as never), /Open the full review/);
+});

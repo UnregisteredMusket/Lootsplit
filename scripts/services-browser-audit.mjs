@@ -506,17 +506,20 @@ async function stable(page, width) {
   await reply(page, "Stabling").click();
   const drawer = talk(page).locator(".npc-talk-drawer");
   await expect(drawer.getByLabel(/Riding horse/)).toBeChecked();
-  await expect(drawer.getByLabel(/Pack mule/)).toBeChecked();
+  await expect(drawer.getByLabel(/Pack mule/).first()).toBeChecked();
+  // Stable the horse only (the device may hold another party's mule as well).
+  for (const box of await drawer.getByLabel(/Pack mule/).all()) await box.uncheck();
   await expect(drawer.locator(".svc-choice.blocked").filter({ hasText: "Pony" })).toContainText("Thorn books for it");
   await drawer.getByRole("button", { name: "More nights" }).click();
   await drawer.getByRole("button", { name: "More nights" }).click();
-  await expect(drawer.locator(".svc-total")).toContainText("3 gp, 3 sp");
+  await expect(drawer.locator(".svc-total")).toContainText("Stalls · 1 animal × 3 nights × 5 sp");
+  await expect(drawer.locator(".svc-total")).toContainText("1 gp, 6 sp, 5 cp");
   await fits(page, `${width} stabling`);
   await page.screenshot({ path: `${output}/stable-stalls-${width}.png`, fullPage: true });
   await reply(page, "Here's the coin.").click();
-  await expect(talk(page).getByLabel("Receipt: Stabling")).toContainText("Riding horse, Pack mule");
+  await expect(talk(page).getByLabel("Receipt: Stabling")).toContainText("Riding horse");
   let state = await readJournal(page);
-  assert.equal(state.ledger.filter((l) => l.copper === -330).length, 1, "stabling paid once");
+  assert.equal(state.ledger.filter((l) => l.copper === -165).length, 1, "stabling paid once");
 
   const coach = reply(page, "Take us to Saltmere.");
   await expect(coach).toContainText("38.2 mi");
@@ -541,9 +544,10 @@ async function stable(page, width) {
   await expect.poll(async () => (await readJournal(page)).journal.services.orders.at(-1).status).toBe("completed");
   state = await readJournal(page);
   assert.equal(state.ledger.filter((l) => l.id === booking.id + "-payment").length, 1, "fare charged once on departure");
-  assert.equal(state.journal.world.journeys[0].status, "active");
+  // The whole route fits in the approved days, so the party is on the road and arrives.
+  assert.ok(["active", "arrived"].includes(state.journal.world.journeys[0].status));
   await navigateApplication(page, origin + "/maps");
-  await expect(page.locator("main")).toContainText("On the road");
+  await expect(page.locator("main")).toContainText(/On the road|Arrived near Saltmere/);
   await fits(page, `${width} on the road`);
 }
 

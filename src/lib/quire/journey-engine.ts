@@ -77,6 +77,23 @@ export function hashText(text: string) {
   return a.toString(16).padStart(8, "0") + b.toString(16).padStart(8, "0");
 }
 export const quoteHash = (quote: unknown) => hashText(canonicalJson(quote));
+const byId = (a: { id: string }, b: { id: string }) => (a.id < b.id ? -1 : a.id > b.id ? 1 : 0);
+/**
+ * The table with its record lists in ID order. Screens list purses, holdings and shops by name,
+ * the device by key and a room in insertion order; Review Inbox's one-click Approve & depart
+ * hashes its quote from this form so the server can compare it whatever order it stores.
+ */
+export function orderedTable<T extends Pick<CloudTable, "purses" | "holdings" | "shops">>(t: T): T {
+  return {
+    ...t,
+    purses: [...t.purses].sort(byId),
+    holdings: [...t.holdings].sort(byId),
+    shops: [...t.shops].sort(byId),
+    ...("stock" in t && Array.isArray((t as { stock?: unknown }).stock)
+      ? { stock: [...(t as unknown as { stock: { id: string }[] }).stock].sort(byId) }
+      : {}),
+  };
+}
 
 type Table = Pick<CloudTable, "purses" | "journal">;
 const journeysOf = (t: Pick<CloudTable, "journal">) => t.journal?.world?.journeys ?? [];

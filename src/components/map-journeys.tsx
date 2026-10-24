@@ -26,6 +26,7 @@ import {
 } from "@/lib/quire/journey-schema";
 import {
   quoteHash,
+  orderedTable,
   journeyTravellers,
   measureJourney,
   type JourneyQuote,
@@ -1157,7 +1158,8 @@ function JourneyInboxEntry({ table, journey: j }: { table: Table; journey: Journ
             void actions.run(async () => {
               const plan = planCommand(table, j, simulated.days) as Extract<CommandRequest, { kind: "downtime-plan" }>;
               const planId = `${batchId.current}-plan`;
-              const expected = simulatePlan(table, j, simulated.days);
+              // Hash the quote from the table in ID order: this screen's lists are sorted by name.
+              const expected = simulatePlan(orderedTable(table), j, simulated.days);
               const outcome = await actions.commandBatch(batchId.current, [
                 { ...plan, id: planId, expectedQuoteHash: quoteHash(expected.quote) },
                 { id: `${batchId.current}-apply`, kind: "downtime-apply", downtimeId: planId, endSession: false },
