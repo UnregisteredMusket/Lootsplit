@@ -11,6 +11,7 @@ import { propertyDeedSchema } from "./property-deed.ts";
 import { custodySchema, estateKey } from "./estate-schema.ts";
 import { tradeLedgerLinkSchema } from "./trade-economy-schema.ts";
 import { lootLedgerSchema, lootPoolMarkerSchema } from "./loot-claims-schema.ts";
+import { awardTagSchema } from "./award-tag.ts";
 const id = z.string().min(1);
 const amount = z.number().int().nonnegative().max(Number.MAX_SAFE_INTEGER);
 export const coinsSchema = z
@@ -95,6 +96,7 @@ const ledger = z.object({
     .strict()
     .optional(),
   loot: lootLedgerSchema.optional(),
+  award: awardTagSchema.optional(),
   transactionType: z
     .enum(["transfer", "purchase", "sale", "loan", "payment", "adjustment", "void"])
     .optional(),

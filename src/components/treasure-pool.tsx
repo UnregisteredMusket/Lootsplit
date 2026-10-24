@@ -30,7 +30,9 @@ import {
   type LootRoll,
   type LootTable,
 } from "@/lib/quire/loot-claims";
-import type { LootChoice, LootMethod } from "@/lib/quire/loot-claims-schema";
+import type { FavourBasis, LootChoice, LootMethod } from "@/lib/quire/loot-claims-schema";
+import { FurthestBehindLine, useFairness } from "@/components/fairness-ledger";
+import { fairnessLedger, fairnessStandings, roundGap } from "@/lib/quire/loot-fairness";
 import type { Holding, Purse } from "@/lib/quire/types";
 import type { Journal } from "@/lib/quire/journal";
 
@@ -195,6 +197,7 @@ export function TreasurePool({ onAddLoot, onAddFund }: { onAddLoot?: () => void;
                   : "Mark what you need, would take (Greed) or don't want (Pass). The DM decides; nothing moves until then. You can change a claim until the DM resolves the item."}
               </p>
             )}
+            <FurthestBehindLine />
           </section>
           {!dm && mine.length > 0 && lots.length > 0 && (
             <div className="loot-chips" role="group" aria-label="Show">
@@ -541,7 +544,14 @@ function TimelineRow({ t, e, holdingId }: { t: LootTable; e: Event; holdingId: s
               <span className={`loot-die${roll.d100.at(-1) === top ? " win" : ""}`}>{roll.d100.join("/")}</span>
             </span>
           ))}
-          {lot.kept ? ` · ${lot.kept} stayed in the pool` : ""} · receipt <span className="loot-receipt-id">{r.id.slice(0, 8)}</span>
+          {lot.kept ? ` · ${lot.kept} stayed in the pool` : ""}
+          {e.lootFavour?.lots.some((l) => l.holdingId === holdingId)
+            ? ` · favoured whoever was behind (${e.lootFavour.lots
+                .find((l) => l.holdingId === holdingId)!
+                .purseIds.map((id) => nameOf(t, id).split(" ")[0])
+                .join(", ")})`
+            : ""}{" "}
+          · receipt <span className="loot-receipt-id">{r.id.slice(0, 8)}</span>
         </small>
       </li>
     </>
@@ -567,6 +577,12 @@ export function LootClaimsReview() {
   const [busy, setBusy] = useState(false);
   const [error, setError] = useState("");
   const [done, setDone] = useState<string | null>(null);
+  // Favour whoever is behind (phase 3): off by default, chosen for this resolution only.
+  const [favourOn, setFavourOn] = useState(false);
+  const [basis, setBasis] = useState<FavourBasis>("campaign");
+  const fair = useFairness();
+  const sessionRunning = (t.journal?.sessions ?? []).some((x) => !x.endedAt);
+  const favourBasis: FavourBasis = basis === "session" && !sessionRunning ? "campaign" : basis;
   const blocked =
     cloud.joined && !cloud.mine
       ? `Return the campaign turn to the DM before resolving (it is ${cloud.who}'s turn).`
@@ -599,16 +615,29 @@ export function LootClaimsReview() {
           return Number.isInteger(n) && n >= 1 && n <= 100 ? n : Number.NaN;
         }
       : undefined;
+  const favouring = favourOn && assist;
+  const totals = useMemo(
+    () => (favouring ? fairnessStandings(fair.table, favourBasis) : null),
+    [favouring, fair.table, favourBasis],
+  );
   let plan: LootPlan | null = null;
+  let plain: LootPlan | null = null;
   let planError = "";
   try {
-    if (input.lots.length) plan = planLootResolution(t, input, roll);
+    if (input.lots.length) {
+      plan = planLootResolution(t, input, roll, totals ?? undefined);
+      if (totals) plain = planLootResolution(t, input, roll);
+    }
   } catch (e) {
     planError = e instanceof Error ? e.message : "Check the resolution.";
   }
-  const expect = input.lots.length ? lootFingerprint(t, input.lots, method) : "";
+  const expect = input.lots.length
+    ? lootFingerprint(t, input.lots, method, totals ? { basis: favourBasis, totals } : undefined)
+    : "";
   // One command ID per reviewed resolution, reused when the same resolution is retried.
-  const action = useCommandId(`${method}|${rolls}|${expect}|${JSON.stringify(input.lots)}|${JSON.stringify(entered)}`);
+  const action = useCommandId(
+    `${method}|${rolls}|${expect}|${JSON.stringify(input.lots)}|${JSON.stringify(entered)}|${favouring ? favourBasis : ""}`,
+  );
   if (seat.role !== "dm" || !t.ready) return null;
   const rolling = method === "random" && plan?.lots.some((l) => l.needsRolls);
   const unmarkedNames = plan
@@ -631,6 +660,7 @@ export function LootClaimsReview() {
           lots: input.lots,
           ...(method === "random" ? { rolls } : {}),
           ...(manualRolls?.length ? { manualRolls } : {}),
+          ...(favouring ? { favour: { basis: favourBasis } } : {}),
           expect,
         },
         { commandId: action.commandId },
@@ -711,6 +741,18 @@ export function LootClaimsReview() {
                   </span>
                 </div>
               )}
+              <FavourPanel
+                on={favourOn}
+                onChange={(on) => {
+                  setFavourOn(on);
+                  setError("");
+                }}
+                basis={favourBasis}
+                onBasis={setBasis}
+                sessionRunning={sessionRunning}
+                method={method}
+                claimants={claimants}
+              />
             </fieldset>
             {assist ? (
               <fieldset className="loot-fieldset">
@@ -754,7 +796,15 @@ export function LootClaimsReview() {
               />
             )}
             {plan ? (
-              <PlanPreview t={t} plan={plan} rolls={method === "random" ? rolls : null} entered={entered} setEntered={setEntered} keyOf={key} />
+              <PlanPreview
+                t={t}
+                plan={plan}
+                rolls={method === "random" ? rolls : null}
+                entered={entered}
+                setEntered={setEntered}
+                keyOf={key}
+                favour={totals && plain ? { totals, plain } : null}
+              />
             ) : (
               <p className="coin-split-hint" role="status">
                 {planError || (assist ? "Select at least one item with claims." : "Choose who receives the item.")}
@@ -797,7 +847,16 @@ export function LootClaimsReview() {
                     </li>
                   )}
                   {rolling && rolls === "manual" && <li>Your Pen &amp; Paper totals are recorded as entered by the DM.</li>}
-                  <li>All items move or none do. If a claim changes before you confirm, nothing moves and you review again.</li>
+                  {favouring && (
+                    <li>
+                      Favour whoever is behind is on ({favourBasis === "session" ? "this session" : "campaign to date"}); the totals it
+                      used are recorded on the receipt.
+                    </li>
+                  )}
+                  <li>
+                    All items move or none do. If a claim{favouring ? " or anyone's total" : ""} changes before you confirm (for
+                    example a split lands), nothing moves and you review again.
+                  </li>
                 </ul>
                 <div className="mt-3 flex flex-wrap gap-2">
                   <Button disabled={!canResolve} onClick={() => void resolve()} aria-busy={busy}>
@@ -964,6 +1023,7 @@ function PlanPreview({
   entered,
   setEntered,
   keyOf,
+  favour,
 }: {
   t: LootTable;
   plan: LootPlan;
@@ -971,6 +1031,8 @@ function PlanPreview({
   entered: Record<string, string>;
   setEntered: (next: Record<string, string>) => void;
   keyOf: (holdingId: string, purseId: string, round: number) => string;
+  /** Favour on: the totals used and the same plan without favour, to compare. */
+  favour: { totals: Map<string, number>; plain: LootPlan } | null;
 }) {
   const pool = plan.lots.reduce((s, l) => s + l.poolQuantity, 0);
   const moving = plan.lots.reduce((s, l) => s + l.quantity, 0);
@@ -1038,6 +1100,7 @@ function PlanPreview({
                   </span>
                 ))}
             </span>
+            {favour && <FavourCompare t={t} lot={lot} plain={favour.plain.lots.find((l) => l.holdingId === lot.holdingId)} totals={favour.totals} method={plan.method} />}
           </div>
         );
       })}
@@ -1062,6 +1125,7 @@ function ResolvedReceipt({ t, event }: { t: LootTable; event: Event }) {
         Receipt <span className="loot-receipt-id">{r.id.slice(0, 8)}</span> · {when(event.at)} · {METHOD_LABEL[r.method]}
         {r.rolls ? ` · ${r.rolls === "manual" ? "Pen & Paper" : r.rolls === "server" ? "server" : "DM device"} rolls` : ""} · resolved once
       </p>
+      <FavourNote t={t} event={event} />
       <div className="coin-split-preview mt-2">
         <div className="coin-split-preview-head">
           <strong>Items moved</strong>
@@ -1089,5 +1153,165 @@ function ResolvedReceipt({ t, event }: { t: LootTable; event: Event }) {
         <AppLink href="/party?section=pool">Back to the pool</AppLink>
       </div>
     </section>
+  );
+}
+
+/** Review Inbox: "Favour whoever is behind" (phase 3). Off by default; for this resolution only. */
+function FavourPanel({
+  on,
+  onChange,
+  basis,
+  onBasis,
+  sessionRunning,
+  method,
+  claimants,
+}: {
+  on: boolean;
+  onChange: (on: boolean) => void;
+  basis: FavourBasis;
+  onBasis: (basis: FavourBasis) => void;
+  sessionRunning: boolean;
+  method: LootMethod;
+  claimants: Purse[];
+}) {
+  const fair = useFairness();
+  const view = useMemo(() => {
+    const active = (fair.table.journal?.sessions ?? []).find((x) => !x.endedAt);
+    return fairnessLedger(fair.table, fair.viewer, basis === "session" && active ? active.id : "campaign");
+  }, [fair.table, fair.viewer, basis]);
+  const rows = claimants
+    .map((p) => [...view.rows, ...view.others].find((r) => r.purseId === p.id))
+    .filter((r): r is NonNullable<typeof r> => !!r)
+    .sort((a, b) => a.total - b.total);
+  return (
+    <div className={`fair-favour${on ? " is-on" : ""}`}>
+      <label className="switch-row">
+        <input type="checkbox" checked={on} onChange={(e) => onChange(e.target.checked)} />
+        <span>
+          Favour whoever is behind<span className="fair-new">New</span>
+        </span>
+        <small>
+          {!on
+            ? "Off. Uses Fairness totals to settle ties instead of re-rolling, and to order round-robin. Need still comes before Greed."
+            : method === "manual"
+              ? "One at a time: you choose; the totals below are for information only."
+              : "For this resolution only. Need still comes before Greed and only claimants can receive. Random: the highest roll still wins; a tie goes to whoever is further behind instead of rolling again. Round-robin: whoever is furthest behind goes next."}
+        </small>
+      </label>
+      {on && (
+        <>
+          <div className="basis">
+            <span>Behind on</span>
+            <select
+              className="min-h-11 rounded-sm border border-border bg-subtle px-3 text-base text-fg"
+              value={basis}
+              onChange={(e) => onBasis(e.target.value as FavourBasis)}
+              aria-label="Favour basis"
+            >
+              <option value="campaign">Campaign to date</option>
+              <option value="session" disabled={!sessionRunning}>
+                This session{sessionRunning ? "" : " (no session running)"}
+              </option>
+            </select>
+          </div>
+          <ul className="fair-standings" aria-label="Fairness standings">
+            {rows.map((r) => {
+              const g = r.gap ? roundGap(r.gap) : null;
+              return (
+                <li key={r.purseId}>
+                  <span>{r.name}</span>
+                  {g === null ? (
+                    <b>{formatCopper(r.total)}</b>
+                  ) : g === 0 ? (
+                    <b>level</b>
+                  ) : (
+                    <b className={g < 0 ? "behind" : "ahead"}>
+                      {formatCopper(Math.abs(g))} {g < 0 ? "behind" : "ahead"}
+                    </b>
+                  )}
+                </li>
+              );
+            })}
+          </ul>
+        </>
+      )}
+    </div>
+  );
+}
+
+/** One lot's preview with favour on, beside what would happen without it. */
+function FavourCompare({
+  t,
+  lot,
+  plain,
+  totals,
+  method,
+}: {
+  t: LootTable;
+  lot: LootPlan["lots"][number];
+  plain: LootPlan["lots"][number] | undefined;
+  totals: Map<string, number>;
+  method: LootMethod;
+}) {
+  const first = (id: string) => nameOf(t, id).split(" ")[0];
+  const awards = (l: LootPlan["lots"][number] | undefined) =>
+    l?.awards.length ? l.awards.map((a) => `${first(a.purseId)}${a.quantity > 1 ? ` × ${a.quantity}` : ""}`).join(", ") : "";
+  const tierIds = lot.claims.filter((c) => c.choice === lot.tier).map((c) => c.purseId);
+  const total = (id: string) => totals.get(id) ?? 0;
+  const lowest = [...tierIds].sort((a, b) => total(a) - total(b));
+  const unique = lowest.length > 1 && total(lowest[0]!) < total(lowest[1]!);
+  const greedBehind =
+    lot.tier === "need"
+      ? lot.claims.filter((c) => c.choice === "greed" && tierIds.every((id) => total(c.purseId) < total(id))).map((c) => c.purseId)
+      : [];
+  let without = "";
+  let withFavour = "";
+  if (method === "random") {
+    without = lot.needsRolls ? "Highest d100 wins. A tie rolls again." : "No roll: every claimant gets the same.";
+    withFavour = !lot.needsRolls
+      ? "The same."
+      : unique
+        ? `Highest d100 still wins. If the top rolls tie, ${first(lowest[0]!)} gets it without a re-roll (further behind).`
+        : "Highest d100 still wins. The claimants are level, so a tie still rolls again.";
+    if (lot.awards.length && plain?.awards.length) {
+      without = `${awards(plain)}.`;
+      withFavour = `${awards(lot)}${lot.favoured.length ? ` (tie settled for ${lot.favoured.map(first).join(", ")}, behind)` : ""}.`;
+    }
+  } else {
+    without = `${awards(plain) || "—"} (name order)`;
+    withFavour = `${awards(lot) || "—"} (furthest behind first)`;
+  }
+  return (
+    <div className="fair-cmp" style={{ gridColumn: "1 / -1" }}>
+      <div>
+        <h4>Without favour</h4>
+        <p>{without}</p>
+      </div>
+      <div className="with">
+        <h4>With favour</h4>
+        <p>
+          {withFavour}
+          {greedBehind.length
+            ? ` ${greedBehind.map(first).join(", ")} ${greedBehind.length === 1 ? "is" : "are"} further behind but marked Greed; Need comes first.`
+            : ""}
+        </p>
+      </div>
+    </div>
+  );
+}
+
+/** "Favoured whoever was behind" on a resolution receipt (Activity, history and the Review Inbox). */
+export function FavourNote({ t, event }: { t: LootTable; event: Event }) {
+  const f = event.lootFavour;
+  if (!f) return null;
+  return (
+    <p className="text-sm text-muted">
+      Favoured whoever was behind, {f.basis === "session" ? "this session" : "campaign to date"}. Totals used:{" "}
+      {[...f.totals]
+        .sort((a, b) => a.copper - b.copper)
+        .map((x) => `${nameOf(t, x.purseId).split(" ")[0]} ${formatCopper(x.copper)}`)
+        .join(", ")}
+      .
+    </p>
   );
 }

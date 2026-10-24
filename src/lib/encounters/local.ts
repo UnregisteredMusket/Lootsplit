@@ -13,6 +13,7 @@ import {
 } from "./model.mjs";
 import { applyEncounterSplit, type EncounterCoinSplitReceipt } from "../quire/coin-split.ts";
 import { encounterPoolRows } from "../quire/loot-claims.ts";
+import { encounterCoinLine, encounterItemLine } from "../quire/award-tag.ts";
 import { readJournal } from "../quire/journal.ts";
 import { creatureIndex } from "./index.mjs";
 import { parseDice, throwDice } from "../characters/model.mjs";
@@ -234,18 +235,6 @@ export async function localEncounterRequest<T>(path: string, input: unknown = {}
             receiptId = crypto.randomUUID();
           const copper =
             e.coins.cp + e.coins.sp * 10 + e.coins.ep * 50 + e.coins.gp * 100 + e.coins.pp * 1000;
-          const ledger = (purseId: string, summary: string, copper: number) =>
-            tx
-              .objectStore("ledger")
-              .put({
-                id: crypto.randomUUID(),
-                at,
-                purseId,
-                shopId: null,
-                summary,
-                copper,
-                transactionType: "adjustment",
-              });
           let splitReceipt: EncounterCoinSplitReceipt | null = null;
           if (copper && e.coinSplit) {
             // The same planner and credit as the shared Worker path (coin-split.ts).
@@ -277,7 +266,8 @@ export async function localEncounterRequest<T>(path: string, input: unknown = {}
             )
               throw new Error("Award exceeds the supported coin balance.");
             tx.objectStore("purses").put(p);
-            ledger(p.id, `Encounter loot: ${e.name}`, copper);
+            // The same helper and award tag as the shared Worker path (award-tag.ts).
+            tx.objectStore("ledger").put(encounterCoinLine(receiptId, at, p.id, e.name, copper));
           }
           // Treasure-pool items: the same rows as the shared Worker path (loot-claims.ts).
           const poolJournal = readJournal(
@@ -298,7 +288,7 @@ export async function localEncounterRequest<T>(path: string, input: unknown = {}
             const chat = await request<{ notes?: unknown[] } | undefined>(tx.objectStore("meta").get("chat"));
             tx.objectStore("meta").put({ id: "chat", notes: [...(chat?.notes ?? []), pool.note] });
           }
-          for (const item of e.loot) {
+          for (const [index, item] of e.loot.entries()) {
             if (item.pool) continue;
             const p = recipient(item.purseId);
             tx.objectStore("holdings").put({
@@ -310,7 +300,7 @@ export async function localEncounterRequest<T>(path: string, input: unknown = {}
               unitCopper: item.unitCopper,
               notes: item.notes,
             });
-            ledger(p.id, `Encounter loot: ${item.quantity} × ${item.name} (${e.name})`, 0);
+            tx.objectStore("ledger").put(encounterItemLine(receiptId, index, at, p.id, item, e.name));
           }
           r.award = { receiptId, at, ...(splitReceipt ?? {}), ...(pool ? { poolFundId: pool.fundId } : {}) };
           r.status = "awarded";

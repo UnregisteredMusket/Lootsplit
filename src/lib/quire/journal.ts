@@ -28,6 +28,7 @@ import {
   lootClaimsSchema,
   lootPoolEventSchema,
   lootResolutionSchema,
+  lootFavourSchema,
 } from "./loot-claims-schema.ts";
 const id = z.string().min(1).max(150),
   at = z.number().int().nonnegative();
@@ -152,6 +153,7 @@ const journalFields = z.object({
         lootClaim: lootClaimEventSchema.optional(),
         lootPool: lootPoolEventSchema.optional(),
         lootResolution: lootResolutionSchema.optional(),
+        lootFavour: lootFavourSchema.optional(),
         change: z
           .object({
             entity: z.enum(["stock", "realm", "shop", "holding", "account"]),
@@ -318,7 +320,12 @@ export function preserveJournalMetadata(value: unknown, current: Journal): Journ
   const loot = new Map(
     current.events.map((event) => [
       event.id,
-      { lootClaim: event.lootClaim, lootPool: event.lootPool, lootResolution: event.lootResolution },
+      {
+        lootClaim: event.lootClaim,
+        lootPool: event.lootPool,
+        lootResolution: event.lootResolution,
+        lootFavour: event.lootFavour,
+      },
     ]),
   );
   const privateEvents = new Set(current.events.filter((e) => e.dmOnly).map((e) => e.id));
@@ -439,6 +446,7 @@ export function preserveJournalMetadata(value: unknown, current: Journal): Journ
         ...(kept?.lootClaim && !event.lootClaim ? { lootClaim: kept.lootClaim } : {}),
         ...(kept?.lootPool && !event.lootPool ? { lootPool: kept.lootPool } : {}),
         ...(kept?.lootResolution && !event.lootResolution ? { lootResolution: kept.lootResolution } : {}),
+        ...(kept?.lootFavour && !event.lootFavour ? { lootFavour: kept.lootFavour } : {}),
         ...(change ? { change } : {}),
         ...(split ? { split } : {}),
         ...(privateEvents.has(event.id) ? { dmOnly: true } : {}),

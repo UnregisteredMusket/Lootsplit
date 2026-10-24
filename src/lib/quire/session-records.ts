@@ -12,6 +12,7 @@ import {
 } from "./character-position.ts";
 import { designatedPartyFund, isNpc, partyFunds } from "./coin-split.ts";
 import { projectLoot } from "./loot-claims.ts";
+import { fairnessProjection } from "./loot-fairness.ts";
 import { readWorld } from "./world-schema.ts";
 import { exchangeHere } from "./trade-economy.ts";
 import { readTradeEconomy } from "./trade-economy-schema.ts";
@@ -53,17 +54,27 @@ export function projectRecord(
       e.visibility === "party" ||
       (dm ? e.visibility === "dm" : e.visibility === "player" && seat.purseIds.includes(e.purseId)),
   );
+  // Fairness ledger (phase 3): whether this seat compares party totals is decided on the
+  // current table (owner decision, 2026-10-24: players away from the party see only their own).
+  const comparesParty = !dm && seatInParty(table, seat);
   t.journal.reports = t.journal.reports
     ?.filter((r) => ownedDevice || !r.seatIds || (seat.id && r.seatIds.includes(seat.id)))
     .map((r) => {
       try {
+        const raw = readArchivedSnapshot(r.snapshot);
+        const projected = projectRecord(raw, seat, {
+          ownedDevice,
+          tabletopProjected: options.tabletopProjected,
+        });
         return {
           ...r,
           snapshot: JSON.stringify(
-            projectRecord(readArchivedSnapshot(r.snapshot), seat, {
-              ownedDevice,
-              tabletopProjected: options.tabletopProjected,
-            }),
+            dm
+              ? projected
+              : {
+                  ...projected,
+                  fairness: fairnessProjection(r.snapshot, raw, table, seat, comparesParty, projected.ledger),
+                },
           ),
         };
       } catch {

@@ -8,6 +8,7 @@ import {
 import { parseDice, throwDice } from "../src/lib/characters/model.mjs";
 import { applyEncounterSplit } from "../src/lib/quire/coin-split.ts";
 import { encounterPoolRows } from "../src/lib/quire/loot-claims.ts";
+import { encounterCoinLine, encounterItemLine } from "../src/lib/quire/award-tag.ts";
 const fail = (message, status = 400) => {
   throw Object.assign(new Error(message), { status });
 };
@@ -391,15 +392,8 @@ export async function handleEncounters(db, user, path, body = {}) {
       const total =
         p.coins.cp + p.coins.sp * 10 + p.coins.ep * 50 + p.coins.gp * 100 + p.coins.pp * 1000;
       if (!Number.isSafeInteger(total)) fail("Award exceeds the supported total coin balance.");
-      room.table.ledger.push({
-        id: crypto.randomUUID(),
-        at,
-        purseId: p.id,
-        shopId: null,
-        summary: `Encounter loot: ${e.name}`,
-        copper,
-        transactionType: "adjustment",
-      });
+      // One helper for the Worker and the device path, with the award tag (award-tag.ts).
+      room.table.ledger.push(encounterCoinLine(receiptId, at, p.id, e.name, copper));
     }
     // Treasure-pool items (prompt 2, phase 2): the same rows as the device path.
     let pool = null;
@@ -421,7 +415,7 @@ export async function handleEncounters(db, user, path, body = {}) {
       room.table.journal.events = [...(room.table.journal.events ?? []), ...pool.events];
       room.table.notes.push(pool.note);
     }
-    for (const item of e.loot) {
+    for (const [index, item] of e.loot.entries()) {
       if (item.pool) continue;
       const p = findPurse(item.purseId);
       room.table.holdings.push({
@@ -433,15 +427,11 @@ export async function handleEncounters(db, user, path, body = {}) {
         unitCopper: item.unitCopper,
         notes: item.notes,
       });
-      room.table.ledger.push({
-        id: crypto.randomUUID(),
-        at,
-        purseId: p.id,
-        shopId: null,
-        summary: `Encounter loot: ${item.quantity} × ${item.name} (${e.name})`,
-        copper: 0,
-        transactionType: "adjustment",
-      });
+      try {
+        room.table.ledger.push(encounterItemLine(receiptId, index, at, p.id, item, e.name));
+      } catch (err) {
+        fail(err.message);
+      }
     }
     room.revision = d.revision + 1;
     const award = {

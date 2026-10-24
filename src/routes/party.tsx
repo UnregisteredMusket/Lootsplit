@@ -30,12 +30,18 @@ import { Button, Modal, Segmented, TextInput } from "@/components/ui";
 import { RemoveButton } from "@/components/quire-ui";
 import { SplitCoins } from "@/components/coin-split";
 import { TreasurePool, usePoolCount } from "@/components/treasure-pool";
+import { FairnessLedger } from "@/components/fairness-ledger";
 import { partyFunds } from "@/lib/quire/coin-split";
 
 export const Route = createFileRoute("/party")({
   validateSearch: (
     search: Record<string, unknown>,
-  ): { action?: string; section?: "funds" | "characters" | "pool" } => ({
+  ): {
+    action?: string;
+    section?: "funds" | "characters" | "pool" | "fairness";
+    period?: string;
+    character?: string;
+  } => ({
     action:
       search.action === "add" ||
       search.action === "give" ||
@@ -43,8 +49,16 @@ export const Route = createFileRoute("/party")({
       search.action === "split"
         ? search.action
         : "",
-    ...(search.section === "funds" || search.section === "characters" || search.section === "pool"
+    ...(search.section === "funds" ||
+    search.section === "characters" ||
+    search.section === "pool" ||
+    search.section === "fairness"
       ? { section: search.section }
+      : {}),
+    // Fairness (phase 3): the period and the character whose receipts are open.
+    ...(typeof search.period === "string" && search.period.length <= 150 ? { period: search.period } : {}),
+    ...(typeof search.character === "string" && search.character.length <= 150
+      ? { character: search.character }
       : {}),
   }),
   component: PartyPage,
@@ -56,7 +70,13 @@ function PartyPage() {
   const [managed, setManaged] = useState("");
   const partyTable = { purses: economy.purses, journal: economy.journal };
   const [section, setSection] = useState("characters");
-  const { action: initialAction, section: requestedSection } = Route.useSearch();
+  const {
+    action: initialAction,
+    section: requestedSection,
+    period: fairPeriod = "campaign",
+    character: fairCharacter,
+  } = Route.useSearch();
+  const navigate = Route.useNavigate();
   // Router hash (not the window's) so this also works in a split-view pane.
   const hash = useRouterState({ select: (s) => s.location.hash });
   useEffect(() => {
@@ -64,6 +84,7 @@ function PartyPage() {
       setSection("funds");
     else if (requestedSection === "characters") setSection("characters");
     else if (requestedSection === "pool" || hash === "treasure-pool") setSection("pool");
+    else if (requestedSection === "fairness") setSection("fairness");
   }, [requestedSection, initialAction, hash]);
   const [action, setAction] = useState(initialAction ?? "");
   useEffect(() => setAction(initialAction ?? ""), [initialAction]);
@@ -80,6 +101,7 @@ function PartyPage() {
     ...(seat.role === "dm" ? ([["characters", "Characters"]] as Array<[string, string]>) : []),
     ["funds", seat.role === "dm" ? "Funds & inventory" : "Inventory & purse"],
     ["pool", "Treasure pool"],
+    ["fairness", "Fairness"],
   ];
   const shownSection = seat.role !== "dm" && section === "characters" ? "funds" : section;
   const visible =
@@ -111,7 +133,11 @@ function PartyPage() {
         </Button>
       </div>
       <div className="flex flex-wrap items-center gap-3">
-        <div className="mode-switch party-sections" role="tablist" aria-label="Party sections">
+        <div
+          className={`mode-switch party-sections ${tabs.length === 4 ? "is-four" : "is-three"}`}
+          role="tablist"
+          aria-label="Party sections"
+        >
           {tabs.map(([k, label], index) => (
             <button
               type="button"
@@ -140,6 +166,7 @@ function PartyPage() {
               }}
             >
               {label}
+              {k === "fairness" ? <span className="fair-new">New</span> : null}
               {k === "pool" && poolCount > 0 ? (
                 <span className="loot-count" aria-label={`${poolCount} lots`}>
                   {poolCount}
@@ -152,6 +179,30 @@ function PartyPage() {
           <AppLink href={seat.role === "dm" ? "/features/reports" : "/features/finances"}>
             Ledger
           </AppLink>
+        )}
+      </div>
+      <div
+        id="party-panel-fairness"
+        role="tabpanel"
+        aria-labelledby="party-tab-fairness"
+        hidden={shownSection !== "fairness"}
+        tabIndex={0}
+      >
+        {shownSection === "fairness" && (
+          <FairnessLedger
+            period={fairPeriod}
+            character={fairCharacter}
+            onPeriod={(period) =>
+              void navigate({
+                search: (prev) => ({
+                  ...prev,
+                  section: "fairness" as const,
+                  period: period === "campaign" ? undefined : period,
+                }),
+                replace: true,
+              })
+            }
+          />
         )}
       </div>
       <div

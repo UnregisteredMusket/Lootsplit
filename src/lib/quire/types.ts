@@ -160,6 +160,8 @@ export type LedgerLine = {
   split?: { id: string; role: "source" | "share" | "remainder"; keptShare?: number };
   /** Treasure pool: a 0 cp line per item moved or pooled, with its recorded value (one resolution or award ID). */
   loot?: import("./loot-claims-schema.ts").LootLedgerLink;
+  /** Encounter award (phase 3): the award receipt and the value the DM reviewed. Absent on older lines. */
+  award?: import("./award-tag.ts").AwardTag;
   id: string;
   at: number;
   purseId: string;
