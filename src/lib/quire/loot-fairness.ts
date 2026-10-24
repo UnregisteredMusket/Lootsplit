@@ -114,7 +114,7 @@ export function fairnessEligible(t: Pick<FairTable, "purses" | "journal">, p: Pu
 export function roundGap(gap: { num: number; den: number }): number {
   const sign = gap.num < 0 ? -1 : 1;
   const abs = Math.abs(gap.num);
-  return sign * Math.floor((2 * abs + gap.den) / (2 * gap.den));
+  return sign * Math.floor((2 * abs + gap.den) / (2 * gap.den)) || 0;
 }
 
 type SplitSource = "fund" | "other";

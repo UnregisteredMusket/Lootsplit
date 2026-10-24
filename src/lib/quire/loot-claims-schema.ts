@@ -122,6 +122,23 @@ export const lootResolutionSchema = z
   .strict();
 export type LootResolution = z.infer<typeof lootResolutionSchema>;
 
+/** "Favour whoever is behind" (phase 3): which Fairness totals a resolution used. */
+export const FAVOUR_BASES = ["campaign", "session"] as const;
+export type FavourBasis = (typeof FAVOUR_BASES)[number];
+/**
+ * Journal event payload beside `lootResolution` (a separate key: the resolution receipt is a
+ * strict schema older clients still parse). The totals the server used and who won by favour.
+ */
+export const lootFavourSchema = z
+  .object({
+    id,
+    basis: z.enum(FAVOUR_BASES),
+    totals: z.array(z.object({ purseId: id, copper: z.number().int().min(-1e15).max(1e15) }).strict()).max(100),
+    lots: z.array(z.object({ holdingId: id, purseIds: z.array(id).max(100) }).strict()).max(MAX_LOOT_LOTS),
+  })
+  .strict();
+export type LootFavour = z.infer<typeof lootFavourSchema>;
+
 /** Ledger link: a 0 cp line per item moved, carrying the recorded value (Phase 3 fairness). */
 export const lootLedgerSchema = z
   .object({
@@ -190,6 +207,8 @@ export const lootCommands = [
         .optional(),
       /** The reviewed preview's fingerprint (lots, claims, party and pointer). */
       expect: z.string().min(1).max(64),
+      /** Phase 3, off unless chosen for this resolution: settle random ties and order round-robin by Fairness totals. */
+      favour: z.object({ basis: z.enum(FAVOUR_BASES) }).strict().optional(),
     })
     .strict(),
 ] as const;

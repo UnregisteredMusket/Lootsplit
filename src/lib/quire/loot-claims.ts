@@ -13,6 +13,7 @@ import { characterVisible, seatInParty } from "./character-position.ts";
 import { isNpc, partyFunds, designatedPartyFund, recipientProblem } from "./coin-split.ts";
 import { formatCopper } from "./money.ts";
 import { POOL_GUARD } from "./custody.ts";
+import { fairnessStandings } from "./loot-fairness.ts";
 import {
   lootClaimsSchema,
   MAX_LOOT_LOTS,
@@ -20,8 +21,10 @@ import {
   type LootAwardChoice,
   type LootChoice,
   type LootClaim,
+  type FavourBasis,
   type LootClaims,
   type LootCommand,
+  type LootFavour,
   type LootMethod,
   type LootResolution,
 } from "./loot-claims-schema.ts";
@@ -124,10 +127,15 @@ export function lootFingerprint(
   t: LootTable,
   lots: Array<{ holdingId: string; quantity: number }>,
   method: LootMethod,
+  /** Favour whoever is behind: the claimants' Fairness totals are part of what was reviewed. */
+  favour?: { basis: FavourBasis; totals: Map<string, number> },
 ): string {
   const state = readLootClaims(t);
   return hash(
     canonicalJson({
+      ...(favour
+        ? { favour: [favour.basis, lootClaimants(t).map((p) => [p.id, favour.totals.get(p.id) ?? 0])] }
+        : {}),
       method,
       party: lootClaimants(t).map((p) => [p.id, p.name]),
       rotation: method === "round-robin" ? (state.rotation?.lastPurseId ?? null) : null,
@@ -156,6 +164,8 @@ export type LotPlan = Omit<LootResolution["lots"][number], "awards"> & {
   needsRolls: boolean;
   /** Rolls still to enter (Pen & Paper), as (character, round). */
   missing: Array<{ purseId: string; round: number }>;
+  /** Favour whoever is behind: who received a unit because they were behind (a tie or the order). */
+  favoured: string[];
 };
 export type LootPlan = {
   method: LootMethod;
@@ -172,7 +182,17 @@ export type LootPlan = {
  * Nothing is changed. Without `roll`, lots that need dice are planned with no awards and
  * `needsRolls` set (the server-roll preview, which cannot show results).
  */
-export function planLootResolution(t: LootTable, input: LootPlanInput, roll?: LootRoll): LootPlan {
+export function planLootResolution(
+  t: LootTable,
+  input: LootPlanInput,
+  roll?: LootRoll,
+  /**
+   * Favour whoever is behind (phase 3, off unless given): Fairness totals by character. Tiers
+   * never change (Need beats Greed). Random: only a tie at the cut goes to the lower total.
+   * Round-robin: each unit goes to the claimant with the lowest running total.
+   */
+  favour?: Map<string, number>,
+): LootPlan {
   if (!input.lots.length) throw Error("Choose at least one treasure-pool item to resolve.");
   if (input.lots.length > MAX_LOOT_LOTS) throw Error(`Resolve at most ${MAX_LOOT_LOTS} items at once.`);
   if (new Set(input.lots.map((l) => l.holdingId)).size !== input.lots.length)
@@ -183,6 +203,8 @@ export function planLootResolution(t: LootTable, input: LootPlanInput, roll?: Lo
   const funds = new Set(partyFunds(t).map((p) => p.id));
   let pointer = state.rotation?.lastPurseId ?? null;
   let npc = false;
+  // Round-robin with favour: running totals, carried across the lots in the order given.
+  const running = favour ? new Map(favour) : null;
   const lots: LotPlan[] = [];
   for (const lot of input.lots) {
     const h = t.holdings.find((x) => x.id === lot.holdingId);
@@ -200,6 +222,7 @@ export function planLootResolution(t: LootTable, input: LootPlanInput, roll?: Lo
     const awards = new Map<string, number>();
     const rolls = new Map<string, number[]>();
     const missing: LotPlan["missing"] = [];
+    const favoured: string[] = [];
     let tier: "need" | "greed" | null = null;
     let needsRolls = false;
     if (input.method === "manual") {
@@ -228,8 +251,17 @@ export function planLootResolution(t: LootTable, input: LootPlanInput, roll?: Lo
         const tierPurses = tierIds.map((id) => byId.get(id)!);
         for (let unit = 0; unit < lot.quantity; unit++) {
           const last = pointer ? byId.get(pointer) : undefined;
-          const next =
-            (last ? tierPurses.find((p) => lootOrder(p, last) > 0) : undefined) ?? tierPurses[0]!;
+          const after = (among: Purse[]) =>
+            (last ? among.find((p) => lootOrder(p, last) > 0) : undefined) ?? among[0]!;
+          let next = after(tierPurses);
+          if (running) {
+            // Lowest running total first; equal totals keep the name-order pointer.
+            const low = Math.min(...tierPurses.map((p) => running.get(p.id) ?? 0));
+            const plain = next;
+            next = after(tierPurses.filter((p) => (running.get(p.id) ?? 0) === low));
+            running.set(next.id, low + h.unitCopper);
+            if (next.id !== plain.id && !favoured.includes(next.id)) favoured.push(next.id);
+          }
           awards.set(next.id, (awards.get(next.id) ?? 0) + 1);
           pointer = next.id;
         }
@@ -241,7 +273,7 @@ export function planLootResolution(t: LootTable, input: LootPlanInput, roll?: Lo
         let winners: string[] = [];
         if (extra > 0) {
           needsRolls = true;
-          const top = roll ? pickTop(tierIds, extra, 1, h.id, roll, rolls, missing) : null;
+          const top = roll ? pickTop(tierIds, extra, 1, h.id, roll, rolls, missing, favour, favoured) : null;
           if (top) winners = top;
         }
         if (extra === 0 || winners.length === extra)
@@ -280,6 +312,7 @@ export function planLootResolution(t: LootTable, input: LootPlanInput, roll?: Lo
       kept: h.quantity - lot.quantity,
       needsRolls,
       missing,
+      favoured,
     });
   }
   return {
@@ -304,6 +337,8 @@ function pickTop(
   roll: LootRoll,
   rolls: Map<string, number[]>,
   missing: LotPlan["missing"],
+  favour?: Map<string, number>,
+  favoured?: string[],
 ): string[] | null {
   if (round > MAX_LOOT_ROLLS) throw Error("Too many tied rolls. Resolve this item yourself.");
   const value = new Map<string, number>();
@@ -329,7 +364,28 @@ function pickTop(
       winners.push(...group);
       i += group.length;
     } else {
-      const sub = pickTop(group, remaining, round + 1, holdingId, roll, rolls, missing);
+      let tied = group;
+      if (favour) {
+        // A tie at the cut goes to whoever is further behind; equal totals still roll again.
+        const total = (id: string) => favour.get(id) ?? 0;
+        const sortedTotals = [...group].sort((a, b) => total(a) - total(b));
+        const cut = total(sortedTotals[remaining - 1]!);
+        const behind = sortedTotals.filter((id) => total(id) < cut);
+        winners.push(...behind);
+        favoured?.push(...behind);
+        tied = sortedTotals.filter((id) => total(id) === cut);
+        const need = remaining - behind.length;
+        if (tied.length === need) {
+          winners.push(...tied);
+          favoured?.push(...tied);
+          continue;
+        }
+        const sub = pickTop(tied, need, round + 1, holdingId, roll, rolls, missing, favour, favoured);
+        if (!sub) return null;
+        winners.push(...sub);
+        continue;
+      }
+      const sub = pickTop(tied, remaining, round + 1, holdingId, roll, rolls, missing);
       if (!sub) return null;
       winners.push(...sub);
     }
@@ -430,7 +486,11 @@ export function applyLootCommand(
   }
   // loot-resolve
   dm();
-  if (lootFingerprint(t, cmd.lots, cmd.method) !== cmd.expect)
+  if (cmd.favour && cmd.method === "manual")
+    throw Error("Favour whoever is behind applies to random and round-robin resolutions only.");
+  // Fairness totals come from the campaign this command runs against, never from the client.
+  const favour = cmd.favour ? { basis: cmd.favour.basis, totals: fairnessStandings(t, cmd.favour.basis) } : undefined;
+  if (lootFingerprint(t, cmd.lots, cmd.method, favour) !== cmd.expect)
     throw Error("Claims changed. Nothing moved. Review the new preview and confirm again.");
   if (cmd.method !== "random" && (cmd.rolls || cmd.manualRolls))
     throw Error("Only random resolutions use rolls.");
@@ -451,7 +511,7 @@ export function applyLootCommand(
               );
             return execution.random(`loot-${holdingId}-${purseId}-${round}`);
           };
-  const plan = planLootResolution(t, { method: cmd.method, lots: cmd.lots }, roll);
+  const plan = planLootResolution(t, { method: cmd.method, lots: cmd.lots }, roll, favour?.totals);
   if (plan.missing) throw Error("Enter every d100 total, including tie-breaks, before resolving.");
   const state = readLootClaims(t);
   const name = (id: string) => t.purses.find((p) => p.id === id)?.name ?? "a character";
@@ -489,7 +549,7 @@ export function applyLootCommand(
       t.holdings = t.holdings.filter((x) => x.id !== h.id);
       state.claims = state.claims.filter((c) => c.holdingId !== h.id);
     }
-    const { needsRolls: _n, missing: _m, ...stored } = lot;
+    const { needsRolls: _n, missing: _m, favoured: _f, ...stored } = lot;
     receiptLots.push({ ...stored, awards });
   }
   if (plan.rotationAfter) state.rotation = { lastPurseId: plan.rotationAfter };
@@ -509,6 +569,15 @@ export function applyLootCommand(
     ...(plan.rotationAfter ? { rotationAfter: plan.rotationAfter } : {}),
     ...(plan.npc ? { npc: true } : {}),
   };
+  if (favour) {
+    const claimants = [...new Set(plan.lots.flatMap((l) => [...l.claims.map((c) => c.purseId), ...l.unmarked]))];
+    lastEvent().lootFavour = {
+      id: cmd.id,
+      basis: favour.basis,
+      totals: claimants.map((purseId) => ({ purseId, copper: favour.totals.get(purseId) ?? 0 })),
+      lots: plan.lots.filter((l) => l.favoured.length).map((l) => ({ holdingId: l.holdingId, purseIds: l.favoured })),
+    };
+  }
   const parts = plan.lots.map((lot) => {
     const to = list(lot.awards.map((a) => `${name(a.purseId)}${a.quantity > 1 ? ` × ${a.quantity}` : ""}`));
     const rolled = lot.rolls.length
@@ -517,7 +586,7 @@ export function applyLootCommand(
     return `${lot.name} to ${to}${rolled}`;
   });
   const count = plan.lots.length;
-  const full = `The DM resolved ${count} treasure-pool item${count === 1 ? "" : "s"}: ${parts.join(", ")}.`;
+  const full = `The DM resolved ${count} treasure-pool item${count === 1 ? "" : "s"}: ${parts.join(", ")}.${favour ? " Favoured whoever was behind." : ""}`;
   const text =
     full.length <= 500
       ? full
@@ -647,10 +716,22 @@ export function projectLoot(
       .filter((lot) => lot.awards.length);
     if (!lots.length) return null;
     const { npc, ...rest } = receipt;
+    const { lootFavour, ...plain } = event;
+    // Favour receipts name only characters this seat may see (defence in depth).
+    const favour: LootFavour | undefined = lootFavour
+      ? {
+          ...lootFavour,
+          totals: lootFavour.totals.filter((x) => shown(x.purseId)),
+          lots: lootFavour.lots
+            .map((l) => ({ ...l, purseIds: l.purseIds.filter(shown) }))
+            .filter((l) => l.purseIds.length && lots.some((x) => x.holdingId === l.holdingId)),
+        }
+      : undefined;
     return {
-      ...event,
+      ...plain,
       ...(npc ? { summary: "Treasure pool resolved" } : {}),
       lootResolution: { ...rest, lots },
+      ...(favour ? { lootFavour: favour } : {}),
     };
   };
 }
