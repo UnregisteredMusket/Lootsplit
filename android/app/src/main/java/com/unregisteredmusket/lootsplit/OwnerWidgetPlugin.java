@@ -54,8 +54,14 @@ public class OwnerWidgetPlugin extends Plugin {
                 try { WidgetStore.revoke(getContext(), generation, "Owner authorization was rejected. Tap Sign in to reconnect."); } catch (Exception failure) { WidgetStore.clearGeneration(getContext(), generation); }
                 call.reject("An active site-owner session is required.");
             } catch (Exception ignored) {
-                WidgetStore.clearGeneration(getContext(), generation);
-                call.reject("Could not connect. Check your connection and try again.");
+                // A slow or failed first reading is not an authorization answer: keep the connection,
+                // show retry feedback and let the periodic job try again (only 401/403 disconnects).
+                if (WidgetRefresh.keepAfterConnectFailure(getContext(), generation)) {
+                    OwnerWidgetJob.schedule(getContext());
+                    call.reject("Owner account connected, but the first reading did not arrive. The widget retries in the background, or tap Refresh.");
+                } else {
+                    call.reject("Could not connect. Check your connection and try again.");
+                }
             } finally { OwnerWidgetProvider.renderAll(getContext()); }
         });
     }
