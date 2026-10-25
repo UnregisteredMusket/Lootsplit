@@ -752,6 +752,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | verify / Packaged Worker / features / Run actions/download-artifact@d3f86a106a0bac45b974a628896c90dbdf5c8093 | open | 2 | 2s → 5s | +3s | +150% |
 | Packaged Worker / features / Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262 | open | 2 | 2s → 5s | +3s | +150% |
 | Android native widget verification | open | 2 | 934s → 2484s | +1550s | +165.95% |
+| verify / Verify identity, asset bytes and desktop/mobile behavior without deploying | open | 2 | 60s → 312s | +252s | +420% |
 | Development / economy / Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 | open | 2 | 7s → 21s | +14s | +200% |
 | Packaged Worker / features / worker-website | open | 3 | 37s → 71s | +34s | +91.89% |
 | Development / gameplay / dev-coin-split | open | 2 | 19s → 29s | +10s | +52.63% |
@@ -779,6 +780,9 @@ Open trends require investigation. Resolved trends retain their history; each ve
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-25T19:02:09Z | step: Development / desktop / dev-map-tiles-1 | 66s → 85s | +19s | +28.79% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40213355385/job/121229168082) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40223872686/job/121261091522) |
+| 2026-10-25T18:58:32Z | step: verify / Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 | 2s → 3s | +1s | +50% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39899788543/job/120238472949) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40223315936/job/121259375132) |
+| 2026-10-25T18:58:29Z | step: verify / Verify identity, asset bytes and desktop/mobile behavior without deploying | 104s → 312s | +208s | +200% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39899788543/job/120238472949) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40223315936/job/121259375132) |
 | 2026-10-25T18:52:01Z | step: Accessibility (axe-core) / Start disposable development server | 8s → 10s | +2s | +25% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39763701404/job/119773831563) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40223198337/job/121259017252) |
 | 2026-10-25T16:48:25Z | step: Development / world / Start disposable development server | 10s → 14s | +4s | +40% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40201080705/job/121192230838) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40213355385/job/121229168089) |
 | 2026-10-25T16:38:55Z | job: Development / governance | 921s → 1168s | +247s | +26.82% | failure | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37962980314/job/113930867612) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40211101571/job/121222347867) |
