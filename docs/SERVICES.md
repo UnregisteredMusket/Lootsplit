@@ -242,7 +242,8 @@ same form, hour pool, Review Inbox, counters, resets and milestone notes.
   presets from SRD 5.1): provider `routes: [{ key, toLocationId, mapId?, points?, legs?,
   paceMilesPerDay }]`, copied by the DM from a journey route drawn with Plan journey. A route
   without a map is listed but locked ("the DM hasn't drawn this route"). `request.routeKey`;
-  terms `route` (place, distance from the journey maths, passengers = `journeyTravellers`, pace).
+  terms `route` (place, distance from the journey maths, passengers = `journeyTravellers` of the
+  paying character's group when the party is split (`coachGroup`), pace).
   Fare = `ceil(passengers × deciMiles × rate ÷ 10)`. Always reviewed.
 - **Booking** (`service-order`): refused while another journey is open; creates, in the same
   command, journey `orderId-journey` (`proposed`, requested by the payer, the frozen-at-booking

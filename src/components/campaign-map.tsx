@@ -3126,6 +3126,7 @@ function MapViewport({
             <MapHereSheet
               sheet={here}
               dm={useDm}
+              partyName={partySplit(recordTable) && hereGroup ? groupInfo(recordTable, hereGroup).name : undefined}
               groupSwitch={
                 partySplit(recordTable) ? (
                   <HereGroupSwitch table={recordTable} groups={hereGroups} value={hereGroup} onChange={setHereGroup} />

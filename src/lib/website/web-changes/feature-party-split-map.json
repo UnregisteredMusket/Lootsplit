@@ -1,0 +1,10 @@
+{
+  "title": "Split party on the map and on the road",
+  "summary": "Each group of a split party has its own map marker, Here list, journeys and ship passage.",
+  "items": [
+    "The map shows one marker per group, with its letter and colour, and Here lists what each group can use.",
+    "A journey moves one group; each group can have one journey, and one approval can move every group the DM ticks.",
+    "Arriving groups are moved in with Move <group> here, and a stable's coach carries the paying character's group.",
+    "A whole group can board a ship together and stay in the party."
+  ]
+}

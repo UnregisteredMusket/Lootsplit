@@ -28,7 +28,10 @@ export function MapHereSheet({
   planJourney,
   showJourney,
   groupSwitch,
+  partyName = "Party",
 }: {
+  /** Split the party: whose place this is ("Ironhold riders is in Ironhold"). */
+  partyName?: string;
   /** Split the party: choose whose place this sheet lists. */
   groupSwitch?: ReactNode;
   sheet: HereSheet;
@@ -154,7 +157,9 @@ export function MapHereSheet({
     body = (
       <>
         {header("Here", "Everything you can use at the party's location")}
-        <p className="map-here-note">Party is in {sheet.locationName}</p>
+        <p className="map-here-note">
+          {partyName} is in {sheet.locationName}
+        </p>
         {planJourney && (
           <div className="map-here-travel">
             <span>
