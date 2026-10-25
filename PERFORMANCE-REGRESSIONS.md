@@ -218,7 +218,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Code checks and immutable builds / Run npm ci | open | 3 | 14s → 423s | +409s | +2921.43% |
 | Packaged Worker / interface / Start disposable built Worker | open | 3 | 7s → 13s | +6s | +85.71% |
 | Development / accounts / Run npm ci | open | 3 | 14s → 303s | +289s | +2064.29% |
-| Development / gameplay / dev-control-panel | open | 2 | 22s → 32s | +10s | +45.45% |
+| Development / gameplay / dev-control-panel | open | 3 | 22s → 38s | +16s | +72.73% |
 | Packaged Worker / interface / worker-shop-stock | open | 2 | 7s → 17s | +10s | +142.86% |
 | verify / Code checks and immutable builds / Run actions/setup-node@v4 | open | 3 | 3s → 7s | +4s | +133.33% |
 | verify / Development / accounts / Run npm ci | open | 2 | 11s → 17s | +6s | +54.55% |
@@ -329,7 +329,7 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Player references / development / Run npx playwright install --with-deps chromium | open | 3 | 24s → 149s | +125s | +520.83% |
 | Development / desktop / dev-navigation | open | 2 | 39s → 115s | +76s | +194.87% |
 | Code checks and immutable builds / web-build | open | 6 | 7s → 23s | +16s | +228.57% |
-| Development / desktop | open | 5 | 161s → 850s | +689s | +427.95% |
+| Development / desktop | open | 6 | 161s → 1008s | +847s | +526.09% |
 | rehearsal / Run actions/setup-node@v4 | open | 2 | 3s → 6s | +3s | +100% |
 | Development / gameplay / dev-blacksmith | open | 2 | 28s → 62s | +34s | +121.43% |
 | Packaged Worker / interface / worker-blacksmith | open | 3 | 24s → 44s | +20s | +83.33% |
@@ -780,6 +780,8 @@ Open trends require investigation. Resolved trends retain their history; each ve
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-25T20:09:26Z | job: Development / desktop | 850s → 1008s | +158s | +18.59% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39764927009/job/119777945591) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40228083641/job/121273741801) |
+| 2026-10-25T19:59:25Z | step: Development / gameplay / dev-control-panel | 32s → 38s | +6s | +18.75% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/38169284057/job/114558280171) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40228083641/job/121273741865) |
 | 2026-10-25T19:02:09Z | step: Development / desktop / dev-map-tiles-1 | 66s → 85s | +19s | +28.79% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40213355385/job/121229168082) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40223872686/job/121261091522) |
 | 2026-10-25T18:58:32Z | step: verify / Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 | 2s → 3s | +1s | +50% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39899788543/job/120238472949) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40223315936/job/121259375132) |
 | 2026-10-25T18:58:29Z | step: verify / Verify identity, asset bytes and desktop/mobile behavior without deploying | 104s → 312s | +208s | +200% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39899788543/job/120238472949) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40223315936/job/121259375132) |
