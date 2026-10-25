@@ -306,6 +306,21 @@ public class OwnerWidgetTest {
         assertEquals(WidgetClient.READ_TIMEOUT_MILLIS, hung.getReadTimeout());
     }
 
+    @Test public void aTimedOutFirstReadingKeepsTheNewConnection() throws Exception {
+        String generation = WidgetStore.connect(context, "synthetic-slow-first");
+        assertTrue(WidgetRefresh.keepAfterConnectFailure(context, generation));
+        JSONObject state = WidgetStore.read(context);
+        assertEquals("synthetic-slow-first", state.optString("token"));
+        assertEquals(generation, state.optString("generation"));
+        assertEquals(WidgetRefresh.FAILED, state.optString("message"));
+        assertTrue(WidgetRefresh.transientFailure(state.optString("message")));
+        // A newer connection is never overwritten by an older connect's failure.
+        String newer = WidgetStore.connect(context, "synthetic-newer");
+        assertFalse(WidgetRefresh.keepAfterConnectFailure(context, generation));
+        assertEquals("synthetic-newer", WidgetStore.read(context).optString("token"));
+        assertEquals(newer, WidgetStore.read(context).optString("generation"));
+    }
+
     @Test public void tapsAfterATimedOutFetchJoinItInsteadOfStackingAnother() throws Exception {
         String generation = WidgetStore.connect(context, "synthetic-stacked");
         WidgetStore.finish(context, generation, WidgetData.project(fixture(), System.currentTimeMillis() - 60000), "");

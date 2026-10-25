@@ -125,6 +125,18 @@ final class WidgetRefresh {
         return task;
     }
 
+    /**
+     * Connect's first fetch failed in transport (timeout, no response, invalid reading): the saved
+     * connection stays and shows the normal retry message. Returns false when the account changed
+     * meanwhile or storage failed; then the connection is cleared as before.
+     */
+    static boolean keepAfterConnectFailure(Context context, String generation) {
+        try { if (WidgetStore.message(context, generation, FAILED)) return true; }
+        catch (Exception ignored) { }
+        WidgetStore.clearGeneration(context, generation);
+        return false;
+    }
+
     /** A transient Keystore/IO write failure keeps the connection; only a lost key needs reconnecting. */
     static String storageError(Exception failure) {
         return WidgetStore.permanent(failure) ? "Widget storage unavailable. Reconnect in My account." : STORAGE_BUSY;
