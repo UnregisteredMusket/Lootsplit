@@ -17,6 +17,7 @@ import { canonicalJson } from "./canonical-json.ts";
 import { validateShopLocations } from "./shop-locations.ts";
 import { propertyAvailableToGroups } from "./property.ts";
 import { actingGroups } from "./party-groups.ts";
+import { partyGroupKinds } from "./party-groups-schema.ts";
 import { readMarketLocations } from "./shop-locations.ts";
 import { locationLabel } from "./shop-locations.ts";
 import { transferPropertyDeed } from "./property-deed.ts";
@@ -2832,6 +2833,8 @@ const financeKind = (kind: string) =>
   kind === "bank-repay" ||
   kind.startsWith("downtime-") ||
   kind === "session";
+const groupBatchKind = (kind: string) =>
+  partyGroupKinds.has(kind) || kind === "party-location" || kind === "party-map-position";
 /** Read, calculate and commit campaign finances under one IndexedDB write lock. */
 export async function executeFinanceCommand(
   input: CommandRequest,
@@ -2858,7 +2861,8 @@ export async function executeFinanceBatch(
   const invoked = captureDeviceMutationScope();
   assertDeviceMutationScope(invoked);
   assertScope?.();
-  if (!inputs.length || !inputs.every((i) => financeKind(i.kind)))
+  // Split the party's batches (Edit groups, Move group here & merge) change only the journal.
+  if (!inputs.length || !inputs.every((i) => financeKind(i.kind) || groupBatchKind(i.kind)))
     throw Error("Not a finance command batch.");
   const commands = inputs.map(
     (input) => ({ ...input, id: input.id || crypto.randomUUID() }) as Parameters<typeof applyCommand>[2],

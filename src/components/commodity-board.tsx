@@ -1,4 +1,5 @@
 import { useMemo, useState, type ReactNode } from "react";
+import { seatGroups } from "@/lib/quire/party-groups";
 import { ArrowDownRight, ArrowUpRight, Minus, Search, SlidersHorizontal } from "lucide-react";
 import {
   readTradeEconomy,
@@ -57,12 +58,13 @@ function chartGeometry(points: RecordedMarketPoint[], width: number, height: num
 
 export function GlobalCommodityMarket() {
   const table = useWorldTable(),
-    dm = useSeat().role === "dm";
+    seat = useSeat(),
+    dm = seat.role === "dm";
   const economy = useMemo(
     () => readTradeEconomy(table.journal.tradeEconomy),
     [table.journal.tradeEconomy],
   );
-  const exchanges = economy.exchanges.filter((e) => dm || (e.visible && exchangeHere(table, e)));
+  const exchanges = economy.exchanges.filter((e) => dm || (e.visible && exchangeHere(table, e, seatGroups(table, seat))));
   const market = readMarketLocations(table.journal.market);
   if (!globalMarketCity(market))
     return (

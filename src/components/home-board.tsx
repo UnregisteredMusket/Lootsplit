@@ -1,4 +1,5 @@
 import { pendingServiceRequests } from "@/lib/quire/services";
+import { PlayerGroupCard } from "./party-groups";
 import { inParty } from "@/lib/quire/character-position";
 import type { ReactNode } from "react";
 import { DesktopDeskPanels } from "./control-panel/desktop-panels";
@@ -389,6 +390,7 @@ export function HomeBoard({ embedded = false }: { embedded?: boolean }) {
           </span>
         </Link>
       ) : null}
+      {seat.role === "player" && <PlayerGroupCard />}
       {seat.role === "player" && (
         <Link to="/share" className="connection-link">
           Multiplayer · Room, chat & connection status →

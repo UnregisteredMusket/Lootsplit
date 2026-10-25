@@ -18,6 +18,7 @@ import { LedgerArt } from "@/components/ledger-art";
 import { Guide } from "@/components/guide";
 import { Fold } from "@/components/ui";
 import { Shortcuts } from "./shortcuts";
+import { DeskGroupsGlance } from "@/components/party-groups";
 import { HomeBoard } from "../home-board";
 import { useSheetReadouts, HpBar } from "./readouts";
 import { InformationStrip } from "./information-strip";
@@ -154,6 +155,7 @@ function DmDeskContents() {
           <h1>Campaign control</h1>
           <Guide />
         </div>
+        <DeskGroupsGlance />
         <div className="desk-connection-row">
           {!room.joined && (
             <p className="desk-status">

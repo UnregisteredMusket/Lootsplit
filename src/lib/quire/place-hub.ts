@@ -16,7 +16,8 @@ import { characterLocation, characterVisible, canReadCharacter } from "./charact
 import { canAccessEstate } from "./estate.ts";
 import { readEstate } from "./estate-schema.ts";
 import { locationPath, readMarketLocations } from "./shop-locations.ts";
-import { propertyAvailableHere } from "./property.ts";
+import { propertyAvailableHere, propertyAvailableToGroups } from "./property.ts";
+import { groupPlace, MAIN_GROUP, seatGroups } from "./party-groups.ts";
 import { exchangeHere } from "./trade-economy.ts";
 import { facilityAccess } from "./ships.ts";
 import { npcAvailableHere, shopVisible } from "./world.ts";
@@ -80,12 +81,12 @@ function inferredLocation(t: Table, ref: MapRecordReference, viewer: Viewer) {
   switch (ref.kind) {
     case "shop": {
       const s = t.shops.find((s) => s.id === ref.id);
-      return s && (dm || shopVisible(s, t)) ? s.locationId : undefined;
+      return s && (dm || shopVisible(s, t, seatGroups(t, viewer))) ? s.locationId : undefined;
     }
     case "npc": {
       const n = t.journal?.world?.npcs.find((n) => n.id === ref.id),
         p = t.purses.find((p) => p.id === ref.id);
-      return n && p && (dm || npcAvailableHere(n, t)) ? characterLocation(t, p) : undefined;
+      return n && p && (dm || npcAvailableHere(n, t, seatGroups(t, viewer))) ? characterLocation(t, p) : undefined;
     }
     case "character": {
       const p = t.purses.find((p) => p.id === ref.id && p.kind === "character");
@@ -217,10 +218,10 @@ export function mapServiceAllowed(
   switch (ref.kind) {
     case "shop": {
       const s = t.shops.find((s) => s.id === ref.id)!;
-      return (!seat.shopIds || seat.shopIds.includes(s.id)) && shopVisible(s, t);
+      return (!seat.shopIds || seat.shopIds.includes(s.id)) && shopVisible(s, t, seatGroups(t, seat));
     }
     case "npc":
-      return npcAvailableHere(t.journal!.world!.npcs.find((n) => n.id === ref.id)!, t);
+      return npcAvailableHere(t.journal!.world!.npcs.find((n) => n.id === ref.id)!, t, seatGroups(t, seat));
     case "character":
       return canReadCharacter(t, t.purses.find((p) => p.id === ref.id)!, seat);
     case "property": {
@@ -230,14 +231,14 @@ export function mapServiceAllowed(
     case "listing": {
       const l = t.listings.find((l) => l.id === ref.id)!;
       return (
-        propertyAvailableHere(l, market, !!t.journal?.world?.partyPosition) &&
+        propertyAvailableToGroups(l, t, seatGroups(t, seat)) &&
         l.quantity !== 0 &&
         l.status !== "withdrawn"
       );
     }
     case "exchange": {
       const e = t.journal!.tradeEconomy!.exchanges.find((e) => e.id === ref.id)!;
-      return e.visible && exchangeHere(t, e);
+      return e.visible && exchangeHere(t, e, seatGroups(t, seat));
     }
     case "facility":
       return facilityAccess(t, t.journal!.fleet!.facilities.find((f) => f.id === ref.id)!, seat);
@@ -275,13 +276,14 @@ export function recordLocationId(t: Table, ref: MapRecordReference): string | nu
   return undefined;
 }
 /** Whether the party is at (or inside) the record's location. Travelling parties are nowhere. */
-export function partyAt(t: Table, locationId: string | null | undefined) {
-  if (!locationId || t.journal?.world?.partyPosition) return false;
+export function partyAt(t: Table, locationId: string | null | undefined, groups: string[] = [MAIN_GROUP]) {
+  if (!locationId) return false;
   const market = readMarketLocations(t.journal?.market);
-  return (
-    !!market.currentLocationId &&
-    locationPath(market, market.currentLocationId).some((l) => l.id === locationId)
-  );
+  // Split the party: one of `groups` is at (or inside) the place.
+  return groups.some((g) => {
+    const place = groupPlace(t, g);
+    return !place.position && !!place.locationId && locationPath(market, place.locationId).some((l) => l.id === locationId);
+  });
 }
 
 /** An NPC pin opens the conversation hub (#188) unless a player controls that NPC; controlled
@@ -404,11 +406,15 @@ export function hereSheet(
   t: Table,
   viewer: Viewer & { shopIds?: string[] },
   viewed?: CampaignMap,
+  /** Split the party: whose place this sheet shows (default: the viewer's first group). */
+  group?: string,
 ): HereSheet {
   const dm = viewer.role === "dm";
   const market = readMarketLocations(t.journal?.market);
-  const world = { npcs: t.journal?.world?.npcs ?? [], partyPosition: t.journal?.world?.partyPosition };
-  const current = market.currentLocationId;
+  const ref = group ?? seatGroups(t, viewer)[0] ?? MAIN_GROUP;
+  const place = groupPlace(t, ref);
+  const world = { npcs: t.journal?.world?.npcs ?? [], partyPosition: place.position };
+  const current = place.locationId;
   const path = locationPath(market, current);
   const name = (id?: string | null) => market.locations.find((l) => l.id === id)?.name ?? "";
   // Browsing a map of a place the party isn't in (nor inside): read only.
@@ -459,7 +465,7 @@ export function hereSheet(
   for (const s of t.shops) {
     if (!on(s.locationId)) continue;
     const visible =
-      shopVisible(s, t) && (dm || !viewer.shopIds || viewer.shopIds.includes(s.id));
+      shopVisible(s, t, [ref]) && (dm || !viewer.shopIds || viewer.shopIds.includes(s.id));
     if (!dm && !visible) continue;
     const office = offices.has(s.id);
     rows.push({
@@ -474,7 +480,7 @@ export function hereSheet(
   }
   for (const e of t.journal?.tradeEconomy?.exchanges ?? []) {
     if (!on(e.locationId)) continue;
-    const visible = e.visible && exchangeHere(t, e);
+    const visible = e.visible && exchangeHere(t, e, [ref]);
     if (!dm && !visible) continue;
     rows.push({
       reference: { kind: "exchange", id: e.id },
@@ -488,7 +494,7 @@ export function hereSheet(
   }
   for (const n of world.npcs) {
     const p = t.purses.find((p) => p.id === n.id);
-    const available = npcAvailableHere(n, t);
+    const available = npcAvailableHere(n, t, [ref]);
     if (!(available || (dm && p && on(characterLocation(t, p))))) continue;
     rows.push({
       reference: { kind: "npc", id: n.id },
@@ -533,7 +539,7 @@ export function hereSheet(
       offers = approvedOffers(p);
     if (!shop || !on(shop.locationId) || !providerListed(p)) continue;
     const npc = world.npcs.find((n) => n.id === p.npcId);
-    if (!npc || (!dm && !npcAvailableHere(npc, t))) continue;
+    if (!npc || (!dm && !npcAvailableHere(npc, t, [ref]))) continue;
     // Fences appear only while the black market is on (players never receive them otherwise).
     if (p.kind === "fence" && !t.journal?.world?.blackMarketActive && !dm) continue;
     const mine = services.orders.filter((o) => o.providerId === p.id && viewer.purseIds.includes(o.purseId));

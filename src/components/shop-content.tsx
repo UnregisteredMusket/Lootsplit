@@ -1,4 +1,5 @@
 import { SearchSelect } from "@/components/search-select";
+import { useSeatGroups } from "@/lib/quire/use-seat-groups";
 import { MapRecordStrip } from "./map-record-strip";
 import { BlacksmithServices } from "@/components/blacksmith-services";
 import { ShopServices } from "@/components/service-providers";
@@ -51,6 +52,7 @@ export function ShopContent({
   const economy = useEconomy();
   const { prefs } = usePrefs();
   const seat = useSeat();
+  const groups = useSeatGroups();
   const shop = economy.shops.find((item) => item.id === shopId);
   const lines = economy.stock.filter((line) => line.shopId === shopId);
   const spendable =
@@ -92,7 +94,7 @@ export function ShopContent({
 
   if (
     seat.role === "player" &&
-    (!seat.shopIds.includes(shop.id) || !shopVisible(shop, { journal: economy.journal }))
+    (!seat.shopIds.includes(shop.id) || !shopVisible(shop, { journal: economy.journal }, groups))
   ) {
     return (
       <>

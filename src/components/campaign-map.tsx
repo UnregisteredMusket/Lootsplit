@@ -1,4 +1,5 @@
 import { SyncStatus } from "./sync-status";
+import { seatGroups } from "@/lib/quire/party-groups";
 import { useMapSketches } from "./map-sketch-tools";
 import { MapWorkspaceChrome, MapEmptyWorkspace } from "./map-workspace-chrome";
 import { captureMutationScope } from "@/lib/quire/cloud-client";
@@ -411,7 +412,7 @@ function CampaignMapWorkspace({ viewScope }: { viewScope: { key: string; ephemer
           href: libraryRecordHref("property", h.id),
         })),
       ...t.shops
-        .filter((s) => dm || shopVisible(s, t))
+        .filter((s) => dm || shopVisible(s, t, seatGroups(t, seat)))
         .map((s) => ({
           id: s.id,
           label: s.name,
@@ -420,7 +421,7 @@ function CampaignMapWorkspace({ viewScope }: { viewScope: { key: string; ephemer
           href: libraryRecordHref("shop", s.id),
         })),
       ...w.npcs
-        .filter((n) => dm || npcAvailableHere(n, t))
+        .filter((n) => dm || npcAvailableHere(n, t, seatGroups(t, seat)))
         .map((n) => ({
           id: n.id,
           label: n.name,

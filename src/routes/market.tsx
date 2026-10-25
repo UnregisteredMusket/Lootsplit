@@ -1,4 +1,6 @@
 import { SearchSelect } from "@/components/search-select";
+import { groupMarket, groupTravelling } from "@/lib/quire/party-groups";
+import { useSeatGroups } from "@/lib/quire/use-seat-groups";
 import { BlacksmithOrders } from "@/components/blacksmith-services";
 import { ServiceOrders } from "@/components/service-providers";
 import { BlackMarketToggle } from "@/components/black-market";
@@ -44,6 +46,7 @@ function MarketPage() {
   const [availableOnly, setAvailableOnly] = useState(false);
   const { prefs } = usePrefs();
   const seat = useSeat();
+  const groups = useSeatGroups();
   const [location, setLocation] = useState("");
   const [category, setCategory] = useState("");
   const [query, setQuery] = useState("");
@@ -58,7 +61,7 @@ function MarketPage() {
   const [stocked, setStocked] = useState<"all" | "open" | "empty">("all");
   const shown =
     seat.role === "player"
-      ? shops.filter((shop) => seat.shopIds.includes(shop.id) && shopVisible(shop, { journal }))
+      ? shops.filter((shop) => seat.shopIds.includes(shop.id) && shopVisible(shop, { journal }, groups))
       : shops;
   const needle = query.trim().toLowerCase();
   const filtered = shown.filter((shop) => {
@@ -69,7 +72,11 @@ function MarketPage() {
         : shop.locationId !== assignedLocation)
     )
       return false;
-    if (availableOnly && !shopAvailableHere(shop, market, !!journal.world?.partyPosition))
+    // Split the party: "available here" is any of this seat's groups' places.
+    if (
+      availableOnly &&
+      !groups.some((g) => shopAvailableHere(shop, groupMarket({ journal }, g), groupTravelling({ journal }, g)))
+    )
       return false;
     if (location && shop.place !== location) return false;
     if (category && shop.category !== category) return false;

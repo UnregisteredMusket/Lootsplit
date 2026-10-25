@@ -26,6 +26,8 @@ export const partyGroupCommands = [
               colour: z.enum(groupColours),
               locationId: id.nullable(),
               memberIds: z.array(id).min(1).max(500),
+              /** Players with no character in this group see it as "Elsewhere". */
+              hidden: z.boolean().optional(),
             })
             .strict(),
         )
