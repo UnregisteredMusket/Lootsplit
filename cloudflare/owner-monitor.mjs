@@ -1,6 +1,7 @@
 import { assertActive, roleOf } from "./members.mjs";
 import { serverMonitor } from "./monitoring.mjs";
 import { ownerAnalytics } from "./game-analytics.mjs";
+import { widgetSeverity } from "./monitor-model.mjs";
 
 const repository = "UnregisteredMusket/Lootsplit";
 const github = `https://api.github.com/repos/${repository}`;
@@ -417,13 +418,39 @@ export async function ownerMonitor(env, userId, sessionId, request, context = nu
     userId,
     view === "widget" ? { budgetMs: REQUEST_PROVIDER_BUDGET_MS, defer } : {},
   );
+  // The widget's charts, recovered problems and live rooms come from stored rows only (no provider
+  // calls); they are read before the authorization re-check below, so a revocation still wins.
+  let widgetData = {};
+  if (view === "widget") {
+    const { monitorWidgetData } = await import("./monitor-journal.mjs");
+    widgetData = await monitorWidgetData(env.DB, snapshot, snapshot.servedAt || Date.now());
+  }
   // Role, account and session revocations during provider reads must fail closed.
   await authorizeOwner(env, userId, sessionId);
   const account = await env.DB.prepare("SELECT name,email FROM user WHERE id=?")
     .bind(userId)
     .first();
   if (!account) throw Object.assign(new Error("Sign in again."), { status: 401 });
-  return view === "widget" ? widgetSnapshot({ ...snapshot, account }) : { ...snapshot, account };
+  return view === "widget"
+    ? widgetSnapshot({ ...snapshot, account, ...widgetData })
+    : { ...snapshot, account };
+}
+/** Completed main runs the Field monitor's Deploys tile shows (newest first, scheduled excluded). */
+export const MAIN_RUN_LIMIT = 20;
+export function mainRuns(runs, limit = MAIN_RUN_LIMIT) {
+  if (!Array.isArray(runs)) return null;
+  return runs
+    .filter(
+      (run) =>
+        run?.branch === "main" && run.status === "completed" && run.event !== "schedule",
+    )
+    .slice(0, limit)
+    .map((run) => ({
+      name: short(label(run.name) || "Workflow", 40),
+      conclusion: label(run.conclusion).slice(0, 40) || null,
+      at: run.updatedAt || run.startedAt || null,
+      deployment: run.deployment === true,
+    }));
 }
 /**
  * The compact form the Android widgets request (`?view=widget`). It drops only bulky lists the
@@ -434,6 +461,11 @@ export async function ownerMonitor(env, userId, sessionId, request, context = nu
  */
 export function widgetSnapshot(snapshot) {
   const out = { ...snapshot, view: "widget" };
+  // Severity per diagnostic (✕ critical, ! warning, i info); older widgets ignore it.
+  if (Array.isArray(snapshot.diagnostics))
+    out.diagnostics = snapshot.diagnostics.map((check) =>
+      check && typeof check === "object" ? { ...check, severity: widgetSeverity(check) } : check,
+    );
   const data = snapshot.development?.data;
   if (data && typeof data === "object") {
     const { runs, closedPulls, ...kept } = data;
@@ -441,6 +473,8 @@ export function widgetSnapshot(snapshot) {
       ...snapshot.development,
       data: {
         ...kept,
+        // The last completed runs on main, compact (no URLs): the widget's CI/deploy pips.
+        ...(Array.isArray(runs) ? { mainRuns: mainRuns(runs) } : {}),
         omitted: {
           runs: Array.isArray(runs) ? runs.length : 0,
           closedPulls: Array.isArray(closedPulls) ? closedPulls.length : 0,

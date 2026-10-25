@@ -495,6 +495,19 @@ export function overall(checks) {
     notes,
   };
 }
+/**
+ * Widget severity of one diagnostic (owner-approved redesign, 2026-10-25). Null when it needs no
+ * attention (green). critical: a confirmed failure (red); info: a coverage limit or optional
+ * check, which never decides the status; warning: everything else that is amber, including a
+ * required check that cannot be verified (owner decision 1). Plan usage is not a diagnostic and
+ * never raises a severity (owner decision 6: it shows on its gauge only).
+ */
+export function widgetSeverity(check) {
+  if (!check || check.color === "green") return null;
+  if (check.color === "red" || check.confirmedFailure === true) return "critical";
+  if (check.required === false || check.coverageLimit === true) return "info";
+  return "warning";
+}
 /** An error rate at or above this (1%) over the 24-hour window is a failure even if errors stopped. */
 export const WORKER_ERROR_RATE_FAILURE = 0.01;
 const plural = (n, word) => `${n} ${word}${n === 1 ? "" : "s"}`;
