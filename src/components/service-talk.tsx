@@ -1,4 +1,5 @@
 import { useState, type ReactNode } from "react";
+import { coachGroup } from "@/lib/quire/party-groups-journeys";
 import { useCommandId } from "@/lib/quire/economy-context";
 import { useSeat } from "@/lib/quire/seat";
 import { postNotes } from "@/lib/quire/chat";
@@ -771,7 +772,8 @@ export function useServiceTalk({
         for (const r of provider.routes ?? []) {
           const place = placeOf(r.toLocationId);
           const deci = routeDeci(r);
-          const passengers = journeyTravellers(table).length;
+          // Split the party: the coach carries the paying character's group.
+          const passengers = journeyTravellers(table, coachGroup(table, purseId ?? "")).length;
           replies.push({
             tag: (
               <>
@@ -796,7 +798,7 @@ export function useServiceTalk({
             disabled:
               lock ||
               (!r.mapId || !r.points ? `Coach to ${place}: the DM hasn't drawn this route on a map yet.` : "") ||
-              (openJourney(table) ? "The party already has a journey planned. Finish or withdraw it first." : "") ||
+              (openJourney(table, coachGroup(table, purseId ?? "")) ? "The party already has a journey planned. Finish or withdraw it first." : "") ||
               undefined,
             run: () => {
               push(
@@ -1097,7 +1099,7 @@ export function useServiceTalk({
               <div className="svc-section">
                 <h4>Passengers</h4>
                 <div className="npc-talk-chips" role="group" aria-label="Passengers">
-                  {journeyTravellers(table).map((p) => (
+                  {journeyTravellers(table, coachGroup(table, character.id)).map((p) => (
                     <button key={p.id} type="button" className="npc-talk-chip" aria-pressed="true" disabled>
                       {p.name} <small>{p.id === character.id ? "you" : "party"}</small>
                     </button>

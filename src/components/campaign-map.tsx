@@ -1,5 +1,7 @@
 import { SyncStatus } from "./sync-status";
-import { seatGroups } from "@/lib/quire/party-groups";
+import { groupInfo, groupPlace, groupRefs, MAIN_GROUP, partySplit, seatGroups } from "@/lib/quire/party-groups";
+import { mapGroupPins, type GroupPin } from "@/lib/quire/party-groups-map";
+import { HereGroupSwitch } from "./party-groups-map";
 import { useMapSketches } from "./map-sketch-tools";
 import { MapWorkspaceChrome, MapEmptyWorkspace } from "./map-workspace-chrome";
 import { captureMutationScope } from "@/lib/quire/cloud-client";
@@ -393,6 +395,8 @@ function CampaignMapWorkspace({ viewScope }: { viewScope: { key: string; ephemer
     w.partyPosition.y !== undefined
       ? { x: w.partyPosition.x, y: w.partyPosition.y }
       : anchorFor(map, t, market.currentLocationId));
+  // Split the party: one marker per group, each with its letter and colour (map.html).
+  const groupPins = map && partySplit(t) ? mapGroupPins(t, map) : undefined;
   function recordsForMap(map: CampaignMap): MapRecord[] {
     const inferredPins = [
       ...t.holdings
@@ -588,8 +592,13 @@ function CampaignMapWorkspace({ viewScope }: { viewScope: { key: string; ephemer
     <>
       <SyncStatus compact />{" "}
       <p className="text-muted">
-        {partyEnvironment(w.partyPosition) || locationLabel(market, market.currentLocationId)} ·{" "}
-        {party
+        {partySplit(t)
+          ? groupRefs(t)
+              .map((g) => `${groupInfo(t, g).name}: ${partyEnvironment(groupPlace(t, g).position) || locationLabel(market, groupPlace(t, g).locationId)}`)
+              .join(" · ")
+          : partyEnvironment(w.partyPosition) || locationLabel(market, market.currentLocationId)}{" "}
+        ·{" "}
+        {party || groupPins?.length
           ? "Party position shown"
           : "Choose a map position or link a location to show the party"}
       </p>
@@ -805,20 +814,45 @@ function CampaignMapWorkspace({ viewScope }: { viewScope: { key: string; ephemer
               <AppLink href={libraryRecordHref("location", a.locationId)}>
                 {locationLabel(market, a.locationId)} →
               </AppLink>
-              {a.locationId === market.currentLocationId ? " · Party here" : ""}
+              {partySplit(t)
+                ? groupRefs(t)
+                    .filter((g) => groupPlace(t, g).locationId === a.locationId)
+                    .map((g) => ` · ${groupInfo(t, g).name} here`)
+                    .join("")
+                : a.locationId === market.currentLocationId
+                  ? " · Party here"
+                  : ""}
             </span>
-            {dm && (
-              <CommandButton
-                input={{
-                  kind: "party-location",
-                  beforePosition: canonicalJson(t.journal.world?.partyPosition ?? null),
-                  before: market.currentLocationId,
-                  locationId: a.locationId,
-                }}
-              >
-                Move party here
-              </CommandButton>
-            )}
+            {dm &&
+              (partySplit(t) ? (
+                groupRefs(t)
+                  .filter((g) => groupPlace(t, g).locationId !== a.locationId)
+                  .map((g) => (
+                    <CommandButton
+                      key={g}
+                      input={{
+                        kind: "party-location",
+                        ...(g === MAIN_GROUP ? {} : { groupId: g }),
+                        beforePosition: canonicalJson(groupPlace(t, g).position ?? null),
+                        before: groupPlace(t, g).locationId,
+                        locationId: a.locationId,
+                      }}
+                    >
+                      {`Move ${groupInfo(t, g).name} here`}
+                    </CommandButton>
+                  ))
+              ) : (
+                <CommandButton
+                  input={{
+                    kind: "party-location",
+                    beforePosition: canonicalJson(t.journal.world?.partyPosition ?? null),
+                    before: market.currentLocationId,
+                    locationId: a.locationId,
+                  }}
+                >
+                  Move party here
+                </CommandButton>
+              ))}
           </div>
         ))}
         {map.markers
@@ -934,6 +968,7 @@ function CampaignMapWorkspace({ viewScope }: { viewScope: { key: string; ephemer
               return false;
             }}
             party={party}
+            groupPins={groupPins}
             selectedToken={selectedToken}
             tileMode={effectiveTileMode}
             routes={(t.journal.fleet?.voyages ?? [])
@@ -1390,6 +1425,7 @@ function MapViewport({
   openLocation,
   recordTable,
   party,
+  groupPins,
   placing,
   point,
   onPlace,
@@ -1430,6 +1466,8 @@ function MapViewport({
   locationMaps: (id: string) => CampaignMap[];
   openLocation: (id: string) => boolean;
   party?: { x: number; y: number };
+  /** Split the party: each group's marker on this map (when split). */
+  groupPins?: GroupPin[];
   placing: boolean;
   point?: { x: number; y: number };
   onPlace: (p: { x: number; y: number }) => void;
@@ -1509,7 +1547,11 @@ function MapViewport({
             description: `Column ${token.column + 1}, row ${token.row + 1}${token.visibility === "dm" ? " · DM only" : ""}`,
           }))
       : []),
-    ...(party ? [{ id: "party", label: "Party", kind: "Party", point: party }] : []),
+    ...(groupPins
+      ? groupPins.map((g) => ({ id: `group:${g.ref}`, label: g.name, kind: "Party", point: g.point, description: `Group ${g.letter} · ${g.where}` }))
+      : party
+        ? [{ id: "party", label: "Party", kind: "Party", point: party }]
+        : []),
   ];
   const groups = groupMapRecords(records, visible);
   const currentDetails = details.flatMap((d) => {
@@ -1521,10 +1563,14 @@ function MapViewport({
         : [];
   });
   // Derived from the projected table; recomputed only when it or the viewed map changes.
+  // Split the party: the Here sheet shows one group's place (the DM: every group; a player: theirs).
+  const hereGroups = seatGroups(recordTable, viewer);
+  const [hereGroupChoice, setHereGroup] = useState<string>();
+  const hereGroup = hereGroupChoice && hereGroups.includes(hereGroupChoice) ? hereGroupChoice : hereGroups[0];
   const here = useMemo(
-    () => hereSheet(recordTable, viewer, map),
+    () => hereSheet(recordTable, viewer, map, hereGroup),
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [recordTable.journal, recordTable.shops, recordTable.holdings, recordTable.listings, recordTable.purses, viewer, map],
+    [recordTable.journal, recordTable.shops, recordTable.holdings, recordTable.listings, recordTable.purses, viewer, map, hereGroup],
   );
   const drawnRecord = (reference: MapRecordReference) =>
     records.find((r) => sameRecord(r.reference, reference) && r.point);
@@ -3080,6 +3126,11 @@ function MapViewport({
             <MapHereSheet
               sheet={here}
               dm={useDm}
+              groupSwitch={
+                partySplit(recordTable) ? (
+                  <HereGroupSwitch table={recordTable} groups={hereGroups} value={hereGroup} onChange={setHereGroup} />
+                ) : undefined
+              }
               close={() => {
                 setHereOpen(false);
                 root.current?.focus();
@@ -3217,6 +3268,14 @@ function MapRecordGlyph({
       token?.kind === "character"
         ? table.purses.find((person) => person.id === token.entityId)?.portrait
         : pinnedPortrait || undefined;
+  // Split the party: a group's marker carries its letter in its colour.
+  const group = kind === "Party" && records[0]?.id.startsWith("group:") ? groupInfo(table, records[0].id.slice(6)) : undefined;
+  if (group)
+    return (
+      <span className={`gbadge map-group-badge g-${group.colour}`} aria-hidden="true">
+        {group.letter}
+      </span>
+    );
   return (
     <>
       {portrait ? (

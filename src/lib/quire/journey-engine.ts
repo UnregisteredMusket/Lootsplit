@@ -25,7 +25,7 @@ import {
   routePointAt,
 } from "./journey.ts";
 import { characterPosition, characterVisible } from "./character-position.ts";
-import { groupInfo, MAIN_GROUP, purseGroup as purseGroupOf, resolveGroup } from "./party-groups.ts";
+import { groupInfo, groupMarket, groupShip, MAIN_GROUP, purseGroup as purseGroupOf, resolveGroup } from "./party-groups.ts";
 import { locationPath, readMarketLocations } from "./shop-locations.ts";
 import { shopScheduleSchema } from "./shop-schedule.ts";
 import { formatCopper, toCopper } from "./money.ts";
@@ -98,11 +98,18 @@ export function orderedTable<T extends Pick<CloudTable, "purses" | "holdings" | 
 
 type Table = Pick<CloudTable, "purses" | "journal">;
 const journeysOf = (t: Pick<CloudTable, "journal">) => t.journal?.world?.journeys ?? [];
-export const openJourney = (t: Pick<CloudTable, "journal">) =>
-  journeysOf(t).find((j) => (OPEN_JOURNEY_STATUSES as readonly string[]).includes(j.status));
-/** The journey under way (active or arrived), if any. */
-export const travellingJourney = (t: Pick<CloudTable, "journal">) =>
-  journeysOf(t).find((j) => j.status === "active" || j.status === "arrived");
+/** The group a journey moves (split the party): absent = the main group. */
+export const journeyGroup = (j: Pick<Journey, "groupId">) => j.groupId ?? MAIN_GROUP;
+/** A group's open journey (one per group); without a group, any open journey. */
+export const openJourney = (t: Pick<CloudTable, "journal">, group?: string) =>
+  journeysOf(t).find(
+    (j) => (OPEN_JOURNEY_STATUSES as readonly string[]).includes(j.status) && (group === undefined || journeyGroup(j) === group),
+  );
+/** A group's journey under way (active or arrived); without a group, any. */
+export const travellingJourney = (t: Pick<CloudTable, "journal">, group?: string) =>
+  journeysOf(t).find(
+    (j) => (j.status === "active" || j.status === "arrived") && (group === undefined || journeyGroup(j) === group),
+  );
 
 /**
  * Who travels: characters (and companions) with the party. A character with their own position,
@@ -160,7 +167,7 @@ export function prepareJourneyPlan(t: CloudTable, journeyId: string) {
   j.status = "planned";
   j.frozen = {
     ...measured,
-    travellerIds: journeyTravellers(t, j.groupId ?? MAIN_GROUP).map((p) => p.id),
+    travellerIds: journeyTravellers(t, journeyGroup(j)).map((p) => p.id),
     unitCopper: { rations: travel.rations.unitCopper, mounts: travel.mounts.unitCopper },
   };
   return j;
@@ -251,7 +258,8 @@ export function previewJourney(
     lines.push({ kind, purseId: payer, quantity: quantities[kind], unitCopper: price[kind], copper, short });
   }
   const notices: JourneyQuote["notices"] = [];
-  const market = readMarketLocations(t.journal?.market);
+  // Split the party: shops left behind are those at the travelling group's place.
+  const market = groupMarket(t, journeyGroup(j));
   const shops = t.shops ?? [];
   const leaving =
     from === 0 && market.currentLocationId
@@ -286,7 +294,7 @@ export function previewJourney(
     }
   }
   if (from === 0)
-    for (const p of staysBehind(t, j.groupId ?? MAIN_GROUP)) {
+    for (const p of staysBehind(t, journeyGroup(j))) {
       const s = characterPosition(t, p);
       const other = s.inParty && !s.shipId && !s.downtime ? resolveGroup(t, s.groupId) : undefined;
       notices.push({
@@ -333,6 +341,8 @@ export function applyJourney(
   receipt: { id: string; name: string },
   at: number,
   move: (purseId: string, delta: number, id: string, summary: string) => void,
+  /** Split the party: a second journey in the same downtime keys its lines apart. */
+  suffix = "",
 ) {
   assertJourneyPayable(t, quote);
   const world = t.journal!.world!;
@@ -351,7 +361,7 @@ export function applyJourney(
     move(
       line.purseId,
       -line.copper,
-      `${receipt.id}:journey:${line.kind}`,
+      `${receipt.id}:journey${suffix}:${line.kind}`,
       `${receipt.name}: ${costLabel[line.kind]} (${line.quantity} × ${formatCopper(line.unitCopper)})`,
     );
   }
@@ -360,16 +370,26 @@ export function applyJourney(
   j.decidedAt ??= at;
   j.elapsedMinutes = quote.toMinutes;
   j.downtimeIds = [...j.downtimeIds, receipt.id];
-  world.partyPosition = quote.position;
-  const market = readMarketLocations(t.journal!.market);
-  if (market.currentLocationId) t.journal!.market = readMarketLocations({ ...market, currentLocationId: null });
+  const group = journeyGroup(j) === MAIN_GROUP ? undefined : world.groups?.find((g) => g.id === j.groupId && g.status === "active");
+  if (j.groupId && !group) throw Error("This journey's group merged. Stop the journey first.");
+  if (group) {
+    // Split the party: the journey moves its own group, not the party's place.
+    group.position = quote.position;
+    group.locationId = null;
+  } else {
+    world.partyPosition = quote.position;
+    const market = readMarketLocations(t.journal!.market);
+    if (market.currentLocationId) t.journal!.market = readMarketLocations({ ...market, currentLocationId: null });
+  }
   t.journal!.events.push({
-    id: `${receipt.id}-journey`,
+    id: `${receipt.id}-journey${suffix}`,
     at,
     kind: "session",
+    // A hidden group's travel stays in the DM's record.
+    ...(group?.hidden ? { dmOnly: true } : {}),
     summary: (
-      `${departing ? "Departed" : "Travelled"}: ${receipt.name} · ${Math.round((quote.toMinutes / quote.durationMinutes) * 100)}% of the route` +
-      (quote.arrived ? " · arrived; waiting for the DM to move the party in" : "")
+      `${group ? `${group.name}: ` : ""}${departing ? "Departed" : "Travelled"}: ${receipt.name} · ${Math.round((quote.toMinutes / quote.durationMinutes) * 100)}% of the route` +
+      (quote.arrived ? ` · arrived; waiting for the DM to move ${group ? "the group" : "the party"} in` : "")
     ).slice(0, 500),
   });
 }
@@ -401,8 +421,9 @@ function settleCoach(t: CloudTable, orderId: string, at: number, departed: boole
 export function validateJourneys(t: CloudTable, projected = false) {
   const journeys = journeysOf(t);
   if (new Set(journeys.map((j) => j.id)).size !== journeys.length) throw Error("Duplicate journey IDs.");
-  if (journeys.filter((j) => (OPEN_JOURNEY_STATUSES as readonly string[]).includes(j.status)).length > 1)
-    throw Error("Only one journey can be open at a time.");
+  // One open journey per group (split the party); one for the whole party otherwise.
+  const open = journeys.filter((j) => (OPEN_JOURNEY_STATUSES as readonly string[]).includes(j.status)).map(journeyGroup);
+  if (new Set(open).size !== open.length) throw Error("Only one journey can be open at a time for each group.");
   if (projected) return;
   // A player's projected table (previews of their own commands) has journeys without a route or
   // map on private and fogged maps; only the room's full table is checked for those.
@@ -450,11 +471,19 @@ export function applyJourneyCommand(
   if (next.runs) throw Error("A journey route must use its full waypoints.");
   const travel = readTravel(world.travel);
   const own = !dm && seat.purseIds.includes(next.requestedBy);
-  // Split the party, phase 1: journeys still move the main group only (group journeys follow).
-  if (next.groupId) throw Error("Journeys for a group other than the main group aren't available yet.");
-  const proposer = purseGroupOf(t, next.requestedBy);
-  if (!current && !dm && proposer && resolveGroup(t, proposer) !== MAIN_GROUP)
-    throw Error("Your character's group can't plan journeys yet. Ask the DM to move your group.");
+  // Split the party: a journey moves one group (absent = the main group), fixed at creation.
+  if (next.groupId === MAIN_GROUP) delete next.groupId;
+  if (current && (next.groupId ?? null) !== (current.groupId ?? null)) throw Error("A journey keeps the group it was planned for.");
+  if (!current && next.groupId && !world.groups?.some((g) => g.id === next.groupId && g.status === "active"))
+    throw Error("This group no longer exists. Refresh before planning.");
+  if (!current && next.groupId && groupShip(t, next.groupId))
+    throw Error("This group is aboard a ship: it travels with the ship's voyage.");
+  if (!current && !dm) {
+    // A player plans for their own character's group (characters away from the party: the main group, as before).
+    const proposer = purseGroupOf(t, next.requestedBy);
+    const theirs = proposer ? resolveGroup(t, proposer) : MAIN_GROUP;
+    if (journeyGroup(next) !== theirs) throw Error("Plan a journey for your own character's group.");
+  }
   if (!current) {
     // Proposing: a new journey starts proposed, with nothing travelled or charged.
     if (next.status !== "proposed" || next.frozen || next.elapsedMinutes || next.downtimeIds.length || next.decidedAt || next.reason)
@@ -463,7 +492,12 @@ export function applyJourneyCommand(
     if (!dm && t.purses.find((p) => p.id === next.requestedBy)?.kind !== "character")
       throw Error("Propose a journey for your own character.");
     if (!dm && next.message === undefined) next.message = "";
-    if (openJourney(t)) throw Error("Another journey is already open. Finish, deny or withdraw it first.");
+    if (openJourney(t, journeyGroup(next)))
+      throw Error(
+        journeyGroup(next) === MAIN_GROUP && !world.groups?.some((g) => g.status === "active")
+          ? "Another journey is already open. Finish, deny or withdraw it first."
+          : `${groupInfo(t, journeyGroup(next)).name} already has a journey open. Finish, deny or withdraw it first.`,
+      );
   } else if (!dm) {
     if (!seat.purseIds.includes(current.requestedBy) || current.status !== "proposed")
       throw Error("Only the DM can change this journey.");

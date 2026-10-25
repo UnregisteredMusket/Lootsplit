@@ -11,6 +11,7 @@ import { characterPosition, characterVisible } from "./character-position.ts";
 import { readMarketLocations } from "./shop-locations.ts";
 import { canonicalJson } from "./canonical-json.ts";
 import {
+  groupShip,
   activeGroups,
   allGroups,
   groupInfo,
@@ -27,8 +28,6 @@ import {
 
 type Event = (summary: string, purseId?: string, dmOnly?: boolean) => void;
 const pendingDowntime = (t: CloudTable) => t.journal?.finance?.downtime.some((d) => d.status === "pending");
-const travelling = (t: CloudTable) =>
-  (t.journal?.world?.journeys ?? []).find((j) => j.status === "active" || j.status === "arrived");
 /** The journey under way for a group (journeys without a group belong to the main group). */
 export const groupJourneyUnderWay = (t: CloudTable, ref: string) =>
   (t.journal?.world?.journeys ?? []).find(
@@ -69,6 +68,7 @@ function assertColours(t: CloudTable) {
  */
 export function moveGroup(t: CloudTable, ref: string, locationId: string | null) {
   const journal = t.journal!;
+  if (groupShip(t, ref)) throw Error(`${groupInfo(t, ref).name} is aboard a ship: it moves with the ship's voyage. Land the group first.`);
   if (locationId && !readMarketLocations(journal.market).locations.some((l) => l.id === locationId))
     throw Error("Choose an existing location.");
   if (ref === MAIN_GROUP) {
@@ -86,6 +86,7 @@ export function applyGroupLocation(
   t: CloudTable,
   cmd: { groupId: string; before: string | null; beforePosition?: string; locationId: string | null; journeyId?: string },
   event: Event,
+  at = Date.now(),
 ) {
   const g = group(t, cmd.groupId);
   if (!g) throw Error("This group no longer exists. Refresh before moving it.");
@@ -93,8 +94,21 @@ export function applyGroupLocation(
   if (g.position && canonicalJson(g.position) !== cmd.beforePosition)
     throw Error(`${g.name}'s travel position changed. Refresh before choosing a location.`);
   if (pendingDowntime(t)) throw Error("Approve or cancel pending downtime before moving a group.");
-  if (cmd.journeyId) throw Error("Journeys for this group aren't available yet.");
-  if (groupJourneyUnderWay(t, g.id)) throw Error(`${g.name} is on a journey. Stop it on the road before moving the group.`);
+  const travelling = groupJourneyUnderWay(t, g.id);
+  if (cmd.journeyId) {
+    // "Move group here" on arrival: no time passes and nothing is charged.
+    if (!travelling || travelling.id !== cmd.journeyId || travelling.status !== "arrived")
+      throw Error("This journey hasn't arrived. Refresh before moving the group.");
+    if (!cmd.locationId || (travelling.destinationLocationId && travelling.destinationLocationId !== cmd.locationId))
+      throw Error("Move the group to the journey's destination, or stop the journey first.");
+    travelling.status = "completed";
+    travelling.decidedAt = at;
+  } else if (travelling)
+    throw Error(
+      travelling.status === "arrived"
+        ? `${g.name} has arrived on a journey. Confirm Move group here, or stop the journey first.`
+        : `${g.name} is on a journey. Stop it on the road before moving the group.`,
+    );
   moveGroup(t, g.id, cmd.locationId);
   // A hidden group's place stays in the DM's record.
   event(`${g.name}: ${cmd.locationId ? `moved to ${placeName(t, cmd.locationId)}` : "location cleared"}`, undefined, !!g.hidden);
@@ -111,6 +125,7 @@ export function applyGroupMapPosition(
   if (canonicalJson(g.position ?? null) !== canonicalJson(cmd.before) || g.locationId !== cmd.beforeLocationId)
     throw Error(`${g.name} moved. Refresh before placing it.`);
   if (pendingDowntime(t)) throw Error("Approve or cancel pending downtime before moving a group.");
+  if (groupShip(t, g.id)) throw Error(`${g.name} is aboard a ship. Land the group first.`);
   if (groupJourneyUnderWay(t, g.id)) throw Error(`${g.name} is on a journey. Stop it on the road before moving it freely.`);
   if (cmd.position) {
     g.position = cmd.position;
@@ -162,7 +177,6 @@ export function applyPartyGroupCommand(
     dm();
     fresh(cmd.before);
     noDowntime();
-    if (travelling(t)) throw Error("Stop or finish the journey under way before splitting the party.");
     if (activeGroups(t).length + cmd.groups.length > MAX_PARTY_GROUPS - 1)
       throw Error(`The party can be split into at most ${MAX_PARTY_GROUPS} groups.`);
     const ids = new Set<string>();
@@ -177,6 +191,9 @@ export function applyPartyGroupCommand(
         if (moved.has(id)) throw Error("A character can be in only one group.");
         moved.add(id);
         member(id);
+        // A group on a journey keeps its travellers until it stops or arrives.
+        if (groupJourneyUnderWay(t, resolveGroup(t, purseGroup(t, id))))
+          throw Error("Stop or finish the journey under way before splitting off its travellers.");
       }
     }
     leavesEmpty(moved);
@@ -233,6 +250,8 @@ export function applyPartyGroupCommand(
     if (from === cmd.groupId) throw Error(`${p.name} is already in ${groupInfo(t, from).name}.`);
     if (groupJourneyUnderWay(t, from) || groupJourneyUnderWay(t, cmd.groupId))
       throw Error("A group on a journey keeps its travellers. Stop or finish the journey first.");
+    if (groupShip(t, from) || groupShip(t, cmd.groupId))
+      throw Error("A group aboard a ship keeps its passengers. Land the group first.");
     leavesEmpty(new Set([p.id]));
     setGroup(t, p.id, cmd.groupId);
     event(`${p.name} joined ${groupInfo(t, cmd.groupId).name}.`, characterVisible(t, p) ? p.id : undefined, !characterVisible(t, p));
@@ -249,6 +268,7 @@ export function applyPartyGroupCommand(
     for (const ref of refs) {
       const name = groupInfo(t, ref).name;
       if (groupJourneyUnderWay(t, ref)) throw Error(`Merge waits: ${name} is on a journey.`);
+      if (groupShip(t, ref)) throw Error(`Merge waits: ${name} is aboard a ship. Land the group where the others are, then merge.`);
       if (groupPlace(t, ref).position) throw Error(`Merge waits: ${name} is on the road. Move the group to a place first.`);
     }
     const places = refs.map((r) => groupPlace(t, r).locationId);

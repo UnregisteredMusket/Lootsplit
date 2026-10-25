@@ -392,7 +392,11 @@ export function preserveJournalMetadata(value: unknown, current: Journal): Journ
             ...(current.world?.groups ? { groups: current.world.groups } : {}),
             ...(current.world?.mainGroup ? { mainGroup: current.world.mainGroup } : {}),
             ...(current.world?.groupRequests ? { groupRequests: current.world.groupRequests } : {}),
-            characterPositions: keepGroups(next.world.characterPositions ?? [], current.world?.characterPositions ?? []),
+            characterPositions: keepGroups(
+              next.world.characterPositions ?? [],
+              current.world?.characterPositions ?? [],
+              new Set((current.fleet?.aboard ?? []).map((a) => a.purseId)),
+            ),
             maps: next.world.maps.map((map) => {
               const old = current.world?.maps.find((m) => m.id === map.id);
               if (old?.connected) map.connected = old.connected;
@@ -463,12 +467,17 @@ export function preserveJournalMetadata(value: unknown, current: Journal): Journ
 
 type StoredPosition = NonNullable<NonNullable<Journal["world"]>["characterPositions"]>[number];
 /** Positions written back without group fields keep the stored group when nothing else moved. */
-function keepGroups(next: StoredPosition[], current: StoredPosition[]): StoredPosition[] {
+function keepGroups(next: StoredPosition[], current: StoredPosition[], aboard: Set<string>): StoredPosition[] {
   return next.map((s) => {
     const old = current.find((o) => o.purseId === s.purseId);
     if (!old || s.groupId !== undefined) return s;
     const kept = { ...s };
     if (old.groupId && s.inParty && old.inParty) kept.groupId = old.groupId;
+    // A group at sea reads as "aboard alone" (out of the party) for older apps: keep it in its group.
+    if (old.groupId && old.inParty && !s.inParty && aboard.has(s.purseId) && s.locationId === old.locationId) {
+      kept.inParty = true;
+      kept.groupId = old.groupId;
+    }
     if (kept.downtime && old.downtime?.returnGroupId && kept.downtime.returnGroupId === undefined && kept.downtime.id === old.downtime.id)
       kept.downtime = { ...kept.downtime, returnGroupId: old.downtime.returnGroupId };
     return kept;

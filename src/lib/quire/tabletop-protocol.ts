@@ -420,9 +420,10 @@ const groupKinds = [
   "party-group-request",
   "party-group-request-withdraw",
   "party-group-request-review",
+  "ship-board-group",
 ];
 const grouped = (text: string) =>
-  /"(groups|groupRequests)":\[|"mainGroup":\{|"(groupId|returnGroupId)":"/.test(text);
+  /"(groups|groupRequests|journeyIds)":\[|"mainGroup":\{|"(groupId|returnGroupId)":"/.test(text);
 /** Whether a table (or a stored backup body) holds split-the-party data. */
 export function hasPartyGroups(table: CloudTable): boolean {
   const w = table.journal?.world;
@@ -433,6 +434,7 @@ export function hasPartyGroups(table: CloudTable): boolean {
     !!w?.characterPositions?.some((s) => s.groupId !== undefined || s.downtime?.returnGroupId !== undefined) ||
     !!w?.journeys?.some((j) => j.groupId !== undefined) ||
     !!table.journal?.fleet?.aboard?.some((a) => a.returnGroupId !== undefined) ||
+    !!(table.journal?.finance as { downtime?: { quote?: { journeys?: unknown } }[] } | undefined)?.downtime?.some((d) => d.quote?.journeys !== undefined) ||
     !!table.journal?.reports?.some((r) => grouped(r.snapshot ?? ""))
   );
 }
@@ -458,6 +460,8 @@ function groupFreeTable(table: CloudTable): CloudTable {
     plainWorld.characterPositions = world.characterPositions.map((s) => {
       if (s.groupId === undefined && s.downtime?.returnGroupId === undefined) return s;
       const plain = { ...s };
+      // A group aboard a ship stays in the party; protocol 9 knows only characters aboard alone.
+      if (s.inParty && journal.fleet?.aboard?.some((a) => a.purseId === s.purseId)) plain.inParty = false;
       delete plain.groupId;
       if (plain.downtime) {
         const downtime = { ...plain.downtime };
@@ -472,10 +476,31 @@ function groupFreeTable(table: CloudTable): CloudTable {
         .filter((j) => j.groupId === undefined);
   }
   const fleet = journal.fleet;
+  const atSea = new Set(
+    (world?.characterPositions ?? []).filter((s) => s.inParty && s.groupId && fleet?.aboard?.some((a) => a.purseId === s.purseId)).map((s) => s.purseId),
+  );
+  const finance = journal.finance as (typeof journal.finance & { downtime?: { quote?: { journeys?: unknown } }[] }) | undefined;
   return {
     ...table,
+    ...(atSea.size
+      ? { purses: table.purses.map((p) => (atSea.has(p.id) && p.control === "npc" ? { ...p, nonParty: true } : p)) }
+      : {}),
     journal: {
       ...journal,
+      // Further groups' journeys in a pending downtime quote (protocol 9 quotes hold one).
+      ...(finance?.downtime?.some((d) => d.quote?.journeys !== undefined)
+        ? {
+            finance: {
+              ...finance,
+              downtime: finance.downtime.map((d) => {
+                if (d.quote?.journeys === undefined) return d;
+                const quote = { ...d.quote };
+                delete quote.journeys;
+                return { ...d, quote };
+              }),
+            } as typeof journal.finance,
+          }
+        : {}),
       ...(plainWorld ? { world: plainWorld } : {}),
       ...(fleet?.aboard?.some((a) => a.returnGroupId !== undefined)
         ? {

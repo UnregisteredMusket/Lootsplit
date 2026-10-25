@@ -14,6 +14,8 @@ import {
 import { courierRecipients, letterCopper, miles } from "./services-courier.ts";
 import { mountLike } from "./mounts.ts";
 import { journeyTravellers, measureJourney, openJourney } from "./journey-engine.ts";
+import { coachGroup } from "./party-groups-journeys.ts";
+import { groupInfo, partySplit } from "./party-groups.ts";
 import {
   isLinkKind,
   readServices,
@@ -323,8 +325,11 @@ export function serviceQuote(
     if (!r.mapId || !r.points || !r.legs) throw Error(`Coach to ${place}: the DM hasn't drawn this route yet.`);
     const map = t.journal?.world?.maps.find((m) => m.id === r.mapId);
     if (!map) throw Error(`Coach to ${place}: the route's map is gone.`);
-    if (openJourney(t as Parameters<typeof openJourney>[0])) throw Error("The party already has a journey planned. Finish or withdraw it first.");
-    const passengers = journeyTravellers(t as Parameters<typeof journeyTravellers>[0]).length;
+    // Split the party: the coach carries the payer's group (the main group for anyone else).
+    const group = coachGroup(t as Parameters<typeof coachGroup>[0], purseId);
+    if (openJourney(t as Parameters<typeof openJourney>[0], group))
+      throw Error(partySplit(t as Parameters<typeof partySplit>[0]) ? `${groupInfo(t as Parameters<typeof groupInfo>[0], group).name} already has a journey planned. Finish or withdraw it first.` : "The party already has a journey planned. Finish or withdraw it first.");
+    const passengers = journeyTravellers(t as Parameters<typeof journeyTravellers>[0], group).length;
     if (!passengers) throw Error("No one in the party can travel.");
     const measured = measureJourney(map, { points: r.points, pace: { preset: "custom", milesPerDay: r.paceMilesPerDay }, forcedMarchHours: 0 } as never);
     const deciMiles = measured.legDeciMiles.reduce((n, l) => n + l, 0);

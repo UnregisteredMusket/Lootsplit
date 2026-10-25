@@ -74,6 +74,8 @@ const lineSchema = z.object({
 export const quoteSchema = z.object({
   /** Party journey (journey planner): optional ration/mount lines and the route position. */
   journey: journeyQuoteSchema.optional(),
+  /** Split the party: other groups' journeys moving in the same window (tabletop protocol 10). */
+  journeys: z.array(journeyQuoteSchema).max(5).optional(),
   downtimeActivities: downtimeActivityQuoteSchema.optional(),
   blacksmith: smithQuoteSchema.optional(),
   /** Workshop commissions (docs/SERVICES.md), beside the forge's. */
@@ -181,6 +183,7 @@ export function previewDowntime(
   estateTime?: import("./estate.ts").EstateTime,
   seasonReceiptId?: string,
   journeyId?: string,
+  journeyIds?: string[],
 ) {
   z.number().int().min(1).max(3650).parse(days);
   const f = readFinance(raw);
@@ -337,8 +340,18 @@ export function previewDowntime(
           balances,
         )
       : undefined;
+  // Split the party: each further journey ticked for this window, paid in order after the first.
+  const journeys =
+    journey && journeyIds?.length
+      ? journeyIds.map((id) =>
+          previewJourney({ ...table, holdings: table.holdings, journal: table.journal }, f.day, days, id, balances),
+        )
+      : undefined;
+  if (journeys && new Set([journey!, ...journeys].map((q) => q.journeyId)).size !== journeys.length + 1)
+    throw Error("Choose each journey once.");
   return quoteSchema.parse({
     ...(journey ? { journey } : {}),
+    ...(journeys ? { journeys } : {}),
     ...(!estateTime
       ? {
           downtimeActivities: previewActivityWindow(
@@ -418,6 +431,7 @@ export function applyDowntime(
     undefined,
     d.quote.tradeSeason?.id,
     d.quote.journey?.journeyId,
+    d.quote.journeys?.map((q) => q.journeyId),
   );
   // An older saved pending quote has no hourly metadata. Compare its original
   // fields, then add the new resource window in the same authoritative approval.
@@ -436,10 +450,16 @@ export function applyDowntime(
     );
   // A journey payer short of coins refuses the whole approval before anything moves.
   assertJourneyPayable(table, quote.journey);
+  for (const q of quote.journeys ?? []) assertJourneyPayable(table, q);
   applyFinanceQuote(table, quote, { id: d.id, name: d.name }, at);
-  if (quote.journey)
-    applyJourney(table, quote.journey, { id: d.id, name: d.name }, at, (purseId, delta, id, summary) =>
-      financeMove(table, purseId, delta, id, summary, at),
+  for (const [i, q] of [...(quote.journey ? [quote.journey] : []), ...(quote.journeys ?? [])].entries())
+    applyJourney(
+      table,
+      q,
+      { id: d.id, name: d.name },
+      at,
+      (purseId, delta, id, summary) => financeMove(table, purseId, delta, id, summary, at),
+      i ? `:${q.journeyId}` : "",
     );
   if (quote.downtimeActivities) {
     const activities = readDowntimeActivities(table.journal!.downtimeActivities);

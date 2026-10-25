@@ -51,6 +51,7 @@ import { defaultLocationMap } from "@/lib/quire/connected-maps";
 import { readTabletopSession } from "@/lib/quire/tabletop";
 import { DEFAULT_TRAVEL } from "@/lib/quire/journey-schema";
 import { journeyPlanHref, legTicks } from "@/lib/quire/journey-ui";
+import { groupInfo, groupPlace, MAIN_GROUP, partySplit, purseGroup, resolveGroup, seatGroups } from "@/lib/quire/party-groups";
 import { useWorldTable } from "@/lib/quire/use-world-table";
 import { Footprints, Lock, Route as RouteIcon, X } from "lucide-react";
 
@@ -62,7 +63,9 @@ const placeName = (t: Pick<CloudTable, "journal">, id?: string | null) =>
 export const journeyTitle = (t: Pick<CloudTable, "journal">, j: Journey) => {
   const from = placeName(t, j.originLocationId),
     to = placeName(t, j.destinationLocationId);
-  return `${from ?? "The party"} → ${to ?? "a point on the map"}`;
+  // Split the party: name the group that travels.
+  const who = partySplit(t) ? `${groupInfo(t, j.groupId ?? MAIN_GROUP).name}: ` : "";
+  return `${who}${from ?? (who ? "here" : "The party")} → ${to ?? "a point on the map"}`;
 };
 const journeyName = (t: Pick<CloudTable, "journal">, j: Journey) =>
   `Journey to ${placeName(t, j.destinationLocationId) ?? "a point on the map"}`.slice(0, 100);
@@ -123,7 +126,7 @@ export function journeyFromDraft(
   t: Table,
   draft: RouteDraft,
   map: CampaignMap,
-  options: { id: string; requestedBy: string; message?: string; base?: Journey },
+  options: { id: string; requestedBy: string; message?: string; base?: Journey; groupId?: string },
 ): Journey {
   const travel = readTravel(t.journal?.world?.travel);
   const first = draft.points[0],
@@ -133,6 +136,7 @@ export function journeyFromDraft(
     id: options.id,
     status: "proposed",
     requestedBy: options.requestedBy,
+    ...((base?.groupId ?? options.groupId) && (base?.groupId ?? options.groupId) !== MAIN_GROUP ? { groupId: base?.groupId ?? options.groupId } : {}),
     ...(options.message !== undefined ? { message: options.message.slice(0, 500) } : {}),
     mapId: map.id,
     points: draft.points.map((p) => ({
@@ -181,12 +185,14 @@ function useJourneyActions() {
   };
   return { busy, error, notice, run, commandOutcome, commandBatch, setError };
 }
-const planCommand = (t: Table, j: Journey, days: number): CommandRequest => ({
+/** `also`: other groups' journeys under way that travel in the same window (split the party). */
+const planCommand = (t: Table, j: Journey, days: number, also: string[] = []): CommandRequest => ({
   id: newCommandId(),
   kind: "downtime-plan",
   name: journeyName(t, j),
   days,
   journeyId: j.id,
+  ...(also.length ? { journeyIds: also } : {}),
 });
 /** The full days still to travel on a journey. */
 const remainingDays = (j: Journey, duration?: number) =>
@@ -208,21 +214,48 @@ export function JourneyPlanActions({
     dm = seat.role === "dm";
   const actions = useJourneyActions();
   const [message, setMessage] = useState("");
-  const open = journeysOf(table).find((j) =>
-    (OPEN_JOURNEY_STATUSES as readonly string[]).includes(j.status),
+  // Split the party: a journey moves one group (the DM chooses; a player plans for their own).
+  const groups = seatGroups(table, seat);
+  const [groupChoice, setGroup] = useState(groups[0] ?? MAIN_GROUP);
+  const group = groups.includes(groupChoice) ? groupChoice : (groups[0] ?? MAIN_GROUP);
+  const split = partySplit(table);
+  const open = journeysOf(table).find(
+    (j) => (OPEN_JOURNEY_STATUSES as readonly string[]).includes(j.status) && (j.groupId ?? MAIN_GROUP) === group,
   );
-  const mine = table.purses.find((p) => p.kind === "character" && seat.purseIds.includes(p.id));
+  const mine =
+    table.purses.find((p) => p.kind === "character" && seat.purseIds.includes(p.id) && resolveGroup(table, purseGroup(table, p.id)) === group && !!purseGroup(table, p.id)) ??
+    table.purses.find((p) => p.kind === "character" && seat.purseIds.includes(p.id));
+  const groupPicker =
+    split && groups.length > 1 ? (
+      <label className="map-route-typed">
+        Journey for
+        <select aria-label="Journey for" value={group} onChange={(e) => setGroup(e.target.value)}>
+          {groups.map((g) => (
+            <option key={g} value={g}>
+              {groupInfo(table, g).name} (group {groupInfo(table, g).letter})
+            </option>
+          ))}
+        </select>
+      </label>
+    ) : split ? (
+      <p className="map-route-help">Journey for {groupInfo(table, group).name}; the other groups stay where they are.</p>
+    ) : null;
   const editable =
     open && (open.status === "proposed" || open.status === "planned") && (dm || open.requestedBy === mine?.id)
       ? open
       : undefined;
   if (open && !editable)
     return (
-      <p className="map-route-help" role="status">
-        {open.status === "active" || open.status === "arrived"
-          ? "The party is already on a journey. Stop it before planning another."
-          : "A journey is already waiting for the DM."}
-      </p>
+      <>
+        {groupPicker}
+        <p className="map-route-help" role="status">
+          {open.status === "active" || open.status === "arrived"
+            ? split
+              ? `${groupInfo(table, group).name} is already on a journey. Stop it before planning another.`
+              : "The party is already on a journey. Stop it before planning another."
+            : "A journey is already waiting for the DM."}
+        </p>
+      </>
     );
   if (draft.points.length < 2) return null;
   if (!dm && !mine) return <p className="map-route-help">Join with a character to propose a journey.</p>;
@@ -232,11 +265,13 @@ export function JourneyPlanActions({
       requestedBy: editable?.requestedBy ?? (dm ? "dm" : mine!.id),
       ...(dm ? (editable?.message !== undefined ? { message: editable.message } : {}) : { message }),
       base: editable,
+      groupId: group,
     });
   const save = (j: Journey) =>
     actions.commandOutcome({ id: newCommandId(), kind: "party-journey", journeyId: j.id, before: editable ?? null, journey: j });
   return (
     <div className="map-journey-actions">
+      {groupPicker}
       {!dm && (
         <label className="map-route-typed">
           Message to the DM (optional)
@@ -351,10 +386,18 @@ export function JourneyReview({
               ? downtimeDays(measureJourney(map, current).durationMinutes)
               : 1
           : nextDays;
-      await actions.commandOutcome(planCommand(table, current, Math.max(1, Math.min(3650, count))));
+      await actions.commandOutcome(planCommand(table, current, Math.max(1, Math.min(3650, count)), also));
+    });
+  // Split the party: one campaign clock. Other groups' journeys under way can travel in this window.
+  const others = journeysOf(table).filter((o) => o.id !== j.id && o.status === "active" && (o.groupId ?? MAIN_GROUP) !== (j.groupId ?? MAIN_GROUP));
+  const also = (preview?.quote.journeys ?? []).map((q) => q.journeyId).filter((id) => others.some((o) => o.id === id));
+  const toggle = (id: string, on: boolean) =>
+    actions.run(async () => {
+      const next = on ? [...also, id] : also.filter((x) => x !== id);
+      await actions.commandOutcome(planCommand(table, j, days, next));
     });
   const holdings = table.holdings.filter(
-    (h) => h.kind === "item" && h.quantity > 0 && (j.frozen?.travellerIds ?? journeyTravellers(table).map((p) => p.id)).concat(table.purses.filter((p) => p.kind === "party").map((p) => p.id)).includes(h.purseId),
+    (h) => h.kind === "item" && h.quantity > 0 && (j.frozen?.travellerIds ?? journeyTravellers(table, j.groupId ?? MAIN_GROUP).map((p) => p.id)).concat(table.purses.filter((p) => p.kind === "party").map((p) => p.id)).includes(h.purseId),
   );
   const mountLike = holdings.filter((h) => isMount(h as typeof h & { category?: string }));
   const mountChoices = mountLike.length ? mountLike : holdings;
@@ -452,6 +495,20 @@ export function JourneyReview({
               </p>
             )}
           </section>
+          {others.length > 0 && (
+            <section aria-label="Other groups travelling">
+              <h3>Other groups travelling</h3>
+              <p className="map-route-help">
+                Time is shared: approving {days} {days === 1 ? "day" : "days"} passes them for every group. Tick the journeys that also travel in this window; the others stay put.
+              </p>
+              {others.map((o) => (
+                <label key={o.id} className="map-journey-share">
+                  <input type="checkbox" checked={also.includes(o.id)} disabled={actions.busy} onChange={(e) => void toggle(o.id, e.target.checked)} />{" "}
+                  {journeyTitle(table, o)} · {Math.round((o.elapsedMinutes / (o.frozen?.durationMinutes ?? 1)) * 100)}% travelled
+                </label>
+              ))}
+            </section>
+          )}
           <section aria-label="Days">
             <h3>Days</h3>
             {duration && (
@@ -710,7 +767,13 @@ export function useMapJourney({
 }) {
   const seat = useSeat(),
     dm = seat.role === "dm";
-  const shown = journeysOf(table).find((j) => ["planned", "active", "arrived"].includes(j.status));
+  // Split the party: each group may have a journey; show the first arrived one (the DM), else the
+  // first of this viewer's groups, else any.
+  const mineFirst = seatGroups(table, seat);
+  const travelling = journeysOf(table)
+    .filter((j) => ["planned", "active", "arrived"].includes(j.status))
+    .sort((a, b) => mineFirst.indexOf(a.groupId ?? MAIN_GROUP) - mineFirst.indexOf(b.groupId ?? MAIN_GROUP));
+  const shown = (dm ? travelling.find((j) => j.status === "arrived") : undefined) ?? travelling[0];
   const onMap = !!shown && shown.mapId === map.id;
   const [panelOpen, setPanelOpen] = useState(false),
     [notYet, setNotYet] = useState("");
@@ -729,7 +792,7 @@ export function useMapJourney({
   const svg = (ps: RoutePoint[]) => ps.map((p) => `${p.x * 1000},${p.y * 1000}`).join(" ");
   const overlay =
     onMap && shown && (shown.points || shown.runs) ? (
-      <svg className="map-route-journey" viewBox="0 0 1000 1000" preserveAspectRatio="none" aria-hidden="true">
+      <svg className={`map-route-journey${partySplit(table) ? ` g-${groupInfo(table, shown.groupId ?? MAIN_GROUP).colour}` : ""}`} viewBox="0 0 1000 1000" preserveAspectRatio="none" aria-hidden="true">
         {shown.status === "planned" && shown.points ? (
           <polyline className="map-route-ahead" points={svg(shown.points)} />
         ) : travelled ? (
@@ -761,6 +824,7 @@ export function useMapJourney({
         onClick={() => setPanelOpen(true)}
       >
         <strong>
+          {partySplit(table) ? `${groupInfo(table, shown.groupId ?? MAIN_GROUP).name} · ` : ""}
           {statusText}
           <span className="map-journey-chip-percent">{Math.round(progress * 100)}%</span>
         </strong>
@@ -963,7 +1027,10 @@ export function JourneyStatusCard({
 function ArrivalDialog({ table, journey: j, notYet }: { table: Table; journey: Journey; notYet: () => void }) {
   const actions = useJourneyActions();
   const to = placeName(table, j.destinationLocationId);
-  const market = readMarketLocations(table.journal?.market);
+  // Split the party: the journey's own group moves in (group A uses the party's place, as before).
+  const group = j.groupId && j.groupId !== MAIN_GROUP ? j.groupId : undefined;
+  const place = groupPlace(table, group);
+  const who = partySplit(table) ? groupInfo(table, group).name : "the party";
   const open = table.shops.filter((s) => s.locationId === j.destinationLocationId && !s.closed);
   const [show, setShow] = useState(false);
   const scene = j.destinationLocationId
@@ -973,10 +1040,12 @@ function ArrivalDialog({ table, journey: j, notYet }: { table: Table; journey: J
       )
     : undefined;
   return (
-    <Modal open onOpenChange={(o) => !o && notYet()} title="Move party here?">
-      <p>The party has reached {to ?? "the end of its route"} on the frozen route.</p>
+    <Modal open onOpenChange={(o) => !o && notYet()} title={group || partySplit(table) ? `Move ${who} here?` : "Move party here?"}>
+      <p>
+        {who[0]!.toUpperCase() + who.slice(1)} has reached {to ?? "the end of its route"} on the frozen route.
+      </p>
       <ul className="map-journey-lines">
-        {to && <li>Party location becomes {to} (the existing Move party here).</li>}
+        {to && <li>{partySplit(table) ? `${who}'s place` : "Party location"} becomes {to} (the existing Move party here).</li>}
         {open.length > 0 && <li>Shops there follow their schedules: {open.map((s) => s.name).join(", ")} open today.</li>}
         <li>The journey is marked complete in the journal.</li>
         <li>No time passes and nothing is charged: that was settled in the approved downtime.</li>
@@ -1001,12 +1070,11 @@ function ArrivalDialog({ table, journey: j, notYet }: { table: Table; journey: J
               await actions.commandOutcome({
                 id: newCommandId(),
                 kind: "party-location",
+                ...(group ? { groupId: group } : {}),
                 journeyId: j.id,
-                before: market.currentLocationId,
+                before: place.locationId,
                 locationId: j.destinationLocationId!,
-                beforePosition: table.journal?.world?.partyPosition
-                  ? canonicalJson(table.journal.world.partyPosition)
-                  : undefined,
+                beforePosition: place.position ? canonicalJson(place.position) : undefined,
               });
               if (!show || !scene) return;
               const session = readTabletopSession(table);
@@ -1025,7 +1093,7 @@ function ArrivalDialog({ table, journey: j, notYet }: { table: Table; journey: J
             })
           }
         >
-          Move party here
+          {partySplit(table) ? `Move ${who} here` : "Move party here"}
         </Button>
       </div>
       <p className="map-route-help">

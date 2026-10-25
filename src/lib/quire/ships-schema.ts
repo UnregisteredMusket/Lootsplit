@@ -250,6 +250,17 @@ export const shipCommands = [
   z
     .object({
       id,
+      /** Split the party (tabletop protocol 10): a whole group boards or lands together and stays in the party. */
+      kind: z.literal("ship-board-group"),
+      propertyId: id,
+      groupId: id,
+      action: z.enum(["board", "disembark"]),
+      before: z.string(),
+    })
+    .strict(),
+  z
+    .object({
+      id,
       kind: z.literal("ship-board"),
       propertyId: id,
       purseId: id,

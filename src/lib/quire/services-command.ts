@@ -15,6 +15,8 @@ import { rumourQuote, serviceQuote, serviceSummary } from "./services.ts";
 import { deliverLetter } from "./services-courier.ts";
 import { journeySchema } from "./journey-schema.ts";
 import { openJourney } from "./journey-engine.ts";
+import { coachGroup } from "./party-groups-journeys.ts";
+import { MAIN_GROUP } from "./party-groups.ts";
 import { validateServices } from "./services-validation.ts";
 
 // Authoritative service commands (docs/SERVICES.md). Every coin movement is one financeMove with
@@ -138,7 +140,8 @@ export function applyServiceCommand(t: CloudTable, seat: CloudSeat, cmd: Service
       // A coach booking is a party journey request with a fare line, created in this command.
       const r = q.provider.routes!.find((x) => x.key === q.terms.route!.key)!;
       const w = t.journal!.world!;
-      if (openJourney(t)) throw Error("The party already has a journey planned. Finish or withdraw it first.");
+      const group = coachGroup(t, cmd.purseId);
+      if (openJourney(t, group)) throw Error("The party already has a journey planned. Finish or withdraw it first.");
       const map = w.maps.find((m) => m.id === r.mapId)!;
       const anchored = (locationId?: string | null) =>
         locationId && map.anchors.some((a) => a.locationId === locationId) ? locationId : null;
@@ -146,6 +149,7 @@ export function applyServiceCommand(t: CloudTable, seat: CloudSeat, cmd: Service
         id: `${cmd.id}-journey`,
         status: "proposed",
         requestedBy: seat.role === "dm" ? "dm" : cmd.purseId,
+        ...(group !== MAIN_GROUP ? { groupId: group } : {}),
         message: `Coach booked with ${q.terms.npcName}, ${q.terms.shopName}.`,
         mapId: r.mapId,
         points: r.points,
