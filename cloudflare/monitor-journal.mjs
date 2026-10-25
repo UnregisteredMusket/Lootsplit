@@ -996,7 +996,7 @@ async function updateDiagnostics(db, snapshot, now, settings) {
 export async function monitorSnapshot(
   env,
   userId,
-  { force = false, now = Date.now(), collector = collectOwnerMonitor } = {},
+  { force = false, now = Date.now(), collector = collectOwnerMonitor, budgetMs = 0, defer = null } = {},
 ) {
   const db = env.DB,
     settings = await initializeMonitor(db, now);
@@ -1007,7 +1007,14 @@ export async function monitorSnapshot(
   if (!force && previous && now - previous.collected_at < 60000)
     snapshot = { ...decode(previous), snapshotId: previous.revision };
   else {
-    const observed = await collector(env, userId);
+    // A request-path collection (budgetMs) keeps a slow provider's previous validated reading
+    // instead of holding the response; see withinBudget in owner-monitor.mjs.
+    const observed = await collector(env, userId, {
+      budgetMs: force ? 0 : budgetMs,
+      defer,
+      now,
+      previous: decode(previous),
+    });
     const diagnostics = await updateDiagnostics(db, observed, now, settings);
     const task = await currentTask(db, now, settings, observed.development ?? null);
     const interval = await db

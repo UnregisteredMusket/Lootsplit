@@ -334,12 +334,45 @@ export async function authorizeOwner(env, userId, sessionId) {
   if (!session)
     throw Object.assign(new Error("Sign in again to view monitoring."), { status: 401 });
 }
-export async function collectOwnerMonitor(env, userId) {
+/**
+ * Longest a request-path collection waits for a slow provider (GitHub, Cloudflare GraphQL) before it
+ * keeps that provider's previous validated reading. Installed widgets (1.10.0–1.12.0) give up after
+ * a 3 s read timeout; GitHub alone took 1.7–4.6 s per request-path collection on 2026-10-24/25.
+ */
+export const REQUEST_PROVIDER_BUDGET_MS = 1200;
+/** A previous provider reading older than this is never reused; the live read is awaited instead. */
+export const REUSE_MAX_AGE_MS = 35 * 60000;
+/**
+ * Waits at most `budgetMs` for a provider reading. When it is late and the previous snapshot holds a
+ * validated ("ready") reading of the same provider no older than REUSE_MAX_AGE_MS, that reading is
+ * used with its own original `checkedAt` and `reused: true`, so its age stays visible. The late read
+ * keeps running through `defer` (waitUntil), which fills the per-isolate provider cache for the next
+ * request. Without a budget, or with no reusable reading, this is the plain awaited read.
+ */
+export function withinBudget(read, earlier, { budgetMs = 0, defer = null, now = Date.now() } = {}) {
+  const reusable =
+    budgetMs > 0 &&
+    earlier?.state === "ready" &&
+    Number.isFinite(earlier.checkedAt) &&
+    now - earlier.checkedAt <= REUSE_MAX_AGE_MS &&
+    earlier.checkedAt <= now + 60000;
+  if (!reusable) return read;
+  let timer;
+  const late = new Promise((resolve) => {
+    timer = setTimeout(() => {
+      if (defer) defer(read.catch(() => null));
+      resolve({ ...earlier, reused: true });
+    }, budgetMs);
+  });
+  return Promise.race([read, late]).finally(() => clearTimeout(timer));
+}
+export async function collectOwnerMonitor(env, userId, options = {}) {
+  const earlier = options.previous || {};
   const [health, analytics, development, traffic, release] = await Promise.all([
     serverMonitor(env, userId),
     capture(() => ownerAnalytics(env.DB, userId)),
-    developmentActivity(env),
-    cloudflareTraffic(env),
+    withinBudget(developmentActivity(env), earlier.development, options),
+    withinBudget(cloudflareTraffic(env), earlier.traffic, options),
     capture(async () => {
       if (!env.ASSETS) throw new Error("No release binding");
       const response = await env.ASSETS.fetch(
@@ -353,7 +386,8 @@ export async function collectOwnerMonitor(env, userId) {
   ]);
   return { checkedAt: Date.now(), health, analytics, development, traffic, release };
 }
-export async function ownerMonitor(env, userId, sessionId, request) {
+/** `context` is the Worker ExecutionContext (waitUntil), when the caller has one. */
+export async function ownerMonitor(env, userId, sessionId, request, context = null) {
   await authorizeOwner(env, userId, sessionId);
   const device = request?.headers.get("x-lootsplit-device");
   if (device && /^[a-f0-9-]{36}$/.test(device)) {
@@ -374,14 +408,21 @@ export async function ownerMonitor(env, userId, sessionId, request) {
     );
   }
   const { monitorSnapshot } = await import("./monitor-journal.mjs");
-  const snapshot = await monitorSnapshot(env, userId);
+  const view = request?.url ? new URL(request.url).searchParams.get("view") : null;
+  // The widget view must answer inside the installed widgets' 3 s read timeout, so a slow provider
+  // keeps its previous validated reading (dated, marked reused) and finishes in the background.
+  const defer = typeof context?.waitUntil === "function" ? (p) => context.waitUntil(p) : null;
+  const snapshot = await monitorSnapshot(
+    env,
+    userId,
+    view === "widget" ? { budgetMs: REQUEST_PROVIDER_BUDGET_MS, defer } : {},
+  );
   // Role, account and session revocations during provider reads must fail closed.
   await authorizeOwner(env, userId, sessionId);
   const account = await env.DB.prepare("SELECT name,email FROM user WHERE id=?")
     .bind(userId)
     .first();
   if (!account) throw Object.assign(new Error("Sign in again."), { status: 401 });
-  const view = request?.url ? new URL(request.url).searchParams.get("view") : null;
   return view === "widget" ? widgetSnapshot({ ...snapshot, account }) : { ...snapshot, account };
 }
 /**

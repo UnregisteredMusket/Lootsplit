@@ -1,0 +1,8 @@
+{
+  "title": "Owner widget refreshes reliably",
+  "summary": "The owner's Android Field monitor no longer times out on most refreshes.",
+  "items": [
+    "A widget refresh now answers within about a second. If GitHub or Cloudflare traffic is slow, the widget keeps that source's previous reading, shown with its own time, and the next refresh picks up the new one.",
+    "Service checks and app statistics are still read fresh on every refresh."
+  ]
+}

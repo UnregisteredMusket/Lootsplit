@@ -55,7 +55,7 @@ export default {
         }),
         env,
       );
-    const accountResponse = await handleAccounts(request, env);
+    const accountResponse = await handleAccounts(request, env, context);
     if (accountResponse) return accountResponse;
     globalThis.__env__ = env;
     return releaseResponse(
