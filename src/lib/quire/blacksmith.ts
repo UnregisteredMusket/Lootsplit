@@ -1,6 +1,5 @@
 import type { CloudTable } from "./cloud.ts";
 import { shopVisible } from "./vendors.ts";
-import { actingGroups } from "./party-groups.ts";
 import {
   assertContribution,
   money as serviceMoney,
@@ -36,7 +35,8 @@ export function smithEnchantments(p: SmithProfile) {
 export function smithAvailability(t: Table, p: SmithProfile, purseId: string) {
   const shop = t.shops.find((s) => s.id === p.shopId),
     npc = t.journal?.world?.npcs.find((n) => n.id === p.npcId);
-  if (!shop || !shopVisible(shop, t, actingGroups(t, purseId)) || shop.closed)
+  // Any group's place; whether this purse is at the forge is checked by smithHere.
+  if (!shop || !shopVisible(shop, t) || shop.closed)
     return "The smith's shop is closed or unavailable.";
   if (!npc?.blacksmithServices) return "The DM has not enabled this NPC's blacksmith services.";
   if (!npcAtShop(t, npc.id, shop.locationId))

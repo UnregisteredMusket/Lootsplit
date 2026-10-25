@@ -2,7 +2,6 @@ import type { CloudTable } from "./cloud.ts";
 import { toCopper, formatCopper } from "./money.ts";
 import { locationPath, readMarketLocations } from "./shop-locations.ts";
 import { shopVisible } from "./vendors.ts";
-import { actingGroups } from "./party-groups.ts";
 import {
   assertHeldItem,
   assertContribution,
@@ -90,7 +89,8 @@ export function providerLock(t: Table, p: ServiceProvider, purseId: string | und
   if (!npc.services?.includes(p.kind))
     return `${npc.name} doesn't offer ${serviceKindNames[p.kind].toLowerCase()} services right now.`;
   if (p.kind === "fence" && !blackMarketOn(t)) return `${npc.name} isn't dealing right now.`;
-  if (!shop || !shopVisible(shop, t, actingGroups(t, purseId)) || shop.closed) return `${shop?.name ?? p.name} is closed.`;
+  // "Closed" means no group can reach it; whether this purse is there is checked by presentAt.
+  if (!shop || !shopVisible(shop, t) || shop.closed) return `${shop?.name ?? p.name} is closed.`;
   if (!npcAtShop(t, npc.id, shop.locationId)) return `${npc.name} isn't at ${shop.name}.`;
   const payer = t.purses.find((x) => x.id === purseId);
   if (!presentAt(t, shop.locationId!, purseId))

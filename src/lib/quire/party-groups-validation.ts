@@ -37,7 +37,14 @@ export function validatePartyGroups(t: CloudTable, projected = false) {
     if (!projected && s.downtime?.returnGroupId && !ids.has(s.downtime.returnGroupId))
       throw Error("A character's downtime return group is missing.");
   }
-  if (!projected && active.some((g) => !members.get(g.id))) throw Error("Every group needs at least one character.");
+  // Characters on downtime or aboard alone count for the group they will return to.
+  for (const s of w.characterPositions)
+    if (s.downtime?.returnInParty && s.downtime.returnGroupId)
+      members.set(s.downtime.returnGroupId, (members.get(s.downtime.returnGroupId) ?? 0) + 1);
+  for (const a of t.journal?.fleet?.aboard ?? [])
+    if (a.returnInParty && a.returnGroupId) members.set(a.returnGroupId, (members.get(a.returnGroupId) ?? 0) + 1);
+  if (!projected && active.some((g) => !members.get(g.id)))
+    throw Error("A group can't be left empty. Merge it, or move a character into it first.");
   if (!projected)
     for (const a of t.journal?.fleet?.aboard ?? [])
       if (a.returnGroupId && !ids.has(a.returnGroupId)) throw Error("An aboard character's return group is missing.");
