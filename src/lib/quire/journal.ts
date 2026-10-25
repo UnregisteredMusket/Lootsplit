@@ -387,6 +387,12 @@ export function preserveJournalMetadata(value: unknown, current: Journal): Journ
             // Journeys and travel settings change only through their commands.
             ...(current.world?.journeys ? { journeys: current.world.journeys } : {}),
             ...(current.world?.travel ? { travel: current.world.travel } : {}),
+            // Split the party: groups change only through their commands, and an older app
+            // (tabletop protocol 9) writing positions back keeps each character's group.
+            ...(current.world?.groups ? { groups: current.world.groups } : {}),
+            ...(current.world?.mainGroup ? { mainGroup: current.world.mainGroup } : {}),
+            ...(current.world?.groupRequests ? { groupRequests: current.world.groupRequests } : {}),
+            characterPositions: keepGroups(next.world.characterPositions ?? [], current.world?.characterPositions ?? []),
             maps: next.world.maps.map((map) => {
               const old = current.world?.maps.find((m) => m.id === map.id);
               if (old?.connected) map.connected = old.connected;
@@ -452,5 +458,19 @@ export function preserveJournalMetadata(value: unknown, current: Journal): Journ
         ...(privateEvents.has(event.id) ? { dmOnly: true } : {}),
       };
     }),
+  });
+}
+
+type StoredPosition = NonNullable<NonNullable<Journal["world"]>["characterPositions"]>[number];
+/** Positions written back without group fields keep the stored group when nothing else moved. */
+function keepGroups(next: StoredPosition[], current: StoredPosition[]): StoredPosition[] {
+  return next.map((s) => {
+    const old = current.find((o) => o.purseId === s.purseId);
+    if (!old || s.groupId !== undefined) return s;
+    const kept = { ...s };
+    if (old.groupId && s.inParty && old.inParty) kept.groupId = old.groupId;
+    if (kept.downtime && old.downtime?.returnGroupId && kept.downtime.returnGroupId === undefined && kept.downtime.id === old.downtime.id)
+      kept.downtime = { ...kept.downtime, returnGroupId: old.downtime.returnGroupId };
+    return kept;
   });
 }

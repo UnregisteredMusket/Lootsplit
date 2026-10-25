@@ -53,8 +53,19 @@ export const SERVICES_PROTOCOL = 8;
  * and their pending drafts with wave-2 service data ask them to finish on the updated website.
  */
 export const SERVICES_WAVE2_PROTOCOL = 9;
+/**
+ * Protocol 10 (2026-10-25, split the party): the world may carry party `groups`, a `mainGroup`
+ * label and `groupRequests`; character positions a `groupId` (and downtime a `returnGroupId`),
+ * journeys a `groupId` and aboard records a `returnGroupId`. Older clients have strict world,
+ * position, journey and fleet schemas, so protocols 0-9 receive the table without them (also
+ * inside archived reports) and see every party member at the main group's place. Their
+ * whole-journal writes keep the stored groups (journal.ts), the server refuses their actions for
+ * characters outside the main group with an update message (`refuseOldClientGroupActions`), and
+ * pending drafts with group commands ask them to finish on the updated website.
+ */
+export const PARTY_GROUPS_PROTOCOL = 10;
 /** The protocol current clients declare. */
-export const CURRENT_TABLETOP_PROTOCOL = SERVICES_WAVE2_PROTOCOL;
+export const CURRENT_TABLETOP_PROTOCOL = PARTY_GROUPS_PROTOCOL;
 /** Server-only, non-enumerable: inline image -> its stored reference for this room read. */
 export const ROOM_IMAGE_SOURCES_KEY = Symbol.for("lootsplit.room-view-image-sources");
 
@@ -400,7 +411,121 @@ export function legacyTabletopMap(map: CampaignMap): CampaignMap {
 export function legacyTabletopTable(table: CloudTable): CloudTable {
   return tableForProtocol(table, 0);
 }
+// Protocol 10 (split the party).
+const groupKinds = [
+  "party-split",
+  "party-group-edit",
+  "party-group-assign",
+  "party-merge",
+  "party-group-request",
+  "party-group-request-withdraw",
+  "party-group-request-review",
+];
+const grouped = (text: string) =>
+  /"(groups|groupRequests)":\[|"mainGroup":\{|"(groupId|returnGroupId)":"/.test(text);
+/** Whether a table (or a stored backup body) holds split-the-party data. */
+export function hasPartyGroups(table: CloudTable): boolean {
+  const w = table.journal?.world;
+  return (
+    w?.groups !== undefined ||
+    w?.mainGroup !== undefined ||
+    w?.groupRequests !== undefined ||
+    !!w?.characterPositions?.some((s) => s.groupId !== undefined || s.downtime?.returnGroupId !== undefined) ||
+    !!w?.journeys?.some((j) => j.groupId !== undefined) ||
+    !!table.journal?.fleet?.aboard?.some((a) => a.returnGroupId !== undefined) ||
+    !!table.journal?.reports?.some((r) => grouped(r.snapshot ?? ""))
+  );
+}
+/** The table as protocol 9 reads it: one party at the main group's place. */
+function groupFreeTable(table: CloudTable): CloudTable {
+  if (!hasPartyGroups(table)) return table;
+  const journal = table.journal!;
+  const world = journal.world;
+  const reports = journal.reports?.map((report) => {
+    if (!grouped(report.snapshot ?? "")) return report;
+    try {
+      return { ...report, snapshot: JSON.stringify(groupFreeTable(JSON.parse(report.snapshot))) };
+    } catch {
+      return report; // Preserve existing unreadable-archive evidence for the recovery reader.
+    }
+  });
+  let plainWorld = world;
+  if (world) {
+    plainWorld = { ...world };
+    delete plainWorld.groups;
+    delete plainWorld.mainGroup;
+    delete plainWorld.groupRequests;
+    plainWorld.characterPositions = world.characterPositions.map((s) => {
+      if (s.groupId === undefined && s.downtime?.returnGroupId === undefined) return s;
+      const plain = { ...s };
+      delete plain.groupId;
+      if (plain.downtime) {
+        const downtime = { ...plain.downtime };
+        delete downtime.returnGroupId;
+        plain.downtime = downtime;
+      }
+      return plain;
+    });
+    // Another group's journeys would break "one open journey" for older apps.
+    if (world.journeys)
+      plainWorld.journeys = world.journeys
+        .filter((j) => j.groupId === undefined);
+  }
+  const fleet = journal.fleet;
+  return {
+    ...table,
+    journal: {
+      ...journal,
+      ...(plainWorld ? { world: plainWorld } : {}),
+      ...(fleet?.aboard?.some((a) => a.returnGroupId !== undefined)
+        ? {
+            fleet: {
+              ...fleet,
+              aboard: fleet.aboard.map((a) => {
+                if (a.returnGroupId === undefined) return a;
+                const plain = { ...a };
+                delete plain.returnGroupId;
+                return plain;
+              }),
+            },
+          }
+        : {}),
+      ...(reports ? { reports } : {}),
+    },
+  };
+}
+/** Whether a pending command (as JSON) carries split-the-party data older apps can't read. */
+export function groupCommandText(c: { kind?: unknown }) {
+  return (typeof c.kind === "string" && groupKinds.includes(c.kind)) || grouped(JSON.stringify(c));
+}
+/**
+ * Protocol 9 and older apps act as if the party were whole. While it is split, the server
+ * refuses their actions for a character outside the main group (the acting character, the
+ * paying purse or the owner of the item), with an update message. Nothing is changed.
+ */
+export function refuseOldClientGroupActions(
+  table: Pick<CloudTable, "journal" | "purses" | "holdings">,
+  commands: { kind: string }[],
+) {
+  const w = table.journal?.world;
+  if (!w?.groups?.some((g) => g.status === "active")) return;
+  for (const c of commands) {
+    const fields = c as Record<string, unknown>;
+    const ids = [fields.purseId, fields.actorId, fields.payerId, fields.senderId, fields.trainerId]
+      .concat(typeof fields.holdingId === "string" ? [table.holdings.find((h) => h.id === fields.holdingId)?.purseId] : [])
+      .filter((id): id is string => typeof id === "string");
+    for (const id of ids) {
+      const s = w.characterPositions.find((x) => x.purseId === id);
+      if (s?.inParty && s.groupId && w.groups.some((g) => g.id === s.groupId && g.status === "active")) {
+        const name = table.purses.find((p) => p.id === id)?.name ?? "this character";
+        throw Error(`The party is split into groups. Update Lootsplitter to act for ${name}.`);
+      }
+    }
+  }
+}
 export function tableForProtocol(table: CloudTable, protocol = 0): CloudTable {
+  if (protocol >= PARTY_GROUPS_PROTOCOL) return table;
+  table = groupFreeTable(table);
   if (protocol >= SERVICES_WAVE2_PROTOCOL) return table;
   table = wave1Table(table);
   if (protocol >= SERVICES_PROTOCOL) return table;
@@ -478,12 +603,15 @@ export function tabletopResponse<T extends { table: CloudTable; draft: string }>
   value: T,
   protocol?: number,
 ): T {
-  if (protocol && protocol >= SERVICES_WAVE2_PROTOCOL) return withImageReferences(value);
+  if (protocol && protocol >= PARTY_GROUPS_PROTOCOL) return withImageReferences(value);
   const draft: unknown = JSON.parse(value.draft);
   if (
     Array.isArray(draft) &&
     draft.some((c) => {
       if (!c || typeof c !== "object") return false;
+      // Protocol 10: split-the-party commands and group fields older apps cannot read.
+      if (groupCommandText(c)) return true;
+      if (protocol && protocol >= SERVICES_WAVE2_PROTOCOL) return false;
       // Protocol 9: wave-2 service kinds and fields older apps cannot read.
       if (
         ((typeof c.kind === "string" && c.kind.startsWith("service-")) ||

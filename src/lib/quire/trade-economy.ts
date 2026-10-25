@@ -1,5 +1,6 @@
 import { assertNotPooled } from "./custody.ts";
 import { assertShipTradingHere } from "./ships.ts";
+import { actingGroups, groupMarket, groupRefs } from "./party-groups.ts";
 import type { CloudSeat, CloudTable } from "./cloud.ts";
 import type { Holding } from "./types.ts";
 import { canonicalJson } from "./canonical-json.ts";
@@ -44,13 +45,20 @@ export function randomTradeRoll(): number {
   return (n % 100) + 1;
 }
 
-export function exchangeHere(table: Pick<CloudTable, "journal">, exchange: Exchange): boolean {
-  const locations = readMarketLocations(table.journal?.market);
-  if (!exchange.locationId) return !!globalMarketCity(locations);
-  return (
-    !!locations.currentLocationId &&
-    locationPath(locations, locations.currentLocationId).some((l) => l.id === exchange.locationId)
-  );
+/** The exchange is reachable from the place of one of `groups` (default: any group). */
+export function exchangeHere(
+  table: Pick<CloudTable, "journal">,
+  exchange: Exchange,
+  groups: string[] = groupRefs(table),
+): boolean {
+  return groups.some((g) => {
+    const locations = groupMarket(table, g);
+    if (!exchange.locationId) return !!globalMarketCity(locations);
+    return (
+      !!locations.currentLocationId &&
+      locationPath(locations, locations.currentLocationId).some((l) => l.id === exchange.locationId)
+    );
+  });
 }
 
 export function validateTradeEconomy(
@@ -456,7 +464,7 @@ export function executeExchange(
         (l) => l.id === exchange.locationId,
       )
       : !!globalMarketCity({ ...readMarketLocations(table.journal?.market), currentLocationId: manager.locationId }));
-  if (!input.overrideLocation && !(manager ? managerHere : exchangeHere(table, exchange)))
+  if (!input.overrideLocation && !(manager ? managerHere : exchangeHere(table, exchange, actingGroups(table, input.purseId, seat.role === "dm" ? undefined : seat.purseIds))))
     throw Error(exchange.locationId ? "Visit the exchange's location to trade." : "Visit a city to access the global commodity exchange.");
   if (seat.role === "player" && !manager) assertShipTradingHere(table, input.purseId);
   const payer = table.purses.find((p) => p.id === input.purseId);

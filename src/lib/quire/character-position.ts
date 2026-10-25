@@ -4,6 +4,7 @@ import { type CharacterPosition, type WorldCommand } from "./world-schema.ts";
 import { readMarketLocations, locationPath } from "./shop-locations.ts";
 import { canonicalJson } from "./canonical-json.ts";
 import { characterSheet, statsOnly } from "../characters/campaign-sheet.mjs";
+import { activeGroups, groupPlace, MAIN_GROUP, resolveGroup, seatGroups, withoutGroupFields } from "./party-groups.ts";
 
 type Table = Pick<CloudTable, "purses" | "journal">;
 export function characterPosition(t: Table, p: Purse): CharacterPosition {
@@ -22,7 +23,8 @@ export function inParty(t: Table, p: Purse) {
 export function characterLocation(t: Table, p: Purse) {
   const s = characterPosition(t, p);
   if (s.shipId) return s.locationId;
-  return s.inParty ? readMarketLocations(t.journal?.market).currentLocationId : s.locationId;
+  // Split the party: a character in the party is wherever its group is (main = the party's place).
+  return s.inParty ? groupPlace(t, resolveGroup(t, s.groupId)).locationId : s.locationId;
 }
 export function characterVisible(t: Table, p: Purse) {
   return characterPosition(t, p).visible;
@@ -85,10 +87,12 @@ export function canReadCharacter(t: Table, p: Purse, seat: Pick<CloudSeat, "role
       !!p.sheet &&
       (s.inParty ||
         (!!characterLocation(t, p) &&
-          locationPath(
-            readMarketLocations(t.journal?.market),
-            readMarketLocations(t.journal?.market).currentLocationId,
-          ).some((l) => l.id === characterLocation(t, p)))))
+          // Any place where one of the seat's groups is (the party's place when not split).
+          seatGroups(t, seat).some((g) =>
+            locationPath(readMarketLocations(t.journal?.market), groupPlace(t, g).locationId).some(
+              (l) => l.id === characterLocation(t, p),
+            ),
+          ))))
   );
 }
 export function campaignMinute(t: Pick<CloudTable, "journal">) {
@@ -105,6 +109,13 @@ function place(t: CloudTable, s: CharacterPosition) {
   w.characterPositions = w.characterPositions.filter((old) => old.purseId !== s.purseId);
   const {shipId,shipReturnInParty,...stored}=s;
   void shipId; void shipReturnInParty;
+  // A group belongs only to characters in the party; the main group is stored as no groupId.
+  if (!stored.inParty || !stored.groupId || stored.groupId === MAIN_GROUP) delete stored.groupId;
+  if (stored.downtime && !stored.downtime.returnGroupId) {
+    const { returnGroupId: _unused, ...downtime } = stored.downtime;
+    void _unused;
+    stored.downtime = downtime;
+  }
   w.characterPositions.push(stored);
   const n = w.npcs.find((n) => n.id === p.id);
   if (n) {
@@ -113,6 +124,15 @@ function place(t: CloudTable, s: CharacterPosition) {
     if (s.locationId) n.locationId = s.locationId;
   }
 }
+/**
+ * Split the party: the group a character returns to after downtime — the group it left if that
+ * group is still active, otherwise the group it merged into, otherwise the main group.
+ */
+function returnGroup(t: CloudTable, d: NonNullable<CharacterPosition["downtime"]>) {
+  if (!d.returnInParty) return undefined;
+  const g = resolveGroup(t, d.returnGroupId);
+  return g === MAIN_GROUP || !activeGroups(t).some((x) => x.id === g) ? undefined : g;
+}
 export function completeCharacterDowntime(t: CloudTable, at: number) {
   for (const s of finishingCharacters(t, campaignMinute(t))) {
     const d = s.downtime!;
@@ -120,6 +140,7 @@ export function completeCharacterDowntime(t: CloudTable, at: number) {
       ...s,
       inParty: d.returnInParty,
       locationId: d.returnLocationId,
+      groupId: returnGroup(t, d),
       downtime: undefined,
     });
     t.journal!.events.push({
@@ -150,8 +171,12 @@ export function applyCharacterPosition(
   if (!p || t.journal?.tradeEconomy?.exchanges.some((e) => e.purseId === p.id))
     throw Error("Choose an existing character or NPC.");
   const s = characterPosition(t, p);
-  if (canonicalJson(s) !== canonicalJson(cmd.before))
+  if (canonicalJson(s) !== canonicalJson(cmd.before)) {
+    // An app older than split-the-party (tabletop protocol 9) sends the placement without its group.
+    if ((s.groupId || s.downtime?.returnGroupId) && canonicalJson(withoutGroupFields(s)) === canonicalJson(cmd.before))
+      throw Error(`The party is split into groups. Update Lootsplitter to act for ${p.name}.`);
     throw Error("This character's placement changed. Reload before saving.");
+  }
   if (
     t.journal?.finance?.downtime.some((d) => d.status === "pending") &&
     (cmd.kind !== "character-position" ||
@@ -207,6 +232,7 @@ export function applyCharacterPosition(
         finishMinute: start + duration,
         returnInParty: s.inParty,
         returnLocationId: s.locationId,
+        ...(s.inParty && s.groupId ? { returnGroupId: s.groupId } : {}),
       },
     });
   } else if (cmd.kind === "character-downtime-cancel") {
@@ -215,6 +241,7 @@ export function applyCharacterPosition(
       ...s,
       inParty: s.downtime.returnInParty,
       locationId: s.downtime.returnLocationId,
+      groupId: returnGroup(t, s.downtime),
       downtime: undefined,
     });
   }

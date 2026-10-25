@@ -1,6 +1,7 @@
 import type { CloudTable } from "./cloud.ts";
 import { canonicalJson } from "./canonical-json.ts";
 import { characterLocation, characterPosition } from "./character-position.ts";
+import { partyPlaces } from "./party-groups.ts";
 import { locationPath, readMarketLocations } from "./shop-locations.ts";
 import { assertCarried } from "./custody.ts";
 import type { Holding } from "./types.ts";
@@ -35,8 +36,9 @@ export function presentAt(t: Pick<CloudTable, "journal" | "purses">, locationId:
     )
   )
     return false;
-  const location = p.kind === "character" ? characterLocation(t, p) : m.currentLocationId;
-  return !!location && locationPath(m, location).some((l) => l.id === locationId);
+  // Party funds are shared by every group (split the party): present wherever a group is.
+  const locations = p.kind === "character" ? [characterLocation(t, p)] : partyPlaces(t);
+  return locations.some((location) => !!location && locationPath(m, location).some((l) => l.id === locationId));
 }
 
 /** The provider NPC is visible, not on downtime and standing at (or inside) the shop's location. */

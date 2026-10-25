@@ -15,7 +15,8 @@ import { actionDigest, commandIdentity } from "./command-identity.ts";
 import { ensureCityExchanges } from "./city-exchanges.ts";
 import { canonicalJson } from "./canonical-json.ts";
 import { validateShopLocations } from "./shop-locations.ts";
-import { propertyAvailableHere } from "./property.ts";
+import { propertyAvailableToGroups } from "./property.ts";
+import { actingGroups } from "./party-groups.ts";
 import { readMarketLocations } from "./shop-locations.ts";
 import { locationLabel } from "./shop-locations.ts";
 import { transferPropertyDeed } from "./property-deed.ts";
@@ -1287,7 +1288,8 @@ export async function buyFromShop(
     );
     if (
       (shop.blackMarket && !journal.world?.blackMarketActive) ||
-      (getSeat().role === "player" && !shopVisible(shop, { journal }))
+      (getSeat().role === "player" &&
+        !shopVisible(shop, { journal }, actingGroups({ journal, purses: [purse] }, purse.id, getSeat().purseIds)))
     )
       throw Error("This vendor is not available at the current location.");
     if (shop.closed) throw new Error("This shop is closed.");
@@ -1391,9 +1393,15 @@ export async function sellToShop(
       (await request<{ value: unknown } | undefined>(tx.objectStore("meta").get("journal")))?.value,
     );
     await assertPlayerTrade(tx, holding.purseId, journal);
+    const seller = await request<Purse | undefined>(tx.objectStore("purses").get(holding.purseId));
     if (
       (shop.blackMarket && !journal.world?.blackMarketActive) ||
-      (getSeat().role === "player" && !shopVisible(shop, { journal }))
+      (getSeat().role === "player" &&
+        !shopVisible(
+          shop,
+          { journal },
+          actingGroups({ journal, purses: seller ? [seller] : [] }, holding.purseId, getSeat().purseIds),
+        ))
     )
       throw Error("This vendor is not available at the current location.");
     if (holding.kind === "property")
@@ -1686,11 +1694,14 @@ export async function buyListing(
           ?.value,
       );
       await assertPlayerTrade(tx, input.purseId, journal);
+      const buyer = await request<Purse | undefined>(tx.objectStore("purses").get(input.purseId));
       if (
-        !propertyAvailableHere(
+        !propertyAvailableToGroups(
           listing,
-          readMarketLocations(journal.market),
-          !!journal.world?.partyPosition,
+          { journal },
+          getSeat().role === "player"
+            ? actingGroups({ journal, purses: buyer ? [buyer] : [] }, input.purseId, getSeat().purseIds)
+            : undefined,
         )
       )
         throw Error("This property is not available at the party's current location.");

@@ -2,6 +2,7 @@ import type { CloudSeat, CloudTable } from "./cloud.ts";
 import type { Holding } from "./types.ts";
 import { canonicalJson } from "./canonical-json.ts";
 import { characterLocation, characterPosition } from "./character-position.ts";
+import { partyPlaces, groupPlace, groupRefs, resolveGroup, MAIN_GROUP } from "./party-groups.ts";
 import { readWorld } from "./world-schema.ts";
 import { readMarketLocations, locationPath } from "./shop-locations.ts";
 import { readEstate, type EstateJob } from "./estate-schema.ts";
@@ -48,9 +49,9 @@ export function shipHere(t: Table, h: Holding, purseId?: string) {
   if (s.mode === "sailing") return false;
   const p = t.purses.find((p) => p.id === purseId),
     m = readMarketLocations(t.journal?.market);
-  const location = p?.kind === "character" ? characterLocation(t, p) : m.currentLocationId;
-  return (
-    !!location && !!h.locationId && locationPath(m, location).some((l) => l.id === h.locationId)
+  const locations = p?.kind === "character" ? [characterLocation(t, p)] : partyPlaces(t);
+  return locations.some(
+    (location) => !!location && !!h.locationId && locationPath(m, location).some((l) => l.id === h.locationId),
   );
 }
 export function facilityAccess(
@@ -126,19 +127,36 @@ function board(t: CloudTable, s: Vessel, purseId: string, action: "board" | "dis
     if (occupants(t, h.id).length >= s.stats.passengers)
       throw Error("The ship has no passenger capacity.");
     w.characterPositions = w.characterPositions.filter((x) => x.purseId !== purseId);
-    w.characterPositions.push({ ...position, inParty: false, locationId: h.locationId });
-    t.journal!.fleet!.aboard.push({ purseId, propertyId: h.id, returnInParty: position.inParty });
+    // Boarding alone still leaves the party (split the party keeps this rule); the character
+    // remembers its group to rejoin on landing.
+    const { groupId, ...ashore } = position;
+    w.characterPositions.push({ ...ashore, inParty: false, locationId: h.locationId });
+    t.journal!.fleet!.aboard.push({
+      purseId,
+      propertyId: h.id,
+      returnInParty: position.inParty,
+      ...(position.inParty && groupId ? { returnGroupId: groupId } : {}),
+    });
   } else {
     if (position.shipId !== h.id) throw Error("This character is not aboard this ship.");
     const { shipId: unusedShip, shipReturnInParty: returnInParty, ...rest } = position;
     void unusedShip;
+    const record = t.journal!.fleet!.aboard.find((a) => a.purseId === purseId);
     t.journal!.fleet!.aboard = t.journal!.fleet!.aboard.filter((a) => a.purseId !== purseId);
-    const party = readMarketLocations(t.journal?.market).currentLocationId;
+    // Rejoin the party when a group is where the ship is: the group the character left first
+    // (or the group it merged into), then the main group, then any other group.
+    const preferred = resolveGroup(t, record?.returnGroupId);
+    const rejoin = !returnInParty
+      ? undefined
+      : [preferred, ...groupRefs(t).filter((g) => g !== preferred)].find(
+          (g) => groupPlace(t, g).locationId === h.locationId,
+        );
     w.characterPositions = w.characterPositions.filter((x) => x.purseId !== purseId);
     w.characterPositions.push({
       ...rest,
-      inParty: !!returnInParty && party === h.locationId,
+      inParty: !!rejoin,
       locationId: h.locationId,
+      ...(rejoin && rejoin !== MAIN_GROUP ? { groupId: rejoin } : {}),
     });
   }
   const npc = w.npcs.find((n) => n.id === p.id);
@@ -152,10 +170,12 @@ export function assertShipTradingHere(t: Table, purseId: string) {
   const position = t.journal?.world?.characterPositions.find((p) => p.purseId === purseId);
   if (!position) throw Error("Aboard character position is missing.");
   const market = readMarketLocations(t.journal?.market);
+  // Split the party: the ship may be at any group's market.
   if (
     !position.locationId ||
-    !market.currentLocationId ||
-    !locationPath(market, position.locationId).some((l) => l.id === market.currentLocationId)
+    !partyPlaces(t).some(
+      (here) => !!here && locationPath(market, position.locationId).some((l) => l.id === here),
+    )
   )
     throw Error(
       "This character is aboard a ship away from the party market. Trade at the ship's port through reviewed manager orders or ask the DM to review the party location.",

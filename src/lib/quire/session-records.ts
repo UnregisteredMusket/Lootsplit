@@ -25,7 +25,9 @@ import { characterSheet } from "../characters/campaign-sheet.mjs";
 import { readFinance } from "./finance.ts";
 import { readJournal, readJournalForRecords, readArchivedSnapshot } from "./journal.ts";
 import { readMarketLocations, publicMarketLocations } from "./shop-locations.ts";
-import { propertyAvailableHere } from "./property.ts";
+import { propertyAvailableToGroups } from "./property.ts";
+import { projectPartyGroups } from "./party-groups-project.ts";
+import { seatGroups } from "./party-groups.ts";
 import { canAccessEstate } from "./estate.ts";
 import { readEstate } from "./estate-schema.ts";
 import { mapAccessible, projectTabletopMap } from "./tabletop.ts";
@@ -131,8 +133,10 @@ export function projectRecord(
       if (world.tabletop.presentation && !world.maps.some(m=>m.id===world.tabletop!.presentation!.mapId)) world.tabletop.presentation=null;
       world.tabletop.tvEnabled = false;
     }
+    // Split the party: "here" is the place of any group this seat has a character in.
+    const groups = seatGroups(table, seat);
     const readableNpcs = new Set(
-      world.npcs.filter((npc) => npcAvailableHere(npc, t)).map((npc) => npc.id),
+      world.npcs.filter((npc) => npcAvailableHere(npc, table, groups)).map((npc) => npc.id),
     );
     const controlledNpcs = new Set(
       world.npcs.filter((npc) => npcController(npc, seat)).map((npc) => npc.id),
@@ -156,6 +160,7 @@ export function projectRecord(
       delete world.partyPosition.x;
       delete world.partyPosition.y;
     }
+    projectPartyGroups(table, world, seat);
     world.npcs = world.npcs.filter((npc) => readableNpcs.has(npc.id));
     projectNpcBarter(world, seat);
     if (t.journal.downtimeActivities) {
@@ -240,7 +245,7 @@ export function projectRecord(
         mode: economy.settings.mode,
       };
       economy.exchanges = economy.exchanges.filter(
-        (e) => economy.settings.enabled && e.visible && exchangeHere(t, e),
+        (e) => economy.settings.enabled && e.visible && exchangeHere(table, e, groups),
       );
       economy.receipts = economy.receipts
         .filter((r) => seat.purseIds.includes(r.purseId))
@@ -254,7 +259,7 @@ export function projectRecord(
       economy.history = [];
       delete economy.pendingSeason;
     }
-    t.shops = t.shops.filter((shop) => shopVisible(shop, t));
+    t.shops = t.shops.filter((shop) => shopVisible(shop, table, groups));
     if (t.journal.blacksmith) {
       const smith = readBlacksmith(t.journal.blacksmith);
       smith.profiles = smith.profiles.filter(
@@ -313,7 +318,7 @@ export function projectRecord(
     }
     t.listings = t.listings.filter(
       (listing) =>
-        propertyAvailableHere(listing, market, !!world.partyPosition) &&
+        propertyAvailableToGroups(listing, table, groups) &&
         listing.quantity !== 0 &&
         listing.status !== "withdrawn",
     );
@@ -341,6 +346,8 @@ export function projectRecord(
                 return s?.locationId ? [s.locationId] : [];
               }),
             t.shops.flatMap((s) => (s.locationId ? [s.locationId] : [])),
+            // Split the party: the places of the groups this seat may see (hidden ones are cut).
+            (world.groups ?? []).flatMap((g) => (g.locationId ? [g.locationId] : [])),
             t.journal.blacksmith?.orders.map((o) => o.terms.locationId) ?? [],
             t.journal.services?.orders.map((o) => o.terms.locationId) ?? [],
             t.listings.flatMap((l) => (l.locationId ? [l.locationId] : [])),
@@ -475,7 +482,13 @@ export function projectRecord(
     else delete t.journal.coinSplit;
     world.characterPositions = world.characterPositions
       .filter((s) => t.purses.some((p) => p.id === s.purseId))
-      .map((s) => ({ ...s, ...(s.downtime ? { downtime: undefined } : {}) }));
+      .map((s) => {
+        const projected = { ...s, ...(s.downtime ? { downtime: undefined } : {}) };
+        // Hidden characters are never shown as members of a group.
+        const p = t.purses.find((p) => p.id === s.purseId);
+        if (projected.groupId && (!p || !characterVisible(table, p))) delete projected.groupId;
+        return projected;
+      });
     if (t.journal.fleet) {
       t.journal.fleet.aboard = t.journal.fleet.aboard.filter((a) =>
         t.purses.some((p) => p.id === a.purseId),

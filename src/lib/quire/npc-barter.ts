@@ -5,6 +5,7 @@ import { readWorld, type Npc } from "./world-schema.ts";
 import { readFinance } from "./finance.ts";
 import { toCopper, formatCopper } from "./money.ts";
 import { barterEligible, npcAvailableHere, settleExchange } from "./world.ts";
+import { actingGroups } from "./party-groups.ts";
 import { characterSheet } from "../characters/campaign-sheet.mjs";
 import { rollSpec } from "../characters/model.mjs";
 import {
@@ -250,7 +251,7 @@ export function quoteNpcBarter(
   const npc = world.npcs.find((n) => n.id === input.npcId);
   if (!npc) throw Error("This NPC is no longer here.");
   if (!npcAnswersBarter(npc)) throw Error(`${npc.name} doesn't trade on their own. Use Trading & Barter.`);
-  if (seat.role !== "dm" && !npcAvailableHere(npc, t)) throw Error(`${npc.name} isn't here right now.`);
+  if (seat.role !== "dm" && !npcAvailableHere(npc, t, actingGroups(t, input.purseId))) throw Error(`${npc.name} isn't here right now.`);
   const character = t.purses.find((p) => p.id === input.purseId);
   if (!character || character.kind !== "character" || character.nonParty || character.control === "npc")
     throw Error("Choose one of the party's characters.");
@@ -479,7 +480,7 @@ export function applyNpcBarterCommand(
       throw Error("Only this character's player or the DM can make this offer.");
     if (state.attempts.some((a) => a.id === cmd.id)) throw Error("This offer was already made.");
     const npc = npcOf(cmd.npcId);
-    if (!npcAvailableHere(npc, t)) throw Error(`${npc.name} isn't here right now.`);
+    if (!npcAvailableHere(npc, t, actingGroups(t, cmd.purseId))) throw Error(`${npc.name} isn't here right now.`);
     barterEligible(t, { left: cmd.give, right: cmd.ask });
     const payer = t.purses.find((p) => p.id === cmd.purseId)!;
     if (toCopper(payer.coins) < cmd.give.copper) throw Error("You can't afford those coins right now.");
@@ -559,7 +560,7 @@ export function applyNpcBarterCommand(
       if (state.rules.cooldownMinutes > 0 && campaignMinute(t) > a.minute + state.rules.cooldownMinutes)
         throw Error("This counter-offer has lapsed. Make a fresh offer.");
       if (cmd.decision === "accept-counter") {
-        if (!npcAvailableHere(npc, t)) throw Error(`${npc.name} isn't here right now.`);
+        if (!npcAvailableHere(npc, t, actingGroups(t, a.purseId))) throw Error(`${npc.name} isn't here right now.`);
         settle(a, cmd.id, a.counterCopper);
         a.lines.push(line(npc, "accept"));
       } else a.status = "declined";

@@ -25,6 +25,7 @@ import {
   routePointAt,
 } from "./journey.ts";
 import { characterPosition, characterVisible } from "./character-position.ts";
+import { groupInfo, MAIN_GROUP, purseGroup as purseGroupOf, resolveGroup } from "./party-groups.ts";
 import { locationPath, readMarketLocations } from "./shop-locations.ts";
 import { shopScheduleSchema } from "./shop-schedule.ts";
 import { formatCopper, toCopper } from "./money.ts";
@@ -107,18 +108,22 @@ export const travellingJourney = (t: Pick<CloudTable, "journal">) =>
  * Who travels: characters (and companions) with the party. A character with their own position,
  * aboard a ship or on personal downtime stays where they are (owner decision, 2026-10-23).
  */
-export function journeyTravellers(t: Table) {
+export function journeyTravellers(t: Table, group: string = MAIN_GROUP) {
   return t.purses.filter((p) => {
     if (p.kind !== "character") return false;
     const s = characterPosition(t, p);
-    return s.inParty && !s.shipId && !s.downtime;
+    // Split the party: a journey moves one group.
+    return s.inParty && !s.shipId && !s.downtime && resolveGroup(t, s.groupId) === group;
   });
 }
-export function staysBehind(t: Table) {
+export function staysBehind(t: Table, group: string = MAIN_GROUP) {
   return t.purses.filter((p) => {
     if (p.kind !== "character" || p.control === "npc") return false;
     const s = characterPosition(t, p);
-    return characterVisible(t, p) && (!s.inParty || !!s.shipId || !!s.downtime);
+    return (
+      characterVisible(t, p) &&
+      (!s.inParty || !!s.shipId || !!s.downtime || resolveGroup(t, s.groupId) !== group)
+    );
   });
 }
 
@@ -155,7 +160,7 @@ export function prepareJourneyPlan(t: CloudTable, journeyId: string) {
   j.status = "planned";
   j.frozen = {
     ...measured,
-    travellerIds: journeyTravellers(t).map((p) => p.id),
+    travellerIds: journeyTravellers(t, j.groupId ?? MAIN_GROUP).map((p) => p.id),
     unitCopper: { rations: travel.rations.unitCopper, mounts: travel.mounts.unitCopper },
   };
   return j;
@@ -281,12 +286,17 @@ export function previewJourney(
     }
   }
   if (from === 0)
-    for (const p of staysBehind(t))
+    for (const p of staysBehind(t, j.groupId ?? MAIN_GROUP)) {
+      const s = characterPosition(t, p);
+      const other = s.inParty && !s.shipId && !s.downtime ? resolveGroup(t, s.groupId) : undefined;
       notices.push({
         kind: "stays-behind",
         purseId: p.id,
-        text: `${p.name} has their own position and stays there.`,
+        text: other
+          ? `${p.name} is with ${groupInfo(t, other).name} and stays there.`.slice(0, 300)
+          : `${p.name} has their own position and stays there.`,
       });
+    }
   return journeyQuoteSchema.parse({
     journeyId: j.id,
     journeyHash: hashText(canonicalJson(j)),
@@ -440,6 +450,11 @@ export function applyJourneyCommand(
   if (next.runs) throw Error("A journey route must use its full waypoints.");
   const travel = readTravel(world.travel);
   const own = !dm && seat.purseIds.includes(next.requestedBy);
+  // Split the party, phase 1: journeys still move the main group only (group journeys follow).
+  if (next.groupId) throw Error("Journeys for a group other than the main group aren't available yet.");
+  const proposer = purseGroupOf(t, next.requestedBy);
+  if (!current && !dm && proposer && resolveGroup(t, proposer) !== MAIN_GROUP)
+    throw Error("Your character's group can't plan journeys yet. Ask the DM to move your group.");
   if (!current) {
     // Proposing: a new journey starts proposed, with nothing travelled or charged.
     if (next.status !== "proposed" || next.frozen || next.elapsedMinutes || next.downtimeIds.length || next.decidedAt || next.reason)
