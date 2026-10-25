@@ -1,5 +1,31 @@
 [
   {
+    "version": "1.13.0",
+    "date": "2026-10-25",
+    "summary": "Split the party into groups, more NPC services from fences to stables, a fairness ledger, and an easier-to-find journey planner.",
+    "features": [
+      "Split the party: the DM can split the party into up to six groups, each with a letter and colour, at different places, and merge them back when they meet again. Everyone stays in the party, so the shared purse, treasure pool, fairness totals and coin splits work as before.",
+      "Each group has its own map marker and Here list, and shops, services, nearby NPCs and property for sale follow where each character's group is. A journey moves one group, one approval can move every group the DM ticks, and a whole group can board a ship together.",
+      "Players see which group they're with and where the others are, unless the DM hides a group's place, and can ask the DM to move their group; the request waits in the Review Inbox. Update every phone in a split campaign: older apps ask to update before acting for a character who is with another group.",
+      "Fairness: Party → Fairness adds up the coins and items each character has received, campaign to date or for one session, with how far each is ahead of or behind the party average. Tap a character to see the receipts behind their total.",
+      "When handing out the treasure pool, the DM can choose Favour whoever is behind: Need still comes before Greed, and ties and round-robin go to whoever has received least.",
+      "Fences, banks, hirelings and tailors: a fence opens their shop's Sell tab while the black market is open, a bank opens a loan request with the bank named, an agent can propose hired hands for one of the party's properties, and tailors make clothes over approved downtime (bring your own cloth to pay less).",
+      "Sages identify an item your character carries. Nothing is charged while the DM considers it; the fee is charged once when the DM answers, and the answer arrives in your private conversation with the sage.",
+      "Trainers give paid lessons. Agree terms in conversation, then log each session in Downtime under Learn from a paid teacher; each session's fee is charged once when the DM approves it.",
+      "Couriers carry letters to NPCs your character has met, priced by distance. The letter travels as the DM approves downtime and arrives in your private conversation with that NPC.",
+      "Stables board your horses and mules by the night, with feed if you like, and coaches carry the party: booking a coach sends a journey request to the DM with the fare, charged once when the DM approves departure."
+    ],
+    "improvements": [
+      "Plan journey is now a labelled button under Here on the map, and you can also start a journey from the Here sheet or from Travel at the top of the Downtime screen. On phones the map stays visible above the planner, journey progress shows a bar, Undo removes the last waypoint, and optional costs show their price before you turn them on.",
+      "Online campaigns: each account can host up to 2 online campaigns at a time, and Start a room and My account show how many you host. At the limit, close or delete one, or keep playing on your device. Joining campaigns as a player and playing on your device stay unlimited, and nothing you already host is closed.",
+      "New encounter awards record each item's value, so it counts in Fairness at the value the DM reviewed.",
+      "For site owners with the home-screen Field monitor: a redesigned widget with severity labels, how long each problem has lasted, problems resolved in the last 24 hours, and At a glance charts you can tap to expand. It can be resized down to 4×2, and the 4×1 companion has a new optional Status + charts preset."
+    ],
+    "fixes": [
+      "For site owners: connecting the home-screen Field monitor no longer disconnects it again when the first reading is slow; it stays connected and retries."
+    ]
+  },
+  {
     "version": "1.12.0",
     "date": "2026-10-23",
     "summary": "Party journeys across the map, NPC services at temples, workshops and inns, and community profiles for finding a group.",
