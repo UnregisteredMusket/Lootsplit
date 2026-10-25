@@ -11,7 +11,10 @@ import {
   updateTask,
   recordLog,
   decisiveRun,
+  recentlyResolved,
+  MANUAL_COVERED_BY,
 } from "../cloudflare/monitor-journal.mjs";
+import { readFileSync, readdirSync } from "node:fs";
 
 const instant = Date.parse("2026-10-21T12:00:00Z");
 const HOUR = 3600000;
@@ -502,6 +505,208 @@ test("a main workflow older than the scanned runs keeps its last logged result",
     const backup = find(result, "Workflow: Encrypted offsite database backup (main)");
     assert.equal(backup.color, "green");
     assert.match(backup.symptom, /older than the scanned GitHub runs/);
+  } finally {
+    DB.close();
+  }
+});
+
+const LIVE = "Verify existing live website (read only)";
+const LIVE_C = `Workflow: ${LIVE} (main)`;
+const DEPLOY = "Deploy verified website";
+const DEPLOY_C = `Workflow: ${DEPLOY} (main)`;
+const manual = (conclusion, fields = {}) =>
+  run(LIVE, "main", conclusion, {
+    event: "workflow_dispatch",
+    startedAt: instant - 60 * HOUR,
+    updatedAt: instant - 59 * HOUR,
+    ...fields,
+  });
+
+test("covered manual workflows only run by hand; the covering workflow runs the same live audits", () => {
+  const files = readdirSync(".github/workflows").filter((f) => /\.ya?ml$/.test(f));
+  const byName = new Map(
+    files.map((f) => {
+      const text = readFileSync(`.github/workflows/${f}`, "utf8");
+      return [/^name:\s*(.+)$/m.exec(text)[1].trim(), text];
+    }),
+  );
+  for (const [manualName, cover] of MANUAL_COVERED_BY) {
+    const text = byName.get(manualName);
+    assert.ok(text, `${manualName} exists`);
+    const on = /^on:\n((?:[ \t].*\n)+)/m.exec(text)[1];
+    const triggers = on.split("\n").filter((l) => /^ {2}[a-z_]+:/.test(l));
+    assert.deepEqual(
+      triggers.map((l) => l.trim().replace(":", "")),
+      ["workflow_dispatch"],
+      `${manualName} must stay manual-only for its cancelled run to be superseded`,
+    );
+    const covering = byName.get(cover);
+    assert.ok(covering, `${cover} exists`);
+    for (const audit of ["live-release-audit.mjs", "website-browser-audit.mjs"]) {
+      assert.match(text, new RegExp(audit.replace(".", "\\.")));
+      assert.match(covering, new RegExp(audit.replace(".", "\\.")), `${cover} runs ${audit}`);
+    }
+  }
+});
+
+test("a cancelled manual live audit superseded by a newer successful deploy is not attention", async () => {
+  const DB = localAccountDb();
+  try {
+    const result = await snap(
+      DB,
+      github({
+        runs: [run(DEPLOY, "main", "success", { event: "workflow_run" }), manual("cancelled")],
+      }),
+    );
+    const live = find(result, LIVE_C);
+    assert.equal(live.state, "not-applicable");
+    assert.equal(live.color, "green");
+    assert.equal(live.lastSuccessAt, null, "Superseded is never recorded as a success");
+    assert.match(
+      live.symptom,
+      /cancelled \(manual run.*superseded by Deploy verified website: success/,
+    );
+    assert.equal(live.evidence.length, 2);
+    assert.deepEqual(attention(result), []);
+  } finally {
+    DB.close();
+  }
+});
+
+test("a remembered cancelled manual run older than the scan resolves and is listed as recently resolved", async () => {
+  const DB = localAccountDb();
+  try {
+    // 2026-10-23: the cancelled manual run is the newest decisive run; no deploy since.
+    const cancelled = manual("cancelled", { event: undefined });
+    delete cancelled.event; // stored incidents from before this change carry no trigger
+    const deploy = run(DEPLOY, "main", "success", { updatedAt: instant - 70 * HOUR });
+    let result = await snap(DB, github({ runs: [cancelled, deploy] }), instant - 50 * HOUR);
+    assert.equal(
+      find(result, LIVE_C).color,
+      "yellow",
+      "An older deploy does not cover a newer cancel",
+    );
+    assert.deepEqual(attention(result), [LIVE_C]);
+    // Later: the manual run aged out of the scanned runs; only the deploy's remembered result
+    // (its component is healthy) shows a newer successful live audit.
+    const newDeploy = run(DEPLOY, "main", "success", {
+      startedAt: instant - 2 * HOUR,
+      updatedAt: instant - HOUR,
+    });
+    result = await snap(DB, github({ runs: [newDeploy] }), instant - 30 * 60000);
+    assert.equal(find(result, DEPLOY_C).state, "healthy");
+    result = await snap(
+      DB,
+      github({ runs: [run("Verify preserved functionality", "main", "success")] }),
+      instant,
+    );
+    const live = find(result, LIVE_C);
+    assert.equal(live.state, "not-applicable");
+    assert.equal(live.color, "green");
+    assert.deepEqual(attention(result), []);
+    const resolved = await recentlyResolved(DB, instant, result.diagnostics);
+    const item = resolved.items.find((i) => i.component === LIVE_C);
+    assert.ok(item, "The warning is listed as recently resolved");
+    assert.equal(item.resolvedAt, live.recoveredAt);
+    assert.ok(item.resolvedAt > item.startedAt);
+  } finally {
+    DB.close();
+  }
+});
+
+test("real problems stay visible: failed or cancelled deploys, failed or non-manual live audits", async () => {
+  const DB = localAccountDb();
+  try {
+    let result = await snap(
+      DB,
+      github({
+        runs: [
+          run(DEPLOY, "main", "failure"),
+          // A failed manual audit is never superseded, even by a later deploy.
+          manual("failure", { updatedAt: instant - 2 * HOUR }),
+        ],
+      }),
+    );
+    assert.equal(find(result, DEPLOY_C).color, "red", "A failed deploy still warns");
+    assert.equal(find(result, LIVE_C).color, "red", "A failed manual audit still warns");
+  } finally {
+    DB.close();
+  }
+  const DB3 = localAccountDb();
+  try {
+    let result = await snap(
+      DB3,
+      github({
+        runs: [
+          run(DEPLOY, "main", "cancelled"),
+          run(DEPLOY, "main", "success", { updatedAt: instant - 3 * HOUR }),
+          manual("cancelled", { updatedAt: instant - 4 * HOUR }),
+        ],
+      }),
+    );
+    assert.equal(
+      find(result, DEPLOY_C).color,
+      "yellow",
+      "A lone cancelled deploy still needs attention",
+    );
+    assert.equal(
+      find(result, LIVE_C).color,
+      "green",
+      "The older successful deploy covers the cancel",
+    );
+    // The same workflow name run by another trigger is not a manual audit.
+    const DB2 = localAccountDb();
+    try {
+      result = await snap(
+        DB2,
+        github({
+          runs: [run(DEPLOY, "main", "success"), manual("cancelled", { event: "push" })],
+        }),
+      );
+      assert.equal(find(result, LIVE_C).color, "yellow");
+    } finally {
+      DB2.close();
+    }
+  } finally {
+    DB3.close();
+  }
+});
+
+test("a cancelled scheduled run keeps the existing rules despite a newer successful deploy", async () => {
+  const DB = localAccountDb();
+  try {
+    const result = await snap(
+      DB,
+      github({
+        runs: [
+          run(DEPLOY, "main", "success"),
+          run("Encrypted offsite database backup", "main", "cancelled", {
+            event: "schedule",
+            updatedAt: instant - 5 * HOUR,
+          }),
+        ],
+      }),
+    );
+    assert.equal(
+      find(result, "Workflow: Encrypted offsite database backup (main)").color,
+      "yellow",
+    );
+    assert.deepEqual(attention(result), ["Workflow: Encrypted offsite database backup (main)"]);
+  } finally {
+    DB.close();
+  }
+});
+
+test("without GitHub data or deploy evidence a cancelled manual run stays a gap, never green", async () => {
+  const DB = localAccountDb();
+  try {
+    let result = await snap(DB, github({ runs: [manual("cancelled")] }));
+    assert.equal(find(result, LIVE_C).color, "yellow", "No deploy evidence: still unverified");
+    result = await snap(DB, unavailable, instant + 1000);
+    const live = find(result, LIVE_C);
+    assert.equal(live.state, "unavailable");
+    assert.equal(live.color, "yellow");
+    assert.match(live.symptom, /No completed build or test result was returned/);
   } finally {
     DB.close();
   }

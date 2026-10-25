@@ -427,6 +427,40 @@ export function decisiveRun(runs) {
   }
   return null;
 }
+/**
+ * Manual, one-off audits (workflow_dispatch is their only trigger, enforced by a test against the
+ * workflow files) whose subject another workflow re-checks on every release. Their cancelled run is
+ * superseded once a newer successful run of the covering workflow on the same branch exists, because
+ * nothing else will ever rerun them. Failed runs are not superseded and stay red. Owner-reviewed
+ * rule (2026-10-25): `Deploy verified website` runs the same read-only live audits
+ * (live-release-audit + website-browser-audit on every approved origin) after each deployment.
+ */
+export const MANUAL_COVERED_BY = new Map([
+  ["Verify existing live website (read only)", "Deploy verified website"],
+]);
+/** The newest successful covering run newer than a cancelled manual run, or null. */
+export function supersedingRun(run, runs, previous) {
+  const cover = MANUAL_COVERED_BY.get(run?.name);
+  if (!cover || run.conclusion !== "cancelled" || !Number.isSafeInteger(run.updatedAt)) return null;
+  // A run recorded with its trigger must have been manual; older records carry no trigger.
+  if (run.event && run.event !== "workflow_dispatch") return null;
+  const remembered = previous?.get?.(workflowComponent(cover, run.branch));
+  const candidates = [
+    ...runs.filter((r) => r.name === cover && r.branch === run.branch),
+    ...(remembered?.state === "healthy" && remembered.lastRun ? [remembered.lastRun] : []),
+  ];
+  let best = null;
+  for (const r of candidates)
+    if (
+      r.status === "completed" &&
+      r.conclusion === "success" &&
+      Number.isSafeInteger(r.updatedAt) &&
+      r.updatedAt > run.updatedAt &&
+      (!best || r.updatedAt > best.updatedAt)
+    )
+      best = r;
+  return best;
+}
 const runSummary = (run) =>
   run
     ? {
@@ -435,6 +469,7 @@ const runSummary = (run) =>
         branch: run.branch,
         status: run.status,
         conclusion: run.conclusion,
+        event: run.event || null,
         url: run.url,
         startedAt: run.startedAt || null,
         updatedAt: run.updatedAt || null,
@@ -489,6 +524,24 @@ async function workflowDiagnostics(db, development, previous, now, add) {
     groups.get(component).push(run); // GitHub lists runs newest first
   }
   let reported = 0;
+  // A cancelled manual audit that a newer successful covering run superseded (MANUAL_COVERED_BY).
+  const superseded = (component, decided) => {
+    const cover = supersedingRun(decided, runs, previous);
+    if (!cover) return false;
+    const at = (t) => new Date(t).toISOString();
+    report(
+      component,
+      "not-applicable",
+      `${decided.name}: cancelled (manual run, last updated ${at(decided.updatedAt)}); superseded by ${cover.name}: success at ${at(cover.updatedAt)}, whose own read-only live audit passed. This manual audit never reruns on its own.`,
+      decided,
+      {
+        historyChecked: true,
+        supersededBy: runSummary(cover),
+        evidence: [decided, cover].filter((r) => r.url).map((r) => ({ label: r.name, url: r.url })),
+      },
+    );
+    return true;
+  };
   const report = (component, state, symptom, run, extra = {}) => {
     if (state !== "retired") reported++;
     add(
@@ -579,6 +632,7 @@ async function workflowDiagnostics(db, development, previous, now, add) {
       continue;
     }
     if (run) {
+      if (superseded(component, run)) continue;
       const [state, symptom] = fromRun(run, null);
       report(component, state, symptom, run, { historyChecked: true });
       continue;
@@ -591,6 +645,7 @@ async function workflowDiagnostics(db, development, previous, now, add) {
     let known = previousCheck.lastRun || null;
     if (!known && !previousCheck.historyChecked)
       known = await loggedDecisiveRun(db, name, branch, now);
+    if (known && superseded(component, known)) continue;
     if (known) {
       let [state, symptom] = fromRun(
         known,
@@ -998,7 +1053,13 @@ async function updateDiagnostics(db, snapshot, now, settings) {
 export async function monitorSnapshot(
   env,
   userId,
-  { force = false, now = Date.now(), collector = collectOwnerMonitor, budgetMs = 0, defer = null } = {},
+  {
+    force = false,
+    now = Date.now(),
+    collector = collectOwnerMonitor,
+    budgetMs = 0,
+    defer = null,
+  } = {},
 ) {
   const db = env.DB,
     settings = await initializeMonitor(db, now);
@@ -1168,7 +1229,9 @@ export async function monitorSeries(db, now, timezone = DEFAULT_CONFIG.timezone)
     errors = [];
   let measured = 0;
   for (let i = SERIES_HALF_HOURS - 1; i >= 0; i--) {
-    const reading = bySlot.has(end - i * INTERVAL) ? slotTraffic(bySlot.get(end - i * INTERVAL)) : null;
+    const reading = bySlot.has(end - i * INTERVAL)
+      ? slotTraffic(bySlot.get(end - i * INTERVAL))
+      : null;
     requests.push(reading ? reading.requests : null);
     errors.push(reading ? reading.errors : null);
     if (reading) measured++;
@@ -1205,7 +1268,14 @@ export async function monitorSeries(db, now, timezone = DEFAULT_CONFIG.timezone)
   return {
     state: "ready",
     timezone,
-    halfHour: { intervalMs: INTERVAL, end, requests, errors, measured, expected: SERIES_HALF_HOURS },
+    halfHour: {
+      intervalMs: INTERVAL,
+      end,
+      requests,
+      errors,
+      measured,
+      expected: SERIES_HALF_HOURS,
+    },
     daily,
   };
 }
@@ -1361,7 +1431,9 @@ export async function liveRooms(db, now) {
   if (now - tracker.first_seen_at < LIVE_ROOM_MS)
     return { ...base, state: "unavailable", live: null, errorCode: "WARMING_UP" };
   const row = await db
-    .prepare("SELECT COUNT(*) AS live FROM owner_monitor_room_activity WHERE room>? AND changed_at>=?")
+    .prepare(
+      "SELECT COUNT(*) AS live FROM owner_monitor_room_activity WHERE room>? AND changed_at>=?",
+    )
     .bind(TRACKER_ROW, now - LIVE_ROOM_MS)
     .first();
   return { ...base, state: "ready", live: Number(row?.live ?? 0) };
@@ -1784,11 +1856,7 @@ const attention = (item) =>
       ? 1
       : 0;
 const itemTime = (item) =>
-  item?.observedAt ??
-  item?.scheduledAt ??
-  item?.task?.completedAt ??
-  item?.task?.heartbeatAt ??
-  0;
+  item?.observedAt ?? item?.scheduledAt ?? item?.task?.completedAt ?? item?.task?.heartbeatAt ?? 0;
 function keepImportant(items, count) {
   return items
     .map((item, index) => ({ item, index }))
@@ -1894,7 +1962,11 @@ async function buildReport(db, day, settings, now) {
       );
   }
   entries.push(
-    ...(await rows(db, `SELECT * FROM owner_monitor_logs WHERE observed_at=? AND ${SLOT_LOG}`, end)),
+    ...(await rows(
+      db,
+      `SELECT * FROM owner_monitor_logs WHERE observed_at=? AND ${SLOT_LOG}`,
+      end,
+    )),
   );
   // Same order as before: insertion (sequence) order.
   entries.sort((a, b) => a.sequence - b.sequence);
