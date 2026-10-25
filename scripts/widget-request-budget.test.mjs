@@ -1,0 +1,117 @@
+// The Field monitor's request path (GET /api/account/owner/monitor?view=widget) must answer inside
+// the installed widgets' 3 s read timeout. Diagnosis 2026-10-25: a widget request more than 60 s
+// after the last stored snapshot ran a full live collection (GitHub alone took 1.7–4.6 s), so most
+// taps and background checks timed out, and a timed-out "Connect owner account" cleared the
+// widget's connection.
+import test from "node:test";
+import assert from "node:assert/strict";
+import { localAccountDb } from "./account-dev-db.mjs";
+import {
+  withinBudget,
+  REQUEST_PROVIDER_BUDGET_MS,
+  REUSE_MAX_AGE_MS,
+} from "../cloudflare/owner-monitor.mjs";
+import { monitorSnapshot } from "../cloudflare/monitor-journal.mjs";
+
+const instant = Date.parse("2026-10-25T11:11:39Z");
+const HOUR = 3600000;
+const ready = (data, checkedAt = instant) => ({ state: "ready", checkedAt, data });
+const slow = (value, ms) => new Promise((resolve) => setTimeout(() => resolve(value), ms));
+
+test("the request budget stays well inside the installed widgets' 3 s read timeout", () => {
+  assert.ok(REQUEST_PROVIDER_BUDGET_MS > 0 && REQUEST_PROVIDER_BUDGET_MS <= 1500);
+  assert.equal(REUSE_MAX_AGE_MS, 35 * 60000);
+});
+
+test("a late provider keeps its previous validated reading, dated and marked reused", async () => {
+  const earlier = ready({ runs: [] }, instant - 10 * 60000);
+  const deferred = [];
+  const started = Date.now();
+  const result = await withinBudget(slow(ready({ runs: [1] }), 400), earlier, {
+    budgetMs: 50,
+    defer: (p) => deferred.push(p),
+    now: instant,
+  });
+  assert.ok(Date.now() - started < 300, "answered at the budget, not when the provider finished");
+  assert.equal(result.reused, true);
+  assert.equal(result.checkedAt, earlier.checkedAt, "the reading keeps its own original time");
+  assert.deepEqual(result.data, earlier.data);
+  assert.equal(deferred.length, 1, "the live read continues through waitUntil");
+  assert.deepEqual((await deferred[0]).data, { runs: [1] });
+});
+
+test("a provider inside the budget is used live", async () => {
+  const live = ready({ runs: [1] });
+  const result = await withinBudget(slow(live, 5), ready({ runs: [] }, instant - 60000), {
+    budgetMs: 200,
+    now: instant,
+  });
+  assert.equal(result, live);
+});
+
+test("no budget, a stale reading or an unavailable reading never replaces the live read", async () => {
+  const live = ready({ runs: [1] });
+  for (const [earlier, options] of [
+    [ready({ runs: [] }, instant - 60000), {}],
+    [ready({ runs: [] }, instant - REUSE_MAX_AGE_MS - 1), { budgetMs: 20 }],
+    [{ state: "unavailable", checkedAt: instant, data: null, errorCode: "SOURCE_TIMEOUT" }, { budgetMs: 20 }],
+    [{ state: "not-connected", checkedAt: null, data: null }, { budgetMs: 20 }],
+    [undefined, { budgetMs: 20 }],
+  ]) {
+    const result = await withinBudget(slow(live, 60), earlier, { ...options, now: instant });
+    assert.equal(result, live);
+  }
+});
+
+const reading = (development, traffic = ready({ requests: 10, errors: 0 })) => ({
+  checkedAt: instant,
+  health: {
+    status: "healthy",
+    checks: [{ name: "Database", status: "healthy", durationMs: 1 }],
+    stats: { accounts: 1, sharedCampaigns: 1, active5m: 1, active24h: 2, cloudBackups: 0 },
+  },
+  analytics: ready({ metrics: { sessions: 1, transactionCount: 3 } }),
+  development,
+  traffic,
+  release: ready({ commit: "a".repeat(40) }),
+});
+const github = (runs = [], closedPulls = []) =>
+  ready({ runs, active: [], openPulls: [], closedPulls });
+let nextId = 5000;
+const run = (branch) => ({
+  id: nextId++,
+  name: "Verify preserved functionality",
+  branch,
+  status: "completed",
+  conclusion: "success",
+  url: "https://github.com/UnregisteredMusket/Lootsplit/actions/runs/1",
+  startedAt: instant - HOUR,
+  updatedAt: instant - HOUR / 2,
+});
+
+test("monitorSnapshot passes the budget and the previous reading to the collector, never when forced", async () => {
+  const DB = localAccountDb();
+  try {
+    const seen = [];
+    const collector = async (_env, _user, options) => {
+      seen.push(options);
+      return reading(github());
+    };
+    await monitorSnapshot({ DB }, "owner", { force: true, now: instant, collector });
+    assert.equal(seen[0].budgetMs, 0);
+    const defer = () => {};
+    await monitorSnapshot({ DB }, "owner", {
+      now: instant + 120000,
+      collector,
+      budgetMs: 900,
+      defer,
+    });
+    assert.equal(seen[1].budgetMs, 900);
+    assert.equal(seen[1].defer, defer);
+    assert.equal(seen[1].previous.development.state, "ready", "the stored snapshot's readings");
+    await monitorSnapshot({ DB }, "owner", { force: true, now: instant + 240000, collector, budgetMs: 900 });
+    assert.equal(seen[2].budgetMs, 0, "a forced (scheduled) collection always waits for providers");
+  } finally {
+    DB.close?.();
+  }
+});

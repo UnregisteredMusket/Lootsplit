@@ -4,4 +4,5 @@ export function accountAuth(env: Record<string, unknown>): {
 export function handleAccounts(
   request: Request,
   env: Record<string, unknown>,
+  context?: { waitUntil(promise: Promise<unknown>): void } | null,
 ): Promise<Response | null>;
