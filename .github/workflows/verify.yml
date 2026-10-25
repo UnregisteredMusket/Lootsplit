@@ -276,9 +276,18 @@ jobs:
       - name: dev-website
         if: matrix.group == 'economy'
         run: node scripts/recovery-step.mjs dev-website 240 node scripts/website-browser-audit.mjs
-      - name: dev-map-tiles
+      - name: dev-map-tiles-2
+        if: matrix.group == 'economy'
+        env:
+          MAP_TILES_PART: 2/2
+        run: node scripts/recovery-step.mjs dev-map-tiles-2 240 node scripts/map-tiles-browser-audit.mjs
+      # The map-tiles audit runs as two disjoint halves (scripts/map-tiles-parts.mjs) in separate
+      # jobs: whole, it needed 211-241 s of its 240 s bound on development runners (2026-10-25).
+      - name: dev-map-tiles-1
         if: matrix.group == 'desktop'
-        run: node scripts/recovery-step.mjs dev-map-tiles 240 node scripts/map-tiles-browser-audit.mjs
+        env:
+          MAP_TILES_PART: 1/2
+        run: node scripts/recovery-step.mjs dev-map-tiles-1 240 node scripts/map-tiles-browser-audit.mjs
       - name: dev-blacksmith
         if: matrix.group == 'desktop'
         run: node scripts/recovery-step.mjs dev-blacksmith 240 node --experimental-strip-types scripts/blacksmith-browser-audit.mjs
