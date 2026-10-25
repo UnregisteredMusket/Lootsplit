@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Section heading in the Field monitor list: NEEDS ATTENTION / RECENTLY RESOLVED / AT A GLANCE / MORE. Not a tap target. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:id="@+id/widget_row" android:layout_width="match_parent" android:layout_height="wrap_content" android:paddingTop="8dp" android:paddingBottom="3dp" android:orientation="horizontal" android:baselineAligned="false" android:gravity="center_vertical" android:background="#071712">
+    <TextView android:id="@+id/section_title" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:textSize="9.5sp" android:letterSpacing="0.08" android:textColor="#7AA68D" android:fontFamily="monospace" android:includeFontPadding="false" android:maxLines="1" android:ellipsize="end" />
+    <TextView android:id="@+id/section_detail" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginStart="6dp" android:textSize="9.5sp" android:textStyle="bold" android:textColor="#B1D6C1" android:fontFamily="monospace" android:includeFontPadding="false" android:maxLines="1" />
+</LinearLayout>

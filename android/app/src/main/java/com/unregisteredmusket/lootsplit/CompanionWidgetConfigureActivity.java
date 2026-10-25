@@ -30,14 +30,16 @@ public class CompanionWidgetConfigureActivity extends Activity {
         if (companion) {
         label(root,"Lootsplitter 4×1 companion · instance "+widgetId);
         label(root,"Choose two summaries in top-to-bottom order and two toolbar actions. Tap a summary for its full detail. Each widget has independent settings.");
+        label(root,"Status + charts shows the most severe active problem with its severity (✕ CRIT, ! WARN) and how long it has lasted, the warning count and problems resolved in the last 24 hours, plus a 24-hour requests chart and the last main runs.");
         label(root,"Agent activity (the default for new companions) shows GitHub workflow runs and pull requests: ✓ succeeded or merged, ! running or needs attention, ✕ failed. It checks about once a minute while a workflow runs and the screen is on, without waking the phone. The development chat is not shown.");
         Spinner presets=choose(root,"preset","Preset",CompanionSettings.PRESETS,CompanionSettings.DEFAULT_PRESET);
         Button apply=new Button(this); apply.setText("Apply preset"); root.addView(apply);
         choose(root,"first","First summary",CompanionSettings.CATEGORIES,settings.optString("first"));
         choose(root,"second","Second summary",CompanionSettings.CATEGORIES,settings.optString("second"));
+        choose(root,"charts","Chart column (requests and main runs; shown when the widget is at least 300 dp wide)",CompanionSettings.CHARTS,settings.optString("charts","off"));
         choose(root,"action1","First toolbar action",WidgetActions.ACTIONS,settings.optString("action1"));
         choose(root,"action2","Second toolbar action",WidgetActions.ACTIONS,settings.optString("action2"));
-        apply.setOnClickListener(v -> { JSONObject preset=CompanionSettings.preset(presets.getSelectedItem().toString()); for(String key: new String[]{"first","second","action1","action2"}) { Spinner spinner=choices.get(key); for(int i=0;i<spinner.getCount();i++) if(spinner.getItemAtPosition(i).equals(preset.optString(key))) spinner.setSelection(i); } });
+        apply.setOnClickListener(v -> { JSONObject preset=CompanionSettings.preset(presets.getSelectedItem().toString()); for(String key: new String[]{"first","second","charts","action1","action2"}) { Spinner spinner=choices.get(key); for(int i=0;i<spinner.getCount();i++) if(spinner.getItemAtPosition(i).equals(preset.optString(key))) spinner.setSelection(i); } });
         } else label(root,"Lootsplitter Field monitor · instance "+widgetId);
         choose(root,"theme","Appearance",CompanionSettings.THEMES,settings.optString("theme"));
         Button save=new Button(this); save.setText("Save widget"); root.addView(save); save.setOnClickListener(v -> {

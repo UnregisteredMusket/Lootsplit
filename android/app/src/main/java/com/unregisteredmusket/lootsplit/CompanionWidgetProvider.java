@@ -13,8 +13,17 @@ import org.json.JSONObject;
 
 public class CompanionWidgetProvider extends AppWidgetProvider {
     static int[] ids(Context context) { return AppWidgetManager.getInstance(context).getAppWidgetIds(new ComponentName(context,CompanionWidgetProvider.class)); }
-    static void renderAll(Context context) { CompanionSettings.preserveLegacyDefaults(context); for(int id:ids(context)) AppWidgetManager.getInstance(context).updateAppWidget(id,views(context,WidgetStore.read(context),CompanionSettings.read(context,id),id)); }
-    static RemoteViews views(Context context, JSONObject state, JSONObject settings, int id) {
+    static void renderAll(Context context) {
+        CompanionSettings.preserveLegacyDefaults(context);
+        AppWidgetManager manager=AppWidgetManager.getInstance(context);
+        for(int id:ids(context)) manager.updateAppWidget(id,views(context,WidgetStore.read(context),CompanionSettings.read(context,id),id,widthDp(manager.getAppWidgetOptions(id))));
+    }
+    /** The placement's portrait width in dp (Android reports it as the minimum width); 0 when unknown. */
+    static int widthDp(Bundle options) { return options==null?0:options.getInt(AppWidgetManager.OPTION_APPWIDGET_MIN_WIDTH,0); }
+    /** Below this width the "Status + charts" chart column is hidden first; the text lines keep their size. */
+    static final int CHARTS_MIN_WIDTH = 300;
+    static RemoteViews views(Context context, JSONObject state, JSONObject settings, int id) { return views(context,state,settings,id,0); }
+    static RemoteViews views(Context context, JSONObject state, JSONObject settings, int id, int widthDp) {
         RemoteViews view=new RemoteViews(context.getPackageName(),R.layout.companion_widget);
         JSONObject snapshot=OwnerWidgetProvider.current(state), task=snapshot==null?null:snapshot.optJSONObject("task");
         String theme=settings.optString("theme","terminal"); boolean light="light".equals(theme)||"system".equals(theme)&&(context.getResources().getConfiguration().uiMode&android.content.res.Configuration.UI_MODE_NIGHT_MASK)!=android.content.res.Configuration.UI_MODE_NIGHT_YES;
@@ -65,7 +74,8 @@ public class CompanionWidgetProvider extends AppWidgetProvider {
             } else {
             String primary=WidgetRows.category(snapshot,first);
             view.setTextViewText(R.id.companion_first,primary);
-            view.setTextColor(R.id.companion_first,"health".equals(first)?OwnerWidgetProvider.color(status,light):ink);
+            String incident="incident".equals(first)?WidgetRows.incidentSeverity(snapshot):null;
+            view.setTextColor(R.id.companion_first,"health".equals(first)?OwnerWidgetProvider.color(status,light):incident!=null?OwnerWidgetProvider.color(incident.isEmpty()?"green":"critical".equals(incident)?"red":"yellow",light):ink);
             view.setContentDescription(R.id.companion_first,"OWNER · "+snapshot.optString("name")+". "+primary);
             view.setOnClickPendingIntent(R.id.companion_first,WidgetActions.pending(context,id,WidgetRows.action(first,snapshot),true));
             }
@@ -90,6 +100,7 @@ public class CompanionWidgetProvider extends AppWidgetProvider {
             }
         }
         view.setOnClickPendingIntent(R.id.companion_timer,WidgetActions.pending(context,id,"task",true));
+        charts(context,view,snapshot,settings,widthDp,light,id);
         for(int i=1;i<=2;i++) {
             String action=settings.optString("action"+i,i==1?"refresh":"settings"); int target=i==1?R.id.companion_action1:R.id.companion_action2;
             view.setImageViewResource(target,icon(action));view.setInt(target,"setColorFilter",tint);
@@ -126,6 +137,33 @@ public class CompanionWidgetProvider extends AppWidgetProvider {
         view.setTextColor(R.id.companion_second,colour);
         view.setContentDescription(R.id.companion_second,description);
         view.setOnClickPendingIntent(R.id.companion_second,WidgetActions.pending(context,id,"activity",true));
+    }
+    /**
+     * The "Status + charts" column: the 24-hour requests sparkline over its error baseline and the
+     * last four main runs as ✓ / ✕ / • pips. Shown only when chosen and the widget is at least
+     * CHARTS_MIN_WIDTH wide (unknown width: shown). Drawn from the stored reading; never fetches.
+     */
+    private static void charts(Context context,RemoteViews view,JSONObject snapshot,JSONObject settings,int widthDp,boolean light,int id) {
+        boolean show=snapshot!=null&&CompanionSettings.showsCharts(settings)&&(widthDp==0||widthDp>=CHARTS_MIN_WIDTH);
+        view.setViewVisibility(R.id.companion_charts,show?View.VISIBLE:View.GONE);
+        if(!show) return;
+        WidgetCharts.Palette p=WidgetCharts.Palette.of(light);
+        JSONObject series=snapshot.optJSONObject("series");
+        boolean chart=series!=null&&"ready".equals(series.optString("state"));
+        view.setViewVisibility(R.id.companion_spark,chart?View.VISIBLE:View.GONE);
+        if(chart) {
+            // Drawn on the widget background (no tile) so the column blends into the 4×1 face.
+            view.setImageViewBitmap(R.id.companion_spark,WidgetCharts.sparkline(OwnerWidgetProvider.longs(series.optJSONArray("requests")),OwnerWidgetProvider.longs(series.optJSONArray("errors")),64,24,context.getResources().getDisplayMetrics().density,p.onBackground()));
+            long[] traffic=WidgetRows.traffic(snapshot);
+            view.setContentDescription(R.id.companion_spark,"Requests per half-hour, past 24 hours"+(traffic==null?"":": "+traffic[0]+" requests, "+traffic[1]+" errors"));
+        }
+        org.json.JSONArray runs=snapshot.optJSONArray("mainRuns"),states=new org.json.JSONArray();
+        JSONObject activity=snapshot.optJSONObject("activity");
+        int running=activity!=null&&"ready".equals(activity.optString("state"))?activity.optInt("active"):0;
+        if(runs!=null){for(int i=Math.min(runs.length(),running>0?3:4)-1;i>=0;i--)states.put(runs.optJSONObject(i)==null?"":runs.optJSONObject(i).optString("conclusion"));if(running>0)states.put("running");}
+        view.setTextViewText(R.id.companion_pips,runs==null?"":WidgetTiles.pips(states,p));
+        view.setContentDescription(R.id.companion_pips,runs==null?"Main runs unavailable":"Last main runs: "+states.toString().replaceAll("[\\[\\]\"]","").replace(","," ")+". Open development activity");
+        view.setOnClickPendingIntent(R.id.companion_charts,WidgetActions.pending(context,id,"activity",true));
     }
     static int icon(String action) {
         switch (action == null ? "" : action) {

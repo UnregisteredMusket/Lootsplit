@@ -5,9 +5,14 @@ import org.json.JSONObject;
 
 /** Presentation preferences only: no identity, credential or private snapshot is stored here. */
 final class CompanionSettings {
-    static final String[] CATEGORIES = {"health", "analytics", "traffic", "task", "timer", "log", "warning", "report", "activity"};
-    /** Agent activity is the default for new companions; every earlier preset stays selectable. */
-    static final String[] PRESETS = {"Agent activity", "Development", "Server Health", "Analytics", "Quick Actions"};
+    static final String[] CATEGORIES = {"health", "analytics", "traffic", "task", "timer", "log", "warning", "report", "activity", "incident", "summary"};
+    /**
+     * Agent activity is the default for new and existing companions (owner decision 5, 2026-10-25);
+     * every earlier preset stays selectable. "Status + charts" (the redesign) is an extra choice.
+     */
+    static final String[] PRESETS = {"Agent activity", "Development", "Server Health", "Analytics", "Quick Actions", "Status + charts"};
+    /** The chart column (requests sparkline over its error baseline, main-run pips): off unless chosen. */
+    static final String[] CHARTS = {"off", "on"};
     static final String DEFAULT_PRESET = "Agent activity";
     /** Unsaved companions placed before Agent activity existed keep rendering this earlier default. */
     static final String LEGACY_DEFAULT = "Development";
@@ -16,14 +21,18 @@ final class CompanionSettings {
     static JSONObject preset(String name) {
         JSONObject out = new JSONObject();
         try {
-            if ("Agent activity".equals(name)) {
+            if ("Status + charts".equals(name)) {
+                // Line 1: the worst active item with severity and duration; line 2: counts, recoveries, reading time.
+                out.put("first", "incident").put("second", "summary").put("charts", "on");
+            } else if ("Agent activity".equals(name)) {
                 // Line 1: latest GitHub action; line 2: the running workflow or the previous event.
                 out.put("first", "activity").put("second", "activity");
             } else {
                 out.put("first", "Development".equals(name) ? "task" : "Analytics".equals(name) ? "analytics" : "health");
                 out.put("second", "Development".equals(name) ? "timer" : "Analytics".equals(name) ? "traffic" : "Server Health".equals(name) ? "warning" : "report");
             }
-            out.put("action1", "refresh").put("action2", "Quick Actions".equals(name) ? "account" : "settings").put("theme", "terminal");
+            if (!out.has("charts")) out.put("charts", "off");
+            out.put("action1", "refresh").put("action2", "Quick Actions".equals(name) ? "account" : "Status + charts".equals(name) ? "logs" : "settings").put("theme", "terminal");
         } catch (Exception ignored) { }
         return out;
     }
@@ -34,6 +43,7 @@ final class CompanionSettings {
     }
     static void save(Context context, int id, JSONObject value) { preferences(context).edit().putString("instance-"+id, value.toString()).commit(); }
     static void remove(Context context, int id) { preferences(context).edit().remove("instance-"+id).apply(); }
+    static boolean showsCharts(JSONObject settings) { return settings != null && "on".equals(settings.optString("charts")); }
     static boolean showsActivity(JSONObject settings) {
         return settings != null && ("activity".equals(settings.optString("first")) || "activity".equals(settings.optString("second")));
     }

@@ -82,6 +82,9 @@ final class WidgetData {
         return out.put("state", "ready").put("reason", "").put("active", Math.max(0, active)).put("events", safe);
     }
     static final int USAGE_ROWS = 6;
+    /** The plan-usage gauges (billing cycle to date): flows only; storage is a level and stays a text row. */
+    static final java.util.Map<String, String> GAUGES = new java.util.LinkedHashMap<>();
+    static { GAUGES.put("requests", "Req"); GAUGES.put("cpuMs", "CPU"); GAUGES.put("d1RowsRead", "D1 rd"); GAUGES.put("d1RowsWritten", "D1 wr"); }
     /** "—" when missing, "<0.01%" for tiny shares; the same rules as the server and website. */
     static String percent(Object value) {
         if (!(value instanceof Number)) return "—";
@@ -136,6 +139,10 @@ final class WidgetData {
         String cycleLabel = month == null ? "" : text(month, "label");
         boolean billingCycle = month != null && "billing-cycle".equals(text(month, "basis")) && cycleLabel.matches("[A-Za-z0-9 ]{1,32}");
         String windowName = billingCycle ? cycleLabel : "Month";
+        JSONArray gauges = new JSONArray();
+        Object elapsedPercent = month == null ? null : month.opt("elapsedPercent");
+        out.put("elapsed", elapsedPercent instanceof Number ? ((Number) elapsedPercent).doubleValue() : -1d).put("cycleLabel", billingCycle ? cycleLabel : "");
+        out.put("gauges", gauges);
         for (int i = 0; i < metrics.length() && rows.length() < USAGE_ROWS; i++) {
             JSONObject metric = metrics.optJSONObject(i);
             if (metric == null) continue;
@@ -157,6 +164,11 @@ final class WidgetData {
                         + (databases instanceof Number ? " · " + ((Number) databases).longValue() + " database" + (((Number) databases).longValue() == 1 ? "" : "s") : "")));
                 continue;
             }
+            String key = text(metric, "key"), shortLabel = GAUGES.get(key);
+            Object cycle = part(metric, "month", "percent");
+            if (shortLabel != null) gauges.put(new JSONObject().put("key", key).put("label", shortLabel)
+                .put("percent", cycle instanceof Number && Double.isFinite(((Number) cycle).doubleValue()) && ((Number) cycle).doubleValue() >= 0 ? ((Number) cycle).doubleValue() : JSONObject.NULL)
+                .put("text", percent(cycle)).put("hot", !color.isEmpty()));
             rows.put(new JSONObject().put("id", "usage:" + label).put("color", color)
                 .put("title", label + " today " + amount(part(metric, "day", "value"), unit))
                 .put("detail", percent(part(metric, "day", "percent")) + " of daily share\n7d " + amount(part(metric, "week", "value"), unit)
@@ -165,6 +177,119 @@ final class WidgetData {
         }
         return out.put("state", "ready").put("reason", "").put("rows", rows)
             .put("summary", "Workers Paid allowance · account-wide, UTC · " + elapsed + " of " + (billingCycle ? "billing cycle elapsed · " + Character.toLowerCase(cycleLabel.charAt(0)) + cycleLabel.substring(1) : "month elapsed"));
+    }
+    /** A plausible past timestamp (not more than a minute in the future), else 0. */
+    static long time(JSONObject object, String key, long now) {
+        Object value = object == null ? null : object.opt(key);
+        if (!(value instanceof Number)) return 0;
+        long at = ((Number) value).longValue();
+        return at > 0 && at <= now + 60000 ? at : 0;
+    }
+    /** A whole non-negative count, or JSON null (unmeasured; never 0). */
+    static Object whole(Object value) {
+        if (!(value instanceof Number)) return JSONObject.NULL;
+        double n = ((Number) value).doubleValue();
+        return Double.isFinite(n) && n >= 0 && n <= 9007199254740991d && n == Math.floor(n) ? (Object) ((Number) value).longValue() : JSONObject.NULL;
+    }
+    static final java.util.List<String> SEVERITIES = java.util.Arrays.asList("critical", "warning", "info");
+    /**
+     * critical (✕ CRIT) for a confirmed failure, info (i INFO) for a coverage limit or optional
+     * check, otherwise warning (! WARN), including a required check that cannot be verified; ""
+     * when green. The server's value is used when valid; older servers send none and the same rule
+     * is applied here. Plan usage is never a severity (owner decision 6).
+     */
+    static String severity(JSONObject entry, String server) {
+        String color = text(entry, "color");
+        if ("green".equals(color)) return "";
+        if (SEVERITIES.contains(server)) return server;
+        if ("red".equals(color) || entry.optBoolean("confirmedFailure", false)) return "critical";
+        if (!entry.optBoolean("required", true) || entry.optBoolean("coverageLimit", false)) return "info";
+        return "warning";
+    }
+    static final int SERIES_POINTS = 48, SERIES_DAYS = 7, RESOLVED_ITEMS = 5, MAIN_RUNS = 20;
+    /** "absent" (older server: needs an update), "unavailable" (read failed) or the server's state. */
+    private static JSONObject part(JSONObject root, String key) throws Exception {
+        JSONObject source = root.optJSONObject(key);
+        if (source == null) return new JSONObject().put("state", "absent");
+        if (!"ready".equals(text(source, "state"))) {
+            String code = text(source, "errorCode");
+            return new JSONObject().put("state", "unavailable").put("errorCode", code.matches("[A-Z0-9_]{1,40}") ? code : "");
+        }
+        return null;
+    }
+    private static JSONArray counts(JSONArray source, int size) {
+        if (source == null || source.length() != size) return null;
+        JSONArray out = new JSONArray();
+        for (int i = 0; i < size; i++) out.put(whole(source.opt(i)));
+        return out;
+    }
+    /** Requests/errors per half-hour (48) and per local day (7); null entries stay gaps. */
+    static JSONObject series(JSONObject root) throws Exception {
+        JSONObject gap = part(root, "series");
+        if (gap != null) return gap;
+        JSONObject source = root.getJSONObject("series"), half = source.optJSONObject("halfHour");
+        JSONArray requests = half == null ? null : counts(half.optJSONArray("requests"), SERIES_POINTS);
+        JSONArray errors = half == null ? null : counts(half.optJSONArray("errors"), SERIES_POINTS);
+        JSONArray days = source.optJSONArray("daily"), daily = new JSONArray();
+        if (requests == null || errors == null || days == null) return new JSONObject().put("state", "unavailable").put("errorCode", "INVALID_SERIES");
+        for (int i = 0; i < days.length() && daily.length() < SERIES_DAYS; i++) {
+            JSONObject day = days.optJSONObject(i);
+            String date = text(day, "day");
+            if (day == null || !date.matches("\\d{4}-\\d{2}-\\d{2}")) continue;
+            daily.put(new JSONObject().put("day", date).put("requests", whole(day.opt("requests"))).put("errors", whole(day.opt("errors")))
+                .put("measured", Math.max(0, day.optInt("measured", 0))).put("expected", Math.max(0, day.optInt("expected", 0)))
+                .put("active", whole(day.opt("active24hMax"))));
+        }
+        return new JSONObject().put("state", "ready").put("end", half.optLong("end", 0)).put("intervalMs", half.optLong("intervalMs", 1800000))
+            .put("requests", requests).put("errors", errors).put("measured", Math.max(0, half.optInt("measured", 0))).put("daily", daily);
+    }
+    private static String clip(String value, int size) { return value.length() > size ? value.substring(0, size - 1) + "…" : value; }
+    /** Problems resolved in the last 24 hours (at most five, newest first), with their start and end. */
+    static JSONObject resolved(JSONObject root, long now) throws Exception {
+        JSONObject gap = part(root, "recentlyResolved");
+        if (gap != null) return gap;
+        JSONObject source = root.getJSONObject("recentlyResolved");
+        JSONArray items = source.optJSONArray("items"), out = new JSONArray();
+        if (items != null) for (int i = 0; i < items.length() && out.length() < RESOLVED_ITEMS; i++) {
+            JSONObject item = items.optJSONObject(i);
+            String component = text(item, "component");
+            long start = time(item, "startedAt", now), end = time(item, "resolvedAt", now);
+            if (item == null || component.isEmpty() || end <= 0) continue;
+            String severity = text(item, "severity");
+            JSONArray history = item.optJSONArray("history"), safeHistory = new JSONArray();
+            if (history != null) for (int h = 0; h < Math.min(3, history.length()); h++) {
+                JSONObject entry = history.optJSONObject(h);
+                if (entry != null) safeHistory.put(new JSONObject().put("at", time(entry, "at", now)).put("color", text(entry, "color")).put("symptom", clip(text(entry, "symptom"), 200)));
+            }
+            out.put(new JSONObject().put("component", clip(component, 80)).put("severity", SEVERITIES.contains(severity) ? severity : "warning")
+                .put("startedAt", start).put("resolvedAt", end).put("durationMs", start > 0 ? Math.max(0, end - start) : 0)
+                .put("resolution", "retired".equals(text(item, "resolution")) ? "retired" : "resolved")
+                .put("brief", clip(text(item, "brief"), 80)).put("symptom", clip(text(item, "symptom"), 240)).put("impact", clip(text(item, "impact"), 200)).put("history", safeHistory));
+        }
+        int total = Math.max(out.length(), source.optInt("total", out.length()));
+        return new JSONObject().put("state", "ready").put("items", out).put("total", total).put("complete", source.optBoolean("complete", true));
+    }
+    /** Live rooms (activity in the last 5 minutes) or an explicit gap. */
+    static JSONObject rooms(JSONObject root, long now) throws Exception {
+        JSONObject gap = part(root, "rooms");
+        if (gap != null) return gap;
+        JSONObject source = root.getJSONObject("rooms");
+        Object live = whole(source.opt("live"));
+        if (live == JSONObject.NULL) return new JSONObject().put("state", "unavailable").put("errorCode", "INVALID_COUNT");
+        return new JSONObject().put("state", "ready").put("live", live).put("checkedAt", time(source, "checkedAt", now));
+    }
+    /** The last completed runs on main for the CI pips; null for an older server or no GitHub reading. */
+    static JSONArray mainRuns(JSONObject root, long now) throws Exception {
+        JSONObject development = ready(root, "development");
+        JSONArray runs = development == null ? null : development.optJSONArray("mainRuns");
+        if (runs == null) return null;
+        JSONArray out = new JSONArray();
+        for (int i = 0; i < runs.length() && out.length() < MAIN_RUNS; i++) {
+            JSONObject run = runs.optJSONObject(i);
+            if (run == null) continue;
+            out.put(new JSONObject().put("name", clip(text(run, "name"), 40)).put("conclusion", text(run, "conclusion")).put("at", time(run, "at", now)).put("deployment", run.optBoolean("deployment", false)));
+        }
+        return out;
     }
     /** healthy, attention (a recent problem, not current), unverified or failure; older servers send only a colour. */
     static String statusKind(JSONObject overall) {
@@ -253,10 +378,25 @@ final class WidgetData {
             long lastAt=source.optLong("lastAt",0);
             entry.put("lastAt",lastAt>0&&lastAt<=now+60000?lastAt:0);
             entry.put("required",source.optBoolean("required",true)).put("coverageLimit",source.optBoolean("coverageLimit",false));
+            // Redesign (2026-10-25): severity, start and duration, which the face once dropped.
+            entry.put("confirmedFailure",source.optBoolean("confirmedFailure",false)).put("retainedFailure",source.optBoolean("retainedFailure",false));
+            entry.put("firstOccurredAt",time(source,"firstOccurredAt",now)).put("durationMs",Math.max(0,source.optLong("durationMs",0)));
+            Object errorCount=source.opt("errorCount"),requestCount=source.opt("requestCount");
+            entry.put("errorCount",whole(errorCount)).put("requestCount",whole(requestCount));
+            entry.put("severity",severity(entry,text(source,"severity")));
             if("Worker execution errors".equals(text(source,"component")))projected.put("errorsColor",text(source,"color")).put("errorsState",text(source,"state"));
             safe.put(entry);
         }
         projected.put("diagnostics",safe);
+        projected.put("series",series(root)).put("resolved",resolved(root,now)).put("rooms",rooms(root,now));
+        JSONArray runs=mainRuns(root,now);
+        if(runs!=null)projected.put("mainRuns",runs);
+        projected.put("activeAccounts24h",count(stats,"active24h"));
+        if(development!=null){JSONObject latest=development.optJSONObject("latestDeployment");long at=latest==null?0:time(latest,"updatedAt",now);projected.put("deployedAt",at);}
+        JSONObject developmentSource=root.optJSONObject("development"),trafficSource=root.optJSONObject("traffic");
+        projected.put("reused",(developmentSource!=null&&developmentSource.optBoolean("reused",false)?"GitHub "+WidgetRows.clock(developmentSource.optLong("checkedAt")):"")
+            +(trafficSource!=null&&trafficSource.optBoolean("reused",false)?(developmentSource!=null&&developmentSource.optBoolean("reused",false)?" · ":"")+"Cloudflare "+WidgetRows.clock(trafficSource.optLong("checkedAt")):""));
+        if(report!=null){JSONArray gaps=report.optJSONArray("gaps");projected.put("reportDay",text(report,"day")).put("reportGaps",gaps==null?-1:gaps.length());}
         JSONArray checks = health.optJSONArray("checks");
         StringBuilder service = new StringBuilder();
         if (checks != null) for (int i = 0; i < checks.length(); i++) {

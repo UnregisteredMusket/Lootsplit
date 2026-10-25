@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- At or above 80% of the cycle's allowance (owner decision 6: shown on the gauge only). -->
+<layer-list xmlns:android="http://schemas.android.com/apk/res/android">
+    <item android:id="@android:id/background"><shape><corners android:radius="3dp" /><solid android:color="#668C8C8C" /></shape></item>
+    <item android:id="@android:id/progress"><clip><shape><corners android:radius="3dp" /><solid android:color="#C08A12" /></shape></clip></item>
+</layer-list>

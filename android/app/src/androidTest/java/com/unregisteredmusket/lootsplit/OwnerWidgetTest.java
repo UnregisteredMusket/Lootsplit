@@ -435,7 +435,7 @@ public class OwnerWidgetTest {
     private View renderCompanion(JSONObject state,JSONObject settings,int width,int height,String name) throws Exception {
         AtomicReference<Throwable> failure=new AtomicReference<>();AtomicReference<View> rendered=new AtomicReference<>();
         InstrumentationRegistry.getInstrumentation().runOnMainSync(()->{ try {
-            FrameLayout parent=new FrameLayout(context);View view=CompanionWidgetProvider.views(context,state,settings,101).apply(context,parent);parent.addView(view);rendered.set(view);
+            FrameLayout parent=new FrameLayout(context);View view=CompanionWidgetProvider.views(context,state,settings,101,width).apply(context,parent);parent.addView(view);rendered.set(view);
             float density=context.getResources().getDisplayMetrics().density;int w=Math.round(width*density),h=Math.round(height*density);
             parent.measure(View.MeasureSpec.makeMeasureSpec(w,View.MeasureSpec.EXACTLY),View.MeasureSpec.makeMeasureSpec(h,View.MeasureSpec.EXACTLY));parent.layout(0,0,w,h);bounds(view);
             assertTrue(view.findViewById(R.id.companion_action1).getWidth()>=44*density);assertTrue(view.findViewById(R.id.companion_action1).getHeight()>=44*density);
@@ -465,24 +465,45 @@ public class OwnerWidgetTest {
         AtomicReference<Throwable> failure=new AtomicReference<>();
         for(String theme:new String[]{"terminal","light"}) for(String color:new String[]{"green","yellow","red"}) {
             CompanionSettings.save(context,103,CompanionSettings.preset("Server Health").put("theme",theme));
+            boolean light="light".equals(theme);WidgetCharts.Palette palette=WidgetCharts.Palette.of(light);
             JSONObject source=journalFixture();source.getJSONArray("diagnostics").getJSONObject(0).put("color",color);
-            org.json.JSONArray rows=WidgetRows.rows(WidgetData.project(source,System.currentTimeMillis()));JSONObject diagnostic=null;
-            for(int i=0;i<rows.length();i++)if("diagnostics".equals(rows.getJSONObject(i).optString("action")) && color.equals(rows.getJSONObject(i).optString("color")))diagnostic=rows.getJSONObject(i);
-            assertNotNull(diagnostic);JSONObject row=diagnostic;
+            org.json.JSONArray rows=WidgetRows.rows(WidgetData.project(source,System.currentTimeMillis()));
+            JSONObject row=rowTitled(rows,"GitHub");
+            assertNotNull(row);
             InstrumentationRegistry.getInstrumentation().runOnMainSync(()->{try{
                 View view=OwnerWidgetService.rowView(context,row,103).apply(context,new FrameLayout(context));
-                TextView glyph=view.findViewById(R.id.widget_row_glyph),title=view.findViewById(R.id.widget_row_title),detail=view.findViewById(R.id.widget_row_detail);
                 int background=((android.graphics.drawable.ColorDrawable)view.getBackground()).getColor();
-                // Status is carried by a distinct glyph shape plus color, and spoken in the row description.
-                assertEquals("red".equals(color)?"✕":"green".equals(color)?"✓":"!",glyph.getText().toString());
-                assertEquals(OwnerWidgetProvider.color(color,"light".equals(theme)),glyph.getCurrentTextColor());
-                assertTrue(view.getContentDescription().toString().startsWith(WidgetRows.statusWord(color)));
-                assertEquals("GitHub",title.getText().toString());
-                assertTrue("Full detail stays available",view.getContentDescription().toString().contains("Check the integration connection."));
-                assertEquals(1,detail.getMaxLines());
-                assertTrue("Status glyph contrast "+theme+"/"+color,androidx.core.graphics.ColorUtils.calculateContrast(glyph.getCurrentTextColor(),background)>=4.5);
-                assertTrue("Title text contrast "+theme,androidx.core.graphics.ColorUtils.calculateContrast(title.getCurrentTextColor(),background)>=4.5);
-                assertTrue("Detail text contrast "+theme,androidx.core.graphics.ColorUtils.calculateContrast(detail.getCurrentTextColor(),background)>=4.5);
+                if("green".equals(color)) {
+                    // A passing check stays a plain row under More: ✓ glyph, colour and spoken status.
+                    assertEquals("row",row.optString("kind","row"));
+                    TextView glyph=view.findViewById(R.id.widget_row_glyph),title=view.findViewById(R.id.widget_row_title),detail=view.findViewById(R.id.widget_row_detail);
+                    assertEquals("✓",glyph.getText().toString());
+                    assertEquals(OwnerWidgetProvider.color(color,light),glyph.getCurrentTextColor());
+                    assertTrue(view.getContentDescription().toString().startsWith(WidgetRows.statusWord(color)));
+                    assertEquals("GitHub",title.getText().toString());
+                    assertEquals(1,detail.getMaxLines());
+                    assertTrue("Status glyph contrast "+theme,androidx.core.graphics.ColorUtils.calculateContrast(glyph.getCurrentTextColor(),background)>=4.5);
+                    assertTrue("Title text contrast "+theme,androidx.core.graphics.ColorUtils.calculateContrast(title.getCurrentTextColor(),background)>=4.5);
+                    assertTrue("Detail text contrast "+theme,androidx.core.graphics.ColorUtils.calculateContrast(detail.getCurrentTextColor(),background)>=4.5);
+                } else {
+                    // A problem is an attention item: the chip's shape and word carry the severity, not only colour.
+                    assertEquals("item",row.getString("kind"));
+                    String severity="red".equals(color)?"critical":"warning";
+                    TextView chip=view.findViewById(R.id.item_chip),title=view.findViewById(R.id.item_title),meta=view.findViewById(R.id.item_meta),tag=view.findViewById(R.id.item_tag);
+                    assertEquals("red".equals(color)?"✕ CRIT":"! WARN",chip.getText().toString());
+                    assertEquals(palette.severity(severity),chip.getCurrentTextColor());
+                    assertEquals("ACTIVE",tag.getText().toString());
+                    assertEquals("GitHub",title.getText().toString());
+                    assertEquals(1,meta.getMaxLines());
+                    assertTrue("Spoken severity",view.getContentDescription().toString().startsWith(WidgetRows.severityWord(severity)+", active. GitHub"));
+                    assertTrue("Full detail stays available",view.getContentDescription().toString().contains("Check the integration connection."));
+                    int tile=palette.tile, tagBackground=((android.graphics.drawable.ColorDrawable)tag.getBackground()).getColor();
+                    assertTrue("Chip contrast "+theme+"/"+color,androidx.core.graphics.ColorUtils.calculateContrast(chip.getCurrentTextColor(),tile)>=4.5);
+                    assertTrue("Title contrast "+theme,androidx.core.graphics.ColorUtils.calculateContrast(title.getCurrentTextColor(),tile)>=4.5);
+                    assertTrue("Meta contrast "+theme,androidx.core.graphics.ColorUtils.calculateContrast(meta.getCurrentTextColor(),tile)>=4.5);
+                    assertTrue("Tag contrast "+theme+"/"+color,androidx.core.graphics.ColorUtils.calculateContrast(tag.getCurrentTextColor(),tagBackground)>=4.5);
+                    assertEquals(palette.background,background);
+                }
             }catch(Throwable error){failure.set(error);}});
             if(failure.get()!=null)throw new AssertionError(theme+"/"+color,failure.get());
         }
@@ -496,6 +517,7 @@ public class OwnerWidgetTest {
         if(failure.get()!=null)throw new AssertionError("neutral row",failure.get());
         CompanionSettings.remove(context,103);
     }
+
     private void captureHostedWidget(View view,String name) throws Exception {
         assertTrue(view.getWidth()>0 && view.getHeight()>0);
         Bitmap bitmap=Bitmap.createBitmap(view.getWidth(),view.getHeight(),Bitmap.Config.ARGB_8888);view.draw(new Canvas(bitmap));
@@ -721,41 +743,57 @@ public class OwnerWidgetTest {
         if(failure.get()!=null)throw new AssertionError("row variants",failure.get());
         WidgetRowState.remove(context,104);
     }
-    /** Polls the hosted collection's first row until it shows the expected state. */
-    private boolean firstRowExpanded(AtomicReference<android.appwidget.AppWidgetHostView> hosted,boolean expected) {
+    /** The hosted list child showing row {@code position}, or null while it is not laid out. */
+    private View hostedRow(AtomicReference<android.appwidget.AppWidgetHostView> hosted,int position) {
+        android.widget.ListView list=hosted.get().findViewById(R.id.monitor_list);
+        return list==null?null:list.getChildAt(position-list.getFirstVisiblePosition());
+    }
+    /** Polls the hosted attention item at {@code position} until it shows the expected state. */
+    private boolean itemExpanded(AtomicReference<android.appwidget.AppWidgetHostView> hosted,int position,boolean expected) {
         long deadline=android.os.SystemClock.elapsedRealtime()+8000;AtomicInteger state=new AtomicInteger(-1);
         while(android.os.SystemClock.elapsedRealtime()<deadline){
             InstrumentationRegistry.getInstrumentation().runOnMainSync(()->{
-                android.widget.ListView list=hosted.get().findViewById(R.id.monitor_list);View child=list==null?null:list.getChildAt(0);
-                TextView chevron=child==null?null:child.findViewById(R.id.widget_row_chevron);TextView detail=child==null?null:child.findViewById(R.id.widget_row_detail);
-                View open=child==null?null:child.findViewById(R.id.widget_row_open);
-                if(chevron==null||detail==null){state.set(-1);return;}
-                boolean isExpanded="▴".contentEquals(chevron.getText())&&detail.getMaxLines()>1&&open!=null&&open.getVisibility()==View.VISIBLE&&open.hasOnClickListeners();
-                boolean isCompact="▾".contentEquals(chevron.getText())&&detail.getMaxLines()==1&&open==null;
+                View child=hostedRow(hosted,position);
+                TextView chevron=child==null?null:child.findViewById(R.id.item_chevron);View more=child==null?null:child.findViewById(R.id.item_more);
+                if(chevron==null||more==null){state.set(-1);return;}
+                View button=more.findViewById(R.id.item_button1);
+                boolean isExpanded="▴".contentEquals(chevron.getText())&&more.getVisibility()==View.VISIBLE&&button!=null&&button.hasOnClickListeners();
+                boolean isCompact="▾".contentEquals(chevron.getText())&&more.getVisibility()==View.GONE;
                 state.set(isExpanded?1:isCompact?0:-1);
             });
             if(state.get()==(expected?1:0))return true;android.os.SystemClock.sleep(100);
         }
         return false;
     }
-    private void tapFirstRow(AtomicReference<android.appwidget.AppWidgetHostView> hosted) {
+    private void tapRow(AtomicReference<android.appwidget.AppWidgetHostView> hosted,int position) {
         InstrumentationRegistry.getInstrumentation().runOnMainSync(()->{
             // A collection item's root fill-in is delivered by the list's item click, as a real tap is.
-            android.widget.ListView list=hosted.get().findViewById(R.id.monitor_list);View child=list.getChildAt(0);
-            assertTrue("Row tap reaches the host's click handler",list.performItemClick(child,list.getFirstVisiblePosition(),list.getItemIdAtPosition(list.getFirstVisiblePosition())));
+            android.widget.ListView list=hosted.get().findViewById(R.id.monitor_list);View child=hostedRow(hosted,position);
+            assertNotNull("Row "+position+" is laid out",child);
+            assertTrue("Row tap reaches the host's click handler",list.performItemClick(child,position,list.getItemIdAtPosition(position)));
         });
+    }
+    private static int position(org.json.JSONArray rows,String id) throws Exception {
+        for(int i=0;i<rows.length();i++)if(id.equals(rows.getJSONObject(i).optString("id"))||rows.getJSONObject(i).optString("ids").contains("\""+id+"\""))return i;
+        return -1;
     }
     @Test public void actualFrameworkHostExpandsAndCollapsesRowOnTap() throws Exception {
         assertEquals("1",shell("getprop ro.kernel.qemu"));
         shell("appwidget grantbind --package "+context.getPackageName()+" --user 0");
         String generation=WidgetStore.connect(context,"synthetic-expand");
-        JSONObject snapshot=WidgetData.project(journalFixture(),System.currentTimeMillis());
+        JSONObject snapshot=WidgetData.project(redesignFixture(),System.currentTimeMillis());
         WidgetStore.finish(context,generation,snapshot,"");
-        String firstId=WidgetRows.rows(snapshot).getJSONObject(0).getString("id");
+        org.json.JSONArray rows=WidgetRows.rows(snapshot);
+        // The first row is the Needs attention heading; the first item under it is the critical one.
+        assertEquals("section:attention",rows.getJSONObject(0).getString("id"));
+        int item=1;String itemId=rows.getJSONObject(item).getString("id");
+        assertEquals("diagnostic:Worker execution errors",itemId);
         android.appwidget.AppWidgetHost host=new android.appwidget.AppWidgetHost(context,197410);
         android.appwidget.AppWidgetManager manager=android.appwidget.AppWidgetManager.getInstance(context);
         int id=host.allocateAppWidgetId();
         WidgetAuditActivity activity=null;
+        AtomicInteger fetches=new AtomicInteger();
+        WidgetRefresh.fetcher=token->{fetches.incrementAndGet();throw new java.io.IOException("Expanding must never fetch");};
         try {
             WidgetRowState.remove(context,id);
             assertTrue(manager.bindAppWidgetIdIfAllowed(id,new android.content.ComponentName(context,OwnerWidgetProvider.class)));
@@ -764,26 +802,52 @@ public class OwnerWidgetTest {
             InstrumentationRegistry.getInstrumentation().runOnMainSync(()->{
                 host.startListening();android.appwidget.AppWidgetHostView view=host.createView(screen,id,manager.getAppWidgetInfo(id));
                 float density=context.getResources().getDisplayMetrics().density;
-                screen.setContentView(view,new ViewGroup.LayoutParams(Math.round(350*density),Math.round(480*density)));hosted.set(view);
+                screen.setContentView(view,new ViewGroup.LayoutParams(Math.round(368*density),Math.round(560*density)));hosted.set(view);
                 OwnerWidgetProvider.renderAll(context);
             });
-            assertTrue("Rows start compact",firstRowExpanded(hosted,false));
-            // Tap: the real host sends the row's fill-in through the broadcast template; the row expands in place.
-            tapFirstRow(hosted);
-            assertTrue("Tapped row expands",firstRowExpanded(hosted,true));
-            assertEquals(java.util.Collections.singleton(firstId),WidgetRowState.expanded(context,id));
+            assertTrue("Items start compact",itemExpanded(hosted,item,false));
+            // Tap: the real host sends the row's fill-in through the broadcast template; the item expands in place.
+            tapRow(hosted,item);
+            assertTrue("Tapped item expands",itemExpanded(hosted,item,true));
+            assertEquals(java.util.Collections.singleton(itemId),WidgetRowState.expanded(context,id));
             AtomicReference<Throwable> captureFailure=new AtomicReference<>();
-            InstrumentationRegistry.getInstrumentation().runOnMainSync(()->{try{captureHostedWidget(hosted.get(),"hosted-main-row-expanded");}catch(Throwable error){captureFailure.set(error);}});
+            AtomicReference<Boolean> chart=new AtomicReference<>(false);
+            InstrumentationRegistry.getInstrumentation().runOnMainSync(()->{try{
+                android.widget.ImageView image=hostedRow(hosted,item).findViewById(R.id.item_chart);
+                chart.set(image.getVisibility()==View.VISIBLE&&image.getDrawable() instanceof android.graphics.drawable.BitmapDrawable);
+                captureHostedWidget(hosted.get(),"hosted-main-item-expanded");}catch(Throwable error){captureFailure.set(error);}});
             if(captureFailure.get()!=null)throw new AssertionError("Expanded screenshot",captureFailure.get());
-            // A newer reading with the same rows keeps the row expanded.
+            assertTrue("The expanded Worker errors item draws its 6-hour error chart",chart.get());
+            // A newer reading with the same items keeps the item expanded.
             assertTrue(WidgetStore.finish(context,generation,new JSONObject(snapshot.toString()).put("snapshotId",43).put("checkedAt",System.currentTimeMillis()),""));
             InstrumentationRegistry.getInstrumentation().runOnMainSync(()->OwnerWidgetProvider.renderAll(context));
             android.os.SystemClock.sleep(500);
-            assertTrue("Expanded state survives a refresh",firstRowExpanded(hosted,true));
+            assertTrue("Expanded state survives a refresh",itemExpanded(hosted,item,true));
             // Tap again: collapses.
-            tapFirstRow(hosted);
-            assertTrue("Second tap collapses",firstRowExpanded(hosted,false));
+            tapRow(hosted,item);
+            assertTrue("Second tap collapses",itemExpanded(hosted,item,false));
             assertTrue(WidgetRowState.expanded(context,id).isEmpty());
+            // A glance tile expands through its own fill-in, then the 24h/7d toggle re-renders without a fetch.
+            int tiles=position(rows,WidgetTiles.TRAFFIC);
+            assertTrue(tiles>0);
+            InstrumentationRegistry.getInstrumentation().runOnMainSync(()->android.widget.ListView.class.cast(hosted.get().findViewById(R.id.monitor_list)).setSelection(tiles));
+            long deadline=android.os.SystemClock.elapsedRealtime()+8000;AtomicReference<Boolean> clicked=new AtomicReference<>(false);
+            while(!clicked.get()&&android.os.SystemClock.elapsedRealtime()<deadline){
+                InstrumentationRegistry.getInstrumentation().runOnMainSync(()->{View child=hostedRow(hosted,tiles);View tile=child==null?null:child.findViewById(R.id.tile_root_a);if(tile!=null&&tile.hasOnClickListeners())clicked.set(tile.performClick());});
+                if(!clicked.get())android.os.SystemClock.sleep(100);
+            }
+            assertTrue("The traffic tile is tappable",clicked.get());
+            deadline=android.os.SystemClock.elapsedRealtime()+8000;
+            while(!WidgetRowState.expanded(context,id).contains(WidgetTiles.TRAFFIC)&&android.os.SystemClock.elapsedRealtime()<deadline)android.os.SystemClock.sleep(50);
+            assertTrue(WidgetRowState.expanded(context,id).contains(WidgetTiles.TRAFFIC));
+            android.content.Intent seven=new android.content.Intent(context,OwnerWidgetProvider.class).setAction(OwnerWidgetProvider.ROW_TAP).putExtra(android.appwidget.AppWidgetManager.EXTRA_APPWIDGET_ID,id).putExtra(OwnerWidgetProvider.ROW_ID,WidgetTiles.RANGE_7D);
+            OwnerWidgetProvider.rowTap(context,seven);
+            assertTrue(WidgetRowState.expanded(context,id).contains(WidgetTiles.RANGE_7D));
+            InstrumentationRegistry.getInstrumentation().runOnMainSync(()->{try{captureHostedWidget(hosted.get(),"hosted-main-traffic-7d");}catch(Throwable error){captureFailure.set(error);}});
+            if(captureFailure.get()!=null)throw new AssertionError("Traffic screenshot",captureFailure.get());
+            OwnerWidgetProvider.rowTap(context,new android.content.Intent(seven).putExtra(OwnerWidgetProvider.ROW_ID,WidgetTiles.RANGE_24H));
+            assertFalse(WidgetRowState.expanded(context,id).contains(WidgetTiles.RANGE_7D));
+            assertEquals("Expanding and toggling never fetch",0,fetches.get());
         }finally{
             if(activity!=null){WidgetAuditActivity screen=activity;InstrumentationRegistry.getInstrumentation().runOnMainSync(screen::finish);InstrumentationRegistry.getInstrumentation().waitForIdleSync();}
             host.stopListening();host.deleteHost();WidgetRowState.remove(context,id);CompanionSettings.remove(context,id);shell("appwidget revokebind --package "+context.getPackageName()+" --user 0");
@@ -837,19 +901,34 @@ public class OwnerWidgetTest {
             assertEquals("red".equals(color)?"✕":"green".equals(color)?"✓":"!",glyph);
             assertEquals("red".equals(color)?"FAILURE":"green".equals(color)?"HEALTHY":"UNVERIFIED",text(view,R.id.monitor_health));
             assertEquals(OwnerWidgetProvider.color(color,false),((TextView)view.findViewById(R.id.monitor_health)).getCurrentTextColor());
+            // Severity counts: ✕ critical, ! warning, i info, always with their number.
+            assertEquals("red".equals(color)?"✕1":"✕0",text(view,R.id.monitor_count_crit));
+            assertEquals("yellow".equals(color)?"!1":"!0",text(view,R.id.monitor_count_warn));
+            assertEquals("i0",text(view,R.id.monitor_count_info));
+            org.json.JSONArray rows=WidgetRows.rows(snapshot);
             if(!"green".equals(color)) {
                 assertEquals("Single component names itself with its symptom","GitHub · The source did not respond.",text(view,R.id.monitor_services));
-                assertEquals("NEEDS ATTENTION FIRST",text(view,R.id.monitor_list_label));
-                assertEquals(color,WidgetRows.rows(snapshot).getJSONObject(0).getString("color"));
-            } else assertEquals("LOG",text(view,R.id.monitor_list_label));
-            assertEquals("12",text(view,R.id.monitor_active));assertEquals("128",text(view,R.id.monitor_accounts));assertEquals("24",text(view,R.id.monitor_campaigns));
-            assertEquals("Traffic not connected stays unavailable, never 0","—",text(view,R.id.monitor_requests));
+                assertEquals("Needs attention",rows.getJSONObject(0).getString("title"));
+                assertEquals("1 active",rows.getJSONObject(0).getString("detail"));
+                assertEquals("GitHub",rows.getJSONObject(1).getString("title"));
+                assertEquals(color,rows.getJSONObject(1).getString("color"));
+            } else {
+                assertEquals("Attention",rows.getJSONObject(0).getString("title"));
+                assertEquals("No active problems",rows.getJSONObject(1).getString("title"));
+            }
+            // The figures the old stats strip showed live on in the Players and Traffic tiles.
+            JSONObject players=WidgetTiles.tile(snapshot,WidgetTiles.PLAYERS,java.util.Collections.<String>emptySet());
+            assertEquals("12 online",players.getString("value"));
+            assertEquals("24 campaigns · 128 accounts",players.getString("note2"));
+            assertEquals("—",WidgetTiles.tile(snapshot,WidgetTiles.TRAFFIC,java.util.Collections.<String>emptySet()).getString("value"));
             assertEquals("OWNER · Test Owner · #42",text(view,R.id.monitor_identity));
-            assertTrue(text(view,R.id.monitor_development).startsWith("▶ TESTING"));
-            assertEquals(View.VISIBLE,view.findViewById(R.id.monitor_timer).getVisibility());
+            // The running task keeps its live timer in the strip.
+            JSONObject strip=WidgetTiles.strip(snapshot);
+            assertTrue(strip.getString("agent").startsWith("▶ TESTING"));
+            assertTrue(strip.getLong("timerStart")>0);
         }
         assertEquals("Glyph shapes differ per state, not only color",3,glyphs.size());
-        // Several components: a count on the face, the full list kept in the description and rows.
+        // Several components: a count on the face, the full list kept in the description and items.
         JSONObject source=journalFixture();
         source.put("overall",new JSONObject().put("color","red").put("reason","Database, Worker errors, GitHub"));
         source.put("traffic",new JSONObject().put("state","ready").put("data",new JSONObject().put("requests",11734).put("errors",42)));
@@ -857,23 +936,29 @@ public class OwnerWidgetTest {
         View view=mainFace(snapshot);
         assertEquals("3 checks failed · tap for details",text(view,R.id.monitor_services));
         assertTrue(view.findViewById(R.id.monitor_services).getContentDescription().toString().contains("Database, Worker errors, GitHub"));
-        assertEquals("11.7k",text(view,R.id.monitor_requests));
-        assertEquals("REQ · 42 ERR",text(view,R.id.monitor_requests_label));
-        assertEquals("Request tile turns red when errors exist",OwnerWidgetProvider.color("red",false),((TextView)view.findViewById(R.id.monitor_requests)).getCurrentTextColor());
-        // Every row is kept when attention rows move first.
+        JSONObject traffic=WidgetTiles.tile(snapshot,WidgetTiles.TRAFFIC,java.util.Collections.<String>emptySet());
+        assertEquals("11.7k req",traffic.getString("value"));
+        assertEquals("42 err",traffic.getString("errors"));
+        assertEquals("Errors are red without the Worker errors check (older server)","red",traffic.getString("errorColor"));
+        // Items are ordered critical first; every check stays listed (problems above, passing ones under More).
         source.put("diagnostics",new org.json.JSONArray().put(new JSONObject().put("component","Database").put("color","green").put("symptom","Responding").put("action","None"))
-            .put(new JSONObject().put("component","Worker errors").put("color","red").put("symptom","42 errors").put("action","Review deployment")));
+            .put(new JSONObject().put("component","GitHub").put("color","yellow").put("state","unavailable").put("symptom","No response").put("action","Retry"))
+            .put(new JSONObject().put("component","Worker errors").put("color","red").put("state","error").put("symptom","42 errors").put("action","Review deployment")));
         snapshot=WidgetData.project(source,System.currentTimeMillis());
         org.json.JSONArray rows=WidgetRows.rows(snapshot);
-        assertEquals("Worker errors",rows.getJSONObject(0).getString("title"));
-        int diagnostics=0;for(int i=0;i<rows.length();i++)if("diagnostics".equals(rows.getJSONObject(i).optString("action"))&&!rows.getJSONObject(i).optString("color").isEmpty())diagnostics++;
-        assertEquals(2,diagnostics);
-        assertEquals("Other rows keep their original order","Development",rows.getJSONObject(1).getString("title"));
-        assertEquals(WidgetRows.rows(WidgetData.project(source.put("diagnostics",new org.json.JSONArray()),System.currentTimeMillis())).length()+2,rows.length());
-        // Missing statistics render as "—" on every tile, never 0.
+        assertEquals("Worker errors",rows.getJSONObject(1).getString("title"));
+        assertEquals("critical",rows.getJSONObject(1).getString("severity"));
+        assertEquals("GitHub",rows.getJSONObject(2).getString("title"));
+        assertEquals("warning",rows.getJSONObject(2).getString("severity"));
+        assertNotNull("A passing check stays listed under More",rowTitled(rows,"Database"));
+        assertEquals("row",rowTitled(rows,"Database").optString("kind","row"));
+        assertNotNull("Earlier rows are kept",rowTitled(rows,"Development"));
+        assertNotNull(rowTitled(rows,"Full history, search and export"));
+        // Missing statistics stay "—", never 0.
         JSONObject missing=journalFixture();missing.getJSONObject("health").remove("stats");
-        view=mainFace(WidgetData.project(missing,System.currentTimeMillis()));
-        for(int id:new int[]{R.id.monitor_active,R.id.monitor_accounts,R.id.monitor_campaigns,R.id.monitor_requests})assertEquals("—",text(view,id));
+        JSONObject players=WidgetTiles.tile(WidgetData.project(missing,System.currentTimeMillis()),WidgetTiles.PLAYERS,java.util.Collections.<String>emptySet());
+        assertEquals("— online",players.getString("value"));
+        assertEquals("— campaigns · — accounts",players.getString("note2"));
     }
 
     private static JSONObject usagePart(long value,double share,double percent) throws Exception {
@@ -921,7 +1006,7 @@ public class OwnerWidgetTest {
         }
         source.remove("usage");
         rows=WidgetRows.rows(WidgetData.project(source,now));
-        boolean older=false;for(int i=0;i<rows.length();i++)older|=rows.getJSONObject(i).getString("detail").contains("not provided by server");
+        boolean older=false;for(int i=0;i<rows.length();i++)older|=rows.getJSONObject(i).optString("detail").contains("not provided by server");
         assertTrue("An older server states the gap",older);
     }
     private JSONObject activityEvent(String kind,String state,String text,String title,int pr,double minutesAgo) throws Exception {
@@ -1043,25 +1128,27 @@ public class OwnerWidgetTest {
         assertEquals("!",text(view,R.id.monitor_glyph));
         assertEquals("A recent error that stopped is attention, not a failure","ATTENTION",text(view,R.id.monitor_health));
         assertEquals("Worker execution errors · 1 error in 24h · last "+WidgetRows.clock(errorAt),text(view,R.id.monitor_services));
-        // The error tile is amber, not red, and the count is unchanged.
-        assertEquals("REQ · 1 ERR",text(view,R.id.monitor_requests_label));
-        assertEquals(OwnerWidgetProvider.color("yellow",false),((TextView)view.findViewById(R.id.monitor_requests_label)).getCurrentTextColor());
-        assertNotEquals(OwnerWidgetProvider.color("red",false),((TextView)view.findViewById(R.id.monitor_requests)).getCurrentTextColor());
-        assertTrue(view.findViewById(R.id.monitor_requests).getContentDescription().toString().contains("errors: 1, none in the latest half-hour"));
-        // Idle task card names the last task and how it ended instead of a bare "no task".
-        assertEquals("No development task active",text(view,R.id.monitor_development));
-        assertEquals(View.VISIBLE,view.findViewById(R.id.monitor_task_detail).getVisibility());
-        assertTrue(text(view,R.id.monitor_task_detail),text(view,R.id.monitor_task_detail).startsWith("Last: website-live-audit · completed "));
-        // Rows: the recent error first; Multiplayer kept, as information, never as attention.
+        assertEquals("✕0",text(view,R.id.monitor_count_crit));assertEquals("!1",text(view,R.id.monitor_count_warn));assertEquals("i1",text(view,R.id.monitor_count_info));
+        // The traffic tile's error count is amber, not red, and unchanged.
+        JSONObject traffic=WidgetTiles.tile(snapshot,WidgetTiles.TRAFFIC,java.util.Collections.<String>emptySet());
+        assertEquals("1 err",traffic.getString("errors"));
+        assertEquals("yellow",traffic.getString("errorColor"));
+        // Items: the recent error (warning) first; Multiplayer kept as information (NOTE), never as attention.
         org.json.JSONArray rows=WidgetRows.rows(snapshot);
-        assertEquals("Worker execution errors",rows.getJSONObject(0).getString("title"));
-        assertEquals("yellow",rows.getJSONObject(0).getString("color"));
-        assertEquals(WidgetRows.clock(errorAt),rows.getJSONObject(0).getString("time"));
-        assertEquals(1,WidgetRows.attention(rows));
-        boolean limit=false;
-        for(int i=0;i<rows.length();i++){JSONObject row=rows.getJSONObject(i);if(row.getString("title").equals("Multiplayer · coverage limit")){limit=true;assertEquals("",row.getString("color"));assertTrue(row.getString("detail").contains("no synthetic player session"));}}
-        assertTrue("The coverage limit stays listed",limit);
-        assertTrue(WidgetRows.rows(snapshot).getJSONObject(1).getString("detail").length()>0);
+        assertEquals("1 active",rows.getJSONObject(0).getString("detail"));
+        JSONObject errors=rows.getJSONObject(1);
+        assertEquals("Worker execution errors",errors.getString("title"));
+        assertEquals("warning",errors.getString("severity"));
+        assertEquals(WidgetRows.clock(errorAt),errors.getString("time"));
+        assertTrue(errors.getString("lines").contains("Warning · a recent problem that has stopped"));
+        JSONObject limit=rows.getJSONObject(2);
+        assertEquals("Multiplayer",limit.getString("title"));
+        assertEquals("info",limit.getString("severity"));
+        assertEquals("NOTE",limit.getString("tag"));
+        assertTrue(limit.getString("detail").contains("no synthetic player session"));
+        // Idle: the Development row names the last task and how it ended.
+        assertTrue(rowTitled(rows,"Development").getString("detail").startsWith("No development task active · last: website-live-audit · completed "));
+        assertFalse(WidgetTiles.strip(snapshot).getString("agent").startsWith("▶"));
         // Healthy with the same coverage limit reads HEALTHY with a short note; the limit is named in the description.
         JSONObject healthySource=productionFixture(errorAt);
         healthySource.put("overall",new JSONObject().put("color","green").put("status","healthy").put("label","Required checks current and healthy")
@@ -1074,21 +1161,26 @@ public class OwnerWidgetTest {
         assertEquals("HEALTHY",text(view,R.id.monitor_health));
         assertEquals("All checks passed · 1 coverage limit",text(view,R.id.monitor_services));
         assertTrue(view.findViewById(R.id.monitor_services).getContentDescription().toString().contains("Multiplayer"));
-        assertEquals("LOG",text(view,R.id.monitor_list_label));
+        assertEquals("Attention",WidgetRows.rows(healthy).getJSONObject(0).getString("title"));
+        assertEquals("i1",text(view,R.id.monitor_count_info));
+        assertEquals("2 checks passed",text(view,R.id.monitor_since));
         assertEquals("HEALTHY · all checks",WidgetRows.category(healthy,"health"));
-        // A current Worker error keeps the red tile.
+        // A current Worker error is red on the tile and critical in the list.
         JSONObject failing=productionFixture(errorAt);
         failing.put("overall",new JSONObject().put("color","red").put("status","failure").put("reason","Worker execution errors"));
-        failing.getJSONArray("diagnostics").getJSONObject(2).put("color","red").put("state","error");
-        view=mainFace(WidgetData.project(failing,System.currentTimeMillis()));
+        failing.getJSONArray("diagnostics").getJSONObject(2).put("color","red").put("state","error").put("confirmedFailure",true);
+        JSONObject failed=WidgetData.project(failing,System.currentTimeMillis());
+        view=mainFace(failed);
         assertEquals("FAILURE",text(view,R.id.monitor_health));
-        assertEquals(OwnerWidgetProvider.color("red",false),((TextView)view.findViewById(R.id.monitor_requests)).getCurrentTextColor());
+        assertEquals("red",WidgetTiles.tile(failed,WidgetTiles.TRAFFIC,java.util.Collections.<String>emptySet()).getString("errorColor"));
+        assertEquals("critical",WidgetRows.rows(failed).getJSONObject(1).getString("severity"));
         // Older servers (colour only) and inconsistent statuses fall back to the colour.
         assertEquals("unverified",WidgetData.statusKind(new JSONObject().put("color","yellow")));
         assertEquals("failure",WidgetData.statusKind(new JSONObject().put("color","red").put("status","healthy")));
         assertEquals("healthy",WidgetData.statusKind(new JSONObject().put("color","green")));
         assertEquals("unverified",WidgetData.statusKind(null));
     }
+
     @Test public void compactPayloadAgesAndBackgroundRetryRules() throws Exception {
         assertTrue("Widgets request the compact view",WidgetClient.ENDPOINT.endsWith("/api/account/owner/monitor?view=widget"));
         // The compact view has no scanned runs; everything the widgets show still projects.
@@ -1223,10 +1315,9 @@ public class OwnerWidgetTest {
                 assertTrue(view.findViewById(R.id.monitor_refresh).getHeight() >= 44 * density);
                 assertEquals(1, ((TextView) view.findViewById(R.id.monitor_services)).getMaxLines());
                 if (name.equals("signed-out") || name.equals("stale") || name.equals("unavailable")) {
-                    assertEquals("—", ((TextView) view.findViewById(R.id.monitor_active)).getText().toString());
-                    assertEquals("—", ((TextView) view.findViewById(R.id.monitor_accounts)).getText().toString());
-                    assertEquals("—", ((TextView) view.findViewById(R.id.monitor_campaigns)).getText().toString());
-                    assertEquals("—", ((TextView) view.findViewById(R.id.monitor_requests)).getText().toString());
+                    // Without a current reading there are no severity counts (never zeros) and no identity.
+                    assertEquals(View.GONE, view.findViewById(R.id.monitor_counts).getVisibility());
+                    assertEquals(View.GONE, view.findViewById(R.id.monitor_since).getVisibility());
                     assertFalse(((TextView) view.findViewById(R.id.monitor_identity)).getText().toString().contains("Test Owner"));
                 }
             } catch (Throwable error) { failure[0] = error; }
@@ -1244,5 +1335,300 @@ public class OwnerWidgetTest {
             assertTrue("Horizontal clipping " + child.getId(), child.getRight() <= group.getWidth() + 1);
             bounds(child);
         }
+    }
+
+    // ------------------------------------------------------------------ redesign (approved 2026-10-25)
+
+    /** A production-shaped reading with an incident, every redesign addition and a hot plan-usage gauge. */
+    private JSONObject redesignFixture() throws Exception {
+        JSONObject source=journalFixture(); long now=System.currentTimeMillis();
+        org.json.JSONArray requests=new org.json.JSONArray(),errors=new org.json.JSONArray();
+        for(int i=0;i<48;i++){requests.put(i==20?JSONObject.NULL:300+(i*37)%250);errors.put(i==20?JSONObject.NULL:i>=45?4:i==19?1:0);}
+        org.json.JSONArray daily=new org.json.JSONArray();
+        String[] days={"2026-10-19","2026-10-20","2026-10-21","2026-10-22","2026-10-23","2026-10-24","2026-10-25"};
+        long[] perDay={13900,15210,16840,14620,25860,26672,15460};
+        for(int i=0;i<7;i++)daily.put(new JSONObject().put("day",days[i]).put("requests",i==2?JSONObject.NULL:perDay[i]).put("errors",i==2?JSONObject.NULL:i==6?12:0).put("measured",i==2?0:i==6?22:48).put("expected",i==6?22:48).put("active24hMax",i+1));
+        source.put("series",new JSONObject().put("state","ready").put("halfHour",new JSONObject().put("intervalMs",1800000).put("end",now-60000).put("requests",requests).put("errors",errors).put("measured",47).put("expected",48)).put("daily",daily));
+        source.put("recentlyResolved",new JSONObject().put("state","ready").put("total",2).put("complete",true).put("items",new org.json.JSONArray()
+            .put(new JSONObject().put("component","GitHub source timeout").put("severity","warning").put("startedAt",now-40*60000).put("resolvedAt",now-39*60000).put("resolution","recovered").put("symptom","GitHub workflows could not be checked.")
+                .put("history",new org.json.JSONArray().put(new JSONObject().put("at",now-39*60000).put("color","green").put("symptom","The source returned a validated reading.")).put(new JSONObject().put("at",now-40*60000).put("color","yellow").put("symptom","Timed out."))))
+            .put(new JSONObject().put("component","Multiplayer round trip").put("severity","critical").put("startedAt",now-3*3600000).put("resolvedAt",now-150*60000).put("resolution","recovered"))));
+        source.put("checkedAt",now);
+        source.put("rooms",new JSONObject().put("state","ready").put("live",1).put("windowMs",300000).put("checkedAt",now-30000));
+        org.json.JSONArray runs=new org.json.JSONArray();
+        for(int i=0;i<12;i++)runs.put(new JSONObject().put("name",i%2==0?"Deploy verified website":"Verify preserved functionality").put("conclusion",i==3?"failure":i==7?"skipped":"success").put("at",now-(i+1)*3600000L).put("deployment",i%2==0));
+        source.getJSONObject("development").put("checkedAt",now).getJSONObject("data").put("mainRuns",runs).put("events",new org.json.JSONArray()).put("activeActivity",0);
+        source.getJSONObject("development").put("state","ready");
+        source.put("overall",new JSONObject().put("color","red").put("status","failure").put("reason","Worker execution errors"));
+        source.put("traffic",new JSONObject().put("state","ready").put("checkedAt",now).put("data",new JSONObject().put("requests",15460).put("errors",12)));
+        source.put("diagnostics",new org.json.JSONArray()
+            .put(new JSONObject().put("component","Storage").put("color","green").put("state","healthy").put("symptom","Database responded in 4 ms.").put("action","No action required."))
+            .put(new JSONObject().put("component","GitHub workflows").put("color","yellow").put("state","unavailable").put("severity","warning").put("firstOccurredAt",now-12*60000).put("symptom","GitHub workflows could not be checked.").put("action","Check the provider status."))
+            .put(new JSONObject().put("component","Multiplayer").put("color","yellow").put("state","unavailable").put("required",false).put("coverageLimit",true).put("symptom","Not measured by design.").put("action","None."))
+            .put(new JSONObject().put("component","Worker execution errors").put("color","red").put("state","error").put("severity","critical").put("confirmedFailure",true).put("firstOccurredAt",now-31*60000).put("lastAt",now-3*60000)
+                .put("errorCount",12).put("requestCount",1204).put("brief","12 errors in 24h").put("symptom","12 Worker error(s) were reported; errors occurred in the newest measured half-hour.").put("action","Inspect Cloudflare invocation logs.")));
+        org.json.JSONArray metrics=new org.json.JSONArray()
+            .put(new JSONObject().put("key","requests").put("label","Worker requests").put("unit","count").put("state","ready").put("level","ok").put("monthlyAllowance",10000000L).put("day",usagePart(12345,322580.645,3.8)).put("week",usagePart(80000,2258064.516,3.5)).put("month",usagePart(3800000,10000000,38)))
+            .put(new JSONObject().put("key","cpuMs").put("label","Worker CPU time").put("unit","ms").put("state","unavailable").put("errorCode","HTTP_400").put("level","unavailable"))
+            .put(new JSONObject().put("key","d1RowsRead").put("label","D1 rows read").put("unit","count").put("state","ready").put("level","attention").put("monthlyAllowance",25000000000L).put("day",usagePart(1000,806451612.9,0.0001)).put("week",usagePart(7000,5645161290.3,0.0001)).put("month",usagePart(21000000000L,25000000000L,84)));
+        source.put("usage",new JSONObject().put("state","ready").put("checkedAt",now).put("data",new JSONObject().put("metrics",metrics).put("windows",new JSONObject().put("month",new JSONObject().put("elapsedPercent",46).put("basis","billing-cycle").put("label","Cycle since Oct 11")))));
+        return source;
+    }
+
+    @Test public void severityChipsCountsAndTimesAreProjectedNeverColourAlone() throws Exception {
+        long now=System.currentTimeMillis();
+        JSONObject snapshot=WidgetData.project(redesignFixture(),now);
+        // Mapping: confirmed error → critical, unverifiable → warning, coverage limit → info, green → none.
+        java.util.Map<String,String> severities=new java.util.HashMap<>();
+        org.json.JSONArray diagnostics=snapshot.getJSONArray("diagnostics");
+        for(int i=0;i<diagnostics.length();i++)severities.put(diagnostics.getJSONObject(i).getString("component"),diagnostics.getJSONObject(i).getString("severity"));
+        assertEquals("critical",severities.get("Worker execution errors"));
+        assertEquals("warning",severities.get("GitHub workflows"));
+        assertEquals("info",severities.get("Multiplayer"));
+        assertEquals("",severities.get("Storage"));
+        // An older server sends no severity: the same rule applies on the phone.
+        for(String[] c:new String[][]{{"red","error","critical"},{"yellow","warning","warning"},{"yellow","unavailable","warning"},{"green","healthy",""}})
+            assertEquals(c[0]+"/"+c[1],c[2],WidgetData.severity(new JSONObject().put("color",c[0]).put("state",c[1]),""));
+        assertEquals("info",WidgetData.severity(new JSONObject().put("color","yellow").put("state","unavailable").put("coverageLimit",true),""));
+        assertEquals("A retained (re-unverified) failure stays critical","critical",WidgetData.severity(new JSONObject().put("color","yellow").put("confirmedFailure",true),""));
+        // Counts: plan usage at 84% is on its gauge only and never raises the warning count (owner decision 6).
+        assertArrayEquals(new int[]{1,1,1},WidgetRows.counts(snapshot));
+        JSONObject usage=WidgetTiles.tile(snapshot,WidgetTiles.USAGE,java.util.Collections.<String>emptySet());
+        boolean hot=false;for(int i=0;i<usage.getJSONArray("gauges").length();i++)hot|=usage.getJSONArray("gauges").getJSONObject(i).getBoolean("hot");
+        assertTrue("The 84% gauge is amber",hot);
+        // Items: chip, ACTIVE tag, start time and duration; critical first.
+        org.json.JSONArray rows=WidgetRows.rows(snapshot);
+        JSONObject critical=rows.getJSONObject(1),warning=rows.getJSONObject(2),info=rows.getJSONObject(3);
+        assertEquals("Worker execution errors",critical.getString("title"));
+        assertEquals("✕ CRIT",WidgetRows.chip(critical.getString("severity")));
+        assertEquals("! WARN",WidgetRows.chip(warning.getString("severity")));
+        assertEquals("i INFO",WidgetRows.chip(info.getString("severity")));
+        assertEquals("ACTIVE",critical.getString("tag"));assertEquals("NOTE",info.getString("tag"));
+        long started=critical.getLong("startedAt");
+        assertEquals("Started 31 minutes before the reading",31*60000L,snapshot.getLong("checkedAt")-started);
+        assertEquals("12 errors in 24h · started "+WidgetRows.clock(started)+" · 31m",critical.getString("meta"));
+        assertTrue(critical.getString("lines"),critical.getString("lines").contains("Severity  Critical · confirmed failure"));
+        assertTrue(critical.getString("lines").contains("Evidence  12 of 1,204 requests (1.0%) in 24h"));
+        assertEquals("Six hours of half-hours",12,critical.getJSONArray("chart").length());
+        View view=mainFace(snapshot);
+        assertEquals("since "+WidgetRows.clock(started)+" · active 31m",text(view,R.id.monitor_since));
+        assertTrue(view.findViewById(R.id.monitor_health).getContentDescription().toString().endsWith("1 critical, 1 warning, 1 info"));
+        assertEquals("1 critical",view.findViewById(R.id.monitor_count_crit).getContentDescription().toString());
+        assertEquals("31m",WidgetRows.duration(31*60000L));assertEquals("2h 5m",WidgetRows.duration(125*60000L));assertEquals("<1m",WidgetRows.duration(1000));assertEquals("3d 4h",WidgetRows.duration((3*24+4)*3600000L));
+        // Rendered, the spoken item names its severity.
+        AtomicReference<Throwable> failure=new AtomicReference<>();
+        InstrumentationRegistry.getInstrumentation().runOnMainSync(()->{try{
+            View item=OwnerWidgetService.rowView(context,critical,-1).apply(context,new FrameLayout(context));
+            assertTrue(item.getContentDescription().toString().startsWith("Critical, active. Worker execution errors"));
+            assertEquals("✕ CRIT",text(item,R.id.item_chip));
+        }catch(Throwable error){failure.set(error);}});
+        if(failure.get()!=null)throw new AssertionError("item",failure.get());
+    }
+
+    @Test public void resolvedItemsMoveDownWithTheirTimesAndOlderServersSaySo() throws Exception {
+        long now=System.currentTimeMillis();
+        JSONObject snapshot=WidgetData.project(redesignFixture(),now);
+        org.json.JSONArray rows=WidgetRows.rows(snapshot);
+        JSONObject resolved=rowTitled(rows,"GitHub source timeout");
+        assertNotNull(resolved);
+        assertEquals("resolved",resolved.getString("kind"));
+        JSONObject first=snapshot.getJSONObject("resolved").getJSONArray("items").getJSONObject(0);
+        assertEquals(60000L,first.getLong("resolvedAt")-first.getLong("startedAt"));
+        assertEquals(WidgetRows.clock(first.getLong("startedAt"))+" → "+WidgetRows.clock(first.getLong("resolvedAt"))+" · 1m · resolved",resolved.getString("line"));
+        assertTrue(resolved.getString("detail").contains("Timed out."));
+        assertEquals("✓",resolved.getString("glyph"));
+        // A resolved component is not an attention item, and an active one is not resolved.
+        for(int i=0;i<rows.length();i++){JSONObject row=rows.getJSONObject(i);
+            if("item".equals(row.optString("kind")))assertNotEquals("GitHub source timeout",row.getString("title"));
+            if("resolved".equals(row.optString("kind")))assertNotEquals("Worker execution errors",row.getString("title"));}
+        assertEquals("resolved:GitHub source timeout",resolved.getString("id"));
+        assertTrue(WidgetRows.summary(snapshot),WidgetRows.summary(snapshot).contains("✓ 2 resolved 24h"));
+        // An older server (no recentlyResolved) says it needs an update; it never claims "none".
+        JSONObject older=redesignFixture();older.remove("recentlyResolved");older.remove("series");older.remove("rooms");
+        org.json.JSONArray olderRows=WidgetRows.rows(WidgetData.project(older,now));
+        assertNotNull(rowTitled(olderRows,"Recovery times need a server update"));
+        assertNull(rowTitled(olderRows,"No problems resolved"));
+        assertEquals("Charts need a server update",WidgetTiles.tile(WidgetData.project(older,now),WidgetTiles.TRAFFIC,java.util.Collections.<String>emptySet()).getString("note1"));
+        assertTrue(WidgetTiles.tile(WidgetData.project(older,now),WidgetTiles.PLAYERS,java.util.Collections.<String>emptySet()).getString("valueNote").contains("update"));
+        // A reading stored by the previous app version (no redesign objects) asks for a refresh instead.
+        JSONObject cached=WidgetData.project(redesignFixture(),now);cached.remove("resolved");cached.remove("series");cached.remove("rooms");
+        assertNotNull(rowTitled(WidgetRows.rows(cached),"Recovery times appear after the next refresh"));
+        assertEquals("Charts appear after the next refresh",WidgetTiles.tile(cached,WidgetTiles.TRAFFIC,java.util.Collections.<String>emptySet()).getString("note1"));
+        // A failed read is explicit too; an empty, successful read says none.
+        JSONObject failed=redesignFixture();failed.put("recentlyResolved",new JSONObject().put("state","unavailable").put("errorCode","READ_FAILED"));
+        assertNotNull(rowTitled(WidgetRows.rows(WidgetData.project(failed,now)),"Recently resolved unavailable"));
+        JSONObject none=redesignFixture();none.put("recentlyResolved",new JSONObject().put("state","ready").put("total",0).put("items",new org.json.JSONArray()));
+        assertNotNull(rowTitled(WidgetRows.rows(WidgetData.project(none,now)),"No problems resolved in the last 24 hours"));
+        // More than five: the extra count is stated.
+        JSONObject many=redesignFixture();many.getJSONObject("recentlyResolved").put("total",8);
+        assertNotNull(rowTitled(WidgetRows.rows(WidgetData.project(many,now)),"6 more resolved in 24h"));
+        // A gap in the series stays null through the projection, never 0.
+        assertTrue(snapshot.getJSONObject("series").getJSONArray("requests").isNull(20));
+        assertTrue(snapshot.getJSONObject("series").getJSONArray("daily").getJSONObject(2).isNull("requests"));
+    }
+
+    @Test public void chartBitmapsAreDeterministicSmallAndKeepGapsAndBaselines() throws Exception {
+        float density=context.getResources().getDisplayMetrics().density;
+        Long[] requests=new Long[48],errors=new Long[48];
+        for(int i=0;i<48;i++){requests[i]=i==20?null:300L+(i*37)%250;errors[i]=i==47?5L:0L;}
+        for(boolean light:new boolean[]{false,true}){
+            WidgetCharts.Palette p=WidgetCharts.Palette.of(light);
+            Bitmap a=WidgetCharts.sparkline(requests,errors,104,26,density,p),b=WidgetCharts.sparkline(requests,errors,104,26,density,p);
+            assertEquals(WidgetCharts.px(104,density),a.getWidth());assertEquals(WidgetCharts.px(26,density),a.getHeight());
+            assertTrue("At most 2x density",a.getWidth()<=208);
+            assertEquals(Bitmap.Config.RGB_565,a.getConfig());
+            assertTrue("Deterministic",a.sameAs(b));
+            assertTrue("Face chart byte budget "+a.getAllocationByteCount(),a.getAllocationByteCount()<=64*1024);
+            // The newest slot's errors sit on their own baseline strip at the bottom right, in the error colour.
+            // The newest slot's errors sit on their own baseline strip (bottom right), in the error colour; none elsewhere.
+            int strip=WidgetCharts.errorStripPx(density);
+            assertTrue("Error bar on its baseline: "+region(a,(int)(a.getWidth()*0.96f),a.getWidth(),a.getHeight()-strip,a.getHeight()),
+                found(a,(int)(a.getWidth()*0.96f),a.getWidth(),a.getHeight()-strip,a.getHeight(),p.error));
+            assertFalse("No error bar where there were none",found(a,0,(int)(a.getWidth()*0.9f),a.getHeight()-strip,a.getHeight(),p.error));
+            assertFalse("Errors are not drawn in the requests area",found(a,0,a.getWidth(),0,a.getHeight()-strip-1,p.error));
+            // Plan-usage pace: a 1 px tall ALPHA_8 strip whose one opaque column is at the elapsed share.
+            Bitmap pace=WidgetCharts.paceStrip(46);
+            assertEquals(Bitmap.Config.ALPHA_8,pace.getConfig());
+            int column=(int)Math.round(0.46*(WidgetCharts.PACE_COLUMNS-1));
+            assertTrue(android.graphics.Color.alpha(pace.getPixel(column,0))>200);
+            assertEquals(0,android.graphics.Color.alpha(pace.getPixel(0,0)));
+            assertNull("Unknown pace draws nothing",WidgetCharts.paceStrip(Double.NaN));
+            // Bars: a missing day is a hollow outline, not a zero-height bar in the bar colour.
+            Bitmap bars=WidgetCharts.bars(new Long[]{100L,null,200L},null,150,30,density,p,p.bar);
+            int third=bars.getWidth()/3;
+            assertTrue("Measured day drawn",near(bars.getPixel(third*2+third/2,bars.getHeight()-3),p.bar));
+            assertFalse("Missing day is not a bar",near(bars.getPixel(third+third/2,bars.getHeight()-WidgetCharts.px(10,density)),p.bar));
+            Bitmap incident=WidgetCharts.errorBars(new Long[]{0L,0L,1L,null,3L,8L},330,26,density,p);
+            assertTrue(incident.getAllocationByteCount()<=96*1024);
+        }
+        // A rendered tile carries its chart as a bitmap with a spoken description of the numbers.
+        JSONObject snapshot=WidgetData.project(redesignFixture(),System.currentTimeMillis());
+        JSONObject row=null;org.json.JSONArray rows=WidgetRows.rows(snapshot);
+        for(int i=0;i<rows.length();i++)if("tiles".equals(rows.getJSONObject(i).optString("kind"))){row=rows.getJSONObject(i);break;}
+        assertNotNull(row);JSONObject tiles=row;
+        AtomicReference<Throwable> failure=new AtomicReference<>();
+        InstrumentationRegistry.getInstrumentation().runOnMainSync(()->{try{
+            View view=OwnerWidgetService.rowView(context,tiles,-1).apply(context,new FrameLayout(context));
+            android.widget.ImageView chart=view.findViewById(R.id.tile_chart_a);
+            assertEquals(View.VISIBLE,chart.getVisibility());
+            assertTrue(chart.getDrawable() instanceof android.graphics.drawable.BitmapDrawable);
+            assertTrue(chart.getContentDescription().toString().startsWith("Requests in the past 24 hours: 15460, errors: 12"));
+            assertNotNull("Plan usage gauges render as ProgressBars",view.findViewById(R.id.usage_bar0_b));
+            assertTrue(view.findViewById(R.id.usage_hot2_b).getVisibility()==View.VISIBLE);
+            assertEquals(View.VISIBLE,view.findViewById(R.id.usage_gauges_b).getVisibility());
+            assertEquals(View.GONE,view.findViewById(R.id.usage_gauges_a).getVisibility());
+            assertEquals("An unavailable metric shows no bar","—",text(view,R.id.usage_value1_b));
+            assertEquals(View.INVISIBLE,view.findViewById(R.id.usage_bar1_b).getVisibility());
+        }catch(Throwable error){failure.set(error);}});
+        if(failure.get()!=null)throw new AssertionError("tile",failure.get());
+    }
+    private static boolean found(Bitmap b,int x0,int x1,int y0,int y1,int color){ for(int x=Math.max(0,x0);x<Math.min(b.getWidth(),x1);x++)for(int y=Math.max(0,y0);y<Math.min(b.getHeight(),y1);y++)if(near(b.getPixel(x,y),color))return true; return false; }
+    private static String region(Bitmap b,int x0,int x1,int y0,int y1){ StringBuilder out=new StringBuilder(b.getWidth()+"x"+b.getHeight()+" "); for(int y=Math.max(0,y0);y<Math.min(b.getHeight(),y1);y+=3){out.append("\n");for(int x=Math.max(0,x0);x<Math.min(b.getWidth(),x1);x++)out.append(String.format("%06x ",b.getPixel(x,y)&0xffffff));} return out.toString(); }
+    private static boolean near(int a,int b){ return Math.abs(android.graphics.Color.red(a)-android.graphics.Color.red(b))<=12&&Math.abs(android.graphics.Color.green(a)-android.graphics.Color.green(b))<=12&&Math.abs(android.graphics.Color.blue(a)-android.graphics.Color.blue(b))<=12; }
+
+    @Test public void fullyExpandedWidgetParcelsUnderBudgetAndExpansionPersists() throws Exception {
+        int id=106; long now=System.currentTimeMillis();
+        JSONObject snapshot=WidgetData.project(redesignFixture(),now);
+        WidgetRowState.remove(context,id);
+        // Everything expanded, Traffic on 7 days, plus a stale ID that must be pruned.
+        for(String row:new String[]{"diagnostic:Worker execution errors","diagnostic:GitHub workflows","diagnostic:Multiplayer","resolved:GitHub source timeout",WidgetTiles.TRAFFIC,WidgetTiles.USAGE,WidgetTiles.DEPLOYS,WidgetTiles.PLAYERS,"diagnostic:Gone component"})WidgetRowState.toggle(context,id,row);
+        WidgetRowState.setRange(context,id,WidgetTiles.RANGE_7D);
+        java.util.Set<String> kept=WidgetRowState.prune(context,id,WidgetRows.rows(snapshot,WidgetRowState.expanded(context,id)));
+        assertFalse("Stale IDs are pruned",kept.contains("diagnostic:Gone component"));
+        assertTrue("Tile IDs survive",kept.contains(WidgetTiles.PLAYERS));
+        assertTrue("The range choice is kept",kept.contains(WidgetTiles.RANGE_7D));
+        org.json.JSONArray rows=WidgetRows.rows(snapshot,kept);
+        // Each expanded tile takes a whole row; the traffic tile shows days.
+        int tileRows=0;JSONObject traffic=null;
+        for(int i=0;i<rows.length();i++){JSONObject row=rows.getJSONObject(i);if("tiles".equals(row.optString("kind"))){tileRows++;assertEquals(1,row.getJSONArray("tiles").length());if(row.getJSONArray("ids").getString(0).equals(WidgetTiles.TRAFFIC))traffic=row.getJSONArray("tiles").getJSONObject(0);}}
+        assertEquals(4,tileRows);
+        assertNotNull(traffic);assertEquals("7d",traffic.getString("range"));assertEquals("bars",traffic.getString("chart"));
+        assertTrue(traffic.getString("note2"),traffic.getString("note2").startsWith("Errors per day: 0 0 — 0 0 0 12"));
+        // The whole RemoteViews (rows inside on API 31+, each row on its own below) parcels under 500 kB.
+        long size;
+        if(android.os.Build.VERSION.SDK_INT>=31) size=parcelSize(OwnerWidgetProvider.views(context,new JSONObject().put("token","synthetic").put("snapshot",snapshot),true,id));
+        else { size=parcelSize(OwnerWidgetProvider.views(context,new JSONObject().put("token","synthetic").put("snapshot",snapshot),true,id)); for(int i=0;i<rows.length();i++)size+=parcelSize(OwnerWidgetService.rowView(context,rows.getJSONObject(i),id,kept)); }
+        assertTrue("RemoteViews parcel "+size+" bytes",size<500*1024);
+        WidgetRowState.remove(context,id);
+        assertFalse(WidgetTiles.sevenDays(WidgetRowState.expanded(context,id)));
+    }
+    private static long parcelSize(android.widget.RemoteViews views) {
+        android.os.Parcel parcel=android.os.Parcel.obtain();
+        try { views.writeToParcel(parcel,0); return parcel.dataSize(); } finally { parcel.recycle(); }
+    }
+
+    @Test public void statusChartsCompanionPresetIsOptionalAndHidesChartsWhenNarrow() throws Exception {
+        java.util.List<String> presets=java.util.Arrays.asList(CompanionSettings.PRESETS);
+        assertTrue(presets.contains("Status + charts"));
+        assertEquals("Agent activity stays the default (owner decision 5)","Agent activity",CompanionSettings.DEFAULT_PRESET);
+        CompanionSettings.remove(context,107);
+        assertEquals("activity",CompanionSettings.read(context,107).getString("first"));
+        assertFalse("Existing and new companions keep no chart column",CompanionSettings.showsCharts(CompanionSettings.read(context,107)));
+        JSONObject preset=CompanionSettings.preset("Status + charts");
+        assertEquals("incident",preset.getString("first"));assertEquals("summary",preset.getString("second"));assertEquals("on",preset.getString("charts"));
+        assertEquals("logs",preset.getString("action2"));
+        String generation=WidgetStore.connect(context,"synthetic-status-charts");
+        assertTrue(WidgetStore.finish(context,generation,WidgetData.project(redesignFixture(),System.currentTimeMillis()),""));
+        for(String theme:new String[]{"terminal","light"}){
+            JSONObject settings=new JSONObject(preset.toString()).put("theme",theme);
+            View wide=renderCompanion(WidgetStore.read(context),settings,368,76,"companion-status-charts-"+theme);
+            assertEquals(View.VISIBLE,wide.findViewById(R.id.companion_charts).getVisibility());
+            android.widget.ImageView spark=wide.findViewById(R.id.companion_spark);
+            assertTrue("Sparkline bitmap present",spark.getVisibility()==View.VISIBLE&&spark.getDrawable() instanceof android.graphics.drawable.BitmapDrawable);
+            assertFalse(text(wide,R.id.companion_pips).isEmpty());
+            assertEquals("CRIT · Worker execution errors · 31m",text(wide,R.id.companion_first));
+            assertEquals(OwnerWidgetProvider.color("red","light".equals(theme)),((TextView)wide.findViewById(R.id.companion_first)).getCurrentTextColor());
+            assertTrue(text(wide,R.id.companion_second),text(wide,R.id.companion_second).startsWith("✕ 1 crit · ! 1 warn · ✓ 2 resolved 24h · "));
+            assertEquals("✕",text(wide,R.id.companion_light));
+            View narrow=renderCompanion(WidgetStore.read(context),settings,250,56,"companion-status-charts-narrow-"+theme);
+            assertEquals("Below 300 dp the chart column hides first",View.GONE,narrow.findViewById(R.id.companion_charts).getVisibility());
+            assertTrue(((TextView)narrow.findViewById(R.id.companion_first)).getTextSize()>=10*context.getResources().getDisplayMetrics().scaledDensity);
+        }
+        // All clear.
+        JSONObject clear=redesignFixture();clear.put("overall",new JSONObject().put("color","green").put("status","healthy").put("reason","All required checks passed."));
+        for(int i=0;i<clear.getJSONArray("diagnostics").length();i++)clear.getJSONArray("diagnostics").getJSONObject(i).put("color","green").remove("severity");
+        JSONObject clearSnapshot=WidgetData.project(clear,System.currentTimeMillis());
+        assertEquals("ALL CLEAR · 4 checks",WidgetRows.incident(clearSnapshot));
+        assertTrue(WidgetRows.summary(clearSnapshot).startsWith("✓ 2 resolved 24h · 12 online"));
+    }
+
+    @Test public void mediumFaceShowsTheTopItemAndDropsTilesWhenShort() throws Exception {
+        android.appwidget.AppWidgetProviderInfo info=null;
+        for(android.appwidget.AppWidgetProviderInfo candidate:android.appwidget.AppWidgetManager.getInstance(context).getInstalledProviders())
+            if(candidate.provider.getClassName().equals(OwnerWidgetProvider.class.getName()))info=candidate;
+        assertNotNull(info);
+        float density=context.getResources().getDisplayMetrics().density;
+        assertTrue("The Field monitor resizes down to 4×2",info.minResizeHeight<=Math.round(110*density)+1);
+        JSONObject state=new JSONObject().put("token","synthetic").put("snapshot",WidgetData.project(redesignFixture(),System.currentTimeMillis()));
+        for(boolean tiles:new boolean[]{true,false}) for(int width:new int[]{250,368}) {
+            int height=tiles?184:110;
+            AtomicReference<Throwable> failure=new AtomicReference<>();
+            String name="medium-"+(tiles?"tiles":"short")+"-"+width;
+            InstrumentationRegistry.getInstrumentation().runOnMainSync(()->{try{
+                FrameLayout parent=new FrameLayout(context);View view=OwnerWidgetProvider.medium(context,state,-1,tiles).apply(context,parent);parent.addView(view);
+                int w=Math.round(width*density),h=Math.round(height*density);
+                parent.measure(View.MeasureSpec.makeMeasureSpec(w,View.MeasureSpec.EXACTLY),View.MeasureSpec.makeMeasureSpec(h,View.MeasureSpec.EXACTLY));parent.layout(0,0,w,h);bounds(view);
+                assertEquals(tiles?View.VISIBLE:View.GONE,view.findViewById(R.id.medium_tiles).getVisibility());
+                assertEquals("✕ CRIT",text(view,R.id.medium_item_chip));
+                assertTrue(text(view,R.id.medium_item_text).startsWith("Worker execution errors · 12 errors in 24h"));
+                assertEquals("FAILURE",text(view,R.id.monitor_health));
+                assertTrue(view.findViewById(R.id.monitor_refresh).hasOnClickListeners());
+                if(tiles){
+                    android.widget.ImageView chart=view.findViewById(R.id.medium_req_chart);
+                    assertTrue(chart.getDrawable() instanceof android.graphics.drawable.BitmapDrawable);
+                    assertEquals("84% D1 rd",text(view,R.id.medium_usage_value));
+                    assertEquals(View.VISIBLE,view.findViewById(R.id.medium_usage_hot).getVisibility());
+                    assertEquals(5,text(view,R.id.medium_main_pips).length());
+                }
+                Bitmap bitmap=Bitmap.createBitmap(w,h,Bitmap.Config.ARGB_8888);parent.draw(new Canvas(bitmap));
+                File dir=context.getExternalFilesDir("widget-audit");if(dir!=null)dir.mkdirs();try(FileOutputStream out=new FileOutputStream(new File(dir,name+".png"))){bitmap.compress(Bitmap.CompressFormat.PNG,100,out);}bitmap.recycle();
+            }catch(Throwable error){failure.set(error);}});
+            if(failure.get()!=null)throw new AssertionError(name,failure.get());
+        }
+        // The 4×4 face with every redesign part, for the audit screenshots.
+        render(state,true,368,392,"redesign-4x4-incident");
+        CompanionSettings.save(context,-1,CompanionSettings.preset("Development").put("theme","light"));
+        render(state,true,368,392,"redesign-4x4-incident-light");
+        CompanionSettings.remove(context,-1);
     }
 }

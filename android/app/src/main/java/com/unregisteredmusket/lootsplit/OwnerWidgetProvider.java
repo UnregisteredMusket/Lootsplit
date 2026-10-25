@@ -26,7 +26,7 @@ public class OwnerWidgetProvider extends AppWidgetProvider {
     }
     static void renderAll(Context context) {
         AppWidgetManager manager = AppWidgetManager.getInstance(context);
-        for (int id : ids(context)) render(context, manager, id, manager.getAppWidgetOptions(id));
+        for (int id : ids(context)) render(context, manager, id, null);
         CompanionWidgetProvider.renderAll(context);
         manager.notifyAppWidgetViewDataChanged(ids(context), R.id.monitor_list);
         WidgetRefresh.scheduleActivity(context); // Arms or cancels the Agent activity fast cadence.
@@ -51,117 +51,220 @@ public class OwnerWidgetProvider extends AppWidgetProvider {
     }
     static int color(String value,boolean light) { return light ? "red".equals(value)?Color.rgb(157,42,42):"green".equals(value)?Color.rgb(21,112,62):Color.rgb(133,91,8) : color(value); }
     static int color(String value) { return "red".equals(value)?Color.rgb(244,114,114):"green".equals(value)?Color.rgb(19,245,128):Color.rgb(238,199,113); }
+    /** Layout breakpoints (dp): below LARGE_MIN_HEIGHT the 4×2 face; below TILES_MIN_HEIGHT it drops its tiles. */
+    static final int LARGE_MIN_HEIGHT = 260, TILES_MIN_HEIGHT = 150;
     static void render(Context context, AppWidgetManager manager, int id, Bundle options) {
-        manager.updateAppWidget(id, views(context, WidgetStore.read(context), true, id));
+        JSONObject state = WidgetStore.read(context);
+        if (Build.VERSION.SDK_INT >= 31) {
+            // The launcher picks the largest layout that fits each placement (and re-picks on resize).
+            java.util.Map<SizeF, RemoteViews> sized = new java.util.HashMap<>();
+            sized.put(new SizeF(250f, 110f), medium(context, state, id, false));
+            sized.put(new SizeF(250f, TILES_MIN_HEIGHT), medium(context, state, id, true));
+            sized.put(new SizeF(250f, LARGE_MIN_HEIGHT), views(context, state, true, id));
+            manager.updateAppWidget(id, new RemoteViews(sized));
+            return;
+        }
+        if (options == null) options = manager.getAppWidgetOptions(id);
+        // Portrait height is the maximum height; 0 (unknown) keeps the full 4×4 face.
+        int height = options == null ? 0 : options.getInt(AppWidgetManager.OPTION_APPWIDGET_MAX_HEIGHT, 0);
+        manager.updateAppWidget(id, height > 0 && height < LARGE_MIN_HEIGHT ? medium(context, state, id, height >= TILES_MIN_HEIGHT) : views(context, state, true, id));
     }
     static RemoteViews views(Context context, JSONObject state, boolean expanded) { return views(context,state,expanded,-1); }
-    static RemoteViews views(Context context, JSONObject state, boolean expanded, int id) {
-        RemoteViews view=new RemoteViews(context.getPackageName(),R.layout.owner_widget);
-        boolean light=WidgetAppearance.light(context,id);
-        int ink=Color.rgb(32,72,51), text=light?ink:Color.rgb(230,248,236), muted=light?ink:Color.rgb(177,214,193), accent=light?ink:Color.rgb(19,245,128);
-        JSONObject snapshot=current(state),task=snapshot==null?null:snapshot.optJSONObject("task");
-        // A busy Keystore keeps the saved connection: show Refresh/retry, not Sign in.
+    /** Theme colours shared by the faces. */
+    private static WidgetCharts.Palette palette(Context context, int id) { return WidgetCharts.Palette.of(WidgetAppearance.light(context, id)); }
+    /**
+     * Header and status shared by the 4×4 and 4×2 faces: reading time, glyph box, status word,
+     * "since 10:41 · active 31m" (or "21 checks passed") and the ✕ ! i severity counts.
+     */
+    private static void status(Context context, RemoteViews view, JSONObject state, JSONObject snapshot, int id, WidgetCharts.Palette p) {
+        boolean light = p.light;
         boolean connected=!state.optString("token").isEmpty()||state.optBoolean(WidgetStore.UNAVAILABLE); String message=state.optString("message");
         boolean refreshing=connected&&"Refreshing…".equals(message);
-        String status=statusColor(snapshot); boolean failure=snapshot!=null&&"red".equals(status);
-        org.json.JSONArray rows=WidgetRows.rows(snapshot);
-        // Root: the existing opaque theme fill; a confirmed failure swaps in the red-bordered variant.
-        if(failure) view.setInt(R.id.monitor_root,"setBackgroundResource",light?R.drawable.monitor_background_alert_light:R.drawable.monitor_background_alert);
-        else view.setInt(R.id.monitor_root,"setBackgroundColor",light?Color.rgb(247,242,228):Color.rgb(7,23,18));
-        // Set both themes explicitly: hosts may reapply onto views that kept the previous theme's colors.
-        for(int target: new int[]{R.id.monitor_title,R.id.monitor_active,R.id.monitor_accounts,R.id.monitor_campaigns,R.id.monitor_timer,R.id.monitor_open,R.id.monitor_refresh}) view.setTextColor(target,accent);
-        for(int target: new int[]{R.id.monitor_checked,R.id.monitor_active_label,R.id.monitor_accounts_label,R.id.monitor_campaigns_label,R.id.monitor_list_label,R.id.monitor_identity}) view.setTextColor(target,muted);
-
-        // 1. Header reading time (full dated wording stays in the description).
+        String status=statusColor(snapshot);
+        view.setTextColor(R.id.monitor_title, light ? p.ink : p.ok);
+        view.setTextColor(R.id.monitor_checked, p.muted);
         view.setTextViewText(R.id.monitor_checked,snapshot==null?"—":WidgetRows.clock(snapshot.optLong("checkedAt")));
         view.setContentDescription(R.id.monitor_checked,snapshot==null?"No current reading":(message.isEmpty()?"Checked ":"Last reading ")+WidgetData.time(snapshot.optLong("checkedAt"))+" · #"+snapshot.optLong("snapshotId"));
-
-        // 2. Status glyph, word and one reason line.
         boolean signedOut=snapshot==null&&!connected;
         glyph(view,R.id.monitor_glyph,signedOut?"":status,light,false);
-        text(view,R.id.monitor_health,refreshing?"REFRESHING":snapshot==null?(connected?"AWAITING CHECK":"SIGN IN REQUIRED"):message.isEmpty()?WidgetRows.status(snapshot):"LAST KNOWN STATUS");
+        String word=refreshing?"REFRESHING":snapshot==null?(connected?"AWAITING CHECK":"SIGN IN REQUIRED"):message.isEmpty()?WidgetRows.status(snapshot):"LAST KNOWN STATUS";
+        view.setTextViewText(R.id.monitor_health,word);
         view.setTextColor(R.id.monitor_health,color(status,light));
+        int[] counts=WidgetRows.counts(snapshot);
+        String since=since(snapshot);
+        view.setViewVisibility(R.id.monitor_since,since.isEmpty()?View.GONE:View.VISIBLE);
+        view.setTextViewText(R.id.monitor_since,since);
+        view.setTextColor(R.id.monitor_since,p.muted);
+        view.setContentDescription(R.id.monitor_health,word+(since.isEmpty()?"":", "+since)+(snapshot==null?"":". "+counts[0]+" critical, "+counts[1]+" warning, "+counts[2]+" info"));
+        int[] ids={R.id.monitor_count_crit,R.id.monitor_count_warn,R.id.monitor_count_info};
+        String[] glyphs={"✕","!","i"}; int[] tones={p.crit,p.warn,p.info};
+        view.setViewVisibility(R.id.monitor_counts,snapshot==null?View.GONE:View.VISIBLE);
+        for(int i=0;i<3;i++){
+            view.setTextViewText(ids[i],glyphs[i]+counts[i]);
+            // A zero count is dimmed (blended toward the background); the number still reads 0.
+            view.setTextColor(ids[i],counts[i]>0?tones[i]:blend(tones[i],p.background,0.55f));
+            view.setContentDescription(ids[i],counts[i]+(i==0?" critical":i==1?" warning":" info"));
+        }
+        view.setOnClickPendingIntent(R.id.monitor_status,WidgetActions.pending(context,id,snapshot==null?"account":"diagnostics",false));
+        view.setOnClickPendingIntent(R.id.monitor_refresh,WidgetActions.pending(context,id,"refresh",false));
+    }
+    static int blend(int a,int b,float t){ return Color.rgb(Math.round(Color.red(a)*(1-t)+Color.red(b)*t),Math.round(Color.green(a)*(1-t)+Color.green(b)*t),Math.round(Color.blue(a)*(1-t)+Color.blue(b)*t)); }
+    /** "since 10:41 · active 31m" for the worst active item, "21 checks passed" when clear, "" without a reading. */
+    static String since(JSONObject snapshot) {
+        if (snapshot == null) return "";
+        long started = 0, checked = snapshot.optLong("checkedAt");
+        int worst = 3;
+        for (JSONObject item : WidgetRows.attentionItems(snapshot)) {
+            int rank = WidgetRows.rank(item.optString("severity"));
+            if (rank > 1) continue;
+            long at = item.optLong("startedAt", 0);
+            if (rank < worst) { worst = rank; started = at; }
+            else if (rank == worst && at > 0 && (started == 0 || at < started)) started = at;
+        }
+        if (worst <= 1) return started > 0 ? "since " + WidgetRows.clock(started) + " · active " + WidgetRows.duration(checked - started) : "";
+        org.json.JSONArray diagnostics = snapshot.optJSONArray("diagnostics");
+        int passed = 0; if (diagnostics != null) for (int i = 0; i < diagnostics.length(); i++) { JSONObject d = diagnostics.optJSONObject(i); if (d != null && "green".equals(d.optString("color"))) passed++; }
+        return passed > 0 && "green".equals(statusColor(snapshot)) ? passed + (passed == 1 ? " check passed" : " checks passed") : "";
+    }
+    static RemoteViews views(Context context, JSONObject state, boolean expanded, int id) {
+        RemoteViews view=new RemoteViews(context.getPackageName(),R.layout.owner_widget);
+        WidgetCharts.Palette p=palette(context,id); boolean light=p.light;
+        int text=p.ink, muted=p.muted, accent=light?p.ink:p.ok;
+        JSONObject snapshot=current(state);
+        boolean connected=!state.optString("token").isEmpty()||state.optBoolean(WidgetStore.UNAVAILABLE); String message=state.optString("message");
+        String status=statusColor(snapshot); boolean failure=snapshot!=null&&"red".equals(status);
+        // Root: the existing opaque theme fill; a confirmed failure swaps in the red-bordered variant.
+        if(failure) view.setInt(R.id.monitor_root,"setBackgroundResource",light?R.drawable.monitor_background_alert_light:R.drawable.monitor_background_alert);
+        else view.setInt(R.id.monitor_root,"setBackgroundColor",p.background);
+        for(int target: new int[]{R.id.monitor_open,R.id.monitor_refresh}) view.setTextColor(target,accent);
+        view.setTextColor(R.id.monitor_identity,muted);
+        status(context,view,state,snapshot,id,p);
+
+        // Reason line (the full list stays in its spoken description and in the items).
         String[] reason=WidgetRows.reason(snapshot);
         view.setTextViewText(R.id.monitor_services,!message.isEmpty()?message:snapshot==null?(connected?"No current reading · tap Refresh":"Tap Sign in to connect your owner account"):reason[0]);
         view.setContentDescription(R.id.monitor_services,!message.isEmpty()?message:snapshot==null?"No current reading":reason[1]);
         view.setTextColor(R.id.monitor_services,failure&&!light?text:muted);
-        view.setOnClickPendingIntent(R.id.monitor_status,WidgetActions.pending(context,id,snapshot==null?"account":"diagnostics",false));
 
-        // 3. Stats strip. Missing values stay "—", never 0.
-        tile(view,R.id.monitor_active,snapshot==null?"—":snapshot.optString("active","—"),"Active accounts in the past 5 minutes");
-        tile(view,R.id.monitor_accounts,snapshot==null?"—":snapshot.optString("accounts","—"),"Accounts");
-        tile(view,R.id.monitor_campaigns,snapshot==null?"—":snapshot.optString("campaigns","—"),"Shared campaigns");
-        long[] traffic=WidgetRows.traffic(snapshot);
-        // The error tile follows the Worker errors check: red only for current/unexplained errors,
-        // amber for a recent error that has stopped. Older servers without the check keep "any error = red".
-        String errorsState=snapshot==null?"":snapshot.optString("errorsState");
-        boolean recentErrors=traffic!=null&&traffic[1]>0&&"warning".equals(errorsState);
-        boolean errors=traffic!=null&&traffic[1]>0&&!recentErrors&&!"healthy".equals(errorsState);
-        view.setTextViewText(R.id.monitor_requests,traffic==null?"—":WidgetRows.compact(traffic[0]));
-        view.setTextViewText(R.id.monitor_requests_label,traffic==null?"REQ · — ERR":"REQ · "+WidgetRows.compact(traffic[1])+" ERR");
-        view.setContentDescription(R.id.monitor_requests,traffic==null?"Requests in the past 24 hours: "+(snapshot==null?"no current reading":snapshot.optString("traffic")):"Requests in the past 24 hours: "+traffic[0]+", errors: "+traffic[1]+(recentErrors?", none in the latest half-hour":""));
-        view.setInt(R.id.monitor_tile_requests,"setBackgroundResource",errors?R.drawable.stat_tile_alert:R.drawable.stat_tile);
-        view.setTextColor(R.id.monitor_requests,errors?color("red",light):accent);
-        view.setTextColor(R.id.monitor_requests_label,errors&&!light?text:recentErrors?color("yellow",light):muted);
-        view.setOnClickPendingIntent(R.id.monitor_tile_requests,WidgetActions.pending(context,id,"logs",false));
-
-        // 4. Task strip.
-        boolean active=task!=null&&task.optBoolean("active");
-        String warning=snapshot==null?"":snapshot.optString("warning");
-        if(active) {
-            android.text.SpannableString line=new android.text.SpannableString("▶ "+task.optString("state").toUpperCase(java.util.Locale.ROOT)+" · "+task.optString("phase"));
-            line.setSpan(new android.text.style.StyleSpan(android.graphics.Typeface.BOLD),0,line.length(),android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
-            view.setTextViewText(R.id.monitor_development,line);
-        } else view.setTextViewText(R.id.monitor_development,"No development task active");
-        view.setTextColor(R.id.monitor_development,active?text:muted);
-        view.setContentDescription(R.id.monitor_development,active?task.optString("title")+" · "+task.optString("phase")+" · "+task.optString("state"):"No development task active");
-        // Idle: name the last task and how it ended (completed, failed, interrupted) with its time.
-        String detail=!warning.isEmpty()?"! "+warning:active?task.optString("title")+" · "+task.optString("progress"):WidgetRows.lastTask(task,"Last: ");
-        view.setViewVisibility(R.id.monitor_task_detail,detail.isEmpty()?View.GONE:View.VISIBLE);
-        view.setTextViewText(R.id.monitor_task_detail,detail);
-        view.setContentDescription(R.id.monitor_task_detail,!warning.isEmpty()?"Warning: "+warning:detail);
-        view.setTextColor(R.id.monitor_task_detail,!warning.isEmpty()?color("yellow",light):muted);
-        view.setInt(R.id.monitor_task,"setBackgroundResource",!warning.isEmpty()?R.drawable.task_card_warn:R.drawable.task_card);
-        view.setViewVisibility(R.id.monitor_timer,task==null?View.GONE:View.VISIBLE);
-        if(task!=null) {
-            long start=task.optLong("startedAt"),end=task.optLong("completedAt",0);
-            view.setChronometer(R.id.monitor_timer,android.os.SystemClock.elapsedRealtime()-Math.max(0,(end>0?end:System.currentTimeMillis())-start),"%s",end==0&&task.optBoolean("active"));
-            view.setContentDescription(R.id.monitor_timer,"Total elapsed since "+WidgetData.time(start));
-        }
-        view.setOnClickPendingIntent(R.id.monitor_task,WidgetActions.pending(context,id,"task",false));
-        view.setOnClickPendingIntent(R.id.monitor_development,WidgetActions.pending(context,id,"task",false));
-        view.setOnClickPendingIntent(R.id.monitor_timer,WidgetActions.pending(context,id,"task",false));
-
-        // 5. Log label and collection; attention rows are already ordered first.
-        boolean attention=WidgetRows.attention(rows)>0;
-        view.setTextViewText(R.id.monitor_list_label,attention?"NEEDS ATTENTION FIRST":"LOG");
-        view.setInt(R.id.monitor_list_rule,"setBackgroundColor",WidgetRows.anyRed(rows)?(light?Color.rgb(157,42,42):Color.argb(89,244,114,114)):(light?ink:Color.argb(64,91,236,160)));
-        // Expanded rows are kept by row ID across readings; IDs no longer present are pruned here.
-        java.util.Set<String> expandedRows=WidgetRowState.prune(context,id,rows);
+        // The list. Expanded rows and tiles are kept by ID across readings; IDs no longer present are pruned.
+        java.util.Set<String> expandedRows=WidgetRowState.prune(context,id,WidgetRows.rows(snapshot,WidgetRowState.expanded(context,id)));
+        org.json.JSONArray rows=WidgetRows.rows(snapshot,expandedRows);
         if(Build.VERSION.SDK_INT>=31) {
-            // Two view types: compact and expanded rows (OwnerWidgetService.Factory.getViewTypeCount).
-            RemoteViews.RemoteCollectionItems.Builder items=new RemoteViews.RemoteCollectionItems.Builder().setViewTypeCount(2).setHasStableIds(false);
-            for(int i=0;i<rows.length();i++){JSONObject row=rows.optJSONObject(i);items.addItem(i,OwnerWidgetService.rowView(context,row,id,row!=null&&expandedRows.contains(row.optString("id"))));}
+            RemoteViews.RemoteCollectionItems.Builder items=new RemoteViews.RemoteCollectionItems.Builder().setViewTypeCount(OwnerWidgetService.VIEW_TYPES).setHasStableIds(false);
+            for(int i=0;i<rows.length();i++){JSONObject row=rows.optJSONObject(i);items.addItem(i,OwnerWidgetService.rowView(context,row,id,expandedRows));}
             view.setRemoteAdapter(R.id.monitor_list,items.build());
         } else {
             Intent service=new Intent(context,OwnerWidgetService.class).putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID,id).putExtra("generation",state.optString("generation"));
             service.setData(android.net.Uri.parse("lootsplit-widget://collection/"+id+"/"+state.optString("generation","empty")));
             view.setRemoteAdapter(R.id.monitor_list,service);
         }
-        // Row taps are a broadcast to this provider: a row's fill-in names the row to expand or
-        // collapse, an expanded row's OPEN button names the app destination (opened in onReceive).
+        // Row taps are a broadcast to this provider: a row's fill-in names the row (or tile, or range)
+        // to change, a button's fill-in names the app destination (opened in onReceive).
         Intent template=new Intent(context,OwnerWidgetProvider.class).setAction(ROW_TAP).putExtra(AppWidgetManager.EXTRA_APPWIDGET_ID,id).setData(android.net.Uri.parse("lootsplit-widget://collection-row/"+id)).addFlags(Intent.FLAG_RECEIVER_FOREGROUND);
         view.setPendingIntentTemplate(R.id.monitor_list,PendingIntent.getBroadcast(context,230000+Math.max(0,id),template,PendingIntent.FLAG_UPDATE_CURRENT|(Build.VERSION.SDK_INT>=31?PendingIntent.FLAG_MUTABLE:0)));
 
-        // 6. Footer: identity (no email on the face), LOGS and REFRESH.
+        // Footer: identity (no email on the face), LOGS and REFRESH.
         view.setTextViewText(R.id.monitor_identity,snapshot==null?"OWNER · SIGN IN":"OWNER · "+snapshot.optString("name")+" · #"+snapshot.optLong("snapshotId"));
         view.setContentDescription(R.id.monitor_account,snapshot==null?"Owner access. Sign in in My account":"Owner access, "+snapshot.optString("name")+". Open My account");
         view.setOnClickPendingIntent(R.id.monitor_account,WidgetActions.pending(context,id,"account",false));
         view.setTextViewText(R.id.monitor_open,connected?"LOGS":"SIGN IN");
         view.setContentDescription(R.id.monitor_open,connected?"Open logs and reports":"Sign in");
         view.setOnClickPendingIntent(R.id.monitor_open,WidgetActions.pending(context,id,connected?"logs":"account",false));
-        view.setOnClickPendingIntent(R.id.monitor_refresh,WidgetActions.pending(context,id,"refresh",false));
         return view;
+    }
+    /**
+     * The 4×2 face: header with refresh, status, one line (the most severe active item, else the
+     * latest recovery) and three mini tiles: requests with errors on their own baseline, the
+     * fullest plan-usage gauge with its pace line, and the last five main runs.
+     */
+    static RemoteViews medium(Context context, JSONObject state, int id, boolean tiles) {
+        RemoteViews view=new RemoteViews(context.getPackageName(),R.layout.owner_widget_medium);
+        WidgetCharts.Palette p=palette(context,id); boolean light=p.light;
+        JSONObject snapshot=current(state);
+        boolean connected=!state.optString("token").isEmpty()||state.optBoolean(WidgetStore.UNAVAILABLE); String message=state.optString("message");
+        boolean failure=snapshot!=null&&"red".equals(statusColor(snapshot));
+        if(failure) view.setInt(R.id.monitor_root,"setBackgroundResource",light?R.drawable.monitor_background_alert_light:R.drawable.monitor_background_alert);
+        else view.setInt(R.id.monitor_root,"setBackgroundColor",p.background);
+        view.setTextColor(R.id.monitor_refresh,light?p.ink:p.ok);
+        status(context,view,state,snapshot,id,p);
+        int tileBackground=light?R.drawable.item_tile_light:R.drawable.item_tile_dark;
+        view.setInt(R.id.medium_item,"setBackgroundResource",tileBackground);
+        // One line: the worst active item, the latest recovery, or the sign-in/refresh state.
+        java.util.List<JSONObject> items=WidgetRows.attentionItems(snapshot);
+        JSONObject top=null; for(JSONObject item:items) if(!"info".equals(item.optString("severity"))){top=item;break;}
+        String chip="",line; int tone=p.muted;
+        if(snapshot==null){line=!message.isEmpty()?message:connected?"No current reading · tap ↻":"Sign in to connect your owner account";}
+        else if(top!=null){chip=WidgetRows.chip(top.optString("severity"));tone=p.severity(top.optString("severity"));line=top.optString("title")+" · "+top.optString("meta");}
+        else {
+            JSONObject resolved=snapshot.optJSONObject("resolved");org.json.JSONArray list=resolved==null?null:resolved.optJSONArray("items");
+            JSONObject latest=list==null?null:list.optJSONObject(0);
+            if(latest!=null){chip="✓";tone=p.ok;line=latest.optString("component")+" · resolved "+WidgetRows.clock(latest.optLong("resolvedAt"))+(latest.optLong("startedAt")>0?" · lasted "+WidgetRows.duration(latest.optLong("resolvedAt")-latest.optLong("startedAt")):"");}
+            else line=resolved==null?"No active problems":"absent".equals(resolved.optString("state"))?"No active problems · recovery times need a server update":"ready".equals(resolved.optString("state"))?"No active problems · none resolved in 24h":"No active problems";
+        }
+        view.setViewVisibility(R.id.medium_item_chip,chip.isEmpty()?View.GONE:View.VISIBLE);
+        view.setTextViewText(R.id.medium_item_chip,chip);view.setTextColor(R.id.medium_item_chip,tone);
+        view.setTextViewText(R.id.medium_item_text,line);view.setTextColor(R.id.medium_item_text,p.ink);
+        view.setContentDescription(R.id.medium_item,(top!=null?WidgetRows.severityWord(top.optString("severity"))+": ":"")+line+". Open diagnostics");
+        view.setOnClickPendingIntent(R.id.medium_item,WidgetActions.pending(context,id,snapshot==null?"account":"diagnostics",false));
+        view.setViewVisibility(R.id.medium_tiles,tiles?View.VISIBLE:View.GONE);
+        if(!tiles) return view;
+        float density=context.getResources().getDisplayMetrics().density;
+        for(int tile:new int[]{R.id.medium_tile_req,R.id.medium_tile_usage,R.id.medium_tile_main}) view.setInt(tile,"setBackgroundResource",tileBackground);
+        for(int key:new int[]{R.id.medium_req_key,R.id.medium_usage_key,R.id.medium_main_key}) view.setTextColor(key,p.faint);
+        for(int note:new int[]{R.id.medium_req_note,R.id.medium_usage_note,R.id.medium_main_note}) view.setTextColor(note,p.muted);
+        for(int value:new int[]{R.id.medium_req_value,R.id.medium_usage_value}) view.setTextColor(value,p.ink);
+        // Requests 24h.
+        long[] traffic=WidgetRows.traffic(snapshot);
+        String errorsState=snapshot==null?"":snapshot.optString("errorsState");
+        android.text.SpannableStringBuilder req=new android.text.SpannableStringBuilder(traffic==null?"—":WidgetRows.compact(traffic[0]));
+        if(traffic!=null){req.append(" ");int s=req.length();req.append(WidgetRows.compact(traffic[1])).append(" err");req.setSpan(new android.text.style.ForegroundColorSpan(traffic[1]==0?p.muted:"warning".equals(errorsState)?p.warn:p.crit),s,req.length(),android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);}
+        view.setTextViewText(R.id.medium_req_value,req);
+        JSONObject series=snapshot==null?null:snapshot.optJSONObject("series");
+        boolean chart=series!=null&&"ready".equals(series.optString("state"));
+        view.setViewVisibility(R.id.medium_req_chart,chart?View.VISIBLE:View.GONE);
+        if(chart) view.setImageViewBitmap(R.id.medium_req_chart,WidgetCharts.sparkline(longs(series.optJSONArray("requests")),longs(series.optJSONArray("errors")),104,26,density,p));
+        view.setTextViewText(R.id.medium_req_note,chart?"":snapshot==null?"":series==null?"chart after refresh":"absent".equals(series.optString("state"))?"chart: server update":"chart unavailable");
+        view.setViewVisibility(R.id.medium_req_note,chart?View.GONE:View.VISIBLE);
+        view.setContentDescription(R.id.medium_tile_req,"Requests in the past 24 hours: "+(traffic==null?"unavailable":traffic[0]+", errors "+traffic[1])+(chart?". Chart per half-hour with errors on their own baseline":""));
+        view.setOnClickPendingIntent(R.id.medium_tile_req,WidgetActions.pending(context,id,"logs",false));
+        // Fullest plan-usage gauge (amber at 80% or more; gauge only).
+        JSONObject usage=snapshot==null?null:snapshot.optJSONObject("usage");
+        org.json.JSONArray gauges=usage==null||!"ready".equals(usage.optString("state"))?null:usage.optJSONArray("gauges");
+        JSONObject worst=null;
+        if(gauges!=null)for(int i=0;i<gauges.length();i++){JSONObject g=gauges.optJSONObject(i);if(g!=null&&g.opt("percent") instanceof Number&&(worst==null||g.optDouble("percent")>worst.optDouble("percent")))worst=g;}
+        boolean hot=worst!=null&&worst.optBoolean("hot");
+        android.text.SpannableStringBuilder use=new android.text.SpannableStringBuilder(worst==null?"—":worst.optString("text"));
+        use.setSpan(new android.text.style.ForegroundColorSpan(hot?p.warn:p.ink),0,use.length(),android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
+        if(worst!=null){use.append(" ");int s=use.length();use.append(worst.optString("label"));use.setSpan(new android.text.style.ForegroundColorSpan(p.muted),s,use.length(),android.text.Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);}
+        view.setTextViewText(R.id.medium_usage_value,use);
+        int value=worst==null?0:(int)Math.round(Math.min(100,Math.max(0,worst.optDouble("percent"))));
+        view.setViewVisibility(R.id.medium_usage_bar,worst!=null&&!hot?View.VISIBLE:View.INVISIBLE);
+        view.setViewVisibility(R.id.medium_usage_hot,hot?View.VISIBLE:View.GONE);
+        view.setProgressBar(R.id.medium_usage_bar,100,value,false);view.setProgressBar(R.id.medium_usage_hot,100,value,false);
+        double elapsed=usage==null?-1:usage.optDouble("elapsed",-1);
+        android.graphics.Bitmap pace=worst==null?null:WidgetCharts.paceStrip(elapsed);
+        view.setViewVisibility(R.id.medium_usage_pace,pace==null?View.GONE:View.VISIBLE);
+        if(pace!=null){view.setImageViewBitmap(R.id.medium_usage_pace,pace);view.setInt(R.id.medium_usage_pace,"setColorFilter",p.ink);}
+        view.setTextViewText(R.id.medium_usage_note,worst==null?(usage==null?"":"unavailable"):elapsed>=0?"pace "+WidgetData.percent(elapsed):"");
+        view.setContentDescription(R.id.medium_tile_usage,worst==null?"Cloudflare plan usage unavailable":"Highest plan usage this cycle: "+worst.optString("label")+" "+worst.optString("text")+(hot?", 80% or more":"")+(elapsed>=0?". Cycle elapsed "+WidgetData.percent(elapsed):""));
+        view.setOnClickPendingIntent(R.id.medium_tile_usage,WidgetActions.pending(context,id,"logs",false));
+        // Last five main runs.
+        org.json.JSONArray runs=snapshot==null?null:snapshot.optJSONArray("mainRuns");
+        JSONObject activity=snapshot==null?null:snapshot.optJSONObject("activity");
+        int running=activity!=null&&"ready".equals(activity.optString("state"))?activity.optInt("active"):0;
+        org.json.JSONArray states=new org.json.JSONArray();
+        if(runs!=null){for(int i=Math.min(runs.length(),5)-1;i>=0;i--)states.put(runs.optJSONObject(i)==null?"":runs.optJSONObject(i).optString("conclusion"));if(running>0)states.put("running");}
+        view.setTextViewText(R.id.medium_main_pips,runs==null?"—":WidgetTiles.pips(states,p));
+        view.setTextViewText(R.id.medium_main_note,runs==null?(snapshot==null?"":series==null?"after refresh":"absent".equals(series.optString("state"))?"server update":"GitHub unavailable"):running>0?running+" running":"live "+snapshot.optString("commit"));
+        view.setContentDescription(R.id.medium_tile_main,runs==null?"Main runs unavailable":"Last "+Math.min(runs.length(),5)+" completed main runs"+(running>0?", "+running+" running":"")+". Open development activity");
+        view.setOnClickPendingIntent(R.id.medium_tile_main,WidgetActions.pending(context,id,"activity",false));
+        return view;
+    }
+    static Long[] longs(org.json.JSONArray values) {
+        if (values == null) return null;
+        Long[] out = new Long[values.length()];
+        for (int i = 0; i < values.length(); i++) { Object v = values.opt(i); out[i] = v instanceof Number ? ((Number) v).longValue() : null; }
+        return out;
     }
     /** Status glyph box shared by both widgets: ✓ / ! / ✕ (shapes differ), "–" when there is no status. */
     static void glyph(RemoteViews view,int target,String color,boolean light,boolean fillHealthy) {
@@ -175,10 +278,6 @@ public class OwnerWidgetProvider extends AppWidgetProvider {
         boolean filled=red||green&&fillHealthy;
         view.setTextColor(target,filled?(light?Color.rgb(247,242,228):Color.rgb(11,17,14)):red||green||yellow?color(color,light):(light?Color.rgb(32,72,51):Color.rgb(177,214,193)));
     }
-    private static void tile(RemoteViews view,int id,String value,String label) {
-        view.setTextViewText(id,value);view.setContentDescription(id,label+": "+("—".equals(value)?"unavailable":value));
-    }
-    private static void text(RemoteViews view,int id,String text) { view.setTextViewText(id,text);view.setContentDescription(id,text); }
     @Override public void onUpdate(Context context, AppWidgetManager manager, int[] ids) {
         renderAll(context);
         OwnerWidgetJob.schedule(context);
@@ -210,7 +309,9 @@ public class OwnerWidgetProvider extends AppWidgetProvider {
         String destination = intent.getStringExtra(WidgetActions.DESTINATION), row = intent.getStringExtra(ROW_ID);
         if (destination != null) { openRow(context, id, WidgetActions.rowAction(destination)); return; }
         if (row == null || row.isEmpty()) return;
-        WidgetRowState.toggle(context, id, row);
+        // The Traffic tile's 24h/7d segments set a range; everything else toggles. No fetch either way.
+        if (row.startsWith(WidgetRowState.RANGE)) WidgetRowState.setRange(context, id, row);
+        else WidgetRowState.toggle(context, id, row);
         AppWidgetManager manager = AppWidgetManager.getInstance(context);
         render(context, manager, id, null);
         manager.notifyAppWidgetViewDataChanged(id, R.id.monitor_list);

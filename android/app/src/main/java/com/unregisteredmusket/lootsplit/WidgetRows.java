@@ -18,13 +18,159 @@ final class WidgetRows {
     static void add(JSONArray rows, String title, String detail, String action, String color, String time) throws Exception {
         rows.put(new JSONObject().put("title", title).put("detail", detail).put("action", action).put("color",color).put("time",time));
     }
-    static JSONArray rows(JSONObject snapshot) {
+    static JSONArray rows(JSONObject snapshot) { return rows(snapshot, java.util.Collections.<String>emptySet()); }
+    /**
+     * The Field monitor list (redesign approved 2026-10-25), top to bottom: Needs attention (active
+     * items, critical → warning → info), Recently resolved (24 h), At a glance tiles (an expanded tile
+     * takes a full row, so {@code expanded} decides the packing), the report/agent strip, and More:
+     * every row the widget listed before, in its earlier order. Each row has a {@code kind}
+     * (section, item, resolved, note, tiles, strip, row) and a stable ID.
+     */
+    static JSONArray rows(JSONObject snapshot, java.util.Set<String> expanded) {
         JSONArray rows = new JSONArray();
         try {
             if (snapshot == null) { add(rows, "No current owner reading", "Sign in or tap Refresh. Backend logging continues independently.", "account"); return identify(rows); }
+            java.util.List<JSONObject> items = attentionItems(snapshot);
+            int active = 0; for (JSONObject item : items) if (!"info".equals(item.optString("severity"))) active++;
+            section(rows, "attention", active > 0 ? "Needs attention" : "Attention", active > 0 ? active + " active" : "none active");
+            if (items.isEmpty()) note(rows, "attention:none", "✓", "green", "No active problems", "All checks passed in this reading", "diagnostics");
+            for (JSONObject item : items) rows.put(item);
+            resolvedRows(rows, snapshot);
+            section(rows, "glance", "At a glance", "");
+            WidgetTiles.add(rows, snapshot, expanded == null ? java.util.Collections.<String>emptySet() : expanded);
+            rows.put(WidgetTiles.strip(snapshot));
+            section(rows, "more", "More", "");
+            more(rows, snapshot);
+        } catch (Exception ignored) { }
+        return identify(rows);
+    }
+    private static void section(JSONArray rows, String id, String title, String detail) throws Exception {
+        rows.put(new JSONObject().put("kind", "section").put("id", "section:" + id).put("title", title).put("detail", detail));
+    }
+    /** A one-line note (no expansion): glyph, text and, when tapped, an app destination. */
+    static void note(JSONArray rows, String id, String glyph, String color, String title, String line, String action) throws Exception {
+        rows.put(new JSONObject().put("kind", "note").put("id", id).put("glyph", glyph).put("color", color).put("title", title).put("line", line).put("action", action == null ? "" : action));
+    }
+    static int rank(String severity) { return "critical".equals(severity) ? 0 : "warning".equals(severity) ? 1 : "info".equals(severity) ? 2 : 3; }
+    static String chip(String severity) { return "critical".equals(severity) ? "✕ CRIT" : "warning".equals(severity) ? "! WARN" : "i INFO"; }
+    static String severityWord(String severity) { return "critical".equals(severity) ? "Critical" : "warning".equals(severity) ? "Warning" : "info".equals(severity) ? "Info" : "Resolved"; }
+    /** 45s → "<1m", "31m", "2h 5m", "3d 4h". */
+    static String duration(long ms) {
+        long minutes = Math.max(0, ms) / 60000;
+        if (minutes < 1) return "<1m";
+        if (minutes < 60) return minutes + "m";
+        if (minutes < 1440) return (minutes / 60) + "h" + (minutes % 60 == 0 ? "" : " " + (minutes % 60) + "m");
+        return (minutes / 1440) + "d" + ((minutes % 1440) / 60 == 0 ? "" : " " + ((minutes % 1440) / 60) + "h");
+    }
+    private static String firstSentence(String text, int size) {
+        int end = text.indexOf(". ");
+        String out = end > 0 ? text.substring(0, end + 1) : text;
+        return out.length() > size ? out.substring(0, size - 1) + "…" : out;
+    }
+    /** Severity counts [critical, warning, info] of the active items (the status header's ✕ ! i). */
+    static int[] counts(JSONObject snapshot) {
+        int[] out = new int[3];
+        for (JSONObject item : attentionItems(snapshot)) { int r = rank(item.optString("severity")); if (r < 3) out[r]++; }
+        return out;
+    }
+    /**
+     * Active attention items: every diagnostic that is not green (with its severity, start and
+     * duration) and the development telemetry warning. Plan usage is not an item (owner decision 6).
+     * Stable order within a severity.
+     */
+    static java.util.List<JSONObject> attentionItems(JSONObject snapshot) {
+        java.util.List<JSONObject> out = new java.util.ArrayList<>();
+        if (snapshot == null) return out;
+        long checked = snapshot.optLong("checkedAt");
+        try {
+            JSONArray diagnostics = snapshot.optJSONArray("diagnostics");
+            if (diagnostics != null) for (int i = 0; i < diagnostics.length(); i++) {
+                JSONObject check = diagnostics.optJSONObject(i);
+                if (check == null) continue;
+                String severity = check.has("severity") ? check.optString("severity") : WidgetData.severity(check, "");
+                if (severity.isEmpty()) continue;
+                out.add(item(snapshot, check, severity, checked));
+            }
+            String warning = snapshot.optString("warning");
+            if (!warning.isEmpty()) {
+                JSONArray buttons = new JSONArray().put(new JSONArray().put("TASK").put("task")).put(new JSONArray().put("HISTORY").put("logs")).put(new JSONArray().put("REPORT").put("report"));
+                out.add(new JSONObject().put("kind", "item").put("id", "development-warning").put("title", "Development warning").put("color", "yellow").put("severity", "warning")
+                    .put("tag", "ACTIVE").put("meta", warning).put("detail", warning).put("action", "task").put("time", "")
+                    .put("lines", "Severity  Warning · development telemetry is missing or late\n" + warning).put("next", "").put("buttons", buttons));
+            }
+        } catch (Exception ignored) { }
+        java.util.Collections.sort(out, (a, b) -> rank(a.optString("severity")) - rank(b.optString("severity")));
+        return out;
+    }
+    private static JSONObject item(JSONObject snapshot, JSONObject check, String severity, long checked) throws Exception {
+        String component = check.optString("component"), symptom = check.optString("symptom"), action = check.optString("action"), state = check.optString("state");
+        long started = check.optLong("firstOccurredAt", 0), lastAt = check.optLong("lastAt", 0);
+        boolean info = "info".equals(severity);
+        String evidence = !check.optString("brief").isEmpty() ? check.optString("brief") : firstSentence(symptom, 70);
+        String meta = evidence + (!info && started > 0 ? " · started " + clock(started) + " · " + duration(checked - started) : "");
+        String reason = "critical".equals(severity)
+            ? "Critical · confirmed failure" + (check.optBoolean("retainedFailure") ? " (not yet rechecked)" : "")
+            : "warning".equals(severity) ? ("warning".equals(state) ? "Warning · a recent problem that has stopped" : "Warning · cannot be verified now (a required check)")
+            : "Info · coverage limit; never decides the status";
+        StringBuilder lines = new StringBuilder("Severity  ").append(reason);
+        if (started > 0) lines.append("\nStarted   ").append(clock(started)).append(" · active ").append(duration(checked - started)).append(" at this reading");
+        if (lastAt > 0) lines.append(started > 0 ? " · last " : "\nLast      ").append(clock(lastAt));
+        Object errors = check.opt("errorCount"), requests = check.opt("requestCount");
+        if (errors instanceof Number && requests instanceof Number && ((Number) requests).longValue() > 0) {
+            long e = ((Number) errors).longValue(), r = ((Number) requests).longValue();
+            lines.append("\nEvidence  ").append(java.text.NumberFormat.getIntegerInstance().format(e)).append(" of ").append(java.text.NumberFormat.getIntegerInstance().format(r))
+                .append(" requests (").append(String.format(Locale.ROOT, e * 1000 / r < 1 ? "%.3f" : "%.1f", e * 100d / r)).append("%) in 24h");
+        } else if (!check.optString("brief").isEmpty()) lines.append("\nEvidence  ").append(check.optString("brief"));
+        if (!symptom.isEmpty()) lines.append("\nSymptom   ").append(symptom);
+        if (!check.optString("impact").isEmpty()) lines.append("\nImpact    ").append(check.optString("impact"));
+        JSONArray buttons = new JSONArray().put(new JSONArray().put("DIAGNOSTICS").put("diagnostics")).put(new JSONArray().put("HISTORY").put("logs")).put(new JSONArray().put("REPORT").put("report"));
+        JSONObject out = new JSONObject().put("kind", "item").put("id", "diagnostic:" + component).put("title", component).put("color", check.optString("color", "yellow"))
+            .put("severity", severity).put("tag", info ? "NOTE" : "ACTIVE").put("meta", meta).put("detail", symptom + "\n" + action).put("action", "diagnostics")
+            .put("time", clock(lastAt)).put("startedAt", started).put("lines", lines.toString()).put("next", action.isEmpty() ? "" : "Action: " + action).put("buttons", buttons);
+        // The Worker errors item expands into errors per half-hour for the last 6 hours (12 slots).
+        JSONObject series = snapshot.optJSONObject("series");
+        if ("Worker execution errors".equals(component) && series != null && "ready".equals(series.optString("state"))) {
+            JSONArray all = series.optJSONArray("errors"), recent = new JSONArray();
+            if (all != null) for (int i = Math.max(0, all.length() - 12); i < all.length(); i++) recent.put(all.opt(i));
+            out.put("chart", recent);
+        }
+        return out;
+    }
+    /** Recently resolved (24 h): one line per recovery, or an explicit note (older server, unavailable, none). */
+    private static void resolvedRows(JSONArray rows, JSONObject snapshot) throws Exception {
+        section(rows, "resolved", "Recently resolved", "24h");
+        JSONObject resolved = snapshot.optJSONObject("resolved");
+        // No object at all: a reading stored by the previous app version (the next refresh fills it).
+        if (resolved == null) { note(rows, "resolved:refresh", "i", "", "Recovery times appear after the next refresh", "", "logs"); return; }
+        String state = resolved.optString("state");
+        if ("absent".equals(state)) { note(rows, "resolved:update", "i", "", "Recovery times need a server update", "", "logs"); return; }
+        if (!"ready".equals(state)) { note(rows, "resolved:unavailable", "!", "yellow", "Recently resolved unavailable", resolved.optString("errorCode"), "logs"); return; }
+        JSONArray items = resolved.optJSONArray("items");
+        if (items == null || items.length() == 0) note(rows, "resolved:none", "•", "", "No problems resolved in the last 24 hours", "", "logs");
+        else for (int i = 0; i < items.length(); i++) {
+            JSONObject item = items.getJSONObject(i);
+            long start = item.optLong("startedAt", 0), end = item.optLong("resolvedAt", 0);
+            boolean retired = "retired".equals(item.optString("resolution"));
+            String line = (start > 0 ? clock(start) + " → " + clock(end) + " · " + duration(end - start) : "ended " + clock(end)) + " · " + (retired ? "retired" : "resolved");
+            StringBuilder detail = new StringBuilder(severityWord(item.optString("severity"))).append(" until ").append(clock(end));
+            if (!item.optString("symptom").isEmpty()) detail.append("\n").append(item.optString("symptom"));
+            if (!item.optString("impact").isEmpty()) detail.append("\n").append(item.optString("impact"));
+            JSONArray history = item.optJSONArray("history");
+            if (history != null) for (int h = 0; h < history.length(); h++) {
+                JSONObject entry = history.optJSONObject(h);
+                if (entry != null && entry.optLong("at") > 0) detail.append("\n").append(clock(entry.optLong("at"))).append(" ").append(glyph(entry.optString("color"))).append(" ").append(entry.optString("symptom"));
+            }
+            rows.put(new JSONObject().put("kind", "resolved").put("id", "resolved:" + item.optString("component")).put("glyph", retired ? "–" : "✓").put("color", retired ? "" : "green")
+                .put("title", item.optString("component")).put("line", line).put("detail", detail.toString()).put("action", "logs"));
+        }
+        int more = resolved.optInt("total", 0) - (items == null ? 0 : items.length());
+        if (more > 0) note(rows, "resolved:more", "+", "", more + " more resolved in 24h", "open history", "logs");
+        if (!resolved.optBoolean("complete", true)) note(rows, "resolved:partial", "i", "", "Older recoveries in the window were not scanned", "open history", "logs");
+    }
+    /** "More": every row the widget showed before the redesign, in its earlier order. */
+    private static void more(JSONArray rows, JSONObject snapshot) throws Exception {
             JSONObject task = snapshot.optJSONObject("task");
             add(rows, "Development", task == null || !task.optBoolean("active") ? "No development task active" + lastTask(task, " · last: ") : task.optString("title") + " · " + task.optString("state") + "\n" + task.optString("phase") + ": " + task.optString("progress"), "task");
-            if (!snapshot.optString("warning").isEmpty()) add(rows, "Development warning", snapshot.optString("warning"), "task", "yellow");
             JSONArray recent=snapshot.optJSONArray("recentEntries");
             if(recent==null||recent.length()==0)add(rows, "Latest monitoring entry", snapshot.optString("log", "No scheduled entry yet"), "logs");
             else for(int i=0;i<recent.length();i++){JSONObject entry=recent.getJSONObject(i);add(rows,"Monitoring",entry.optString("summary"),"logs","",clock(entry.optLong("observedAt")));id(rows,"monitoring:"+entry.optLong("observedAt"));}
@@ -32,21 +178,20 @@ final class WidgetRows {
             add(rows, "Cloudflare traffic · past 24h", snapshot.optString("traffic") + snapshot.optString("trafficTime"), "logs");
             usageRows(rows, snapshot.optJSONObject("usage"));
             add(rows, "App statistics", snapshot.optString("games") + "\nBackups " + snapshot.optString("backups") + snapshot.optString("gamesTime"), "logs");
+            // Passing checks stay listed here; every check that needs attention is an item above.
             JSONArray diagnostics = snapshot.optJSONArray("diagnostics");
             if (diagnostics != null) for (int i=0; i<diagnostics.length(); i++) {
                 JSONObject check = diagnostics.getJSONObject(i);
-                // A coverage limit (by-design gap) stays listed as information, not attention.
-                boolean limit=check.optBoolean("coverageLimit",false);
-                String color=limit?"":check.optString("color","yellow");
-                add(rows, check.optString("component") + (limit ? " · coverage limit" : ""), check.optString("symptom") + "\n" + check.optString("action"), "diagnostics",color,clock(check.optLong("lastAt",0)));
+                String severity = check.has("severity") ? check.optString("severity") : WidgetData.severity(check, "");
+                if (!severity.isEmpty()) continue;
+                add(rows, check.optString("component"), check.optString("symptom") + "\n" + check.optString("action"), "diagnostics",check.optString("color","yellow"),clock(check.optLong("lastAt",0)));
                 id(rows, "diagnostic:" + check.optString("component"));
             }
             add(rows, "Builds and deployments", snapshot.optString("development") + "\n" + snapshot.optString("deployment") + snapshot.optString("developmentTime"), "task");
-            add(rows, "Shared snapshot " + snapshot.optLong("snapshotId"), "Data collected " + WidgetData.time(snapshot.optLong("checkedAt")) + ". Android delivery may be delayed. Web " + snapshot.optString("commit"), "diagnostics","",clock(snapshot.optLong("checkedAt")));
+            String reused = snapshot.optString("reused");
+            add(rows, "Shared snapshot " + snapshot.optLong("snapshotId"), "Data collected " + WidgetData.time(snapshot.optLong("checkedAt")) + ". Android delivery may be delayed. Web " + snapshot.optString("commit") + (reused.isEmpty() ? "" : "\nReused provider reading: " + reused + " (the live read was slow)"), "diagnostics","",clock(snapshot.optLong("checkedAt")));
             id(rows, "snapshot");
             add(rows, "Full history, search and export", "Open private monitoring logs and detailed reports in Lootsplitter.", "logs");
-        } catch (Exception ignored) { }
-        return attentionFirst(identify(rows));
     }
     /** Names the row just added: its title carries a value or time that changes between readings. */
     private static void id(JSONArray rows, String id) throws Exception { rows.getJSONObject(rows.length() - 1).put("id", id); }
@@ -253,8 +398,44 @@ final class WidgetRows {
             case "log": return snapshot.optString("log", "No log yet");
             case "warning": return snapshot.optString("warning").isEmpty() ? reason(snapshot)[0] : snapshot.optString("warning");
             case "report": return snapshot.optString("report", "No report yet");
+            case "incident": return incident(snapshot);
+            case "summary": return summary(snapshot);
             default: return status(snapshot) + " · " + ("green".equals(snapshot.optString("statusColor")) ? "all checks" : reason(snapshot)[0]);
         }
     }
-    static String action(String category,JSONObject snapshot) { if("activity".equals(category)) return "activity"; if("warning".equals(category) && (snapshot==null||snapshot.optString("warning").isEmpty())) return "diagnostics"; return "report".equals(category) ? "report" : "task".equals(category) || "timer".equals(category) || "warning".equals(category) ? "task" : "health".equals(category) ? "diagnostics" : "logs"; }
+    /** The worst active item (not info): its severity, title and duration, or "ALL CLEAR · 21 checks". */
+    static JSONObject worst(JSONObject snapshot) {
+        for (JSONObject item : attentionItems(snapshot)) if (!"info".equals(item.optString("severity"))) return item;
+        return null;
+    }
+    /** "CRIT · Worker execution errors · 31m" / "ALL CLEAR · 21 checks" / the status word when unverified. */
+    static String incident(JSONObject snapshot) {
+        JSONObject item = worst(snapshot);
+        if (item != null) {
+            long started = item.optLong("startedAt", 0);
+            return chip(item.optString("severity")).substring(2) + " · " + item.optString("title") + (started > 0 ? " · " + duration(snapshot.optLong("checkedAt") - started) : "");
+        }
+        if (!"green".equals(OwnerWidgetProvider.statusColor(snapshot))) return status(snapshot) + " · " + reason(snapshot)[0];
+        JSONArray diagnostics = snapshot.optJSONArray("diagnostics");
+        int checks = diagnostics == null ? 0 : diagnostics.length();
+        return "ALL CLEAR" + (checks > 0 ? " · " + checks + (checks == 1 ? " check" : " checks") : "");
+    }
+    /** Severity colour of the incident line: the worst item's, green when clear, the status colour otherwise. */
+    static String incidentSeverity(JSONObject snapshot) {
+        JSONObject item = worst(snapshot);
+        return item != null ? item.optString("severity") : "green".equals(OwnerWidgetProvider.statusColor(snapshot)) ? "" : "warning";
+    }
+    /** "! 1 warn · ✓ 2 resolved 24h" (counts that are not zero, then recoveries); no reading time (the caller adds it). */
+    static String summary(JSONObject snapshot) {
+        int[] counts = counts(snapshot);
+        java.util.List<String> parts = new java.util.ArrayList<>();
+        if (counts[0] > 0) parts.add("✕ " + counts[0] + " crit");
+        if (counts[1] > 0) parts.add("! " + counts[1] + " warn");
+        JSONObject resolved = snapshot.optJSONObject("resolved");
+        if (resolved != null && "ready".equals(resolved.optString("state"))) parts.add("✓ " + resolved.optInt("total", 0) + " resolved 24h");
+        else if (resolved != null && "absent".equals(resolved.optString("state"))) parts.add("recoveries: server update");
+        if (counts[0] == 0 && counts[1] == 0) parts.add(snapshot.optString("active", "—") + " online");
+        return android.text.TextUtils.join(" · ", parts);
+    }
+    static String action(String category,JSONObject snapshot) { if("incident".equals(category)||"summary".equals(category)) return "diagnostics"; if("activity".equals(category)) return "activity"; if("warning".equals(category) && (snapshot==null||snapshot.optString("warning").isEmpty())) return "diagnostics"; return "report".equals(category) ? "report" : "task".equals(category) || "timer".equals(category) || "warning".equals(category) ? "task" : "health".equals(category) ? "diagnostics" : "logs"; }
 }
