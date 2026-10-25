@@ -438,7 +438,7 @@ export function applyWorldCommand(t: CloudTable, seat: CloudSeat, cmd: WorldComm
     if (journal.finance?.downtime.some((d) => d.status === "pending"))
       throw Error("Approve or cancel pending downtime before moving the party.");
     // The party marker follows a journey under way; stop it before moving the party freely.
-    if (w.journeys?.some((j) => j.status === "active" || j.status === "arrived"))
+    if (w.journeys?.some((j) => (j.status === "active" || j.status === "arrived") && !j.groupId))
       throw Error("The party is on a journey. Stop it on the road before moving the party freely.");
     if (cmd.position) {
       w.partyPosition = cmd.position;

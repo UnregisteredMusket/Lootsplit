@@ -189,3 +189,16 @@ export function withoutGroupFields<T extends Partial<CharacterPosition>>(s: T): 
 
 /** Every group's location (main first); null for a group on the road. */
 export const partyPlaces = (t: J): (string | null)[] => groupRefs(t).map((g) => groupPlace(t, g).locationId);
+
+/**
+ * The ship a whole group boarded as a group (it stays in the party), or undefined. A group is
+ * aboard when every member is aboard the same ship and still in the party.
+ */
+export function groupShip(t: PJ, ref: string): string | undefined {
+  if (ref === MAIN_GROUP) return undefined;
+  const members = (t.journal?.world?.characterPositions ?? []).filter((s) => s.inParty && s.groupId === ref);
+  if (!members.length) return undefined;
+  const ships = new Set(members.map((s) => t.journal?.fleet?.aboard.find((a) => a.purseId === s.purseId)?.propertyId));
+  const [only] = [...ships];
+  return ships.size === 1 && only ? only : undefined;
+}

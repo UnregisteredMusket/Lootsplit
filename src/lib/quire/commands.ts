@@ -144,6 +144,11 @@ export const commandSchema = z.discriminatedUnion("kind", [
     days: z.number().int().min(1).max(3650),
     /** Journey planner: price and move a party journey in this downtime. */
     journeyId: id.optional(),
+    /**
+     * Split the party: other groups' journeys under way that also travel in this window (the
+     * DM ticks them; one campaign clock). Each moves its own group.
+     */
+    journeyIds: z.array(id).max(5).optional(),
     /** One-click inbox approval: refuse if the quote differs from the one the DM was shown. */
     expectedQuoteHash: z.string().max(100).optional(),
   }),
@@ -556,15 +561,19 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
     event(cmd.after ? `Location saved: ${cmd.after.name}` : "Location removed");
   } else if (cmd.kind === "party-location" && cmd.groupId && cmd.groupId !== MAIN_GROUP) {
     dm();
-    applyGroupLocation(t, { ...cmd, groupId: cmd.groupId }, (summary, purseId, dmOnly) =>
-      journal.events.push({
-        id: cmd.id + "-event-" + journal.events.length,
-        at,
-        summary,
-        kind: "management",
-        ...(purseId ? { purseId } : {}),
-        ...(dmOnly ? { dmOnly: true } : {}),
-      }),
+    applyGroupLocation(
+      t,
+      { ...cmd, groupId: cmd.groupId },
+      (summary, purseId, dmOnly) =>
+        journal.events.push({
+          id: cmd.id + "-event-" + journal.events.length,
+          at,
+          summary,
+          kind: "management",
+          ...(purseId ? { purseId } : {}),
+          ...(dmOnly ? { dmOnly: true } : {}),
+        }),
+      at,
     );
   } else if (cmd.kind === "party-location") {
     dm();
@@ -572,7 +581,7 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
     if (market.currentLocationId !== cmd.before) throw Error("The party moved elsewhere. Refresh before changing location.");
     if (journal.world?.partyPosition && canonicalJson(journal.world.partyPosition) !== cmd.beforePosition) throw Error("The party travel position changed. Refresh before choosing a location.");
     if (journal.finance?.downtime.some(d=>d.status==="pending")) throw Error("Approve or cancel pending downtime before moving the party.");
-    const travelling = travellingJourney(t);
+    const travelling = travellingJourney(t, MAIN_GROUP);
     if (cmd.journeyId) {
       // "Move party here" on arrival: no time passes and nothing is charged.
       if (!travelling || travelling.id !== cmd.journeyId || travelling.status !== "arrived")
@@ -773,11 +782,14 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
     // The one-click approval hashes its quote from the table in ID order (screens sort by name).
     const ordered = cmd.expectedQuoteHash ? orderedTable(structuredClone(t)) : undefined;
     // A journey is frozen (route, scale, duration, travellers, prices) when it is reviewed.
-    if (cmd.journeyId) prepareJourneyPlan(t, cmd.journeyId);
-    const quote = previewDowntime(t, f, cmd.days, undefined, cmd.advanceSeason ? cmd.id : undefined, cmd.journeyId);
+    const moving = [...(cmd.journeyId ? [cmd.journeyId] : []), ...(cmd.journeyIds ?? [])];
+    if (new Set(moving).size !== moving.length) throw Error("Choose each journey once.");
+    if (cmd.journeyIds?.length && !cmd.journeyId) throw Error("Choose the journey to review first.");
+    for (const journeyId of moving) prepareJourneyPlan(t, journeyId);
+    const quote = previewDowntime(t, f, cmd.days, undefined, cmd.advanceSeason ? cmd.id : undefined, cmd.journeyId, cmd.journeyIds);
     if (cmd.expectedQuoteHash && quoteHash(quote) !== cmd.expectedQuoteHash) {
-      if (cmd.journeyId) prepareJourneyPlan(ordered!, cmd.journeyId);
-      const same = previewDowntime(ordered!, readFinance(ordered!.journal?.finance), cmd.days, undefined, cmd.advanceSeason ? cmd.id : undefined, cmd.journeyId);
+      for (const journeyId of moving) prepareJourneyPlan(ordered!, journeyId);
+      const same = previewDowntime(ordered!, readFinance(ordered!.journal?.finance), cmd.days, undefined, cmd.advanceSeason ? cmd.id : undefined, cmd.journeyId, cmd.journeyIds);
       if (quoteHash(same) !== cmd.expectedQuoteHash)
         throw Error("Something changed since this request was drawn up (balances, the route's map or a pending preview). Open the full review.");
     }

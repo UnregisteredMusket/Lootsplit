@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useState, type ReactNode } from "react";
 import { MapPin, Route, X } from "lucide-react";
 import type { HereRow, HereSheet } from "@/lib/quire/place-hub";
 import type { MapRecordReference } from "@/lib/quire/connected-maps-schema";
@@ -27,7 +27,13 @@ export function MapHereSheet({
   showParty,
   planJourney,
   showJourney,
+  groupSwitch,
+  partyName = "Party",
 }: {
+  /** Split the party: whose place this is ("Ironhold riders is in Ironhold"). */
+  partyName?: string;
+  /** Split the party: choose whose place this sheet lists. */
+  groupSwitch?: ReactNode;
   sheet: HereSheet;
   dm: boolean;
   close: () => void;
@@ -151,7 +157,9 @@ export function MapHereSheet({
     body = (
       <>
         {header("Here", "Everything you can use at the party's location")}
-        <p className="map-here-note">Party is in {sheet.locationName}</p>
+        <p className="map-here-note">
+          {partyName} is in {sheet.locationName}
+        </p>
         {planJourney && (
           <div className="map-here-travel">
             <span>
@@ -234,6 +242,7 @@ export function MapHereSheet({
   }
   return (
     <section className="map-record-details map-service-open map-here-sheet" aria-label="Here">
+      {groupSwitch}
       {body}
     </section>
   );

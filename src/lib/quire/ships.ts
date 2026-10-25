@@ -2,7 +2,7 @@ import type { CloudSeat, CloudTable } from "./cloud.ts";
 import type { Holding } from "./types.ts";
 import { canonicalJson } from "./canonical-json.ts";
 import { characterLocation, characterPosition } from "./character-position.ts";
-import { partyPlaces, groupPlace, groupRefs, resolveGroup, MAIN_GROUP } from "./party-groups.ts";
+import { partyPlaces, groupPlace, groupRefs, resolveGroup, MAIN_GROUP, groupMembers, groupShip } from "./party-groups.ts";
 import { readWorld } from "./world-schema.ts";
 import { readMarketLocations, locationPath } from "./shop-locations.ts";
 import { readEstate, type EstateJob } from "./estate-schema.ts";
@@ -108,6 +108,51 @@ function move(t: CloudTable, s: Vessel, locationId: string | null) {
     const npc = t.journal?.world?.npcs.find((n) => n.id === p.purseId);
     if (npc && locationId) npc.locationId = locationId;
   }
+  // Split the party: a group aboard is wherever its ship is (nowhere ashore while sailing).
+  for (const g of t.journal?.world?.groups ?? [])
+    if (g.status === "active" && groupShip(t, g.id) === h.id) {
+      g.locationId = locationId;
+      delete g.position;
+    }
+}
+/**
+ * Split the party: a whole (non-main) group boards together and stays in the party; every member
+ * goes aboard with `returnGroupId`. Landing takes the whole group ashore where the ship is.
+ */
+function boardGroup(t: CloudTable, s: Vessel, ref: string, action: "board" | "disembark") {
+  const h = holding(t, s.propertyId),
+    w = (t.journal!.world ??= readWorld()),
+    f = t.journal!.fleet!;
+  const g = w.groups?.find((x) => x.id === ref && x.status === "active");
+  if (ref === MAIN_GROUP || !g) throw Error("Choose a group other than the main group (split it off first).");
+  if (s.mode === "sailing") throw Error("A sailing ship must arrive or be teleported before boarding or disembarking.");
+  if (!h.locationId) throw Error("The ship needs a known location.");
+  const members = groupMembers(t, ref);
+  if (action === "board") {
+    if (groupShip(t, ref)) throw Error(`${g.name} is already aboard a ship.`);
+    if (g.position || !g.locationId || !locationPath(readMarketLocations(t.journal?.market), g.locationId).some((l) => l.id === h.locationId))
+      throw Error(`${g.name} must be at the ship to board.`);
+    if ((w.journeys ?? []).some((j) => j.groupId === ref && ["planned", "active", "arrived"].includes(j.status)))
+      throw Error(`${g.name} has a journey planned or under way. Finish or stop it first.`);
+    if (occupants(t, h.id).length + members.length > s.stats.passengers)
+      throw Error("The ship hasn't enough passenger capacity for the whole group.");
+    for (const p of members) {
+      const position = characterPosition(t, p);
+      if (position.shipId) throw Error(`${p.name} is already aboard a ship.`);
+      if (position.downtime) throw Error(`${p.name} is on downtime.`);
+      const { shipId: _s, shipReturnInParty: _r, ...stored } = position;
+      void _s;
+      void _r;
+      w.characterPositions = [...w.characterPositions.filter((x) => x.purseId !== p.id), { ...stored, locationId: h.locationId }];
+      f.aboard.push({ purseId: p.id, propertyId: h.id, returnInParty: true, returnGroupId: ref });
+    }
+    g.locationId = h.locationId;
+    return `${g.name} boarded ${h.name} as a group and stays in the party.`;
+  }
+  if (groupShip(t, ref) !== h.id) throw Error(`${g.name} isn't aboard ${h.name}.`);
+  f.aboard = f.aboard.filter((a) => !members.some((p) => p.id === a.purseId));
+  g.locationId = h.locationId;
+  return `${g.name} landed from ${h.name}.`;
 }
 function board(t: CloudTable, s: Vessel, purseId: string, action: "board" | "disembark") {
   const p = t.purses.find((p) => p.id === purseId && p.kind === "character");
@@ -118,6 +163,8 @@ function board(t: CloudTable, s: Vessel, purseId: string, action: "board" | "dis
     position = characterPosition(t, p);
   if (position.downtime)
     throw Error("Cancel this character's downtime before boarding or leaving.");
+  if (position.inParty && position.shipId)
+    throw Error(`${p.name} is aboard with their group. Land the whole group, or move them to another group first.`);
   if (s.mode === "sailing")
     throw Error("A sailing ship must arrive or be teleported before boarding or disembarking.");
   if (!h.locationId) throw Error("The ship needs a known location.");
@@ -284,7 +331,8 @@ export function validateFleet(t: Table, projected = false) {
     if (
       !v ||
       !s ||
-      s.inParty ||
+      // In the party only when the whole group is aboard this ship (split the party).
+      (s.inParty && !(s.groupId && groupShip(t, s.groupId) === v.propertyId)) ||
       s.downtime ||
       s.locationId !== (holding(t, v.propertyId).locationId ?? null)
     )
@@ -601,6 +649,9 @@ export function applyShipCommand(t: CloudTable, seat: CloudSeat, cmd: ShipComman
       s.facilityId = cmd.facilityId;
       s.mode = cmd.mode;
       summary = `Ship placed in ${cmd.mode}.`;
+    } else if (cmd.kind === "ship-board-group") {
+      dm();
+      summary = boardGroup(t, s, cmd.groupId, cmd.action);
     } else if (cmd.kind === "ship-board") {
       if (seat.role !== "dm" && !seat.purseIds.includes(cmd.purseId))
         throw Error("Request movement only for your assigned character.");

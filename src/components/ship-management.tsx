@@ -1,4 +1,5 @@
 import { VoyageMapRoute } from "./voyage-map-route";
+import { activeGroups, groupInfo, groupShip, partySplit } from "@/lib/quire/party-groups";
 import { routeDistance } from "@/lib/quire/map-tiles";
 import { setVoyageRouteDraft, voyageRouteDraft } from "@/lib/quire/voyage-route-draft";
 import { AppLink } from "./app-link";
@@ -348,8 +349,40 @@ function Boarding({ holding: h, vessel: s }: { holding: Holding; vessel: Vessel 
         </Field>
         <p>Only the DM approves placement. Boarding gives no control over another character.</p>
       </ActionForm>
+      {dm && partySplit(t) && <GroupBoarding holding={h} vessel={s} />}
       <ShipBoardingReviews propertyId={h.id} />
     </>
+  );
+}
+/** Split the party: a whole group boards (or lands) as a group and stays in the party. */
+function GroupBoarding({ holding: h, vessel: s }: { holding: Holding; vessel: Vessel }) {
+  const t = useEstateTable();
+  const groups = activeGroups(t);
+  const [group, setGroup] = useState(groups[0]?.id ?? "");
+  const chosen = groups.find((g) => g.id === group) ?? groups[0];
+  if (!chosen) return null;
+  const action = groupShip(t, chosen.id) === h.id ? "disembark" : "board";
+  return (
+    <ActionForm
+      title="Board a whole group"
+      disabled={s.mode === "sailing"}
+      label={action === "board" ? `Board ${chosen.name} as a group` : `Land ${chosen.name}`}
+      command={() => ({ kind: "ship-board-group", propertyId: h.id, groupId: chosen.id, action, before: shipFingerprint(t, h.id) })}
+    >
+      <Field label="Group">
+        <select className="min-h-11 w-full" aria-label="Group to board" value={chosen.id} onChange={(e) => setGroup(e.target.value)}>
+          {groups.map((g) => (
+            <option key={g.id} value={g.id}>
+              {g.name} (group {groupInfo(t, g.id).letter})
+            </option>
+          ))}
+        </select>
+      </Field>
+      <p>
+        The group stays in the party (balances, pool, fairness) and travels with the ship's voyages; shops ashore are out of reach while sailing. One
+        character boarding alone still leaves the party, as before. Group A can't board as a group: split the travellers off first.
+      </p>
+    </ActionForm>
   );
 }
 export function ShipBoardingReviews({ propertyId }: { propertyId?: string }) {

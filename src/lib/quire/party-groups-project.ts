@@ -50,6 +50,11 @@ export function projectPartyGroups(
       delete world.mainGroup;
     }
   }
+  // A hidden group's journeys stay with its own players and the DM.
+  if (world.journeys) {
+    const hidden = new Set((table.journal?.world?.groups ?? []).filter((g) => g.hidden && !mine.has(g.id)).map((g) => g.id));
+    if (hidden.size) world.journeys = world.journeys.filter((j) => !j.groupId || !hidden.has(j.groupId));
+  }
   if (world.groupRequests) {
     const own = world.groupRequests
       .filter((r) => seat.purseIds.includes(r.purseId))

@@ -1,8 +1,10 @@
 // Split the party (mockups approved 2026-10-25) in a disposable device campaign at 1280, 390 and
 // 320 px: the DM splits the party into two groups (one moves to Ironhold), sees the Groups panel,
 // a player of each group sees their own group and only their own place's shops, buying fails
-// across groups and works at home, the DM moves a group back and merges, and the party is whole
-// again. No sideways scrolling anywhere. Never targets a real campaign.
+// across groups and works at home, the map shows two group markers and Here lists each group's
+// place, a journey moves one group and arrives ("Move Ironhold riders here"), the DM moves a group
+// back and merges, and the party is whole again with one marker. No sideways scrolling anywhere.
+// Never targets a real campaign.
 import { chromium } from "playwright";
 import assert from "node:assert/strict";
 import { mkdir } from "node:fs/promises";
@@ -57,6 +59,15 @@ try {
       const { readJournal } = await import("/src/lib/quire/journal.ts");
       const { fromCopper } = await import("/src/lib/quire/money.ts");
       const shop = (id, name, locationId) => ({ id, name, keeper: "", place: "", notes: "", sellRate: 1, buyRate: 0.5, wealth: "modest", category: "general", priceScale: 1, acceptAnyCategory: true, ...(locationId ? { locationId } : {}) });
+      const canvas = document.createElement("canvas");
+      canvas.width = 1200;
+      canvas.height = 600;
+      const c = canvas.getContext("2d");
+      c.fillStyle = "#8aa06a";
+      c.fillRect(0, 0, 1200, 600);
+      c.fillStyle = "#c8b48a";
+      c.fillRect(100, 290, 1000, 20);
+      const image = canvas.toDataURL();
       const line = (id, shopId, name, copper) => ({ id, shopId, name, copper, quantity: 10, notes: "", baseCopper: copper, rarity: "common" });
       await applyCloudTable({
         purses: [
@@ -82,6 +93,27 @@ try {
               { id: "saltmarsh", name: "Saltmarsh", kind: "town", parentId: "coast", description: "" },
               { id: "harbour", name: "Harbour ward", kind: "area", parentId: "saltmarsh", description: "" },
               { id: "ironhold", name: "Ironhold", kind: "town", parentId: "coast", description: "" },
+              { id: "ford", name: "Greywater Ford", kind: "town", parentId: "coast", description: "" },
+            ],
+          },
+          finance: { day: 14 },
+          world: {
+            maps: [
+              {
+                id: "coast-map",
+                name: "The Sunken Coast",
+                type: "regional",
+                locationId: "coast",
+                image,
+                visible: true,
+                anchors: [
+                  { locationId: "harbour", x: 0.1, y: 0.5 },
+                  { locationId: "ford", x: 0.5, y: 0.5 },
+                  { locationId: "ironhold", x: 0.9, y: 0.5 },
+                ],
+                markers: [],
+                scale: { a: { x: 0, y: 0.5 }, b: { x: 1, y: 0.5 }, distance: 100, unit: "mi", aspect: 2 },
+              },
             ],
           },
         }),
@@ -154,7 +186,73 @@ try {
     t = await book(page);
     assert.equal(t.purses.find((p) => p.id === "tamsin").coins.gp * 100 + t.purses.find((p) => p.id === "tamsin").coins.sp * 10 + t.purses.find((p) => p.id === "tamsin").coins.cp + t.purses.find((p) => p.id === "tamsin").coins.ep * 50 + t.purses.find((p) => p.id === "tamsin").coins.pp * 1000, 1794 - 1500);
 
-    // 4. The DM moves the riders back and merges: the party is whole again.
+    // 4. The map: one marker per group (letter and colour); Here lists one group's place at a time.
+    await go(page, "/maps?map=coast-map");
+    const frame = page.getByRole("region", { name: "Map workspace", exact: true });
+    await frame.getByRole("img", { name: "The Sunken Coast", exact: true }).waitFor();
+    await frame.locator('button[title="Party: Harbour watch"]').waitFor();
+    await frame.locator('button[title="Party: Ironhold riders"]').waitFor();
+    assert.equal(await frame.locator('button[title="Party: Ironhold riders"] .gbadge').innerText(), "B");
+    await frame.getByRole("button", { name: "Fit map", exact: true }).click();
+    await noOverflow(page, `map ${width}`);
+    await page.screenshot({ path: `${out}/map-${width}.png` });
+    await frame.locator('button[title="What you can use at the party\'s location"]').click();
+    const here = page.getByRole("region", { name: "Here", exact: true });
+    await here.getByRole("group", { name: "Whose place" }).getByRole("button", { name: "Ironhold riders" }).click();
+    await here.getByText("Ironhold riders is in Ironhold").waitFor();
+    await here.getByText("Ironhold Armoury").first().waitFor();
+    assert.equal(await here.getByText("Saltmarsh Chandlery").count(), 0, "the riders' Here lists Ironhold only");
+    await noOverflow(page, `here ${width}`);
+    await page.screenshot({ path: `${out}/here-${width}.png` });
+
+    // 5. A journey moves one group: the riders travel to Greywater Ford; Harbour watch stays put.
+    await page.evaluate(async () => {
+      const { executeLocalCommand, executeFinanceCommand, economySnapshot } = await import("/src/lib/quire/economy.ts");
+      const riders = (await economySnapshot()).journal.world.groups[0].id;
+      await executeLocalCommand({
+        id: "audit-riders-journey",
+        kind: "party-journey",
+        journeyId: "riders-trip",
+        before: null,
+        journey: {
+          id: "riders-trip",
+          status: "proposed",
+          requestedBy: "dm",
+          groupId: riders,
+          mapId: "coast-map",
+          points: [
+            { x: 0.9, y: 0.5, locationId: "ironhold" },
+            { x: 0.5, y: 0.5, locationId: "ford" },
+          ],
+          legs: [{ environment: "Roads" }],
+          originLocationId: "ironhold",
+          destinationLocationId: "ford",
+          pace: { preset: "normal", milesPerDay: 24 },
+          forcedMarchHours: 0,
+          costs: { rations: false, mounts: false, payerId: null, mountHoldingIds: [] },
+          elapsedMinutes: 0,
+          downtimeIds: [],
+          createdAt: 1,
+        },
+      });
+      await executeFinanceCommand({ id: "audit-riders-plan", kind: "downtime-plan", name: "Riders to the ford", days: 2, journeyId: "riders-trip" });
+      const t = await economySnapshot();
+      const d = t.journal.finance.downtime.find((x) => x.status === "pending");
+      await executeFinanceCommand({ id: "audit-riders-apply", kind: "downtime-apply", downtimeId: d.id, endSession: false });
+    });
+    await go(page, "/maps?map=coast-map");
+    const arrival = page.getByRole("dialog");
+    await arrival.getByText("Move Ironhold riders here?").waitFor();
+    await noOverflow(page, `arrival ${width}`);
+    await page.screenshot({ path: `${out}/arrival-${width}.png` });
+    await arrival.getByRole("button", { name: "Move Ironhold riders here" }).click();
+    await arrival.waitFor({ state: "detached" });
+    t = await book(page);
+    assert.equal(t.journal.world.groups[0].locationId, "ford");
+    assert.equal(t.journal.market.currentLocationId, "harbour", "Harbour watch stayed put");
+    assert.equal(t.journal.world.journeys[0].status, "completed");
+
+    // 6. The DM moves the riders back and merges: the party is whole again.
     await go(page, "/party?section=characters");
     const card = page.getByRole("article", { name: "Ironhold riders, group B" });
     await card.getByRole("button", { name: "Move…" }).click();
@@ -175,6 +273,10 @@ try {
     assert.equal(t.journal.world.characterPositions.some((s) => s.groupId), false);
     assert.ok(t.journal.events.some((e) => /regrouped at Harbour ward/.test(e.summary)));
     await page.screenshot({ path: `${out}/merged-${width}.png`, fullPage: true });
+    // One marker again.
+    await go(page, "/maps?map=coast-map");
+    await page.getByRole("region", { name: "Map workspace", exact: true }).locator('button[title="Party: Party"]').waitFor();
+    assert.equal(await page.locator('button[title^="Party: "]').count(), 1);
     assert.deepEqual(errors, [], `page errors at ${width}`);
     await context.close();
   }
