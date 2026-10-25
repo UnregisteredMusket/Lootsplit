@@ -28,6 +28,15 @@ Android version code **20**, same package and permanent signing certificate. Ins
 - Server-side widget changes (#264 faster monitor answers, #269 the redesign's data) are already live and also help 1.12.0.
 - Website-only, CI-only and documentation changes do not affect the app.
 
+## Release verification
+
+Published October 25, 2026 by `android-release.yml` (run 40204536132, first attempt) from main `4c2afe9`, after the full preservation checks, the API 24 and API 35 widget and picker checks, and the signed-APK upgrade gate passed.
+
+Independent inspection of the public APK, downloaded through the GitHub API:
+- SHA-256 `7658a56c243da707201c547e974d451542a80595f7646b148a083e425d36fb2a` (32,127,153 bytes), matching the workflow's signed-APK output, SHA256SUMS.txt and the GitHub asset digest.
+- Its v2 signing block carries the permanent certificate (`baca95a8…f730a0`, unchanged from 1.12.0).
+- The manifest keeps package `com.unregisteredmusket.lootsplit`, with versionName 1.13.0 and versionCode 20.
+
 ---
 
 # Lootsplitter 1.12.0
