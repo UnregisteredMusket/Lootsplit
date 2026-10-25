@@ -773,11 +773,13 @@ Open trends require investigation. Resolved trends retain their history; each ve
 | Unused files, exports and dependencies (knip) / Run actions/checkout@11d5960a326750d5838078e36cf38b85af677262 | open | 2 | 2s → 4s | +2s | +100% |
 | verify / Development / economy / dev-website | open | 2 | 49s → 89s | +40s | +81.63% |
 | Development / world / dev-journey-planner | open | 2 | 25s → 43s | +18s | +72% |
+| Development / world / Start disposable development server | open | 2 | 8s → 14s | +6s | +75% |
 
 ## Recorded slowdowns
 
 | Date (UTC) | Operation | Before → after | Added | Increase | Result | State | Evidence |
 | --- | --- | ---: | ---: | ---: | --- | --- | --- |
+| 2026-10-25T16:48:25Z | step: Development / world / Start disposable development server | 10s → 14s | +4s | +40% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40201080705/job/121192230838) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40213355385/job/121229168089) |
 | 2026-10-25T16:38:55Z | job: Development / governance | 921s → 1168s | +247s | +26.82% | failure | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/37962980314/job/113930867612) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40211101571/job/121222347867) |
 | 2026-10-25T16:35:14Z | step: Development / governance / Run actions/upload-artifact@ea165f8d65b6e75b540449e92b4886f43607fa02 | 5s → 160s | +155s | +3100% | failure | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39908630780/job/120266399394) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40211101571/job/121222347867) |
 | 2026-10-25T16:21:47Z | step: Development / governance / Run actions/setup-node@49933ea5288caeca8642d1e84afbd3f7d6820020 | 14s → 137s | +123s | +878.57% | success | open | [Before](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/39863694406/job/120120889519) · [After](https://github.com/UnregisteredMusket/Lootsplit/actions/runs/40211101571/job/121222347867) |
