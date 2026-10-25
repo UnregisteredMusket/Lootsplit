@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Field monitor list tile (redesign 2026-10-25): the mockups' rgba(91,236,160,.07) on #071712, flattened. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android">
+    <solid android:color="#0D261C" />
+    <corners android:radius="8dp" />
+</shape>

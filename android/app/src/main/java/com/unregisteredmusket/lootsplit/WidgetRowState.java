@@ -39,16 +39,40 @@ final class WidgetRowState {
         save(context, id, rows);
         return expanded;
     }
-    /** Expanded IDs still present in {@code rows}; IDs of rows that no longer exist are dropped and saved. */
+    /** Range choices ("range:traffic=7d") are stored with the expanded IDs and never pruned. */
+    static final String RANGE = "range:";
+    /**
+     * Expanded IDs still present in {@code rows} (a row's own ID or one of its tiles' IDs, "ids");
+     * IDs of rows that no longer exist are dropped and saved. Range choices are kept.
+     */
     static synchronized Set<String> prune(Context context, int id, JSONArray rows) {
         Set<String> saved = expanded(context, id), present = new HashSet<>();
         if (saved.isEmpty()) return saved;
+        for (String entry : saved) if (entry.startsWith(RANGE)) present.add(entry);
         for (int i = 0; rows != null && i < rows.length(); i++) {
             JSONObject row = rows.optJSONObject(i);
-            if (row != null && saved.contains(row.optString("id"))) present.add(row.optString("id"));
+            if (row == null) continue;
+            if (saved.contains(row.optString("id"))) present.add(row.optString("id"));
+            JSONArray ids = row.optJSONArray("ids");
+            for (int j = 0; ids != null && j < ids.length(); j++) if (saved.contains(ids.optString(j))) present.add(ids.optString(j));
         }
         if (present.size() != saved.size() && id >= 0) save(context, id, present);
         return present;
+    }
+    /**
+     * Sets a range choice such as "range:traffic=7d" (the 24h/7d toggle). The default (24h) is
+     * stored as no entry. Returns the saved set.
+     */
+    static synchronized Set<String> setRange(Context context, int id, String choice) {
+        Set<String> rows = expanded(context, id);
+        int split = choice.indexOf('=');
+        if (!choice.startsWith(RANGE) || split < 0) return rows;
+        String prefix = choice.substring(0, split + 1);
+        java.util.Iterator<String> it = rows.iterator();
+        while (it.hasNext()) if (it.next().startsWith(prefix)) it.remove();
+        if (!choice.endsWith("=24h")) rows.add(choice);
+        save(context, id, rows);
+        return rows;
     }
     static synchronized void remove(Context context, int id) { preferences(context).edit().remove(key(id)).commit(); }
 }

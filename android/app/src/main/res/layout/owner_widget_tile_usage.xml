@@ -1,0 +1,46 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Plan usage tile: one ProgressBar gauge per metric (billing cycle to date; amber at 80% or more, on the gauge only) and the
+     billing-cycle pace line, an ALPHA_8 strip stretched over the tracks. Expanded: today / 7 days / cycle per metric. -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:id="@+id/tile_root" android:layout_width="match_parent" android:layout_height="wrap_content" android:minHeight="48dp" android:orientation="vertical" android:paddingStart="7dp" android:paddingEnd="7dp" android:paddingTop="5dp" android:paddingBottom="5dp" android:background="@drawable/item_tile_dark">
+    <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="horizontal" android:baselineAligned="false" android:gravity="center_vertical">
+        <TextView android:id="@+id/tile_key" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:textSize="8.5sp" android:letterSpacing="0.08" android:textColor="#7AA68D" android:fontFamily="monospace" android:includeFontPadding="false" android:maxLines="1" android:ellipsize="end" />
+        <TextView android:id="@+id/tile_chevron" android:layout_width="wrap_content" android:layout_height="wrap_content" android:layout_marginStart="4dp" android:text="▾" android:textSize="10sp" android:textColor="#B1D6C1" android:fontFamily="monospace" android:includeFontPadding="false" android:importantForAccessibility="no" />
+    </LinearLayout>
+    <LinearLayout android:id="@+id/usage_gauges" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="2dp" android:orientation="horizontal" android:baselineAligned="false">
+        <LinearLayout android:layout_width="38dp" android:layout_height="wrap_content" android:orientation="vertical">
+                <TextView android:id="@+id/usage_label0" android:layout_width="match_parent" android:layout_height="13dp" android:gravity="center_vertical" android:textSize="8.5sp" android:textColor="#B1D6C1" android:fontFamily="monospace" android:includeFontPadding="false" android:maxLines="1" />
+                <TextView android:id="@+id/usage_label1" android:layout_width="match_parent" android:layout_height="13dp" android:gravity="center_vertical" android:textSize="8.5sp" android:textColor="#B1D6C1" android:fontFamily="monospace" android:includeFontPadding="false" android:maxLines="1" />
+                <TextView android:id="@+id/usage_label2" android:layout_width="match_parent" android:layout_height="13dp" android:gravity="center_vertical" android:textSize="8.5sp" android:textColor="#B1D6C1" android:fontFamily="monospace" android:includeFontPadding="false" android:maxLines="1" />
+                <TextView android:id="@+id/usage_label3" android:layout_width="match_parent" android:layout_height="13dp" android:gravity="center_vertical" android:textSize="8.5sp" android:textColor="#B1D6C1" android:fontFamily="monospace" android:includeFontPadding="false" android:maxLines="1" />
+        </LinearLayout>
+        <FrameLayout android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:layout_marginStart="2dp" android:layout_marginEnd="4dp">
+            <LinearLayout android:layout_width="match_parent" android:layout_height="wrap_content" android:orientation="vertical">
+                    <FrameLayout android:layout_width="match_parent" android:layout_height="13dp">
+                        <ProgressBar android:id="@+id/usage_bar0" style="@android:style/Widget.ProgressBar.Horizontal" android:layout_width="match_parent" android:layout_height="6dp" android:layout_gravity="center_vertical" android:max="100" android:progressDrawable="@drawable/gauge_ok" android:indeterminate="false" android:importantForAccessibility="no" />
+                        <ProgressBar android:id="@+id/usage_hot0" style="@android:style/Widget.ProgressBar.Horizontal" android:layout_width="match_parent" android:layout_height="6dp" android:layout_gravity="center_vertical" android:max="100" android:progressDrawable="@drawable/gauge_hot" android:indeterminate="false" android:visibility="gone" android:importantForAccessibility="no" />
+                    </FrameLayout>
+                    <FrameLayout android:layout_width="match_parent" android:layout_height="13dp">
+                        <ProgressBar android:id="@+id/usage_bar1" style="@android:style/Widget.ProgressBar.Horizontal" android:layout_width="match_parent" android:layout_height="6dp" android:layout_gravity="center_vertical" android:max="100" android:progressDrawable="@drawable/gauge_ok" android:indeterminate="false" android:importantForAccessibility="no" />
+                        <ProgressBar android:id="@+id/usage_hot1" style="@android:style/Widget.ProgressBar.Horizontal" android:layout_width="match_parent" android:layout_height="6dp" android:layout_gravity="center_vertical" android:max="100" android:progressDrawable="@drawable/gauge_hot" android:indeterminate="false" android:visibility="gone" android:importantForAccessibility="no" />
+                    </FrameLayout>
+                    <FrameLayout android:layout_width="match_parent" android:layout_height="13dp">
+                        <ProgressBar android:id="@+id/usage_bar2" style="@android:style/Widget.ProgressBar.Horizontal" android:layout_width="match_parent" android:layout_height="6dp" android:layout_gravity="center_vertical" android:max="100" android:progressDrawable="@drawable/gauge_ok" android:indeterminate="false" android:importantForAccessibility="no" />
+                        <ProgressBar android:id="@+id/usage_hot2" style="@android:style/Widget.ProgressBar.Horizontal" android:layout_width="match_parent" android:layout_height="6dp" android:layout_gravity="center_vertical" android:max="100" android:progressDrawable="@drawable/gauge_hot" android:indeterminate="false" android:visibility="gone" android:importantForAccessibility="no" />
+                    </FrameLayout>
+                    <FrameLayout android:layout_width="match_parent" android:layout_height="13dp">
+                        <ProgressBar android:id="@+id/usage_bar3" style="@android:style/Widget.ProgressBar.Horizontal" android:layout_width="match_parent" android:layout_height="6dp" android:layout_gravity="center_vertical" android:max="100" android:progressDrawable="@drawable/gauge_ok" android:indeterminate="false" android:importantForAccessibility="no" />
+                        <ProgressBar android:id="@+id/usage_hot3" style="@android:style/Widget.ProgressBar.Horizontal" android:layout_width="match_parent" android:layout_height="6dp" android:layout_gravity="center_vertical" android:max="100" android:progressDrawable="@drawable/gauge_hot" android:indeterminate="false" android:visibility="gone" android:importantForAccessibility="no" />
+                    </FrameLayout>
+            </LinearLayout>
+            <ImageView android:id="@+id/usage_pace" android:layout_width="match_parent" android:layout_height="52dp" android:scaleType="fitXY" android:visibility="gone" android:importantForAccessibility="no" />
+        </FrameLayout>
+        <LinearLayout android:layout_width="34dp" android:layout_height="wrap_content" android:orientation="vertical">
+                <TextView android:id="@+id/usage_value0" android:layout_width="match_parent" android:layout_height="13dp" android:gravity="center_vertical|end" android:textSize="8.5sp" android:textStyle="bold" android:textColor="#E6F8EC" android:fontFamily="monospace" android:includeFontPadding="false" android:maxLines="1" />
+                <TextView android:id="@+id/usage_value1" android:layout_width="match_parent" android:layout_height="13dp" android:gravity="center_vertical|end" android:textSize="8.5sp" android:textStyle="bold" android:textColor="#E6F8EC" android:fontFamily="monospace" android:includeFontPadding="false" android:maxLines="1" />
+                <TextView android:id="@+id/usage_value2" android:layout_width="match_parent" android:layout_height="13dp" android:gravity="center_vertical|end" android:textSize="8.5sp" android:textStyle="bold" android:textColor="#E6F8EC" android:fontFamily="monospace" android:includeFontPadding="false" android:maxLines="1" />
+                <TextView android:id="@+id/usage_value3" android:layout_width="match_parent" android:layout_height="13dp" android:gravity="center_vertical|end" android:textSize="8.5sp" android:textStyle="bold" android:textColor="#E6F8EC" android:fontFamily="monospace" android:includeFontPadding="false" android:maxLines="1" />
+        </LinearLayout>
+    </LinearLayout>
+    <TextView android:id="@+id/tile_note1" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="2dp" android:textSize="9sp" android:textColor="#B1D6C1" android:fontFamily="monospace" android:includeFontPadding="false" android:maxLines="1" android:ellipsize="end" />
+    <TextView android:id="@+id/tile_detail" android:layout_width="match_parent" android:layout_height="wrap_content" android:layout_marginTop="3dp" android:textSize="9.5sp" android:lineSpacingExtra="1dp" android:textColor="#B1D6C1" android:fontFamily="monospace" android:visibility="gone" />
+</LinearLayout>

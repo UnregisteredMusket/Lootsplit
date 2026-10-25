@@ -1,0 +1,6 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Parchment variant: rgba(32,72,51,.06) on #F7F2E4, flattened. -->
+<shape xmlns:android="http://schemas.android.com/apk/res/android">
+    <solid android:color="#EAE8D9" />
+    <corners android:radius="8dp" />
+</shape>

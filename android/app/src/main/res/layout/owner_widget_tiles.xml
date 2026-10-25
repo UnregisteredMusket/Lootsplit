@@ -1,0 +1,7 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- A row of At a glance tiles: two compact tiles side by side, or one expanded tile across both columns.
+     Each slot receives a nested tile RemoteViews (owner_widget_tile / owner_widget_tile_usage). -->
+<LinearLayout xmlns:android="http://schemas.android.com/apk/res/android" android:id="@+id/widget_row" android:layout_width="match_parent" android:layout_height="wrap_content" android:paddingTop="2dp" android:paddingBottom="3dp" android:orientation="horizontal" android:baselineAligned="false" android:background="#071712">
+    <FrameLayout android:id="@+id/tiles_a" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" />
+    <FrameLayout android:id="@+id/tiles_b" android:layout_width="0dp" android:layout_weight="1" android:layout_height="wrap_content" android:layout_marginStart="5dp" />
+</LinearLayout>
