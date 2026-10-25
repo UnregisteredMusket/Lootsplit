@@ -10,6 +10,7 @@ import { readJournal } from "./journal.ts";
 import { encounterCoinLine, encounterItemLine } from "./award-tag.ts";
 import {
   fairnessCacheSize,
+  fairnessCacheStats,
   fairnessLedger,
   fairnessReceipts,
   fairnessStandings,
@@ -392,17 +393,26 @@ test("performance: 50 archived sessions of 400 lines each build once, then reuse
     t = run(t, { kind: "session", name: `Session ${s + 1}`, end: true });
   }
   assert.equal(t.journal!.reports!.length, 50);
+  const before = fairnessCacheStats();
   const started = performance.now();
   const first = fairnessLedger(t, DM);
   const cold = performance.now() - started;
+  const afterCold = fairnessCacheStats();
   assert.equal(first.sum, 50 * 400 * (10 + 50) / 4);
   assert.ok(fairnessCacheSize() >= 50);
-  // A new live table (one new line) reuses every archived digest.
+  // The cold build digests each archived session exactly once.
+  assert.equal(afterCold.builds - before.builds, 50, "cold build digests all 50 archived sessions");
+  // A new live table (one new line) reuses every archived digest: nothing is re-derived.
   const next = { ...t, ledger: [...t.ledger, line("a", "Encounter loot: Late", 5)] };
   const warmStart = performance.now();
   const second = fairnessLedger(next, DM);
   const warm = performance.now() - warmStart;
+  const afterWarm = fairnessCacheStats();
   assert.equal(second.sum, first.sum + 5);
+  assert.equal(afterWarm.builds - afterCold.builds, 0, "warm build re-derives no archived session");
+  assert.equal(afterWarm.hits - afterCold.hits, 50, "warm build reuses all 50 cached digests");
+  // Wall-clock bounds stay as coarse guards only (shared CI runners pause for GC and neighbours):
+  // the cache counts above are the real check.
   assert.ok(cold < 4000, `cold build took ${cold.toFixed(0)} ms`);
-  assert.ok(warm < Math.max(50, cold / 2), `warm build took ${warm.toFixed(0)} ms (cold ${cold.toFixed(0)} ms)`);
+  assert.ok(warm < Math.max(1000, cold), `warm build took ${warm.toFixed(0)} ms (cold ${cold.toFixed(0)} ms)`);
 });

@@ -311,6 +311,8 @@ function digest(t: FairTable, extension?: FairnessExtension): Digest {
  */
 const CACHE_LIMIT = 300;
 const snapshotCache = new Map<string, Digest | null>();
+/** Work counters for tests: digests built (snapshots parsed and derived) and cache reuses. */
+const cacheStats = { builds: 0, hits: 0 };
 function snapshotKey(snapshot: string): string {
   let h = 0x811c9dc5;
   const step = Math.max(1, Math.floor(snapshot.length / 65536));
@@ -325,8 +327,10 @@ function cached(snapshot: string, build: () => Digest | null): Digest | null {
   if (hit !== undefined) {
     snapshotCache.delete(key);
     snapshotCache.set(key, hit);
+    cacheStats.hits++;
     return hit;
   }
+  cacheStats.builds++;
   const value = build();
   snapshotCache.set(key, value);
   if (snapshotCache.size > CACHE_LIMIT) snapshotCache.delete(snapshotCache.keys().next().value!);
@@ -335,6 +339,10 @@ function cached(snapshot: string, build: () => Digest | null): Digest | null {
 /** Test hook: the number of digested snapshots held in memory. */
 export function fairnessCacheSize(): number {
   return snapshotCache.size;
+}
+/** Test hook: how many archived snapshots were digested and how many reused a cached digest. */
+export function fairnessCacheStats(): { builds: number; hits: number } {
+  return { ...cacheStats };
 }
 
 /** The fairness part of a player's projected archived session (session-records.ts). */
