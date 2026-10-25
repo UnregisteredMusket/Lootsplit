@@ -35,7 +35,13 @@ import { manualCharacterRolls, database } from "./room-store.server.ts";
 import { referenceAccess, referenceSection } from "./reference-access.ts";
 import { isProbeRoomCode } from "../../../cloudflare/probe-namespace.mjs";
 import { SUBMIT_LIMIT_MESSAGE, takeSubmitAllowance } from "./room-submit-limit.ts";
-import { IMAGE_REFERENCE_PROTOCOL, ROOM_IMAGE_SOURCES_KEY } from "./tabletop-protocol.ts";
+import {
+  IMAGE_REFERENCE_PROTOCOL,
+  PARTY_GROUPS_PROTOCOL,
+  ROOM_IMAGE_SOURCES_KEY,
+  groupCommandText,
+  refuseOldClientGroupActions,
+} from "./tabletop-protocol.ts";
 
 /**
  * Server-only options. Client server functions pass a single `data` argument, so a browser can never
@@ -734,6 +740,8 @@ async function freshCode(): Promise<string> {
 
 // Commands are validated against authoritative state and committed with a revision CAS.
 export async function submitCommands(input: {
+  /** The client's tabletop protocol; protocol 9 and older apps can't see party groups. */
+  tabletopProtocol?: number;
   code: string;
   token: string;
   batchId: string;
@@ -796,6 +804,13 @@ export async function submitCommands(input: {
       throw new Error("This session is no longer assigned. Ask the DM to release your character.");
     if (room.viewOnly && seat.role === "player")
       throw Error("The session has ended. This room is view-only until the DM resumes play.");
+    // Split the party: older apps place everyone with the main group, so the server refuses their
+    // actions for characters in another group (tabletop protocol 10).
+    if ((input.tabletopProtocol ?? 0) < PARTY_GROUPS_PROTOCOL) {
+      if (commands.some((c) => groupCommandText(c)))
+        throw Error("Update Lootsplitter to split, move or merge the party's groups.");
+      refuseOldClientGroupActions(room.table, commands);
+    }
     const key = seat.id + ":" + input.batchId;
     for (const command of commands) {
       const previous = room.commandHashes?.[seat.id + ":" + command.id];

@@ -194,7 +194,7 @@ export const fleetSchema = z
     voyages: z.array(voyageSchema).default([]),
     boarding: z.array(boardingRequestSchema).default([]),
     aboard: z
-      .array(z.object({ purseId: id, propertyId: id, returnInParty: z.boolean() }).strict())
+      .array(z.object({ purseId: id, propertyId: id, returnInParty: z.boolean(), /** Split the party (protocol 10): the group to rejoin on landing. */ returnGroupId: id.optional() }).strict())
       .default([]),
     work: z.array(shipWorkSchema).default([]),
   })

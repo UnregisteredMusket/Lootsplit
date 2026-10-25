@@ -21,19 +21,28 @@ import { applyTabletopCommand, validateTabletop, readTabletopSession } from "./t
 import { tabletopCommands, type TabletopCommand } from "./tabletop-schema.ts";
 import { fogSnapshotMap, legacyDiagonals, legacyTabletopMap, legacyTabletopToken, previousTabletopMap, withoutMapScale, withoutPlacementStyles } from "./tabletop-protocol.ts";
 import { compactTabletopHistory } from "./fog-history.ts";
+import { actingGroups, groupPlace, groupRefs, MAIN_GROUP, resolveGroup } from "./party-groups.ts";
+import { applyGroupMapPosition } from "./party-groups-command.ts";
+import { validatePartyGroups } from "./party-groups-validation.ts";
 
-export function npcAvailableHere(npc: Npc, table: Pick<CloudTable, "journal">) {
+/**
+ * The NPC is "here" for one of `groups` (split the party: the acting character's group, or a
+ * seat's groups): a companion travelling in that group, or an NPC at or inside that group's
+ * place. Without groups: any group, which is the party when it is whole.
+ */
+export function npcAvailableHere(
+  npc: Npc,
+  table: Pick<CloudTable, "journal">,
+  groups: string[] = groupRefs(table),
+) {
   const market = readMarketLocations(table.journal?.market);
   const s = table.journal?.world?.characterPositions?.find((s) => s.purseId === npc.id);
-  return (
-    npc.visible &&
-    (s?.visible ?? true) &&
-    (s?.inParty ||
-      (!!market.currentLocationId &&
-        locationPath(market, market.currentLocationId).some(
-          (l) => l.id === (s ? s.locationId : npc.locationId),
-        )))
-  );
+  if (!npc.visible || !(s?.visible ?? true)) return false;
+  if (s?.inParty) return groups.includes(resolveGroup(table, s.groupId));
+  return groups.some((g) => {
+    const here = groupPlace(table, g).locationId;
+    return !!here && locationPath(market, here).some((l) => l.id === (s ? s.locationId : npc.locationId));
+  });
 }
 export { shopVisible, shopAsking } from "./vendors.ts";
 export function npcController(npc: Npc, seat: Pick<CloudSeat, "role" | "purseIds">) {
@@ -156,6 +165,7 @@ export function validateWorld(t: CloudTable, projected = false) {
       market.currentLocationId)
   )
     throw Error("Free party placement requires an existing map and no linked party location.");
+  validatePartyGroups(t, projected);
   for (const npc of w.npcs) {
     const p = t.purses.find((p) => p.id === npc.id);
     if (
@@ -275,7 +285,9 @@ function eligible(t: CloudTable, trade: Pick<Trade, "left" | "right">) {
     if (!t.purses.some((p) => p.id === side.purseId))
       throw Error("Trade account no longer exists.");
     const npc = w.npcs.find((n) => n.id === side.purseId);
-    if (npc && (!npc.barterAllowed || !npcAvailableHere(npc, t)))
+    // Split the party: the NPC must be where the other participant's group is.
+    const other = side === trade.left ? trade.right : trade.left;
+    if (npc && (!npc.barterAllowed || !npcAvailableHere(npc, t, actingGroups(t, other.purseId))))
       throw Error("This NPC is not available for bartering at the current location.");
     for (const item of side.items) {
       const h = t.holdings.find((h) => h.id === item.holdingId && h.purseId === side.purseId);
@@ -410,6 +422,11 @@ export function applyWorldCommand(t: CloudTable, seat: CloudSeat, cmd: WorldComm
       delete w.combat;
     }
     event(binding?.phase==='active'?"Encounter map opened":binding?"Encounter map transition prepared":"Returned from encounter map");
+  } else if (cmd.kind === "party-map-position" && cmd.groupId && cmd.groupId !== MAIN_GROUP) {
+    dm();
+    applyGroupMapPosition(t, { ...cmd, groupId: cmd.groupId }, (summary, _purseId, dmOnly) =>
+      journal.events.push({ id: cmd.id + "-event", at, summary: summary.slice(0, 500), kind: "management", ...(dmOnly ? { dmOnly: true } : {}) }),
+    );
   } else if (cmd.kind === "party-map-position") {
     dm();
     const market = readMarketLocations(journal.market);
@@ -499,6 +516,8 @@ export function applyWorldCommand(t: CloudTable, seat: CloudSeat, cmd: WorldComm
     if (cmd.map && cmd.map.id !== cmd.mapId) throw Error("Map identity cannot change.");
     if (!cmd.map && w.partyPosition?.mapId === cmd.mapId)
       throw Error("Move or clear the free party position before removing this map.");
+    if (!cmd.map && w.groups?.some((g) => g.status === "active" && g.position?.mapId === cmd.mapId))
+      throw Error("Move or clear the group's free position before removing this map.");
     if (
       !cmd.map &&
       readFleet(journal.fleet).voyages.some(
@@ -609,6 +628,7 @@ export function applyWorldCommand(t: CloudTable, seat: CloudSeat, cmd: WorldComm
       if (cmd.npc.locationId !== cmd.before.locationId) {
         position.inParty = false;
         position.locationId = cmd.npc.locationId;
+        delete position.groupId;
         p.nonParty = true;
       }
     }
@@ -656,7 +676,7 @@ export function applyWorldCommand(t: CloudTable, seat: CloudSeat, cmd: WorldComm
       if (t.purses.find((p) => p.id === cmd.purseId)?.nonParty)
         throw Error("Choose a party character.");
     }
-    if (!npcAvailableHere(npc, t))
+    if (!npcAvailableHere(npc, t, actingGroups(t, cmd.purseId)))
       throw Error("This NPC is not available at the current location.");
     const conversationId = `${npc.id}:${cmd.purseId}`;
     let c = w.conversations.find((c) => c.id === conversationId);

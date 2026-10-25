@@ -4,6 +4,7 @@ import type { CatalogItem, Lexeme } from "./types.ts";
 import { readMarketLocations, locationLabel } from "./shop-locations.ts";
 import { readWorld } from "./world-schema.ts";
 import { npcAvailableHere, shopVisible } from "./world.ts";
+import { groupPlace, resolveGroup, seatGroups } from "./party-groups.ts";
 import { formatCopper } from "./money.ts";
 import { missingCreatureFields } from "./resource-packs.ts";
 import { canAccessEstate } from "./estate.ts";
@@ -66,9 +67,10 @@ export function libraryRecords(
   }));
   const npcLocation = (id: string, fallback: string) => {
     const s=world.characterPositions.find(s=>s.purseId===id);
-    return s ? s.inParty ? market.currentLocationId : s.locationId : fallback;
+    return s ? s.inParty ? groupPlace(table, resolveGroup(table, s.groupId)).locationId : s.locationId : fallback;
   };
-  for (const n of world.npcs.filter((n) => dm || npcAvailableHere(n, table)))
+  const groups = seatGroups(table, seat);
+  for (const n of world.npcs.filter((n) => dm || npcAvailableHere(n, table, groups)))
     records.push({
       key: libraryRecordKey("npc", n.id),
       name: n.name,
@@ -129,7 +131,7 @@ export function libraryRecords(
         { name: "Party & character sheets", href: "/party" },
       ],
     });
-  for (const s of table.shops.filter((s) => dm || shopVisible(s, table)))
+  for (const s of table.shops.filter((s) => dm || shopVisible(s, table, groups)))
     records.push({
       key: libraryRecordKey("shop", s.id),
       name: s.name,

@@ -59,7 +59,7 @@ const hireProposal = (t: CloudTable, id: string, role = "guard") => {
 
 test("protocol 9 is the current protocol", () => {
   assert.equal(SERVICES_WAVE2_PROTOCOL, 9);
-  assert.equal(CURRENT_TABLETOP_PROTOCOL, 9);
+  assert.equal(CURRENT_TABLETOP_PROTOCOL, 10);
 });
 
 test("link kinds take no offers and carry only their own settings; every engine kind is accepted", () => {

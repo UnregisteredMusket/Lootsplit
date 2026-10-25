@@ -10,6 +10,7 @@ import {
 } from "./ships.ts";
 import { characterLocation, inParty } from "./character-position.ts";
 import { shopVisible, shopAsking } from "./vendors.ts";
+import { actingGroups, partyPlaces } from "./party-groups.ts";
 import { exchangeQuoteKey, executeExchange, recordShopTrade } from "./trade-economy.ts";
 import type { CloudTable, CloudSeat } from "./cloud.ts";
 import type { Holding, StockLine } from "./types.ts";
@@ -48,12 +49,12 @@ export function physicallyHere(t: Table, h: Holding, purseId?: string) {
   const aboard = shipHere(t, h, purseId);
   if (aboard !== undefined) return aboard;
   const market = readMarketLocations(t.journal?.market);
-  const p = t.purses.find((p) => p.id === purseId),
-    location = p ? characterLocation(t, p) : market.currentLocationId;
+  const p = t.purses.find((p) => p.id === purseId);
+  // Party funds (and no purse) are wherever any group is (the party's place when whole).
+  const locations = p?.kind === "character" ? [characterLocation(t, p)] : partyPlaces(t);
   return (
     !!h.locationId &&
-    !!location &&
-    locationPath(market, location).some((l) => l.id === h.locationId)
+    locations.some((location) => !!location && locationPath(market, location).some((l) => l.id === h.locationId))
   );
 }
 export function canAccessEstate(
@@ -1093,7 +1094,7 @@ export function applyEstateCommand(t: CloudTable, seat: CloudSeat, cmd: EstateCo
         shop &&
         !shop.closed &&
         !!shop.locationId &&
-        shopVisible(shop, t) &&
+        shopVisible(shop, t, actingGroups(t, sender.id)) &&
         !!settlement &&
         (settlement.kind === "city" || o.allowTown)
       );

@@ -17,6 +17,11 @@ export const characterPositionSchema = z
     locationId: id.nullable(),
     visible: z.boolean(),
     sheetVisible: z.boolean(),
+    /**
+     * Split the party (tabletop protocol 10): the party group this character travels with.
+     * Absent means the main group (or not in the party). Only on characters in the party.
+     */
+    groupId: id.optional(),
     downtime: z
       .object({
         id,
@@ -25,6 +30,8 @@ export const characterPositionSchema = z
         finishMinute: z.number().int().nonnegative(),
         returnInParty: z.boolean(),
         returnLocationId: id.nullable(),
+        /** The group the character returns to (protocol 10); absent = the main group. */
+        returnGroupId: id.optional(),
       })
       .strict()
       .optional(),
@@ -324,6 +331,8 @@ export const journeySchema = z
     status: z.enum(journeyStatuses),
     /** "dm", or the character purse that asked. */
     requestedBy: id,
+    /** Split the party (tabletop protocol 10): the group that travels. Absent = the main group. */
+    groupId: id.optional(),
     message: z.string().trim().max(500).optional(),
     reason: z.object({ text: z.string().trim().max(500), showToPlayer: z.boolean() }).strict().optional(),
     /** Absent only in a player's projection of a private map. */
@@ -380,6 +389,52 @@ export type Journey = z.infer<typeof journeySchema>;
 export type JourneyPoint = z.infer<typeof journeyPointSchema>;
 export type JourneyLeg = z.infer<typeof journeyLegSchema>;
 
+/* ---- Split the party (tabletop protocol 10; party-groups.ts) ---- */
+export const groupColours = ["green", "blue", "amber", "plum", "teal", "red"] as const;
+export const groupLetters = ["A", "B", "C", "D", "E", "F"] as const;
+/** Up to six groups while split: the main group (A) and five more. */
+export const MAX_PARTY_GROUPS = 6;
+export const partyGroupSchema = z
+  .object({
+    id,
+    name: z.string().trim().min(1).max(60),
+    colour: z.enum(groupColours),
+    letter: z.enum(groupLetters).optional(),
+    /** Merged groups stay as history; they are never deleted. */
+    status: z.enum(["active", "merged"]),
+    /** Like `market.currentLocationId` for the main group. */
+    locationId: id.nullable(),
+    /** Like `world.partyPosition` for the main group: a free position on the road. */
+    position: partyMapPositionSchema.optional(),
+    /** DM: players with no character in this group see it as "Elsewhere". */
+    hidden: z.boolean().optional(),
+    createdAt: z.number(),
+    mergedAt: z.number().optional(),
+    /** "main" or another group's ID. */
+    mergedInto: id.optional(),
+  })
+  .strict();
+export type PartyGroup = z.infer<typeof partyGroupSchema>;
+export const mainGroupSchema = z
+  .object({ name: z.string().trim().min(1).max(60), colour: z.enum(groupColours) })
+  .strict();
+export const groupRequestSchema = z
+  .object({
+    id,
+    /** "main" or a group ID. */
+    groupId: id,
+    /** The character whose player asked. */
+    purseId: id,
+    locationId: id,
+    message: z.string().trim().max(500).optional(),
+    status: z.enum(["pending", "approved", "denied", "withdrawn"]),
+    reason: z.object({ text: z.string().trim().max(500), showToPlayer: z.boolean() }).strict().optional(),
+    createdAt: z.number(),
+    decidedAt: z.number().optional(),
+  })
+  .strict();
+export type GroupRequest = z.infer<typeof groupRequestSchema>;
+
 const conversationSchema = z
   .object({
     id,
@@ -409,6 +464,12 @@ export const worldSchema = z
     journeys: z.array(journeySchema).max(1000).optional(),
     /** DM travel settings (paces, forced march, cost prices); defaults when absent. */
     travel: travelSettingsSchema.optional(),
+    /** Split the party (tabletop protocol 10): groups other than the main group, history kept. */
+    groups: z.array(partyGroupSchema).max(1000).optional(),
+    /** The main group's label while the party is split; absent when the party is whole. */
+    mainGroup: mainGroupSchema.optional(),
+    /** Players' requests to move their group (the DM approves). */
+    groupRequests: z.array(groupRequestSchema).max(1000).optional(),
     npcs: z.array(npcSchema).max(500).default([]),
     trades: z.array(tradeSchema).default([]),
     conversations: z.array(conversationSchema).default([]),
@@ -454,6 +515,8 @@ export const worldCommands = [
     before: partyMapPositionSchema.nullable(),
     beforeLocationId: id.nullable(),
     position: partyMapPositionSchema.nullable(),
+    /** Split the party: place this group (absent = the main group, as before). */
+    groupId: id.optional(),
   }),
   z.object({
     id,

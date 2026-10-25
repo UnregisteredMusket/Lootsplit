@@ -1,6 +1,8 @@
 import { z } from "zod";
 import { artworkSchema } from "./artwork.ts";
 import { readMarketLocations, locationPath, type MarketLocations } from "./shop-locations.ts";
+import type { CloudTable } from "./cloud.ts";
+import { groupMarket, groupRefs, groupTravelling } from "./party-groups.ts";
 
 export const PROPERTY_TYPES = {
   residence: "Residence",
@@ -83,6 +85,14 @@ export function propertyAvailableHere(
       (location) => location.id === property.locationId,
     )
   );
+}
+/** Split the party: available at the place of one of `groups` (default: any group). */
+export function propertyAvailableToGroups(
+  property: Pick<PropertyRecord, "locationId">,
+  t: Pick<CloudTable, "journal">,
+  groups: string[] = groupRefs(t),
+) {
+  return groups.some((g) => propertyAvailableHere(property, groupMarket(t, g), groupTravelling(t, g)));
 }
 export function validatePropertyLocations(
   listings: PropertyRecord[],

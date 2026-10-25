@@ -64,7 +64,10 @@ import type { CloudTable, CloudSeat } from "./cloud.ts";
 import { formatCopper, fromCopper, toCopper, spendCoins, priceAfterCharisma } from "./money.ts";
 import { charismaScore, readSheets } from "./sheet.ts";
 import { validateEconomyRows } from "./validation.ts";
-import { listingSchema, propertyProfileSchema, propertyAvailableHere, validatePropertyLocations } from "./property.ts";
+import { listingSchema, propertyProfileSchema, propertyAvailableToGroups, validatePropertyLocations } from "./property.ts";
+import { actingGroups, activeGroups, groupInfo, MAIN_GROUP, partySplit, purseGroup } from "./party-groups.ts";
+import { partyGroupCommands, partyGroupKinds, type PartyGroupCommand } from "./party-groups-schema.ts";
+import { applyGroupLocation, applyPartyGroupCommand } from "./party-groups-command.ts";
 import { transferPropertyDeed } from "./property-deed.ts";
 import { locationLabel } from "./shop-locations.ts";
 import { applySmithCommand } from "./blacksmith-command.ts";
@@ -85,6 +88,7 @@ export const commandSchema = z.discriminatedUnion("kind", [
   ...worldCommands,
   ...npcBarterCommands,
   ...journeyCommands,
+  ...partyGroupCommands,
   ...estateCommands,
   ...shipCommands,
   ...smithCommands,
@@ -103,7 +107,9 @@ export const commandSchema = z.discriminatedUnion("kind", [
   z.object({ ...base, kind: z.literal("market-location"), locationId: id, before: marketLocationSchema.nullable(), after: marketLocationSchema.nullable() }),
   z.object({ ...base, kind: z.literal("party-location"), before: id.nullable(), locationId: id.nullable(), beforePosition: z.string().optional(),
     /** Journey planner: "Move party here" on arrival completes this journey. */
-    journeyId: id.optional() }),
+    journeyId: id.optional(),
+    /** Split the party: move this group (absent or "main" = the main group, as before). */
+    groupId: id.optional() }),
   z.object({ ...base, kind: z.literal("bank-repay"), loanId: id, copper: amount.min(1) }),
   z.object({ ...base, kind: z.literal("property-details"), holdingId: id, before: z.object({name:z.string(),notes:z.string()}), name: z.string().trim().min(1).max(160), notes: z.string().max(4000) }),
   z.object({ ...base, kind: z.literal("shop-schedule"), shopId: id, schedule: shopScheduleSchema.nullable() }),
@@ -342,6 +348,13 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
   const dm = () => {
     if (seat.role !== "dm") throw new Error("Only the DM can perform this action.");
   };
+  // Split the party: name the acting character's group; whole party: today's wording.
+  const notHere = (purseId: string, what: string) => {
+    const group = purseGroup(t, purseId);
+    return partySplit(t) && group
+      ? `${what} isn't where ${t.purses.find((p) => p.id === purseId)?.name ?? "this character"}'s group (${groupInfo(t, group).name}) is.`
+      : `${what} is not available at the party's current location.`;
+  };
   const coins = (purseId: string, delta: number) => {
     const p = t.purses.find((p) => p.id === purseId);
     if (!p) throw new Error("Account no longer exists.");
@@ -404,6 +417,17 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
     journal.world = readWorld(journal.world);
     applyJourneyCommand(t, seat, cmd as JourneyCommand, at, (summary, purseId) =>
       event(summary, "management", purseId),
+    );
+  } else if (partyGroupKinds.has(cmd.kind)) {
+    applyPartyGroupCommand(t, seat, cmd as PartyGroupCommand, at, (summary, purseId, dmOnly) =>
+      journal.events.push({
+        id: cmd.id + "-event-" + journal.events.length,
+        at,
+        summary,
+        kind: "management",
+        ...(purseId ? { purseId } : {}),
+        ...(dmOnly ? { dmOnly: true } : {}),
+      }),
     );
   } else if (npcBarterKinds.has(cmd.kind)) {
     applyNpcBarterCommand(t, seat, cmd as NpcBarterCommand, at, execution);
@@ -507,6 +531,8 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
         journal.world?.characterPositions.some(
           (s) => s.locationId === cmd.locationId || s.downtime?.returnLocationId === cmd.locationId,
         ) ||
+        activeGroups(t).some((g) => g.locationId === cmd.locationId) ||
+        journal.world?.groupRequests?.some((r) => r.status === "pending" && r.locationId === cmd.locationId) ||
         journal.fleet?.facilities.some(y=>y.locationId===cmd.locationId) ||
         journal.fleet?.voyages.some(v=>!["arrived","cancelled","dm-overridden","denied"].includes(v.status)&&(v.originId===cmd.locationId||v.destinationId===cmd.locationId)) ||
         journal.world?.npcs.some((n) => n.locationId === cmd.locationId) ||
@@ -528,6 +554,18 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
     ];
     journal.market = readMarketLocations(market);
     event(cmd.after ? `Location saved: ${cmd.after.name}` : "Location removed");
+  } else if (cmd.kind === "party-location" && cmd.groupId && cmd.groupId !== MAIN_GROUP) {
+    dm();
+    applyGroupLocation(t, { ...cmd, groupId: cmd.groupId }, (summary, purseId, dmOnly) =>
+      journal.events.push({
+        id: cmd.id + "-event-" + journal.events.length,
+        at,
+        summary,
+        kind: "management",
+        ...(purseId ? { purseId } : {}),
+        ...(dmOnly ? { dmOnly: true } : {}),
+      }),
+    );
   } else if (cmd.kind === "party-location") {
     dm();
     const market = readMarketLocations(journal.market);
@@ -923,7 +961,7 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
     const s = t.stock.find((x) => x.id === cmd.stockId),
       shop = t.shops.find((x) => x.id === s?.shopId);
     if (!s || !shop) throw new Error("Item or shop no longer exists.");
-    if (seat.role === "player" && !shopVisible(shop, t)) throw Error("This shop is not available at the party's current location.");
+    if (seat.role === "player" && !shopVisible(shop, t, actingGroups(t, cmd.purseId, seat.purseIds))) throw Error(notHere(cmd.purseId, "This shop"));
     if (shop.blackMarket && !journal.world?.blackMarketActive) throw Error("This black-market vendor is hidden.");
     if (shop.closed) throw new Error("This shop is closed.");
     if (s.quantity !== null && s.quantity < cmd.quantity)
@@ -971,8 +1009,8 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
     if (!l) throw new Error("Listing no longer exists.");
     if (cmd.before && !same(l, cmd.before)) throw Error("This listing changed. Review its current price and details before buying.");
     if (l.kind === "property" && l.status && l.status !== "available") throw Error("This property is not currently for sale.");
-    if (seat.role === "player" && !propertyAvailableHere(l, readMarketLocations(journal.market), !!journal.world?.partyPosition))
-      throw Error("This property is not available at the party's current location.");
+    if (seat.role === "player" && !propertyAvailableToGroups(l, t, actingGroups(t, cmd.purseId, seat.purseIds)))
+      throw Error(notHere(cmd.purseId, "This property"));
     if (l.quantity !== null && l.quantity < cmd.quantity)
       throw new Error("Not enough listing stock.");
     const cost = priceAfterCharisma(l.copper, score(cmd.purseId)) * cmd.quantity;
@@ -1022,7 +1060,7 @@ function applyOwnedCommand(t: CloudTable, seat: CloudSeat, raw: Command, executi
     const h = t.holdings.find((x) => x.id === cmd.holdingId),
       s = t.shops.find((x) => x.id === cmd.shopId);
     if (!h || !s) throw new Error("Item or shop no longer exists.");
-    if (seat.role === "player" && !shopVisible(s, t)) throw Error("This shop is not available at the party's current location.");
+    if (seat.role === "player" && !shopVisible(s, t, actingGroups(t, h.purseId, seat.purseIds))) throw Error(notHere(h.purseId, "This shop"));
     if (s.blackMarket && !journal.world?.blackMarketActive) throw Error("This black-market vendor is hidden.");
     if (s.closed) throw new Error("This shop is closed.");
     own(h.purseId);
