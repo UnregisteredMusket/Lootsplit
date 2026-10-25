@@ -44,7 +44,9 @@ test("each development check belongs to exactly one declared isolated group", ()
     .map((v) => v.trim());
   assert.equal(new Set(groups).size, groups.length);
   const checks = [...workflow.matchAll(/- name: (dev-[\w-]+)\n\s+if: matrix.group == '([^']+)'/g)];
-  assert.equal(checks.length, 46);
+  assert.equal(checks.length, 47);
+  // Split the party: split, groups panel, players per group, buying per group, merge (1280/390/320).
+  assert.ok(checks.some(([, name, group]) => name === "dev-party-split" && group === "world"));
   // Community profiles and the Looking for Group directory (docs/COMMUNITY.md).
   assert.ok(checks.some(([, name, group]) => name === "dev-community" && group === "accounts"));
   // Even coin split: fund split, refusal keeps the form, Activity row, encounter split (1280/390/320).
