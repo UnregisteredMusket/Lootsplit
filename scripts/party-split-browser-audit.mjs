@@ -6,7 +6,7 @@
 import { chromium } from "playwright";
 import assert from "node:assert/strict";
 import { mkdir } from "node:fs/promises";
-import { openApplication, reloadApplication } from "./title-screen-navigation.mjs";
+import { continueIntoApp, openApplication, reloadApplication } from "./title-screen-navigation.mjs";
 const origin = process.env.AUDIT_ORIGIN || "http://127.0.0.1:8080";
 const browser = await chromium.launch({
   executablePath: process.env.CHROMIUM_EXECUTABLE_PATH,
@@ -33,6 +33,10 @@ const book = (page) =>
     const { economySnapshot } = await import("/src/lib/quire/economy.ts");
     return await economySnapshot();
   });
+const go = async (page, path) => {
+  await page.goto(origin + path);
+  await continueIntoApp(page);
+};
 const seatAs = (page, purseIds) =>
   page.evaluate(async (ids) => {
     const { setSeat, DM_SEAT } = await import("/src/lib/quire/table.ts");
@@ -83,7 +87,7 @@ try {
         }),
       });
     });
-    await reloadApplication(page, origin + "/party?section=characters");
+    await reloadApplication(page);
 
     // 1. The DM splits the party.
     await page.getByRole("button", { name: "Split the party", exact: true }).click();
@@ -124,12 +128,13 @@ try {
 
     // 3. Each group's player sees their own group, and buys only at their own place.
     await seatAs(page, ["tamsin"]);
-    await reloadApplication(page, origin + "/party");
+    await go(page, "/party");
     await page.getByText("You're with Ironhold riders").first().waitFor();
     await page.getByText(/Harbour watch.*Saltmarsh · Harbour ward/).first().waitFor();
     await noOverflow(page, `player B ${width}`);
     await page.screenshot({ path: `${out}/player-b-${width}.png`, fullPage: true });
-    await reloadApplication(page, origin + "/market");
+    await go(page, "/market");
+    await page.screenshot({ path: `${out}/market-b-${width}.png`, fullPage: true });
     await page.getByText("Ironhold Armoury").first().waitFor();
     assert.equal(await page.getByText("Saltmarsh Chandlery").count(), 0, "group B doesn't see Harbour ward's shops");
     const across = await page.evaluate(async () => {
@@ -140,9 +145,9 @@ try {
     });
     assert.match(across, /not available at the current location/);
     await seatAs(page, ["brannoc"]);
-    await reloadApplication(page, origin + "/party");
+    await go(page, "/party");
     await page.getByText("You're with Harbour watch").first().waitFor();
-    await reloadApplication(page, origin + "/market");
+    await go(page, "/market");
     await page.getByText("Saltmarsh Chandlery").first().waitFor();
     assert.equal(await page.getByText("Ironhold Armoury").count(), 0, "group A doesn't see Ironhold's shops");
     await seatAs(page, null);
@@ -150,7 +155,7 @@ try {
     assert.equal(t.purses.find((p) => p.id === "tamsin").coins.gp * 100 + t.purses.find((p) => p.id === "tamsin").coins.sp * 10 + t.purses.find((p) => p.id === "tamsin").coins.cp + t.purses.find((p) => p.id === "tamsin").coins.ep * 50 + t.purses.find((p) => p.id === "tamsin").coins.pp * 1000, 1794 - 1500);
 
     // 4. The DM moves the riders back and merges: the party is whole again.
-    await reloadApplication(page, origin + "/party?section=characters");
+    await go(page, "/party?section=characters");
     const card = page.getByRole("article", { name: "Ironhold riders, group B" });
     await card.getByRole("button", { name: "Move…" }).click();
     await card.getByRole("combobox", { name: /Move Ironhold riders to/ }).selectOption("harbour");

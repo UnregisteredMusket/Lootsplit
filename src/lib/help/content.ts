@@ -178,6 +178,21 @@ export const HELP_GROUPS: HelpGroup[] = [
           ["Downtime", "/features/downtime"],
         ],
       },
+      {
+        id: "split-party",
+        title: "Split the party into groups",
+        audience: "DM",
+        paragraphs: [
+          "Party → Split the party lets some characters go somewhere else while staying in the party. Name each group (up to 6, lettered A–F with their own colour), choose where each new group is and who goes where, review, then confirm. A group sent to a different place moves at once: no time passes and nothing is charged, like Move party here. Group A keeps the party's place.",
+          "While split, Party → Characters shows a Groups panel: each group's place, members and coins, Move… (instant), Merge, and Hide this group's place from other groups' players (they see Elsewhere). Edit groups… renames and recolours groups and moves characters between them. Leaving the party is unchanged and stays in each character's placement.",
+          "Everyone stays in the party: balances, companion funds, the treasure pool, fairness, coin splits and Give work across groups, and party funds belong to every group. Shops, services, NPCs nearby and property for sale follow each character's group, so a character can only buy, sell or talk where their own group is. Your own tools have no presence check, as before.",
+          "Players may ask to move their own group; the request waits in Review Inbox (Bank → Review Inbox) and on the Groups panel. Approve moves the group once; Deny keeps an optional reason you can show to the player. Merge… regroups groups at the same place (or one inside the other); a group on the road or on a journey waits. Pending downtime must be approved or cancelled before splitting, moving or merging. One campaign clock runs for everyone. Characters on downtime return to the group they left (or the group it merged into). Journeys still move group A in this version. Older apps see one party at group A's place and are asked to update before acting for a character in another group.",
+        ],
+        links: [
+          ["Party", "/party"],
+          ["Review Inbox", "/features/review"],
+        ],
+      },
     ],
   },
   {

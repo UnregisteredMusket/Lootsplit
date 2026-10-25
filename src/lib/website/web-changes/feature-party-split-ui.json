@@ -1,0 +1,11 @@
+{
+  "title": "Split the party",
+  "summary": "The DM can split the party into groups at different places, and merge them back when they meet again.",
+  "items": [
+    "Party → Split the party names up to six groups, each with a letter and colour, chooses where each group is and who goes with it, then shows a receipt.",
+    "Everyone stays in the party: balances, the treasure pool, fairness and coin splits are shared as before.",
+    "Shops, services, nearby NPCs and property for sale follow each character's own group.",
+    "The Groups panel moves a group at once, edits groups, hides a group's place from other players, and merges groups at the same place.",
+    "Players see which group they're with and where the others are, and can ask the DM to move their group; the request waits in Review Inbox."
+  ]
+}

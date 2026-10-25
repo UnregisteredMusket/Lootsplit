@@ -287,6 +287,19 @@ export const PLAYER_HELP_GROUPS: HelpGroup[] = [
           ["Trading & Barter", "/features/trading"],
         ],
       },
+      {
+        id: "split-party",
+        title: "When the party splits into groups",
+        paragraphs: [
+          "The DM can split the party into groups at different places. Home and Inventory & purse show which group you're with, where it is, and where the other groups are (unless the DM hides a group: then it shows as Elsewhere).",
+          "You stay in the party: party balances, the treasure pool, fairness and coin splits work as before, and you can still give coins or items to anyone in the party. Shops, services, NPCs nearby and property for sale are the ones where your own group is.",
+          "To go somewhere else, open Move your group, choose a place and add a message. Nothing moves until the DM approves; you can withdraw the request while it waits, and you'll see the DM's answer. If your app is older, it asks you to update before acting for a character who is with another group.",
+        ],
+        links: [
+          ["Inventory & purse", "/party"],
+          ["Market", "/market"],
+        ],
+      },
     ],
   },
   {

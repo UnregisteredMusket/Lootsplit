@@ -380,8 +380,7 @@ function SplitPartyDialog({ onClose }: { onClose: () => void }) {
                     </dl>
                     {g && (
                       <label className="gcheck">
-                        <input type="checkbox" checked={g.hidden} onChange={(e) => setGroups((all) => all.map((x) => (x.key === g.key ? { ...x, hidden: e.target.checked } : x)))} /> Hide {c.name}'s place from
-                        other groups' players (they see "Elsewhere")
+                        <input type="checkbox" checked={g.hidden} onChange={(e) => setGroups((all) => all.map((x) => (x.key === g.key ? { ...x, hidden: e.target.checked } : x)))} /> Hide this group's place from other groups' players (they see "Elsewhere")
                       </label>
                     )}
                   </section>
@@ -1069,20 +1068,5 @@ export function PlayerGroupCard() {
       <GroupRequestInbox />
       {error && <p role="alert" className="gerror">{error}</p>}
     </section>
-  );
-}
-
-/** A small group chip for a character (Party balances, lists); nothing when the party is whole. */
-export function CharacterGroupChip({ purseId }: { purseId: string }) {
-  const t = useTable();
-  if (!partySplit(t)) return null;
-  const g = purseGroup(t, purseId);
-  if (!g) return null;
-  const info = groupInfo(t, resolveGroup(t, g));
-  return (
-    <span className={`g-${info.colour}`} title={info.name}>
-      <GroupBadge letter={info.letter} colour={info.colour} />
-      <span className="sr-only">{info.name}</span>
-    </span>
   );
 }
