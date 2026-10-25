@@ -1,3 +1,35 @@
+# Lootsplitter 1.13.0
+
+Android version code **20**, same package and permanent signing certificate. Install over the existing app; do not uninstall or clear saved data.
+
+## Added
+
+- **Split the party** (#266, #267, #268). The DM can split the party into up to six groups (letters A–F, each with a colour) at different places, choose who goes with each group, and merge groups that meet again. Everyone stays in the party: balances, companion funds, the treasure pool, Fairness and coin splits are shared as before. Shops, services, nearby NPCs and property for sale follow each character's own group. The Groups panel moves a group, edits groups, hides a group's place from other players and merges groups. On the map each group has its own marker and Here list; each group can have one journey, one approval can move every group the DM ticks, arriving groups are moved in with Move <group> here, a stable's coach carries the paying character's group, and a whole group can board a ship together. Players see which group they're with and where the others are, and can ask the DM to move their group from the Review Inbox. Apps older than 1.13.0 ask to update before acting for a character outside the main group; nothing is lost meanwhile.
+- **Fairness ledger** (#257). Party → Fairness adds up the coins and items each party character has received, campaign to date or for one session, with the difference from the party average and the receipts behind each total. Coin splits, encounter awards and treasure-pool items count; purchases, trades, Give, wages, loans and downtime don't. Older encounter items without a recorded value count as 0 cp and are marked. When resolving the treasure pool, the DM can choose Favour whoever is behind.
+- **Fences, banks, hirelings and tailors** (#256). A fence opens their shop's Sell tab while the black market is open, a bank opens Apply for a loan with the bank named, an agent can propose a staff contract for one of the party's properties, and a Tailor preset makes clothes over approved downtime (bringing your own cloth costs less).
+- **Sages identify items** (#259). Pick an item your character carries and ask; nothing is charged until the DM answers, then the fee is charged once and the answer arrives in your private thread with the sage. The answer can be added to the item's notes and the item renamed.
+- **Paid lessons from trainers** (#261). Agree terms in conversation (nothing is charged then), log sessions in Downtime → Learn from a paid teacher, and each session's fee is charged once when the DM approves it. Lessons count in training totals.
+- **Courier letters** (#262). Send a letter to an NPC your character has met who is somewhere the courier delivers, priced by distance and paid once. It travels with approved downtime and arrives in your private thread with that NPC; if the recipient can't be found, the DM decides.
+- **Stables and coaches** (#263). Book stalls for your animals by the night, with optional feed, paid once up front; the animals stay in your inventory. A coach booking sends a journey request with the fare, charged once when the DM approves departure.
+
+## Improved
+
+- **Journey planner is easier to find** (#258). Plan journey is a labelled button under Here on the map (it stays when the tool bar is collapsed); the Here sheet offers Plan a journey and Journey progress, and the Downtime screen starts with Travel. On phones the map stays visible above the planner and the journey review opens full height. Journey progress shows a bar with leg marks, Undo removes the last waypoint, and optional costs show their price before you turn them on.
+- **Online campaign limit** (#260). Each account can host up to 2 online campaigns at a time. Start a room and My account show the count (for example "1 of 2 online campaigns"); at the limit, Create room, Reopen as DM and Restore shared records explain how to free a slot or keep playing on the device. Joining as a player, device campaigns and account backups are not limited, and nothing already hosted is closed.
+- New encounter awards record each item's value on its ledger line (#257).
+- **Owner Field monitor widget** (#270, site owners only). The home-screen Field monitor is redesigned: severity labels (✕ CRIT, ! WARN, i INFO) with start time and duration, Recently resolved for the last 24 hours, At a glance tiles with traffic, plan-usage, main-run and player charts, and tap-to-expand items and tiles (with a 24h/7d traffic toggle) that never download anything. It can be resized down to 4×2, and the 4×1 companion has an optional Status + charts preset with a Chart column setting; Agent activity stays the default and every earlier row stays under More.
+
+## Fixed
+
+- **Owner widget connect** (#265, site owners only). Connect owner account keeps the new connection when the first reading times out, shows "Could not refresh · tap Refresh to retry" and retries in the background; only an authorization rejection or a changed account clears it. The widget's read limit is 4 s (7 s total).
+
+## Not in this release
+
+- Server-side widget changes (#264 faster monitor answers, #269 the redesign's data) are already live and also help 1.12.0.
+- Website-only, CI-only and documentation changes do not affect the app.
+
+---
+
 # Lootsplitter 1.12.0
 
 Android version code **19**, same package and permanent signing certificate. Install over the existing app; do not uninstall or clear saved data.
