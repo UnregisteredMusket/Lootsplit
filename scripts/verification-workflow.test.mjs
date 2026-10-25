@@ -3,6 +3,7 @@ import { readFileSync } from "node:fs";
 import test from "node:test";
 import { assertVerification, requiredJobs } from "./verification-gate.mjs";
 import { changesCode } from "./change-scope.mjs";
+import { MAP_TILES_WIDTHS, mapTilesPart, phaseNotice } from "./map-tiles-parts.mjs";
 
 test("the aggregate release gate refuses failure, timeout, cancellation, skipped and missing groups", () => {
   const good = Object.fromEntries(requiredJobs.map((job) => [job, { result: "success" }]));
@@ -44,7 +45,7 @@ test("each development check belongs to exactly one declared isolated group", ()
     .map((v) => v.trim());
   assert.equal(new Set(groups).size, groups.length);
   const checks = [...workflow.matchAll(/- name: (dev-[\w-]+)\n\s+if: matrix.group == '([^']+)'/g)];
-  assert.equal(checks.length, 47);
+  assert.equal(checks.length, 48);
   // Split the party: split, groups panel, players per group, buying per group, merge (1280/390/320).
   assert.ok(checks.some(([, name, group]) => name === "dev-party-split" && group === "world"));
   // Community profiles and the Looking for Group directory (docs/COMMUNITY.md).
@@ -72,7 +73,11 @@ test("each development check belongs to exactly one declared isolated group", ()
   assert.ok(checks.some(([, name, group]) => name === "dev-npc-barter" && group === "world"));
   // Journey planner: calibrate, draw, review, approve, progress, arrive (docs/MAP-TILES.md).
   assert.ok(checks.some(([, name, group]) => name === "dev-journey-planner" && group === "world"));
-  assert.ok(checks.some(([, name, group]) => name === "dev-map-tiles" && group === "desktop"));
+  // The development map-tiles audit runs as its two halves in separate jobs; the packaged
+  // Worker step runs it whole.
+  assert.ok(checks.some(([, name, group]) => name === "dev-map-tiles-1" && group === "desktop"));
+  assert.ok(checks.some(([, name, group]) => name === "dev-map-tiles-2" && group === "economy"));
+  assert.ok(!checks.some(([, name]) => name === "dev-map-tiles"));
   assert.ok(checks.some(([, name, group]) => name === "dev-split-view" && group === "desktop"));
   assert.match(workflow, /worker-map-tiles 240 node scripts\/map-tiles-browser-audit\.mjs/);
   assert.ok(checks.some(([, name, group]) => name === "dev-ships" && group === "accounts-2"));
@@ -194,4 +199,29 @@ test("the blacksmith audit waits for cross-device sync as long as the room poll 
   const longest = Number(/Math\.min\((\d+), 2000 \* 2 \*\* pollFailures\)/.exec(client)?.[1]);
   assert.equal(longest, Number(/const ROOM_SYNC_MAX_POLL_MS = (\d+);/.exec(audit)?.[1]));
   assert.match(audit, /timeout: ROOM_SYNC_WAIT_MS,\n\s+\}\)\n\s+\.toBe\("claimed"\)/);
+});
+
+test("the two map-tiles halves are disjoint, together the complete audit, each in its own job", () => {
+  const workflow = readFileSync(".github/workflows/verify.yml", "utf8");
+  const full = mapTilesPart("");
+  assert.deepEqual(full, { part: null, widths: MAP_TILES_WIDTHS, connected: true });
+  const one = mapTilesPart("1/2"),
+    two = mapTilesPart("2/2");
+  assert.deepEqual([...one.widths, ...two.widths].sort(), [...MAP_TILES_WIDTHS].sort());
+  assert.equal(one.widths.filter((w) => two.widths.includes(w)).length, 0);
+  assert.equal(Number(one.connected) + Number(two.connected), 1, "connected maps run exactly once");
+  for (const bad of ["3/2", "1/3", "all", "2"]) assert.throws(() => mapTilesPart(bad), /MAP_TILES_PART/);
+  const steps = [
+    ...workflow.matchAll(
+      /- name: dev-map-tiles-(\d)\n\s+if: matrix.group == '([^']+)'\n\s+env:\n\s+MAP_TILES_PART: (\d\/2)\n\s+run: node scripts\/recovery-step\.mjs dev-map-tiles-\d 240 node scripts\/map-tiles-browser-audit\.mjs/g,
+    ),
+  ];
+  assert.deepEqual(steps.map(([, n, , part]) => `${n}/2` === part), [true, true]);
+  assert.notEqual(steps[0][2], steps[1][2], "halves run in parallel jobs");
+  // The packaged Worker step keeps the whole audit, without a part.
+  assert.match(workflow, /- name: worker-map-tiles\n\s+if: matrix.group == 'features'\n\s+env:\n\s+AUDIT_ORIGIN: [^\n]+\n\s+run: node scripts\/recovery-step\.mjs worker-map-tiles 240/);
+  assert.equal(
+    phaseNotice("1/2", [{ name: "width-1280", ms: 101234 }]),
+    "::notice title=Map tiles phases part 1/2::width-1280: 101.2s",
+  );
 });

@@ -21,10 +21,14 @@ import {
 } from "./title-screen-navigation.mjs";
 import { chooseOption } from "./search-select-browser.mjs";
 import { createAndSaveRoom } from "./browser/account-fixtures.mjs";
+import { mapTilesPart, phaseNotice } from "./map-tiles-parts.mjs";
 const origin = process.env.AUDIT_ORIGIN || "http://127.0.0.1:8080",
   output = "test-results/map-tiles",
   started = Date.now(),
-  errors = [];
+  errors = [],
+  // MAP_TILES_PART=1/2 or 2/2 selects one disjoint half of the audit (CI); unset runs all of it.
+  selected = mapTilesPart(process.env.MAP_TILES_PART),
+  phases = [];
 assert.match(
   origin,
   /^http:\/\/(127\.0\.0\.1|localhost):/,
@@ -70,7 +74,8 @@ async function tileForm(page, label) {
     .filter({ has: page.getByRole("button", { name: label, exact: true }) });
 }
 try {
-  for (const width of [1280, 390]) {
+  for (const width of selected.widths) {
+    const phaseStarted = Date.now();
     const context = await browser.newContext({
       viewport: { width, height: 950 },
       serviceWorkers: "block",
@@ -416,16 +421,24 @@ try {
     await viewer.close();
     await guestContext.close();
     await context.close();
+    phases.push({ name: `width-${width}`, ms: Date.now() - phaseStarted });
   }
-  await checkConnectedMaps({ browser, origin, output });
+  if (selected.connected) {
+    const phaseStarted = Date.now();
+    await checkConnectedMaps({ browser, origin, output });
+    phases.push({ name: "connected-maps", ms: Date.now() - phaseStarted });
+  }
   assert.deepEqual(errors, []);
+  if (process.env.CI) console.log(phaseNotice(selected.part, phases));
   console.log(
     JSON.stringify({
       ok: true,
-      widths: [1280, 390],
+      part: selected.part,
+      widths: selected.widths,
       durationMs: Date.now() - started,
+      phases,
       flows: [
-        "connected-navigation-services-placement-encounter-return",
+        ...(selected.connected ? ["connected-navigation-services-placement-encounter-return"] : []),
         "legacy-filter",
         "property-grid",
         "free-party-biome",
