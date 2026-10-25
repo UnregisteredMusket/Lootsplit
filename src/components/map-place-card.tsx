@@ -1,4 +1,5 @@
 import { lazy, Suspense, useEffect, useRef, useState } from "react";
+import { groupInfo, partySplit, seatGroups } from "@/lib/quire/party-groups";
 import { useCanGoBack, useRouter } from "@tanstack/react-router";
 import { ChevronDown, ChevronUp, Link2, X } from "lucide-react";
 import type { MapRecord } from "@/lib/quire/map-signals";
@@ -84,7 +85,11 @@ export function MapPlaceCard({
     .map((l) => l.name)
     .join(" › ");
   const allowed = reference ? mapServiceAllowed(table, reference, seat) : false;
-  const here = reference && reference.kind !== "location" ? partyAt(table, locationId) : false;
+  // Split the party: which of this viewer's groups is here (the DM: any group).
+  const hereGroups = reference && reference.kind !== "location"
+    ? seatGroups(table, seat).filter((g) => partyAt(table, locationId, [g]))
+    : [];
+  const here = hereGroups.length > 0;
   const pin = reference
     ? map.connected?.placements.find((p) => sameRecord(p.record, reference))
     : undefined;
@@ -174,7 +179,11 @@ export function MapPlaceCard({
         <>
           <ul className="map-place-chips" aria-label="Status">
             {shop && <li>{shop.closed ? "Closed" : "Open"}</li>}
-            {here && <li className="map-place-chip-here">The party is here</li>}
+            {here && (
+              <li className="map-place-chip-here">
+                {partySplit(table) ? `${hereGroups.map((g) => groupInfo(table, g).name).join(", ")} ${hereGroups.length === 1 ? "is" : "are"} here` : "The party is here"}
+              </li>
+            )}
             {shopServices.length > 0 && (
               <li className="map-place-chip-here">Services: {shopServices.join(" · ")}</li>
             )}

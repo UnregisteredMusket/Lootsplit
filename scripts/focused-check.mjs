@@ -15,6 +15,7 @@ const featureAudits = {
   "loot-claims": "scripts/loot-claims-browser-audit.mjs",
   "loot-fairness": "scripts/loot-fairness-browser-audit.mjs",
   "journey-planner": "scripts/journey-planner-browser-audit.mjs",
+  "party-split": "scripts/party-split-browser-audit.mjs",
   services: "scripts/services-browser-audit.mjs",
 };
 const known = ["accounts", ...accountScenarios, ...Object.keys(featureAudits)];

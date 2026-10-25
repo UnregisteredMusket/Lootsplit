@@ -1,4 +1,5 @@
 import { CharacterPlacement } from "./character-placement";
+import { actingGroups, seatGroups } from "@/lib/quire/party-groups";
 import { MapRecordStrip } from "./map-record-strip";
 import { characterLocation, characterPosition } from "@/lib/quire/character-position";
 import { SearchSelect } from "@/components/search-select";
@@ -37,7 +38,7 @@ export function LocationNpcs() {
     [selected, setSelected] = useState(""),
     [importText, setImportText] = useState(""),
     [importError, setImportError] = useState("");
-  const npcs = world.npcs.filter((n) => dm || npcAvailableHere(n, t)),
+  const npcs = world.npcs.filter((n) => dm || npcAvailableHere(n, t, seatGroups(t, seat))),
     npc = npcs.find((n) => n.id === selected);
   const requestedNpc = useRouterState({ select: (s) => s.location.search.npc });
   useEffect(() => {
@@ -211,7 +212,7 @@ export function LocationNpcs() {
                           t.purses.find((p) => p.id === n.id)!,
                         ),
                       )}{" "}
-                  · {npcAvailableHere(n, t) ? "Nearby" : "Away / hidden"} ·{" "}
+                  · {npcAvailableHere(n, t, seatGroups(t, seat)) ? "Nearby" : "Away / hidden"} ·{" "}
                   {n.barterAllowed ? "Bartering allowed" : "No bartering"}
                 </p>
               </span>
@@ -477,7 +478,8 @@ function NpcInteraction({
   const conversation = world.conversations.find(
       (c) => c.npcId === npc.id && c.purseId === character,
     ),
-    near = npcAvailableHere(npc, table),
+    // Split the party: near the chosen character's group.
+    near = npcAvailableHere(npc, table, character ? actingGroups(table, character, seat.purseIds) : seatGroups(table, seat)),
     purse = table.purses.find((p) => p.id === npc.id)!;
   return (
     <section className="world-card">
@@ -662,7 +664,7 @@ export function NpcMapService({ npcId, onFarewell }: { npcId: string; onFarewell
   const table = useWorldTable(),
     seat = useSeat();
   const npc = table.journal.world?.npcs.find((n) => n.id === npcId);
-  if (!npc || (seat.role !== "dm" && !npcAvailableHere(npc, table)))
+  if (!npc || (seat.role !== "dm" && !npcAvailableHere(npc, table, seatGroups(table, seat))))
     return <p>This NPC is unavailable here.</p>;
   if (!npcPinOpensHub(npc))
     return (

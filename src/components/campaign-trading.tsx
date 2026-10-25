@@ -1,4 +1,5 @@
 import { SearchSelect } from "@/components/search-select";
+import { seatGroups } from "@/lib/quire/party-groups";
 import { useState } from "react";
 import { useSeat } from "@/lib/quire/seat";
 import { readWorld, type Trade } from "@/lib/quire/world-schema";
@@ -205,7 +206,7 @@ function TradeEditor({
       (p) =>
         !table.journal?.tradeEconomy?.exchanges.some((e) => e.purseId === p.id) &&
         (p.nonParty
-          ? world.npcs.some((n) => n.id === p.id && n.barterAllowed && npcAvailableHere(n, table))
+          ? world.npcs.some((n) => n.id === p.id && n.barterAllowed && npcAvailableHere(n, table, seatGroups(table, seat)))
           : p.kind === "party" || p.control !== "npc"),
     ),
     actors = accounts.filter((p) => canAct(p.id));

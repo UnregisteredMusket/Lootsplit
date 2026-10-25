@@ -94,6 +94,8 @@ Owner decisions (2026-10-25, mockups approved as shown). Party members can stay 
 
 **Older apps (protocol 9 and below)** receive the table without groups (also inside archived reports) and see every party member at the main group's place. The server refuses their actions for a character outside the main group with "The party is split into groups. Update Lootsplitter to act for <name>." Their whole-journal writes keep the stored groups; pending drafts with group commands ask them to finish on the updated website; account backups with groups are restored on the updated website.
 
+**Screens (phase 2).** Party → **Split the party** (DM dialog: groups, confirm, receipt), the **Groups panel** on Party → Characters (Move…, Edit groups…, Merge…, Hide, move requests with Approve / Deny, Away from the party), a group chip line on the DM desk, group move requests in Review Inbox, and the player's group card on Home and Inventory & purse (You're with…, the other groups, Move your group). The Here sheet, place cards ("<group> is here"), Market, People & NPCs, barter, property for sale and exchanges use the viewer's groups (`seatGroups`; the DM: every group, the Here sheet defaults to group A).
+
 Journeys still move the main group only in this phase (`journeyTravellers` counts the main group; the journey quote names characters "with <group>" as staying behind). Downtime: a character returns to the group it left, the group that merged it, or the main group. Boarding a ship alone still leaves the party; landing where a group is rejoins it (its own group first).
 
 ## Development and verification rules

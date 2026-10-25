@@ -32,6 +32,7 @@ import { SplitCoins } from "@/components/coin-split";
 import { TreasurePool, usePoolCount } from "@/components/treasure-pool";
 import { FairnessLedger } from "@/components/fairness-ledger";
 import { partyFunds } from "@/lib/quire/coin-split";
+import { PartyGroupsPanel, PlayerGroupCard, SplitPartyButton } from "@/components/party-groups";
 
 export const Route = createFileRoute("/party")({
   validateSearch: (
@@ -122,15 +123,18 @@ function PartyPage() {
             {seat.role === "dm" ? "Party" : "Inventory & purse"}
           </h1>
         </div>
-        <Button
-          disabled={!economy.ready || visible.length === 0 || readOnly}
-          onClick={() => {
-            setSection("funds");
-            setAction("add");
-          }}
-        >
-          + Add loot
-        </Button>
+        <div className="flex flex-wrap justify-end gap-2">
+          {seat.role === "dm" && !readOnly && <SplitPartyButton />}
+          <Button
+            disabled={!economy.ready || visible.length === 0 || readOnly}
+            onClick={() => {
+              setSection("funds");
+              setAction("add");
+            }}
+          >
+            + Add loot
+          </Button>
+        </div>
       </div>
       <div className="flex flex-wrap items-center gap-3">
         <div
@@ -226,6 +230,15 @@ function PartyPage() {
           />
         )}
       </div>
+      {seat.role === "player" && <PlayerGroupCard />}
+      {seat.role === "dm" && shownSection === "characters" && (
+        <PartyGroupsPanel
+          onPlacement={(id) => {
+            setManaged(id);
+            document.getElementById("character-placement")?.scrollIntoView({ block: "start" });
+          }}
+        />
+      )}
       {seat.role === "dm" && shownSection === "characters" && <CharacterPlacement selectedId={managed} />}
       {seat.role === "dm" && (
         <div

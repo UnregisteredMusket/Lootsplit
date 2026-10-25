@@ -1,4 +1,5 @@
 import { SearchSelect } from "@/components/search-select";
+import { actingGroups, seatGroups } from "@/lib/quire/party-groups";
 import { MapRecordStrip } from "./map-record-strip";
 import { useEffect, useId, useRef, useState } from "react";
 import { Building2, MapPin, ScrollText, Search, Scale, KeyRound } from "lucide-react";
@@ -18,7 +19,7 @@ import { mutationNotice } from "@/lib/quire/mutation-outcome";
 import {
   PROPERTY_TYPES,
   PROPERTY_CONDITIONS,
-  propertyAvailableHere,
+  propertyAvailableToGroups,
   propertyStatus,
   listingSchema,
 } from "@/lib/quire/property";
@@ -95,7 +96,7 @@ export function PropertyMarketplace() {
     (listing) =>
       listing.kind === "property" &&
       (dm ||
-        (propertyAvailableHere(listing, market, !!journal.world?.partyPosition) &&
+        (propertyAvailableToGroups(listing, { journal }, seatGroups({ purses, journal }, seat)) &&
           listing.quantity !== 0 &&
           listing.status !== "withdrawn")),
   );
@@ -120,7 +121,8 @@ export function PropertyMarketplace() {
         return false;
       if (status === "sold" && listing.quantity !== 0) return false;
       if (status === "withdrawn" && listing.status !== "withdrawn") return false;
-      if (here && !propertyAvailableHere(listing, market, !!journal.world?.partyPosition))
+      // Split the party: here for the buyer's group (any of this seat's groups without a buyer).
+      if (here && !propertyAvailableToGroups(listing, { journal }, buyer ? actingGroups({ purses, journal }, buyer, seat.purseIds) : seatGroups({ purses, journal }, seat)))
         return false;
       if (
         location === "campaignwide"
@@ -1102,7 +1104,7 @@ function PropertyListingEditor({
 export function MapListingService({ listingId }: { listingId: string }) {
   const { listings, journal, purses } = useEconomy(), seat = useSeat();
   const listing = listings.find(l => l.id === listingId), mine = purses.filter(p => seat.role === "dm" || seat.purseIds.includes(p.id));
-  const here = !!listing && propertyAvailableHere(listing, readMarketLocations(journal.market), !!journal.world?.partyPosition);
+  const here = !!listing && propertyAvailableToGroups(listing, { journal }, seatGroups({ purses, journal }, seat));
   if (!listing || (seat.role !== "dm" && (!here || listing.quantity === 0 || listing.status === "withdrawn"))) return <p>This listing is unavailable here.</p>;
   return <PropertyViewing key={listing.id} listing={listing} initialBuyer={mine[0]?.id??""} purses={mine} available={here} />;
 }

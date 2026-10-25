@@ -187,7 +187,7 @@ export function applyPartyGroupCommand(
       const letter = nextGroupLetter(t, taken);
       if (!letter) throw Error(`The party can be split into at most ${MAX_PARTY_GROUPS} groups.`);
       taken.push(letter);
-      groups.push({ id: g.id, name: g.name, colour: g.colour, letter, status: "active", locationId: g.locationId, createdAt: at });
+      groups.push({ id: g.id, name: g.name, colour: g.colour, letter, status: "active", locationId: g.locationId, ...(g.hidden ? { hidden: true } : {}), createdAt: at });
       for (const id of g.memberIds) setGroup(t, id, g.id);
     }
     assertColours(t);

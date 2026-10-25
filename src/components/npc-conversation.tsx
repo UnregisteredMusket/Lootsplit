@@ -1,4 +1,5 @@
 import { useEffect, useMemo, useRef, useState, type KeyboardEvent, type ReactNode } from "react";
+import { seatGroups } from "@/lib/quire/party-groups";
 import { useSeat } from "@/lib/quire/seat";
 import { useCommandId, useEconomy } from "@/lib/quire/economy-context";
 import { readWorld, type Npc } from "@/lib/quire/world-schema";
@@ -331,7 +332,7 @@ export function NpcConversation({
     { commandOutcome } = useEconomy();
   const world = readWorld(table.journal?.world),
     state = readNpcBarter(world),
-    near = npcAvailableHere(npc, table);
+    near = npcAvailableHere(npc, table, seatGroups(table, seat));
   const characters = table.purses.filter(
     (p: Purse) =>
       p.kind === "character" &&

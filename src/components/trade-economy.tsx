@@ -1,4 +1,5 @@
 import { MapRecordStrip } from "./map-record-strip";
+import { actingGroups, seatGroups } from "@/lib/quire/party-groups";
 import {
   useState,
   useMemo,
@@ -128,7 +129,7 @@ export function TradeEconomyPanel() {
     realm = clampRealm(table.realm);
   const [commodityId, setCommodityId] = useState(""),
     [exchangeId, setExchangeId] = useState("");
-  const visible = economy.exchanges.filter((e) => dm || (e.visible && exchangeHere(table, e)));
+  const visible = economy.exchanges.filter((e) => dm || (e.visible && exchangeHere(table, e, seatGroups(table, seat))));
   const search = useRouterState({
     select: (state) => state.location.search as Record<string, unknown>,
   });
@@ -1090,7 +1091,7 @@ function TradeForm({
     <div className="commodity-order">
       <CommandForm
         label={direction === "buy" ? "Buy commodity" : "Sell commodity"}
-        submitDisabled={!purseId || (!exchangeHere(table, exchange) && !overrideLocation)}
+        submitDisabled={!purseId || (!exchangeHere(table, exchange, actingGroups(table, purseId, dm ? undefined : seat.purseIds)) && !overrideLocation)}
         dirty={quantity !== 1 || !!holdingId || !!propertyId}
         onDone={() => {
           setQuantity(1);
@@ -1177,7 +1178,7 @@ function TradeForm({
           max={100000}
           set={setQuantity}
         />
-        {!exchangeHere(table, exchange) && (
+        {!exchangeHere(table, exchange, purseId ? actingGroups(table, purseId, dm ? undefined : seat.purseIds) : seatGroups(table, seat)) && (
           <p role="status">
             {exchange.locationId
               ? "Visit this exchange's location to trade."
@@ -1393,6 +1394,6 @@ function ManualSeason({ economy }: { economy: TradeEconomy }) {
 export function MapExchangeService({ exchangeId }: { exchangeId: string }) {
   const table = useWorldTable(), seat = useSeat(), economy = readTradeEconomy(table.journal.tradeEconomy);
   const exchange = economy.exchanges.find(e => e.id === exchangeId);
-  if (!exchange || (seat.role !== "dm" && (!exchange.visible || !exchangeHere(table, exchange)))) return <p>This exchange is unavailable here.</p>;
+  if (!exchange || (seat.role !== "dm" && (!exchange.visible || !exchangeHere(table, exchange, seatGroups(table, seat))))) return <p>This exchange is unavailable here.</p>;
   return <CommodityBoard economy={economy} exchanges={[exchange]} market={readMarketLocations(table.journal.market)} dm={seat.role === "dm"} initialExchange={exchange.id} initialCommodity="" renderTrade={({exchange:e,commodity:c})=>economy.settings.enabled&&e.open&&c.active ? <TradeForm key={exchangeQuoteKey(economy,e,c)} economy={economy} exchange={e} commodity={c}/> : <p>Trading is currently unavailable.</p>} />;
 }

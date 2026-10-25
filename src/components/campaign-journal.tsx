@@ -1,4 +1,5 @@
 import { ServiceRequests } from "./service-providers";
+import { GroupRequestInbox } from "./party-groups";
 import { useDraftGuard } from "@/lib/quire/use-draft-guard";
 import { useNavigate, useRouterState } from "@tanstack/react-router";
 import { FeatureCards } from "./feature-navigation";
@@ -621,6 +622,7 @@ export function CampaignJournal({
           </p>
           <FinanceReadiness />
           <JourneyRequests />
+          <GroupRequestInbox />
           <ServiceRequests />
           <div className="flex flex-wrap gap-2 my-3">
             <input
