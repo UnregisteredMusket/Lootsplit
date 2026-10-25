@@ -833,7 +833,7 @@ public class OwnerWidgetTest {
             InstrumentationRegistry.getInstrumentation().runOnMainSync(()->android.widget.ListView.class.cast(hosted.get().findViewById(R.id.monitor_list)).setSelection(tiles));
             long deadline=android.os.SystemClock.elapsedRealtime()+8000;AtomicReference<Boolean> clicked=new AtomicReference<>(false);
             while(!clicked.get()&&android.os.SystemClock.elapsedRealtime()<deadline){
-                InstrumentationRegistry.getInstrumentation().runOnMainSync(()->{View child=hostedRow(hosted,tiles);View tile=child==null?null:child.findViewById(R.id.tile_root);if(tile!=null&&tile.hasOnClickListeners())clicked.set(tile.performClick());});
+                InstrumentationRegistry.getInstrumentation().runOnMainSync(()->{View child=hostedRow(hosted,tiles);View tile=child==null?null:child.findViewById(R.id.tile_root_a);if(tile!=null&&tile.hasOnClickListeners())clicked.set(tile.performClick());});
                 if(!clicked.get())android.os.SystemClock.sleep(100);
             }
             assertTrue("The traffic tile is tappable",clicked.get());
@@ -1006,7 +1006,7 @@ public class OwnerWidgetTest {
         }
         source.remove("usage");
         rows=WidgetRows.rows(WidgetData.project(source,now));
-        boolean older=false;for(int i=0;i<rows.length();i++)older|=rows.getJSONObject(i).getString("detail").contains("not provided by server");
+        boolean older=false;for(int i=0;i<rows.length();i++)older|=rows.getJSONObject(i).optString("detail").contains("not provided by server");
         assertTrue("An older server states the gap",older);
     }
     private JSONObject activityEvent(String kind,String state,String text,String title,int pr,double minutesAgo) throws Exception {
@@ -1480,9 +1480,12 @@ public class OwnerWidgetTest {
             assertTrue("Deterministic",a.sameAs(b));
             assertTrue("Face chart byte budget "+a.getAllocationByteCount(),a.getAllocationByteCount()<=64*1024);
             // The newest slot's errors sit on their own baseline strip at the bottom right, in the error colour.
-            int x=(int)(47.4f/48f*a.getWidth()),y=a.getHeight()-2;
-            assertTrue("Error bar on its baseline",near(a.getPixel(x,y),p.error));
-            assertTrue("No error bar where there were none",!near(a.getPixel(a.getWidth()/2,y),p.error));
+            // The newest slot's errors sit on their own baseline strip (bottom right), in the error colour; none elsewhere.
+            int strip=WidgetCharts.errorStripPx(density);
+            assertTrue("Error bar on its baseline: "+region(a,(int)(a.getWidth()*0.96f),a.getWidth(),a.getHeight()-strip,a.getHeight()),
+                found(a,(int)(a.getWidth()*0.96f),a.getWidth(),a.getHeight()-strip,a.getHeight(),p.error));
+            assertFalse("No error bar where there were none",found(a,0,(int)(a.getWidth()*0.9f),a.getHeight()-strip,a.getHeight(),p.error));
+            assertFalse("Errors are not drawn in the requests area",found(a,0,a.getWidth(),0,a.getHeight()-strip-1,p.error));
             // Plan-usage pace: a 1 px tall ALPHA_8 strip whose one opaque column is at the elapsed share.
             Bitmap pace=WidgetCharts.paceStrip(46);
             assertEquals(Bitmap.Config.ALPHA_8,pace.getConfig());
@@ -1506,17 +1509,21 @@ public class OwnerWidgetTest {
         AtomicReference<Throwable> failure=new AtomicReference<>();
         InstrumentationRegistry.getInstrumentation().runOnMainSync(()->{try{
             View view=OwnerWidgetService.rowView(context,tiles,-1).apply(context,new FrameLayout(context));
-            android.widget.ImageView chart=view.findViewById(R.id.tile_chart);
+            android.widget.ImageView chart=view.findViewById(R.id.tile_chart_a);
             assertEquals(View.VISIBLE,chart.getVisibility());
             assertTrue(chart.getDrawable() instanceof android.graphics.drawable.BitmapDrawable);
             assertTrue(chart.getContentDescription().toString().startsWith("Requests in the past 24 hours: 15460, errors: 12"));
-            assertNotNull("Plan usage gauges render as ProgressBars",view.findViewById(R.id.usage_bar0));
-            assertTrue(view.findViewById(R.id.usage_hot2).getVisibility()==View.VISIBLE);
-            assertEquals("An unavailable metric shows no bar","—",text(view,R.id.usage_value1));
-            assertEquals(View.INVISIBLE,view.findViewById(R.id.usage_bar1).getVisibility());
+            assertNotNull("Plan usage gauges render as ProgressBars",view.findViewById(R.id.usage_bar0_b));
+            assertTrue(view.findViewById(R.id.usage_hot2_b).getVisibility()==View.VISIBLE);
+            assertEquals(View.VISIBLE,view.findViewById(R.id.usage_gauges_b).getVisibility());
+            assertEquals(View.GONE,view.findViewById(R.id.usage_gauges_a).getVisibility());
+            assertEquals("An unavailable metric shows no bar","—",text(view,R.id.usage_value1_b));
+            assertEquals(View.INVISIBLE,view.findViewById(R.id.usage_bar1_b).getVisibility());
         }catch(Throwable error){failure.set(error);}});
         if(failure.get()!=null)throw new AssertionError("tile",failure.get());
     }
+    private static boolean found(Bitmap b,int x0,int x1,int y0,int y1,int color){ for(int x=Math.max(0,x0);x<Math.min(b.getWidth(),x1);x++)for(int y=Math.max(0,y0);y<Math.min(b.getHeight(),y1);y++)if(near(b.getPixel(x,y),color))return true; return false; }
+    private static String region(Bitmap b,int x0,int x1,int y0,int y1){ StringBuilder out=new StringBuilder(b.getWidth()+"x"+b.getHeight()+" "); for(int y=Math.max(0,y0);y<Math.min(b.getHeight(),y1);y+=3){out.append("\n");for(int x=Math.max(0,x0);x<Math.min(b.getWidth(),x1);x++)out.append(String.format("%06x ",b.getPixel(x,y)&0xffffff));} return out.toString(); }
     private static boolean near(int a,int b){ return Math.abs(android.graphics.Color.red(a)-android.graphics.Color.red(b))<=12&&Math.abs(android.graphics.Color.green(a)-android.graphics.Color.green(b))<=12&&Math.abs(android.graphics.Color.blue(a)-android.graphics.Color.blue(b))<=12; }
 
     @Test public void fullyExpandedWidgetParcelsUnderBudgetAndExpansionPersists() throws Exception {

@@ -17,7 +17,8 @@ import org.json.JSONObject;
 
 /**
  * At a glance tiles (Traffic, Plan usage, Deploys · main, Players now) and the report/agent strip
- * of the Field monitor list (redesign approved 2026-10-25). Tiles sit two to a row; tapping one
+ * of the Field monitor list (redesign approved 2026-10-25). Tiles sit two to a row (one flat
+ * layout with slots _a and _b; fill-in taps do not reach nested RemoteViews); tapping one
  * expands it across both columns (stable IDs glance:*, kept in {@link WidgetRowState}). The
  * Traffic tile's 24h/7d toggle is stored there too ("range:traffic=7d"). Expanding or toggling only
  * re-renders the stored reading; it never fetches.
@@ -229,7 +230,7 @@ final class WidgetTiles {
 
     /** The report/agent strip: daily report coverage and the development task (with its timer) or GitHub activity. */
     static JSONObject strip(JSONObject snapshot) throws Exception {
-        JSONObject out = new JSONObject().put("kind", "strip").put("id", "strip").put("title", "Daily report and agent activity");
+        JSONObject out = new JSONObject().put("kind", "strip").put("id", "strip").put("title", "Report and agent strip");
         String report = snapshot.optString("report", "No daily report yet");
         java.util.regex.Matcher m = java.util.regex.Pattern.compile("(\\d+) of (\\d+) scheduled intervals observed").matcher(report);
         int gaps = snapshot.optInt("reportGaps", -1);
@@ -259,34 +260,45 @@ final class WidgetTiles {
         WidgetCharts.Palette p = WidgetCharts.Palette.of(light);
         view.setInt(R.id.widget_row, "setBackgroundColor", p.background);
         JSONArray tiles = row.getJSONArray("tiles");
-        view.removeAllViews(R.id.tiles_a); view.removeAllViews(R.id.tiles_b);
-        view.addView(R.id.tiles_a, view(context, tiles.getJSONObject(0), p));
-        if (tiles.length() > 1) { view.setViewVisibility(R.id.tiles_b, View.VISIBLE); view.addView(R.id.tiles_b, view(context, tiles.getJSONObject(1), p)); }
-        else view.setViewVisibility(R.id.tiles_b, View.GONE);
+        fill(context, view, "a", tiles.getJSONObject(0), p);
+        if (tiles.length() > 1) { view.setViewVisibility(R.id.tile_root_b, View.VISIBLE); fill(context, view, "b", tiles.getJSONObject(1), p); }
+        else view.setViewVisibility(R.id.tile_root_b, View.GONE);
         StringBuilder spoken = new StringBuilder();
         for (int i = 0; i < tiles.length(); i++) spoken.append(i == 0 ? "" : ". ").append(tiles.getJSONObject(i).optString("description"));
         view.setContentDescription(R.id.widget_row, spoken.toString());
         return view;
     }
+    private static final java.util.Map<String, Integer> IDS = new java.util.concurrent.ConcurrentHashMap<>();
+    /** The view ID of {@code name} in tile slot a or b of owner_widget_tiles (e.g. tile_key_a). */
+    static int slotId(Context context, String name, String slot) {
+        String key = name + "_" + slot;
+        Integer known = IDS.get(key);
+        if (known != null) return known;
+        int id = context.getResources().getIdentifier(key, "id", context.getPackageName());
+        if (id == 0) throw new IllegalStateException("Missing tile view " + key);
+        IDS.put(key, id);
+        return id;
+    }
 
-    /** One tile as a nested RemoteViews. Its root toggles the tile; the 24h/7d segments set the range. */
-    static RemoteViews view(Context context, JSONObject tile, WidgetCharts.Palette p) throws Exception {
+    /** Fills one tile slot. Its root toggles the tile; the 24h/7d segments set the range. */
+    static void fill(Context context, RemoteViews view, String slot, JSONObject tile, WidgetCharts.Palette p) throws Exception {
+        java.util.function.Function<String, Integer> v = name -> slotId(context, name, slot);
         boolean usage = tile.optBoolean("usage"), open = tile.optBoolean("expanded");
-        RemoteViews view = new RemoteViews(context.getPackageName(), usage ? R.layout.owner_widget_tile_usage : R.layout.owner_widget_tile);
         float density = context.getResources().getDisplayMetrics().density;
-        view.setInt(R.id.tile_root, "setBackgroundResource", open ? (p.light ? R.drawable.item_tile_outlined_light : R.drawable.item_tile_outlined_dark) : (p.light ? R.drawable.item_tile_light : R.drawable.item_tile_dark));
-        view.setTextViewText(R.id.tile_key, tile.optString("key").toUpperCase(Locale.ROOT));
-        view.setTextColor(R.id.tile_key, p.faint);
-        view.setTextViewText(R.id.tile_chevron, open ? "▴" : "▾"); view.setTextColor(R.id.tile_chevron, p.faint);
-        view.setTextColor(R.id.tile_note1, p.muted);
-        view.setTextViewText(R.id.tile_note1, tile.optString("note1"));
-        view.setViewVisibility(R.id.tile_note1, tile.optString("note1").isEmpty() ? View.GONE : View.VISIBLE);
-        view.setTextColor(R.id.tile_detail, p.muted);
-        view.setViewVisibility(R.id.tile_detail, open && !tile.optString("detail").isEmpty() ? View.VISIBLE : View.GONE);
-        view.setTextViewText(R.id.tile_detail, tile.optString("detail"));
-        view.setContentDescription(R.id.tile_root, tile.optString("description") + (open ? ". Expanded; tap to collapse." : ". Tap to expand."));
-        view.setOnClickFillInIntent(R.id.tile_root, new Intent().putExtra(OwnerWidgetProvider.ROW_ID, tile.optString("id")));
-        if (usage) { gauges(view, tile, p); return view; }
+        int root = v.apply("tile_root");
+        view.setInt(root, "setBackgroundResource", open ? (p.light ? R.drawable.item_tile_outlined_light : R.drawable.item_tile_outlined_dark) : (p.light ? R.drawable.item_tile_light : R.drawable.item_tile_dark));
+        view.setTextViewText(v.apply("tile_key"), tile.optString("key").toUpperCase(Locale.ROOT));
+        view.setTextColor(v.apply("tile_key"), p.faint);
+        view.setTextViewText(v.apply("tile_chevron"), open ? "▴" : "▾"); view.setTextColor(v.apply("tile_chevron"), p.faint);
+        view.setTextColor(v.apply("tile_note1"), p.muted);
+        view.setTextViewText(v.apply("tile_note1"), tile.optString("note1"));
+        view.setViewVisibility(v.apply("tile_note1"), tile.optString("note1").isEmpty() ? View.GONE : View.VISIBLE);
+        view.setTextColor(v.apply("tile_detail"), p.muted);
+        view.setViewVisibility(v.apply("tile_detail"), open && !tile.optString("detail").isEmpty() ? View.VISIBLE : View.GONE);
+        view.setTextViewText(v.apply("tile_detail"), tile.optString("detail"));
+        view.setContentDescription(root, tile.optString("description") + (open ? ". Expanded; tap to collapse." : ". Tap to expand."));
+        view.setOnClickFillInIntent(root, new Intent().putExtra(OwnerWidgetProvider.ROW_ID, tile.optString("id")));
+        view.setViewVisibility(v.apply("usage_gauges"), View.GONE);
         // Value line: "15.5k req · 12 err" with the error count in its status colour.
         SpannableStringBuilder value = new SpannableStringBuilder(tile.optString("value", "—"));
         value.setSpan(new ForegroundColorSpan(p.ink), 0, value.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
@@ -298,18 +310,18 @@ final class WidgetTiles {
             String errorColor = tile.optString("errorColor");
             value.setSpan(new ForegroundColorSpan(errors.isEmpty() || errorColor.isEmpty() ? p.muted : "red".equals(errorColor) ? p.crit : p.warn), start, value.length(), Spanned.SPAN_EXCLUSIVE_EXCLUSIVE);
         }
-        view.setTextViewText(R.id.tile_value, value);
-        view.setViewVisibility(R.id.tile_value, tile.has("value") ? View.VISIBLE : View.GONE);
-        view.setTextColor(R.id.tile_note2, p.muted);
-        view.setTextViewText(R.id.tile_note2, tile.optString("note2"));
-        view.setViewVisibility(R.id.tile_note2, tile.optString("note2").isEmpty() ? View.GONE : View.VISIBLE);
+        view.setTextViewText(v.apply("tile_value"), value);
+        view.setViewVisibility(v.apply("tile_value"), tile.has("value") ? View.VISIBLE : View.GONE);
+        view.setTextColor(v.apply("tile_note2"), p.muted);
+        view.setTextViewText(v.apply("tile_note2"), tile.optString("note2"));
+        view.setViewVisibility(v.apply("tile_note2"), tile.optString("note2").isEmpty() ? View.GONE : View.VISIBLE);
         // Pips (Deploys).
         JSONArray pipStates = tile.optJSONArray("pipStates");
-        view.setViewVisibility(R.id.tile_pips, pipStates == null ? View.GONE : View.VISIBLE);
-        if (pipStates != null) { view.setTextViewText(R.id.tile_pips, pips(pipStates, p)); view.setContentDescription(R.id.tile_pips, tile.optString("description")); }
+        view.setViewVisibility(v.apply("tile_pips"), pipStates == null ? View.GONE : View.VISIBLE);
+        if (pipStates != null) { view.setTextViewText(v.apply("tile_pips"), pips(pipStates, p)); view.setContentDescription(v.apply("tile_pips"), tile.optString("description")); }
         // Charts.
         String chart = tile.optString("chart");
-        int target = open ? R.id.tile_chart_large : R.id.tile_chart, other = open ? R.id.tile_chart : R.id.tile_chart_large;
+        int target = v.apply(open ? "tile_chart_large" : "tile_chart"), other = v.apply(open ? "tile_chart" : "tile_chart_large");
         view.setViewVisibility(other, View.GONE);
         Bitmap bitmap = null;
         if ("spark".equals(chart)) bitmap = WidgetCharts.sparkline(longs(tile.optJSONArray("requests")), longs(tile.optJSONArray("errorSeries")), open ? 330 : 150, open ? 46 : 30, density, p);
@@ -323,55 +335,58 @@ final class WidgetTiles {
         if (bitmap != null) { view.setImageViewBitmap(target, bitmap); view.setContentDescription(target, tile.optString("description")); }
         // Axis (24h) or day letters (7d), as real text rather than text drawn into the bitmap.
         JSONArray axis = tile.optJSONArray("axis"), days = tile.optJSONArray("days");
-        view.setViewVisibility(R.id.tile_axis, axis == null || !open ? View.GONE : View.VISIBLE);
-        if (axis != null) { int[] ids = {R.id.tile_axis_start, R.id.tile_axis_mid, R.id.tile_axis_end}; for (int i = 0; i < 3; i++) { view.setTextViewText(ids[i], axis.optString(i)); view.setTextColor(ids[i], p.faint); } }
-        view.setViewVisibility(R.id.tile_days, days == null || !open ? View.GONE : View.VISIBLE);
-        if (days != null) { int[] ids = {R.id.tile_day0, R.id.tile_day1, R.id.tile_day2, R.id.tile_day3, R.id.tile_day4, R.id.tile_day5, R.id.tile_day6}; for (int i = 0; i < 7; i++) { view.setTextViewText(ids[i], days.optString(i, "")); view.setTextColor(ids[i], p.faint); } }
+        view.setViewVisibility(v.apply("tile_axis"), axis == null || !open ? View.GONE : View.VISIBLE);
+        if (axis != null) { String[] names = {"tile_axis_start", "tile_axis_mid", "tile_axis_end"}; for (int i = 0; i < 3; i++) { view.setTextViewText(v.apply(names[i]), axis.optString(i)); view.setTextColor(v.apply(names[i]), p.faint); } }
+        view.setViewVisibility(v.apply("tile_days"), days == null || !open ? View.GONE : View.VISIBLE);
+        if (days != null) for (int i = 0; i < 7; i++) { view.setTextViewText(v.apply("tile_day" + i), days.optString(i, "")); view.setTextColor(v.apply("tile_day" + i), p.faint); }
         // 24h / 7d toggle (Traffic, expanded): each segment sets its range; the selected one is highlighted.
         boolean toggle = tile.optBoolean("toggle");
-        view.setViewVisibility(R.id.tile_seg_24h, toggle ? View.VISIBLE : View.GONE);
-        view.setViewVisibility(R.id.tile_seg_7d, toggle ? View.VISIBLE : View.GONE);
+        int day = v.apply("tile_seg_24h"), week = v.apply("tile_seg_7d");
+        view.setViewVisibility(day, toggle ? View.VISIBLE : View.GONE);
+        view.setViewVisibility(week, toggle ? View.VISIBLE : View.GONE);
         if (toggle) {
-            boolean week = "7d".equals(tile.optString("range"));
-            for (int seg : new int[]{R.id.tile_seg_24h, R.id.tile_seg_7d}) {
-                boolean on = (seg == R.id.tile_seg_7d) == week;
+            boolean sevenDays = "7d".equals(tile.optString("range"));
+            for (int seg : new int[]{day, week}) {
+                boolean on = (seg == week) == sevenDays;
                 view.setInt(seg, "setBackgroundColor", on ? p.line : p.tile);
                 view.setTextColor(seg, on ? p.ink : p.muted);
-                view.setContentDescription(seg, (seg == R.id.tile_seg_7d ? "Seven days" : "Twenty-four hours") + (on ? ", selected" : ""));
-                view.setOnClickFillInIntent(seg, new Intent().putExtra(OwnerWidgetProvider.ROW_ID, seg == R.id.tile_seg_7d ? RANGE_7D : RANGE_24H));
+                view.setContentDescription(seg, (seg == week ? "Seven days" : "Twenty-four hours") + (on ? ", selected" : ""));
+                view.setOnClickFillInIntent(seg, new Intent().putExtra(OwnerWidgetProvider.ROW_ID, seg == week ? RANGE_7D : RANGE_24H));
             }
         }
-        return view;
+        if (usage) {
+            // Plan usage shows gauges in place of the value, pips and chart.
+            for (String name : new String[]{"tile_value", "tile_pips", "tile_chart", "tile_chart_large", "tile_axis", "tile_days", "tile_note2"}) view.setViewVisibility(v.apply(name), View.GONE);
+            gauges(view, tile, p, v);
+        }
     }
-    private static final int[][] GAUGE_IDS = {
-        {R.id.usage_label0, R.id.usage_bar0, R.id.usage_hot0, R.id.usage_value0},
-        {R.id.usage_label1, R.id.usage_bar1, R.id.usage_hot1, R.id.usage_value1},
-        {R.id.usage_label2, R.id.usage_bar2, R.id.usage_hot2, R.id.usage_value2},
-        {R.id.usage_label3, R.id.usage_bar3, R.id.usage_hot3, R.id.usage_value3}};
     /** ProgressBar gauges (amber at 80% or more of the cycle's allowance; never red) and the pace line. */
-    private static void gauges(RemoteViews view, JSONObject tile, WidgetCharts.Palette p) {
+    private static void gauges(RemoteViews view, JSONObject tile, WidgetCharts.Palette p, java.util.function.Function<String, Integer> v) {
         JSONArray gauges = tile.optJSONArray("gauges");
-        view.setViewVisibility(R.id.usage_gauges, gauges == null || gauges.length() == 0 ? View.GONE : View.VISIBLE);
+        int block = v.apply("usage_gauges");
+        view.setViewVisibility(block, gauges == null || gauges.length() == 0 ? View.GONE : View.VISIBLE);
         int row = 0;
         for (java.util.Map.Entry<String, String> entry : WidgetData.GAUGES.entrySet()) {
             JSONObject gauge = null;
             if (gauges != null) for (int i = 0; i < gauges.length(); i++) if (entry.getKey().equals(gauges.optJSONObject(i) == null ? "" : gauges.optJSONObject(i).optString("key"))) gauge = gauges.optJSONObject(i);
-            int[] ids = GAUGE_IDS[row++];
+            int label = v.apply("usage_label" + row), bar = v.apply("usage_bar" + row), hotBar = v.apply("usage_hot" + row), text = v.apply("usage_value" + row);
+            row++;
             Object percent = gauge == null ? null : gauge.opt("percent");
             boolean known = percent instanceof Number, hot = known && gauge.optBoolean("hot");
             int value = known ? (int) Math.round(Math.min(100, Math.max(0, ((Number) percent).doubleValue()))) : 0;
-            view.setTextViewText(ids[0], entry.getValue()); view.setTextColor(ids[0], p.muted);
-            view.setTextViewText(ids[3], known ? gauge.optString("text") : "—"); view.setTextColor(ids[3], hot ? p.warn : p.ink);
+            view.setTextViewText(label, entry.getValue()); view.setTextColor(label, p.muted);
+            view.setTextViewText(text, known ? gauge.optString("text") : "—"); view.setTextColor(text, hot ? p.warn : p.ink);
             // An unknown metric has no bar at all (never an empty, zero-looking bar).
-            view.setViewVisibility(ids[1], known && !hot ? View.VISIBLE : View.INVISIBLE);
-            view.setViewVisibility(ids[2], hot ? View.VISIBLE : View.GONE);
-            view.setProgressBar(ids[1], 100, value, false);
-            view.setProgressBar(ids[2], 100, value, false);
+            view.setViewVisibility(bar, known && !hot ? View.VISIBLE : View.INVISIBLE);
+            view.setViewVisibility(hotBar, hot ? View.VISIBLE : View.GONE);
+            view.setProgressBar(bar, 100, value, false);
+            view.setProgressBar(hotBar, 100, value, false);
         }
+        int paceView = v.apply("usage_pace");
         Bitmap pace = WidgetCharts.paceStrip(tile.optDouble("pace", -1));
-        view.setViewVisibility(R.id.usage_pace, pace == null ? View.GONE : View.VISIBLE);
-        if (pace != null) { view.setImageViewBitmap(R.id.usage_pace, pace); view.setInt(R.id.usage_pace, "setColorFilter", p.ink); }
-        view.setContentDescription(R.id.usage_gauges, tile.optString("description"));
+        view.setViewVisibility(paceView, pace == null ? View.GONE : View.VISIBLE);
+        if (pace != null) { view.setImageViewBitmap(paceView, pace); view.setInt(paceView, "setColorFilter", p.ink); }
+        view.setContentDescription(block, tile.optString("description"));
     }
 
     static RemoteViews stripRow(Context context, JSONObject row, int id, boolean light) {
