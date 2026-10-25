@@ -37,7 +37,9 @@ import {
   interruptedTask,
   WORKFLOW_ORPHAN_MS,
   workerErrorCheck,
+  widgetSeverity,
 } from "./monitor-model.mjs";
+import { notProbeRoom } from "./probe-namespace.mjs";
 
 const REPO = "https://github.com/UnregisteredMusket/Lootsplit";
 // Recent provider-cache snapshots retained; older cache rows are deleted (never history).
@@ -1108,6 +1110,282 @@ export async function monitorSnapshot(
   return snapshot;
 }
 
+/*
+ * Field monitor widget data (owner-approved redesign, 2026-10-25). Everything here is read from
+ * rows the minute cron already writes (half-hour intervals, the diagnostics log and the room
+ * activity tracker); none of it calls GitHub or Cloudflare. A value that was not measured stays
+ * null with its coverage count, never 0.
+ */
+export const SERIES_HALF_HOURS = 48;
+export const SERIES_DAYS = 7;
+const metricValue = (key) =>
+  `(SELECT json_extract(m.value,'$.value') FROM json_each(json_extract(body,'$.metrics')) m WHERE json_extract(m.value,'$.key')='${key}')`;
+const whole = (value) => {
+  const n = value === null || value === undefined || value === "" ? NaN : Number(value);
+  return Number.isSafeInteger(n) && n >= 0 ? n : null;
+};
+/** Requests and errors of one stored half-hour: its own reading, else recovered provider history. */
+function slotTraffic(row) {
+  const own = [whole(row.requests), whole(row.errors)];
+  if (own[0] !== null && own[1] !== null) return { requests: own[0], errors: own[1] };
+  const recovered = [whole(row.historicalRequests), whole(row.historicalErrors)];
+  return row.historicalState === "ready" && recovered[0] !== null && recovered[1] !== null
+    ? { requests: recovered[0], errors: recovered[1] }
+    : null;
+}
+/**
+ * Requests and errors per half-hour (the last 48 window ends) and per local calendar day (the last
+ * 7, oldest first), from owner_monitor_intervals. A slot without a measured reading (missed,
+ * failed, partial without traffic, or not yet collected) is null in `halfHour` and is left out of
+ * the day's sums; each day states `measured` of `expected` slots so a partial day never reads as a
+ * quiet one. `active24hMax` is the largest "signed-in accounts in 24 hours" reading of the day.
+ */
+export async function monitorSeries(db, now, timezone = DEFAULT_CONFIG.timezone) {
+  const boundary = Math.floor(now / INTERVAL) * INTERVAL;
+  const days = [];
+  let day = localCalendar(now, timezone).day;
+  for (let i = 0; i < SERIES_DAYS; i++) {
+    days.unshift({ day, ...dayBounds(day, timezone) });
+    day = previousDay(day);
+  }
+  const from = Math.min(days[0].start, boundary - SERIES_HALF_HOURS * INTERVAL);
+  const found = await rows(
+    db,
+    `SELECT slot,outcome,${metricValue("requests")} AS requests,${metricValue("errors")} AS errors,${metricValue("active24h")} AS active24h,json_extract(body,'$.historicalTraffic.state') AS historicalState,json_extract(body,'$.historicalTraffic.data.requests') AS historicalRequests,json_extract(body,'$.historicalTraffic.data.errors') AS historicalErrors FROM owner_monitor_intervals WHERE slot>? AND slot<=? ORDER BY slot`,
+    from,
+    boundary,
+  );
+  const bySlot = new Map(found.map((row) => [row.slot, row]));
+  // The newest boundary is collected a minute or so after it passes; until its collection is
+  // final the series ends at the previous slot instead of showing a gap that is only "not yet".
+  const newest = bySlot.get(boundary);
+  const end =
+    (!newest || ["pending", "collecting", "failed"].includes(newest.outcome)) &&
+    now - boundary < 10 * 60000
+      ? boundary - INTERVAL
+      : boundary;
+  const requests = [],
+    errors = [];
+  let measured = 0;
+  for (let i = SERIES_HALF_HOURS - 1; i >= 0; i--) {
+    const reading = bySlot.has(end - i * INTERVAL) ? slotTraffic(bySlot.get(end - i * INTERVAL)) : null;
+    requests.push(reading ? reading.requests : null);
+    errors.push(reading ? reading.errors : null);
+    if (reading) measured++;
+  }
+  const daily = days.map(({ day: date, start, end: dayEnd }) => {
+    const limit = Math.min(dayEnd, end);
+    const expected = Math.max(0, Math.floor(limit / INTERVAL) - Math.floor(start / INTERVAL));
+    let count = 0,
+      sumRequests = 0,
+      sumErrors = 0,
+      active = null;
+    for (const row of found) {
+      if (row.slot <= start || row.slot > limit) continue;
+      const reading = slotTraffic(row);
+      if (reading) {
+        count++;
+        sumRequests += reading.requests;
+        sumErrors += reading.errors;
+      }
+      const accounts = whole(row.active24h);
+      if (accounts !== null) active = Math.max(active ?? 0, accounts);
+    }
+    return {
+      day: date,
+      start,
+      end: dayEnd,
+      requests: count ? sumRequests : null,
+      errors: count ? sumErrors : null,
+      measured: count,
+      expected,
+      active24hMax: active,
+    };
+  });
+  return {
+    state: "ready",
+    timezone,
+    halfHour: { intervalMs: INTERVAL, end, requests, errors, measured, expected: SERIES_HALF_HOURS },
+    daily,
+  };
+}
+
+export const RESOLVED_WINDOW_MS = 86400000;
+export const RESOLVED_LIMIT = 5;
+/** Diagnostics transitions read for the window; above it the list says it is incomplete. */
+export const RESOLVED_SCAN = 400;
+const RESOLVED_HISTORY = 3;
+// Indexed reads for problems that began before the window, per request.
+const RESOLVED_LOOKUPS = 30;
+const clip = (value, size) =>
+  typeof value === "string" ? (value.length > size ? `${value.slice(0, size - 1)}…` : value) : "";
+/**
+ * Components that went from a problem back to green in the last 24 hours (owner decision 2), newest
+ * first, at most five, from the `diagnostics` log (one entry per colour change). A component whose
+ * newest entry, or current diagnostic, is not green is still a problem and is never listed. The
+ * start is the problem's firstOccurredAt; the end is its recoveredAt. `total` counts every resolved
+ * component found, so a list cut to five says how many more there were.
+ */
+export async function recentlyResolved(db, now, current = []) {
+  const found = await rows(
+    db,
+    "SELECT id,observed_at,body FROM owner_monitor_logs WHERE source='diagnostics' AND observed_at>? AND observed_at<=? ORDER BY observed_at DESC,sequence DESC LIMIT ?",
+    now - RESOLVED_WINDOW_MS,
+    now + 60000,
+    RESOLVED_SCAN,
+  );
+  const currentColor = new Map(
+    (Array.isArray(current) ? current : []).map((check) => [check.component, check.color]),
+  );
+  const byComponent = new Map();
+  for (const row of found) {
+    let check;
+    try {
+      check = decode(row).diagnostic;
+    } catch {
+      continue;
+    }
+    if (!check || typeof check.component !== "string") continue;
+    if (!byComponent.has(check.component)) byComponent.set(check.component, []);
+    byComponent.get(check.component).push({ at: row.observed_at, check });
+  }
+  const candidates = [];
+  for (const [component, list] of byComponent) {
+    const newest = list[0];
+    if (newest.check.color !== "green") continue;
+    if (currentColor.has(component) && currentColor.get(component) !== "green") continue;
+    candidates.push({ component, list, resolvedAt: newest.check.recoveredAt || newest.at });
+  }
+  candidates.sort((a, b) => b.resolvedAt - a.resolvedAt || (a.component < b.component ? -1 : 1));
+  const items = [];
+  let total = 0,
+    lookups = 0,
+    complete = found.length < RESOLVED_SCAN;
+  for (const { component, list, resolvedAt } of candidates) {
+    let bad = list.slice(1).find((entry) => entry.check.color !== "green");
+    if (!bad && lookups >= RESOLVED_LOOKUPS) {
+      complete = false; // Not checked: the count says so rather than guessing.
+      continue;
+    }
+    if (!bad) {
+      lookups++;
+      // The problem began before the window: its last entry is the one just before the recovery.
+      const prefix = `diagnostic:${component}:`;
+      const earlier = await db
+        .prepare(
+          "SELECT observed_at,body FROM owner_monitor_logs WHERE source='diagnostics' AND id>=? AND id<? AND observed_at<? ORDER BY observed_at DESC LIMIT 1",
+        )
+        .bind(prefix, `diagnostic:${component};`, list[0].at)
+        .first();
+      const check = earlier ? decode(earlier).diagnostic : null;
+      if (check && check.color !== "green") bad = { at: earlier.observed_at, check };
+    }
+    if (!bad) continue; // A first observation that was green: never a problem.
+    total++;
+    if (items.length >= RESOLVED_LIMIT) continue;
+    const startedAt = bad.check.firstOccurredAt || bad.at;
+    const state = list[0].check.state;
+    items.push({
+      component,
+      severity: widgetSeverity(bad.check) || "warning",
+      startedAt,
+      resolvedAt,
+      durationMs: Math.max(0, resolvedAt - startedAt),
+      resolution: state === "healthy" ? "recovered" : clip(state, 40) || "recovered",
+      brief: clip(bad.check.brief, 80),
+      symptom: clip(bad.check.symptom, 240),
+      impact: clip(bad.check.impact, 200),
+      history: list.slice(0, RESOLVED_HISTORY).map((entry) => ({
+        at: entry.at,
+        color: entry.check.color,
+        state: clip(entry.check.state, 40),
+        symptom: clip(entry.check.symptom, 200),
+      })),
+    });
+  }
+  return {
+    state: "ready",
+    windowMs: RESOLVED_WINDOW_MS,
+    limit: RESOLVED_LIMIT,
+    total,
+    complete,
+    items,
+  };
+}
+
+/** A live room had activity (a stored change) in this window (owner decision 4). */
+export const LIVE_ROOM_MS = 5 * 60000;
+// Row 0 of the tracker is its own run record: first_seen_at = first run, changed_at = latest run.
+const TRACKER_ROW = 0;
+/**
+ * Called every minute by the scheduler. Records each shared room's stored revision (by row id; no
+ * room code or body is copied) and when it last changed. Probe rooms are excluded. Only rooms whose
+ * revision changed are written. On the first run every existing room is recorded without a change
+ * time, so rooms that were idle are never counted as live.
+ */
+export async function trackRoomActivity(db, now) {
+  const tracker = await db
+    .prepare("SELECT first_seen_at FROM owner_monitor_room_activity WHERE room=?")
+    .bind(TRACKER_ROW)
+    .first();
+  await db.batch([
+    statement(
+      db,
+      `INSERT INTO owner_monitor_room_activity(room,revision,changed_at,first_seen_at) SELECT rowid,revision,?,? FROM campaign_rooms WHERE ${notProbeRoom()} AND rowid>0 ON CONFLICT(room) DO UPDATE SET revision=excluded.revision,changed_at=? WHERE owner_monitor_room_activity.revision<>excluded.revision`,
+      tracker ? now : null,
+      now,
+      now,
+    ),
+    statement(
+      db,
+      "INSERT INTO owner_monitor_room_activity(room,revision,changed_at,first_seen_at) VALUES(?,0,?,?) ON CONFLICT(room) DO UPDATE SET changed_at=excluded.changed_at",
+      TRACKER_ROW,
+      now,
+      now,
+    ),
+  ]);
+}
+/**
+ * Live rooms now, or an explicit gap: before the tracker has watched a full window, or when its
+ * latest run is more than three minutes old (the minute cron stopped), the count is unknown.
+ */
+export async function liveRooms(db, now) {
+  const tracker = await db
+    .prepare("SELECT first_seen_at,changed_at FROM owner_monitor_room_activity WHERE room=?")
+    .bind(TRACKER_ROW)
+    .first();
+  const base = { windowMs: LIVE_ROOM_MS, checkedAt: tracker?.changed_at ?? null };
+  if (!tracker) return { ...base, state: "unavailable", live: null, errorCode: "NOT_COLLECTED" };
+  if (now - tracker.changed_at > 3 * 60000)
+    return { ...base, state: "unavailable", live: null, errorCode: "STALE_READING" };
+  if (now - tracker.first_seen_at < LIVE_ROOM_MS)
+    return { ...base, state: "unavailable", live: null, errorCode: "WARMING_UP" };
+  const row = await db
+    .prepare("SELECT COUNT(*) AS live FROM owner_monitor_room_activity WHERE room>? AND changed_at>=?")
+    .bind(TRACKER_ROW, now - LIVE_ROOM_MS)
+    .first();
+  return { ...base, state: "ready", live: Number(row?.live ?? 0) };
+}
+/**
+ * The widget view's extra data. Each part fails on its own into an explicit unavailable state, so
+ * one failed read never hides the others or reads as zero.
+ */
+export async function monitorWidgetData(db, snapshot, now = Date.now()) {
+  const part = async (read) => {
+    try {
+      return await read();
+    } catch {
+      return { state: "unavailable", errorCode: "READ_FAILED" };
+    }
+  };
+  const [series, resolved, rooms] = await Promise.all([
+    part(() => monitorSeries(db, now, snapshot?.settings?.timezone || DEFAULT_CONFIG.timezone)),
+    part(() => recentlyResolved(db, now, snapshot?.diagnostics)),
+    part(() => liveRooms(db, now)),
+  ]);
+  return { series, recentlyResolved: resolved, rooms };
+}
+
 async function textFetch(url, fetcher) {
   const response = await fetcher(url, {
     signal: AbortSignal.timeout(8000),
@@ -1915,6 +2193,13 @@ export async function scheduledMonitor(env, scheduledAt = Date.now(), options = 
     )
     .first();
   if (!owner) throw Error("Monitoring requires an active provisioned owner.");
+  // Live rooms for the Field monitor (one bounded read of room revisions, no provider calls). A
+  // failure leaves the tracker's run time behind, so the widget shows the count as unknown.
+  try {
+    await trackRoomActivity(db, now);
+  } catch {
+    /* The live-room count becomes an explicit STALE_READING gap after three minutes. */
+  }
   const slot = Math.floor(scheduledAt / INTERVAL) * INTERVAL;
   const created = (
     await db.prepare("SELECT created_at FROM owner_monitor_config WHERE id=1").first()
