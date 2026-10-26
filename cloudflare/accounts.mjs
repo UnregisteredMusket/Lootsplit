@@ -3,7 +3,7 @@ import { accountRequestOrigin } from "../src/lib/deployment/origins.mjs";
 import { ownerTestMode } from "./test-mode.mjs";
 import { campaignRecords } from "./campaign-records.mjs";
 import { accountMapAsset, validateBackupMapAssets } from "./account-map-assets.mjs";
-import { roomCampaignName } from "../src/lib/quire/campaign-name.ts";
+import { libraryMemberRoom } from "./library-member-room.mjs";
 import { hasJourneys, hasMapScales, hasNpcServices, hasPartyGroups, hasPlacementStyles, hasWave2Services, tableForProtocol } from "../src/lib/quire/tabletop-protocol.ts";
 
 /** Tabletop protocol the account client declared: 0 (none) to 9 (current; 4 adds nothing here,
@@ -552,19 +552,10 @@ export async function handleAccounts(request, env, context = null) {
               .bind(userId)
               .all()
           ).results,
-          members: members.results.map(({ room_body, token, ...m }) => {
-            const room = room_body ? JSON.parse(room_body) : null;
-            const seat = room?.seats.find((s) => s.id === m.seat_id && s.token === token);
-            return {
-              ...m,
-              role: seat && (!room.closed || seat.role === "dm") ? seat.role : null,
-              closed: room?.closed === true,
-              viewOnly: room?.viewOnly === true,
-              ...(room ? { live: room.live === true } : {}),
-              // The DM's campaign name (not private), shown on the membership card.
-              ...(roomCampaignName(room?.campaignName) ? { campaignName: roomCampaignName(room.campaignName) } : {}),
-            };
-          }),
+          members: members.results.map(({ room_body, token, ...m }) => ({
+            ...m,
+            ...libraryMemberRoom(room_body ? JSON.parse(room_body) : null, m, token),
+          })),
           backups: backups.results,
           characters: characters.results.map((r) => ({ id: r.id, ...JSON.parse(r.body) })),
           hasRecoveryKey: !!recovery,

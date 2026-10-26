@@ -124,3 +124,21 @@ test("rooms opened without a name (older clients) stay readable and unnamed", as
   assert.equal((await previewRoom(dm.code)).campaignName, undefined);
   assert.throws(() => readRoomResponse({ ...view, campaignName: 7 }));
 });
+
+test("the join lookup refuses banned accounts and test rooms, and hides the name from kicked ones", async () => {
+  const { readRoom, updateRoom } = await import("./room-store.server.ts");
+  const dm = await openRoom({ name: "DM", table: campaign(), campaignName: "The Wayfarers" });
+  // The restrictions manageRoom's Kick and Ban record for these accounts.
+  const before = (await readRoom(dm.code))!;
+  await updateRoom(
+    { ...before, blockedUsers: { "user-ann": "banned", "user-ben": "kicked" }, revision: before.revision + 1 },
+    before.revision,
+  );
+  await assert.rejects(previewRoom(dm.code, undefined, "user-ann"), /banned/);
+  const kicked = await previewRoom(dm.code, undefined, "user-ben");
+  assert.equal(kicked.campaignName, undefined);
+  assert.equal((await previewRoom(dm.code, undefined, "someone-else")).campaignName, "The Wayfarers");
+  const room = (await readRoom(dm.code))!;
+  await updateRoom({ ...room, testMode: true, revision: room.revision + 1 }, room.revision);
+  await assert.rejects(previewRoom(dm.code), /Test rooms are private/);
+});

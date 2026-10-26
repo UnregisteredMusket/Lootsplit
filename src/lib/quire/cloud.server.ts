@@ -252,10 +252,15 @@ export async function previewRoom(
 ): Promise<{ characters: { id: string; name: string }[]; campaignName?: string }> {
   const room = await must(code);
   refuseProbeRoom(room);
+  // The same refusals as joinRoom, before anything about the room is shown.
+  if (room.testMode) throw Error("Test rooms are private to the owner.");
   requireInvitationSession(room, sessionId);
+  const blocked = userId ? room.blockedUsers?.[userId] : undefined;
+  if (blocked === "banned") throw Error("You are banned from this campaign.");
   return {
-    // The campaign's name is not private: the join card reads "Joining <name>".
-    ...(room.campaignName ? { campaignName: room.campaignName } : {}),
+    // The campaign's name is not private: the join card reads "Joining <name>". A kicked
+    // account (which needs a fresh invitation to rejoin) is not told the current name.
+    ...(room.campaignName && !blocked ? { campaignName: room.campaignName } : {}),
     characters: room.table.purses
       .filter(
         (purse) =>

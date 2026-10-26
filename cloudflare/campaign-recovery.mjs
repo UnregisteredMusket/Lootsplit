@@ -1,3 +1,4 @@
+import { restoredCampaignName } from "./library-member-room.mjs";
 import { readCloudTableForImport } from "../src/lib/quire/cloud.ts";
 import { encounterSchema } from "../src/lib/encounters/model.mjs";
 import { sheetSchema } from "../src/lib/characters/model.mjs";
@@ -290,8 +291,8 @@ export async function restoreDeletedCampaign(db, userId, body, actor, limit = ho
     table,
     seen: recovery.roomState?.seen || { gifts: [], sales: [] },
     blockedUsers: recovery.roomState?.blockedUsers || {},
-    ...(typeof recovery.roomState?.campaignName === "string"
-      ? { campaignName: recovery.roomState.campaignName.slice(0, 60) }
+    ...(restoredCampaignName(recovery.roomState)
+      ? { campaignName: restoredCampaignName(recovery.roomState) }
       : {}),
     invitations: {},
     drafts: {},
