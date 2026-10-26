@@ -760,6 +760,7 @@ function SellBox({ shopId }: { shopId: string }) {
         </p>
       )}
       <SearchSelect
+        aria-label="Item to sell"
         value={holdingId}
         onValueChange={(selectedValue) => setHoldingId(selectedValue)}
         className="min-h-11 rounded-sm border border-border bg-subtle px-3 text-base text-fg"

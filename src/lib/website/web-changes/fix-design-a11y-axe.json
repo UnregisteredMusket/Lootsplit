@@ -1,0 +1,11 @@
+{
+  "title": "Accessibility fixes on the sheet, shops, Market and chat",
+  "summary": "Screen readers, keyboards and low-vision players get correctly announced sheet tabs, named pickers, readable gain and loss colours, and a focusable chat history.",
+  "items": [
+    "Character sheet tabs announce as tabs with the selected one marked; arrow keys move between them.",
+    "The shop's \"Sell to this shop\" picker is named \"Item to sell\", and Market quotes read out the good, exchange, prices and change.",
+    "Gains, losses and \"Open for trading\" use darker or lighter shades in every theme so they meet 4.5:1 contrast.",
+    "The chat history and the shop's inventory totals can be reached and scrolled with the keyboard; new messages are announced.",
+    "The fairness \"New\" badge is readable in the dark theme, and links inside sentences are underlined."
+  ]
+}

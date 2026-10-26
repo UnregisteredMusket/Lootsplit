@@ -58,10 +58,11 @@ export function Website({
       </a>
       <header className="ls-header">
         <div className="ls-wrap ls-header-row">
-          <Link className="ls-brand" to="/welcome" aria-label="Lootsplitter home">
+          {/* The name keeps the visible wordmark and tagline (WCAG 2.5.3); phones show only the icon. */}
+          <Link className="ls-brand" to="/welcome" aria-label="Lootsplitter, The Party Ledger: home">
             <img src="/brand/kobold-icon-128.png" alt="" width="40" height="40" />
             <span className="ls-brand-text">
-              <span className="ls-brand-name">Lootsplitter</span>
+              <span className="ls-brand-name">Lootsplitter</span>{" "}
               <span className="ls-brand-tag">The Party Ledger</span>
             </span>
           </Link>

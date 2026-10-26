@@ -81,7 +81,12 @@ export function ShopStockList({
   ] as const;
   return (
     <section className="mt-6" aria-label="Shop inventory">
-      <dl className="flex gap-2 overflow-x-auto pb-2" aria-label="Shop inventory totals">
+      <dl
+        className="flex gap-2 overflow-x-auto pb-2"
+        aria-label="Shop inventory totals"
+        // Scrolls sideways on phones, so it must take keyboard focus (axe scrollable-region-focusable).
+        tabIndex={0}
+      >
         {totals.map(([label, value]) => (
           <div
             key={label}

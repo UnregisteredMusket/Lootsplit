@@ -149,7 +149,8 @@
   .fair-standings li { flex-wrap: wrap; align-items: flex-start; padding: .2rem 0; }
   .fair-standings b { white-space: normal; margin-left: auto; }
 }
-.fair-new { display: inline-block; margin-left: .3rem; font-size: .62rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; padding: .05rem .3rem; border-radius: 4px; background: color-mix(in srgb, var(--color-lead) 18%, transparent); }
+/* An opaque badge with body ink: readable inside a selected (lead) tab and in every theme. */
+.fair-new { display: inline-block; margin-left: .3rem; font-size: .62rem; font-weight: 700; letter-spacing: .08em; text-transform: uppercase; padding: .05rem .3rem; border-radius: 4px; color: var(--color-fg); background: color-mix(in srgb, var(--color-lead) 18%, var(--color-bg)); }
 .fair-cmp { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1fr); gap: .5rem; margin-top: .35rem; font-size: .84rem; }
 .fair-cmp > div { border: 1px solid var(--color-border); border-radius: 6px; padding: .4rem .55rem; min-width: 0; }
 .fair-cmp > div.with { border-color: var(--color-lead); background: color-mix(in srgb, var(--color-lead) 7%, transparent); }

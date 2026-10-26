@@ -230,7 +230,7 @@ try {
     // Switch through the real UI so both the device default and this window's
     // pinned campaign are updated. Editing only localStorage leaves this tab on
     // its original campaign, by design, since independent windows were added.
-    await page.getByRole("button", { name: "Select campaign", exact: true }).click();
+    await page.getByRole("button", { name: /^Select campaign: / }).click();
     const originalName = await page.getByLabel("Campaign name", { exact: true }).inputValue();
     await page.getByLabel("New campaign name", { exact: true }).fill("Other campaign");
     await page.getByRole("button", { name: "New campaign", exact: true }).click();
@@ -238,7 +238,7 @@ try {
     await page.keyboard.press("Escape");
     await reloadApplication(page);
     await finance.getByText(/Outstanding loans 0 cp · In-game day 0/).waitFor();
-    await page.getByRole("button", { name: "Select campaign", exact: true }).click();
+    await page.getByRole("button", { name: /^Select campaign: / }).click();
     await page
       .getByRole("listitem")
       .filter({ has: page.getByText(originalName, { exact: true }) })
@@ -377,7 +377,7 @@ try {
     await mapWindow.screenshot({ path: `${output}/multi-window-maps-${width}.png` });
     // Create a second campaign through real controls in the second tab.
     // Its new selection must not redirect the first tab's subsequent writes.
-    await other.getByRole("button", { name: "Select campaign", exact: true }).click();
+    await other.getByRole("button", { name: /^Select campaign: / }).click();
     await other.getByLabel("New campaign name", { exact: true }).fill("Other monitor campaign");
     await other.getByRole("button", { name: "New campaign", exact: true }).click();
     await expect(other.getByLabel("Campaign name", { exact: true })).toHaveValue(

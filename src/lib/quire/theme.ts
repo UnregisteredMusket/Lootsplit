@@ -29,6 +29,10 @@ export const LOOKS: Look[] = [
   { id: "ledger", label: "Ledger", appearance: "light", accent: "#8a5a12", ground: "#f3ead7" },
 ];
 
+/** Base hues of the status tokens; `themeVars` adjusts them per theme for contrast. */
+const POSITIVE = "#7d9a6a";
+const NEGATIVE = "#c46a62";
+
 export const DEFAULT_ACCENT = FANTASY_LOOKS.dark.accent;
 export const DEFAULT_GROUND = FANTASY_LOOKS.dark.ground;
 
@@ -48,10 +52,16 @@ export function themeVars(appearance: Appearance, accent: string, ground: string
     const x = luminance(a), y = luminance(b);
     return (Math.max(x, y) + 0.05) / (Math.min(x, y) + 0.05);
   };
-  let lead = accent;
-  for (let step = 1; step <= 20 && Math.min(contrast(lead, ground), contrast(lead, elevated), contrast(lead, subtle)) < 4.5; step++) {
-    lead = mix(accent, target, step / 20);
-  }
+  // Text tokens keep their hue and move toward black or white until they read at 4.5:1 (WCAG AA)
+  // on every app surface they appear on.
+  const readable = (color: string) => {
+    let ink = color;
+    for (let step = 1; step <= 20 && Math.min(contrast(ink, ground), contrast(ink, elevated), contrast(ink, subtle)) < 4.5; step++) {
+      ink = mix(color, target, step / 20);
+    }
+    return ink;
+  };
+  const lead = readable(accent);
   return {
     "--color-bg": ground,
     "--color-elevated": elevated,
@@ -68,6 +78,9 @@ export function themeVars(appearance: Appearance, accent: string, ground: string
     "--color-ink": "#1a1422",
     "--color-paper-muted": "#5e564c",
     "--color-danger": "#9a3044",
+    // Gains/"open" and losses/warnings, used as text (`text-positive`, `text-negative`).
+    "--color-positive": readable(POSITIVE),
+    "--color-negative": readable(NEGATIVE),
   };
 }
 

@@ -92,6 +92,7 @@ export function PriceHarvest({ bookId }: { bookId: string }) {
       ) : (
         <div className="mt-4 flex flex-col gap-3">
           <SearchSelect
+            aria-label="Book to scan"
             value={chosenBook}
             disabled={busy}
             onValueChange={(selectedValue) => {
@@ -170,6 +171,7 @@ export function PriceHarvest({ bookId }: { bookId: string }) {
           </ul>
           <div className="mt-4 flex flex-col gap-3">
             <SearchSelect
+              aria-label="Shop for the chosen prices"
               value={shopId}
               onValueChange={(selectedValue) => setShopId(selectedValue)}
               className="min-h-11 rounded-sm border border-border bg-subtle px-3 text-base text-fg"

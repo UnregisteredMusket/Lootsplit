@@ -678,14 +678,9 @@ async function commodityBoardViews(page, width) {
   ).toContainText("New exchange awaiting supplies");
   await page.getByText("Exchange directory · 3", { exact: true }).click();
   const board = page.getByRole("region", { name: "Commodity quotes", exact: true });
-  const timber = page.getByRole("button", {
-    name: "View Current timber label at Current Harbor Exchange",
-    exact: true,
-  });
-  const grain = page.getByRole("button", {
-    name: "View Golden grain at Current Harbor Exchange",
-    exact: true,
-  });
+  // Quote rows are named from their content: "View <good> <exchange> · <unit> Ask … Bid …".
+  const timber = page.getByRole("button", { name: /^View Current timber label\b.*Current Harbor Exchange/ });
+  const grain = page.getByRole("button", { name: /^View Golden grain\b.*Current Harbor Exchange/ });
   await expect(board.getByRole("button", { name: /^View / })).toHaveCount(8);
   await page.getByRole("button", { name: "Show all 10 quotes", exact: true }).click();
   await expect(board.getByRole("button", { name: /^View / })).toHaveCount(10);
@@ -766,7 +761,7 @@ async function commodityBoardViews(page, width) {
   }
   await page.screenshot({ path: `${output}/global-market-${width}.png`, fullPage: true });
   await page
-    .getByRole("link", { name: "View Iron ingots at Inland Exchange", exact: true })
+    .getByRole("link", { name: /^View Iron ingots\b.*Inland Exchange/ })
     .click();
   await expect(
     page

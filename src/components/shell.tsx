@@ -274,7 +274,8 @@ function WindowShell({ children, width = "wide" }: ShellProps) {
                 onClick={() => {
                   afterContextChange(() => setCampaignOpen(true));
                 }}
-                aria-label="Select campaign"
+                // The accessible name keeps the visible campaign name (WCAG 2.5.3 label in name).
+                aria-label={`Select campaign: ${campaignName}`}
                 aria-haspopup="dialog"
               >
                 <span>{campaignName}</span>
@@ -282,7 +283,7 @@ function WindowShell({ children, width = "wide" }: ShellProps) {
               </button>
               <button
                 className="role-chip"
-                aria-label={dm ? "Dungeon master. Change role." : "Player. Change role."}
+                aria-label={`${dm ? "DM, dungeon master. Change role." : "Player. Change role."}${testRoom.testMode ? " Test mode" : ""}`}
                 onClick={() => void requestRoleChange()}
                 disabled={!seatKnown}
               >
