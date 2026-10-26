@@ -104,6 +104,7 @@ import { RecordIcon } from "./map-record-icon";
 import { MapPlaceCard } from "./map-place-card";
 import { MapPlaceBar } from "./map-place-bar";
 import { MapHereSheet } from "./map-here-sheet";
+import { nextObjective, questsHere } from "@/lib/quire/quest-view";
 import {
   groupMapRecords,
   mapRecordKinds,
@@ -3194,6 +3195,15 @@ function MapViewport({
               sheet={here}
               dm={useDm}
               partyName={partySplit(recordTable) && hereGroup ? groupInfo(recordTable, hereGroup).name : undefined}
+              quests={questsHere(recordTable, viewer, hereGroup).map((q) => ({
+                id: q.id,
+                title: q.title,
+                detail: nextObjective(q)?.text ?? (q.main ? "Main quest" : "Quest"),
+              }))}
+              openQuest={(id) => {
+                if (!allowContextChange()) return;
+                void navigate({ to: "/features/$feature", params: { feature: "quests" }, search: { from: "/maps", code: undefined, quest: id } });
+              }}
               groupSwitch={
                 partySplit(recordTable) ? (
                   <HereGroupSwitch table={recordTable} groups={hereGroups} value={hereGroup} onChange={setHereGroup} />

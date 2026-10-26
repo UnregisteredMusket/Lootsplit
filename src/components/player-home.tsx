@@ -7,6 +7,7 @@ import { normalizeShortcuts, shortcutDestinations } from "@/lib/quire/shortcuts.
 import { characterSheet } from "@/lib/characters/campaign-sheet.mjs";
 import { Guide } from "./guide";
 import { LedgerArt } from "./ledger-art";
+import { PlayerQuestHome } from "./quests";
 
 // Fixed player services share the existing destination labels and artwork.
 const playerServices = normalizeShortcuts(null, "player").map((item) =>
@@ -56,6 +57,7 @@ export function PlayerHome() {
             );
           })
         )}
+        {ready && mine.length > 0 && <PlayerQuestHome />}
         <AppLink className="settings-link" href="/share">
           Campaign, messages & session status →
         </AppLink>

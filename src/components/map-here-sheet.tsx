@@ -29,7 +29,12 @@ export function MapHereSheet({
   showJourney,
   groupSwitch,
   partyName = "Party",
+  quests = [],
+  openQuest,
 }: {
+  /** Quests here (docs/QUESTS.md): an open objective's, the quest's or its giver's place. */
+  quests?: { id: string; title: string; detail: string }[];
+  openQuest?: (id: string) => void;
   /** Split the party: whose place this is ("Ironhold riders is in Ironhold"). */
   partyName?: string;
   /** Split the party: choose whose place this sheet lists. */
@@ -47,7 +52,7 @@ export function MapHereSheet({
   /** The party's journey under way (progress panel or status card). */
   showJourney?: () => void;
 }) {
-  const [filter, setFilter] = useState<"all" | HereRow["group"]>("all");
+  const [filter, setFilter] = useState<"all" | "quests" | HereRow["group"]>("all");
   const header = (title: string, subtitle: string) => (
     <header className="map-place-header">
       <span className="map-place-glyph" aria-hidden="true">
@@ -154,6 +159,28 @@ export function MapHereSheet({
   else {
     const count = (g: HereRow["group"]) => sheet.rows.filter((r) => r.group === g).length;
     const shown = sheet.rows.filter((r) => filter === "all" || r.group === filter);
+    const questGroup =
+      quests.length && (filter === "all" || filter === "quests") ? (
+        <section aria-label="Quests here">
+          <h3 className="map-here-group">Quests here</h3>
+          <ul className="map-here-rows">
+            {quests.map((q) => (
+              <li key={`quest:${q.id}`}>
+                <span>
+                  <strong>{q.title}</strong>
+                  <small>{q.detail}</small>
+                </span>
+                <Button aria-label={`Read: ${q.title}`} onClick={() => openQuest?.(q.id)}>
+                  Read
+                </Button>
+              </li>
+            ))}
+          </ul>
+          <p className="map-here-note">
+            Quests appear here when an open objective, its giver or the quest itself is at this place.
+          </p>
+        </section>
+      ) : null;
     body = (
       <>
         {header("Here", "Everything you can use at the party's location")}
@@ -175,12 +202,13 @@ export function MapHereSheet({
             </Button>
           </div>
         )}
-        {sheet.rows.length ? (
+        {sheet.rows.length || quests.length ? (
           <>
             <div className="map-here-filters" role="group" aria-label="Filter places">
               {(
                 [
-                  ["all", "All", sheet.rows.length],
+                  ["all", "All", sheet.rows.length + quests.length],
+                  ...(quests.length ? ([["quests", "Quests", quests.length]] as const) : []),
                   ["shops", "Shops", count("shops")],
                   ["people", "People", count("people")],
                   ["services", "Services", count("services")],
@@ -196,7 +224,9 @@ export function MapHereSheet({
                 </button>
               ))}
             </div>
+            {questGroup}
             {groups.map(([group, title]) => {
+              if (filter === "quests") return null;
               const rows = shown.filter((r) => r.group === group);
               if (!rows.length) return null;
               return (

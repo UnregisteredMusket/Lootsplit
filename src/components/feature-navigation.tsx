@@ -6,7 +6,8 @@ import { useSeat } from "@/lib/quire/seat";
 import { useEconomy } from "@/lib/quire/economy-context";
 import { readFinance } from "@/lib/quire/finance";
 import { formatCopper } from "@/lib/quire/money";
-import { featureScreens, safeReturn, type Feature } from "@/lib/quire/feature-navigation";
+import { featureScreens, featureTitle, safeReturn, type Feature } from "@/lib/quire/feature-navigation";
+import { questsOf } from "@/lib/quire/quests";
 export function FeatureLink({
   feature,
   children,
@@ -17,12 +18,13 @@ export function FeatureLink({
   campaignCode?: string;
 }) {
   const href = useRouterState({ select: (s) => s.location.href });
+  const dm = useSeat().role === "dm";
   return (
     <AppLink
       className="settings-link"
       href={`/features/${feature}?from=${encodeURIComponent(safeReturn(href))}${campaignCode ? `&code=${encodeURIComponent(campaignCode)}` : ""}`}
     >
-      {children || `Open ${featureScreens[feature].title}`} →
+      {children || `Open ${featureTitle(feature, dm)}`} →
     </AppLink>
   );
 }
@@ -45,9 +47,9 @@ export function FeatureCards({
       <section className="feature-cards dm-tool-groups" aria-label="Campaign features">
         <h2>Campaign tools</h2>
         <FeatureLink feature="music">Music & Ambience</FeatureLink>
-        <Fold title="Sessions & records" hint="Journal, reports, downtime, training and reviews." defaultOpen>
+        <Fold title="Sessions & records" hint="Journal, quests, reports, downtime, training and reviews." defaultOpen>
           <div className="dm-tool-links">
-            {(["journal", "reports", "downtime", "time", "review"] as Feature[]).map((id) => (
+            {(["journal", "quests", "reports", "downtime", "time", "review"] as Feature[]).map((id) => (
               <FeatureLink key={id} feature={id}>
                 {id === "reports" ? "Reports" : featureScreens[id].title}
               </FeatureLink>
@@ -70,11 +72,11 @@ export function FeatureCards({
       className={desktop ? "feature-desktop-links" : "feature-cards"}
       aria-label="Campaign features"
     >
-      {cards.map(([id, x]) => (
+      {cards.map(([id]) => (
         <div className="journal-entry" key={id}>
           {!desktop && (
             <>
-              <h2>{x.title}</h2>
+              <h2>{featureTitle(id as Feature, dm)}</h2>
               <p className="text-sm text-muted">
                 {id === "npcs" ? "Location encounters & NPC conversations" : id === "trading" ? "Reviewed offers & property deeds" : id === "time" ? "Advance the session clock & award rests" : id === "bank"
                   ? `${loans.filter((l) => l.status === "pending").length + journal.requests.filter((r) => r.status === "pending").length} pending financial requests`
@@ -84,6 +86,8 @@ export function FeatureCards({
                       ? `Campaign day ${f.day} · ${f.downtime.some((d) => d.status === "pending") ? "Approval pending" : "No pending settlement"}`
                       : id === "journal"
                         ? `${journal.entries?.length || 0} visible entries`
+                        : id === "quests"
+                          ? `${questsOf({ journal }).filter((q) => q.status === "active" && !q.archived).length} active quests`
                         : id === "finances"
                           ? `Outstanding debt ${formatCopper(f.loans.reduce((s, l) => s + l.principal + l.interest, 0))}`
                           : id === "financial"
@@ -98,7 +102,7 @@ export function FeatureCards({
               </p>
             </>
           )}
-          <FeatureLink feature={id as Feature}>{desktop ? x.title : `Open ${x.title}`}</FeatureLink>
+          <FeatureLink feature={id as Feature}>{desktop ? featureTitle(id as Feature, dm) : `Open ${featureTitle(id as Feature, dm)}`}</FeatureLink>
         </div>
       ))}
     </section>

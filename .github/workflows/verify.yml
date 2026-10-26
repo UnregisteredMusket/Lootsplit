@@ -327,6 +327,9 @@ jobs:
       - name: dev-map-controls
         if: matrix.group == 'world'
         run: node scripts/recovery-step.mjs dev-map-controls 240 node --experimental-strip-types scripts/map-controls-browser-audit.mjs
+      - name: dev-quest-log
+        if: matrix.group == 'world'
+        run: node scripts/recovery-step.mjs dev-quest-log 300 node scripts/quest-log-browser-audit.mjs
       - name: dev-journey-planner
         if: matrix.group == 'world'
         run: node scripts/recovery-step.mjs dev-journey-planner 240 node scripts/journey-planner-browser-audit.mjs
