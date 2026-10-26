@@ -254,6 +254,23 @@ export function sortInitiative(e) {
     combatants: [...e.combatants].sort((a, b) => (b.initiative ?? -1001) - (a.initiative ?? -1001)),
   };
 }
+/**
+ * The previous combatant's turn (map controls: DM Previous turn). Stepping back from the first
+ * combatant wraps to the last one and goes back a round (never below round 1).
+ * @param {z.infer<typeof encounterSchema>} e
+ */
+export function previousTurn(e) {
+  const order = e.combatants;
+  if (!order.length) return e;
+  const current = order.findIndex((c) => c.id === e.activeId);
+  if (current < 0) return { ...e, activeId: order[order.length - 1].id };
+  const previous = (current - 1 + order.length) % order.length;
+  return {
+    ...e,
+    activeId: order[previous].id,
+    round: current === 0 ? Math.max(1, e.round - 1) : e.round,
+  };
+}
 /** @param {z.infer<typeof encounterSchema>} e */
 export function nextTurn(e) {
   const order = e.combatants;
