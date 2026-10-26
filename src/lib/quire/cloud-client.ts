@@ -551,9 +551,7 @@ async function accept(value: RoomView, committed = false) {
           revision: remote.revision,
           userId: remote.userId,
           sessionId: remote.sessionId,
-          ...(conflict !== undefined
-            ? { conflictBatch: s.batchId, conflictMessage: conflict }
-            : {}),
+          ...(conflict !== undefined ? { conflictBatch: s.batchId, conflictMessage: conflict } : {}),
         }
       : undefined;
   if (s.role === "player")
@@ -900,12 +898,7 @@ export async function queueCommand(
     if (view.viewOnly && s.role === "player")
       throw Error("The session has ended. This room is view-only until the DM resumes play.");
     // Chat, treasure-pool claims and quest changes (which move nothing) are not bound to the turn.
-    if (
-      input.kind !== "message" &&
-      input.kind !== "loot-claim" &&
-      !input.kind.startsWith("quest-") &&
-      !view.mine
-    )
+    if (input.kind !== "message" && input.kind !== "loot-claim" && !input.kind.startsWith("quest-") && !view.mine)
       throw new Error(`It is ${view.who}'s turn.`);
     if (s.pending.length >= 100) throw new Error("Submit your pending actions before adding more.");
     // A caller-supplied ID identifies one user action across retries: an action
@@ -914,9 +907,7 @@ export async function queueCommand(
     const queued = s.pending.find((c) => c.id === command.id);
     if (queued) {
       if (!sameCommand(queued, command))
-        throw Error(
-          "This action ID was already used for a different action. Refresh before retrying.",
-        );
+        throw Error("This action ID was already used for a different action. Refresh before retrying.");
       return { status: "pending" };
     }
     const seasonalPlan =
@@ -1458,14 +1449,11 @@ export async function requestMapAssets(request: unknown) {
   return result;
 }
 
-export async function readSharedMapCombat(mapId: string) {
-  const expected = captureMutationScope(),
-    current = requireSession();
-  const { readMapCombatPresentation } = await import("./cloud-api");
-  const { mapCombatHudSchema } = await import("./map-combat-schema");
-  const result = await readMapCombatPresentation({
-    data: { code: current.code, token: current.token, mapId },
-  });
+export async function readSharedMapCombat(mapId:string) {
+  const expected=captureMutationScope(),current=requireSession();
+  const {readMapCombatPresentation}=await import("./cloud-api");
+  const {mapCombatHudSchema}=await import("./map-combat-schema");
+  const result=await readMapCombatPresentation({data:{code:current.code,token:current.token,mapId}});
   assertMutationScope(expected);
-  return result === null ? null : mapCombatHudSchema.parse(result);
+  return result===null?null:mapCombatHudSchema.parse(result);
 }
