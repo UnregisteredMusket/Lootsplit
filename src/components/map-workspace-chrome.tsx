@@ -256,7 +256,7 @@ export function MapWorkspaceChrome({
                       ]
                     : [
                         ["Home", "/?view=home"],
-                        ["Inventory", "/party"],
+                        ["Party & inventory", "/party"],
                         ["Campaign", "/share"],
                       ]),
                   ["Market", "/market"],

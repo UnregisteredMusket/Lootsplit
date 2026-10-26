@@ -76,7 +76,7 @@ export function screenName(href: string, dm: boolean) {
     (
       {
         "/maps": "Maps",
-        "/party": dm ? "Party" : "Inventory",
+        "/party": dm ? "Party" : "Party & inventory",
         "/market": "Market",
         "/share": "Campaign",
         "/settings": "Settings",

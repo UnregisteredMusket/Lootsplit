@@ -1,3 +1,10 @@
+# Treasure pool and Fairness polish, player screen name — October 25, 2026 (design plan P10, Q22)
+
+- **Party tabs:** short labels that never wrap (DM: Characters · Funds & inventory · Pool · Fairness; players: Inventory · Pool · Fairness). The pool's lot count sits inside the Pool tab; the tabs keep their full accessible names ("Treasure pool, N lots", "Inventory & purse").
+- **Treasure pool:** a lot nobody has claimed shows "No claims yet · N can claim", which opens to the names; lots with claims list everyone as before. **Claim all as Pass** marks Pass on every lot not yet marked: for a player's own characters, or for the character the DM chooses at a shared table. It is one `loot-claim` per lot, each with its own command ID, after a themed confirmation, and it moves nothing. Need / Greed / Pass keep their place as claims update: the status and "Changed …" lines are always present.
+- **Fairness:** when nothing has been handed out campaign to date, an empty state ("No loot handed out yet …", What counts?, still-undivided funds) replaces the rows of 0 cp.
+- **Glossary:** players see **Party & inventory** in the main nav, the map menu, Tabs & windows, split view and the page eyebrow; DMs keep **Party**. Player help now says "Party & inventory → Fairness / Pool".
+
 # Party inventory list — October 25, 2026 (design plan D3, P6)
 
 - **One list (Party → Funds & inventory).** Every visible holding appears once as a shared `RecordRow` (`src/components/record-row.tsx`: icon, name, holder · category, Equipped / In the pool / Stored / Reserved chips, quantity, value with the dollar line when that preference is on, notes, ⋯ menu). The second "Manage holdings & property" list with its always-open category boxes (saved on blur) is gone; its Category edit and Remove moved into the row menu. Group by holder (default, remembered per browser) or category, filter by holder, category and **Equipped**, search name and notes. Receipt links to `#holding-<id>` still land on the row (opening its stack and clearing filters). Two columns of rows at ≥1100 px.

@@ -201,7 +201,7 @@ export async function checkMapWorkspace(page, origin, output, width) {
   await expect(page.getByText("No accessible maps or places found.")).toBeVisible();
   await search.press("Escape");
   await page.getByRole("button", { name: "Map navigation menu", exact: true }).click();
-  for (const label of ["Home", "Inventory", "Campaign", "Market", "Library", "Maps"])
+  for (const label of ["Home", "Party & inventory", "Campaign", "Market", "Library", "Maps"])
     await expect(nav.getByRole("link", { name: label, exact: true })).toBeVisible();
   return [
     "direct-map-entry",

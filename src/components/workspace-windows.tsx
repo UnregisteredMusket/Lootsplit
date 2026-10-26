@@ -103,7 +103,7 @@ export function WorkspaceWindows() {
                   <option value="/maps">Maps</option>
                   {dm && <option value="/encounters">Encounters</option>}
                   <option value="/characters">Character sheet</option>
-                  <option value="/party">{dm ? "Party" : "Inventory"}</option>
+                  <option value="/party">{dm ? "Party" : "Party & inventory"}</option>
                   <option value="/market">Market</option>
                   <option value="/library">Library</option>
                   <option value="/share?tab=chat">Campaign chat</option>

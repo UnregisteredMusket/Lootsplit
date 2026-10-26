@@ -4632,3 +4632,7 @@ button.quest-chip { min-height: 44px; }
 :root[data-appearance="light"] .quest-box.dm-notes { background: #f1eefc; border-color: #6d63b8; }
 :root[data-appearance="light"] .quest-chronicle li.dm-only p { color: #3b3176; }
 :root[data-appearance="light"] .quest-mark.hidden-objective { border-color: #6d63b8; }
+/* Treasure pool polish (design plan P10, Q22). */
+.loot-claims-none > summary { cursor: pointer; list-style: revert; min-height: 2.75rem; display: list-item; padding-top: .7rem; }
+.loot-claims-none[open] > summary { margin-bottom: .35rem; }
+.loot-pass-all { display: flex; flex-wrap: wrap; gap: .5rem; margin-top: .6rem; }

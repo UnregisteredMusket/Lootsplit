@@ -3,15 +3,18 @@
 :root { --fair-behind: #f0a5a5; --fair-ahead: #9fc28a; --fair-track: #6f5c3d88; }
 :root[data-appearance="light"], :root[data-fantasy-theme="adventurers-ledger"] { --fair-behind: #8b263b; --fair-ahead: #3f5f2c; --fair-track: #bd987755; }
 
-/* Four Party tabs for the DM: one row on wide screens, two by two on phones. */
+/* Party tabs (design plan P10): short labels that never wrap; the pool's count sits inside its tab.
+ * Four DM tabs: one row on wide screens, two by two on phones. */
+.party-sections button { white-space: nowrap; }
+.party-sections button .loot-count { margin-left: 0; }
 .party-sections.is-four { max-width: 46rem; }
-.party-sections.is-four button { white-space: nowrap; padding: 0 .6rem; }
+.party-sections.is-four button { padding: 0 .6rem; }
 @media (max-width: 600px) {
   .party-sections.is-four { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); }
-  .party-sections.is-four button { white-space: normal; line-height: 1.15; }
 }
 @media (max-width: 430px) {
-  .party-sections.is-three button { white-space: normal; line-height: 1.15; font-size: .85rem; padding: 0 .3rem; }
+  .party-sections { width: 100%; }
+  .party-sections button { gap: .3rem; font-size: .85rem; padding: 0 .3rem; }
 }
 
 .fair-ledger { min-width: 0; }

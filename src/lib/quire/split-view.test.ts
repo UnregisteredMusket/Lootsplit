@@ -58,7 +58,7 @@ test("pane screens match Tabs & windows and hide DM-only screens from players", 
   assert.ok(!dm.includes("/features/finances"), "DMs keep the existing Tabs & windows exclusion");
   assert.deepEqual(
     paneScreens(false).filter((s) => s.group === "main").map((s) => s.title),
-    ["Home", "Character sheet", "Inventory", "Market", "Library", "Maps", "Campaign chat"],
+    ["Home", "Character sheet", "Party & inventory", "Market", "Library", "Maps", "Campaign chat"],
   );
   assert.equal(paneScreens(true)[0].title, "DM Desk");
 });

@@ -603,7 +603,8 @@ function navItems(dm: boolean, pathname: string, search: Record<string, unknown>
         },
         {
           to: "/party",
-          label: "Inventory",
+          // Glossary (design plan P10): players see "Party & inventory"; DMs keep "Party".
+          label: "Party & inventory",
           icon: "Inventory",
           active: pathname === "/party",
         },
