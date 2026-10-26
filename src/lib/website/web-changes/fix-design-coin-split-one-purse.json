@@ -1,0 +1,7 @@
+{
+  "title": "Readable \"One purse\" coin choice",
+  "summary": "When the DM awards encounter loot, the \"One purse\" coin option reads normally again instead of squeezing into a one-letter column.",
+  "items": [
+    "\"One purse\", its note and the recipient picker now sit in one readable column on phones and desktops."
+  ]
+}

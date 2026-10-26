@@ -134,8 +134,37 @@ try {
     assert.equal(await row.locator(".coin-split-lines li").count(), 4);
     await noOverflow(page, `activity ${width}`);
     await page.screenshot({ path: `test-results/coin-split/activity-${width}.png`, fullPage: true });
-    // Encounter award: Coins go to → Split evenly among, with the same preview, transferred once.
+    // Encounter award, One purse (design audit D1): the recipient picker stays in the text column,
+    // so "One purse" and its note keep a readable width instead of one letter per line.
     page.on("dialog", (d) => d.accept());
+    const onePurseId = await page.evaluate(async () => {
+      const { localEncounterRequest: call } = await import("/src/lib/encounters/local.ts");
+      const { blankEncounter, blankLoot } = await import("/src/lib/encounters/model.mjs");
+      const { id } = await call("encounters/create", { id: crypto.randomUUID() });
+      const e = blankEncounter();
+      e.name = "Toll bridge strongbox";
+      e.coins = { cp: 0, sp: 0, ep: 0, gp: 12, pp: 0 };
+      e.loot = [{ ...blankLoot(), name: "Iron key", purseId: "hoard" }];
+      await call("encounters/save", { id, revision: 0, encounter: e });
+      await call("encounters/conclude", { id, revision: 1 });
+      return id;
+    });
+    await openApplication(page, `${origin}/encounters?encounter=${encodeURIComponent(onePurseId)}&review=1`);
+    const onePurse = page.locator("label.coin-split-rule").filter({ hasText: "One purse" });
+    await onePurse.getByRole("combobox", { name: "Coin recipient" }).waitFor();
+    assert.equal(await onePurse.getByRole("radio").isChecked(), true);
+    const geometry = await onePurse.evaluate((el) => {
+      const box = (sel) => el.querySelector(sel).getBoundingClientRect();
+      return { title: box(":scope > span"), note: box(":scope > small"), picker: box(":scope > label") };
+    });
+    for (const [part, rect] of Object.entries(geometry)) {
+      assert.ok(rect.width > 150, `${width}: One purse ${part} is ${Math.round(rect.width)}px wide`);
+      assert.ok(rect.height < 120, `${width}: One purse ${part} is ${Math.round(rect.height)}px tall`);
+    }
+    assert.ok(geometry.note.top >= geometry.title.bottom - 1 && geometry.picker.top >= geometry.note.bottom - 1, `${width}: title, note and picker stack in one column`);
+    await noOverflow(page, `encounter one purse ${width}`);
+    await onePurse.screenshot({ path: `test-results/coin-split/encounter-one-purse-${width}.png` });
+    // Encounter award: Coins go to → Split evenly among, with the same preview, transferred once.
     const encounterId = await page.evaluate(async () => {
       const { localEncounterRequest: call } = await import("/src/lib/encounters/local.ts");
       const { blankEncounter, blankLoot } = await import("/src/lib/encounters/model.mjs");
