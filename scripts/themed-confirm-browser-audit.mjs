@@ -25,12 +25,63 @@ const noOverflow = async (page, label) =>
     false,
     `${label}: the page scrolls sideways`,
   );
-/** The open dialog is the topmost element at its centre (stacked above any other dialog). */
-const onTop = (dialog) =>
-  dialog.evaluate((el) => {
-    const box = el.getBoundingClientRect();
-    return el.contains(document.elementFromPoint(box.x + box.width / 2, box.y + 12));
-  });
+/** Both dialogs have finished their open animations and kept the same box for two frames. */
+const settled = (locator) =>
+  expect
+    .poll(
+      () =>
+        locator.evaluate(
+          (el) =>
+            new Promise((resolve) => {
+              const box = () => JSON.stringify(el.getBoundingClientRect());
+              const before = box();
+              const moving = el
+                .getAnimations({ subtree: true })
+                .some((a) => a.playState === "running" || a.playState === "pending");
+              requestAnimationFrame(() =>
+                requestAnimationFrame(() => resolve(!moving && box() === before)),
+              );
+            }),
+        ),
+      { timeout: 10000, message: "Dialog open animation settles" },
+    )
+    .toBe(true);
+/**
+ * The question is stacked above the other dialog: it paints above it in the stacking order
+ * (higher z-index, later in the document, and its overlay above the other dialog), and hit
+ * testing at its centre lands in it. Sampled until stable, because a busy runner can still be
+ * compositing the opening frame when the first sample is taken.
+ */
+const assertStackedAbove = async (page, top, below) => {
+  await settled(top);
+  await settled(below);
+  const order = await page.evaluate(
+    ([topEl, belowEl]) => {
+      const z = (el) => Number(getComputedStyle(el).zIndex) || 0;
+      const overlay = [...document.querySelectorAll(".modal-overlay")].at(-1);
+      return {
+        topZ: z(topEl),
+        belowZ: z(belowEl),
+        overlayZ: overlay ? z(overlay) : 0,
+        laterInDocument: !!(belowEl.compareDocumentPosition(topEl) & Node.DOCUMENT_POSITION_FOLLOWING),
+      };
+    },
+    [await top.elementHandle(), await below.elementHandle()],
+  );
+  assert.ok(order.topZ > order.belowZ, `Question z-index ${order.topZ} > dialog ${order.belowZ}`);
+  assert.ok(order.overlayZ > order.belowZ, "The question's overlay covers the dialog below");
+  assert.ok(order.laterInDocument, "The question is rendered after the dialog below");
+  await expect
+    .poll(
+      () =>
+        top.evaluate((el) => {
+          const box = el.getBoundingClientRect();
+          return el.contains(document.elementFromPoint(box.x + box.width / 2, box.y + box.height / 2));
+        }),
+      { timeout: 5000, message: "Hit testing at the question's centre lands in the question" },
+    )
+    .toBe(true);
+};
 
 try {
   for (const width of [1280, 390]) {
@@ -142,7 +193,13 @@ try {
     });
     await expect(discard).toHaveAttribute("data-tone", "discard");
     await expect(discard.getByRole("button", { name: "Keep editing", exact: true })).toBeFocused();
-    assert.ok(await onTop(discard), "The question sits above the Restock dialog");
+    // The question sits above the Restock dialog.
+    // (The Restock dialog is aria-hidden behind the question, so it is located by its element.)
+    await assertStackedAbove(
+      page,
+      discard,
+      page.locator(".modal-pop:not([data-themed-dialog])").filter({ hasText: /^Restock / }),
+    );
     await page.screenshot({ path: `${output}/discard-over-dialog-${width}.png` });
     // Escape answers only the question; the Restock dialog and its amount stay.
     await page.keyboard.press("Escape");
