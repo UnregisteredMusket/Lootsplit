@@ -1,0 +1,9 @@
+{
+  "title": "A shorter changelog",
+  "summary": "The Changelog opens on the two newest releases; older ones fold to one line each, with a list to jump to any version.",
+  "items": [
+    "The two newest releases (and the latest Android download) are shown in full.",
+    "Older releases show their date and summary line; open one to read every change.",
+    "\"Jump to an Android version\" and a dated list of website releases open the release you pick, and links to a release still work."
+  ]
+}

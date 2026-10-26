@@ -1,6 +1,6 @@
 import { Link } from "@tanstack/react-router";
 import { ArrowDownToLine, ArrowRight } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useEffect, useState, type ReactNode } from "react";
 import changelog from "@/lib/website/changelog.json";
 import { formatReleaseDate } from "@/lib/website/format";
 import release from "@/lib/website/release.json";
@@ -29,8 +29,6 @@ const entries: Entry[] = [
   ...publishedAndroid.map((entry) => ({ kind: "android" as const, entry })),
   ...publishedWebReleases(webReleases).map((entry) => ({ kind: "web" as const, entry })),
 ].sort((a, b) => b.entry.date.localeCompare(a.entry.date));
-
-const latestWebId = publishedWebReleases(webReleases)[0]?.id;
 
 const filters: [Filter, string][] = [
   ["all", "All releases"],
@@ -77,105 +75,206 @@ function ChangeLists({ entry }: { entry: AndroidEntry }) {
   );
 }
 
-function AndroidRelease({ entry, hidden }: { entry: AndroidEntry; hidden: boolean }) {
-  const latest = entry.version === release.version;
+/** The newest releases shown in full; older ones fold to their summary line (W-7). */
+const EXPANDED_RELEASES = 2;
+
+const entryId = (item: Entry) =>
+  item.kind === "android" ? `android-${item.entry.version}` : `web-${item.entry.id}`;
+
+type Shape = {
+  id: string;
+  hidden: boolean;
+  /** Folded to one summary line inside a disclosure. */
+  folded: boolean;
+  open: boolean;
+  onToggle: (open: boolean) => void;
+};
+
+/** One release: in full, or folded to its date, title and summary line. Every release keeps
+ * its `#android-x.y.z` / `#web-…` anchor on the article either way. */
+function ReleaseShell({
+  id,
+  hidden,
+  folded,
+  open,
+  onToggle,
+  date,
+  label,
+  tag,
+  title,
+  summary,
+  head,
+  card = false,
+  children,
+}: Shape & {
+  date: string;
+  label: string;
+  tag: ReactNode;
+  title: string;
+  summary: string;
+  head?: ReactNode;
+  card?: boolean;
+  children: ReactNode;
+}) {
+  const titleId = `${id}-title`;
+  if (folded)
+    return (
+      <article
+        className="ls-entry ls-entry-folded ls-release ls-anchor"
+        id={id}
+        hidden={hidden}
+        aria-labelledby={titleId}
+      >
+        <details
+          className="ls-fold"
+          open={open}
+          onToggle={(event) => onToggle(event.currentTarget.open)}
+        >
+          <summary>
+            <span className="ls-fold-meta">
+              <time dateTime={date}>{formatReleaseDate(date, "short")}</time>
+              <span className="ls-sc">{label}</span>
+            </span>
+            <span className="ls-fold-title">
+              <h2 id={titleId}>{title}</h2>
+              <span className="ls-fold-line">{summary}</span>
+            </span>
+          </summary>
+          <div className="ls-entry-body ls-fold-body">{children}</div>
+        </details>
+      </article>
+    );
   return (
-    <article
-      className="ls-entry ls-release ls-anchor"
-      id={`android-${entry.version}`}
-      hidden={hidden}
-      aria-labelledby={`android-${entry.version}-title`}
-    >
-      <DateMargin date={entry.date} label="Android" />
-      <div className={`ls-entry-body${latest ? " ls-card ls-card-raised" : ""}`}>
+    <article className="ls-entry ls-release ls-anchor" id={id} hidden={hidden} aria-labelledby={titleId}>
+      <DateMargin date={date} label={label} />
+      <div className={`ls-entry-body${card ? " ls-card ls-card-raised" : ""}`}>
         <div className="ls-entry-head">
           <div>
-            <p className="ls-sc ls-latest">
-              {latest ? "Latest Android release" : "Android release"}
-            </p>
-            <h2 id={`android-${entry.version}-title`}>Version {entry.version}</h2>
+            {tag}
+            <h2 id={titleId}>{title}</h2>
           </div>
-          {latest && (
-            <Link className="ls-btn ls-btn-ink" to="/downloads">
-              Get version {entry.version} <ArrowDownToLine size={17} aria-hidden="true" />
-            </Link>
-          )}
+          {head}
         </div>
-        <p className="ls-entry-summary">{entry.summary}</p>
-        {latest ? (
-          <ChangeLists entry={entry} />
-        ) : (
-          <details className="ls-entry-details">
-            <summary>Show changes in {entry.version}</summary>
-            <ChangeLists entry={entry} />
-          </details>
-        )}
-        {!latest && (
-          <p className="ls-fine">
-            <a
-              href={`https://github.com/UnregisteredMusket/Lootsplit/releases/tag/android-v${entry.version}`}
-            >
-              View this release on GitHub ↗
-            </a>
-          </p>
-        )}
+        <p className="ls-entry-summary">{summary}</p>
+        {children}
       </div>
     </article>
   );
 }
 
-function WebReleaseEntry({ entry, hidden }: { entry: WebRelease; hidden: boolean }) {
-  const lists = (
-    <ul className="ls-plain-list">
-      {entry.improvements.map((item) => (
-        <li key={item}>{item}</li>
-      ))}
-    </ul>
-  );
+function AndroidRelease({ entry, ...shape }: Shape & { entry: AndroidEntry }) {
+  const latest = entry.version === release.version;
   return (
-    <article
-      className="ls-entry ls-release ls-anchor"
-      id={`web-${entry.id}`}
-      hidden={hidden}
-      aria-labelledby={`web-${entry.id}-title`}
+    <ReleaseShell
+      {...shape}
+      date={entry.date}
+      label="Android"
+      tag={<p className="ls-sc ls-latest">{latest ? "Latest Android release" : "Android release"}</p>}
+      title={`Version ${entry.version}`}
+      summary={entry.summary}
+      card={latest}
+      head={
+        latest && (
+          <Link className="ls-btn ls-btn-ink" to="/downloads">
+            Get version {entry.version} <ArrowDownToLine size={17} aria-hidden="true" />
+          </Link>
+        )
+      }
     >
-      <DateMargin date={entry.date} label="Website and backend" />
-      <div className="ls-entry-body">
-        <p className="ls-sc ls-web-tag">Published web & backend</p>
-        <h2 id={`web-${entry.id}-title`}>{entry.title}</h2>
-        <p className="ls-entry-summary">{entry.summary}</p>
-        {entry.id === latestWebId ? (
-          lists
-        ) : (
-          <details className="ls-entry-details">
-            <summary>Show changes</summary>
-            {lists}
-          </details>
-        )}
+      <ChangeLists entry={entry} />
+      {!latest && (
         <p className="ls-fine">
-          Published source:{" "}
-          <a href={`https://github.com/UnregisteredMusket/Lootsplit/commit/${entry.commit}`}>
-            <code>{entry.commit.slice(0, 12)}</code>
+          <a
+            href={`https://github.com/UnregisteredMusket/Lootsplit/releases/tag/android-v${entry.version}`}
+          >
+            View this release on GitHub ↗
           </a>
-          {entry.evidence.map((item) => (
-            <span key={item.url}>
-              {" · "}
-              <a href={item.url}>{item.label}</a>
-            </span>
-          ))}
         </p>
-      </div>
-    </article>
+      )}
+    </ReleaseShell>
+  );
+}
+
+function WebReleaseEntry({ entry, ...shape }: Shape & { entry: WebRelease }) {
+  return (
+    <ReleaseShell
+      {...shape}
+      date={entry.date}
+      label="Website and backend"
+      tag={<p className="ls-sc ls-web-tag">Published web & backend</p>}
+      title={entry.title}
+      summary={entry.summary}
+    >
+      <ul className="ls-plain-list">
+        {entry.improvements.map((item) => (
+          <li key={item}>{item}</li>
+        ))}
+      </ul>
+      <p className="ls-fine">
+        Published source:{" "}
+        <a href={`https://github.com/UnregisteredMusket/Lootsplit/commit/${entry.commit}`}>
+          <code>{entry.commit.slice(0, 12)}</code>
+        </a>
+        {entry.evidence.map((item) => (
+          <span key={item.url}>
+            {" · "}
+            <a href={item.url}>{item.label}</a>
+          </span>
+        ))}
+      </p>
+    </ReleaseShell>
+  );
+}
+
+/** Version jump list: every Android version, and web releases by date (W-7). */
+function JumpList() {
+  const web = entries.filter((item) => item.kind === "web");
+  return (
+    <nav className="ls-jump" aria-label="Jump to a release">
+      <p className="ls-sc">Jump to an Android version</p>
+      <ul className="ls-jump-list">
+        {publishedAndroid.map((entry) => (
+          <li key={entry.version}>
+            <a href={`#android-${entry.version}`}>{entry.version}</a>
+          </li>
+        ))}
+      </ul>
+      <details className="ls-jump-web">
+        <summary>Website and backend releases by date ({web.length})</summary>
+        <ul>
+          {web.map((item) => (
+            <li key={entryId(item)}>
+              <a href={`#${entryId(item)}`}>
+                {formatReleaseDate(item.entry.date, "short")} ·{" "}
+                {item.kind === "web" ? item.entry.title : ""}
+              </a>
+            </li>
+          ))}
+        </ul>
+      </details>
+    </nav>
   );
 }
 
 export function UpdatesPage() {
   const [filter, setFilter] = useState<Filter>("all");
+  // Folded releases opened by the visitor or by a link to their anchor.
+  const [opened, setOpened] = useState<ReadonlySet<string>>(() => new Set());
+  const toggle = (id: string, open: boolean) =>
+    setOpened((prev) => {
+      if (prev.has(id) === open) return prev;
+      const next = new Set(prev);
+      if (open) next.add(id);
+      else next.delete(id);
+      return next;
+    });
   useEffect(() => {
     const apply = () => {
       const next = filterFromHash(window.location.hash);
       if (!next) return;
       setFilter(next);
+      // Opening a release's anchor expands it.
+      toggle(window.location.hash.slice(1), true);
       // The target may have been hidden by an earlier filter; scroll once it shows.
       requestAnimationFrame(() =>
         document.getElementById(window.location.hash.slice(1))?.scrollIntoView(),
@@ -186,6 +285,21 @@ export function UpdatesPage() {
     return () => window.removeEventListener("hashchange", apply);
   }, []);
   const shown = entries.filter((item) => filter === "all" || item.kind === filter);
+  // The newest releases in the current filter, and the latest Android download, stay in full.
+  const expanded = new Set([
+    ...shown.slice(0, EXPANDED_RELEASES).map(entryId),
+    ...(filter === "web" ? [] : [`android-${release.version}`]),
+  ]);
+  const shape = (item: Entry) => {
+    const id = entryId(item);
+    return {
+      id,
+      hidden: !shown.includes(item),
+      folded: !expanded.has(id),
+      open: opened.has(id),
+      onToggle: (open: boolean) => toggle(id, open),
+    };
+  };
   return (
     <Website footer="ink">
       <PageHero kicker="From the Lootsplitter ledger" title="Changelog">
@@ -220,6 +334,7 @@ export function UpdatesPage() {
               </button>
             ))}
           </div>
+          <JumpList />
           <p className="ls-fine ls-filter-status" role="status">
             Showing {shown.length} of {entries.length} releases
           </p>
@@ -227,17 +342,9 @@ export function UpdatesPage() {
           <span id="web-backend" className="ls-anchor" />
           {entries.map((item) =>
             item.kind === "android" ? (
-              <AndroidRelease
-                key={`android-${item.entry.version}`}
-                entry={item.entry}
-                hidden={filter === "web"}
-              />
+              <AndroidRelease key={entryId(item)} entry={item.entry} {...shape(item)} />
             ) : (
-              <WebReleaseEntry
-                key={`web-${item.entry.id}`}
-                entry={item.entry}
-                hidden={filter === "android"}
-              />
+              <WebReleaseEntry key={entryId(item)} entry={item.entry} {...shape(item)} />
             ),
           )}
           <div className="ls-entries-end">
